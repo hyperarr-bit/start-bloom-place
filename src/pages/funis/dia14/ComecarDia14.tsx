@@ -20,9 +20,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
-  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL,
+  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL, PORTA_TUDO,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
+import { ehFunilRoi2 } from "@/lib/funil-roi2";
+import { buscarProvaSocial } from "@/lib/prova-social";
+import { Faixa, Grade16, LinhaInclusos } from "./pecas-roi2";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -162,12 +165,67 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
 /** Porta do criativo "vida inteira": o vídeo vendeu a casa, a porta faz a
  *  pessoa escolher um cômodo — amplitude vira especificidade em 1 toque. */
 export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
-  const options: Array<{ area: AreaKey; emoji: string; label: string }> = [
-    ...DOOR_AREAS.map((key) => ({ area: key, emoji: AREAS[key].emoji, label: AREAS[key].label })),
+  const options: Array<{ area: AreaKey; emoji: string; label: string; sub: string }> = [
+    ...DOOR_AREAS.map((key) => ({ area: key, emoji: AREAS[key].emoji, label: AREAS[key].label, sub: AREAS[key].sub })),
     // "Tudo" não é uma trilha — é pedido de priorização. Começa pelo que
     // custa mais caro (dinheiro), e a central mostra o resto junto.
-    { area: "dinheiro" as AreaKey, emoji: "😵", label: "Tudo, sinceramente" },
+    { area: "dinheiro" as AreaKey, ...PORTA_TUDO },
   ];
+  /* FUNIL ROI 2 (27/09, ver src/lib/funil-roi2.ts). A porta de 19/09 dizia
+   * "Qual área tá mais fora de controle hoje?" — lê como "escolha UMA área",
+   * e 62% escolhem uma. Agora a 1ª frase responde a dúvida antes de ela
+   * nascer ("todos vêm juntos… só me diz por onde a gente começa"), cada
+   * opção diz o que tem dentro, e o selo das lojas entra no topo. SEM preço
+   * (ordem do dono, 23/08) e "Entrar" vira linha discreta. */
+  if (ehFunilRoi2()) {
+    return (
+      <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto" data-testid="porta-roi2">
+        <div className="grid grid-cols-8 gap-1.5 mb-3 px-1 opacity-90" aria-hidden>
+          {ALL_MODULE_ICONS.map((m) => (
+            <span key={m.label} className="grid place-items-center aspect-square rounded-lg bg-secondary text-[14px]">
+              {m.emoji}
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-1.5 flex-wrap mb-3.5">
+          <span className="inline-flex items-center rounded-full bg-accent/10 text-accent text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">16 módulos · 1 pagamento</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-secondary text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">📱 App Store · Google Play</span>
+        </div>
+        <h1 className="text-[clamp(27px,7.5vw,38px)] font-extrabold leading-[1.06] tracking-tight mb-2 text-center">
+          Sua vida inteira,<br />num app só.
+        </h1>
+        <p className="text-[15px] text-muted-foreground text-center leading-snug mb-4">
+          São 16 módulos e <strong className="text-foreground font-semibold">todos vêm juntos</strong> no mesmo acesso. Só me diz por onde a gente começa:
+        </p>
+
+        <div className="space-y-2">
+          {options.map((o) => (
+            <button
+              key={o.label}
+              onClick={() => onPickArea(o.area, o.label)}
+              className="group w-full flex items-center gap-3 rounded-2xl border-2 border-border bg-card px-3 py-2.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+            >
+              <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{o.emoji}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-semibold text-[15px] leading-tight">{o.label}</span>
+                <span className="block text-[11.5px] text-muted-foreground leading-tight mt-0.5">{o.sub}</span>
+              </span>
+              <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <p className="text-[11.5px] text-muted-foreground mt-3.5 text-center leading-snug">
+          🔒 Leva 60 s · sem cadastro · <strong className="text-foreground font-semibold">os 16 módulos vêm em qualquer escolha</strong>
+        </p>
+        <p className="text-[12px] text-muted-foreground mt-2 text-center">
+          Já tem conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
       {/* Prova visual da amplitude: os 16 módulos como pano de fundo, sem virar menu */}
@@ -310,6 +368,7 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
 
 export function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
   const a = AREAS[area];
+  const roi2 = ehFunilRoi2();
   const items = answers.vitoria
     ? [answers.vitoria, ...AREA_RESULT_ITEMS[area].filter((r) => r !== answers.vitoria)].slice(0, 4)
     : AREA_RESULT_ITEMS[area].slice(0, 4);
@@ -320,11 +379,20 @@ export function RadarResultScreen({ answers, area, onDone }: { answers: Record<s
       <LifeRadar area={area} />
       <Card className="p-3.5 text-left mb-4 border-destructive/30 bg-destructive/[0.04]">
         <p className="text-[13.5px] leading-snug">
-          <strong>Seu ponto de partida: {a.nome}.</strong> Foi o que você disse que mais dói — é por onde seu plano começa.
+          {/* ROI 2 (27/09): "…é por onde seu plano começa" era a frase que a
+              cliente do Instagram repetiu ("que vc prioriza no início e não
+              todas"). Agora o card diz que os outros 15 JÁ vêm ligados. */}
+          {roi2 ? (
+            <><strong>Seu começo: {a.nome}.</strong> Foi o que mais dói, então o plano abre por aí. <strong>Os outros 15 módulos já vêm ligados</strong> — você abre quando quiser.</>
+          ) : (
+            <><strong>Seu ponto de partida: {a.nome}.</strong> Foi o que você disse que mais dói — é por onde seu plano começa.</>
+          )}
         </p>
       </Card>
       <Card className="p-4 text-left space-y-3 mb-7">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Com o CORE, você vai</div>
+        {roi2
+          ? <Faixa>Com o CORE, você vai</Faixa>
+          : <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Com o CORE, você vai</div>}
         {items.map((r, i) => (
           <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 + i * 0.08 }}
             className="flex items-start gap-2.5 text-[14px]">
@@ -347,6 +415,26 @@ export function RadarResultScreen({ answers, area, onDone }: { answers: Record<s
  *  tela — trailer, não mapa. A demo continua guiada (5 módulos do vídeo). */
 export function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
   const a = AREAS[area];
+  /* ROI 2 (27/09): "o resto entra no seu ritmo" lia como "o resto vem
+   * depois", e só o tile escolhido tinha marca — os outros 15 eram lisos. Agora
+   * TODOS os 16 têm ✓ verde (incluso), "COMEÇA AQUI" só no escolhido, e a
+   * frase é "tudo isso é seu, de uma vez". */
+  if (ehFunilRoi2()) {
+    return (
+      <div className="w-full max-w-sm mx-auto text-center" data-testid="central-roi2">
+        <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Sua central tá pronta</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed mb-5">
+          <strong className="text-foreground">Tudo isso é seu, de uma vez</strong> — 16 módulos no mesmo acesso. {a.nome} em destaque porque é por onde você começa.
+        </p>
+        <div className="mb-3 pt-1"><Grade16 area={area} animar /></div>
+        <div className="mb-6"><LinhaInclusos>Os 16 inclusos · nada é cobrado à parte · pagamento único</LinhaInclusos></div>
+        <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "central_open", area }); onOpen(); }}>
+          Abrir minha central <ArrowRight className="w-4 h-4" />
+        </Button>
+        <p className="text-xs text-muted-foreground mt-3">Explore à vontade — dados de exemplo</p>
+      </div>
+    );
+  }
   // Só o módulo da área tem anel "começa aqui" (bate com a copy). Os outros
   // 15 são cards sólidos — NADA apagado, senão o lead acha que estão bloqueados.
   const startLabel: Record<string, string> = { financas: "Finanças", rotina: "Rotina", treino: "Treino", saude: "Saúde", desenvolvimento: "Metas" };
@@ -490,7 +578,7 @@ export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string, comEc
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, pilula }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -510,6 +598,10 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
    *  Número à vista vira contrato — a pessoa calcula quanto falta e desiste
    *  no meio. A barra sozinha dá a mesma noção de avanço sem dar o boleto. */
   semContador?: boolean;
+  /** Funil ROI 2 (27/09): pílula persistente na barra ("16 módulos · começo:
+   *  Dinheiro") — a pessoa lê o tempo todo que escolheu o COMEÇO, não o
+   *  produto. Entra no lugar do contador (barra sem número, regra de 31/08). */
+  pilula?: string;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -555,7 +647,11 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
           <motion.div className="h-full bg-accent rounded-full" initial={false}
             animate={{ width: `${((idx + 1 + counterBase) / (items.length + counterBase)) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        {!semContador && <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>}
+        {pilula ? (
+          <span data-testid="quiz-pilula" className="shrink-0 rounded-full bg-accent/10 text-accent text-[10px] font-bold px-2.5 py-1 whitespace-nowrap">{pilula}</span>
+        ) : (
+          !semContador && <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -787,8 +883,17 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
   );
 }
 
-function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
+function SignupScreen({ onSession, onConfirm, area }: { onSession: () => void; onConfirm: (email: string) => void; area?: AreaKey | null }) {
   const { signUp, signIn } = useAuth();
+  /* FUNIL ROI 2 (27/09): cadastro de DOIS campos (e-mail + senha). O nome sai
+   * porque nada depende dele: `signUp` já aceita nome vazio (o metadado
+   * full_name só entra quando existe), o perfil nasce sem nome pelo trigger de
+   * qualquer jeito, e todo leitor de "user-name" tem fallback (prefixo do
+   * e-mail, "Cliente CORE" no Pix, saudação sem nome no e-mail). Google já
+   * cadastrava sem esse campo. O título passa a dizer o VALOR da conta ("é com
+   * esse e-mail que você entra no app do celular") e o formulário vem em cima,
+   * com o Google como link discreto — 30% viam 3 campos e não tocavam em nada. */
+  const roi2 = ehFunilRoi2();
   const { set: setUserData } = useUserData();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -804,7 +909,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // nunca voltaram do e-mail). O link mágico corta a senha do caminho:
   // um clique no e-mail e a pessoa volta LOGADA direto na oferta.
   const [magicSent, setMagicSent] = useState(false);
-  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
+  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || roi2 || !!name.trim());
   // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
   // botão nesse ambiente e vai direto pro e-mail — igual o Auth.tsx já faz.
@@ -815,24 +920,27 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
    * registra a variante, o 1º toque em cada campo e o que estava preenchido
    * quando a pessoa saiu (beacon no pagehide). */
   const [variante] = useState(varianteCadastro);
-  const emailPrimeiro = inApp || variante === "email_primeiro";
+  // ROI 2: formulário em cima pra todo mundo; o rótulo nos eventos vira
+  // "roi2" pra ninguém ler o A/B antigo como se ainda estivesse rodando.
+  const emailPrimeiro = inApp || roi2 || variante === "email_primeiro";
+  const varianteTela = roi2 ? "roi2" : variante;
   const tocouRef = useRef<Set<string>>(new Set());
   const estadoRef = useRef({ name: "", email: "", password: "", t0: Date.now(), saiu: false });
   estadoRef.current.name = name; estadoRef.current.email = email; estadoRef.current.password = password;
   const tocou = (campo: string) => {
     if (tocouRef.current.has(campo)) return;
     tocouRef.current.add(campo);
-    trackEvent("funnel_click", { cta: "signup_campo", campo, variante, inapp: inApp });
+    trackEvent("funnel_click", { cta: "signup_campo", campo, variante: varianteTela, inapp: inApp });
   };
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
-    trackEvent("funnel_view", { step: "signup_tela", variante, inapp: inApp });
+    trackEvent("funnel_view", { step: "signup_tela", variante: varianteTela, inapp: inApp });
     const saiu = () => {
       const e = estadoRef.current;
       if (e.saiu) return;
       e.saiu = true;
       trackEventBeacon("funnel_view", {
-        step: "signup_saiu", variante, inapp: inApp,
+        step: "signup_saiu", variante: varianteTela, inapp: inApp,
         nome: !!e.name.trim(), email: /\S+@\S+\.\S+/.test(e.email), senha: e.password.length >= 6,
         campos_tocados: [...tocouRef.current].join(","), segundos: Math.round((Date.now() - e.t0) / 1000),
       });
@@ -850,7 +958,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     if (loading || googleLoading) return;
     setErr(null);
     setGoogleLoading(true);
-    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp, variante });
+    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp, variante: varianteTela });
     // O VALOR é o caminho do funil (17/08): o AuthCallback usa pra voltar pro
     // funil CERTO — antes voltava fixo pro /comecar, o funil velho.
     try { localStorage.setItem(FUNNEL_OAUTH_KEY, window.location.pathname); } catch { /* noop */ }
@@ -919,9 +1027,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       return;
     }
 
-    trackEvent("funnel_click", { cta: "signup_submit", variante, inapp: inApp });
+    trackEvent("funnel_click", { cta: "signup_submit", variante: varianteTela, inapp: inApp });
     estadoRef.current.saiu = true; // enviou: não conta como "saiu"
-    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
+    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim() || undefined);
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
       // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
@@ -948,7 +1056,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       setLoading(false);
       return;
     }
-    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
+    try { if (name.trim()) setUserData("user-name", name.trim()); } catch { /* noop */ }
     /*
      * TUTORIAL PRA QUEM ESCOLHEU QUALQUER ÁREA (05/08) — mesma correção do
      * funil do app (ver ComecarRadar). A marca era gravada só pra "dinheiro",
@@ -974,15 +1082,29 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
   return (
     <div className="w-full max-w-sm mx-auto">
-      <div className="text-center mb-7">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
-          <Sparkles className="w-3.5 h-3.5" /> Último passo
+      {roi2 ? (
+        <div className="text-center mb-6" data-testid="cadastro-roi2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5" /> Último passo antes do acesso
+          </div>
+          <h2 className="text-[26px] font-bold tracking-tight leading-tight">
+            Salva seu plano<br />em 10 segundos
+          </h2>
+          <p className="text-muted-foreground text-[15px] leading-snug mt-2">
+            É com esse e-mail que você entra no <strong className="text-foreground font-semibold">app do celular</strong> e em qualquer aparelho.
+          </p>
         </div>
-        <h2 className="text-[26px] font-bold tracking-tight leading-tight">
-          Só falta 1 passo pra você<br />começar a usar o CORE.
-        </h2>
-        <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
-      </div>
+      ) : (
+        <div className="text-center mb-7">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5" /> Último passo
+          </div>
+          <h2 className="text-[26px] font-bold tracking-tight leading-tight">
+            Só falta 1 passo pra você<br />começar a usar o CORE.
+          </h2>
+          <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
+        </div>
+      )}
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
           o OAuth trava, então nem mostra — e-mail vira o único caminho. */}
@@ -998,19 +1120,19 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
             <div className="flex-1 h-px bg-border" />
           </div>
         </>
-      ) : (
+      ) : roi2 ? null : (
         <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4" data-testid="signup-email-primeiro">
           Crie sua conta com e-mail e senha — leva 10 segundos.
         </p>
       )}
 
       <form onSubmit={submit} className="space-y-3">
-        <Input placeholder="Seu nome" value={name} onFocus={() => tocou("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+        {!roi2 && <Input placeholder="Seu nome" value={name} onFocus={() => tocou("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />}
         <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={() => tocou("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
         <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={() => tocou("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : roi2 ? <>Salvar e ver meu acesso <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
         {existingAccount && !magicSent && (
           <>
@@ -1033,6 +1155,11 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
           </p>
         )}
       </form>
+      {roi2 && (
+        <p className="text-[11.5px] text-muted-foreground text-center mt-3 leading-snug">
+          🔒 Sem cartão agora · sem mensalidade · <strong className="text-foreground font-semibold">16 módulos inclusos</strong>
+        </p>
+      )}
       {/* variante "e-mail primeiro" fora do navegador embutido: o Google continua
           existindo, como link discreto — some onde o OAuth trava (webview). */}
       {emailPrimeiro && !inApp && (
@@ -1040,7 +1167,16 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
           {googleLoading ? "Abrindo o Google…" : "ou continuar com Google"}
         </button>
       )}
-      <div className="mt-5"><TrustRow /></div>
+      {roi2 ? (
+        /* Endowment: o plano que a pessoa acabou de montar fica guardado NESTA
+           conta — e é por aqui que ela volta se o Instagram matar a aba. */
+        <div className="mt-6 rounded-2xl bg-secondary/80 p-3.5 text-[12px] leading-snug text-muted-foreground text-left" data-testid="cadastro-plano-guardado">
+          Seu plano de <strong className="text-foreground">{area ? AREAS[area].nome : "Dinheiro"} + 15 módulos</strong> fica guardado nessa conta.{" "}
+          {inApp ? "Se fechar o Instagram, é por aqui que você volta." : "Se fechar a aba, é por aqui que você volta."}
+        </div>
+      ) : (
+        <div className="mt-5"><TrustRow /></div>
+      )}
     </div>
   );
 }
@@ -1093,9 +1229,55 @@ export default function ComecarDia14() {
   const trackItems = vitrine && area && area !== "dinheiro"
     ? buildQuizItems(track, "consistencia")
     : QUIZ_ITEMS;
+  const roi2 = ehFunilRoi2();
+  /* ROI 2 (27/09): "Preparando o módulo de X" era a 1ª vez que o funil
+   * falava em "módulo" — e falava de UM. Agora liga os 16 e destaca o começo. */
   const vidaPrepSteps = area
-    ? ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
+    ? roi2
+      ? ["Analisando suas respostas", "Ligando os 16 módulos", `Destacando ${AREAS[area].nome}, seu ponto de partida`, "Finalizando seu plano personalizado"]
+      : ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
     : PREP_STEPS;
+
+  /* PORTA_SAIDA (27/09, medição — não é A/B). 69% das sessões pagas de iPhone
+   * tinham 1 evento e sumiam, e não dava pra separar "saiu em 2 s" de "leu e
+   * saiu". Quem entra pela porta ganha UM beacon na despedida da página (aba
+   * escondida ou fechada), com: quantos segundos ficou na porta (até tocar
+   * numa área ou até sair), se tocou, e em que tela estava ao sair. Beacon,
+   * não insert: quem sai não espera a resposta. `tela:"central"` + fechou =
+   * foi pra demo (a demo é outra página), não abandono. Só quando a sessão
+   * NASCEU na porta — volta da demo (?step=signup) e do Google (?step=offer)
+   * não contam. */
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const portaRef = useRef({ t0: Date.now(), tocou: false, tocouEm: 0, enviado: false, valendo: step === "start" && vitrine, visivel0: typeof document !== "undefined" ? document.visibilityState === "visible" : true });
+  useEffect(() => {
+    const p = portaRef.current;
+    if (!p.valendo) return;
+    const sair = (motivo: string) => {
+      if (p.enviado) return;
+      p.enviado = true;
+      const fim = p.tocou ? p.tocouEm : Date.now();
+      trackEventBeacon("funnel_view", {
+        step: "porta_saida", porta: "vida", motivo, segundos: Math.round((fim - p.t0) / 1000),
+        tocou: p.tocou, tela: stepRef.current, visivel_no_inicio: p.visivel0, roi2,
+      });
+    };
+    const aoEsconder = () => { if (document.visibilityState === "hidden") sair("escondeu"); };
+    const aoFechar = () => sair("fechou");
+    document.addEventListener("visibilitychange", aoEsconder);
+    window.addEventListener("pagehide", aoFechar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoEsconder);
+      window.removeEventListener("pagehide", aoFechar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Prova social viva do paywall: busca já no cadastro (cache em memória),
+  // pra o número estar na tela junto com a oferta. Falhou → texto fixo.
+  useEffect(() => {
+    if (roi2 && (step === "signup" || step === "offer")) void buscarProvaSocial();
+  }, [step, roi2]);
 
   // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
   // qual campanha/origem trouxe cada sessão.
@@ -1142,6 +1324,8 @@ export default function ComecarDia14() {
             {step === "start" && (vitrine ? (
               <VitrineStartScreen
                 onPickArea={(picked, label) => {
+                  portaRef.current.tocou = true;
+                  portaRef.current.tocouEm = Date.now();
                   setArea(picked);
                   const first = { area: picked };
                   setAnswers(first);
@@ -1172,6 +1356,7 @@ export default function ComecarDia14() {
                 items={trackItems}
                 skipFirstAnswered={!vitrine}
                 proofArea={vitrine && area ? area : undefined}
+                pilula={roi2 && vitrine && area ? `16 módulos · começo: ${AREAS[area].nome}` : undefined}
                 initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {
@@ -1196,6 +1381,7 @@ export default function ComecarDia14() {
             )}
             {step === "signup" && (
               <SignupScreen
+                area={vitrine ? area : null}
                 onSession={() => setStep("offer")}
                 onConfirm={(e) => { setConfirmEmail(e); setStep("confirm"); }}
               />

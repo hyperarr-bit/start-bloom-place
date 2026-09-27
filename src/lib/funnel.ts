@@ -29,18 +29,25 @@ export type AreaKey = "dinheiro" | "rotina" | "corpo" | "saude" | "metas";
 export const AREAS: Record<AreaKey, {
   emoji: string;
   label: string;        // opção na porta
+  /** Legenda sob a opção na porta (27/09, funil ROI 2): o que tem dentro —
+   *  a porta vira vitrine, não formulário. */
+  sub: string;
   nome: string;         // nome curto ("Rotina") usado em copy
   module: string;       // módulo do app que a demo/1ª sessão abre
   color: string;        // acento visual (radar/central)
 }> = {
-  dinheiro: { emoji: "💰", label: "Meu dinheiro", nome: "Dinheiro", module: "financas", color: "hsl(45 85% 45%)" },
-  rotina: { emoji: "📅", label: "Minha rotina", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
-  corpo: { emoji: "💪", label: "Treino e dieta", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
-  saude: { emoji: "❤️", label: "Minha saúde", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
+  dinheiro: { emoji: "💰", label: "Meu dinheiro", sub: "gastos, contas, metas", nome: "Dinheiro", module: "financas", color: "hsl(45 85% 45%)" },
+  rotina: { emoji: "📅", label: "Minha rotina", sub: "hábitos, semana, tarefas", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
+  corpo: { emoji: "💪", label: "Treino e dieta", sub: "plano, cargas, cardápio", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
+  saude: { emoji: "❤️", label: "Minha saúde", sub: "água, sono, vitaminas", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
   // Metas + desenvolvimento pessoal juntos (mesmo módulo). A dor lidera o
   // rótulo ("metas"); "evolução pessoal" é a identidade do criativo.
-  metas: { emoji: "🎯", label: "Metas e evolução pessoal", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
+  metas: { emoji: "🎯", label: "Metas e evolução pessoal", sub: "plano, linha do tempo, diário", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
 };
+
+/** A 5ª opção da porta: "Tudo" não é trilha, é pedido de priorização (cai
+ *  em dinheiro). A legenda diz isso sem prometer que "o resto vem depois". */
+export const PORTA_TUDO = { emoji: "😵", label: "Tudo, sinceramente", sub: "a gente começa pelo que mais dói" } as const;
 
 /**
  * Área do funil → chave do TUTORIAL (05/08). Não dá pra reaproveitar

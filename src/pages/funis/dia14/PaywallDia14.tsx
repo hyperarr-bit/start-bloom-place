@@ -4,8 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, X, ShieldCheck, Gift,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
-  CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
+  CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid, Smartphone, Zap, MessageCircle,
 } from "lucide-react";
+import { ehFunilRoi2 } from "@/lib/funil-roi2";
+import { useProvaSocial, formatarPessoas, type ProvaSocial } from "@/lib/prova-social";
+import { Faixa, Grade16, PostIt, SERIF_ITALICO } from "./pecas-roi2";
 import { Button } from "@/components/ui/button";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
@@ -277,23 +280,34 @@ const TIMELINE = [
   { Icon: ShieldCheck, title: "Até o dia 7", sub: "Não curtiu? Reembolso de 100% em 1 mensagem. Sem perguntas." },
   { Icon: MessageCircleHeart, title: "Do dia 8 em diante", sub: "Você só continua se estiver funcionando pra você." },
 ];
+/* ROI 2 (27/09): a mesma linha do tempo, dizendo "os 16" e "não paga mais nada". */
+const TIMELINE_ROI2 = [
+  { Icon: Unlock, title: "Hoje", sub: "Acesso total, na hora. Os 16 módulos, sem limite." },
+  { Icon: ShieldCheck, title: "Até o dia 7", sub: "Não curtiu? Reembolso de 100% em 1 mensagem." },
+  { Icon: MessageCircleHeart, title: "Do dia 8 em diante", sub: "Você só continua se estiver funcionando pra você. E não paga mais nada." },
+];
 
-function GuaranteeTimeline() {
+function GuaranteeTimeline({ roi2 = false }: { roi2?: boolean }) {
+  const linhas = roi2 ? TIMELINE_ROI2 : TIMELINE;
   return (
     <div className="rounded-2xl border border-border bg-card p-4 text-left">
-      <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
-        Risco zero, de verdade
-      </div>
+      {roi2 ? (
+        <Faixa cor="azul" className="mb-3">Risco zero, de verdade</Faixa>
+      ) : (
+        <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
+          Risco zero, de verdade
+        </div>
+      )}
       <div className="space-y-0">
-        {TIMELINE.map((t, i) => (
+        {linhas.map((t, i) => (
           <motion.div key={t.title} {...stagger(6 + i)} className="flex gap-3">
             <div className="flex flex-col items-center">
               <span className={`grid place-items-center w-8 h-8 rounded-full shrink-0 ${i === 1 ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
                 <t.Icon className="w-4 h-4" />
               </span>
-              {i < TIMELINE.length - 1 && <span className="w-0.5 flex-1 min-h-4 bg-accent/20 my-1" />}
+              {i < linhas.length - 1 && <span className="w-0.5 flex-1 min-h-4 bg-accent/20 my-1" />}
             </div>
-            <div className={i < TIMELINE.length - 1 ? "pb-4" : ""}>
+            <div className={i < linhas.length - 1 ? "pb-4" : ""}>
               <div className="text-[13.5px] font-bold leading-tight mt-1.5">{t.title}</div>
               <div className="text-[12px] text-muted-foreground leading-snug mt-0.5">{t.sub}</div>
             </div>
@@ -456,20 +470,27 @@ const MURAL_EXTRA_TODAS: Depo[] = [DEPO.rebeca, DEPO.natalia, DEPO.paulo, DEPO.s
  *  10/08: +1000, medido no banco antes de subir (1.058 assinaturas, 920 delas
  *  compra Pix na web), arredondado PRA BAIXO. Número dinâmico pequeno
  *  desconverte (dono, 29/07). Se mexer aqui, mexe nas outras três telas. */
-function LaurelProva() {
+/** `prova` (27/09, ROI 2): o número VIVO da edge function prova-social — quem
+ *  já comprou o acesso vitalício pela web, contado no banco. Sem ele (falhou,
+ *  0, abaixo do piso) fica o texto fixo de sempre. Ver src/lib/prova-social.ts. */
+function LaurelProva({ prova = null }: { prova?: ProvaSocial | null }) {
   return (
-    <motion.div {...stagger(1)} className="flex items-center justify-center gap-2 mb-5 text-[12.5px]">
+    <motion.div {...stagger(1)} className="flex items-center justify-center gap-2 mb-5 text-[12.5px]" data-testid="laurel">
       <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span>
       {/* 10/08 (dono): +500 → +1000. Conferido no banco antes de escrever —
           1.058 assinaturas, 920 delas compra Pix na web. Se o patamar mudar,
           este número muda junto; número inflado aqui é o tipo de coisa que a
           pessoa checa. */}
-      <span className="text-muted-foreground"><strong className="text-foreground font-bold">+1000 pessoas</strong> aprovaram o CORE</span>
+      {prova ? (
+        <span className="text-muted-foreground"><strong className="text-foreground font-bold">{formatarPessoas(prova.total)} pessoas</strong> já garantiram o acesso vitalício</span>
+      ) : (
+        <span className="text-muted-foreground"><strong className="text-foreground font-bold">+1000 pessoas</strong> aprovaram o CORE</span>
+      )}
     </motion.div>
   );
 }
 
-function DepoCard({ d, neutra = false }: { d: Depo; neutra?: boolean }) {
+function DepoCard({ d, neutra = false, semChip = false }: { d: Depo; neutra?: boolean; semChip?: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 text-left">
       <div className="flex items-center gap-2.5">
@@ -486,7 +507,7 @@ function DepoCard({ d, neutra = false }: { d: Depo; neutra?: boolean }) {
           <div className="text-[11px] text-muted-foreground leading-tight">{neutra ? "avaliação de usuário" : "Avaliação na Google Play"} · {d.meta}</div>
         </div>
       </div>
-      {d.chip && (
+      {d.chip && !semChip && (
         <div className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold px-2.5 py-1 mt-2.5">
           <TrendingUp className="w-3 h-3" /> {d.chip}
         </div>
@@ -505,20 +526,27 @@ function DepoCard({ d, neutra = false }: { d: Depo; neutra?: boolean }) {
  * depoimento elogiando "pagamento único" (real, da Sabrina) contradiz a tela
  * e a Apple lê isso como promessa. Não editamos avaliação de ninguém: só não
  * mostramos essa lá. Web e Android seguem com todas. */
-export function MuralDepoimentos({ area, semLoja = false, soAssinatura = false }: { area: AreaKey; semLoja?: boolean; soAssinatura?: boolean }) {
+/* `roi2` (27/09): o mural vira um card com faixa de seção (planner) e sem os
+ * chips de resumo — só o texto que a pessoa escreveu na loja, como na prancha
+ * aprovada. As avaliações são as MESMAS: reais, verbatim, sem nota nem
+ * quantidade (veto de 03/09). */
+export function MuralDepoimentos({ area, semLoja = false, soAssinatura = false, roi2 = false }: { area: AreaKey; semLoja?: boolean; soAssinatura?: boolean; roi2?: boolean }) {
   const [aberto, setAberto] = useState(false);
   const neutra = semLoja || ehApple();
   const cabe = (d: Depo) => !soAssinatura || !/pagamento único|vitalíc|pra sempre|uma vez só/i.test(d.texto);
   const daArea = MURAL_POR_AREA[area].filter(cabe);
   const extras = MURAL_EXTRA_TODAS.filter((d) => !MURAL_POR_AREA[area].includes(d)).filter(cabe);
+  const titulo = neutra ? "O que dizem quem já usa" : "O que dizem na Google Play";
   return (
-    <div className="text-left">
-      <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">
-        {neutra ? "O que dizem quem já usa" : "O que dizem na Google Play"}
-      </div>
-      <div className="space-y-3">
-        {daArea.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
-        {aberto && extras.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
+    <div className={roi2 ? "text-left rounded-2xl border border-border bg-card p-4" : "text-left"} data-testid="mural">
+      {roi2 ? (
+        <Faixa cor="amarelo" className="mb-3">{titulo}</Faixa>
+      ) : (
+        <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">{titulo}</div>
+      )}
+      <div className={roi2 ? "space-y-2.5" : "space-y-3"}>
+        {daArea.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} semChip={roi2} />)}
+        {aberto && extras.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} semChip={roi2} />)}
       </div>
       {!aberto && (
         <button
@@ -626,7 +654,9 @@ function FragmentRow({ row, Mark }: { row: (typeof COMPARE_ROWS)[number]; Mark: 
 
 /** Card único do VITALÍCIO: a estrela visual da oferta — borda gradiente,
  *  glow e preço grande centralizado (padrão dos paywalls mobile premium). */
-function LifetimeCard() {
+/* `roi2` (27/09): a frase que mata a dúvida nº 1 dos comentários do anúncio
+ * ("mensal ou taxa única?"), dita com todas as letras, dentro do card do preço. */
+function LifetimeCard({ roi2 = false }: { roi2?: boolean }) {
   return (
     <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
       <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center">
@@ -645,12 +675,181 @@ function LifetimeCard() {
           </span>
         </div>
         <div className="relative text-[12px] font-semibold text-muted-foreground mt-1.5">pagamento único no Pix</div>
+        {roi2 && (
+          <div className="relative text-[12.5px] leading-snug mt-2.5" data-testid="nao-e-mensal">
+            <strong>Não é mensal, não é anual.</strong> Nenhuma cobrança depois — nunca.
+          </div>
+        )}
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Garantia 7 dias"].map((c) => (
             <span key={c} className="rounded-full bg-secondary px-1 py-1.5 text-[10px] font-bold leading-tight">
               {c}
             </span>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------- blocos do funil ROI 2 */
+
+/** "O que você leva": os 16 com ✓ em TODAS as trilhas, o escolhido marcado
+ *  "começa aqui". Até 27/09 a trilha de dinheiro (83% das sessões) via só a
+ *  comparação com planilha — e pagava o Pix a 38%, contra 60% de quem
+ *  escolhia "Tudo" no mesmo paywall. */
+function LevaCard({ area }: { area: AreaKey }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 text-left" data-testid="leva-16">
+      <Faixa>O que você leva</Faixa>
+      <div className="mt-4"><Grade16 area={area} compacta /></div>
+      <p className="text-[12.5px] leading-snug mt-3">
+        <strong>Você escolheu por onde começar.</strong> Leva os 16 — no mesmo pagamento, sem nada cobrado à parte.
+      </p>
+    </div>
+  );
+}
+
+/** "É confiável?": SÓ fatos verificáveis — o app está nas duas lojas, a
+ *  liberação é automática (webhook + check), o suporte existe (chamado no app
+ *  e suporte@coreaplicativo.com.br) e a garantia de 7 dias é honrada (a linha
+ *  do tempo e o legal do CTA já a prometiam). Nada de nota, quantidade de
+ *  avaliações ou depoimento inventado. */
+const FATOS_CONFIAVEL = [
+  { Icon: Smartphone, titulo: "É o mesmo app das lojas.", sub: "Publicado na App Store e no Google Play — entra com o e-mail da compra." },
+  { Icon: Zap, titulo: "Pix confirmado = acesso na hora.", sub: "Liberação automática, sem esperar ninguém." },
+  { Icon: MessageCircle, titulo: "Suporte dentro do app e por e-mail.", sub: "suporte@coreaplicativo.com.br — gente de verdade respondendo." },
+];
+
+function ConfiavelCard() {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 text-left" data-testid="confiavel">
+      <Faixa cor="verde">É confiável?</Faixa>
+      <div className="mt-3 space-y-3">
+        {FATOS_CONFIAVEL.map((f) => (
+          <div key={f.titulo} className="flex items-start gap-2.5">
+            <span className="grid place-items-center w-8 h-8 rounded-[10px] bg-secondary shrink-0">
+              <f.Icon className="w-4 h-4 text-foreground/80" />
+            </span>
+            <div className="text-[13px] leading-snug">
+              <strong>{f.titulo}</strong><br />
+              <span className="text-muted-foreground">{f.sub}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <PostIt className="mt-5 mx-1 mb-1">
+        <strong>Garantia de 7 dias.</strong> Não curtiu? Manda 1 mensagem e o valor volta. Sem perguntas.
+      </PostIt>
+    </div>
+  );
+}
+
+/**
+ * PAYWALL DO FUNIL ROI 2 (27/09, prancha aprovada pelo dono). Ordem
+ * (benchmark Cal AI / Finch / Duolingo): promessa + prova viva → "O que você
+ * leva" (os 16, em todas as trilhas) → âncora pessoal → preço com "não é
+ * mensal, não é anual" → "É confiável?" → 3 avaliações reais → linha do tempo
+ * da garantia → selos. CTA responde o que acontece / quanto custa / o que a
+ * pessoa se compromete: "Liberar os 16 módulos — R$ 27,90 no Pix".
+ * O que SAIU em relação ao paywall de 19/09: o gráfico de transformação, o
+ * value stack de 4 tiles e a comparação com planilha — o paywall de finanças
+ * reforçava a comparação com app de banco em vez de vender a casa inteira.
+ * Rollback = FUNIL_ROI2 = false (volta o OfferScreen abaixo, intocado).
+ */
+function OfferScreenRoi2({
+  context, answers, onBuy, onEscape,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; onEscape: () => void }) {
+  const [showClose, setShowClose] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowClose(true), 1800);
+    return () => clearTimeout(t);
+  }, []);
+  const area: AreaKey = answers?.area && answers.area in AREAS ? (answers.area as AreaKey) : "dinheiro";
+  const AREA_VICTORY_FALLBACK: Record<AreaKey, string> = {
+    dinheiro: "ver pra onde seu dinheiro vai",
+    rotina: "organizar sua rotina",
+    corpo: "cuidar do seu corpo com constância",
+    saude: "cuidar da sua saúde todo dia",
+    metas: "tirar suas metas do papel",
+  };
+  const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
+  const prova = useProvaSocial();
+
+  return (
+    <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10" data-testid="paywall-roi2">
+      <AnimatePresence>
+        {showClose && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            onClick={onEscape}
+            aria-label="Fechar"
+            className="fixed top-3 right-3 z-[80] grid place-items-center w-9 h-9 rounded-full bg-black/[0.06] text-muted-foreground/70 hover:text-foreground transition-colors"
+          >
+            <X className="w-[18px] h-[18px]" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 220, damping: 15 }}
+        className="w-14 h-14 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-4 shadow-[0_8px_28px_-6px_hsl(var(--accent)/0.55)]"
+      >
+        <Check className="w-7 h-7" strokeWidth={3} />
+      </motion.div>
+      <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
+        Seu plano pra<br />
+        {/* Instrument Serif itálica só aqui — editorial, como nas Conquistas. */}
+        <span className="text-accent text-[33px] leading-[1.05] inline-block" style={SERIF_ITALICO}>{victory}</span><br />
+        está pronto
+      </motion.h1>
+      <motion.p {...stagger(1)} className="text-muted-foreground text-sm leading-relaxed mb-3">
+        Você já viu como funciona. Agora é com os seus números de verdade.
+      </motion.p>
+
+      <LaurelProva prova={prova} />
+
+      <div className="space-y-3">
+        <motion.div {...stagger(2)}><LevaCard area={area} /></motion.div>
+        <motion.div {...stagger(3)}>
+          {area === "dinheiro"
+            ? <AnchorCard gasto={answers?.gasto ?? ""} precoTitulo={<>CORE completo,<br />pra enxergar tudo</>} />
+            : <AreaAnchorCard area={area} />}
+        </motion.div>
+        <motion.div {...stagger(4)}><LifetimeCard roi2 /></motion.div>
+        <motion.div {...stagger(5)}><ConfiavelCard /></motion.div>
+        <motion.div {...stagger(6)}><MuralDepoimentos area={area} roi2 /></motion.div>
+        <motion.div {...stagger(7)}><GuaranteeTimeline roi2 /></motion.div>
+        <motion.div {...stagger(8)}><TrustChips /></motion.div>
+      </div>
+
+      {/* CTA sticky */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white via-white/95 to-transparent pt-8"
+        style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="max-w-sm mx-auto px-5">
+          <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
+            {/* 14px abaixo de 390 px de largura: a 16px o texto estourava o
+                botão no Android de 360 px (o "L" de Liberar ficava cortado). */}
+            <Button
+              size="lg"
+              className="w-full h-14 rounded-full px-3 text-[14px] min-[390px]:text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy)}
+            >
+              Liberar os 16 módulos — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4 shrink-0" />
+            </Button>
+          </motion.div>
+          <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+            <span>
+              Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} · sem mensalidade · garantia de 7 dias
+            </span>
+          </p>
         </div>
       </div>
     </div>
@@ -1029,8 +1228,10 @@ export function PaywallDia14({
     adiantadoRef.current = a;
     return () => { a.parar(); adiantadoRef.current = null; };
   }, []);
+  // Despedida do paywall (paywall_saida, abaixo): o toque no CTA fica marcado aqui.
+  const saidaRef = useRef({ t0: Date.now(), rolou: 0, tocou: false, enviado: false });
   // Toque em pagar: avisa o adiantado ANTES de o checkout abrir.
-  const abrirPix = (o: PixOffer) => { adiantadoRef.current?.tocou(); setPixOffer(o); };
+  const abrirPix = (o: PixOffer) => { adiantadoRef.current?.tocou(); saidaRef.current.tocou = true; setPixOffer(o); };
 
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).
@@ -1039,13 +1240,54 @@ export function PaywallDia14({
     try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
   });
 
+  // Funil ROI 2 (27/09): congelado no mount, como o braço — a tela não troca
+  // de cara no meio. Rollback = FUNIL_ROI2 em src/lib/funil-roi2.ts.
+  const [roi2] = useState<boolean>(() => ehFunilRoi2());
+
   useEffect(() => {
     const name = context === "funnel" ? "funnel_view" : "paywall_view";
     // paywall_ab vai junto pra dar pra separar os dois braços na leitura do dia.
     trackEvent(name, context === "funnel"
-      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco }
-      : { phase: `v2_${phase}`, paywall_ab: braco });
-  }, [phase, context, braco]);
+      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco, roi2 }
+      : { phase: `v2_${phase}`, paywall_ab: braco, roi2 });
+  }, [phase, context, braco, roi2]);
+
+  /* PAYWALL_SAIDA (27/09, medição — copiado do PaywallW, com beacon): 72% de
+   * quem vê o paywall não toca em pagar e não dava pra saber se saía no topo
+   * ou lá embaixo. Na despedida (aba escondida, fechada ou tela trocada) sai
+   * UM evento com quanto tempo ficou, até onde rolou (% da página) e se tocou
+   * no CTA. Só na web (no binário da loja não existe este paywall). */
+  useEffect(() => {
+    if (nativoNoMount.current) return;
+    const s = saidaRef.current;
+    const medir = () => {
+      const alt = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = alt > 0 ? Math.min(100, Math.round((window.scrollY / alt) * 100)) : 100;
+      if (pct > s.rolou) s.rolou = pct;
+    };
+    const sair = (motivo: string) => {
+      if (s.enviado) return;
+      s.enviado = true;
+      const a = quiz?.area && quiz.area in AREAS ? quiz.area : "dinheiro";
+      trackEventBeacon("funnel_view", {
+        step: "paywall_saida", context, motivo, segundos: Math.round((Date.now() - s.t0) / 1000),
+        rolou_pct: s.rolou, tocou_cta: s.tocou, area: a, paywall_ab: braco, roi2,
+      });
+    };
+    const aoEsconder = () => { if (document.visibilityState === "hidden") sair("escondeu"); };
+    const aoFechar = () => sair("fechou");
+    window.addEventListener("scroll", medir, { passive: true });
+    document.addEventListener("visibilitychange", aoEsconder);
+    window.addEventListener("pagehide", aoFechar);
+    medir();
+    return () => {
+      window.removeEventListener("scroll", medir);
+      document.removeEventListener("visibilitychange", aoEsconder);
+      window.removeEventListener("pagehide", aoFechar);
+      sair("trocou_tela");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fade = {
     initial: { opacity: 0, y: 16 },
@@ -1062,7 +1304,20 @@ export function PaywallDia14({
       <div className="px-5">
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
-            {phase === "offer" && (
+            {phase === "offer" && (roi2 ? (
+              <OfferScreenRoi2
+                context={context}
+                answers={quiz}
+                onBuy={abrirPix}
+                onEscape={() => {
+                  if (abrirResgate("x")) return;
+                  trackEvent("funnel_click", { cta: "paywall_escape", context });
+                  if (context !== "funnel") return;
+                  const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
+                  navigate(`/${AREAS[a].module}`);
+                }}
+              />
+            ) : (
               <OfferScreen
                 context={context}
                 answers={quiz}
@@ -1079,7 +1334,7 @@ export function PaywallDia14({
                   navigate(`/${AREAS[a].module}`);
                 }}
               />
-            )}
+            ))}
             {phase === "roleta" && (
               <div className="min-h-dvh flex items-center justify-center">
                 <RoletaComTelemetria context={context} onDone={() => setPhase("premio")} />

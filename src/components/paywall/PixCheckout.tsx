@@ -9,6 +9,7 @@ import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analyt
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
 import { isInAppBrowser } from "@/lib/funnel";
+import { ehFunilRoi2 } from "@/lib/funil-roi2";
 import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
@@ -61,6 +62,15 @@ export const PIX_PRICES: Record<PixOffer, string> = {
 export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
   lifetime: true, downsell: true, w97: true, w25: false, w47: true, w27: true,
 };
+
+/** Linha do recibo (27/09, funil ROI 2 — só COPY): a dúvida "mensal ou taxa
+ *  única?" nasce nos comentários do anúncio e chegava até o QR sem resposta
+ *  literal. Vitalício passa a dizer "pagamento único (não renova)"; o mês
+ *  pré-pago continua "30 dias de acesso". Rollback = FUNIL_ROI2 = false. */
+export const linhaRecibo = (offer: PixOffer): string =>
+  OFERTA_VITALICIA[offer]
+    ? (ehFunilRoi2() ? "16 módulos · acesso vitalício · pagamento único (não renova)" : "16 módulos · acesso vitalício")
+    : "16 módulos · 30 dias de acesso";
 
 interface Props {
   offer: PixOffer;
@@ -1086,6 +1096,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   };
 
   const enterApp = () => { window.location.href = "/"; };
+  // Funil ROI 2 (27/09): só muda TEXTO (título do QR, recibo, "pronto") e só
+  // pro vitalício — a lógica do Pix é a mesma. Ver src/lib/funil-roi2.ts.
+  const roi2Vitalicio = OFERTA_VITALICIA[offer] && ehFunilRoi2();
 
   const mm = secondsLeft != null ? String(Math.floor(secondsLeft / 60)).padStart(2, "0") : null;
   const ss = secondsLeft != null ? String(secondsLeft % 60).padStart(2, "0") : null;
@@ -1121,7 +1134,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     </span>
                     <div>
                       <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{linhaRecibo(offer)}</div>
                     </div>
                   </div>
                   <div className="text-xl font-extrabold text-accent leading-none shrink-0">R$ {price}</div>
@@ -1208,7 +1221,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     </span>
                     <div>
                       <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{linhaRecibo(offer)}</div>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -1295,7 +1308,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                       </span>
                       <div>
                         <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{linhaRecibo(offer)}</div>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -1397,7 +1410,18 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                 <>
                   {/* HIERARQUIA INVERTIDA — o botão é o dinheiro (75% de
                       conversão em quem copia); o QR serve ~5% e vira opção. */}
-                  <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
+                  {roi2Vitalicio ? (
+                    <>
+                      <h2 className="text-[22px] font-bold tracking-tight mb-1">Seu Pix de R$ {fmtBRL(pix.amount)} tá pronto</h2>
+                      {/* Recibo ACIMA da dobra: quem não copia sai em 7–8 s e
+                          precisa ler o que está pagando antes disso. */}
+                      <p className="text-[12px] font-semibold text-foreground/85 leading-snug mb-1" data-testid="pix-recibo-qr">
+                        CORE completo · 16 módulos · acesso vitalício · pagamento único (não renova)
+                      </p>
+                    </>
+                  ) : (
+                    <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
+                  )}
                   <p className="text-[13px] text-muted-foreground mb-2.5">
                     Copia o código, cola no app do banco e o acesso libera <strong className="text-foreground">sozinho nesta tela</strong>.
                   </p>
@@ -1574,11 +1598,23 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               >
                 <Check className="w-10 h-10" strokeWidth={3} />
               </motion.div>
-              <h2 className="text-2xl font-bold tracking-tight mb-2">Pagamento confirmado 🎉</h2>
-              <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">
-                O CORE agora é <strong className="text-foreground">seu pra sempre</strong> — todos os módulos,
-                sem mensalidade, nunca.
-              </p>
+              {roi2Vitalicio ? (
+                <>
+                  <h2 className="text-2xl font-bold tracking-tight mb-2">Pronto! Os 16 módulos<br />estão liberados.</h2>
+                  <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">
+                    Pagamento único confirmado — <strong className="text-foreground">nenhuma cobrança depois</strong>.
+                    O CORE também é app de celular: entra com o mesmo e-mail.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold tracking-tight mb-2">Pagamento confirmado 🎉</h2>
+                  <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">
+                    O CORE agora é <strong className="text-foreground">seu pra sempre</strong> — todos os módulos,
+                    sem mensalidade, nunca.
+                  </p>
+                </>
+              )}
               <Button
                 size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
                 onClick={v2?.onConfirmado ?? enterApp}

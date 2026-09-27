@@ -1,745 +1,538 @@
-import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, animate } from "framer-motion";
-import { X, Share2, Loader2 } from "lucide-react";
-import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
-import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeSavingsRate } from "@/lib/finance-totals";
-import { trackEvent } from "@/lib/analytics";
-import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
-import { useTheme } from "@/hooks/use-theme";
-import { barraClaraEnquantoMontado } from "@/lib/status-bar";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Instagram } from "lucide-react";
 import { toast } from "sonner";
-import { renderWrappedImage } from "./wrapped-share";
-// só o TIPO: `retrospectiva.ts` importa o builder daqui, então um import de
-// valor fecharia o ciclo. `import type` some no build e não fecha nada.
-import type { RetroMes } from "@/lib/retrospectiva";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { UserDataContext } from "@/hooks/use-user-data";
+import {
+  conteudoDoCard, fatoDaCurta, mesAnterior, mesSeguinte, opcoesDeFoco, type ConteudoDoCard, type RetroMes,
+} from "@/lib/retrospectiva";
+import { compartilharCard } from "./wrapped-share";
+import { ALTURA_MINIMA, Camada, LARGURA_DA_PRANCHETA, PranchetaCtx, useMedidas, type Prancheta } from "./prancheta";
+import { TopoEBarras } from "./moldura";
+import { FolhaDeTema } from "./FolhaDeTema";
+import { CardPlanner, StoryPlanner } from "./CardPlanner";
+import { CardRevista, PELE_EDICAO, StoryRevista } from "./tema-edicao";
+import { CardRecortes, PELE_RECORTES, StoryRecortes } from "./tema-recortes";
+import { PELE_PAGINAS } from "./tema-paginas";
+import { CHAVE_DO_TEMA, ROTULO_DO_ESTILO, TEMA_PADRAO, estiloDoTema, lerTema, type EstiloDoCard, type TemaDaRetro } from "./temas";
+import type { Base, PaginaPronta, Pele, PeleDoCard } from "./pele";
+
+// (26/09) O construtor e os tipos do bloco de finanças moram em
+// lib/retrospectiva (a parte pura inteira mora lá); reexportados aqui pra quem
+// já importava deste arquivo — os testes da virada e da varredura.
+export { buildWrappedData } from "@/lib/retrospectiva";
+export type { WrappedData, EgoMoment } from "@/lib/retrospectiva";
 
 /**
- * Retrospectiva do mês — "Spotify Wrapped" das finanças.
- * Stories em tela cheia: tap na direita avança, esquerda volta, barras de
- * progresso no topo. Um slide de EGO condicional: se o mês foi bom, infla
- * (comparação honesta, número grande, ouro); se foi ruim, mostra a realidade
- * sem dourar — com o corte mais óbvio na mesa.
+ * A RETROSPECTIVA DO MÊS — o motor (26/09, sistema de temas aprovado pelo
+ * dono: o "papel pontilhado" saiu, entraram 3 peles desenhadas pelo designer).
+ *
+ * Este arquivo decide QUAIS páginas existem e com que dado — a lógica não
+ * mudou: capa → meu mês → dinheiro → corpo → como você estava → card → foco;
+ * pouco dado = capa curta, 1 fato de verdade e o fecho. O TEMA (pele.ts)
+ * só desenha cada página: "Páginas de dentro" (padrão), "Edição de
+ * setembro" (revista) e "Recortes" (scrapbook). A escolha fica em
+ * `retro-tema` (user_data) e se troca pelo chip "Tema" da capa e da tela do
+ * card, numa folha com as 3 capas em miniatura.
+ *
+ * Regras que ficam de todas as rodadas: sem renda não existe saldo; R$ só na
+ * página de dinheiro, e só se a pessoa tocar pra ver; nada de "rombo",
+ * "faltou" nem perfil negativo; o que a pessoa escreve nunca vai pro card.
+ * O card final é o do planner em todos os temas (na revista e nos recortes,
+ * o card do tema é a opção "Estilo do card").
+ *
+ * Stories: toque à direita avança, à esquerda volta, SEGURAR pausa; as
+ * páginas de leitura andam sozinhas, as que pedem ação (card, foco) esperam.
+ * Tudo é desenhado numa prancheta de 430 unidades (a do designer) escalada
+ * pra largura do aparelho — ver prancheta.tsx.
  */
 
-const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const PELES: Record<TemaDaRetro, Pele> = { paginas: PELE_PAGINAS, edicao: PELE_EDICAO, recortes: PELE_RECORTES };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  alimentacao: "Alimentação", restaurante: "Restaurante", mercado: "Mercado",
-  transporte: "Transporte", combustivel: "Combustível", lazer: "Lazer",
-  saude: "Saúde", farmacia: "Farmácia", vestuario: "Vestuário",
-  educacao: "Educação", eletronicos: "Eletrônicos", delivery: "Delivery",
-  presente: "Presentes", pets: "Pets", moradia: "Moradia",
-  contas_casa: "Contas da Casa", plano_saude: "Plano de Saúde",
-  assinaturas: "Assinaturas", internet_telefone: "Internet/Telefone",
-  academia: "Academia", beleza: "Beleza", outros: "Outros",
+/** ms até a página virar sozinha (null = espera a pessoa). */
+const AUTO: Record<string, number | null> = {
+  capa: 7000, "meu-mes": 9000, dinheiro: 10000, corpo: 9000, humor: 10000, fato: 8000, card: null, foco: null, fecho: null,
 };
+/** As páginas que contam como "chegou ao fim" no wrapped_fechou. */
+const TELAS_FINAIS = new Set(["card", "fecho"]);
+/** Mais que isso segurando é "pausar", não "tocar". */
+const TOQUE_MAXIMO_MS = 350;
 
-const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+interface Medidas { w: number; h: number; topo: number; base: number }
 
-export type EgoMoment =
-  | { kind: "saver"; rate: number; saved: number }
-  | { kind: "raise"; pct: number; prevMonth: string }
-  | { kind: "cutter"; pct: number; prevMonth: string }
-  | { kind: "modest"; saved: number }
-  | { kind: "reality"; deficit: number; cut: { label: string; value: number } | null };
-
-export interface WrappedData {
-  month: string;
-  income: number;
-  outflow: number;
-  balance: number;
-  savingsRate: number;
-  topCategories: { label: string; value: number }[];
-  biggestExpense: { description: string; value: number; day: string } | null;
-  pixPct: number;
-  txCount: number;
-  ego: EgoMoment;
-}
-
-/** Lê o bloco de FINANÇAS do mês. Null se o mês não tem lançamento nenhum. */
-export const buildWrappedData = (month: string, userId: string | null, ano?: number): WrappedData | null => {
-  const totals = getMonthTotals(month, userId, ano);
-  const keys = getFinanceStorageKeys(month, ano);
-  const perfil = perfilAtivoLocal(userId);
-  const expenses: any[] = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
-  const fixed: any[] = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
-
-  const income = totals.receitas;
-  const outflow = totals.custosFixos + totals.custosVariaveis;
-  if (income <= 0 && outflow <= 0) return null;
-
-  const all = [...expenses, ...fixed];
-  const byCategory: Record<string, number> = {};
-  for (const e of all) {
-    const cat = e.category || "outros";
-    byCategory[cat] = (byCategory[cat] || 0) + (e.value || 0);
-  }
-  const topCategories = Object.entries(byCategory)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([cat, value]) => ({ label: CATEGORY_LABELS[cat] || cat, value }));
-
-  const biggest = [...expenses].sort((a, b) => (b.value || 0) - (a.value || 0))[0];
-  const biggestExpense = biggest
-    ? {
-        description: biggest.description || CATEGORY_LABELS[biggest.category] || "Gasto",
-        value: biggest.value || 0,
-        day: biggest.date ? new Date(`${biggest.date}T12:00:00`).getDate().toString() : "",
-      }
-    : null;
-
-  const paid = all.filter((e) => e.paymentMethod);
-  const pixPct = paid.length > 0
-    ? Math.round((paid.filter((e) => e.paymentMethod === "pix").length / paid.length) * 100)
-    : 0;
-
-  const savingsRate = computeSavingsRate(income, outflow);
-  const balance = income - outflow;
-
-  // ---- comparação com o mês anterior (pro momento de ego) ----
-  // O ano tem que acompanhar a virada: em Janeiro o "anterior" é Dezembro do
-  // ANO PASSADO, e sem isso a comparação lia um mês que não existe.
-  const idxAtual = MONTHS.indexOf(month);
-  const prevMonth = MONTHS[(idxAtual + 11) % 12];
-  const anoBase = ano ?? new Date().getFullYear();
-  const prev = getMonthTotals(prevMonth, userId, idxAtual === 0 ? anoBase - 1 : anoBase);
-  const prevOutflow = prev.custosFixos + prev.custosVariaveis;
-  const incomeUpPct = prev.receitas > 0 ? ((income - prev.receitas) / prev.receitas) * 100 : 0;
-  const spentDownPct = prevOutflow > 0 ? ((prevOutflow - outflow) / prevOutflow) * 100 : 0;
-
-  // ---- momento de ego: só infla se mereceu; senão, realidade na mesa ----
-  let ego: EgoMoment;
-  if (balance < 0) {
-    // Corte sugerido: maior categoria VARIÁVEL (fixo não dá pra cortar amanhã)
-    const varByCat: Record<string, number> = {};
-    for (const e of expenses) {
-      const cat = e.category || "outros";
-      varByCat[cat] = (varByCat[cat] || 0) + (e.value || 0);
-    }
-    const topVar = Object.entries(varByCat).sort((a, b) => b[1] - a[1])[0];
-    ego = {
-      kind: "reality",
-      deficit: Math.abs(balance),
-      cut: topVar ? { label: CATEGORY_LABELS[topVar[0]] || topVar[0], value: topVar[1] } : null,
-    };
-  } else if (savingsRate >= 20) {
-    ego = { kind: "saver", rate: savingsRate, saved: balance };
-  } else if (incomeUpPct >= 10) {
-    ego = { kind: "raise", pct: incomeUpPct, prevMonth };
-  } else if (spentDownPct >= 10) {
-    ego = { kind: "cutter", pct: spentDownPct, prevMonth };
-  } else {
-    ego = { kind: "modest", saved: balance };
-  }
-
-  return {
-    month, income, outflow, balance, savingsRate,
-    topCategories, biggestExpense, pixPct,
-    txCount: all.length,
-    ego,
-  };
+/** Tamanho da tela e as áreas seguras (notch, barra de gestos). */
+const medir = (raiz: HTMLElement | null, sonda: HTMLElement | null): Medidas => {
+  const w = raiz?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 430) || 430;
+  const h = raiz?.clientHeight || (typeof window !== "undefined" ? window.innerHeight : 932) || 932;
+  const cs = sonda ? getComputedStyle(sonda) : null;
+  return { w, h, topo: parseFloat(cs?.paddingTop || "0") || 0, base: parseFloat(cs?.paddingBottom || "0") || 0 };
 };
-
-/* ------------------------------------------------------------ primitivas */
-
-/** Número que "conta" até o valor — o momento-assinatura dos wrappeds. */
-const CountUp = ({ to, render, delay = 0.3, duration = 1.1 }: {
-  to: number;
-  render: (v: number) => string;
-  delay?: number;
-  duration?: number;
-}) => {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    const controls = animate(0, to, { delay, duration, ease: [0.16, 1, 0.3, 1], onUpdate: setV });
-    return () => controls.stop();
-  }, [to, delay, duration]);
-  return <>{render(v)}</>;
-};
-
-/** Blobs desfocados flutuando no fundo — profundidade sem custo de layout. */
-const Blobs = ({ a, b }: { a: string; b: string }) => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-    <motion.div
-      className="absolute w-[420px] h-[420px] rounded-full blur-3xl"
-      style={{ background: a, top: "-12%", left: "-25%", opacity: 0.5 }}
-      animate={{ x: [0, 30, 0], y: [0, 24, 0] }}
-      transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-    />
-    <motion.div
-      className="absolute w-[380px] h-[380px] rounded-full blur-3xl"
-      style={{ background: b, bottom: "-14%", right: "-28%", opacity: 0.45 }}
-      animate={{ x: [0, -26, 0], y: [0, -20, 0] }}
-      transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-    />
-  </div>
-);
-
-const Eyebrow = ({ children }: { children: React.ReactNode }) => (
-  <motion.p
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4 }}
-    className="text-[12px] font-bold uppercase tracking-[0.28em] text-white/55 mb-5"
-  >
-    {children}
-  </motion.p>
-);
-
-const Pop = ({ children, delay = 0.15, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 26, scale: 0.94 }}
-    animate={{ opacity: 1, y: 0, scale: 1 }}
-    transition={{ delay, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-    className={className}
-  >
-    {children}
-  </motion.div>
-);
-
-/* --------------------------------------------------------------- slides */
-
-type SlideDef = { bg: string; blobs: [string, string]; node: React.ReactNode };
 
 interface Props {
   retro: RetroMes;
   onClose: () => void;
+  /** nome da pessoa ("O setembro de Ana") — sem nome, "O seu setembro" */
+  nome?: string | null;
+  /** relógio (testes) */
+  agora?: Date;
 }
 
-export const MonthlyWrapped = ({ retro, onClose }: Props) => {
-  const [idx, setIdx] = useState(0);
-  const [sharing, setSharing] = useState(false);
-  const v = retro.vida;
-  const { mode } = useTheme();
+export const MonthlyWrapped = ({ retro, onClose, nome = null, agora: agoraFixo }: Props) => {
+  const agoraDaMontagem = useRef(new Date());
+  const agora = agoraFixo ?? agoraDaMontagem.current;
+  const userData = useContext(UserDataContext);
 
-  // A retrospectiva é escura em tela cheia, doa o tema que doer: sem forçar,
-  // quem está no tema claro ficaria com relógio e bateria escuros por cima do
-  // roxo — invisíveis. Restaura ao sair.
-  useEffect(() => barraClaraEnquantoMontado(mode === "dark" ? "dark" : "light"), [mode]);
+  /* ------------------------------------------------------------ o tema */
+  const [temaSemStore, setTemaSemStore] = useState<TemaDaRetro>(TEMA_PADRAO);
+  const tema: TemaDaRetro = userData ? lerTema(userData.get<unknown>(CHAVE_DO_TEMA, null)) : temaSemStore;
+  const pele = PELES[tema];
+  const [folhaAberta, setFolhaAberta] = useState(false);
+  const [estilo, setEstilo] = useState<EstiloDoCard>("planner");
+  const estiloDoTemaAtual = estiloDoTema(tema);
+  const card: EstiloDoCard = estilo !== "planner" && estilo === estiloDoTemaAtual ? estilo : "planner";
+
+  const [idx, setIdx] = useState(0);
+  const [segurando, setSegurando] = useState(false);
+  const [oculto, setOculto] = useState(false);
+  const [paradoEm, setParadoEm] = useState<number | null>(null);
+  const [revelado, setRevelado] = useState(false);
+  const [valores, setValores] = useState(false);
+  const [enviando, setEnviando] = useState<null | "salvar" | "stories">(null);
+  // a 1ª opção de foco já vem marcada (como no desenho): um toque em "Guardar foco"
+  const [escolha, setEscolha] = useState<string | null>(() => opcoesDeFoco(retro)[0]?.texto ?? null);
+  const [textoDoFoco, setTextoDoFoco] = useState("");
+  const [focoSalvo, setFocoSalvo] = useState<string | null>(null);
 
   /* MOMENTO DE VALOR (28/08): a retrospectiva é a função citada nominalmente
    * na avaliação 5★ do Rafael C. ("parece aqueles resumos de fim de ano, só
-   * que da minha própria vida"). 12s = a pessoa passou dos primeiros slides e
-   * está DENTRO da emoção — `forte` porque esse pico só existe 1× por mês e
-   * só quem construiu um mês de dados chega aqui. Travas em
-   * pedirAvaliacaoSePuder. */
+   * que da minha própria vida"). 12s = a pessoa passou das primeiras páginas
+   * e está DENTRO da emoção — `forte` porque esse pico só existe 1× por mês.
+   * Travas em pedirAvaliacaoSePuder. */
   useEffect(() => {
     const t = window.setTimeout(() => { void pedirAvaliacaoSePuder("retrospectiva", { forte: true }); }, 12000);
     return () => window.clearTimeout(t);
   }, []);
 
-  const slides = useMemo<SlideDef[]>(() => {
-    const s: SlideDef[] = [];
-    // `d` é o bloco de finanças. Quando é null, os slides de dinheiro
-    // simplesmente não entram e a retrospectiva vira só de vida — que é o
-    // caso de quem usa o CORE pra hábito, leitura e treino.
-    const d = retro.financas;
-    const mes = retro.mes;
+  // app em segundo plano: a página não vira sozinha enquanto ninguém olha
+  useEffect(() => {
+    const aoMudar = () => setOculto(document.visibilityState === "hidden");
+    document.addEventListener("visibilitychange", aoMudar);
+    return () => document.removeEventListener("visibilitychange", aoMudar);
+  }, []);
 
-    s.push({
-      bg: "linear-gradient(165deg, #0c0a09 0%, #3b0764 160%)",
-      blobs: ["#D22D80", "#7c3aed"],
-      node: (
-        <div className="text-center">
-          <motion.p
-            initial={{ scale: 0, rotate: -14 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 12 }}
-            className="text-7xl mb-7"
-          >
-            🎁
-          </motion.p>
-          <Eyebrow>Retrospectiva CORE</Eyebrow>
-          <Pop className="text-[44px] font-black text-white leading-[1.02] tracking-tight">
-            {mes} fechou.<br />Bora ver como foi?
-          </Pop>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="text-white/45 text-sm mt-9">
-            toca pra continuar →
-          </motion.p>
-        </div>
-      ),
-    });
+  /* ------------------------------------------------------- a prancheta */
+  const raizRef = useRef<HTMLDivElement>(null);
+  const sondaRef = useRef<HTMLDivElement>(null);
+  const [medidas, setMedidas] = useState<Medidas>(() => medir(null, null));
+  useLayoutEffect(() => {
+    const atualizar = () => setMedidas(medir(raizRef.current, sondaRef.current));
+    atualizar();
+    window.addEventListener("resize", atualizar);
+    return () => window.removeEventListener("resize", atualizar);
+  }, []);
+  const util = Math.max(200, medidas.h - medidas.topo - medidas.base);
+  const s = Math.max(0.3, Math.min(medidas.w / LARGURA_DA_PRANCHETA, util / ALTURA_MINIMA, 1.25));
+  const prancheta: Prancheta = { s, H: util / s, cheia: medidas.h / s, miniatura: false };
+  const x0 = (medidas.w - LARGURA_DA_PRANCHETA * s) / 2;
 
-    /* ---------------------------------------------------- bloco: dinheiro */
-    if (d) s.push({
-      bg: "linear-gradient(165deg, #0c0a09 0%, #052e16 150%)",
-      blobs: ["#10b981", "#D22D80"],
-      node: (
-        <div className="text-center">
-          <Eyebrow>O fluxo do mês</Eyebrow>
-          <Pop delay={0.1}>
-            <p className="text-white/60 text-lg">entrou</p>
-            <p className="font-black tracking-tight text-[64px] leading-none text-emerald-300 tabular-nums">
-              <CountUp to={d.income} render={fmt} delay={0.3} />
-            </p>
-          </Pop>
-          <Pop delay={0.7}>
-            <p className="text-white/60 text-lg mt-7">saiu</p>
-            <p className="font-black tracking-tight text-[64px] leading-none text-rose-300 tabular-nums">
-              <CountUp to={d.outflow} render={fmt} delay={0.9} />
-            </p>
-          </Pop>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.7, type: "spring", stiffness: 200, damping: 14 }}
-            className="mt-9 inline-block rounded-full border border-white/20 bg-white/10 backdrop-blur px-7 py-3"
-          >
-            <p className="text-white font-bold text-xl">
-              {d.balance >= 0 ? "sobraram" : "faltaram"} {fmt(Math.abs(d.balance))}
-            </p>
-          </motion.div>
-        </div>
-      ),
-    });
+  /* --------------------------------------------------------- as páginas */
+  const proximo = mesSeguinte(retro);
+  // o foco só faz sentido pro mês que está começando (retrospectiva do mês que acabou de fechar)
+  const recemFechado = (() => { const a = mesAnterior(agora); return a.ano === retro.ano && a.mesIdx === retro.mesIdx; })();
+  const podeFocar = !!userData && recemFechado;
+  const fato = useMemo(() => (retro.curta ? fatoDaCurta(retro) : null), [retro]);
+  const opcoes = useMemo(() => opcoesDeFoco(retro), [retro]);
 
-    if (d && d.topCategories.length > 0) {
-      const max = d.topCategories[0].value || 1;
-      s.push({
-        bg: "linear-gradient(165deg, #500724 0%, #0c0a09 90%)",
-        blobs: ["#D22D80", "#f59e0b"],
-        node: (
-          <div className="w-full">
-            <Eyebrow>Pra onde foi</Eyebrow>
-            <Pop className="text-[40px] font-black text-white tracking-tight leading-[1.05] mb-9">
-              Seu pódio<br />de gastos
-            </Pop>
-            <div className="space-y-6">
-              {d.topCategories.map((c, i) => (
-                <motion.div key={c.label} initial={{ opacity: 0, x: -24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + i * 0.28, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
-                  <div className="flex items-baseline justify-between mb-2">
-                    <span className="text-white font-bold text-xl">
-                      <span className="mr-2.5">{["🥇", "🥈", "🥉"][i]}</span>{c.label}
-                    </span>
-                    <span className="text-white/85 font-black tabular-nums">{fmt(c.value)}</span>
-                  </div>
-                  <div className="h-3.5 rounded-full bg-white/10 overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: "linear-gradient(90deg, #D22D80, #fda4af)" }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.max((c.value / max) * 100, 8)}%` }}
-                      transition={{ delay: 0.6 + i * 0.28, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        ),
-      });
+  const ids = useMemo(() => {
+    const f = retro.financas;
+    const t: string[] = ["capa"];
+    if (retro.curta) {
+      if (fato) t.push("fato");
+      t.push("fecho");
+    } else {
+      if (retro.meuMes) t.push("meu-mes");
+      if (f && (f.gastosAnotados > 0 || f.topCategories.length > 0)) t.push("dinheiro");
+      if (retro.corpo) t.push("corpo");
+      if (retro.sentir) t.push("humor");
+      t.push("card");
     }
+    if (podeFocar) t.push("foco");
+    return t;
+  }, [retro, fato, podeFocar]);
 
-    if (d?.biggestExpense) {
-      s.push({
-        bg: "linear-gradient(165deg, #0c0a09 0%, #7c2d12 160%)",
-        blobs: ["#f97316", "#D22D80"],
-        node: (
-          <div className="text-center">
-            <Eyebrow>O golpe mais forte</Eyebrow>
-            <motion.p
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 170, damping: 10, delay: 0.15 }}
-              className="text-7xl mb-6"
-            >
-              💥
-            </motion.p>
-            <p className="font-black tracking-tight text-[68px] leading-none text-white tabular-nums">
-              <CountUp to={d.biggestExpense.value} render={fmt} delay={0.4} />
-            </p>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="text-white/75 text-2xl font-bold mt-5">
-              {d.biggestExpense.description}
-              {d.biggestExpense.day && <span className="text-white/40 font-normal"> · dia {d.biggestExpense.day}</span>}
-            </motion.p>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }} className="text-white/40 text-sm mt-7">
-              um gasto só. respira.
-            </motion.p>
-          </div>
-        ),
+  // os dados podem mudar com a retrospectiva aberta (a carga do servidor
+  // chegando): o índice nunca aponta pra fora da lista
+  const atual = Math.min(idx, ids.length - 1);
+  const atualRef = useRef(0);
+  atualRef.current = atual;
+  const idDaTela = ids[atual];
+  // (26/09, desenho do designer) a versão curta tem 3 páginas na barra: o foco
+  // é um extra que abre pelo link do fecho, e tocar depois do fecho fecha
+  const nasBarras = retro.curta ? ids.filter((id) => id !== "foco") : ids;
+  const atualNaBarra = Math.min(atual, nasBarras.length - 1);
+  const pararAqui = () => setParadoEm(atualRef.current);
+
+  /* ------------------------------------------------------------ eventos */
+  const aberturaRef = useRef(Date.now());
+  const vistasRef = useRef(new Set<string>());
+  const telaRef = useRef(idDaTela);
+  const mesRef = useRef(retro.mes);
+  mesRef.current = retro.mes;
+  useEffect(() => {
+    telaRef.current = idDaTela;
+    vistasRef.current.add(idDaTela);
+    trackEvent("wrapped_tela", { month: mesRef.current, i: atual, id: idDaTela, curta: retro.curta });
+    // só quando a PÁGINA muda — não a cada recálculo dos dados
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atual, idDaTela]);
+  useEffect(() => {
+    let enviado = false;
+    // beacon: quem sai costuma estar fechando o app, e o insert normal morre junto
+    const despedir = () => {
+      if (enviado) return;
+      enviado = true;
+      trackEventBeacon("wrapped_fechou", {
+        month: mesRef.current,
+        tela: telaRef.current,
+        segundos: Math.round((Date.now() - aberturaRef.current) / 1000),
+        completou: [...vistasRef.current].some((x) => TELAS_FINAIS.has(x)),
       });
-    }
+    };
+    window.addEventListener("pagehide", despedir);
+    return () => {
+      window.removeEventListener("pagehide", despedir);
+      despedir();
+    };
+  }, []);
 
-    if (d && d.pixPct > 0) {
-      s.push({
-        bg: "linear-gradient(165deg, #083344 0%, #0c0a09 95%)",
-        blobs: ["#06b6d4", "#D22D80"],
-        node: (
-          <div className="text-center">
-            <Eyebrow>Seu jeito de pagar</Eyebrow>
-            <p className="font-black tracking-tight text-[110px] leading-none text-cyan-300 tabular-nums">
-              <CountUp to={d.pixPct} render={(v) => `${Math.round(v)}%`} delay={0.3} />
-            </p>
-            <Pop delay={0.9} className="text-white text-2xl font-bold mt-5">
-              dos pagamentos no Pix ⚡
-            </Pop>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }} className="text-white/45 text-sm mt-5">
-              {d.txCount} lançamentos registrados no mês
-            </motion.p>
-          </div>
-        ),
-      });
-    }
-
-    // ---- MOMENTO DE EGO (ou de realidade) ----
-    if (d?.ego.kind === "reality") {
-      const e = d.ego;
-      s.push({
-        bg: "linear-gradient(170deg, #1c1917 0%, #450a0a 170%)",
-        blobs: ["#57534e", "#7f1d1d"],
-        node: (
-          <div className="text-center">
-            <Eyebrow>A real de {d.month}</Eyebrow>
-            <p className="font-black tracking-tight text-[72px] leading-none text-rose-300 tabular-nums">
-              <CountUp to={e.deficit} render={(v) => `-${fmt(v)}`} delay={0.3} />
-            </p>
-            <Pop delay={0.9} className="text-white text-xl font-bold mt-5">
-              saiu mais do que entrou.
-            </Pop>
-            {e.cut && (
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.3 }}
-                className="mt-8 rounded-2xl border border-white/15 bg-white/[0.07] backdrop-blur px-5 py-4 text-left"
-              >
-                <p className="text-white/50 text-[11px] font-bold uppercase tracking-wider mb-1">O corte mais óbvio</p>
-                <p className="text-white text-lg font-bold">
-                  {e.cut.label}: {fmt(e.cut.value)} no mês
-                </p>
-                <p className="text-white/60 text-sm mt-1">
-                  Metade disso já cobria {fmt(Math.min(e.cut.value / 2, e.deficit))} do rombo.
-                </p>
-              </motion.div>
-            )}
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8 }} className="text-white/40 text-sm mt-7">
-              sem drama — agora tá no radar.
-            </motion.p>
-          </div>
-        ),
-      });
-    } else if (d) {
-      const e = d.ego;
-      const headline =
-        e.kind === "saver" ? (
-          <>
-            <p className="font-black tracking-tight text-[110px] leading-none text-amber-300 tabular-nums">
-              <CountUp to={e.rate} render={(v) => `${v.toFixed(0)}%`} delay={0.4} />
-            </p>
-            <Pop delay={1} className="text-white text-2xl font-bold mt-4">da renda guardada 👏</Pop>
-          </>
-        ) : e.kind === "raise" ? (
-          <>
-            <p className="font-black tracking-tight text-[110px] leading-none text-amber-300 tabular-nums">
-              <CountUp to={e.pct} render={(v) => `+${v.toFixed(0)}%`} delay={0.4} />
-            </p>
-            <Pop delay={1} className="text-white text-2xl font-bold mt-4">de renda vs {e.prevMonth} 📈</Pop>
-          </>
-        ) : e.kind === "cutter" ? (
-          <>
-            <p className="font-black tracking-tight text-[110px] leading-none text-amber-300 tabular-nums">
-              <CountUp to={e.pct} render={(v) => `-${v.toFixed(0)}%`} delay={0.4} />
-            </p>
-            <Pop delay={1} className="text-white text-2xl font-bold mt-4">de gastos vs mês passado ✂️</Pop>
-          </>
-        ) : (
-          <>
-            <p className="font-black tracking-tight text-[84px] leading-none text-amber-300 tabular-nums">
-              <CountUp to={e.saved} render={fmt} delay={0.4} />
-            </p>
-            <Pop delay={1} className="text-white text-2xl font-bold mt-4">guardados no azul ✅</Pop>
-          </>
-        );
-
-      s.push({
-        bg: "linear-gradient(170deg, #422006 0%, #0c0a09 90%)",
-        blobs: ["#f59e0b", "#D22D80"],
-        node: (
-          <div className="text-center">
-            <motion.p
-              initial={{ scale: 0, rotate: 12 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 190, damping: 10 }}
-              className="text-6xl mb-5"
-            >
-              🏆
-            </motion.p>
-            <Eyebrow>Momento de respeito</Eyebrow>
-            {headline}
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5 }}
-              className="mt-8 rounded-2xl border border-amber-300/25 bg-amber-300/10 backdrop-blur px-5 py-4"
-            >
-              <p className="text-amber-100/90 text-[15px] leading-relaxed">
-                {e.kind === "saver" || e.kind === "modest" ? (
-                  <>Pesquisas mostram que <strong className="text-white">7 em cada 10 brasileiros</strong> fecham o mês sem guardar nada. Você guardou <strong className="text-white">{fmt(d.balance)}</strong>.</>
-                ) : e.kind === "raise" ? (
-                  <>Renda subindo e conta no azul — <strong className="text-white">{fmt(d.balance)}</strong> guardados no mês.</>
-                ) : (
-                  <>Cortar gasto sem cortar vida é raro. E ainda sobrou <strong className="text-white">{fmt(d.balance)}</strong>.</>
-                )}
-              </p>
-            </motion.div>
-          </div>
-        ),
-      });
-    }
-
-    /* ------------------------------------------------------- bloco: vida */
-
-    // CONSTÂNCIA. Vem antes de leitura/treino porque é o número que resume o
-    // mês inteiro: não "quanto você fez", e sim "quantos dias você apareceu".
-    if (v && v.diasAtivos > 0) {
-      const pct = Math.round((v.diasAtivos / Math.max(v.diasPossiveis, 1)) * 100);
-      s.push({
-        bg: "linear-gradient(165deg, #0c0a09 0%, #7c2d12 165%)",
-        blobs: ["#F59F0A", "#ea580c"],
-        node: (
-          <div className="text-center">
-            <Eyebrow>Sua constância</Eyebrow>
-            <p className="font-black tracking-tight text-[128px] leading-none text-amber-300 tabular-nums">
-              <CountUp to={v.diasAtivos} render={(n) => `${Math.round(n)}`} delay={0.3} duration={1.2} />
-            </p>
-            <Pop delay={0.9} className="text-white text-2xl font-bold mt-2">
-              dias no jogo em {mes}
-            </Pop>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }} className="text-white/50 text-base mt-2">
-              {pct}% dos dias do mês
-            </motion.p>
-            {v.melhorSequencia >= 3 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.5, type: "spring", stiffness: 200, damping: 14 }}
-                className="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 backdrop-blur px-6 py-3"
-              >
-                <span className="text-xl">🔥</span>
-                <span className="text-white font-bold text-lg">
-                  {v.melhorSequencia} dias seguidos na melhor fase
-                </span>
-              </motion.div>
-            )}
-          </div>
-        ),
-      });
-    }
-
-    // LEITURA. O módulo mais usado do app em tempo por pessoa — e o que rende
-    // o print mais gostoso de postar, porque a pessoa lista os títulos.
-    if (v && v.livros.length > 0) {
-      s.push({
-        bg: "linear-gradient(165deg, #082f49 0%, #0c0a09 95%)",
-        blobs: ["#38bdf8", "#6366f1"],
-        node: (
-          <div className="w-full text-center">
-            <Eyebrow>Você leu</Eyebrow>
-            <p className="font-black tracking-tight text-[120px] leading-none text-sky-300 tabular-nums">
-              <CountUp to={v.livros.length} render={(n) => `${Math.round(n)}`} delay={0.3} />
-            </p>
-            <Pop delay={0.9} className="text-white text-2xl font-bold mt-1">
-              {v.livros.length === 1 ? "livro terminado" : "livros terminados"} 📖
-            </Pop>
-            <div className="mt-8 space-y-2.5 text-left">
-              {v.livros.slice(0, 4).map((l, i) => (
-                <motion.div
-                  key={`${l.titulo}-${i}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 1.1 + i * 0.18, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                  className="rounded-xl border border-white/12 bg-white/[0.06] backdrop-blur px-4 py-2.5"
-                >
-                  <p className="text-white font-bold text-[15px] leading-tight truncate">{l.titulo}</p>
-                  {l.autor && <p className="text-white/45 text-[12px] truncate">{l.autor}</p>}
-                </motion.div>
-              ))}
-              {v.livros.length > 4 && (
-                <p className="text-white/40 text-sm text-center pt-1">e mais {v.livros.length - 4}</p>
-              )}
-            </div>
-            {v.paginas > 0 && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.9 }} className="text-white/50 text-sm mt-6">
-                {v.paginas.toLocaleString("pt-BR")} páginas viradas
-              </motion.p>
-            )}
-          </div>
-        ),
-      });
-    }
-
-    if (v && v.treinos > 0) {
-      s.push({
-        bg: "linear-gradient(170deg, #0c0a09 0%, #4c0519 165%)",
-        blobs: ["#f43f5e", "#a21caf"],
-        node: (
-          <div className="text-center">
-            <motion.p
-              initial={{ scale: 0, rotate: -12 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 190, damping: 11 }}
-              className="text-6xl mb-5"
-            >
-              🏋️
-            </motion.p>
-            <Eyebrow>Na academia</Eyebrow>
-            <p className="font-black tracking-tight text-[120px] leading-none text-rose-300 tabular-nums">
-              <CountUp to={v.treinos} render={(n) => `${Math.round(n)}`} delay={0.4} />
-            </p>
-            <Pop delay={1} className="text-white text-2xl font-bold mt-1">
-              {v.treinos === 1 ? "treino registrado" : "treinos registrados"}
-            </Pop>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="text-white/45 text-sm mt-6">
-              média de {(v.treinos / 4.3).toFixed(1)} por semana
-            </motion.p>
-          </div>
-        ),
-      });
-    }
-
-    // COMO VOCÊ ESTAVA. Fecha o bloco de vida com o dado mais íntimo — e o
-    // único que não é performance. Depois de contar dias e números, perguntar
-    // "e como você estava?" é o que faz a retrospectiva parecer sua.
-    if (v && (v.humorMedio !== null || v.diasDeDiario > 0)) {
-      const carinha = v.humorMedio === null ? "✨"
-        : v.humorMedio >= 4.2 ? "😄" : v.humorMedio >= 3.4 ? "🙂" : v.humorMedio >= 2.6 ? "😐" : "😕";
-      s.push({
-        bg: "linear-gradient(165deg, #2e1065 0%, #0c0a09 95%)",
-        blobs: ["#a78bfa", "#D22D80"],
-        node: (
-          <div className="text-center">
-            <Eyebrow>Como você estava</Eyebrow>
-            <motion.p
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 180, damping: 11, delay: 0.2 }}
-              className="text-8xl mb-6"
-            >
-              {carinha}
-            </motion.p>
-            {v.humorMedio !== null && (
-              <>
-                <p className="font-black tracking-tight text-[76px] leading-none text-violet-200 tabular-nums">
-                  <CountUp to={v.humorMedio} render={(n) => n.toFixed(1)} delay={0.5} />
-                  <span className="text-white/30 text-4xl">/5</span>
-                </p>
-                <Pop delay={1.1} className="text-white/70 text-lg mt-3">humor médio do mês</Pop>
-              </>
-            )}
-            {v.diasDeDiario > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.4 }}
-                className="mt-8 rounded-2xl border border-white/15 bg-white/[0.07] backdrop-blur px-5 py-4"
-              >
-                <p className="text-white text-lg font-bold">
-                  {v.diasDeDiario} {v.diasDeDiario === 1 ? "dia de diário" : "dias de diário"} ✍️
-                </p>
-                <p className="text-white/55 text-sm mt-1">
-                  Ficou registrado. Daqui a um ano você vai querer reler.
-                </p>
-              </motion.div>
-            )}
-          </div>
-        ),
-      });
-    }
-
-    s.push({
-      bg: "linear-gradient(160deg, #D22D80 0%, #0c0a09 92%)",
-      blobs: ["#f0abfc", "#7c3aed"],
-      node: (
-        <div className="text-center">
-          <Eyebrow>Seu perfil de {mes}</Eyebrow>
-          <motion.p
-            initial={{ scale: 0, rotate: 10 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 180, damping: 10, delay: 0.2 }}
-            className="text-8xl mb-6"
-          >
-            {retro.perfil.emoji}
-          </motion.p>
-          <Pop className="text-[52px] font-black text-white tracking-tight leading-none">{retro.perfil.name}</Pop>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="text-white/70 text-lg mt-5 max-w-[270px] mx-auto leading-snug">
-            {retro.perfil.line}
-          </motion.p>
-          <motion.button
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1 }}
-            onClick={async (e) => {
-              e.stopPropagation();
-              setSharing(true);
-              trackEvent("wrapped_share", { month: mes });
-              const result = await renderWrappedImage(retro);
-              if (result === "downloaded") toast.success("Imagem salva! Agora é só postar 🎉");
-              setSharing(false);
-            }}
-            disabled={sharing}
-            className="mt-9 inline-flex items-center gap-2 rounded-full bg-white text-stone-900 font-bold px-8 py-3.5 text-base shadow-[0_12px_36px_-8px_rgba(0,0,0,0.6)] active:scale-95 transition-transform"
-          >
-            {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-            Compartilhar retrospectiva
-          </motion.button>
-        </div>
-      ),
-    });
-
-    return s;
-  }, [retro, v, sharing]);
-
-  const advance = (dir: 1 | -1) => {
-    const next = idx + dir;
-    if (next < 0) return;
-    if (next >= slides.length) { onClose(); return; }
-    setIdx(next);
+  const trocarTema = (novo: TemaDaRetro) => {
+    setFolhaAberta(false);
+    if (novo === tema) return;
+    if (userData) userData.set(CHAVE_DO_TEMA, novo);
+    else setTemaSemStore(novo);
+    setEstilo("planner");
+    trackEvent("wrapped_tema", { month: retro.mes, tema: novo, de: tema });
   };
 
-  const slide = slides[idx];
+  const compartilhar = async (destino: "salvar" | "stories") => {
+    if (enviando) return;
+    setEnviando(destino);
+    pararAqui();
+    trackEvent("wrapped_share", { month: retro.mes, valores, destino, tema, card });
+    const c = conteudoDoCard(retro, { valores, nome });
+    const arte = card === "revista" ? <StoryRevista c={c} /> : card === "recortes" ? <StoryRecortes c={c} /> : <StoryPlanner c={c} />;
+    const resultado = await compartilharCard(arte, retro.mes, destino);
+    if (resultado === "downloaded") toast.success("Imagem salva! Agora é só postar 🎉");
+    if (resultado === "sem-imagem") toast.error("Não consegui montar a imagem agora. Tenta de novo em instantes?");
+    // no app sem o compartilhar nativo (versão antiga) não dá pra salvar: diz a verdade
+    if (resultado === "failed") toast.error("Não consegui abrir o compartilhar. Atualize o CORE na loja e tente de novo.");
+    setEnviando(null);
+  };
+
+  const salvarFoco = () => {
+    const texto = (textoDoFoco.trim() || escolha || "").trim();
+    if (!texto || !userData) return;
+    const metas = userData.get<Record<string, { id: string; text: string; done: boolean }[]>>("month-goals", {}) ?? {};
+    const doMes = Array.isArray(metas[proximo.id]) ? metas[proximo.id] : [];
+    if (!doMes.some((g) => g?.text?.trim().toLowerCase() === texto.toLowerCase())) {
+      userData.set("month-goals", { ...metas, [proximo.id]: [...doMes, { id: Date.now().toString(), text: texto, done: false }] });
+    }
+    trackEvent("wrapped_foco", { month: retro.mes, sugestao: !textoDoFoco.trim() });
+    setFocoSalvo(texto);
+  };
+
+  /* -------------------------------------------------- navegação (stories) */
+  const avancar = useCallback((dir: 1 | -1) => {
+    const proxima = atual + dir;
+    if (proxima < 0) return;
+    if (proxima >= ids.length || (retro.curta && ids[proxima] === "foco")) { onClose(); return; }
+    setParadoEm(null);
+    setIdx(proxima);
+  }, [atual, ids, retro.curta, onClose]);
+  const irPara = (id: string) => {
+    const i = ids.indexOf(id);
+    if (i >= 0) { setParadoEm(null); setIdx(i); }
+  };
+
+  // teclado (web no PC): setas viram a página, Esc fecha
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
+      if (folhaAberta) { if (e.key === "Escape") setFolhaAberta(false); return; }
+      if (e.key === "ArrowRight") avancar(1);
+      else if (e.key === "ArrowLeft") avancar(-1);
+      else if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [avancar, onClose, folhaAberta]);
+
+  // SEGURAR PAUSA: o dedo pousado para a página; soltar depois de um toque
+  // longo só retoma (não vira a página).
+  const pousouEm = useRef(0);
+  const toqueLongo = useRef(false);
+  const pousar = () => { pousouEm.current = Date.now(); setSegurando(true); };
+  const soltar = () => {
+    if (pousouEm.current && Date.now() - pousouEm.current > TOQUE_MAXIMO_MS) toqueLongo.current = true;
+    pousouEm.current = 0;
+    setSegurando(false);
+  };
+  const tocar = (dir: 1 | -1) => {
+    if (toqueLongo.current) { toqueLongo.current = false; return; }
+    avancar(dir);
+  };
+  const zona = (dir: 1 | -1) => ({
+    onPointerDown: pousar,
+    onPointerUp: soltar,
+    onPointerCancel: soltar,
+    onPointerLeave: () => { if (pousouEm.current) soltar(); },
+    onClick: () => tocar(dir),
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  });
+
+  const pausado = segurando || oculto || folhaAberta || paradoEm === atual;
+
+  /* -------------------------------------------------- a página da vez */
+  const base: Base = { retro, nome, paginas: ids, proximo: { nome: proximo.nome, ano: proximo.ano }, recente: recemFechado };
+  const conteudo = useMemo(() => conteudoDoCard(retro, { valores, nome }), [retro, valores, nome]);
+  const montar = (id: string): PaginaPronta => {
+    switch (id) {
+      case "capa": return retro.curta ? pele.capaCurta(base) : pele.capa(base);
+      case "meu-mes": return pele.meuMes(base);
+      case "dinheiro":
+        return pele.dinheiro({
+          ...base, revelado,
+          onRevelar: () => {
+            pararAqui();
+            if (!revelado) trackEvent("wrapped_valores", { month: retro.mes });
+            setRevelado((x) => !x);
+          },
+        });
+      case "corpo": return pele.corpo(base);
+      case "humor": return pele.humor(base);
+      case "fato": return pele.fato({ ...base, fato: fato! });
+      case "fecho": return pele.fecho({ ...base, podeFocar, onFocar: () => irPara("foco"), onFechar: onClose });
+      case "foco":
+        return pele.foco({
+          ...base, opcoes, escolha, texto: textoDoFoco, salvo: focoSalvo, onFechar: onClose, onSalvar: salvarFoco,
+          onEscolha: (t) => { pararAqui(); setTextoDoFoco(""); setEscolha(t || null); },
+          onTexto: (t) => { pararAqui(); setTextoDoFoco(t); },
+        });
+      default: {
+        const p = pele.card;
+        return {
+          fundoCor: p.fundoCor,
+          fundo: p.fundo,
+          moldura: p.moldura,
+          conteudo: (
+            <TelaDoCard
+              pele={p}
+              c={conteudo}
+              card={card}
+              estilos={estiloDoTemaAtual ? ["planner", estiloDoTemaAtual] : null}
+              onEstilo={(e) => { pararAqui(); setEstilo(e); }}
+              temDinheiro={!!retro.financas}
+              valores={valores}
+              onValores={() => { pararAqui(); setValores((x) => !x); }}
+              enviando={enviando}
+              onCompartilhar={compartilhar}
+              proximo={podeFocar ? proximo.nome.toLowerCase() : null}
+            />
+          ),
+        };
+      }
+    }
+  };
+  const pagina = montar(idDaTela);
 
   return (
-    <div className="fixed inset-0 z-[400] select-none transition-[background] duration-500" style={{ background: slide.bg }}>
-      <Blobs a={slide.blobs[0]} b={slide.blobs[1]} />
+    <div
+      ref={raizRef}
+      className="fixed inset-0 z-[400] select-none overflow-hidden"
+      style={{ background: pagina.fundoCor, transition: "background-color .25s", WebkitTouchCallout: "none", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", WebkitFontSmoothing: "antialiased" } as CSSProperties}
+      data-testid="retrospectiva"
+      data-tema={tema}
+    >
+      <style>{"@keyframes retro-barra{from{width:0}to{width:100%}}"}</style>
+      {/* sonda das áreas seguras (notch em cima, barra de gestos embaixo) */}
+      <div ref={sondaRef} aria-hidden style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", visibility: "hidden", pointerEvents: "none" }} />
 
-      {/* progresso */}
-      <div className="absolute top-0 inset-x-0 z-20 flex gap-1.5 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
-        {slides.map((_, i) => (
-          <div key={i} className="flex-1 h-1 rounded-full bg-white/25 overflow-hidden">
-            <div className={`h-full bg-white transition-all duration-300 ${i <= idx ? "w-full" : "w-0"}`} style={i === idx ? { opacity: 0.95 } : undefined} />
-          </div>
-        ))}
-      </div>
+      <PranchetaCtx.Provider value={prancheta}>
+        {/* zonas de toque: esquerda volta, direita avança, segurar pausa */}
+        <div className="absolute inset-y-0 left-0 w-1/3 z-[5]" {...zona(-1)} />
+        <div className="absolute inset-y-0 right-0 w-2/3 z-[5]" {...zona(1)} />
 
-      <button
-        onClick={onClose}
-        aria-label="Fechar"
-        className="absolute top-[max(1.6rem,calc(env(safe-area-inset-top)+0.9rem))] right-4 z-30 grid place-items-center w-9 h-9 rounded-full bg-white/15 text-white backdrop-blur"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
-      {/* zonas de toque */}
-      <div className="absolute inset-y-0 left-0 w-1/3 z-[5]" onClick={() => advance(-1)} />
-      <div className="absolute inset-y-0 right-0 w-2/3 z-[5]" onClick={() => advance(1)} />
-
-      {/* conteúdo — z acima das zonas de toque; só os botões capturam clique,
-          o resto deixa passar pro avanço de slide */}
-      <div className="relative z-10 h-full flex items-center justify-center px-8 pointer-events-none">
+        {/* a página — fundo sangrado + conteúdo na área segura; só botões/campos
+            capturam o toque, o resto passa pra virar a página */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={idx}
+            key={`${atual}-${tema}`}
+            data-tela={idDaTela}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="w-full max-w-sm [&_button]:pointer-events-auto"
+            className="absolute inset-0 z-10 pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto"
           >
-            {slide.node}
+            {pagina.fundo && (
+              <Camada x={x0} y={0} altura={prancheta.cheia} escala={s} style={{ overflow: "hidden" }}>{pagina.fundo}</Camada>
+            )}
+            <Camada x={x0} y={medidas.topo} altura={prancheta.H} escala={s}>{pagina.conteudo}</Camada>
           </motion.div>
         </AnimatePresence>
-      </div>
+
+        {/* moldura: barras + "CORE · RETROSPECTIVA" + chip Tema (capa e card) + X */}
+        <Camada x={x0} y={medidas.topo} altura={60} escala={s} style={{ zIndex: 30, pointerEvents: "none" }}>
+          <TopoEBarras
+            moldura={pagina.moldura}
+            total={nasBarras.length}
+            atual={atualNaBarra}
+            animada={{ auto: AUTO[idDaTela] ?? null, pausado, onFim: () => avancar(1) }}
+            // o chip mora na capa (desenho do designer) e na tela do card (regra do dono)
+            chip={idDaTela === "capa" || idDaTela === "card"}
+            onChip={() => { pararAqui(); setFolhaAberta(true); }}
+            onFechar={onClose}
+          />
+        </Camada>
+
+        {folhaAberta && (
+          <div className="absolute inset-0 z-40" style={{ background: "rgba(0,0,0,.55)" }} onClick={() => setFolhaAberta(false)}>
+            <div
+              style={{ position: "absolute", left: x0, bottom: 0, width: LARGURA_DA_PRANCHETA, transform: `scale(${s})`, transformOrigin: "0 100%" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <FolhaDeTema
+                tema={tema}
+                peles={PELES}
+                base={base}
+                curta={retro.curta}
+                total={nasBarras.length}
+                folha={pele.folha}
+                folgaBaixo={medidas.base / s}
+                onEscolher={trocarTema}
+                onFechar={() => setFolhaAberta(false)}
+              />
+            </div>
+          </div>
+        )}
+      </PranchetaCtx.Provider>
     </div>
   );
 };
+
+/* ---------------------------------------------------------- tela do card */
+
+const SOMBRA_DO_CARD: Record<EstiloDoCard, { sombra?: string; raio: number }> = {
+  planner: { raio: 0 },
+  revista: { sombra: "0 30px 60px -28px rgba(0,0,0,.9)", raio: 6 },
+  recortes: { sombra: "0 26px 50px -24px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.06)", raio: 6 },
+};
+
+function TelaDoCard({ pele, c, card, estilos, onEstilo, temDinheiro, valores, onValores, enviando, onCompartilhar, proximo }: {
+  pele: PeleDoCard;
+  c: ConteudoDoCard;
+  card: EstiloDoCard;
+  /** o segmentado "Estilo do card" (revista e recortes); null no planner */
+  estilos: EstiloDoCard[] | null;
+  onEstilo: (e: EstiloDoCard) => void;
+  temDinheiro: boolean;
+  valores: boolean;
+  onValores: () => void;
+  enviando: null | "salvar" | "stories";
+  onCompartilhar: (destino: "salvar" | "stories") => void;
+  proximo: string | null;
+}) {
+  const { m, fs, H } = useMedidas();
+  // medidas do mockup (430×932): o card em 70, os controles logo abaixo dele;
+  // com o segmentado, o card vai a 0,952 (como o designer desenhou)
+  const topo = m(70, 58);
+  const controles = (estilos ? 52 : 0) + (temDinheiro ? 62 : 0) + 48 + (proximo ? 34 : 0);
+  const folgaBaixo = estilos ? m(50, 16) : m(70, 18);
+  const k = Math.max(0.5, Math.min(estilos ? 0.952 : 1, (H - topo - 16 - controles - folgaBaixo) / 630));
+  const largura = 354 * k;
+  let y = topo + 630 * k + 16;
+  const linha = (altura: number, gap: number) => { const topoDaLinha = y; y += altura + gap; return topoDaLinha; };
+  const yEstilo = estilos ? linha(40, 12) : 0;
+  const yToggle = temDinheiro ? linha(48, 14) : 0;
+  const yBotoes = linha(48, 18);
+  const yProxima = y;
+  const sombra = SOMBRA_DO_CARD[card];
+  const arte: ReactNode = card === "revista"
+    ? <CardRevista c={c} testId="card-da-retro" />
+    : card === "recortes" ? <CardRecortes c={c} testId="card-da-retro" /> : <CardPlanner c={c} testId="card-da-retro" />;
+  const lados: CSSProperties = { position: "absolute", left: 38, right: 38 };
+  return (
+    <>
+      {/* a arte segura o toque: tocar no card não pode virar a página nem fechar */}
+      <div
+        style={{ position: "absolute", left: (430 - largura) / 2, top: topo, width: largura, height: 630 * k, pointerEvents: "auto", borderRadius: sombra.raio * k, boxShadow: sombra.sombra }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ width: 354, height: 630, transform: `scale(${k})`, transformOrigin: "0 0" }}>{arte}</div>
+      </div>
+      {estilos && (
+        <div style={{ ...lados, top: yEstilo, height: 40, display: "flex", alignItems: "center", color: pele.seg.fg }}>
+          <span style={{ fontSize: fs(10.5), fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", opacity: 0.7 }}>Estilo do card</span>
+          <span role="radiogroup" aria-label="Estilo do card" style={{ marginLeft: "auto", display: "flex", padding: 3, borderRadius: 10, background: pele.seg.bg }}>
+            {estilos.map((e) => {
+              const on = e === card;
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={(ev) => { ev.stopPropagation(); onEstilo(e); }}
+                  className="p-0"
+                  style={{ padding: "6px 14px", borderRadius: 8, fontWeight: 700, fontSize: fs(12.5), border: 0, cursor: "pointer", fontFamily: "inherit", background: on ? pele.seg.onBg : "transparent", color: on ? pele.seg.onFg : pele.seg.fg, opacity: on ? 1 : 0.75 }}
+                >
+                  {ROTULO_DO_ESTILO[e]}
+                </button>
+              );
+            })}
+          </span>
+        </div>
+      )}
+      {temDinheiro && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={valores}
+          onClick={(e) => { e.stopPropagation(); onValores(); }}
+          style={{ ...lados, top: yToggle, height: 48, display: "flex", alignItems: "center", padding: "0 16px", borderRadius: 12, fontSize: fs(13.5), fontWeight: 600, background: pele.linha.bg, color: pele.linha.fg, boxShadow: pele.linha.sombra, border: 0, textAlign: "left", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          Mostrar valores em R$
+          <span aria-hidden style={{ marginLeft: "auto", width: 44, height: 24, borderRadius: 999, position: "relative", background: valores ? "#10b981" : pele.linha.trilhoOff, transition: "background .2s" }}>
+            <i style={{ position: "absolute", left: 2, top: 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,.25)", transform: valores ? "translateX(20px)" : undefined, transition: "transform .2s" }} />
+          </span>
+        </button>
+      )}
+      <div style={{ ...lados, top: yBotoes, display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 10 }}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onCompartilhar("salvar"); }}
+          disabled={!!enviando}
+          style={{ height: 48, borderRadius: 12, fontSize: 14, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: pele.salvar.bg, color: pele.salvar.fg, border: pele.salvar.borda, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {enviando === "salvar" && <Loader2 className="animate-spin" style={{ width: 16, height: 16 }} />}
+          Salvar
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onCompartilhar("stories"); }}
+          disabled={!!enviando}
+          style={{ height: 48, borderRadius: 12, fontSize: 14, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: pele.postar.bg, color: pele.postar.fg, border: 0, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {enviando === "stories" ? <Loader2 className="animate-spin" style={{ width: 16, height: 16 }} /> : <Instagram style={{ width: 18, height: 18 }} />}
+          Postar nos Stories
+        </button>
+      </div>
+      {proximo && (
+        <p style={{ position: "absolute", left: 0, right: 0, top: yProxima, margin: 0, textAlign: "center", fontSize: fs(12.5), color: pele.proxima }}>Próxima: escolha 1 foco pra {proximo} →</p>
+      )}
+    </>
+  );
+}

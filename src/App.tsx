@@ -15,6 +15,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { PortaoBoasVindas } from "@/components/onboarding/PortaoBoasVindas";
 import { GracePeriodBanner } from "@/components/GracePeriodBanner";
+import { AvisoCobrancaRecusada } from "@/components/app/AvisoCobrancaRecusada";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
@@ -279,6 +280,20 @@ import LandingPage from "./pages/lp/LpFinancas";
 // 02/09: fora do bundle principal — a porta do /inicio não usa (49 KB raw);
 // o Suspense das rotas já cobre o flash.
 const Comecar = lazy(() => import("./pages/Comecar"));
+const MomentosConquistas = lazy(() => import("@/components/conquistas/Momentos").then((m) => ({ default: m.MomentosConquistas })));
+
+/* Momentos das Conquistas (adesivo novo, marco da sequência) em QUALQUER tela
+ * do app (26/09) — antes só na Home e nas Conquistas, e a festa é no momento
+ * da ação (Duolingo). Uma montagem só (ela também faz as escritas da
+ * sequência). Nunca em demo, funil, paywall, login ou na própria
+ * retrospectiva: só com conta e só nas telas dos módulos. */
+const ROTAS_DOS_MOMENTOS = ["/home", "/conquistas", "/financas", "/rotina", "/treino", "/dieta", "/saude", "/estudos", "/carreira", "/casa", "/biblioteca", "/beleza", "/pet", "/viagens", "/relacionamentos", "/detox", "/hiperfoco", "/desenvolvimento", "/notificacoes"];
+const MomentosNoApp = () => {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  if (!user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
+  return <Suspense fallback={null}><MomentosConquistas /></Suspense>;
+};
 // dia14 é o funil do /inicio (25/07; de volta em 19/09) — import EAGER: a URL
 // do tráfego de anúncio não pode ter flash de loading (lazy quebraria fora do
 // Suspense). O W segue lazy: vende no app (/app) e fica de teste em /funil-w.
@@ -376,6 +391,7 @@ const AdminFunnel = lazyPage(() => import("./pages/admin/AdminFunnel"));
 const AdminCampaigns = lazyPage(() => import("./pages/admin/AdminCampaigns"));
 const AdminUsuarios = lazyPage(() => import("./pages/admin/AdminUsuarios"));
 const AdminPagantes = lazyPage(() => import("./pages/admin/AdminPagantes"));
+const AdminUso = lazyPage(() => import("./pages/admin/AdminUso"));
 
 const queryClient = new QueryClient();
 
@@ -595,6 +611,7 @@ const AnimatedRoutes = () => {
           <Route path="usuarios" element={<AdminUsuarios />} />
           {/* Assinantes removida (inútil) — rota antiga cai no funil via catch-all */}
           <Route path="pagantes" element={<AdminPagantes />} />
+          <Route path="uso" element={<AdminUso />} />
           <Route path="suporte" element={<AdminSuporte />} />
           {/* Compat: qualquer rota antiga do admin cai no funil novo. */}
           <Route path="*" element={<Navigate to="/admin/funil" replace />} />
@@ -634,6 +651,8 @@ const App = () => {
                 <GuardaDemoShell />
                 <TelemetriaWebView />
                 <GracePeriodBanner />
+                {/* 26/09: cartão recusado na App Store/Google Play (só no app). */}
+                <AvisoCobrancaRecusada />
                 <TrilhoLateral />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
@@ -672,6 +691,7 @@ const App = () => {
                 <GlobalWinback />
                 {/* 23/09: convite de avaliação só pra quem paga e voltou — iPhone. Ver ConviteDeValor. */}
                 <ConviteDeValor />
+                <MomentosNoApp />
                 {/* QuickSignupModal APOSENTADO 16/07: era o gate do modo visitante (teste grátis) — prendia cliente com sessão expirada numa tela sem saída ("Entrar" navegava por baixo do overlay). Visitante agora nem entra no app: ProtectedRoute sem allowGuest redireciona pro /auth. */}
               </BrowserRouter>
             </div>

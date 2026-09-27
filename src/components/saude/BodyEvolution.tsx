@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Camera, ArrowLeftRight } from "lucide-react";
+import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { avisarApagado } from "@/lib/desfazer";
+import { avisarFotoNaDemo, estaNaDemo } from "./AnexosDeSaude";
 
 interface Measurement {
   date: string;
@@ -18,7 +21,43 @@ interface Measurement {
   pernaD: string;
   pernaE: string;
   peito: string;
+  /** o "⚖️ Peso" da Home grava { date, weight, id } nesta mesma chave */
+  weight?: number | string;
+  id?: string;
 }
+
+type CampoMedida = Exclude<keyof Measurement, "date" | "weight" | "id">;
+
+const fields: { key: CampoMedida; label: string; unit: string }[] = [
+  { key: "peso", label: "PESO", unit: "kg" },
+  { key: "bf", label: "BF%", unit: "%" },
+  { key: "cintura", label: "CINTURA", unit: "cm" },
+  { key: "bracoD", label: "BRAÇO D", unit: "cm" },
+  { key: "bracoE", label: "BRAÇO E", unit: "cm" },
+  { key: "pernaD", label: "PERNA D", unit: "cm" },
+  { key: "pernaE", label: "PERNA E", unit: "cm" },
+  { key: "peito", label: "PEITO", unit: "cm" },
+];
+
+/** "80,5" ou "80.5" → 80.5 · vazio → null · lixo ("abc") → NaN (26/09, varredura) */
+const lerMedida = (texto: unknown): number | null => {
+  const t = String(texto ?? "").trim().replace(",", ".");
+  if (!t) return null;
+  return /^(\d+(\.\d*)?|\.\d+)$/.test(t) ? Number(t) : NaN;
+};
+
+/** Valor da tabela com vírgula ("35,5 cm"). Lixo gravado antes da validação
+ *  aparece como foi digitado, sem unidade — some quando a pessoa apagar. */
+const mostrarMedida = (m: Measurement, f: (typeof fields)[number]) => {
+  const bruto = f.key === "peso" && !String(m.peso ?? "").trim() && m.weight != null ? m.weight : m[f.key];
+  const n = lerMedida(bruto);
+  if (n === null) return "—";
+  if (Number.isNaN(n)) return String(bruto).trim();
+  return `${n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${f.unit === "%" ? "%" : f.unit === "kg" ? "kg" : " cm"}`;
+};
+
+const diaCurto = (key: string) =>
+  key ? parseLocalDay(key).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—";
 
 interface BodyPhoto {
   date: string;
@@ -55,11 +94,46 @@ export const BodyEvolution = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  /* SALVAR MEDIDAS (26/09, varredura): só peso ou cintura contavam — com BF% ou
+     braço preenchidos o botão não fazia nada e não dizia nada — e "abc" virava
+     "abckg" na tabela. Agora qualquer medida serve, número com vírgula ou ponto,
+     e o que não for número avisa em vez de ir pra tabela. */
   const saveMeasurement = () => {
-    if (!newM.peso && !newM.cintura) return;
-    setMeasurements(prev => [...prev, { ...newM }]);
+    const preenchidos = fields.filter(f => String(newM[f.key] ?? "").trim());
+    if (preenchidos.length === 0) { toast.error("Preencha pelo menos uma medida"); return; }
+    const invalidos = preenchidos.filter(f => Number.isNaN(lerMedida(newM[f.key])));
+    if (invalidos.length > 0) {
+      toast.error(`Confira ${invalidos.map(f => f.label).join(", ")}: só números (ex.: 80,5)`);
+      return;
+    }
+    const nova: Measurement = { ...newM, date: newM.date || today };
+    fields.forEach(f => { nova[f.key] = String(newM[f.key] ?? "").trim(); });
+    setMeasurements(prev => [...prev, nova]);
     setNewM({ date: today, peso: "", bf: "", cintura: "", bracoD: "", bracoE: "", pernaD: "", pernaE: "", peito: "" });
     setShowForm(false);
+  };
+
+  /* APAGAR UMA MEDIDA (26/09, varredura): a lixeira filtrava por DATA — duas
+     medidas no mesmo dia viravam duas colunas "26/09" e a 1ª lixeira apagava
+     as duas, sem aviso. Agora é pelo índice no array gravado (só a medida da
+     Home tem id) e o toast oferece desfazer. */
+  const apagarMedida = (idx: number) => {
+    const alvo = measurements[idx];
+    if (!alvo) return;
+    setMeasurements(prev => prev.filter((_, j) => j !== idx));
+    avisarApagado(`Medida de ${diaCurto(alvo.date)} apagada`, () =>
+      setMeasurements(prev => {
+        const volta = [...prev];
+        volta.splice(Math.min(idx, volta.length), 0, alvo);
+        return volta;
+      }));
+  };
+
+  // Demo (/preview): foto não tem pra onde subir — avisa em vez de abrir a
+  // galeria e não fazer nada (26/09, varredura)
+  const escolherFoto = () => {
+    if (estaNaDemo()) { avisarFotoNaDemo(); return; }
+    fileRef.current?.click();
   };
 
   const uploadPhoto = async (file: File) => {
@@ -84,19 +158,12 @@ export const BodyEvolution = () => {
     setUploading(false);
   };
 
-  const sorted = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
+  // o índice original viaja junto: é ele que identifica a medida pra apagar.
+  // Mesmo dia: a registrada por último vem primeiro.
+  const sorted = measurements
+    .map((m, idx) => ({ m, idx }))
+    .sort((a, b) => (b.m.date || "").localeCompare(a.m.date || "") || b.idx - a.idx);
   const todaySentiment = sentimentLog[today];
-
-  const fields: { key: keyof Measurement; label: string; unit: string }[] = [
-    { key: "peso", label: "PESO", unit: "kg" },
-    { key: "bf", label: "BF%", unit: "%" },
-    { key: "cintura", label: "CINTURA", unit: "cm" },
-    { key: "bracoD", label: "BRAÇO D", unit: "cm" },
-    { key: "bracoE", label: "BRAÇO E", unit: "cm" },
-    { key: "pernaD", label: "PERNA D", unit: "cm" },
-    { key: "pernaE", label: "PERNA E", unit: "cm" },
-    { key: "peito", label: "PEITO", unit: "cm" },
-  ];
 
   const addSentimentItem = () => {
     if (!newSentimentItem.trim()) return;
@@ -174,7 +241,7 @@ export const BodyEvolution = () => {
                 </button>
               </div>
             )).slice(-8)}
-            <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            <button onClick={escolherFoto} disabled={uploading}
               className="flex-shrink-0 w-20 h-28 rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1 hover:border-primary/50 transition-colors">
               {uploading ? <span className="text-[10px] text-muted-foreground">Enviando...</span> : (
                 <><Camera className="w-5 h-5 text-muted-foreground" /><span className="text-[9px] text-muted-foreground">Adicionar</span></>
@@ -206,7 +273,7 @@ export const BodyEvolution = () => {
                 <Input type="date" value={newM.date} onChange={e => setNewM({ ...newM, date: e.target.value })} className="col-span-2 text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
                 {fields.map(f => (
                   <div key={f.key} className="relative">
-                    <Input value={newM[f.key]} onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />
+                    <Input value={newM[f.key]} inputMode="decimal" onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{f.unit}</span>
                   </div>
                 ))}
@@ -225,9 +292,15 @@ export const BodyEvolution = () => {
               <thead>
                 <tr className="bg-pink-200/60 dark:bg-pink-900/20">
                   <th className="text-left px-3 py-2.5 font-bold text-foreground uppercase tracking-wider">.</th>
-                  {sorted.slice(0, 4).map((m, i) => (
-                    <th key={i} className="text-center px-2 py-2.5 font-bold text-foreground">
-                      {new Date(m.date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                  {/* lixeira no cabeçalho da PRÓPRIA coluna (26/09, varredura):
+                      antes ficavam amontoadas no canto, sem dizer de qual era */}
+                  {sorted.slice(0, 4).map(({ m, idx }) => (
+                    <th key={idx} className="text-center px-2 pt-2.5 pb-1 font-bold text-foreground">
+                      {diaCurto(m.date)}
+                      <button onClick={() => apagarMedida(idx)} aria-label={`Apagar medida de ${diaCurto(m.date)}`}
+                        className="mx-auto mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
+                        <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
+                      </button>
                     </th>
                   ))}
                   <th className="px-1 py-2.5" />
@@ -237,9 +310,9 @@ export const BodyEvolution = () => {
                 {fields.map((f, fi) => (
                   <tr key={f.key} className={`${fi % 2 === 0 ? "bg-pink-50/50 dark:bg-pink-950/10" : ""} border-t border-border/30`}>
                     <td className="px-3 py-2.5 font-bold text-foreground uppercase">{f.label}</td>
-                    {sorted.slice(0, 4).map((m, i) => (
-                      <td key={i} className="text-center px-2 py-2.5 text-muted-foreground">
-                        {m[f.key] ? `${m[f.key]}${f.unit === "%" ? "%" : f.unit === "kg" ? "kg" : " cm"}` : "—"}
+                    {sorted.slice(0, 4).map(({ m, idx }) => (
+                      <td key={idx} className="text-center px-2 py-2.5 text-muted-foreground">
+                        {mostrarMedida(m, f)}
                       </td>
                     ))}
                     <td className="px-1 py-2.5" />
@@ -247,16 +320,6 @@ export const BodyEvolution = () => {
                 ))}
               </tbody>
             </table>
-            {sorted.length > 0 && (
-              <div className="px-3 py-2 flex justify-end">
-                {sorted.slice(0, 4).map((m, i) => (
-                  <button key={i} onClick={() => setMeasurements(prev => prev.filter(x => x.date !== m.date))}
-                    className="mx-1">
-                    <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive transition-colors" />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <div className="px-4 pb-4 text-center">

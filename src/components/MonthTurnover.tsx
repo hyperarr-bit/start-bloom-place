@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar } from "lucide-react";
-import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getCurrentYear, readMonthData, writeMonthData } from "@/components/finance/storage-keys";
+import { getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getMonthIndex, getCurrentYear, isCurrentMonth, readMonthData, writeMonthData } from "@/components/finance/storage-keys";
+import { totaisDoMes } from "@/components/finance/MonthComparison";
+import { doPerfil, doPerfilDueDays, perfilDe, perfilAtivoLocal, PERFIL_PESSOAL } from "@/lib/finance-perfil";
+import { cartaoDoId } from "@/lib/finance-faturas";
+import { computeSavingsRate } from "@/lib/finance-totals";
 import { trackEvent } from "@/lib/analytics";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -16,9 +20,147 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 const readLocalKey = (userId: string | null, logicalKey: string) =>
   readMonthData(userId, logicalKey);
 
-const countItems = (userId: string | null, logicalKey: string) => {
-  const data = readLocalKey(userId, logicalKey);
-  return Array.isArray(data) ? data.length : 0;
+/* ═══ A CÓPIA SÓ SOMA (26/09, auditoria da virada 30/09 → 01/10) ═══
+ *
+ * A cópia gravava a lista do mês passado NO LUGAR da do mês corrente. Pela
+ * porta do Index (`aplicarNoMesCorrente` → `mesclarPerfil`), item do mês
+ * corrente que não vinha na lista copiada conta como "apagado na tela" e
+ * sai. Então quem já tinha lançado o salário de outubro no dia 1º e tocava
+ * "Copiar para Outubro" no dia 3 PERDIA o salário de outubro (trocado pela
+ * cópia de setembro) — e o ✓ da conta paga no dia 1º voltava a "não paga",
+ * porque a cópia das contas regravava o balde inteiro com ids novos. Desde a
+ * virada das contas (08/08, lib/virada-contas) o balde já atravessa o mês
+ * sozinho: copiar contas só regenerava ids e desmarcava o que estava pago.
+ *
+ * Agora a cópia é um PLANO: só entra o que falta no mês de destino, com id
+ * novo; o que já existe fica intacto — valor, ✓ e vínculo `fixedId`.
+ * Receitas faltam por descrição (contando repetidos). Fixos e contas, que
+ * atravessam o mês sozinhos, só entram como restauração (destino vazio) —
+ * ver `planoDeCopia`. Cada caixinha só aparece quando o plano tem algo pra
+ * ela (a regra da "caixinha que mentia", de 01/09, agora vale pra todas).
+ * Conta ligada a custo fixo nunca é copiada: quem a cria é o finance-sync a
+ * partir do fixo. Conta de outro perfil também não: a porta do mês corrente
+ * só devolve contas do Pessoal (mesclarPerfilDueDays).
+ */
+const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
+const lista = (v: unknown): any[] => (Array.isArray(v) ? v : []);
+
+/** Tira da fonte o que o destino já tem, contando repetidos (dois "Freela"
+ *  em setembro e um em outubro → falta um). */
+const oQueFalta = (fonte: any[], destino: any[], chave: (i: any) => string): any[] => {
+  const tem = new Map<string, number>();
+  for (const i of destino) tem.set(chave(i), (tem.get(chave(i)) ?? 0) + 1);
+  const falta: any[] = [];
+  for (const i of fonte) {
+    const k = chave(i);
+    const n = tem.get(k) ?? 0;
+    if (n > 0) { tem.set(k, n - 1); continue; }
+    falta.push(i);
+  }
+  return falta;
+};
+
+/** Mesmo DIA no mês de destino ("Salário dia 5" copiado vira dia 5 de novo),
+ *  limitado ao último dia dele. Antes a cópia datava tudo com o dia do toque. */
+const mesmoDiaNoMes = (data: unknown, mesIdx: number, ano: number): string => {
+  const m = typeof data === "string" ? /^\d{4}-\d{2}-(\d{2})/.exec(data.trim()) : null;
+  if (!m) return localDayKey();
+  const ultimo = new Date(ano, mesIdx + 1, 0).getDate();
+  const dia = Math.min(Math.max(1, Number(m[1])), ultimo);
+  return `${ano}-${String(mesIdx + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+};
+
+const chaveDosLimites = (month: string, ano: number) =>
+  isCurrentMonth(month) && ano === getCurrentYear()
+    ? "finance-category-budgets"
+    : `finance-${ano}-${getMonthKey(month)}-category-budgets`;
+
+export interface PlanoDeCopia {
+  /** Itens NOVOS (id novo) que faltam no destino, por tipo. */
+  fixos: any[];
+  contas: { day: number; color?: string; bill: any }[];
+  receitas: any[];
+  notas: any[];
+  limites: Record<string, number>;
+  /** Como o destino está agora — base da gravação (nada dele é tirado). */
+  destino: { fixos: any[]; contas: any[]; receitas: any[]; notas: any[]; limites: Record<string, number> };
+}
+
+/**
+ * O que a cópia de `fromMonth`/`anoOrigem` traria pro `toMonth` do ano
+ * corrente. Só leitura. `anoOrigem` ausente = ano corrente (o comportamento
+ * antigo); o cartão passa o ano certo do mês anterior — em janeiro é
+ * dezembro do ANO PASSADO (26/09).
+ */
+export const planoDeCopia = (
+  userId: string | null,
+  fromMonth: string,
+  toMonth: string,
+  anoOrigem: number = getCurrentYear(),
+): PlanoDeCopia => {
+  const anoDestino = getCurrentYear();
+  const fromKeys = getFinanceStorageKeys(fromMonth, anoOrigem);
+  const toKeys = getFinanceStorageKeys(toMonth, anoDestino);
+  const newId = () => Date.now().toString() + Math.random();
+
+  const destino = {
+    fixos: lista(readLocalKey(userId, toKeys.fixed)),
+    contas: lista(readLocalKey(userId, toKeys.dueDays)),
+    receitas: lista(readLocalKey(userId, toKeys.incomes)),
+    notas: lista(readLocalKey(userId, toKeys.notes)),
+    limites: (readLocalKey(userId, chaveDosLimites(toMonth, anoDestino)) ?? {}) as Record<string, number>,
+  };
+
+  const porDescricao = (i: any) => `${perfilDe(i)}|${norm(i?.description)}`;
+  // Fixos e contas ATRAVESSAM o mês sozinhos (chave única; virada das
+  // contas). Com o destino já tendo algum, o que "falta" foi APAGADO pela
+  // pessoa no mês novo — a caixinha nasce marcada e desfaria a decisão
+  // (o Netflix cancelado no dia 2 voltava no dia 3). Então os dois só são
+  // oferecidos como RESTAURAÇÃO: destino vazio e retrato do mês passado.
+  const fixos = destino.fixos.length > 0 ? [] : lista(readLocalKey(userId, fromKeys.fixed))
+    .map((f) => ({ ...f, id: newId() }));
+  const idxDestino = getMonthIndex(toMonth);
+  const receitas = oQueFalta(lista(readLocalKey(userId, fromKeys.incomes)), destino.receitas, porDescricao)
+    .map((i) => ({ ...i, id: newId(), date: mesmoDiaNoMes(i?.date, idxDestino < 0 ? new Date().getMonth() : idxDestino, anoDestino) }));
+  const porTexto = (n: any) => norm(n?.text ?? n?.content ?? n?.title);
+  const notas = oQueFalta(lista(readLocalKey(userId, fromKeys.notes)), destino.notas, porTexto)
+    .map((n) => ({ ...n, id: newId() }));
+
+  // Contas: só as avulsas do Pessoal (ver o cabeçalho acima) e só como
+  // restauração — mesma regra dos fixos, logo acima.
+  const temContaNoDestino = destino.contas.some((d: any) => lista(d?.bills).length > 0);
+  const contas = temContaNoDestino ? [] : lista(readLocalKey(userId, fromKeys.dueDays)).flatMap((d: any) =>
+    lista(d?.bills)
+      .filter((b: any) => b && !b.fixedId && cartaoDoId(b.id) === null && perfilDe(b) === PERFIL_PESSOAL)
+      .map((b: any) => ({ day: Number(d?.day), color: d?.color, bill: { ...b, id: newId(), paid: false } })),
+  ).filter((c) => Number.isInteger(c.day) && c.day >= 1 && c.day <= 31);
+
+  // Limites: só categoria SEM teto no destino — teto já definido não é
+  // sobrescrito. Sem retrato de limites do mês de origem, não há o que
+  // copiar: a chave de sempre já vale pra todo mês.
+  const limites: Record<string, number> = {};
+  const chaveOrigem = chaveDosLimites(fromMonth, anoOrigem);
+  if (chaveOrigem !== chaveDosLimites(toMonth, anoDestino)) {
+    const fonte = readLocalKey(userId, chaveOrigem);
+    if (fonte && typeof fonte === "object" && !Array.isArray(fonte)) {
+      for (const [cat, v] of Object.entries(fonte as Record<string, number>)) {
+        if (!(cat in destino.limites) && Number(v) > 0) limites[cat] = v;
+      }
+    }
+  }
+
+  return { fixos, contas, receitas, notas, limites, destino };
+};
+
+/** Encaixa contas novas nos dias do destino (cria o dia se preciso). */
+const juntarContas = (dias: any[], novas: PlanoDeCopia["contas"]) => {
+  const saida = dias.map((d: any) => ({ ...d, bills: [...lista(d?.bills)] }));
+  for (const n of novas) {
+    let alvo = saida.find((d: any) => d.day === n.day);
+    if (!alvo) { alvo = { day: n.day, color: n.color ?? "slate", bills: [] }; saida.push(alvo); }
+    alvo.bills.push(n.bill);
+  }
+  return saida.sort((a: any, b: any) => a.day - b.day);
 };
 
 /*
@@ -66,77 +208,59 @@ export const copyToMonth = (
   toMonth: string,
   options: {
     fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
+    /** Ano do mês de ORIGEM (26/09). Ausente = ano corrente, o de sempre. */
+    anoOrigem?: number;
   },
   aplicar?: (logicalKey: string, value: any) => boolean,
   persistir?: (logicalKey: string, value: any) => void,
 ) => {
-  const fromKeys = getFinanceStorageKeys(fromMonth);
   const toKeys = getFinanceStorageKeys(toMonth);
-  const newId = () => Date.now().toString() + Math.random();
+  // Plano calculado NA HORA do toque (não o do render): lê o destino como
+  // ele está agora e só acrescenta o que falta — ver "A CÓPIA SÓ SOMA".
+  const plano = planoDeCopia(userId, fromMonth, toMonth, options.anoOrigem);
 
   // Tenta primeiro pelo estado do React; sem dono, grava local+servidor via
   // `persistir`; o writeMonthData (só local) fica de último recurso.
-  const gravar = (logicalKey: string, value: any) => {
-    if (aplicar?.(logicalKey, value)) return;
-    if (persistir) { persistir(logicalKey, value); return; }
-    writeMonthData(userId, logicalKey, value);
+  // (26/09) Dois valores: a porta do Index recompõe a lista pelo perfil
+  // (`mesclarPerfil` com PERFIL_PESSOAL) e por isso recebe o Pessoal + os
+  // novos — mandar a lista inteira duplicaria os itens das empresas. Quem
+  // grava direto (persistir/writeMonthData) substitui a chave e recebe TUDO.
+  const gravar = (logicalKey: string, paraAplicar: any, completo: any) => {
+    if (aplicar?.(logicalKey, paraAplicar)) return;
+    if (persistir) { persistir(logicalKey, completo); return; }
+    writeMonthData(userId, logicalKey, completo);
   };
 
-  if (options.fixed) {
-    const data = readLocalKey(userId, fromKeys.fixed);
-    if (data) {
-      const items = data.map((i: any) => ({ ...i, id: newId() }));
-      gravar(toKeys.fixed, items);
-    }
+  if (options.fixed && plano.fixos.length > 0) {
+    gravar(toKeys.fixed,
+      [...doPerfil(plano.destino.fixos, PERFIL_PESSOAL), ...plano.fixos],
+      [...plano.destino.fixos, ...plano.fixos]);
   }
 
-  if (options.bills) {
-    const data = readLocalKey(userId, fromKeys.dueDays);
-    if (data) {
-      const days = data.map((d: any) => ({
-        ...d,
-        bills: (Array.isArray(d?.bills) ? d.bills : []).map((b: any) => ({ ...b, id: newId(), paid: false })),
-      }));
-      gravar(toKeys.dueDays, days);
-    }
+  if (options.bills && plano.contas.length > 0) {
+    gravar(toKeys.dueDays,
+      juntarContas(doPerfilDueDays(plano.destino.contas, PERFIL_PESSOAL), plano.contas),
+      juntarContas(plano.destino.contas, plano.contas));
   }
 
-  if (options.incomes) {
-    const data = readLocalKey(userId, fromKeys.incomes);
-    if (data) {
-      const items = data.map((i: any) => ({
-        ...i,
-        id: newId(),
-        date: localDayKey(),
-      }));
-      gravar(toKeys.incomes, items);
-    }
+  if (options.incomes && plano.receitas.length > 0) {
+    gravar(toKeys.incomes,
+      [...doPerfil(plano.destino.receitas, PERFIL_PESSOAL), ...plano.receitas],
+      [...plano.destino.receitas, ...plano.receitas]);
   }
 
-  if (options.categoryBudgets) {
-    const year = getCurrentYear();
-    const fromKey = isCurrentMonthCheck(fromMonth)
-      ? "finance-category-budgets"
-      : `finance-${year}-${getMonthKey(fromMonth)}-category-budgets`;
-    const toKey = isCurrentMonthCheck(toMonth)
-      ? "finance-category-budgets"
-      : `finance-${year}-${getMonthKey(toMonth)}-category-budgets`;
-    const baseBudgets = readLocalKey(userId, "finance-category-budgets");
-    const monthBudgets = readLocalKey(userId, fromKey);
-    const data = monthBudgets || baseBudgets;
-    if (data) gravar(toKey, data);
+  if (options.categoryBudgets && Object.keys(plano.limites).length > 0) {
+    const limites = { ...plano.destino.limites, ...plano.limites };
+    gravar(chaveDosLimites(toMonth, getCurrentYear()), limites, limites);
   }
 
-  if (options.notes) {
-    const data = readLocalKey(userId, fromKeys.notes);
-    if (data) {
-      const items = data.map((n: any) => ({ ...n, id: newId() }));
-      gravar(toKeys.notes, items);
-    }
+  if (options.notes && plano.notas.length > 0) {
+    // nota não tem perfil: a porta do Index (setNotes) substitui a lista
+    // inteira, então recebe a lista inteira
+    const notas = [...plano.destino.notas, ...plano.notas];
+    gravar(toKeys.notes, notas, notas);
   }
 };
-
-const isCurrentMonthCheck = (month: string) => month === getCurrentMonthName();
 
 interface MonthTurnoverProps {
   onOpenMonth?: (month: string) => void;
@@ -177,10 +301,22 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
   const prevMonth = months[prevMonthIdx];
 
   const year = new Date().getFullYear();
+  /* JANEIRO LIA O DEZEMBRO ERRADO (26/09). As leituras do mês anterior iam
+     sem ano, e sem ano vale o ano CORRENTE: em janeiro/2027 o cartão
+     procurava `finance-2027-dezembro-*` (que não existe), concluía "mês
+     passado parado" e sumia — sem resumo de dezembro e sem cópia. O
+     `prevKey` já sabia o ano certo; agora todas as leituras usam o mesmo. */
+  const anoDoPrev = prevMonthIdx === 11 ? year - 1 : year;
   const currentKey = `${currentMonth}-${year}`;
-  const prevKey = `${prevMonth}-${prevMonthIdx === 11 ? year - 1 : year}`;
+  const prevKey = `${prevMonth}-${anoDoPrev}`;
 
-  const prevData = getMonthTotals(prevMonth, userId);
+  /* NÚMEROS DO RESUMO = OS DA COMPARAÇÃO MENSAL (26/09). O saldo aqui
+     subtraía `dividas`, que é o TOTAL que falta pagar das parcelas (12x de
+     R$ 150 no 3º mês = R$ 1.350 tirados de um mês que gastou R$ 150), e a
+     taxa de economia ignorava as parcelas do mês. Agora é a mesma conta do
+     Dashboard e da Comparação Mensal (fixos + variáveis + parcelas do mês,
+     lib/finance-totals) — o mesmo mês não pode ter dois saldos no app. */
+  const prevData = totaisDoMes({ ano: anoDoPrev, idx: prevMonthIdx }, userId, perfilAtivoLocal(userId));
 
   /*
    * "O mês passado teve movimento?" precisa olhar os DOIS lugares (02/08).
@@ -196,7 +332,6 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
    * também conta como movimento.
    */
   const prevAindaNoBaldeCorrente = (() => {
-    const anoDoPrev = prevMonthIdx === 11 ? year - 1 : year;
     const alvo = `${anoDoPrev}-${String(prevMonthIdx + 1).padStart(2, "0")}`;
     const correntes = getFinanceStorageKeys(currentMonth);
     const ler = (chave: string) => {
@@ -212,33 +347,35 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
     prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0 ||
     prevAindaNoBaldeCorrente;
 
-  const prevKeys = getFinanceStorageKeys(prevMonth);
-  const prevFixedCount = countItems(userId, prevKeys.fixed);
-  const prevIncomesCount = countItems(userId, prevKeys.incomes);
-  const prevNotesCount = countItems(userId, prevKeys.notes);
+  const prevKeys = getFinanceStorageKeys(prevMonth, anoDoPrev);
+  // O que a cópia traria de fato (26/09) — cada caixinha conta o que FALTA
+  // no mês corrente, não o tamanho do mês passado.
+  const plano = planoDeCopia(userId, prevMonth, currentMonth, anoDoPrev);
 
-  const prevBalance = prevData.receitas - prevData.custosFixos - prevData.custosVariaveis - prevData.dividas;
+  const prevBalance = prevData.receitas - prevData.despesas;
 
   const prevBillsInfo = (() => {
     const data = readLocalKey(userId, prevKeys.dueDays);
-    if (!data) return { total: 0, paid: 0 };
-    const allBills = data.flatMap((d: any) => d.bills || []);
-    return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
+    if (!Array.isArray(data)) return { total: 0, paid: 0 };
+    const allBills = data.flatMap((d: any) => (Array.isArray(d?.bills) ? d.bills : []));
+    return { total: allBills.length, paid: allBills.filter((b: any) => b?.paid).length };
   })();
 
-  const hasCategoryBudgets = (() => {
-    const base = readLocalKey(userId, "finance-category-budgets");
-    const yr = getCurrentYear();
-    const monthKey = `finance-${yr}-${getMonthKey(prevMonth)}-category-budgets`;
-    const month = readLocalKey(userId, monthKey);
-    const data = month || base;
-    return data && Object.keys(data).length > 0;
-  })();
+  /* VIRADA AINDA NÃO ARQUIVADA (26/09). Quando Finanças é a 1ª tela do dia
+     1º, ela monta com o cache antes de a carga do servidor voltar — e a
+     virada (use-virada-do-mes) só roda depois dela. Nesse intervalo o
+     lançamento do mês passado ainda mora no balde corrente e o resumo leria
+     o arquivo vazio: abriria "Setembro acabou! R$ 0". Então o cartão espera,
+     o resumo não abre sozinho e o `lastSeenMonth` não é gasto; quando a
+     virada grava, a tela remonta (`useVersaoDaVirada`) e o resumo abre com
+     setembro arquivado. */
+  const viradaPendente = prevAindaNoBaldeCorrente;
 
   // Janela de virada: quando o app ABRE o resumo sozinho — primeiros 7 dias do
   // mês, usuário ativo no mês anterior, virada ainda não confirmada.
   const dayOfMonth = new Date().getDate();
   const isTurnoverWindow =
+    !viradaPendente &&
     dayOfMonth <= 7 &&
     prevHasData &&
     lastSeenMonth === prevKey &&
@@ -285,14 +422,21 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
    * ids — quebrando o vínculo `fixedId` que liga cada conta ao seu custo fixo.
    * Então a opção passa a aparecer só quando existe retrato arquivado pra
    * restaurar, e no lugar dela a pessoa lê por que não precisa copiar.
+   *
+   * (26/09) Desde a auditoria da virada o hook ARQUIVA os fixos do mês que
+   * acabou (`finance-{ano}-{mes}-fixed`) — o retrato existe pra quase todo
+   * mundo. A restauração continua só pra destino VAZIO (`planoDeCopia`):
+   * com fixo no mês corrente, o que falta foi apagado de propósito.
    */
-  const podeFixos = prevFixedCount > 0;
-  const podeContas = prevBillsInfo.total > 0;
-  const podeReceitas = prevIncomesCount > 0;
+  const podeFixos = plano.fixos.length > 0;
+  const podeContas = plano.contas.length > 0;
+  const podeReceitas = plano.receitas.length > 0;
+  const podeLimites = Object.keys(plano.limites).length > 0;
+  const podeNotas = plano.notas.length > 0;
   const temAlgoPraCopiar =
-    podeFixos || podeContas || podeReceitas || hasCategoryBudgets || prevNotesCount > 0;
+    podeFixos || podeContas || podeReceitas || podeLimites || podeNotas;
 
-  const podeCopiar = prevHasData && (isTurnoverWindow || temAlgoPraCopiar);
+  const podeCopiar = !viradaPendente && prevHasData && (isTurnoverWindow || temAlgoPraCopiar);
 
   /*
    * O sinal só é gasto DEPOIS da decisão (02/08).
@@ -314,16 +458,14 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
   }, [isTurnoverWindow]);
 
   useEffect(() => {
-    if (isTurnoverWindow) return;
+    if (isTurnoverWindow || viradaPendente) return;
     if (lastSeenMonth !== currentKey) {
       setLastSeenMonth(currentKey);
     }
-  }, [isTurnoverWindow, lastSeenMonth, currentKey, setLastSeenMonth]);
+  }, [isTurnoverWindow, viradaPendente, lastSeenMonth, currentKey, setLastSeenMonth]);
 
 
-  const savingsRate = prevData.receitas > 0
-    ? ((prevData.receitas - prevData.custosVariaveis - prevData.custosFixos) / prevData.receitas) * 100
-    : 0;
+  const savingsRate = computeSavingsRate(prevData.receitas, prevData.despesas);
 
   const getMessage = () => {
     if (prevBalance > 0 && savingsRate >= 30) {
@@ -348,8 +490,9 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
       fixed: copyFixed && podeFixos,
       bills: copyBills && podeContas,
       incomes: copyIncomes && podeReceitas,
-      categoryBudgets: copyCategoryBudgets && hasCategoryBudgets,
-      notes: copyNotes && prevNotesCount > 0,
+      categoryBudgets: copyCategoryBudgets && podeLimites,
+      notes: copyNotes && podeNotas,
+      anoOrigem: anoDoPrev,
     }, aplicarNoMesCorrente, (chave, valor) => persistirNoServidor(chave, valor));
     trackEvent("virada_copiou_mes", {
       fixed: copyFixed && podeFixos, bills: copyBills && podeContas,
@@ -389,8 +532,8 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
     (podeFixos && copyFixed) ||
     (podeContas && copyBills) ||
     (podeReceitas && copyIncomes) ||
-    (hasCategoryBudgets && copyCategoryBudgets) ||
-    (prevNotesCount > 0 && copyNotes);
+    (podeLimites && copyCategoryBudgets) ||
+    (podeNotas && copyNotes);
 
   return (
     <>
@@ -421,7 +564,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Despesas</p>
-                <p className="text-xs font-bold tabular-nums text-red-400">R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
+                <p className="text-xs font-bold tabular-nums text-red-400">R$ {prevData.despesas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Saldo</p>
@@ -473,7 +616,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                   <div className="rounded-lg p-3 bg-card-despesas border border-card-despesas-border">
                     <span className="text-[10px] text-card-despesas-text font-medium">Despesas</span>
                     <p className="text-sm font-bold text-card-despesas-text">
-                      R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                      R$ {prevData.despesas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -563,7 +706,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                       <div className="flex-1">
                         <p className="text-xs font-bold">Custos Fixos</p>
                         <p className="text-[10px] text-muted-foreground">
-                          Aluguel, contas, assinaturas ({prevFixedCount} itens)
+                          Aluguel, contas, assinaturas ({plano.fixos.length} itens)
                         </p>
                       </div>
                       <Copy className="w-4 h-4 text-muted-foreground" />
@@ -584,7 +727,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                       <div className="flex-1">
                         <p className="text-xs font-bold">Vencimentos</p>
                         <p className="text-[10px] text-muted-foreground">
-                          Contas por dia ({prevBillsInfo.total} contas, marcadas como não pagas)
+                          Contas por dia ({plano.contas.length} contas, marcadas como não pagas)
                         </p>
                       </div>
                       <Copy className="w-4 h-4 text-muted-foreground" />
@@ -598,7 +741,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                       <div className="flex-1">
                         <p className="text-xs font-bold">Receitas</p>
                         <p className="text-[10px] text-muted-foreground">
-                          Salário, freelances, etc. ({prevIncomesCount} fontes)
+                          Salário, freelances, etc. ({plano.receitas.length} fontes)
                         </p>
                       </div>
                       <Copy className="w-4 h-4 text-muted-foreground" />
@@ -606,7 +749,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                   )}
 
                   {/* Limites por Categoria */}
-                  {hasCategoryBudgets && (
+                  {podeLimites && (
                     <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                       <Checkbox checked={copyCategoryBudgets} onCheckedChange={(v) => setCopyCategoryBudgets(!!v)} />
                       <div className="flex-1">
@@ -620,13 +763,13 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                   )}
 
                   {/* Notas */}
-                  {prevNotesCount > 0 && (
+                  {podeNotas && (
                     <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                       <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
                       <div className="flex-1">
                         <p className="text-xs font-bold">Notas</p>
                         <p className="text-[10px] text-muted-foreground">
-                          Lembretes e anotações ({prevNotesCount} notas)
+                          Lembretes e anotações ({plano.notas.length} notas)
                         </p>
                       </div>
                       <Copy className="w-4 h-4 text-muted-foreground" />

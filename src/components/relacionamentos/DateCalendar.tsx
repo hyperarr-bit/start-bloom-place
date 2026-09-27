@@ -34,7 +34,10 @@ export const DateCalendar = () => {
   ];
 
   const getDaysUntil = (dateStr: string) => {
+    // meia-noite (26/09): com a hora de agora, às 18h o aniversário de amanhã
+    // saía "Hoje!" e o de hoje "364d" — a aba PESSOAS já fazia assim.
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const d = parseLocalDay(dateStr);
     let next = setYear(d, today.getFullYear());
     if (next < today) next = setYear(d, today.getFullYear() + 1);

@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Loader2, Gift, RotateCw, Users2, XCircle, RotateCcw, Zap, QrCode, Copy, CheckCircle2, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { rpcAdmin, type ErroAdmin } from "./rpc";
 import {
   RangePicker, rangeToDates, type RangeKey,
   GranularityToggle, type Granularity,
   CustomRangePicker, type CustomWindow,
-  Panel, StatTile, EmptyState, RankedBars, FunnelChart, WorstDropCallout,
+  Panel, StatTile, EmptyState, RankedBars, FunnelChart, WorstDropCallout, ErroConsulta,
   getCounterReset, setCounterReset,
   type FunnelStep,
 } from "./components";
@@ -69,7 +69,7 @@ export default function AdminFunnel() {
   const [customWindow, setCustomWindow] = useState<CustomWindow | null>(null);
   const [data, setData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErroAdmin | null>(null);
 
   // Zerar: salva o marco AGORA e passa a contar desde ali (não apaga dado).
   const handleReset = () => {
@@ -91,11 +91,11 @@ export default function AdminFunnel() {
   const load = useCallback(async (from: string, to: string, g: Granularity) => {
     setLoading(true);
     setError(null);
-    const { data: res, error: err } = await supabase.rpc("admin_acquisition_funnel", {
+    const { data: res, error: err } = await rpcAdmin<FunnelData>("admin_acquisition_funnel", {
       _from: from, _to: to, _granularity: g,
     });
-    if (err) setError(err.message);
-    else setData(res as unknown as FunnelData);
+    if (err) setError(err);
+    else setData(res);
     setLoading(false);
   }, []);
 
@@ -109,7 +109,7 @@ export default function AdminFunnel() {
     setCustomWindow(null); // preset limpa a janela custom
     setRange(r);
     if (r === "today") setGranularity("hour");
-    else if (r !== "today" && granularity === "hour") setGranularity("day");
+    else if (granularity === "hour") setGranularity("day");
   };
 
   // Janela custom: aplica e força granularidade por hora (é o caso de uso —
@@ -157,9 +157,13 @@ export default function AdminFunnel() {
       )}
 
       {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-destructive">
-          Erro ao carregar: {error}
-        </div>
+        <ErroConsulta
+          erro={error}
+          onRetry={() => {
+            const { from, to } = customWindow ?? rangeToDates(range);
+            void load(from, to, granularity);
+          }}
+        />
       )}
 
       {loading && !data ? (

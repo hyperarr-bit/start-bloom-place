@@ -1,35 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { Plus, X, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
+import { avisarApagado } from "@/lib/desfazer";
+import {
+  CATEGORIAS_PADRAO_MERCADO, alternarItemMercado, precisaReparar, repararCategorias,
+  type CategoriaMercado, type ItemDespensa,
+} from "@/lib/mercado";
+import { pantryCategoryLabel } from "./types";
 
-interface GroceryItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-interface GroceryCategory {
-  id: string;
-  name: string;
-  emoji: string;
-  color: string;
-  items: GroceryItem[];
-}
-
-const DEFAULT_CATEGORIES: GroceryCategory[] = [
-  { id: "1", name: "HortiFrutti", emoji: "🥬", color: "bg-green-500", items: [] },
-  { id: "2", name: "Açougue e Peixaria", emoji: "🥩", color: "bg-red-500", items: [] },
-  { id: "3", name: "Laticínios e Frios", emoji: "🧀", color: "bg-blue-600", items: [] },
-  { id: "4", name: "Mercearia", emoji: "🏪", color: "bg-purple-500", items: [] },
-  { id: "5", name: "Padaria", emoji: "🥖", color: "bg-orange-500", items: [] },
-  { id: "6", name: "Congelados", emoji: "🍦", color: "bg-yellow-600", items: [] },
-  { id: "7", name: "Limpeza", emoji: "🧹", color: "bg-cyan-500", items: [] },
-  { id: "8", name: "Higiene Pessoal", emoji: "🛁", color: "bg-pink-500", items: [] },
-  { id: "9", name: "Bebidas", emoji: "🥤", color: "bg-indigo-600", items: [] },
-];
+// Formato salvo em casa-grocery-categories: o mesmo de sempre, agora em lib/mercado.ts
+// (fonte única com a Dieta, que também escreve nesta chave).
+type GroceryCategory = CategoriaMercado;
 
 const EXTRA_COLORS = [
   { label: "Verde", value: "bg-green-500" },
@@ -42,8 +28,30 @@ const EXTRA_COLORS = [
   { label: "Rosa", value: "bg-pink-500" },
 ];
 
+/* Contraste (26/09, varredura): texto branco no verde/ciano/laranja/amarelo
+ * ficava entre 2,3:1 e 2,9:1 no tema claro. Nesses fundos claros o texto é o
+ * escuro do tema (5,1–6,6:1); no escuro ele vira o claro do tema sozinho. */
+const FUNDO_CLARO = new Set(["bg-green-500", "bg-cyan-500", "bg-orange-500", "bg-yellow-600"]);
+
+// valor torto na chave não derruba a aba (mesmo cuidado da Rotina)
+const comoCategorias = (v: unknown): GroceryCategory[] =>
+  (Array.isArray(v) ? v : []).filter((c): c is GroceryCategory => !!c && Array.isArray((c as GroceryCategory).items));
+
 const GroceryList = () => {
-  const [categories, setCategories] = usePersistedState<GroceryCategory[]>("casa-grocery-categories", DEFAULT_CATEGORIES);
+  const { loaded, get } = useUserData();
+  const [salvas, setCategories] = usePersistedState<GroceryCategory[]>("casa-grocery-categories", CATEGORIAS_PADRAO_MERCADO);
+  const categories = comoCategorias(salvas);
+  // a compra de item que veio da Despensa devolve ele pro canto de origem
+  const [despensa, setDespensa] = usePersistedState<ItemDespensa[]>("casa-pantry", []);
+
+  /* Quem mandou a lista da Dieta antes de abrir o Mercado ficou só com a
+     categoria "Dieta" (as 9 do padrão sumiam). Devolve as 9 uma vez — depois
+     da carga do servidor e com o estado igual ao salvo (escrita antes disso
+     ganha do servidor e subiria o cache velho). */
+  useEffect(() => {
+    if (!loaded || JSON.stringify(get("casa-grocery-categories", CATEGORIAS_PADRAO_MERCADO)) !== JSON.stringify(salvas)) return;
+    if (precisaReparar(salvas)) setCategories(repararCategorias(salvas));
+  }, [loaded, get, salvas, setCategories]);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -53,27 +61,28 @@ const GroceryList = () => {
   const addItem = (catId: string) => {
     const text = inputs[catId]?.trim();
     if (!text) return;
-    setCategories(prev => prev.map(c =>
+    setCategories(prev => comoCategorias(prev).map(c =>
       c.id === catId ? { ...c, items: [...c.items, { id: Date.now().toString(), text, done: false }] } : c
     ));
     setInputs(prev => ({ ...prev, [catId]: "" }));
   };
 
   const toggleItem = (catId: string, itemId: string) => {
-    setCategories(prev => prev.map(c =>
-      c.id === catId ? { ...c, items: c.items.map(i => i.id === itemId ? { ...i, done: !i.done } : i) } : c
-    ));
+    const r = alternarItemMercado(categories, despensa, catId, itemId);
+    setCategories(r.categorias);
+    if (r.despensa !== despensa) setDespensa(r.despensa);
+    if (r.voltou) toast.success(`${r.voltou.nome} voltou pra ${pantryCategoryLabel[r.voltou.canto] ?? "Despensa"}`);
   };
 
   const removeItem = (catId: string, itemId: string) => {
-    setCategories(prev => prev.map(c =>
+    setCategories(prev => comoCategorias(prev).map(c =>
       c.id === catId ? { ...c, items: c.items.filter(i => i.id !== itemId) } : c
     ));
   };
 
   const addCategory = () => {
     if (!newCatName.trim()) return;
-    setCategories(prev => [...prev, {
+    setCategories(prev => [...comoCategorias(prev), {
       id: Date.now().toString(),
       name: newCatName.trim(),
       emoji: newCatEmoji || "🛒",
@@ -85,12 +94,22 @@ const GroceryList = () => {
     setShowAddCat(false);
   };
 
+  // Apagar a categoria leva os itens junto: dá pra desfazer por alguns segundos.
   const removeCategory = (catId: string) => {
-    setCategories(prev => prev.filter(c => c.id !== catId));
+    const pos = categories.findIndex(c => c.id === catId);
+    const cat = categories[pos];
+    if (!cat) return;
+    setCategories(prev => comoCategorias(prev).filter(c => c.id !== catId));
+    avisarApagado(`Categoria "${cat.name}" apagada`, () => setCategories(prev => {
+      const n = comoCategorias(prev);
+      if (n.some(c => c.id === cat.id)) return n;
+      n.splice(Math.min(pos, n.length), 0, cat);
+      return n;
+    }));
   };
 
   const clearChecked = () => {
-    setCategories(prev => prev.map(c => ({ ...c, items: c.items.filter(i => !i.done) })));
+    setCategories(prev => comoCategorias(prev).map(c => ({ ...c, items: c.items.filter(i => !i.done) })));
   };
 
   const totalItems = categories.reduce((s, c) => s + c.items.length, 0);
@@ -157,6 +176,7 @@ const GroceryList = () => {
       {categories.map(cat => {
         const done = cat.items.filter(i => i.done).length;
         const total = cat.items.length;
+        const tinta = FUNDO_CLARO.has(cat.color) ? "text-foreground" : "text-white";
         return (
           <div
             key={cat.id}
@@ -166,14 +186,15 @@ const GroceryList = () => {
             {/* Colored Header */}
             <div className={`grocery-header ${cat.color} px-4 py-3 flex items-center gap-3`}>
               <span className="text-xl">{cat.emoji}</span>
-              <span className="text-sm font-black text-white flex-1">{cat.name}</span>
-              <span className="text-xs font-bold text-white/80">{done}/{total}</span>
+              <span className={`text-sm font-black flex-1 ${tinta}`}>{cat.name}</span>
+              <span className={`text-xs font-bold ${tinta === "text-white" ? "text-white/80" : tinta}`}>{done}/{total}</span>
               <button
                 onClick={() => removeCategory(cat.id)}
                 className="grocery-trash opacity-60 hover:opacity-100 transition-opacity ml-1"
                 title="Remover categoria"
+                aria-label={`Remover categoria ${cat.name}`}
               >
-                <Trash2 className="w-3.5 h-3.5 text-white" />
+                <Trash2 className={`w-3.5 h-3.5 ${tinta}`} />
               </button>
             </div>
 
@@ -189,6 +210,7 @@ const GroceryList = () => {
                   <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {item.text}
                   </span>
+                  {item.origem && <span className="text-[9px] bg-primary/10 text-primary px-1 rounded" title="Volta pra despensa quando você marcar">Despensa</span>}
                   <button
                     onClick={() => removeItem(cat.id, item.id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"

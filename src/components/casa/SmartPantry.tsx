@@ -3,6 +3,8 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, ShoppingCart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { adicionarDaDespensa, devolverADespensa, retirarDaDespensa, type CategoriaMercado } from "@/lib/mercado";
 import { PantryItem, ShoppingItem, pantryCategoryEmoji, pantryCategoryLabel, statusEmoji } from "./types";
 
 const categories = ["geladeira", "armario", "limpeza", "banheiro"] as const;
@@ -14,9 +16,11 @@ const categoryColors: Record<string, { header: string; body: string }> = {
   banheiro: { header: "bg-pink-200 dark:bg-pink-900/60", body: "bg-pink-50 dark:bg-pink-950/30" },
 };
 
-const SmartPantry = () => {
+const SmartPantry = ({ onAbrirMercado }: { onAbrirMercado?: () => void } = {}) => {
   const [pantry, setPantry] = usePersistedState<PantryItem[]>("casa-pantry", []);
   const [shopping, setShopping] = usePersistedState<ShoppingItem[]>("casa-shopping-list", []);
+  // "Acabou" vai pra lista do Mercado (a mesma da aba MERCADO e da Dieta)
+  const [mercado, setMercado] = usePersistedState<CategoriaMercado[]>("casa-grocery-categories", []);
   const [newItems, setNewItems] = useState<Record<string, string>>({});
   const [newShopItem, setNewShopItem] = useState("");
   const [view, setView] = useState<"pantry" | "shopping">("pantry");
@@ -31,11 +35,16 @@ const SmartPantry = () => {
   const changeStatus = (id: string, status: PantryItem["status"]) => {
     if (status === "acabou") {
       const item = pantry.find(p => p.id === id);
-      if (item) {
-        // guarda a categoria de origem pra devolver o item ao lugar certo
-        setShopping(prev => [...prev, { id: Date.now().toString(), name: item.name, checked: false, fromPantry: true, origemCategory: item.category }]);
-      }
       setPantry(prev => prev.filter(p => p.id !== id));
+      if (!item) return;
+      /* Vai pro MERCADO (26/09, varredura): antes caía na lista "Compras" aqui
+         da Despensa e a dica do módulo prometia a Lista de Compras. O item leva
+         o canto de origem e volta pra ele quando for marcado como comprado. */
+      const r = adicionarDaDespensa(mercado, item.name, item.category);
+      setMercado(r.lista);
+      const ver = onAbrirMercado ? { action: { label: "Ver", onClick: onAbrirMercado } } : {};
+      if (r.entrou) toast.success(`${item.name} foi pra lista do Mercado (${r.categoria})`, ver);
+      else toast(`${item.name} já está na lista do Mercado`, ver);
     } else {
       setPantry(prev => prev.map(p => p.id === id ? { ...p, status } : p));
     }
@@ -43,15 +52,30 @@ const SmartPantry = () => {
 
   const checkShoppingItem = (id: string) => {
     const item = shopping.find(s => s.id === id);
-    if (item && !item.checked && item.fromPantry) {
+    if (!item) return;
+    const marcando = !item.checked;
+    let devolvidoId = item.devolvidoId;
+    if (item.fromPantry) {
       /* Volta pra categoria de ONDE SAIU (07/09, avaliação: "os itens voltam
-         todos para o armário"). Leite comprado ia pro armário e a pessoa
-         tinha que apagar e recadastrar na geladeira. "armario" só como
-         fallback pra item que entrou na lista antes de existir a origem. */
+         todos para o armário"). "armario" só como fallback pra item que entrou
+         na lista antes de existir a origem. Desmarcar tira de novo (26/09,
+         varredura: marcar/desmarcar/marcar punha "Leite" 2x na despensa). */
       const category: PantryItem["category"] = item.origemCategory ?? "armario";
-      setPantry(prev => [...prev, { id: Date.now().toString(), name: item.name, category, status: "cheio" }]);
+      if (marcando) {
+        const r = devolverADespensa(pantry, item.name, category);
+        setPantry(r.despensa);
+        devolvidoId = r.id;
+      } else {
+        setPantry(retirarDaDespensa(pantry, item.devolvidoId));
+        devolvidoId = undefined;
+      }
     }
-    setShopping(prev => prev.map(s => s.id === id ? { ...s, checked: !s.checked } : s));
+    setShopping(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const novo: ShoppingItem = { ...s, checked: marcando };
+      if (devolvidoId) novo.devolvidoId = devolvidoId; else delete novo.devolvidoId;
+      return novo;
+    }));
   };
 
   const addShoppingItem = () => {
@@ -134,6 +158,10 @@ const SmartPantry = () => {
             )}
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 space-y-1.5">
+            <p className="text-[10px] text-muted-foreground px-1">
+              O que acaba na despensa vai pra lista do Mercado.
+              {onAbrirMercado && <button type="button" onClick={onAbrirMercado} className="ml-1 font-bold text-primary underline underline-offset-2">Ver Mercado</button>}
+            </p>
             {shopping.map(item => (
               <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border ${item.checked ? "bg-green-500/10 border-green-500/20" : "bg-background/50 border-border"}`}>
                 <button onClick={() => checkShoppingItem(item.id)} aria-label={`${item.checked ? "Desmarcar" : "Comprei"} ${item.name}`}

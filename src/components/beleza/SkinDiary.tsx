@@ -1,14 +1,16 @@
 import { useState, useRef } from "react";
 import { localDayKey } from "@/lib/utils";
-import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { avisarApagado } from "@/lib/desfazer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2, Camera, ImagePlus, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
+import { useChaveDaBeleza, emDemonstracao } from "./estado-compartilhado";
+import { inserirEm } from "./utils";
 
 const genId = () => crypto.randomUUID();
 const getDateKey = () => localDayKey();
@@ -33,7 +35,13 @@ const skinStatuses = [
 
 export const SkinDiary = () => {
   const { user } = useAuth();
-  const [entries, setEntries] = usePersistedState<DiaryEntry[]>("skincare-diary", []);
+  const [entries, setEntries] = useChaveDaBeleza<DiaryEntry[]>("skincare-diary", []);
+  /* "Pele hoje" do formulário É o "Como está sua pele hoje?" do Espelho do
+     dia, que fica logo acima (26/09, varredura: os dois perguntavam a mesma
+     coisa e cada um guardava a sua resposta). Escolher aqui marca lá e
+     vice-versa; o registro salvo leva a mesma resposta. Mesmos ids nos dois
+     (seca/oleosa/acne/boa/sensivel), nenhum formato muda. */
+  const [checkins, setCheckins] = useChaveDaBeleza<Record<string, string>>("skincare-daily-checkin", {});
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({ notes: "", skinStatus: "boa", mood: "😊", photoUrl: "" });
@@ -42,10 +50,34 @@ export const SkinDiary = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const today = getDateKey();
   const todayEntry = entries.find(e => e.date === today);
+  const peleHoje = typeof checkins[today] === "string" ? checkins[today] : "";
+  const peleEscolhida = peleHoje || form.skinStatus;
+
+  const escolherPele = (id: string) => {
+    setForm(p => ({ ...p, skinStatus: id }));
+    setCheckins(prev => ({ ...prev, [today]: id }));
+  };
+
+  // Na demonstração não há conta, então a foto não tem pra onde subir: o
+  // botão abria a galeria e nada acontecia (26/09, varredura). Avisa em vez
+  // de abrir; no app logado segue igual.
+  const abrirGaleria = () => {
+    if (emDemonstracao()) {
+      toast("Na demonstração a foto não fica salva. Depois de criar sua conta, ela vai pro seu diário.");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+    if (!user) {
+      // sem conta a foto sumia calada; agora a pessoa sabe o porquê
+      toast.error("Pra salvar foto, entre na sua conta.");
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "jpg";
@@ -64,17 +96,30 @@ export const SkinDiary = () => {
       toast.error("Erro ao carregar foto: " + err.message);
     } finally {
       setUploading(false);
+      e.target.value = ""; // deixa escolher a mesma foto de novo se falhou
     }
   };
 
   const save = () => {
     if (!form.photoUrl && !form.notes) { toast.error("Adicione uma foto ou observação"); return; }
-    setEntries(prev => [{ id: genId(), date: today, ...form }, ...prev]);
+    setEntries(prev => [{ id: genId(), date: today, ...form, skinStatus: peleEscolhida }, ...prev]);
+    // registrou sem mexer na pele (ficou o padrão): o Espelho passa a mostrar
+    // a mesma resposta do registro
+    if (!peleHoje) setCheckins(prev => ({ ...prev, [today]: peleEscolhida }));
     setForm({ notes: "", skinStatus: "boa", mood: "😊", photoUrl: "" });
     setShowForm(false);
   };
 
-  const deleteEntry = (id: string) => setEntries(prev => prev.filter(x => x.id !== id));
+  // Apaga já e oferece Desfazer (26/09, varredura): o registro pode ter foto
+  // e sumia num toque, sem volta.
+  const deleteEntry = (id: string) => {
+    const idx = entries.findIndex(x => x.id === id);
+    const entrada = entries[idx];
+    if (!entrada) return;
+    setEntries(prev => prev.filter(x => x.id !== id));
+    avisarApagado("Registro do diário apagado", () =>
+      setEntries(prev => (prev.some(x => x.id === id) ? prev : inserirEm(prev, idx, entrada))));
+  };
 
   const toggleCompare = (entry: DiaryEntry) => {
     if (compareEntries[0]?.id === entry.id) setCompareEntries([null, compareEntries[1]]);
@@ -149,7 +194,7 @@ export const SkinDiary = () => {
               </button>
             </div>
           ) : (
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            <button onClick={abrirGaleria} disabled={uploading}
               className="w-full h-32 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-emerald-300 hover:text-emerald-600 transition-colors">
               {uploading ? <p className="text-xs">Carregando...</p> : (
                 <><ImagePlus className="w-6 h-6" /><p className="text-xs font-medium">Tirar foto ou escolher da galeria</p></>
@@ -160,9 +205,9 @@ export const SkinDiary = () => {
             <p className="text-xs font-medium mb-1.5">Pele hoje</p>
             <div className="flex gap-1.5 flex-wrap">
               {skinStatuses.map(s => (
-                <button key={s.id} onClick={() => setForm(p => ({ ...p, skinStatus: s.id }))}
+                <button key={s.id} onClick={() => escolherPele(s.id)}
                   className={`px-2.5 py-1.5 rounded-lg text-[10px] font-medium border transition-all ${
-                    form.skinStatus === s.id ? "bg-emerald-100 dark:bg-emerald-800/30 border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground"
+                    peleEscolhida === s.id ? "bg-emerald-100 dark:bg-emerald-800/30 border-emerald-300 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground"
                   }`}>
                   {s.emoji} {s.label}
                 </button>
@@ -221,8 +266,9 @@ export const SkinDiary = () => {
                   <span className="text-sm ml-1">{e.mood}</span>
                 </div>
                 <div className="col-span-3">
+                  {/* rótulo com acento ("Sensível"); o valor gravado segue "sensivel" */}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    {skinStatuses.find(s => s.id === e.skinStatus)?.emoji} {e.skinStatus}
+                    {skinStatuses.find(s => s.id === e.skinStatus)?.emoji} {skinStatuses.find(s => s.id === e.skinStatus)?.label ?? e.skinStatus}
                   </span>
                 </div>
                 <div className="col-span-3">
@@ -230,7 +276,7 @@ export const SkinDiary = () => {
                 </div>
                 <div className="col-span-1 flex justify-end">
                   {!compareMode && (
-                    <button onClick={() => deleteEntry(e.id)} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100">
+                    <button onClick={() => deleteEntry(e.id)} aria-label="Apagar registro" className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   )}

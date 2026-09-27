@@ -48,7 +48,9 @@ const VIVAS = [300, 400, 500, 600, 700]; // fundos que gritam no escuro
 const PALIDAS = [50, 100, 200];           // fundos pastel do claro (sem dark: viram manchas claras)
 const esc = (s) => s.replace(/[/.]/g, (c) => "\\" + c);
 const N = ":not(.tema-claro *)"; // funil/paywall forçam o claro: ficam de fora
-const PEQUENO = ":is(.rounded-full,.h-1,.h-1\\.5,.h-2,.h-2\\.5,.h-3,.w-1,.w-1\\.5,.w-2,.w-2\\.5,.w-3)";
+// `.marca-grafico` (26/09): célula de mapa de calor, barra de gráfico — é DADO, não fundo.
+// Sem ela o verde do "treinou" virava tinta quase preta em cima do card e o gráfico sumia.
+const PEQUENO = ":is(.rounded-full,.h-1,.h-1\\.5,.h-2,.h-2\\.5,.h-3,.w-1,.w-1\\.5,.w-2,.w-2\\.5,.w-3,.marca-grafico)";
 
 // Só gera regra pra classe que EXISTE no código (varre src/): o CSS cai de 217 KB pra o
 // que o app usa de verdade, e uma classe nova entra na próxima rodada do script.
@@ -90,6 +92,9 @@ for (const [fam, [texto, meio, tinta, borda, suave]] of Object.entries(FAM)) {
   const g_from = filtra(VIVAS.map((s) => `from-${fam}-${s}`)); if (g_from.length) linhas.push(`.dark :is(${g_from.map((c) => "." + c).join(",")})${N}{--tw-gradient-from:${tinta} var(--tw-gradient-from-position);--tw-gradient-to:transparent var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)}`);
   const g_via = filtra(VIVAS.map((s) => `via-${fam}-${s}`)); if (g_via.length) linhas.push(`.dark :is(${g_via.map((c) => "." + c).join(",")})${N}{--tw-gradient-to:transparent var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from),${tinta} var(--tw-gradient-via-position),var(--tw-gradient-to)}`);
   const g_to = filtra(VIVAS.map((s) => `to-${fam}-${s}`)); if (g_to.length) linhas.push(`.dark :is(${g_to.map((c) => "." + c).join(",")})${N}{--tw-gradient-to:${tinta} var(--tw-gradient-to-position)}`);
+  // barra de gráfico em degradê fica no tom do meio (visível), não na tinta
+  if (g_from.length) linhas.push(`.dark :is(${g_from.map((c) => `.marca-grafico.${c}`).join(",")})${N}{--tw-gradient-from:${meio} var(--tw-gradient-from-position);--tw-gradient-to:transparent var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)}`);
+  if (g_to.length) linhas.push(`.dark :is(${g_to.map((c) => `.marca-grafico.${c}`).join(",")})${N}{--tw-gradient-to:${meio} var(--tw-gradient-to-position)}`);
   // fill/stroke de SVG inline (ícones lucide usam currentColor; isto cobre os raros fill-*)
   const s_fill = filtra(VIVAS.map((s) => `fill-${fam}-${s}`)); if (s_fill.length) linhas.push(`.dark :is(${s_fill.map((c) => "." + c).join(",")})${N}{fill:${meio}}`);
   const s_stroke = filtra(VIVAS.map((s) => `stroke-${fam}-${s}`)); if (s_stroke.length) linhas.push(`.dark :is(${s_stroke.map((c) => "." + c).join(",")})${N}{stroke:${meio}}`);

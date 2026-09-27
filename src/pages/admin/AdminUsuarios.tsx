@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { RangePicker, rangeToDates, type RangeKey, Panel, EmptyState } from "./components";
+import { RangePicker, rangeToDates, type RangeKey, Panel, EmptyState, ErroConsulta } from "./components";
+import { rpcAdmin, type ErroAdmin } from "./rpc";
 
 interface JourneyRow {
   email: string | null;
@@ -36,15 +36,15 @@ export default function AdminUsuarios() {
   const [range, setRange] = useState<RangeKey>("30d");
   const [rows, setRows] = useState<JourneyRow[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErroAdmin | null>(null);
 
   const load = useCallback(async (r: RangeKey) => {
     setLoading(true);
     setError(null);
     const { from, to } = rangeToDates(r);
-    const { data, error: err } = await supabase.rpc("admin_funnel_users", { _from: from, _to: to, _limit: 300 });
-    if (err) setError(err.message);
-    else setRows((data as any)?.users ?? []);
+    const { data, error: err } = await rpcAdmin<{ users?: JourneyRow[] }>("admin_funnel_users", { _from: from, _to: to, _limit: 300 });
+    if (err) setError(err);
+    else setRows(data?.users ?? []);
     setLoading(false);
   }, []);
 
@@ -60,11 +60,7 @@ export default function AdminUsuarios() {
         <RangePicker value={range} onChange={setRange} />
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-destructive">
-          Erro ao carregar: {error}
-        </div>
-      )}
+      {error && <ErroConsulta erro={error} onRetry={() => void load(range)} />}
 
       <Panel>
         {loading && !rows ? (

@@ -49,6 +49,16 @@ const somarDias = (dia: string, n: number): string => {
   return localDayKey(new Date(y, m - 1, d + n));
 };
 
+/** Dia (local) da ÚLTIMA resposta do cartão (26/09, varredura). Não precisa de
+ *  campo novo: `responder` grava `proxima = dia da resposta + INTERVALOS_DIAS[degrau]`,
+ *  então a conta de volta é exata. É o que deixa o "Esta semana: N cartões" do
+ *  Método contar a revisão feita FORA da sessão guiada ("Revisar agora",
+ *  Caderno) — antes só a sessão entrava e o número ficava em 0. */
+export const ultimaRevisao = (e: EstadoRevisao): string => {
+  const degrau = Math.min(Math.max(0, Math.floor(Number(e.degrau) || 0)), INTERVALOS_DIAS.length - 1);
+  return somarDias(e.proxima, -INTERVALOS_DIAS[degrau]);
+};
+
 /** Dia em que o cartão vence: o agendado, ou o dia seguinte ao registro. */
 export const vencimento = (a: { id: string; data: string }, revisoes: Revisoes): string =>
   revisoes[a.id]?.proxima ?? somarDias(a.data || localDayKey(), 1);

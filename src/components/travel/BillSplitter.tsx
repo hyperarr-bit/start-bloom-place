@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
+import { toast } from "sonner";
 import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BillSplitData, BillEntry, calculateSettlement, genId, formatCurrency } from "./types";
@@ -75,10 +77,19 @@ export const BillSplitter = () => {
     setNewPerson("");
   };
 
+  /* 26/09: remover a pessoa APAGAVA, num toque e sem aviso, toda despesa que
+     ela pagou (o Hotel de R$ 900 sumia e o acerto mudava). Agora quem pagou
+     alguma coisa não sai: troque quem pagou (ou apague a despesa) antes. */
   const removePerson = (name: string) => {
+    const pagas = data.entries.filter(e => e.paidBy === name).length;
+    if (pagas > 0) {
+      toast.error(`${name} pagou ${pagas} ${pagas === 1 ? "despesa" : "despesas"}. Troque quem pagou ou apague ${pagas === 1 ? "ela" : "elas"} antes de remover.`);
+      return;
+    }
+    if (!window.confirm(`Tirar ${name} da divisão?`)) return;
     setData(prev => ({
       ...prev, people: prev.people.filter(p => p !== name),
-      entries: prev.entries.filter(e => e.paidBy !== name).map(e => ({ ...e, splitBetween: e.splitBetween.filter(p => p !== name) })),
+      entries: prev.entries.map(e => ({ ...e, splitBetween: e.splitBetween.filter(p => p !== name) })),
     }));
   };
 
@@ -94,7 +105,7 @@ export const BillSplitter = () => {
   };
 
   const removeEntry = (id: string) => {
-    setData(prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== id) }));
+    apagarComDesfazer(setData, prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== id) }), "Despesa apagada");
     setEditandoId(prev => (prev === id ? null : prev));
   };
 
@@ -200,7 +211,7 @@ export const BillSplitter = () => {
                 <button onClick={() => { setEditandoPessoa(p); setNomePessoa(p); }} aria-label={`Renomear ${p}`} className="h-9 w-8 flex items-center justify-center">
                   <Pencil className="w-3 h-3 text-muted-foreground hover:text-foreground" />
                 </button>
-                <button onClick={() => removePerson(p)} aria-label={`Remover ${p} (apaga as despesas que ela pagou)`} className="h-9 w-8 flex items-center justify-center">
+                <button onClick={() => removePerson(p)} aria-label={`Remover ${p}`} className="h-9 w-8 flex items-center justify-center">
                   <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
                 </button>
               </Badge>

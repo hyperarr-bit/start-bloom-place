@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Pill, Receipt, Salad, Sparkles, Wrench } from "lucide-react";
+import { ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Flame, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -32,7 +32,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const HORAS = [6, 7, 8, 9, 10, 12, 18, 20, 21, 22];
 
-type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa" | "compromissos";
+type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa" | "compromissos" | "limite" | "sequencia";
 
 const Notificacoes = () => {
   // 30/07 (dono): na web/PWA não existe como ENTREGAR notificação local, e a
@@ -235,6 +235,28 @@ const Notificacoes = () => {
             Vêm desligados. Ligue só o que você quer ser lembrado — e no horário que for seu.
           </p>
         </div>
+
+        <LinhaAviso
+          icone={<Wallet className="w-4 h-4" />}
+          titulo="Limite do dia"
+          descricao="De manhã, um toque pra ver quanto você pode gastar hoje sem apertar o mês. Se você já abriu Finanças no dia, ele não vem."
+          ligado={p.limite}
+          onChange={(v) => void alternar("limite", v)}
+          rodape={rodapeDe("limite", p.limite, "Lance uma receita ou um gasto em Finanças pra ter o que calcular")}
+          hora={p.limite ? p.horaLimite : undefined}
+          onHora={(h) => void aplicar({ horaLimite: h })}
+        />
+
+        <LinhaAviso
+          icone={<Flame className="w-4 h-4" />}
+          titulo="Sequência"
+          descricao="À noite, só se você ainda não anotou nada no dia — pra sua sequência de dias não cair. Anotou, ele não vem."
+          ligado={p.sequencia}
+          onChange={(v) => void alternar("sequencia", v)}
+          rodape={rodapeDe("sequencia", p.sequencia, "Anote qualquer coisa hoje pra começar uma sequência")}
+          hora={p.sequencia ? p.horaSequencia : undefined}
+          onHora={(h) => void aplicar({ horaSequencia: h })}
+        />
 
         <LinhaAviso
           icone={<CalendarCheck className="w-4 h-4" />}

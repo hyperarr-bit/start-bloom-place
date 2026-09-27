@@ -86,6 +86,12 @@ export const TrackedCard = ({ cardKey, tab, children }: Props) => {
 
   const child = Children.only(children);
   if (!isValidElement(child)) return <>{children}</>;
+  // Ref e onClickCapture só pegam em elemento de DOM. Em componente (Dashboard,
+  // IncomeTable…) o React avisava "Function components cannot be given refs"
+  // 22× por abertura de Finanças e o evento nunca disparava (varredura 26/09).
+  // A medição por card de todos os módulos (lib/medicao-cards, card_view) já
+  // cobre esses cards; aqui fica só o que sempre funcionou (filho <div>).
+  if (typeof child.type !== "string") return <>{children}</>;
 
   const childElement = child as ReactElement<any>;
   const existingRef = (childElement as any).ref as Ref<HTMLElement> | undefined;

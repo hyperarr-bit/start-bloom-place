@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { DiaryEntry, genId } from "./types";
@@ -33,7 +34,7 @@ export const TravelDiary = () => {
   };
 
   const remove = (id: string) => {
-    setEntries(prev => prev.filter(e => e.id !== id));
+    apagarComDesfazer(setEntries, prev => prev.filter(e => e.id !== id), "Entrada do diário apagada");
     setEditandoId(prev => (prev === id ? null : prev));
   };
 

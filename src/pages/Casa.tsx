@@ -83,7 +83,7 @@ const Casa = () => {
         <ModuleTip
           moduleId="casa"
           tips={[
-            "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra Lista de Compras",
+            "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra lista do Mercado",
             "Use o Cardápio para planejar as refeições da semana",
             "Cadastre plantas e pets para nunca esquecer de regar ou dar remédio",
           ]}
@@ -92,7 +92,8 @@ const Casa = () => {
         {activeTab === "comodos" && <RoomManager />}
         {activeTab === "mercado" && <GroceryList />}
         {activeTab === "rotina" && <CleaningRoutine />}
-        {activeTab === "despensa" && <SmartPantry />}
+        {/* "Acabou" na Despensa vai pro Mercado; o toast tem "Ver" que troca de aba (26/09, varredura) */}
+        {activeTab === "despensa" && <SmartPantry onAbrirMercado={() => handleTabChange("mercado")} />}
         {activeTab === "cardapio" && <MealPlanner />}
         {activeTab === "manutencao" && <MaintenanceLog />}
         

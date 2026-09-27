@@ -22,13 +22,23 @@ const diaDoMes = (n: number): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(Math.min(n, 28)).padStart(2, "0")}`;
 };
 
+/* Demo relativa a HOJE (26/09, varredura): as contas tinham dia fixo e, do dia
+ * 19 em diante, a demo abria com "4 contas atrasadas" — e "Energia" (paga) ao
+ * lado de "Energia elétrica" (em aberto), porque o nome da conta não batia com
+ * o do fixo e o sync criava outra. Agora as contas saem dos próprios fixos
+ * (fixedId), paga = dia já passou, e o único ponto de atenção é a Internet
+ * vencendo em 2 dias, em qualquer dia do mês. */
+const HOJE = new Date().getDate();
+const DIAS_NO_MES = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+const DIA_INTERNET = Math.min(HOJE + 2, DIAS_NO_MES);
+
 const FIXED = (prefix: string) => [
   { id: `${prefix}-f1`, value: 1850, cardName: "inter", category: "moradia", description: "Aluguel", paymentMethod: "debito", day: 5 },
   { id: `${prefix}-f2`, value: 420, category: "plano_saude", description: "Plano de saúde", paymentMethod: "boleto", day: 8 },
   { id: `${prefix}-f3`, value: 320, category: "educacao", description: "Curso de inglês", paymentMethod: "pix", day: 15 },
   { id: `${prefix}-f4`, value: 178, category: "contas_casa", description: "Energia elétrica", paymentMethod: "pix", day: 10 },
   { id: `${prefix}-f5`, value: 120, category: "academia", description: "Academia", paymentMethod: "pix", day: 3 },
-  { id: `${prefix}-f6`, value: 99, category: "internet_telefone", description: "Internet", paymentMethod: "boleto", day: 10 },
+  { id: `${prefix}-f6`, value: 99, category: "internet_telefone", description: "Internet", paymentMethod: "boleto", day: DIA_INTERNET },
   { id: `${prefix}-f7`, value: 62, category: "contas_casa", description: "Água", paymentMethod: "pix", day: 18 },
   { id: `${prefix}-f8`, value: 55, category: "assinaturas", description: "Streaming", paymentMethod: "credito", cardName: "nubank", day: 20 },
 ];
@@ -46,12 +56,40 @@ const INSTALLMENT = (paid: number) => [{
   totalInstallments: 12,
 }];
 
+type Lanc = [dia: number, valor: number, categoria: string, descricao: string, pagamento: string, cartao?: string];
+/* Os 4 meses de antes, do mais recente pro mais antigo (eram agosto, julho, junho, maio). */
+const MODELOS: { parcelasPagas: number; gastos: Lanc[] }[] = [
+  { parcelasPagas: 9, gastos: [[2, 640, "alimentacao", "Mercado do mês", "pix"], [6, 112, "delivery", "iFood", "credito", "nubank"], [9, 131, "transporte", "Uber", "pix"], [13, 168, "restaurante", "Jantar fora", "credito", "nubank"], [16, 62, "lazer", "Cinema", "pix"], [19, 89, "farmacia", "Farmácia", "pix"], [23, 74, "alimentacao", "Padaria", "pix"], [27, 95, "pets", "Petshop", "pix"]] },
+  { parcelasPagas: 8, gastos: [[3, 598, "alimentacao", "Mercado do mês", "pix"], [8, 84, "delivery", "iFood", "credito", "nubank"], [11, 122, "transporte", "Uber", "pix"], [15, 139, "restaurante", "Jantar fora", "credito", "nubank"], [21, 58, "farmacia", "Farmácia", "pix"], [26, 110, "vestuario", "Tênis", "debito", "inter"]] },
+  { parcelasPagas: 8, gastos: [[3, 610, "alimentacao", "Mercado do mês", "pix"], [7, 96, "delivery", "iFood", "credito", "nubank"], [10, 118, "transporte", "Uber", "pix"], [14, 145, "restaurante", "Jantar fora", "credito", "nubank"], [15, 76, "lazer", "Cinema", "pix"], [18, 129, "vestuario", "Camiseta", "debito", "inter"], [20, 54, "farmacia", "Farmácia", "pix"], [22, 120, "presente", "Presente de aniversário", "pix"], [25, 82, "alimentacao", "Padaria", "pix"], [28, 90, "pets", "Petshop", "pix"]] },
+  { parcelasPagas: 7, gastos: [[4, 640, "alimentacao", "Mercado do mês", "pix"], [8, 112, "delivery", "iFood", "credito", "nubank"], [12, 95, "transporte", "Uber", "pix"], [16, 178, "restaurante", "Restaurante", "credito", "nubank"], [17, 150, "lazer", "Show", "pix"], [20, 220, "vestuario", "Tênis", "debito", "inter"], [23, 63, "farmacia", "Farmácia", "pix"], [27, 92, "alimentacao", "Padaria", "pix"], [29, 130, "pets", "Petshop", "pix"]] },
+];
+const NOMES_MES = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+function mesesAnteriores(): Record<string, any> {
+  const out: Record<string, any> = {};
+  const hoje = new Date();
+  MODELOS.forEach((m, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - (i + 1), 1);
+    const ano = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const nome = NOMES_MES[d.getMonth()];
+    const px = nome.slice(0, 3);
+    const dia = (n: number) => `${ano}-${mm}-${String(n).padStart(2, "0")}`;
+    out[`finance-${ano}-${nome}-incomes`] = [{ id: `${px}-i1`, date: dia(1), value: 6200, description: "Salário" }];
+    out[`finance-${ano}-${nome}-fixed`] = FIXED(px);
+    out[`finance-${ano}-${nome}-expenses`] = m.gastos.map(([n, value, category, description, paymentMethod, cardName], k) =>
+      ({ id: `${px}-e${k + 1}`, date: dia(n), value, category, description, paymentMethod, ...(cardName ? { cardName } : {}) }));
+    out[`finance-${ano}-${nome}-installments`] = INSTALLMENT(m.parcelasPagas);
+  });
+  return out;
+}
+
 export const FINANCAS_SEED: Record<string, any> = {
   // 15/09: um perfil de empresa ao lado do pessoal (09/09: PF × PJ) — a demo
   // mostra o seletor; os lançamentos seguem no pessoal.
   "finance-perfis": [{ id: "pj-demo", nome: "Minha empresa" }],
   "finance-perfil-ativo": "pessoal",
-  "finance-last-seen-month": "Julho-2026",
+  "finance-last-seen-month": (() => { const d = new Date(); const n = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][d.getMonth()]; return `${n}-${d.getFullYear()}`; })(),
   "finance-streak": 41,
   "finance-lastCheckIn": "2026-07-06",
   "finance-trips": [],
@@ -71,38 +109,20 @@ export const FINANCAS_SEED: Record<string, any> = {
   ],
   "finance-installments": INSTALLMENT(9),
 
-  "finance-dueDays": [
-    {
-      day: 5, color: "yellow",
-      bills: [
-        { id: "b-1", name: "Aluguel", paid: true, value: 1850 },
-        { id: "b-2", name: "Plano de Saúde", paid: true, value: 420 },
-      ],
-    },
-    {
-      day: 10, color: "slate",
-      bills: [
-        { id: "b-3", name: "Energia", paid: true, value: 178 },
-        // Único ponto de atenção do demo: vence em poucos dias → alerta útil
-        { id: "b-4", name: "Internet", paid: false, value: 99 },
-      ],
-    },
-    {
-      day: 20, color: "indigo",
-      bills: [
-        { id: "b-5", name: "Streaming", paid: true, value: 55 },
-        { id: "b-6", name: "Academia", paid: true, value: 120 },
-      ],
-    },
-    {
-      day: 27, color: "emerald",
-      bills: [
-        // 42 (iFood) + 89 (restaurante) + 150 (parcela do celular) = gastos
-        // reais do nubank no mês — a fatura bate com o app de propósito.
-        { id: "b-7", name: "Fatura Nubank", paid: false, value: 281 },
-      ],
-    },
-  ],
+  "finance-dueDays": (() => {
+    const cores = ["yellow", "slate", "indigo", "emerald", "rose", "cyan", "orange", "purple"];
+    const porDia = new Map<number, any[]>();
+    for (const f of FIXED("jul")) {
+      const bill = { id: `fx-${f.id}`, name: f.description, paid: f.description !== "Internet" && f.day < HOJE, value: f.value, fixedId: f.id };
+      porDia.set(f.day, [...(porDia.get(f.day) ?? []), bill]);
+    }
+    return [...porDia.entries()].sort((a, b) => a[0] - b[0]).map(([day, bills], i) => ({ day, color: cores[i % cores.length], bills }));
+  })(),
+  // Fatura do Nubank DERIVADA (como a de um cliente): cartão com vencimento →
+  // "Fatura Nubank · R$ 281" (iFood 42 + restaurante 89 + parcela 150). A conta
+  // digitada à mão que existia aqui era contada de novo no "quanto posso gastar".
+  "finance-card-config": { nubank: { closingDay: 20, dueDay: 27 } },
+  "finance-faturas-pagas": HOJE > 27 ? { [`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}:nubank`]: true } : {},
 
   // ------------------------------------------------- metas, desejos, aportes
   "finance-goals": [
@@ -177,74 +197,9 @@ export const FINANCAS_SEED: Record<string, any> = {
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ].map((month) => ({ month, value: 4800, hasNote: false })),
 
-  // 16/09: AGOSTO e JULHO arquivados. A demo nasceu em julho e os meses
-  // anteriores pararam em junho — em setembro a Comparação Mensal abria
-  // "ago/2026: R$ 0" pra todo visitante do funil. Espelham junho com
-  // pequenas variações, pra comparação e gráficos terem o mês anterior real.
-  "finance-2026-agosto-incomes": [
-    { id: "ago-i1", date: "2026-08-01", value: 6200, description: "Salário" },
-  ],
-  "finance-2026-agosto-fixed": FIXED("ago"),
-  "finance-2026-agosto-expenses": [
-    { id: "ago-e1", date: "2026-08-02", value: 640, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
-    { id: "ago-e2", date: "2026-08-06", value: 112, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
-    { id: "ago-e3", date: "2026-08-09", value: 131, category: "transporte", description: "Uber", paymentMethod: "pix" },
-    { id: "ago-e4", date: "2026-08-13", value: 168, category: "restaurante", description: "Jantar fora", paymentMethod: "credito", cardName: "nubank" },
-    { id: "ago-e5", date: "2026-08-16", value: 62, category: "lazer", description: "Cinema", paymentMethod: "pix" },
-    { id: "ago-e6", date: "2026-08-19", value: 89, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
-    { id: "ago-e7", date: "2026-08-23", value: 74, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
-    { id: "ago-e8", date: "2026-08-27", value: 95, category: "pets", description: "Petshop", paymentMethod: "pix" },
-  ],
-  "finance-2026-agosto-installments": INSTALLMENT(9),
-  "finance-2026-julho-incomes": [
-    { id: "jul-i1", date: "2026-07-01", value: 6200, description: "Salário" },
-  ],
-  "finance-2026-julho-fixed": FIXED("jul"),
-  "finance-2026-julho-expenses": [
-    { id: "jul-e1", date: "2026-07-03", value: 598, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
-    { id: "jul-e2", date: "2026-07-08", value: 84, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
-    { id: "jul-e3", date: "2026-07-11", value: 122, category: "transporte", description: "Uber", paymentMethod: "pix" },
-    { id: "jul-e4", date: "2026-07-15", value: 139, category: "restaurante", description: "Jantar fora", paymentMethod: "credito", cardName: "nubank" },
-    { id: "jul-e5", date: "2026-07-21", value: 58, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
-    { id: "jul-e6", date: "2026-07-26", value: 110, category: "vestuario", description: "Tênis", paymentMethod: "debito", cardName: "inter" },
-  ],
-  "finance-2026-julho-installments": INSTALLMENT(8),
-
-  // --------------------------------------- meses anteriores (junho / maio)
-  // Alimentam o gráfico Receitas vs Despesas, a Evolução do Patrimônio e a
-  // Comparação Mensal (todos leem estas chaves, não o array do mês atual).
-  "finance-2026-junho-incomes": [
-    { id: "jun-i1", date: "2026-06-01", value: 6200, description: "Salário" },
-  ],
-  "finance-2026-junho-fixed": FIXED("jun"),
-  "finance-2026-junho-expenses": [
-    { id: "jun-e1", date: "2026-06-03", value: 610, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
-    { id: "jun-e2", date: "2026-06-07", value: 96, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
-    { id: "jun-e3", date: "2026-06-10", value: 118, category: "transporte", description: "Uber", paymentMethod: "pix" },
-    { id: "jun-e4", date: "2026-06-14", value: 145, category: "restaurante", description: "Jantar fora", paymentMethod: "credito", cardName: "nubank" },
-    { id: "jun-e5", date: "2026-06-15", value: 76, category: "lazer", description: "Cinema", paymentMethod: "pix" },
-    { id: "jun-e6", date: "2026-06-18", value: 129, category: "vestuario", description: "Camiseta", paymentMethod: "debito", cardName: "inter" },
-    { id: "jun-e7", date: "2026-06-20", value: 54, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
-    { id: "jun-e8", date: "2026-06-22", value: 120, category: "presente", description: "Presente de aniversário", paymentMethod: "pix" },
-    { id: "jun-e9", date: "2026-06-25", value: 82, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
-    { id: "jun-e10", date: "2026-06-28", value: 90, category: "pets", description: "Petshop", paymentMethod: "pix" },
-  ],
-  "finance-2026-junho-installments": INSTALLMENT(8),
-
-  "finance-2026-maio-incomes": [
-    { id: "mai-i1", date: "2026-05-01", value: 6200, description: "Salário" },
-  ],
-  "finance-2026-maio-fixed": FIXED("mai"),
-  "finance-2026-maio-expenses": [
-    { id: "mai-e1", date: "2026-05-04", value: 640, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
-    { id: "mai-e2", date: "2026-05-08", value: 112, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
-    { id: "mai-e3", date: "2026-05-12", value: 95, category: "transporte", description: "Uber", paymentMethod: "pix" },
-    { id: "mai-e4", date: "2026-05-16", value: 178, category: "restaurante", description: "Restaurante", paymentMethod: "credito", cardName: "nubank" },
-    { id: "mai-e5", date: "2026-05-17", value: 150, category: "lazer", description: "Show", paymentMethod: "pix" },
-    { id: "mai-e6", date: "2026-05-20", value: 220, category: "vestuario", description: "Tênis", paymentMethod: "debito", cardName: "inter" },
-    { id: "mai-e7", date: "2026-05-23", value: 63, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
-    { id: "mai-e8", date: "2026-05-27", value: 92, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
-    { id: "mai-e9", date: "2026-05-29", value: 130, category: "pets", description: "Petshop", paymentMethod: "pix" },
-  ],
-  "finance-2026-maio-installments": INSTALLMENT(7),
+  // Os 4 meses ANTERIORES, relativos a hoje (26/09): eram chaves fixas
+  // (maio–agosto de 2026). Em outubro, "setembro" não teria arquivo e a
+  // Comparação Mensal, os gráficos e a Retrospectiva da demo — a vitrine do
+  // funil — abririam vazios. Mesmos valores de antes, datas do mês certo.
+  ...mesesAnteriores(),
 };

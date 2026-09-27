@@ -1,12 +1,14 @@
-export type BadgeCategoria = "finance" | "rotina" | "leitura" | "treino" | "dieta" | "geral";
+export type BadgeCategoria = "sequencia" | "finance" | "rotina" | "leitura" | "treino" | "dieta" | "saude" | "geral";
 
-/** Rótulo e ordem das seções da grade — a ordem é a de uso real dos módulos. */
+/** Rótulo e ordem das categorias — a ordem é a de uso real dos módulos. */
 export const CATEGORIAS: { id: BadgeCategoria; label: string; emoji: string }[] = [
+  { id: "sequencia", label: "Sequência", emoji: "🔥" },
   { id: "finance", label: "Finanças", emoji: "💰" },
   { id: "rotina", label: "Rotina", emoji: "📅" },
   { id: "leitura", label: "Leitura", emoji: "📚" },
   { id: "treino", label: "Treino", emoji: "🏋️" },
   { id: "dieta", label: "Dieta", emoji: "🥗" },
+  { id: "saude", label: "Saúde", emoji: "💧" },
   { id: "geral", label: "CORE", emoji: "👑" },
 ];
 
@@ -25,11 +27,21 @@ export interface Badge {
    * conquistas" por PROXIMIDADE em vez de por ordem de declaração.
    */
   progresso?: { atual: number; alvo: number };
+  /**
+   * Como o adesivo que falta mostra o progresso (26/09): "3/7" (contagem),
+   * "R$ 80" (reais), "12%" (porcento), "620 xp" (xp).
+   */
+  formato?: "contagem" | "reais" | "porcento" | "xp";
+  /**
+   * Unidade do "falta": ["livro", "livros"] → "mais 1 livro". Sem unidade
+   * (sim/não, ou medida por RECORDE de dias seguidos) o "falta" é a descrição.
+   */
+  unidade?: [string, string];
 }
 
 /** 0..1. Sem progresso declarado, só existe trancada (0) ou aberta (1). */
 export const fracaoDe = (b: Badge): number =>
-  b.unlocked ? 1 : b.progresso && b.progresso.alvo > 0 ? b.progresso.atual / b.progresso.alvo : 0;
+  b.unlocked ? 1 : b.progresso && b.progresso.alvo > 0 ? Math.min(1, b.progresso.atual / b.progresso.alvo) : 0;
 
 export interface Level {
   name: string;
@@ -54,3 +66,8 @@ export const getNextLevel = (xp: number): Level | null => {
   const idx = LEVELS.findIndex(l => l.minXP > xp);
   return idx >= 0 ? LEVELS[idx] : null;
 };
+
+/** Raridade pelo XP (50 comum · 100 raro · 200 épico). */
+export type BadgeTier = "comum" | "rara" | "epica";
+export const tierOf = (xp: number): BadgeTier => (xp >= 200 ? "epica" : xp >= 100 ? "rara" : "comum");
+export const TIER_LABEL: Record<BadgeTier, string> = { comum: "Comum", rara: "Raro", epica: "Épico" };

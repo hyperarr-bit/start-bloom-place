@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
-import { parseLocalDay, mesAtualExtenso } from "@/lib/utils";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
+import { parseLocalDay, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -64,6 +66,37 @@ const examColors = [
   "border-l-4 border-l-purple-400 bg-purple-50 dark:bg-purple-950/20",
 ];
 
+/** Cor da prova SEMPRE com fundo claro e texto legível (26/09, varredura). O
+ *  card pinta `ex.color` como classe e escreve a data em cinza por cima: cor
+ *  forte gravada (a demo tem "bg-blue-500"; a versão de março gravava outra
+ *  paleta) deixava a data ilegível — contraste 1,3:1. Cor fora da paleta de
+ *  hoje vira a da paleta no MESMO tom (azul forte → azul claro); tom que a
+ *  paleta não tem, uma dela pela posição. Só na tela: nada é regravado. */
+export const corDaProva = (cor: unknown, posicao = 0): string => {
+  if (typeof cor === "string" && examColors.includes(cor)) return cor;
+  const tom = typeof cor === "string" ? cor.match(/\bbg-([a-z]+)-\d{2,3}\b/)?.[1] : undefined;
+  return (tom && examColors.find((c) => c.includes(`bg-${tom}-50 `))) || examColors[Math.abs(posicao) % examColors.length];
+};
+
+/** Prova que já passou (data antes de hoje, dia local) ou marcada como feita. */
+export const provaPassou = (ex: { date?: string; done?: boolean }, hoje: string = localDayKey()): boolean =>
+  !!ex.done || (!!ex.date && ex.date < hoje);
+
+/** Ordem da lista (26/09, varredura): as que vêm — da mais próxima pra mais
+ *  longe —, depois as sem data, e no fim as que passaram ou foram feitas (da
+ *  mais recente pra mais antiga). Antes a prova de agosto ficava no topo pra
+ *  sempre, e não havia como tirá-la de lá sem apagar. */
+export const ordenarProvas = <T extends { date?: string; done?: boolean }>(lista: T[], hoje: string = localDayKey()): T[] => {
+  const grupo = (e: T) => (provaPassou(e, hoje) ? 2 : e.date ? 0 : 1);
+  return [...lista].sort((a, b) => {
+    const ga = grupo(a), gb = grupo(b);
+    if (ga !== gb) return ga - gb;
+    if (ga === 0) return (a.date || "").localeCompare(b.date || "");
+    if (ga === 2) return (b.date || "").localeCompare(a.date || "");
+    return 0;
+  });
+};
+
 const defaultScheduleHours = ["7h30", "8h", "9h", "10h", "11h", "12h", "13h", "14h"];
 
 /** Sábado é COLUNA da grade, não o "FINAL DE SEMANA" das tarefas (aquele é
@@ -110,6 +143,10 @@ const TABS = [
 
 const Estudos = () => {
   const navigate = useNavigate();
+  // Demo (/preview/estudos): a seta sai pra LP, como em Finanças — /home sem
+  // conta caía no login (26/09, varredura).
+  const location = useLocation();
+  const isPreview = location.pathname.startsWith("/preview");
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
 
@@ -122,6 +159,25 @@ const Estudos = () => {
   const [newCursoDesejoLink, setNewCursoDesejoLink] = useState("");
   /** Qual curso está com o painel de link+anotações aberto (o ícone de papel). */
   const [cursoAberto, setCursoAberto] = useState<string | null>(null);
+  /** Apagar curso com DESFAZER (26/09, varredura): o curso leva junto progresso
+   *  (aulas) e anotações — um toque na lixeira apagava sem volta. O Desfazer
+   *  devolve o objeto inteiro no mesmo lugar; os aprendizados nunca saem (ficam
+   *  como "Curso removido" e voltam a se ligar pelo id). */
+  const apagarCurso = (c: Course) => {
+    const posicao = cursosAndamento.findIndex(x => x.id === c.id);
+    setCursosAndamento(prev => prev.filter(x => x.id !== c.id));
+    avisarApagado(`Curso apagado: ${c.name}`, () => setCursosAndamento(prev => prev.some(x => x.id === c.id)
+      ? prev
+      : [...prev.slice(0, Math.max(0, posicao)), c, ...prev.slice(Math.max(0, posicao))]));
+  };
+
+  /** "Comecei" (26/09, varredura): o curso da lista de desejos vai pra em
+   *  andamento com nome e link — antes era apagar de um lado e redigitar no outro. */
+  const comecarCurso = (c: Course) => {
+    setCursosDesejo(prev => prev.filter(x => x.id !== c.id));
+    setCursosAndamento(prev => [...prev, prev.some(x => x.id === c.id) ? { ...c, id: Date.now().toString() } : c]);
+    toast.success(`${c.name} foi pra Cursos em andamento`);
+  };
 
   // APRENDIZADOS POR CURSO (09/09, pedido literal do dono: "Não tem como
   // acrescentar o que aprendi no curso. Tipo: aprendi isso, esse slide é bom
@@ -378,6 +434,15 @@ const Estudos = () => {
     setExamEditId(null);
   };
 
+  /** Apaga a anotação do Caderno e oferece Desfazer (volta no MESMO lugar). */
+  const apagarAnotacao = (n: Notebook) => {
+    const posicao = notebooks.findIndex(x => x.id === n.id);
+    setNotebooks(prev => prev.filter(x => x.id !== n.id));
+    avisarApagado("Anotação apagada", () => setNotebooks(prev => prev.some(x => x.id === n.id)
+      ? prev
+      : [...prev.slice(0, Math.max(0, posicao)), n, ...prev.slice(Math.max(0, posicao))]));
+  };
+
   const addNotebook = () => {
     setNotebooks([{
       id: Date.now().toString(), date: new Date().toLocaleDateString("pt-BR"),
@@ -405,7 +470,7 @@ const Estudos = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label={isPreview ? "Voltar" : "Todos os módulos"}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <GraduationCap className="w-5 h-5 text-indigo-600" />
@@ -474,8 +539,9 @@ const Estudos = () => {
                             <FileText className="w-4 h-4" />
                           </button>
                           {/* Lixeira SEM hover: celular não tem hover, então a
-                              ÚNICA ação viva da linha era justamente a invisível. */}
-                          <button onClick={() => setCursosAndamento(prev => prev.filter(x => x.id !== c.id))}
+                              ÚNICA ação viva da linha era justamente a invisível.
+                              Com Desfazer desde 26/09 — ver apagarCurso. */}
+                          <button onClick={() => apagarCurso(c)}
                             aria-label={`Excluir ${c.name}`}
                             className="h-9 w-9 flex items-center justify-center rounded-lg">
                             <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
@@ -570,6 +636,10 @@ const Estudos = () => {
                   <div key={c.id} className="px-4 py-2">
                     <div className="flex items-center gap-1">
                       <span className="text-sm font-medium flex-1 min-w-0 break-words">{c.name}</span>
+                      <button onClick={() => comecarCurso(c)} aria-label={`Comecei ${c.name}`}
+                        className="h-8 px-2.5 rounded-lg border border-border bg-card text-[11px] font-semibold text-muted-foreground shrink-0">
+                        Comecei
+                      </button>
                       {/* Mesma correção da lista de cima: excluir não pode
                           depender de hover, que no celular não acontece. */}
                       <button onClick={() => setCursosDesejo(prev => prev.filter(x => x.id !== c.id))}
@@ -717,10 +787,10 @@ const Estudos = () => {
                 <span className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">📝 PROVAS, TRABALHOS E ENTREGAS</span>
               </div>
               <div className="bg-stone-100 dark:bg-stone-950/20 p-4 space-y-2">
-                {/* `[...exams]` porque `.sort()` ordena NO LUGAR: o original
-                    mutava o array que está no estado/persistência a cada render.
-                    Sem data vai pro fim ("9999"), não pro topo. */}
-                {[...exams].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999")).map(ex => examEditId === ex.id ? (
+                {/* ordenarProvas copia antes de ordenar (o `.sort()` no lugar
+                    mutava o array do estado): as que vêm primeiro, sem data
+                    depois, as passadas/feitas no fim — ver ordenarProvas. */}
+                {ordenarProvas(exams, localDayKey()).map(ex => examEditId === ex.id ? (
                   <div key={ex.id} className="rounded-lg border border-border bg-card px-3 py-3 space-y-2">
                     <Input autoFocus value={examDraft.title} onChange={e => setExamDraft({ ...examDraft, title: e.target.value })}
                       placeholder="Título" className="h-9 text-xs rounded-lg"
@@ -744,15 +814,24 @@ const Estudos = () => {
                     </div>
                   </div>
                 ) : (
-                  <div key={ex.id} className={`rounded-lg px-3 py-2 ${ex.color}`}>
+                  <div key={ex.id} className={`rounded-lg px-3 py-2 ${corDaProva(ex.color, exams.indexOf(ex))} ${provaPassou(ex) ? "opacity-70" : ""}`}>
                     <div className="flex items-center gap-2">
+                      {/* Marcar como feita (26/09, varredura): a prova vai pro
+                          fim da lista, esmaecida — antes não havia como. */}
+                      <button onClick={() => setExams(prev => prev.map(x => x.id === ex.id ? { ...x, done: !x.done } : x))}
+                        aria-label={`${ex.done ? "Desmarcar" : "Marcar"} ${ex.title} como feita`} aria-pressed={!!ex.done}
+                        className="h-9 w-9 -mx-2 flex items-center justify-center shrink-0">
+                        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${ex.done ? "bg-blue-500 border-blue-500" : "border-muted-foreground/30"}`}>
+                          {ex.done && <Check className="w-3 h-3 text-white" />}
+                        </span>
+                      </button>
                       {/* Prova adiada era caso de apagar e recadastrar. Agora o
                           card inteiro abre a edição — alvo grande, dá no dedo. */}
                       <button onClick={() => { setExamEditId(ex.id); setExamDraft({ title: ex.title, date: ex.date, time: ex.time }); }}
                         aria-label={`Editar ${ex.title}`}
                         className="flex-1 min-w-0 min-h-[36px] flex items-center gap-1.5 text-left">
                         <span className="flex-1 min-w-0">
-                          <span className="text-sm font-bold">{ex.title}</span>
+                          <span className={`text-sm font-bold ${ex.done ? "line-through" : ""}`}>{ex.title}</span>
                           <span className="text-sm text-muted-foreground">
                             {" - "}
                             {/* parseLocalDay: `new Date("2026-08-10")` parseia como
@@ -774,21 +853,25 @@ const Estudos = () => {
                 {exams.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-4">Nenhuma prova ou entrega registrada</p>
                 )}
-                <div className="flex gap-2 pt-2">
-                  <Input value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} placeholder="Título" className="text-xs h-9 flex-1 rounded-lg" />
-                  <div className="relative w-32">
-                    <CampoData rotulo="Data" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="text-xs h-9 rounded-lg" />
+                {/* Título em linha própria (26/09, varredura): lado a lado com
+                    data, hora e o botão, a 360 px o campo ficava com 38 px ("Ti"). */}
+                <div className="space-y-2 pt-2">
+                  <Input value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} placeholder="Título" className="text-xs h-9 w-full rounded-lg" />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 min-w-0">
+                      <CampoData rotulo="Data" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="text-xs h-9 rounded-lg" />
+                    </div>
+                    <Input value={newExamTime} onChange={e => setNewExamTime(e.target.value)} placeholder="Hora" className="text-xs h-9 w-20 rounded-lg" />
+                    <Button size="sm" className="h-9" aria-label="Adicionar prova ou entrega" onClick={() => {
+                      if (newExamTitle.trim()) {
+                        setExams([...exams, {
+                          id: Date.now().toString(), title: newExamTitle.trim(), date: newExamDate, time: newExamTime,
+                          color: examColors[exams.length % examColors.length], done: false,
+                        }]);
+                        setNewExamTitle(""); setNewExamDate(""); setNewExamTime("");
+                      }
+                    }}><Plus className="w-3 h-3" /></Button>
                   </div>
-                  <Input value={newExamTime} onChange={e => setNewExamTime(e.target.value)} placeholder="Hora" className="text-xs h-9 w-16 rounded-lg" />
-                  <Button size="sm" className="h-9" aria-label="Adicionar prova ou entrega" onClick={() => {
-                    if (newExamTitle.trim()) {
-                      setExams([...exams, {
-                        id: Date.now().toString(), title: newExamTitle.trim(), date: newExamDate, time: newExamTime,
-                        color: examColors[exams.length % examColors.length], done: false,
-                      }]);
-                      setNewExamTitle(""); setNewExamDate(""); setNewExamTime("");
-                    }
-                  }}><Plus className="w-3 h-3" /></Button>
                 </div>
               </div>
             </div>
@@ -996,12 +1079,18 @@ const Estudos = () => {
                   <div className="px-4 pb-3 space-y-2">
                     {tasks.filter(t => t.text).map((task, ti) => (
                       <div key={ti} className="flex items-center gap-2.5 group">
+                        {/* w-5 h-5 num alvo de 36 px (26/09, varredura): `w-4.5`/
+                            `h-4.5` não existem no Tailwind — o quadradinho tinha
+                            4 px, invisível e impossível de tocar. */}
                         <button onClick={() => {
                           const u = { ...weekTasks };
                           u[day] = tasks.map((t, j) => j === ti ? { ...t, done: !t.done } : t);
                           setWeekTasks(u);
-                        }} className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${task.done ? "bg-blue-500 border-blue-500" : "border-muted-foreground/30"}`}>
-                          {task.done && <Check className="w-3 h-3 text-white" />}
+                        }} aria-label={`${task.done ? "Desmarcar" : "Marcar"} ${task.text}`} aria-pressed={task.done}
+                          className="h-9 w-9 -mx-2 flex items-center justify-center shrink-0">
+                          <span className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.done ? "bg-blue-500 border-blue-500" : "border-muted-foreground/30"}`}>
+                            {task.done && <Check className="w-3 h-3 text-white" />}
+                          </span>
                         </button>
                         <span className={`text-sm flex-1 ${task.done ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
                         {/* Mesma regra do resto do módulo: no celular não existe
@@ -1017,7 +1106,7 @@ const Estudos = () => {
                     {/* Empty checkbox slots */}
                     {tasks.filter(t => t.text).length < 2 && Array.from({ length: 2 - tasks.filter(t => t.text).length }).map((_, i) => (
                       <div key={`empty-${i}`} className="flex items-center gap-2.5">
-                        <div className="w-4.5 h-4.5 rounded border-2 border-muted-foreground/20 shrink-0" />
+                        <div className="w-5 h-5 rounded border-2 border-muted-foreground/20 shrink-0" />
                       </div>
                     ))}
                     <div className="flex gap-1.5 pt-1">
@@ -1071,8 +1160,12 @@ const Estudos = () => {
                   {/* Meta cards */}
                   <div className="rounded-xl border border-border bg-card p-4 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold">Data: {n.date}</p>
-                      <button onClick={() => setNotebooks(notebooks.filter(x => x.id !== n.id))}>
+                      {/* data antiga/da demo em AAAA-MM-DD sai como dd/mm/aaaa, igual à gravada hoje */}
+                      <p className="text-sm font-bold">Data: {/^\d{4}-\d{2}-\d{2}$/.test(n.date) ? dataSegura(n.date, "dd/MM/yyyy") : n.date}</p>
+                      {/* Apagar com Desfazer (26/09, varredura): a anotação inteira
+                          (resumo, plano, dúvidas, frases) sumia num toque. */}
+                      <button onClick={() => apagarAnotacao(n)} aria-label="Apagar anotação"
+                        className="h-9 w-9 -m-2 flex items-center justify-center shrink-0">
                         <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                       </button>
                     </div>

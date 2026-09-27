@@ -258,10 +258,16 @@ serve(async (req) => {
       .filter((c) => PULAR_QUEM_GEROU_QR.includes(c.stage)).map((c) => c.user_id))];
     const comQR = new Set<string>();
     for (let i = 0; i < idsDs.length; i += 50) {
+      /* 26/09: Pix ADIANTADO (o paywall da web cria o Pix antes do toque) só
+       * conta se foi pra TELA — senão quem só viu o preço perderia este e-mail
+       * sem ganhar o de Pix pendente, que sai do pix_generated. */
       const { data: qs } = await supabase
-        .from("analytics_events").select("user_id")
-        .eq("event_name", "pix_order_created").in("user_id", idsDs.slice(i, i + 50));
-      for (const q of qs ?? []) comQR.add(String(q.user_id));
+        .from("analytics_events").select("user_id, event_name, event_data")
+        .in("event_name", ["pix_order_created", "pix_generated"]).in("user_id", idsDs.slice(i, i + 50));
+      for (const q of qs ?? []) {
+        if (q.event_name === "pix_order_created" && q.event_data?.adiantado === true) continue;
+        comQR.add(String(q.user_id));
+      }
     }
 
     /* 20/09: quem já ABRIU O APP das lojas (Android ou iPhone) sai desta régua.

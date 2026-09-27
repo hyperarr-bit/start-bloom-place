@@ -22,7 +22,7 @@
  * justamente a pessoa que pediu.
  */
 import { useState } from "react";
-import { localDayKey, semanaAtualId, parseLocalDay } from "@/lib/utils";
+import { localDayKey, semanaAtualId, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, Trash2, Edit2, BookMarked, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -92,6 +92,9 @@ export const BlocoDeFases = ({
   const [novaTarefa, setNovaTarefa] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [memoAberto, setMemoAberto] = useState<string | null>(null);
+  // Apagar fase em DOIS toques (26/09, varredura): a fase leva junto a contagem
+  // de todos os dias e o memorando — um toque na lixeira apagava sem volta.
+  const [apagandoFase, setApagandoFase] = useState<string | null>(null);
   const [semanaOffset, setSemanaOffset] = useState(0);
   const [mesOffset, setMesOffset] = useState(0);
 
@@ -143,7 +146,9 @@ export const BlocoDeFases = ({
     .filter(([dia]) => dia.startsWith(prefixoMes))
     .reduce((s, [, n]) => s + n, 0);
   const tarefasDoMes = tasks.filter(t => t.dia.startsWith(prefixoMes) && t.feito).length;
-  const nomeMes = refMes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  // "Setembro de 2026" (26/09, varredura): a classe `capitalize` subia toda
+  // palavra ("Setembro De 2026") — o mesmo defeito que o mesAtualExtenso resolveu.
+  const nomeMes = mesAtualExtenso(refMes);
 
   return (
     <div className="space-y-4">
@@ -168,17 +173,25 @@ export const BlocoDeFases = ({
                 ) : (
                   <span className="flex-1 text-sm font-medium truncate">{f.nome}</span>
                 )}
-                <button onClick={() => setEditId(f.id)} className="text-muted-foreground hover:text-foreground p-1" aria-label="Renomear fase">
+                <button onClick={() => { setEditId(f.id); setApagandoFase(null); }} className="text-muted-foreground hover:text-foreground p-1" aria-label="Renomear fase">
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
                 <button onClick={() => setMemoAberto(memoAberto === f.id ? null : f.id)}
                   className={`p-1 ${f.memo ? "text-amber-500" : "text-muted-foreground hover:text-foreground"}`} aria-label="Memorando">
                   <BookMarked className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => setPhases(prev => prev.filter(p => p.id !== f.id))}
-                  className="text-muted-foreground hover:text-destructive p-1" aria-label="Apagar fase">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {apagandoFase === f.id ? (
+                  <button onClick={() => { setPhases(prev => prev.filter(p => p.id !== f.id)); setApagandoFase(null); }}
+                    className="px-1.5 py-1 rounded text-[9px] font-bold text-destructive border border-destructive/40"
+                    aria-label={`Confirmar: apagar a fase ${f.nome} e a contagem dela`}>
+                    apagar?
+                  </button>
+                ) : (
+                  <button onClick={() => setApagandoFase(f.id)}
+                    className="text-muted-foreground hover:text-destructive p-1" aria-label="Apagar fase">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex items-center justify-center gap-4">
                 <Button size="icon" variant="outline" className="h-9 w-9 rounded-full text-lg" onClick={() => contar(f.id, -1)}>−</Button>
@@ -269,7 +282,7 @@ export const BlocoDeFases = ({
             <button onClick={() => setMesOffset(m => m - 1)} className="p-0.5 hover:bg-background/50 rounded" aria-label="Mês anterior">
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <span className="text-[9px] font-medium capitalize min-w-[76px] text-center">{nomeMes}</span>
+            <span className="text-[9px] font-medium min-w-[76px] text-center">{nomeMes}</span>
             <button onClick={() => setMesOffset(m => Math.min(0, m + 1))} disabled={mesOffset >= 0}
               className="p-0.5 hover:bg-background/50 rounded disabled:opacity-30" aria-label="Próximo mês">
               <ChevronRight className="w-3.5 h-3.5" />

@@ -5,6 +5,7 @@ import { Plus, X, Check, Shield, AlertTriangle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmergencyItem, daysSince } from "./types";
+import { dataBR } from "./formatos";
 
 const SafetyChecks = () => {
   const [travelChecklist, setTravelChecklist] = usePersistedState<{ id: string; text: string; checked: boolean }[]>("casa-travel-checklist", [
@@ -102,7 +103,8 @@ const SafetyChecks = () => {
               </button>
               <span className="text-xs flex-1">{item.name}</span>
               <span className="text-[9px] text-muted-foreground">
-                {item.lastChecked ? `Checado: ${new Date(item.lastChecked).toLocaleDateString("pt-BR")}` : "Nunca"}
+                {/* dia LOCAL (26/09, varredura): o UTC mostrava "Checado" 1 dia antes */}
+                {item.lastChecked ? `Checado: ${dataBR(item.lastChecked)}` : "Nunca"}
               </span>
               <button onClick={() => setEmergencyStock(prev => prev.filter(x => x.id !== item.id))} className="opacity-0 group-hover:opacity-100">
                 <X className="w-3 h-3 text-muted-foreground" />

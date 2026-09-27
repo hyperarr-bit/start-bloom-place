@@ -5,6 +5,12 @@ import { getMonthTotals, getFinanceStorageKeys, readMonthData, anosComLancamento
 import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceCategories } from "@/lib/finance-categories";
+import { computeMonthlyOutflow } from "@/lib/finance-totals";
+import {
+  type Parcela, chaveArquivadaDeParcelas, mesesAnteriores, mesesEntre, projetarParcelas, somaParcelasDoMes,
+  valorDaParcelaNoMes, viradaDeParcelas,
+} from "@/lib/finance-parcelas";
+import { mesCorrenteId } from "@/lib/virada-contas";
 
 /* Exportados (09/09) pra Comparação Anual (YearComparison), que soma os 12
    meses com as MESMAS leituras e a MESMA cara — uma tabela de rótulos e uma
@@ -84,7 +90,48 @@ interface CategoryData {
   monthB: number;
 }
 
-export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string): Record<string, number> => {
+/**
+ * PARCELAS DO MÊS (26/09, varredura). A comparação mensal/anual e a
+ * retrospectiva somavam só fixos + variáveis: setembro da demo dava R$ 3.568
+ * aqui e R$ 3.718 no Dashboard — a parcela de R$ 150 do celular ficava de
+ * fora. A regra é a de quem MOSTRA o mês: mês corrente = balde
+ * `finance-installments` já virado (Index); outro mês = a chave dele + o que
+ * as chaves anteriores projetam pra ele (MonthlySheet). Mês que ainda não
+ * chegou não recebe projeção: comparação é do que aconteceu, não previsão.
+ * Só leitura — nada é gravado.
+ */
+export const parcelasDoMesDe = (m: MesAno, userId: string | null, perfil: string, agora = new Date()): Parcela[] => {
+  const mesId = idDeMesAno(m);
+  const atual = mesCorrenteId(agora);
+  const ler = (chave: string): Parcela[] => {
+    const v = readMonthData(userId, chave);
+    return Array.isArray(v) ? (v as Parcela[]) : [];
+  };
+  if (mesId === atual) {
+    const balde = ler("finance-installments");
+    const fontes = [atual, ...mesesAnteriores(atual, 24)].map((mes) => ({ mes, itens: ler(chaveArquivadaDeParcelas(mes)) }));
+    return doPerfil(viradaDeParcelas(balde, atual, fontes)?.lista ?? balde, perfil);
+  }
+  const proprias = ler(chaveArquivadaDeParcelas(mesId));
+  if (mesesEntre(atual, mesId) > 0) return doPerfil(proprias, perfil);
+  const fontes = mesesAnteriores(mesId, 24).map((mes) => ({
+    mes, itens: ler(mes === atual ? "finance-installments" : chaveArquivadaDeParcelas(mes)),
+  }));
+  return doPerfil([...proprias, ...projetarParcelas(fontes, mesId, proprias)], perfil);
+};
+
+/** Categoria da parcela como o card de parcelamentos mostra ("roupa" antigo = vestuário). */
+const categoriaDaParcela = (c?: string) => (c === "roupa" ? "vestuario" : c || "outros");
+
+/** Totais do mês com a MESMA conta do Dashboard: fixos + variáveis + parcelas
+ *  (computeMonthlyOutflow, lib/finance-totals). */
+export const totaisDoMes = (m: MesAno, userId: string | null, perfil: string, agora = new Date()) => {
+  const t = getMonthTotals(ALL_MONTHS[m.idx], userId, m.ano, perfil);
+  const parcelas = somaParcelasDoMes(parcelasDoMesDe(m, userId, perfil, agora));
+  return { ...t, parcelas, despesas: computeMonthlyOutflow(t.custosVariaveis, t.custosFixos, parcelas) };
+};
+
+export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string, agora = new Date()): Record<string, number> => {
   const keys = getFinanceStorageKeys(ALL_MONTHS[m.idx], m.ano);
   const expenses = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
   const fixed = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
@@ -98,11 +145,25 @@ export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: 
     const cat = e.category || "outros";
     grouped[cat] = (grouped[cat] || 0) + (e.value || 0);
   });
+  // a parcela entra na categoria dela, senão as categorias não fecham com o total (26/09)
+  parcelasDoMesDe(m, userId, perfil, agora).forEach((p) => {
+    const v = valorDaParcelaNoMes(p);
+    if (v <= 0) return;
+    const cat = categoriaDaParcela(p.category);
+    grouped[cat] = (grouped[cat] || 0) + v;
+  });
 
   return grouped;
 };
 
-export const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
+/* Dinheiro: sinal antes do R$ ("-R$ 500", não "R$ -500") e, havendo centavos,
+   sempre as duas casas ("R$ 3.807,90", não "R$ 3.807,9") — 26/09, varredura.
+   Valor redondo continua sem ",00": são cards de comparação, de olhada. */
+export const fmt = (v: number) => {
+  const r = Math.round((Number(v) || 0) * 100) / 100;
+  const casas = Number.isInteger(r) ? 0 : 2;
+  return `${r < 0 ? "-" : ""}R$ ${Math.abs(r).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}`;
+};
 
 /**
  * Badge de variação. Compartilhado com o Balanço Anual (linha "vs ano
@@ -156,8 +217,8 @@ export const MonthComparison = ({ perfil }: Props) => {
   const mB = mesAnoDeId(idB);
   const opcoes = useMemo(() => opcoesDeMeses(anosComLancamentos(userId)), [userId]);
 
-  const totalsA = useMemo(() => { const m = mesAnoDeId(idA); return getMonthTotals(ALL_MONTHS[m.idx], userId, m.ano, p); }, [idA, userId, p]);
-  const totalsB = useMemo(() => { const m = mesAnoDeId(idB); return getMonthTotals(ALL_MONTHS[m.idx], userId, m.ano, p); }, [idB, userId, p]);
+  const totalsA = useMemo(() => totaisDoMes(mesAnoDeId(idA), userId, p), [idA, userId, p]);
+  const totalsB = useMemo(() => totaisDoMes(mesAnoDeId(idB), userId, p), [idB, userId, p]);
 
   const categoryComparison = useMemo(() => {
     const catsA = getExpensesByCategory(mesAnoDeId(idA), userId, p);
@@ -181,8 +242,9 @@ export const MonthComparison = ({ perfil }: Props) => {
     return Math.max(1, ...categoryComparison.map((c) => Math.max(c.monthA, c.monthB)));
   }, [categoryComparison]);
 
-  const totalExpA = totalsA.custosFixos + totalsA.custosVariaveis;
-  const totalExpB = totalsB.custosFixos + totalsB.custosVariaveis;
+  // fixos + variáveis + parcelas — o mesmo "Despesas" do Dashboard (26/09)
+  const totalExpA = totalsA.despesas;
+  const totalExpB = totalsB.despesas;
   const saldoA = totalsA.receitas - totalExpA;
   const saldoB = totalsB.receitas - totalExpB;
 

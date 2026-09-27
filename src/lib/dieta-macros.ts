@@ -73,9 +73,11 @@ export const macrosRegistradas = (log?: Record<string, Partial<EntradaLog> | und
 export const formatarMacros = (m?: Partial<Macros> | null) => {
   const x = comoMacros(m);
   const partes: string[] = [];
-  if (x.p > 0) partes.push(`P ${x.p}g`);
-  if (x.c > 0) partes.push(`C ${x.c}g`);
-  if (x.g > 0) partes.push(`G ${x.g}g`);
+  // vírgula decimal (26/09: saía "P 2.5g")
+  const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  if (x.p > 0) partes.push(`P ${n(x.p)}g`);
+  if (x.c > 0) partes.push(`C ${n(x.c)}g`);
+  if (x.g > 0) partes.push(`G ${n(x.g)}g`);
   return partes.join(" · ");
 };
 

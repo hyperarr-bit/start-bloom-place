@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { PixCheckout, PIX_PRICES, aquecerCheckoutPix, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES, aquecerCheckoutPix, prepararPixAdiantado, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
 import { WinbackWheel, SLICES_FUNIL } from "@/components/retention/WinbackWheel";
 import { isNativeShell } from "@/lib/native-shell";
 import { ehApple } from "@/lib/loja";
@@ -1007,7 +1007,7 @@ export function PaywallDia14({
 
   const navigate = useNavigate();
   // Braço congelado no mount: ninguém vê a tela trocar de cara no meio.
-  const { user: abUser } = useAuth();
+  const { user: abUser, isSubscribed, subLoaded } = useAuth();
   const [braco] = useState<PaywallArm>(() => bracoPaywall(abUser?.id));
   // 25/09 (teste Asaas × Cakto): quem vai cair na Cakto aquece a função dela
   // enquanto lê a oferta. Não cria cobrança.
@@ -1016,6 +1016,21 @@ export function PaywallDia14({
     aquecerCheckoutPix(abUser?.id, OFERTA_WEB);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* PIX ADIANTADO (26/09, dono aprovou): com a oferta visível há 1,5 s, o Pix
+   * de 27,90 já nasce na Cakto em segundo plano — o toque (mediana 23 s depois
+   * da tela) acha o QR pronto em vez de esperar ~4,5 s. Uma vez por visita;
+   * quem toca antes de 1,5 s não gera pedido a mais. Regras em PixCheckout. */
+  const assinanteRef = useRef(false);
+  assinanteRef.current = subLoaded && isSubscribed;
+  const adiantadoRef = useRef<ReturnType<typeof prepararPixAdiantado> | null>(null);
+  useEffect(() => {
+    if (nativoNoMount.current) return;
+    const a = prepararPixAdiantado(OFERTA_WEB, { podeAdiantar: () => !assinanteRef.current });
+    adiantadoRef.current = a;
+    return () => { a.parar(); adiantadoRef.current = null; };
+  }, []);
+  // Toque em pagar: avisa o adiantado ANTES de o checkout abrir.
+  const abrirPix = (o: PixOffer) => { adiantadoRef.current?.tocou(); setPixOffer(o); };
 
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).
@@ -1051,7 +1066,7 @@ export function PaywallDia14({
               <OfferScreen
                 context={context}
                 answers={quiz}
-                onBuy={setPixOffer}
+                onBuy={abrirPix}
                 braco={braco}
                 onEscape={() => {
                   // Já girou uma vez? Então o X é X mesmo: entrega a pessoa ao
@@ -1071,7 +1086,7 @@ export function PaywallDia14({
               </div>
             )}
             {phase === "premio" && (
-              <PremioScreen context={context} onBuy={setPixOffer} />
+              <PremioScreen context={context} onBuy={abrirPix} />
             )}
           </motion.div>
         </AnimatePresence>

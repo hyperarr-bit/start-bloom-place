@@ -10,11 +10,12 @@
 process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { format } from "date-fns";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
 import { PeoplePanel } from "@/components/relacionamentos/PeoplePanel";
 import SmartPantry from "@/components/casa/SmartPantry";
+import GroceryList from "@/components/casa/GroceryList";
 import { kcalDoPlano, kcalRegistradas, lerKcal } from "@/pages/Dieta";
 import { planejarRemedios } from "@/lib/notificacoes";
 
@@ -92,25 +93,20 @@ describe("Casa: item comprado volta pra categoria de origem", () => {
   type Pantry = { id: string; name: string; category: string; status: string }[];
   type Shopping = { id: string; name: string; checked: boolean; fromPantry: boolean; origemCategory?: string }[];
 
-  it("acabou na geladeira → lista de compras → comprado → volta pra GELADEIRA", () => {
+  // 26/09 (varredura): o "Acabou" passou a mandar pro MERCADO (a dica do
+  // módulo sempre prometeu a Lista de Compras), no corredor do canto de
+  // origem; comprado lá, o item volta pro MESMO canto — o pedido da avaliação.
+  it("acabou na geladeira → Mercado → comprado → volta pra GELADEIRA", () => {
     const store = criarStore({ "casa-pantry": [{ id: "1", name: "Leite", category: "geladeira", status: "cheio" }] });
     const tela = renderComStore(<SmartPantry />, store);
-
     fireEvent.change(screen.getByDisplayValue("Cheio"), { target: { value: "acabou" } });
-    const lista = store.dados["casa-shopping-list"] as Shopping;
-    expect(lista).toHaveLength(1);
-    expect(lista[0].origemCategory).toBe("geladeira");
+    const m = store.dados["casa-grocery-categories"] as { name: string; items: { text: string; origem?: string }[] }[];
+    expect(m.find((c) => c.name === "Laticínios e Frios")!.items[0]).toMatchObject({ text: "Leite", origem: "geladeira" });
     expect(store.dados["casa-pantry"]).toHaveLength(0);
-
-    // sai, reabre, vai na lista de compras e marca como comprado
     tela.unmount();
-    renderComStore(<SmartPantry />, store);
-    fireEvent.click(screen.getByRole("button", { name: /Compras/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Comprei Leite/i }));
-
-    const despensa = store.dados["casa-pantry"] as Pantry;
-    expect(despensa).toHaveLength(1);
-    expect(despensa[0]).toMatchObject({ name: "Leite", category: "geladeira", status: "cheio" });
+    renderComStore(<GroceryList />, store);
+    fireEvent.click(within(screen.getByText("Leite").parentElement!).getByRole("checkbox"));
+    expect((store.dados["casa-pantry"] as Pantry)[0]).toMatchObject({ name: "Leite", category: "geladeira", status: "cheio" });
   });
 
   it("item que já estava na lista ANTES da origem existir continua voltando pro armário", () => {
@@ -171,10 +167,11 @@ describe("Saúde: lembrete na hora de cada remédio", () => {
     expect(hoje2130.title).toBe("💊 Hora do Creatina");
     expect(hoje2130.quando.getMinutes()).toBe(30);
 
-    // ids únicos e dentro da faixa "saude" (800000–809999)
+    // ids únicos e dentro da faixa "saude" — 1300000–1309999 desde 26/09 (a
+    // 800000 era da régua do teste grátis e os remédios apagavam o D1/D2/D3)
     const ids = avisos.map((a) => a.id!);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((id) => id >= 800000 && id < 810000)).toBe(true);
+    expect(ids.every((id) => id >= 1300000 && id < 1310000)).toBe(true);
   });
 
   it("depois do horário, o aviso de hoje não existe — só o de amanhã em diante", () => {

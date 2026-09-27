@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ItineraryDay, TimelineItem, genId, formatCurrency } from "./types";
@@ -84,12 +85,12 @@ export const DailyTimeline = () => {
   };
 
   const removeItem = (dayId: string, itemId: string) => {
-    setDays(prev => prev.map(d => d.id === dayId ? { ...d, items: d.items.filter(i => i.id !== itemId) } : d));
+    apagarComDesfazer(setDays, prev => prev.map(d => d.id === dayId ? { ...d, items: d.items.filter(i => i.id !== itemId) } : d), "Item do roteiro apagado");
     setEditandoItem(prev => (prev === itemId ? null : prev));
   };
 
   const removeDay = (dayId: string) => {
-    setDays(prev => prev.filter(d => d.id !== dayId));
+    apagarComDesfazer(setDays, prev => prev.filter(d => d.id !== dayId), "Dia do roteiro apagado");
     if (activeDay === dayId) setActiveDay(null);
   };
 
@@ -174,7 +175,8 @@ export const DailyTimeline = () => {
           {days.length > 0 && (
             <div className="p-3 flex gap-2 overflow-x-auto scrollbar-hide">
               {days.sort((a, b) => a.date.localeCompare(b.date)).map(d => (
-                <button key={d.id} onClick={() => setActiveDay(d.id)}
+                /* trocar de dia fecha a edição do dia (26/09: salvar gravava o Dia 1 no Dia 2) */
+                <button key={d.id} onClick={() => { setActiveDay(d.id); setEditandoDia(false); }}
                   className={`shrink-0 rounded-xl px-4 py-2 border transition-all text-center min-w-[80px] ${
                     activeDay === d.id ? "border-foreground bg-foreground text-background shadow-sm"
                       : d.date === todayStr ? "border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-950/20"

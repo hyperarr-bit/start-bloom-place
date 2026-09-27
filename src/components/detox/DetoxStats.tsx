@@ -1,8 +1,8 @@
 import { useUserData } from "@/hooks/use-user-data";
+import { sequenciaDetox, taxaDeSucesso, semanasDetox } from "@/lib/detox";
 import { lazy, Suspense } from "react";
 // Gráfico (recharts) num chunk próprio (22/09) — ver DetoxGrafico.tsx.
 const GraficoSemanas = lazy(() => import("@/components/detox/DetoxGrafico").then((m) => ({ default: m.GraficoSemanas })));
-import { differenceInDays, format, subDays } from "date-fns";
 import { TrendingUp, Calendar, Target, Flame } from "lucide-react";
 
 interface DetoxHabit {
@@ -10,6 +10,7 @@ interface DetoxHabit {
   name: string;
   icon: string;
   startDate: string;
+  createdAt?: string;
   relapses: string[];
   record: number;
 }
@@ -26,27 +27,10 @@ export const DetoxStats = () => {
     );
   }
 
-  const getStreak = (h: DetoxHabit) => {
-    const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;
-    const from = lastRelapse || h.startDate;
-    return differenceInDays(new Date(), new Date(from));
-  };
+  const getStreak = (h: DetoxHabit) => sequenciaDetox(h);
 
   // Weekly data for last 4 weeks
-  const getWeeklyData = (h: DetoxHabit) => {
-    const weeks = [];
-    for (let w = 3; w >= 0; w--) {
-      const weekEnd = subDays(new Date(), w * 7);
-      const weekStart = subDays(weekEnd, 6);
-      const relapseCount = h.relapses.filter(r => {
-        const d = new Date(r);
-        return d >= weekStart && d <= weekEnd;
-      }).length;
-      const pureDays = 7 - relapseCount;
-      weeks.push({ name: `S${4 - w}`, pure: pureDays, relapse: relapseCount });
-    }
-    return weeks;
-  };
+  const getWeeklyData = (h: DetoxHabit) => semanasDetox(h);
 
   return (
     <div className="space-y-4 mt-3">
@@ -78,8 +62,7 @@ export const DetoxStats = () => {
       {habits.map(h => {
         const streak = getStreak(h);
         const best = Math.max(h.record, streak);
-        const totalDays = differenceInDays(new Date(), new Date(h.startDate)) || 1;
-        const successRate = Math.round(((totalDays - h.relapses.length) / totalDays) * 100);
+        const successRate = taxaDeSucesso(h);
         const weekData = getWeeklyData(h);
 
         return (

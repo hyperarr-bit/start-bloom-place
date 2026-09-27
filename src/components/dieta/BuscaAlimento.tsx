@@ -12,6 +12,9 @@ import { trackEvent } from "@/lib/analytics";
  * a chave (o diário da Dieta grava em core-dieta-log, que é o que os widgets
  * Calorias e Macros do Dia leem).
  */
+
+// Número da tabela TACO com vírgula (26/09: "2.5 g").
+const virgula = (v: number) => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 export type EntradaDeAlimento = { name: string; calories: number; protein: number; carbs: number; fat: number };
 
 const GRAMAS_RAPIDAS = [50, 100, 150, 200];
@@ -108,7 +111,7 @@ export const BuscaAlimento = ({ onAdicionar, onFechar }: { onAdicionar: (e: Entr
             <span className="text-[11px] text-muted-foreground">g</span>
           </div>
           <div className="grid grid-cols-4 gap-1 text-center">
-            {[["kcal", calc.kcal], ["P", `${calc.p} g`], ["C", `${calc.c} g`], ["G", `${calc.g} g`]].map(([k, v]) => (
+            {[["kcal", calc.kcal], ["P", `${virgula(calc.p)} g`], ["C", `${virgula(calc.c)} g`], ["G", `${virgula(calc.g)} g`]].map(([k, v]) => (
               <div key={String(k)} className="rounded-md bg-card border border-border py-1">
                 <p className="text-[9px] text-muted-foreground uppercase">{k}</p>
                 <p className="text-xs font-bold tabular-nums">{v}</p>

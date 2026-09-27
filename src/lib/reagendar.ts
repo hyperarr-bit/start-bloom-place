@@ -1,13 +1,15 @@
 import {
-  agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarManutencao, agendarRemedios,
+  agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
   agendarRetrospectiva, agendarRotina, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { acaoMaisUsada } from "@/lib/conquistas-acao";
+import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
 import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
 import { CARD_CONFIG_KEY, CUSTOM_CARDS_KEY, DEFAULT_CARDS, type CustomCard } from "@/lib/finance-cards";
 import type { CardConfig } from "@/lib/finance-fatura";
-import { CHAVE_FATURAS_PAGAS, faturasDoMes, injetarFaturas } from "@/lib/finance-faturas";
-import { somarMeses } from "@/lib/finance-parcelas";
+import { CHAVE_FATURAS_PAGAS, faturasAVencer, injetarFaturas, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import { avancarPara, somarMeses, type Parcela } from "@/lib/finance-parcelas";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
@@ -56,6 +58,10 @@ export const sequenciaAtual = (marcados: Set<string>): number => {
 
 export interface DadosDosLembretes {
   dueDays: { day?: number; bills?: { name?: string; paid?: boolean }[] }[];
+  /** (26/09) as contas do MÊS SEGUINTE — todas em aberto (o ✓ expira na
+   *  virada) e com a fatura que vence nele. Sem isto a conta do dia 1º nunca
+   *  tinha aviso: a véspera dela cai no mês anterior. */
+  dueDaysProximoMes: { day?: number; bills?: { name?: string; paid?: boolean }[] }[];
   marcados: Set<string>;
   sequencia: number;
   diasAtivos: string[];
@@ -74,6 +80,11 @@ export interface DadosDosLembretes {
   manutencao: ManutencaoAgendavel[];
   /** compromissos com hora da Rotina (22/09) */
   compromissos: Compromisso[];
+  /** limite do dia (26/09): a pessoa usa Finanças? e já abriu hoje? */
+  temFinancas: boolean;
+  abriuFinancasHoje: boolean;
+  /** sequência de dias anotados das Conquistas (26/09) */
+  seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -122,34 +133,51 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
 
   /* FATURA DO CARTÃO no aviso de conta a vencer (22/09): a mesma conta da
      tela (lib/finance-faturas), pelo NOME só — o texto da notificação congela
-     no agendamento e um valor de ontem seria mentira amanhã. */
+     no agendamento e um valor de ontem seria mentira amanhã.
+     26/09: a fatura que VENCE no mês (`faturasAVencer` — no cartão "vence dia
+     5 do mês seguinte" é a que fechou no mês anterior) e também a do MÊS
+     SEGUINTE, pro aviso da véspera do dia 1º/2 existir. */
   const mes = mesCorrenteId();
-  const mesAnterior = somarMeses(mes, -1);
-  const chaveAnterior = chaveArquivada(Number(mesAnterior.slice(0, 4)), Number(mesAnterior.slice(5, 7)) - 1, "expenses");
+  const mesSeguinte = somarMeses(mes, 1);
   const configCartoes = get<Record<string, CardConfig>>(CARD_CONFIG_KEY, {}) ?? {};
   const personalizados = get<CustomCard[]>(CUSTOM_CARDS_KEY, []) ?? [];
   const rotulos = new Map<string, string>([
     ...DEFAULT_CARDS.map((c) => [c.value, c.label] as [string, string]),
     ...(Array.isArray(personalizados) ? personalizados : []).map((c) => [c.value, c.label] as [string, string]),
   ]);
-  let dueDays = get<DadosDosLembretes["dueDays"]>("finance-dueDays", []) ?? [];
+  const gravadas = (get<DadosDosLembretes["dueDays"]>("finance-dueDays", []) ?? []) as DadosDosLembretes["dueDays"];
+  let dueDays = gravadas;
+  // mês seguinte: as mesmas contas, TODAS em aberto (o ✓ expira na virada)
+  let dueDaysProximoMes = (Array.isArray(gravadas) ? gravadas : []).map((d) => ({
+    ...d, bills: (Array.isArray(d?.bills) ? d.bills : []).map((b) => ({ ...b, paid: false })),
+  }));
   try {
-    const faturas = faturasDoMes({
-      mes,
-      variaveis: get<unknown[]>("finance-expenses", []) as never[],
-      variaveisAnterior: get<unknown[]>(chaveAnterior, []) as never[],
-      fixos: get<unknown[]>("finance-fixed-expenses", []) as never[],
-      parcelas: get<unknown[]>("finance-installments", []) as never[],
+    const lista = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+    const parcelasDoBalde = lista<Parcela>(get<unknown>("finance-installments", []));
+    const base = {
+      // gastos gravados na chave do mês: balde corrente, arquivo, ou nada (futuro)
+      gastosDoMes: (m: string) => lista<never>(
+        m === mes ? get<unknown>("finance-expenses", [])
+          : m > mes ? []
+          : get<unknown>(chaveArquivada(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, "expenses"), []),
+      ),
+      // parcelas: o balde é o mês de agora; mês que vem = o balde avançado; mês passado = retratos da virada
+      parcelasDoMes: (m: string) => (m === mes ? parcelasDoBalde
+        : m > mes ? parcelasDoBalde.map((p) => avancarPara(p, mes, m) ?? p)
+        : parcelasDoMesPassado(m, (chave) => lista<Parcela>(get<unknown>(chave, [])))),
+      fixos: lista<never>(get<unknown>("finance-fixed-expenses", [])),
       cards: [...rotulos.keys()],
-      configOf: (card) => configCartoes?.[card],
-      labelOf: (card) => rotulos.get(card) ?? card,
+      configOf: (card: string) => configCartoes?.[card],
+      labelOf: (card: string) => rotulos.get(card) ?? card,
       pagas: get<Record<string, boolean>>(CHAVE_FATURAS_PAGAS, {}) ?? {},
-    });
-    dueDays = injetarFaturas(dueDays as never[], faturas, true) as DadosDosLembretes["dueDays"];
+    };
+    dueDays = injetarFaturas(gravadas as never[], faturasAVencer({ mes, ...base }), true) as DadosDosLembretes["dueDays"];
+    dueDaysProximoMes = injetarFaturas(dueDaysProximoMes as never[], faturasAVencer({ mes: mesSeguinte, ...base }), true) as typeof dueDaysProximoMes;
   } catch { /* dado torto em alguma chave: o aviso sai sem a fatura, nunca sem as contas */ }
 
   return {
     dueDays,
+    dueDaysProximoMes,
     marcados,
     sequencia: sequenciaAtual(marcados),
     diasAtivos: get<string[]>("treino-active-days", []) ?? [],
@@ -172,8 +200,21 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       .filter((t) => t?.task && t?.lastDone)
       .map((t) => ({ tarefa: String(t.task), ultimaVez: String(t.lastDone), frequenciaMeses: Number(t.frequencyMonths) || 6 })),
     compromissos: compromissosValidos(get<unknown>(CHAVE_COMPROMISSOS, [])),
+    // usa Finanças = lançou alguma coisa (as 4 "caixas" padrão de vencimento
+    // existem pra todo mundo, então conta a vencer só vale com conta dentro)
+    temFinancas: ["finance-expenses", "finance-incomes", "finance-fixed-expenses"]
+      .some((k) => { const v = get<unknown>(k, null); return Array.isArray(v) && v.length > 0; })
+      || (get<{ bills?: unknown[] }[]>("finance-dueDays", []) ?? []).some((d) => Array.isArray(d?.bills) && d.bills.length > 0),
+    abriuFinancasHoje: get<string>(CHAVE_FINANCAS_VISTO, "") === hoje,
+    seqAnotada: (() => {
+      const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
+      return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
+    })(),
   };
 }
+
+/** Marca "Finanças aberto hoje" (dia local) — o limite do dia não avisa quem já viu. */
+export const CHAVE_FINANCAS_VISTO = "finance-visto-dia";
 
 /**
  * Só o que MUDA o agendamento entra aqui. Comparar esta string antes de
@@ -187,6 +228,10 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     dados.dueDays
       .map((d) => [d?.day, (d?.bills ?? []).filter((b) => !b?.paid).map((b) => b?.name).sort()])
       .filter(([, naoPagas]) => Array.isArray(naoPagas) && naoPagas.length),
+    // (26/09) o mês seguinte também agenda: conta nova ou fatura nova muda o plano
+    (dados.dueDaysProximoMes ?? [])
+      .map((d) => [d?.day, (d?.bills ?? []).map((b) => b?.name).sort()])
+      .filter(([, nomes]) => Array.isArray(nomes) && nomes.length),
     prefs.rotina && [dados.marcados.has(hoje), dados.sequencia],
     prefs.treino && [dados.diasAtivos, dados.musculosPorDia, [...dados.diasComPlano].sort(), dados.jaTreinouHoje],
     prefs.leitura && dados.leitura,
@@ -195,6 +240,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.aniversario && dados.pessoas,
     prefs.casa && dados.manutencao,
     prefs.compromissos && dados.compromissos,
+    prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
+    prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
   ]);
 }
 
@@ -205,7 +252,7 @@ export async function reagendarTudo(
 ): Promise<Record<string, number>> {
   const d = lerDadosDosLembretes(get);
   return {
-    contas: await agendarContas(d.dueDays, { hora: prefs.horaContas, ligado: prefs.contas }),
+    contas: await agendarContas(d.dueDays, { hora: prefs.horaContas, ligado: prefs.contas }, d.dueDaysProximoMes),
     retrospectiva: await agendarRetrospectiva(prefs.retrospectiva),
     rotina: await agendarRotina(
       { marcados: d.marcados, sequencia: d.sequencia },
@@ -221,5 +268,10 @@ export async function reagendarTudo(
     aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
     casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
     compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
+    limite: await agendarLimiteDoDia(
+      { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
+      { hora: prefs.horaLimite, ligado: prefs.limite },
+    ),
+    sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
   };
 }

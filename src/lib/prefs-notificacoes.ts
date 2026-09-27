@@ -45,6 +45,12 @@ export interface PrefsNotificacoes {
   horaCasa: number;
   /** compromissos com hora da Rotina (22/09) — a antecedência é por compromisso, aqui é só o interruptor geral */
   compromissos: boolean;
+  /** "seu limite de hoje" de Finanças, de manhã (26/09) — diário, nasce desligado */
+  limite: boolean;
+  horaLimite: number;
+  /** "sua sequência acaba hoje" das Conquistas, à noite (26/09) — nasce desligado */
+  sequencia: boolean;
+  horaSequencia: number;
 }
 
 /**
@@ -77,6 +83,12 @@ export const PREFS_PADRAO: PrefsNotificacoes = {
   // nasce LIGADO como os remédios: cadastrar um compromisso escolhendo
   // "avisar 1 hora antes" JÁ é pedir pra ser lembrado — a escolha mora em cada um
   compromissos: true,
+  // 26/09: diário como os outros, então nasce DESLIGADO. Liga na central ou
+  // no próprio card "Quanto posso gastar hoje". 8h: antes do primeiro gasto.
+  limite: false,
+  horaLimite: 8,
+  sequencia: false,
+  horaSequencia: 20,
 };
 
 export const CHAVE_PREFS = "notif-prefs";
@@ -108,6 +120,10 @@ export const lerPrefs = (bruto: unknown): PrefsNotificacoes => {
     casa: p.casa === true,
     horaCasa: horaValida(p.horaCasa, PREFS_PADRAO.horaCasa),
     compromissos: p.compromissos !== false,
+    limite: p.limite === true,
+    horaLimite: horaValida(p.horaLimite, PREFS_PADRAO.horaLimite),
+    sequencia: p.sequencia === true,
+    horaSequencia: horaValida(p.horaSequencia, PREFS_PADRAO.horaSequencia),
   };
 };
 

@@ -1,80 +1,87 @@
-import { usePaletaGrafico } from "@/lib/paleta-grafico";
-import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+/**
+ * TREINO — redesenho de 26/09 (mockups p1–p4 e p7 aprovados pelo dono).
+ *
+ * Seis abas viraram três (o uso real mostrou RESUMO, PROGRESSÃO e RECORDES
+ * quase sem abertura): 🏋️ HOJE (a folha do dia, série por série) · 📅 SEMANA
+ * (a tabela da semana + a constância nova) · 📈 EVOLUÇÃO. O CONFIG saiu da fila
+ * de abas e virou o ⚙️ do cabeçalho.
+ *
+ * Dados — tudo o que já existia continua lido e gravado do mesmo jeito:
+ *  - plano `saude-workouts-v2` (alvo em sets/reps/carga, texto) — o `done` de
+ *    cada exercício agora acompanha as séries (todas feitas = done);
+ *  - histórico `treino-exercise-history`: uma entrada por exercício feito, com
+ *    o resumo de sempre + `series` (novo, opcional);
+ *  - `saude-workout-log`, `treino-weekly-volume`, `treino-notas-sessoes`,
+ *    `treino-active-days`, `treino-descanso-padrao`, `treino-sound`,
+ *    `treino-semana-dos-checks`, `saude-prs`.
+ * Chaves novas: `treino-sessao` (a sessão do dia, série por série — se descarta
+ * sozinha no dia seguinte), `treino-meta-semanal` (só gravada quando a pessoa
+ * muda; o padrão é o nº de dias de treino) e `treino-sessoes` (por data: dia do
+ * plano, minutos e músculos — o carimbo do mês e as horas saem daqui).
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Dumbbell, Flame, Settings } from "lucide-react";
+import { toast } from "sonner";
+import { localDayKey, mesAtualExtenso, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
-import { useNavigate } from "react-router-dom";
-import {
-  ArrowLeft, Plus, X, Trash2, Check, Timer, Play, Pause, RotateCcw,
-  Trophy, Flame, Dumbbell, TrendingUp, Target, Zap, BarChart3, Calendar,
-  Award, Star, Clock, Volume2, VolumeX, ChevronDown, ChevronUp, Settings,
-  FileText, MessageSquare, ArrowUpRight, ArrowDownRight, Minus, Copy
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
-import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-// Gráficos (recharts) num chunk próprio — só descem na aba de progressão (22/09).
-const GraficoProgressao = lazy(() => import("@/components/treino/TreinoGraficos").then((m) => ({ default: m.GraficoProgressao })));
-const GraficoVolume = lazy(() => import("@/components/treino/TreinoGraficos").then((m) => ({ default: m.GraficoVolume })));
-import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-
-const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
-const dayColors: Record<string, string> = {
-  SEGUNDA: "bg-blue-500", TERÇA: "bg-indigo-500", QUARTA: "bg-green-500",
-  QUINTA: "bg-yellow-500", SEXTA: "bg-pink-500", SÁBADO: "bg-purple-500", DOMINGO: "bg-violet-500"
-};
-
-const exerciseColors: string[] = [
-  "bg-blue-200 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300",
-  "bg-green-200 dark:bg-green-500/20 text-green-800 dark:text-green-300",
-  "bg-purple-200 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300",
-  "bg-red-200 dark:bg-red-500/20 text-red-800 dark:text-red-300",
-  "bg-amber-200 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300",
-  "bg-cyan-200 dark:bg-cyan-500/20 text-cyan-800 dark:text-cyan-300",
-  "bg-pink-200 dark:bg-pink-500/20 text-pink-800 dark:text-pink-300",
-];
-
-const muscleGroups = [
-  "Peito", "Costas", "Ombros", "Bíceps", "Tríceps", "Pernas", "Glúteos",
-  "Abdômen", "Quadríceps", "Posterior", "Panturrilha", "Cardio", "Full Body"
-];
-
-const muscleGroupIcons: Record<string, string> = {
-  "Peito": "🏋️", "Costas": "💪", "Ombros": "🏋️", "Bíceps": "💪", "Tríceps": "💪",
-  "Pernas": "🦵", "Glúteos": "🍑", "Abdômen": "🔥", "Quadríceps": "🦵",
-  "Posterior": "🦵", "Panturrilha": "🦵", "Cardio": "🏃", "Full Body": "🏋️",
-};
-
-interface Exercise {
-  name: string;
-  sets: string;
-  reps: string;
-  carga: string;
-  done: boolean;
-  obs: string;
-  // Cardio (23/07, pedido de usuária): musculação usa S×R×Carga; cardio
-  // (corrida, pular corda, bike) não tem carga em kg — registra duração +
-  // distância/quantidade. tipo ausente = musculação (retrocompatível).
-  tipo?: "cardio";
-  duracao?: string;
-  distancia?: string;
-}
+import { avisarApagado } from "@/lib/desfazer";
+import {
+  adicionarSerie,
+  alternarFeito,
+  assinaturaDasSeries,
+  chavesDosExercicios,
+  concluirTreino,
+  definirValor,
+  duracaoEstimada,
+  marcarExercicio,
+  registrarNoHistorico,
+  removerUltimaSerie,
+  seriesIniciais,
+  sessaoNova,
+  sessaoValida,
+  subirCarga,
+  sugestaoDeCarga,
+  ultimaVez,
+  variacaoPct,
+  volumeDaVezAnterior,
+  type EntradaDoHistorico,
+  type ExercicioDoPlano,
+  type SerieDaSessao,
+  type SessaoDoTreino,
+} from "@/lib/treino-series";
+import {
+  DIAS,
+  grupoEsquecido,
+  indiceDoDia,
+  metaPadrao,
+  nomeDoMes,
+  semanasNaMeta,
+  type FonteDosTreinos,
+  type MetaDaSessao,
+} from "@/lib/treino-constancia";
+import { cargaPorExercicio, recordesDoMes, resumoDaSemana } from "@/lib/treino-evolucao";
+import { TreinoHoje, type AcoesDoHoje } from "@/components/treino/TreinoHoje";
+import { RodapeDoTreino, type EstadoDoRodape } from "@/components/treino/RodapeDoTreino";
+import { TreinoSemana, linhasDaSemana } from "@/components/treino/TreinoSemana";
+import { ConstanciaTreino } from "@/components/treino/ConstanciaTreino";
+import { TreinoEvolucao, type RecordeAnotado } from "@/components/treino/TreinoEvolucao";
+import { TreinoConcluido, type ResumoDoTreino } from "@/components/treino/TreinoConcluido";
+import { EditorDoDia, type AcoesDoEditor } from "@/components/treino/EditorDoDia";
+import { ConfigDoTreino, type ModeloDeTreino } from "@/components/treino/ConfigDoTreino";
+import { tomDoDia } from "@/components/treino/planner";
 
 interface DayPlan {
   muscles: string[];
-  exercises: Exercise[];
+  exercises: ExercicioDoPlano[];
 }
 
 type WorkoutPlan = Record<string, DayPlan>;
@@ -89,78 +96,29 @@ const defaultWorkoutPlan: WorkoutPlan = {
   DOMINGO: { muscles: [], exercises: [] },
 };
 
-const templates: { name: string; emoji: string; plan: Record<string, string[]> }[] = [
-  {
-    name: "Push / Pull / Legs",
-    emoji: "💪",
-    plan: {
-      SEGUNDA: ["Peito", "Ombros", "Tríceps"],
-      TERÇA: ["Costas", "Bíceps"],
-      QUARTA: ["Quadríceps", "Posterior", "Glúteos", "Panturrilha"],
-      QUINTA: ["Peito", "Ombros", "Tríceps"],
-      SEXTA: ["Costas", "Bíceps"],
-      SÁBADO: ["Quadríceps", "Posterior", "Glúteos", "Panturrilha"],
-      DOMINGO: [],
-    }
-  },
-  {
-    name: "Upper / Lower",
-    emoji: "🏋️",
-    plan: {
-      SEGUNDA: ["Peito", "Costas", "Ombros", "Bíceps", "Tríceps"],
-      TERÇA: ["Quadríceps", "Posterior", "Glúteos", "Panturrilha"],
-      QUARTA: [],
-      QUINTA: ["Peito", "Costas", "Ombros", "Bíceps", "Tríceps"],
-      SEXTA: ["Quadríceps", "Posterior", "Glúteos", "Panturrilha"],
-      SÁBADO: [],
-      DOMINGO: [],
-    }
-  },
-  {
-    name: "ABC Clássico",
-    emoji: "🔥",
-    plan: {
-      SEGUNDA: ["Peito", "Tríceps"],
-      TERÇA: ["Costas", "Bíceps"],
-      QUARTA: ["Ombros", "Pernas"],
-      QUINTA: ["Peito", "Tríceps"],
-      SEXTA: ["Costas", "Bíceps"],
-      SÁBADO: ["Ombros", "Pernas"],
-      DOMINGO: [],
-    }
-  },
-  {
-    name: "Full Body 3x",
-    emoji: "⚡",
-    plan: {
-      SEGUNDA: ["Full Body"],
-      TERÇA: [],
-      QUARTA: ["Full Body"],
-      QUINTA: [],
-      SEXTA: ["Full Body"],
-      SÁBADO: [],
-      DOMINGO: [],
-    }
-  },
-];
+/** Dia como pode estar gravado (formato de antes de 07/2026 tinha `muscle` único). */
+type DiaGravado = { muscles?: string[]; muscle?: string; exercises?: Partial<ExercicioDoPlano>[] } | null | undefined;
 
-function migratePlan(plan: any): WorkoutPlan {
+function migratePlan(plan: unknown): WorkoutPlan {
   const result: WorkoutPlan = {};
-  for (const day of weekDays) {
-    const d = plan[day];
+  const gravado = (plan && typeof plan === "object" ? plan : {}) as Record<string, DiaGravado>;
+  for (const day of DIAS) {
+    const d = gravado[day];
     if (!d) { result[day] = { muscles: [], exercises: [] }; continue; }
     const muscles = d.muscles
       ? d.muscles
       : d.muscle && d.muscle !== "Descanso"
         ? [d.muscle]
         : [];
-    const exercises = (d.exercises || []).map((ex: any) => ({
+    const exercises: ExercicioDoPlano[] = (d.exercises || []).map((ex) => ({
       name: ex.name || "",
       sets: ex.sets || "",
       reps: ex.reps || "",
       carga: ex.carga || "",
       done: ex.done || false,
       obs: ex.obs || "",
+      // Cardio (23/07, pedido de usuária): tempo + distância no lugar de
+      // S×R×Carga; tipo ausente = musculação (retrocompatível).
       ...(ex.tipo === "cardio" ? { tipo: "cardio" as const } : {}),
       ...(ex.duracao ? { duracao: ex.duracao } : {}),
       ...(ex.distancia ? { distancia: ex.distancia } : {}),
@@ -170,21 +128,36 @@ function migratePlan(plan: any): WorkoutPlan {
   return result;
 }
 
-function estimate1RM(weight: number, reps: number): number {
-  if (reps <= 0 || weight <= 0) return 0;
-  if (reps === 1) return weight;
-  return Math.round(weight * (1 + reps / 30));
-}
+/** Um AudioContext só pro bipe do descanso (26/09: criava um novo a cada bipe). */
+let audioDoDescanso: AudioContext | null = null;
+const bipeDoDescanso = () => {
+  try {
+    audioDoDescanso ??= new AudioContext();
+    if (audioDoDescanso.state === "suspended") void audioDoDescanso.resume();
+    const osc = audioDoDescanso.createOscillator();
+    osc.connect(audioDoDescanso.destination);
+    osc.frequency.value = 800;
+    osc.start();
+    setTimeout(() => osc.stop(), 300);
+  } catch { /* sem áudio no aparelho */ }
+};
+
+type Aba = "hoje" | "semana" | "evolucao";
+const ABAS: { id: Aba; label: string; icon: string }[] = [
+  { id: "hoje", label: "HOJE", icon: "🏋️" },
+  { id: "semana", label: "SEMANA", icon: "📅" },
+  { id: "evolucao", label: "EVOLUÇÃO", icon: "📈" },
+];
 
 const Treino = () => {
-  const paleta = usePaletaGrafico(); // 17/09: linhas dos gráficos por tema
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("hoje");
+  const [activeTab, setActiveTab] = useState<Aba>("hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
   const today = localDayKey();
-  const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const hojeData = useMemo(() => parseLocalDay(today), [today]);
+  const todayDayName = DIAS[indiceDoDia(hojeData)];
 
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
   const { get: getUserData, isGuest } = useUserData();
@@ -197,1144 +170,647 @@ const Treino = () => {
   }, [isGuest, getUserData]);
 
   const [rawPlan, setRawPlan] = usePersistedState("saude-workouts-v2", defaultWorkoutPlan);
-  // Sem nenhum músculo ou exercício em nenhum dia, o módulo abre com três
-  // linhas e 501px de branco (medido na varredura) — o pior do app.
-  const treinoVazio = Object.values(rawPlan ?? {}).every(
-    (d) => !(d?.muscles?.length) && !(d?.exercises?.length),
-  );
+  // Sem nenhum músculo ou exercício em nenhum dia, o módulo abre vazio — o
+  // "Próximo passo" diz o que fazer.
+  const treinoVazio = Object.values(rawPlan ?? {}).every((d) => !(d?.muscles?.length) && !(d?.exercises?.length));
   const workoutPlan = useMemo(() => migratePlan(rawPlan), [rawPlan]);
-  const setWorkoutPlan = (p: WorkoutPlan | ((prev: WorkoutPlan) => WorkoutPlan)) => {
-    if (typeof p === "function") setRawPlan((prev: any) => p(migratePlan(prev)));
-    else setRawPlan(p);
-  };
+  const setWorkoutPlan = useCallback(
+    (p: WorkoutPlan | ((prev: WorkoutPlan) => WorkoutPlan)) => {
+      if (typeof p === "function") setRawPlan((prev) => p(migratePlan(prev)));
+      else setRawPlan(p);
+    },
+    [setRawPlan],
+  );
 
   /*
    * ZERA OS CHECKS NA VIRADA DA SEMANA (29/07, bug do dono: "fiz esse treino
-   * terça passada mas ainda estava marcado como feito hoje").
+   * terça passada mas ainda estava marcado como feito hoje"). O `done` mora
+   * no plano, na chave do dia da semana, sem data — então guardo QUAL SEMANA
+   * os checks atuais pertencem; semana nova, checks zerados, uma vez só.
    *
-   * A causa é a forma do dado: o `done` mora DENTRO do plano, na chave do dia
-   * da semana, sem data nenhuma. Marcar terça grava "TERÇA feito" — e fica
-   * assim pra sempre, porque nada nunca desmarcou. Na terça seguinte o
-   * exercício já nasce riscado.
-   *
-   * Em vez de pendurar uma data em cada exercício (mudaria o formato salvo de
-   * todo mundo e exigiria migração), guardo QUAL SEMANA os checks atuais
-   * pertencem. Semana nova, checks zerados — uma vez só, na primeira abertura.
-   *
-   * A semana começa na SEGUNDA porque é assim que o módulo é desenhado
-   * (weekDays começa em SEGUNDA); domingo pertence à semana que termina.
+   * 26/09: o carimbo só é gravado quando EXISTE ✓ a proteger. Antes o boot do
+   * Treino escrevia a chave pra toda conta nova ao abrir o módulo — escrita que
+   * conta como "primeiro treino" (ativação) sem ninguém ter feito nada.
    */
   const [semanaDosChecks, setSemanaDosChecks] = usePersistedState<string>("treino-semana-dos-checks", "");
-  const semanaAtual = useMemo(() => {
-    const d = new Date();
-    const diaSemana = (d.getDay() + 6) % 7;        // 0 = segunda
-    const segunda = new Date(d);
-    segunda.setDate(d.getDate() - diaSemana);
-    segunda.setHours(0, 0, 0, 0);
-    return localDayKey(segunda);
-  }, []);
-
+  const semanaAtual = useMemo(() => semanaAtualId(), [today]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!semanaAtual || semanaDosChecks === semanaAtual) return;
-    // primeira vez do usuário: só carimba a semana, sem mexer em nada
+    const temCheck = Object.values(workoutPlan).some((d) => d.exercises.some((e) => e.done));
     if (semanaDosChecks) {
-      setRawPlan((prev: any) => {
-        const plano = migratePlan(prev);
-        let mexeu = false;
-        const novo: WorkoutPlan = { ...plano };
-        for (const dia of Object.keys(novo)) {
-          const exs = novo[dia]?.exercises ?? [];
-          if (exs.some((e) => e.done)) {
-            mexeu = true;
-            novo[dia] = { ...novo[dia], exercises: exs.map((e) => ({ ...e, done: false })) };
+      if (temCheck) {
+        setRawPlan((prev) => {
+          const plano = migratePlan(prev);
+          const novo: WorkoutPlan = { ...plano };
+          for (const dia of Object.keys(novo)) {
+            const exs = novo[dia]?.exercises ?? [];
+            if (exs.some((e) => e.done)) novo[dia] = { ...novo[dia], exercises: exs.map((e) => ({ ...e, done: false })) };
           }
-        }
-        return mexeu ? novo : prev;
-      });
+          return novo;
+        });
+      }
+      setSemanaDosChecks(semanaAtual);
+    } else if (temCheck) {
+      setSemanaDosChecks(semanaAtual);
     }
-    setSemanaDosChecks(semanaAtual);
-  }, [semanaAtual, semanaDosChecks, setRawPlan, setSemanaDosChecks]);
+  }, [semanaAtual, semanaDosChecks, workoutPlan, setRawPlan, setSemanaDosChecks]);
 
   const [activeDays, setActiveDays] = usePersistedState<string[]>("treino-active-days", ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"]);
   // Dias ativos normalizados: MAIÚSCULA + só dias válidos + sem repetição, na
-  // ordem da semana. Cura dado sujo (23/07: contas com "Segunda" Title Case
-  // AO LADO de "SEGUNDA" renderizavam a grade de músculos 2x, a 2ª com rótulo
-  // branco-no-branco — dayColors só tem as chaves em maiúscula).
+  // ordem da semana (23/07: "Segunda" Title Case ao lado de "SEGUNDA").
   const diasAtivosLimpos = useMemo(
-    () => [...new Set(activeDays.map(d => d.toUpperCase()).filter(d => weekDays.includes(d)))]
-      .sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)),
+    () => [...new Set((Array.isArray(activeDays) ? activeDays : []).map((d) => String(d).toUpperCase()).filter((d) => DIAS.includes(d)))]
+      .sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b)),
     [activeDays],
   );
-  // Grava a versão limpa de volta quando detectar sujeira (roda também DEPOIS
-  // da hidratação do servidor, que chega após o mount). Escreve só o normalizado
-  // do próprio activeDays — não apaga dado, só deduplica; converge e para.
   useEffect(() => {
+    if (!Array.isArray(activeDays)) return;
     const sujo = activeDays.length !== diasAtivosLimpos.length || activeDays.some((d, i) => d !== diasAtivosLimpos[i]);
     if (sujo) setActiveDays(diasAtivosLimpos);
   }, [activeDays, diasAtivosLimpos, setActiveDays]);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [newExName, setNewExName] = useState("");
+
   const [workoutLog, setWorkoutLog] = usePersistedState<string[]>("saude-workout-log", []);
+  const log = useMemo(() => (Array.isArray(workoutLog) ? workoutLog : []), [workoutLog]);
   const [workoutNotes, setWorkoutNotes] = usePersistedState<Record<string, string>>("saude-workout-notes", {});
-  const [personalRecords, setPersonalRecords] = usePersistedState<{id: string; exercise: string; record: string; date: string}[]>("saude-prs", []);
-  const [newPRExercise, setNewPRExercise] = useState("");
-  const [newPRRecord, setNewPRRecord] = useState("");
-
-  // Rest timer
-  const [restTime, setRestTime] = useState(60);
-  const [restCountdown, setRestCountdown] = useState(0);
-  const [restRunning, setRestRunning] = useState(false);
+  // Nota da sessão com DATA (26/09): a de cima é por dia da semana; no Concluir
+  // ela desce pra cá e o campo do dia fica limpo.
+  const [notasDasSessoes, setNotasDasSessoes] = usePersistedState<Record<string, string>>("treino-notas-sessoes", {});
+  const [personalRecords, setPersonalRecords] = usePersistedState<RecordeAnotado[]>("saude-prs", []);
+  // descanso escolhido fica salvo (26/09: voltava pra 60 s toda vez)
+  const [restTime, setRestTime] = usePersistedState<number>("treino-descanso-padrao", 60);
   const [soundEnabled, setSoundEnabled] = usePersistedState("treino-sound", true);
-  const restRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Session timer
-  const [sessionStart, setSessionStart] = usePersistedState<string | null>("treino-session-start", null);
-  const [sessionElapsed, setSessionElapsed] = useState(0);
-
-  // Volume
   const [weeklyVolume, setWeeklyVolume] = usePersistedState<Record<string, number>>("treino-weekly-volume", {});
-  const [exerciseHistory, setExerciseHistory] = usePersistedState<{date: string; exercise: string; sets: string; reps: string; carga: string; obs?: string}[]>("treino-exercise-history", []);
+  const [exerciseHistory, setExerciseHistory] = usePersistedState<EntradaDoHistorico[]>("treino-exercise-history", []);
+  const historico = useMemo(() => (Array.isArray(exerciseHistory) ? exerciseHistory : []), [exerciseHistory]);
+  const [sessaoSalva, setSessaoSalva] = usePersistedState<SessaoDoTreino | null>("treino-sessao", null);
+  const [metaSalva, setMetaSalva] = usePersistedState<number | null>("treino-meta-semanal", null);
+  const [sessoesMeta, setSessoesMeta] = usePersistedState<Record<string, MetaDaSessao>>("treino-sessoes", {});
+  // Sessão da versão anterior (só o horário de início): quem estava no meio de um
+  // treino na atualização continua com o relógio; depois a chave é limpa.
+  const [inicioLegado, setInicioLegado] = usePersistedState<string | null>("treino-session-start", null);
 
-  const [expandedDay, setExpandedDay] = useState<string | null>(todayDayName);
-  const [showObsFor, setShowObsFor] = useState<string | null>(null);
-  // copiar treino pra outros dias (22/09) — mesmo par de estados da Dieta
-  const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
-  const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
+  const meta = Math.min(7, Math.max(1, Math.round(Number(metaSalva) || metaPadrao(diasAtivosLimpos))));
 
-  // 1RM calculator
-  const [rmWeight, setRmWeight] = useState("");
-  const [rmReps, setRmReps] = useState("");
+  /* ---------------- a sessão de hoje ---------------- */
+  const sessaoOk = sessaoValida(sessaoSalva, today, Date.now());
+  const sessao: SessaoDoTreino = useMemo(
+    () => (sessaoOk ? (sessaoSalva as SessaoDoTreino) : sessaoNova(today, todayDayName)),
+    [sessaoOk, sessaoSalva, today, todayDayName],
+  );
+  // Sessão de outro dia esquecida aberta se descarta sozinha (a regra das 12 h, 26/09).
+  useEffect(() => {
+    if (sessaoSalva && !sessaoValida(sessaoSalva, today, Date.now())) setSessaoSalva(null);
+  }, [sessaoSalva, today, setSessaoSalva]);
+  useEffect(() => {
+    if (!inicioLegado) return;
+    const t = Date.parse(inicioLegado);
+    if (!sessaoSalva && Number.isFinite(t) && Date.now() - t < 12 * 3_600_000 && localDayKey(new Date(t)) === today) {
+      setSessaoSalva({ ...sessaoNova(today, todayDayName), inicio: inicioLegado });
+    }
+    setInicioLegado(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicioLegado]);
 
-  // Progression chart filter
-  const [selectedExercise, setSelectedExercise] = useState("");
+  const diaDoTreino = DIAS.includes(sessao.dia) ? sessao.dia : todayDayName;
+  const planoDoDia = workoutPlan[diaDoTreino] ?? { muscles: [], exercises: [] };
+  const exercicios = planoDoDia.exercises;
+  const chaves = useMemo(() => chavesDosExercicios(exercicios), [exercicios]);
+  const ultimas = useMemo(
+    () => Object.fromEntries(chaves.map((k, i) => [k, exercicios[i]?.tipo === "cardio" ? null : ultimaVez(historico, exercicios[i].name, sessao.data)])),
+    [chaves, exercicios, historico, sessao.data],
+  );
+  // O ✓ do plano só vale pro dia da semana de hoje e se for DESTA semana (na
+  // virada, antes do efeito acima zerar, o ✓ da semana passada ainda está lá).
+  const checksValem = diaDoTreino === todayDayName && (!semanaDosChecks || semanaDosChecks === semanaAtual);
+  const iniciais = useMemo(
+    () => Object.fromEntries(chaves.map((k, i) => [k, seriesIniciais(checksValem ? exercicios[i] : { ...exercicios[i], done: false }, ultimas[k])])),
+    [chaves, exercicios, ultimas, checksValem],
+  );
+  const seriesEfetivas = useMemo(
+    () => Object.fromEntries(chaves.map((k) => [k, sessao.series[k] ?? iniciais[k]])) as Record<string, SerieDaSessao[]>,
+    [chaves, sessao.series, iniciais],
+  );
+  const sugestoes = useMemo(
+    () => Object.fromEntries(chaves.map((k, i) => [k, sugestaoDeCarga(exercicios[i], ultimas[k])])),
+    [chaves, exercicios, ultimas],
+  );
+  let feitas = 0;
+  let total = 0;
+  for (const k of chaves) {
+    total += seriesEfetivas[k].length;
+    feitas += seriesEfetivas[k].filter((s) => s.feito).length;
+  }
+  const soCardio = exercicios.length > 0 && exercicios.every((e) => e.tipo === "cardio");
+  const rotuloTotal = soCardio ? "exercícios" : "séries";
+
+  const hojeAtivo = diasAtivosLimpos.includes(todayDayName);
+  const descanso = diaDoTreino === todayDayName && !hojeAtivo && exercicios.length === 0;
+  const temTreinoHoje = !descanso && exercicios.length > 0;
+  const outrosDias = DIAS.filter((d) => d !== todayDayName && (workoutPlan[d]?.exercises.length ?? 0) > 0).map((d) => ({
+    dia: d,
+    rotulo: workoutPlan[d].muscles.join(" + ") || `${workoutPlan[d].exercises.length} exercício${workoutPlan[d].exercises.length > 1 ? "s" : ""}`,
+  }));
+  // Dia que ancora o tutorial: hoje, ou (se hoje é descanso) o primeiro dia ativo vazio.
+  const diaVazio = DIAS.find((d) => diasAtivosLimpos.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0) ?? null;
+  const spotlightDay = hojeAtivo ? todayDayName : diaVazio ?? todayDayName;
+  const minutosAnteriores = useMemo(
+    () => Object.entries(sessoesMeta ?? {})
+      .filter(([data, m]) => m?.dia === diaDoTreino && data < sessao.data)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([, m]) => Number(m?.minutos) || 0),
+    [sessoesMeta, diaDoTreino, sessao.data],
+  );
+  const minutosEstimados = duracaoEstimada(exercicios, restTime, minutosAnteriores);
+
+  const concluido = !!sessao.fim;
+  const seriesParaAssinatura = useMemo(() => ({ ...sessao.series, ...seriesEfetivas }), [sessao.series, seriesEfetivas]);
+  const alterado = concluido && sessao.assinatura !== assinaturaDasSeries(seriesParaAssinatura);
+  const estadoDoRodape: EstadoDoRodape = concluido
+    ? (alterado ? "alterado" : "concluido")
+    : !sessao.inicio && feitas === 0 ? "comecar" : "treinando";
+  const nota = concluido ? (notasDasSessoes?.[sessao.data] ?? "") : (workoutNotes?.[diaDoTreino] ?? "");
+
+  /* ---------------- descanso (horário de fim, não contador) ---------------- */
+  const [descansoAte, setDescansoAte] = useState<number | null>(null);
+  useEffect(() => {
+    if (!descansoAte) return;
+    const t = window.setTimeout(() => {
+      // voltou da tela bloqueada muito depois: não bipa atrasado
+      if (Date.now() - descansoAte < 3000) {
+        if (soundEnabled) bipeDoDescanso();
+        try { navigator.vibrate?.([200, 100, 200]); } catch { /* sem vibração */ }
+      }
+      setDescansoAte(null);
+    }, Math.max(0, descansoAte - Date.now()));
+    return () => window.clearTimeout(t);
+  }, [descansoAte, soundEnabled]);
+  const iniciarDescanso = () => setDescansoAte(Date.now() + Math.max(5, Number(restTime) || 60) * 1000);
+  const ajustarDescanso = (seg: number) =>
+    setDescansoAte((a) => {
+      if (!a) return a;
+      const n = Math.min(a + seg * 1000, Date.now() + 600_000);
+      return n - Date.now() <= 500 ? null : n;
+    });
+
+  /* ---------------- ações da sessão ---------------- */
+  const mudarSessao = (f: (s: SessaoDoTreino) => SessaoDoTreino) =>
+    setSessaoSalva((prev) => f(sessaoValida(prev, today, Date.now()) ? (prev as SessaoDoTreino) : sessaoNova(today, todayDayName)));
+  const comInicio = (s: SessaoDoTreino) => (s.inicio ? s : { ...s, inicio: new Date().toISOString() });
+
+  // O `done` do exercício no plano acompanha as séries (é o que versões antigas
+  // do app e a virada da semana leem). Treino de OUTRO dia feito hoje não mexe
+  // no ✓ daquele dia — senão a sexta abriria já feita depois de um "treinar
+  // mesmo assim" na quarta.
+  const sincronizarDone = (k: string, feito: boolean) => {
+    const idx = chaves.indexOf(k);
+    if (diaDoTreino !== todayDayName || idx < 0 || !!exercicios[idx]?.done === feito) return;
+    const nome = exercicios[idx].name;
+    setWorkoutPlan((prev) => {
+      const d0 = prev[diaDoTreino];
+      if (!d0?.exercises[idx] || d0.exercises[idx].name !== nome) return prev;
+      const exs = [...d0.exercises];
+      exs[idx] = { ...exs[idx], done: feito };
+      return { ...prev, [diaDoTreino]: { ...d0, exercises: exs } };
+    });
+  };
+
+  const mudarExercicio = (dia: string, idx: number, mudanca: Partial<ExercicioDoPlano>) =>
+    setWorkoutPlan((prev) => {
+      const d0 = prev[dia] ?? { muscles: [], exercises: [] };
+      if (!d0.exercises[idx]) return prev;
+      const exs = [...d0.exercises];
+      exs[idx] = { ...exs[idx], ...mudanca };
+      if ("tipo" in mudanca && !mudanca.tipo) delete (exs[idx] as Partial<ExercicioDoPlano>).tipo;
+      return { ...prev, [dia]: { ...d0, exercises: exs } };
+    });
+
+  const adicionarExercicio = (dia: string, nome: string) => {
+    setWorkoutPlan((prev) => {
+      const d0 = prev[dia] ?? { muscles: [], exercises: [] };
+      return { ...prev, [dia]: { ...d0, exercises: [...(d0.exercises ?? []), { name: nome, sets: "", reps: "", carga: "", done: false, obs: "" }] } };
+    });
+    // dia que recebe exercício vira dia de treino (senão fica "descanso" com treino dentro)
+    if (!diasAtivosLimpos.includes(dia)) setActiveDays((prev) => [...new Set([...(prev ?? []), dia])]);
+  };
+
+  const acoesDoHoje: AcoesDoHoje = {
+    alternarSerie: (k, i) => {
+      const lista = seriesEfetivas[k];
+      if (!lista?.[i]) return;
+      const marcando = !lista[i].feito;
+      mudarSessao((s) => {
+        const n = alternarFeito(s, k, iniciais[k], i);
+        return marcando ? comInicio(n) : n;
+      });
+      sincronizarDone(k, lista.every((s, j) => (j === i ? marcando : s.feito)));
+      // marcar dispara o descanso (menos na última série do treino)
+      if (marcando && feitas + 1 < total) iniciarDescanso();
+    },
+    valor: (k, i, campo, v) => mudarSessao((s) => definirValor(s, k, iniciais[k], i, campo, v)),
+    subir: (k, nova) => {
+      mudarSessao((s) => subirCarga(s, k, iniciais[k], nova));
+      trackEvent("treino_subiu_carga", { carga: nova });
+    },
+    maisSerie: (k) => mudarSessao((s) => adicionarSerie(s, k, iniciais[k])),
+    menosSerie: (k) => mudarSessao((s) => removerUltimaSerie(s, k, iniciais[k])),
+    marcarExercicio: (k, feito) => {
+      mudarSessao((s) => {
+        const n = marcarExercicio(s, k, iniciais[k], feito);
+        return feito ? comInicio(n) : n;
+      });
+      sincronizarDone(k, feito);
+    },
+    obs: (i, texto) => mudarExercicio(diaDoTreino, i, { obs: texto }),
+    cardio: (i, campo, v) => mudarExercicio(diaDoTreino, i, { [campo]: v }),
+    adicionarExercicio,
+    nota: (texto) => {
+      if (concluido) setNotasDasSessoes((prev) => ({ ...(prev ?? {}), [sessao.data]: texto }));
+      else setWorkoutNotes((prev) => ({ ...(prev ?? {}), [diaDoTreino]: texto }));
+    },
+    escolherDia: (d) => {
+      if (d == null) setSessaoSalva(null);
+      else mudarSessao((s) => ({ ...s, dia: d }));
+    },
+    abrirConfig: () => abrirConfig(),
+  };
+
+  /* ---------------- concluir ---------------- */
+  const [resumo, setResumo] = useState<ResumoDoTreino | null>(null);
+  const [concluidoAberto, setConcluidoAberto] = useState(false);
+
+  const montarResumo = (series: Record<string, SerieDaSessao[]>, logDepois: string[], minutos: number | null, notaTexto: string): ResumoDoTreino => {
+    const antes = historico.filter((h) => h && typeof h.date === "string" && h.date < sessao.data);
+    const r = concluirTreino({ exercicios, chaves, series, historico: antes, data: sessao.data });
+    const anterior = volumeDaVezAnterior(antes, r.entradas.filter((e) => e.tipo !== "cardio").map((e) => e.exercise), sessao.data);
+    const d = parseLocalDay(sessao.data);
+    return {
+      diaNome: DIAS[indiceDoDia(d)],
+      dataTexto: `${d.getDate()} DE ${nomeDoMes(d.getMonth()).toUpperCase()}`,
+      titulo: planoDoDia.muscles.join(" + ") || `${r.linhas.length} exercício${r.linhas.length === 1 ? "" : "s"}`,
+      minutos,
+      linhas: r.linhas,
+      volume: r.volume,
+      vsUltima: anterior ? variacaoPct(r.volume, anterior.volume) : null,
+      sequencia: semanasNaMeta(logDepois, meta, hojeData).sequencia,
+      nota: notaTexto,
+      recorde: r.recordes.length > 0,
+    };
+  };
+
+  const concluir = () => {
+    if (feitas === 0) {
+      toast("Marque pelo menos uma série pra concluir o treino.");
+      return;
+    }
+    const data = sessao.data;
+    const agora = new Date();
+    const series: Record<string, SerieDaSessao[]> = { ...sessao.series, ...seriesEfetivas };
+    const antes = historico.filter((h) => h && typeof h.date === "string" && h.date < data);
+    const r = concluirTreino({ exercicios, chaves, series, historico: antes, data });
+    // Concluir de novo no mesmo dia SUBSTITUI o do dia: sai tudo deste treino
+    // naquela data (inclusive o que foi desmarcado depois) e entra o de agora.
+    const nomesDoTreino = new Set(exercicios.map((e) => e.name.trim()));
+    setExerciseHistory((prev) =>
+      registrarNoHistorico(
+        (Array.isArray(prev) ? prev : []).filter((h) => !(h?.date === data && nomesDoTreino.has(String(h.exercise ?? "").trim()))),
+        r.entradas,
+        data,
+      ),
+    );
+    const logDepois = log.includes(data) ? log : [...log, data];
+    if (!log.includes(data)) setWorkoutLog((prev) => (Array.isArray(prev) && prev.includes(data) ? prev : [...(Array.isArray(prev) ? prev : []), data]));
+    // volume do dia = Σ carga × reps das séries feitas (cardio não soma)
+    setWeeklyVolume((prev) => ({ ...(prev ?? {}), [data]: r.volume }));
+    const inicio = sessao.inicio ?? agora.toISOString();
+    const minutos = sessao.inicio ? Math.min(240, Math.max(1, Math.round((agora.getTime() - Date.parse(sessao.inicio)) / 60_000))) : null;
+    setSessoesMeta((prev) => ({ ...(prev ?? {}), [data]: { dia: diaDoTreino, ...(minutos ? { minutos } : {}), musculos: planoDoDia.muscles } }));
+    const notaDoDia = (workoutNotes?.[diaDoTreino] ?? "").trim();
+    if (notaDoDia) {
+      setNotasDasSessoes((prev) => ({ ...(prev ?? {}), [data]: notaDoDia }));
+      setWorkoutNotes((prev) => ({ ...(prev ?? {}), [diaDoTreino]: "" }));
+    }
+    setSessaoSalva({ ...sessao, series, inicio, fim: agora.toISOString(), assinatura: assinaturaDasSeries(series) });
+    setDescansoAte(null);
+    setResumo(montarResumo(series, logDepois, minutos, notaDoDia || notasDasSessoes?.[data] || ""));
+    setConcluidoAberto(true);
+    trackEvent("treino_concluido", { series: r.feitas, volume: Math.round(r.volume), recordes: r.recordes.length, de_novo: concluido });
+  };
+
+  const verResumo = () => {
+    const minutos = sessao.inicio && sessao.fim ? Math.max(1, Math.round((Date.parse(sessao.fim) - Date.parse(sessao.inicio)) / 60_000)) : null;
+    setResumo(montarResumo({ ...sessao.series, ...seriesEfetivas }, log, minutos, notasDasSessoes?.[sessao.data] ?? ""));
+    setConcluidoAberto(true);
+  };
+
+  /* ---------------- semana, constância, evolução ---------------- */
+  const { semanas, sequencia } = useMemo(() => semanasNaMeta(log, meta, hojeData), [log, meta, hojeData]);
+  const fonte: FonteDosTreinos = useMemo(() => ({ sessoes: sessoesMeta ?? {}, historico, plano: workoutPlan }), [sessoesMeta, historico, workoutPlan]);
+  const esquecido = useMemo(
+    () => grupoEsquecido({ fonte, diasAtivos: diasAtivosLimpos, log, hoje: today }),
+    [fonte, diasAtivosLimpos, log, today],
+  );
+  const linhas = linhasDaSemana({
+    plano: workoutPlan,
+    diasAtivos: diasAtivosLimpos,
+    hoje: hojeData,
+    hojeNome: todayDayName,
+    log,
+    volumePorDia: weeklyVolume ?? {},
+    progressoHoje: { feitas: concluido ? 0 : feitas, total, rotulo: rotuloTotal },
+  });
+  const resumoSemana = useMemo(() => resumoDaSemana(log, weeklyVolume, hojeData), [log, weeklyVolume, hojeData]);
+  const recordesMes = useMemo(() => recordesDoMes(historico, hojeData.getFullYear(), hojeData.getMonth()), [historico, hojeData]);
+  const recordesAnteriores = useMemo(() => {
+    const d = new Date(hojeData.getFullYear(), hojeData.getMonth() - 1, 1);
+    return { nome: nomeDoMes(d.getMonth()), lista: recordesDoMes(historico, d.getFullYear(), d.getMonth()) };
+  }, [historico, hojeData]);
+  const cargas = useMemo(() => cargaPorExercicio(historico, today), [historico, today]);
+
+  /* ---------------- plano: editor do dia e ⚙️ ---------------- */
+  const [diaEditando, setDiaEditando] = useState<string | null>(null);
+  const [configAberta, setConfigAberta] = useState(false);
+  const abrirConfig = () => {
+    setConfigAberta(true);
+    reportTab?.("config");
+  };
+  const fecharConfig = () => {
+    setConfigAberta(false);
+    reportTab?.(activeTab);
+  };
 
   const toggleDay = (day: string) => {
-    setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-    setWorkoutPlan(prev => prev[day] ? prev : { ...prev, [day]: { muscles: [], exercises: [] } });
+    setActiveDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+    setWorkoutPlan((prev) => (prev[day] ? prev : { ...prev, [day]: { muscles: [], exercises: [] } }));
   };
 
   const toggleMuscleForDay = (day: string, muscle: string) => {
-    setWorkoutPlan(prev => {
+    setWorkoutPlan((prev) => {
       const day0 = prev[day] ?? { muscles: [], exercises: [] };
       const current = day0.muscles ?? [];
-      const newMuscles = current.includes(muscle)
-        ? current.filter(m => m !== muscle)
-        : [...current, muscle];
+      const newMuscles = current.includes(muscle) ? current.filter((m) => m !== muscle) : [...current, muscle];
       return { ...prev, [day]: { ...day0, muscles: newMuscles } };
     });
   };
 
-  const applyTemplate = (template: typeof templates[0]) => {
+  const applyTemplate = (template: ModeloDeTreino) => {
+    const planoAntes = workoutPlan;
+    const diasAntes = activeDays;
     const newPlan: WorkoutPlan = {};
     const newActiveDays: string[] = [];
-    for (const day of weekDays) {
+    for (const day of DIAS) {
       const muscles = template.plan[day] || [];
       newPlan[day] = { muscles, exercises: workoutPlan[day]?.exercises || [] };
       if (muscles.length > 0) newActiveDays.push(day);
     }
     setWorkoutPlan(() => newPlan);
     setActiveDays(newActiveDays);
-    setShowTemplates(false);
+    // trocava a semana inteira sem aviso nem volta (varredura 26/09)
+    avisarApagado(`Modelo "${template.name}" aplicado`, () => { setWorkoutPlan(() => planoAntes); setActiveDays(diasAntes); });
   };
 
-  const streak = (() => {
-    if (workoutLog.length === 0) return 0;
-    const sorted = [...workoutLog].sort((a, b) => b.localeCompare(a));
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 365; i++) {
-      const dateStr = localDayKey(d);
-      if (sorted.includes(dateStr)) { count++; d.setDate(d.getDate() - 1); }
-      else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
-      else break;
-    }
-    return count;
-  })();
-
-  const totalWeeklySets = Object.values(workoutPlan).reduce((total, day) =>
-    total + day.exercises.reduce((s, ex) => s + (Number(ex.sets) || 0), 0), 0
-  );
-
-  const thisWeekVolume = useMemo(() => {
-    const now = new Date();
-    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
-    let total = 0;
-    for (let i = 0; i < dayOfWeek; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      total += weeklyVolume[localDayKey(d)] || 0;
-    }
-    return total;
-  }, [weeklyVolume]);
-
-  const lastWeekVolume = useMemo(() => {
-    const now = new Date();
-    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
-    let total = 0;
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - dayOfWeek - i);
-      total += weeklyVolume[localDayKey(d)] || 0;
-    }
-    return total;
-  }, [weeklyVolume]);
-
-  const volumeDiff = lastWeekVolume > 0 ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100) : 0;
-
-  const uniqueExercises = useMemo(() => {
-    const set = new Set(exerciseHistory.map(h => h.exercise));
-    Object.values(workoutPlan).forEach(day => {
-      (day.exercises || []).forEach((ex: any) => { if (ex.name) set.add(ex.name); });
-    });
-    return Array.from(set).sort();
-  }, [exerciseHistory, workoutPlan]);
-
-  const progressionData = useMemo(() => {
-    if (!selectedExercise) return [];
-    return exerciseHistory
-      .filter(h => h.exercise === selectedExercise && h.carga && h.carga !== "—")
-      .reverse()
-      .map(h => ({
-        date: new Date(h.date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-        carga: parseFloat(h.carga) || 0,
-        volume: (Number(h.sets) || 0) * (Number(h.reps) || 0) * (parseFloat(h.carga) || 0),
-      }))
-      .slice(-20);
-  }, [exerciseHistory, selectedExercise]);
-
-  // Rest timer logic
-  useEffect(() => {
-    if (restRunning && restCountdown > 0) {
-      restRef.current = setTimeout(() => setRestCountdown(prev => prev - 1), 1000);
-    } else if (restCountdown === 0 && restRunning) {
-      setRestRunning(false);
-      if (soundEnabled) {
-        try { const ctx = new AudioContext(); const osc = ctx.createOscillator(); osc.connect(ctx.destination); osc.frequency.value = 800; osc.start(); setTimeout(() => osc.stop(), 300); } catch {}
-      }
-    }
-    return () => { if (restRef.current) clearTimeout(restRef.current); };
-  }, [restRunning, restCountdown, soundEnabled]);
-
-  // Session timer
-  useEffect(() => {
-    if (!sessionStart) { setSessionElapsed(0); return; }
-    const interval = setInterval(() => {
-      setSessionElapsed(Math.floor((Date.now() - new Date(sessionStart).getTime()) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [sessionStart]);
-
-  const formatTime = (secs: number) => {
-    const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  const acoesDoEditor: AcoesDoEditor = {
+    ativo: (d, on) => {
+      setActiveDays((prev) => (on ? [...new Set([...(prev ?? []), d])] : (prev ?? []).filter((x) => x !== d)));
+      if (on) setWorkoutPlan((prev) => (prev[d] ? prev : { ...prev, [d]: { muscles: [], exercises: [] } }));
+    },
+    musculo: toggleMuscleForDay,
+    exercicio: mudarExercicio,
+    adicionar: adicionarExercicio,
+    // "Remover exercício": a lixeira apagava SEMPRE o último, sem volta (26/09).
+    remover: (dia, i) => {
+      const removido = workoutPlan[dia]?.exercises[i];
+      if (!removido) return;
+      setWorkoutPlan((prev) => {
+        const d0 = prev[dia] ?? { muscles: [], exercises: [] };
+        return { ...prev, [dia]: { ...d0, exercises: (d0.exercises ?? []).filter((_, j) => j !== i) } };
+      });
+      avisarApagado(`"${removido.name}" removido`, () => setWorkoutPlan((prev) => {
+        const d0 = prev[dia] ?? { muscles: [], exercises: [] };
+        const lista = [...(d0.exercises ?? [])];
+        lista.splice(Math.min(i, lista.length), 0, removido);
+        return { ...prev, [dia]: { ...d0, exercises: lista } };
+      }));
+    },
+    // COPIAR PRA OUTROS DIAS (22/09) — copia músculos + exercícios (zerando os ✓);
+    // 26/09: com Desfazer, que antes não tinha.
+    copiar: (dia, destinos) => {
+      if (!destinos.length) return;
+      const planoAntes = workoutPlan;
+      const diasAntes = activeDays;
+      setWorkoutPlan((prev) => {
+        const src = prev[dia] ?? { muscles: [], exercises: [] };
+        const u = { ...prev };
+        destinos.forEach((t) => {
+          u[t] = { ...src, muscles: [...(src.muscles ?? [])], exercises: (src.exercises ?? []).map((e) => ({ ...e, done: false })) };
+        });
+        return u;
+      });
+      // dia que recebe um treino vira dia de treino — senão continua "descanso"
+      setActiveDays((prev) => Array.from(new Set([...(prev ?? []), ...destinos])));
+      trackEvent("treino_copiado", { de: dia, para: destinos.length });
+      avisarApagado(
+        `Treino de ${dia.toLowerCase()} copiado pra ${destinos.length} dia${destinos.length > 1 ? "s" : ""}`,
+        () => { setWorkoutPlan(() => planoAntes); setActiveDays(diasAntes); },
+      );
+    },
   };
 
-  const logWorkoutToday = () => {
-    if (!workoutLog.includes(today)) setWorkoutLog([...workoutLog, today]);
-    const todayW = workoutPlan[todayDayName];
-    if (todayW) {
-      const vol = todayW.exercises.reduce((s, ex) => s + (Number(ex.sets) || 0) * (Number(ex.reps) || 0) * (parseFloat(ex.carga) || 0), 0);
-      setWeeklyVolume(prev => ({ ...prev, [today]: vol }));
-    }
-    const todayExercises = workoutPlan[todayDayName]?.exercises || [];
-    const newHistory = todayExercises.filter(ex => ex.done).map(ex => ({
-      date: today, exercise: ex.name, sets: ex.sets, reps: ex.reps, carga: ex.carga, obs: ex.obs
-    }));
-    if (newHistory.length > 0) setExerciseHistory(prev => [...newHistory, ...prev].slice(0, 500));
-    setSessionStart(null);
+  const trocarAba = (id: Aba) => {
+    setActiveTab(id);
+    reportTab?.(id);
   };
 
-  const todayWorkout = workoutPlan[todayDayName];
-  const todayProgress = todayWorkout ? todayWorkout.exercises.filter(e => e.done).length / Math.max(todayWorkout.exercises.length, 1) * 100 : 0;
-  const todayDoneCount = todayWorkout?.exercises.filter(e => e.done).length || 0;
-  const todayTotalCount = todayWorkout?.exercises.length || 0;
-
-  const muscleDistribution = weekDays.map(day => ({
-    day: day.slice(0, 3),
-    muscles: workoutPlan[day]?.muscles || [],
-    exercises: workoutPlan[day]?.exercises.length || 0,
-    volume: workoutPlan[day]?.exercises.reduce((s, ex) => s + (Number(ex.sets) || 0) * (Number(ex.reps) || 0), 0) || 0
-  }));
-
-  const badges = [
-    { name: "Primeiro Treino", desc: "Registrou o primeiro treino", unlocked: workoutLog.length >= 1, icon: "🎯" },
-    { name: "Sequência 7", desc: "7 dias seguidos", unlocked: streak >= 7, icon: "🔥" },
-    { name: "Sequência 30", desc: "30 dias seguidos!", unlocked: streak >= 30, icon: "⚡" },
-    { name: "Centurião", desc: "100 treinos registrados", unlocked: workoutLog.length >= 100, icon: "💯" },
-    { name: "PR Hunter", desc: "5+ recordes pessoais", unlocked: personalRecords.length >= 5, icon: "🏆" },
-    { name: "4 Semanas", desc: "4 semanas consecutivas", unlocked: streak >= 28, icon: "📅" },
-    { name: "Volume 50k", desc: "50k+ volume em uma semana", unlocked: thisWeekVolume >= 50000, icon: "💎" },
-    { name: "Dedicação", desc: "Treinou 200+ dias", unlocked: workoutLog.length >= 200, icon: "👑" },
-  ];
-
-  // Dia que ancora o tutorial: hoje, ou (se hoje é descanso) o primeiro dia ativo vazio.
-  const spotlightDay = useMemo(() => {
-    if (activeDays.includes(todayDayName)) return todayDayName;
-    return weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0) ?? todayDayName;
-  }, [activeDays, todayDayName, workoutPlan]);
-
-  const renderWorkoutDay = (day: string, compact = false) => {
-    const workout = workoutPlan[day];
-    const isActive = activeDays.includes(day);
-    if (!workout) return null;
-
-    const muscleLabel = workout.muscles.length > 0 ? workout.muscles.join(" + ") : "";
-    const muscleEmoji = workout.muscles.length > 0 ? (muscleGroupIcons[workout.muscles[0]] || "💪") : "😴";
-    const doneCount = workout.exercises.filter(e => e.done).length;
-    const totalCount = workout.exercises.length;
-
-    if (!isActive && totalCount === 0) return (
-      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden opacity-50">
-        <div className={`${dayColors[day]} text-white p-3 font-bold text-sm flex items-center justify-between`}>
-          <span>{day} {day === todayDayName ? "⬅️ HOJE" : ""}</span>
-          <span className="text-lg">😴</span>
-        </div>
-        <div className="p-4 text-center"><p className="text-xs text-muted-foreground">Dia de descanso</p></div>
-      </motion.div>
-    );
-
-    if (totalCount === 0) return (
-      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className={`${dayColors[day]} text-white p-3 font-bold text-sm flex items-center justify-between`}>
-          <span>{day} {day === todayDayName ? "⬅️ HOJE" : ""}</span>
-          <span className="text-xs opacity-80">{muscleLabel || "Configurar"}</span>
-        </div>
-        <div className="p-4">
-          {muscleLabel && <p className="text-xs text-muted-foreground mb-2">{muscleEmoji} {muscleLabel}</p>}
-          <p className="text-xs text-muted-foreground text-center mb-3">
-            {muscleLabel ? `Adicione exercícios de ${muscleLabel}` : "Configure os músculos na aba ⚙️ CONFIG"}
-          </p>
-          <div className="flex gap-1" data-spotlight={day === spotlightDay ? "add-exercise" : undefined}>
-            <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-7 flex-1 bg-transparent" />
-            <Button size="sm" className="h-7 px-2" onClick={() => {
-              if (newExName.trim()) {
-                setWorkoutPlan(prev => {
-                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
-                  return { ...prev, [day]: { ...day0, exercises: [...(day0.exercises ?? []), { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] } };
-                });
-                setNewExName("");
-              }
-            }}><Plus className="w-3 h-3" /></Button>
-          </div>
-        </div>
-      </motion.div>
-    );
-
-    return (
-      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className={`${dayColors[day]} text-white p-3`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-bold text-sm">{day} {day === todayDayName ? "⬅️ HOJE" : ""}</p>
-              <p className="text-xs opacity-80">{muscleEmoji} {muscleLabel}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* COPIAR PRA OUTROS DIAS (22/09, chamado: "no treino senti a falta
-                  de ter como copiar para outro dia da semana igual tem na
-                  dieta") — mesmo gesto da Dieta: botão no cabeçalho, painel
-                  com os dias, copia músculos + exercícios (zerando os ✓). */}
-              <button
-                type="button"
-                onClick={() => { if (copyFromDay === day) { setCopyFromDay(null); setCopyTargetDays([]); } else { setCopyFromDay(day); setCopyTargetDays([]); } }}
-                className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
-                title="Copiar este treino para outros dias"
-                aria-label={`Copiar treino de ${day} para outros dias`}
-                data-testid={`copiar-treino-${day}`}
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span className="text-[9px] font-normal">Copiar</span>
-              </button>
-              <div className="text-right">
-                <p className="text-xs opacity-80">{doneCount}/{totalCount}</p>
-                <div className="w-16 h-1.5 bg-white/30 rounded-full mt-1">
-                  <div className="h-full bg-white rounded-full transition-all" style={{ width: `${doneCount / Math.max(totalCount, 1) * 100}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {copyFromDay === day && (
-          <div className="p-2 bg-muted/50 border-b border-border space-y-2" data-testid="painel-copiar-treino">
-            <p className="text-[10px] font-bold text-muted-foreground">Copiar para:</p>
-            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-              <Checkbox
-                checked={copyTargetDays.length === weekDays.length - 1}
-                onCheckedChange={(checked) => setCopyTargetDays(checked ? weekDays.filter(d => d !== day) : [])}
-              />
-              Todos
-            </label>
-            <div className="grid grid-cols-2 gap-1">
-              {weekDays.filter(d => d !== day).map(d => (
-                <label key={d} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
-                  <Checkbox
-                    checked={copyTargetDays.includes(d)}
-                    onCheckedChange={(checked) => setCopyTargetDays(prev => checked ? [...prev, d] : prev.filter(x => x !== d))}
-                  />
-                  {d}
-                </label>
-              ))}
-            </div>
-            <Button
-              size="sm"
-              className="w-full h-7 text-xs"
-              disabled={copyTargetDays.length === 0}
-              onClick={() => {
-                setWorkoutPlan(prev => {
-                  const src = prev[day] ?? { muscles: [], exercises: [] };
-                  const updated = { ...prev };
-                  copyTargetDays.forEach(t => {
-                    updated[t] = { ...src, muscles: [...(src.muscles ?? [])], exercises: (src.exercises ?? []).map(e => ({ ...e, done: false })) };
-                  });
-                  return updated;
-                });
-                // dia que recebe um treino vira dia de treino — senão o card
-                // continua "descanso" e o copiado não aparece
-                setActiveDays(prev => Array.from(new Set([...prev, ...copyTargetDays])));
-                trackEvent("treino_copiado", { de: day, para: copyTargetDays.length });
-                setCopyFromDay(null);
-                setCopyTargetDays([]);
-              }}
-            >
-              Copiar ({copyTargetDays.length})
-            </Button>
-          </div>
-        )}
-        <div className="p-3">
-          {/* Cabeçalho de tabela só existe onde a linha É uma tabela (≥640px).
-              No celular a linha vira duas, e um cabeçalho de 4 colunas em cima
-              de um layout de 2 linhas alinha com nada. */}
-          <div className="hidden sm:grid grid-cols-[20px_1fr_auto_28px] gap-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border pb-1 mb-2">
-            <span></span><span>Exercício</span><span className="text-center">S × R × Carga</span><span className="text-center">✓</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
-            <span className="inline-flex items-center gap-0.5 h-4 px-1 rounded border border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300 text-[9px] font-semibold">🏋️ Força</span>
-            é o padrão — toque nele pra virar <span className="text-orange-600 dark:text-orange-300 font-semibold">🏃 Cardio</span> (corrida, bike, corda) e registrar tempo + distância.
-          </p>
-          {workout.exercises.map((ex, i) => (
-            <div key={i}>
-              {/*
-                DUAS LINHAS no celular (30/07) — e o porquê, pra ninguém desfazer.
-
-                Em 29/07 eu botei número, chip de tipo, nome, obs, 3 campos
-                numéricos e o ✅ numa linha só, com o nome em `minmax(0,1fr)`.
-                A conta a 360px: sobram ~100px pra coluna do nome, o chip
-                "Força" come 56 e o ícone de obs mais 12 — restam ~24px, UMA
-                LETRA. Uma usuária relatou: "agora não consigo ver o nome do
-                exercício". Ela estava certa.
-
-                Consertar o vazamento sacrificando o nome foi trocar um defeito
-                por outro pior: o exercício É a informação, os números são o
-                acessório. Não cabe tudo numa linha a 360px — então não força.
-
-                Celular: linha 1 = número + nome + obs + ✅
-                         linha 2 = chip + S × R × carga
-                ≥640px : a tabela de 4 colunas de sempre, que lá cabe.
-              */}
-              <div className={`grid gap-x-1.5 gap-y-1 items-center py-1.5 grid-cols-[16px_minmax(0,1fr)_28px] sm:grid-cols-[16px_minmax(0,1fr)_auto_28px] ${ex.done ? "opacity-60" : ""}`}>
-                <span className="col-start-1 row-start-1 text-[10px] text-muted-foreground">{i + 1}</span>
-                <div className="col-start-2 row-start-1 flex items-center gap-1 min-w-0">
-                  {/* truncate segue como rede de segurança — mas agora só entra
-                      em nome absurdo, não em todo nome. */}
-                  <span className={`min-w-0 truncate px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`} title={ex.name}>
-                    {ex.name}
-                  </span>
-                  <button onClick={() => setShowObsFor(showObsFor === `${day}-${i}` ? null : `${day}-${i}`)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                    <MessageSquare className={`w-3 h-3 ${ex.obs ? "text-amber-500" : ""}`} />
-                  </button>
-                </div>
-                <div className="col-start-2 row-start-2 flex items-center gap-1 min-w-0 sm:col-start-3 sm:row-start-1">
-                  <button
-                    onClick={() => {
-                      setWorkoutPlan(prev => {
-                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                        const atual = u[day].exercises[i];
-                        u[day].exercises[i] = { ...atual, tipo: atual.tipo === "cardio" ? undefined : "cardio" };
-                        return u;
-                      });
-                    }}
-                    className={`shrink-0 flex items-center gap-0.5 h-6 pl-1 pr-1.5 rounded-md border text-[10px] font-semibold active:scale-95 transition ${
-                      ex.tipo === "cardio"
-                        ? "border-orange-300 bg-orange-100 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300"
-                        : "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300"
-                    }`}
-                    title="Toque pra alternar entre Musculação e Cardio"
-                    aria-label="Alternar tipo de exercício"
-                  >
-                    <span className="text-xs leading-none">{ex.tipo === "cardio" ? "🏃" : "🏋️"}</span>
-                    {ex.tipo === "cardio" ? "Cardio" : "Força"}
-                  </button>
-                {ex.tipo === "cardio" ? (
-                  <div className="flex items-center gap-1">
-                    <Input value={ex.duracao ?? ""} placeholder="min" inputMode="decimal" onChange={e => {
-                      setWorkoutPlan(prev => {
-                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                        u[day].exercises[i] = { ...u[day].exercises[i], duracao: e.target.value }; return u;
-                      });
-                    }} className="text-xs h-6 w-12 text-center border-none bg-transparent p-0" />
-                    <span className="text-muted-foreground text-[10px]">min</span>
-                    <span className="text-muted-foreground text-xs mx-0.5">·</span>
-                    <Input value={ex.distancia ?? ""} placeholder="km/qtd" onChange={e => {
-                      setWorkoutPlan(prev => {
-                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                        u[day].exercises[i] = { ...u[day].exercises[i], distancia: e.target.value }; return u;
-                      });
-                    }} className="text-xs h-6 w-16 text-center border-none bg-transparent p-0 font-medium" />
-                  </div>
-                ) : (
-                <div className="flex items-center gap-1">
-                  <Input value={ex.sets} placeholder="S" onChange={e => {
-                    setWorkoutPlan(prev => {
-                      const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                      u[day].exercises[i] = { ...u[day].exercises[i], sets: e.target.value }; return u;
-                    });
-                  }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
-                  <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.reps} placeholder="R" onChange={e => {
-                    setWorkoutPlan(prev => {
-                      const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                      u[day].exercises[i] = { ...u[day].exercises[i], reps: e.target.value }; return u;
-                    });
-                  }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
-                  <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.carga} placeholder="kg" onChange={e => {
-                    setWorkoutPlan(prev => {
-                      const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                      u[day].exercises[i] = { ...u[day].exercises[i], carga: e.target.value }; return u;
-                    });
-                  }} className="text-xs h-6 w-16 text-center border-none bg-transparent p-0 font-medium" />
-                </div>
-                )}
-                </div>
-                {/* ✅ na linha do NOME (não na dos números): é a ação que
-                    fecha o exercício, tem que estar na altura em que a pessoa
-                    lê o que está marcando. */}
-                <button onClick={() => {
-                  setWorkoutPlan(prev => {
-                    const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                    u[day].exercises[i] = { ...u[day].exercises[i], done: !ex.done }; return u;
-                  });
-                  if (!ex.done && sessionStart) { setRestCountdown(restTime); setRestRunning(true); }
-                }} className={`col-start-3 row-start-1 sm:col-start-4 w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${ex.done ? "bg-green-500 border-green-500 scale-110" : "border-muted-foreground/30 hover:border-green-400"}`}>
-                  {ex.done && <Check className="w-3 h-3 text-white" />}
-                </button>
-              </div>
-              {showObsFor === `${day}-${i}` && (
-                <div className="ml-5 mr-7 mb-2">
-                  <Input value={ex.obs} onChange={e => {
-                    setWorkoutPlan(prev => {
-                      const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
-                      u[day].exercises[i] = { ...u[day].exercises[i], obs: e.target.value }; return u;
-                    });
-                  }} placeholder="Obs: execução, dores, ajustes..." className="text-[10px] h-6 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30" />
-                </div>
-              )}
-              {ex.obs && showObsFor !== `${day}-${i}` && (
-                <p className="ml-5 mr-7 text-[9px] text-amber-600 dark:text-amber-400 mb-1">💬 {ex.obs}</p>
-              )}
-              {/* Rest timer inline — appears between exercises when timer is running */}
-              {ex.done && restRunning && i === workout.exercises.filter(e => e.done).length - 1 && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  className="mx-2 my-1.5 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-200 dark:border-blue-500/20 p-2 flex items-center gap-2"
-                >
-                  <div className="relative w-8 h-8 flex-shrink-0">
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-                      <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--primary))" strokeWidth="4"
-                        strokeDasharray={`${((restCountdown || restTime) / restTime) * 176} 176`} strokeLinecap="round" />
-                    </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold font-mono">{restCountdown}s</span>
-                  </div>
-                  <div className="flex gap-1 flex-1">
-                    {[30, 45, 60, 90].map(t => (
-                      <button key={t} onClick={() => { setRestTime(t); setRestCountdown(t); }}
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${restTime === t ? "bg-blue-500 text-white border-blue-500" : "border-border"}`}>{t}s</button>
-                    ))}
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => setRestRunning(false)} className="p-1 rounded border border-border"><Pause className="w-3 h-3" /></button>
-                    <button onClick={() => { setRestRunning(false); setRestCountdown(restTime); }} className="p-1 rounded border border-border"><RotateCcw className="w-3 h-3" /></button>
-                  </div>
-                </motion.div>
-              )}
-              {i < workout.exercises.length - 1 && <div className="border-b border-border/30" />}
-            </div>
-          ))}
-          <div className="flex gap-1 mt-2 pt-2 border-t border-border/30">
-            <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-6 flex-1 bg-transparent" />
-            <Button size="sm" className="h-6 px-2" onClick={() => {
-              if (newExName.trim()) {
-                setWorkoutPlan(prev => {
-                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
-                  return { ...prev, [day]: { ...day0, exercises: [...(day0.exercises ?? []), { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] } };
-                });
-                setNewExName("");
-              }
-            }}><Plus className="w-3 h-3" /></Button>
-            {workout.exercises.length > 0 && (
-              <Button size="sm" variant="ghost" className="h-6 px-2 text-red-400" onClick={() => {
-                setWorkoutPlan(prev => {
-                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
-                  return { ...prev, [day]: { ...day0, exercises: (day0.exercises ?? []).slice(0, -1) } };
-                });
-              }}><Trash2 className="w-3 h-3" /></Button>
-            )}
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/30">
-            <Input value={workoutNotes[day] || ""} onChange={e => setWorkoutNotes({ ...workoutNotes, [day]: e.target.value })}
-              placeholder="📝 Notas da sessão (sono, energia, dores...)" className="text-[10px] h-6 bg-muted/20 border-none" />
-          </div>
-        </div>
-      </motion.div>
-    );
-  };
-
-  // Get day status for SEMANA tab
-  const getDayStatus = (day: string) => {
-    const isActive = activeDays.includes(day);
-    const workout = workoutPlan[day];
-    if (!isActive) return { icon: "😴", label: "Descanso", color: "text-muted-foreground" };
-    if (!workout || workout.exercises.length === 0) return { icon: "⚪", label: "Sem exercícios", color: "text-muted-foreground" };
-    const done = workout.exercises.filter(e => e.done).length;
-    const total = workout.exercises.length;
-    if (done === total) return { icon: "✅", label: "Completo", color: "text-green-600" };
-    if (done > 0) return { icon: "🟡", label: `${done}/${total}`, color: "text-yellow-600" };
-    return { icon: "⚪", label: "Pendente", color: "text-muted-foreground" };
-  };
+  const [alturaRodape, setAlturaRodape] = useState(0);
+  const mostraRodape = activeTab === "hoje" && temTreinoHoje;
+  const tomHoje = tomDoDia(todayDayName);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background">
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
           { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout" },
         ]}
       />
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Dumbbell className="w-5 h-5 text-blue-600" /> TREINO</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {sessionStart && (
-              <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300 dark:border-green-500/20">
-                <Clock className="w-3 h-3 text-green-600" />
-                <span className="text-[10px] font-bold text-green-700 font-mono dark:text-green-300">{formatTime(sessionElapsed)}</span>
-              </div>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
+          <button type="button" onClick={() => navigate("/home")} aria-label="Voltar" className="w-9 h-9 -ml-2 shrink-0 grid place-items-center rounded-md hover:bg-muted">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <Dumbbell className="w-5 h-5 text-blue-600 shrink-0" aria-hidden="true" />
+          <h1 className="text-[18px] font-extrabold tracking-tight">TREINO</h1>
+          <div className="ml-auto flex items-center gap-1.5">
+            {sequencia > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-orange-300 bg-orange-50 text-orange-600 text-[12px] font-bold px-2 h-7 whitespace-nowrap"
+                title="Semanas seguidas batendo a meta"
+                data-testid="sequencia-semanas"
+              >
+                <Flame className="w-3 h-3" aria-hidden="true" />
+                {sequencia} sem
+              </span>
             )}
-            {streak > 0 && (
-              <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-500/20 px-2 py-1 rounded-full border border-orange-300 dark:border-orange-500/20">
-                <Flame className="w-3 h-3 text-orange-500" />
-                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{streak}🔥</span>
-              </div>
-            )}
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+            <span className="hidden min-[425px]:inline text-muted-foreground text-xs whitespace-nowrap">{currentMonth}</span>
+            <button type="button" onClick={abrirConfig} aria-label="Configurar treino" className="w-9 h-9 shrink-0 rounded-xl bg-muted hover:bg-muted/80 grid place-items-center" data-testid="abrir-config">
+              <Settings className="w-4 h-4" />
+            </button>
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {[
-            { id: "hoje", label: "HOJE", icon: "🏋️" },
-            { id: "semana", label: "SEMANA", icon: "📅" },
-            { id: "config", label: "CONFIG", icon: "⚙️" },
-            { id: "resumo", label: "RESUMO", icon: "📊" },
-            { id: "progressao", label: "PROGRESSÃO", icon: "📈" },
-            { id: "records", label: "RECORDES", icon: "🏆" },
-          ].map((tab) => (
+        <div className="max-w-5xl mx-auto px-4 pb-2.5 grid grid-cols-3 gap-2">
+          {ABAS.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               data-spotlight={`tab-${tab.id}`}
-              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+              data-active={activeTab === tab.id}
+              onClick={() => trocarAba(tab.id)}
+              className={`notion-tab justify-center gap-1.5 px-1 rounded-lg text-[11.5px] min-[400px]:text-[12.5px] font-semibold tracking-wide whitespace-nowrap ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
-              <span>{tab.icon}</span>
+              <span aria-hidden="true">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-4">
+      <main
+        className="max-w-5xl mx-auto px-4 py-4"
+        style={{ paddingBottom: mostraRodape ? `calc(${alturaRodape + 20}px + var(--teste-banner-h, 0px))` : "calc(2rem + var(--teste-banner-h, 0px))" }}
+      >
         <ModuleTip
           moduleId="treino"
           tips={[
-            "Use os templates na aba ⚙️ CONFIG para começar rápido",
-            "Inicie uma sessão para ativar o timer de descanso automático",
-            "Acompanhe sua progressão de carga na aba 📈 PROGRESSÃO"
+            "No ⚙️ do topo tem modelos prontos pra montar a semana num toque",
+            "Marque cada série no HOJE — o descanso começa sozinho",
+            "Recordes e a carga de cada exercício aparecem em 📈 EVOLUÇÃO",
           ]}
         />
 
-
-          {/* ========== HOJE — só o treino do dia ========== */}
-          {activeTab === "hoje" && (() => {
-            // Se hoje é descanso, o tutorial não tem onde se ancorar.
-            // Mostra também o primeiro dia ativo vazio para o usuário conseguir adicionar.
-            const todayIsRest = !activeDays.includes(todayDayName);
-            const fallbackDay = todayIsRest
-              ? weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0)
-              : null;
-            return (
-              <div className="space-y-4">
-                <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
-                {fallbackDay && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground px-1">
-                      Hoje é dia de descanso — adicione um exercício no próximo dia de treino:
-                    </p>
-                    {renderWorkoutDay(fallbackDay)}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* ========== SEMANA — visão clara ========== */}
-          {activeTab === "semana" && <div className="space-y-4">
-            <div className="bg-muted/30 rounded-lg px-4 py-3 border border-border">
-              <p className="text-sm font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-blue-500" /> Visão geral da sua semana</p>
-              <p className="text-xs text-muted-foreground mt-1">Toque em qualquer dia para ver e editar os exercícios</p>
-              {/* Mini status legend */}
-              <div className="flex gap-3 mt-2 text-[10px] text-muted-foreground">
-                <span>✅ Completo</span>
-                <span>🟡 Parcial</span>
-                <span>⚪ Pendente</span>
-                <span>😴 Descanso</span>
-              </div>
-            </div>
-
-            {/* Week overview cards */}
-            <div className="grid grid-cols-7 gap-1.5 mb-4">
-              {weekDays.map(day => {
-                const status = getDayStatus(day);
-                const isToday = day === todayDayName;
-                return (
-                  /* 31/08: a célula tem ~39px num celular de 360 e o p-2 comia
-                   * 16 deles — "Completo"/"Pendente" vazava por cima da borda
-                   * em QUALQUER largura. Padding lateral zero + truncate: o
-                   * rótulo agora respeita a caixa em vez de transbordar. */
-                  <div key={day} className={`text-center py-2 px-0.5 rounded-lg border transition-all ${isToday ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}>
-                    <p className="text-[10px] font-bold">{day.slice(0, 3)}</p>
-                    <p className="text-lg my-0.5">{status.icon}</p>
-                    <p className={`text-[8px] leading-tight truncate ${status.color}`}>{status.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* A série vive AQUI, na aba que 207 pessoas abrem, e não junto do
-                gráfico de 14 dias que mora no "resumo". A queixa da 2★ era
-                exatamente essa: o histórico existia longe de onde se olha, e
-                não passava de uma janela fixa. `weeklyVolume` já é
-                { "2026-08-30": 4200 } — não houve dado novo a gravar. */}
-            <div className="bg-card rounded-xl border border-border px-4 pt-4 pb-3">
-              <h3 className="text-xs font-bold flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-500" /> SUA EVOLUÇÃO DE CARGA
-              </h3>
-              <SerieHistorico
-                registros={weeklyVolume}
-                cor="hsl(142 71% 45%)"
-                id="treino-volume"
-                unidade="kg"
-                // "4.500" e não "4,5k": a média sai como `${fmt}${unidade}` e
-                // "4,5k" + "kg" virava "4,5kkg" (visto no print de 11/09).
-                formatar={(n) => Math.round(n).toLocaleString("pt-BR")}
-              />
-            </div>
-
-            {/* Full workout cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {weekDays.map(day => renderWorkoutDay(day))}
-            </div>
-          </div>}
-
-          {/* ========== CONFIG ========== */}
-          {activeTab === "config" && <div className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-              {/* Templates */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-bold flex items-center gap-2"><Copy className="w-4 h-4 text-muted-foreground" /> TEMPLATES</h3>
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowTemplates(!showTemplates)}>
-                    {showTemplates ? "Fechar" : "Ver Templates"}
-                  </Button>
-                </div>
-                <AnimatePresence>
-                  {showTemplates && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                      <div className="grid grid-cols-2 gap-2 pb-2">
-                        {templates.map(t => (
-                          <button key={t.name} onClick={() => applyTemplate(t)}
-                            className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all dark:bg-blue-500/10">
-                            <p className="text-sm font-bold">{t.emoji} {t.name}</p>
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                              {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Day chips */}
-              <div>
-                <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /> DIAS ATIVOS</h3>
-                <div className="flex gap-1.5 flex-wrap">
-                  {weekDays.map(day => (
-                    <button key={day} onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer hover:scale-105 ${
-                        activeDays.includes(day) ? `${dayColors[day]} text-white border-transparent` : "bg-muted/30 text-muted-foreground border-border"
-                      } ${day === todayDayName ? "ring-2 ring-primary ring-offset-1" : ""}`}>
-                      {day.slice(0, 3)}
-                      {activeDays.includes(day) && <Check className="w-3 h-3 inline ml-1" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Muscle groups per day */}
-              <div>
-                <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-muted-foreground" /> GRUPOS MUSCULARES POR DIA</h3>
-                <div className="space-y-3">
-                  {diasAtivosLimpos.map(day => (
-                    <div key={day} className="space-y-1">
-                      <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
-                      <div className="flex flex-wrap gap-1 ml-1">
-                        {muscleGroups.map(m => {
-                          const isSelected = workoutPlan[day]?.muscles?.includes(m) ?? false;
-                          return (
-                            <button key={m} onClick={() => toggleMuscleForDay(day, m)}
-                              className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                                isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground dark:border-blue-500/20"
-                              }`}>
-                              {muscleGroupIcons[m] || "💪"} {m}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Rest timer config */}
-              <div>
-                <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Timer className="w-4 h-4 text-muted-foreground" /> TIMER DE DESCANSO</h3>
-                <p className="text-[10px] text-muted-foreground mb-2">O timer aparece automaticamente entre exercícios quando você marca um como feito durante uma sessão ativa</p>
-                <div className="flex gap-2 items-center">
-                  <span className="text-xs text-muted-foreground">Padrão:</span>
-                  {[30, 45, 60, 90, 120].map(t => (
-                    <button key={t} onClick={() => setRestTime(t)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${restTime === t ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300"} dark:border-blue-500/20`}>{t}s</button>
-                  ))}
-                  <button onClick={() => setSoundEnabled(!soundEnabled)} className="ml-auto p-1.5 rounded border border-border">
-                    {soundEnabled ? <Volume2 className="w-4 h-4 text-blue-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>}
-
-          {/* ========== RESUMO — stats + volume + distribuição ========== */}
-          {activeTab === "resumo" && <div className="space-y-4">
-            {/* 4 stat cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
-                <Dumbbell className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-                <p className="text-2xl font-black">{todayTotalCount}</p>
-                <p className="text-[10px] text-muted-foreground">Exercícios hoje</p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
-                <Check className="w-5 h-5 text-green-500 mx-auto mb-1" />
-                <p className="text-2xl font-black">{todayDoneCount}</p>
-                <p className="text-[10px] text-muted-foreground">Feitos hoje</p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
-                <BarChart3 className="w-5 h-5 text-purple-500 mx-auto mb-1" />
-                <p className="text-2xl font-black">{totalWeeklySets}</p>
-                <p className="text-[10px] text-muted-foreground">Séries/semana</p>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-4 text-center">
-                <Flame className="w-5 h-5 text-orange-500 mx-auto mb-1" />
-                <p className="text-2xl font-black">{workoutLog.length}</p>
-                <p className="text-[10px] text-muted-foreground">Total treinos</p>
-              </div>
-            </div>
-
-            {/* Volume semanal */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> VOLUME SEMANAL</h3>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Esta semana</p>
-                  <p className="text-xl font-black">{(thisWeekVolume / 1000).toFixed(1)}k <span className="text-xs font-normal text-muted-foreground">kg</span></p>
-                </div>
-                <div className={`flex items-center gap-0.5 px-3 py-1.5 rounded-full text-xs font-bold ${
-                  volumeDiff > 0 ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400" :
-                  volumeDiff < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400" :
-                  "bg-muted text-muted-foreground"
-                }`}>
-                  {volumeDiff > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : volumeDiff < 0 ? <ArrowDownRight className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
-                  {Math.abs(volumeDiff)}%
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground">Semana passada</p>
-                  <p className="text-xl font-black text-muted-foreground">{(lastWeekVolume / 1000).toFixed(1)}k</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Distribuição semanal */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /> DISTRIBUIÇÃO SEMANAL</h3>
-              <div className="space-y-2">
-                {muscleDistribution.map(d => (
-                  <div key={d.day} className="flex items-center gap-3">
-                    <span className="text-xs font-bold w-8">{d.day}</span>
-                    <div className="flex-1 h-6 bg-muted/30 rounded-full overflow-hidden relative">
-                      <div className="h-full bg-gradient-to-r from-blue-400 to-purple-400 rounded-full transition-all"
-                        style={{ width: `${Math.min((d.volume / Math.max(...muscleDistribution.map(x => x.volume), 1)) * 100, 100)}%` }} />
-                      <span className="absolute inset-0 flex items-center px-2 text-[10px] font-medium">{d.muscles.join(" + ")}</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground w-12 text-right">{d.exercises} ex</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Volume últimos 14 dias */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> VOLUME DE TREINO (últimos 14 dias)</h3>
-              <div className="flex items-end gap-1 h-24">
-                {Array.from({ length: 14 }, (_, i) => {
-                  const d = new Date(); d.setDate(d.getDate() - (13 - i));
-                  const dateStr = localDayKey(d);
-                  const vol = weeklyVolume[dateStr] || 0;
-                  const trained = workoutLog.includes(dateStr);
-                  const maxVol = Math.max(...Object.values(weeklyVolume), 1);
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                      {vol > 0 && <span className="text-[7px] font-bold">{(vol / 1000).toFixed(0)}k</span>}
-                      <div className={`w-full rounded-t transition-all ${trained ? "bg-green-400" : "bg-muted/30"}`}
-                        style={{ height: `${vol > 0 ? Math.max((vol / maxVol) * 80, 10) : 4}%` }} />
-                      <span className="text-[7px] text-muted-foreground">{d.getDate()}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Heatmap */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-500" /> HEATMAP — {streak} dias de sequência 🔥</h3>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {Array.from({ length: 60 }, (_, i) => {
-                  const d = new Date(); d.setDate(d.getDate() - (59 - i));
-                  const dateStr = localDayKey(d);
-                  const trained = workoutLog.includes(dateStr);
-                  return (
-                    <div key={i} title={d.toLocaleDateString("pt-BR")}
-                      className={`w-4 h-4 rounded-sm transition-colors ${trained ? "bg-green-400 hover:bg-green-500" : "bg-muted/30 hover:bg-muted/50"} border border-border/30`} />
-                  );
-                })}
-              </div>
-              <p className="text-[10px] text-muted-foreground">Últimos 60 dias — verde = treinou</p>
-            </div>
-
-            {/* Histórico */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" /> HISTÓRICO DE EXERCÍCIOS</h3>
-              {exerciseHistory.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-8">Finalize um treino para ver o histórico aqui 📋</p>
-              ) : (
-                <div className="space-y-1">
-                  {exerciseHistory.slice(0, 50).map((h, i) => (
-                    <div key={i} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-1.5 text-xs border border-border/50">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0">{new Date(h.date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
-                        <span className="font-medium truncate">{h.exercise}</span>
-                        {h.obs && <span className="text-[9px] text-amber-500 flex-shrink-0">💬</span>}
-                      </div>
-                      <span className="text-muted-foreground flex-shrink-0 ml-2">{h.sets}×{h.reps} — {h.carga}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>}
-
-          {/* ========== PROGRESSÃO ========== */}
-          {activeTab === "progressao" && <div className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> PROGRESSÃO DE CARGA</h3>
-              <p className="text-[10px] text-muted-foreground mb-3">Selecione um exercício para ver a evolução da carga ao longo do tempo</p>
-              <Select value={selectedExercise} onValueChange={setSelectedExercise}>
-                <SelectTrigger className="h-8 text-xs mb-3"><SelectValue placeholder="Selecionar exercício" /></SelectTrigger>
-                <SelectContent>
-                  {uniqueExercises.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {progressionData.length > 1 ? (
-                <Suspense fallback={<div style={{ height: 200 }} />}>
-                  <GraficoProgressao dados={progressionData} cor={paleta.azul} />
-                </Suspense>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-8">
-                  {selectedExercise ? "Precisa de pelo menos 2 registros para gerar o gráfico" : "Selecione um exercício acima"}
-                </p>
-              )}
-            </div>
-
-            {selectedExercise && progressionData.length > 1 && (
-              <div className="bg-card rounded-xl border border-border p-4">
-                <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /> VOLUME TOTAL ({selectedExercise})</h3>
-                <Suspense fallback={<div style={{ height: 160 }} />}>
-                  <GraficoVolume dados={progressionData} cor={paleta.roxo} />
-                </Suspense>
-              </div>
-            )}
-
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
-              <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-amber-500" /> CALCULADORA DE 1RM (Epley)</h3>
-              <p className="text-[10px] text-muted-foreground mb-3">Estime sua repetição máxima com base no peso e reps realizadas</p>
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">Peso (kg)</label>
-                  <Input value={rmWeight} onChange={e => setRmWeight(e.target.value)} placeholder="80" className="text-sm h-8" type="number" />
-                </div>
-                <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground">Reps</label>
-                  <Input value={rmReps} onChange={e => setRmReps(e.target.value)} placeholder="8" className="text-sm h-8" type="number" />
-                </div>
-                <div className="flex-1 text-center">
-                  <label className="text-[10px] text-muted-foreground">1RM Estimado</label>
-                  <p className="text-2xl font-black text-amber-600">
-                    {rmWeight && rmReps ? `${estimate1RM(parseFloat(rmWeight), parseInt(rmReps))}kg` : "—"}
-                  </p>
-                </div>
-              </div>
-              {rmWeight && rmReps && (
-                <div className="mt-3 grid grid-cols-5 gap-1">
-                  {[100, 90, 80, 70, 60].map(pct => {
-                    const rm = estimate1RM(parseFloat(rmWeight), parseInt(rmReps));
-                    return (
-                      <div key={pct} className="text-center bg-white/50 dark:bg-background/30 rounded p-1.5">
-                        <p className="text-[10px] text-muted-foreground">{pct}%</p>
-                        <p className="text-xs font-bold">{Math.round(rm * pct / 100)}kg</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>}
-
-          {/* ========== RECORDES ========== */}
-          {activeTab === "records" && <div className="space-y-4">
-            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-yellow-500" /> MEUS RECORDES PESSOAIS (PRs)</h3>
-              <p className="text-xs text-muted-foreground mb-3">Registre seus maiores pesos e conquistas 💪</p>
-              {personalRecords.map((pr, i) => (
-                <div key={pr.id} className="flex items-center gap-3 bg-white/50 dark:bg-background/30 rounded-lg p-3 border border-yellow-200/50 dark:border-yellow-500/20 mb-2">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-400/20">
-                    {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : <Trophy className="w-4 h-4 text-yellow-500" />}
-                  </div>
-                  <div className="flex-1">
-                    <Input value={pr.exercise} onChange={e => { const u = [...personalRecords]; u[i] = { ...pr, exercise: e.target.value }; setPersonalRecords(u); }}
-                      className="text-xs h-6 font-bold border-none bg-transparent p-0" />
-                  </div>
-                  <Input value={pr.record} onChange={e => { const u = [...personalRecords]; u[i] = { ...pr, record: e.target.value }; setPersonalRecords(u); }}
-                    className="text-xs h-6 w-24 text-center font-bold border-none bg-transparent p-0 text-yellow-700 dark:text-yellow-300" />
-                  <Input type="date" value={pr.date} onChange={e => { const u = [...personalRecords]; u[i] = { ...pr, date: e.target.value }; setPersonalRecords(u); }}
-                    className="text-[10px] h-6 w-28 border-none bg-transparent p-0" />
-                  <button onClick={() => setPersonalRecords(personalRecords.filter(x => x.id !== pr.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
-                </div>
-              ))}
-              <div className="flex gap-2 mt-3">
-                <Input value={newPRExercise} onChange={e => setNewPRExercise(e.target.value)} placeholder="Exercício" className="text-xs h-8 flex-1" />
-                <Input value={newPRRecord} onChange={e => setNewPRRecord(e.target.value)} placeholder="Recorde" className="text-xs h-8 w-24" />
-                <Button size="sm" className="h-8" onClick={() => {
-                  if (newPRExercise.trim()) { setPersonalRecords([...personalRecords, { id: Date.now().toString(), exercise: newPRExercise.trim(), record: newPRRecord, date: today }]); setNewPRExercise(""); setNewPRRecord(""); }
-                }}><Plus className="w-3 h-3" /></Button>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Award className="w-4 h-4 text-purple-500" /> CONQUISTAS ({badges.filter(b => b.unlocked).length}/{badges.length})</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {badges.map(a => (
-                  <div key={a.name} className={`rounded-xl border p-3 text-center ${a.unlocked ? "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10 border-amber-200 dark:border-amber-500/30" : "bg-muted/30 border-border opacity-50"}`}>
-                    <span className="text-2xl">{a.icon}</span>
-                    <p className="text-xs font-bold mt-1">{a.name}</p>
-                    <p className="text-[9px] text-muted-foreground">{a.desc}</p>
-                    {a.unlocked && <Badge className="text-[8px] mt-1 bg-green-500">Desbloqueado!</Badge>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>}
-        
-        {treinoVazio && (
-          <ProximoPasso
-            emoji="💪"
-            titulo="Monte seu treino da semana"
-            passos={[
-              "Abra a aba CONFIG e escolha os músculos de cada dia",
-              "Adicione os exercícios com séries, repetições e carga",
-              "Toque em Iniciar Sessão — o timer de descanso liga sozinho",
-            ]}
+        {activeTab === "hoje" && (
+          <TreinoHoje
+            hoje={today}
+            hojeNome={todayDayName}
+            dia={diaDoTreino}
+            descanso={descanso}
+            exercicios={exercicios}
+            musculos={planoDoDia.muscles}
+            chaves={chaves}
+            series={seriesEfetivas}
+            ultimas={ultimas}
+            sugestoes={sugestoes}
+            feitas={feitas}
+            total={total}
+            rotuloTotal={rotuloTotal}
+            minutos={minutosEstimados}
+            nota={nota}
+            outrosDias={outrosDias}
+            diaParaMontar={descanso ? diaVazio : null}
+            spotlightDia={spotlightDay}
+            podeTrocar={diaDoTreino !== todayDayName}
+            acoes={acoesDoHoje}
           />
+        )}
+
+        {activeTab === "semana" && (
+          <TreinoSemana linhas={linhas} onAbrirDia={setDiaEditando}>
+            <ConstanciaTreino
+              meta={meta}
+              onMeta={(n) => setMetaSalva(n)}
+              semanas={semanas}
+              sequencia={sequencia}
+              hoje={today}
+              hojeNome={todayDayName}
+              log={log}
+              fonte={fonte}
+              notas={notasDasSessoes ?? {}}
+              esquecido={esquecido}
+            />
+          </TreinoSemana>
+        )}
+
+        {activeTab === "evolucao" && (
+          <TreinoEvolucao
+            resumo={resumoSemana}
+            meta={meta}
+            recordes={recordesMes}
+            anteriores={recordesAnteriores}
+            nomeDoMes={nomeDoMes(hojeData.getMonth())}
+            cargas={cargas}
+            historico={historico}
+            prs={Array.isArray(personalRecords) ? personalRecords : []}
+            onPrs={setPersonalRecords}
+            hoje={today}
+            volumePorDia={weeklyVolume ?? {}}
+            onAvisarApagado={avisarApagado}
+          />
+        )}
+
+        {treinoVazio && (
+          <div className="mt-4">
+            <ProximoPasso
+              emoji="💪"
+              titulo="Monte seu treino da semana"
+              passos={[
+                "Toque no ⚙️ e escolha um modelo pronto — ou monte dia a dia na SEMANA",
+                "Adicione os exercícios com séries, repetições e carga",
+                "No HOJE, marque cada série — o descanso começa sozinho",
+              ]}
+              acao={
+                <button type="button" onClick={abrirConfig} className="h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-bold">
+                  Ver modelos prontos
+                </button>
+              }
+            />
+          </div>
         )}
       </main>
 
-      {/* ===== BOTTOM ACTION BAR ===== */}
-      {/* bottom via var: no teste grátis a faixa "Dia X de 3" ocupa o rodapé
-          e cobria o Iniciar Sessão/Finalizar — a var (setada pelo TesteBanner)
-          empurra a barra pra cima só enquanto a faixa existe. */}
-      <div
-        className="fixed left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border"
-        style={{ bottom: "var(--teste-banner-h, 0px)" }}
-      >
-        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {!sessionStart ? (
-              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1 h-8 text-xs" onClick={() => setSessionStart(new Date().toISOString())}>
-                <Play className="w-3 h-3" /> Iniciar Sessão
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => logWorkoutToday()}>
-                <Check className="w-3 h-3" /> Finalizar
-              </Button>
-            )}
-          </div>
+      {mostraRodape && (
+        <RodapeDoTreino
+          tom={tomHoje}
+          descansoAte={descansoAte}
+          onDescanso={ajustarDescanso}
+          onPular={() => setDescansoAte(null)}
+          inicio={sessao.inicio}
+          fim={sessao.fim ?? null}
+          feitas={feitas}
+          total={total}
+          rotuloTotal={rotuloTotal}
+          estado={estadoDoRodape}
+          estimativa={minutosEstimados}
+          onComecar={() => mudarSessao(comInicio)}
+          onConcluir={concluir}
+          onVerResumo={verResumo}
+          onAltura={setAlturaRodape}
+        />
+      )}
 
-          <div className="flex items-center gap-2">
-            {restRunning && (
-              <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-full border border-blue-300 animate-pulse dark:border-blue-500/20">
-                <Timer className="w-3 h-3 text-blue-500" />
-                <span className="text-[10px] font-bold text-blue-700 font-mono dark:text-blue-300">{restCountdown}s</span>
-              </div>
-            )}
-            {todayProgress > 0 && (
-              <div className="flex items-center gap-1.5">
-                <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-green-500 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${todayProgress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                <span className="text-[10px] font-bold text-green-600">{Math.round(todayProgress)}%</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <EditorDoDia
+        dia={diaEditando}
+        hojeNome={todayDayName}
+        musculos={diaEditando ? workoutPlan[diaEditando]?.muscles ?? [] : []}
+        exercicios={diaEditando ? workoutPlan[diaEditando]?.exercises ?? [] : []}
+        ativo={!!diaEditando && diasAtivosLimpos.includes(diaEditando)}
+        onFechar={() => setDiaEditando(null)}
+        acoes={acoesDoEditor}
+        spotlight={false}
+      />
+      <ConfigDoTreino
+        aberto={configAberta}
+        onFechar={fecharConfig}
+        hojeNome={todayDayName}
+        diasAtivos={diasAtivosLimpos}
+        musculosPorDia={Object.fromEntries(DIAS.map((d) => [d, workoutPlan[d]?.muscles ?? []]))}
+        descanso={Number(restTime) || 60}
+        som={soundEnabled !== false}
+        onModelo={(m) => { applyTemplate(m); fecharConfig(); }}
+        onDia={toggleDay}
+        onMusculo={toggleMuscleForDay}
+        onDescanso={(s) => setRestTime(s)}
+        onSom={(v) => setSoundEnabled(v)}
+      />
+      <TreinoConcluido resumo={resumo} aberto={concluidoAberto} onFechar={() => setConcluidoAberto(false)} />
     </div>
   );
 };

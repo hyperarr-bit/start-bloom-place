@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package, Pencil } from "lucide-react";
@@ -11,6 +11,7 @@ import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
+import { avisarApagado } from "@/lib/desfazer";
 
 interface Supplement {
   id: string;
@@ -77,6 +78,14 @@ const EstoqueEditavel = ({ nome, valor, baixo, onSalvar }: { nome: string; valor
   );
 };
 
+/* DESMARCAR DEVOLVE SÓ O QUE O MARCAR TIROU (26/09, varredura): com estoque 0,
+ * marcar "tomado" não tira nada (não existe estoque negativo), mas desmarcar
+ * somava 1 — tomar e destomar por engano criava um comprimido do nada. Quem foi
+ * marcado hoje SEM baixa fica anotado nesta chave à parte (só o dia de hoje):
+ * o log de "tomado" é lido pelos lembretes e pela Home e não muda de formato. */
+export const CHAVE_SEM_BAIXA = "core-saude-supplement-sem-baixa";
+type SemBaixa = { dia: string; ids: string[] };
+
 const nameColors = [
   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -98,14 +107,21 @@ export const PharmacyChecklist = () => {
   const [newQuem, setNewQuem] = useState("");
   const [newStock, setNewStock] = useState(String(ESTOQUE_PADRAO));
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
+  const [semBaixa, setSemBaixa] = usePersistedState<SemBaixa>(CHAVE_SEM_BAIXA, { dia: "", ids: [] });
   const takenToday = supplementLog[today] || [];
+  const semBaixaHoje = semBaixa?.dia === today && Array.isArray(semBaixa.ids) ? semBaixa.ids : [];
 
   const toggleTaken = (id: string) => {
     const alreadyTaken = takenToday.includes(id);
     const newTaken = alreadyTaken ? takenToday.filter(x => x !== id) : [...takenToday, id];
     setSupplementLog(prev => ({ ...prev, [today]: newTaken }));
-    if (!alreadyTaken) {
+    const semEstoque = (supplements.find(s => s.id === id)?.stock ?? 0) <= 0;
+    if (!alreadyTaken && semEstoque) {
+      setSemBaixa({ dia: today, ids: [...semBaixaHoje.filter(x => x !== id), id] });
+    } else if (!alreadyTaken) {
       setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock: Math.max(0, s.stock - 1) } : s));
+    } else if (semBaixaHoje.includes(id)) {
+      setSemBaixa({ dia: today, ids: semBaixaHoje.filter(x => x !== id) }); // não tirou, não devolve
     } else {
       setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock: s.stock + 1 } : s));
     }
@@ -146,10 +162,28 @@ export const PharmacyChecklist = () => {
     void rearmarLembretes(lista, true);
   };
 
+  // lista mais recente pro "Desfazer" do toast, que roda segundos depois
+  const listaAtual = useRef(supplements);
+  listaAtual.current = supplements;
+
+  /* APAGAR COM DESFAZER (26/09, varredura): um toque na lixeira sumia com o
+     remédio, o horário e o estoque, sem volta. Agora apaga já e o toast
+     oferece desfazer — volta no mesmo lugar e o lembrete é reagendado. */
   const removeSupplement = (id: string) => {
+    const pos = supplements.findIndex(s => s.id === id);
+    if (pos < 0) return;
+    const removido = supplements[pos];
     const lista = supplements.filter(s => s.id !== id);
     setSupplements(lista);
     void rearmarLembretes(lista, false); // cancela o aviso do que foi apagado
+    avisarApagado(`${removido.name} apagado`, () => {
+      const atual = listaAtual.current;
+      if (atual.some(s => s.id === removido.id)) return;
+      const volta = [...atual];
+      volta.splice(Math.min(pos, volta.length), 0, removido);
+      setSupplements(volta);
+      void rearmarLembretes(volta, false);
+    });
   };
 
   /** Horário editável na própria linha — antes era só texto, e mudar de 8h
@@ -173,17 +207,20 @@ export const PharmacyChecklist = () => {
         <span className="text-3xl">💊</span>
       </div>
 
-      {/* Table */}
+      {/* Table — LIXEIRA À VISTA (26/09, varredura): a 360 px a tabela passava
+          da largura e a lixeira ficava escondida numa rolagem lateral. Colunas
+          mais justas cabem no celular; se um nome comprido ainda estourar, a
+          coluna da lixeira gruda na direita com o fundo do card. */}
       {supplements.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50">
-                <th className="w-10 px-3 py-3" />
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Nome</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
-                <th className="text-left pl-3 pr-2 py-3 text-xs font-semibold text-muted-foreground">Estoque</th>
-                <th className="px-2 py-3" />
+                <th className="w-9 pl-3 pr-1 py-3" />
+                <th className="text-left px-2 py-3 text-xs font-semibold text-muted-foreground">Nome</th>
+                <th className="text-left px-1 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
+                <th className="text-left pl-2 pr-1 py-3 text-xs font-semibold text-muted-foreground">Estoque</th>
+                <th className="sticky right-0 bg-card pl-0 pr-1.5 py-3"><span aria-hidden className="absolute inset-0 bg-muted/50" /></th>
               </tr>
             </thead>
             <tbody>
@@ -201,7 +238,7 @@ export const PharmacyChecklist = () => {
                       exit={{ opacity: 0 }}
                       className={`border-t border-border/50 transition-colors ${taken ? "bg-[hsl(var(--saude-green)/0.05)]" : "hover:bg-muted/30"}`}
                     >
-                      <td className="px-3 py-3">
+                      <td className="pl-3 pr-1 py-3">
                         <button
                           onClick={() => toggleTaken(s.id)}
                           aria-label={taken ? `Desmarcar ${s.name}` : `Marcar ${s.name} como tomado`}
@@ -210,7 +247,7 @@ export const PharmacyChecklist = () => {
                           {taken && <Check className="w-3 h-3 text-white" />}
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3">
                         <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${taken ? "line-through opacity-60" : ""} ${color}`}>
                           {s.name}
                         </span>
@@ -220,7 +257,7 @@ export const PharmacyChecklist = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-1 py-3 text-xs text-muted-foreground">
                         <input
                           type="time"
                           value={s.time}
@@ -229,11 +266,15 @@ export const PharmacyChecklist = () => {
                           className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
                         />
                       </td>
-                      <td className="pl-3 pr-2 py-3">
+                      <td className="pl-2 pr-1 py-3">
                         <EstoqueEditavel nome={s.name} valor={s.stock} baixo={lowStock} onSalvar={n => changeStock(s.id, n)} />
                       </td>
-                      <td className="px-2 py-3">
-                        <button onClick={() => removeSupplement(s.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      {/* célula grudada precisa de fundo opaco: o do card, com o
+                          verde de "tomado" por cima (a zebra do escuro, mais
+                          específica, troca este fundo igual troca o das vizinhas) */}
+                      <td className={`sticky right-0 pl-0 pr-1.5 py-1 ${taken ? "[background:linear-gradient(hsl(var(--saude-green)/0.05),hsl(var(--saude-green)/0.05)),hsl(var(--card))]" : "bg-card"}`}>
+                        <button onClick={() => removeSupplement(s.id)} aria-label={`Apagar ${s.name}`}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-destructive transition-colors">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>

@@ -1,5 +1,5 @@
-import { usePersistedState } from "@/hooks/use-persisted-state";
 import { localDayKey } from "@/lib/utils";
+import { useChaveDaBeleza } from "./estado-compartilhado";
 
 const getDateKey = () => localDayKey();
 
@@ -13,9 +13,12 @@ const skinOptions = [
 
 export const DailyMirror = () => {
   const today = getDateKey();
-  const [checkins, setCheckins] = usePersistedState<Record<string, string>>("skincare-daily-checkin", {});
-  const [morningChecked] = usePersistedState<Record<string, number[]>>("skincare-morning-checked", {});
-  const [nightChecked] = usePersistedState<Record<string, number[]>>("skincare-night-checked", {});
+  // Mesma fonte da Rotina e do Diário (26/09, varredura): cada um tinha a sua
+  // cópia e o "Sensível" daqui só valia lá depois de trocar de aba; o anel
+  // não andava ao marcar passo.
+  const [checkins, setCheckins] = useChaveDaBeleza<Record<string, string>>("skincare-daily-checkin", {});
+  const [morningChecked] = useChaveDaBeleza<Record<string, number[]>>("skincare-morning-checked", {});
+  const [nightChecked] = useChaveDaBeleza<Record<string, number[]>>("skincare-night-checked", {});
 
   const todaySkin = checkins[today] || "";
 
@@ -72,10 +75,12 @@ export const DailyMirror = () => {
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground mb-0.5">Como está sua pele hoje?</p>
               <p className="text-[10px] text-muted-foreground mb-2.5">
-                {streak > 0 ? `🔥 ${streak} dias consecutivos de rotina` : "Comece sua sequência hoje!"}
+                {streak > 0 ? `🔥 ${streak} ${streak === 1 ? "dia" : "dias consecutivos"} de rotina` : "Comece sua sequência hoje!"}
               </p>
 
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+              {/* Quebra linha em vez de rolar de lado: a 360 px "Boa" e
+                  "Sensível" ficavam escondidos sem indicação (26/09, varredura). */}
+              <div className="flex flex-wrap gap-1.5">
                 {skinOptions.map(s => (
                   <button
                     key={s.id}

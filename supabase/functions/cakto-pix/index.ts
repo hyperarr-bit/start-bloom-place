@@ -77,6 +77,28 @@ const JANELA_FALHAS_MS = 60 * 60 * 1000;
 const RESFRIAR_MS = 30 * 60 * 1000;
 const CAKTO_LENTA_MS = 10_000; // só pra log: acima disso fica marcado no cronômetro
 
+/* PIX ADIANTADO (26/09, dono: "faz isso da cakto adiantado"). O paywall da web
+ * pede o Pix da w27 com {adiantado:true} 1,5 s depois de aparecer; o QR só vai
+ * pra tela (e o pix_generated só sai) se a pessoa tocar em pagar.
+ * - pix_order_created leva `adiantado: true` (o webhook e o reconcile casam pelo
+ *   order_id como sempre — pago é pago).
+ * - Falha de adiantado NÃO conta pro disjuntor: vira `cakto_falha_adiantado` e o
+ *   toque tenta de novo do jeito de sempre (aí, se falhar, conta).
+ * - DESLIGAR = false aqui + redeploy: o aquecimento passa a responder
+ *   adiantar:false e o front para de pedir na hora (sem push). */
+const PIX_ADIANTADO_LIGADO = true;
+const OFERTAS_ADIANTADAS = new Set(["w27"]);
+
+/** `pix.expirationDate` da Cakto → ms (26/09). Sem fuso, lê como UTC — a leitura
+ *  MAIS CEDO (se for hora de Brasília, o Pix na verdade vence 3 h depois): na
+ *  dúvida o adiantado vence antes, nunca depois. */
+function lerDataCakto(v: unknown): number | null {
+  if (typeof v !== "string" || !v.trim()) return null;
+  const s = v.trim().replace(" ", "T");
+  const ms = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s) ? s : `${s}Z`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 // deno-lint-ignore no-explicit-any
 type Admin = any;
 
@@ -129,6 +151,13 @@ async function registrarFalha(admin: Admin, userId: string, motivo: string, ms: 
     logStep("registrarFalha falhou", { message: e instanceof Error ? e.message : String(e) });
     return { erro: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Falha de Pix ADIANTADO (26/09): fica à parte e NÃO conta pro disjuntor — o
+ *  adiantamento faz ~3× mais pedidos e, se falhar, o toque ainda tenta de novo. */
+async function registrarFalhaAdiantada(admin: Admin, userId: string, motivo: string, ms: number): Promise<void> {
+  await admin.from("analytics_events").insert({ event_name: "cakto_falha_adiantado", user_id: userId, event_data: { motivo: motivo.slice(0, 300), ms } });
+  logStep("cakto_falha_adiantado (não conta pro disjuntor)", { motivo: motivo.slice(0, 120), ms });
 }
 
 /** Roda depois da resposta (a pessoa não espera o registro da falha).
@@ -270,7 +299,8 @@ serve(async (req) => {
         disjuntorAberto(supabaseAdmin).catch(() => false).finally(() => { msDisj = Date.now() - t0; }),
         getCaktoToken(clientId, clientSecret, supabaseAdmin).catch(() => null).finally(() => { msToken = Date.now() - t0; }), // create tenta de novo
       ]);
-      return jsonResponse({ ok: true, ativa: !aberto, t: { instancia_ms: Date.now() - NASCEU, pedidos: pedidosNestaInstancia, disjuntor_ms: msDisj, token_ms: msToken, token_fonte: ultimaFonteToken } });
+      // `adiantar` (26/09): o front só adianta o Pix quando a função diz que aceita.
+      return jsonResponse({ ok: true, ativa: !aberto, adiantar: PIX_ADIANTADO_LIGADO, t: { instancia_ms: Date.now() - NASCEU, pedidos: pedidosNestaInstancia, disjuntor_ms: msDisj, token_ms: msToken, token_fonte: ultimaFonteToken } });
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -340,6 +370,8 @@ serve(async (req) => {
       // TikTok (16/08): _ttp é o cookie de navegador deles (par do _fbp).
       ttp: z.string().max(200).nullable().optional(),
       sourceUrl: z.string().max(500).nullable().optional(),
+      // 26/09: Pix criado antes do toque (ver PIX_ADIANTADO_LIGADO).
+      adiantado: z.boolean().optional(),
     });
 
     /* SONDA DO CPF (25/09, dono: "to pensando em mudar pra cakto, bora testar").
@@ -470,6 +502,16 @@ serve(async (req) => {
     if (!parsed.success) return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
     const body = parsed.data;
 
+    // Pix adiantado (26/09): só a w27 (a trava de preço vale aqui também).
+    const pixAdiantado = body.adiantado === true;
+    if (pixAdiantado && !PIX_ADIANTADO_LIGADO) return jsonResponse({ error: "adiantado_desligado" });
+    if (pixAdiantado && !OFERTAS_ADIANTADAS.has(body.offer)) return jsonResponse({ error: "adiantado_so_w27" }, 400);
+    if (pixAdiantado) T.adiantado = 1;
+    // Falha de adiantado fica à parte (não conta pro disjuntor); a do toque conta como sempre.
+    const anotarFalha = (motivo: string, ms: number) => emSegundoPlano(pixAdiantado
+      ? registrarFalhaAdiantada(supabaseAdmin, user.id, motivo, ms)
+      : registrarFalha(supabaseAdmin, user.id, motivo, ms));
+
     const offerId = OFFER_IDS[body.offer];
     if (!offerId) {
       logStep("Missing offer id secret", { offer: body.offer });
@@ -531,7 +573,7 @@ serve(async (req) => {
       caktoToken = await (pToken ?? getCaktoToken(clientId, clientSecret, supabaseAdmin));
       if (!pToken) { T.token = Date.now() - tCakto; T.token_fonte = ultimaFonteToken; }
     } catch (e) {
-      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `token: ${e instanceof Error ? e.message : String(e)}`, Date.now() - tCakto));
+      anotarFalha(`token: ${e instanceof Error ? e.message : String(e)}`, Date.now() - tCakto);
       return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
     }
 
@@ -562,7 +604,7 @@ serve(async (req) => {
       },
     };
 
-    logStep("Creating pix", { offer: body.offer, offerId, doc: docNumber === CPF_CORINGA ? "coringa" : "cpf" });
+    logStep("Creating pix", { offer: body.offer, offerId, doc: docNumber === CPF_CORINGA ? "coringa" : "cpf", adiantado: pixAdiantado });
     // 25/09: prazo de 15 s — em 06/09 a Cakto chegou a pendurar minutos. O
     // checkout desiste aos 12 s e gera pela Asaas; aqui só evita a função presa.
     let res: Response;
@@ -587,8 +629,8 @@ serve(async (req) => {
       }
     } catch (e) {
       const motivo = e instanceof Error ? e.message : String(e);
-      logStep("Cakto payments fetch error", { motivo, ms: Date.now() - tCakto });
-      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `fetch: ${motivo}`, Date.now() - tCakto));
+      logStep("Cakto payments fetch error", { motivo, ms: Date.now() - tCakto, adiantado: pixAdiantado });
+      anotarFalha(`fetch: ${motivo}`, Date.now() - tCakto);
       return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
     }
     const data = await res.json().catch(() => ({}));
@@ -597,8 +639,8 @@ serve(async (req) => {
 
     if (!res.ok || !data?.pix?.qrCode) {
       // Log completo do erro — a visibilidade que o checkout hospedado nunca deu
-      logStep("Cakto payments error", { status: res.status, body: JSON.stringify(data).slice(0, 600) });
-      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `http ${res.status}: ${JSON.stringify(data).slice(0, 250)}`, msCakto));
+      logStep("Cakto payments error", { status: res.status, body: JSON.stringify(data).slice(0, 600), adiantado: pixAdiantado });
+      anotarFalha(`http ${res.status}: ${JSON.stringify(data).slice(0, 250)}`, msCakto);
       return jsonResponse({
         error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.",
         // diagnóstico opt-in (QA, 17/07 — conta em análise): corpo cru do
@@ -609,7 +651,11 @@ serve(async (req) => {
       }, 502);
     }
 
-    logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount, ms: msCakto });
+    // Validade do QR (26/09): a Cakto devolve `pix.expirationDate` (doc da API). O
+    // front do adiantado usa `restaMs` (duração, imune ao relógio do celular).
+    const expBruto = data?.pix?.expirationDate ?? data?.pix?.expiresAt ?? null;
+    const expMs = lerDataCakto(expBruto);
+    logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount, ms: msCakto, adiantado: pixAdiantado, expira: expBruto });
     // Deu QR, só que devagar: NÃO é falha (25/09 noite) — o checkout já cai pra Asaas aos 12 s. Fica no cronômetro.
     if (msCakto > CAKTO_LENTA_MS) T.lenta = 1;
     if (adiantar) {
@@ -647,6 +693,10 @@ serve(async (req) => {
       event_data: {
         t: T, // cronômetro do servidor (25/09 noite) — onde vai a espera
         order_id: data.id, offer: body.offer, gateway: "cakto",
+        // 26/09: criado ANTES do toque. Só vira "Pix gerado" se o front exibir (pix_generated com este order_id).
+        ...(pixAdiantado ? { adiantado: true } : {}),
+        expira_em: expMs ? new Date(expMs).toISOString() : null,
+        expira_bruto: typeof expBruto === "string" ? expBruto.slice(0, 40) : null,
         amount_cents: Math.round(Number(data.amount ?? 0) * 100) || null,
         ref_id: data.refId ?? null,
         fbp: body.fbp ?? null,
@@ -666,7 +716,11 @@ serve(async (req) => {
       amount: data.amount,
       qrCode: data.pix.qrCode,
       qrCodeBase64: data.pix.qrCodeBase64 ?? null,
-      expiresAt: data.pix.expiresAt ?? null,
+      expiresAt: data.pix.expiresAt ?? null, // (sem mudança: a tela da Cakto segue sem contagem regressiva)
+      // 26/09: validade do QR pro Pix adiantado — quanto falta, medido aqui.
+      ...(pixAdiantado ? { adiantado: true } : {}),
+      expiraEm: expMs ? new Date(expMs).toISOString() : null,
+      restaMs: expMs ? expMs - Date.now() : null,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

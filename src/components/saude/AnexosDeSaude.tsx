@@ -9,10 +9,20 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Camera, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 import { removeImage, signedUrlFor, uploadImagePath } from "@/lib/image-upload";
 
 export const BUCKET_SAUDE = "dream-board";
 export const PASTA_SAUDE = "saude";
+
+/* FOTO NA DEMO (26/09, varredura): em /preview não existe conta nem bucket —
+ * a galeria abria e nada acontecia (progresso) ou dizia "Tenta de novo"
+ * (exame, documento). Na demo o toque só explica; o app logado não muda. */
+export const estaNaDemo = () => {
+  try { return window.location.pathname.startsWith("/preview"); } catch { return false; }
+};
+export const avisarFotoNaDemo = () =>
+  toast("Fotos funcionam depois de criar a conta", { description: "Aqui na demonstração nada é salvo." });
 
 /** Cache de URLs assinadas por caminho: a lista re-renderiza a cada tecla no
  *  formulário e não pode pedir assinatura de novo a cada render. */
@@ -73,7 +83,7 @@ export const AnexosDeSaude = ({ caminhos, onChange, rotulo }: {
     <div className="space-y-1.5" data-testid="anexos-saude">
       <div className="flex flex-wrap gap-2">
         {caminhos.map((c, i) => <Miniatura key={c} caminho={c} rotulo={`${rotulo} · foto ${i + 1}`} onRemover={() => remover(c)} />)}
-        <button type="button" onClick={() => inputRef.current?.click()} disabled={subindo}
+        <button type="button" onClick={() => (estaNaDemo() ? avisarFotoNaDemo() : inputRef.current?.click())} disabled={subindo}
           className="w-20 h-20 rounded-lg border border-dashed border-border text-muted-foreground flex flex-col items-center justify-center gap-1 text-[10px] hover:bg-muted/50 disabled:opacity-60">
           {subindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
           {subindo ? "Enviando" : "Foto"}

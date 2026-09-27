@@ -22,15 +22,20 @@ import { Badge } from "./types";
 
 type Leitor = <T>(key: string, fallback: T) => T;
 
-/** Progresso explícito: é o que deixa "Próximas conquistas" ser de verdade. */
+/** Progresso explícito: é o que deixa "Próximas conquistas" ser de verdade.
+ *  `unidade` (26/09) monta o "falta": ["livro", "livros"] → "mais 1 livro".
+ *  As medidas por RECORDE de dias seguidos ficam sem unidade — o "falta" delas
+ *  é a descrição, porque "mais 4 dias" só vale pra quem está no recorde. */
 const fazer = (
   id: string, name: string, description: string, icon: string,
   category: Badge["category"], xp: number, atual: number, alvo: number,
+  unidade?: [string, string],
 ): Badge => ({
   id, name, description, icon, category, xp,
   color: "green",
   unlocked: atual >= alvo,
   progresso: { atual: Math.min(atual, alvo), alvo },
+  ...(unidade ? { unidade } : {}),
 });
 
 const ehDia = (k: unknown) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
@@ -84,25 +89,35 @@ export function buildBadgesVida(get: Leitor): Badge[] {
   });
   const recordeDieta = recordeDeSequencia(diasImpecaveis.map(([k]) => k));
 
+  // ---------- saúde: água (26/09 — o adesivo da gota do Fable) ----------
+  // Dia "em dia" = copos do dia ≥ meta (a mesma meta que a Hidratação usa).
+  const meta = Math.min(20, Math.max(1, Math.round(Number(get<number>("core-saude-water-goal", 8)) || 8)));
+  const agua = get<Record<string, number>>("water-log", {}) ?? {};
+  const diasDeAgua = Object.entries(agua && typeof agua === "object" ? agua : {})
+    .filter(([k, v]) => ehDia(k) && Number(v) >= meta).length;
+
   return [
     // ---- Rotina: o módulo onde a constância é o produto ----
-    fazer("rotina-1", "Primeiro Dia", "Marque 1 dia na sua rotina", "🌱", "rotina", 50, diasAtivos.length, 1),
+    fazer("rotina-1", "Primeiro Dia", "Marque 1 dia na sua rotina", "🌱", "rotina", 50, diasAtivos.length, 1, ["dia marcado", "dias marcados"]),
     fazer("rotina-7", "Semana Cheia", "7 dias seguidos sem falhar", "📅", "rotina", 100, recordeRotina, 7),
     fazer("rotina-21", "Hábito Formado", "21 dias seguidos — o número que vira hábito", "🔥", "rotina", 200, recordeRotina, 21),
-    fazer("diario-7", "Reflexivo", "7 dias de diário escritos", "✨", "rotina", 100, diasDeDiario, 7),
+    fazer("diario-7", "Reflexivo", "7 dias de diário escritos", "✨", "rotina", 100, diasDeDiario, 7, ["dia de diário", "dias de diário"]),
 
     // ---- Leitura: o módulo com mais tempo por pessoa no app ----
-    fazer("leitura-estante", "Estante Montada", "3 livros na sua biblioteca", "📚", "leitura", 50, livros.length, 3),
-    fazer("leitura-1", "Livro Fechado", "Termine 1 livro", "📖", "leitura", 100, terminados, 1),
-    fazer("leitura-10", "Devorador", "Termine 10 livros", "🐛", "leitura", 200, terminados, 10),
+    fazer("leitura-estante", "Estante Montada", "3 livros na sua biblioteca", "📚", "leitura", 50, livros.length, 3, ["livro na estante", "livros na estante"]),
+    fazer("leitura-1", "Livro Fechado", "Termine 1 livro", "📖", "leitura", 100, terminados, 1, ["livro terminado", "livros terminados"]),
+    fazer("leitura-10", "Devorador", "Termine 10 livros", "🐛", "leitura", 200, terminados, 10, ["livro terminado", "livros terminados"]),
 
     // ---- Treino ----
-    fazer("treino-1", "Primeiro Treino", "Registre 1 treino", "🏋️", "treino", 50, treinos.length, 1),
-    fazer("treino-12", "Ritmo de Academia", "12 treinos registrados", "💪", "treino", 100, treinos.length, 12),
-    fazer("treino-pr", "Recordista", "3 recordes pessoais anotados", "🏅", "treino", 200, recordesPessoais, 3),
+    fazer("treino-1", "Primeiro Treino", "Registre 1 treino", "🏋️", "treino", 50, treinos.length, 1, ["treino", "treinos"]),
+    fazer("treino-12", "Ritmo de Academia", "12 treinos registrados", "💪", "treino", 100, treinos.length, 12, ["treino", "treinos"]),
+    fazer("treino-pr", "Recordista", "3 recordes pessoais anotados", "🏅", "treino", 200, recordesPessoais, 3, ["recorde pessoal", "recordes pessoais"]),
 
     // ---- Dieta ----
-    fazer("dieta-1", "Dia Impecável", "1 dia com todas as refeições seguidas", "🥗", "dieta", 50, diasImpecaveis.length, 1),
+    fazer("dieta-1", "Dia Impecável", "1 dia com todas as refeições seguidas", "🥗", "dieta", 50, diasImpecaveis.length, 1, ["dia impecável", "dias impecáveis"]),
     fazer("dieta-7", "Semana Limpa", "7 dias impecáveis seguidos", "🍎", "dieta", 200, recordeDieta, 7),
+
+    // ---- Saúde ----
+    fazer("agua-7", "Água em Dia", "7 dias batendo a meta de água", "💧", "saude", 100, diasDeAgua, 7, ["dia com a meta de água", "dias com a meta de água"]),
   ];
 }

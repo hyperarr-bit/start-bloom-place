@@ -5,6 +5,10 @@ import { localDayKey } from "@/lib/utils";
 interface DayScoreRingProps {
   score: number;
   streak: number;
+  /** Selo "🔥 N dias" ao lado do anel. A Home desliga (26/09): a linha da
+   *  sequência logo abaixo do anel já mostra o número (e leva às Conquistas) —
+   *  os dois juntos repetiam "12 dias" a um palmo de distância. */
+  mostrarSequencia?: boolean;
 }
 
 /* Comemoração dos 100 (10/09). Até aqui não existia NADA em 100: a cor mudava
@@ -16,7 +20,7 @@ interface DayScoreRingProps {
 export const CHAVE_DIA_100_VISTO = "core-dia-100-visto";
 export const MENSAGEM_DIA_100 = "Dia 100%. Fecha o app em paz. 🌟";
 
-export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
+export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScoreRingProps) => {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
@@ -94,7 +98,7 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
         </motion.p>
         <p className="text-[11px] text-muted-foreground mb-3">Score do dia baseado em suas atividades</p>
 
-        {streak > 0 && (
+        {mostrarSequencia && streak > 0 && (
           <motion.div
             /* Selo é unidade — ou cabe inteiro, ou não é selo.
              *

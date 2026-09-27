@@ -1107,11 +1107,17 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
  * lixeira/lápis de 12–14 px das listas (o botão tem o tamanho exato do ícone,
  * sem padding). Aqui o botão sem fundo e sem tamanho fixo ganha 8 px de área
  * de toque de cada lado, e a margem negativa devolve o espaço: NADA muda de
- * lugar nem de aparência, só passa a acertar no dedo. Botões com fundo (bg-),
- * tamanho (w-/h-) ou posição absoluta ficam como estão. WebView antigo sem
- * :has() ignora a regra inteira, sem quebrar.
+ * lugar nem de aparência, só passa a acertar no dedo. Botões com fundo (bg-
+ * OU `style` com background), borda ou posição absoluta ficam como estão.
+ * WebView antigo sem :has() ignora a regra inteira, sem quebrar.
+ *
+ * 26/09 (print do dono no iPhone): o "Pergunte ao CORE" de Finanças pinta o
+ * rosa por `style` inline (a cor vem de --fixo-ia), escapava do :not([class*="bg-"])
+ * e o padding de 8 px em content-box inflava o fundo de 32 pra 48 px — "a borda
+ * rosa tá muito grande". Varredura dos 16 módulos da demo: era o único botão
+ * com fundo visível pego pela regra.
  */
-button:has(> svg:only-child):not([class*="bg-"]):not([class*="border"]):not([class*="absolute"]):not([class*="fixed"]):not([class^="p-"]):not([class*=" p-"]):not([class*=" px-"]):not([class*=" py-"]) {
+button:has(> svg:only-child):not([class*="bg-"]):not([style*="background"]):not([class*="border"]):not([class*="absolute"]):not([class*="fixed"]):not([class^="p-"]):not([class*=" p-"]):not([class*=" px-"]):not([class*=" py-"]) {
   padding: 8px;
   margin: -8px;
   box-sizing: content-box;

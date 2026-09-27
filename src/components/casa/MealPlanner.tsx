@@ -3,6 +3,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { Recipe, MealPlan } from "./types";
 
 const weekDays = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
@@ -34,7 +35,12 @@ const MealPlanner = () => {
   };
 
   const randomize = () => {
-    if (recipes.length === 0) return;
+    // antes o botão não fazia nada e não dizia por quê (26/09, varredura)
+    if (recipes.length === 0) {
+      setShowRecipes(true);
+      toast("Cadastre pelo menos uma receita no 📖 Banco de Receitas pra sugerir o cardápio.");
+      return;
+    }
     const plan: MealPlan = {};
     weekDays.forEach(day => {
       plan[day] = {

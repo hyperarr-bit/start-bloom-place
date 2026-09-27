@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Place, PLACE_CATEGORIES, PLACE_STATUS, genId } from "./types";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,7 @@ export const PlacesBoard = () => {
   };
 
   const remove = (id: string) => {
-    setPlaces(prev => prev.filter(p => p.id !== id));
+    apagarComDesfazer(setPlaces, prev => prev.filter(p => p.id !== id), "Lugar apagado");
     setEditandoId(prev => (prev === id ? null : prev));
   };
 

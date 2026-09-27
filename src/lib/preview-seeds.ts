@@ -2,7 +2,7 @@
 // Cada entrada é um snapshot in-memory pra dar a sensação de app cheio.
 // Adicionar mais chaves aqui = preview mais rico.
 import { FINANCAS_SEED } from "./preview-seeds-financas";
-import { localDayKey } from "./utils";
+import { localDayKey, semanaAtualId } from "./utils";
 
 const today = new Date();
 const iso = (d: Date) => localDayKey(d);
@@ -34,15 +34,22 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       "Beber 2L de água", "Treinar", "Ler 30min",
       "Meditar 10min", "Dormir até 23h", "Sem celular após 22h",
     ],
-    "rotina-habits-checked": {
-      SEGUNDA: [true, true, false, true, true, true],
-      "TERÇA": [true, true, true, true, false, true],
-      QUARTA: [true, false, true, true, true, false],
-      QUINTA: [false, false, false, false, false, false],
-      SEXTA: [false, false, false, false, false, false],
-      "SÁBADO": [false, false, false, false, false, false],
-      DOMINGO: [false, false, false, false, false, false],
-    },
+    // Semana coerente com o "41 dias seguidos" (26/09): da segunda até ontem
+    // com hábitos feitos, hoje pela metade, o resto em branco. E com o carimbo
+    // da semana — sem ele a Rotina descarta a grade (é o que impede o check da
+    // semana passada de ressuscitar) e a demo abria com a grade toda vazia.
+    "rotina-habits-checked": (() => {
+      const dias = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+      const feitos = [
+        [true, true, false, true, true, true], [true, true, true, true, false, true],
+        [true, false, true, true, true, false], [true, true, true, false, true, true],
+        [true, true, false, true, true, false], [true, false, true, true, false, true],
+        [true, true, true, true, true, false],
+      ];
+      const hoje = (today.getDay() + 6) % 7;
+      return Object.fromEntries(dias.map((d, i) => [d, i < hoje ? feitos[i] : i === hoje ? [true, true, false, false, false, false] : Array(6).fill(false)]));
+    })(),
+    "rotina-habits-week": semanaAtualId(),
     "rotina-schedule": {
       "6:00": { Segunda: "Acordar", Terça: "Acordar", Quarta: "Acordar", Quinta: "Acordar", Sexta: "Acordar", Sábado: "Manhã sem pressa", Domingo: "Dia livre 🌿" },
       "7:00": { Segunda: "Ritual pessoal (água, skincare)", Terça: "Ritual pessoal", Quarta: "Manhã mais leve", Quinta: "", Sexta: "", Sábado: "", Domingo: "" },
@@ -71,82 +78,135 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "1", text: "Renovar CNH essa semana", done: false },
     ],
   },
-  treino: {
-    ...COMMON,
-    // Semana espelhando o criativo: segunda completa (5/5), terça pendente.
-    "saude-workouts-v2": {
-      SEGUNDA: {
-        muscles: ["Quadríceps", "Pernas"],
-        exercises: [
-          { name: "Agachamento Livre", sets: "4", reps: "10", carga: "60kg", done: true, obs: "" },
-          { name: "Leg Press 45°", sets: "4", reps: "12", carga: "120kg", done: true, obs: "" },
-          { name: "Cadeira Extensora", sets: "3", reps: "12", carga: "40kg", done: true, obs: "" },
-          { name: "Afundo com halteres", sets: "3", reps: "10", carga: "16kg", done: true, obs: "" },
-          { name: "Panturrilha em pé", sets: "4", reps: "15", carga: "40kg", done: true, obs: "" },
-        ],
+  // TREINO (26/09, redesenho aprovado em mockup): a demo é tela de VENDA e pode
+  // ser aberta em qualquer dia — então a semana é montada a partir de HOJE.
+  // Hoje é sempre "Peito + Tríceps" com o supino fechado 4×10 há 7 dias (a
+  // "última vez" em cinza + o post-it "Sobe pra 52,5 kg?") e duas séries já
+  // marcadas; 12 semanas de histórico série por série, com as antigas mais
+  // fracas e as 5 últimas na meta (🔥 5 sem); ombros sem treino há 15 dias
+  // (o post-it do grupo esquecido).
+  treino: (() => {
+    const DIAS = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+    const idxHoje = (today.getDay() + 6) % 7;
+    type Treino = { musculos: string[]; forca: [string, number, number | string, number, number, number?][]; cardio?: [string, string, string][] };
+    // [nome, séries, reps, carga de 12 semanas atrás, carga de agora, sessões no platô]
+    const TREINOS: Record<string, Treino> = {
+      pernas: { musculos: ["Quadríceps", "Pernas"], forca: [["Agachamento livre", 4, 8, 60, 80], ["Leg press 45°", 4, 12, 140, 180], ["Cadeira extensora", 3, 12, 35, 45], ["Mesa flexora", 3, 12, 30, 40], ["Panturrilha em pé", 4, 15, 40, 50]] },
+      costas: { musculos: ["Costas", "Bíceps"], forca: [["Puxada frente", 4, 10, 45, 55], ["Remada curvada", 4, 10, 40, 45, 4], ["Remada baixa", 3, 12, 40, 50], ["Rosca direta", 3, 12, 10, 14]] },
+      ombros: { musculos: ["Ombros", "Abdômen"], forca: [["Desenvolvimento com halteres", 4, 10, 12, 18], ["Elevação lateral", 3, 12, 6, 9], ["Prancha", 3, "40s", 0, 0], ["Abdominal infra", 3, 15, 0, 0]] },
+      peito: { musculos: ["Peito", "Tríceps"], forca: [["Supino reto", 4, 10, 40, 50], ["Crucifixo inclinado", 3, 12, 10, 14], ["Tríceps corda", 3, 12, 20, 25]] },
+      cardio: { musculos: ["Cardio"], forca: [], cardio: [["Esteira inclinada", "30", "3 km"], ["Bike", "15", "5 km"]] },
+    };
+    // o padrão da semana contado a partir de hoje (posição 5 = hoje = peito)
+    const PADRAO: (string | null)[] = ["pernas", null, "costas", null, "ombros", "peito", "cardio"];
+    const doDia = (i: number) => PADRAO[(i - idxHoje + 12) % 7];
+    const kg = (n: number) => (n ? `${String(n).replace(".", ",")}kg` : "");
+    const plano: Record<string, { muscles: string[]; exercises: Record<string, unknown>[] }> = {};
+    DIAS.forEach((d, i) => {
+      const t = doDia(i) ? TREINOS[doDia(i) as string] : null;
+      plano[d] = t
+        ? {
+            muscles: t.musculos,
+            exercises: [
+              ...t.forca.map(([name, sets, reps, , ate]) => ({ name, sets: String(sets), reps: String(reps), carga: kg(ate), done: false, obs: "" })),
+              ...(t.cardio ?? []).map(([name, duracao, distancia]) => ({ name, sets: "", reps: "", carga: "", done: false, obs: "", tipo: "cardio", duracao, distancia })),
+            ],
+          }
+        : { muscles: [], exercises: [] };
+    });
+
+    // Sessões dos últimos 84 dias. Semana (segunda a domingo) contada de trás
+    // pra frente: 0 = a atual. Semana 6 fraca (quebra a sequência antes das 5
+    // últimas); 7–11 com adesão de quem está começando.
+    const segundaDeHoje = new Date(today.getFullYear(), today.getMonth(), today.getDate() - idxHoje);
+    const semanaDe = (d: Date) => Math.round((segundaDeHoje.getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)).getTime()) / (7 * 86_400_000));
+    const FICA: Record<number, string[]> = { 6: ["pernas", "peito"], 7: ["pernas", "costas", "peito"], 8: ["pernas"], 9: ["pernas", "costas", "ombros", "peito"], 10: ["pernas", "peito"], 11: ["pernas", "costas", "peito"] };
+    const sessoes: { n: number; data: string; dia: string; treino: string }[] = [];
+    for (let n = 84; n >= 1; n--) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - n);
+      const i = (d.getDay() + 6) % 7;
+      const treino = doDia(i);
+      if (!treino) continue;
+      const w = semanaDe(d);
+      if (w > 11) continue;
+      if (treino === "ombros" && n <= 9) continue;
+      if (FICA[w] && !FICA[w].includes(treino)) continue;
+      sessoes.push({ n, data: iso(d), dia: DIAS[i], treino });
+    }
+
+    const historico: Record<string, unknown>[] = [];
+    const volume: Record<string, number> = {};
+    const meta: Record<string, { dia: string; minutos: number; musculos: string[] }> = {};
+    const porExercicio: Record<string, number> = {};
+    const totalDoExercicio: Record<string, number> = {};
+    sessoes.forEach((s) => TREINOS[s.treino].forca.forEach(([nome]) => { totalDoExercicio[nome] = (totalDoExercicio[nome] ?? 0) + 1; }));
+    const passo = (c: number) => (c < 20 ? 1 : 2.5);
+    sessoes.forEach((s) => {
+      const t = TREINOS[s.treino];
+      let vol = 0;
+      t.forca.forEach(([nome, sets, reps, de, ate, plato = 2]) => {
+        const j = porExercicio[nome] ?? 0;
+        porExercicio[nome] = j + 1;
+        // sobe em linha até `plato` sessões antes do fim e fica ali (a última fecha)
+        const ate100 = Math.max(1, totalDoExercicio[nome] - plato);
+        const cargaNa = (x: number) => {
+          const bruto = de + (ate - de) * Math.min(1, Math.max(0, x) / ate100);
+          return Math.round(bruto / passo(bruto)) * passo(bruto);
+        };
+        const carga = cargaNa(j);
+        const subiu = j > 0 && carga > cargaNa(j - 1);
+        const r = typeof reps === "number" ? reps : parseInt(reps, 10);
+        // carga que acabou de subir: as últimas séries caem; carga repetida: fecha todas
+        const lista = Array.from({ length: sets }, (_, k) => ({ carga, reps: subiu && k >= sets - 2 ? r - (k - sets + 3) : r }));
+        vol += lista.reduce((a, x) => a + x.carga * x.reps, 0);
+        const melhor = lista.reduce((m, x) => (x.carga > m.carga || (x.carga === m.carga && x.reps > m.reps) ? x : m), lista[0]);
+        historico.push({ date: s.data, exercise: nome, sets: String(sets), reps: String(melhor.reps), carga: kg(melhor.carga), obs: "", series: lista });
+      });
+      (t.cardio ?? []).forEach(([nome, duracao, distancia]) => {
+        historico.push({ date: s.data, exercise: nome, sets: "", reps: "", carga: "", obs: "", tipo: "cardio", duracao, distancia });
+      });
+      volume[s.data] = vol;
+      meta[s.data] = { dia: s.dia, minutos: s.treino === "cardio" ? 45 : 42 + ((s.n * 7) % 17), musculos: t.musculos };
+    });
+    historico.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const ultimaDePeito = sessoes.filter((s) => s.treino === "peito").pop();
+    const ultimaDePernas = sessoes.filter((s) => s.treino === "pernas").pop();
+
+    return {
+      ...COMMON,
+      // conta "viva" não vê a dica de primeira abertura em cima do treino
+      "core-tip-seen-treino": "true",
+      "saude-workouts-v2": plano,
+      "treino-active-days": DIAS.filter((_, i) => doDia(i)),
+      "treino-meta-semanal": 4,
+      "treino-descanso-padrao": 90,
+      // sem o carimbo da semana a virada zeraria os ✓ no primeiro mount
+      "treino-semana-dos-checks": semanaAtualId(),
+      "saude-workout-log": sessoes.map((s) => s.data),
+      "treino-exercise-history": historico,
+      "treino-weekly-volume": volume,
+      "treino-sessoes": meta,
+      "treino-notas-sessoes": {
+        ...(ultimaDePeito ? { [ultimaDePeito.data]: "Supino fechou 4×10 limpo. Semana que vem sobe." } : {}),
+        ...(ultimaDePernas ? { [ultimaDePernas.data]: "Joelho tranquilo, agachamento até embaixo." } : {}),
       },
-      "TERÇA": {
-        muscles: ["Full Body", "Abdômen"],
-        exercises: [
-          { name: "Puxada Aberta", sets: "4", reps: "10", carga: "", done: false, obs: "" },
-          { name: "Remada Aberta", sets: "4", reps: "10", carga: "", done: false, obs: "" },
-          { name: "Desenvolvimento com halteres", sets: "3", reps: "10", carga: "", done: false, obs: "" },
-          { name: "Supino reto com halteres", sets: "3", reps: "10", carga: "", done: false, obs: "" },
-          { name: "Prancha", sets: "3", reps: "40s", carga: "", done: false, obs: "" },
-          { name: "Abdominal infra", sets: "3", reps: "15", carga: "", done: false, obs: "" },
-        ],
+      "saude-workout-notes": { [DIAS[idxHoje]]: "Dormi 6h, energia ok. Ombro esquerdo pediu calma no supino." },
+      // o treino de hoje já começou: 2 séries do supino feitas, as outras em cinza
+      "treino-sessao": {
+        data: iso(today),
+        dia: DIAS[idxHoje],
+        inicio: new Date(Date.now() - 23 * 60_000).toISOString(),
+        series: {
+          "Supino reto": [
+            { carga: 50, reps: 10, feito: true, ok: true },
+            { carga: 50, reps: 10, feito: true, ok: true },
+            { carga: 50, reps: 10, feito: false },
+            { carga: 50, reps: 10, feito: false },
+          ],
+        },
       },
-      QUARTA: {
-        muscles: ["Peito", "Tríceps"],
-        exercises: [
-          { name: "Supino reto", sets: "4", reps: "10", carga: "50kg", done: false, obs: "" },
-          { name: "Crucifixo inclinado", sets: "3", reps: "12", carga: "14kg", done: false, obs: "" },
-          { name: "Tríceps corda", sets: "3", reps: "12", carga: "25kg", done: false, obs: "" },
-        ],
-      },
-      QUINTA: {
-        muscles: ["Costas", "Bíceps"],
-        exercises: [
-          { name: "Puxada frente", sets: "4", reps: "10", carga: "55kg", done: false, obs: "" },
-          { name: "Remada curvada", sets: "4", reps: "10", carga: "40kg", done: false, obs: "" },
-          { name: "Rosca direta", sets: "3", reps: "12", carga: "12kg", done: false, obs: "" },
-        ],
-      },
-      SEXTA: {
-        muscles: ["Ombros", "Abdômen"],
-        exercises: [
-          { name: "Desenvolvimento militar", sets: "4", reps: "10", carga: "30kg", done: false, obs: "" },
-          { name: "Elevação lateral", sets: "3", reps: "12", carga: "8kg", done: false, obs: "" },
-          { name: "Prancha", sets: "3", reps: "45s", carga: "", done: false, obs: "" },
-        ],
-      },
-      // Fim de semana preenchido de leve: a demo pode abrir no sábado —
-      // "Dia de descanso" como 1ª tela é empty state que não vende nada.
-      "SÁBADO": {
-        muscles: ["Cardio", "Abdômen"],
-        exercises: [
-          { name: "Esteira inclinada", sets: "1", reps: "25min", carga: "", done: false, obs: "" },
-          { name: "Prancha", sets: "3", reps: "40s", carga: "", done: false, obs: "" },
-          { name: "Abdominal supra", sets: "3", reps: "15", carga: "", done: false, obs: "" },
-        ],
-      },
-      DOMINGO: {
-        muscles: ["Cardio"],
-        exercises: [
-          { name: "Caminhada leve", sets: "1", reps: "30min", carga: "", done: false, obs: "" },
-          { name: "Alongamento completo", sets: "1", reps: "10min", carga: "", done: false, obs: "" },
-        ],
-      },
-    },
-    "treino-active-days": ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"],
-    "saude-workout-log": [daysAgo(0), daysAgo(2), daysAgo(3), daysAgo(5), daysAgo(7), daysAgo(9)],
-    "treino-exercise-history": [
-      { date: daysAgo(7), exercise: "Agachamento Livre", sets: "4", reps: "10", carga: "55kg" },
-      { date: daysAgo(0), exercise: "Agachamento Livre", sets: "4", reps: "10", carga: "60kg", obs: "Subiu 5kg 🎉" },
-      { date: daysAgo(7), exercise: "Leg Press 45°", sets: "4", reps: "12", carga: "110kg" },
-      { date: daysAgo(0), exercise: "Leg Press 45°", sets: "4", reps: "12", carga: "120kg" },
-    ],
-  },
+    };
+  })(),
   dieta: {
     ...COMMON,
     "dieta-meals-config": ["Café da Manhã", "Almoço", "Lanche", "Janta", "Ceia"],
@@ -167,7 +227,7 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
         SEXTA: varTue, "SÁBADO": weekend, DOMINGO: weekend,
       };
     })(),
-    "saude-fast-goal": 14,
+    "saude-fast-goal": 16, // 14 não é nenhum dos botões (16/18/20/24)
     // 15/09: substitutos por refeição (11/09) — o "❌ comi outra coisa" vira "Comi: X"
     "dieta-substitutos": {
       Almoço: ["Salada de atum com arroz", "Wrap de frango com folhas"],
@@ -365,15 +425,15 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "2", company: "Loja Vida", role: "Vendedor", link: "", status: "aplicado", date: daysAgo(6), salary: "R$ 2.400 + comissão", notes: "", favorite: false },
     ],
     "career-skills": [
-      { id: "1", name: "Vendas", category: "Comercial", level: 3, targetLevel: 5, notes: "" },
-      { id: "2", name: "Excel", category: "Ferramentas", level: 2, targetLevel: 4, notes: "" },
-      { id: "3", name: "Inglês", category: "Idiomas", level: 2, targetLevel: 4, notes: "" },
+      { id: "1", name: "Vendas", category: "soft skill", level: 3, targetLevel: 5, notes: "" },
+      { id: "2", name: "Excel", category: "ferramenta", level: 2, targetLevel: 4, notes: "" },
+      { id: "3", name: "Inglês", category: "idioma", level: 2, targetLevel: 4, notes: "" },
     ],
     "career-contacts": [
-      { id: "1", name: "Marina S.", company: "Studio Norte", role: "Gerente", linkedin: "", email: "", phone: "", notes: "Indicou a vaga", lastContact: daysAgo(2), category: "Rede" },
+      { id: "1", name: "Marina S.", company: "Studio Norte", role: "Gerente", linkedin: "", email: "", phone: "", notes: "Indicou a vaga", lastContact: daysAgo(2), category: "profissional" },
     ],
     "career-portfolio": [
-      { id: "1", title: "Site da padaria do bairro", description: "Landing page feita em uma semana", link: "", category: "Design", date: daysAgo(20), highlight: true },
+      { id: "1", title: "Site da padaria do bairro", description: "Landing page feita em uma semana", link: "", category: "projeto", date: daysAgo(20), highlight: true },
     ],
   },
   biblioteca: {

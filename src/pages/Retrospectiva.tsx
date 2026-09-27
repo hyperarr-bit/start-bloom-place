@@ -1,11 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
-import { construirRetroMes, lerDadosDaVida, type RetroMes } from "@/lib/retrospectiva";
+import { construirRetroMes, lerDadosDaVida, nomeDaPessoa, type Leitor, type RetroMes } from "@/lib/retrospectiva";
 import { MonthlyWrapped } from "@/components/wrapped/MonthlyWrapped";
+import { CHAVE_DO_TEMA, lerTema, perfilEmFrase, type TemaDaRetro } from "@/components/wrapped/temas";
+import { foilCss } from "@/components/wrapped/prancheta";
+import { Espiral, Fita, P3, creme, kicker, linho, relevo, serif, vinheta } from "@/components/wrapped/pecas-planner";
 
 /**
  * A casa da retrospectiva (27/07).
@@ -17,6 +21,11 @@ import { MonthlyWrapped } from "@/components/wrapped/MonthlyWrapped";
  * E não é de um mês só: a tela lista os meses com dados, porque a graça de
  * uma retrospectiva é poder voltar nela. Quem chega pela notificação já cai
  * com o mês certo aberto (`?mes=`), sem precisar escolher nada.
+ *
+ * (26/09) Os dados vêm do STORE (useUserData), não do localStorage, e os
+ * meses são RECALCULADOS quando ele carrega ou muda: no dia 1º, aberto pela
+ * notificação com o app frio, o cálculo único da montagem acontecia antes da
+ * carga do servidor e do arquivamento do mês — e setembro saía sem Finanças.
  */
 
 /** "1 livros" é o tipo de detalhe que faz o app parecer feito às pressas. */
@@ -32,17 +41,39 @@ const RESUMO_DE = (r: RetroMes): string => {
   // fallbacks: um mês pode existir só por diário, humor ou água — sem eles a
   // linha caía num texto genérico que não dizia nada.
   if (partes.length === 0 && v && v.diasDeDiario > 0) partes.push(plural(v.diasDeDiario, "dia de diário", "dias de diário"));
-  if (partes.length === 0 && v && v.humorMedio !== null) partes.push(`humor ${v.humorMedio.toFixed(1)}/5`);
+  if (partes.length === 0 && v && v.humorMedio !== null) partes.push(`humor ${v.humorMedio.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5`); // vírgula decimal (26/09)
   if (partes.length === 0 && v && v.copos > 0) partes.push(plural(v.copos, "copo d'água", "copos d'água"));
   if (partes.length === 0 && r.financas) partes.push("suas finanças do mês");
   return partes.slice(0, 3).join(" · ") || "seu mês em números";
 };
 
+const idDe = (r: RetroMes) => `${r.ano}-${r.mesIdx}`;
+
+/** (26/09, temas) o fundo da espera = o da capa do tema salvo (a espera emenda na capa sem piscar). */
+const FUNDO_DA_ESPERA: Record<TemaDaRetro, { fundo: string; spinner: string }> = {
+  paginas: { fundo: P3.grafite, spinner: "rgba(230,193,92,.8)" },
+  edicao: { fundo: "#1b1b20", spinner: "rgba(246,241,231,.7)" },
+  recortes: { fundo: "#d5b787", spinner: "rgba(35,35,39,.6)" },
+};
+
+/**
+ * Chaves que passam de 50KB com facilidade: a hidratação não as grava no
+ * localStorage, e se a carga do servidor falhou elas não estão no store.
+ * Busca UMA vez por sessão, só as que faltam (26/09).
+ */
+const CHAVES_PESADAS = ["journal-entries", "lib-books", "mood-log", "rotina-habit-log"];
+const jaBuscadas = new Set<string>();
+
+/** Quanto esperar pelo mês pedido antes de desistir e mostrar a lista. */
+const ESPERA_MAXIMA_MS = 8000;
+
 const Retrospectiva = () => {
   const { user } = useAuth();
+  const { get, loaded, fetchKey } = useUserData();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const mesPedido = params.get("mes");
+  const uid = user?.id ?? null;
 
   // Últimos 12 meses FECHADOS, do mais recente pro mais antigo. Começa em
   // `atras = 1` de propósito (02/09, bug visto pelo dono): com 0, o mês
@@ -50,34 +81,119 @@ const Retrospectiva = () => {
   // retrospectiva de mês que mal começou é mentira com dois dias de dado.
   // O próprio rodapé da tela já prometia o contrato certo: "fica pronta no
   // dia 1º". 12 é o teto natural: é o que cabe numa "vida no app".
+  //
+  // (26/09) `get` muda de identidade a cada mudança do store (e quando ele
+  // termina de carregar): é a "versão dos dados" que faz os meses serem
+  // refeitos. Mês com o MESMO conteúdo devolve o MESMO objeto, pra
+  // retrospectiva aberta não re-renderizar a cada gravação.
+  const cache = useRef(new Map<string, { json: string; r: RetroMes }>());
   const meses = useMemo(() => {
+    const ler: Leitor = (chave) => get<unknown>(chave, undefined);
     const hoje = new Date();
     // um snapshot só pros 12 meses: as chaves de vida são globais e algumas
     // são grandes (diário), então reler por mês seria 12× o mesmo parse.
-    const dados = lerDadosDaVida(user?.id ?? null);
+    const dados = lerDadosDaVida(ler);
     const out: RetroMes[] = [];
     for (let atras = 1; atras <= 12; atras++) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() - atras, 1);
-      const r = construirRetroMes(d.getFullYear(), d.getMonth(), user?.id ?? null, dados);
-      if (r) out.push(r);
+      const r = construirRetroMes(d.getFullYear(), d.getMonth(), uid, dados, { ler, agora: hoje });
+      if (!r) continue;
+      const json = JSON.stringify(r);
+      const antes = cache.current.get(idDe(r));
+      if (antes && antes.json === json) out.push(antes.r);
+      else {
+        cache.current.set(idDe(r), { json, r });
+        out.push(r);
+      }
     }
     return out;
-  }, [user?.id]);
+    // `loaded` de propósito: o fim da carga refaz os meses mesmo num provider cujo `get` não mude
+  }, [uid, get, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Chegou pela notificação/atalho com um mês no endereço? Abre direto nele.
-  const [aberto, setAberto] = useState<RetroMes | null>(() => {
-    if (!mesPedido) return null;
-    const alvo = mesPedido.toLowerCase();
-    return meses.find((m) => m.mes.toLowerCase() === alvo) ?? null;
-  });
+  // Chave pesada que não veio (carga do servidor falhou): busca sob demanda.
+  const fetchKeyRef = useRef(fetchKey);
+  fetchKeyRef.current = fetchKey;
+  const getRef = useRef(get);
+  getRef.current = get;
+  useEffect(() => {
+    if (!loaded || !uid) return;
+    for (const chave of CHAVES_PESADAS) {
+      const marca = `${uid}:${chave}`;
+      if (jaBuscadas.has(marca) || getRef.current<unknown>(chave, undefined) !== undefined) continue;
+      jaBuscadas.add(marca);
+      void fetchKeyRef.current(chave).catch(() => null);
+    }
+  }, [loaded, uid]);
+
+  // Qual mês está aberto é um ID, não o objeto: o objeto é refeito quando o
+  // store muda, e a retrospectiva aberta acompanha.
+  const [abertoId, setAbertoId] = useState<string | null>(null);
+  // Chegou pela notificação/atalho com um mês no endereço? Abre direto nele —
+  // assim que ele existir nos dados (no dia 1º, com o app frio, os dados
+  // chegam depois da primeira pintura).
+  const [pedidoEncerrado, setPedidoEncerrado] = useState(!mesPedido);
+  const [desistiu, setDesistiu] = useState(false);
+  const alvo = mesPedido?.toLowerCase() ?? null;
+  const doPedido = !pedidoEncerrado && alvo ? meses.find((m) => m.mes.toLowerCase() === alvo) ?? null : null;
+  const esperandoPedido = !pedidoEncerrado && !doPedido && !loaded && !desistiu;
+
+  useEffect(() => {
+    if (!esperandoPedido) return;
+    const t = window.setTimeout(() => setDesistiu(true), ESPERA_MAXIMA_MS);
+    return () => window.clearTimeout(t);
+  }, [esperandoPedido]);
+  // Carregou (ou cansou de esperar) e o mês não tem nada: fica a lista, e o
+  // pedido não abre sozinho mais tarde por cima dela.
+  useEffect(() => {
+    if (!pedidoEncerrado && !doPedido && (loaded || desistiu)) setPedidoEncerrado(true);
+  }, [pedidoEncerrado, doPedido, loaded, desistiu]);
+
+  // (26/09) quem abria pela notificação não gerava wrapped_open — o funil da
+  // notificação não tinha o passo "abriu".
+  const contouPedido = useRef(false);
+  useEffect(() => {
+    if (!doPedido || contouPedido.current) return;
+    contouPedido.current = true;
+    // (26/09, temas) com o tema salvo: quem abre em qual pele
+    trackEvent("wrapped_open", { month: doPedido.mes, origem: params.get("origem") || "notif", tema: lerTema(getRef.current<unknown>(CHAVE_DO_TEMA, null)) });
+  }, [doPedido, params]);
 
   const abrir = (r: RetroMes, origem: string) => {
-    trackEvent("wrapped_open", { month: r.mes, origem });
-    setAberto(r);
+    trackEvent("wrapped_open", { month: r.mes, origem, tema: lerTema(get<unknown>(CHAVE_DO_TEMA, null)) });
+    setPedidoEncerrado(true);
+    setAbertoId(idDe(r));
   };
 
+  const aberto = doPedido ?? (abertoId ? meses.find((m) => idDe(m) === abertoId) ?? null : null);
+  // "O setembro de Ana" (26/09, redesenho): o nome que a pessoa deu, nunca o e-mail
+  const nome = nomeDaPessoa((chave) => get<unknown>(chave, undefined), user?.user_metadata);
+
   if (aberto) {
-    return <MonthlyWrapped retro={aberto} onClose={() => setAberto(null)} />;
+    return (
+      <MonthlyWrapped
+        retro={aberto}
+        nome={nome}
+        onClose={() => {
+          setPedidoEncerrado(true);
+          setAbertoId(null);
+        }}
+      />
+    );
+  }
+
+  if (esperandoPedido) {
+    // mesmo fundo da capa (a do tema salvo): a espera emenda na retrospectiva sem piscar a lista
+    const espera = FUNDO_DA_ESPERA[lerTema(get<unknown>(CHAVE_DO_TEMA, null))];
+    return (
+      <div
+        className="fixed inset-0 z-[400] grid place-items-center"
+        style={{ background: espera.fundo }}
+        aria-busy="true"
+        aria-label="Carregando a retrospectiva"
+      >
+        <Loader2 className="w-7 h-7 animate-spin" style={{ color: espera.spinner }} />
+      </div>
+    );
   }
 
   return (
@@ -95,7 +211,11 @@ const Retrospectiva = () => {
       </header>
 
       <div className="px-4 py-5 space-y-3 pb-[max(1.5rem,var(--app-safe-bottom))]">
-        {meses.length === 0 ? (
+        {meses.length === 0 && !loaded ? (
+          <div className="pt-24 grid place-items-center" aria-busy="true">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : meses.length === 0 ? (
           <div className="pt-16 text-center px-6">
             <span className="inline-grid place-items-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-5">
               <Sparkles className="w-7 h-7" />
@@ -113,31 +233,34 @@ const Retrospectiva = () => {
             </button>
           </div>
         ) : (
+          // (26/09, temas) cada mês é uma lombada do planner (a pele do tema padrão):
+          // linho grafite, espiral, o mês em foil; o mais recente leva o marcador
           meses.map((r, i) => (
             <motion.button
-              key={`${r.ano}-${r.mes}`}
+              key={idDe(r)}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, duration: 0.35 }}
               onClick={() => abrir(r, "lista")}
-              className="w-full flex items-center gap-3.5 rounded-2xl p-4 text-left text-white active:scale-[0.99] transition-transform"
-              style={{
-                background: i === 0
-                  ? "linear-gradient(120deg, #1c1917 25%, #D22D80 165%)"
-                  : "linear-gradient(120deg, #1c1917 40%, #44403c 160%)",
-              }}
+              className="relative block w-full overflow-hidden text-left active:scale-[0.99] transition-transform"
+              style={{ borderRadius: 14, background: P3.mesa, color: P3.creme }}
             >
-              <span className="grid place-items-center w-12 h-12 rounded-xl bg-white/12 text-2xl shrink-0">
-                {r.perfil.emoji}
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[15px] font-bold leading-tight">
-                  {r.mes}
-                  {r.ano !== new Date().getFullYear() && <span className="text-white/45 font-normal"> {r.ano}</span>}
+              <span aria-hidden style={{ position: "absolute", left: 12, top: 0, right: 0, bottom: 0, borderRadius: "3px 14px 14px 3px", ...linho() }} />
+              <span aria-hidden style={{ ...vinheta, left: 12 }} />
+              <Espiral n={3} passo={26} topo={10} esquerda={12} w={10} h={18} caixa={24} />
+              {i === 0 && <Fita style={{ right: 48, top: -4, height: 44 }} largura={10} bico={6} />}
+              <span className="relative flex items-center gap-3" style={{ padding: "13px 14px 14px 32px" }}>
+                <span className="flex-1 min-w-0">
+                  {/* mês curto (pouco dado) não tem perfil — 26/09 */}
+                  <span className="block truncate" style={kicker(9)}>{r.curta ? "Edição curta" : perfilEmFrase(r.perfil.name)}</span>
+                  <span className="block" style={{ ...serif, fontSize: 25, lineHeight: 1.05, marginTop: 2 }}>
+                    <span style={{ ...foilCss, paddingRight: 3 }}>{r.mes}</span>
+                    {r.ano !== new Date().getFullYear() && <span style={{ ...relevo, fontFamily: "inherit", fontStyle: "normal", fontSize: 13, fontWeight: 900, letterSpacing: ".06em" }}> {r.ano}</span>}
+                  </span>
+                  <span className="block truncate" style={{ fontSize: 12, color: creme(0.55), marginTop: 2 }}>{RESUMO_DE(r)}</span>
                 </span>
-                <span className="block text-[12px] text-white/55 mt-0.5 truncate">{RESUMO_DE(r)}</span>
+                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: P3.ouroTxt }} />
               </span>
-              <ChevronRight className="w-4 h-4 text-white/50 shrink-0" />
             </motion.button>
           ))
         )}

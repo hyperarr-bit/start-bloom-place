@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { numeroBR } from "@/lib/data-normalizers";
+import { datasDeCheckin } from "@/lib/detox";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -181,8 +182,9 @@ export const QuickActions = () => {
   };
 
   const submitExpense = () => {
-    const amount = parseFloat(expenseValue.replace(",", "."));
-    if (!amount || amount <= 0) { toast.error("Informe um valor válido"); return; }
+    // numeroBR (26/09): parseFloat trocando só a 1ª vírgula gravava "1.250,50" como R$ 1,25
+    const amount = numeroBR(expenseValue);
+    if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
     const expenses = get<any[]>("finance-expenses", []);
     const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
     const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
@@ -197,7 +199,7 @@ export const QuickActions = () => {
     set("finance-expenses", expenses);
     vibrate();
     showSuccess("expense");
-    toast.success(`💸 R$ ${amount.toFixed(2)} em ${expenseCategory}`);
+    toast.success(`💸 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em ${expenseCategory}`);
     setExpenseValue("");
     setExpenseCategory("Outros");
     setActiveAction(null);
@@ -225,7 +227,7 @@ export const QuickActions = () => {
     ]);
     vibrate();
     showSuccess("income");
-    toast.success(`💰 R$ ${amount.toFixed(2)} — ${incomeKind}`, { action: { label: "Ver Finanças", onClick: () => navigate("/financas") } });
+    toast.success(`💰 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} — ${incomeKind}`, { action: { label: "Ver Finanças", onClick: () => navigate("/financas") } });
     setIncomeValue("");
     setIncomeKind(incomeKinds[0]);
     setActiveAction(null);
@@ -345,13 +347,12 @@ export const QuickActions = () => {
   const submitDetoxCheckin = (habitName: string) => {
     const tStr = todayStr();
     const habits = get<any[]>("detox-habits", []);
+    // 26/09: o Detox guarda LISTA de datas; isto gravava um objeto {dia: n} que
+    // virava [] no banco (e quebrava o Detox em hábito antigo). Um por dia.
     const updated = habits.map((h: any) => {
-      if (h.name === habitName) {
-        const checkins = h.checkins || {};
-        checkins[tStr] = (checkins[tStr] || 0) + 1;
-        return { ...h, checkins };
-      }
-      return h;
+      if (h.name !== habitName) return h;
+      const datas = datasDeCheckin(h.checkins);
+      return datas.includes(tStr) ? { ...h, checkins: datas } : { ...h, checkins: [...datas, tStr] };
     });
     set("detox-habits", updated);
     vibrate();
@@ -706,7 +707,7 @@ export const QuickActions = () => {
                         <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
                         <span className="text-xs font-medium truncate">{h.name}</span>
                         <span className="text-[10px] text-muted-foreground ml-auto">
-                          {h.checkins?.[todayStr()] || 0}x hoje
+                          {datasDeCheckin(h.checkins).includes(todayStr()) ? "✓ hoje" : "check-in"}
                         </span>
                       </motion.button>
                     ))

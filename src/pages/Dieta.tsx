@@ -6,12 +6,15 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
 import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
 import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
+import { enviarParaMercado } from "@/lib/mercado";
+import { avisarApagado } from "@/lib/desfazer";
+import { fotografarDias, itensDoCardapio, primeiraMaiuscula, restaurarDias, statusAderencia } from "@/components/dieta/cardapio";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
   ArrowUp, ArrowDown, Copy, Search, BookOpen,
-  ShoppingCart, Send, UtensilsCrossed, Pencil, Link2, ExternalLink, Tag
+  ShoppingCart, Send, UtensilsCrossed, Pencil, Link2, ExternalLink, Tag, ChevronDown
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -37,6 +40,12 @@ const dayColors: Record<string, string> = {
   SEGUNDA: "bg-blue-500", TERÇA: "bg-indigo-500", QUARTA: "bg-green-500",
   QUINTA: "bg-yellow-500", SEXTA: "bg-pink-500", SÁBADO: "bg-purple-500", DOMINGO: "bg-violet-500"
 };
+/* Contraste (26/09, varredura): texto branco no verde da QUARTA dava 2,3:1 e no
+ * amarelo da QUINTA 1,9:1. Nesses dois fundos claros o texto é o escuro do tema
+ * (6,6:1 e 7,9:1); no modo escuro o fundo vira tinta e o texto, o claro do tema. */
+const dayText: Record<string, string> = { QUARTA: "text-foreground", QUINTA: "text-foreground" };
+/** Nome do dia da semana ("SÁBADO") de um Date local. */
+const nomeDoDia = (d: Date) => weekDays[(d.getDay() + 6) % 7];
 
 const defaultMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta"];
 const defaultMealEmojis: Record<string, string> = { "Café da Manhã": "🌅", "Almoço": "🍽️", "Lanche": "🍎", "Janta": "🌙", "Pré-Treino": "⚡", "Pós-Treino": "💪", "Ceia": "🌙", "Café da Tarde": "☕" };
@@ -333,6 +342,10 @@ const Dieta = () => {
   const [newMealNameConfig, setNewMealNameConfig] = useState("");
   const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
   const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
+  /* Cardápio recolhido no celular (26/09, varredura): a 360 px os 7 dias
+     abertos davam ~4.400 px de rolagem. Abre só HOJE; o resto mostra um resumo
+     e abre com um toque. No desktop (md+) tudo continua aberto. */
+  const [diasAbertos, setDiasAbertos] = useState<string[]>(() => [nomeDoDia(new Date())]);
 
   const mealEmojis = defaultMealEmojis;
   const mealColors = defaultMealColors;
@@ -409,6 +422,11 @@ const Dieta = () => {
     };
   }, []);
   const [diaryData, setDiaryData] = usePersistedState<Record<string, { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }>>("dieta-diary-v2", {});
+  // virou o dia com o app aberto: o novo "hoje" também abre no cardápio
+  useEffect(() => {
+    const nome = nomeDoDia(parseLocalDay(today));
+    setDiasAbertos(prev => (prev.includes(nome) ? prev : [...prev, nome]));
+  }, [today]);
 
   /* SÉRIE DA DIETA (01/09) — refeições SEGUIDAS por dia.
    *
@@ -444,7 +462,27 @@ const Dieta = () => {
     return () => clearInterval(interval);
   }, [fastingStart]);
 
+  /* TROCAR DE REFEIÇÃO SALVA A ABERTA (26/09, varredura): digitar no Almoço e
+     tocar na Janta jogava fora o texto e as kcal. Só grava se algo mudou — cada
+     escrita em saude-meals conta como "refeição registrada" (ativação). */
+  const refeicaoAberta = (): { day: string; meal: string } | null => {
+    if (!editingMeal) return null;
+    const day = weekDays.find(d => editingMeal.startsWith(`${d}-`)); // dia não tem hífen; refeição pode ter ("Pré-Treino")
+    return day ? { day, meal: editingMeal.slice(day.length + 1) } : null;
+  };
+  const edicaoMudou = (day: string, meal: string) => {
+    if (editMealValue !== (mealPlan[day]?.[meal] || "")) return true;
+    if (lerKcal(editMealKcal) !== (Number(mealKcal[day]?.[meal]) > 0 ? Number(mealKcal[day][meal]) : 0)) return true;
+    const m = comoMacros(mealMacros[day]?.[meal]);
+    return lerGramas(editMacros.p) !== m.p || lerGramas(editMacros.c) !== m.c || lerGramas(editMacros.g) !== m.g;
+  };
+  const salvarEdicaoAberta = () => {
+    const aberta = refeicaoAberta();
+    if (aberta && edicaoMudou(aberta.day, aberta.meal)) saveMeal(aberta.day, aberta.meal);
+  };
+
   const startEditMeal = (day: string, meal: string) => {
+    salvarEdicaoAberta();
     setEditingMeal(`${day}-${meal}`);
     setEditMealValue(mealPlan[day]?.[meal] || "");
     const kcal = mealKcal[day]?.[meal];
@@ -468,6 +506,22 @@ const Dieta = () => {
     });
     setEditingMeal(null);
   };
+  // Abre/recolhe um dia no celular; recolher o dia da edição aberta salva antes.
+  const alternarDia = (day: string) => {
+    if (diasAbertos.includes(day) && refeicaoAberta()?.day === day) {
+      salvarEdicaoAberta();
+      setEditingMeal(null);
+    }
+    setDiasAbertos(prev => (prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]));
+  };
+  // "3 de 5 refeições · 1.850 kcal" — o que o dia recolhido mostra
+  const resumoDoDia = (day: string) => {
+    const cheias = meals.filter(m => (mealPlan[day]?.[m] || "").trim()).length;
+    if (cheias === 0) return "Nada planejado — toque pra abrir";
+    const kcal = kcalDoPlano(mealKcal[day]);
+    return `${cheias} de ${meals.length} ${meals.length === 1 ? "refeição" : "refeições"}${kcal > 0 ? ` · ${kcal.toLocaleString("pt-BR")} kcal` : ""}`;
+  };
+
   /* Diário ↔ log do dia. "Segui" grava a refeição planejada (kcal + gramas)
    * em core-dieta-log — o que os widgets Calorias e Macros do Dia leem.
    * Antes o diário só contava refeições; caloria e macro ficavam em branco
@@ -516,58 +570,52 @@ const Dieta = () => {
     return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
   };
 
-  // Smart list: generate from meal plan
+  /* LISTA INTELIGENTE (26/09, varredura): cada refeição INTEIRA virava um item
+     ("2 ovos mexidos (100g) • 1 fatia de pão…"), com as gramas e até a
+     "Refeição livre 😌". Agora separa por "•", ",", quebra de linha etc., tira
+     quantidades e não repete — ver src/components/dieta/cardapio.ts. */
+  const juntarNaLista = (novos: string[]) => {
+    if (novos.length > 0) {
+      const t = Date.now();
+      setSmartList(prev => [...prev, ...novos.map((text, n) => ({ id: `${t}-${n}`, text, done: false }))]);
+    }
+    toast(novos.length ? `${novos.length} ${novos.length === 1 ? "item entrou" : "itens entraram"} na lista` : "A lista já tem tudo isso");
+  };
+
+  // Smart list: generate from meal plan (na ordem das refeições do cardápio)
   const generateFromMealPlan = () => {
-    const items: string[] = [];
+    const descricoes: string[] = [];
     weekDays.forEach(day => {
       const dayMeals = mealPlan[day];
       if (!dayMeals) return;
-      Object.values(dayMeals).forEach(desc => {
-        if (desc && desc.trim()) {
-          desc.split(/[,\n+]/).forEach(item => {
-            const clean = item.trim().toLowerCase();
-            if (clean && !items.includes(clean)) items.push(clean);
-          });
-        }
+      [...meals, ...Object.keys(dayMeals).filter(m => !meals.includes(m))].forEach(m => {
+        const desc = dayMeals[m];
+        if (typeof desc === "string" && desc.trim()) descricoes.push(desc);
       });
     });
-    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
-    if (newItems.length > 0) {
-      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
-    }
+    if (descricoes.length === 0) { toast("O cardápio está vazio — preencha as refeições na aba Cardápio."); return; }
+    juntarNaLista(itensDoCardapio(descricoes, smartList.map(i => i.text)));
   };
 
   const generateFromRecipes = () => {
-    const items: string[] = [];
-    recipes.filter(r => r.favorite).forEach(r => {
-      if (r.ingredients) {
-        r.ingredients.split("\n").forEach(line => {
-          const clean = line.trim().toLowerCase();
-          if (clean && !items.includes(clean)) items.push(clean);
-        });
-      }
-    });
-    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
-    if (newItems.length > 0) {
-      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
-    }
+    const favoritas = recipes.filter(r => r.favorite && r.ingredients);
+    if (favoritas.length === 0) { toast("Favorite uma receita (❤️) com ingredientes pra gerar a lista."); return; }
+    juntarNaLista(itensDoCardapio(favoritas.map(r => r.ingredients), smartList.map(i => i.text)));
   };
 
   const sendToCasa = () => {
     const pendingItems = smartList.filter(i => !i.done);
     if (pendingItems.length === 0) return;
-    setCasaGrocery((prev: any[]) => {
-      const updated = [...prev];
-      // Find or create "Dieta" category
-      let dietaCat = updated.find(c => c.name === "Dieta");
-      if (!dietaCat) {
-        dietaCat = { id: "dieta-auto", name: "Dieta", emoji: "🥗", color: "bg-green-500", items: [] };
-        updated.push(dietaCat);
-      }
-      const existingTexts = dietaCat.items.map((i: any) => i.text.toLowerCase());
-      const newItems = pendingItems.filter(i => !existingTexts.includes(i.text.toLowerCase()));
-      dietaCat.items = [...dietaCat.items, ...newItems.map(i => ({ id: Date.now().toString() + Math.random(), text: i.text, done: false }))];
-      return updated.map(c => c.id === dietaCat!.id ? dietaCat! : c);
+    // Parte das 9 categorias do Mercado quando ele nunca foi aberto (antes a
+    // "Dieta" entrava numa lista vazia e as outras sumiam) e avisa o que foi.
+    const { lista, novos } = enviarParaMercado(casaGrocery, pendingItems.map(i => primeiraMaiuscula(i.text)));
+    if (novos === 0) {
+      toast("Esses itens já estão no Mercado da Casa.");
+      return;
+    }
+    setCasaGrocery(lista);
+    toast.success(novos === 1 ? "1 item enviado pro Mercado da Casa" : `${novos} itens enviados pro Mercado da Casa`, {
+      action: { label: "Ver", onClick: () => navigate("/casa") },
     });
   };
 
@@ -679,7 +727,7 @@ const Dieta = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Voltar" onClick={() => { salvarEdicaoAberta(); navigate("/home"); }}><ArrowLeft className="w-5 h-5" /></Button>
           <Apple className="w-5 h-5 text-green-600" />
           <h1 className="text-base font-bold tracking-tight">DIETA</h1>
           <div className="flex items-center gap-2 ml-auto">
@@ -697,7 +745,7 @@ const Dieta = () => {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
+              onClick={() => { salvarEdicaoAberta(); setEditingMeal(null); setActiveTab(tab.id); reportTab?.(tab.id); }}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
               <span>{tab.icon}</span>
@@ -726,13 +774,15 @@ const Dieta = () => {
 
             {showMealConfig && (
               <div className="bg-muted/30 rounded-xl border border-border p-3 space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground">CONFIGURAR REFEIÇÕES (arraste a ordem)</p>
+                {/* não dá pra arrastar — a ordem muda pelas setas (26/09, varredura) */}
+                <p className="text-[10px] font-bold text-muted-foreground">CONFIGURAR REFEIÇÕES (use as setas pra mudar a ordem)</p>
                 <div className="space-y-1.5">
                   {meals.map((meal, i) => (
                     <div key={meal} className="flex items-center gap-1.5 bg-card rounded-lg border border-border px-2 py-1.5">
                       <div className="flex flex-col gap-0.5">
                         <button
                           disabled={i === 0}
+                          aria-label={`Subir ${meal}`}
                           onClick={() => setMeals(prev => { const n = [...prev]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}
                           className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         >
@@ -740,6 +790,7 @@ const Dieta = () => {
                         </button>
                         <button
                           disabled={i === meals.length - 1}
+                          aria-label={`Descer ${meal}`}
                           onClick={() => setMeals(prev => { const n = [...prev]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; return n; })}
                           className="text-muted-foreground hover:text-foreground disabled:opacity-20"
                         >
@@ -793,9 +844,10 @@ const Dieta = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {weekDays.map((day, dayIdx) => (
-                <div key={day} data-spotlight={dayIdx === 0 ? "first-day" : undefined} className="bg-card rounded-xl border border-border overflow-hidden">
-                  <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center flex items-center justify-between`}>
+              {weekDays.map((day) => (
+                // o passo do tour aponta pro dia de HOJE, que é o que nasce aberto no celular
+                <div key={day} data-spotlight={day === nomeDoDia(parseLocalDay(today)) ? "first-day" : undefined} data-testid={`dia-${day}`} className="bg-card rounded-xl border border-border overflow-hidden">
+                  <div className={`${dayColors[day]} ${dayText[day] ?? "text-white"} p-3 font-bold text-sm text-center flex items-center justify-between`}>
                     <div className="flex gap-1">
                       <button
                         onClick={() => {
@@ -809,7 +861,16 @@ const Dieta = () => {
                         <span className="text-[9px] font-normal">Copiar</span>
                       </button>
                     </div>
-                    <span className="flex-1 text-center">{day}</span>
+                    <button
+                      type="button"
+                      onClick={() => alternarDia(day)}
+                      aria-expanded={diasAbertos.includes(day)}
+                      aria-label={`${diasAbertos.includes(day) ? "Recolher" : "Abrir"} ${day}`}
+                      className="flex-1 flex items-center justify-center gap-1 font-bold"
+                    >
+                      {day}
+                      <ChevronDown className={`w-3.5 h-3.5 md:hidden transition-transform ${diasAbertos.includes(day) ? "rotate-180" : ""}`} />
+                    </button>
                     <div className="flex gap-1">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -829,6 +890,8 @@ const Dieta = () => {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction onClick={() => {
+                              // a edição aberta neste dia não pode ressuscitar o que foi limpo
+                              if (refeicaoAberta()?.day === day) setEditingMeal(null);
                               setMealPlan(prev => {
                                 const updated = { ...prev };
                                 delete updated[day];
@@ -873,6 +936,10 @@ const Dieta = () => {
                         className="w-full h-7 text-xs"
                         disabled={copyTargetDays.length === 0}
                         onClick={() => {
+                          salvarEdicaoAberta(); // o que está sendo digitado vai junto na cópia
+                          const destinos = [...copyTargetDays];
+                          // foto dos dias que vão ser trocados, pro "Desfazer" (26/09, varredura)
+                          const antes = { plano: fotografarDias(mealPlan, destinos), kcal: fotografarDias(mealKcal, destinos), macros: fotografarDias(mealMacros, destinos) };
                           setMealPlan(prev => {
                             const updated = { ...prev };
                             copyTargetDays.forEach(targetDay => {
@@ -893,6 +960,13 @@ const Dieta = () => {
                           });
                           setCopyFromDay(null);
                           setCopyTargetDays([]);
+                          // "Todos" trocava os outros 6 dias (com kcal e macros) sem aviso nem volta
+                          const para = destinos.length === weekDays.length - 1 ? "todos os dias" : destinos.length === 1 ? destinos[0] : `${destinos.length} dias`;
+                          avisarApagado(`Cardápio de ${day} copiado pra ${para}`, () => {
+                            setMealPlan(prev => restaurarDias(prev, antes.plano));
+                            setMealKcal(prev => restaurarDias(prev, antes.kcal));
+                            setMealMacros(prev => restaurarDias(prev, antes.macros));
+                          });
                         }}
                       >
                         Copiar ({copyTargetDays.length})
@@ -900,7 +974,13 @@ const Dieta = () => {
                     </div>
                   )}
 
-                  <div className="p-3 space-y-3">
+                  {/* recolhido (só no celular): resumo de uma linha que abre o dia */}
+                  {!diasAbertos.includes(day) && (
+                    <button type="button" onClick={() => alternarDia(day)} className="md:hidden w-full px-3 py-2.5 text-left text-[11px] text-muted-foreground" data-testid={`resumo-${day}`}>
+                      {resumoDoDia(day)}
+                    </button>
+                  )}
+                  <div className={`p-3 space-y-3 ${diasAbertos.includes(day) ? "" : "hidden md:block"}`}>
                     {meals.map(meal => {
                       const key = `${day}-${meal}`; const isEditing = editingMeal === key;
                       return (
@@ -1177,7 +1257,19 @@ const Dieta = () => {
                                 <Heart className={`w-4 h-4 ${r.favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
                               </button>
                               <button
-                                onClick={e => { e.stopPropagation(); setRecipes(prev => prev.filter(x => x.id !== r.id)); }}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  // apagava na hora e sem volta: agora dá pra desfazer (26/09, varredura)
+                                  const pos = recipes.findIndex(x => x.id === r.id);
+                                  setRecipes(prev => prev.filter(x => x.id !== r.id));
+                                  if (expandedRecipe === r.id) setExpandedRecipe(null);
+                                  avisarApagado(`Receita "${r.name}" apagada`, () => setRecipes(prev => {
+                                    if (prev.some(x => x.id === r.id)) return prev;
+                                    const n = [...prev];
+                                    n.splice(Math.min(Math.max(pos, 0), n.length), 0, r);
+                                    return n;
+                                  }));
+                                }}
                                 aria-label={`Apagar ${r.name}`}
                                 className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                               >
@@ -1314,7 +1406,7 @@ const Dieta = () => {
                       checked={false}
                       onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: true } : i))}
                     />
-                    <span className="text-xs flex-1 capitalize">{item.text}</span>
+                    <span className="text-xs flex-1">{primeiraMaiuscula(item.text)}</span>
                     <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
                       <X className="w-3 h-3 text-muted-foreground" />
                     </button>
@@ -1330,7 +1422,7 @@ const Dieta = () => {
                           checked={true}
                           onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: false } : i))}
                         />
-                        <span className="text-xs flex-1 capitalize line-through text-muted-foreground">{item.text}</span>
+                        <span className="text-xs flex-1 line-through text-muted-foreground">{primeiraMaiuscula(item.text)}</span>
                         <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
                           <X className="w-3 h-3 text-muted-foreground" />
                         </button>
@@ -1603,16 +1695,22 @@ const Dieta = () => {
                         const dayNameCheck = getDiaryDayName(dateStr);
                         const dayMealsCheck = mealPlan[dayNameCheck];
                         const planned = dayMealsCheck ? Object.entries(dayMealsCheck).filter(([, v]) => v && v.trim()) : [];
-                        const allGood = planned.length > 0 && planned.every(([m]) => dayDiary.meals[m]?.followed);
-                        const anyMarked = planned.some(([m]) => dayDiary.meals[m]);
+                        // ❌ só com "não segui"; dia pela metade em âmbar com a conta (26/09, varredura)
+                        const { status, seguidas, total } = statusAderencia(planned.map(([m]) => m), dayDiary.meals);
                         return (
                           <div key={i} className="flex-1 text-center">
-                            <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm border ${
-                              allGood ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600 dark:border-green-500/20" :
-                              anyMarked ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600 dark:border-red-500/20" :
-                              "bg-muted/30 border-border text-muted-foreground"
+                            <div
+                              role="img"
+                              aria-label={`${d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "numeric" })}: ${status === "vazio" ? "sem registro" : `${seguidas} de ${total} refeições seguidas`}`}
+                              data-testid={`aderencia-${dateStr}`}
+                              data-status={status}
+                              className={`w-full aspect-square rounded-lg flex items-center justify-center border ${
+                              status === "tudo" ? "text-sm bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600 dark:border-green-500/20" :
+                              status === "furou" ? "text-sm bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600 dark:border-red-500/20" :
+                              status === "parcial" ? "text-xs font-bold bg-amber-100 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-400" :
+                              "text-sm bg-muted/30 border-border text-muted-foreground"
                             }`}>
-                              {allGood ? "✅" : anyMarked ? "❌" : "—"}
+                              {status === "tudo" ? "✅" : status === "furou" ? "❌" : status === "parcial" ? `${seguidas}/${total}` : "—"}
                             </div>
                             <p className="text-[9px] text-muted-foreground mt-0.5">
                               {d.toLocaleDateString("pt-BR", { weekday: "narrow" })}

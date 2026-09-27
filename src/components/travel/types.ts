@@ -354,8 +354,12 @@ export function calculateSettlement(data: BillSplitData): { from: string; to: st
   return debts;
 }
 
+/** Dias de CALENDÁRIO até a data (hoje = 0, amanhã = 1). 26/09: contava pela
+ *  hora de agora — a viagem de hoje virava "passada" e a véspera oscilava. */
 export function daysUntil(dateStr: string): number {
-  return Math.ceil((parseLocalDay(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.round((parseLocalDay(dateStr).getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function formatCurrency(value: number, currency = "BRL"): string {

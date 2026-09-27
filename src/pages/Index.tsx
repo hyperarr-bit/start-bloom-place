@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
-import { mesAtualExtenso } from "@/lib/utils";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { reais } from "@/lib/dinheiro";
+import { mesAtualExtenso, localDayKey } from "@/lib/utils";
+import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -48,10 +50,11 @@ import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
-import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasDoMes, injetarFaturas } from "@/lib/finance-faturas";
+import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
+import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
@@ -62,7 +65,13 @@ import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 
-const Index = () => {
+interface PropsDoConteudo {
+  /** Aba em que a pessoa estava quando a virada remontou a tela (26/09). */
+  abaInicial?: string | null;
+  aoTrocarAba?: (aba: string) => void;
+}
+
+const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const navigate = useNavigate();
   const location = useLocation();
   // No demo aberto (/preview/financas) o "voltar" deve sair pra LP, não pro app.
@@ -85,8 +94,9 @@ const Index = () => {
   const quizVictory = VICTORY_PHRASE[quiz.vitoria ?? ""];
   const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
   const [activeTab, setActiveTab] = useState(
-    getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
+    () => abaInicial ?? (getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard")
   );
+  useEffect(() => { aoTrocarAba?.(activeTab); }, [activeTab, aoTrocarAba]);
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   /* Mês aberto passa a carregar o ANO junto (01/09) — sem ele a planilha de
@@ -192,10 +202,23 @@ const Index = () => {
      pedido literal do chamado de 14/09. Nada disso entra nas despesas (os
      gastos que compõem a fatura já estão lá). */
   const [faturasPagas, setFaturasPagas] = usePersistedState<Record<string, boolean>>(CHAVE_FATURAS_PAGAS, {});
-  const faturas = useMemo(() => faturasDoMes({
-    mes: mesAgora, variaveis: expenses, variaveisAnterior: expensesAnterior, fixos: fixedExpenses,
-    parcelas: installments as Parcela[], cards: cartoes.map((c) => c.value), configOf, labelOf: labelDoCartao, pagas: faturasPagas ?? {},
-  }), [mesAgora, expenses, expensesAnterior, fixedExpenses, installments, cartoes, configOf, labelDoCartao, faturasPagas]);
+  /* A FATURA QUE VENCE NESTE MÊS (26/09, lib/finance-faturas
+     `faturasAVencer`): no cartão que vence no mês seguinte ao fechamento
+     (fecha 25, vence 5), a linha do dia 5 de outubro é a fatura que fechou em
+     25/09 — antes era a que fecha em 25/10, parcial. Pra ela o app precisa
+     dos gastos e das parcelas do mês ANTERIOR (e do retrasado, pelas compras
+     depois do fechamento de lá). */
+  const faturas = useMemo(() => {
+    const doArquivo = (mes: string): any[] =>
+      doPerfil(getUserData<any[]>(chaveArquivada(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, "expenses"), []) || [], perfilValido);
+    const lerParcelas = (chave: string) => getUserData<Parcela[]>(chave, []) || [];
+    return faturasAVencer({
+      mes: mesAgora,
+      gastosDoMes: (mes) => (mes === mesAgora ? expenses : mes === mesAnterior ? expensesAnterior : doArquivo(mes)),
+      parcelasDoMes: (mes) => (mes === mesAgora ? installments as Parcela[] : doPerfil(parcelasDoMesPassado(mes, lerParcelas), perfilValido)),
+      fixos: fixedExpenses, cards: cartoes.map((c) => c.value), configOf, labelOf: labelDoCartao, pagas: faturasPagas ?? {},
+    });
+  }, [mesAgora, mesAnterior, expenses, expensesAnterior, fixedExpenses, installments, cartoes, configOf, labelDoCartao, faturasPagas, getUserData, perfilValido]);
   const dueDaysComFaturas = useMemo(() => injetarFaturas(dueDays as any[], faturas), [dueDays, faturas]);
   const setDueDaysComFaturas = (lista: any[]) => {
     const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
@@ -208,6 +231,10 @@ const Index = () => {
       const chave = chaveDaFatura(mesAgora, m.card);
       if (m.paga) {
         pagas[chave] = true;
+        // (26/09) Só a fatura que FECHOU neste mês leva as parcelas deste mês.
+        // A que vence agora mas fechou no mês passado (cartão "vence dia 5 do
+        // mês seguinte") cobrou as parcelas de lá — as de agora vêm na próxima.
+        if (mesDeFechamento(mesAgora, configOf(m.card)) !== mesAgora) continue;
         parcelasNovas = parcelasNovas.map((p) => {
           if (p.cardName !== m.card || valorDaParcelaNoMes(p) <= 0 || parcelaPagaNoMes(p)) return p;
           mudouParcela = true;
@@ -242,6 +269,15 @@ const Index = () => {
         return false; // sem dono em memória — o MonthTurnover persiste local+servidor
     }
   };
+
+  // Limite do dia (26/09): quem abriu Finanças hoje não recebe o aviso de manhã.
+  // Escrita de sistema (não conta como uso) e só uma vez por dia.
+  useEffect(() => {
+    if (!userDataLoaded || isPreview) return;
+    const hoje = localDayKey();
+    if (getUserData<string>(CHAVE_FINANCAS_VISTO, "") !== hoje) setUserData(CHAVE_FINANCAS_VISTO, hoje, { system: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDataLoaded]);
 
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
@@ -397,7 +433,7 @@ const Index = () => {
             <button
               onClick={() => setAskOpen(true)}
               aria-label="Pergunte ao CORE"
-              className="grid place-items-center w-8 h-8 rounded-lg transition-colors" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
+              className="grid place-items-center w-9 h-9 rounded-xl transition-colors" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
             >
               <Sparkles className="w-4 h-4" />
             </button>
@@ -432,19 +468,19 @@ const Index = () => {
           <div className="bg-card rounded-lg border border-border px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-2">
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Receitas</span>
-              <span className="text-xs font-bold text-green-500 truncate">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+              <span className="text-xs font-bold text-green-500 truncate">R$ {reais(totalIncome)}</span>
             </div>
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Despesas</span>
-              <span className="text-xs font-bold text-red-400 truncate">R$ {monthlyOutflow.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+              <span className="text-xs font-bold text-red-400 truncate">R$ {reais(monthlyOutflow)}</span>
             </div>
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Dívidas</span>
-              <span className="text-xs font-bold text-orange-400 truncate">R$ {totalDebts.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+              <span className="text-xs font-bold text-orange-400 truncate">R$ {reais(totalDebts)}</span>
             </div>
             <div className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-[10px] text-muted-foreground shrink-0">Invest.</span>
-              <span className="text-xs font-bold text-purple-400 truncate">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+              <span className="text-xs font-bold text-purple-400 truncate">R$ {reais(totalInvestments)}</span>
             </div>
           </div>
         )}
@@ -725,6 +761,32 @@ const Index = () => {
       />
       <ConviteAvaliacao gasto={convite} pagante={isSubscribed} onFechar={() => setConvite(null)} />
     </div>
+  );
+};
+
+/*
+ * A TELA RELÊ OS BALDES DEPOIS DA VIRADA DO MÊS (26/09, auditoria da virada).
+ *
+ * Este componente guarda os baldes de Finanças em `usePersistedState`, que
+ * hidrata uma vez e não relê a chave. Quando Finanças é a primeira tela do
+ * dia 1º (o aviso "seu limite de hoje" das 8h abre direto aqui), ele monta
+ * com o cache de setembro antes de a virada rodar; sem remontar, mostrava
+ * setembro somado em outubro e o primeiro toque gravava os ✓ de setembro
+ * por cima do mês novo. A virada publica uma versão quando grava dado
+ * (use-virada-do-mes, `useVersaoDaVirada`) e ela é a `key` daqui: o conteúdo
+ * renasce lendo o store já virado, na mesma aba em que a pessoa estava.
+ */
+const Index = () => {
+  const versao = useVersaoDaVirada();
+  const versaoDaMontagem = useRef(versao);
+  const ultimaAba = useRef<string | null>(null);
+  const aoTrocarAba = useRef((aba: string) => { ultimaAba.current = aba; }).current;
+  return (
+    <IndexConteudo
+      key={versao}
+      abaInicial={versao !== versaoDaMontagem.current ? ultimaAba.current : null}
+      aoTrocarAba={aoTrocarAba}
+    />
   );
 };
 

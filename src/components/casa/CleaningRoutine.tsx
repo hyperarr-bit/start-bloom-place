@@ -1,23 +1,20 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { Plus, X, Trash2, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
+import { alternarLimpeza, feitoNoPeriodo, periodoDaSecao, renovarRotina, type SecaoLimpeza } from "./rotina-limpeza";
 
-interface CleaningItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
+// `doneOn` (dia local do ✓) é opcional: ver rotina-limpeza.ts (26/09, varredura)
+type CleaningSection = SecaoLimpeza;
 
-interface CleaningSection {
-  id: string;
-  name: string;
-  color: string;
-  items: CleaningItem[];
-}
+const comoSecoes = (v: unknown): CleaningSection[] =>
+  (Array.isArray(v) ? v : []).filter(Boolean).map((s: any) => ({ ...s, items: Array.isArray(s?.items) ? s.items : [] }));
 
 interface Reminder {
   id: string;
@@ -51,11 +48,35 @@ const SECTION_COLORS = [
 ];
 
 const CleaningRoutine = () => {
+  const { loaded, get } = useUserData();
   const [rawSections, setSections] = usePersistedState<CleaningSection[]>("casa-cleaning-routine", DEFAULT_SECTIONS);
-  const sections: CleaningSection[] = (Array.isArray(rawSections) ? rawSections : []).map((s: any) => ({
-    ...s,
-    items: Array.isArray(s?.items) ? s.items : [],
-  }));
+  const sections = useMemo(() => comoSecoes(rawSections), [rawSections]);
+
+  /* "Hoje" é ESTADO: com a tela aberta, a virada da meia-noite tem que zerar a
+     limpeza diária sem precisar sair e voltar (mesmo cuidado da Dieta). */
+  const [hoje, setHoje] = useState(() => localDayKey());
+  useEffect(() => {
+    const sync = () => setHoje(localDayKey());
+    const onVisible = () => { if (document.visibilityState === "visible") sync(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sync);
+    const id = window.setInterval(sync, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sync);
+      window.clearInterval(id);
+    };
+  }, []);
+  const agora = parseLocalDay(hoje);
+  /* Grava o zerado/carimbado (o widget "Tarefas de hoje" da Home lê `done`) —
+     mas só com a carga do servidor pronta e o estado igual ao salvo: escrita
+     antes disso ganha do servidor e subiria o cache velho por cima do que veio
+     de outro aparelho. */
+  useEffect(() => {
+    if (!loaded || JSON.stringify(get("casa-cleaning-routine", DEFAULT_SECTIONS)) !== JSON.stringify(rawSections)) return;
+    const renovadas = renovarRotina(sections, parseLocalDay(hoje));
+    if (renovadas !== sections) setSections(renovadas);
+  }, [loaded, get, rawSections, sections, hoje, setSections]);
   const [reminders, setReminders] = usePersistedState<Reminder[]>("casa-cleaning-reminders", []);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [newReminder, setNewReminder] = useState("");
@@ -66,27 +87,27 @@ const CleaningRoutine = () => {
   const addItem = (sectionId: string) => {
     const text = inputs[sectionId]?.trim();
     if (!text) return;
-    setSections(prev => prev.map(s =>
+    setSections(prev => comoSecoes(prev).map(s =>
       s.id === sectionId ? { ...s, items: [...s.items, { id: Date.now().toString(), text, done: false }] } : s
     ));
     setInputs(prev => ({ ...prev, [sectionId]: "" }));
   };
 
   const toggleItem = (sectionId: string, itemId: string) => {
-    setSections(prev => prev.map(s =>
-      s.id === sectionId ? { ...s, items: s.items.map(i => i.id === itemId ? { ...i, done: !i.done } : i) } : s
+    setSections(prev => comoSecoes(prev).map(s =>
+      s.id === sectionId ? { ...s, items: s.items.map(i => i.id === itemId ? alternarLimpeza(i, periodoDaSecao(s.name), new Date()) : i) } : s
     ));
   };
 
   const removeItem = (sectionId: string, itemId: string) => {
-    setSections(prev => prev.map(s =>
+    setSections(prev => comoSecoes(prev).map(s =>
       s.id === sectionId ? { ...s, items: s.items.filter(i => i.id !== itemId) } : s
     ));
   };
 
   const addSection = () => {
     if (!newSectionName.trim()) return;
-    setSections(prev => [...prev, {
+    setSections(prev => [...comoSecoes(prev), {
       id: Date.now().toString(),
       name: newSectionName.trim().toUpperCase(),
       color: newSectionColor,
@@ -96,7 +117,20 @@ const CleaningRoutine = () => {
     setShowAddSection(false);
   };
 
-  const removeSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
+  // A seção leva as tarefas junto: dá pra desfazer por alguns segundos (26/09, varredura).
+  const removeSection = (id: string) => {
+    const pos = sections.findIndex(s => s.id === id);
+    const sec = sections[pos];
+    if (!sec) return;
+    setSections(prev => comoSecoes(prev).filter(s => s.id !== id));
+    const nome = String(sec.name ?? "");
+    avisarApagado(`Seção "${nome.charAt(0)}${nome.slice(1).toLowerCase()}" apagada`, () => setSections(prev => {
+      const n = comoSecoes(prev);
+      if (n.some(s => s.id === sec.id)) return n;
+      n.splice(Math.min(pos, n.length), 0, sec);
+      return n;
+    }));
+  };
 
   const addReminderItem = () => {
     if (!newReminder.trim()) return;
@@ -181,7 +215,9 @@ const CleaningRoutine = () => {
       {/* Cleaning Sections */}
       {sections.map(section => {
         const bodyColor = BODY_COLORS[section.color] || "bg-card";
-        const doneCount = section.items.filter(i => i.done).length;
+        const periodo = periodoDaSecao(section.name);
+        const feito = (i: CleaningSection["items"][number]) => feitoNoPeriodo(i, periodo, agora);
+        const doneCount = section.items.filter(feito).length;
         return (
           <div key={section.id} className={`rounded-2xl border border-border overflow-hidden ${bodyColor}`}>
             {/* Colored Header */}
@@ -202,11 +238,11 @@ const CleaningRoutine = () => {
               {section.items.map(item => (
                 <div key={item.id} className="flex items-center gap-3 py-2 group">
                   <Checkbox
-                    checked={item.done}
+                    checked={feito(item)}
                     onCheckedChange={() => toggleItem(section.id, item.id)}
                     className="w-5 h-5"
                   />
-                  <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                  <span className={`text-sm flex-1 ${feito(item) ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {item.text}
                   </span>
                   <button onClick={() => removeItem(section.id, item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">

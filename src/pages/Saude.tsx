@@ -150,7 +150,22 @@ const SleepCard = () => {
             onBlur={() => { digitando.current = false; }}
             onChange={e => {
               setVal(e.target.value);
-              const n = parseFloat(e.target.value);
+              /* CAMPO VAZIO APAGA O REGISTRO DE HOJE (26/09, varredura): antes o
+                 valor velho ficava gravado e a tela seguia em "Faltam 0,5h".
+                 badInput é o "7," no meio da digitação, que o campo numérico
+                 entrega como "" — esse não apaga nada. */
+              if (!e.target.value.trim()) {
+                if (!e.target.validity?.badInput) {
+                  setSleepLog(prev => {
+                    if (!prev || !(today in prev)) return prev;
+                    const resto = { ...prev };
+                    delete resto[today];
+                    return resto;
+                  });
+                }
+                return;
+              }
+              const n = parseFloat(e.target.value.replace(",", "."));
               if (!isNaN(n) && n >= 0 && n <= 24) {
                 setSleepLog(prev => ({ ...prev, [today]: n }));
               }
@@ -159,7 +174,8 @@ const SleepCard = () => {
           />
         </div>
         <div className={`text-xs font-bold ${debtHours > 0 ? "text-[hsl(var(--saude-red))]" : "text-[hsl(var(--saude-green))]"}`}>
-          {sleepToday > 0 ? (debtHours > 0 ? `Faltam ${debtHours}h para a meta` : "Meta atingida ✓") : ""}
+          {/* "0,5h", com vírgula (26/09, varredura); o valor gravado não muda */}
+          {sleepToday > 0 ? (debtHours > 0 ? `Faltam ${debtHours.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h para a meta` : "Meta atingida ✓") : ""}
         </div>
       </div>
 
@@ -269,7 +285,8 @@ const BMICalculator = () => {
       </div>
       {bmi && (
         <div className="flex items-center gap-3 mt-2">
-          <span className="text-2xl font-bold">{bmi}</span>
+          {/* "24,1" e não "24.1" (26/09, varredura) */}
+          <span className="text-2xl font-bold">{Number(bmi).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
           <span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span>
         </div>
       )}

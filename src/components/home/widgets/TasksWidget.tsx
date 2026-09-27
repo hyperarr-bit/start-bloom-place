@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { alternarLimpeza, feitoNoPeriodo, periodoDaSecao, type ItemLimpeza } from "@/components/casa/rotina-limpeza";
 import { ListChecks, ChevronRight } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,15 +50,23 @@ export const TasksWidget = () => {
 
   const linhas: Linha[] = [];
 
+  /* A tarefa criada pela ação rápida da Home nasce com o MESMO id em
+     "rotina-urgencies" e em "todo-list" (26/09: aparecia duas vezes aqui e era
+     preciso marcar duas vezes). Mostra uma linha só e marca as duas juntas. */
+  const idsUrgencia = new Set(lista<Urgencia>(urgencias).map((u) => u.id));
   lista<Urgencia>(urgencias).forEach((u) => linhas.push({
     key: `u-${u.id}`, origem: "Rotina", texto: u.text, feito: !!u.done, detalhe: "urgência",
-    toggle: () => setUrgencias((prev) => lista<Urgencia>(prev).map((x) => (x.id === u.id ? { ...x, done: !x.done } : x))),
+    toggle: () => {
+      const feito = !u.done;
+      setUrgencias((prev) => lista<Urgencia>(prev).map((x) => (x.id === u.id ? { ...x, done: feito } : x)));
+      if (lista<Todo>(todos).some((t) => t.id === u.id)) setTodos((prev) => lista<Todo>(prev).map((x) => (x.id === u.id ? { ...x, done: feito } : x)));
+    },
   }));
 
   // Foco → tarefas: as com prazo até hoje (vencidas primeiro), depois as sem prazo
   const comPrazo = lista<Todo>(todos).filter((t) => t?.dueDate && t.dueDate <= hoje);
   const semPrazo = lista<Todo>(todos).filter((t) => !t?.dueDate);
-  [...comPrazo, ...semPrazo].forEach((t) => linhas.push({
+  [...comPrazo, ...semPrazo].filter((t) => !idsUrgencia.has(t.id)).forEach((t) => linhas.push({
     key: `t-${t.id}`, origem: "Rotina", texto: t.text, feito: !!t.done,
     detalhe: t.dueDate && t.dueDate < hoje ? "atrasada" : t.priority === "alta" ? "alta" : undefined,
     toggle: () => setTodos((prev) => lista<Todo>(prev).map((x) => (x.id === t.id ? { ...x, done: !x.done } : x))),
@@ -81,10 +90,12 @@ export const TasksWidget = () => {
 
   lista<CleaningSection>(limpeza)
     .filter((s) => /di[aá]ri/i.test(String(s?.name ?? "")))
+    // "Feito" só vale no dia (26/09): o ✓ de ontem continuava marcado na Home
+    // até a pessoa abrir Casa › Rotina — mesma regra do módulo (rotina-limpeza).
     .forEach((s) => lista<CleaningSection["items"][number]>(s.items).forEach((it) => linhas.push({
-      key: `cl-${s.id}-${it.id}`, origem: "Casa", texto: it.text, feito: !!it.done, detalhe: "limpeza diária",
+      key: `cl-${s.id}-${it.id}`, origem: "Casa", texto: it.text, feito: feitoNoPeriodo(it as ItemLimpeza, periodoDaSecao(String(s.name ?? ""))), detalhe: "limpeza diária",
       toggle: () => setLimpeza((prev) => lista<CleaningSection>(prev).map((sec) => (sec.id !== s.id ? sec : {
-        ...sec, items: lista<CleaningSection["items"][number]>(sec.items).map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)),
+        ...sec, items: lista<CleaningSection["items"][number]>(sec.items).map((x) => (x.id === it.id ? alternarLimpeza(x as ItemLimpeza, periodoDaSecao(String(sec.name ?? ""))) : x)),
       }))),
     })));
 

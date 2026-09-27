@@ -36,6 +36,32 @@
  * pago". Quem tiver pago algo hoje remarca com um toque; quem não zerar
  * carrega uma mentira o mês inteiro. Da próxima virada em diante o carimbo
  * existe e o arquivamento é exato.
+ *
+ * ═══ AUDITORIA DA VIRADA 30/09 → 01/10 (26/09) ═══
+ *
+ * 1. O ✓ DE QUEM ACABOU DE CHEGAR SUMIA. O caminho LEGADO acima (sem
+ *    carimbo → zera tudo) não pegava só quem tinha conta antes de 08/08:
+ *    pegava TODA pessoa nova. O hook só carimba quando já existe conta, e
+ *    ele se dá por atendido na primeira escrita da sessão — no tutorial de
+ *    Finanças a 1ª escrita é a RENDA, antes de qualquer conta. Resultado:
+ *    a pessoa cadastrava o aluguel, marcava ✓ (o "momento de valor" do
+ *    teste grátis) e, na abertura seguinte, o ✓ tinha sumido. Agora o ✓ de
+ *    uma conta que NASCEU no mês corrente fica — ela não existia no mês
+ *    passado, então o pagamento só pode ser deste. O mês de nascimento sai
+ *    do id: todo escritor de conta usa `Date.now()` (MonthCalendar,
+ *    BillsDueCards, `fx-<id do fixo>` do finance-sync, cópia do mês). Id
+ *    ilegível = não sei = zera, como sempre foi.
+ *
+ * 2. CARIMBO DO FUTURO não faz a virada andar pra trás. Relógio adiantado
+ *    ou outro aparelho num fuso à frente (Lisboa vira o mês às 20h de
+ *    Brasília) gravava "2026-10" ainda em setembro; o aparelho certo via
+ *    carimbo ≠ mês dele, arquivava o balde NO MÊS FUTURO (arquivo que depois
+ *    nunca mais seria sobrescrito — o outubro de verdade se perdia) e
+ *    regravava o carimbo pra trás. Carimbo à frente do relógio = no-op.
+ *
+ * 3. O retrato dos CUSTOS FIXOS do mês que acabou mora no hook
+ *    (use-virada-do-mes + lib/virada-do-mes `viradaDeFixos`), com carimbo
+ *    próprio — não aqui: este carimbo só existe pra quem tem conta do mês.
  */
 
 import { chaveArquivada } from "@/lib/virada-do-mes";
@@ -61,7 +87,8 @@ export interface DiaDeContas {
 }
 
 export interface ViradaDeContas {
-  /** Balde do mês novo: mesmos dias/nomes/valores, todo `paid` em false. */
+  /** Balde do mês novo: mesmos dias/nomes/valores, `paid` em false — menos o
+   *  da conta que nasceu no próprio mês novo (26/09, cabeçalho item 1). */
   zeradas: DiaDeContas[];
   /** Havia ✓ para limpar? Se não, o balde não precisa ser regravado. */
   zerou: boolean;
@@ -78,6 +105,30 @@ export const mesCorrenteId = (d: Date = new Date()) =>
 
 const ehCarimbo = (v: unknown): v is string =>
   typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+
+/* Janela de plausibilidade do carimbo de tempo no id (26/09): antes de 2020
+ * o app não existia; depois de amanhã é relógio errado. Fora dela = não sei. */
+const INICIO_PLAUSIVEL = new Date(2020, 0, 1).getTime();
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Mês LOCAL ("YYYY-MM") em que a conta nasceu, lido do id (26/09).
+ *
+ * Todo escritor de conta grava `Date.now()` no id: MonthCalendar e
+ * BillsDueCards direto, o finance-sync como `fx-<id do custo fixo>` (o fixo
+ * também nasce com `Date.now()`, e a conta não existe antes dele), a cópia
+ * do mês como `Date.now() + Math.random()`. Qualquer outra coisa — id de
+ * seed, id digitado, relógio absurdo — devolve null, e quem chama trata
+ * como "não sei de quando é".
+ */
+export const mesDeNascimento = (id: unknown, hoje: Date = new Date()): string | null => {
+  if (typeof id !== "string" && typeof id !== "number") return null;
+  const m = /^(?:fx-)?(\d{13})/.exec(String(id));
+  if (!m) return null;
+  const ms = Number(m[1]);
+  if (!Number.isFinite(ms) || ms < INICIO_PLAUSIVEL || ms > hoje.getTime() + UM_DIA_MS) return null;
+  return mesCorrenteId(new Date(ms));
+};
 
 /** Tem pelo menos uma conta cadastrada? (dia vazio não conta) */
 export const temContas = (dias: unknown): boolean =>
@@ -96,6 +147,10 @@ export const viradaDeContas = (
 ): ViradaDeContas | null => {
   const mesAgora = mesCorrenteId(hoje);
   if (carimboAtual === mesAgora) return null;
+  // (26/09) Carimbo À FRENTE do relógio deste aparelho: outro aparelho num
+  // fuso adiantado (ou com relógio errado) já virou. Virar daqui arquivaria o
+  // balde no mês FUTURO e regravaria o carimbo pra trás — no-op.
+  if (ehCarimbo(carimboAtual) && carimboAtual > mesAgora) return null;
 
   const dias = (Array.isArray(dueDays) ? dueDays : []).map((d) => ({
     ...d,
@@ -107,16 +162,30 @@ export const viradaDeContas = (
   // parecer já virado.
   if (!temContas(dias)) return null;
 
+  // (26/09) Conta que NASCEU neste mês não tem ✓ de mês passado pra expirar:
+  // o ✓ dela é deste mês e fica. Era o que apagava o primeiro "paguei" de
+  // toda pessoa nova (ver o cabeçalho, item 1).
+  const expira = (b: Conta | undefined) => !!b?.paid && mesDeNascimento(b?.id, hoje) !== mesAgora;
   const zeradas = dias.map((d) => ({
     ...d,
-    bills: d.bills.map((b) => (b?.paid ? { ...b, paid: false } : b)),
+    bills: d.bills.map((b) => (expira(b) ? { ...b, paid: false } : b)),
   }));
-  const zerou = dias.some((d) => d.bills.some((b) => b?.paid));
+  const zerou = dias.some((d) => d.bills.some(expira));
 
   let arquivo: ViradaDeContas["arquivo"] = null;
   if (ehCarimbo(carimboAtual)) {
     const [ano, mes] = carimboAtual.split("-").map(Number);
-    arquivo = { chave: chaveArquivada(ano, mes - 1, "dueDays"), contas: dias };
+    // (26/09) Conta nascida DEPOIS do mês arquivado não existia nele — não
+    // entra no retrato (acontece quando o carimbo ficou parado, ex.: balde
+    // vazio na virada anterior). Id ilegível entra, como sempre entrou.
+    const doMes = dias.map((d) => ({
+      ...d,
+      bills: d.bills.filter((b) => {
+        const nasceu = mesDeNascimento(b?.id, hoje);
+        return nasceu === null || nasceu <= carimboAtual;
+      }),
+    }));
+    if (temContas(doMes)) arquivo = { chave: chaveArquivada(ano, mes - 1, "dueDays"), contas: doMes };
   }
 
   return { zeradas, zerou, arquivo, carimbo: mesAgora };
@@ -125,18 +194,22 @@ export const viradaDeContas = (
 /**
  * Aplica a virada pelas portas de quem chamou.
  *
- * Existem DOIS chamadores de propósito, e os dois precisam ser idempotentes:
- *  - o hook do App (`use-virada-do-mes`), que atende quem nunca abre a aba de
- *    Finanças mas vê "contas a pagar" no hub e nas conquistas;
- *  - a própria tela de Finanças, porque lá o balde vive num estado do React
- *    (`usePersistedState`) que NÃO relê a chave depois de hidratar — escrita
- *    externa seria invisível e o próximo toque na tela ressuscitaria o array
- *    velho por cima.
+ * O desenho previa DOIS chamadores idempotentes — o hook do App
+ * (`use-virada-do-mes`) e a própria tela de Finanças. ATENÇÃO (26/09): o
+ * segundo nunca foi ligado. `git log -S viradaDeContas` mostra o Index sem
+ * chamada desde 08/08; o único chamador é o hook. Consequência medida no
+ * teste src/test/virada-mes-auditoria.test.tsx: quando Finanças é a PRIMEIRA
+ * tela da sessão do dia 1º (toque no aviso "limite de hoje" ou recarregar a
+ * aba), o `usePersistedState` dela hidrata ANTES do hook (efeito de filho
+ * roda antes do pai) e fica com o balde de setembro em memória; o primeiro
+ * toque na tela gravava os ✓ de setembro de volta — com o carimbo já em
+ * outubro, nada os zerava de novo. Desde 26/09 a tela REMONTA quando a
+ * virada grava (use-virada-do-mes, `useVersaoDaVirada`, usada como `key`
+ * no Index) e renasce lendo o store já virado.
  *
- * A ordem entre eles não é garantida (efeito de filho roda antes do pai), daí
- * as duas travas: o carimbo já gravado faz o segundo virar no-op, e o arquivo
- * existente nunca é sobrescrito — senão o segundo a rodar salvaria por cima
- * do retrato bom um retrato já zerado.
+ * As travas continuam valendo pra quem chamar: o carimbo já gravado faz a
+ * segunda chamada virar no-op, e o arquivo existente nunca é sobrescrito —
+ * senão um segundo chamador salvaria por cima do retrato bom um já zerado.
  */
 export const aplicarViradaDeContas = (
   virada: ViradaDeContas,

@@ -437,7 +437,7 @@ serve(async (req) => {
         return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
       };
       const { data: subs } = await admin.from("subscriptions")
-        .select("user_id, customer_email, current_period_start, amount_cents")
+        .select("user_id, customer_email, current_period_start, amount_cents, abacatepay_billing_id")
         .gte("current_period_start", desde).order("current_period_start", { ascending: true }).limit(500);
       const enviados: Array<Record<string, unknown>> = [];
       let cakto = 0, pulados = 0, erros = 0, receita = 0;
@@ -448,7 +448,11 @@ serve(async (req) => {
           .select("event_data, created_at, event_name").eq("user_id", sub.user_id)
           .order("created_at", { ascending: false }).limit(80);
         const rows = (evs ?? []) as Array<{ event_data: Record<string, string>; created_at: string; event_name: string }>;
-        const ordem = rows.find((r) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto");
+        // 26/09: com o Pix adiantado a pessoa pode ter pedidos da Cakto que nunca viu —
+        // o event_id tem que ser o pedido PAGO (o mesmo do pixel), não o mais recente.
+        const ehCakto = (r: { event_name: string; event_data: Record<string, unknown> }) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto";
+        const ordem = rows.find((r) => ehCakto(r) && String(r.event_data?.order_id ?? "") === String(sub.abacatepay_billing_id ?? ""))
+          ?? rows.find((r) => ehCakto(r) && r.event_data?.adiantado !== true) ?? rows.find(ehCakto);
         if (!ordem) { pulados++; continue; } // não é venda cakto (ou sem rastro) → pula
         cakto++;
         const eventId = String(ordem.event_data.order_id);

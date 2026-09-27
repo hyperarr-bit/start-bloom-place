@@ -1,5 +1,70 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, ChevronDown, TrendingDown, AlertTriangle, CalendarClock, X } from "lucide-react";
+import { Check, ChevronDown, TrendingDown, AlertTriangle, CalendarClock, X, Loader2, RotateCw, Clock3, WifiOff, ShieldAlert, DatabaseZap } from "lucide-react";
+import type { ErroAdmin } from "./rpc";
+
+/* ------------------------------------------------ erro e espera (27/09) */
+
+const ICONE_ERRO = { tempo: Clock3, rede: WifiOff, permissao: ShieldAlert, sem_funcao: DatabaseZap, dado: DatabaseZap, outro: AlertTriangle } as const;
+
+/**
+ * Erro de consulta com o que fazer, em vez de tela em branco ou do texto cru
+ * do banco ("canceling statement due to statement timeout"). O detalhe técnico
+ * fica miúdo embaixo, pra quem for investigar.
+ */
+export function ErroConsulta({
+  erro, onRetry, acao, compacto = false,
+}: {
+  erro: ErroAdmin;
+  onRetry?: () => void;
+  acao?: { rotulo: string; onClick: () => void };
+  compacto?: boolean;
+}) {
+  const Icone = ICONE_ERRO[erro.tipo] ?? AlertTriangle;
+  return (
+    <div role="alert" className={`rounded-xl border border-destructive/30 bg-destructive/5 ${compacto ? "p-3" : "p-4"} flex items-start gap-3`}>
+      <Icone className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold text-foreground">{erro.mensagem}</p>
+        {erro.detalhe && <p className="text-[11px] text-muted-foreground mt-0.5 break-words">{erro.detalhe}</p>}
+        {(onRetry || acao) && (
+          <div className="flex flex-wrap gap-2 mt-2.5">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 transition-opacity"
+              >
+                <RotateCw className="w-3.5 h-3.5" /> Tentar de novo
+              </button>
+            )}
+            {acao && (
+              <button
+                onClick={acao.onClick}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-semibold hover:bg-muted transition-colors"
+              >
+                {acao.rotulo}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Spinner que, passados alguns segundos, avisa que a consulta é pesada. */
+export function CarregandoLento({ aviso = "Consulta pesada — pode levar até 1 minuto.", depoisDe = 6000 }: { aviso?: string; depoisDe?: number }) {
+  const [lento, setLento] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setLento(true), depoisDe);
+    return () => clearTimeout(t);
+  }, [depoisDe]);
+  return (
+    <div className="grid place-items-center py-20 gap-2" aria-busy="true">
+      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      {lento && <p className="text-[12px] text-muted-foreground">{aviso}</p>}
+    </div>
+  );
+}
 
 /* ---------------------------------------------------------------- range */
 

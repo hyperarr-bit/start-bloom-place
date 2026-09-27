@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminWebRoi } from "./AdminWebRoi";
 import { Loader2, RefreshCw, ChevronDown, ChevronRight, Pencil, Megaphone, Leaf, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { rpcAdmin, type ErroAdmin } from "./rpc";
 import {
   RangePicker, rangeToDates, type RangeKey,
-  Panel, StatTile, EmptyState,
+  Panel, StatTile, EmptyState, ErroConsulta,
 } from "./components";
 
 /**
@@ -53,7 +54,7 @@ export default function AdminCampaigns() {
   const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [spendErr, setSpendErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErroAdmin | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
@@ -62,11 +63,11 @@ export default function AdminCampaigns() {
     setError(null);
     const { from, to } = rangeToDates(range);
     const [metricsRes, spendRes] = await Promise.all([
-      supabase.rpc("admin_campaign_metrics", { _from: from, _to: to }),
+      rpcAdmin<Metrics>("admin_campaign_metrics", { _from: from, _to: to }),
       supabase.functions.invoke("meta-insights", { body: { since: brDate(from), until: brDate(to) } }),
     ]);
-    if (metricsRes.error) setError(metricsRes.error.message);
-    else setData(metricsRes.data as unknown as Metrics);
+    if (metricsRes.error) setError(metricsRes.error);
+    else setData(metricsRes.data);
 
     const sd = spendRes.data as { spend?: SpendRow[]; campaigns?: MetaCampaign[]; error?: string; detail?: string } | null;
     if (spendRes.error || !sd || sd.error) {
@@ -115,7 +116,8 @@ export default function AdminCampaigns() {
     const current = data?.aliases?.[c.key] || "";
     const name = window.prompt(`Apelido pra campanha ${c.key}:`, current);
     if (name == null) return;
-    await supabase.rpc("admin_set_campaign_alias", { _id: c.key, _name: name.trim() });
+    const { error: erroApelido } = await rpcAdmin("admin_set_campaign_alias", { _id: c.key, _name: name.trim() });
+    if (erroApelido) window.alert(`Não salvou o apelido: ${erroApelido.mensagem}`);
     load(true);
   };
 
@@ -175,7 +177,7 @@ export default function AdminCampaigns() {
       {loading && !data ? (
         <div className="grid place-items-center py-24"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
       ) : error ? (
-        <Panel><EmptyState label={`Erro: ${error}`} /></Panel>
+        <ErroConsulta erro={error} onRetry={() => load()} />
       ) : !data ? null : (
         <>
           {/* 20/09: ROI real da web por campanha e anúncio — a tabela que o

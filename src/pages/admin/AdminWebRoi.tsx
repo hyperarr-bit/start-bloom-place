@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Panel, EmptyState } from "./components";
+import { Panel, EmptyState, ErroConsulta } from "./components";
+import { rpcAdmin, type ErroAdmin } from "./rpc";
 
 /**
  * ROI REAL DA WEB (20/09/2026) — pedido do dono: "focar na web, pois é algo
@@ -33,18 +34,17 @@ const soma = (a: Omit<Linha, "camp" | "ad" | "src">, b: Omit<Linha, "camp" | "ad
 export function AdminWebRoi({ from, to, tick }: { from: string; to: string; tick: number }) {
   const [linhas, setLinhas] = useState<Linha[] | null>(null);
   const [anuncios, setAnuncios] = useState<Anuncio[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+  const [erro, setErro] = useState<ErroAdmin | null>(null);
   const [aberta, setAberta] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErro(null);
     const [roi, meta] = await Promise.all([
-      // @ts-expect-error RPC nova (migração 20260920210000); os tipos gerados do Supabase ainda não a conhecem
-      supabase.rpc("admin_web_roi", { _from: from, _to: to }),
+      rpcAdmin<{ linhas?: Linha[] }>("admin_web_roi", { _from: from, _to: to }),
       supabase.functions.invoke("meta-insights", { body: { since: brDate(from), until: brDate(to), nivel: "ad" } }),
     ]);
-    if (roi.error) { setErro(roi.error.message); return; }
-    setLinhas(((roi.data as { linhas?: Linha[] } | null)?.linhas) ?? []);
+    if (roi.error) { setErro(roi.error); return; }
+    setLinhas(roi.data?.linhas ?? []);
     const m = meta.data as { anuncios?: Anuncio[]; error?: string } | null;
     setAnuncios(meta.error || !m || m.error ? null : (m.anuncios ?? []));
   }, [from, to]);
@@ -118,7 +118,7 @@ export function AdminWebRoi({ from, to, tick }: { from: string; to: string; tick
 
   return (
     <Panel title="ROI real da web" sub="Gasto e cliques: Meta por anúncio · sessões, funil e vendas: nossa atribuição (utm do clique) · ROAS = receita líquida do Pix ÷ gasto">
-      {erro ? <EmptyState label={`Erro: ${erro}`} /> : linhas == null ? (
+      {erro ? <ErroConsulta erro={erro} onRetry={() => void load()} compacto /> : linhas == null ? (
         <div className="grid place-items-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="overflow-x-auto -mx-1" data-testid="web-roi">

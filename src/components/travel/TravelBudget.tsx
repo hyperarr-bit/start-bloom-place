@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
 import { parseLocalDay } from "@/lib/utils";
@@ -47,6 +48,17 @@ const CHAVE_OBJETO_UNICO = "travel-budget-v2";
 const CHAVE_LISTA = "travel-trips-v2";
 
 const storeVazio = (): TravelTripsStore => ({ trips: [], ativoId: "", migrouDoObjetoUnico: false });
+
+/**
+ * Valor de custo da viagem digitado (26/09, varredura): "Real −300" entrava e
+ * DESCONTAVA do orçamento total. Vazio vale 0; negativo ou lixo não entra
+ * (`null`) — quem chama avisa e o campo volta pro valor que estava.
+ */
+export const valorDeCusto = (texto: string): number | null => {
+  if (String(texto ?? "").trim() === "") return 0;
+  const n = Number(texto);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
 
 // `temConteudo` e `aplicarMigracao` vivem em ./types (funções puras, com
 // teste próprio em viagens-migracao.test.ts).
@@ -379,16 +391,28 @@ export const TravelBudget = () => {
                       <Input
                         type="number"
                         inputMode="decimal"
+                        min={0}
+                        aria-label={`Valor estimado de ${item.description || "item"}`}
                         value={item.estimated || ""}
-                        onChange={e => updateItem(cat.key, item.id, { estimated: Number(e.target.value) })}
+                        onChange={e => {
+                          const v = valorDeCusto(e.target.value);
+                          if (v === null) { toast.error("O valor não pode ser negativo."); return; }
+                          updateItem(cat.key, item.id, { estimated: v });
+                        }}
                         placeholder="0"
                         className="h-9 rounded-md text-[11px] bg-background/50 border-0 px-2 text-right tabular-nums"
                       />
                       <Input
                         type="number"
                         inputMode="decimal"
+                        min={0}
+                        aria-label={`Valor real de ${item.description || "item"}`}
                         value={item.actual || ""}
-                        onChange={e => updateItem(cat.key, item.id, { actual: Number(e.target.value) })}
+                        onChange={e => {
+                          const v = valorDeCusto(e.target.value);
+                          if (v === null) { toast.error("O valor não pode ser negativo."); return; }
+                          updateItem(cat.key, item.id, { actual: v });
+                        }}
                         placeholder="0"
                         className="h-9 rounded-md text-[11px] bg-background/50 border-0 px-2 text-right tabular-nums"
                       />

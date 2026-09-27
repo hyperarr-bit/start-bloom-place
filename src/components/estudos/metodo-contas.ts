@@ -16,7 +16,7 @@
 import { localDayKey } from "@/lib/utils";
 import type { Compromisso } from "@/lib/compromissos";
 import { misturarCursos, type Aprendizado, type AprendizadoComCurso, type AprendizadosPorCurso } from "./aprendizados";
-import { responder, vencimento, type EstadoRevisao, type Resposta, type Revisoes } from "./revisao";
+import { responder, ultimaRevisao, vencimento, type EstadoRevisao, type Resposta, type Revisoes } from "./revisao";
 
 export const CHAVE_SESSOES = "estudos-sessoes";
 export const CHAVE_INTRO_FECHADA = "estudos-metodo-intro-fechada";
@@ -115,16 +115,30 @@ const inicioDaSemana = (agora = new Date()): string => {
   return localDayKey(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - dow));
 };
 
-/** "Esta semana: 3 sessões · 5 pomodoros · 12 cartões (9 lembrados)". */
-export const resumoDaSemana = (sessoes: SessaoEstudo[], agora = new Date()) => {
+/** "Esta semana: 3 sessões · 5 pomodoros · 12 cartões (9 lembrados)".
+ *  Com `revisoes` (26/09, varredura): cartões = os respondidos nesta semana
+ *  (segunda local em diante) em QUALQUER lugar — sessão, "Revisar agora",
+ *  Recall avulso, Caderno —, pela data da última resposta de cada um;
+ *  lembrados = os que ficaram no "Lembrei" (degrau ≥ 2, ver `responder`).
+ *  Antes só a sessão guiada contava e revisar 2 cartões deixava "0 cartões".
+ *  Sem `revisoes`, a conta antiga (só as sessões). */
+export const resumoDaSemana = (sessoes: SessaoEstudo[], agora = new Date(), revisoes?: Revisoes) => {
   const desde = inicioDaSemana(agora);
   const semana = comoSessoes(sessoes).filter((s) => s.data >= desde);
-  return {
+  const base = {
     sessoes: semana.length,
     pomodoros: semana.reduce((n, s) => n + (Number(s.pomodoros) || 0), 0),
     cartoes: semana.reduce((n, s) => n + (Number(s.recall?.feitos) || 0), 0),
     lembrados: semana.reduce((n, s) => n + (Number(s.recall?.acertos) || 0), 0),
   };
+  if (!revisoes) return base;
+  const hoje = localDayKey(agora);
+  const respondidos = Object.values(revisoes).filter((e) => {
+    if (!e || typeof e.proxima !== "string") return false;
+    const dia = ultimaRevisao(e);
+    return dia >= desde && dia <= hoje;
+  });
+  return { ...base, cartoes: respondidos.length, lembrados: respondidos.filter((e) => e.degrau >= 2).length };
 };
 
 /* ───────────────────────── MÉTODO SOCRÁTICO (22/09) ─────────────────────────

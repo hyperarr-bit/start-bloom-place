@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Destination, genId } from "./types";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,7 @@ export const BucketList = () => {
   const toggleVisited = (id: string) => setDestinations(prev => prev.map(d => d.id === id ? { ...d, visited: !d.visited } : d));
   const setRating = (id: string, rating: number) => setDestinations(prev => prev.map(d => d.id === id ? { ...d, rating } : d));
   const remove = (id: string) => {
-    setDestinations(prev => prev.filter(d => d.id !== id));
+    apagarComDesfazer(setDestinations, prev => prev.filter(d => d.id !== id), "Destino apagado");
     setEditandoId(prev => (prev === id ? null : prev));
   };
 

@@ -216,7 +216,37 @@ const voltaFunilTeste = (from: string, tour?: boolean) => {
 /** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
  *  27/07: a demo PROVA e devolve direto pro CADASTRO, como no dia 14. (Antes
  *  devolvia pra tela SEU PLANO, que saiu do funil do app.) */
+/** A faixa do "Criar conta" é fixa no rodapé (z-70) e cobria o que os módulos
+ *  também fixam lá embaixo: o Iniciar Sessão/Finalizar do Treino, o Salvar da
+ *  folha de edição da Grade (tocar em Salvar levava pro cadastro), o fim do
+ *  Pergunte ao CORE (varredura 26/09). Agora: some enquanto houver janela ou
+ *  folha aberta, e publica a própria altura na mesma variável que a faixa do
+ *  teste grátis usa, pra barra fixa do módulo subir junto. */
+const useDialogoAberto = () => {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    const confere = () => setAberto(!!document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]'));
+    confere();
+    const obs = new MutationObserver(confere);
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state"] });
+    return () => obs.disconnect();
+  }, []);
+  return aberto;
+};
+
 const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
+  const dialogoAberto = useDialogoAberto();
+  const faixaRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const raiz = document.documentElement.style;
+    const el = faixaRef.current;
+    if (!el || dialogoAberto) { raiz.removeProperty("--teste-banner-h"); return; }
+    const publica = () => raiz.setProperty("--teste-banner-h", `${el.offsetHeight}px`);
+    publica();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(publica) : null;
+    ro?.observe(el);
+    return () => { ro?.disconnect(); raiz.removeProperty("--teste-banner-h"); };
+  }, [dialogoAberto]);
   // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
   // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
   // quando eu fechei o vazamento do Pix. A trava manda pra ENTRADA_APP, que
@@ -244,8 +274,10 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
     : voltaMarcada()
       ?? (from && voltaFunilTeste(from, tour))
       ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
+  if (dialogoAberto) return null;
   return (
     <div
+      ref={faixaRef}
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >

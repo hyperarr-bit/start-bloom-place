@@ -2,10 +2,27 @@ import { useState, type ReactNode } from "react";
 import { Gauge, Pencil, Check, X, Target, Trash2, Tag, Building2, User } from "lucide-react";
 import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
 import { useFinanceCategories, type FinanceCategory } from "@/lib/finance-categories";
 import { doPerfil, nomeDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { type Parcela, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
+import { numeroBR } from "@/lib/data-normalizers";
+
+/** Dinheiro com 2 casas (26/09): "R$ 1.850,00 / R$ 1.900,00". */
+const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * PARCELA CONTA NO LIMITE (26/09, varredura). "Eletrônicos R$ 0 / R$ 300"
+ * com a parcela de R$ 150 do celular vencendo no mês: o teto media só fixos
+ * e variáveis. A parcela do mês entra como gasto da categoria dela, com o
+ * perfil dela (o filtro por perfil de cada bloco vale pra ela também).
+ */
+export const parcelasComoGastos = (parcelas: Parcela[]): { category: string; value: number; perfil?: string }[] =>
+  (Array.isArray(parcelas) ? parcelas : [])
+    .map((p) => ({ category: p?.category === "roupa" ? "vestuario" : p?.category || "outros", value: valorDaParcelaNoMes(p), perfil: p?.perfil }))
+    .filter((g) => g.value > 0);
 
 /**
  * LIMITES POR PERFIL (09/09) — cliente pagante: "a divisão de empresa e
@@ -40,6 +57,8 @@ interface CategoryBudgetsProps {
   /** Perfil ativo (PF/PJ). Sem a prop: pessoal, o comportamento de sempre. */
   perfil?: string;
   perfis?: Perfil[];
+  /** Parcelamentos do mês. Ausente = lidos do store (`finance-installments`). */
+  parcelas?: Parcela[];
 }
 
 type Tetos = Record<string, number>;
@@ -106,7 +125,8 @@ const BlocoDeLimites = ({ titulo, icone, expenses, budgets, setBudgets, categori
   };
 
   const saveEdit = (cat: string) => {
-    const val = parseFloat(editValue);
+    // numeroBR: "1.500,50" virava 1,5 no parseFloat (26/09)
+    const val = numeroBR(editValue);
     if (val > 0) {
       setBudgets({ ...budgets, [cat]: val });
     }
@@ -187,8 +207,8 @@ const BlocoDeLimites = ({ titulo, icone, expenses, budgets, setBudgets, categori
                     ) : (
                       <>
                         <span className="text-[11px] tabular-nums text-muted-foreground">
-                          R$ {spent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
-                          {limit > 0 && <span> / R$ {limit.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>}
+                          R$ {brl(spent)}
+                          {limit > 0 && <span> / R$ {brl(limit)}</span>}
                         </span>
                         {!somenteLeitura && (
                           <button onClick={() => startEdit(cat.value)} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={`Editar limite de ${cat.label}`}>
@@ -209,7 +229,7 @@ const BlocoDeLimites = ({ titulo, icone, expenses, budgets, setBudgets, categori
                 )}
                 {limit > 0 && pct >= 100 && (
                   <p className="text-[10px] text-red-400 font-medium">
-                    ⚠ Limite excedido em R$ {(spent - limit).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                    ⚠ Limite excedido em R$ {brl(spent - limit)}
                   </p>
                 )}
               </div>
@@ -239,7 +259,10 @@ const BlocoDeLimites = ({ titulo, icone, expenses, budgets, setBudgets, categori
   );
 };
 
-export const CategoryBudgets = ({ expenses, perfil = PERFIL_PESSOAL, perfis = [] }: CategoryBudgetsProps) => {
+export const CategoryBudgets = ({ expenses: gastos, perfil = PERFIL_PESSOAL, perfis = [], parcelas }: CategoryBudgetsProps) => {
+  // parcelas do mês somam no gasto da categoria (26/09) — ver parcelasComoGastos
+  const { get } = useUserData();
+  const expenses = [...gastos, ...parcelasComoGastos(parcelas ?? get<Parcela[]>("finance-installments", []))];
   // fonte única: categorias padrão + personalizadas (com renomear/excluir)
   const { allCats: categories, custom, renameCustom, removeCustom } = useFinanceCategories();
   const [budgetsPessoal, setBudgetsPessoal] = usePersistedState<Tetos>("finance-category-budgets", {});

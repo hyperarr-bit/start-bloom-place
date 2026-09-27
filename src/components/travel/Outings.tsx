@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Outing, OutingType, OUTING_TYPES, genId, formatCurrency, mesDaChave } from "./types";
@@ -165,7 +166,7 @@ export const Outings = () => {
   };
 
   const remover = (id: string) => {
-    setOutings(prev => prev.filter(o => o.id !== id));
+    apagarComDesfazer(setOutings, prev => prev.filter(o => o.id !== id), "Passeio apagado");
     if (editandoId === id) setEditandoId(null);
   };
 

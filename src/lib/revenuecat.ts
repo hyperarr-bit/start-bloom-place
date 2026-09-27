@@ -206,6 +206,43 @@ export async function conferirTrialCartao(): Promise<void> {
   } catch { /* rede de segurança: nunca pode quebrar o boot */ }
 }
 
+/**
+ * COBRANÇA RECUSADA (26/09). 11 testes do iPhone (turmas 21–23/09) deixaram
+ * a renovação ligada e o cartão foi recusado no fim do teste: a loja segue
+ * tentando por semanas, e basta a pessoa trocar o cartão pra entrar. Só que
+ * ninguém avisava — sem carência ligada ela só vê o acesso sumir.
+ *
+ * O RevenueCat marca `billingIssueDetectedAt` no entitlement (em `all`, que
+ * inclui os inativos; com carência ele continua em `active`) e mantém
+ * `willRenew`. Quem cancelou (`unsubscribeDetectedAt`/`willRenew` false) não
+ * entra: aí não é cartão, é decisão.
+ */
+export type ProblemaDeCobranca = { temProblema: boolean; comAcesso: boolean; url: string | null };
+const SEM_PROBLEMA: ProblemaDeCobranca = { temProblema: false, comAcesso: false, url: null };
+
+export function lerProblemaDeCobranca(info: unknown): ProblemaDeCobranca {
+  const i = info as {
+    managementURL?: string | null;
+    entitlements?: { all?: Record<string, { billingIssueDetectedAt?: string | null; willRenew?: boolean; unsubscribeDetectedAt?: string | null; isActive?: boolean }> };
+  } | null;
+  const todos = Object.values(i?.entitlements?.all ?? {});
+  const e = todos.find((x) => !!x?.billingIssueDetectedAt && x?.willRenew !== false && !x?.unsubscribeDetectedAt);
+  if (!e) return SEM_PROBLEMA;
+  return { temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null };
+}
+
+export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
+  if (!isNativeShell()) return SEM_PROBLEMA;
+  if (!configurado) { try { await initRevenueCat(); } catch { return SEM_PROBLEMA; } }
+  if (!Purchases || !configurado) return SEM_PROBLEMA;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    return lerProblemaDeCobranca(customerInfo);
+  } catch {
+    return SEM_PROBLEMA; // rede de segurança: aviso nunca quebra o app
+  }
+}
+
 /** Trial que NÃO vai renovar (cancelou, acesso ainda vivo): periodType TRIAL
  *  + willRenew false. É o gatilho da save-offer de downgrade (22/08, caso
  *  raquel: cancelou o anual 4h antes do débito — churn de preço, não de

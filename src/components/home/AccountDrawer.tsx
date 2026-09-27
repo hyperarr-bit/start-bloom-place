@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,6 +11,7 @@ import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { NameEditDialog } from "./NameEditDialog";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+import { ApagarDadosDialog } from "@/components/account/ApagarDadosDialog";
 import { toast } from "sonner";
 
 interface AccountDrawerProps {
@@ -33,6 +34,7 @@ export const AccountDrawer = ({
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showApagarDados, setShowApagarDados] = useState(false);
   const [view, setView] = useState<"menu" | "account" | "computador">("menu");
 
   useEffect(() => {
@@ -53,9 +55,9 @@ export const AccountDrawer = ({
   }, [open]);
 
   // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame
-  const go = (path: string) => {
+  const go = (path: string, state?: Record<string, unknown>) => {
     onOpenChange(false);
-    startTransition(() => navigate(path));
+    startTransition(() => navigate(path, state ? { state } : undefined));
   };
 
   const initials = displayName
@@ -126,7 +128,8 @@ export const AccountDrawer = ({
         // 27/07: a retrospectiva existia escondida dentro de Finanças — quem
         // não abria aquele módulo nunca soube. Agora tem porta no menu.
         { icon: Sparkles, label: "Retrospectiva", onClick: () => go("/retrospectiva") },
-        { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
+        // origem "menu" (26/09): o evento conquistas_open separa quem chega pelo menu de quem vem da Home
+        { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas", { origem: "menu" }) },
         // Notificações são LOCAIS do app da loja — na web/PWA não existe como
         // entregar (30/07, dono: some da web pra não virar ticket de suporte).
         ...(isNativeShell() ? [{ icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") }] : []),
@@ -295,7 +298,15 @@ export const AccountDrawer = ({
                 {/* Exigência do Google Play (24/07): app com login precisa de
                     caminho de exclusão DENTRO do app. Fica no fim, discreto e
                     com confirmação por digitação — é irreversível. */}
-                <div className="pt-2 mt-1 border-t border-border">
+                <div className="pt-2 mt-1 border-t border-border space-y-1">
+                  {/* Começar do zero (26/09): apaga os registros, mantém conta e acesso. */}
+                  <button
+                    onClick={() => { trackEvent("dados_apagar_open", {}); setShowApagarDados(true); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <Eraser className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    Apagar meus dados e começar do zero
+                  </button>
                   <button
                     onClick={() => { trackEvent("account_delete_open", {}); setShowDeleteDialog(true); }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -318,6 +329,7 @@ export const AccountDrawer = ({
       />
 
       <DeleteAccountDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
+      <ApagarDadosDialog open={showApagarDados} onOpenChange={setShowApagarDados} />
     </>
   );
 };

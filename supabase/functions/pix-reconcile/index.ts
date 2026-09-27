@@ -206,11 +206,27 @@ serve(async (req) => {
       // sinais de match pro CAPI — o cakto-pix grava tudo isso no create (10/08)
       fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null;
     };
+    /* 26/09: Pix ADIANTADO que nunca foi pra tela não tem como ter sido pago
+     * (ninguém viu o código) — fica fora da varredura. Os exibidos têm
+     * pix_generated com o mesmo order_id. Sem isto, o adiantamento (~3× mais
+     * pedidos na Cakto) multiplicaria as consultas a cada 15 min. */
+    const adiantados = (qrs ?? []).filter((q) => q.event_data?.adiantado === true)
+      .map((q) => String(q.event_data?.order_id ?? "")).filter(Boolean);
+    const exibidos = new Set<string>();
+    for (let i = 0; i < adiantados.length; i += 100) {
+      const { data: gs } = await admin.from("analytics_events").select("event_data")
+        .eq("event_name", "pix_generated").gte("created_at", desde)
+        .in("event_data->>order_id", adiantados.slice(i, i + 100));
+      for (const g of gs ?? []) exibidos.add(String(g.event_data?.order_id ?? ""));
+    }
+    let adiantadosFora = 0;
+
     const porUser = new Map<string, Ordem[]>();
     for (const q of qrs ?? []) {
       const uid = q.user_id as string | null;
       const oid = String(q.event_data?.order_id ?? "");
       if (!uid || !oid) continue;
+      if (q.event_data?.adiantado === true && !exibidos.has(oid)) { adiantadosFora++; continue; }
       // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
       // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.
       const ofertaCrua = String(q.event_data?.offer ?? "");
@@ -358,8 +374,8 @@ serve(async (req) => {
       }
     }
 
-    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, creditados: creditados.length, falhas: falhas.length });
-    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, creditados, falhas });
+    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, creditados: creditados.length, falhas: falhas.length });
+    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, creditados, falhas });
   } catch (e) {
     logStep("ERRO", { e: String(e).slice(0, 200) });
     return jsonResponse({ error: String(e).slice(0, 200) }, 500);

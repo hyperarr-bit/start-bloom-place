@@ -74,8 +74,9 @@ export const TripCountdown = () => {
     </div>
   );
 
-  const upcoming = countdowns.filter(c => daysUntil(c.departureDate) > 0).sort((a, b) => daysUntil(a.departureDate) - daysUntil(b.departureDate));
-  const past = countdowns.filter(c => daysUntil(c.departureDate) <= 0);
+  // viagem de HOJE ainda é das próximas (26/09: caía em "passadas" no próprio dia)
+  const upcoming = countdowns.filter(c => daysUntil(c.departureDate) >= 0).sort((a, b) => daysUntil(a.departureDate) - daysUntil(b.departureDate));
+  const past = countdowns.filter(c => daysUntil(c.departureDate) < 0);
 
   return (
     <div className="space-y-3">
@@ -108,11 +109,11 @@ export const TripCountdown = () => {
             {editando ? formEdicao : (
               <div className="bg-teal-50 dark:bg-teal-950/20 p-4 flex items-center justify-between">
                 <p className="text-xs font-medium">
-                  {days === 1 ? "Amanhã! ✈️" : `${days} dias restantes`}
+                  {days === 0 ? "É hoje! ✈️" : days === 1 ? "Amanhã! ✈️" : `${days} dias restantes`}
                 </p>
                 <div className="text-right">
-                  <p className="text-3xl font-black">{days}</p>
-                  <p className="text-[9px] text-muted-foreground">dias</p>
+                  <p className="text-3xl font-black">{days === 0 ? "Hoje" : days}</p>
+                  {days > 0 && <p className="text-[9px] text-muted-foreground">{days === 1 ? "dia" : "dias"}</p>}
                 </div>
               </div>
             )}

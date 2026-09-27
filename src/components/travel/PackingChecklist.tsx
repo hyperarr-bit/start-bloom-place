@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apagarComDesfazer } from "@/lib/desfazer";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { PackingList, PackingItem, PackingTemplate, PACKING_TEMPLATES, genId } from "./types";
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,12 @@ export const PackingChecklist = () => {
   };
 
   const removeItem = (listId: string, itemId: string) => {
-    setLists(prev => prev.map(l => l.id === listId ? { ...l, items: l.items.filter(i => i.id !== itemId) } : l));
+    apagarComDesfazer(setLists, prev => prev.map(l => l.id === listId ? { ...l, items: l.items.filter(i => i.id !== itemId) } : l), "Item apagado");
     setEditandoItem(prev => (prev === itemId ? null : prev));
   };
 
   const deleteList = (id: string) => {
-    setLists(prev => prev.filter(l => l.id !== id));
+    apagarComDesfazer(setLists, prev => prev.filter(l => l.id !== id), "Lista apagada");
     if (activeList === id) setActiveList(null);
   };
 
@@ -119,7 +120,7 @@ export const PackingChecklist = () => {
           return (
             <button
               key={l.id}
-              onClick={() => setActiveList(l.id)}
+              onClick={() => { setActiveList(l.id); setEditandoLista(false); }} // 26/09: renomear a A e tocar na B renomeava as duas
               className={`shrink-0 rounded-xl px-4 py-3 border transition-all text-left min-w-[140px] ${
                 activeList === l.id
                   ? "border-foreground bg-foreground text-background shadow-md"

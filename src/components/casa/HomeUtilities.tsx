@@ -4,6 +4,17 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ServiceContact, DeclutterItem, UtilityRecord, GuestAllergy } from "./types";
+import { ROTULO_CONSUMO, brl, linkWhatsApp, mesCurtoBR } from "./formatos";
+import { numeroBR } from "@/lib/data-normalizers";
+
+/* WhatsApp por BOTÃO, com a URL montada no clique (26/09, varredura): na web a
+ * UTMify (script do index.html) reescreve todo <a href="https://wa.me/…"> e
+ * enfia "?text=Olá" com caracteres invisíveis de rastreio — a mensagem pro
+ * encanador saía com lixo. Sem âncora wa.me no DOM, não há o que reescrever. */
+const abrirWhatsApp = (telefone: string) => {
+  const url = linkWhatsApp(telefone);
+  if (url) window.open(url, "_blank");
+};
 
 const HomeUtilities = () => {
   const [contacts, setContacts] = usePersistedState<ServiceContact[]>("casa-contacts", []);
@@ -48,9 +59,9 @@ const HomeUtilities = () => {
                 <p className="text-xs font-bold">{c.name}</p>
                 <p className="text-[10px] text-muted-foreground">{c.phone}</p>
               </div>
-              <a href={`https://wa.me/55${c.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" size="sm" className="h-6 text-[10px]">WhatsApp</Button>
-              </a>
+              {linkWhatsApp(c.phone) && (
+                <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => abrirWhatsApp(c.phone)} aria-label={`Abrir WhatsApp de ${c.name}`}>WhatsApp</Button>
+              )}
               <button onClick={() => setContacts(prev => prev.filter(x => x.id !== c.id))} className="opacity-0 group-hover:opacity-100">
                 <X className="w-3 h-3 text-muted-foreground" />
               </button>
@@ -148,12 +159,12 @@ const HomeUtilities = () => {
             const records = utilities.filter(u => u.type === type).sort((a, b) => b.month.localeCompare(a.month));
             const last = records[0];
             const prev = records[1];
-            const trend = last && prev ? ((last.cost - prev.cost) / prev.cost * 100) : 0;
+            const trend = last && prev && prev.cost > 0 ? ((last.cost - prev.cost) / prev.cost * 100) : 0;
             return (
               <div key={type} className="bg-background/50 rounded-lg p-2 border border-border">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm">{emoji}</span>
-                  <h5 className="text-[10px] font-bold capitalize">{type}</h5>
+                  <h5 className="text-[10px] font-bold">{ROTULO_CONSUMO[type]}</h5>
                   {last && (
                     <span className={`ml-auto text-[10px] font-bold ${trend > 0 ? "text-red-500" : trend < 0 ? "text-green-500" : "text-muted-foreground"}`}>
                       {trend > 0 ? "↑" : trend < 0 ? "↓" : "="} {Math.abs(trend).toFixed(0)}%
@@ -162,9 +173,10 @@ const HomeUtilities = () => {
                 </div>
                 {records.slice(0, 3).map(r => (
                   <div key={r.id} className="flex items-center gap-2 text-xs py-0.5 group">
-                    <span className="text-muted-foreground w-16">{r.month}</span>
-                    <span className="font-bold">R$ {r.cost.toFixed(2)}</span>
-                    <span className="text-muted-foreground">{r.consumption} {r.unit}</span>
+                    {/* "set/2026", "R$ 150,50", "12,5 m³" — antes a chave crua e o ponto americano (26/09, varredura) */}
+                    <span className="text-muted-foreground w-16">{mesCurtoBR(r.month)}</span>
+                    <span className="font-bold">{brl(r.cost)}</span>
+                    <span className="text-muted-foreground">{(Number(r.consumption) || 0).toLocaleString("pt-BR")} {r.unit}</span>
                     <button onClick={() => setUtilities(prev => prev.filter(x => x.id !== r.id))} className="ml-auto opacity-0 group-hover:opacity-100">
                       <X className="w-2.5 h-2.5 text-muted-foreground" />
                     </button>
@@ -188,7 +200,7 @@ const HomeUtilities = () => {
           <Button size="sm" className="h-7 w-full text-xs mt-1" onClick={() => {
             if (uMonth && uCost) {
               const unit = { luz: "kWh", agua: "m³", gas: "m³", internet: "Mbps" }[uType];
-              setUtilities(prev => [...prev, { id: Date.now().toString(), month: uMonth, type: uType, cost: parseFloat(uCost) || 0, consumption: parseFloat(uConsumption) || 0, unit }]);
+              setUtilities(prev => [...prev, { id: Date.now().toString(), month: uMonth, type: uType, cost: numeroBR(uCost) || 0, consumption: numeroBR(uConsumption) || 0, unit }]);
               setUCost(""); setUConsumption("");
             }
           }}>Registrar</Button>

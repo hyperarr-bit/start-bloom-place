@@ -4,6 +4,7 @@ import { Plus, X, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { avisarApagado } from "@/lib/desfazer";
 
 interface RoomTask {
   id: string;
@@ -55,6 +56,8 @@ const RoomManager = () => {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(ROOM_COLORS[0].value);
   const [newTaskInputs, setNewTaskInputs] = useState<Record<string, string>>({});
+  // cômodo com tarefas: "apagar?" em dois toques, como o EntradaAprendizado (26/09, varredura)
+  const [confirmandoApagar, setConfirmandoApagar] = useState<string | null>(null);
 
   const addRoom = () => {
     if (!newName.trim()) return;
@@ -68,8 +71,21 @@ const RoomManager = () => {
     setShowAdd(false);
   };
 
+  // Apagar levava o cômodo e as tarefas sem volta: agora dá pra desfazer.
   const removeRoom = (id: string) => {
+    const pos = rooms.findIndex(r => r.id === id);
+    const room = rooms[pos];
+    if (!room) return;
+    setConfirmandoApagar(null);
     setRooms(prev => prev.filter(r => r.id !== id));
+    const nome = room.name.charAt(0) + room.name.slice(1).toLowerCase();
+    const tarefas = room.tasks.length ? ` e ${room.tasks.length} ${room.tasks.length === 1 ? "tarefa" : "tarefas"}` : "";
+    avisarApagado(`Cômodo "${nome}"${tarefas} apagado${tarefas ? "s" : ""}`, () => setRooms(prev => {
+      if (prev.some(r => r.id === room.id)) return prev;
+      const n = [...prev];
+      n.splice(Math.min(pos, n.length), 0, room);
+      return n;
+    }));
   };
 
   const addTask = (roomId: string) => {
@@ -101,7 +117,8 @@ const RoomManager = () => {
       {/* Summary */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-black uppercase tracking-wide">COMPRAS E AFAZERES</h3>
+          {/* era "COMPRAS E AFAZERES" — as compras moram no Mercado (26/09, varredura) */}
+          <h3 className="text-sm font-black uppercase tracking-wide">Afazeres por cômodo</h3>
           <p className="text-xs text-muted-foreground">
             {totalCount > 0 ? `${doneCount}/${totalCount} concluídos` : "Adicione tarefas aos cômodos"}
           </p>
@@ -147,13 +164,25 @@ const RoomManager = () => {
             {/* Colored Header */}
             <div className={`${room.color} px-5 py-4 flex items-center justify-between`}>
               <h4 className="text-base font-black uppercase tracking-wide text-foreground">{room.name}</h4>
-              <button
-                onClick={() => removeRoom(room.id)}
-                className="opacity-60 hover:opacity-100 transition-opacity"
-                title="Remover cômodo"
-              >
-                <Trash2 className="w-4 h-4 text-foreground" />
-              </button>
+              {confirmandoApagar === room.id ? (
+                <button
+                  type="button"
+                  onClick={() => removeRoom(room.id)}
+                  aria-label={`Confirmar: apagar ${room.name} e as tarefas`}
+                  className="h-8 px-2 rounded-md text-[10px] font-bold text-destructive border border-destructive/40 bg-background/80"
+                >
+                  apagar?
+                </button>
+              ) : (
+                <button
+                  onClick={() => (room.tasks.length > 0 ? setConfirmandoApagar(room.id) : removeRoom(room.id))}
+                  className="opacity-60 hover:opacity-100 transition-opacity"
+                  title="Remover cômodo"
+                  aria-label={`Remover ${room.name}`}
+                >
+                  <Trash2 className="w-4 h-4 text-foreground" />
+                </button>
+              )}
             </div>
 
             {/* Tasks */}

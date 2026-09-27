@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { parseLocalDay } from "@/lib/utils";
 import { localDayKey, dataSegura } from "@/lib/utils";
 import { Plus, Trash2, Syringe, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
-import { differenceInDays } from "date-fns";
 
 interface HealthRecord {
   id: string;
@@ -16,6 +16,14 @@ interface HealthRecord {
 }
 
 const typeLabels: Record<string, string> = { vaccine: "Vacina", deworming: "Vermífugo", visit: "Consulta" };
+
+
+/** Dias de calendário até a data (26/09: `new Date("AAAA-MM-DD")` é UTC — no
+ *  Brasil a vacina de amanhã saía "Hoje!" e a de 5 dias "em 4 dias"). */
+const diasAte = (dia: string) => {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return Math.round((parseLocalDay(dia).getTime() - hoje.getTime()) / 86_400_000);
+};
 
 export const PetHealth = () => {
   const { get, set } = useUserData();
@@ -63,7 +71,7 @@ export const PetHealth = () => {
 
   const alerts = records.filter(r => {
     if (!r.nextDate) return false;
-    const days = differenceInDays(new Date(r.nextDate), new Date());
+    const days = diasAte(r.nextDate);
     return days <= 14 && days >= 0;
   });
 
@@ -71,15 +79,15 @@ export const PetHealth = () => {
     <div className="mt-3 space-y-3">
       {alerts.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
-          <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-1">
+          <p className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5 mb-1">
             <AlertTriangle className="w-3.5 h-3.5" /> Próximos vencimentos
           </p>
           {alerts.map(a => {
             const pet = pets.find((p: any) => p.id === a.petId);
-            const days = differenceInDays(new Date(a.nextDate), new Date());
+            const days = diasAte(a.nextDate);
             return (
-              <p key={a.id} className="text-[10px] text-amber-300">
-                {pet?.name || "Pet"} — {a.name}: {days === 0 ? "Hoje!" : `em ${days} dias`}
+              <p key={a.id} className="text-[10px] text-amber-800 dark:text-amber-200">
+                {pet?.name || "Pet"} — {a.name}: {days === 0 ? "Hoje!" : days === 1 ? "amanhã" : `em ${days} dias`}
               </p>
             );
           })}

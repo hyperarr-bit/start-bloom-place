@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { markActivation, trackEvent } from "@/lib/analytics";
+import { localDayKey } from "@/lib/utils";
+import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, temConteudo } from "@/lib/sequencia";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
@@ -201,6 +203,9 @@ interface UserDataContextType {
   isGuest: boolean;
   /** Lazy fetch a single heavy key from Supabase on demand. */
   fetchKey: <T>(key: string) => Promise<T | null>;
+  /** Apaga TODOS os registros da pessoa (servidor + cache do aparelho) e mantém
+   *  conta e acesso. Opcional no tipo pra não obrigar os mocks de teste. */
+  apagarTudo?: () => Promise<{ ok: boolean; erro?: string }>;
 }
 
 export const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
@@ -219,6 +224,14 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const userRef = useRef(user);
   const lastUserIdRef = useRef<string | null>(null);
   const inFlightFetches = useRef<Map<string, Promise<any>>>(new Map());
+  // Sequência (26/09): espelhos síncronos pro `set` (que é estável e não
+  // enxerga o store) e o dia já registrado nesta sessão.
+  const storeRef = useRef(store);
+  storeRef.current = store;
+  const loadedRef = useRef(loaded);
+  loadedRef.current = loaded;
+  const diaAnotadoRef = useRef<string | null>(null);
+  const setRef = useRef<(key: string, value: any, opts?: { system?: boolean }) => void>(() => {});
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -232,6 +245,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
         flushTimer.current = null;
       }
       pendingWrites.current = {};
+      diaAnotadoRef.current = null; // sequência (26/09): o dia registrado era da outra conta
       inFlightFetches.current.clear();
       setStore({});
       setLoaded(false);
@@ -466,6 +480,32 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     try { return JSON.parse(raw) as T; } catch { return fallback; }
   }, [store, loaded]);
 
+  /*
+   * SEQUÊNCIA NOVA (26/09): o dia conta quando a pessoa ANOTA algo em qualquer
+   * módulo — não mais quando o app abre. A 1ª escrita de DADO do dia (chave
+   * que não é de interface, com conteúdo, que mudou de verdade) acrescenta
+   * hoje em `core-dias-anotados`: uma escrita por dia no máximo, conferida em
+   * memória, e como {system:true} pra não voltar aqui. Escrita antes do
+   * servidor responder não registra: gravar a lista sem a do servidor apagaria
+   * o histórico (o próximo registro do dia registra).
+   */
+  const registrarDiaAnotado = useCallback((key: string, value: any) => {
+    const hoje = localDayKey();
+    if (diaAnotadoRef.current === hoje || !loadedRef.current) return;
+    if (!contaComoAnotacao(key) || !temConteudo(value)) return;
+    try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
+    diaAnotadoRef.current = hoje;
+    const nova = registrarDia(storeRef.current[CHAVE_DIAS_ANOTADOS], hoje, storeRef.current[CHAVE_HUB_STREAK]);
+    if (!nova) return; // hoje já estava na lista (outra sessão/aparelho)
+    setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
+    const { dias } = calcularSequencia(nova, hoje);
+    import("@/components/conquistas/aviso-sequencia").then((m) => m.avisarSequencia(dias)).catch(() => {});
+  }, []);
+  // Lista apagada ("começar do zero"): o próximo registro de hoje entra de novo.
+  useEffect(() => {
+    if (!(CHAVE_DIAS_ANOTADOS in store)) diaAnotadoRef.current = null;
+  }, [store]);
+
   const set = useCallback((key: string, value: any, opts?: { system?: boolean }) => {
     if (process.env.NODE_ENV !== "production") {
       try {
@@ -495,8 +535,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     // Escrita de SISTEMA (virada do mês etc.) não é gesto do usuário:
     // não dispara ativação — senão a trilha do teste e o spotlight
     // celebram degrau no BOOT, sem ninguém ter feito nada (review 16/08).
-    if (!opts?.system) checkActivation(key, value);
-  }, [flush]);
+    if (!opts?.system) {
+      checkActivation(key, value);
+      registrarDiaAnotado(key, value);
+    }
+  }, [flush, registrarDiaAnotado]);
+  setRef.current = set;
 
   // Force flush on tab hide / unload.
   useEffect(() => {
@@ -521,8 +565,29 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [flush]);
 
+  /*
+   * COMEÇAR DO ZERO (26/09, chamado do iPhone: "quero excluir tudo o que já
+   * botei e iniciar o app novamente"). Apaga as linhas de user_data da pessoa
+   * (RLS deixa cada um apagar as próprias) e o cache do aparelho; conta,
+   * e-mail e acesso pago moram em outras tabelas e ficam. A ordem importa:
+   * primeiro descarta as gravações pendentes (senão o flush recriaria linhas
+   * logo depois do delete), só então apaga no servidor, e o cache local só
+   * sai quando o servidor confirmou — falha de rede não deixa meio apagado.
+   */
+  const apagarTudo = useCallback(async (): Promise<{ ok: boolean; erro?: string }> => {
+    const userId = userRef.current?.id;
+    if (!userId) return { ok: false, erro: "Entre na sua conta pra apagar os dados." };
+    if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
+    pendingWrites.current = {};
+    const { error } = await (supabase as any).from("user_data").delete().eq("user_id", userId);
+    if (error) return { ok: false, erro: "Não deu pra apagar agora. Confere a internet e tenta de novo." };
+    purgeUserLocalCache();
+    setStore({});
+    return { ok: true };
+  }, []);
+
   return (
-    <UserDataContext.Provider value={{ get, set, loaded, fetchKey, isGuest: !user }}>
+    <UserDataContext.Provider value={{ get, set, loaded, fetchKey, isGuest: !user, apagarTudo }}>
       {children}
     </UserDataContext.Provider>
   );

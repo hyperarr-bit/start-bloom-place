@@ -32,6 +32,9 @@
  * `finance-dueDays` não têm data por item — são recorrentes, valem "todo mês"
  * por natureza. Chutar de que mês eles eram seria inventar dado. Eles seguem
  * no balde corrente e continuam sendo copiados adiante pelo cartão de virada.
+ * (26/09: os dois ganharam CARIMBO de mês e, com ele, retrato no mês que
+ * acabou — as contas em lib/virada-contas, os fixos em `viradaDeFixos`,
+ * mais abaixo.)
  */
 
 import { getMonthKey } from "@/components/finance/storage-keys";
@@ -111,6 +114,75 @@ export const separarPorMes = (
   }
 
   return { ficam, arquivar, movidos };
+};
+
+/* ═══ OS CUSTOS FIXOS DO MÊS QUE ACABOU (26/09, auditoria da virada) ═══
+ *
+ * O parágrafo lá de cima ("o que NÃO entra aqui") valia pra separar por
+ * DATA: fixo não tem data por item. Só que todo leitor de mês passado —
+ * retrospectiva do dia 1º, Comparação Mensal e Anual, gráficos do
+ * Dashboard, resumo da virada — procura `finance-{ano}-{mes}-fixed`, e
+ * ninguém escrevia essa chave (só a planilha do mês, se a pessoa editasse
+ * lá). No dia 1º o aluguel de setembro sumia de SETEMBRO: "saiu" menor,
+ * "% guardado" maior, "Poupador" onde não houve poupança.
+ *
+ * O que dá pra afirmar sem inventar: na primeira abertura do mês novo, a
+ * lista de `finance-fixed-expenses` é a que valia no mês da ÚLTIMA virada
+ * que a viu (ninguém mexe nela entre uma abertura e outra). Esse mês vai
+ * num carimbo NOVO (`finance-fixed-expenses-mes`, aditivo como o das
+ * contas). Duas travas contra dado inventado:
+ *   - mês SEM movimento (nenhuma receita/gasto datado nele) não ganha
+ *     retrato: um mês em que a pessoa não usou Finanças viraria "saiu
+ *     R$ 2.000, entrou R$ 0" na retrospectiva;
+ *   - quem chama nunca grava por cima de chave que já existe (planilha
+ *     editada), nem cria arquivo com lista vazia.
+ * Transição: sem carimbo (todo mundo em 01/10/2026, a chave é nova), o mês
+ * do retrato é o anterior do calendário — valendo a mesma trava de
+ * movimento.
+ */
+export const CHAVE_FIXOS = "finance-fixed-expenses";
+/** Chave NOVA (26/09): de que mês é a lista que está em `finance-fixed-expenses`. */
+export const CHAVE_CARIMBO_FIXOS = "finance-fixed-expenses-mes";
+
+/** "YYYY-MM" LOCAL (mesma regra do mesCorrenteId de lib/virada-contas —
+ *  repetida aqui porque virada-contas importa este arquivo). */
+const mesLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const ehMes = (v: unknown): v is string => typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+const mesAntesDe = (mes: string) => {
+  const [a, m] = mes.split("-").map(Number);
+  return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, "0")}`;
+};
+
+export interface ViradaDeFixos {
+  /** Retrato a guardar no mês que acabou — null se o mês não é sabido ou não teve movimento. */
+  arquivo: { chave: string; fixos: unknown[] } | null;
+  /** Carimbo novo (o mês de agora). */
+  carimbo: string;
+}
+
+/**
+ * Decide o retrato dos fixos. `null` = nada a fazer (o caminho de toda
+ * abertura normal). `teveMovimento(ano, mesIdx0)` diz se o mês teve receita
+ * ou gasto — quem chama sabe ler as chaves (e o que acabou de arquivar).
+ */
+export const viradaDeFixos = (
+  fixos: unknown,
+  carimboAtual: unknown,
+  hoje: Date,
+  teveMovimento: (ano: number, mes: number) => boolean,
+): ViradaDeFixos | null => {
+  const agora = mesLocal(hoje);
+  if (carimboAtual === agora) return null;
+  // carimbo à frente do relógio (outro aparelho num fuso adiantado): não anda pra trás
+  if (ehMes(carimboAtual) && carimboAtual > agora) return null;
+  const lista = Array.isArray(fixos) ? fixos : [];
+  // Sem fixo não há retrato; o carimbo só avança se já existia (convidado
+  // vazio não ganha chave nenhuma — ela migraria pra conta no cadastro).
+  if (lista.length === 0) return ehMes(carimboAtual) ? { arquivo: null, carimbo: agora } : null;
+  const alvo = ehMes(carimboAtual) ? carimboAtual : mesAntesDe(agora);
+  const [ano, mes] = alvo.split("-").map(Number);
+  const arquivo = teveMovimento(ano, mes - 1) ? { chave: chaveArquivada(ano, mes - 1, "fixed"), fixos: lista } : null;
+  return { arquivo, carimbo: agora };
 };
 
 /**

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
-import { semanaAtualId, mesAtualExtenso } from "@/lib/utils";
+import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
@@ -106,6 +107,45 @@ const getDateKey = (d?: Date) => {
 };
 
 const getMonthDays = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+
+/* ============= SEQUÊNCIA E MARCA DO DIA (26/09, varredura) =============
+ * Dois defeitos no card CONSISTÊNCIA:
+ *  1. a conta começava em HOJE: de manhã, com 41 dias até ontem e nada
+ *     marcado ainda, o card dizia "0 dias seguidos" enquanto o lembrete (que
+ *     usa sequenciaAtual) dizia 41. Agora é a MESMA função do lembrete.
+ *  2. o dia só era marcado, nunca desmarcado: desmarcar o único hábito do dia
+ *     deixava o quadradinho verde e a sequência em 42. A marca agora segue a
+ *     grade no toque (nunca no mount — ver a regra do carimbo de semana). */
+// nivelDoHeatmap/marcaDoDia moram em lib/rotina-habitos (o widget da Home
+// marca hábito com a mesma regra — 26/09).
+
+/** Sequência mostrada no card: agregada, ou de um hábito só (foco). */
+export const sequenciaDoCard = (log: LogDoHeatmap, habitLog: Record<string, string[]> = {}, foco: string | null = null): number =>
+  sequenciaAtual(new Set(foco
+    ? Object.keys(habitLog ?? {}).filter((k) => Array.isArray(habitLog[k]) && habitLog[k].includes(foco))
+    : Object.keys(log ?? {}).filter((k) => nivelDoHeatmap(log[k]) > 0)));
+
+export { marcaDoDia };
+
+/* REVISÃO DA SEMANA (26/09, varredura): a semana começava no DOMINGO e os
+ * hábitos (semanaAtualId) na segunda — a revisão escrita no sábado sumia no
+ * domingo ("Esta semana" virava 27/09–03/10 em branco). A chave agora é a
+ * segunda-feira (semanaAtualId). Revisão já gravada na chave antiga (o
+ * domingo ANTERIOR à segunda) continua aparecendo: é lida como reserva, e a
+ * próxima edição grava na chave nova. */
+export const semanaDaRevisao = (offset: number) => {
+  const inicio = parseLocalDay(semanaAtualId());
+  inicio.setDate(inicio.getDate() + offset * 7);
+  const fim = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + 6);
+  const chaveAntiga = localDayKey(new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() - 1));
+  return { chave: localDayKey(inicio), chaveAntiga, inicio, fim };
+};
+
+type RevisaoSemanal = { wins: string; improve: string; focus: string; rating: number };
+export const lerRevisaoDaSemana = (reviews: Record<string, RevisaoSemanal> | undefined, offset: number): RevisaoSemanal => {
+  const { chave, chaveAntiga } = semanaDaRevisao(offset);
+  return reviews?.[chave] ?? reviews?.[chaveAntiga] ?? { wins: "", improve: "", focus: "", rating: 0 };
+};
 
 /* Sugestões do BlocoDeFases na Rotina. São só um ponto de partida renomeável
    — o vocabulário aqui é de vida, não de trabalho como na Carreira. */
@@ -392,6 +432,8 @@ const TodoList = () => {
     baixa: "bg-blue-100 dark:bg-[hsl(210,55%,16%)] text-blue-700 dark:text-blue-300 border-blue-200 dark:border-[hsl(210,55%,30%)]",
   };
   const priorityDot = { alta: "bg-red-500", media: "bg-yellow-500", baixa: "bg-blue-500" };
+  // Rótulo com acento (26/09, varredura) — o valor gravado continua "media".
+  const priorityLabel: Record<string, string> = { alta: "alta", media: "média", baixa: "baixa" };
 
   const filtered = todos
     .filter(t => filter === "all" || (filter === "active" && !t.done) || (filter === "done" && t.done))
@@ -468,7 +510,7 @@ const TodoList = () => {
                   {t.text}
                 </button>
               )}
-              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${priorityColors[t.priority]}`}>{t.priority}</span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${priorityColors[t.priority]}`}>{priorityLabel[t.priority] ?? t.priority}</span>
               <button
                 onClick={() => removeTodo(t.id)}
                 aria-label={`Apagar tarefa: ${t.text}`}
@@ -573,22 +615,30 @@ const Rituals = () => {
 // hábito re-pinta o MESMO heatmap e o 🔥 vira o streak daquele hábito. A
 // fonte por hábito é o rotina-habit-log {data: [nomes]}, alimentado no toggle
 // do ✓ (NUNCA no mount — lição do bug destrutivo dos widgets de 20/08).
-const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[]; habitLog: Record<string, string[]> }) => {
-  const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
+// O log (heatmap-log) vem do PAI desde 26/09 (varredura): o toque no hábito
+// desmarca o dia lá em cima, e duas cópias do usePersistedState da mesma
+// chave não se enxergam — o card seguiria verde com a cópia velha.
+const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog, streakLog, setStreakLog }: {
+  habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[]; habitLog: Record<string, string[]>;
+  streakLog: LogDoHeatmap; setStreakLog: (v: LogDoHeatmap | ((prev: LogDoHeatmap) => LogDoHeatmap)) => void;
+}) => {
   const [foco, setFoco] = useState<string | null>(null);
   // hábito apagado/renomeado some dos chips — o filtro não pode apontar pro nada
   useEffect(() => { if (foco && !habits.includes(foco)) setFoco(null); }, [habits, foco]);
-  
+
   // Calculate if today has any habits done
   const today = new Date();
   const todayDayName = dayNames[today.getDay() === 0 ? 6 : today.getDay() - 1];
   const todayHabitsDone = (habitsChecked[todayDayName] || []).filter(Boolean).length;
   const todayKey = getDateKey();
-  
+
+  // Só MARCA (nunca desmarca): quem desmarca é o toque, lá no pai. E só grava
+  // se o dia ainda não está marcado — sem escrita repetida a cada montagem.
   useEffect(() => {
-    if (todayHabitsDone > 0) {
-      setStreakLog(prev => ({ ...prev, [todayKey]: true }));
+    if (todayHabitsDone > 0 && nivelDoHeatmap(streakLog?.[todayKey]) === 0) {
+      setStreakLog(prev => marcaDoDia(prev, todayKey, todayHabitsDone));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todayHabitsDone]);
 
   // Last 16 weeks (112 days)
@@ -596,15 +646,9 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog }: { hab
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 111);
 
-  const getLevel = (raw: boolean | number | undefined): number => {
-    if (raw === true) return 2;
-    if (typeof raw === "number") return Math.max(0, Math.min(3, Math.round(raw)));
-    return 0;
-  };
-
   // Com foco num hábito, o nível vem do log POR HÁBITO; sem foco, tudo igual.
   const nivelDoDia = (key: string): number =>
-    foco ? ((habitLog[key] ?? []).includes(foco) ? 2 : 0) : getLevel(streakLog[key]);
+    foco ? ((habitLog[key] ?? []).includes(foco) ? 2 : 0) : nivelDoHeatmap(streakLog?.[key]);
 
   let currentWeek: typeof weeks[0] = [];
   for (let i = 0; i < 112; i++) {
@@ -619,14 +663,9 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog }: { hab
   }
   if (currentWeek.length > 0) weeks.push(currentWeek);
 
-  // Calculate streak (any non-zero level counts)
-  let streak = 0;
-  const checkDate = new Date();
-  while (true) {
-    const key = getDateKey(checkDate);
-    if (nivelDoDia(key) > 0) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
-    else break;
-  }
+  // Sequência: a MESMA conta do lembrete — hoje ainda sem marca não zera,
+  // conta até ontem (26/09, varredura).
+  const streak = sequenciaDoCard(streakLog, habitLog, foco);
 
   const getColor = (level: number) => {
     if (level >= 3) return "bg-[hsl(var(--rt-heat-3))]";
@@ -806,7 +845,8 @@ const MonthlyPlanning = () => {
             <div className="mt-3 p-3 bg-muted/30 rounded-md space-y-3">
               <CompromissosDoDia dia={selectedDay} lista={compromissos} onChange={setCompromissos} />
               <div className="space-y-2">
-                <span className="text-xs font-bold">📝 Notas — {selectedDay}</span>
+                {/* dd/mm na tela (26/09, varredura) — a chave continua AAAA-MM-DD */}
+                <span className="text-xs font-bold">📝 Notas — {dataSegura(selectedDay, "dd/MM")}</span>
                 <Textarea
                   placeholder="O que tem pra esse dia?"
                   value={dayNotes[selectedDay] || ""}
@@ -1060,11 +1100,15 @@ const FocusZones = () => {
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
-          <Input placeholder="Atividade" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-7 text-xs flex-1" />
-          <Input type="time" value={newStart} onChange={e => setNewStart(e.target.value)} className="h-7 text-xs w-24" />
-          <Input type="time" value={newEnd} onChange={e => setNewEnd(e.target.value)} className="h-7 text-xs w-24" />
-          <Button size="sm" onClick={addBlock} className="h-7 text-xs"><Plus className="w-3 h-3" /></Button>
+        {/* Atividade em linha própria (26/09, varredura): lado a lado com as
+            duas horas e o botão, a 360 px sobravam 38 px pro nome ("Ati"). */}
+        <div className="space-y-2">
+          <Input placeholder="Atividade" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="h-7 text-xs w-full" />
+          <div className="flex gap-2">
+            <Input type="time" value={newStart} onChange={e => setNewStart(e.target.value)} className="h-7 text-xs flex-1" aria-label="Começa às" />
+            <Input type="time" value={newEnd} onChange={e => setNewEnd(e.target.value)} className="h-7 text-xs flex-1" aria-label="Termina às" />
+            <Button size="sm" onClick={addBlock} className="h-7 text-xs" aria-label="Adicionar bloco de foco"><Plus className="w-3 h-3" /></Button>
+          </div>
         </div>
       </div>
     </div>
@@ -1074,27 +1118,16 @@ const FocusZones = () => {
 // ============= WEEKLY REVIEW =============
 const WeeklyReview = () => {
   const [weekOffset, setWeekOffset] = useState(0);
-  const getWeekKeyForOffset = (offset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset * 7);
-    const start = new Date(d);
-    start.setDate(d.getDate() - d.getDay());
-    return getDateKey(start);
-  };
+  // Semana de SEGUNDA a domingo, igual aos hábitos (26/09, varredura) — ver semanaDaRevisao.
   const getWeekRange = (offset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset * 7);
-    const start = new Date(d);
-    start.setDate(d.getDate() - d.getDay());
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    const { inicio, fim } = semanaDaRevisao(offset);
     const fmt = (dt: Date) => dt.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
-    return `${fmt(start)} — ${fmt(end)}`;
+    return `${fmt(inicio)} — ${fmt(fim)}`;
   };
   const isCurrentWeek = weekOffset === 0;
-  const weekKey = getWeekKeyForOffset(weekOffset);
-  const [reviews, setReviews] = usePersistedState<Record<string, { wins: string; improve: string; focus: string; rating: number }>>("weekly-reviews", {});
-  const review = reviews[weekKey] || { wins: "", improve: "", focus: "", rating: 0 };
+  const weekKey = semanaDaRevisao(weekOffset).chave;
+  const [reviews, setReviews] = usePersistedState<Record<string, RevisaoSemanal>>("weekly-reviews", {});
+  const review = lerRevisaoDaSemana(reviews, weekOffset);
 
   const updateReview = (field: string, value: any) => {
     setReviews(prev => ({ ...prev, [weekKey]: { ...review, [field]: value } }));
@@ -1108,11 +1141,11 @@ const WeeklyReview = () => {
           <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={() => setWeekOffset(prev => prev - 1)} aria-label="Semana anterior" className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
           <span className="text-xs text-white font-medium min-w-[120px] text-center">
             {isCurrentWeek ? "Esta semana" : getWeekRange(weekOffset)}
           </span>
-          <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))} disabled={isCurrentWeek} className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))} disabled={isCurrentWeek} aria-label="Próxima semana" className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
       <div className="p-4 space-y-4">
@@ -1148,7 +1181,9 @@ const WeeklyReview = () => {
 const Rotina = () => {
   // Sequência viva de dias marcados — a mesma conta que os lembretes usam,
   // pra o convite não prometer um número diferente do que a notificação diz.
-  const [heatmapDoConvite] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
+  // Única cópia do heatmap-log na tela (26/09, varredura): o card CONSISTÊNCIA
+  // lê e o toque no hábito grava por aqui — ver HabitHeatmap.
+  const [heatmapDoConvite, setHeatmapLog] = usePersistedState<LogDoHeatmap>("heatmap-log", {});
   const sequenciaViva = useMemo(() => sequenciaAtual(new Set(
     Object.entries(heatmapDoConvite ?? {})
       .filter(([k, v]) => /^\d{4}-\d{2}-\d{2}$/.test(k) && (typeof v === "number" ? v > 0 : v === true))
@@ -1156,6 +1191,10 @@ const Rotina = () => {
   )), [heatmapDoConvite]);
 
   const navigate = useNavigate();
+  // Demo (/preview/rotina): a seta sai pra LP, como em Finanças — /home sem
+  // conta caía no login (26/09, varredura).
+  const location = useLocation();
+  const isPreview = location.pathname.startsWith("/preview");
   // `?aba=mes` (22/09): o toque na notificação de compromisso abre direto o
   // Meu mês; qualquer outra rota chega como sempre, na semana.
   const [activeTab, setActiveTab] = useState(() => {
@@ -1220,6 +1259,13 @@ const Rotina = () => {
     const chave = getDateKey(dataReal);
     const feitos = habitNames.filter((_, i) => newChecked[day][i]);
     setHabitLog(prev => ({ ...prev, [chave]: feitos }));
+    // A marca do heatmap segue o toque (26/09, varredura): desmarcar o último
+    // hábito do dia desfaz o quadradinho verde e a sequência. Dia futuro da
+    // semana não entra — o heatmap termina hoje.
+    if (chave <= localDayKey()) {
+      const quantos = newChecked[day].filter(Boolean).length;
+      setHeatmapLog(prev => marcaDoDia(prev, chave, quantos));
+    }
   };
 
   const addHabit = () => {
@@ -1236,7 +1282,11 @@ const Rotina = () => {
     setShowAddHabit(false);
   };
 
+  // Apagar hábito em DOIS toques (26/09, varredura): a coluna leva junto as
+  // marcações da semana. Guarda o NOME, não o índice — a lista pode mudar.
+  const [apagandoHabito, setApagandoHabito] = useState<string | null>(null);
   const removeHabit = (index: number) => {
+    setApagandoHabito(null);
     const newHabits = habitNames.filter((_, i) => i !== index);
     setHabits(newHabits);
     if (!semanaValida) setSemanaChecks(semanaAtualId());
@@ -1299,7 +1349,7 @@ const Rotina = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Calendar className="w-5 h-5 text-emerald-600" />
@@ -1362,9 +1412,16 @@ const Rotina = () => {
                         <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] min-w-[100px] group">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-center text-[11px]">{habit}</span>
-                            <button onClick={() => removeHabit(i)} className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600">
-                              <X className="w-3 h-3" />
-                            </button>
+                            {apagandoHabito === habit ? (
+                              <button onClick={() => removeHabit(i)} aria-label={`Confirmar: apagar o hábito ${habit} e as marcações da semana`}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold text-destructive border border-destructive/40 whitespace-nowrap">
+                                apagar?
+                              </button>
+                            ) : (
+                              <button onClick={() => setApagandoHabito(habit)} aria-label={`Apagar o hábito ${habit}`} className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </th>
                       ))}
@@ -1387,7 +1444,7 @@ const Rotina = () => {
             </div>
 
             {/* Heatmap */}
-            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} streakLog={heatmapDoConvite} setStreakLog={setHeatmapLog} />
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -1534,7 +1591,7 @@ const Rotina = () => {
         {activeTab === "revisao" && (
           <div className="space-y-5">
             <WeeklyReview />
-            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} streakLog={heatmapDoConvite} setStreakLog={setHeatmapLog} />
           </div>
         )}
       </main>

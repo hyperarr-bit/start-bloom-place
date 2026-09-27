@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { computeDailyBudget, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { dataSegura } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
 
 interface WishlistItem {
   id: string;
@@ -35,6 +38,50 @@ const priorityConfig = {
 };
 
 const categories = ["Eletrônicos", "Vestuário", "Casa", "Lazer", "Viagem", "Educação", "Saúde", "Outros"];
+
+/** Dinheiro com 2 casas e o sinal antes do R$ ("-R$ 500,00") — 26/09. */
+const reais = (v: number) => {
+  const r = Math.round((Number(v) || 0) * 100) / 100;
+  return `${r < 0 ? "-" : ""}R$ ${Math.abs(r).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+/**
+ * PREVISÃO DO FIM DO MÊS — a MESMA do Dashboard (26/09, varredura). Esta tela
+ * tinha conta própria e errada: "Contas pendentes (5) − R$ 1.940" era
+ * quantidade × média dos fixos (as contas somavam R$ 940), e "Gastos atuais"
+ * deixava a parcela de fora — dava R$ 621 aqui e +R$ 1.471 no Dashboard.
+ * Agora: saída do mês por computeMonthlyOutflow (fixos + variáveis +
+ * parcelas), contas a reservar por computeDailyBudget (lib/finance-totals —
+ * a correção feita lá vale aqui também) e, como no Dashboard, o ritmo dos
+ * variáveis projetado pros dias que faltam depois de hoje.
+ *
+ * `gastosFixosEVariaveis` é o `totalExpenses` que o Index manda pra esta tela
+ * (variáveis + fixos, SEM parcelas — as parcelas chegam à parte).
+ */
+export const previsaoDoMes = (
+  receita: number,
+  gastosFixosEVariaveis: number,
+  parcelasDoMes: number,
+  fixedExpenses: { value?: unknown }[],
+  dueDays: unknown[],
+  agora: Date = new Date(),
+) => {
+  const fixos = (fixedExpenses ?? []).reduce((s: number, e) => s + (Number(e?.value) || 0), 0);
+  const variaveis = Math.max(0, gastosFixosEVariaveis - fixos);
+  const saidaDoMes = computeMonthlyOutflow(variaveis, fixos, parcelasDoMes || 0);
+  const base = computeDailyBudget(receita, saidaDoMes, dueDays ?? [], fixedExpenses ?? []);
+  const dia = agora.getDate();
+  const diasNoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
+  const diasDepoisDeHoje = diasNoMes - dia;
+  const projecaoVariavel = dia > 0 ? (variaveis / dia) * diasDepoisDeHoje : 0;
+  return {
+    saidaDoMes,
+    contasPendentes: base.unpaidBillsEstimate,
+    projecaoVariavel,
+    diasDepoisDeHoje,
+    saldoProjetado: base.availableReal - projecaoVariavel,
+  };
+};
 
 // ── URL Import (same pattern as Biblioteca) ──
 const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: string; price: number; url: string }) => void }) => {
@@ -126,8 +173,24 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
     setShowForm(false);
   };
 
+  /* Apagar com "Desfazer" (26/09, varredura): um toque levava embora o iPad
+     com R$ 2.550 guardados. O aviso diz quanto estava guardado, e o desfazer
+     devolve o desejo inteiro (foto, link, guardado). */
+  const ultimo = useRef({ lista: rawItems, gravar: setItems });
+  useEffect(() => { ultimo.current = { lista: rawItems, gravar: setItems }; });
+
   const deleteItem = (id: string) => {
+    const pos = items.findIndex((i) => i.id === id);
+    if (pos < 0) return;
+    const original = (Array.isArray(rawItems) ? rawItems : [])[pos] ?? items[pos];
     setItems(items.filter((i) => i.id !== id));
+    const guardado = items[pos].savedAmount > 0 ? ` (tinha ${reais(items[pos].savedAmount)} guardados)` : "";
+    avisarApagado(`Desejo apagado: ${items[pos].name}${guardado}`, () => {
+      const { lista, gravar } = ultimo.current;
+      const atual = Array.isArray(lista) ? lista : [];
+      if (atual.some((i) => i?.id === id)) return;
+      gravar([...atual.slice(0, pos), original, ...atual.slice(pos)]);
+    });
   };
 
   /**
@@ -180,22 +243,15 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
   const remainingToSave = totalWishlistValue - totalSaved;
   const overallProgress = totalWishlistValue > 0 ? (totalSaved / totalWishlistValue) * 100 : 0;
   
-  // Forecast logic (same as Dashboard)
-  const forecast = (() => {
-    const now = new Date();
-    const day = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - day;
-    const fixedCostsRecorded = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || 0), 0);
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
-    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
-    const projectedVariableRemaining = dailyVariableRate * remainingDays;
-    const unpaidBillsCount = dueDays.reduce((sum: number, d: any) => sum + (Array.isArray(d?.bills) ? d.bills.filter((b: any) => !b?.paid).length : 0), 0);
-    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
-    const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
-    return { projectedBalance, remainingDays, totalExpenses, unpaidBillsEstimate, projectedVariableRemaining, fixedCostsRecorded, variableSpent, unpaidBillsCount };
-  })();
+  // Previsão do fim do mês: a mesma do Dashboard (ver previsaoDoMes, 26/09)
+  const previsao = previsaoDoMes(monthlyBudget, totalExpenses, monthlyInstallments, fixedExpenses, dueDays);
+  const forecast = {
+    projectedBalance: previsao.saldoProjetado,
+    remainingDays: previsao.diasDepoisDeHoje,
+    totalExpenses: previsao.saidaDoMes,
+    unpaidBillsEstimate: previsao.contasPendentes,
+    projectedVariableRemaining: previsao.projecaoVariavel,
+  };
 
   const projectedAvailable = Math.max(0, forecast.projectedBalance);
   const savingsForWishlist = projectedAvailable * 0.3;
@@ -238,7 +294,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <p className="text-[10px] text-muted-foreground">Tempo Estimado</p>
           </div>
           <p className="text-lg font-bold text-blue-400">
-            {monthsToComplete > 0 ? `${monthsToComplete} meses` : "—"}
+            {monthsToComplete > 0 ? (monthsToComplete === 1 ? "1 mês" : `${monthsToComplete} meses`) : "—"}
           </p>
           {monthsToComplete > 0 && (
             <p className="text-[9px] text-muted-foreground">30% do saldo livre</p>
@@ -254,30 +310,30 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <div className="w-full">
               <p className="text-xs font-semibold">✅ Seus desejos cabem no orçamento!</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/mês para desejos (30%)
+                Previsão fim do mês: {reais(forecast.projectedBalance)} → {reais(savingsForWishlist)}/mês para desejos (30%)
               </p>
               <div className="mt-2 pt-2 border-t border-emerald-500/20 space-y-1">
                 <p className="text-[10px] text-muted-foreground font-medium">Como chegamos nesse valor:</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                   <span className="text-muted-foreground">Receita</span>
-                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
-                  <span className="text-muted-foreground">Gastos atuais</span>
-                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
-                  {forecast.unpaidBillsCount > 0 && (
+                  <span className="text-right text-emerald-400">+ {reais(monthlyBudget)}</span>
+                  <span className="text-muted-foreground">Gastos do mês</span>
+                  <span className="text-right text-red-400">- {reais(forecast.totalExpenses)}</span>
+                  {forecast.unpaidBillsEstimate > 0 && (
                     <>
-                      <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+                      <span className="text-muted-foreground">Contas pendentes</span>
+                      <span className="text-right text-orange-400">- {reais(forecast.unpaidBillsEstimate)}</span>
                     </>
                   )}
                   {forecast.projectedVariableRemaining > 0 && (
                     <>
                       <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+                      <span className="text-right text-orange-400">- {reais(forecast.projectedVariableRemaining)}</span>
                     </>
                   )}
                   <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
                   <span className={`text-right font-semibold border-t border-border pt-0.5 mt-0.5 ${forecast.projectedBalance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                    {reais(forecast.projectedBalance)}
                   </span>
                 </div>
               </div>
@@ -291,30 +347,30 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <div className="w-full">
               <p className="text-xs font-semibold">⚠️ Previsão aponta saldo negativo no fim do mês</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}. Foque em reduzir gastos primeiro.
+                Saldo projetado: {reais(forecast.projectedBalance)}. Foque em reduzir gastos primeiro.
               </p>
               <div className="mt-2 pt-2 border-t border-destructive/20 space-y-1">
                 <p className="text-[10px] text-muted-foreground font-medium">Detalhamento:</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                   <span className="text-muted-foreground">Receita</span>
-                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
-                  <span className="text-muted-foreground">Gastos atuais</span>
-                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
-                  {forecast.unpaidBillsCount > 0 && (
+                  <span className="text-right text-emerald-400">+ {reais(monthlyBudget)}</span>
+                  <span className="text-muted-foreground">Gastos do mês</span>
+                  <span className="text-right text-red-400">- {reais(forecast.totalExpenses)}</span>
+                  {forecast.unpaidBillsEstimate > 0 && (
                     <>
-                      <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+                      <span className="text-muted-foreground">Contas pendentes</span>
+                      <span className="text-right text-orange-400">- {reais(forecast.unpaidBillsEstimate)}</span>
                     </>
                   )}
                   {forecast.projectedVariableRemaining > 0 && (
                     <>
                       <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+                      <span className="text-right text-orange-400">- {reais(forecast.projectedVariableRemaining)}</span>
                     </>
                   )}
                   <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
                   <span className="text-right font-semibold border-t border-border pt-0.5 mt-0.5 text-red-400">
-                    -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                    {reais(forecast.projectedBalance)}
                   </span>
                 </div>
               </div>
@@ -476,7 +532,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{item.category}</span>
                         {item.targetDate && (
-                          <span className="text-[10px] text-muted-foreground">📅 {new Date(item.targetDate).toLocaleDateString("pt-BR")}</span>
+                          <span className="text-[10px] text-muted-foreground">📅 {dataSegura(item.targetDate, "dd/MM/yyyy")}</span>
                         )}
                       </div>
                     </div>

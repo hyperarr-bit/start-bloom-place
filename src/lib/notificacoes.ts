@@ -30,8 +30,19 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "outro";
 
+/*
+ * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
+ * régua avulsas lá embaixo (resgate do paywall, teste grátis, missão) — e
+ * saúde (07/09) nasceu em 800000 e aniversário (11/09) em 900000. Cada
+ * reagendamento dos remédios (toda abertura do app) limpava 800000–809999
+ * e levava junto o D1/D2/D3 do teste grátis; os ids 800001–800003 dos
+ * remédios ainda SOBRESCREVIAM os do teste. Aniversário (nasce desligado)
+ * limpava 900000–909999 e apagava a missão pós-assinatura. Agora cada tipo
+ * tem faixa própria e o teste `notificacoes-faixas` trava a sobreposição.
+ * Os agendamentos antigos são limpos uma vez por limparLegado().
+ */
 const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   contas: 100000,
   retrospectiva: 200000,
@@ -39,11 +50,15 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   treino: 400000,
   leitura: 500000,
   dieta: 600000,
-  saude: 800000, // 700000 é o resgate do paywall (BASE_RESGATE, mais abaixo)
-  aniversario: 900000,
   casa: 1000000,
   compromisso: 1100000, // 22/09: compromissos com hora da Rotina (lib/compromissos)
+  limite: 1200000, // 26/09: "seu limite de hoje" (Finanças), de manhã
+  saude: 1300000, // era 800000 (colidia com o teste grátis)
+  aniversario: 1400000, // era 900000 (colidia com a missão)
+  sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
 };
+/** Pra teste: as faixas dos tipos acima. */
+export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
 const BASE_CONTAS = BASES.contas;
 const BASE_RETRO = BASES.retrospectiva;
 const HORA_RETRO = 10; // 10h do dia 1º: o mês fechou, ninguém tem pressa
@@ -145,6 +160,24 @@ const doisDigitos = (n: number) => String(n).padStart(2, "0");
  * Cancela só os agendamentos de UM tipo (uma faixa de id). É isso que deixa
  * a central desligar "contas" sem derrubar a retrospectiva junto.
  */
+/**
+ * Limpeza única das faixas ANTIGAS de saúde (800000) e aniversário (900000),
+ * sem tocar nas régua que moram lá de verdade (teste grátis, missão): só sai
+ * o que é reconhecidamente remédio/aniversário, pela rota e pelo emoji.
+ */
+async function limparLegado(base: number, rota: string, emoji: string): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  const { LN } = p;
+  try {
+    const pendentes = await LN.getPending();
+    const antigos = (pendentes.notifications ?? []).filter((n) =>
+      n.id >= base && n.id < base + 10000 &&
+      ((n.extra as { rota?: string } | undefined)?.rota === rota || String(n.title ?? "").startsWith(emoji)));
+    if (antigos.length) await LN.cancel({ notifications: antigos.map((n) => ({ id: n.id })) });
+  } catch { /* nada pendente */ }
+}
+
 async function limparFaixa(base: number): Promise<void> {
   const p = await plugin();
   if (!p) return;
@@ -157,14 +190,79 @@ async function limparFaixa(base: number): Promise<void> {
 }
 
 /**
+ * AVISOS DE CONTA NA VIRADA DO MÊS (26/09, auditoria da virada 30/09 → 01/10).
+ *
+ * Só o mês CORRENTE era agendado, e o aviso sai na VÉSPERA. Resultado: conta
+ * que vence no dia 1º nunca tinha aviso — a véspera dela é sempre o último
+ * dia do mês anterior, quando o app ainda só olhava o mês anterior; a do dia
+ * 2 só avisava se o app fosse aberto no dia 1º antes da hora do aviso; e
+ * quem ficava sem abrir o app na virada ficava sem aviso nenhum do mês novo.
+ * Além disso `new Date(ano, mes, 31)` em setembro é 1º de outubro: a conta
+ * "dia 31" avisava "vence amanhã, dia 31" num mês de 30 dias, e a "dia 30"
+ * de fevereiro avisava em 1º de março, depois de vencida.
+ *
+ * Agora o plano cobre o mês corrente E o seguinte (neste, tudo em aberto: o ✓
+ * expira na virada — lib/virada-contas), o dia é limitado ao último dia do
+ * mês (como o calendário MEU MÊS já mostra) e contas que caem na mesma data
+ * viram UM aviso. O id continua sendo BASE_CONTAS + MMDD da data de
+ * vencimento, sempre na faixa [100000, 110000) — única dentro dos dois meses
+ * do plano — e cada reagendamento limpa a faixa inteira antes (limparFaixa):
+ * como as contas nunca usaram outra faixa desde a 1ª versão (26/07), não há
+ * agendamento antigo fora dela pra limpar.
+ */
+export type ContasDoMes = { ano: number; mes: number; dueDays: DueDay[] | null | undefined };
+
+export function planejarContas(meses: ContasDoMes[], hora = 9, agora = new Date()): (Planejado & { id: number })[] {
+  const porData = new Map<string, { vencimento: Date; nomes: string[]; quantas: number }>();
+  for (const { ano, mes, dueDays } of meses) {
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    for (const d of dueDays ?? []) {
+      const dia = Number(d?.day);
+      if (!Number.isInteger(dia) || dia < 1 || dia > 31) continue;
+      const naoPagas = (Array.isArray(d?.bills) ? d.bills : []).filter((b) => b && !b.paid);
+      if (!naoPagas.length) continue;
+      const vencimento = new Date(ano, mes, Math.min(dia, ultimoDia), hora, 0, 0, 0);
+      const chave = `${vencimento.getFullYear()}-${vencimento.getMonth()}-${vencimento.getDate()}`;
+      const grupo = porData.get(chave) ?? { vencimento, nomes: [], quantas: 0 };
+      grupo.nomes.push(...(naoPagas.map((b) => b?.name).filter(Boolean) as string[]));
+      grupo.quantas += naoPagas.length;
+      porData.set(chave, grupo);
+    }
+  }
+
+  const avisos: (Planejado & { id: number })[] = [];
+  for (const { vencimento, nomes, quantas } of porData.values()) {
+    // avisa na VÉSPERA, na hora escolhida na central
+    const quando = new Date(vencimento.getFullYear(), vencimento.getMonth(), vencimento.getDate() - 1, hora, 0, 0, 0);
+    if (quando.getTime() <= agora.getTime()) continue;                 // já passou
+    if (quando.getTime() - agora.getTime() > 60 * 24 * 3600e3) continue; // longe demais
+    const dia = doisDigitos(vencimento.getDate());
+    avisos.push({
+      id: BASE_CONTAS + Number(`${doisDigitos(vencimento.getMonth() + 1)}${dia}`),
+      quando,
+      // concordância de verdade: alerta de dinheiro é onde a pessoa mais repara
+      title: quantas === 1 ? "1 conta vence amanhã" : `${quantas} contas vencem amanhã`,
+      body: nomes.length
+        ? `${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` e mais ${nomes.length - 3}` : ""} — dia ${dia}`
+        : `Vencimento no dia ${dia}`,
+    });
+  }
+  return avisos.sort((a, b) => a.quando.getTime() - b.quando.getTime());
+}
+
+/**
  * Reagenda os avisos de conta a vencer a partir do estado atual do módulo.
  * Idempotente: pode chamar a cada mudança que não duplica.
+ *
+ * `proximoMes` (26/09): as contas do mês SEGUINTE, já com a fatura que vence
+ * nele — sem isso a conta do dia 1º nunca tinha aviso (ver planejarContas).
  *
  * Devolve quantos avisos ficaram agendados (0 = nada a avisar ou sem permissão).
  */
 export async function agendarContas(
   dueDays: DueDay[] | null | undefined,
   opcoes?: { hora?: number; ligado?: boolean },
+  proximoMes?: DueDay[] | null,
 ): Promise<number> {
   const p = await plugin();
   if (!p) return 0;
@@ -176,43 +274,20 @@ export async function agendarContas(
 
   const horaAviso = Number.isInteger(opcoes?.hora) ? (opcoes!.hora as number) : 9;
   const agora = new Date();
-  const ano = agora.getFullYear();
-  const mes = agora.getMonth();
-  const avisos: { id: number; title: string; body: string; schedule: { at: Date } }[] = [];
-
-  (dueDays ?? []).forEach((d) => {
-    const dia = Number(d?.day);
-    if (!Number.isInteger(dia) || dia < 1 || dia > 31) return;
-    const naoPagas = (Array.isArray(d?.bills) ? d.bills : []).filter((b) => b && !b.paid);
-    if (!naoPagas.length) return;
-
-    // avisa na VÉSPERA, na hora escolhida na central
-    const vencimento = new Date(ano, mes, dia, horaAviso, 0, 0, 0);
-    const quando = new Date(vencimento.getTime() - 24 * 3600e3);
-    if (quando.getTime() <= agora.getTime()) return;             // já passou
-    if (quando.getTime() - agora.getTime() > 60 * 24 * 3600e3) return; // longe demais
-
-    const nomes = naoPagas.map((b) => b?.name).filter(Boolean) as string[];
-    const n = nomes.length;
-    // concordância de verdade: alerta de dinheiro é onde a pessoa mais repara
-    const titulo = n === 1 ? "1 conta vence amanhã" : `${n} contas vencem amanhã`;
-    const corpo = nomes.length
-      ? `${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` e mais ${nomes.length - 3}` : ""} — dia ${doisDigitos(dia)}`
-      : `Vencimento no dia ${doisDigitos(dia)}`;
-
-    avisos.push({
-      id: BASE_CONTAS + Number(`${doisDigitos(mes + 1)}${doisDigitos(dia)}`),
-      title: titulo,
-      body: corpo,
-      schedule: { at: quando },
-    });
-  });
+  const seguinte = new Date(agora.getFullYear(), agora.getMonth() + 1, 1);
+  const avisos = planejarContas([
+    { ano: agora.getFullYear(), mes: agora.getMonth(), dueDays },
+    ...(proximoMes ? [{ ano: seguinte.getFullYear(), mes: seguinte.getMonth(), dueDays: proximoMes }] : []),
+  ], horaAviso, agora);
 
   if (!avisos.length) return 0;
   try {
     await LN.schedule({
       notifications: avisos.map((a) => ({
-        ...a,
+        id: a.id,
+        title: a.title,
+        body: a.body,
+        schedule: { at: a.quando },
         channelId: CANAL,
         smallIcon: ICONE, iconColor: COR_MARCA,
         extra: { rota: "/financas" },
@@ -454,6 +529,83 @@ export async function agendarDieta(
   return agendarSerie("dieta", "/dieta", avisos);
 }
 
+/**
+ * LIMITE DO DIA (26/09) — "seu limite de hoje já está calculado".
+ *
+ * O "quanto posso gastar hoje" é a tela mais forte do app, e o teste grátis
+ * do iPhone morre no 2º dia (metade usa um dia só). Um toque de manhã dá o
+ * motivo de abrir. O VALOR não vai no texto: a notificação congela no
+ * agendamento e o número de ontem seria mentira hoje. Nasce desligado como
+ * todo diário (ordem do dono); liga pela central ou pelo próprio card.
+ * Pula hoje se Finanças já foi aberto; nada pra quem nunca usou Finanças.
+ */
+export function planejarLimiteDoDia(
+  dados: { temFinancas: boolean; abriuFinancasHoje: boolean },
+  hora = 8,
+  agora = new Date(),
+): Planejado[] {
+  if (!dados.temFinancas) return [];
+  const hoje = localDia(agora);
+  const out: Planejado[] = [];
+  for (let i = 0; i <= HORIZONTE_DIAS; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, hora, 0, 0, 0);
+    if (d.getTime() <= agora.getTime()) continue;
+    if (localDia(d) === hoje && dados.abriuFinancasHoje) continue;
+    const dia = d.getDay(); // 0 domingo … 5 sexta
+    const title = dia === 1 ? "Semana nova, limite novo 👀" : dia === 5 ? "Sexta! Quanto dá pra gastar hoje? 👀" : "Seu limite de hoje já está calculado 👀";
+    out.push({ quando: d, title, body: "Toca pra ver quanto você pode gastar hoje sem apertar o mês." });
+  }
+  return out;
+}
+
+export async function agendarLimiteDoDia(
+  dados: { temFinancas: boolean; abriuFinancasHoje: boolean },
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.limite); return 0; }
+  return agendarSerie("limite", "/financas", planejarLimiteDoDia(dados, opcoes.hora));
+}
+
+/**
+ * SEQUÊNCIA (26/09) — "sua sequência de N dias acaba hoje". Nasce desligado
+ * (diário só com o sim da pessoa); liga pelo card da sequência nas
+ * Conquistas ou pela central. Hoje só se ainda não anotou nada. Os próximos
+ * dias ficam agendados com texto que não depende do número (o app pode não
+ * abrir até lá) e são refeitos a cada registro — anotar cancela o de hoje.
+ */
+export function planejarLembreteSequencia(
+  dados: { dias: number; anotouHoje: boolean; acao: string },
+  hora = 20,
+  agora = new Date(),
+): Planejado[] {
+  if (dados.dias <= 0) return [];
+  const hoje = localDia(agora);
+  const out: Planejado[] = [];
+  for (let i = 0; i <= HORIZONTE_DIAS; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, hora, 0, 0, 0);
+    if (d.getTime() <= agora.getTime()) continue;
+    if (localDia(d) === hoje) {
+      if (dados.anotouHoje) continue;
+      out.push({
+        quando: d,
+        title: `Sua sequência de ${dados.dias} ${dados.dias === 1 ? "dia" : "dias"} acaba hoje 🔥`,
+        body: `Falta 1 coisa: ${dados.acao}. Leva 10 segundos.`,
+      });
+    } else {
+      out.push({ quando: d, title: "Sua sequência tá te esperando 🔥", body: "Anota 1 coisa do seu dia e ela continua." });
+    }
+  }
+  return out;
+}
+
+export async function agendarLembreteSequencia(
+  dados: { dias: number; anotouHoje: boolean; acao: string },
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.sequencia); return 0; }
+  return agendarSerie("sequencia", "/conquistas", planejarLembreteSequencia(dados, opcoes.hora));
+}
+
 /* ------------------------------------------------------ remédios (07/09) */
 
 export type RemedioAgendavel = { id: string; nome: string; hora: string; tomadoHoje: boolean };
@@ -516,6 +668,7 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
 }
 
 export async function agendarRemedios(lista: RemedioAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
+  await limparLegado(800000, "/saude", "💊");
   if (!opcoes.ligado) { await limparFaixa(BASES.saude); return 0; }
   return agendarSerie("saude", "/saude", planejarRemedios(lista));
 }
@@ -559,6 +712,7 @@ export function planejarAniversarios(pessoas: PessoaAgendavel[], hora = 10, agor
 }
 
 export async function agendarAniversarios(pessoas: PessoaAgendavel[], opcoes: { hora?: number; ligado: boolean }): Promise<number> {
+  await limparLegado(900000, "/relacionamentos", "🎂");
   if (!opcoes.ligado) { await limparFaixa(BASES.aniversario); return 0; }
   const hora = Number.isInteger(opcoes.hora) ? (opcoes.hora as number) : 10;
   return agendarSerie("aniversario", "/relacionamentos", planejarAniversarios(pessoas, hora));
@@ -579,7 +733,11 @@ export function planejarManutencao(tarefas: ManutencaoAgendavel[], hora = 10, ag
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t?.ultimaVez ?? "");
     const meses = Number(t?.frequenciaMeses);
     if (!m || !t?.tarefa || !Number.isInteger(meses) || meses < 1) continue;
-    const vence = new Date(Number(m[1]), Number(m[2]) - 1 + meses, Number(m[3]), hora, 0, 0, 0);
+    // (26/09) dia limitado ao fim do mês-alvo: 31/08 + 1 mês vence 30/09, não
+    // 01/10 (o `new Date` transbordava) — a mesma conta da tela de Casa.
+    const alvo = new Date(Number(m[1]), Number(m[2]) - 1 + meses, 1);
+    const ultimoDia = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+    const vence = new Date(alvo.getFullYear(), alvo.getMonth(), Math.min(Number(m[3]), ultimoDia), hora, 0, 0, 0);
     // vencida (ou vence hoje e a hora passou): um único lembrete, amanhã
     const quando = vence.getTime() <= agora.getTime() ? amanha : vence;
     if (quando.getTime() - agora.getTime() > 60 * 24 * 3600e3) continue;
@@ -942,3 +1100,7 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
 export async function cancelarReguaDaMissao(): Promise<void> {
   await limparFaixa(BASE_MISSAO);
 }
+
+/** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
+ *  é a faixa antiga da missão, ainda reservada (ver comentário acima). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000 } as const;

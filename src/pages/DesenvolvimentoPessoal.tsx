@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso, dataSegura, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -238,6 +238,22 @@ export const ReflexoesAnteriores = ({ entradas, hoje }: { entradas: Record<strin
   </div>
 );
 
+/* CARTA PRO FUTURO (26/09, varredura). A regra era `new Date() >= new
+ * Date(openDate)`: "2026-12-25" vira meia-noite UTC, que no Brasil é 24/12 às
+ * 21h — a carta abria na véspera e a tela dizia "Será aberta em 24/12". Agora
+ * compara DIA LOCAL com dia local (chave YYYY-MM-DD). Valor antigo fora desse
+ * formato ainda passa pelo Date, pra carta velha nunca ficar trancada. */
+export const cartaPodeAbrir = (abrirEm: unknown, hoje: string = localDayKey()): boolean => {
+  if (typeof abrirEm !== "string" || !abrirEm) return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(abrirEm)) return hoje >= abrirEm;
+  const d = new Date(abrirEm);
+  return !Number.isNaN(d.getTime()) && Date.now() >= d.getTime();
+};
+
+/** Amanhã, dia local — a data mínima pra selar (selar pra hoje ou pro passado abria na hora). */
+export const amanhaLocal = (agora: Date = new Date()): string =>
+  localDayKey(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1));
+
 const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass, onAdd }: {
   items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string; onAdd?: () => void;
 }) => {
@@ -277,6 +293,10 @@ const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorCl
 
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
+  // Demo (/preview/desenvolvimento): a seta sai pra LP, como em Finanças —
+  // /home sem conta caía no login (26/09, varredura).
+  const location = useLocation();
+  const isPreview = location.pathname.startsWith("/preview");
   // ?tab= permite deep-link (a demo do funil de metas abre direto na aba Metas)
   // ids das metas que passam no filtro de etiqueta/ano (null = sem filtro) — ver EtiquetasDasMetas
   const [metasFiltradas, setMetasFiltradas] = useState<Set<string> | null>(null);
@@ -400,18 +420,57 @@ const DesenvolvimentoPessoal = () => {
 
   // === NEW: LETTER TO FUTURE SELF ===
   const [futureLetter, setFutureLetter] = usePersistedState<{text: string; openDate: string; written: string}>("dp-future-letter", { text: "", openDate: "", written: "" });
-  const [letterDraft, setLetterDraft] = useState(futureLetter.text);
-  const [letterDate, setLetterDate] = useState(futureLetter.openDate);
-  const canOpenLetter = futureLetter.openDate && new Date() >= new Date(futureLetter.openDate);
+  // Rascunho nasce VAZIO (26/09, varredura): começava com o texto da carta
+  // selada, e "Escrever nova carta" mostrava a carta inteira antes da data.
+  const [letterDraft, setLetterDraft] = useState("");
+  const [letterDate, setLetterDate] = useState("");
+  const canOpenLetter = cartaPodeAbrir(futureLetter.openDate, today);
+  // "Escrever nova carta" apaga a atual: dois toques, nunca um (26/09, varredura).
+  const [confirmarNovaCarta, setConfirmarNovaCarta] = useState(false);
+  const descartarCarta = () => {
+    setFutureLetter({ text: "", openDate: "", written: "" });
+    setLetterDraft(""); setLetterDate(""); setConfirmarNovaCarta(false);
+  };
+  const selarCarta = () => {
+    if (!letterDraft.trim()) { toast.error("Escreva a carta antes de selar"); return; }
+    if (!letterDate) { toast.error("Escolha o dia de abrir"); return; }
+    if (letterDate < amanhaLocal()) { toast.error("Escolha uma data a partir de amanhã"); return; }
+    setFutureLetter({ text: letterDraft, openDate: letterDate, written: today });
+    setLetterDraft(""); setLetterDate("");
+  };
+  const botaoNovaCarta = (selada: boolean) => confirmarNovaCarta ? (
+    <div className="mt-3 space-y-2">
+      <p className="text-[11px] text-muted-foreground">
+        {selada ? "Ela ainda não foi aberta. Apagar agora não tem volta." : "Apagar esta carta não tem volta."}
+      </p>
+      <div className="flex items-center justify-center gap-2">
+        <Button variant="destructive" size="sm" onClick={descartarCarta}>Apagar a carta e escrever outra</Button>
+        <Button variant="ghost" size="sm" onClick={() => setConfirmarNovaCarta(false)}>Manter</Button>
+      </div>
+    </div>
+  ) : (
+    <Button variant="outline" size="sm" className="mt-3" onClick={() => setConfirmarNovaCarta(true)}>Escrever nova carta</Button>
+  );
 
   // === NEW: 30-DAY CHALLENGE ===
   const [challenges, setChallenges] = usePersistedState<{name: string; days: boolean[]}[]>("dp-challenges", []);
   const [newChallengeName, setNewChallengeName] = useState("");
+  // Apagar desafio em DOIS toques (26/09, varredura): leva junto os dias marcados.
+  const [apagandoDesafio, setApagandoDesafio] = useState<number | null>(null);
 
   // === NEW: SCORECARD SEMANAL ===
   const [weeklyScores, setWeeklyScores] = usePersistedState<Record<string, Record<string, number>>>("dp-weekly-scores", {});
   const currentWeek = (() => { const d = new Date(); const start = new Date(d.getFullYear(), 0, 1); return `${d.getFullYear()}-W${Math.ceil(((d.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7)}`; })();
   const thisWeekScores = weeklyScores[currentWeek] || Object.fromEntries(lifeAreas.map(a => [a.id, 5]));
+  // "2026-W40" é a chave gravada, não é texto de gente (26/09): o título
+  // mostra a semana como a pessoa lê — "21 a 27/09".
+  const rotuloDaSemana = (() => {
+    const seg = parseLocalDay(semanaAtualId());
+    const dom = new Date(seg); dom.setDate(seg.getDate() + 6);
+    const dd = (d: Date) => String(d.getDate()).padStart(2, "0");
+    const mm = (d: Date) => String(d.getMonth() + 1).padStart(2, "0");
+    return seg.getMonth() === dom.getMonth() ? `${dd(seg)} a ${dd(dom)}/${mm(dom)}` : `${dd(seg)}/${mm(seg)} a ${dd(dom)}/${mm(dom)}`;
+  })();
 
   // === NEW: COURSES/PODCASTS TRACKER ===
   const [courses, setCourses] = usePersistedState<{id: string; title: string; platform: string; status: string; progress: number; notes: string}[]>("dp-courses", []);
@@ -440,7 +499,7 @@ const DesenvolvimentoPessoal = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label={isPreview ? "Voltar" : "Todos os módulos"}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
           <div className="flex items-center gap-2 ml-auto">
@@ -565,10 +624,13 @@ const DesenvolvimentoPessoal = () => {
           {activeTab === "humor" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Brain className="w-4 h-4" /> COMO VOCÊ ESTÁ HOJE?</h3>
-              <div className="flex justify-center gap-3 mb-4">
+              {/* Menores até o sm (26/09, varredura): com text-3xl + p-3 os 5
+                  botões somavam 338 px e estouravam o card em qualquer celular
+                  abaixo de ~430 px (a 360 saíam 5 px pra cada lado). */}
+              <div className="flex justify-center gap-2 sm:gap-3 mb-4">
                 {moodOptions.map(m => (
-                  <button key={m.value} onClick={() => setMoodLog({ ...moodLog, [today]: m.value })}
-                    className={`text-3xl p-3 rounded-xl border-2 transition-all ${moodLog[today] === m.value ? `${m.color} border-primary scale-110` : "border-border hover:scale-105"}`}>
+                  <button key={m.value} onClick={() => setMoodLog({ ...moodLog, [today]: m.value })} aria-label={m.label} aria-pressed={moodLog[today] === m.value}
+                    className={`text-2xl sm:text-3xl p-2 sm:p-3 rounded-xl border-2 transition-all ${moodLog[today] === m.value ? `${m.color} border-primary scale-110` : "border-border hover:scale-105"}`}>
                     {m.emoji}
                   </button>
                 ))}
@@ -583,9 +645,14 @@ const DesenvolvimentoPessoal = () => {
                   const key = localDayKey(d);
                   const val = moodLog[key] || 0;
                   const colors = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-300", "bg-green-500"];
+                  // A coluna ocupa a altura toda (h-full) e a barra mora numa
+                  // faixa flex-1: sem altura definida, o `height: %` resolvia
+                  // contra "auto" e nenhuma barra aparecia (26/09, varredura).
                   return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div className={`w-full rounded-t ${val ? colors[val] : "bg-muted/30"}`} style={{ height: `${val ? val * 20 : 5}%` }} />
+                    <div key={i} className="flex-1 h-full flex flex-col items-center gap-1" data-testid="humor-coluna">
+                      <div className="w-full flex-1 flex items-end">
+                        <div className={`w-full rounded-t ${val ? colors[val] : "bg-muted/30"}`} style={{ height: `${val ? val * 20 : 5}%` }} />
+                      </div>
                       <span className="text-[8px] text-muted-foreground">{d.getDate()}</span>
                     </div>
                   );
@@ -595,7 +662,7 @@ const DesenvolvimentoPessoal = () => {
 
             {/* Scorecard Semanal dentro de Humor */}
             <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4" /> SCORECARD SEMANAL — {currentWeek}</h3>
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4" /> SCORECARD SEMANAL — {rotuloDaSemana}</h3>
               <p className="text-xs text-muted-foreground mb-4">Dê uma nota de 1 a 10 para cada área nesta semana:</p>
               <div className="space-y-3">
                 {lifeAreas.map(area => {
@@ -686,17 +753,18 @@ const DesenvolvimentoPessoal = () => {
                 <div className="text-center py-8">
                   <p className="text-4xl mb-3">📩</p>
                   <p className="text-sm font-bold">Carta selada!</p>
-                  <p className="text-xs text-muted-foreground">Será aberta em: {new Date(futureLetter.openDate).toLocaleDateString("pt-BR")}</p>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => setFutureLetter({ text: "", openDate: "", written: "" })}>Escrever nova carta</Button>
+                  {/* dataSegura: "AAAA-MM-DD" é dia LOCAL — o new Date() mostrava a véspera */}
+                  <p className="text-xs text-muted-foreground">Será aberta em: {dataSegura(futureLetter.openDate, "dd/MM/yyyy")}</p>
+                  {botaoNovaCarta(true)}
                 </div>
               ) : canOpenLetter ? (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">📬 Sua carta está pronta para ser aberta!</p>
                   <div className="bg-white dark:bg-background rounded-lg p-4 border border-rose-200 dark:border-rose-500/20">
                     <p className="text-xs italic whitespace-pre-wrap">{futureLetter.text}</p>
-                    <p className="text-[10px] text-muted-foreground mt-2">Escrita em: {new Date(futureLetter.written).toLocaleDateString("pt-BR")}</p>
+                    <p className="text-[10px] text-muted-foreground mt-2">Escrita em: {dataSegura(futureLetter.written, "dd/MM/yyyy")}</p>
                   </div>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => setFutureLetter({ text: "", openDate: "", written: "" })}>Escrever nova carta</Button>
+                  {botaoNovaCarta(false)}
                 </div>
               ) : (
                 <div>
@@ -705,14 +773,10 @@ const DesenvolvimentoPessoal = () => {
                     placeholder="Querido(a) eu do futuro..." className="text-xs min-h-[120px] mb-3" />
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs">Abrir em:</span>
-                    <Input type="date" value={letterDate} onChange={e => setLetterDate(e.target.value)} className="text-xs h-8 w-40" />
+                    {/* min = amanhã: selar pra hoje ou pro passado abria a carta na hora */}
+                    <Input type="date" min={amanhaLocal()} value={letterDate} onChange={e => setLetterDate(e.target.value)} className="text-xs h-8 w-40" aria-label="Abrir em" />
                   </div>
-                  <Button size="sm" className="w-full" onClick={() => {
-                    if (letterDraft.trim() && letterDate) {
-                      setFutureLetter({ text: letterDraft, openDate: letterDate, written: today });
-                      setLetterDraft(""); setLetterDate("");
-                    }
-                  }}>Selar carta ✉️</Button>
+                  <Button size="sm" className="w-full" onClick={selarCarta}>Selar carta ✉️</Button>
                 </div>
               )}
             </div>
@@ -734,7 +798,15 @@ const DesenvolvimentoPessoal = () => {
                     <p className="text-sm font-bold">{ch.name}</p>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">{ch.days.filter(Boolean).length}/30</span>
-                      <button onClick={() => setChallenges(challenges.filter((_, i) => i !== ci))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
+                      {apagandoDesafio === ci ? (
+                        <button onClick={() => { setChallenges(challenges.filter((_, i) => i !== ci)); setApagandoDesafio(null); }}
+                          aria-label={`Confirmar: apagar o desafio ${ch.name} e os dias marcados`}
+                          className="px-1.5 py-1 rounded text-[9px] font-bold text-destructive border border-destructive/40">
+                          apagar?
+                        </button>
+                      ) : (
+                        <button onClick={() => setApagandoDesafio(ci)} aria-label={`Apagar o desafio ${ch.name}`} className="p-1"><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
+                      )}
                     </div>
                   </div>
                   <Progress value={(ch.days.filter(Boolean).length / 30) * 100} className="h-2 mb-2" />

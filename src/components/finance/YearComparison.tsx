@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { ArrowLeftRight } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
+import { getCurrentYear } from "@/components/finance/storage-keys";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import {
-  ALL_MONTHS, COLORS, DiffBadge, SaldoDiffBadge, categoryLabels, fmt, getExpensesByCategory,
+  ALL_MONTHS, COLORS, DiffBadge, SaldoDiffBadge, categoryLabels, fmt, getExpensesByCategory, totaisDoMes,
 } from "@/components/finance/MonthComparison";
 
 /* ── COMPARAÇÃO ANUAL (09/09) ──────────────────────────────────────────────
@@ -73,8 +73,10 @@ export interface TotaisAnuais {
 
 /**
  * Soma dos primeiros `meses` meses do ano, mês a mês, pelas mesmas leituras
- * do mensal (getMonthTotals respeita o perfil; getExpensesByCategory idem).
- * Nada de cache: são no máximo 24 × 4 leituras de localStorage por render.
+ * do mensal (totaisDoMes respeita o perfil; getExpensesByCategory idem).
+ * Despesa do mês = fixos + variáveis + PARCELAS, igual ao Dashboard (26/09 —
+ * antes as parcelas ficavam de fora do ano inteiro).
+ * Nada de cache: leituras de localStorage por render, a maioria de chave vazia.
  */
 export const totaisDoAno = (ano: number, userId: string | null, perfil: string, meses = 12): TotaisAnuais => {
   const n = Math.min(12, Math.max(0, meses));
@@ -82,9 +84,9 @@ export const totaisDoAno = (ano: number, userId: string | null, perfil: string, 
   let despesas = 0;
   const categorias: Record<string, number> = {};
   for (let idx = 0; idx < n; idx++) {
-    const t = getMonthTotals(ALL_MONTHS[idx], userId, ano, perfil);
+    const t = totaisDoMes({ ano, idx }, userId, perfil);
     receitas += t.receitas;
-    despesas += t.custosFixos + t.custosVariaveis;
+    despesas += t.despesas;
     const cats = getExpensesByCategory({ ano, idx }, userId, perfil);
     for (const [c, v] of Object.entries(cats)) categorias[c] = (categorias[c] || 0) + v;
   }

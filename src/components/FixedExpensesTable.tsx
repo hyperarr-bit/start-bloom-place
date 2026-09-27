@@ -73,6 +73,31 @@ const paymentMethods = [
 
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
+/**
+ * "Dia" do custo fixo (26/09, varredura). O campo diz "opcional", mas o
+ * adicionar fazia `Math.max(1, …)`: em branco virava "vence dia 1" — e no
+ * dia 26 isso aparecia como CONTA ATRASADA ("5 contas atrasadas: Spotify…").
+ * Mesma regra da edição: só inteiro de 1 a 31 vira dia; em branco = sem
+ * vencimento (não vira conta do mês). `null` = digitou algo que não é dia.
+ */
+export const diaDoFixo = (texto: string): number | undefined | null => {
+  const t = String(texto ?? "").trim();
+  if (!t) return undefined;
+  const dia = Number(t);
+  return Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : null;
+};
+
+/** Nome de verdade e valor maior que zero — a mensagem de erro, ou null. */
+export const erroDoFixo = (descricao: string, valorDigitado: string): string | null => {
+  const nome = descricao.trim();
+  if (!nome && !valorDigitado.trim()) return "Adicione o nome e o valor";
+  if (!nome) return "Adicione o nome";
+  const valor = numeroBR(valorDigitado);
+  if (!Number.isFinite(valor)) return "Informe o valor";
+  if (valor <= 0) return "O valor precisa ser maior que zero.";
+  return null;
+};
+
 export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
@@ -94,36 +119,35 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   }, [expenses, setExpenses]);
 
   const addExpense = () => {
-    if (!newExpense.description && !newExpense.value) {
-      toast.error("Adicione o nome e o valor");
-      return;
-    }
-    if (!newExpense.description) {
-      toast.error("Adicione o nome");
-      return;
-    }
-    if (!newExpense.value) {
-      toast.error("Informe o valor");
-      return;
-    }
-    const dayNum = Math.min(31, Math.max(1, parseInt(newExpense.day, 10) || 0));
+    const erro = erroDoFixo(newExpense.description, newExpense.value);
+    if (erro) { toast.error(erro); return; }
+    const dia = diaDoFixo(newExpense.day);
+    if (dia === null) { toast.error("O dia do vencimento vai de 1 a 31 — ou deixe em branco."); return; }
     setExpenses([
       ...expenses,
       {
         id: Date.now().toString(),
-        description: newExpense.description,
+        description: newExpense.description.trim(),
         category: newExpense.category || "outros",
         value: numeroBR(newExpense.value),
         paymentMethod: newExpense.paymentMethod || "boleto",
         cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
-        day: dayNum >= 1 ? dayNum : undefined,
+        day: dia,
       },
     ]);
     setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "" });
   };
 
+  /* Apagar em DOIS toques (26/09, varredura: um toque apagava sem volta).
+     Aqui não é o "Desfazer" das receitas/gastos de propósito: custo fixo com
+     Dia leva junto a conta do mês e o ✓ de paga (finance-sync) — desfazer
+     traria o Aluguel de volta como NÃO pago e ele virava "conta atrasada".
+     É o caso "item que carrega histórico" de lib/desfazer.ts. */
+  const [confirmandoApagar, setConfirmandoApagar] = useState<string | null>(null);
+
   const deleteExpense = (id: string) => {
     setExpenses(expenses.filter((e) => e.id !== id));
+    setConfirmandoApagar(null);
   };
 
   /** Edição na própria linha — o mesmo motivo descrito em ExpenseTable. */
@@ -133,6 +157,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   });
 
   const comecarEdicao = (e: FixedExpense) => {
+    setConfirmandoApagar(null);
     setEditandoId(e.id);
     setRascunho({
       description: e.description,
@@ -146,7 +171,9 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
 
   const salvarEdicao = () => {
     const valor = numeroBR(rascunho.value);
-    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    // negativo/zero também não salva — e diz por quê (26/09)
+    const erro = erroDoFixo(rascunho.description, rascunho.value);
+    if (erro) { toast.error(erro); return; }
     const dia = parseInt(rascunho.day, 10);
     setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
       ...e,
@@ -452,9 +479,19 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
                     {rotuloQuem(expense.quem ?? "eu")}
                   </button>
                 )}
-                <button onClick={() => deleteExpense(expense.id)} aria-label={`Apagar ${expense.description}`} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {confirmandoApagar === expense.id ? (
+                  <button
+                    onClick={() => deleteExpense(expense.id)}
+                    aria-label={`Confirmar exclusão de ${expense.description}`}
+                    className="h-7 px-1.5 rounded text-[9px] font-bold text-destructive border border-destructive/40 flex-shrink-0"
+                  >
+                    apagar?
+                  </button>
+                ) : (
+                  <button onClick={() => setConfirmandoApagar(expense.id)} aria-label={`Apagar ${expense.description}`} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           ))

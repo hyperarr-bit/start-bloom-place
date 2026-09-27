@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso, dataSegura } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2, Briefcase } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, TrendingDown, Link2, Briefcase } from "lucide-react";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const genId = () => crypto.randomUUID();
+
+/** Data das listas em dd/mm (dd/mm/aa se não for deste ano) — antes saía o
+ *  "2026-09-23" gravado (26/09, varredura). Vazio/inválido → "—". */
+export const dataCurtaCarreira = (valor: unknown, agora: Date = new Date()): string => {
+  const texto = typeof valor === "string" ? valor : "";
+  const doAno = texto.startsWith(`${agora.getFullYear()}-`);
+  return dataSegura(texto, doAno ? "dd/MM" : "dd/MM/yy");
+};
 
 // ============= TYPES =============
 type JobApp = { id: string; company: string; role: string; link: string; status: "aplicado" | "entrevista" | "teste" | "oferta" | "rejeitado" | "desistiu"; date: string; salary: string; notes: string; favorite: boolean };
@@ -162,7 +170,7 @@ const JobTracker = () => {
               <div className="col-span-2">
                 <Badge className={`text-[8px] px-1.5 py-0 ${statusConfig[job.status]?.color}`}>{statusConfig[job.status]?.emoji} {statusConfig[job.status]?.label}</Badge>
               </div>
-              <span className="col-span-2 text-[10px] text-muted-foreground">{job.date}</span>
+              <span className="col-span-2 text-[10px] text-muted-foreground">{dataCurtaCarreira(job.date)}</span>
               <div className="col-span-2 flex justify-end gap-1 shrink-0">
                 {job.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(job.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
                 <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => { setForm(job); setEditId(job.id); setShowForm(true); }}><Edit2 className="w-3 h-3" /></Button>
@@ -327,7 +335,7 @@ const Portfolio = () => {
                         </div>
                       )}
                     </div>
-                    <span className="col-span-3 text-[10px] text-muted-foreground">{item.date}</span>
+                    <span className="col-span-3 text-[10px] text-muted-foreground">{dataCurtaCarreira(item.date)}</span>
                     <div className="col-span-4 flex justify-end gap-1">
                       {item.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(item.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
                       <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={`Etiquetas e notas de ${item.title}`} onClick={() => setEditandoTags(editandoTags === item.id ? null : item.id)}><Edit2 className="w-3 h-3" /></Button>
@@ -371,15 +379,24 @@ const Networking = () => {
   const [contacts, setContacts] = usePersistedState<Contact[]>("career-contacts", []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<Contact>>({ category: "profissional" });
+  // Editar contato (26/09, varredura): o mesmo formulário do "Detalhado".
+  const [editId, setEditId] = useState<string | null>(null);
   const categories = ["profissional", "mentor", "recrutador", "colega", "cliente"];
   const catEmoji: Record<string, string> = { profissional: "👔", mentor: "🧠", recrutador: "🎯", colega: "🤝", cliente: "💼" };
   const [inlineForm, setInlineForm] = useState({ name: "", company: "" });
 
   const save = () => {
     if (!form.name) return;
-    setContacts(prev => [...prev, { id: genId(), name: form.name || "", company: form.company || "", role: form.role || "", linkedin: form.linkedin || "", email: form.email || "", phone: form.phone || "", notes: form.notes || "", lastContact: form.lastContact || "", category: form.category || "profissional" }]);
-    setForm({ category: "profissional" }); setShowForm(false);
+    if (editId) {
+      setContacts(prev => prev.map(c => c.id === editId ? { ...c, ...form, name: form.name || c.name } as Contact : c));
+    } else {
+      // Nasce com último contato = HOJE, como o "+ Add" da linha (26/09,
+      // varredura): vazio, o contato recém-criado caía direto no follow-up.
+      setContacts(prev => [...prev, { id: genId(), name: form.name || "", company: form.company || "", role: form.role || "", linkedin: form.linkedin || "", email: form.email || "", phone: form.phone || "", notes: form.notes || "", lastContact: form.lastContact || localDayKey(), category: form.category || "profissional" }]);
+    }
+    setForm({ category: "profissional" }); setEditId(null); setShowForm(false);
   };
+  const editar = (c: Contact) => { setForm(c); setEditId(c.id); setShowForm(true); };
 
   const addInline = () => {
     if (!inlineForm.name) return;
@@ -421,7 +438,7 @@ const Networking = () => {
           <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
           <div className="flex gap-2">
             <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setShowForm(false); setEditId(null); setForm({ category: "profissional" }); }}>Cancelar</Button>
           </div>
         </div>
       )}
@@ -429,7 +446,7 @@ const Networking = () => {
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-purple-200 dark:bg-purple-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">🤝 REDE DE CONTATOS</span>
-          <button onClick={() => setShowForm(!showForm)}
+          <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm({ category: "profissional" }); }}
             className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
             <Plus className="w-3 h-3 inline mr-0.5" />Detalhado
           </button>
@@ -454,9 +471,10 @@ const Networking = () => {
               <div className="col-span-3 min-w-0">
                 <p className="text-[10px] text-muted-foreground truncate">{c.role}{c.company ? ` @ ${c.company}` : ""}</p>
               </div>
-              <span className="col-span-3 text-[10px] text-muted-foreground">{c.lastContact || "—"}</span>
+              <span className="col-span-3 text-[10px] text-muted-foreground">{dataCurtaCarreira(c.lastContact)}</span>
               <div className="col-span-2 flex justify-end gap-1">
                 {c.linkedin && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(c.linkedin, "_blank")}><Link2 className="w-3 h-3" /></Button>}
+                <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={`Editar ${c.name}`} onClick={() => editar(c)}><Edit2 className="w-3 h-3" /></Button>
                 <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setContacts(prev => prev.filter(x => x.id !== c.id))}><Trash2 className="w-3 h-3" /></Button>
               </div>
             </div>
@@ -516,8 +534,20 @@ const SkillsTracker = () => {
     setInlineInputs(prev => ({ ...prev, [cat]: "" }));
   };
 
+  // Nível sobe E desce (26/09, varredura): só havia o ↑ — um toque a mais e
+  // não tinha como voltar.
+  const mudarNivel = (id: string, delta: number) =>
+    setSkills(prev => prev.map(s => s.id === id ? { ...s, level: Math.min(5, Math.max(1, (Number(s.level) || 1) + delta)) } : s));
+
   return (
     <div className="space-y-4">
+      {/* Porta do formulário detalhado (26/09, varredura): ele existia, mas
+          nada o abria — mesmo caso (e mesma porta) do Portfolio. */}
+      {!showForm && (
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowForm(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1" /> Skill detalhada (nível, notas)
+        </Button>
+      )}
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Input placeholder="Nome da skill" value={form.name || ""} onChange={e => setForm(p => ({...p, name: e.target.value}))} className="h-9 text-sm" />
@@ -558,7 +588,8 @@ const SkillsTracker = () => {
                     ))}
                   </div>
                   <Badge className={`text-[7px] px-1 py-0 text-white shrink-0 ${levelColors[skill.level - 1]}`}>{levels[skill.level - 1]}</Badge>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => setSkills(prev => prev.map(s => s.id === skill.id ? {...s, level: Math.min(s.level + 1, 5)} : s))}><TrendingUp className="w-3 h-3 text-green-500" /></Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label={`Baixar nível de ${skill.name}`} disabled={skill.level <= 1} onClick={() => mudarNivel(skill.id, -1)}><TrendingDown className="w-3 h-3 text-muted-foreground" /></Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label={`Subir nível de ${skill.name}`} disabled={skill.level >= 5} onClick={() => mudarNivel(skill.id, 1)}><TrendingUp className="w-3 h-3 text-green-500" /></Button>
                   <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100 shrink-0" onClick={() => setSkills(prev => prev.filter(s => s.id !== skill.id))}><Trash2 className="w-3 h-3" /></Button>
                 </div>
               ))}
@@ -661,6 +692,10 @@ const WorkDay = () => (
 // ============= MAIN =============
 const Carreira = () => {
   const navigate = useNavigate();
+  // Demo (/preview/carreira): a seta sai pra LP, como em Finanças — /home sem
+  // conta caía no login (26/09, varredura).
+  const location = useLocation();
+  const isPreview = location.pathname.startsWith("/preview");
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
 
@@ -694,7 +729,7 @@ const Carreira = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label={isPreview ? "Voltar" : "Todos os módulos"}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Briefcase className="w-5 h-5 text-slate-600" />

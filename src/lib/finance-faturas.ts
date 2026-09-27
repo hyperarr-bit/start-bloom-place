@@ -1,5 +1,7 @@
 import { mesDoGasto, type CardConfig, type GastoDeCartao } from "@/lib/finance-fatura";
-import { somarMeses, valorDaParcelaNoMes, type Parcela } from "@/lib/finance-parcelas";
+import {
+  somarMeses, valorDaParcelaNoMes, chaveArquivadaDeParcelas, mesesAnteriores, projetarParcelas, type Parcela,
+} from "@/lib/finance-parcelas";
 
 /**
  * FATURA DO CARTÃO COMO UMA CONTA DO MÊS (22/09) — o chamado mais longo da
@@ -94,6 +96,83 @@ export function faturasDoMes(e: EntradaFatura): FaturaDoMes[] {
       variaveis: t?.variaveis ?? 0, parcelas: t?.parcelas ?? 0, fixos: t?.fixos ?? 0,
       paga: e.pagas?.[chaveDaFatura(e.mes, card)] === true,
     });
+  }
+  return out.sort((a, b) => a.dueDay - b.dueDay || a.label.localeCompare(b.label));
+}
+
+/* ═══ A FATURA QUE VENCE NO MÊS (26/09, auditoria da virada 30/09 → 01/10) ═══
+ *
+ * `faturasDoMes` soma a fatura que FECHA no mês. Pro cartão que fecha e vence
+ * no mesmo mês (fecha 20, vence 27) é a mesma que vence no mês. Mas no cartão
+ * comum o vencimento cai no mês SEGUINTE ao fechamento — fecha 25, vence 5,
+ * e o próprio app escreve "vence dia 5 do mês seguinte". A conta que vence
+ * em 05/10 é a fatura que FECHOU em 25/09; CONTAS DO MÊS e o aviso de véspera
+ * mostravam no dia 5 de outubro a que fecha em 25/10 — parcial, só com as
+ * compras de 26/09 em diante — e o "paguei" marcava as parcelas de OUTUBRO,
+ * que só serão cobradas em novembro.
+ *
+ * `faturasAVencer` escolhe a fatura certa por cartão. O "paguei" continua na
+ * chave do mês em que ela VENCE (`AAAA-MM:cartão`): é o que todo mundo já
+ * marcou até aqui — o ✓ da linha do dia 5 de setembro foi o pagamento do que
+ * venceu em 5 de setembro. `faturasDoMes` não muda: é a fatura que fecha.
+ */
+
+/** Cartão que vence no mês SEGUINTE ao fechamento (vencimento ≤ fechamento). */
+export const venceNoMesSeguinte = (cfg: CardConfig | undefined): boolean => {
+  const fecha = dia(cfg?.closingDay);
+  const vence = dia(cfg?.dueDay);
+  return fecha !== null && vence !== null && vence <= fecha;
+};
+
+/** Mês em que FECHOU a fatura que vence em `mesVencimento`. */
+export const mesDeFechamento = (mesVencimento: string, cfg: CardConfig | undefined): string =>
+  venceNoMesSeguinte(cfg) ? somarMeses(mesVencimento, -1) : mesVencimento;
+
+/** Parcelas como estavam num mês que JÁ PASSOU: a chave dele (retratos que a
+ *  virada deixa) + o que chaves mais antigas projetam pra ele — a mesma
+ *  leitura da planilha do mês (MonthlySheet). */
+export const parcelasDoMesPassado = (mes: string, ler: (chave: string) => Parcela[]): Parcela[] => {
+  const proprias = arr<Parcela>(ler(chaveArquivadaDeParcelas(mes)));
+  const fontes = mesesAnteriores(mes, 24).map((m) => ({ mes: m, itens: arr<Parcela>(ler(chaveArquivadaDeParcelas(m))) }));
+  return [...proprias, ...projetarParcelas(fontes, mes, proprias)];
+};
+
+export interface EntradaFaturasAVencer {
+  /** Mês em que as faturas VENCEM — o da tela ou do aviso. */
+  mes: string;
+  /** Gastos variáveis gravados na chave de um mês (balde corrente ou arquivo). */
+  gastosDoMes: (mes: string) => GastoDeCartao[];
+  /** Parcelas como estavam (ou estarão) num mês. */
+  parcelasDoMes: (mes: string) => Parcela[];
+  fixos: EntradaFatura["fixos"];
+  cards: string[];
+  configOf: (card: string) => CardConfig | undefined;
+  labelOf: (card: string) => string;
+  pagas: Record<string, boolean>;
+}
+
+/** As faturas que VENCEM em `e.mes`, uma por cartão com vencimento cadastrado. */
+export function faturasAVencer(e: EntradaFaturasAVencer): FaturaDoMes[] {
+  const cache = new Map<string, FaturaDoMes[]>();
+  const fechadaEm = (mesFechamento: string) => {
+    if (!cache.has(mesFechamento)) {
+      cache.set(mesFechamento, faturasDoMes({
+        mes: mesFechamento,
+        variaveis: e.gastosDoMes(mesFechamento),
+        variaveisAnterior: e.gastosDoMes(somarMeses(mesFechamento, -1)),
+        fixos: e.fixos,
+        parcelas: e.parcelasDoMes(mesFechamento),
+        cards: e.cards, configOf: e.configOf, labelOf: e.labelOf,
+        pagas: {},
+      }));
+    }
+    return cache.get(mesFechamento)!;
+  };
+  const cartoes = new Set([...e.cards, ...fechadaEm(e.mes).map((f) => f.card), ...fechadaEm(somarMeses(e.mes, -1)).map((f) => f.card)]);
+  const out: FaturaDoMes[] = [];
+  for (const card of cartoes) {
+    const f = fechadaEm(mesDeFechamento(e.mes, e.configOf(card))).find((x) => x.card === card);
+    if (f) out.push({ ...f, paga: e.pagas?.[chaveDaFatura(e.mes, card)] === true });
   }
   return out.sort((a, b) => a.dueDay - b.dueDay || a.label.localeCompare(b.label));
 }

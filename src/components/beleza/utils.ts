@@ -1,19 +1,24 @@
+import { parseLocalDay } from "@/lib/utils";
+
 // ============= CONFLICT DATABASE =============
 export interface ConflictRule {
   ingredients: [string, string];
   severity: "high" | "medium";
   message: string;
   suggestion: string;
+  /** A dica manda ALTERNAR OS DIAS: os dois no mesmo dia já é conflito, mesmo
+   *  um de manhã e outro à noite. Sem isso, só conflita no mesmo período. */
+  mesmoDia?: boolean;
 }
 
 export const CONFLICT_RULES: ConflictRule[] = [
-  { ingredients: ["retinol", "ácido glicólico"], severity: "high", message: "Retinol + Ácido Glicólico podem causar irritação severa", suggestion: "Use Retinol à noite e Ácido Glicólico em dias alternados" },
-  { ingredients: ["retinol", "aha"], severity: "high", message: "Retinol + AHA causam descamação excessiva", suggestion: "Alterne os dias de uso" },
+  { ingredients: ["retinol", "ácido glicólico"], severity: "high", message: "Retinol + Ácido Glicólico podem causar irritação severa", suggestion: "Use Retinol à noite e Ácido Glicólico em dias alternados", mesmoDia: true },
+  { ingredients: ["retinol", "aha"], severity: "high", message: "Retinol + AHA causam descamação excessiva", suggestion: "Alterne os dias de uso", mesmoDia: true },
   { ingredients: ["retinol", "bha"], severity: "high", message: "Retinol + BHA podem sensibilizar a pele", suggestion: "Use BHA de manhã e Retinol à noite" },
   { ingredients: ["retinol", "vitamina c"], severity: "medium", message: "Retinol + Vitamina C podem reduzir eficácia", suggestion: "Vitamina C de manhã, Retinol à noite" },
   { ingredients: ["retinol", "peróxido de benzoíla"], severity: "high", message: "Peróxido de Benzoíla inativa o Retinol", suggestion: "Use em horários diferentes" },
   { ingredients: ["vitamina c", "niacinamida"], severity: "medium", message: "Em alta concentração podem causar vermelhidão", suggestion: "Espere 15 min entre aplicações ou use em horários diferentes" },
-  { ingredients: ["aha", "bha"], severity: "medium", message: "AHA + BHA juntos podem ressecar demais", suggestion: "Alterne: AHA em um dia, BHA no outro" },
+  { ingredients: ["aha", "bha"], severity: "medium", message: "AHA + BHA juntos podem ressecar demais", suggestion: "Alterne: AHA em um dia, BHA no outro", mesmoDia: true },
   { ingredients: ["aha", "vitamina c"], severity: "medium", message: "Ambos são ácidos e podem irritar", suggestion: "Vitamina C de manhã, AHA à noite" },
   { ingredients: ["peróxido de benzoíla", "vitamina c"], severity: "high", message: "Peróxido oxida a Vitamina C, anulando o efeito", suggestion: "Nunca use juntos" },
   { ingredients: ["retinol", "ácido salicílico"], severity: "medium", message: "Ambos esfoliam e podem irritar peles sensíveis", suggestion: "Ácido Salicílico de manhã, Retinol à noite" },
@@ -34,7 +39,7 @@ export const SKINCARE_STEP_ICONS: Record<string, string> = {
 };
 
 export function getStepIcon(stepName: string): string {
-  const lower = stepName.toLowerCase();
+  const lower = String(stepName ?? "").toLowerCase();
   for (const [key, icon] of Object.entries(SKINCARE_STEP_ICONS)) {
     if (lower.includes(key)) return icon;
   }
@@ -53,6 +58,51 @@ export function checkConflicts(steps: string[]): ConflictRule[] {
   }
   return found;
 }
+
+/** Conflitos da rotina olhando manhã e noite SEPARADAS (26/09, varredura).
+ *  Antes a rotina juntava os dois períodos: Vitamina C de manhã + Retinol à
+ *  noite dava "CONFLITOS DETECTADOS… 💡 Vitamina C de manhã, Retinol à noite"
+ *  — o alerta contradizia a própria dica. Regra de "horários diferentes" só
+ *  conflita no mesmo período; regra de "alterne os dias" (mesmoDia) conflita
+ *  com os dois em qualquer período do dia. */
+export function conflitosDaRotina(manha: string[], noite: string[]): ConflictRule[] {
+  const m = manha.map(s => String(s ?? "").toLowerCase());
+  const n = noite.map(s => String(s ?? "").toLowerCase());
+  const tem = (lista: string[], ingrediente: string) => lista.some(s => s.includes(ingrediente));
+  return CONFLICT_RULES.filter(({ ingredients: [a, b], mesmoDia }) => {
+    const noMesmoPeriodo = (tem(m, a) && tem(m, b)) || (tem(n, a) && tem(n, b));
+    if (noMesmoPeriodo) return true;
+    return !!mesmoDia && (tem(m, a) || tem(n, a)) && (tem(m, b) || tem(n, b));
+  });
+}
+
+// ============= PASSOS DA ROTINA × CHECKS DO DIA =============
+/* Os checks do dia guardam o ÍNDICE do passo (skincare-*-checked, formato
+   gravado em conta real — não muda). Apagar um passo desloca os índices de
+   quem vem depois, então os checks de HOJE andam junto; dias passados só
+   contam pra sequência (tamanho > 0) e ficam como estão. */
+export const marcadosAposRemover = (marcados: number[], idx: number): number[] =>
+  marcados.filter(i => i !== idx).map(i => (i > idx ? i - 1 : i));
+
+export const marcadosAposInserir = (marcados: number[], idx: number, marcar: boolean): number[] => {
+  const deslocados = marcados.map(i => (i >= idx ? i + 1 : i));
+  return marcar ? [...deslocados, idx] : deslocados;
+};
+
+export const inserirEm = <T,>(lista: T[], idx: number, item: T): T[] => {
+  const pos = Math.min(Math.max(0, idx), lista.length);
+  return [...lista.slice(0, pos), item, ...lista.slice(pos)];
+};
+
+/** Fase do skin cycling (0–3) contando dias LOCAIS desde o início gravado.
+ *  Início vazio ou inválido = hoje é o dia 1 (nunca NaN na tela). */
+export const faseDoCiclo = (inicio: string, hoje: string): number => {
+  const ehDia = (s: unknown) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  if (!ehDia(inicio) || !ehDia(hoje)) return 0;
+  // round, não floor: dia com horário de verão tem 23 ou 25 h
+  const dias = Math.round((parseLocalDay(hoje).getTime() - parseLocalDay(inicio).getTime()) / 86_400_000);
+  return ((dias % 4) + 4) % 4;
+};
 
 // ============= COST PER DOSE =============
 const DOSE_ESTIMATES: Record<string, number> = {

@@ -4,9 +4,10 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
-import { localDayKey, mesAtualExtenso, dataSegura } from "@/lib/utils";
+import { localDayKey, parseLocalDay, mesAtualExtenso, dataSegura } from "@/lib/utils";
 import { uploadFromInput } from "@/lib/image-upload";
 import { limparLivros } from "@/lib/biblioteca-limpeza";
+import { avisarApagado } from "@/lib/desfazer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +17,7 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, addDays, format } from "date-fns";
+import { differenceInDays, differenceInCalendarDays, addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 // ── Types ──
@@ -84,6 +85,38 @@ export const rotuloDoFormato = (f: unknown): string | null => {
 };
 
 const genId = () => crypto.randomUUID();
+
+/** Página atual válida (26/09, varredura). Livro SEM total de páginas não tem
+ *  teto — antes o teto era `pages` (0) e o campo voltava vazio a cada dígito.
+ *  Com total, não passa dele ("400/320" na estante). */
+export const paginaValida = (pagina: number, total: number): number => {
+  const p = Number.isFinite(pagina) ? Math.max(0, Math.floor(pagina)) : 0;
+  return total > 0 ? Math.min(total, p) : p;
+};
+
+/** Meta anual a partir do rascunho digitado, validada só ao SAIR do campo
+ *  (26/09, varredura): gravar a cada tecla com mínimo 1 fazia o campo vazio
+ *  virar "1" na hora — digitar 5 dava 15, 20 dava 120. Vazio ou lixo mantém a
+ *  meta de antes; o resto fica entre 1 e 999 (a estante do desafio desenha
+ *  um espaço por livro da meta). */
+export const metaDoRascunho = (texto: string, atual: number): number => {
+  const n = Number(String(texto).trim().replace(",", "."));
+  if (!String(texto).trim() || !Number.isFinite(n)) return atual;
+  return Math.min(999, Math.max(1, Math.round(n)));
+};
+
+/** Devolução do empréstimo comparando DIAS LOCAIS (26/09, varredura):
+ *  `new Date("2026-09-26")` é meia-noite UTC = 21h do dia 25 no Brasil, então
+ *  devolução marcada pra HOJE já aparecia "⚠️ ATRASADO" (e amanhã, "0d").
+ *  Atrasado só a partir do dia seguinte ao combinado. */
+export const situacaoDevolucao = (dataDevolucao: string | undefined, hoje: string = localDayKey()): { atrasado: boolean; diasRestantes: number | null } => {
+  if (!dataDevolucao || !/^\d{4}-\d{2}-\d{2}$/.test(dataDevolucao)) return { atrasado: false, diasRestantes: null };
+  const diasRestantes = differenceInCalendarDays(parseLocalDay(dataDevolucao), parseLocalDay(hoje));
+  return { atrasado: diasRestantes < 0, diasRestantes };
+};
+
+/** "AAAA-MM-DD" vira dia LOCAL; outro formato gravado passa pelo Date normal. */
+const diaLocal = (valor: string) => (/^\d{4}-\d{2}-\d{2}$/.test(valor) ? parseLocalDay(valor) : new Date(valor));
 
 /* TELA LARGA (pedido de cliente pagante, 10/09, print da estante num
    monitor em modo escuro): "nesse espaço branco não dá pra colocar
@@ -225,10 +258,30 @@ const Biblioteca = () => {
   const [erroCapa, setErroCapa] = useState("");
 
   // ── Derived Data ──
-  const currentBook = books.find(b => b.status === "lendo");
+  /* VÁRIOS LIVROS AO MESMO TEMPO (26/09, varredura): "Lendo agora" mostrava
+     só o primeiro "lendo" — o segundo sumia da aba e a página dele só mudava
+     editando o livro. Agora o card lista todos: o livro em foco fica grande
+     (ritmo, citações e abandonar valem pra ele) e os outros aparecem embaixo,
+     com a página à mão e um toque pra trocar o foco. */
+  const [focoLeituraId, setFocoLeituraId] = useState<string | null>(null);
+  const lendoAgora = books.filter(b => b.status === "lendo");
+  const currentBook = lendoAgora.find(b => b.id === focoLeituraId) ?? lendoAgora[0];
+  const outrosLendo = lendoAgora.filter(b => b.id !== currentBook?.id);
   const booksRead = books.filter(b => b.status === "lido");
   const currentYear = new Date().getFullYear();
-  const booksReadThisYear = booksRead.filter(b => b.endDate?.startsWith(String(currentYear))).length;
+  // Só os lidos DESTE ano: a estante do desafio 2026 mostrava livro de 2025
+  // (26/09, varredura). endDate é dia local "AAAA-MM-DD".
+  const lidosNoAno = booksRead.filter(b => typeof b.endDate === "string" && b.endDate.startsWith(String(currentYear)));
+  const booksReadThisYear = lidosNoAno.length;
+  // Meta: rascunho em texto enquanto a pessoa digita; grava ao sair do campo.
+  const [metaRascunho, setMetaRascunho] = useState<string | null>(null);
+  const metaAno = Number.isFinite(yearGoal) && yearGoal >= 1 ? Math.min(999, Math.floor(yearGoal)) : 12;
+  const salvarMeta = () => {
+    if (metaRascunho === null) return;
+    const nova = metaDoRascunho(metaRascunho, metaAno);
+    if (nova !== yearGoal) setYearGoal(nova);
+    setMetaRascunho(null);
+  };
   /* META QUE NÃO CONTAVA (09/09): a meta do ano só soma "lido" COM endDate do
      ano, mas o campo FIM nunca se preenchia sozinho — a cliente marcava lido,
      a meta ficava em 0/12 e ela achava que a meta não funcionava. Daqui pra
@@ -263,7 +316,9 @@ const Biblioteca = () => {
     if (!form.title) return;
     // Rede de segurança da meta: "lido" sem FIM ganha o dia de HOJE (dia
     // LOCAL — toISOString depois das 21h vira amanhã, bug real de 16/07).
-    const pronto: Partial<Book> = form.status === "lido" && !form.endDate ? { ...form, endDate: localDayKey() } : form;
+    const comFim: Partial<Book> = form.status === "lido" && !form.endDate ? { ...form, endDate: localDayKey() } : form;
+    // Página atual não passa do total quando há total (26/09: "400/320").
+    const pronto: Partial<Book> = { ...comFim, currentPage: paginaValida(Number(comFim.currentPage) || 0, Number(comFim.pages) || 0) };
     if (editId) {
       setBooks(prev => prev.map(b => b.id === editId ? { ...b, ...pronto, quotes: b.quotes || [] } as Book : b));
     } else {
@@ -296,7 +351,20 @@ const Biblioteca = () => {
     } finally { setSubindoCapa(false); }
   };
 
-  const remove = (id: string) => setBooks(prev => prev.filter(b => b.id !== id));
+  /* APAGAR SEM VOLTA (26/09, varredura): a lixeira ficava a 2 px do lápis e
+     apagava na hora — livro com citações, anotações e progresso. Apaga já e
+     oferece Desfazer; o livro volta no mesmo lugar da estante, do jeito que
+     estava gravado. */
+  const remove = (id: string) => {
+    const idx = booksBrutos.findIndex(b => b.id === id);
+    const livro = booksBrutos[idx];
+    if (!livro) return;
+    setBooks(prev => prev.filter(b => b.id !== id));
+    if (editId === id) { setShowForm(false); setEditId(null); }
+    const titulo = books.find(b => b.id === id)?.title || "Livro";
+    avisarApagado(`"${titulo}" saiu da estante`, () =>
+      setBooks(prev => (prev.some(b => b.id === id) ? prev : [...prev.slice(0, idx), livro, ...prev.slice(idx)])));
+  };
 
   // Dias em que a pessoa mexeu na página de algum livro: é o "li hoje" que a
   // Home usa pra riscar "Continuar «livro»" e dar o ponto de leitura (11/09).
@@ -306,7 +374,7 @@ const Biblioteca = () => {
     if (!readLog.includes(hoje)) setReadLog([...readLog.slice(-60), hoje]);
   };
   const updatePage = (id: string, page: number) => {
-    setBooks(prev => prev.map(b => b.id === id ? { ...b, currentPage: Math.min(b.pages, Math.max(0, page)) } : b));
+    setBooks(prev => prev.map(b => b.id === id ? { ...b, currentPage: paginaValida(page, Number(b.pages) || 0) } : b));
     marcarLeituraHoje();
   };
 
@@ -326,21 +394,33 @@ const Biblioteca = () => {
     setQuoteText(""); setQuotePage(""); setQuoteTags(""); setQuoteBookId(null);
   };
 
+  // Citação também é texto que a pessoa digitou: apaga com Desfazer (26/09).
   const removeQuote = (bookId: string, quoteId: string) => {
+    const lista = booksBrutos.find(b => b.id === bookId)?.quotes || [];
+    const idx = lista.findIndex(q => q.id === quoteId);
+    const citacao = lista[idx];
     setBooks(prev => prev.map(b => b.id === bookId ? { ...b, quotes: (b.quotes || []).filter(q => q.id !== quoteId) } : b));
+    if (!citacao) return;
+    avisarApagado("Citação apagada", () =>
+      setBooks(prev => prev.map(b => {
+        if (b.id !== bookId) return b;
+        const atuais = b.quotes || [];
+        return atuais.some(q => q.id === quoteId) ? b : { ...b, quotes: [...atuais.slice(0, idx), citacao, ...atuais.slice(idx)] };
+      })));
   };
 
   // ── Pace Calculator ──
   const calcPace = (book: Book) => {
     if (!book.startDate || book.pages <= 0) return null;
-    const daysElapsed = Math.max(1, differenceInDays(new Date(), new Date(book.startDate)));
+    // datas "AAAA-MM-DD" como dia LOCAL (new Date lia em UTC: 1 dia antes no Brasil)
+    const daysElapsed = Math.max(1, differenceInDays(new Date(), diaLocal(book.startDate)));
     const pagesPerDay = book.currentPage / daysElapsed;
     const remaining = book.pages - book.currentPage;
     const estFinish = pagesPerDay > 0 ? addDays(new Date(), Math.ceil(remaining / pagesPerDay)) : null;
 
     let neededPerDay: number | null = null;
     if (book.goalDate) {
-      const daysLeft = Math.max(1, differenceInDays(new Date(book.goalDate), new Date()));
+      const daysLeft = Math.max(1, differenceInDays(diaLocal(book.goalDate), new Date()));
       neededPerDay = Math.ceil(remaining / daysLeft);
     }
 
@@ -563,17 +643,58 @@ const Biblioteca = () => {
                     <div className="mt-4 flex gap-2 items-center">
                       <Input
                         type="number"
+                        inputMode="numeric"
                         placeholder="Atualizar página..."
+                        aria-label={`Página atual de ${currentBook.title}`}
                         value={currentBook.currentPage || ""}
                         onChange={e => updatePage(currentBook.id, +e.target.value)}
                         className="h-9 text-sm flex-1"
                         min={0}
-                        max={currentBook.pages}
+                        max={currentBook.pages > 0 ? currentBook.pages : undefined}
                       />
                       <Button size="sm" variant="outline" className="h-9 text-xs" onClick={() => openEdit(currentBook)}>
                         <Edit2 className="w-3 h-3 mr-1" /> Editar
                       </Button>
                     </div>
+
+                    {/* Os outros livros em leitura: página à mão e um toque no
+                        título traz o livro pro foco (ritmo e citações dele). */}
+                    {outrosLendo.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-border space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Também lendo</p>
+                        {outrosLendo.map(b => (
+                          <div key={b.id} className="flex items-center gap-3">
+                            <button type="button" onClick={() => setFocoLeituraId(b.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left" aria-label={`Ver ${b.title}`}>
+                              {b.cover ? (
+                                <img src={b.cover} alt="" className="w-10 h-14 rounded object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                                  <BookOpen className="w-4 h-4 text-muted-foreground/30" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs leading-tight truncate">{b.title}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{b.author}</p>
+                                {b.pages > 0 && (
+                                  <p className="text-[10px] font-bold text-muted-foreground">Pág. {b.currentPage || 0}/{b.pages} · {Math.round(((b.currentPage || 0) / b.pages) * 100)}%</p>
+                                )}
+                              </div>
+                            </button>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              placeholder="Pág."
+                              aria-label={`Página atual de ${b.title}`}
+                              value={b.currentPage || ""}
+                              onChange={e => updatePage(b.id, +e.target.value)}
+                              className="h-9 w-20 text-sm"
+                              min={0}
+                              max={b.pages > 0 ? b.pages : undefined}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -818,8 +939,7 @@ const Biblioteca = () => {
                   <p className="text-center text-muted-foreground text-sm py-6">Nenhum livro emprestado. Sorte sua! 🎉</p>
                 ) : (
                   lentBooks.map(book => {
-                    const overdue = book.lentReturnDate && new Date(book.lentReturnDate) < new Date();
-                    const daysLeft = book.lentReturnDate ? differenceInDays(new Date(book.lentReturnDate), new Date()) : null;
+                    const { atrasado: overdue, diasRestantes: daysLeft } = situacaoDevolucao(book.lentReturnDate);
                     return (
                       <div key={book.id} className={`rounded-lg border p-3 space-y-2 ${overdue ? "border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-950/20" : "border-border bg-card"}`}>
                         <div className="flex gap-3 items-start">
@@ -840,7 +960,7 @@ const Biblioteca = () => {
                               {overdue && <Badge className="text-[9px] bg-red-500 text-white border-red-600">⚠️ ATRASADO</Badge>}
                               {daysLeft !== null && !overdue && daysLeft <= 7 && (
                                 <Badge className="text-[9px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                                  ⏰ {daysLeft}d
+                                  ⏰ {daysLeft === 0 ? "hoje" : `${daysLeft}d`}
                                 </Badge>
                               )}
                             </div>
@@ -886,12 +1006,19 @@ const Biblioteca = () => {
                 {/* Goal setter */}
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-muted-foreground">Meta anual:</span>
+                  {/* Rascunho em texto enquanto digita; valida e grava ao sair
+                      (ou no Enter). Apagar tudo não vira "1" no meio do caminho. */}
                   <Input
                     type="number"
-                    value={yearGoal}
-                    onChange={e => setYearGoal(Math.max(1, +e.target.value))}
+                    inputMode="numeric"
+                    aria-label="Meta anual de livros"
+                    value={metaRascunho ?? String(metaAno)}
+                    onChange={e => setMetaRascunho(e.target.value)}
+                    onBlur={salvarMeta}
+                    onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
                     className="w-20 h-8 text-sm text-center font-bold"
                     min={1}
+                    max={999}
                   />
                   <span className="text-xs text-muted-foreground">livros</span>
                 </div>
@@ -899,13 +1026,13 @@ const Biblioteca = () => {
                 {/* Progress */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-bold">
-                    <span>{booksReadThisYear} de {yearGoal} livros</span>
-                    <span>{Math.round((booksReadThisYear / yearGoal) * 100)}%</span>
+                    <span>{booksReadThisYear} de {metaAno} livros</span>
+                    <span>{Math.round((booksReadThisYear / metaAno) * 100)}%</span>
                   </div>
                   <div className="h-4 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, (booksReadThisYear / yearGoal) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (booksReadThisYear / metaAno) * 100)}%` }}
                     />
                   </div>
                   {/* Livros marcados "lido" antes de 09/09 sem data de fim:
@@ -925,8 +1052,9 @@ const Biblioteca = () => {
                 {booksRead.length > 0 && (
                   <div className="rounded-lg border border-border bg-card p-3">
                     <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">📚 SUA ESTANTE</p>
+                    {/* Só os lidos no ano do desafio (antes entrava livro de 2025) */}
                     <div className="flex flex-wrap gap-1.5">
-                      {booksRead.slice(0, yearGoal).map((b, i) => (
+                      {lidosNoAno.slice(0, metaAno).map((b, i) => (
                         <div key={b.id} className="w-9 h-12 rounded bg-gradient-to-b from-orange-400 to-orange-600 flex items-center justify-center overflow-hidden" title={b.title}>
                           {b.cover ? (
                             <img src={b.cover} alt={b.title} className="w-full h-full object-cover" />
@@ -935,7 +1063,7 @@ const Biblioteca = () => {
                           )}
                         </div>
                       ))}
-                      {Array.from({ length: Math.max(0, yearGoal - booksRead.length) }).map((_, i) => (
+                      {Array.from({ length: Math.max(0, metaAno - lidosNoAno.length) }).map((_, i) => (
                         <div key={`empty-${i}`} className="w-9 h-12 rounded border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
                           <span className="text-[10px] text-muted-foreground/30">?</span>
                         </div>
@@ -1089,9 +1217,13 @@ const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit:
             {blocoDetalhe}
           </div>
         )}
-        <div className="flex flex-col gap-0.5">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit} aria-label={`Editar ${book.title}`}><Edit2 className="w-3 h-3" /></Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={onRemove} aria-label={`Remover ${book.title}`}><Trash2 className="w-3 h-3" /></Button>
+        {/* Lápis e lixeira eram 24×24 a 2 px um do outro: o toque no lápis
+            pegava a lixeira (26/09, varredura). 36 px cada, 8 px entre os
+            dois; a margem negativa usa o respiro do card pra linha crescer
+            o mínimo. */}
+        <div className="flex flex-col gap-2 -my-1 -mr-1.5">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onEdit} aria-label={`Editar ${book.title}`}><Edit2 className="w-3.5 h-3.5" /></Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive/50 hover:text-destructive" onClick={onRemove} aria-label={`Remover ${book.title}`}><Trash2 className="w-3.5 h-3.5" /></Button>
         </div>
       </div>
       {aberto && temDetalhe && !aoLado && (

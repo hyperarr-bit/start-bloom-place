@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { avisarApagado } from "@/lib/desfazer";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -118,8 +119,11 @@ export const InstallmentTracker = ({
     }
   };
 
+  // Desfazer (26/09): um toque apagava o parcelamento inteiro, sem volta.
   const deleteInstallment = (id: string) => {
+    const antes = installments;
     gravar(installments.filter((i) => i.id !== id));
+    avisarApagado("Parcelamento apagado", () => gravar(antes));
   };
 
   /**
@@ -237,16 +241,25 @@ export const InstallmentTracker = ({
           Cada parcela aparece sozinha nos meses seguintes até quitar. O ✓ marca a parcela deste mês como paga.
         </p>
 
+        {/* NO CELULAR (26/09, varredura): a tabela tinha 650px fixos e, num
+            aparelho de 430px, "Valor/Parcela" e o ✓ de paga ficavam fora da
+            tela (x=459 a 667) — o texto logo acima manda usar um ✓ que não
+            aparecia, e o TOTAL MENSAL parecia vazio. Abaixo de `sm` somem as
+            colunas Parcela, Data, Cartão e Categoria; "k de N · cartão" desce
+            pra baixo do nome, e ficam Nome | Valor | Paga, sem rolar. */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[650px]">
+          <table className="w-full text-sm sm:min-w-[650px]">
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Nome</th>
-                <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Parcela</th>
-                <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Data</th>
-                <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Cartão</th>
-                <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Categoria</th>
-                <th className="px-3 py-2 text-right font-medium text-muted-foreground text-xs">Valor/Parcela</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-center font-medium text-muted-foreground text-xs">Parcela</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-center font-medium text-muted-foreground text-xs">Data</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-center font-medium text-muted-foreground text-xs">Cartão</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-center font-medium text-muted-foreground text-xs">Categoria</th>
+                <th className="px-3 py-2 text-right font-medium text-muted-foreground text-xs">
+                  <span className="sm:hidden">Valor</span>
+                  <span className="hidden sm:inline">Valor/Parcela</span>
+                </th>
                 <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Paga</th>
               </tr>
             </thead>
@@ -332,26 +345,30 @@ export const InstallmentTracker = ({
                           <Pencil className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden="true" />
                         </button>
                       )}
+                      {/* só no celular: o que as colunas escondidas diziam */}
+                      <span className={`sm:hidden block text-[10px] font-normal ${isDone ? "text-green-500" : "text-muted-foreground"}`}>
+                        {`${isDone ? "quitado" : `${k} de ${inst.totalInstallments}`} · ${getCardLabel(inst.cardName)}`}
+                      </span>
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="hidden sm:table-cell px-3 py-2 text-center">
                       <span className={`text-xs font-mono whitespace-nowrap ${isDone ? "text-green-500" : ""}`} title={`${inst.paidInstallments} de ${inst.totalInstallments} pagas`}>
                         {isDone ? "quitado" : `${k} de ${inst.totalInstallments}`}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-center text-muted-foreground text-xs">
+                    <td className="hidden sm:table-cell px-3 py-2 text-center text-muted-foreground text-xs">
                       {inst.date ? new Date(inst.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="hidden sm:table-cell px-3 py-2 text-center">
                       <span className={`category-badge ${getCardStyle(inst.cardName)}`}>
                         {getCardLabel(inst.cardName)}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="hidden sm:table-cell px-3 py-2 text-center">
                       <span className={`category-badge ${getCatStyle(catValue(inst.category))}`}>
                         {getCatLabel(catValue(inst.category))}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                    <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
                       R$ {brl(inst.installmentValue)}
                     </td>
                     <td className="px-3 py-2">
@@ -380,7 +397,15 @@ export const InstallmentTracker = ({
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-border">
+              {/* colSpan não muda com a tela: o celular tem a própria linha
+                  (Nome | Valor+Paga), senão o total caía numa coluna escondida */}
+              <tr className="border-t border-border sm:hidden">
+                <td className="px-3 py-2 text-xs text-muted-foreground">TOTAL MENSAL</td>
+                <td className="px-3 py-2 text-right font-bold tabular-nums whitespace-nowrap" colSpan={2}>
+                  R$ {brl(totalMonthly)}
+                </td>
+              </tr>
+              <tr className="border-t border-border hidden sm:table-row">
                 <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={5}>TOTAL MENSAL</td>
                 <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={2}>
                   R$ {brl(totalMonthly)}

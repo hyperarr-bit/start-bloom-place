@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
+import { avisarApagado } from "@/lib/desfazer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Sun, Moon, Plus, X, AlertTriangle, ShieldCheck } from "lucide-react";
-import { getStepIcon, checkConflicts } from "./utils";
+import { getStepIcon, conflitosDaRotina, faseDoCiclo, inserirEm, marcadosAposInserir, marcadosAposRemover } from "./utils";
+import { useChaveDaBeleza } from "./estado-compartilhado";
 
 const getDateKey = () => localDayKey();
 
@@ -28,13 +30,16 @@ const SKIN_CYCLE_PHASES = [
 
 export const SkincareRoutine = () => {
   const today = getDateKey();
-  const [morningSteps, setMorningSteps] = usePersistedState<RoutineStep[]>("skincare-am-steps", DEFAULT_MORNING);
-  const [nightSteps, setNightSteps] = usePersistedState<RoutineStep[]>("skincare-pm-steps", DEFAULT_NIGHT);
-  const [morningChecked, setMorningChecked] = usePersistedState<Record<string, number[]>>("skincare-morning-checked", {});
-  const [nightChecked, setNightChecked] = usePersistedState<Record<string, number[]>>("skincare-night-checked", {});
-  const [cycleStart] = usePersistedState<string>("skincare-cycle-start", today);
-  const [checkins] = usePersistedState<Record<string, string>>("skincare-daily-checkin", {});
-  const [triggers] = usePersistedState<string[]>("skincare-triggers", []);
+  const { loaded, set: gravarChave } = useUserData();
+  // Todas pela mesma fonte do Espelho do dia (useChaveDaBeleza): marcar
+  // "Sensível" lá ou um passo aqui aparece nos dois na hora (26/09, varredura).
+  const [morningSteps, setMorningSteps] = useChaveDaBeleza<RoutineStep[]>("skincare-am-steps", DEFAULT_MORNING);
+  const [nightSteps, setNightSteps] = useChaveDaBeleza<RoutineStep[]>("skincare-pm-steps", DEFAULT_NIGHT);
+  const [morningChecked, setMorningChecked] = useChaveDaBeleza<Record<string, number[]>>("skincare-morning-checked", {});
+  const [nightChecked, setNightChecked] = useChaveDaBeleza<Record<string, number[]>>("skincare-night-checked", {});
+  const [cycleStart] = useChaveDaBeleza<string>("skincare-cycle-start", "");
+  const [checkins] = useChaveDaBeleza<Record<string, string>>("skincare-daily-checkin", {});
+  const [triggers] = useChaveDaBeleza<string[]>("skincare-triggers", []);
   const [showGuide, setShowGuide] = useState(false);
   const [newStepAm, setNewStepAm] = useState("");
   const [newStepPm, setNewStepPm] = useState("");
@@ -44,36 +49,53 @@ export const SkincareRoutine = () => {
   const todaySkin = checkins[today] || "";
   const isSensitive = todaySkin === "sensivel";
 
-  const daysSinceStart = Math.floor((new Date(today + "T12:00:00").getTime() - new Date(cycleStart + "T12:00:00").getTime()) / (1000 * 60 * 60 * 24));
-  const cyclePhase = ((daysSinceStart % 4) + 4) % 4;
+  /* SKIN CYCLING PARADO NO DIA 1 (26/09, varredura): o início do ciclo nunca
+     era gravado — o padrão era "hoje", então todo dia virava "Esfoliação ·
+     Dia 1/4". Grava na 1ª vez que a rotina abre, só depois de carregar (senão
+     um aparelho novo gravaria "hoje" por cima do início que está no servidor),
+     e como escrita de SISTEMA (não é gesto da pessoa, não conta ativação). */
+  useEffect(() => {
+    if (!loaded || cycleStart) return;
+    gravarChave("skincare-cycle-start", today, { system: true });
+  }, [loaded, cycleStart, today, gravarChave]);
+
+  const cyclePhase = faseDoCiclo(cycleStart || today, today);
   const currentPhase = SKIN_CYCLE_PHASES[cyclePhase];
 
-  const todayMorning = morningChecked[today] || [];
-  const todayNight = nightChecked[today] || [];
+  const todayMorning = Array.isArray(morningChecked[today]) ? morningChecked[today] : [];
+  const todayNight = Array.isArray(nightChecked[today]) ? nightChecked[today] : [];
 
   const toggleStep = (period: "am" | "pm", index: number) => {
-    if (period === "am") {
-      const arr = [...todayMorning];
+    const setChecked = period === "am" ? setMorningChecked : setNightChecked;
+    setChecked(prev => {
+      const arr = Array.isArray(prev[today]) ? [...prev[today]] : [];
       arr.includes(index) ? arr.splice(arr.indexOf(index), 1) : arr.push(index);
-      setMorningChecked(prev => ({ ...prev, [today]: arr }));
-    } else {
-      const arr = [...todayNight];
-      arr.includes(index) ? arr.splice(arr.indexOf(index), 1) : arr.push(index);
-      setNightChecked(prev => ({ ...prev, [today]: arr }));
-    }
+      return { ...prev, [today]: arr };
+    });
   };
 
-  const effectiveNightSteps = isSensitive ? nightSteps.filter(s => !s.isAcid) : nightSteps;
+  /* APAGAR NO MODO SENSÍVEL APAGAVA OUTRO PASSO (26/09, varredura): a lista
+     da noite era FILTRADA (sem os ácidos) e o índice da lista filtrada ia
+     pro array completo — X no "Hidratante noturno" apagava o Retinol. Os
+     checks tinham o mesmo desvio. Agora cada linha leva o índice ORIGINAL. */
+  const noiteVisivel = nightSteps
+    .map((step, i) => ({ step, i }))
+    .filter(({ step }) => !(isSensitive && step.isAcid));
+  const feitosManha = morningSteps.filter((_, i) => todayMorning.includes(i)).length;
+  const feitosNoite = noiteVisivel.filter(({ i }) => todayNight.includes(i)).length;
 
+  // Só cobra protetor quando EXISTE passo de protetor e o resto já foi feito
+  // (antes aparecia pra rotina sem protetor nenhum).
   const sunscreenIdx = morningSteps.findIndex(s => s.isSunscreen);
   const sunscreenDone = sunscreenIdx >= 0 && todayMorning.includes(sunscreenIdx);
-  const morningMissingSunscreen = todayMorning.length === morningSteps.length - 1 && !sunscreenDone;
+  const morningMissingSunscreen = sunscreenIdx >= 0 && !sunscreenDone && morningSteps.length > 1
+    && morningSteps.every((_, i) => i === sunscreenIdx || todayMorning.includes(i));
 
-  const morningPct = morningSteps.length > 0 ? Math.round((todayMorning.length / morningSteps.length) * 100) : 0;
-  const nightPct = effectiveNightSteps.length > 0 ? Math.round((todayNight.length / effectiveNightSteps.length) * 100) : 0;
+  const morningPct = morningSteps.length > 0 ? Math.round((feitosManha / morningSteps.length) * 100) : 0;
+  const nightPct = noiteVisivel.length > 0 ? Math.round((feitosNoite / noiteVisivel.length) * 100) : 0;
 
   const allStepNames = [...morningSteps.map(s => s.name), ...nightSteps.map(s => s.name)];
-  const conflicts = checkConflicts(allStepNames);
+  const conflicts = conflitosDaRotina(morningSteps.map(s => s.name), nightSteps.map(s => s.name));
 
   const addStep = (period: "am" | "pm") => {
     const text = period === "am" ? newStepAm : newStepPm;
@@ -94,9 +116,23 @@ export const SkincareRoutine = () => {
     }
   };
 
+  // Apaga já e oferece Desfazer (26/09, varredura: o X apagava sem volta).
+  // Os checks de hoje andam junto com os índices; o Desfazer devolve o passo
+  // na mesma posição, com o check que ele tinha.
   const removeStep = (period: "am" | "pm", idx: number) => {
-    if (period === "am") setMorningSteps(prev => prev.filter((_, i) => i !== idx));
-    else setNightSteps(prev => prev.filter((_, i) => i !== idx));
+    const setSteps = period === "am" ? setMorningSteps : setNightSteps;
+    const setChecked = period === "am" ? setMorningChecked : setNightChecked;
+    const passo = (period === "am" ? morningSteps : nightSteps)[idx];
+    if (!passo) return;
+    const dia = today;
+    const estavaMarcado = (period === "am" ? todayMorning : todayNight).includes(idx);
+    setSteps(prev => prev.filter((_, i) => i !== idx));
+    setChecked(prev => ({ ...prev, [dia]: marcadosAposRemover(Array.isArray(prev[dia]) ? prev[dia] : [], idx) }));
+    avisarApagado(`"${passo.name}" saiu da rotina`, () => {
+      let pos = idx;
+      setSteps(prev => { pos = Math.min(idx, prev.length); return inserirEm(prev, pos, passo); });
+      setChecked(prev => ({ ...prev, [dia]: marcadosAposInserir(Array.isArray(prev[dia]) ? prev[dia] : [], pos, estavaMarcado) }));
+    });
   };
 
   return (
@@ -133,7 +169,7 @@ export const SkincareRoutine = () => {
             <Sun className="w-3.5 h-3.5" />
             <span className="text-[10px] font-bold uppercase tracking-wider">☀️ ROTINA DA MANHÃ</span>
           </div>
-          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayMorning.length}/{morningSteps.length}</Badge>
+          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{feitosManha}/{morningSteps.length}</Badge>
         </div>
         <div className="bg-green-50 dark:bg-green-950/20 p-4 space-y-2">
           {/* Progress bar */}
@@ -158,7 +194,7 @@ export const SkincareRoutine = () => {
                     OBRIGATÓRIO
                   </span>
                 )}
-                <button onClick={() => removeStep("am", i)} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => removeStep("am", i)} aria-label={`Tirar ${step.name} da rotina`} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -204,7 +240,7 @@ export const SkincareRoutine = () => {
             <Moon className="w-3.5 h-3.5" />
             <span className="text-[10px] font-bold uppercase tracking-wider">🌙 ROTINA DA NOITE</span>
           </div>
-          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayNight.length}/{effectiveNightSteps.length}</Badge>
+          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{feitosNoite}/{noiteVisivel.length}</Badge>
         </div>
         <div className="bg-purple-50 dark:bg-purple-950/20 p-4 space-y-2">
           {/* Skin Cycling Phase */}
@@ -232,27 +268,31 @@ export const SkincareRoutine = () => {
 
           {/* Steps */}
           <div className="space-y-0.5">
-            {effectiveNightSteps.map((step, i) => {
-              const displayName = step.isAcid && !isSensitive ? `${currentPhase.emoji} ${currentPhase.label} (${currentPhase.desc})` : step.name;
-              return (
-                <div key={i} className="flex items-center gap-2.5 group py-1.5 px-1 rounded-lg hover:bg-background/50 transition-colors">
-                  <Checkbox
-                    checked={todayNight.includes(i)}
-                    onCheckedChange={() => toggleStep("pm", i)}
-                  />
-                  <span className="text-base">{step.isAcid ? currentPhase.emoji : getStepIcon(step.name)}</span>
-                  <span className={`text-xs flex-1 ${todayNight.includes(i) ? "line-through text-muted-foreground" : ""}`}>
-                    {displayName}
-                  </span>
-                  {i === 0 && !todayNight.includes(0) && (
-                    <span className="text-[8px] text-muted-foreground">Remova o protetor!</span>
-                  )}
-                  <button onClick={() => removeStep("pm", i)} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+            {/* `i` é o índice no array COMPLETO (ver noiteVisivel); `pos` é a
+                posição na tela. O passo ácido mostra o NOME dele — antes virava
+                "✨ Esfoliação (Ácido Glicólico ou Lático)" e a pessoa não sabia
+                qual produto era; a fase da noite já está no card do ciclo. */}
+            {noiteVisivel.map(({ step, i }, pos) => (
+              <div key={i} className="flex items-center gap-2.5 group py-1.5 px-1 rounded-lg hover:bg-background/50 transition-colors">
+                <Checkbox
+                  checked={todayNight.includes(i)}
+                  onCheckedChange={() => toggleStep("pm", i)}
+                />
+                <span className="text-base">{getStepIcon(step.name)}</span>
+                <span className={`text-xs flex-1 ${todayNight.includes(i) ? "line-through text-muted-foreground" : ""}`}>
+                  {step.name}
+                </span>
+                {step.isAcid && (
+                  <span className="text-[8px] text-muted-foreground">ativo</span>
+                )}
+                {pos === 0 && !todayNight.includes(i) && (
+                  <span className="text-[8px] text-muted-foreground">Remova o protetor!</span>
+                )}
+                <button onClick={() => removeStep("pm", i)} aria-label={`Tirar ${step.name} da rotina`} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
 
           {nightSteps.length === 0 && (

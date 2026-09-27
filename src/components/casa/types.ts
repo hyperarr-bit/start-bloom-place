@@ -26,6 +26,9 @@ export interface ShoppingItem {
    *  para o local onde foi colocado inicial"). Opcional: item que já estava
    *  na lista antes disto não tem — e volta pro armário como sempre voltou. */
   origemCategory?: PantryItem["category"];
+  /** Item que o "comprei" recriou na despensa (26/09, varredura): desmarcar
+   *  tira ele de novo, em vez de marcar/desmarcar/marcar duplicar. */
+  devolvidoId?: string;
 }
 
 export interface Recipe {
@@ -134,11 +137,20 @@ export const daysSince = (dateStr: string): number => {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 };
 
-export const monthsSince = (dateStr: string): number => {
+/**
+ * Meses COMPLETOS desde a data (26/09, auditoria da virada). Contava mês de
+ * calendário: o filtro trocado em 30/09 "a cada 1 mês" aparecia ATRASADO em
+ * 01/10 — um dia depois — enquanto o aviso de Casa (planejarManutencao) dizia
+ * 30/10. Agora o mês só fecha no mesmo dia do mês seguinte, limitado ao fim
+ * dele (31/08 + 1 mês = 30/09), a mesma conta do aviso.
+ */
+export const monthsSince = (dateStr: string, now: Date = new Date()): number => {
   if (!dateStr) return 999;
   const d = parseLocalDay(dateStr);
-  const now = new Date();
-  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  let meses = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  const diaQueFecha = Math.min(d.getDate(), new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate());
+  if (now.getDate() < diaQueFecha) meses -= 1;
+  return Math.max(0, meses);
 };
 
 export const healthPercent = (lastDone: string, frequencyDays: number): number => {

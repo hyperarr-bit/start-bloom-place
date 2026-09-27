@@ -19,6 +19,11 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   const [state, setState] = useState<T>(() => normalizeForKey(key, get(key, initial)));
   const lastWrittenJson = useRef<string>(JSON.stringify(state));
   const hydratedRef = useRef(false);
+  // Último valor, síncrono: o setter calcula o próximo a partir daqui e grava
+  // no store FORA do updater do setState. Gravar dentro do updater atualizava
+  // o provider no meio do render do componente ("Cannot update a component
+  // while rendering a different component", varredura 26/09).
+  const latestRef = useRef<T>(state);
 
   // Hydrate once after Supabase finishes its initial load.
   useEffect(() => {
@@ -28,6 +33,7 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     const latestJson = JSON.stringify(latest);
     if (latestJson !== lastWrittenJson.current) {
       lastWrittenJson.current = latestJson;
+      latestRef.current = latest;
       setState(latest);
     }
 
@@ -44,6 +50,7 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
         if (lastWrittenJson.current !== baseline) return; // usuário já escreveu — não atropela
         const norm = normalizeForKey(key, remote);
         lastWrittenJson.current = JSON.stringify(norm);
+        latestRef.current = norm;
         setState(norm);
       }).catch(() => { /* sem rede: fica no estado atual */ });
     }
@@ -52,12 +59,11 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   }, [loaded]);
 
   const setPersistedState = useCallback((v: T | ((prev: T) => T)) => {
-    setState(prev => {
-      const next = typeof v === "function" ? (v as (prev: T) => T)(prev) : v;
-      lastWrittenJson.current = JSON.stringify(next);
-      setData(key, next);
-      return next;
-    });
+    const next = typeof v === "function" ? (v as (prev: T) => T)(latestRef.current) : v;
+    latestRef.current = next;
+    lastWrittenJson.current = JSON.stringify(next);
+    setState(next);
+    setData(key, next);
   }, [key, setData]);
 
   return [state, setPersistedState];

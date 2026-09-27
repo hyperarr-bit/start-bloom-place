@@ -194,7 +194,8 @@ export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomod
   const hoje = localDayKey();
   const nomes = useMemo(() => Object.fromEntries(cursos.map((c) => [c.id, c.name])), [cursos]);
   const todosCartoes = useMemo(() => misturarCursos(mapa, nomes), [mapa, nomes]);
-  const semana = resumoDaSemana(sessoes);
+  // revisoes entra na conta (26/09, varredura): cartão revisado no "Revisar agora" também é "esta semana"
+  const semana = resumoDaSemana(sessoes, new Date(), revisoes);
   const semCurso = cursos.length === 0;
 
   // um curso escolhido vale pra aba inteira (sessão, recall, Feynman, socrático, bloco novo)

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, ChevronDown, Check, X, CreditCard, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,22 @@ const paymentMethods = [
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * O que o gasto precisa pra entrar (26/09, varredura): nome de verdade e
+ * valor MAIOR que zero — "Devolução −R$ 50" entrava e descontava do total do
+ * mês sem ninguém perceber. Vale pro gasto à vista, pro parcelado e pro
+ * recorrente. Devolve a mensagem de erro, ou null quando está tudo certo.
+ */
+export const erroDoGasto = (descricao: string, valorDigitado: string): string | null => {
+  const nome = descricao.trim();
+  if (!nome && !valorDigitado.trim()) return "Escreva o nome e o valor do gasto.";
+  if (!nome) return "Dê um nome ao gasto.";
+  const valor = numeroBR(valorDigitado);
+  if (!Number.isFinite(valor)) return "Informe o valor do gasto.";
+  if (valor <= 0) return "O valor precisa ser maior que zero.";
+  return null;
+};
 
 export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
@@ -195,32 +212,46 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
   };
 
   const addExpense = () => {
-    if (newExpense.description && newExpense.value) {
-      // mesma tecla, três destinos: parcelado vira dívida, recorrente vira
-      // custo fixo, à vista vira gasto
-      if (parcelando) { lancarParcelamento(numeroBR(newExpense.value)); return; }
-      if (repetindo) { lancarRecorrente(numeroBR(newExpense.value)); return; }
-      const eraVazia = expenses.length === 0;
-      const novo: Expense = {
-        id: Date.now().toString(),
-        description: newExpense.description,
-        category: newExpense.category || "outros",
-        value: numeroBR(newExpense.value),
-        date: newExpense.date || localDayKey(),
-        paymentMethod: newExpense.paymentMethod || "pix",
-        cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
-        ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),
-      };
-      setExpenses([...expenses, novo]);
-      limparForm();
-      if (eraVazia) {
-        onPrimeiroGasto?.({ id: novo.id, descricao: novo.description, valor: novo.value, categoria: getCategoryLabel(novo.category) });
-      }
+    const erro = erroDoGasto(newExpense.description, newExpense.value);
+    if (erro) { toast.error(erro); return; }
+    // mesma tecla, três destinos: parcelado vira dívida, recorrente vira
+    // custo fixo, à vista vira gasto
+    if (parcelando) { lancarParcelamento(numeroBR(newExpense.value)); return; }
+    if (repetindo) { lancarRecorrente(numeroBR(newExpense.value)); return; }
+    const eraVazia = expenses.length === 0;
+    const novo: Expense = {
+      id: Date.now().toString(),
+      description: newExpense.description.trim(),
+      category: newExpense.category || "outros",
+      value: numeroBR(newExpense.value),
+      date: newExpense.date || localDayKey(),
+      paymentMethod: newExpense.paymentMethod || "pix",
+      cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+      ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),
+    };
+    setExpenses([...expenses, novo]);
+    limparForm();
+    if (eraVazia) {
+      onPrimeiroGasto?.({ id: novo.id, descricao: novo.description, valor: novo.value, categoria: getCategoryLabel(novo.category) });
     }
   };
 
+  /* Apagar com "Desfazer" (26/09, varredura): um toque na lixeira levava o
+     gasto embora sem volta. O desfazer usa a lista MAIS RECENTE e devolve o
+     gasto inteiro, mesmo id. */
+  const ultimo = useRef({ lista: expenses, gravar: setExpenses });
+  useEffect(() => { ultimo.current = { lista: expenses, gravar: setExpenses }; });
+
   const deleteExpense = (id: string) => {
+    const pos = expenses.findIndex((e) => e.id === id);
+    if (pos < 0) return;
+    const apagado = expenses[pos];
     setExpenses(expenses.filter((e) => e.id !== id));
+    avisarApagado(`Gasto apagado: ${apagado.description}`, () => {
+      const { lista, gravar } = ultimo.current;
+      if (lista.some((e) => e.id === id)) return;
+      gravar([...lista.slice(0, pos), apagado, ...lista.slice(pos)]);
+    });
   };
 
   /**
@@ -255,8 +286,9 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
 
   const salvarEdicao = () => {
     const valor = numeroBR(rascunho.value);
-    // valor inválido não salva: melhor o botão não responder do que gravar NaN
-    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    // valor inválido não salva — e agora diz por quê (26/09: negativo passava)
+    const erro = erroDoGasto(rascunho.description, rascunho.value);
+    if (erro) { toast.error(erro); return; }
     setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
       ...e,
       description: rascunho.description.trim(),

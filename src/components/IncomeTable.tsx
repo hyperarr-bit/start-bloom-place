@@ -1,8 +1,26 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+
+/**
+ * O que a receita precisa pra entrar (26/09, varredura): nome de verdade (só
+ * espaços não é nome) e valor MAIOR que zero. Antes entravam "−R$ 500",
+ * "R$ 0,00" e receita sem nome, e o total do mês ficava errado sem aviso.
+ * Devolve a mensagem de erro, ou null quando está tudo certo.
+ */
+export const erroDaReceita = (descricao: string, valorDigitado: string): string | null => {
+  const nome = descricao.trim();
+  if (!nome && !valorDigitado.trim()) return "Escreva o nome e o valor da receita.";
+  if (!nome) return "Dê um nome à receita.";
+  const valor = numeroBR(valorDigitado);
+  if (!Number.isFinite(valor)) return "Informe o valor da receita.";
+  if (valor <= 0) return "O valor precisa ser maior que zero.";
+  return null;
+};
 
 interface Income {
   id: string;
@@ -32,22 +50,37 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
 
 
   const addIncome = () => {
-    if (newIncome.description && newIncome.value) {
-      setIncomes([
-        ...incomes,
-        {
-          id: Date.now().toString(),
-          description: newIncome.description,
-          value: numeroBR(newIncome.value),
-          date: newIncome.date || localDayKey(),
-        },
-      ]);
-      setNewIncome({ description: "", value: "", date: "" });
-    }
+    const erro = erroDaReceita(newIncome.description, newIncome.value);
+    if (erro) { toast.error(erro); return; }
+    setIncomes([
+      ...incomes,
+      {
+        id: Date.now().toString(),
+        description: newIncome.description.trim(),
+        value: numeroBR(newIncome.value),
+        date: newIncome.date || localDayKey(),
+      },
+    ]);
+    setNewIncome({ description: "", value: "", date: "" });
   };
 
+  /* Apagar com "Desfazer" (26/09, varredura): um toque na lixeira levava a
+     receita embora sem volta. O desfazer usa a lista MAIS RECENTE (o toast
+     vive 6 s e a pessoa pode ter mexido em outra linha nesse meio-tempo) e
+     devolve a receita inteira, mesmo id. */
+  const ultimo = useRef({ lista: incomes, gravar: setIncomes });
+  useEffect(() => { ultimo.current = { lista: incomes, gravar: setIncomes }; });
+
   const deleteIncome = (id: string) => {
+    const pos = incomes.findIndex((i) => i.id === id);
+    if (pos < 0) return;
+    const apagada = incomes[pos];
     setIncomes(incomes.filter((i) => i.id !== id));
+    avisarApagado(`Receita apagada: ${apagada.description}`, () => {
+      const { lista, gravar } = ultimo.current;
+      if (lista.some((i) => i.id === id)) return;
+      gravar([...lista.slice(0, pos), apagada, ...lista.slice(pos)]);
+    });
   };
 
   /** Edição na própria linha — o mesmo motivo descrito em ExpenseTable. */
@@ -61,7 +94,9 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
 
   const salvarEdicao = () => {
     const valor = numeroBR(rascunho.value);
-    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    // mesma régua do "adicionar": a edição também deixava gravar negativo
+    const erro = erroDaReceita(rascunho.description, rascunho.value);
+    if (erro) { toast.error(erro); return; }
     setIncomes(incomes.map((i) => i.id !== editandoId ? i : {
       ...i,
       description: rascunho.description.trim(),

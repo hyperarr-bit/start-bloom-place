@@ -12,6 +12,10 @@ import { DailyNudge } from "@/components/onboarding/DailyNudge";
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
 import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
+import { LinhaSequencia } from "@/components/conquistas/LinhaSequencia";
+import { RetrospectivaNaHome } from "@/components/wrapped/RetrospectivaNaHome";
+import { useSequencia } from "@/components/conquistas/use-conquistas";
+// Momentos (adesivo novo, marco de sequência) sob demanda: a arte e o gerador dos Stories não pesam a abertura da Home
 import { QuickActions } from "@/components/home/QuickActions";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -98,6 +102,8 @@ const HomePage = () => {
   }, []);
 
   const lifeData = useLifeHubData();
+  // Sequência nova (26/09): dias com algo ANOTADO — o anel e a linha abaixo dele.
+  const sequencia = useSequencia();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
@@ -303,6 +309,7 @@ const HomePage = () => {
   return (
     <>
       <DailyNudge />
+      {/* Adesivo novo / marco de sequência (26/09): um de cada vez, uma vez cada */}
 
       <div className="min-h-dvh bg-background flex flex-col" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <header className="sticky top-0 z-40 border-b border-border bg-card flex-shrink-0">
@@ -319,9 +326,14 @@ const HomePage = () => {
           <div className="flex-1 max-w-lg md:max-w-4xl mx-auto w-full px-4 pt-4 pb-5 space-y-8 flex flex-col justify-center">
 
             <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
-              <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
-              <CelebracaoDia100 score={lifeData.dayScore} streak={lifeData.streak} />
+              <DayScoreRing score={lifeData.dayScore} streak={sequencia.dias} mostrarSequencia={false} />
+              <LinhaSequencia seq={sequencia} />
+              <CelebracaoDia100 score={lifeData.dayScore} streak={sequencia.dias} />
             </div>
+
+            {/* Retrospectiva do mês que fechou, do dia 1 ao 10 (26/09) — some sozinha
+                fora da janela e com o X; só pra quem tem conta. */}
+            <RetrospectivaNaHome />
 
             {/* 15/09: era o convite de PWA ("instale na tela inicial") — que fazia
                 quem comprou na web achar que o CORE era só um site, e pedia

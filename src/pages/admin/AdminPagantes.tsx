@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Clock, Layers, LogIn, ChevronDown, ChevronRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Panel, StatTile, EmptyState } from "./components";
+import { Panel, StatTile, EmptyState, ErroConsulta } from "./components";
+import { rpcAdmin, type ErroAdmin } from "./rpc";
 
 /**
  * Pagantes — uso REAL de cada assinante, lido da tabela module_analytics
@@ -113,20 +113,22 @@ const fmtDT = (d: string | null) =>
 export default function AdminPagantes() {
   const [rows, setRows] = useState<PayerRow[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErroAdmin | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [seg, setSeg] = useState<SegId>("todos");
   const [ordem, setOrdem] = useState<SortId>("recentes");
   const [busca, setBusca] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      const { data, error: err } = await supabase.rpc("admin_paying_users_detail");
-      if (err) setError(err.message);
-      else setRows((data as any)?.users ?? []);
-      setLoading(false);
-    })();
-  }, []);
+  const carregar = async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: err } = await rpcAdmin<{ users?: PayerRow[] }>("admin_paying_users_detail");
+    if (err) setError(err);
+    else setRows(data?.users ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { void carregar(); }, []);
 
   // Resumo agregado (pro dono decidir o que melhorar)
   const summary = useMemo(() => {
@@ -171,11 +173,7 @@ export default function AdminPagantes() {
         <p className="text-[13px] text-muted-foreground mt-0.5">O que cada assinante usa de verdade — módulo, aba e tempo</p>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-destructive">
-          Erro ao carregar: {error}
-        </div>
-      )}
+      {error && <ErroConsulta erro={error} onRetry={() => void carregar()} />}
 
       {loading ? (
         <div className="grid place-items-center py-24"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>

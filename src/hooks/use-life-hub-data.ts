@@ -136,12 +136,25 @@ export function useLifeHubData(): LifeHubData {
     const monthBalance = totalIncome - totalVariableExpense - totalFixedExpense;
 
     const dueDays = doPerfilDueDays(get<any[]>("finance-dueDays", []), perfil);
-    const today = new Date().getDate();
+    /* MÊS DE VERDADE, NÃO DE 30 DIAS (26/09, auditoria da virada). A conta
+       seguinte era `30 - hoje + dia`: em 31/10 a conta do dia 1º "vencia
+       hoje", em 28/02 "vencia em 3 dias" (é amanhã), e a do dia 31 num mês
+       de 30 dias nunca chegava. Agora o dia é limitado ao fim de cada mês
+       (como o calendário MEU MÊS mostra) e a conta de dias usa o tamanho
+       real do mês. Conta do mês que já passou do dia continua contando pela
+       ocorrência do mês seguinte, como antes. */
+    const agoraHub = new Date();
+    const today = agoraHub.getDate();
+    const diasNoMes = new Date(agoraHub.getFullYear(), agoraHub.getMonth() + 1, 0).getDate();
+    const diasNoProximo = new Date(agoraHub.getFullYear(), agoraHub.getMonth() + 2, 0).getDate();
     let nextBill: any = null;
     dueDays.forEach((d: any) => {
       const unpaid = (d.bills || []).filter((b: any) => !b.paid);
       unpaid.forEach((b: any) => {
-        const daysUntil = d.day >= today ? d.day - today : 30 - today + d.day;
+        const diaNoMes = Math.min(Number(d.day), diasNoMes);
+        const daysUntil = diaNoMes >= today
+          ? diaNoMes - today
+          : diasNoMes - today + Math.min(Number(d.day), diasNoProximo);
         if (!nextBill || daysUntil < nextBill._daysUntil) {
           nextBill = { ...b, _daysUntil: daysUntil, _day: d.day };
         }

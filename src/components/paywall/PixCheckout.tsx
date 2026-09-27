@@ -5,7 +5,7 @@ import { Check, Copy, Fingerprint, ShieldCheck, User, X, Zap } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { trackEvent, getAttributionParams } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
 import { isInAppBrowser } from "@/lib/funnel";
@@ -223,10 +223,18 @@ export const aquecerCheckoutPix = (uid: string | null | undefined, offer: PixOff
 /* O aquecimento também diz se o DISJUNTOR da cakto-pix abriu (3 falhas em
  * 24 h). Desligada: o checkout nem tenta a Cakto — vai direto pra Asaas. */
 let caktoAtiva: boolean | null = null;
+/* 26/09: e se a função aceita Pix ADIANTADO (PIX_ADIANTADO_LIGADO na cakto-pix).
+ * Cada aquecimento decide de novo: função antiga (ou rollback) não diz nada,
+ * e aquecimento que falhou também não → nada é adiantado. */
+let caktoAdianta = false;
+let aquecimento: Promise<void> | null = null;
 const aquecerCakto = () => {
-  supabase.functions.invoke("cakto-pix", { body: { warm: true } })
-    .then(({ data }) => { if (typeof data?.ativa === "boolean") caktoAtiva = data.ativa; })
-    .catch(() => { /* noop */ });
+  aquecimento = supabase.functions.invoke("cakto-pix", { body: { warm: true } })
+    .then(({ data }) => {
+      if (typeof data?.ativa === "boolean") caktoAtiva = data.ativa;
+      caktoAdianta = data?.adiantar === true;
+    })
+    .catch(() => { caktoAdianta = false; });
 };
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
@@ -242,9 +250,12 @@ const aquecerCakto = () => {
  * (stagger 0.65s → 0.28s) pra animação caber na janela nova. */
 const PREPARO_MIN_MS = 900;
 // Depois que o Pix chega: tempo de "Gerando seu Pix" e o último item marcarem.
-const PREPARO_FECHO_MS = 420;
+// 26/09 (dono aprovou): 420 → 150 ms. Com a Cakto (~4,5 s) o mínimo acima já
+// passou; o fecho era só espera a mais em cima do QR que já chegou.
+const PREPARO_FECHO_MS = 150;
 // Cakto: ~4–6 s normais (sonda 25/09). Passou disso, o Pix sai pela Asaas.
 const PRAZO_CAKTO_MS = 12_000;
+const prazoCakto = () => new Promise<never>((_, rejeita) => setTimeout(() => rejeita(new Error("prazo_cakto")), PRAZO_CAKTO_MS));
 const PREPARO_LINHAS = [
   "Criando seu acesso vitalício",
   "Gerando seu Pix seguro",
@@ -257,6 +268,211 @@ export type Step = "form" | "email" | "generating" | "qr" | "confirmed" | "expir
 // padrão do outro SaaS dele): vai um coringa fixo. O que importa pra nota é
 // o CPF. Testado direto na API 13/07: aceita e gera o QR normalmente.
 const DUMMY_PHONE = "5511999999999";
+
+const lerCookie = (n: string) =>
+  document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
+
+/** Corpo do create da Cakto — o MESMO no toque e no Pix adiantado (26/09). */
+const corpoDaCakto = async (offer: PixOffer, nm: string, doc: string) => {
+  // SDK antifraude da Cakto (best-effort — doc diz que é fluxo de cartão)
+  let fingerprint: string | undefined;
+  let antifraudRef: string | undefined;
+  try {
+    const w = window as any;
+    if (w.Cakto?.CaktoSDK && w.__caktoSdk) {
+      await w.__caktoSdk.completeAntifraudProfile?.();
+      antifraudRef = w.__caktoSdk.getAntifraudReference?.();
+    }
+  } catch { /* segue sem — a edge function manda UUID */ }
+
+  /* fbp/fbc/sourceUrl NO CREATE (10/08) — o braço Asaas já mandava, o
+   * Cakto não, e é o Cakto que vende. Sem esses cookies a CAPI do
+   * webhook manda Purchase só com e-mail hasheado, e a Meta casa menos:
+   * a cobertura medida caiu de 100% (05/08) pra 78% (10/08). Como ela
+   * otimiza e aplica a trava de ROAS em cima do que ENXERGA, subcontar
+   * vira entrega estrangulada — a campanha via ROAS 1,49 num piso de
+   * 1,30 enquanto o real era 1,92.
+   *
+   * Capturados AQUI e não no confirm porque metade dos pagantes sai pro
+   * app do banco e nunca volta pra tela — no create o navegador ainda
+   * está aberto e os cookies existem. */
+  return {
+    offer,
+    customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
+    fingerprint,
+    antifraudRef,
+    attribution: getAttributionParams(),
+    fbp: lerCookie("_fbp"),
+    fbc: lerCookie("_fbc"),
+    // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
+    // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
+    // dentro de attribution (getAttributionParams).
+    ttp: lerCookie("_ttp"),
+    sourceUrl: window.location.href,
+  };
+};
+
+/* PIX ADIANTADO (26/09, dono: "faz isso da cakto adiantado"). A Cakto leva
+ * ~4,5 s pra devolver o QR, e no paywall da web a pessoa toca em pagar, em
+ * mediana, 23 s depois de a tela abrir (346 toques de 20–26/09: 1% antes de
+ * 1,5 s, 1% depois de 15 min). Então, com o paywall visível há 1,5 s, o Pix da
+ * w27 nasce em segundo plano — uma vez por visita — e fica AQUI, na memória:
+ * - no toque, pronto e válido → o QR aparece na hora;
+ * - ainda em voo → o toque espera ESTE (mesmo teto de 12 s), sem 2º pedido;
+ * - falhou ou venceu → caminho de sempre (Cakto no toque; falhou, Asaas).
+ * Antes do toque não sai evento de venda nenhum: pix_generated,
+ * markPixPurchasePending e InitiateCheckout continuam no toque/na tela do QR.
+ * Diagnóstico: `pix_adiantado {status: ok|falhou|expirou|nao_usado, ms}`. */
+const ADIANTAR_APOS_MS = 1_500;
+const ADIANTADO_VALIDADE_MS = 20 * 60_000;
+// Folga mínima de validade do QR quando ele aparece: quem copia ainda vai ao banco.
+const ADIANTADO_FOLGA_MS = 15 * 60_000;
+// A Cakto não disse quando o QR vence: guarda pouco (95% dos toques vêm em até 3,5 min).
+const ADIANTADO_SEM_PRAZO_MS = 5 * 60_000;
+
+type RespostaPix = { data: any; error: any };
+type Adiantado = {
+  chave: string;              // `${uid}:${offer}` — o Pix é da conta que estava logada
+  offer: PixOffer;
+  t0: number;                 // início do pedido (relógio do aparelho)
+  estado: "voando" | "pronto" | "falhou";
+  promessa: Promise<RespostaPix>;
+  resposta: RespostaPix | null;
+  validoAte: number;
+  ms: number | null;          // quanto o pedido levou
+  usado: boolean;
+  relatado: boolean;          // pix_adiantado já saiu (um por pedido)
+};
+let adiantado: Adiantado | null = null;
+
+const relatarAdiantado = (
+  reg: Adiantado,
+  status: "ok" | "falhou" | "expirou" | "nao_usado",
+  extra: Record<string, unknown> = {},
+  saindo = false,
+) => {
+  if (reg.relatado) return;
+  reg.relatado = true;
+  const dados = { status, ms: reg.ms, offer: reg.offer, order_id: reg.resposta?.data?.orderId ?? null, ...extra };
+  // Saindo da página: beacon — o insert normal morre com a navegação.
+  if (saindo) trackEventBeacon("pix_adiantado", dados);
+  else trackEvent("pix_adiantado", dados);
+};
+
+const criarAdiantado = (uid: string, offer: PixOffer): Adiantado => {
+  if (adiantado) descartarAdiantado(adiantado);
+  const t0 = Date.now();
+  const promessa: Promise<RespostaPix> = corpoDaCakto(offer, "", "")
+    .then((body) => supabase.functions.invoke("cakto-pix", { body: { ...body, adiantado: true } }))
+    .then((r) => ({ data: r?.data ?? null, error: r?.error ?? null }), (e) => ({ data: null, error: e }));
+  const reg: Adiantado = {
+    chave: `${uid}:${offer}`, offer, t0, estado: "voando", promessa,
+    resposta: null, validoAte: 0, ms: null, usado: false, relatado: false,
+  };
+  adiantado = reg;
+  void promessa.then((r) => {
+    reg.ms = Date.now() - t0;
+    reg.resposta = r;
+    if (r.error || !r.data?.qrCode) {
+      reg.estado = "falhou";
+      relatarAdiantado(reg, "falhou", { motivo: String(r.error?.message || r.data?.error || "sem_qr").slice(0, 120), esperando: reg.usado });
+      return;
+    }
+    // Validade: 20 min, ou até faltar a folga pro QR vencer — o que vier antes.
+    // `restaMs` é duração medida no servidor: o relógio do celular não entra.
+    const resta = typeof r.data.restaMs === "number" ? r.data.restaMs : null;
+    reg.validoAte = t0 + (resta != null ? Math.min(ADIANTADO_VALIDADE_MS, resta - ADIANTADO_FOLGA_MS) : ADIANTADO_SEM_PRAZO_MS);
+    reg.estado = "pronto";
+  });
+  return reg;
+};
+
+/** Fim da visita ao paywall sem usar o Pix adiantado: registra e esquece. */
+const descartarAdiantado = (reg: Adiantado, saindo = false) => {
+  if (adiantado === reg) adiantado = null;
+  if (reg.usado || reg.estado === "falhou") return;
+  relatarAdiantado(reg, "nao_usado", { idade_ms: Date.now() - reg.t0, voando: reg.estado === "voando" }, saindo);
+};
+
+/** No toque: o Pix adiantado DESTA conta e oferta (marcado como usado), ou null. */
+const tomarAdiantado = (uid: string | null, offer: PixOffer): Adiantado | null => {
+  const reg = adiantado;
+  if (!uid || !reg || reg.usado || reg.chave !== `${uid}:${offer}`) return null;
+  adiantado = null; // um pedido, um QR: fechou e tocou de novo → caminho de sempre
+  if (reg.estado === "falhou") return null;
+  if (reg.estado === "pronto" && Date.now() >= reg.validoAte) {
+    relatarAdiantado(reg, "expirou", { idade_ms: Date.now() - reg.t0 });
+    return null;
+  }
+  reg.usado = true;
+  return reg;
+};
+
+const temAdiantado = (uid: string | null | undefined, offer: PixOffer) =>
+  !!uid && !!adiantado && !adiantado.usado && adiantado.estado !== "falhou" && adiantado.chave === `${uid}:${offer}`;
+
+/** Sessão LOCAL (sem ida à rede): de quem é o Pix adiantado, e se tem e-mail. */
+const sessaoLocal = async (): Promise<{ uid: string | null; email: string | null }> => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return { uid: data?.session?.user?.id ?? null, email: data?.session?.user?.email ?? null };
+  } catch {
+    return { uid: null, email: null };
+  }
+};
+
+/** Paywall da web (26/09): arma o Pix adiantado desta visita. Chamar no mount;
+ *  `tocou()` no toque em pagar (ANTES de abrir o checkout); `parar()` ao
+ *  desmontar. Só adianta com sessão, braço Cakto, disjuntor fechado e a função
+ *  respondendo `adiantar:true` no aquecimento (chamar aquecerCheckoutPix antes). */
+export function prepararPixAdiantado(
+  offer: PixOffer,
+  opts: { aposMs?: number; podeAdiantar?: () => boolean } = {},
+): { tocou: () => void; parar: () => void } {
+  if (isNativeShell() || !OFERTAS_NA_CAKTO.includes(offer)) return { tocou: () => {}, parar: () => {} };
+  const aposMs = opts.aposMs ?? ADIANTAR_APOS_MS;
+  let tocou = false, parado = false, disparou = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let meu: Adiantado | null = null;
+
+  async function disparar() {
+    disparou = true;
+    // Sem sessão não adianta: a anônima só nasce no toque (ver generate).
+    const { uid } = await sessaoLocal();
+    if (!uid || tocou || parado || bracoDoUsuario(uid, offer) !== "cakto") return;
+    if (opts.podeAdiantar && !opts.podeAdiantar()) return;
+    // O aquecimento do paywall diz se o disjuntor está fechado e se a função aceita adiantar.
+    if (aquecimento) await Promise.race([aquecimento, new Promise((r) => setTimeout(r, 3_000))]);
+    if (tocou || parado || !caktoAdianta || caktoAtiva === false) return;
+    meu = criarAdiantado(uid, offer);
+  }
+  function armar() {
+    if (disparou || tocou || parado || timer || document.visibilityState !== "visible") return;
+    timer = setTimeout(() => { timer = null; void disparar(); }, aposMs);
+  }
+  // Escondeu antes de 1,5 s (webview pré-carregando, troca de app): a conta recomeça na volta.
+  function aoMudarVisibilidade() {
+    if (document.visibilityState === "visible") armar();
+    else if (timer) { clearTimeout(timer); timer = null; }
+  }
+  function parar(saindo: boolean) {
+    if (parado) return;
+    parado = true;
+    if (timer) clearTimeout(timer);
+    document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+    window.removeEventListener("pagehide", aoSair);
+    if (meu) descartarAdiantado(meu, saindo);
+  }
+  function aoSair() { parar(true); }
+
+  document.addEventListener("visibilitychange", aoMudarVisibilidade);
+  window.addEventListener("pagehide", aoSair);
+  armar();
+  return {
+    tocou: () => { tocou = true; if (timer) { clearTimeout(timer); timer = null; } },
+    parar: () => parar(false),
+  };
+}
 
 // A Cakto exige CPF ("docNumber é obrigatório para pagamentos no Brasil") mas
 // não valida o dígito — validamos aqui pra pegar erro de digitação antes do Pix.
@@ -365,6 +581,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
   const cpfRef = useRef<HTMLInputElement>(null);
+  // 26/09: o toque em pagar = abertura do checkout; mede espera_ms do pix_generated.
+  const toqueEm = useRef<number | null>(Date.now());
+  // 26/09: sessão (anônima, se preciso) que começa a nascer no mount — ver o efeito abaixo.
+  const sessaoCedo = useRef<ReturnType<typeof garantirSessao> | null>(null);
   /* 18/09: o e-mail é pedido NA HORA CERTA — depois que a pessoa copiou o
    * código Pix (já decidiu pagar). Antes o campo ficava quieto embaixo do
    * botão: 3 de 13 QR de hoje com e-mail; 35% dos pagantes desde 02/09
@@ -417,8 +637,21 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
        * Pix (202 de 774) fecham a aba sem voltar, e 59% dos checkouts rodam em
        * webview do Instagram, onde o armazenamento é volátil. Sem e-mail, essa
        * fatia paga e fica sem nenhuma forma de recuperar o acesso. */
+      /* SESSÃO NO MOUNT (26/09, dono aprovou): a sessão — anônima, se não houver
+       * nenhuma — começa a nascer JÁ no toque, junto das checagens de e-mail
+       * abaixo; antes só começava depois delas, dentro do generate. É a mesma
+       * chamada que o generate faria (ele usa esta promessa na 1ª vez): quem está
+       * logado não cria nada (só lê a sessão local); quem não está ganharia a
+       * anônima no generate de qualquer jeito, meio segundo depois. NÃO nasce no
+       * paywall: lá 99% já têm conta (954 de 963 telas, 20–26/09), e usuário
+       * anônimo pra quem só olhou o preço mudaria o app de quem não comprou. */
+      const cedo = garantirSessao();
+      cedo.catch(() => { /* quem usa trata */ });
+      sessaoCedo.current = cedo;
       void (async () => {
-        const jaTem = await emailDaSessao();
+        // 26/09: com Pix adiantado na mão, o e-mail sai da sessão LOCAL — o
+        // getUser (rede, ~0,3 s) atrasaria um QR que já está pronto.
+        const jaTem = (temAdiantado(abUser?.id, offer) ? (await sessaoLocal()).email : null) ?? await emailDaSessao();
         if (jaTem) { generate("", ""); return; }
         const podeAnonimo = await anonimoLigado();
         if (!podeAnonimo) { generate("", ""); return; } // caminho antigo: já tem conta
@@ -544,6 +777,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   };
 
   const generate = async (nm: string, doc: string) => {
+    // 26/09: espera_ms conta do TOQUE (abertura do checkout) no 1º Pix; nos
+    // seguintes (gerar de novo, entrar na conta), do botão que chamou.
+    const tToque = (SEM_FORM ? toqueEm.current : null) ?? Date.now();
+    toqueEm.current = null;
     setStep("generating");
     setErrMsg(null);
     /* Sem sessão as edge functions respondem 401 e o retry vira loop eterno
@@ -555,7 +792,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
      * quando nem isso dá certo (chave de anônimo desligada no painel, rede
      * fora) é que cai no caminho antigo de "entra de novo" — por isso a
      * mudança é segura de subir antes de a chave ser ligada. */
-    const estadoSessao = await garantirSessao();
+    // 26/09: a 1ª vez usa a sessão que já começou a nascer no mount.
+    const cedo = sessaoCedo.current;
+    sessaoCedo.current = null;
+    const estadoSessao = await (cedo ?? garantirSessao());
     if (estadoSessao === "indisponivel") {
       trackEvent("pix_error", { offer, context, message: "sem_sessao" });
       setSemSessao(true);
@@ -590,6 +830,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     try {
       let data: any, error: any;
       let gwUsado: Gateway = braco;
+      // 26/09: o Pix que foi pra tela veio do adiantado do paywall?
+      let usado: { reg: Adiantado; pronto: boolean; idadeMs: number; esperouMs: number } | null = null;
       if (braco === "asaas") {
         ({ data, error } = await criarNaAsaas());
       } else if (braco === "pagarme") {
@@ -612,61 +854,49 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           },
         }));
       } else {
-        // SDK antifraude da Cakto (best-effort — doc diz que é fluxo de cartão)
-        let fingerprint: string | undefined;
-        let antifraudRef: string | undefined;
-        try {
-          const w = window as any;
-          if (w.Cakto?.CaktoSDK && w.__caktoSdk) {
-            await w.__caktoSdk.completeAntifraudProfile?.();
-            antifraudRef = w.__caktoSdk.getAntifraudReference?.();
+        /* PIX ADIANTADO (26/09): o paywall pode já ter criado este Pix pra esta
+         * conta. Pronto e válido → vai pra tela já; em voo → espera ELE (mesmo
+         * teto de 12 s), sem 2º pedido — se falhar, é a tentativa da Cakto deste
+         * toque e o Pix sai pela Asaas; falhou antes ou venceu → como sempre. */
+        const reg = adiantado ? tomarAdiantado((await sessaoLocal()).uid, offer) : null;
+        if (reg) {
+          const tEspera = Date.now();
+          const pronto = reg.estado === "pronto" && !!reg.resposta;
+          if (pronto) {
+            ({ data, error } = reg.resposta as RespostaPix);
+          } else {
+            try {
+              ({ data, error } = await Promise.race([reg.promessa, prazoCakto()]));
+            } catch (e: any) {
+              error = e;
+              relatarAdiantado(reg, "falhou", { motivo: "prazo_cakto", esperando: true });
+            }
           }
-        } catch { /* segue sem — a edge function manda UUID */ }
-
-        /* fbp/fbc/sourceUrl NO CREATE (10/08) — o braço Asaas já mandava, o
-         * Cakto não, e é o Cakto que vende. Sem esses cookies a CAPI do
-         * webhook manda Purchase só com e-mail hasheado, e a Meta casa menos:
-         * a cobertura medida caiu de 100% (05/08) pra 78% (10/08). Como ela
-         * otimiza e aplica a trava de ROAS em cima do que ENXERGA, subcontar
-         * vira entrega estrangulada — a campanha via ROAS 1,49 num piso de
-         * 1,30 enquanto o real era 1,92.
-         *
-         * Capturados AQUI e não no confirm porque metade dos pagantes sai pro
-         * app do banco e nunca volta pra tela — no create o navegador ainda
-         * está aberto e os cookies existem. */
-        /* 25/09: UMA tentativa, com prazo. Antes eram duas (02/09: 2 de 8
-         * pedidos nasciam "refused") — mas cada uma leva ~4 s, e em 06/09 a
-         * Cakto chegou a pendurar minutos. Sem QR em 12 s, o Pix sai pela Asaas
-         * na hora, sem CPF; a queda fica medida em pix_fallback. */
-        try {
-          if (caktoAtiva === false) throw new Error("cakto_desligada");
-          ({ data, error } = await Promise.race([
-            supabase.functions.invoke("cakto-pix", {
-              body: {
-                offer,
-                customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
-                fingerprint,
-                antifraudRef,
-                attribution: getAttributionParams(),
-                fbp: cookie("_fbp"),
-                fbc: cookie("_fbc"),
-                // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
-                // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
-                // dentro de attribution (getAttributionParams).
-                ttp: cookie("_ttp"),
-                sourceUrl: window.location.href,
-              },
-            }),
-            new Promise<never>((_, rejeita) => setTimeout(() => rejeita(new Error("prazo_cakto")), PRAZO_CAKTO_MS)),
-          ]));
-        } catch (e: any) {
-          error = e;
+          usado = { reg, pronto, idadeMs: tEspera - reg.t0, esperouMs: Date.now() - tEspera };
+        } else {
+          // Corpo (cookies fbp/fbc/ttp, atribuição, SDK) em corpoDaCakto.
+          const body = await corpoDaCakto(offer, nm, doc);
+          /* 25/09: UMA tentativa, com prazo. Antes eram duas (02/09: 2 de 8
+           * pedidos nasciam "refused") — mas cada uma leva ~4 s, e em 06/09 a
+           * Cakto chegou a pendurar minutos. Sem QR em 12 s, o Pix sai pela Asaas
+           * na hora, sem CPF; a queda fica medida em pix_fallback. */
+          try {
+            if (caktoAtiva === false) throw new Error("cakto_desligada");
+            ({ data, error } = await Promise.race([
+              supabase.functions.invoke("cakto-pix", { body }),
+              prazoCakto(),
+            ]));
+          } catch (e: any) {
+            error = e;
+          }
         }
         if (error || !data?.qrCode) {
           trackEvent("pix_fallback", {
             offer, context, de: "cakto", para: "asaas", ms: Date.now() - t0,
             motivo: String(error?.message || data?.error || "sem_qr").slice(0, 120),
+            adiantado: !!usado,
           });
+          usado = null;
           gwUsado = "asaas";
           ({ data, error } = await criarNaAsaas());
         }
@@ -680,8 +910,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       // de mentira) ou o tempo de os dois últimos itens marcarem.
       setPixChegou(true);
       if (SEM_FORM) {
-        const falta = Math.max(PREPARO_MIN_MS - (Date.now() - t0), PREPARO_FECHO_MS);
-        await new Promise((r) => setTimeout(r, falta));
+        // 26/09: Pix adiantado que já estava pronto aparece NA HORA (a espera
+        // mínima existe pra resposta rápida demais não parecer teatro).
+        const falta = usado?.pronto ? 0 : Math.max(PREPARO_MIN_MS - (Date.now() - t0), PREPARO_FECHO_MS);
+        if (falta > 0) await new Promise((r) => setTimeout(r, falta));
       }
       // Código NOVO reseta o estado (07d5175, 30/07): sem isso, quem deixa o
       // 1º QR expirar cai numa tela que já diz "copiado" pra um código que
@@ -690,7 +922,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setMostrarQR(false);
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
-      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco });
+      /* pix_generated SÓ sai aqui, com o QR na tela — é ele que alimenta o
+       * e-mail de Pix pendente e o ROI da web. 26/09: + adiantado e espera_ms
+       * (do toque até o QR). O pedido adiantado que ninguém viu não vira evento. */
+      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco, adiantado: !!usado, espera_ms: Date.now() - tToque });
+      if (usado) relatarAdiantado(usado.reg, "ok", { idade_ms: usado.idadeMs, esperou_ms: usado.esperouMs, pronto: usado.pronto });
       // dia-14: o CPF digitado vira tax_id no perfil → próximo open pula o
       // form. Pagar.me/Cakto salvam no servidor; Asaas/Abacate ignoram o doc,
       // então salva daqui. Não-bloqueante: falha não afeta a venda.

@@ -12,6 +12,14 @@ const COMMON_CURRENCIES = [
   { from: "ARS", to: "BRL", label: "Peso Arg. → Real" },
 ];
 
+
+/** Valor na moeda DE DESTINO (26/09: BRL→EUR mostrava "US$ 160,00"). Código
+ *  que o Intl não conhece cai no número com a sigla do lado, nunca em erro. */
+const valorNaMoeda = (v: number, moeda: string) => {
+  try { return v.toLocaleString("pt-BR", { style: "currency", currency: (moeda || "BRL").toUpperCase() }); }
+  catch { return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${moeda}`; }
+};
+
 export const CurrencyConverter = () => {
   const [rates, setRates] = usePersistedState<CurrencyRate[]>("travel-currency-rates", []);
   const [amount, setAmount] = useState("");
@@ -98,7 +106,7 @@ export const CurrencyConverter = () => {
             {amount && (
               <div className="text-center">
                 <p className="text-2xl font-black">
-                  {convertCurrency(Number(amount), active.rate).toLocaleString("pt-BR", { style: "currency", currency: active.toCurrency === "BRL" ? "BRL" : "USD" })}
+                  {valorNaMoeda(convertCurrency(Number(amount), active.rate), active.toCurrency)}
                 </p>
                 <p className="text-[9px] text-muted-foreground mt-1">
                   {Number(amount).toLocaleString()} {active.fromCurrency} × {active.rate} = {convertCurrency(Number(amount), active.rate).toLocaleString()} {active.toCurrency}

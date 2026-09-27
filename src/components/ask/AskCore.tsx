@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { getMonthTotals } from "@/components/finance/storage-keys";
@@ -70,9 +71,15 @@ const QUESTIONS: Question[] = [
       const b = computeDailyBudget(ctx.totalIncome, ctx.monthlyOutflow, ctx.dueDays, ctx.fixedExpenses);
       if (ctx.totalIncome <= 0) return "Ainda não vi nenhuma receita este mês — registra sua renda na aba Meu Financeiro que eu te digo na hora.";
       if (b.cantSpend) {
-        return `Hoje o ideal é segurar. Seu saldo do mês (${fmt(b.currentBalance)}) já está comprometido com ${fmt(b.unpaidBillsEstimate)} de contas a vencer.\n\nQualquer gasto agora sai do que deveria sobrar.`;
+        return b.unpaidBillsEstimate > 0
+          ? `Hoje o ideal é segurar. Seu saldo do mês (${fmt(b.currentBalance)}) já está comprometido com ${fmt(b.unpaidBillsEstimate)} de contas a vencer.\n\nQualquer gasto agora sai do que deveria sobrar.`
+          : `Hoje o ideal é segurar. O que saiu no mês já passou do que entrou (saldo de ${fmt(b.currentBalance)}).\n\nQualquer gasto agora aumenta o buraco.`;
       }
-      return `Você pode gastar até ${fmt(b.perDay)} hoje sem apertar o resto do mês.\n\nA conta: sobram ${fmt(b.availableReal)} livres (já reservei ${fmt(b.unpaidBillsEstimate)} pras contas a vencer) ÷ ${b.remainingDays} dias restantes.`;
+      // Mesma conta do card (26/09): contas de custo fixo e fatura já estão
+      // no que saiu do mês; a reserva é só das contas avulsas em aberto.
+      const reserva = b.unpaidBillsEstimate > 0 ? `, e já separei ${fmt(b.unpaidBillsEstimate)} pras contas avulsas a vencer` : "";
+      const dias = b.remainingDays === 1 ? "hoje é o último dia do mês" : `÷ ${b.remainingDays} dias, contando hoje`;
+      return `Você pode gastar até ${fmt(b.perDay)} hoje sem apertar o resto do mês.\n\nA conta: sobram ${fmt(b.availableReal)} livres (já sem os custos fixos, as parcelas e o cartão${reserva}) ${dias}.`;
     },
   },
   {
@@ -245,7 +252,9 @@ export const AskCore = ({ open, onOpenChange, ctx }: Props) => {
   }, [messages, typing]);
 
   const budgets = useMemo(() => get<Record<string, number>>("finance-category-budgets", {}), [get]);
-  const streak = get<number>("finance-streak", 0);
+  // "finance-streak" ninguém grava desde o check-in antigo (sempre 0): a
+  // sequência de verdade é a de dias com algo anotado (26/09).
+  const streak = useSequencia().dias;
 
   const ask = (q: Question) => {
     if (typing) return;
@@ -272,7 +281,7 @@ export const AskCore = ({ open, onOpenChange, ctx }: Props) => {
             </span>
             Pergunte ao CORE
           </SheetTitle>
-          <p className="text-xs text-muted-foreground !mt-1">Respostas na hora, direto dos seus números.</p>
+          <SheetDescription className="text-xs text-muted-foreground !mt-1">Respostas na hora, direto dos seus números.</SheetDescription>
         </SheetHeader>
 
         {/* mensagens */}

@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
-import { localDayKey } from "@/lib/utils";
 import { CheckSquare } from "lucide-react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
+import { alternarHabitoDeHoje, checksDeHoje, nomesDosHabitos, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { ProgressBar } from "@/components/home/ProgressBar";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 
@@ -11,31 +11,28 @@ export const HabitsWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const data = useLifeHubData();
   const { get, set } = useUserData();
 
-  const todayStr = localDayKey();
+  // Mesma fonte e mesma regra da Rotina (26/09, varredura): o widget lia
+  // `core-rotina-habits`, que ninguém grava — pra cliente real a lista saía
+  // vazia, e o toque ia pra um log que a Rotina não lê.
+  const nomes = nomesDosHabitos(get<unknown[]>("rotina-habits", get<unknown[]>("core-rotina-habits", [])));
+  const checked = get<Record<string, boolean[]>>("rotina-habits-checked", {});
+  const semana = get<string>("rotina-habits-week", "");
+  const hoje = checksDeHoje(checked, semana);
 
-  const toggleHabit = (habitKey: string, e: React.MouseEvent) => {
+  const toggleHabit = (indice: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const log = get<any>("core-rotina-habit-log", {});
-    const todayLog = log[todayStr] || {};
-    if (todayLog[habitKey]) {
-      const { [habitKey]: _, ...rest } = todayLog;
-      set("core-rotina-habit-log", { ...log, [todayStr]: rest });
-    } else {
-      set("core-rotina-habit-log", { ...log, [todayStr]: { ...todayLog, [habitKey]: true } });
-    }
+    const novo = alternarHabitoDeHoje({
+      nomes, checked, semana, indice,
+      habitLog: get<Record<string, string[]>>("rotina-habit-log", {}),
+      heatmap: get<LogDoHeatmap>("heatmap-log", {}),
+    });
+    set("rotina-habits-checked", novo.checked);
+    set("rotina-habits-week", novo.semana);
+    set("rotina-habit-log", novo.habitLog);
+    set("heatmap-log", novo.heatmap);
   };
 
-  const habits = get<any[]>("core-rotina-habits", []);
-  const habitLog = get<any>("core-rotina-habit-log", {});
-  const todayHabits = habitLog[todayStr] || {};
-  const topHabits = habits.slice(0, 3).map((h: any) => {
-    const key = h.id || h.name || h;
-    return {
-      key,
-      name: typeof h === "string" ? h : h.name || "Hábito",
-      done: !!todayHabits[key],
-    };
-  });
+  const topHabits = nomes.slice(0, 3).map((name, i) => ({ key: `${i}-${name}`, indice: i, name, done: !!hoje[i] }));
 
   if (size === "small") {
     return (
@@ -76,10 +73,12 @@ export const HabitsWidget = ({ size = "small" }: { size?: WidgetSize }) => {
           {topHabits.map(h => (
             <button
               key={h.key}
-              onClick={(e) => toggleHabit(h.key, e)}
+              onClick={(e) => toggleHabit(h.indice, e)}
               className="w-full flex items-center gap-2.5 text-left group"
             >
-              <div className={`w-4.5 h-4.5 rounded-md border-2 flex items-center justify-center transition-all ${
+              {/* w-5 h-5 (26/09, varredura): `w-4.5`/`h-4.5` não existem no
+                  Tailwind — o quadradinho saía com 4 px, só a borda. */}
+              <div className={`w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${
                 h.done
                   ? "bg-emerald-500 border-emerald-500 text-white"
                   : "border-muted-foreground/30 group-hover:border-emerald-500"

@@ -40,6 +40,9 @@ export const ConviteDeValor = () => {
       timer = window.setTimeout(() => {
         const el = document.activeElement as HTMLElement | null;
         if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+        // 26/09: o 1º ✓ do Treino (first_workout) abria a folha de avaliação no
+        // meio da série. No Treino não pede; a reserva fica pra próxima ação.
+        if (window.location.pathname.startsWith("/treino")) return;
         if (reservarConviteDeValor(acao, { pagante: isSubscribed, emTrial: trialCartaoAtivo() })) {
           setMomento({ rotulo: ACOES_DE_VALOR[acao], dias: diasDeUso() });
         }

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useEffect, useRef, useState } from "react";
+import { avisarApagado } from "@/lib/desfazer";
+import { numeroBR } from "@/lib/data-normalizers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,8 +8,28 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, X, ShoppingCart, Package, AlertTriangle, Ban } from "lucide-react";
-import { type Product, calculateCostPerDose, getExpiryProgress } from "./utils";
+import { Plus, Trash2, X, ShoppingCart, Package, AlertTriangle, Ban, Edit2 } from "lucide-react";
+import { type Product, calculateCostPerDose, getExpiryProgress, inserirEm } from "./utils";
+import { useChaveDaBeleza } from "./estado-compartilhado";
+
+
+/** Número com vírgula (26/09, varredura): `type="number"` + parseFloat zerava
+ *  "12,90" digitado no teclado do iPhone. Rascunho em texto; o número sai do
+ *  numeroBR. Quando o valor muda por fora (outro produto, formulário limpo), o
+ *  rascunho acompanha. */
+const CampoDecimal = ({ valor, onValor, rotulo }: { valor: number; onValor: (n: number) => void; rotulo: string }) => {
+  const mostra = (n: number) => (n ? String(n).replace(".", ",") : "");
+  const [txt, setTxt] = useState(() => mostra(valor));
+  useEffect(() => {
+    const atual = numeroBR(txt);
+    if ((Number.isFinite(atual) ? atual : 0) !== (valor || 0)) setTxt(mostra(valor));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor]);
+  return (
+    <Input type="text" inputMode="decimal" placeholder="0" aria-label={rotulo} value={txt} className="h-9 text-sm"
+      onChange={e => { setTxt(e.target.value); const n = numeroBR(e.target.value); onValor(Number.isFinite(n) && n > 0 ? n : 0); }} />
+  );
+};
 
 const genId = () => crypto.randomUUID();
 
@@ -25,11 +46,21 @@ const emptyProduct: Partial<Product> = {
 };
 
 export const ProductShelf = () => {
-  const [products, setProducts] = usePersistedState<Product[]>("beauty-products", DEFAULT_PRODUCTS);
-  const [shoppingList, setShoppingList] = usePersistedState<Product[]>("beauty-shopping-list", []);
-  const [triggers, setTriggers] = usePersistedState<string[]>("skincare-triggers", []);
+  // Sem cópia local (useChaveDaBeleza): o Desfazer do apagar funciona mesmo
+  // depois de trocar de aba, e a Rotina vê os ingredientes a evitar na hora.
+  const [products, setProducts] = useChaveDaBeleza<Product[]>("beauty-products", DEFAULT_PRODUCTS);
+  const [shoppingList, setShoppingList] = useChaveDaBeleza<Product[]>("beauty-shopping-list", []);
+  const [triggers, setTriggers] = useChaveDaBeleza<string[]>("skincare-triggers", []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<Product>>({ ...emptyProduct });
+  /* EDITAR PRODUTO (26/09, varredura): o detalhe só tinha "Acabou" e a
+     lixeira — errou a marca ou o preço, tinha que apagar e cadastrar de novo.
+     O "Editar" reaproveita o formulário de detalhes, preenchido. */
+  const [editId, setEditId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [showForm, editId]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showShopping, setShowShopping] = useState(false);
   const [showTriggers, setShowTriggers] = useState(false);
@@ -60,17 +91,51 @@ export const ProductShelf = () => {
   };
 
   const save = () => {
-    if (!form.name) return;
-    const product: Product = {
-      id: genId(), name: form.name || "", category: form.category || "Outro", brand: form.brand || "",
-      opened: !!form.openedDate, openedDate: form.openedDate || "", paoMonths: form.paoMonths || 12,
-      expiry: "", notes: form.notes || "", rating: 0, repurchase: form.repurchase || false,
-      price: form.price || 0, sizeMl: form.sizeMl || 0, photoUrl: form.photoUrl || "",
-      frequency: form.frequency || "Diário", finished: false,
-    };
-    setProducts(prev => [...prev, product]);
+    if (!form.name?.trim()) return;
+    if (editId) {
+      // edição: troca só o que o formulário mostra; id, "acabou", nota e foto ficam
+      const id = editId;
+      setProducts(prev => prev.map(x => x.id === id ? {
+        ...x, name: form.name!.trim(), category: form.category || x.category || "Outro", brand: form.brand || "",
+        opened: !!form.openedDate, openedDate: form.openedDate || "", paoMonths: form.paoMonths || 12,
+        notes: form.notes || "", repurchase: form.repurchase || false,
+        price: form.price || 0, sizeMl: form.sizeMl || 0,
+      } : x));
+    } else {
+      const product: Product = {
+        id: genId(), name: form.name.trim(), category: form.category || "Outro", brand: form.brand || "",
+        opened: !!form.openedDate, openedDate: form.openedDate || "", paoMonths: form.paoMonths || 12,
+        expiry: "", notes: form.notes || "", rating: 0, repurchase: form.repurchase || false,
+        price: form.price || 0, sizeMl: form.sizeMl || 0, photoUrl: form.photoUrl || "",
+        frequency: form.frequency || "Diário", finished: false,
+      };
+      setProducts(prev => [...prev, product]);
+    }
+    fecharForm();
+  };
+
+  const fecharForm = () => {
     setForm({ ...emptyProduct });
+    setEditId(null);
     setShowForm(false);
+  };
+
+  const abrirEdicao = (p: Product) => {
+    setForm({ ...emptyProduct, ...(products.find(x => x.id === p.id) ?? p) });
+    setEditId(p.id);
+    setSelectedProduct(null);
+    setShowForm(true);
+  };
+
+  // Apaga já e oferece Desfazer (26/09, varredura: a lixeira apagava sem volta).
+  const apagarProduto = (p: Product) => {
+    const idx = products.findIndex(x => x.id === p.id);
+    const atual = products[idx] ?? p;
+    setProducts(prev => prev.filter(x => x.id !== p.id));
+    setSelectedProduct(null);
+    if (editId === p.id) fecharForm();
+    avisarApagado(`"${atual.name}" saiu da bancada`, () =>
+      setProducts(prev => (prev.some(x => x.id === p.id) ? prev : inserirEm(prev, idx, atual))));
   };
 
   const markFinished = (p: Product) => {
@@ -217,7 +282,7 @@ export const ProductShelf = () => {
               <Button size="sm" className="h-7 px-3 text-[10px] flex-1" onClick={quickAdd}>
                 <Plus className="w-3 h-3 mr-0.5" /> Adicionar
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-3 text-[10px]" onClick={() => setShowForm(true)}>
+              <Button size="sm" variant="ghost" className="h-7 px-3 text-[10px]" onClick={() => { if (editId) { setEditId(null); setForm({ ...emptyProduct }); } setShowForm(true); }}>
                 + Detalhes
               </Button>
             </div>
@@ -225,9 +290,10 @@ export const ProductShelf = () => {
         </div>
       </div>
 
-      {/* Add form (detailed) */}
+      {/* Add form (detailed) — o mesmo serve pra editar */}
       {showForm && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div ref={formRef} className="rounded-xl border border-border bg-card p-4 space-y-3 scroll-mt-32">
+          {editId && <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✏️ Editar produto</p>}
           <Input placeholder="Nome do produto" value={form.name || ""} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2">
             <Input placeholder="Marca" value={form.brand || ""} onChange={e => setForm(p => ({ ...p, brand: e.target.value }))} className="h-9 text-sm" />
@@ -239,11 +305,11 @@ export const ProductShelf = () => {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[9px] text-muted-foreground">Preço (R$)</label>
-              <Input type="number" placeholder="0" value={form.price || ""} onChange={e => setForm(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))} className="h-9 text-sm" />
+              <CampoDecimal rotulo="Preço" valor={form.price || 0} onValor={n => setForm(p => ({ ...p, price: n }))} />
             </div>
             <div>
               <label className="text-[9px] text-muted-foreground">Tamanho (ml/g)</label>
-              <Input type="number" placeholder="0" value={form.sizeMl || ""} onChange={e => setForm(p => ({ ...p, sizeMl: parseFloat(e.target.value) || 0 }))} className="h-9 text-sm" />
+              <CampoDecimal rotulo="Tamanho" valor={form.sizeMl || 0} onValor={n => setForm(p => ({ ...p, sizeMl: n }))} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -265,7 +331,7 @@ export const ProductShelf = () => {
           </label>
           <div className="flex gap-2">
             <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button size="sm" variant="ghost" onClick={fecharForm}>Cancelar</Button>
           </div>
         </div>
       )}
@@ -301,10 +367,13 @@ export const ProductShelf = () => {
                   )}
                   {p.notes && <p className="text-xs text-muted-foreground">{p.notes}</p>}
                   <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => abrirEdicao(p)}>
+                      <Edit2 className="w-3.5 h-3.5 mr-1" /> Editar
+                    </Button>
                     <Button size="sm" variant="outline" className="flex-1" onClick={() => { markFinished(p); setSelectedProduct(null); }}>
                       <Package className="w-3.5 h-3.5 mr-1" /> Acabou
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setProducts(prev => prev.filter(x => x.id !== p.id)); setSelectedProduct(null); }}>
+                    <Button size="sm" variant="destructive" onClick={() => apagarProduto(p)} aria-label="Apagar produto">
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>

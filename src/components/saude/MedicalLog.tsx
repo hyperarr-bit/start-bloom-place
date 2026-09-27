@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip } from "lucide-react";
 import { AnexosDeSaude } from "./AnexosDeSaude";
 import { toast } from "sonner";
+import { avisarApagado } from "@/lib/desfazer";
 import { isNativeShell } from "@/lib/native-shell";
 import { adicionarAoCalendario, type EventoDeCalendario } from "@/lib/calendario";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -113,6 +114,18 @@ const numeroOu = (texto: string, atual: number) => {
   const n = Number(texto.replace(",", "."));
   return texto.trim() && Number.isFinite(n) ? n : atual;
 };
+
+/** Preenchido mas não é número ("abc", "4,0,1") — vírgula ou ponto valem. */
+const naoENumero = (texto: string) => !!texto.trim() && !Number.isFinite(Number(texto.trim().replace(",", ".")));
+
+/** Número de exame com vírgula, como se escreve no Brasil (26/09, varredura:
+ *  a tela mostrava "8.5 mUI/L" e "Ref: 0.4 – 4"). O valor gravado não muda. */
+const numeroBr = (n: number) =>
+  Number.isFinite(n) ? n.toLocaleString("pt-BR", { maximumFractionDigits: 4 }) : String(n);
+
+/** Data da tabela numa linha só (26/09, varredura: "5 de out. de 2026"
+ *  quebrava em 4 linhas no celular e empurrava as ações pra fora da tela). */
+const DATA_CURTA: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "2-digit" };
 
 export const MedicalLog = () => {
   const [appointments, setAppointments] = usePersistedState<Appointment[]>("core-saude-appointments", []);
@@ -224,9 +237,23 @@ export const MedicalLog = () => {
     else if (r === "erro") toast.error("Não consegui abrir o calendário");
   };
 
+  /* FAIXA COM VÍRGULA (26/09, varredura): o cadastro fazia Number("0,4"), que é
+     NaN, e "0,4 – 4,0" virava 0 – 100 — um TSH de 8,5 aparecia VERDE. Agora lê
+     igual à edição (numeroOu); lixo ou mínimo acima do máximo avisa em vez de
+     gravar uma faixa que pinta o histórico todo da cor errada. */
   const addBiomarker = () => {
     if (!newBio.name.trim()) return;
-    setBiomarkers(prev => [...prev, { id: Date.now().toString(), name: newBio.name, unit: newBio.unit, entries: [], refMin: Number(newBio.refMin) || 0, refMax: Number(newBio.refMax) || 100 }]);
+    if (naoENumero(newBio.refMin) || naoENumero(newBio.refMax)) {
+      toast.error("Faixa de referência: use só números (ex.: 0,4 e 4,0)");
+      return;
+    }
+    const refMin = numeroOu(newBio.refMin, 0);
+    const refMax = numeroOu(newBio.refMax, 100);
+    if (newBio.refMin.trim() && newBio.refMax.trim() && refMin > refMax) {
+      toast.error("O mínimo da faixa está maior que o máximo");
+      return;
+    }
+    setBiomarkers(prev => [...prev, { id: Date.now().toString(), name: newBio.name.trim(), unit: newBio.unit, entries: [], refMin, refMax }]);
     setNewBio({ name: "", unit: "ng/dL", refMin: "", refMax: "" });
     setShowBioForm(false);
   };
@@ -234,9 +261,16 @@ export const MedicalLog = () => {
   const [editandoBioId, setEditandoBioId] = useState<string | null>(null);
   const [rascunhoBio, setRascunhoBio] = useState({ name: "", unit: "", refMin: "", refMax: "" });
 
+  /* APAGAR O BIOMARCADOR leva junto TODAS as medições (26/09, varredura: um
+     toque na lixeira sumia com o histórico inteiro). Dois toques, o mesmo
+     "apagar?" dos aprendizados (EntradaAprendizado). */
+  const [confirmandoApagarBio, setConfirmandoApagarBio] = useState<string | null>(null);
+
   const comecarEdicaoBio = (b: Biomarker) => {
     setEditandoBioId(b.id);
-    setRascunhoBio({ name: b.name, unit: b.unit, refMin: String(b.refMin), refMax: String(b.refMax) });
+    setConfirmandoApagarBio(null);
+    // campo de texto: mostra com vírgula ("0,4"); o numeroOu lê de volta
+    setRascunhoBio({ name: b.name, unit: b.unit, refMin: String(b.refMin).replace(".", ","), refMax: String(b.refMax).replace(".", ",") });
   };
 
   const salvarEdicaoBio = () => {
@@ -310,10 +344,36 @@ export const MedicalLog = () => {
   };
 
   const removerMedicao = (bioId: string, idx: number) => {
+    const medida = biomarkers.find(b => b.id === bioId)?.entries[idx];
     setBiomarkers(prev => prev.map(b => b.id !== bioId ? b : { ...b, entries: b.entries.filter((_, i) => i !== idx) }));
     // apagar desloca os índices seguintes: manter um editor aberto apontando
     // pro índice antigo faria a próxima gravação cair na medição errada
     setEditandoMedicao(null);
+    // desfazer (26/09, varredura): a medição volta pro mesmo lugar do array
+    if (medida) avisarApagado(`Medição de ${mostrarDia(medida.date, { day: "2-digit", month: "2-digit" })} apagada`, () =>
+      setBiomarkers(prev => prev.map(b => {
+        if (b.id !== bioId) return b;
+        const entries = [...b.entries];
+        entries.splice(Math.min(idx, entries.length), 0, medida);
+        return { ...b, entries };
+      })));
+  };
+
+  /* Desfazer do apagar (26/09, varredura): consulta, exame e documento sumiam
+     num toque, com endereço, perguntas e fotos junto. Volta no mesmo lugar. */
+  const apagarComDesfazer = <T extends { id: string }>(
+    lista: T[], set: (v: T[] | ((prev: T[]) => T[])) => void, id: string, texto: string,
+  ) => {
+    const pos = lista.findIndex(x => x.id === id);
+    if (pos < 0) return;
+    const item = lista[pos];
+    set(prev => prev.filter(x => x.id !== id));
+    avisarApagado(texto, () => set(prev => {
+      if (prev.some(x => x.id === id)) return prev;
+      const volta = [...prev];
+      volta.splice(Math.min(pos, volta.length), 0, item);
+      return volta;
+    }));
   };
 
   /**
@@ -392,13 +452,17 @@ export const MedicalLog = () => {
         </div>
         {allAppts.length > 0 ? (
           <div className="overflow-x-auto">
+            {/* AÇÕES SEMPRE À VISTA (26/09, varredura): a 430 px "Apagar" ficava
+                fora da tela e a 360 px só o 1º botão aparecia. A coluna das
+                ações gruda na direita com o fundo do card, os botões quebram
+                em duas linhas quando falta espaço e a data não quebra mais. */}
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Médico</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Data</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
-                  <th className="px-2 py-3" />
+                  <th className="text-left pl-3 pr-2 py-3 text-xs font-semibold text-muted-foreground">Médico</th>
+                  <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Data</th>
+                  <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
+                  <th className="sticky right-0 bg-card pl-1 pr-2 py-3"><span aria-hidden className="absolute inset-0 bg-muted/50" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -432,7 +496,7 @@ export const MedicalLog = () => {
                     {/* O nome do médico é o que a pessoa lembra ("a consulta da
                         Dra. Ana"), não a especialidade — ele vem em destaque e a
                         especialidade fica de sublinha (pedido de cliente). */}
-                    <td className="px-4 py-3">
+                    <td className="pl-3 pr-2 py-3">
                       <p className="text-xs font-bold text-foreground">{a.doctor || a.specialty || "—"}</p>
                       {a.specialty && a.doctor && (
                         <span className={`mt-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${getSpecialtyColor(a.specialty)}`}>
@@ -445,12 +509,12 @@ export const MedicalLog = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {mostrarDia(a.date)}
+                    <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {mostrarDia(a.date, DATA_CURTA)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{a.time || "—"}</td>
-                    <td className="px-2 py-3">
-                      <div className="flex gap-1">
+                    <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">{a.time || "—"}</td>
+                    <td className="sticky right-0 bg-card pl-1 pr-2 py-2">
+                      <div className="flex flex-wrap justify-end gap-1 min-w-[76px]">
                         {a.address && (
                           <a href={`https://maps.google.com/?q=${encodeURIComponent(a.address)}`} target="_blank" rel="noopener noreferrer"
                             aria-label={`Ver endereço da consulta com ${a.doctor}`}
@@ -485,7 +549,7 @@ export const MedicalLog = () => {
                           className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
                           <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
-                        <button onClick={() => setAppointments(prev => prev.filter(x => x.id !== a.id))}
+                        <button onClick={() => apagarComDesfazer(appointments, setAppointments, a.id, "Consulta apagada")}
                           aria-label={`Apagar consulta com ${a.doctor || a.specialty}`}
                           className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                           <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
@@ -564,13 +628,14 @@ export const MedicalLog = () => {
 
         {exams.length > 0 ? (
           <div className="overflow-x-auto">
+            {/* ações sempre à vista, igual às consultas (26/09, varredura) */}
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Exame</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Data</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
-                  <th className="px-2 py-3" />
+                  <th className="text-left pl-3 pr-2 py-3 text-xs font-semibold text-muted-foreground">Exame</th>
+                  <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Data</th>
+                  <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
+                  <th className="sticky right-0 bg-card pl-1 pr-2 py-3"><span aria-hidden className="absolute inset-0 bg-muted/50" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -598,7 +663,7 @@ export const MedicalLog = () => {
                   </tr>
                 ) : (
                   <tr key={e.id} className={`border-t border-border/50 hover:bg-muted/30 transition-colors ${e.done ? "opacity-50" : ""}`}>
-                    <td className="px-4 py-3">
+                    <td className="pl-3 pr-2 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getExamColor(e.name)}`}>
                         {e.done ? "✓ " : ""}{e.name}
                       </span>
@@ -609,12 +674,12 @@ export const MedicalLog = () => {
                         <p className="mt-1 text-[10px] text-muted-foreground max-w-[160px] truncate" title={e.location}>{e.location}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {mostrarDia(e.date)}
+                    <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {mostrarDia(e.date, DATA_CURTA)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{e.time || "—"}</td>
-                    <td className="px-2 py-3">
-                      <div className="flex gap-1">
+                    <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">{e.time || "—"}</td>
+                    <td className="sticky right-0 bg-card pl-1 pr-2 py-2">
+                      <div className="flex flex-wrap justify-end gap-1 min-w-[84px]">
                         <button onClick={() => toggleExamDone(e.id)}
                           className={`h-9 text-[10px] px-2.5 rounded-lg font-bold transition-colors ${e.done ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
                           {e.done ? "Desfazer" : "Feito"}
@@ -655,7 +720,7 @@ export const MedicalLog = () => {
                           className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
                           <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
-                        <button onClick={() => setExams(prev => prev.filter(x => x.id !== e.id))}
+                        <button onClick={() => apagarComDesfazer(exams, setExams, e.id, "Exame apagado")}
                           aria-label={`Apagar exame ${e.name}`}
                           className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                           <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
@@ -750,7 +815,7 @@ export const MedicalLog = () => {
                     className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                     <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`} />
                   </button>
-                  <button onClick={() => setDocumentos(prev => prev.filter(x => x.id !== d.id))} aria-label={`Apagar ${d.titulo}`}
+                  <button onClick={() => apagarComDesfazer(documentos, setDocumentos, d.id, "Documento apagado")} aria-label={`Apagar ${d.titulo}`}
                     className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                     <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
                   </button>
@@ -832,12 +897,12 @@ export const MedicalLog = () => {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-foreground truncate">{bio.name}</p>
-                    <p className="text-[10px] text-muted-foreground">Ref: {bio.refMin} – {bio.refMax} {bio.unit}</p>
+                    <p className="text-[10px] text-muted-foreground">Ref: {numeroBr(bio.refMin)} – {numeroBr(bio.refMax)} {bio.unit}</p>
                   </div>
                   {ultima && (
                     <div className="text-right flex-shrink-0">
                       <span className={`text-sm font-black ${inRange ? "text-[hsl(var(--saude-green))]" : "text-destructive"}`}>
-                        {ultima.value} {bio.unit}
+                        {numeroBr(ultima.value)} {bio.unit}
                       </span>
                       {/* Resultado sem data não serve pra comparar com o próximo
                           exame — era exatamente a queixa da cliente. */}
@@ -856,8 +921,8 @@ export const MedicalLog = () => {
                         // isso o `height: %` da barra não tem contra o que
                         // resolver e ela some.
                         <div key={m.idx} className="flex-1 h-full flex flex-col items-center gap-0.5 min-w-0"
-                          title={`${m.value} ${bio.unit} em ${mostrarDia(m.date)}`}>
-                          <span className="text-[7px] leading-none text-muted-foreground">{m.value}</span>
+                          title={`${numeroBr(m.value)} ${bio.unit} em ${mostrarDia(m.date)}`}>
+                          <span className="text-[7px] leading-none text-muted-foreground">{numeroBr(m.value)}</span>
                           <div className="w-full flex-1 flex items-end">
                             <div className={`w-full ${color} rounded-t`} style={{ height: `${pct}%` }} />
                           </div>
@@ -905,10 +970,18 @@ export const MedicalLog = () => {
                     className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
                     <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
                   </button>
-                  <button onClick={() => setBiomarkers(prev => prev.filter(b => b.id !== bio.id))} aria-label={`Apagar biomarcador ${bio.name}`}
-                    className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
-                  </button>
+                  {confirmandoApagarBio === bio.id ? (
+                    <button onClick={() => { setBiomarkers(prev => prev.filter(b => b.id !== bio.id)); setConfirmandoApagarBio(null); }}
+                      aria-label={`Confirmar exclusão do biomarcador ${bio.name}`}
+                      className="h-9 px-1.5 rounded text-[9px] font-bold text-destructive border border-destructive/40">
+                      apagar?
+                    </button>
+                  ) : (
+                    <button onClick={() => setConfirmandoApagarBio(bio.id)} aria-label={`Apagar biomarcador ${bio.name}`}
+                      className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Histórico do mais recente pro mais antigo: o valor que a
@@ -938,7 +1011,7 @@ export const MedicalLog = () => {
                       <div key={m.idx} className="flex items-center gap-2 px-2 py-1">
                         <span className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">{mostrarDia(m.date)}</span>
                         <span className={`text-xs font-bold ${naFaixa(m.value) ? "text-[hsl(var(--saude-green))]" : "text-destructive"}`}>
-                          {m.value} {bio.unit}
+                          {numeroBr(m.value)} {bio.unit}
                         </span>
                         <button onClick={() => comecarEdicaoMedicao(bio.id, m.idx, m)} aria-label={`Editar medição de ${mostrarDia(m.date)}`}
                           className="w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">

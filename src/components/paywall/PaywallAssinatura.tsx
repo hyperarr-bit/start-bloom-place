@@ -72,8 +72,13 @@ export function useRecap(area: AreaKey | null): string[] {
     if (habitos.length > 0) linhas.push(`${habitos.length} hábito${habitos.length > 1 ? "s" : ""} no painel`);
     const metas = get<unknown[]>("goals-board-v2", []) ?? [];
     if (metas.length > 0) linhas.push(`${metas.length} meta${metas.length > 1 ? "s" : ""} saindo do papel`);
-    const treinos = get<unknown[]>("saude-workouts-v2", []) ?? [];
-    if (Array.isArray(treinos) && treinos.length > 0) linhas.push("Plano de treino montado");
+    // 26/09: o plano é { SEGUNDA: {exercises: [...]}, ... } — lido como array,
+    // "Plano de treino montado" nunca aparecia no resumo do que a pessoa construiu.
+    const plano = get<unknown>("saude-workouts-v2", {}) ?? {};
+    const temTreino = Array.isArray(plano)
+      ? plano.length > 0
+      : typeof plano === "object" && Object.values(plano as Record<string, { exercises?: unknown[] }>).some((d) => Array.isArray(d?.exercises) && d.exercises.length > 0);
+    if (temTreino) linhas.push("Plano de treino montado");
     // v83: a conta armada na DEMO GUIADA (chave própria pra não poluir o
     // módulo finanças) também conta como construção — endowment do funil.
     const demoConta = get<string | null>("core-demo-conta", null);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { datasDeCheckin } from "@/lib/detox";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check, X, Heart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
@@ -46,7 +47,7 @@ export const DetoxTracker = () => {
 
   const addHabit = () => {
     if (!name.trim()) return;
-    const updated = [...habits, { id: Date.now().toString(), name: name.trim(), icon, startDate: todayStr, relapses: [], record: 0, checkins: [] }];
+    const updated = [...habits, { id: Date.now().toString(), name: name.trim(), icon, startDate: todayStr, createdAt: todayStr, relapses: [], record: 0, checkins: [] }];
     set("detox-habits", updated);
     setName("");
   };
@@ -65,8 +66,8 @@ export const DetoxTracker = () => {
   const checkin = (id: string) => {
     const updated = habits.map(h => {
       if (h.id !== id) return h;
-      const checkins = h.checkins || [];
-      if (checkins.includes(todayStr)) return h;
+      const checkins = datasDeCheckin(h.checkins);
+      if (checkins.includes(todayStr)) return { ...h, checkins };
       return { ...h, checkins: [...checkins, todayStr] };
     });
     set("detox-habits", updated);
@@ -119,7 +120,7 @@ export const DetoxTracker = () => {
             const streak = getStreak(h);
             const best = Math.max(h.record, streak);
             const isExpanded = selectedHabit === h.id;
-            const checkedToday = (h.checkins || []).includes(todayStr);
+            const checkedToday = datasDeCheckin(h.checkins).includes(todayStr);
 
             return (
               <div
@@ -220,7 +221,7 @@ export const DetoxTracker = () => {
                         const ds = format(day, "yyyy-MM-dd");
                         const isRelapse = h.relapses.includes(ds);
                         const isFuture = day > today;
-                        const isCheckedIn = (h.checkins || []).includes(ds);
+                        const isCheckedIn = datasDeCheckin(h.checkins).includes(ds);
                         const isPure = !isRelapse && !isFuture && day >= new Date(h.startDate);
                         return (
                           <div

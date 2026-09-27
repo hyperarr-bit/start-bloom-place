@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { MaintenanceTask, Warranty, RoomMeasure, monthsSince } from "./types";
+import { dataBR, diasDeGarantia } from "./formatos";
 
 const MaintenanceLog = () => {
   const [tasks, setTasks] = usePersistedState<MaintenanceTask[]>("casa-maint-tasks", []);
@@ -30,12 +31,8 @@ const MaintenanceLog = () => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, lastDone: localDayKey() } : t));
   };
 
-  const warrantyDaysLeft = (w: Warranty) => {
-    if (!w.purchaseDate) return 0;
-    const end = new Date(w.purchaseDate);
-    end.setMonth(end.getMonth() + w.warrantyMonths);
-    return Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-  };
+  // null = sem data de compra: sem status (antes caía em "Expirada") — 26/09, varredura
+  const warrantyDaysLeft = (w: Warranty) => diasDeGarantia(w.purchaseDate, w.warrantyMonths);
 
   const addWarranty = () => {
     if (!wProduct.trim()) return;
@@ -66,7 +63,8 @@ const MaintenanceLog = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold">{t.task}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    A cada {t.frequencyMonths}m • {t.lastDone ? `Último: ${new Date(t.lastDone).toLocaleDateString("pt-BR")}` : "Nunca feito"}
+                    {/* dia LOCAL: new Date("AAAA-MM-DD") é UTC e mostrava o dia anterior (26/09, varredura) */}
+                    A cada {t.frequencyMonths}m • {t.lastDone ? `Último: ${dataBR(t.lastDone)}` : "Nunca feito"}
                   </p>
                 </div>
                 {overdue && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
@@ -95,11 +93,11 @@ const MaintenanceLog = () => {
           {warranties.map(w => {
             const daysLeft = warrantyDaysLeft(w);
             return (
-              <div key={w.id} className={`flex items-center gap-2 p-2 rounded-lg group border ${daysLeft <= 30 ? "border-red-500/30 bg-red-500/5" : daysLeft <= 60 ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-background/50"}`}>
+              <div key={w.id} className={`flex items-center gap-2 p-2 rounded-lg group border ${daysLeft === null ? "border-border bg-background/50" : daysLeft <= 30 ? "border-red-500/30 bg-red-500/5" : daysLeft <= 60 ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-background/50"}`}>
                 <div className="flex-1">
                   <p className="text-xs font-bold">{w.product}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {daysLeft > 0 ? `${daysLeft} dias restantes` : "Expirada"} • {w.warrantyMonths} meses
+                    {daysLeft === null ? "Sem data de compra" : daysLeft > 0 ? `${daysLeft} ${daysLeft === 1 ? "dia restante" : "dias restantes"}` : "Expirada"} • {w.warrantyMonths} meses
                   </p>
                 </div>
                 <button onClick={() => setWarranties(prev => prev.filter(x => x.id !== w.id))} className="opacity-0 group-hover:opacity-100">

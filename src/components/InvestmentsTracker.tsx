@@ -1,5 +1,8 @@
-import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { dataSegura, localDayKey } from "@/lib/utils";
+import { numeroBR } from "@/lib/data-normalizers";
+import { avisarApagado } from "@/lib/desfazer";
 import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +34,24 @@ const typeLabels: Record<string, { label: string; color: string; icon: string }>
   imoveis: { label: "Imóveis/FIIs", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: "🏠" },
   outros: { label: "Outros", color: "bg-gray-500/20 text-gray-400 border-gray-500/30", icon: "💼" },
 };
+
+/* Formatação (26/09, varredura): dinheiro sempre com 2 casas e o sinal antes
+   do R$ ("-R$ 500,00", não "R$ -500,00"); percentual com vírgula ("13,5%",
+   não "13.5%"). */
+const brl = (v: number) => Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const reais = (v: number) => {
+  const r = Math.round((Number(v) || 0) * 100) / 100;
+  return `${r < 0 ? "-" : ""}R$ ${brl(r)}`;
+};
+/** "+R$ 900,00" / "-R$ 400,00" — pra retorno, que pode ser as duas coisas. */
+export const reaisComSinal = (v: number) => {
+  const r = Math.round((Number(v) || 0) * 100) / 100;
+  return `${r < 0 ? "-" : "+"}R$ ${brl(r)}`;
+};
+export const pct = (v: number, casas = 1) =>
+  `${(Number(v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
+/** Taxa a.a. sem ",0" sobrando: "12% a.a.", "13,5% a.a." */
+const taxa = (v: number) => `${(Number(v) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% a.a.`;
 
 // Juros compostos: FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
 const futureValue = (pv: number, pmt: number, rateAnnual: number, years: number) => {
@@ -68,8 +89,22 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
     setShowForm(false);
   };
 
+  /* Apagar com "Desfazer" (26/09, varredura): um toque na lixeira levava o
+     investimento — aportado, rentabilidade, histórico — sem volta. O desfazer
+     devolve o registro inteiro, sobre a lista mais recente. */
+  const ultimo = useRef({ lista: investments, gravar: setInvestments });
+  useEffect(() => { ultimo.current = { lista: investments, gravar: setInvestments }; });
+
   const deleteInvestment = (id: string) => {
+    const pos = investments.findIndex((i) => i.id === id);
+    if (pos < 0) return;
+    const apagado = investments[pos];
     setInvestments(investments.filter((i) => i.id !== id));
+    avisarApagado(`Investimento apagado: ${apagado.name} (${reais(apagado.currentValue)})`, () => {
+      const { lista, gravar } = ultimo.current;
+      if (lista.some((i) => i.id === id)) return;
+      gravar([...lista.slice(0, pos), apagado, ...lista.slice(pos)]);
+    });
   };
 
   /**
@@ -127,6 +162,54 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
           : i
       )
     );
+  };
+
+  /* OS TRÊS CAMPOS DA LINHA (26/09, varredura). Eram inputs soltos com
+     `defaultValue`: o aporte de R$ 500 somava no card (15.600), mas o campo
+     "valor atual" continuava mostrando 15100 — e tocar nele e sair gravava o
+     15100 por cima, e o aporte sumia. Agora são controlados por rascunho:
+     sem rascunho mostram o valor SALVO (sempre o de agora), e sair do campo
+     só grava se o número mudou. O aporte, que antes só ia com Enter, ganhou
+     o botão "+" (Enter continua valendo). */
+  const [campos, setCampos] = useState<Record<string, string>>({});
+  const chaveCampo = (id: string, qual: "atual" | "taxa" | "aporte") => `${id}:${qual}`;
+  const escrever = (chave: string, v: string) => setCampos((c) => ({ ...c, [chave]: v }));
+  const soltar = (chave: string) => setCampos((c) => {
+    const { [chave]: _descartado, ...resto } = c;
+    return resto;
+  });
+
+  const salvarValorAtual = (inv: Investment) => {
+    const chave = chaveCampo(inv.id, "atual");
+    const texto = campos[chave];
+    if (texto === undefined) return;
+    soltar(chave);
+    if (!texto.trim()) return; // apagou e saiu: fica o valor salvo
+    const v = numeroBR(texto);
+    if (!Number.isFinite(v) || v < 0) { toast.error("Valor atual inválido."); return; }
+    if (v !== inv.currentValue) updateCurrentValue(inv.id, v);
+  };
+
+  const salvarTaxa = (inv: Investment) => {
+    const chave = chaveCampo(inv.id, "taxa");
+    const texto = campos[chave];
+    if (texto === undefined) return;
+    soltar(chave);
+    if (!texto.trim()) return;
+    const v = numeroBR(texto);
+    if (!Number.isFinite(v)) { toast.error("Rentabilidade inválida."); return; }
+    // 0% é valor de verdade (o `|| anterior` de antes não deixava zerar)
+    if (v !== (inv.expectedReturn ?? 10)) updateExpectedReturn(inv.id, v);
+  };
+
+  const lancarAporte = (inv: Investment) => {
+    const chave = chaveCampo(inv.id, "aporte");
+    const texto = campos[chave] ?? "";
+    if (!texto.trim()) { toast.error("Digite o valor do aporte."); return; }
+    const v = numeroBR(texto);
+    if (!Number.isFinite(v) || v <= 0) { toast.error("O aporte precisa ser maior que zero."); return; }
+    addContribution(inv.id, v);
+    soltar(chave);
   };
 
   const totalInvested = investments.reduce((sum, i) => sum + i.investedAmount, 0);
@@ -190,10 +273,10 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <span className="text-xs text-muted-foreground">Rentabilidade</span>
           </div>
           <p className={`text-lg font-bold ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {totalReturn >= 0 ? "+" : ""}R$ {totalReturn.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {reaisComSinal(totalReturn)}
           </p>
           <p className={`text-[10px] ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {returnPercentage >= 0 ? "+" : ""}{returnPercentage.toFixed(2)}%
+            {returnPercentage >= 0 ? "+" : ""}{pct(returnPercentage, 2)}
           </p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
@@ -222,12 +305,12 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span>{typeInfo.label}</span>
-                      <span className="text-muted-foreground">{percentage.toFixed(1)}%</span>
+                      <span className="text-muted-foreground">{pct(percentage, 1)}</span>
                     </div>
                     <Progress value={percentage} className="h-1.5" />
                   </div>
                   <span className={`text-xs w-24 text-right ${returnVal >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {reaisComSinal(returnVal)}
                   </span>
                 </div>
               );
@@ -333,7 +416,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                           {typeInfo.icon} {typeInfo.label}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/50 text-accent-foreground border border-border">
-                          {(inv.expectedReturn ?? 10).toFixed(1)}% a.a.
+                          {taxa(inv.expectedReturn ?? 10)}
                         </span>
                         {inv.broker && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -347,7 +430,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                           Investido: R$ {(inv.investedAmount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className={returnVal >= 0 ? "text-green-400" : "text-red-400"}>
-                          Retorno: {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({returnPct.toFixed(2)}%)
+                          Retorno: {reaisComSinal(returnVal)} ({pct(returnPct, 2)})
                         </span>
                       </div>
                     </div>
@@ -355,9 +438,13 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       <p className="text-sm font-bold">
                         R$ {inv.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Desde {new Date(inv.startDate).toLocaleDateString("pt-BR")}
-                      </p>
+                      {/* dia LOCAL (26/09): `new Date("2025-06-01")` é meia-noite UTC
+                          e no Brasil virava "Desde 31/05/2025" */}
+                      {dataSegura(inv.startDate, "dd/MM/yyyy") !== "—" && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Desde {dataSegura(inv.startDate, "dd/MM/yyyy")}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col gap-0.5 shrink-0">
                       <Button
@@ -433,35 +520,58 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     </div>
                   )}
 
-                  <div className="mt-2 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Atualizar valor atual"
-                      className="h-6 text-[10px] flex-1"
-                      onBlur={(e) => updateCurrentValue(inv.id, parseFloat(e.target.value) || inv.currentValue)}
-                      defaultValue={inv.currentValue}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Rent. esperada (% a.a.)"
-                      className="h-6 text-[10px] w-24"
-                      defaultValue={inv.expectedReturn ?? 10}
-                      onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Novo aporte"
-                      className="h-6 text-[10px] w-28"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const val = parseFloat((e.target as HTMLInputElement).value) || 0;
-                          if (val > 0) {
-                            addContribution(inv.id, val);
-                            (e.target as HTMLInputElement).value = "";
-                          }
-                        }
-                      }}
-                    />
+                  {/* Rótulo curto em cada campo (26/09): "15100" e "12" soltos
+                      não diziam o que eram. */}
+                  <div className="mt-2 flex items-end gap-2">
+                    <label className="flex-1 min-w-0 text-[10px] text-muted-foreground">
+                      Valor atual (R$)
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        aria-label={`Valor atual de ${inv.name}`}
+                        className="h-8 text-xs mt-0.5"
+                        value={campos[chaveCampo(inv.id, "atual")] ?? String(inv.currentValue ?? "")}
+                        onChange={(e) => escrever(chaveCampo(inv.id, "atual"), e.target.value)}
+                        onBlur={() => salvarValorAtual(inv)}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    </label>
+                    <label className="w-16 shrink-0 text-[10px] text-muted-foreground">
+                      Rent. % a.a.
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        aria-label={`Rentabilidade esperada de ${inv.name} (% ao ano)`}
+                        className="h-8 text-xs mt-0.5"
+                        value={campos[chaveCampo(inv.id, "taxa")] ?? String(inv.expectedReturn ?? 10)}
+                        onChange={(e) => escrever(chaveCampo(inv.id, "taxa"), e.target.value)}
+                        onBlur={() => salvarTaxa(inv)}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    </label>
+                    <div className="w-28 shrink-0 text-[10px] text-muted-foreground">
+                      Novo aporte (R$)
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Input
+                          type="number"
+                          inputMode="decimal"
+                          placeholder="R$"
+                          aria-label={`Novo aporte em ${inv.name}`}
+                          className="h-8 text-xs flex-1 min-w-0"
+                          value={campos[chaveCampo(inv.id, "aporte")] ?? ""}
+                          onChange={(e) => escrever(chaveCampo(inv.id, "aporte"), e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") lancarAporte(inv); }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => lancarAporte(inv)}
+                          aria-label={`Adicionar aporte em ${inv.name}`}
+                          className="h-8 w-8 shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -479,27 +589,27 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Se continuar aportando</p>
-            <p className="text-sm font-bold">R$ {monthlyContributions.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/mês</p>
-            <p className="text-[10px] text-muted-foreground">Taxa média: {weightedRate.toFixed(1)}% a.a.</p>
+            <p className="text-sm font-bold">{reais(monthlyContributions)}/mês</p>
+            <p className="text-[10px] text-muted-foreground">Taxa média: {pct(weightedRate, 1)} a.a.</p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 5 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {projection5y.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              {reais(projection5y)}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 10 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {projection10y.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              {reais(projection10y)}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Renda passiva potencial</p>
             <p className="text-sm font-bold text-purple-400">
-              R$ {passiveIncome.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mês
+              {reais(passiveIncome)}/mês
             </p>
-            <p className="text-[10px] text-muted-foreground">({weightedRate.toFixed(1)}% a.a.)</p>
+            <p className="text-[10px] text-muted-foreground">({pct(weightedRate, 1)} a.a.)</p>
           </div>
         </div>
       </div>

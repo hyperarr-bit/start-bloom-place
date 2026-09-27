@@ -1,5 +1,5 @@
 import { Badge, fracaoDe } from "@/components/gamification/types";
-import { ehDia, MARCOS_SEQUENCIA } from "@/lib/sequencia";
+import { ehDia, MARCOS_SEQUENCIA, MAX_DIAS_GUARDADOS } from "@/lib/sequencia";
 
 /**
  * CONQUISTAS QUE NÃO VOLTAM ATRÁS (26/09).
@@ -15,22 +15,56 @@ export const CHAVE_DESBLOQUEADAS = "conquistas-desbloqueadas";
 /** O que já foi comemorado ({ adesivos: ids, marcos: [7, 30…] }) — cada momento aparece UMA vez. */
 export const CHAVE_VISTAS = "conquistas-vistas";
 
-export const XP_MESTRE = 200;
-export const XP_DIAMANTE = 2000;
+/** Mestre do CORE é lendário (27/09) e abre no Diamante da escada nova. */
+export const XP_MESTRE = 400;
+export const XP_DIAMANTE = 3000;
 
-/** Adesivos da sequência nova (dias com algo anotado): 7, 30 e 100 dias. */
-export const buildBadgesSequencia = (recorde: number): Badge[] =>
-  MARCOS_SEQUENCIA.map((n) => ({
+/**
+ * XP que cada adesivo valia ANTES da raridade (27/09): três subiram pra
+ * lendário (200 → 400). Serve só pra calcular o nível que a pessoa tinha na
+ * escada antiga — o piso de nível (ver gamification/types).
+ */
+export const XP_ANTIGO: Record<string, number> = { "sequencia-100": 200, "investor-100k": 200, master: 200 };
+export const xpPelaTabelaAntiga = (adesivos: Badge[]): number =>
+  adesivos.filter((b) => b.unlocked).reduce((s, b) => s + (XP_ANTIGO[b.id] ?? b.xp), 0);
+
+/** Um ano de dias anotados (a lista guarda 400, então dá pra medir). */
+export const ALVO_ANO = 365;
+
+/**
+ * Adesivos da sequência (dias com algo anotado): 7, 30 e 100 dias seguidos
+ * (raro · épico · lendário), "Salvo pelo Gelo" (1 protetor já segurou um dia
+ * vazio) e "Um Ano Anotado" (365 dias no total).
+ */
+export const buildBadgesSequencia = (recorde: number, extra: { protetoresUsados?: number; diasAnotados?: number } = {}): Badge[] => {
+  const marcos: Badge[] = MARCOS_SEQUENCIA.map((n) => ({
     id: `sequencia-${n}`,
     name: `${n} Dias Seguidos`,
     description: `Anote algo no app ${n} dias seguidos`,
     icon: "🔥",
     category: "sequencia" as const,
     color: "green",
-    xp: n === 7 ? 100 : 200,
+    raridade: n === 7 ? ("raro" as const) : n === 30 ? ("epico" as const) : ("lendario" as const),
+    xp: n === 7 ? 100 : n === 30 ? 200 : 400,
     unlocked: recorde >= n,
     progresso: { atual: Math.min(Math.max(0, recorde), n), alvo: n },
   }));
+  const usados = Math.max(0, extra.protetoresUsados ?? 0);
+  const dias = Math.max(0, Math.min(MAX_DIAS_GUARDADOS, extra.diasAnotados ?? 0));
+  return [
+    ...marcos,
+    {
+      id: "protetor-1", name: "Salvo pelo Gelo", description: "Um protetor segurou um dia vazio da sua sequência", icon: "🧊",
+      category: "sequencia", color: "green", raridade: "comum", xp: 50,
+      unlocked: usados >= 1, progresso: { atual: Math.min(usados, 1), alvo: 1 }, unidade: ["dia salvo por um protetor", "dias salvos por protetores"],
+    },
+    {
+      id: "ano-365", name: "Um Ano Anotado", description: "365 dias com algo anotado", icon: "📓",
+      category: "sequencia", color: "green", raridade: "lendario", xp: 400,
+      unlocked: dias >= ALVO_ANO, progresso: { atual: Math.min(dias, ALVO_ANO), alvo: ALVO_ANO }, unidade: ["dia anotado", "dias anotados"],
+    },
+  ];
+};
 
 /** A insígnia máxima é do APP INTEIRO: medida pelo XP das outras. */
 const mestre = (xpDasOutras: number, gravado: boolean): Badge => ({
@@ -40,6 +74,7 @@ const mestre = (xpDasOutras: number, gravado: boolean): Badge => ({
   icon: "👑",
   category: "geral",
   color: "green",
+  raridade: "lendario",
   xp: XP_MESTRE,
   unlocked: gravado || xpDasOutras >= XP_DIAMANTE,
   progresso: { atual: Math.min(xpDasOutras, XP_DIAMANTE), alvo: XP_DIAMANTE },
@@ -116,6 +151,9 @@ export const proximoAdesivo = (adesivos: Badge[]): Badge | null =>
 const brl = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: v >= 100 ? 0 : 2 });
 
+/** "5h" · "10h" — minutos de foco em horas cheias (pro círculo do adesivo). */
+const horasCurto = (min: number) => `${Math.floor(Math.max(0, min) / 60)}h`;
+
 /** "R$ 80" · "R$ 1,2 mil" · "R$ 12 mil" — cabe no círculo do adesivo que falta. */
 export const brlCurto = (v: number): string => {
   const n = Math.max(0, v);
@@ -131,6 +169,7 @@ export const rotuloProgresso = (b: Badge): string | null => {
     case "reais": return brlCurto(atual);
     case "porcento": return `${Math.max(0, Math.round(atual))}%`;
     case "xp": return `${Math.floor(atual)} xp`;
+    case "minutos": return `${horasCurto(atual)}/${horasCurto(alvo)}`;
     default: return `${Math.floor(Math.max(0, atual))}/${alvo}`;
   }
 };
@@ -140,7 +179,8 @@ export const textoFalta = (b: Badge, diasDeSequencia = 0): string => {
   const desc = b.description.charAt(0).toLowerCase() + b.description.slice(1);
   if (!b.progresso) return desc;
   const { atual, alvo } = b.progresso;
-  if (b.category === "sequencia") {
+  // só os marcos de dias SEGUIDOS (7/30/100): "Um Ano Anotado" e "Salvo pelo Gelo" contam por unidade
+  if (/^sequencia-\d+$/.test(b.id)) {
     const n = Math.max(1, alvo - Math.max(0, diasDeSequencia));
     return `mais ${n} ${n === 1 ? "dia seguido" : "dias seguidos"} anotando`;
   }
@@ -151,6 +191,10 @@ export const textoFalta = (b: Badge, diasDeSequencia = 0): string => {
         ? "anotar pelo menos 5 gastos do mês pra taxa valer"
         : `poupança do mês em ${Math.max(0, Math.round(atual))}% — a meta é ${alvo}%`;
     case "xp": return `faltam ${Math.max(0, Math.ceil(alvo - atual))} XP`;
+    case "minutos": {
+      const h = Math.max(1, Math.ceil((alvo - atual) / 60));
+      return `mais ${h} ${h === 1 ? "hora" : "horas"} de foco`;
+    }
     default: {
       if (!b.unidade) return desc;
       const n = Math.max(1, Math.ceil(alvo - atual));

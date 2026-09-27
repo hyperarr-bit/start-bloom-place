@@ -89,7 +89,10 @@ describe("tela de Conquistas", () => {
     expect(screen.getByText(/Hoje falta/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "registrar um gasto" })).toBeInTheDocument();
     expect(screen.getByText("MEUS ADESIVOS")).toBeInTheDocument();
-    expect(screen.getByText(/de 39/)).toBeInTheDocument();
+    expect(screen.getAllByText(/de 65/).length).toBeGreaterThan(0);
+    // a semana: 12 dias até ontem (sexta) → SEG…SEX feitos, SÁB (hoje) em aberto, DOM futuro
+    const semana = Array.from(document.querySelectorAll('[data-testid="card-sequencia"] .seq-dia')).map((d) => d.getAttribute("data-estado"));
+    expect(semana).toEqual(["feito", "feito", "feito", "feito", "feito", "hoje", "futuro"]);
     expect(eventos).toContainEqual(["conquistas_open", { origem: "home" }]);
   });
 
@@ -128,7 +131,7 @@ describe("tela de Conquistas", () => {
 });
 
 describe("linha da sequência na Home", () => {
-  const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, acao: ACAO_PADRAO, protegidoOntem: false, ...p });
+  const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: ACAO_PADRAO, protegidoOntem: false, ...p });
   const Onde = () => { const l = useLocation(); return <p data-testid="onde">{l.pathname}|{JSON.stringify(l.state)}</p>; };
 
   it("'12 dias · falta 1 coisa hoje' e abre as Conquistas com origem home", () => {

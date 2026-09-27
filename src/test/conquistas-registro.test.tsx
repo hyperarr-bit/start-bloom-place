@@ -155,7 +155,8 @@ describe("useConquistas grava o que abriu", () => {
     const { gravacoes, estado } = montar({ [CHAVE_DESBLOQUEADAS]: { "investor-100k": "2026-08-01", "saver-60": "2026-08-01", "treino-pr": "2026-08-01" } });
     act(() => {});
     expect(gravacoes.filter(([k]) => k === CHAVE_DESBLOQUEADAS)).toEqual([]);
-    expect(estado().xp).toBe(600);
+    // 27/09: Patrimônio 100k virou lendário (400) — 400 + 200 + 200; Ouro na escada nova (≥ 800)
+    expect(estado().xp).toBe(800);
     expect(estado().nivel.name).toBe("Ouro");
   });
 });

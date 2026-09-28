@@ -127,6 +127,8 @@ describe("Beleza 1 — modo Sensível: o X apaga o passo certo", () => {
     expect(marcado("Hidratante noturno")).toBe(true); // check pelo índice ORIGINAL (2)
     expect(marcado("Demaquilante")).toBe(false);
 
+    // 28/09 (protótipo): o "Tirar da rotina" mora na ficha do passo (tocar no nome abre)
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Hidratante noturno" }));
     fireEvent.click(screen.getByRole("button", { name: "Tirar Hidratante noturno da rotina" }));
     expect(nomes(store.dados["skincare-pm-steps"])).toEqual(["Demaquilante", "Retinol"]);
     expect((store.dados["skincare-night-checked"] as Record<string, number[]>)[HOJE]).toEqual([]);
@@ -153,8 +155,12 @@ describe("Beleza 1 — modo Sensível: o X apaga o passo certo", () => {
 });
 
 describe("Beleza 2 — skin cycling anda", () => {
+  // 28/09 (protótipo): o ciclo fixo aparece pra rotina ANTIGA (passos sem dias próprios);
+  // rotina vazia mostra as 3 perguntas e a rotina com agenda mostra a semana.
+  const ANTIGA = { "skincare-pm-steps": [{ name: "Hidratante" }] };
+
   it("grava o início na 1ª vez (escrita de SISTEMA) e hoje é o Dia 1/4", () => {
-    const store = criarStoreReativo({});
+    const store = criarStoreReativo({ ...ANTIGA });
     store.montar(<SkincareRoutine />);
     expect(store.dados["skincare-cycle-start"]).toBe(HOJE);
     expect(store.escritas.find(e => e.chave === "skincare-cycle-start")?.opts).toEqual({ system: true });
@@ -169,7 +175,7 @@ describe("Beleza 2 — skin cycling anda", () => {
   });
 
   it("início há 2 dias = Recuperação, Dia 3/4; quem já tem início não é regravado", () => {
-    const store = criarStoreReativo({ "skincare-cycle-start": diaMais(-2) });
+    const store = criarStoreReativo({ ...ANTIGA, "skincare-cycle-start": diaMais(-2) });
     store.montar(<SkincareRoutine />);
     expect(screen.getByText("Skin Cycling: Recuperação")).toBeInTheDocument();
     expect(screen.getByText("Dia 3/4")).toBeInTheDocument();
@@ -238,7 +244,7 @@ describe("Beleza 5 — Espelho, Rotina e Diário falam entre si na hora", () => 
   it("'Pele hoje' do Diário é a mesma resposta do Espelho (abre com ela, escolher lá marca aqui, o registro leva junto)", () => {
     const store = criarStoreReativo({ "skincare-daily-checkin": { [HOJE]: "oleosa" }, "skincare-cycle-start": HOJE });
     store.montar(<Beleza />);
-    fireEvent.click(screen.getByRole("button", { name: /Diário/ }));
+    fireEvent.click(screen.getByRole("button", { name: /DIÁRIO/ })); // abas em caixa alta desde 28/09
     fireEvent.click(screen.getByRole("button", { name: /Registrar Hoje/ }));
     const form = screen.getByText("Pele hoje").closest("div.rounded-xl") as HTMLElement;
     expect(within(form).getByRole("button", { name: /Oleosa/ }).className).toMatch(/bg-emerald-100/);

@@ -2,6 +2,7 @@ import { isNativeShell } from "./native-shell";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
+import { algumLigado, planejarSkincare, type DadosDoSkincare } from "./beleza-lembrete";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -31,7 +32,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -58,6 +59,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   aniversario: 1400000, // era 900000 (colidia com a missão)
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
+  beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -789,6 +791,17 @@ export async function agendarCompromissos(lista: Compromisso[], opcoes: { ligado
 export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.tarefa); return 0; }
   return agendarSerie("tarefa", "/rotina", planejarTarefas(lista, BASES.tarefa));
+}
+
+/* ─── Skincare de manhã e de noite (28/09, protótipo da Beleza: lembrete é o
+   pedido funcional mais repetido nas avaliações de apps de pele) ─────────────
+   A conta mora em lib/beleza-lembrete (pura): um aviso por período ligado, na
+   hora escolhida, com os passos que a agenda da rotina diz pra aquele dia da
+   semana. Marcar os passos de hoje muda o dado → o useLembretes reagenda → o
+   aviso de hoje some. O toque abre a Beleza. */
+export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
+  if (!algumLigado(dados.prefs)) { await limparFaixa(BASES.beleza); return 0; }
+  return agendarSerie("beleza", "/beleza", planejarSkincare(dados, BASES.beleza));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

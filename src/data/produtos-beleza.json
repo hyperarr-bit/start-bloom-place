@@ -1,0 +1,2141 @@
+[
+ {
+  "id": "adcos-protetor-solar-mousse-tonalizante-fps-50-mineral",
+  "marca": "Adcos",
+  "nome": "Protetor Solar Mousse Tonalizante FPS 50 - Mineral",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido hialurônico",
+   "niacinamida",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "normal",
+   "sensivel"
+  ],
+  "fps": 50,
+  "cor": true,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.lojaadcos.com.br/protetor-solar-mousse-fps50/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "adcos-vitamina-c-15-acido-hialuronico-serum",
+  "marca": "Adcos",
+  "nome": "Vitamina C 15 + Ácido Hialurônico - Sérum Anti-Idade",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.lojaadcos.com.br/vitaminac-15-acido-hialuronico/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "avene-cleanance-gel",
+  "marca": "Avène",
+  "nome": "Cleanance Gel",
+  "categoria": "limpeza",
+  "ativos": [
+   "zinco"
+  ],
+  "tipos": [
+   "oleosa",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.eau-thermale-avene.com.br/p/cleanance-gel-3282770101027-eb46eea4",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "avene-cleanance-uv-fps-70-sem-cor",
+  "marca": "Avène",
+  "nome": "Cleanance UV FPS 70 Sem Cor",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": 70,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.eau-thermale-avene.com.br/p/cleanance-uv-3282770143898-eb46eea4",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "avene-hyaluron-activ-b3-serum-concentrado",
+  "marca": "Avène",
+  "nome": "Hyaluron Activ B3 Sérum Concentrado",
+  "categoria": "serum",
+  "ativos": [
+   "niacinamida",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.eau-thermale-avene.com.br/p/hyaluron-activ-b3-serum-concentrado-3282770153101-eb46eea4",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "avene-retrinal-creme-0-1",
+  "marca": "Avène",
+  "nome": "RetrinAL Creme 0.1",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinal",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.eau-thermale-avene.com.br/p/retrinal-creme-0-1-838760007706-eb46eea4",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bioderma-photoderm-antioleosidade-fps-70",
+  "marca": "Bioderma",
+  "nome": "Photoderm Antioleosidade FPS 70",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "mista",
+   "oleosa",
+   "sensivel"
+  ],
+  "fps": 70,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-facial-bioderma-photoderm-antioleosidade-fps-70/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bioderma-sebium-h2o-agua-micelar-antioleosidade",
+  "marca": "Bioderma",
+  "nome": "Sébium H2O Água Micelar Antioleosidade",
+  "categoria": "demaquilante",
+  "ativos": [
+   "zinco"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/sebium-h2o-agua-micelar-para-pele-oleosa-bioderma/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bioderma-sensibio-h2o-agua-micelar-calmante",
+  "marca": "Bioderma",
+  "nome": "Sensibio H2O Água Micelar Calmante",
+  "categoria": "demaquilante",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/agua-micelar-calmante-bioderma-sensibio-h2o-solution-micellaire-850ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cerave-gel-de-limpeza",
+  "marca": "CeraVe",
+  "nome": "Gel de Limpeza",
+  "categoria": "limpeza",
+  "ativos": [
+   "ceramidas",
+   "ácido hialurônico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "normal",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.cerave.com.br/todos-os-produtos/gel-de-limpeza",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cerave-gel-de-limpeza-acne-control",
+  "marca": "CeraVe",
+  "nome": "Gel de Limpeza Acne Control",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico",
+   "ceramidas",
+   "niacinamida",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.cerave.com.br/todos-os-produtos/gel-de-limpeza-acne-control",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cerave-locao-de-limpeza-hidratante",
+  "marca": "CeraVe",
+  "nome": "Loção de Limpeza Hidratante",
+  "categoria": "limpeza",
+  "ativos": [
+   "ceramidas",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "normal",
+   "seca"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.cerave.com.br/todos-os-produtos/locao-de-limpeza-hidratante",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cerave-locao-facial-hidratante",
+  "marca": "CeraVe",
+  "nome": "Loção Facial Hidratante",
+  "categoria": "hidratante",
+  "ativos": [
+   "ceramidas",
+   "ácido hialurônico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "normal",
+   "seca"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.cerave.com.br/nossos-produtos/hidratantes/locao-facial-hidratante-52ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cetaphil-oil-control-gel-de-limpeza-facial-antioleosidade",
+  "marca": "Cetaphil",
+  "nome": "Gel de Limpeza Facial Antioleosidade Oil Control",
+  "categoria": "limpeza",
+  "ativos": [
+   "niacinamida",
+   "pantenol"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/gel-de-limpeza-facial-antioleosidade-cetaphil-oil-control/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cetaphil-locao-de-limpeza-pele-seca-e-sensivel",
+  "marca": "Cetaphil",
+  "nome": "Loção de Limpeza Corporal e Facial para Pele Seca e Sensível",
+  "categoria": "limpeza",
+  "ativos": [
+   "niacinamida",
+   "pantenol"
+  ],
+  "tipos": [
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/cetaphil-locao-de-limpeza-limpeza-facial-para-peles-secas-e-sensiveis/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cetaphil-locao-hidratante-facial",
+  "marca": "Cetaphil",
+  "nome": "Loção Hidratante Facial",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico",
+   "ureia"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/locao-hidratante-facial-cetaphil-com-acido-hialuronico/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "cetaphil-oil-control-serum-facial-tripla-acao",
+  "marca": "Cetaphil",
+  "nome": "Sérum Facial Tripla Ação Oil Control",
+  "categoria": "serum",
+  "ativos": [
+   "niacinamida",
+   "ácido salicílico",
+   "zinco"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-facial-tripla-acao-cetaphil-oil-control/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-acido-glicolico",
+  "marca": "Creamy",
+  "nome": "Esfoliante Químico - Ácido Glicólico",
+  "categoria": "acido",
+  "ativos": [
+   "ácido glicólico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/acido-glicolico/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-acido-mandelico",
+  "marca": "Creamy",
+  "nome": "Gel Clareador Antiacne - Ácido Mandélico",
+  "categoria": "acido",
+  "ativos": [
+   "ácido mandélico",
+   "alfa-arbutin"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/acido-mandelico/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-calming-cream",
+  "marca": "Creamy",
+  "nome": "Gel-creme Hidratante Calmante - Calming Cream",
+  "categoria": "hidratante",
+  "ativos": [
+   "centella asiática",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/creamy-calming-cream-1/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-protetor-solar-watery-lotion-fps-60",
+  "marca": "Creamy",
+  "nome": "Protetor Solar Watery Lotion FPS 60",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/protetor-solar-fps60-watery-lotion/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-retinal",
+  "marca": "Creamy",
+  "nome": "Sérum Anti idade - Retinal",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinal"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/serum-facial-anti-aging-retinal-30-g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "creamy-vitamina-c",
+  "marca": "Creamy",
+  "nome": "Sérum Antioxidante - Vitamina C",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "vitamina e",
+   "ácido ferúlico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.creamy.com.br/vitamina-c/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "darrow-actine-aquafluid-fps-sem-cor",
+  "marca": "Darrow",
+  "nome": "Actine Aquafluid FPS sem cor",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://darrow.com.br/produtos/darrow-actine-aquafluid-fps-sem-cor/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "darrow-actine-aquaforce-gel-hidratante",
+  "marca": "Darrow",
+  "nome": "Actine Aquaforce Gel Hidratante Dermatológico",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico",
+   "vitamina c"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://darrow.com.br/produtos/darrow-actine-aquaforce-gel-hidratante-dermatologico/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "darrow-actine-gel-de-limpeza",
+  "marca": "Darrow",
+  "nome": "Actine Gel de Limpeza",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico",
+   "vitamina c"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://darrow.com.br/produtos/darrow-actine-gel-de-limpeza-400g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "darrow-actine-oil-control-gel-de-limpeza",
+  "marca": "Darrow",
+  "nome": "Actine Oil Control Gel de Limpeza",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido glicólico",
+   "pantenol",
+   "zinco"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://darrow.com.br/produtos/darrow-actine-oil-control-gel-de-limpeza-400g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "darrow-actine-vitamina-c",
+  "marca": "Darrow",
+  "nome": "Actine Vitamina C",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "niacinamida"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://darrow.com.br/produtos/darrow-actine-vitamina-c-30g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dermage-hyaluage-acqua-filler-b3-b5",
+  "marca": "Dermage",
+  "nome": "Hyaluage Acqua Filler B3+B5",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico",
+   "niacinamida",
+   "pantenol"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.dermage.com.br/hyaluage-acqua-filler/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dermage-hyaluage-agua-micelar",
+  "marca": "Dermage",
+  "nome": "Hyaluage Água Micelar",
+  "categoria": "demaquilante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.dermage.com.br/hyaluage-agua-micelar-120ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dermage-improve-c-20-biotic-serum",
+  "marca": "Dermage",
+  "nome": "Improve C 20 Biotic Sérum",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.dermage.com.br/improve-c20-serum-30g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dermage-secatriz-salic-sabonete-liquido",
+  "marca": "Dermage",
+  "nome": "Secatriz Salic Sabonete Líquido",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.dermage.com.br/sabonete-liquido-facial-secatriz-salic-300ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-regenerative-gel-de-limpeza-facial-anti-oleosidade",
+  "marca": "Dove",
+  "nome": "Regenerative Gel de Limpeza Facial Anti-Oleosidade & Efeito Matte",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.dove.com/br/p/gel-limpeza-facial-anti-oleosidade-efeito-matte.html/07891150096479",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "eucerin-dermopure-clinical-gel-de-limpeza-facial-concentrado",
+  "marca": "Eucerin",
+  "nome": "DermoPure Clinical Gel de Limpeza Facial Concentrado",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico"
+  ],
+  "tipos": [
+   "oleosa",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.eucerin.com.br/produtos/dermopure-clinical/dermopure-clinical-gel-de-limpeza-facial-concentrado-150g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eucerin-hy-fi-3x-effect-creme-antirrugas-dia-fps-30",
+  "marca": "Eucerin",
+  "nome": "Hy-Fi 3x Effect Creme Antirrugas Dia FPS 30",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.eucerin.com.br/produtos/hyaluron-filler/creme-antirrugas-dia-fps-30",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eucerin-protetor-solar-facial-oil-control-fps60",
+  "marca": "Eucerin",
+  "nome": "Protetor Solar Facial Oil Control FPS60",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.eucerin.com.br/produtos/protecao-solar/sun-gel-creme-oil-control-dry-touch-spf-50plus",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-niina-secrets-skin-hidragel",
+  "marca": "Eudora",
+  "nome": "Hidratante Facial em Gel Niina Secrets Skin Hidragel",
+  "categoria": "hidratante",
+  "ativos": [
+   "niacinamida",
+   "ácido hialurônico",
+   "pantenol"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/hidratante-facial-em-gel-niina-secrets-by-eudora-niina-skin-hidragel/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "garnier-skinactive-agua-micelar-tudo-em-1",
+  "marca": "Garnier",
+  "nome": "SkinActive Água Micelar Tudo em 1",
+  "categoria": "demaquilante",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.garnier.com.br/loja/pele/necessidade/remocao-de-maquiagem/agua-micelar-tudo-em-um",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "garnier-uniform-matte-protetor-hidratante-fps-30",
+  "marca": "Garnier",
+  "nome": "Uniform & Matte Protetor Hidratante FPS 30",
+  "categoria": "protetor",
+  "ativos": [
+   "vitamina c"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa",
+   "sensivel"
+  ],
+  "fps": 30,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.garnier.com.br/loja/pele/necessidade/protecao-solar/protetor-hidratante-facial-uniform-matte-com-fps-30-e-vitamina-c-40g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "garnier-uniform-matte-serum-booster-antimanchas-vitamina-c",
+  "marca": "Garnier",
+  "nome": "Uniform & Matte Sérum Booster Antimanchas Vitamina C",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "niacinamida",
+   "ácido salicílico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.garnier.com.br/loja/pele/necessidade/hidratacao/serum-garnier-antimarcas-com-vitamina-c",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-fusion-water-fps-60",
+  "marca": "Isdin",
+  "nome": "Fusion Water FPS 60",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido hialurônico",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/fotoprotector-isdin/fusion-water-fps-60",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-fusion-water-magic-color-fps-50",
+  "marca": "Isdin",
+  "nome": "Fusion Water MAGIC Color FPS 50",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido hialurônico",
+   "vitamina e"
+  ],
+  "tipos": [],
+  "fps": 50,
+  "cor": true,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/fotoprotector-isdin/fusion-water-magic-color-media-fps-50",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-isdinceutics-glicoisdin-8-soft",
+  "marca": "Isdin",
+  "nome": "Isdinceutics Glicoisdin 8 Soft",
+  "categoria": "acido",
+  "ativos": [
+   "ácido glicólico"
+  ],
+  "tipos": [
+   "normal",
+   "seca"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/isdinceutics/glicoisdin-8-soft",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-isdinceutics-hyaluronic-concentrate",
+  "marca": "Isdin",
+  "nome": "Isdinceutics Hyaluronic Concentrate",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/isdinceutics/hyaluronic-concentrate",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-isdinceutics-hyaluronic-moisture-oily-and-combination-skin",
+  "marca": "Isdin",
+  "nome": "Isdinceutics Hyaluronic Moisture Oily and Combination Skin",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico",
+   "niacinamida",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/isdinceutics/hyaluronic-moisture-oily",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "isdin-salicylic-renewal",
+  "marca": "Isdin",
+  "nome": "Salicylic Renewal",
+  "categoria": "acido",
+  "ativos": [
+   "ácido salicílico",
+   "ácido glicólico",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.isdin.com/pt-BR/produto/isdinceutics/salicylic-renewal",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-agua-micelar-solucao-de-limpeza-5-em-1",
+  "marca": "L'Oréal Paris",
+  "nome": "Água Micelar Solução de Limpeza Demaquilante 5 em 1",
+  "categoria": "demaquilante",
+  "ativos": [],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/agua-micelar-solucao-de-limpeza-facial-5-em-1-l-oreal-paris-demaquilante/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-revitalift-hialuronico-creme-noturno",
+  "marca": "L'Oréal Paris",
+  "nome": "Creme Hidratante Facial Anti-idade Revitalift Hialurônico Cuidado Noturno",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/creme-anti-idade-loreal-paris-revitalift-hialuronico-noturno/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-uv-defender-fluido-fps-60",
+  "marca": "L'Oréal Paris",
+  "nome": "Protetor Solar Facial UV Defender Fluido FPS 60",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-loreal-paris-uv-defender-fluido-fps60/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-glycolic-bright-serum-anti-marcas",
+  "marca": "L'Oréal Paris",
+  "nome": "Sérum Facial Anti-Marcas com Ácido Glicólico Glycolic Bright",
+  "categoria": "acido",
+  "ativos": [
+   "ácido glicólico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-facial-loreal-paris-glycolic-bright/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-revitalift-retinol-puro-noite-serum",
+  "marca": "L'Oréal Paris",
+  "nome": "Sérum Facial Revitalift Retinol Puro Noite",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinol",
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-facial-antirrugas-noturno-loreal-paris-revitalift-retinol/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "loreal-paris-revitalift-hialuronico-serum-preenchedor",
+  "marca": "L'Oréal Paris",
+  "nome": "Sérum Preenchedor Facial Anti-idade Revitalift Hialurônico",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-preenchedor-anti-idade-loreal-paris-revitalift-hialuronico-30ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-anthelios-xl-protect-face-fps-60",
+  "marca": "La Roche-Posay",
+  "nome": "Anthelios XL-Protect Face FPS 60",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://laroche-posay.com.br/anthelios-alta-cobertura-fps60/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-gel-de-limpeza-facial-effaclar-concentrado",
+  "marca": "La Roche-Posay",
+  "nome": "Gel de Limpeza Facial Effaclar Concentrado",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico",
+   "zinco",
+   "lha"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/gel-concentrado-desincrustante-la-roche-posay-limpador-facial/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-hidratante-facial-toleriane-sensitive",
+  "marca": "La Roche-Posay",
+  "nome": "Hidratante Facial Toleriane Sensitive",
+  "categoria": "hidratante",
+  "ativos": [],
+  "tipos": [
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.laroche-posay.com.br/toleriane/sensitive",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-hyalu-b5-serum-olhos",
+  "marca": "La Roche-Posay",
+  "nome": "Hyalu B5 Sérum Olhos",
+  "categoria": "olhos",
+  "ativos": [
+   "ácido hialurônico",
+   "pantenol",
+   "cafeína",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.laroche-posay.com.br/hyalu-b5/serum-olhos",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-hyalu-b5-serum-superativado",
+  "marca": "La Roche-Posay",
+  "nome": "Hyalu B5 Sérum Superativado",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico",
+   "pantenol"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.laroche-posay.com.br/hyalu-b5/serum",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-pure-vitamin-c12-serum",
+  "marca": "La Roche-Posay",
+  "nome": "Pure Vitamin C12 Sérum",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.laroche-posay.com.br/vitamin-c/pure-vitamin-c12-serum",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "laroche-posay-serum-antiacne-ultra-concentrado-effaclar",
+  "marca": "La Roche-Posay",
+  "nome": "Sérum Antiacne Ultra Concentrado Effaclar",
+  "categoria": "acido",
+  "ativos": [
+   "ácido salicílico",
+   "ácido glicólico",
+   "lha",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.laroche-posay.com.br/effaclar/serum-antiacne-ultra-concentrado",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "laroche-posay-serum-antirrugas-retinol-b3",
+  "marca": "La Roche-Posay",
+  "nome": "Sérum Antirrugas Retinol B3",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinol",
+   "ácido hialurônico",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-antirrugas-la-roche-posay---retinol-b3---30ml-113425/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "mantecorp-skincare-protetor-solar-facial-episol-color-fps-70",
+  "marca": "Mantecorp Skincare",
+  "nome": "Protetor Solar Facial Episol Color FPS 70",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": 70,
+  "cor": true,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-facial-fps-70-episol-color-protetor-solar/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "mantecorp-skincare-glycare-serum",
+  "marca": "Mantecorp Skincare",
+  "nome": "Rejuvenescedor Facial Glycare Sérum",
+  "categoria": "acido",
+  "ativos": [
+   "ácido glicólico",
+   "niacinamida",
+   "alfa-arbutin"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-mantecorp-skincare-glycare/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "mantecorp-skincare-reviline-retinol-serum",
+  "marca": "Mantecorp Skincare",
+  "nome": "Rejuvenescedor Facial Reviline Retinol Sérum",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinol",
+   "peptídeos",
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-rejuvenescedor-facial-mantecorp-skincare-reviline-r/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "natura-chronos-derma-hidratante-acqua-renovador",
+  "marca": "Natura",
+  "nome": "Hidratante Acqua Renovador Chronos Derma",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.natura.com.br/p/hidratante-acqua-renovador-chronos-derma-40-g/NATBRA-91849",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "natura-chronos-derma-protetor-multiclareador-fps-70",
+  "marca": "Natura",
+  "nome": "Protetor Multiclareador FPS 70 Chronos Derma",
+  "categoria": "protetor",
+  "ativos": [
+   "niacinamida",
+   "ácido ferúlico"
+  ],
+  "tipos": [],
+  "fps": 70,
+  "cor": true,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.natura.com.br/p/protetor-clareador-fps-70-chronos-derma-50-ml/NATBRA-PAI69049",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "needs-agua-micelar-hidratacao-equilibrada",
+  "marca": "Needs",
+  "nome": "Água Micelar Hidratação Equilibrada",
+  "categoria": "demaquilante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.drogasil.com.br/needs-agua-micelar-hidratacao-equilibrada-200ml.html",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "needs-gel-de-limpeza-facial-controle-de-oleosidade",
+  "marca": "Needs",
+  "nome": "Gel de Limpeza Facial Controle de Oleosidade",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico",
+   "ácido glicólico"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.drogasil.com.br/needs-gel-de-limpezacontrole-de-oleosidade-120g.html",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "needs-protetor-solar-facial-hidratacao-equilibrada-fps-70",
+  "marca": "Needs",
+  "nome": "Protetor Solar Facial Hidratação Equilibrada FPS 70 sem cor",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": 70,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.drogasil.com.br/needs-protetor-solar-facial-hidratacao-equilibrada-fps70-sem-cor-40g.html",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "needs-serum-facial-antioxidante-firmeza-e-antissinais",
+  "marca": "Needs",
+  "nome": "Sérum Facial Antioxidante Firmeza e Antissinais",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.drogasil.com.br/needs-serum-facial-antioxidante-firmeza-e-antissinais-30ml.html",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "neostrata-minesol-antioxidant-fps99",
+  "marca": "Neostrata",
+  "nome": "Minesol Antioxidant FPS99",
+  "categoria": "protetor",
+  "ativos": [
+   "vitamina e"
+  ],
+  "tipos": [
+   "normal",
+   "seca"
+  ],
+  "fps": 99,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-neostrata-minesol-antioxidant-fps99/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "neostrata-minesol-oil-control-fps-70",
+  "marca": "Neostrata",
+  "nome": "Minesol Oil Control FPS 70",
+  "categoria": "protetor",
+  "ativos": [
+   "vitamina e"
+  ],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": 70,
+  "cor": true,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-com-cor-neostrata-mineol-oil-control-fps-70/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "neutrogena-purified-skin-gel-de-limpeza-facial",
+  "marca": "Neutrogena",
+  "nome": "Gel de Limpeza Facial Purified Skin",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido glicólico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/gel-limpador-facial-neutrogena-purified-skin/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "neutrogena-deep-clean-gel-de-limpeza-profunda",
+  "marca": "Neutrogena",
+  "nome": "Gel de Limpeza Profunda Deep Clean",
+  "categoria": "limpeza",
+  "ativos": [],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/deep-clean-gel-de-limpeza-neutrogena-limpador-facial/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "neutrogena-hidratante-facial-hydro-boost-water-gel",
+  "marca": "Neutrogena",
+  "nome": "Hidratante Facial Hydro Boost Water Gel",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/hydro-boost-water-gel-neutrogena-hidratante-facial/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "neutrogena-sun-fresh-derm-care-facial-fps-70",
+  "marca": "Neutrogena",
+  "nome": "Protetor Solar Sun Fresh Derm Care Facial FPS 70",
+  "categoria": "protetor",
+  "ativos": [
+   "niacinamida",
+   "vitamina c"
+  ],
+  "tipos": [],
+  "fps": 70,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-neutrogena-sun-fresh-derm-care-facial-fps70/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "nivea-micellair-agua-micelar-facial-solucao-7-em-1",
+  "marca": "Nivea",
+  "nome": "Água Micelar Facial MicellAir Solução 7 em 1",
+  "categoria": "demaquilante",
+  "ativos": [
+   "vitamina e"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/nivea-micellair-agua-micelar-solucao-de-limpeza-7-em-1/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "nivea-hidratante-facial-em-gel-ultraleve",
+  "marca": "Nivea",
+  "nome": "Hidratante Facial em Gel Ultraleve",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/hidratante-gel-fresh-nivea-facial-100g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "nivea-serum-cellular-luminous-630-antimarcas-anti-idade",
+  "marca": "Nivea",
+  "nome": "Sérum Facial Cellular Luminous 630 Antimarcas Anti-idade",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-facial-nivea-cellular-luminous-630-antimarcas-anti-idade/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "nivea-sun-protetor-facial-tripla-protecao-antissinais-fps-50",
+  "marca": "Nivea",
+  "nome": "Sun Protetor Solar Facial Tripla Proteção Loção Antissinais FPS 50",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [],
+  "fps": 50,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/protetor-solar-facial-nivea-sun-triple-protect-antissinais-fps50/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "o-boticario-gel-de-limpeza-facial-nutritivo-vitamina-b5-botik",
+  "marca": "O Boticário",
+  "nome": "Gel de Limpeza Facial Nutritivo Vitamina B5 Botik",
+  "categoria": "limpeza",
+  "ativos": [
+   "pantenol"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.boticario.com.br/b77149-gel-de-limpeza-facial-nutritivo-vitamina-b5-botik-150g/",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "o-boticario-serum-de-alta-potencia-vitamina-c-10-botik",
+  "marca": "O Boticário",
+  "nome": "Sérum de Alta Potência Vitamina C 10% Botik",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.boticario.com.br/serum-de-alta-potencia-vitamina-c-10-botik-15ml/",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "payot-creme-hidratante-diurno-fps-30",
+  "marca": "Payot",
+  "nome": "Creme Hidratante Diurno FPS 30",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico",
+   "pantenol"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://payot.com.br/cuidados-com-a-pele/cuidados-essenciais/creme-hidratante-diurno-fp30/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "payot-sabonete-liquido-detox-vitamina-c",
+  "marca": "Payot",
+  "nome": "Sabonete Líquido Detox Vitamina C",
+  "categoria": "limpeza",
+  "ativos": [
+   "vitamina c",
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://payot.com.br/cuidados-com-a-pele/vitamina-c/sabonete-liquido-detox-vitamina-c/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-gel-de-limpeza-gl-01",
+  "marca": "Principia",
+  "nome": "Gel de Limpeza GL-01 (2% Ácido Salicílico e 5% Glicerina)",
+  "categoria": "limpeza",
+  "ativos": [
+   "ácido salicílico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/gel-de-limpeza-gl-01-200g-acido-salicilico-glicerina.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-protetor-solar-ps-01-fps-60",
+  "marca": "Principia",
+  "nome": "Protetor Solar PS-01 FPS 60",
+  "categoria": "protetor",
+  "ativos": [
+   "niacinamida"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/protetor-solar-facial-ps-01-filtros-uv-niacinamida.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-serum-acido-glicolico-ag-10",
+  "marca": "Principia",
+  "nome": "Sérum Ácido Glicólico AG-10 (9,8% Glicólico e 4% Aminoácidos)",
+  "categoria": "acido",
+  "ativos": [
+   "ácido glicólico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/serum-renovador-10-acido-glicolico-4-aminoacidos-prodew-600.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-serum-niacinamida-nc-10",
+  "marca": "Principia",
+  "nome": "Sérum Niacinamida NC-10 (10% Niacinamida e 1% Zinco)",
+  "categoria": "serum",
+  "ativos": [
+   "niacinamida",
+   "zinco"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/serum-anti-idade-nc-10-niacinamida-zinco-pca.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-serum-retinol-0-3",
+  "marca": "Principia",
+  "nome": "Sérum Retinol 0,3% RN-0,3 (Retinol, Vitamina E e Bisabolol)",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinol",
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/serum-anti-idade-retinol-0-3.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "principia-serum-vitamina-c-vc-10",
+  "marca": "Principia",
+  "nome": "Sérum Vitamina C VC-10 (10% Vitamina C e 0,5% Ácido Ferúlico)",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "ácido ferúlico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.principiaskin.com/serum-vc-10-vitamina-c-acido-ferulico.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-creme-retexturizador-noturno",
+  "marca": "Sallve",
+  "nome": "Creme Retexturizador Noturno",
+  "categoria": "retinoide",
+  "ativos": [
+   "retinol",
+   "ácido glicólico",
+   "pantenol"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/creme-retexturizador-noturno",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-hidratante-facial",
+  "marca": "Sallve",
+  "nome": "Hidratante Facial",
+  "categoria": "hidratante",
+  "ativos": [
+   "niacinamida",
+   "esqualano"
+  ],
+  "tipos": [
+   "normal",
+   "mista"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/hidratante-facial",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-limpador-facial",
+  "marca": "Sallve",
+  "nome": "Limpador Facial",
+  "categoria": "limpeza",
+  "ativos": [
+   "niacinamida",
+   "esqualano",
+   "pantenol"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/limpador-facial",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-protetor-solar-fps-60",
+  "marca": "Sallve",
+  "nome": "Protetor Solar FPS 60",
+  "categoria": "protetor",
+  "ativos": [
+   "vitamina e"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/protetor-solar-fps60",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-super-acido-salicilico-2",
+  "marca": "Sallve",
+  "nome": "Super Ácido Salicílico 2%",
+  "categoria": "acido",
+  "ativos": [
+   "ácido salicílico",
+   "ácido mandélico",
+   "zinco"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/super-acido-salicilico-2",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "sallve-vitamina-c-antioxidante-hidratante",
+  "marca": "Sallve",
+  "nome": "Vitamina C Antioxidante Hidratante",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "ácido hialurônico",
+   "vitamina e",
+   "niacinamida",
+   "cafeína"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.sallve.com.br/products/vitamina-c-antioxidante-hidratante",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "simple-organic-solucao-vitamina-c",
+  "marca": "Simple Organic",
+  "nome": "Solução Vitamina C",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://simpleorganic.com.br/products/solucao-vitamina-c",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tracta-sabonete-facial-em-gel-pele-mista-a-oleosa",
+  "marca": "Tracta",
+  "nome": "Sabonete Facial em Gel Pele Mista a Oleosa",
+  "categoria": "limpeza",
+  "ativos": [],
+  "tipos": [
+   "mista",
+   "oleosa"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.drogaraia.com.br/tracta-sabonete-facial-em-gel-pele-mista-a-oleosa-150ml-1096528.html",
+  "fontePao": null,
+  "verificacao": "busca"
+ },
+ {
+  "id": "vichy-capital-soleil-protetor-solar-facial-uv-clear-fps60",
+  "marca": "Vichy",
+  "nome": "Capital Soleil Protetor Solar Facial UV Clear FPS60",
+  "categoria": "protetor",
+  "ativos": [
+   "ácido salicílico",
+   "niacinamida"
+  ],
+  "tipos": [],
+  "fps": 60,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.vichy.com.br/todos-os-produtos/suncare/sunscreens/uv-protection/capital-soleil-protetor-solar-facial-uv-clear-fps60",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "vichy-liftactiv-serum-vitamina-c",
+  "marca": "Vichy",
+  "nome": "Liftactiv Sérum Vitamina C",
+  "categoria": "serum",
+  "ativos": [
+   "vitamina c",
+   "vitamina e",
+   "ácido hialurônico"
+  ],
+  "tipos": [],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.vichy.com.br/todos-os-produtos/skincare/face-serums/sinais-de-envelhecimento/liftactiv-serum-vitamina-c-20-ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "vichy-mineral-89-creme-hidratante-fortalecedor",
+  "marca": "Vichy",
+  "nome": "Minéral 89 Creme Hidratante Fortalecedor",
+  "categoria": "hidratante",
+  "ativos": [
+   "ácido hialurônico",
+   "niacinamida",
+   "vitamina e",
+   "esqualano"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.vichy.com.br/todos-os-produtos/skincare/creams-and-face-moisturizers/ressecamento/mineral-89-hidratante-facial-fortalecedor",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "vichy-mineral-89-serum-fortalecedor-facial",
+  "marca": "Vichy",
+  "nome": "Minéral 89 Sérum Fortalecedor Facial",
+  "categoria": "serum",
+  "ativos": [
+   "ácido hialurônico"
+  ],
+  "tipos": [
+   "oleosa",
+   "mista",
+   "normal",
+   "seca",
+   "sensivel"
+  ],
+  "fps": null,
+  "cor": false,
+  "pao": 6,
+  "paoPadrao": true,
+  "fonte": "https://www.vichy.com.br/todos-os-produtos/skincare/face-serums/ressecamento/mineral-89-booster",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "vult-protetor-solar-facial-fps-70",
+  "marca": "Vult",
+  "nome": "Protetor Solar Facial FPS 70",
+  "categoria": "protetor",
+  "ativos": [],
+  "tipos": [
+   "oleosa"
+  ],
+  "fps": 70,
+  "cor": false,
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.vult.com.br/protetor-solar-facial-fps-70-vult-40ml/",
+  "fontePao": null,
+  "verificacao": "busca"
+ }
+]

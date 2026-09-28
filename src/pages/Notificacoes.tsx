@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Flame, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
+import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -8,6 +8,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
+import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -119,6 +120,27 @@ const Notificacoes = () => {
     }
     set(CHAVE_REMEDIOS_LIGADO, valor);
     const leitor: Leitor = (k, fb) => (k === CHAVE_REMEDIOS_LIGADO ? (valor as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Skincare (28/09): chave própria (horários de manhã e de noite escolhidos na
+   *  Beleza). Aqui é o interruptor geral: liga/desliga os dois períodos. */
+  const skincare = lerLembreteSkincare(get<unknown>(CHAVE_LEMBRETE_SKINCARE, undefined));
+  const alternarSkincare = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "skincare", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { manha: { ...skincare.manha, ligado: valor }, noite: { ...skincare.noite, ligado: valor } };
+    set(CHAVE_LEMBRETE_SKINCARE, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_SKINCARE ? (novo as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -265,6 +287,15 @@ const Notificacoes = () => {
           rodape={rodapeDe("sequencia", p.sequencia, "Anote qualquer coisa hoje pra começar uma sequência")}
           hora={p.sequencia ? p.horaSequencia : undefined}
           onHora={(h) => void aplicar({ horaSequencia: h })}
+        />
+
+        <LinhaAviso
+          icone={<Droplets className="w-4 h-4" />}
+          titulo="Skincare"
+          descricao={`De manhã (${skincare.manha.hora}) e à noite (${skincare.noite.hora}), com os passos do dia da sua rotina de pele. Os horários mudam na Beleza.`}
+          ligado={algumLigado(skincare)}
+          onChange={(v) => void alternarSkincare(v)}
+          rodape={rodapeDe("beleza", algumLigado(skincare), "Monte sua rotina na Beleza pra ter o que lembrar")}
         />
 
         <LinhaAviso

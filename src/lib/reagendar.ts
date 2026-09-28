@@ -1,6 +1,6 @@
 import {
   agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
-  agendarRetrospectiva, agendarRotina, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
@@ -16,6 +16,7 @@ import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
 import { localDayKey } from "@/lib/utils";
+import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 
 /**
  * A fonte única de "o que agendar" (27/07).
@@ -88,6 +89,8 @@ export interface DadosDosLembretes {
   abriuFinancasHoje: boolean;
   /** sequência de dias anotados das Conquistas (26/09) */
   seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
+  /** skincare de manhã e de noite (28/09): horários, passos da agenda e o que já foi marcado hoje */
+  skincare?: DadosDoSkincare;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -218,6 +221,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
       return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
     })(),
+    skincare: lerDadosDoSkincare(get, hoje),
   };
 }
 
@@ -251,6 +255,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.tarefas && dados.tarefas,
     prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
+    // (28/09) skincare: as prefs moram na chave própria; marcar um passo de hoje muda o plano
+    !!dados.skincare && algumLigado(dados.skincare.prefs) && dados.skincare,
   ]);
 }
 
@@ -283,5 +289,6 @@ export async function reagendarTudo(
       { hora: prefs.horaLimite, ligado: prefs.limite },
     ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
+    beleza: d.skincare ? await agendarSkincare(d.skincare) : 0,
   };
 }

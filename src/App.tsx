@@ -306,6 +306,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
+// 28/09: a Beleza e a Home com uma rotina de pele de exemplo (rotina pronta, skincare de hoje, lembrete) — só no dev
+const DevBeleza = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevBeleza")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -568,6 +570,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevBeleza && (
+          <Route path="/dev/beleza" element={<Suspense fallback={null}><DevBeleza /></Suspense>} />
         )}
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

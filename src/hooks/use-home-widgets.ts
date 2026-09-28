@@ -20,7 +20,8 @@ export type WidgetId =
   | "sleep-log"
   | "countdown"
   | "week-calendar"
-  | "tasks";
+  | "tasks"
+  | "skincare";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -46,6 +47,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   // 22/09, chamado: "tarefas criadas em Carreira, Rotina, Casa não aparecem no dashboard inicial"
   { id: "tasks", label: "Tarefas de hoje", description: "Rotina, Carreira e Casa numa lista só, com ✓", emoji: "☑️", category: "produtividade", defaultSize: "large" },
   { id: "reading", label: "Leitura", description: "Livro atual e progresso", emoji: "📖", category: "bem-estar", defaultSize: "small" },
+  // 28/09 (protótipo da Beleza): os passos de pele de hoje, manhã e noite, com o quadradinho
+  { id: "skincare", label: "Skincare de hoje", description: "Os passos de pele de hoje, manhã e noite, com ✓", emoji: "🧴", category: "bem-estar", defaultSize: "large" },
   // Custom widgets
   { id: "week-progress", label: "Progresso Semanal", description: "Gráfico do seu score ao longo da semana", emoji: "📊", category: "produtividade", defaultSize: "large" },
   { id: "budget-remaining", label: "Orçamento Restante", description: "Quanto ainda pode gastar este mês", emoji: "💸", category: "finanças", defaultSize: "large" },
@@ -60,6 +63,21 @@ export const WIDGET_CATALOG: WidgetDef[] = [
 ];
 
 const KEY = "core-home-widgets-v2";
+/** A chave dos widgets da Home (lista de { id, size }) — pra quem oferece "pôr na Home" de dentro de um módulo. */
+export const CHAVE_WIDGETS_HOME = KEY;
+
+/**
+ * A lista com o widget acrescentado no fim, no tamanho pedido; `null` se ele já
+ * está lá (ou se a lista gravada é lixo — não sobrescreve o que não entende).
+ * Widget desconhecido pro app antigo não quebra a Home dele: WidgetGrid pula id
+ * sem componente.
+ */
+export function comWidget(atuais: unknown, id: WidgetId, size: WidgetSize): ActiveWidget[] | null {
+  if (atuais != null && !Array.isArray(atuais)) return null;
+  const lista = (Array.isArray(atuais) ? atuais : []) as ActiveWidget[];
+  if (lista.some((w) => w?.id === id)) return null;
+  return [...lista, { id, size }];
+}
 
 const DEFAULT_WIDGETS: ActiveWidget[] = [];
 

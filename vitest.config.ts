@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // 27/09: os testes de ciclo inteiro (Treino, Conquistas) levam 5–9 s na suíte cheia com a
+    // máquina carregada (emulador/simulador) e o padrão de 5 s derrubava o hook de push sem bug nenhum.
+    testTimeout: 15_000,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

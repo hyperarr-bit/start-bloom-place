@@ -173,14 +173,20 @@ export const rotuloRepeticao = (c: Compromisso): string => {
 export const rotuloAviso = (minutos: number): string =>
   AVISOS.find((a) => a.valor === minutos)?.rotulo ?? `${minutos} min antes`;
 
-/** O que a notificação diz sobre "quando" — congelado no agendamento, então só verdades que não mudam. */
-const corpoDoAviso = (c: Compromisso, minutos: number): string => {
-  const onde = c.local?.trim() ? ` · ${c.local.trim()}` : "";
-  if (minutos <= 0) return `Agora, às ${c.hora}${onde}`;
-  if (minutos < 60) return `Em ${minutos} min, às ${c.hora}${onde}`;
-  if (minutos < 1440) return `Em ${minutos === 60 ? "1 hora" : `${Math.round(minutos / 60)} horas`}, às ${c.hora}${onde}`;
-  return `Amanhã às ${c.hora}${onde}`;
+/**
+ * O que a notificação diz sobre "quando" — congelado no agendamento, então só
+ * verdades que não mudam. Exportada (28/09) pra tarefa com horário dizer o
+ * "quando" com as mesmas palavras do compromisso (lib/tarefas).
+ */
+export const fraseDoAviso = (hora: string, minutos: number): string => {
+  if (minutos <= 0) return `Agora, às ${hora}`;
+  if (minutos < 60) return `Em ${minutos} min, às ${hora}`;
+  if (minutos < 1440) return `Em ${minutos === 60 ? "1 hora" : `${Math.round(minutos / 60)} horas`}, às ${hora}`;
+  return `Amanhã às ${hora}`;
 };
+
+const corpoDoAviso = (c: Compromisso, minutos: number): string =>
+  `${fraseDoAviso(c.hora, minutos)}${c.local?.trim() ? ` · ${c.local.trim()}` : ""}`;
 
 export type AvisoPlanejado = { quando: Date; title: string; body: string; id: number };
 

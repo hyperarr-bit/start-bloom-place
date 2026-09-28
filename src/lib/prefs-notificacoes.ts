@@ -45,6 +45,8 @@ export interface PrefsNotificacoes {
   horaCasa: number;
   /** compromissos com hora da Rotina (22/09) — a antecedência é por compromisso, aqui é só o interruptor geral */
   compromissos: boolean;
+  /** tarefas de hoje com horário (28/09) — a antecedência é por tarefa, aqui é só o interruptor geral */
+  tarefas: boolean;
   /** "seu limite de hoje" de Finanças, de manhã (26/09) — diário, nasce desligado */
   limite: boolean;
   horaLimite: number;
@@ -83,6 +85,9 @@ export const PREFS_PADRAO: PrefsNotificacoes = {
   // nasce LIGADO como os remédios: cadastrar um compromisso escolhendo
   // "avisar 1 hora antes" JÁ é pedir pra ser lembrado — a escolha mora em cada um
   compromissos: true,
+  // 28/09: nasce LIGADO pelo mesmo motivo — pôr horário numa tarefa e deixar
+  // "Avisar: na hora" JÁ é pedir pra ser lembrado; quem não quer escolhe "Sem aviso"
+  tarefas: true,
   // 26/09: diário como os outros, então nasce DESLIGADO. Liga na central ou
   // no próprio card "Quanto posso gastar hoje". 8h: antes do primeiro gasto.
   limite: false,
@@ -120,6 +125,7 @@ export const lerPrefs = (bruto: unknown): PrefsNotificacoes => {
     casa: p.casa === true,
     horaCasa: horaValida(p.horaCasa, PREFS_PADRAO.horaCasa),
     compromissos: p.compromissos !== false,
+    tarefas: p.tarefas !== false,
     limite: p.limite === true,
     horaLimite: horaValida(p.horaLimite, PREFS_PADRAO.horaLimite),
     sequencia: p.sequencia === true,

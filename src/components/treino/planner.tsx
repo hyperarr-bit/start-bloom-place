@@ -82,6 +82,7 @@ export function Quadradinho({
   tom,
   className,
   testId,
+  comoCaixa,
 }: {
   marcado: boolean;
   parcial?: boolean;
@@ -90,6 +91,8 @@ export function Quadradinho({
   tom?: TomDoDia;
   className?: string;
   testId?: string;
+  /** Lista de tarefas (28/09): anuncia como caixa de marcar (role="checkbox"), não botão de alternar. */
+  comoCaixa?: boolean;
 }) {
   const desenho = (
     <span
@@ -108,7 +111,7 @@ export function Quadradinho({
       type="button"
       onClick={onClick}
       aria-label={rotulo}
-      aria-pressed={marcado}
+      {...(comoCaixa ? { role: "checkbox", "aria-checked": marcado } : { "aria-pressed": marcado })}
       data-testid={testId}
       className={cn("w-10 h-10 shrink-0 grid place-items-center rounded-lg active:scale-95 transition-transform", className)}
     >

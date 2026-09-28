@@ -1,8 +1,9 @@
 import {
   agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
-  agendarRetrospectiva, agendarRotina, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  agendarRetrospectiva, agendarRotina, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
 import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
@@ -80,6 +81,8 @@ export interface DadosDosLembretes {
   manutencao: ManutencaoAgendavel[];
   /** compromissos com hora da Rotina (22/09) */
   compromissos: Compromisso[];
+  /** tarefas de hoje com horário e aviso, ainda não feitas (28/09) — Rotina e Carreira */
+  tarefas: TarefaAgendavel[];
   /** limite do dia (26/09): a pessoa usa Finanças? e já abriu hoje? */
   temFinancas: boolean;
   abriuFinancasHoje: boolean;
@@ -200,6 +203,11 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       .filter((t) => t?.task && t?.lastDone)
       .map((t) => ({ tarefa: String(t.task), ultimaVez: String(t.lastDone), frequenciaMeses: Number(t.frequencyMonths) || 6 })),
     compromissos: compromissosValidos(get<unknown>(CHAVE_COMPROMISSOS, [])),
+    // marcar como feita tira a tarefa daqui → a assinatura muda → o aviso pendente é cancelado
+    tarefas: tarefasAgendaveis([
+      { chave: CHAVE_TAREFAS_ROTINA, lista: get<unknown>(CHAVE_TAREFAS_ROTINA, []) },
+      { chave: CHAVE_TAREFAS_CARREIRA, lista: get<unknown>(CHAVE_TAREFAS_CARREIRA, []) },
+    ], hoje),
     // usa Finanças = lançou alguma coisa (as 4 "caixas" padrão de vencimento
     // existem pra todo mundo, então conta a vencer só vale com conta dentro)
     temFinancas: ["finance-expenses", "finance-incomes", "finance-fixed-expenses"]
@@ -240,6 +248,7 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.aniversario && dados.pessoas,
     prefs.casa && dados.manutencao,
     prefs.compromissos && dados.compromissos,
+    prefs.tarefas && dados.tarefas,
     prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
   ]);
@@ -268,6 +277,7 @@ export async function reagendarTudo(
     aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
     casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
     compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
+    tarefa: await agendarTarefas(d.tarefas, { ligado: prefs.tarefas }),
     limite: await agendarLimiteDoDia(
       { temFinancas: d.temFinancas, abriuFinancasHoje: d.abriuFinancasHoje },
       { hora: prefs.horaLimite, ligado: prefs.limite },

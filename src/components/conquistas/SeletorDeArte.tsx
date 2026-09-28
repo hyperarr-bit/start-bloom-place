@@ -158,16 +158,32 @@ interface PreviaProps {
 /** Prévia em tela cheia da arte, com "Postar nos Stories" (o vídeo e o fundo transparente quando existem). */
 export const Previa = ({ titulo, elemento, transparente, video, acoes, onPostar, onFechar, children }: PreviaProps) => {
   const reduzir = useReducedMotion();
-  const [palco, largura] = useLargura(342);
+  const palco = useRef<HTMLDivElement>(null);
   const [enviando, setEnviando] = useState<"cor" | "transparente" | "video" | null>(null);
   const [progresso, setProgresso] = useState(0);
-  const [alturaPalco, setAlturaPalco] = useState(608);
+  /* O palco medido AO VIVO, sem o recuo (varredura 27/09). Antes a altura era lida uma vez, na montagem — e o
+   * rodapé cresce DEPOIS: o "Postar vídeo" só entra quando a detecção do vídeo responde, o que na prévia direta
+   * (planner → "Postar minha conquista", card do álbum → "Compartilhar") é depois da 1ª pintura. A arte saía do
+   * tamanho do palco antigo: ~27 px por baixo do cabeçalho e ~27 px por cima do rodapé, cobrindo o alto do
+   * "Trocar conquista"/"Postar vídeo nos Stories" em 360, 390 e 430. */
+  const [caixa, setCaixa] = useState({ w: 342, h: 608 });
   useLayoutEffect(() => {
     const el = palco.current;
-    if (el && el.clientHeight) setAlturaPalco(el.clientHeight);
-  }, [palco]);
+    if (!el) return;
+    const medir = () => {
+      const cs = getComputedStyle(el);
+      const w = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+      const h = el.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+      if (w > 0 && h > 0) setCaixa((c) => (c.w === w && c.h === h ? c : { w, h }));
+    };
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // cabe na largura e na altura do palco
-  const w = Math.max(160, Math.min(largura, Math.floor((alturaPalco * STORIES.w) / STORIES.h)));
+  const w = Math.max(160, Math.min(caixa.w, Math.floor((caixa.h * STORIES.w) / STORIES.h)));
   const postar = async (t: boolean) => {
     setEnviando(t ? "transparente" : "cor");
     try { await onPostar(t); } finally { setEnviando(null); }
@@ -202,12 +218,13 @@ export const Previa = ({ titulo, elemento, transparente, video, acoes, onPostar,
           compensação de status-bar.ts — com env() o X ficava embaixo do .app-safe-top-guard (APK 27/09). */}
       <header className="shrink-0 pt-[var(--app-safe-top)] relative z-10 bg-background">
         <div className="h-[52px] flex items-center gap-2 px-3 text-[14px] font-extrabold">
-          <button type="button" onClick={onFechar} aria-label="Fechar a prévia" className="w-10 h-10 grid place-items-center rounded-full hover:bg-muted active:bg-muted" data-testid="previa-fechar"><X className="w-5 h-5" /></button>
+          {/* shrink-0 (varredura 27/09): sem ele o título comprido espremia o X pra 29 px em 360 (34 em 390) */}
+          <button type="button" onClick={onFechar} aria-label="Fechar a prévia" className="w-10 h-10 shrink-0 grid place-items-center rounded-full hover:bg-muted active:bg-muted" data-testid="previa-fechar"><X className="w-5 h-5" /></button>
           <span className="truncate">Prévia · {titulo}</span>
           <span className="ml-auto pr-1 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">{comVideo ? `1080 × 1920 · ${video?.rotulo ?? "vídeo"}` : "1080 × 1920"}</span>
         </div>
       </header>
-      <div ref={palco} className="flex-1 min-h-0 grid place-items-center px-4 py-1.5">
+      <div ref={palco} className="flex-1 min-h-0 grid place-items-center px-4 py-1.5" data-testid="previa-palco">
         <motion.div
           className="relative rounded-[22px] overflow-hidden border border-border shadow-[0_20px_50px_-20px_rgba(0,0,0,.55)]"
           initial={reduzir ? false : { scale: 0.86, y: 30 }}

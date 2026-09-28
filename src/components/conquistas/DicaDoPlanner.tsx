@@ -84,7 +84,11 @@ export const DicaDoPlanner = ({ aberta, onAbrir, onEntendi, onFechar, ignorar }:
             <div className="dica-titulo">Toca no seu planner</div>
             <div className="dica-texto">pra abrir e ver suas insígnias do mês — o número de cada conquista, na sua letra.</div>
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <button type="button" className="dica-abrir" onClick={onAbrir} data-testid="dica-abrir">
+              {/* `border-0` (varredura 27/09): o ícone é o único ELEMENTO filho (o texto não conta pro
+                  :only-child), então a regra global do alvo de toque (index.css) pegava este botão pintado
+                  pelo conquistas.css — padding 8 px em content-box + margem −8 px: a pílula de 38 px virava
+                  54 e avançava 8 px sobre a margem do cartão. A classe "border" é uma saída daquela regra. */}
+              <button type="button" className="dica-abrir border-0" onClick={onAbrir} data-testid="dica-abrir">
                 <BookOpen className="w-4 h-4" aria-hidden /> Abrir agora
               </button>
               <button type="button" className="dica-entendi" onClick={onEntendi} data-testid="dica-entendi">

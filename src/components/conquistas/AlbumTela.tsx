@@ -277,13 +277,17 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
           --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
       <div className="shrink-0" style={{ paddingTop: "var(--app-safe-top)" }}>
+      {/* `border-0` nos botões redondos (varredura 27/09): o fundo deles vem do conquistas.css, então a regra
+          global do alvo de toque (index.css, botão só-ícone "sem fundo") os pegava — 8 px de padding em
+          content-box e margem −8 px: o círculo de 40 virava 56 e colava na borda da tela (as setas, 34 → 50).
+          A classe "border" é uma das saídas daquela regra; a borda já é 0 no CSS. */}
       <div className="alb-topo">
-        <button type="button" className="alb-redondo" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
+        <button type="button" className="alb-redondo border-0" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">
           <b className="block text-[14px] font-black truncate">Álbum CORE {ano}</b>
           <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total} · faltam {total - abertos}</span>
         </div>
-        <button type="button" className="alb-redondo" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>
+        <button type="button" className="alb-redondo border-0" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>
       </div>
       </div>
 
@@ -317,11 +321,11 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           )}
         </motion.div>
         <div className="alb-nav2">
-          <button type="button" className="alb-seta" onClick={() => irPara(atual - 1)} disabled={atual === 0} aria-label="Página anterior" data-testid="album-tela-anterior"><ChevronLeft className="w-5 h-5" /></button>
+          <button type="button" className="alb-seta border-0" onClick={() => irPara(atual - 1)} disabled={atual === 0} aria-label="Página anterior" data-testid="album-tela-anterior"><ChevronLeft className="w-5 h-5" /></button>
           <div className="alb-dots2" aria-hidden>
             {paginas.map((p, i) => <i key={p.id} data-rar={p.raridade ?? "destaque"} data-ativo={i === atual ? "" : undefined} />)}
           </div>
-          <button type="button" className="alb-seta" onClick={() => irPara(atual + 1)} disabled={atual >= n - 1} aria-label="Próxima página" data-testid="album-tela-proxima"><ChevronRight className="w-5 h-5" /></button>
+          <button type="button" className="alb-seta border-0" onClick={() => irPara(atual + 1)} disabled={atual >= n - 1} aria-label="Próxima página" data-testid="album-tela-proxima"><ChevronRight className="w-5 h-5" /></button>
         </div>
       </div>
 

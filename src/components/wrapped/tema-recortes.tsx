@@ -1,7 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Adesivo as AdesivoDasConquistas } from "@/components/conquistas/adesivos-arte";
 import { nomeDaCapa, type ConteudoDoCard, type TipoDoFato } from "@/lib/retrospectiva";
-import { CountUp, INTER, SERIF, tamanhoQueCabe, useMedidas } from "./prancheta";
+import { CountUp, INTER, SERIF, tamanhoQueCabe, useFontesProntas, useMedidas } from "./prancheta";
 import { Cadeado } from "./pecas-planner";
 import { Adesivo, COR_DO_ADESIVO_DE_TREINO, type TipoDeAdesivo } from "./adesivos-recortes";
 import { fraseDoHabito, fraseDosDiasSemGasto, linhaDoMeuMes, numeroDaEdicao } from "./temas";
@@ -279,6 +279,15 @@ const tamanhoDaFoto = (valor: number | string, base: number) => {
   const d = String(valor).length;
   return d <= 2 ? base : d === 3 ? base * 0.68 : base * 0.52;
 };
+
+export const FONTE_DA_PALAVRA = { familia: "inter", peso: 900, espaco: -0.05 } as const;
+/**
+ * A palavra do humor na foto da polaroide ("bem." · "no meio-termo."), com a foto de largura `w`.
+ * Varredura 27/09: com o piso padrão do tamanhoQueCabe (40% do máximo), "no meio-termo." — a mais
+ * comprida, 3× "bem." — não cabia e a foto cortava ("no meio-term") em 360 e 390; "pra baixo." e
+ * "muito bem." também passavam. Piso baixo: a palavra diminui até caber na linha.
+ */
+export const tamanhoDaPalavra = (palavra: string, w: number) => tamanhoQueCabe([palavra], FONTE_DA_PALAVRA, w - 40, w * 0.42, 12);
 
 /* ============================================================== capa */
 
@@ -572,7 +581,9 @@ const Humor = (p: Base) => {
   const w = t(246, 212);
   const palavra = s.palavra ? `${s.palavra}.` : null;
   const foto = palavra ?? String(s.diasDeDiario || s.gratidoes);
-  const tamFoto = palavra ? tamanhoQueCabe([palavra], { familia: "inter", peso: 900, espaco: -0.05 }, w - 40, w * 0.42) : tamanhoDaFoto(foto, w * 0.634);
+  // a medida é do Inter 900: se a fonte ainda estava chegando na 1ª pintura, mede de novo quando chegar
+  useFontesProntas();
+  const tamFoto = palavra ? tamanhoDaPalavra(palavra, w) : tamanhoDaFoto(foto, w * 0.634);
   return (
     <>
       <DymoEm left={24} top={m(84, 76)} giro={2}>Como você estava</DymoEm>
@@ -589,7 +600,8 @@ const Humor = (p: Base) => {
       <Adesivo tipo="estrela" style={{ left: 326, top: m(270, 238), width: 60, height: 60, transform: "rotate(14deg)" }} />
       {s.porDia.length > 0 && (
         <Rasgo semente={53} style={{ left: 26, top: m(470, 406), width: 352, transform: "rotate(1deg)", padding: "14px 18px 16px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", rowGap: 4 }}>
+          {/* columnGap (varredura 27/09): em 360 a legenda cabia na linha sem folga e grudava no rótulo ("DIA A DIA●ótimo") */}
+          <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", rowGap: 4, columnGap: 10 }}>
             <span style={{ ...rot(fs(9.5)), whiteSpace: "nowrap" }}>Seu humor, dia a dia</span>
             <span aria-hidden style={{ marginLeft: "auto", display: "flex", gap: 7, fontSize: fs(9.5), fontWeight: 700, color: R.rot }}>
               {[["ótimo", 5], ["bem", 4], ["ok", 3], ["mal", 2]].map(([n, v]) => (

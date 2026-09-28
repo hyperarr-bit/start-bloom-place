@@ -273,6 +273,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
   return (
     <div
       className="fixed inset-0 z-[100] bg-background flex items-center justify-center p-5 overflow-y-auto"
+      data-camada-guia="tutorial"
       style={{
         minHeight: "100dvh",
         paddingTop: "max(1.25rem, env(safe-area-inset-top))",

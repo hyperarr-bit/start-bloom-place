@@ -292,7 +292,9 @@ const MomentosNoApp = () => {
   const { user } = useAuth();
   const { pathname } = useLocation();
   if (!user || !ROTAS_DOS_MOMENTOS.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
-  return <Suspense fallback={null}><MomentosConquistas /></Suspense>;
+  // conta com menos de 24 h: 1 festa por vez (o 1º dia já tem tutorial e a Missão do teste)
+  const contaNova = !!user.created_at && Date.now() - Date.parse(user.created_at) < 24 * 3600e3;
+  return <Suspense fallback={null}><MomentosConquistas contaNova={contaNova} /></Suspense>;
 };
 // dia14 é o funil do /inicio (25/07; de volta em 19/09) — import EAGER: a URL
 // do tráfego de anúncio não pode ter flash de loading (lazy quebraria fora do

@@ -14,6 +14,7 @@ export const TutorialDonePopup = ({ onClose }: TutorialDonePopupProps) => {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
       className="fixed inset-0 z-[110] flex items-center justify-center p-5 bg-background"
+      data-camada-guia="tutorial-fim"
       style={{
         paddingTop: "max(1.25rem, env(safe-area-inset-top))",
         paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",

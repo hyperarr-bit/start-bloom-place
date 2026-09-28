@@ -312,6 +312,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-[300] flex items-center justify-center bg-background/70 pointer-events-auto px-6"
+          data-camada-guia="spotlight-fim"
           onClick={() => setShowCompletion(false)}
         >
           <motion.div
@@ -415,6 +416,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         exit={{ opacity: 0 }}
         transition={{ duration: 0.25 }}
         className="fixed inset-0 z-[200] pointer-events-none"
+        data-camada-guia="spotlight"
       >
         {/*
           * DESTAQUE SEM APAGAR O APP (27/07 — 2ª rodada, correção do dono).

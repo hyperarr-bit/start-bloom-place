@@ -189,6 +189,7 @@ function Holofote({ area, aoSair }: { area: string; aoSair: (motivo: string) => 
   return (
     <motion.div
       className="fixed inset-0 z-[200] pointer-events-none"
+      data-camada-guia="missao-holofote"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
       aria-hidden
     >
@@ -229,6 +230,7 @@ function Celebracao({ dia, aoFim }: { dia: 1 | 2 | 3; aoFim: () => void }) {
   return (
     <motion.div
       className="fixed inset-0 z-[210] pointer-events-none grid place-items-center px-8"
+      data-camada-guia="missao-dia"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
       aria-hidden
     >
@@ -346,7 +348,7 @@ export function MissaoDoTrial() {
   /* B1 — boas-vindas do pagante (uma vez) */
   if (!missao.vista) {
     return (
-      <div className="fixed inset-0 z-[240] overflow-y-auto" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)" }}>
+      <div className="fixed inset-0 z-[240] overflow-y-auto" data-camada-guia="missao-boas-vindas" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)" }}>
         <div className="min-h-full max-w-[400px] mx-auto flex flex-col px-6 py-10">
           <motion.div
             initial={{ scale: 0 }} animate={{ scale: 1 }}

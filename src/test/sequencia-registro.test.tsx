@@ -82,8 +82,9 @@ describe("registro do dia anotado", () => {
     await montar();
     act(() => api.set("heatmap-log", { "2026-09-26": 2 }));
     act(() => api.set("heatmap-log", { "2026-09-26": 3 }));
-    await act(async () => { await new Promise((r) => setTimeout(r, 900)); });
-    // (o toast de outro teste pode cair aqui por causa do atraso de 700 ms: conta só o deste)
+    await act(async () => { await new Promise((r) => setTimeout(r, 2600)); });
+    // (o toast sai 2,4 s depois — desde 28/09, pra olhar se festa/guia/diálogo já está na tela;
+    //  o de outro teste pode cair aqui: conta só o deste)
     expect(toastFn.mock.calls.filter((c) => c[0] === "🔥 5 dias seguidos")).toHaveLength(1);
   });
 

@@ -14,7 +14,9 @@ import { localDayKey } from "@/lib/utils";
  *
  * Mora em `rotina-compromissos` (uma lista, sincronizada como o resto). A
  * repetição é expandida na leitura (`ocorrencias`), nunca gravada — uma aula
- * de seg/qua/sex é UM registro, e apagar apaga a série inteira.
+ * de seg/qua/sex é UM registro. Apagar oferece "só este dia" (`pula`),
+ * "daqui pra frente" (`ate`) ou a série toda (28/09, chamado: "criei trabalho
+ * 07:30 de seg a sex, vou estar de férias 5 dias e queria excluir só esses dias").
  *
  * O aviso vira notificação LOCAL (lib/notificacoes → agendarCompromissos), na
  * antecedência escolhida POR COMPROMISSO (30 min, 1 h, 1 dia…). Tudo aqui é
@@ -54,6 +56,10 @@ export interface Compromisso {
   origem?: string;
   /** Referência de quem criou (ex.: id do curso). */
   ref?: string;
+  /** Dias ("YYYY-MM-DD") em que a série NÃO acontece — "apagar só este dia". */
+  pula?: string[];
+  /** Último dia da série ("YYYY-MM-DD", inclusive) — "apagar daqui pra frente". Ausente = sem fim. */
+  ate?: string;
 }
 
 export interface Ocorrencia {
@@ -108,13 +114,45 @@ export function ocorrencias(lista: Compromisso[], de: Date, dias: number): Ocorr
     const desde = primeira.getTime() > inicio.getTime()
       ? new Date(primeira.getFullYear(), primeira.getMonth(), primeira.getDate())
       : inicio;
+    const pulados = new Set((Array.isArray(c.pula) ? c.pula : []).filter(ehDia));
+    const ultimo = ehDia(c.ate) ? c.ate : null;
     for (let d = new Date(desde); d.getTime() < fim.getTime(); d.setDate(d.getDate() + 1)) {
       if (!repete.includes(indiceSemana(d))) continue;
+      const dia = localDayKey(d);
+      if (ultimo && dia > ultimo) break;
+      if (pulados.has(dia)) continue;
       const quando = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, mi, 0, 0);
-      out.push({ compromisso: c, quando, dia: localDayKey(d) });
+      out.push({ compromisso: c, quando, dia });
     }
   }
   return out.sort((a, b) => a.quando.getTime() - b.quando.getTime() || a.compromisso.titulo.localeCompare(b.compromisso.titulo));
+}
+
+export type ModoDeApagar = "dia" | "proximos" | "serie";
+
+/** "YYYY-MM-DD" do dia anterior (montado por partes, sem fuso). */
+const vesperaDe = (dia: string): string => {
+  const [a, m, d] = dia.split("-").map(Number);
+  return localDayKey(new Date(a, m - 1, d - 1));
+};
+
+/**
+ * A lista depois de apagar `c` na ocorrência de `dia`:
+ *  - "dia": a série continua, só aquele dia sai (`pula`);
+ *  - "proximos": a série termina na véspera (`ate`) — se isso não deixa
+ *    nenhum dia pra trás (era a 1ª ocorrência), é a série toda;
+ *  - "serie" (ou compromisso que não repete): sai o registro.
+ * Os avisos se refazem a partir da lista nova (quem chama rearma).
+ */
+export function apagarCompromisso(lista: Compromisso[], c: Compromisso, modo: ModoDeApagar, dia: string): Compromisso[] {
+  const repete = Array.isArray(c.repete) && c.repete.length > 0;
+  if (!repete || modo === "serie" || !ehDia(dia)) return lista.filter((x) => x.id !== c.id);
+  if (modo === "dia") {
+    return lista.map((x) => (x.id === c.id ? { ...x, pula: [...new Set([...(Array.isArray(x.pula) ? x.pula : []), dia])].filter(ehDia).sort() } : x));
+  }
+  const vespera = vesperaDe(dia);
+  if (vespera < c.data) return lista.filter((x) => x.id !== c.id);
+  return lista.map((x) => (x.id === c.id ? { ...x, ate: vespera } : x));
 }
 
 /** Ocorrências de HOJE que ainda não passaram (com 30 min de tolerância — a reunião das 15h ainda interessa às 15h10). */

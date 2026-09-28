@@ -13,8 +13,8 @@ import { adicionarAoCalendario } from "@/lib/calendario";
 import { trackEvent } from "@/lib/analytics";
 import { parseLocalDay } from "@/lib/utils";
 import {
-  AVISOS, AVISO_PADRAO, CHAVE_COMPROMISSOS, DIAS_CURTOS, avisoDe, indiceSemana, ocorrencias,
-  rotuloAviso, rotuloRepeticao, type Compromisso, type Ocorrencia,
+  AVISOS, AVISO_PADRAO, CHAVE_COMPROMISSOS, DIAS_CURTOS, apagarCompromisso, avisoDe, indiceSemana, ocorrencias,
+  rotuloAviso, rotuloRepeticao, type Compromisso, type ModoDeApagar, type Ocorrencia,
 } from "@/lib/compromissos";
 
 /**
@@ -51,6 +51,31 @@ const diaLongo = (dia: string) =>
 
 const diaCurto = (dia: string) =>
   parseLocalDay(dia).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(".", "");
+
+const diaMes = (dia: string) => parseLocalDay(dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+type Apagar = (c: Compromisso, modo: ModoDeApagar, dia: string) => void;
+
+/**
+ * Apaga na lista e avisa com "Desfazer" (apagar a série sem querer era o medo
+ * do chamado de 28/09). Os avisos do celular se refazem com a lista nova.
+ */
+const useApagar = (lista: Compromisso[], onChange: (lista: Compromisso[]) => void): Apagar => {
+  const { get } = useUserData();
+  return (c, modo, dia) => {
+    const repete = !!c.repete?.length;
+    const nova = apagarCompromisso(lista, c, repete ? modo : "serie", dia);
+    onChange(nova);
+    trackEvent("compromisso_apagado", { repete, modo: repete ? modo : "serie" });
+    void armarAvisosDeCompromissos(get, nova, false);
+    const texto = !repete || modo === "serie" || !nova.some((x) => x.id === c.id)
+      ? `${c.titulo} apagado`
+      : modo === "dia" ? `${c.titulo} sai só de ${diaCurto(dia)}` : `${c.titulo} termina em ${diaMes(nova.find((x) => x.id === c.id)?.ate ?? dia)}`;
+    toast.success(texto, {
+      action: { label: "Desfazer", onClick: () => { onChange(lista); void armarAvisosDeCompromissos(get, lista, false); } },
+    });
+  };
+};
 
 /* ------------------------------------------------------------ formulário */
 
@@ -138,10 +163,11 @@ const FormCompromisso = ({ dia, onSalvar, onCancelar }: { dia: string; onSalvar:
 
 /* -------------------------------------------------------- linha de item */
 
-const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar: (c: Compromisso) => void; mostrarDia?: boolean }) => {
+const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar: Apagar; mostrarDia?: boolean }) => {
   const [confirmando, setConfirmando] = useState(false);
   const c = o.compromisso;
   const repeticao = rotuloRepeticao(c);
+  const escolher = (modo: ModoDeApagar) => (e: React.MouseEvent) => { e.stopPropagation(); setConfirmando(false); onApagar(c, modo, o.dia); };
   const minutos = avisoDe(c);
   const noCelular = isNativeShell();
 
@@ -153,7 +179,8 @@ const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar:
   };
 
   return (
-    <div className="flex items-start gap-2 group" data-testid="compromisso-item">
+    <div data-testid="compromisso-item">
+    <div className="flex items-start gap-2 group">
       <span className="text-xs font-bold tabular-nums text-sky-700 dark:text-sky-300 w-11 shrink-0 pt-0.5">{c.hora}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold leading-snug">
@@ -161,7 +188,7 @@ const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar:
           {c.titulo}
         </p>
         <p className="text-[10px] text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-          {repeticao && <span className="inline-flex items-center gap-0.5"><Repeat className="w-2.5 h-2.5" /> {repeticao}</span>}
+          {repeticao && <span className="inline-flex items-center gap-0.5"><Repeat className="w-2.5 h-2.5" /> {repeticao}{c.ate ? ` · até ${diaMes(c.ate)}` : ""}</span>}
           <span className="inline-flex items-center gap-0.5">
             {minutos < 0 ? <BellOff className="w-2.5 h-2.5" /> : <Bell className="w-2.5 h-2.5" />} {rotuloAviso(minutos)}
           </span>
@@ -173,15 +200,34 @@ const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar:
           <CalendarPlus className="w-3.5 h-3.5" />
         </button>
       )}
-      {confirmando ? (
-        <button type="button" onClick={() => onApagar(c)} className="text-[10px] font-semibold text-red-500 whitespace-nowrap">
-          {repeticao ? "apagar a série?" : "apagar?"}
+      {confirmando && !repeticao ? (
+        <button type="button" onClick={escolher("serie")} className="text-[10px] font-semibold text-red-500 whitespace-nowrap" data-testid="apagar-confirmar">
+          apagar?
         </button>
       ) : (
-        <button type="button" onClick={() => setConfirmando(true)} aria-label={`Apagar ${c.titulo}`} className="text-red-400 hover:text-red-600 p-0.5 opacity-60 group-hover:opacity-100">
+        <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmando((v) => !v); }} aria-label={`Apagar ${c.titulo}`} aria-expanded={repeticao ? confirmando : undefined} className="text-red-400 hover:text-red-600 p-0.5 opacity-60 group-hover:opacity-100">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       )}
+    </div>
+    {confirmando && repeticao && (
+      // Série: "só este dia" é o caso do chamado (férias); os três com altura de dedo (32 px).
+      <div className="ml-[3.25rem] mt-1.5 flex flex-wrap items-center gap-1.5" data-testid="apagar-opcoes" onClick={(e) => e.stopPropagation()}>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mr-0.5">Apagar</span>
+        <button type="button" onClick={escolher("dia")} className="h-8 px-2.5 rounded-md border border-red-200 dark:border-red-900 text-[11px] font-semibold text-red-600 dark:text-red-400" data-testid="apagar-so-este-dia">
+          só {diaCurto(o.dia)}
+        </button>
+        <button type="button" onClick={escolher("proximos")} className="h-8 px-2.5 rounded-md border border-red-200 dark:border-red-900 text-[11px] font-semibold text-red-600 dark:text-red-400" data-testid="apagar-daqui-pra-frente">
+          daqui pra frente
+        </button>
+        <button type="button" onClick={escolher("serie")} className="h-8 px-2.5 rounded-md border border-red-200 dark:border-red-900 text-[11px] font-semibold text-red-600 dark:text-red-400" data-testid="apagar-serie">
+          a série toda
+        </button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmando(false); }} className="h-8 px-2 text-[11px] font-semibold text-muted-foreground">
+          cancelar
+        </button>
+      </div>
+    )}
     </div>
   );
 };
@@ -208,12 +254,7 @@ export const CompromissosDoDia = ({ dia, lista, onChange }: PropsDia) => {
     void armarAvisosDeCompromissos(get, nova, avisoDe(c) >= 0);
   };
 
-  const apagar = (c: Compromisso) => {
-    const nova = lista.filter((x) => x.id !== c.id);
-    onChange(nova);
-    trackEvent("compromisso_apagado", { repete: !!c.repete?.length });
-    void armarAvisosDeCompromissos(get, nova, false);
-  };
+  const apagar = useApagar(lista, onChange);
 
   return (
     <div className="space-y-2" data-testid="compromissos-do-dia">
@@ -237,17 +278,12 @@ export const CompromissosDoDia = ({ dia, lista, onChange }: PropsDia) => {
 /* ------------------------------------------------------------- próximos */
 
 export const ProximosCompromissos = ({ lista, onChange, onAbrirDia }: { lista: Compromisso[]; onChange: (lista: Compromisso[]) => void; onAbrirDia: (dia: string) => void }) => {
-  const { get } = useUserData();
   const proximos = useMemo(() => {
     const agora = new Date();
     return ocorrencias(lista, agora, 30).filter((o) => o.quando.getTime() >= agora.getTime() - 30 * 60_000).slice(0, 6);
   }, [lista]);
 
-  const apagar = (c: Compromisso) => {
-    const nova = lista.filter((x) => x.id !== c.id);
-    onChange(nova);
-    void armarAvisosDeCompromissos(get, nova, false);
-  };
+  const apagar = useApagar(lista, onChange);
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden" data-testid="proximos-compromissos">

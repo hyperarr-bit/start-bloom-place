@@ -21,12 +21,13 @@ import { Button } from "@/components/ui/button";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { armarAvisos } from "@/lib/armar-avisos";
+import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { cn, localDayKey } from "@/lib/utils";
 import { rotuloAviso } from "@/lib/compromissos";
 import {
   AVISO_PADRAO_TAREFA, AVISOS_TAREFA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, horaDaTarefa, horaDoAviso,
-  normalizarHora, resumoDosDetalhes, textoDoAviso, type TarefaDoDia,
+  normalizarHora, ordenarPorHora, resumoDosDetalhes, textoDoAviso, type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/components/treino/planner";
 
@@ -287,6 +288,10 @@ export function FormTarefa({
           </label>
         </div>
         <p className={cn("mt-1.5 text-[11.5px]", passou ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")} data-testid="dica-do-aviso">{dica}</p>
+        {/* 28/09 (dono): no site o aviso não toca — dizer antes, pra ninguém confiar num alarme que não vem */}
+        {hora && aviso >= 0 && !passou && !isNativeShell() && (
+          <p className="mt-0.5 text-[11.5px] text-muted-foreground" data-testid="aviso-so-no-app">No site o aviso não toca — ele toca no app do celular.</p>
+        )}
       </div>
 
       <div>
@@ -481,4 +486,97 @@ export function LinhaNovaTarefa({ onAbrir, linha }: { onAbrir: () => void; linha
       </span>
     </button>
   );
+}
+
+/* ------------------------------------------------- a lista inteira do dia */
+
+/** A tabela das tarefas no azul-céu (o cabeçalho do card já era sky). */
+export const TOM_CEU: TomDaTabela = { claro: "bg-sky-50", linha: "border-sky-100", titulo: "text-sky-900" };
+
+/**
+ * "TAREFAS DE HOJE" dos módulos: a tabela, o campo rápido (+), o ⏰ que abre a
+ * folha com horário/aviso/detalhes e a ficha. Recebe a lista pronta porque o
+ * BlocoDeFases também usa as mesmas tarefas nos fechamentos da semana e do mês
+ * (dois hooks na mesma chave não se enxergam na hora).
+ */
+export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", onde }: {
+  tarefas: ReturnType<typeof useTarefasDoDia>;
+  placeholder?: string;
+  onde: string;
+}) {
+  const [novaTarefa, setNovaTarefa] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [aberta, setAberta] = useState<string | null>(null);
+  const hoje = localDayKey();
+  const tarefasHoje = tarefas.lista.filter((t) => t.dia === hoje);
+  const feitasHoje = tarefasHoje.filter((t) => t.feito).length;
+  const addTarefa = () => {
+    if (!novaTarefa.trim()) return;
+    tarefas.adicionar({ texto: novaTarefa });
+    setNovaTarefa("");
+  };
+  const tarefaAberta = aberta ? tarefasHoje.find((t) => t.id === aberta) : undefined;
+  const ficha: FichaAberta | null = tarefaAberta ? {
+    texto: tarefaAberta.texto, feito: !!tarefaAberta.feito, onde, tarefa: tarefaAberta,
+    onAlternar: () => tarefas.alternar(tarefaAberta.id),
+    onSalvar: (c) => tarefas.salvar(tarefaAberta.id, c),
+    onApagar: () => tarefas.apagar(tarefaAberta.id),
+  } : null;
+
+  return (
+    <>
+      {/* Tarefas de hoje — tabela de planner (28/09): HORA | TAREFA | FEITO, as com
+          horário primeiro. Tocar no texto abre a ficha (detalhes, editar, apagar);
+          o ⏰ ao lado do + abre a folha com horário, aviso e detalhes. */}
+      <div className="rounded-xl border border-border overflow-hidden" data-testid="tarefas-de-hoje">
+        <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">✅ TAREFAS DE HOJE</span>
+          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{tarefasHoje.length}</span>
+        </div>
+        <div className="bg-card">
+          {tarefasHoje.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tarefa hoje ainda.</p>
+          ) : (
+            <>
+              <CabecalhoDaTabela tom={TOM_CEU} />
+              {[false, true].flatMap((feita) => ordenarPorHora(tarefasHoje.filter((t) => !!t.feito === feita).map((t) => ({ ...t, hora: horaDaTarefa(t) ?? undefined }))))
+                .map((t, i) => (
+                  <LinhaDeTarefa
+                    key={t.id}
+                    tom={TOM_CEU}
+                    primeira={i === 0}
+                    l={{
+                      key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+                      onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
+                    }}
+                  />
+                ))}
+            </>
+          )}
+          <div className="flex gap-2 p-2.5 border-t border-sky-100 bg-sky-50">
+            <Input placeholder={placeholder} value={novaTarefa} onChange={(e) => setNovaTarefa(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addTarefa()} className="h-9 text-xs" />
+            <Button size="sm" variant="outline" className="h-9 px-2.5 bg-card" onClick={() => setCriando(true)} aria-label="Tarefa com horário ou detalhes">
+              <AlarmClock className="w-4 h-4" />
+            </Button>
+            <Button size="sm" className="h-9" onClick={addTarefa} aria-label="Adicionar tarefa"><Plus className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+      </div>
+      <FolhaNovaTarefa
+        aberta={criando}
+        onFechar={() => setCriando(false)}
+        textoInicial={novaTarefa}
+        onde={onde}
+        onSalvar={(c) => { tarefas.adicionar(c); setNovaTarefa(""); }}
+      />
+      <FichaDaTarefa ficha={ficha} onFechar={() => setAberta(null)} />
+    </>
+  );
+}
+
+/** A lista sozinha, dona das próprias tarefas — a Rotina de quem não usa o bloco de fases (28/09). */
+export function TarefasDeHoje({ chave, placeholder, onde }: { chave: string; placeholder?: string; onde: string }) {
+  const tarefas = useTarefasDoDia(chave);
+  return <ListaTarefasDeHoje tarefas={tarefas} placeholder={placeholder} onde={onde} />;
 }

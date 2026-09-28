@@ -9,10 +9,18 @@ import { normalizeForKey } from "@/lib/data-normalizers";
  * - On first mount, reads the latest value from the store (or `initial`).
  * - Writes update local state immediately and queue a debounced upsert.
  * - External changes to the same key (e.g. another component writing to it)
- *   are picked up via the `loaded` flag and a per-key version counter, NOT
- *   by re-running on every store mutation (which previously caused unrelated
+ *   are picked up via the `loaded` flag and a per-key broadcast, NOT by
+ *   re-running on every store mutation (which previously caused unrelated
  *   key updates to revert local state with stale closures).
+ *
+ * MESMA CHAVE, DUAS TELAS (28/09): o comentário acima prometia a sincronia, mas
+ * só a hidratação existia — a tarefa criada pela ação rápida da Home não
+ * aparecia no widget "Tarefas de hoje" da mesma Home até recarregar. Agora cada
+ * escrita avisa as outras instâncias DA MESMA CHAVE (evento na window, fora do
+ * render); quem escreveu ignora o próprio aviso e nada é regravado no store.
  */
+const EVENTO_MESMA_CHAVE = "core:persisted-state";
+type AvisoDeEscrita = { key: string; json: string; value: unknown; origem: symbol };
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
   const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
 
@@ -24,6 +32,21 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   // o provider no meio do render do componente ("Cannot update a component
   // while rendering a different component", varredura 26/09).
   const latestRef = useRef<T>(state);
+  const origem = useRef<symbol>(Symbol(key));
+
+  // Outra instância gravou a mesma chave: adota o valor (sem regravar no store).
+  useEffect(() => {
+    const aoOuvir = (e: Event) => {
+      const d = (e as CustomEvent<AvisoDeEscrita>).detail;
+      if (!d || d.key !== key || d.origem === origem.current || d.json === lastWrittenJson.current) return;
+      const valor = normalizeForKey(key, d.value as T);
+      lastWrittenJson.current = d.json;
+      latestRef.current = valor;
+      setState(valor);
+    };
+    window.addEventListener(EVENTO_MESMA_CHAVE, aoOuvir);
+    return () => window.removeEventListener(EVENTO_MESMA_CHAVE, aoOuvir);
+  }, [key]);
 
   // Hydrate once after Supabase finishes its initial load.
   useEffect(() => {
@@ -60,10 +83,14 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
 
   const setPersistedState = useCallback((v: T | ((prev: T) => T)) => {
     const next = typeof v === "function" ? (v as (prev: T) => T)(latestRef.current) : v;
+    const json = JSON.stringify(next);
     latestRef.current = next;
-    lastWrittenJson.current = JSON.stringify(next);
+    lastWrittenJson.current = json;
     setState(next);
     setData(key, next);
+    // fora da pilha atual: quem escreve pode estar no meio de um updater/render
+    const aviso: AvisoDeEscrita = { key, json, value: next, origem: origem.current };
+    queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));
   }, [key, setData]);
 
   return [state, setPersistedState];

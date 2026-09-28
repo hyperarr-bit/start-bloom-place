@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { numeroBR } from "@/lib/data-normalizers";
 import { datasDeCheckin } from "@/lib/detox";
+import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
+import { CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -89,7 +91,10 @@ export const QuickActions = () => {
   const [incomeKind, setIncomeKind] = useState(incomeKinds[0]);
   const [weightValue, setWeightValue] = useState("");
   const [ideaText, setIdeaText] = useState("");
-  const [taskText, setTaskText] = useState("");
+  // "Nova Tarefa" (28/09, dono): abre a folha de tarefa com horário/aviso/detalhes e
+  // grava nas tarefas de hoje da Rotina — antes virava urgência sem hora (e ia pra duas listas).
+  const tarefasRotina = useTarefasDoDia(CHAVE_TAREFAS_ROTINA);
+  const [folhaTarefa, setFolhaTarefa] = useState(false);
   const [gratitudeText, setGratitudeText] = useState("");
   const [sleepHours, setSleepHours] = useState("");
   /* Refeição em dois toques (07/09): escolhe a refeição do plano, confirma as
@@ -116,6 +121,9 @@ export const QuickActions = () => {
       markWorkout();
     } else if (id === "detox") {
       setActiveAction("detox");
+    } else if (id === "task") {
+      setActiveAction(null);
+      setFolhaTarefa(true);
     } else {
       setActiveAction(id);
     }
@@ -264,23 +272,16 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
-  const submitTask = () => {
-    if (!taskText.trim()) { toast.error("Digite a tarefa"); return; }
-    const taskId = crypto.randomUUID();
-    const trimmed = taskText.trim();
-    // Add to urgencies
-    const urgencies = get<any[]>("rotina-urgencies", []);
-    urgencies.push({ id: taskId, text: trimmed, done: false });
-    set("rotina-urgencies", urgencies);
-    // Also add to focus todo-list
-    const todos = get<any[]>("todo-list", []);
-    todos.push({ id: taskId, text: trimmed, priority: "alta", done: false });
-    set("todo-list", todos);
+  const criarTarefa = (c: Parameters<typeof tarefasRotina.adicionar>[0]) => {
+    const t = tarefasRotina.adicionar(c);
+    const aviso = avisoDaTarefa(t);
+    const hora = horaDaTarefa(t);
     vibrate();
     showSuccess("task");
-    toast.success("✅ Tarefa adicionada!", { action: { label: "Ver em Rotina", onClick: () => navigate("/rotina") } });
-    setTaskText("");
-    setActiveAction(null);
+    toast.success("Tarefa anotada", {
+      description: hora && aviso >= 0 && !avisoJaPassou(t.dia, hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}` : undefined,
+      action: { label: "Ver na Rotina", onClick: () => navigate("/rotina") },
+    });
   };
 
   const submitGratitude = () => {
@@ -533,23 +534,6 @@ export const QuickActions = () => {
                 </div>
               )}
 
-              {/* Task form */}
-              {activeAction === "task" && (
-                <div className="flex gap-2">
-                  <Input
-                    ref={inputRef}
-                    placeholder="O que precisa fazer?"
-                    value={taskText}
-                    onChange={e => setTaskText(e.target.value)}
-                    className="h-9 text-sm flex-1"
-                    onKeyDown={e => e.key === "Enter" && submitTask()}
-                  />
-                  <button onClick={submitTask} className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold">
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-
               {/* Gratitude form */}
               {activeAction === "gratitude" && (
                 <div className="flex gap-2">
@@ -718,6 +702,7 @@ export const QuickActions = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      <FolhaNovaTarefa aberta={folhaTarefa} onFechar={() => setFolhaTarefa(false)} onde="Rotina" onSalvar={criarTarefa} />
     </div>
   );
 };

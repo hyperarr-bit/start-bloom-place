@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
+import { TarefasDeHoje } from "@/components/tarefas/tarefas-do-dia";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
 import { CompromissosDoDia, ProximosCompromissos } from "@/components/rotina/Compromissos";
 import { CHAVE_COMPROMISSOS, ocorrencias, type Compromisso } from "@/lib/compromissos";
@@ -159,18 +160,20 @@ const FASES_ROTINA: Fase[] = [
    os quatro cards (repete no dia / tarefas de hoje / fechamento da semana e
    do mês) feios e confusos na aba mais aberta do app, e não há telemetria
    por card pra saber quantos usam. Regra: contou alguma vez, criou fase
-   própria, tarefa ou nota do mês → continua vendo, nada some; quem nunca
-   tocou volta a ter a Rotina de antes. A Carreira, onde o bloco nasceu,
-   segue igual. O evento `rotina_fases_em_uso` responde em uma semana
-   quantas pessoas são — é o dado que decide se vale redesenhar. */
-export const fasesEmUso = (fases: unknown, tarefas: unknown, notas: unknown, padrao: Fase[] = FASES_ROTINA): boolean => {
+   própria ou nota do mês → continua vendo, nada some; quem nunca tocou
+   volta a ter a Rotina de antes. A Carreira, onde o bloco nasceu, segue
+   igual. O evento `rotina_fases_em_uso` responde em uma semana quantas
+   pessoas são — é o dado que decide se vale redesenhar.
+   28/09 (dono): TAREFA não conta mais como "usa o bloco" — as tarefas de
+   hoje aparecem pra todo mundo sozinhas (TarefasDeHoje), e a criada pela
+   Home não pode arrastar junto os contadores e fechamentos. */
+export const fasesEmUso = (fases: unknown, _tarefas: unknown, notas: unknown, padrao: Fase[] = FASES_ROTINA): boolean => {
   const lista = Array.isArray(fases) ? (fases as Partial<Fase>[]) : [];
   const idsPadrao = new Set(padrao.map((f) => f.id));
   const contou = lista.some((f) => Object.values(f?.counts ?? {}).some((n) => Number(n) > 0));
   const criou = lista.some((f) => f?.id && !idsPadrao.has(f.id));
-  const temTarefa = Array.isArray(tarefas) && tarefas.length > 0;
   const temNota = !!notas && typeof notas === "object" && Object.values(notas as Record<string, unknown>).some((v) => typeof v === "string" && v.trim() !== "");
-  return contou || criou || temTarefa || temNota;
+  return contou || criou || temNota;
 };
 
 const useFasesEmUso = () => {
@@ -1549,7 +1552,7 @@ const Rotina = () => {
                 Fica DEPOIS dos hábitos porque é outra pergunta: hábito é
                 sim/não no dia, fase é QUANTAS VEZES. Quem precisa das duas
                 (o caso dela) encontra as duas na mesma rolagem. */}
-            {fasesUsadas && (
+            {fasesUsadas ? (
               <BlocoDeFases
                 chaveFases="rotina-day-phases"
                 chaveTarefas="rotina-day-tasks"
@@ -1559,6 +1562,11 @@ const Rotina = () => {
                 placeholderTarefa="Nova tarefa de hoje..."
                 chaveNotaMes="rotina-month-notes"
               />
+            ) : (
+              /* 28/09 (dono): as tarefas de hoje aparecem pra TODO mundo — a tarefa
+                 criada pela Home tem que estar na Rotina sem trazer junto o bloco de
+                 contadores e fechamentos, que segue só pra quem usa (regra de 12/09). */
+              <TarefasDeHoje chave="rotina-day-tasks" placeholder="Nova tarefa de hoje..." onde="Rotina" />
             )}
           </>
         )}

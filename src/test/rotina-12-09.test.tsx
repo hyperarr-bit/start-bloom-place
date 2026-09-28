@@ -54,7 +54,8 @@ describe("bloco de fases só pra quem usa", () => {
     expect(fasesEmUso(padrao, [], {}, padrao)).toBe(false);
     expect(fasesEmUso([{ ...padrao[0], counts: { "2026-09-12": 2 } }], [], {}, padrao)).toBe(true);
     expect(fasesEmUso([...padrao, { id: "x9", nome: "Caminhada", memo: "", counts: {} }], [], {}, padrao)).toBe(true);
-    expect(fasesEmUso(padrao, [{ id: "t1", texto: "Ligar pro banco", feito: false }], {}, padrao)).toBe(true);
+    // 28/09: tarefa sozinha não puxa mais o bloco (a lista de tarefas aparece pra todos)
+    expect(fasesEmUso(padrao, [{ id: "t1", texto: "Ligar pro banco", feito: false }], {}, padrao)).toBe(false);
     expect(fasesEmUso(padrao, [], { "2026-09": "Mês corrido" }, padrao)).toBe(true);
     expect(fasesEmUso("lixo", "lixo", "lixo", padrao)).toBe(false);
   });

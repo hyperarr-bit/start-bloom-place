@@ -126,7 +126,7 @@
 .dark :is(.to-cyan-500):not(.tema-claro *){--tw-gradient-to:hsl(190 24% 12%) var(--tw-gradient-to-position)}
 .dark :is(.marca-grafico.from-cyan-400):not(.tema-claro *){--tw-gradient-from:#2F9DB0 var(--tw-gradient-from-position);--tw-gradient-to:transparent var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from),var(--tw-gradient-to)}
 .dark :is(.marca-grafico.to-cyan-500):not(.tema-claro *){--tw-gradient-to:#2F9DB0 var(--tw-gradient-to-position)}
-.dark :is(.text-sky-400,.text-sky-700,.text-sky-800):not(.tema-claro *){color:#7FB8E6}
+.dark :is(.text-sky-400,.text-sky-700,.text-sky-800,.text-sky-900):not(.tema-claro *){color:#7FB8E6}
 .dark :is(.bg-sky-300,.bg-sky-400,.bg-sky-500,.bg-sky-600):not(.tema-claro *){background-color:hsl(205 24% 13%)}
 .dark :is(.bg-sky-50,.bg-sky-100,.bg-sky-200):not(.tema-claro *){background-color:hsl(205 12% 12%)}
 .dark :is(:is(.rounded-full,.h-1,.h-1\.5,.h-2,.h-2\.5,.h-3,.w-1,.w-1\.5,.w-2,.w-2\.5,.w-3,.marca-grafico).bg-sky-300,:is(.rounded-full,.h-1,.h-1\.5,.h-2,.h-2\.5,.h-3,.w-1,.w-1\.5,.w-2,.w-2\.5,.w-3,.marca-grafico).bg-sky-400,:is(.rounded-full,.h-1,.h-1\.5,.h-2,.h-2\.5,.h-3,.w-1,.w-1\.5,.w-2,.w-2\.5,.w-3,.marca-grafico).bg-sky-500,:is(.rounded-full,.h-1,.h-1\.5,.h-2,.h-2\.5,.h-3,.w-1,.w-1\.5,.w-2,.w-2\.5,.w-3,.marca-grafico).bg-sky-600,button.bg-sky-300,button.bg-sky-400,button.bg-sky-500,button.bg-sky-600,a.bg-sky-300,a.bg-sky-400,a.bg-sky-500,a.bg-sky-600):not(.tema-claro *){background-color:#3A8FD0}

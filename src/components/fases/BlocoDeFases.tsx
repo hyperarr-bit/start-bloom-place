@@ -24,17 +24,24 @@
 import { useState } from "react";
 import { localDayKey, semanaAtualId, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, Trash2, Edit2, BookMarked, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Edit2, BookMarked, ChevronLeft, ChevronRight, AlarmClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CHAVE_TAREFAS_CARREIRA, avisoDaTarefa, detalhesDaTarefa, horaDaTarefa, ordenarPorHora, type TarefaDoDia } from "@/lib/tarefas";
+import {
+  CabecalhoDaTabela, FichaDaTarefa, FolhaNovaTarefa, LinhaDeTarefa, useTarefasDoDia, type FichaAberta, type TomDaTabela,
+} from "@/components/tarefas/tarefas-do-dia";
 
 const genId = () => crypto.randomUUID();
 
 /** `counts` é por dia (localDayKey) — o fechamento do mês soma as chaves do mês. */
 export type Fase = { id: string; nome: string; memo: string; counts: Record<string, number> };
-export type TarefaDoDia = { id: string; texto: string; feito: boolean; dia: string };
+/** A tarefa do dia mora em lib/tarefas desde 28/09 (ganhou horário, aviso e detalhes opcionais). */
+export type { TarefaDoDia };
+
+/** A tabela das tarefas no azul-céu do card (o cabeçalho do card já era sky). */
+const TOM_CEU: TomDaTabela = { claro: "bg-sky-50", linha: "border-sky-100", titulo: "text-sky-900" };
 
 export interface BlocoDeFasesProps {
   /** Chave de armazenamento das fases (ex.: "career-day-phases"). */
@@ -87,9 +94,14 @@ export const BlocoDeFases = ({
   chaveNotaMes,
 }: BlocoDeFasesProps) => {
   const [phases, setPhases] = usePersistedState<Fase[]>(chaveFases, fasesPadrao);
-  const [tasks, setTasks] = usePersistedState<TarefaDoDia[]>(chaveTarefas, []);
+  // tarefas: a mesma lista de sempre, agora com horário/aviso/detalhes opcionais (28/09)
+  const tarefas = useTarefasDoDia(chaveTarefas);
+  const tasks = tarefas.lista;
   const [novaFase, setNovaFase] = useState("");
   const [novaTarefa, setNovaTarefa] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [aberta, setAberta] = useState<string | null>(null);
+  const onde = chaveTarefas === CHAVE_TAREFAS_CARREIRA ? "Carreira" : "Rotina";
   const [editId, setEditId] = useState<string | null>(null);
   const [memoAberto, setMemoAberto] = useState<string | null>(null);
   // Apagar fase em DOIS toques (26/09, varredura): a fase leva junto a contagem
@@ -116,9 +128,16 @@ export const BlocoDeFases = ({
 
   const addTarefa = () => {
     if (!novaTarefa.trim()) return;
-    setTasks(prev => [...prev, { id: genId(), texto: novaTarefa.trim(), feito: false, dia: hoje }]);
+    tarefas.adicionar({ texto: novaTarefa });
     setNovaTarefa("");
   };
+  const tarefaAberta = aberta ? tarefasHoje.find(t => t.id === aberta) : undefined;
+  const ficha: FichaAberta | null = tarefaAberta ? {
+    texto: tarefaAberta.texto, feito: !!tarefaAberta.feito, onde, tarefa: tarefaAberta,
+    onAlternar: () => tarefas.alternar(tarefaAberta.id),
+    onSalvar: (c) => tarefas.salvar(tarefaAberta.id, c),
+    onApagar: () => tarefas.apagar(tarefaAberta.id),
+  } : null;
 
   // Fechamento da semana: soma os contadores de cada fase nos 7 dias da semana
   // escolhida (segunda→domingo, mesma âncora dos hábitos — semanaAtualId).
@@ -213,34 +232,52 @@ export const BlocoDeFases = ({
         </div>
       </div>
 
-      {/* Tarefas de hoje */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      {/* Tarefas de hoje — tabela de planner (28/09): HORA | TAREFA | FEITO, as com
+          horário primeiro. Tocar no texto abre a ficha (detalhes, editar, apagar);
+          o ⏰ ao lado do + abre a folha com horário, aviso e detalhes. */}
+      <div className="rounded-xl border border-border overflow-hidden" data-testid="tarefas-de-hoje">
         <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">✅ TAREFAS DE HOJE</span>
           <span className="text-[9px] text-muted-foreground">{feitasHoje}/{tarefasHoje.length}</span>
         </div>
-        <div className="bg-sky-50 dark:bg-sky-950/20 p-3 space-y-1.5">
-          {tarefasHoje.length === 0 && (
+        <div className="bg-card">
+          {tarefasHoje.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tarefa hoje ainda.</p>
+          ) : (
+            <>
+              <CabecalhoDaTabela tom={TOM_CEU} />
+              {[false, true].flatMap(feita => ordenarPorHora(tarefasHoje.filter(t => !!t.feito === feita).map(t => ({ ...t, hora: horaDaTarefa(t) ?? undefined }))))
+                .map((t, i) => (
+                  <LinhaDeTarefa
+                    key={t.id}
+                    tom={TOM_CEU}
+                    primeira={i === 0}
+                    l={{
+                      key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+                      onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
+                    }}
+                  />
+                ))}
+            </>
           )}
-          {tarefasHoje.map(t => (
-            <div key={t.id} className="flex items-center gap-2 rounded-lg bg-card border border-border px-2.5 py-2">
-              <Checkbox checked={t.feito}
-                onCheckedChange={v => setTasks(prev => prev.map(x => x.id === t.id ? { ...x, feito: !!v } : x))} />
-              <span className={`flex-1 text-sm ${t.feito ? "line-through text-muted-foreground" : ""}`}>{t.texto}</span>
-              <button onClick={() => setTasks(prev => prev.filter(x => x.id !== t.id))}
-                className="text-muted-foreground hover:text-destructive" aria-label="Apagar tarefa">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 p-2.5 border-t border-sky-100 bg-sky-50">
             <Input placeholder={placeholderTarefa} value={novaTarefa} onChange={e => setNovaTarefa(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addTarefa()} className="h-8 text-xs" />
-            <Button size="sm" className="h-8" onClick={addTarefa} aria-label="Adicionar tarefa"><Plus className="w-3.5 h-3.5" /></Button>
+              onKeyDown={e => e.key === "Enter" && addTarefa()} className="h-9 text-xs" />
+            <Button size="sm" variant="outline" className="h-9 px-2.5 bg-card" onClick={() => setCriando(true)} aria-label="Tarefa com horário ou detalhes">
+              <AlarmClock className="w-4 h-4" />
+            </Button>
+            <Button size="sm" className="h-9" onClick={addTarefa} aria-label="Adicionar tarefa"><Plus className="w-3.5 h-3.5" /></Button>
           </div>
         </div>
       </div>
+      <FolhaNovaTarefa
+        aberta={criando}
+        onFechar={() => setCriando(false)}
+        textoInicial={novaTarefa}
+        onde={onde}
+        onSalvar={c => { tarefas.adicionar(c); setNovaTarefa(""); }}
+      />
+      <FichaDaTarefa ficha={ficha} onFechar={() => setAberta(null)} />
 
       {/* Fechamento da semana */}
       <div className="rounded-xl border border-border overflow-hidden">

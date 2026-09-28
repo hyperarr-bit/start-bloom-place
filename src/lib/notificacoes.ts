@@ -1,6 +1,7 @@
 import { isNativeShell } from "./native-shell";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
+import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -30,7 +31,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -56,6 +57,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   saude: 1300000, // era 800000 (colidia com o teste grátis)
   aniversario: 1400000, // era 900000 (colidia com a missão)
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
+  tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -379,8 +381,11 @@ const DIAS_SEMANA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"
 const indiceSemana = (d: Date) => (d.getDay() === 0 ? 6 : d.getDay() - 1);
 
 /** `id` opcional: quem precisa de mais de um aviso por dia (remédios) traz o
- *  seu; o padrão continua sendo um por dia, BASE + MMDD. */
-type Planejado = { quando: Date; title: string; body: string; id?: number };
+ *  seu; o padrão continua sendo um por dia, BASE + MMDD. `rota` e `largeBody`
+ *  (28/09, tarefas): a série inteira vai pra uma rota, a não ser que o aviso
+ *  traga a dele (tarefa da Carreira abre a Carreira); `largeBody` é o texto
+ *  inteiro que o Android mostra ao expandir a notificação. */
+type Planejado = { quando: Date; title: string; body: string; id?: number; rota?: string; largeBody?: string };
 
 /** Agenda uma série já pronta na faixa do tipo, substituindo a anterior. */
 async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string, avisos: Planejado[]): Promise<number> {
@@ -398,11 +403,12 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
         id: a.id ?? BASES[tipo] + Number(`${doisDigitos(a.quando.getMonth() + 1)}${doisDigitos(a.quando.getDate())}`),
         title: a.title,
         body: a.body,
+        ...(a.largeBody ? { largeBody: a.largeBody } : {}),
         schedule: { at: a.quando },
         channelId: CANAL,
         smallIcon: ICONE,
         iconColor: COR_MARCA,
-        extra: { rota },
+        extra: { rota: a.rota ?? rota },
       })),
     });
     return avisos.length;
@@ -770,6 +776,19 @@ export async function agendarManutencao(tarefas: ManutencaoAgendavel[], opcoes: 
 export async function agendarCompromissos(lista: Compromisso[], opcoes: { ligado: boolean }): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.compromisso); return 0; }
   return agendarSerie("compromisso", "/rotina?aba=mes", planejarCompromissos(lista, BASES.compromisso));
+}
+
+/* ─── Tarefa de hoje com horário (28/09, três chamados: "notificar na hora do
+   remédio, da água, das tarefas daquele horário", "tarefas com lembrete" e
+   "pôr alarme e descrever mais coisas, ali em tarefas de hoje") ──────────────
+   O MESMO sistema dos compromissos: a conta mora em lib/tarefas (pura), um
+   aviso por tarefa pendente na antecedência escolhida, id explícito na faixa
+   própria. Marcar como feita muda o dado → o useLembretes reagenda → a série
+   é limpa e refeita sem ela, e o aviso pendente daquela tarefa some. O toque
+   abre o módulo onde a lista mora (Rotina ou Carreira). */
+export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.tarefa); return 0; }
+  return agendarSerie("tarefa", "/rotina", planejarTarefas(lista, BASES.tarefa));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

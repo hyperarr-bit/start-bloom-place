@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
-import { estadoPermissao, pedirPermissao } from "@/lib/notificacoes";
-import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
-import { reagendarTudo, type Leitor } from "@/lib/reagendar";
+import { armarAvisos } from "@/lib/armar-avisos";
+import type { Leitor } from "@/lib/reagendar";
 import { adicionarAoCalendario } from "@/lib/calendario";
 import { trackEvent } from "@/lib/analytics";
 import { parseLocalDay } from "@/lib/utils";
@@ -33,18 +32,10 @@ const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).sli
  * Rearma os avisos no sistema com a lista NOVA (o `get` deste render ainda
  * não enxerga a escrita — o leitor sobreposto entrega o valor novo ao
  * reagendador sem esperar o próximo render, como no PharmacyChecklist).
+ * O corpo mora em lib/armar-avisos desde 28/09 (as tarefas com horário usam o mesmo).
  */
-export async function armarAvisosDeCompromissos(get: Leitor, lista: Compromisso[], pedir: boolean): Promise<void> {
-  if (!isNativeShell()) return;
-  const estado = await estadoPermissao();
-  if (estado === "prompt" && pedir) {
-    const ok = await pedirPermissao();
-    trackEvent("compromisso_permissao", { concedida: ok, total: lista.length });
-    if (!ok) return;
-  } else if (estado !== "granted") return;
-  const leitor: Leitor = (k, fb) => (k === CHAVE_COMPROMISSOS ? (lista as unknown as typeof fb) : get(k, fb));
-  try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
-}
+export const armarAvisosDeCompromissos = (get: Leitor, lista: Compromisso[], pedir: boolean): Promise<void> =>
+  armarAvisos(get, { [CHAVE_COMPROMISSOS]: lista }, pedir, { nome: "compromisso_permissao", total: lista.length });
 
 const diaLongo = (dia: string) =>
   parseLocalDay(dia).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });

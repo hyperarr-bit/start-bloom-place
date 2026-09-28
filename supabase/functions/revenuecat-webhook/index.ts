@@ -70,6 +70,10 @@ serve(async (req) => {
       const r = await reconciliarRevenueCat(admin, uid, u.user.email ?? null);
       log("reconciliado", { uid, ...r });
       resultados.push({ uid, ...r });
+      // CARTÃO RECUSADO NA APP STORE (28/09): e-mail pra atualizar o
+      // pagamento — quem teve o cartão recusado quase nunca abre o app de
+      // novo. Nunca derruba o webhook: o estado já foi reconciliado acima.
+      if (ev.type === "BILLING_ISSUE" && ev.store === "APP_STORE") await avisarCobrancaRecusada(uid);
     }
 
     return json({ received: true, resultados });
@@ -86,6 +90,25 @@ function json(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
     status,
   });
+}
+
+/** Chama a cobranca-recusada (ela confere o estado no RevenueCat, evita
+ *  e-mail repetido e manda). Qualquer falha só vira log. */
+async function avisarCobrancaRecusada(uid: string) {
+  try {
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL") ?? ""}/functions/v1/cobranca-recusada`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId: uid }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    log("cobranca-recusada", { uid, status: r.status, r: (await r.text()).slice(0, 120) });
+  } catch (e) {
+    log("cobranca-recusada falhou", { uid, erro: String(e).slice(0, 120) });
+  }
 }
 
 // ---------------------------------------------------------------------------

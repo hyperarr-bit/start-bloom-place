@@ -31,3 +31,8 @@ verify_jwt = false
 
 [functions.prova-social]
 verify_jwt = false
+
+# Chamada pelo revenuecat-webhook (service role) ou por admin logado — a função
+# confere as duas coisas por conta própria.
+[functions.cobranca-recusada]
+verify_jwt = false

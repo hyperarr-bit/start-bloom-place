@@ -11,6 +11,8 @@ import { AdesivoRaro, ChipRaridade } from "./adesivos-raridade";
 import { Roseta } from "./Roseta";
 import { compartilharAdesivo, compartilharRoseta } from "./compartilhar-conquistas";
 import { useConquistas, useEfeitosSequencia, usePerfilConquistas, useSequencia } from "./use-conquistas";
+import { isNativeShell } from "@/lib/native-shell";
+import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import "./conquistas.css";
 
 /**
@@ -48,12 +50,30 @@ type Item = { tipo: "marco"; dias: number } | { tipo: "adesivo"; badge: Badge };
 
 /** Quantos adesivos novos ganham festa de uma vez; o resto só cola na folha. */
 export const MAX_FESTAS_DE_UMA_VEZ = 3;
+/** Conta com menos de 24 h (1º dia, tutorial e Missão ainda passando): uma festa só por vez (28/09). */
+export const MAX_FESTAS_CONTA_NOVA = 1;
+
+/**
+ * TESTE GRÁTIS SEM FESTA (28/09, dono: "o teste grátis tá convertendo bem, cuidado"). A Missão dos
+ * 3 dias é a peça que converte, e as conversões boas vieram SEM festa de adesivo (a 1.0.6 nem tinha).
+ * Na 1.0.7 a festa em tela cheia caía por cima do "Primeiro registro feito! Dia 1 da missão". Enquanto
+ * a Missão estiver valendo, o adesivo cola quieto na folha — igual à 1.0.6 no caminho que converte.
+ */
+export const emTesteComMissao = (): boolean => {
+  try { return isNativeShell() && trialCartaoAtivo() && !!missaoAtual(); } catch { return false; }
+};
 const pesoDaRaridade = (b: Badge) => RARIDADES.indexOf(raridadeDe(b));
 
-/** Outra camada em cima da tela? (comemoração do 100, diálogo, folha de baixo) */
-const outraTelaAberta = () =>
+/**
+ * Outra camada em cima da tela? (comemoração do 100, diálogo, folha de baixo) —
+ * e, desde 28/09, QUALQUER camada de guia (Missão do teste, tutorial, holofote
+ * dos módulos: `data-camada-guia`). No 1º gasto do teste grátis a festa do
+ * adesivo caía 0,8 s depois do "Primeiro registro feito! Dia 1 da missão" e
+ * cobria a tela inteira — a peça da Missão que puxa a volta do dia 2 sumia.
+ */
+export const outraTelaAberta = () =>
   typeof document !== "undefined" &&
-  !!document.querySelector('[data-testid="celebracao-100"], [role="dialog"]:not([data-momento]), [role="alertdialog"]');
+  !!document.querySelector('[data-testid="celebracao-100"], [role="dialog"]:not([data-momento]), [role="alertdialog"], [data-camada-guia]');
 
 // Confete: pedaços nas cores do app (ou de ouro), caem uma vez. Quantos, pela raridade.
 const CORES = ["#d22d80", "#F5B301", "#4F8BFF", "#22c55e", "#fb923c", "#8b5cf6"];
@@ -272,7 +292,7 @@ export const MomentoMarco = ({ dias, nome, membroDesde, nivel, onContinuar }: {
 };
 
 /** Orquestra a fila de momentos + as escritas da sequência (uma vez por tela). */
-export const MomentosConquistas = () => {
+export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean } = {}) => {
   const { get, set, loaded } = useUserData();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -299,13 +319,14 @@ export const MomentosConquistas = () => {
     const itens: Item[] = [];
     // pelo RECORDE: quem bateu 7 e quebrou antes de abrir a Home ainda ganha a roseta dos 7
     const marco = [...MARCOS_SEQUENCIA].reverse().find((m) => seq.recorde >= m && !vistas.marcos.includes(m));
-    if (marco) itens.push({ tipo: "marco", dias: marco });
+    if (marco && !emTesteComMissao()) itens.push({ tipo: "marco", dias: marco });
     const novos = conq.folha
       .filter((b) => b.unlocked && !/^sequencia-/.test(b.id) && !vistas.adesivos.includes(b.id))
       .sort((a, b) => pesoDaRaridade(b) - pesoDaRaridade(a));
-    for (const b of novos.slice(0, MAX_FESTAS_DE_UMA_VEZ)) itens.push({ tipo: "adesivo", badge: b });
-    return { fila: itens, semFesta: novos.slice(MAX_FESTAS_DE_UMA_VEZ).map((b) => b.id) };
-  }, [loaded, vistas, seq.recorde, conq.folha]);
+    const max = emTesteComMissao() ? 0 : contaNova ? MAX_FESTAS_CONTA_NOVA : MAX_FESTAS_DE_UMA_VEZ;
+    for (const b of novos.slice(0, max)) itens.push({ tipo: "adesivo", badge: b });
+    return { fila: itens, semFesta: novos.slice(max).map((b) => b.id) };
+  }, [loaded, vistas, seq.recorde, conq.folha, contaNova]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");
@@ -328,7 +349,10 @@ export const MomentosConquistas = () => {
       if (outraTelaAberta()) t = setTimeout(tentar, 1200);
       else setLiberado(true);
     };
-    t = setTimeout(tentar, 900);
+    // 1,6 s (28/09, era 0,9): as camadas que a PRÓPRIA ação abre (pedido de avaliação no 1º gasto do
+    // Android ~1,2 s, festa do dia da Missão ~0,1 s) já estão montadas quando a festa olha a tela — antes
+    // ela chegava primeiro e as duas abriam juntas.
+    t = setTimeout(tentar, 1600);
     return () => { vivo = false; clearTimeout(t); };
   }, [temFila]);
 

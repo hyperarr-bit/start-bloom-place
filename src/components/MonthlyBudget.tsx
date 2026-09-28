@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FileText, ChevronRight, ChevronLeft } from "lucide-react";
 import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear, readMonthData } from "@/components/finance/storage-keys";
@@ -42,12 +43,25 @@ const ANO_MINIMO = 2015;
  * O formato antigo (número puro) é aceito como escolhido em 2026: a chave
  * nasceu em 02/09/2026 e ganhou o formato novo em 26/09/2026 — número puro
  * não existe de outro ano. Em 2026 ele segue valendo (quem está lançando
- * 2025 continua em 2025); em 2027 volta pro ano corrente. */
+ * 2025 continua em 2025); em 2027 volta pro ano corrente.
+ *
+ * O OBJETO QUEBRAVA FINANÇAS NO APP ANTIGO (28/09, 14 erros de 2 pessoas no
+ * Android 122). O {ano, em} de 26/09 sincroniza pela nuvem, e o cartão das
+ * versões antigas (Android ≤122, iPhone ≤1.0.6) põe o valor direto na tela:
+ * objeto dentro do <span> = "React error #31", e Finanças inteiro cai na tela
+ * de erro toda vez que abre. Bastava trocar o ano na web ou num app novo pra
+ * derrubar o celular antigo da mesma conta. Agora a chave volta a guardar só o
+ * NÚMERO (o que o app antigo sabe mostrar) e o ano da escolha mora ao lado, em
+ * `finance-orcamento-ano-em`. O objeto que já foi pra nuvem é lido aqui e
+ * desfeito na primeira abertura: vira número de novo e o aparelho antigo volta
+ * a abrir. */
 type AnoGuardado = number | { ano: number; em: number };
 const ANO_DO_FORMATO_ANTIGO = 2026;
-const anoValido = (guardado: AnoGuardado | null | undefined, anoAtual: number): number => {
-  const g = typeof guardado === "number" ? { ano: guardado, em: ANO_DO_FORMATO_ANTIGO } : guardado;
-  const bruto = g && typeof g === "object" && g.em === anoAtual ? Number(g.ano) : anoAtual;
+const anoValido = (guardado: AnoGuardado | null | undefined, escolhidoEm: number | null | undefined, anoAtual: number): number => {
+  const g = typeof guardado === "number"
+    ? { ano: guardado, em: typeof escolhidoEm === "number" ? escolhidoEm : ANO_DO_FORMATO_ANTIGO }
+    : guardado;
+  const bruto = g && typeof g === "object" && Number(g.em) === anoAtual ? Number(g.ano) : anoAtual;
   return Number.isInteger(bruto) ? Math.min(anoAtual, Math.max(ANO_MINIMO, bruto)) : anoAtual;
 };
 
@@ -77,8 +91,18 @@ export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudge
      rodapé "Você está em 2024" já deixa o estado visível, então guardar não
      engana ninguém. */
   const [guardado, setGuardado] = usePersistedState<AnoGuardado>("finance-orcamento-ano", anoAtual);
-  const ano = anoValido(guardado, anoAtual);
-  const setAno = (proximo: (a: number) => number) => setGuardado({ ano: proximo(ano), em: anoAtual });
+  const [escolhidoEm, setEscolhidoEm] = usePersistedState<number | null>("finance-orcamento-ano-em", null);
+  const ano = anoValido(guardado, escolhidoEm, anoAtual);
+  const setAno = (proximo: (a: number) => number) => {
+    setEscolhidoEm(anoAtual);
+    setGuardado(proximo(ano));
+  };
+  useEffect(() => {
+    if (!guardado || typeof guardado !== "object") return;
+    const em = Number(guardado.em), a = Number(guardado.ano);
+    setEscolhidoEm(Number.isInteger(em) ? em : null);
+    setGuardado(Number.isInteger(a) ? a : anoAtual);
+  }, [guardado, anoAtual, setEscolhidoEm, setGuardado]);
   const noAnoCorrente = ano === anoAtual;
 
   return (

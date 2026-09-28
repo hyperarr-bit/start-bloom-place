@@ -894,6 +894,47 @@ describe("CORRIGIDO (26/09, MonthlyBudget.tsx): Orçamento Mensal na virada", ()
     expect(screen.getByText("2025")).toBeInTheDocument();
     expect(screen.getByText(/Você está em 2025/)).toBeInTheDocument();
   });
+
+  /* 28/09: o app antigo (Android 122, iPhone ≤1.0.6) mostra a chave direto na tela — objeto ali
+     derrubava Finanças inteiro ("React error #31"). A chave só pode guardar NÚMERO. */
+  const comControle = (inicial: Record<string, unknown>) => {
+    const controle = {} as Controle;
+    render(
+      <Provedor inicial={inicial} controle={controle}>
+        <MonthlyBudget budgets={NOMES.map((month) => ({ month, value: 0, hasNote: false }))} setBudgets={() => {}} />
+      </Provedor>,
+    );
+    return controle;
+  };
+
+  it("CORRIGIDO (28/09): a seta grava NÚMERO (o que o app antigo sabe mostrar) e o ano da escolha ao lado", () => {
+    vi.setSystemTime(em(2026, 9, 28, 20));
+    const controle = comControle({});
+    act(() => { screen.getByRole("button", { name: "Ano anterior" }).click(); });
+    expect(controle.dados()["finance-orcamento-ano"]).toBe(2025);
+    expect(controle.dados()["finance-orcamento-ano-em"]).toBe(2026);
+    expect(screen.getByText(/Você está em 2025/)).toBeInTheDocument();
+  });
+
+  it("CORRIGIDO (28/09): o objeto que já foi pra nuvem ({em, ano}, ordem do jsonb) mostra o ano certo e volta a ser número", () => {
+    vi.setSystemTime(em(2026, 9, 28, 20));
+    const controle = comControle({ "finance-orcamento-ano": { em: 2026, ano: 2024 } });
+    expect(screen.getByText(/Você está em 2024/)).toBeInTheDocument();
+    expect(controle.dados()["finance-orcamento-ano"]).toBe(2024);
+    expect(controle.dados()["finance-orcamento-ano-em"]).toBe(2026);
+    // o que o cartão antigo faz com o valor: {ano} direto no <span> — número renderiza, objeto quebrava
+    const Antigo = ({ v }: { v: unknown }) => <span>{v as React.ReactNode}</span>;
+    expect(() => render(<Antigo v={controle.dados()["finance-orcamento-ano"]} />)).not.toThrow();
+  });
+
+  it("CORRIGIDO (28/09): com o ano da escolha ao lado, a virada de ano continua certa", () => {
+    vi.setSystemTime(em(2027, 3, 10, 9));
+    comControle({ "finance-orcamento-ano": 2025, "finance-orcamento-ano-em": 2027 }); // escolhido este ano
+    expect(screen.getByText(/Você está em 2025/)).toBeInTheDocument();
+    cleanup();
+    comControle({ "finance-orcamento-ano": 2025, "finance-orcamento-ano-em": 2026 }); // escolhido no ano passado
+    expect(screen.getByText("2027")).toBeInTheDocument();
+  });
 });
 
 /* ======================================================================

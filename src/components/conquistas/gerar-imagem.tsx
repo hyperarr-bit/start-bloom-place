@@ -172,3 +172,22 @@ export async function gerarCanvas(elemento: ReactElement, medidas: Medidas): Pro
     return canvas;
   });
 }
+
+/**
+ * A foto como canvas + MEDIDAS tiradas do mesmo DOM montado (29/09, os cards
+ * de compartilhar): o vídeo precisa saber onde cada casa do calendário, o
+ * número e cada bloco de texto ficaram. `medir` roda com tudo assentado
+ * (fonte carregada), antes da foto; as medidas são do espaço do card.
+ */
+export async function gerarCanvasEMedir<T>(elemento: ReactElement, medidas: Medidas, medir: (alvo: HTMLElement) => T): Promise<{ canvas: HTMLCanvasElement; medida: T } | null> {
+  return comElementoMontado(elemento, medidas, async (alvo, lib) => {
+    const medida = medir(alvo);
+    const opcoes = opcoesDe(medidas);
+    let canvas = await lib.toCanvas(alvo, opcoes);
+    if (ehWebKit()) {
+      await esperar(80);
+      canvas = await lib.toCanvas(alvo, opcoes);
+    }
+    return { canvas, medida };
+  });
+}

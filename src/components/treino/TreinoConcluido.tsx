@@ -3,7 +3,8 @@
  * dia, a tabela EXERCÍCIO | SÉRIES | MELHOR SÉRIE, o adesivo de NOVO RECORDE
  * quando alguma série bateu o recorde anterior, os totais e a nota. Confete
  * leve uma vez (parado pra quem pediu menos movimento). O "Postar nos Stories"
- * do mockup fica pra depois — por ora só "Fechar".
+ * (29/09) é o card do mês com o calendário dos treinos — só aparece com a
+ * chave COMPARTILHAR_V2 ligada (desligada: só "Fechar", como antes).
  */
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
@@ -11,6 +12,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { formatarKgInteiro, textoDaSerie, type LinhaDoResumo } from "@/lib/treino-series";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "./planner";
+// 29/09: "Postar nos Stories" com o card do mês (o calendário dos treinos) — atrás da chave COMPARTILHAR_V2, desligada
+import { BotaoPostarCard } from "@/components/compartilhar/BotaoPostarCard";
 
 export interface ResumoDoTreino {
   diaNome: string;
@@ -156,7 +159,8 @@ export function TreinoConcluido({ resumo, aberto, onFechar }: { resumo: ResumoDo
               </p>
             )}
 
-            <div className="py-4">
+            <div className="py-4 flex flex-col gap-2">
+              <BotaoPostarCard tipo="treinos" origem="treino-concluido" />
               <button
                 type="button"
                 onClick={onFechar}

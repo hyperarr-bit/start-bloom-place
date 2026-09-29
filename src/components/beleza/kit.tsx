@@ -179,6 +179,33 @@ export function Chip({ tom = "blush", children, className }: { tom?: TomChip; ch
   );
 }
 
+/* CABELO (Onda 1, 28/09): as 3 etapas do cronograma — babosa (H), mel (N), ameixa (R). */
+export type EtapaDoKit = "hidratacao" | "nutricao" | "reconstrucao";
+export const TOM_DA_ETAPA: Record<EtapaDoKit, string> = {
+  hidratacao: "bg-bz-hidra text-bz-hidra-tinta",
+  nutricao: "bg-bz-nutri text-bz-nutri-tinta",
+  reconstrucao: "bg-bz-recons text-bz-recons-tinta",
+};
+const LETRA_DA_ETAPA: Record<EtapaDoKit, string> = { hidratacao: "H", nutricao: "N", reconstrucao: "R" };
+
+/** A letra da etapa (H/N/R) numa bolinha da cor dela; feita = contorno forte + ✓ ao lado. */
+export function LetraDaEtapa({ etapa, feita, tamanho = "md", className }: { etapa: EtapaDoKit; feita?: boolean; tamanho?: "sm" | "md"; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "shrink-0 inline-grid place-items-center rounded-full font-extrabold tabular-nums",
+        tamanho === "sm" ? "w-6 h-6 text-[11px]" : "w-8 h-8 text-[13px]",
+        TOM_DA_ETAPA[etapa],
+        feita && "ring-2 ring-bz-acento/70",
+        className,
+      )}
+    >
+      {LETRA_DA_ETAPA[etapa]}
+    </span>
+  );
+}
+
 export type TipoGota = "retinol" | "acido" | "serum" | "base";
 const GOTA: Record<Exclude<TipoGota, "base">, string> = { retinol: "text-bz-retinol", acido: "text-bz-acido", serum: "text-bz-serum" };
 

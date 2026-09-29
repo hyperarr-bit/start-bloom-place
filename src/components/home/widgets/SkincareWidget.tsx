@@ -5,7 +5,9 @@ import { diaDaSemanaDaChave, passosDoDia } from "@/lib/beleza-rotina";
 import { diaCurto } from "@/components/tarefas/tarefas-do-dia";
 import { useSkincare } from "@/components/beleza/use-skincare";
 import { FolhaDoSkincare, nomeDoDia } from "@/components/beleza/skincare-do-dia";
-import { CartaoBeleza, Serif, TEMA_BELEZA } from "@/components/beleza/kit";
+import { CartaoBeleza, LetraDaEtapa, Serif, TEMA_BELEZA } from "@/components/beleza/kit";
+import { useCabelo } from "@/components/beleza/use-cabelo";
+import { ETAPAS } from "@/lib/beleza-cabelo";
 
 /**
  * SKINCARE DE HOJE na Home (28/09, protótipo da Beleza). Os módulos com
@@ -22,10 +24,25 @@ import { CartaoBeleza, Serif, TEMA_BELEZA } from "@/components/beleza/kit";
 export const SkincareWidget = ({ size = "large" }: { size?: "small" | "large" }) => {
   const navigate = useNavigate();
   const s = useSkincare();
+  const cabelo = useCabelo();
   const abrir = () => navigate("/beleza");
   const nome = nomeDoDia(s.hoje);
   const lembrete = s.lembrete;
   const horas = [lembrete.manha.ligado && lembrete.manha.hora, lembrete.noite.ligado && lembrete.noite.hora].filter(Boolean).join(" · ");
+  /* Onda 1 (28/09): no dia de lavar, a linha do cabelo — "Cabelo: NUTRIÇÃO hoje" */
+  const lavarHoje = cabelo.plano && cabelo.agenda[0]?.dia === cabelo.hoje && !cabelo.doDia(cabelo.hoje)?.feita ? cabelo.agenda[0] : null;
+  const linhaCabelo = lavarHoje ? (
+    <button
+      type="button"
+      onClick={() => navigate("/beleza?aba=cabelo")}
+      className="w-full flex items-center gap-2.5 px-4 min-h-[48px] border-t border-bz-linha bg-transparent text-left active:bg-bz-blush"
+      data-testid="cabelo-na-home"
+    >
+      <LetraDaEtapa etapa={lavarHoje.etapa} tamanho="sm" />
+      <span className="text-[13px] text-bz-tinta">Cabelo: <b>{ETAPAS[lavarHoje.etapa].rotulo}</b> hoje</span>
+      <ChevronRight className="w-4 h-4 ml-auto text-bz-suave" aria-hidden="true" />
+    </button>
+  ) : null;
 
   if (s.vazia) {
     return (
@@ -43,6 +60,7 @@ export const SkincareWidget = ({ size = "large" }: { size?: "small" | "large" })
           </span>
           <ChevronRight className="w-4 h-4 text-bz-suave shrink-0" aria-hidden="true" />
         </button>
+        {linhaCabelo}
       </CartaoBeleza>
     );
   }
@@ -73,11 +91,14 @@ export const SkincareWidget = ({ size = "large" }: { size?: "small" | "large" })
       testId="skincare-widget"
       onAbrirPasso={abrir}
       rodape={
-        <button type="button" onClick={abrir} className="w-full flex items-center gap-2 px-4 h-12 border-t border-bz-linha bg-bz-papel text-[13px] font-semibold text-bz-suave active:bg-bz-blush" data-testid="abrir-beleza">
-          {horas ? <Bell className="w-4 h-4 text-bz-acento" aria-hidden="true" /> : <BellOff className="w-4 h-4" aria-hidden="true" />}
-          <span className="text-[12px] font-medium">{horas ? `Lembrete ${horas}` : "Sem lembrete"}</span>
-          <span className="ml-auto inline-flex items-center gap-0.5 text-bz-acento font-bold">Abrir Beleza <ChevronRight className="w-4 h-4" aria-hidden="true" /></span>
-        </button>
+        <>
+          {linhaCabelo}
+          <button type="button" onClick={abrir} className="w-full flex items-center gap-2 px-4 h-12 border-t border-bz-linha bg-bz-papel text-[13px] font-semibold text-bz-suave active:bg-bz-blush" data-testid="abrir-beleza">
+            {horas ? <Bell className="w-4 h-4 text-bz-acento" aria-hidden="true" /> : <BellOff className="w-4 h-4" aria-hidden="true" />}
+            <span className="text-[12px] font-medium">{horas ? `Lembrete ${horas}` : "Sem lembrete"}</span>
+            <span className="ml-auto inline-flex items-center gap-0.5 text-bz-acento font-bold">Abrir Beleza <ChevronRight className="w-4 h-4" aria-hidden="true" /></span>
+          </button>
+        </>
       }
     />
   );

@@ -71,6 +71,18 @@ const P = {
   },
 };
 
+/* CABELO (Onda 1, 28/09): as 3 etapas do cronograma capilar, iguais nas 3 direções.
+   Hidratação em BABOSA (verde-sálvia — a "água" do cabelo no Brasil é a babosa, e azul
+   está proibido), nutrição em MEL (óleos, manteigas), reconstrução em AMEIXA. */
+const CABELO = {
+  claro: { hidra: "#E6F2E6", hidraTinta: "#2B5E37", nutri: "#FCEBCB", nutriTinta: "#7A4A0E", recons: "#F1DDEB", reconsTinta: "#5B2350" },
+  escuro: { hidra: "#1D3326", hidraTinta: "#A9DDB7", nutri: "#3A2B14", nutriTinta: "#F6D59C", recons: "#3A1B34", reconsTinta: "#F0CFE7" },
+};
+for (const d of Object.values(P)) {
+  Object.assign(d.claro, CABELO.claro);
+  Object.assign(d.escuro, CABELO.escuro);
+}
+
 const hexParaRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 const hsl = (h) => {
   const [r, g, b] = hexParaRgb(h);
@@ -94,6 +106,7 @@ const PARES = [
   ["acentoTinta", "acento", 4.5], ["acento", "cartao", 3], ["alertaTinta", "alerta", 4.5], ["okTinta", "ok", 4.5],
   ["manhaIcone", "manha", 2.2], ["noiteIcone", "noite", 3], ["retinol", "cartao", 3], ["acido", "cartao", 2.2], ["serum", "cartao", 2.2],
   ["tinta", "blush", 4.5], ["roseTinta", "hoje", 4.5],
+  ["hidraTinta", "hidra", 4.5], ["nutriTinta", "nutri", 4.5], ["reconsTinta", "recons", 4.5],
 ];
 let falhas = 0;
 for (const [id, d] of Object.entries(P)) {

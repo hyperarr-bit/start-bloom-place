@@ -1,8 +1,9 @@
 import {
-  agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
+  agendarAniversarios, agendarCabelo, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
   agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { lembreteCabeloLigado, lerDadosDoCabelo, type DadosDoCabelo } from "@/lib/beleza-cabelo";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -91,6 +92,8 @@ export interface DadosDosLembretes {
   seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
   /** skincare de manhã e de noite (28/09): horários, passos da agenda e o que já foi marcado hoje */
   skincare?: DadosDoSkincare;
+  /** cabelo (28/09, Onda 1): o cronograma, as lavagens feitas e os avisos do dia de lavar/véspera */
+  cabelo?: DadosDoCabelo;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -222,6 +225,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
     })(),
     skincare: lerDadosDoSkincare(get, hoje),
+    cabelo: lerDadosDoCabelo(get),
   };
 }
 
@@ -257,6 +261,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
     // (28/09) skincare: as prefs moram na chave própria; marcar um passo de hoje muda o plano
     !!dados.skincare && algumLigado(dados.skincare.prefs) && dados.skincare,
+    // (28/09) cabelo: FEITO muda a fila, e a fila muda a agenda dos avisos
+    !!dados.cabelo && lembreteCabeloLigado(dados.cabelo.prefs) && dados.cabelo,
   ]);
 }
 
@@ -290,5 +296,6 @@ export async function reagendarTudo(
     ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
     beleza: d.skincare ? await agendarSkincare(d.skincare) : 0,
+    cabelo: d.cabelo ? await agendarCabelo(d.cabelo) : 0,
   };
 }

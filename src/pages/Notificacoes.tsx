@@ -9,6 +9,7 @@ import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao,
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
+import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -141,6 +142,27 @@ const Notificacoes = () => {
     const novo = { manha: { ...skincare.manha, ligado: valor }, noite: { ...skincare.noite, ligado: valor } };
     set(CHAVE_LEMBRETE_SKINCARE, novo);
     const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_SKINCARE ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Cabelo (28/09, Onda 1 da Beleza): chave própria (dia de lavar + véspera). Aqui
+   *  liga/desliga o aviso do DIA de lavar; a véspera e os horários mudam na Beleza. */
+  const cabelo = lerLembreteCabelo(get<unknown>(CHAVE_LEMBRETE_CABELO, undefined));
+  const alternarCabelo = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "cabelo", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { dia: { ...cabelo.dia, ligado: valor }, vespera: { ...cabelo.vespera, ligado: valor && cabelo.vespera.ligado } };
+    set(CHAVE_LEMBRETE_CABELO, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_CABELO ? (novo as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -296,6 +318,15 @@ const Notificacoes = () => {
           ligado={algumLigado(skincare)}
           onChange={(v) => void alternarSkincare(v)}
           rodape={rodapeDe("beleza", algumLigado(skincare), "Monte sua rotina na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<Sparkles className="w-4 h-4" />}
+          titulo="Cabelo"
+          descricao={`No dia de lavar (${cabelo.dia.hora}), com a etapa do cronograma: hidratação, nutrição ou reconstrução. A véspera e o horário mudam na Beleza.`}
+          ligado={lembreteCabeloLigado(cabelo)}
+          onChange={(v) => void alternarCabelo(v)}
+          rodape={rodapeDe("cabelo", lembreteCabeloLigado(cabelo), "Monte seu cronograma na Beleza pra ter o que lembrar")}
         />
 
         <LinhaAviso

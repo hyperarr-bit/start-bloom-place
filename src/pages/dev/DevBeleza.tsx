@@ -4,6 +4,9 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { gerarRotina, guardarNaBancada, passoDigitado, type PassoDaRotina, type ProdutoDaBancada, type ProdutoDoCatalogo } from "@/lib/beleza-rotina";
 import { CHAVE_LEMBRETE_SKINCARE, lerDadosDoSkincare, planejarSkincare } from "@/lib/beleza-lembrete";
+import {
+  CHAVE_LAVAGENS, CHAVE_PERFIL_CABELO, CHAVE_PLANO_CABELO, criarPlano, perfilDasRespostas, type LavagemCapilar,
+} from "@/lib/beleza-cabelo";
 import { BASES_LEMBRETES } from "@/lib/notificacoes";
 import { quandoDoAviso } from "@/components/beleza/lembrete-skincare";
 import catalogo from "@/data/produtos-beleza.json";
@@ -24,6 +27,8 @@ import "./beleza-direcoes.css";
  *   ?tela=antiga   · rotina ANTIGA (do tempo do ciclo de 4 dias): tudo todo dia + a oferta "Alternar"
  *   ?tela=labios   · a rotina da Ana + um passo digitado "Protetor labial" (acha os produtos de lábios)
  *   &direcao=a|b|c · as 3 direções de visual (rosé & nude · pêssego & malva · creme & lavanda-rosada)
+ *   &aba=cabelo|produtos|cuidados · abre a aba (o mesmo link das notificações)
+ *   ?tela=cabelo-vazio · a Ana sem cronograma (as 4 perguntas do cabelo)
  *   ?tela=avisos   · o que o celular recebe (o plano do lembrete, com o texto de cada dia)
  * O tema escuro vem do próprio app (localStorage "core-theme-mode").
  */
@@ -87,6 +92,37 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
   const feitosNoite: Record<string, number[]> = { [ontem]: [0] };
   for (let k = 2; k <= 6; k++) { feitosManha[diaMenos(hoje, k)] = [0, 1, 2, 3]; feitosNoite[diaMenos(hoje, k)] = [0, 1, 2, 3]; }
 
+  /* CABELO (Onda 1): a Ana respondeu as 4 perguntas há 2 semanas (ondulado e cacheado,
+     coloração, 3×/semana, porosidade média). Lavou seg/qua/sex, PULOU a sexta 25 (o
+     cronograma esperou), fez um co-wash fora do plano no sábado e hoje (segunda) está
+     no meio da lavagem. Os produtos de cabelo são os que ela digitou. */
+  bancada = [
+    ...bancada,
+    { id: "c1", name: "Shampoo sem sulfato", brand: "", category: "Cabelo", opened: true, openedDate: "2026-08-20", paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+    { id: "c2", name: "Máscara de hidratação", brand: "", category: "Cabelo", opened: true, openedDate: "2026-08-20", paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+  ];
+  const perfilCabelo = perfilDasRespostas({ curvaturas: ["ondulado", "cacheado"], quimica: "coloracao", frequencia: { porSemana: 3 }, porosidade: [2, 2, 2] }, diaMenos(hoje, 14));
+  const planoCabelo = criarPlano(perfilCabelo, diaMenos(hoje, 14), "cab1");
+  const seq = planoCabelo.sequencia;
+  const lavagem = (id: string, dias: number, etapa: LavagemCapilar["etapa"], extra: Partial<LavagemCapilar> = {}): LavagemCapilar => ({
+    id, data: diaMenos(hoje, dias), etapa, noPlano: true, plano: "cab1", feita: true,
+    passos: ["pre-shampoo", "shampoo", "mascara", "condicionador", "finalizador"], extras: [], produtos: { shampoo: "c1" }, tags: [], nota: "", ...extra,
+  });
+  const lavagens: LavagemCapilar[] = [
+    lavagem("l1", 14, seq[0], { tags: ["maciez", "brilho"] }),
+    lavagem("l2", 12, seq[1], { tags: ["definicao"] }),
+    lavagem("l3", 10, seq[2]),
+    lavagem("l4", 7, seq[3], { nota: "deixei a máscara 20 min" }),
+    lavagem("l5", 5, seq[4], { extras: ["umectacao"], tags: ["brilho", "definicao"] }),
+    { id: "l6", data: diaMenos(hoje, 2), etapa: null, noPlano: false, feita: true, passos: [], extras: ["co-wash"], produtos: {}, tags: ["frizz"], nota: "só co-wash depois da academia" },
+    lavagem("l7", 0, seq[5], { feita: false, passos: ["pre-shampoo", "shampoo"], produtos: { shampoo: "c1" } }),
+  ];
+  const cabelo = tela === "cabelo-vazio" ? {} : {
+    [CHAVE_PERFIL_CABELO]: perfilCabelo,
+    [CHAVE_PLANO_CABELO]: planoCabelo,
+    [CHAVE_LAVAGENS]: lavagens,
+  };
+
   return {
     ...base,
     "core-home-widgets-v2": [{ id: "skincare", size: "large" }],
@@ -98,6 +134,7 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     "skincare-perfil": { pele: "oleosa", objetivo: "acne", nivel: "avancado" },
     "beauty-products": bancada,
     [CHAVE_LEMBRETE_SKINCARE]: { manha: { ligado: true, hora: "07:30" }, noite: { ligado: true, hora: "21:30" } },
+    ...cabelo,
   };
 };
 

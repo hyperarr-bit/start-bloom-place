@@ -3,6 +3,7 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { algumLigado, planejarSkincare, type DadosDoSkincare } from "./beleza-lembrete";
+import { lembreteCabeloLigado, planejarCabelo, type DadosDoCabelo } from "./beleza-cabelo";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -32,7 +33,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "cabelo" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -60,6 +61,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
+  cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -802,6 +804,15 @@ export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado:
 export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
   if (!algumLigado(dados.prefs)) { await limparFaixa(BASES.beleza); return 0; }
   return agendarSerie("beleza", "/beleza", planejarSkincare(dados, BASES.beleza));
+}
+
+/* ─── Cabelo: dia de lavar e véspera (28/09, Onda 1 da Beleza) ───────────────
+   A conta mora em lib/beleza-cabelo (pura): a agenda do cronograma nos próximos
+   10 dias, com a etapa da vez (a R espera 15 dias). FEITO muda a fila → muda a
+   agenda → o reagendador refaz a série. O toque abre a aba CABELO. */
+export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
+  if (!dados.plano || !lembreteCabeloLigado(dados.prefs)) { await limparFaixa(BASES.cabelo); return 0; }
+  return agendarSerie("cabelo", "/beleza?aba=cabelo", planejarCabelo(dados, BASES.cabelo));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

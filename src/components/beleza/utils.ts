@@ -144,13 +144,14 @@ export function getPorosityRecommendation(result: PorosityResult): { focus: stri
 }
 
 // ============= HAIR RESULT TAGS =============
+// (28/09, Onda 1: primeira tela que usa) sem emoji azul — maciez 🧸, volume 🦁, definição ➰
 export const HAIR_RESULT_TAGS = [
   { id: "brilho", label: "Brilho", emoji: "✨" },
   { id: "frizz", label: "Frizz", emoji: "⚡" },
-  { id: "maciez", label: "Maciez", emoji: "☁️" },
+  { id: "maciez", label: "Maciez", emoji: "🧸" },
   { id: "peso", label: "Peso", emoji: "⚖️" },
-  { id: "volume", label: "Volume", emoji: "💨" },
-  { id: "definicao", label: "Definição", emoji: "🌀" },
+  { id: "volume", label: "Volume", emoji: "🦁" },
+  { id: "definicao", label: "Definição", emoji: "➰" },
 ];
 
 export const WASH_STEPS = [

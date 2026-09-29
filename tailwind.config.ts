@@ -85,6 +85,13 @@ export default {
           "ok-tinta": "hsl(var(--bz-ok-tinta) / <alpha-value>)",
           "hoje": "hsl(var(--bz-hoje) / <alpha-value>)",
           "sombra": "hsl(var(--bz-sombra) / <alpha-value>)",
+          // CABELO (28/09): as etapas do cronograma — babosa, mel, ameixa
+          "hidra": "hsl(var(--bz-hidra) / <alpha-value>)",
+          "hidra-tinta": "hsl(var(--bz-hidra-tinta) / <alpha-value>)",
+          "nutri": "hsl(var(--bz-nutri) / <alpha-value>)",
+          "nutri-tinta": "hsl(var(--bz-nutri-tinta) / <alpha-value>)",
+          "recons": "hsl(var(--bz-recons) / <alpha-value>)",
+          "recons-tinta": "hsl(var(--bz-recons-tinta) / <alpha-value>)",
         },
         success: {
           DEFAULT: "hsl(var(--success))",

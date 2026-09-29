@@ -9,6 +9,7 @@ import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
+import { Cabelo } from "@/components/beleza/Cabelo";
 import { useSkincare } from "@/components/beleza/use-skincare";
 import type { PerfilDaPele } from "@/lib/beleza-rotina";
 import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
@@ -25,15 +26,17 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
  * Os ids ficam (medição por aba, tour, testes): `routine` = SKINCARE, `shelf` =
  * MEUS PRODUTOS. O id antigo `diary` redireciona pra SKINCARE, rolando até as fotos.
  */
-type Aba = "routine" | "shelf";
+type Aba = "routine" | "hair" | "shelf";
 const tabs: { id: Aba; label: string; icon: string }[] = [
   { id: "routine", label: "SKINCARE", icon: "✨" },
+  { id: "hair", label: "CABELO", icon: "💇‍♀️" },
   { id: "shelf", label: "MEUS PRODUTOS", icon: "🧴" },
 ];
 
 /** `/beleza?aba=…` (link de notificação, atalho, tour): nomes em português e os ids antigos. */
 const ABA_DO_LINK: Record<string, Aba | "fotos"> = {
   skincare: "routine", routine: "routine", rotina: "routine",
+  cabelo: "hair", hair: "hair",
   produtos: "shelf", "meus-produtos": "shelf", shelf: "shelf",
   diario: "fotos", diary: "fotos", fotos: "fotos",
 };
@@ -75,6 +78,7 @@ const Beleza = () => {
       <SpotlightOverlay
         moduleKey="beleza"
         steps={[
+          { selector: '[data-spotlight="tab-hair"]', label: "Seu cronograma capilar em 4 perguntas.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os seus produtos.", advanceOnClick: true },
         ]}
       />
@@ -122,6 +126,7 @@ const Beleza = () => {
             <SkinDiary />
           </>
         )}
+        {activeTab === "hair" && <Cabelo />}
         {activeTab === "shelf" && <ProductShelf />}
       </main>
     </div>

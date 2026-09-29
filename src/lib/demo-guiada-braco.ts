@@ -22,7 +22,9 @@
  */
 export type ModoDemoGuiada = "off" | "ab" | "on";
 
-export const DEMO_GUIADA: ModoDemoGuiada = "off";
+// 28/09 (dono): "pode subir pra todo mundo" — ligada pra todo o funil da web,
+// sem A/B. Voltar atrás = "off" + push (o funil de antes, byte a byte).
+export const DEMO_GUIADA: ModoDemoGuiada = "on";
 
 /** Fatia que cai na missão quando DEMO_GUIADA = "ab". */
 export const DEMO_GUIADA_FATIA = 0.2;

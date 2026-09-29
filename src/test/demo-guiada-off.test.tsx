@@ -36,6 +36,16 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 vi.mock("@/lib/sessao-anonima", () => ({ guardarCompraAnonima: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => false }));
+// A chave de produção pode estar ligada (28/09: "on"); este arquivo prova o caminho DESLIGADO —
+// o botão de voltar atrás tem que devolver o funil de antes, byte a byte.
+vi.mock("@/lib/demo-guiada-braco", async (orig) => {
+  const real = await orig<typeof import("@/lib/demo-guiada-braco")>();
+  return {
+    ...real,
+    DEMO_GUIADA: "off" as const,
+    sortearBracoDaDemo: (modo: import("@/lib/demo-guiada-braco").ModoDemoGuiada = "off", sorte?: () => number) => real.sortearBracoDaDemo(modo, sorte),
+  };
+});
 vi.mock("@/lib/loja", async (orig) => ({ ...(await orig<typeof import("@/lib/loja")>()), ehApple: () => false }));
 vi.mock("@/lib/meta-pixel", () => ({ fireMetaEvent: vi.fn() }));
 vi.mock("@/components/retention/WinbackWheel", () => ({ WinbackWheel: () => null, SLICES_FUNIL: [] }));

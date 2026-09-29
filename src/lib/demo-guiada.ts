@@ -16,7 +16,7 @@
  * — só o item dela, nunca dado de exemplo.
  */
 import { AREAS, type AreaKey } from "@/lib/funnel";
-import { CHAVE_FORCA_DEMO_GUIADA, DEMO_GUIADA, PARAM_BRACO, forcaDaDemoGuiada } from "@/lib/demo-guiada-braco";
+import { CHAVE_FORCA_DEMO_GUIADA, PARAM_BRACO, forcaDaDemoGuiada } from "@/lib/demo-guiada-braco";
 import { CHAVE_SESSAO_DA_MISSAO, PARAM_ITEM } from "@/lib/demo-guiada-volta";
 
 export { CHAVE_FORCA_DEMO_GUIADA, PARAM_BRACO, PARAM_ITEM };
@@ -94,7 +94,10 @@ const paramsDe = (busca: string | URLSearchParams): URLSearchParams =>
 /**
  * Braço desta demo: "on" (missão), "off" (controle do A/B — a demo de hoje,
  * só que medida) ou null (fora do experimento = o funil de hoje, intocado).
- * Ordem: força de QA no aparelho > braço na URL > chave "on".
+ * Ordem: força de QA no aparelho > braço na URL. A CHAVE (DEMO_GUIADA) não
+ * entra aqui: ela só vale no funil do dia 14, pelo sorteio na entrada da demo
+ * (Preview) — com a chave em "on", a demo do /comecar, v1 e radar (paywalls
+ * sem o "O que você já construiu") ficava com a missão pela metade (28/09).
  */
 export function bracoDaDemo(busca: string | URLSearchParams): "on" | "off" | null {
   const f = forcaDaDemoGuiada();
@@ -102,7 +105,7 @@ export function bracoDaDemo(busca: string | URLSearchParams): "on" | "off" | nul
   const g = paramsDe(busca).get(PARAM_BRACO);
   if (g === "1") return "on";
   if (g === "0") return "off";
-  return DEMO_GUIADA === "on" ? "on" : null;
+  return null;
 }
 
 /* -------------------------------------------- estado da missão na sessão */

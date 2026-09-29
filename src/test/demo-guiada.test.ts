@@ -28,14 +28,18 @@ beforeEach(() => {
 });
 
 describe("a chave (DEMO_GUIADA) e o sorteio na entrada da demo", () => {
-  it("em produção a chave nasce DESLIGADA", () => {
-    expect(DEMO_GUIADA).toBe("off");
+  it("a chave é uma das três (28/09: \"on\" — ligada pra todo o funil do dia 14, decisão do dono)", () => {
+    expect(["off", "ab", "on"]).toContain(DEMO_GUIADA);
   });
 
-  it("desligada: sem braço e a URL da demo é a MESMA string de hoje", () => {
-    expect(sortearBracoDaDemo()).toBeNull();
-    expect(urlDaDemoComBraco(DEMO)).toBe(DEMO);
+  it("desligada (o botão de voltar atrás): sem braço e a URL da demo é a MESMA string de hoje", () => {
+    expect(sortearBracoDaDemo("off")).toBeNull();
+    expect(urlDaDemoComBraco(DEMO, sortearBracoDaDemo("off"))).toBe(DEMO);
     expect(urlDaDemoComBraco(DEMO, null)).toBe(DEMO);
+  });
+
+  it("ligada: todo mundo que entra na demo do funil do dia 14 cai na missão", () => {
+    expect(sortearBracoDaDemo("on", () => 0.99)).toBe("1");
   });
 
   it("A/B: sorteia pela fatia e carimba o braço na URL", () => {

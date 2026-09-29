@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
-import { gerarRotina, guardarNaBancada, type PassoDaRotina, type ProdutoDaBancada, type ProdutoDoCatalogo } from "@/lib/beleza-rotina";
+import { gerarRotina, guardarNaBancada, passoDigitado, type PassoDaRotina, type ProdutoDaBancada, type ProdutoDoCatalogo } from "@/lib/beleza-rotina";
 import { CHAVE_LEMBRETE_SKINCARE, lerDadosDoSkincare, planejarSkincare } from "@/lib/beleza-lembrete";
 import { BASES_LEMBRETES } from "@/lib/notificacoes";
 import { quandoDoAviso } from "@/components/beleza/lembrete-skincare";
@@ -20,6 +20,7 @@ import Beleza from "@/pages/Beleza";
  *   ?tela=home     · a Home com o card "Skincare de hoje"
  *   ?tela=vazia    · a Beleza sem rotina (as 3 perguntas)
  *   ?tela=antiga   · rotina ANTIGA (do tempo do ciclo de 4 dias): tudo todo dia + a oferta "Alternar"
+ *   ?tela=labios   · a rotina da Ana + um passo digitado "Protetor labial" (acha os produtos de lábios)
  *   ?tela=avisos   · o que o celular recebe (o plano do lembrete, com o texto de cada dia)
  * O tema escuro vem do próprio app (localStorage "core-theme-mode").
  */
@@ -64,15 +65,18 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     bancada = r.bancada.map((x) => (x.id === r.id && abertoEm ? { ...x, opened: true, openedDate: abertoEm } : x));
     return r.id;
   };
-  const limpeza = guardar("laroche-posay-gel-de-limpeza-facial-effaclar-concentrado", "b1", "2026-07-20");
-  const niacinamida = guardar("principia-serum-niacinamida-nc-10", "b2", "2026-08-02");
+  const limpeza = guardar("la-roche-posay-gel-de-limpeza-facial-effaclar-concentrado", "b1", "2026-07-20");
+  const niacinamida = guardar("principia-serum-niacinamida-nc-10-10-niacinamida-e-1-zinco", "b2", "2026-08-02");
   const hidratante = guardar("neutrogena-hidratante-facial-hydro-boost-water-gel", "b3");
   const protetor = guardar("isdin-fusion-water-fps-60", "b4", "2026-08-10");
   const salicilico = guardar("sallve-super-acido-salicilico-2", "b5", "2026-09-01");
-  const retinol = guardar("principia-serum-retinol-0-3", "b6", "2026-04-05");
+  const retinol = guardar("principia-serum-retinol-0-3-rn-0-3-retinol-vitamina-e-e-bisabolol", "b6", "2026-04-05");
   const comProduto = (lista: PassoDaRotina[], ids: (string | null)[]) => lista.map((p, i) => (ids[i] ? { ...p, produtoId: ids[i] as string } : p));
   // manhã: limpeza, niacinamida, hidratante, protetor · noite: limpeza, ácido salicílico, retinol, hidratante (sem produto: mostra o "+ escolher")
-  const am = comProduto(manha, [limpeza, niacinamida, hidratante, protetor]);
+  const am = [
+    ...comProduto(manha, [limpeza, niacinamida, hidratante, protetor]),
+    ...(tela === "labios" ? [passoDigitado("Protetor labial", "manha")] : []),
+  ];
   const pm = comProduto(noite, [limpeza, salicilico, retinol, null]);
 
   const ontem = diaMenos(hoje, 1);

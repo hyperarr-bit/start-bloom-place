@@ -39,6 +39,7 @@ const FOLHA = "rounded-t-3xl p-0 gap-0 overflow-hidden max-h-[92dvh] flex flex-c
 const CATEGORIA_DO_TIPO: Record<TipoDoPasso, CategoriaDoCatalogo> = {
   limpeza: "limpeza", hidratante: "hidratante", protetor: "protetor", "vitamina-c": "serum", niacinamida: "serum",
   hialuronico: "serum", "acido-salicilico": "acido", "acido-glicolico": "acido", retinol: "retinoide",
+  olhos: "olhos", labios: "labios", mascara: "mascara", tonico: "tonico",
 };
 
 function FaixaDaFicha({ titulo, sub, onFechar, onVoltar }: { titulo: ReactNode; sub: ReactNode; onFechar: () => void; onVoltar?: () => void }) {
@@ -201,9 +202,11 @@ function LinhaDoProduto({ p, evitado, primeira, onEscolher }: { p: ProdutoDoCata
       <span className="min-w-0 flex-1">
         <span className="block text-[10.5px] font-extrabold tracking-[.1em] text-muted-foreground uppercase truncate">{p.marca}</span>
         <span className="block text-[14px] font-semibold leading-snug">{p.nome}</span>
-        {(p.ativos.length > 0 || p.fps) && (
+        {(p.ativos.length > 0 || p.fps || p.cor || p.textura) && (
           <span className="mt-1 flex flex-wrap gap-1">
             {p.fps ? <span className="rounded px-1.5 py-px text-[10.5px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">FPS {p.fps}</span> : null}
+            {p.cor ? <span className="rounded px-1.5 py-px text-[10.5px] font-bold bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">com cor</span> : null}
+            {p.textura ? <span className="rounded px-1.5 py-px text-[10.5px] font-semibold border border-border text-muted-foreground">{p.textura}</span> : null}
             {p.ativos.slice(0, 3).map((a) => (
               <span key={a} className="rounded px-1.5 py-px text-[10.5px] font-semibold bg-pink-100 text-pink-800 dark:bg-pink-500/20 dark:text-pink-300">{a}</span>
             ))}

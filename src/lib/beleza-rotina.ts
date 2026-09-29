@@ -35,7 +35,9 @@ export type PerfilDaPele = { pele: TipoDePele; objetivo: Objetivo; nivel: Nivel 
 export type TipoDoPasso =
   | "limpeza" | "hidratante" | "protetor"
   | "vitamina-c" | "niacinamida" | "hialuronico"
-  | "acido-salicilico" | "acido-glicolico" | "retinol";
+  | "acido-salicilico" | "acido-glicolico" | "retinol"
+  // passos que o gerador não cria, mas a pessoa digita (28/09, lista de ~250): acham os produtos certos
+  | "olhos" | "labios" | "mascara" | "tonico";
 
 export interface PassoDaRotina {
   name: string;
@@ -193,6 +195,11 @@ const NOMES: Record<TipoDoPasso, (pele: TipoDePele) => string> = {
   "acido-salicilico": () => "Ácido salicílico (BHA)",
   "acido-glicolico": () => "Ácido glicólico (AHA)",
   retinol: () => "Retinol",
+  // o gerador não cria estes (a pessoa digita); o nome só existe pra tabela ficar completa
+  olhos: () => "Área dos olhos",
+  labios: () => "Hidratante labial",
+  mascara: () => "Máscara facial",
+  tonico: () => "Tônico",
 };
 
 /** O ativo principal de cada tipo — é o que "ingredientes a evitar" compara. */
@@ -382,6 +389,10 @@ export function conflitosDoPlano(manha: PassoParaConflito[], noite: PassoParaCon
 /** Passo digitado à mão: o tipo sai do nome (filtra a lista de produtos e acha protetor/ácido). */
 export const tipoPeloNome = (nome: string): TipoDoPasso | undefined => {
   const n = norm(nome);
+  // antes do protetor e do hidratante: "Protetor labial", "Hidratante labial", "Máscara hidratante", "Creme pros olhos"
+  if (/labi|\bboca\b/.test(n)) return "labios";
+  if (/mascara/.test(n)) return "mascara";
+  if (/olho|olheira|contorno/.test(n)) return "olhos";
   if (/protetor|fps|filtro solar|sunscreen/.test(n)) return "protetor";
   if (/retin/.test(n)) return "retinol";
   if (/salicil|\bbha\b/.test(n)) return "acido-salicilico";
@@ -391,6 +402,7 @@ export const tipoPeloNome = (nome: string): TipoDoPasso | undefined => {
   if (/hialuron/.test(n)) return "hialuronico";
   if (/hidratante|creme|moistur/.test(n)) return "hidratante";
   if (/limpeza|sabonete|cleanser|micelar|demaquil/.test(n)) return "limpeza";
+  if (/tonico|toner/.test(n)) return "tonico";
   return undefined;
 };
 
@@ -407,7 +419,10 @@ export const passoDigitado = (nome: string, periodo: Periodo): PassoDaRotina => 
 
 /* ------------------------------------------------------------ a lista curada de produtos */
 
-export type CategoriaDoCatalogo = "limpeza" | "demaquilante" | "tonico" | "serum" | "acido" | "retinoide" | "hidratante" | "protetor" | "olhos";
+export type CategoriaDoCatalogo =
+  | "limpeza" | "demaquilante" | "tonico" | "serum" | "acido" | "retinoide" | "hidratante" | "protetor" | "olhos"
+  // 28/09 (lista de ~250): lábios (hidratante/protetor labial) e máscaras faciais
+  | "labios" | "mascara";
 
 export interface ProdutoDoCatalogo {
   id: string;
@@ -418,6 +433,8 @@ export interface ProdutoDoCatalogo {
   tipos: TipoDePele[];
   fps?: number | null;
   cor?: boolean;
+  /** o que a página diz: fluido, gel-creme, bastão, mousse… (protetor, sobretudo) */
+  textura?: string | null;
   /** meses de validade depois de aberto */
   pao: number;
   /** true = o rótulo/página não informa; é o padrão da categoria */
@@ -434,6 +451,7 @@ export interface ProdutoDoCatalogo {
  */
 export const PAO_PADRAO: Record<CategoriaDoCatalogo, number> = {
   limpeza: 12, demaquilante: 12, tonico: 12, serum: 6, acido: 12, retinoide: 6, hidratante: 12, protetor: 12, olhos: 6,
+  labios: 12, mascara: 12,
 };
 
 let cache: Promise<ProdutoDoCatalogo[]> | null = null;
@@ -459,6 +477,10 @@ const ENCAIXE: Record<TipoDoPasso, { categorias: CategoriaDoCatalogo[]; ativos?:
   "acido-salicilico": { categorias: ["acido", "serum", "tonico"], ativos: ["ácido salicílico", "lha"] },
   "acido-glicolico": { categorias: ["acido", "serum", "tonico"], ativos: ["ácido glicólico", "ácido lático", "ácido mandélico"] },
   retinol: { categorias: ["retinoide", "serum", "hidratante"], ativos: ["retinol", "retinal"] },
+  olhos: { categorias: ["olhos"] },
+  labios: { categorias: ["labios"] },
+  mascara: { categorias: ["mascara"] },
+  tonico: { categorias: ["tonico"] },
 };
 
 export const encaixaNoPasso = (p: ProdutoDoCatalogo, tipo: TipoDoPasso | string | undefined): boolean => {
@@ -522,14 +544,18 @@ export function buscarProdutos(
   tipo?: TipoDoPasso | string,
   periodo?: Periodo,
 ): ProdutoDoCatalogo[] {
-  const palavras = norm(consulta).split(/\s+/).filter((p) => p.length > 0);
-  if (!palavras.length || norm(consulta).length < 2) return [];
+  const q = norm(consulta);
+  const palavras = q.split(/\s+/).filter((p) => p.length > 0);
+  if (!palavras.length || q.length < 2) return [];
+  // "protetor com cor" é o que o público mais busca: o atributo conta, e "sem cor" desce quando se pede cor
+  const pedeCor = /\bcor\b/.test(q) && !/\bsem\b/.test(q);
+  const alvo = (p: ProdutoDoCatalogo) =>
+    norm(`${p.marca} ${p.nome} ${p.ativos.join(" ")} ${p.cor ? "com cor tonalizante" : ""} ${p.textura ?? ""} ${p.fps ? `fps ${p.fps}` : ""}`);
+  const base = ordenar({ pele, evitar, periodo, tipo });
+  const cor = (p: ProdutoDoCatalogo) => (!pedeCor ? 0 : p.cor ? 1 : /sem cor/.test(norm(p.nome)) ? -1 : 0);
   return lista
-    .filter((p) => {
-      const alvo = norm(`${p.marca} ${p.nome} ${p.ativos.join(" ")}`);
-      return palavras.every((w) => alvo.includes(w));
-    })
-    .sort(ordenar({ pele, evitar, periodo, tipo }))
+    .filter((p) => palavras.every((w) => alvo(p).includes(w)))
+    .sort((a, b) => cor(b) - cor(a) || base(a, b))
     .slice(0, limite);
 }
 

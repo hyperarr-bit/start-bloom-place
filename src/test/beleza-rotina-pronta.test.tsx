@@ -46,7 +46,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   ATIVO_DO_TIPO, OPCOES_NIVEL, OPCOES_OBJETIVO, OPCOES_PELE, PAO_PADRAO, alternarDia, buscarProdutos, conflitosDoPlano, sugerirDias,
-  diaDaSemanaDaChave, diasDoPasso, ehTodoDia, gerarRotina, guardarNaBancada, indicadosPara, passosDoDia, termosDoPasso,
+  diaDaSemanaDaChave, diasDoPasso, ehTodoDia, gerarRotina, guardarNaBancada, indicadosPara, passoDigitado, passosDoDia, termosDoPasso, tipoPeloNome,
   type PassoDaRotina, type ProdutoDoCatalogo, type TipoDoPasso,
 } from "@/lib/beleza-rotina";
 import { algumLigado, lerDadosDoSkincare, lerLembreteSkincare, planejarSkincare, textoDoAviso } from "@/lib/beleza-lembrete";
@@ -716,11 +716,12 @@ describe("lista curada de produtos (src/data/produtos-beleza.json)", () => {
   const VOCAB = new Set([
     "ácido glicólico", "ácido lático", "ácido mandélico", "ácido salicílico", "lha", "retinol", "retinal", "vitamina c", "niacinamida",
     "ácido hialurônico", "ceramidas", "pantenol", "centella asiática", "ácido tranexâmico", "alfa-arbutin", "zinco", "ácido ferúlico",
-    "vitamina e", "bakuchiol", "ureia", "esqualano", "ácido azelaico", "peptídeos", "cafeína",
+    "vitamina e", "bakuchiol", "ureia", "esqualano", "ácido azelaico", "peptídeos", "cafeína", "argila", "ácido kójico", "colágeno",
   ]);
+  const TEXTURAS = new Set(["fluido", "gel", "gel-creme", "creme", "loção", "bastão", "spray", "mousse", "pó", "sérum", "balm", "óleo"]);
 
-  it("60+ produtos, ids únicos, campos no formato, fonte https em cada um", () => {
-    expect(CATALOGO.length).toBeGreaterThanOrEqual(60);
+  it("~250 produtos (200+), ids únicos, campos no formato, fonte https em cada um", () => {
+    expect(CATALOGO.length).toBeGreaterThanOrEqual(200);
     expect(new Set(CATALOGO.map((p) => p.id)).size).toBe(CATALOGO.length);
     for (const p of CATALOGO) {
       expect(p.marca.trim() && p.nome.trim(), p.id).toBeTruthy();
@@ -729,6 +730,35 @@ describe("lista curada de produtos (src/data/produtos-beleza.json)", () => {
       expect(new URL(p.fonte).protocol, p.id).toBe("https:");
       expect(Number.isInteger(p.pao) && p.pao >= 1, p.id).toBe(true);
       expect(typeof p.paoPadrao, p.id).toBe("boolean");
+    }
+  });
+
+  it("rodada 2 (dono, 28/09): protetor em várias texturas e COM COR, lábios e máscaras, e as marcas nacionais pedidas", () => {
+    const protetores = CATALOGO.filter((p) => p.categoria === "protetor");
+    expect(protetores.length).toBeGreaterThanOrEqual(30);
+    expect(protetores.filter((p) => p.cor).length).toBeGreaterThanOrEqual(8);
+    expect(new Set(protetores.map((p) => p.textura).filter(Boolean)).size).toBeGreaterThanOrEqual(4);
+    for (const p of CATALOGO) if (p.textura != null) expect(TEXTURAS.has(p.textura), `${p.id}: ${p.textura}`).toBe(true);
+    for (const c of ["labios", "mascara", "olhos"] as const) expect(CATALOGO.filter((p) => p.categoria === c).length, c).toBeGreaterThanOrEqual(3);
+    const marcas = new Set(CATALOGO.map((p) => p.marca));
+    for (const m of ["Principia", "Sallve", "Creamy", "Simple Organic", "Nivea", "Neutrogena", "Vult", "Payot", "Adcos", "Mantecorp Skincare", "Darrow"]) {
+      expect(marcas.has(m), m).toBe(true);
+    }
+  });
+
+  it("passo digitado acha a categoria certa: 'Protetor labial' = lábios, 'Máscara de argila' = máscara, 'Contorno dos olhos' = olhos", () => {
+    expect(tipoPeloNome("Protetor labial")).toBe("labios");
+    expect(tipoPeloNome("Hidratante labial")).toBe("labios");
+    expect(tipoPeloNome("Máscara de argila")).toBe("mascara");
+    expect(tipoPeloNome("Máscara hidratante noturna")).toBe("mascara");
+    expect(tipoPeloNome("Contorno dos olhos")).toBe("olhos");
+    expect(tipoPeloNome("Creme para olheiras")).toBe("olhos");
+    expect(tipoPeloNome("Protetor solar FPS 50")).toBe("protetor"); // o de sempre continua
+    expect(passoDigitado("Protetor labial", "manha").isSunscreen).toBeUndefined(); // não vira o "OBRIGATÓRIO" do rosto
+    for (const t of ["labios", "mascara", "olhos"] as const) {
+      const lista = indicadosPara(CATALOGO, t);
+      expect(lista.length, t).toBeGreaterThanOrEqual(3);
+      expect(lista.every((p) => p.categoria === t), t).toBe(true);
     }
   });
 
@@ -743,6 +773,12 @@ describe("lista curada de produtos (src/data/produtos-beleza.json)", () => {
     const tiposDoGerador: TipoDoPasso[] = ["limpeza", "hidratante", "protetor", ...(Object.keys(ATIVO_DO_TIPO) as TipoDoPasso[])];
     for (const t of tiposDoGerador) expect(indicadosPara(CATALOGO, t).length, t).toBeGreaterThanOrEqual(3);
     expect(buscarProdutos(CATALOGO, "anthelios").every((p) => /anthelios/i.test(p.nome))).toBe(true);
+    // "cor" (o termo mais buscado): os COM cor primeiro, "Sem Cor" pro fim; "fluido" acha pela textura
+    const comCor = buscarProdutos(CATALOGO, "cor", "oleosa", [], 30, "protetor");
+    expect(comCor.slice(0, 5).every((p) => p.cor)).toBe(true);
+    const primeiroSemCor = comCor.findIndex((p) => /sem cor/i.test(p.nome));
+    if (primeiroSemCor >= 0) expect(comCor.slice(primeiroSemCor).every((p) => !p.cor)).toBe(true);
+    expect(buscarProdutos(CATALOGO, "protetor fluido", undefined, undefined, 50).every((p) => p.textura === "fluido" || /fluid/i.test(p.nome))).toBe(true);
     // no passo do hidratante, "cerave hidratante" traz o HIDRATANTE antes da loção de limpeza
     expect(buscarProdutos(CATALOGO, "cerave hidratante", undefined, undefined, 30, "hidratante")[0].categoria).toBe("hidratante");
   });

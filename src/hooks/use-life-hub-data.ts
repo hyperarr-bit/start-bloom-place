@@ -2,6 +2,8 @@ import { useMemo, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
+import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
+import { computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -133,7 +135,14 @@ export function useLifeHubData(): LifeHubData {
     const totalIncome = incomes.reduce((s: number, i: any) => s + (Number(i.value) || Number(i.amount) || 0), 0);
     const totalVariableExpense = variableExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
     const totalFixedExpense = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
-    const monthBalance = totalIncome - totalVariableExpense - totalFixedExpense;
+    /* SALDO DA HOME = SALDO DO FINANÇAS (29/09, varredura). A Home fazia a conta
+       própria (receitas − variáveis − fixos) e esquecia as PARCELAS do mês: com
+       um celular em 12× de R$ 150, o card "Finanças" da Home dizia R$ 3.677,60 e o
+       módulo R$ 3.527,60. Regra da casa (lib/finance-totals): despesas do mês =
+       fixas + variáveis + parcelas do mês — nenhuma tela com fórmula própria. */
+    const parcelasBrutas = get<unknown>("finance-installments", []);
+    const parcelasDoMes = somaParcelasDoMes(doPerfil(Array.isArray(parcelasBrutas) ? parcelasBrutas : [], perfil) as Parcela[]);
+    const monthBalance = computeMonthlyBalance(totalIncome, computeMonthlyOutflow(totalVariableExpense, totalFixedExpense, parcelasDoMes));
 
     const dueDays = doPerfilDueDays(get<any[]>("finance-dueDays", []), perfil);
     /* MÊS DE VERDADE, NÃO DE 30 DIAS (26/09, auditoria da virada). A conta

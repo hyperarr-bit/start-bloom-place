@@ -13,6 +13,9 @@ import { InstallmentTracker, type Installment } from "@/components/InstallmentTr
 import { EmergencyFund } from "@/components/finance/EmergencyFund";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { FinancialHealth } from "@/components/FinancialHealth";
+import { FinancesWidget } from "@/components/home/widgets/FinancesWidget";
+import { BudgetRemainingWidget } from "@/components/home/widgets/BudgetRemainingWidget";
+import { MemoryRouter } from "react-router-dom";
 import { normalizeForKey } from "@/lib/data-normalizers";
 
 vi.mock("sonner", async (orig) => {
@@ -218,5 +221,41 @@ describe("Saúde Financeira", () => {
     expect(texto).toMatch(/50,0%/);
     expect(texto).not.toMatch(/\d\.\d%/);
     expect(texto).toMatch(/Necessidades: R\$ 2\.500,50/);
+  });
+});
+
+/* ============================================================
+ * 5. HOME × FINANÇAS — o mesmo saldo nos dois lugares
+ *    A Home fazia conta própria sem as parcelas do mês, e o "Orçamento
+ *    Restante" dividia pelos dias SEM contar hoje ("por 1 dias" em 29/09).
+ * ============================================================ */
+describe("Widgets de dinheiro da Home", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  const conta = {
+    "finance-incomes": [{ id: "r", date: "2026-09-01", value: 6200, description: "Salário" }],
+    "finance-expenses": [
+      { id: "e1", date: "2026-09-03", value: 640.5, description: "Mercado" },
+      { id: "e2", date: "2026-09-28", value: 31.9, description: "Uber" },
+    ],
+    "finance-fixed-expenses": [{ id: "f", description: "Aluguel", value: 1850, day: 5 }],
+    "finance-installments": [{ id: "p", description: "Celular", totalValue: 1800, installmentValue: 150, paidInstallments: 9, totalInstallments: 12, cardName: "nubank", category: "eletronicos", date: "2025-12-15" }],
+  };
+  const naHome = (ui: React.ReactElement) => renderComStore(<MemoryRouter>{ui}</MemoryRouter>, criarStore(conta));
+
+  it("card Finanças: 6.200 − 672,40 − 1.850 − parcela 150 = R$ 3.527,60 (antes R$ 3.677,60)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 29, 10, 0));
+    naHome(<FinancesWidget size="small" />);
+    expect(document.body.textContent).toMatch(/R\$\s?3\.527,60/);
+  });
+
+  it("Orçamento Restante em 29/09: divide por 2 dias (29 e 30), com a parcela", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 29, 10, 0));
+    naHome(<BudgetRemainingWidget />);
+    const texto = document.body.textContent ?? "";
+    expect(texto).toMatch(/R\$\s?3\.527,60/);
+    expect(texto).toMatch(/R\$\s?1\.763,80\/dia por 2 dias/);
+    expect(texto).not.toMatch(/por 1 dias/);
   });
 });

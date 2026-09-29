@@ -17,6 +17,12 @@ import { FinancesWidget } from "@/components/home/widgets/FinancesWidget";
 import { BudgetRemainingWidget } from "@/components/home/widgets/BudgetRemainingWidget";
 import { MemoryRouter } from "react-router-dom";
 import { normalizeForKey } from "@/lib/data-normalizers";
+import { useState } from "react";
+import { waitFor } from "@testing-library/react";
+import { PlannerAberto } from "@/components/conquistas/PlannerAberto";
+
+// o miolo da página (insígnias) não importa aqui: só quem abre e fecha o planner
+vi.mock("@/components/conquistas/PaginaInsignias", () => ({ PaginaInsignias: () => <div data-testid="miolo-falso" /> }));
 
 vi.mock("sonner", async (orig) => {
   const real = await orig<typeof import("sonner")>();
@@ -257,5 +263,35 @@ describe("Widgets de dinheiro da Home", () => {
     expect(texto).toMatch(/R\$\s?3\.527,60/);
     expect(texto).toMatch(/R\$\s?1\.763,80\/dia por 2 dias/);
     expect(texto).not.toMatch(/por 1 dias/);
+  });
+});
+
+/* ============================================================
+ * 6. PLANNER DE CONQUISTAS — um só "Fechar o planner"
+ *    Aberto (animação concluída), a capa de trás também se chamava
+ *    "Fechar o planner": dois botões iguais pro leitor de tela, e o teste
+ *    da tela (conquistas-tela-v2) falhava com a máquina carregada.
+ * ============================================================ */
+describe("Planner de conquistas", () => {
+  const Casca = () => {
+    const [aberto, setAberto] = useState(false);
+    return (
+      <PlannerAberto capa="grafite" nome="Ana" membroDesde="set/2026" dias={3} nivel="Bronze" onSelo={() => {}}
+        pagina={{} as never} onSelecionar={() => {}} onValores={() => {}} aberto={aberto}
+        onAbrir={() => setAberto(true)} onFechar={() => setAberto(false)} onPostar={() => {}} />
+    );
+  };
+
+  it("aberto de vez: 1 botão 'Fechar o planner'; a capa de trás sai da árvore; fechado de novo: 'Abrir o planner' volta", async () => {
+    render(<Casca />);
+    expect(screen.getAllByRole("button", { name: "Abrir o planner" })).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("capa-3d"));
+    await waitFor(() => expect(document.querySelector('[data-planner="aberto"]')).not.toBeNull(), { timeout: 5000 });
+    expect(screen.getAllByRole("button", { name: "Fechar o planner" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Abrir o planner" })).toBeNull();
+    expect(screen.getByTestId("capa-3d")).toHaveAttribute("tabindex", "-1");
+    fireEvent.click(screen.getByRole("button", { name: "Fechar o planner" }));
+    await waitFor(() => expect(document.querySelector('[data-planner="fechado"]')).not.toBeNull(), { timeout: 5000 });
+    expect(screen.getByRole("button", { name: "Abrir o planner" })).toHaveAttribute("tabindex", "0");
   });
 });

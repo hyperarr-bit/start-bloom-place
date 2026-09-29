@@ -125,12 +125,20 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, pa
     <div ref={caixa} style={{ width: "100%", maxWidth: W, margin: "0 auto" }} data-planner={fase} data-moldura={moldura}>
       {/* a MOLDURA: altura fixa = a da capa, aberta ou fechada */}
       <div style={{ position: "relative", height: hCapa, perspective: 1400 }} data-testid="moldura-planner" data-moldura={moldura}>
-        {/* a capa (frente + verso), girando na lombada */}
+        {/* a capa (frente + verso), girando na lombada.
+            UM SÓ "Fechar o planner" (29/09, varredura): com o planner aberto a
+            capa virava um SEGUNDO botão "Fechar o planner", ao lado do texto
+            de mesmo nome embaixo — o leitor de tela anunciava dois, e o teste
+            da tela falhava com a máquina carregada (a animação terminava antes
+            do toque e os dois existiam). Aberta, a capa está ATRÁS da página
+            (z 0): sai da árvore de acessibilidade e do Tab; quem fecha é o
+            botão de baixo. O toque na parte da capa que aparece segue valendo. */}
         <motion.div
           role="button"
-          tabIndex={0}
-          aria-label={fase === "aberto" ? "Fechar o planner" : "Abrir o planner"}
-          aria-expanded={fase === "aberto"}
+          tabIndex={mostrarPagina ? -1 : 0}
+          aria-hidden={mostrarPagina || undefined}
+          aria-label="Abrir o planner"
+          aria-expanded={false}
           data-testid="capa-3d"
           data-moldura={moldura}
           onClick={toque}

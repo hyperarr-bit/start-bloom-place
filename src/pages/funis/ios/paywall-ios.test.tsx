@@ -21,7 +21,7 @@ import { PaywallIOS } from "./PaywallIOS";
 
 // 20/09: preço "da loja" mutável por teste — a App Store manda a string já
 // formatada e ela muda com a vitrine ("R$ 97,90" no Brasil, "$14.99" nos EUA).
-const loja = vi.hoisted(() => ({ preco: "R$ 97,90", mes: "R$ 8,16", dias: 3, trial: true, compraOk: true }));
+const loja = vi.hoisted(() => ({ preco: "R$ 97,90", mes: "R$ 8,16", dias: 3, trial: true, compraOk: true, motivo: null as string | null }));
 // 24/09: o paywall não pede mais permissão nem arma o lembrete do teste. O mock
 // fica pra provar isso — se alguém religar, estes espiões acusam.
 const notif = vi.hoisted(() => ({
@@ -52,11 +52,14 @@ vi.mock("@/lib/revenuecat", () => ({
   restaurar: vi.fn().mockResolvedValue(false),
   compraVitaliciaLocal: vi.fn().mockResolvedValue(false),
   compraAssinaturaLocal: vi.fn().mockResolvedValue(false),
-  motivoUltimaCompra: () => null,
+  motivoUltimaCompra: () => loja.motivo,
   sincronizarAssinatura: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), getAttributionParams: () => ({}) }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null, loading: false }) }));
+
+import { trackEvent } from "@/lib/analytics";
+import { comprarAnualIos, comprar as comprarAssinatura } from "@/lib/revenuecat";
 
 // gasto tem que ser uma CHAVE real do quiz (GASTO_ANCHOR) — senão o cartão
 // âncora nem monta e o teste "passa" sem olhar pra ele (foi assim que a build
@@ -70,8 +73,9 @@ const montar = (opts: { area?: "dinheiro" | "corpo" | "saude"; onPago?: () => vo
 
 beforeEach(() => {
   localStorage.clear();
-  loja.preco = "R$ 97,90"; loja.mes = "R$ 8,16"; loja.dias = 3; loja.trial = true; loja.compraOk = true;
+  loja.preco = "R$ 97,90"; loja.mes = "R$ 8,16"; loja.dias = 3; loja.trial = true; loja.compraOk = true; loja.motivo = null;
   notif.pedir.mockClear(); notif.agendar.mockClear();
+  vi.mocked(trackEvent).mockClear(); vi.mocked(comprarAnualIos).mockClear(); vi.mocked(comprarAssinatura).mockClear();
 });
 afterEach(cleanup);
 
@@ -214,6 +218,92 @@ describe("Paywall do iPhone", () => {
   it("avisa que a assinatura RENOVA — 3.1.2", () => {
     const { container } = montar();
     expect(container.textContent ?? "").toMatch(/renova/i);
+  });
+
+  // ---------- 28/09: segunda chance pra quem fecha a folha da Apple ----------
+  describe("segunda chance (fechou a folha da Apple)", () => {
+    const TITULO = "Hoje você não paga nada · cancela em 2 toques";
+    const vezes = (evento: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === evento).length;
+    const fecharFolhaDoAnual = async () => {
+      loja.compraOk = false; loja.motivo = "cancelou";
+      fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+    };
+
+    it("fechou a folha do anual com teste: cartão perto do botão; 'Tentar de novo' reabre a compra do anual e some quando dá certo", async () => {
+      const onPago = vi.fn();
+      montar({ onPago });
+      await fecharFolhaDoAnual();
+      expect(await screen.findByText(TITULO)).toBeInTheDocument();
+      expect(screen.getByTestId("ios-segunda-chance")).toContainElement(screen.getByRole("button", { name: "Tentar de novo" }));
+      expect(vezes("folha_segunda_chance_view")).toBe(1);
+      // não é modal: o botão principal continua vivo, com o texto de sempre
+      expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled();
+      expect(comprarAnualIos).toHaveBeenCalledTimes(1);
+
+      loja.compraOk = true; loja.motivo = null;
+      fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+      await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+      expect(comprarAnualIos).toHaveBeenCalledTimes(2); // a MESMA compra do botão principal
+      expect(vezes("folha_segunda_chance_click")).toBe(1);
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+    });
+
+    it("aparece 1 vez por sessão do paywall: fechou de novo depois de usar o cartão, ele não volta", async () => {
+      montar();
+      await fecharFolhaDoAnual();
+      fireEvent.click(await screen.findByRole("button", { name: "Tentar de novo" }));
+      await waitFor(() => expect(comprarAnualIos).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+      await waitFor(() => expect(comprarAnualIos).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+      expect(vezes("folha_segunda_chance_view")).toBe(1);
+    });
+
+    it("some com o mensal selecionado e volta com o anual — a mesma exibição, um evento só", async () => {
+      montar();
+      await fecharFolhaDoAnual();
+      await screen.findByText(TITULO);
+      fireEvent.click(screen.getByText("mês"));
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText("meses"));
+      expect(screen.getByText(TITULO)).toBeInTheDocument();
+      expect(vezes("folha_segunda_chance_view")).toBe(1);
+    });
+
+    it("erro da loja (não foi ela que fechou): mensagem de erro, sem cartão", async () => {
+      montar();
+      loja.compraOk = false; loja.motivo = "billing_erro";
+      fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+      expect(vezes("folha_segunda_chance_view")).toBe(0);
+    });
+
+    it("sem direito ao teste: nunca promete 'não paga nada'", async () => {
+      loja.trial = false;
+      montar();
+      loja.compraOk = false; loja.motivo = "cancelou";
+      fireEvent.click(await screen.findByRole("button", { name: /Quero o ano — R\$ 97,90/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Quero o ano — R\$ 97,90/ })).toBeEnabled());
+      expect(document.body.textContent).not.toMatch(/não paga nada/);
+      expect(vezes("folha_segunda_chance_view")).toBe(0);
+    });
+
+    it("fechou a folha do MENSAL: sem cartão (o teste grátis é só do anual)", async () => {
+      montar();
+      await screen.findByText("Como funciona o teste");
+      fireEvent.click(screen.getByText("mês"));
+      loja.motivo = "cancelou";
+      fireEvent.click(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ }));
+      await waitFor(() => expect(comprarAssinatura).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ })).toBeEnabled());
+      fireEvent.click(screen.getByText("meses"));
+      expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
+      expect(vezes("folha_segunda_chance_view")).toBe(0);
+    });
   });
 
   it("é independente do Android: não lê nem escreve a flag do A/B de lá", () => {

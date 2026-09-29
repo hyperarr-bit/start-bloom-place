@@ -251,6 +251,15 @@ export function PaywallIOS({
   }, []);
 
   const [resgatouCodigo, setResgatouCodigo] = useState(false);
+  /* SEGUNDA CHANCE (28/09): fechar a folha da Apple não gerava resposta
+   * nenhuma — e 32% das compras vêm de quem fechou uma primeira vez. Só na
+   * desistência da própria pessoa (não em erro), só no anual com teste
+   * grátis, 1 vez por sessão do paywall; some quando a compra dá certo. */
+  const [segundaChance, setSegundaChance] = useState<"nunca" | "visivel" | "usada">("nunca");
+  useEffect(() => {
+    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: "core_anual_97", dias });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segundaChance]);
 
   const confirmarPagamento = async () => {
     setConferindo(true);
@@ -279,13 +288,15 @@ export function PaywallIOS({
          * "acaba amanhã" nem pede permissão pra ele — segue direto pro
          * cadastro. Quem começou o teste antes disso ainda recebe o aviso que
          * já estava agendado no aparelho (foi prometido na hora da compra). */
+        setSegundaChance("usada");
         onPagoSemConta();
         return;
       }
       /* RECUSA NA APPLE — e aqui acaba. Não existe escada: a folha é
        * instantânea, autentica no Face ID, e um cancelamento é uma decisão,
        * não uma tela que não carregou. A pessoa continua no paywall com o
-       * botão vivo, e é só isso que a gente faz. */
+       * botão vivo — no anual com teste, mais o cartão da segunda chance
+       * (28/09, abaixo), que também não abre nada sozinho. */
       const motivo = rc.motivoUltimaCompra();
       if (motivo === "pendente") {
         setPendente(true);
@@ -300,6 +311,12 @@ export function PaywallIOS({
          * paywall ficava MUDO — botão voltava ao normal sem dizer nada. Foi o
          * que o revisor viu. Cancelar continua silencioso (foi decisão dela). */
         setErro(erroFolhaNaoConcluiu());
+      }
+      // "cancelou" = PURCHASE_CANCELLED do RevenueCat (código 1): foi ela que
+      // fechou a folha. Não reabre nada sozinho — só deixa o cartão perto do
+      // botão. Sem direito ao teste, "não paga nada" seria mentira: sem cartão.
+      if (motivo === "cancelou" && produto === "anual" && comTrial && rc.anualIosTemTrial()) {
+        setSegundaChance((s) => (s === "nunca" ? "visivel" : s));
       }
     } catch {
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
@@ -317,9 +334,13 @@ export function PaywallIOS({
   };
 
   const mostraMensal = plano === "mensal";
+  // O cartão fala do anual com teste: some com o mensal selecionado e durante
+  // a folha aberta; volta com o anual (a mesma exibição — sem novo evento).
+  const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
 
   return (
-    <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8">
+    /* pb maior só com o cartão: a barra fixa cresce e cobriria o "Restaurar compras" do rodapé */
+    <div className={`relative w-full max-w-sm mx-auto text-center ${mostraSegundaChance ? "pb-60" : "pb-40"} pt-8`}>
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -460,6 +481,22 @@ export function PaywallIOS({
             </div>
           )}
           {erro && <p className="text-[12.5px] text-destructive text-center mb-2">{erro}</p>}
+          {mostraSegundaChance && (
+            <div role="status" data-testid="ios-segunda-chance" className="rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 mb-2.5 flex items-center gap-2.5 text-left">
+              <p className="flex-1 text-[12.5px] font-bold leading-snug text-foreground">Hoje você não paga nada · cancela em 2 toques</p>
+              <button
+                type="button"
+                className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
+                onClick={() => {
+                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: "core_anual_97", dias });
+                  setSegundaChance("usada");
+                  void comprar("anual");
+                }}
+              >
+                Tentar de novo
+              </button>
+            </div>
+          )}
 
           <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
             <Button

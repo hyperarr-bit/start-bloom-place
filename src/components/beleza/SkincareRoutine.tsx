@@ -36,6 +36,9 @@ import { MontarRotina } from "./montar-rotina";
  * Tocar num passo abre a ficha: dias, produto (lista curada ou digitado),
  * remover. Tudo nas chaves de sempre (ver lib/beleza-rotina).
  */
+/** O aviso da rotina pronta (28/09, dono): discreto, sem alarde. */
+export const AVISO_DERMATOLOGISTA = "Orientação geral — não substitui a avaliação de um dermatologista.";
+
 export const SkincareRoutine = ({
   recemGerada: deFora,
   onGerada,
@@ -120,6 +123,7 @@ export const SkincareRoutine = ({
         <div ref={postIts} className="space-y-2.5 pt-1 scroll-mt-32" data-testid="rotina-pronta">
           <PostIt testId="postit-pronta">
             Rotina pronta pra pele <b>{rotuloPele}</b>, foco em <b>{rotuloObjetivo}</b>. Toque num passo pra escolher o seu produto ou mudar os dias.
+            <span className="block mt-1 text-[11px] opacity-75" data-testid="aviso-dermatologista-pronta">{AVISO_DERMATOLOGISTA}</span>
           </PostIt>
           {!s.lembrete.manha.ligado && !s.lembrete.noite.ligado && (
             <PostIt
@@ -234,6 +238,13 @@ export const SkincareRoutine = ({
             <p className="text-[9px] text-red-700 dark:text-red-300">{s.evitar.join(", ")}</p>
           </div>
         </div>
+      )}
+
+      {/* 28/09 (dono): a rotina que as 3 perguntas montam é orientação geral — dito sem alarde, no pé */}
+      {nPassos > 0 && s.perfil?.pele && (
+        <p className="px-4 text-center text-[11px] leading-snug text-muted-foreground" data-testid="aviso-dermatologista">
+          {AVISO_DERMATOLOGISTA}
+        </p>
       )}
 
       {nPassos > 0 && (

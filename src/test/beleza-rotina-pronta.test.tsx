@@ -542,6 +542,29 @@ describe("telas", () => {
     expect(store.dados["core-home-widgets-v2"]).toEqual([{ id: "skincare", size: "large" }]);
   });
 
+  it("rotina pronta traz o aviso discreto do dermatologista (no post-it e no pé); rotina montada à mão não", () => {
+    fixarData(SEG);
+    const store = criarStore({});
+    const t = store.montar(<SkincareRoutine />);
+    fireEvent.click(screen.getByTestId("opcao-normal"));
+    fireEvent.click(screen.getByTestId("opcao-basico"));
+    fireEvent.click(screen.getByTestId("opcao-iniciante"));
+    const texto = "Orientação geral — não substitui a avaliação de um dermatologista.";
+    expect(screen.getByTestId("aviso-dermatologista-pronta")).toHaveTextContent(texto);
+    expect(screen.getByTestId("aviso-dermatologista")).toHaveTextContent(texto);
+    t.unmount();
+    // voltando depois (sem o "acabou de montar"): fica só o pé
+    criarStore({ ...store.dados }).montar(<SkincareRoutine />);
+    expect(screen.queryByTestId("aviso-dermatologista-pronta")).not.toBeInTheDocument();
+    expect(screen.getByTestId("aviso-dermatologista")).toHaveTextContent(texto);
+  });
+
+  it("rotina montada à mão (sem as 3 perguntas) não mostra o aviso", () => {
+    fixarData(SEG);
+    criarStore({ "skincare-am-steps": [{ name: "Limpeza" }] }).montar(<SkincareRoutine />);
+    expect(screen.queryByTestId("aviso-dermatologista")).not.toBeInTheDocument();
+  });
+
   it("'Prefiro montar do zero' abre a tabela vazia com os campos de sempre", () => {
     fixarData(SEG);
     const store = criarStore({});

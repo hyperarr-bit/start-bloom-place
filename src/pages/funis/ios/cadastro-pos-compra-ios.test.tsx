@@ -31,11 +31,14 @@ vi.mock("@/hooks/use-user-data", () => ({
 vi.mock("@/lib/analytics", () => ({
   trackEvent: vi.fn(), getAttributionParams: () => ({}), captureLandingMeta: () => ({}),
 }));
+// 28/09: o que a última compra do anual foi — teste grátis (periodType TRIAL) ou não.
+const compra = vi.hoisted(() => ({ foiTeste: false }));
 vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   estadoRevenueCat: () => "pronto",
   sincronizarAssinatura: vi.fn().mockResolvedValue(false),
   restaurar: vi.fn().mockResolvedValue(false),
+  ultimaCompraAnualFoiTrial: () => compra.foiTeste,
 }));
 
 const fingir = (p: "ios" | "android") => {
@@ -59,7 +62,7 @@ const montarAndroid = () =>
     </MemoryRouter>
   );
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); compra.foiTeste = false; });
 afterEach(() => { cleanup(); delete (window as { Capacitor?: unknown }).Capacitor; });
 
 describe("iPhone: a tela que aparece depois de pagar", () => {
@@ -96,6 +99,27 @@ describe("iPhone: a tela que aparece depois de pagar", () => {
     fingir("ios");
     const { container } = montarIOS();
     expect(container.textContent ?? "").not.toMatch(/garantia/i);
+  });
+
+  // 28/09: começar o teste grátis não é pagar.
+  const seloDe = (texto: RegExp) => screen.getByText(texto).closest("div") as HTMLElement;
+
+  it("começou o TESTE grátis do anual: selo diz 'Teste ativado · nada cobrado hoje', com o mesmo check", () => {
+    fingir("ios");
+    compra.foiTeste = true;
+    montarIOS();
+    const selo = seloDe(/Teste ativado · nada cobrado hoje/);
+    expect(selo.querySelector("svg.lucide-check")).not.toBeNull();
+    expect(screen.queryByText(/Pagamento confirmado/)).toBeNull();
+  });
+
+  it("mensal pago: continua 'Pagamento confirmado'", () => {
+    fingir("ios");
+    compra.foiTeste = false;
+    montarIOS();
+    const selo = seloDe(/Pagamento confirmado/);
+    expect(selo.querySelector("svg.lucide-check")).not.toBeNull();
+    expect(screen.queryByText(/Teste ativado/)).toBeNull();
   });
 });
 

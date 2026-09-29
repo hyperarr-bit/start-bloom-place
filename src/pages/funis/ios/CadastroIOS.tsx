@@ -44,6 +44,7 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
+import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
 
 
 /* Glifo oficial da Apple: as diretrizes de marca não aceitam emoji nem ícone
@@ -231,7 +232,11 @@ export function SignupIOS({
         {posCompra ? (
           <>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-3">
-              <Check className="w-3.5 h-3.5" strokeWidth={3} /> Pagamento confirmado
+              {/* 28/09: começar o teste grátis não é pagar — "Pagamento
+                  confirmado" num teste de R$ 0 assusta quem acabou de ler "sem
+                  cobrança hoje". O sinal é o da própria compra (periodType
+                  TRIAL no retorno da loja), gravado antes de chegar aqui. */}
+              <Check className="w-3.5 h-3.5" strokeWidth={3} /> {ultimaCompraAnualFoiTrial() ? "Teste ativado · nada cobrado hoje" : "Pagamento confirmado"}
             </div>
             <h2 className="text-[26px] font-bold tracking-tight leading-tight">
               Agora crie sua conta pra<br />guardar seu acesso.

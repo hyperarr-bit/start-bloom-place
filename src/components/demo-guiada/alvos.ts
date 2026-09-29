@@ -15,6 +15,22 @@
 import { normalizarItem, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
 
+/**
+ * Os tempos da missão. As duas comemorações duram o mesmo que as da Missão do
+ * teste grátis no app (MissaoDoTrial: 2,8 s o 1º registro, 3,6 s a missão
+ * cumprida). Objeto (e não constantes soltas) só pra os testes encurtarem.
+ */
+export const TEMPOS_DA_MISSAO = {
+  /** a faixa fica em 1/3 ("área escolhida ✓") antes de a demo andar sozinha até o botão */
+  antesDoHolofote: 1200,
+  /** "Primeiro registro feito!" */
+  primeiroRegistro: 2800,
+  /** holofote no resumo que recalculou, com o número subindo */
+  olhar: 4500,
+  /** "Missão cumprida 🏆" */
+  cumprida: 3600,
+};
+
 export interface Numero {
   titulo: string;
   antes: number;

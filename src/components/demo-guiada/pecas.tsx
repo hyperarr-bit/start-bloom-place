@@ -2,8 +2,13 @@
  * PEÇAS DA DEMO GUIADA (28/09) — só descem dentro da demo, junto com a missão.
  *
  * Cara de PLANNER (memória feedback_identidade_planner): faixa colorida com
- * título em CAIXA ALTA, quadradinho de marcar (não bolinha), tabela com grade,
- * adesivo das Conquistas. Tokens do funil ROI 2 (pecas-roi2).
+ * título em CAIXA ALTA, quadradinho de marcar (não bolinha). Tokens do funil
+ * ROI 2 (pecas-roi2).
+ *
+ * A COMEMORAÇÃO é a da Missão do teste grátis (28/09, dono: "quando o usuário
+ * faz algo aparece comemoração, porque isso converteu bem lá") — e SEM adesivo:
+ * a 1.0.6, que vendeu bem, não tinha festa de adesivo; a 1.0.7 pôs a festa por
+ * cima da comemoração e a 1.0.8 tirou.
  *
  * O holofote segue as regras de aço da Missão do teste grátis
  * (MissaoDoTrial.tsx — "sempre que fizemos overlay, bugou"):
@@ -16,39 +21,20 @@
  * A barra de módulos sobe acima do escuro enquanto o anel existe: trocar de
  * módulo tem que continuar à mão a missão inteira.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { animate, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check } from "lucide-react";
-import { Adesivo } from "@/components/conquistas/adesivos-arte";
+import { ArrowRight } from "lucide-react";
 import { VERDE_OK } from "@/pages/funis/dia14/pecas-roi2";
-import { ADESIVO_DO_TIPO, type TipoDoItem } from "@/lib/demo-guiada";
 import type { Retangulo } from "./alvos";
+import { Quadradinho } from "./Quadradinho";
 
 export const GRAFITE = "#16121c";
-
-/* ------------------------------------------------------------ quadradinho */
-
-export function Quadradinho({ marcado, tam = 14, claro = false }: { marcado: boolean; tam?: number; claro?: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className="inline-grid place-items-center shrink-0 rounded-[3px] border-2 transition-colors duration-300"
-      style={{
-        width: tam, height: tam,
-        borderColor: marcado ? (claro ? "#fff" : VERDE_OK) : claro ? "rgba(255,255,255,.7)" : "hsl(var(--foreground) / .35)",
-        background: marcado ? (claro ? "#fff" : VERDE_OK) : "transparent",
-      }}
-    >
-      {marcado && <Check strokeWidth={4} style={{ width: tam - 5, height: tam - 5, color: claro ? VERDE_OK : "#fff" }} />}
-    </span>
-  );
-}
 
 /* ------------------------------------------------------------ faixa */
 
 /** A faixa da missão, grudada embaixo da barra de módulos (sticky junto com ela). */
-export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false, adesivo = null }: { feitos: number; texto: ReactNode; aoPular?: () => void; cumprida?: boolean; adesivo?: TipoDoItem | null }) {
+export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false }: { feitos: number; texto: ReactNode; aoPular?: () => void; cumprida?: boolean }) {
   return (
     <div className="border-t border-border" style={{ background: cumprida ? `${VERDE_OK}14` : "hsl(var(--accent) / 0.07)" }} data-testid="demo-guia-faixa">
       <div className="max-w-5xl mx-auto pl-3 pr-1.5 pt-1 flex items-center gap-2 min-h-9">
@@ -58,14 +44,11 @@ export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false, adesiv
           {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitos} />)}
         </span>
         <span className="text-[11px] font-extrabold tabular-nums text-foreground/80">{feitos}/3</span>
-        <span className="ml-auto flex items-center gap-0.5">
-          {adesivo && <AdesivoNaFaixa tipo={adesivo} />}
-          {aoPular && (
-            <button type="button" onClick={aoPular} className="min-h-9 px-2 text-[12px] font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground" data-testid="demo-guia-pular">
-              Pular
-            </button>
-          )}
-        </span>
+        {aoPular && (
+          <button type="button" onClick={aoPular} className="ml-auto min-h-9 px-2 text-[12px] font-semibold text-muted-foreground underline underline-offset-2 hover:text-foreground" data-testid="demo-guia-pular">
+            Pular
+          </button>
+        )}
       </div>
       <p className="max-w-5xl mx-auto pl-[22px] pr-3 pb-1.5 text-[12px] leading-snug text-foreground/85" data-testid="demo-guia-texto">{texto}</p>
     </div>
@@ -237,74 +220,89 @@ export function ContaSubindo({ de, para, formatar, atraso = 0.35, duracao = 1.1 
   return <span className="tabular-nums">{formatar(inteiros ? Math.round(v) : v)}</span>;
 }
 
-/* ------------------------------------------------------------ adesivo + confete */
+/* ------------------------------------------------------------ comemoração */
 
-// As cores do confete das Conquistas (Momentos.tsx) e a quantidade da raridade
-// COMUM (14): aqui ele estoura em volta do adesivo, no canto — sem festa de
-// tela cheia (a do teste grátis foi cortada pelo dono em 28/09).
-const CORES = ["#d22d80", "#F5B301", "#4F8BFF", "#22c55e", "#fb923c", "#8b5cf6"];
-const CONFETES_COMUM = 14;
-
-function ConfeteNoCanto() {
-  const pedacos = useMemo(
-    () => Array.from({ length: CONFETES_COMUM }, (_, i) => {
-      const ang = (i / CONFETES_COMUM) * Math.PI * 2 + (i % 2 ? 0.18 : -0.12);
-      const r = 44 + ((i * 17) % 30);
-      return {
-        id: i,
-        dx: Math.cos(ang) * r,
-        dy: Math.sin(ang) * r * 0.75,
-        giro: (i % 2 ? 1 : -1) * (120 + ((i * 37) % 160)),
-        cor: CORES[i % CORES.length],
-        w: 5 + (i % 3) * 2,
-        redondo: i % 3 === 0,
-        atraso: 0.28 + (i % 4) * 0.04,
-      };
-    }),
-    [],
-  );
-  return (
-    <>
-      {pedacos.map((p) => (
-        <motion.span
-          key={p.id}
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2"
-          style={{ width: p.w, height: p.redondo ? p.w : p.w * 1.6, background: p.cor, borderRadius: p.redondo ? "50%" : 2, marginLeft: -p.w / 2, marginTop: -p.w / 2 }}
-          initial={{ x: 0, y: 0, opacity: 0, rotate: 0, scale: 0.6 }}
-          animate={{ x: p.dx, y: [0, p.dy, p.dy + 34], opacity: [0, 1, 1, 0], rotate: p.giro, scale: 1 }}
-          transition={{ duration: 1.5, delay: p.atraso, ease: "easeOut" }}
-        />
-      ))}
-    </>
-  );
-}
-
-/** O adesivo do 1º registro colando NA FAIXA da missão (raridade comum): o
- *  selo cai, quica e o confete estoura em volta — nada de tela cheia, nada por
- *  cima dos botões do módulo. */
-export function AdesivoNaFaixa({ tipo }: { tipo: TipoDoItem }) {
-  const reduzir = useReducedMotion();
-  return (
-    <span className="relative inline-block w-11 h-9 shrink-0" role="img" aria-label="Adesivo do 1º registro" data-testid="demo-guia-adesivo">
-      {!reduzir && <ConfeteNoCanto />}
-      <motion.span
-        className="absolute left-1/2 top-1/2 -ml-[23px] -mt-[23px] leading-none isolate"
-        initial={reduzir ? { opacity: 0 } : { y: -90, rotate: -30, scale: 1.4, opacity: 0 }}
-        animate={reduzir ? { opacity: 1 } : { y: 0, rotate: -8, scale: 1, opacity: 1 }}
-        // o mesmo quique leve do adesivo das Conquistas (Momentos: Colando)
-        transition={reduzir ? { duration: 0.2 } : { type: "spring", stiffness: 260, damping: 21, mass: 0.9, opacity: { duration: 0.15 } }}
+/**
+ * A COMEMORAÇÃO DA MISSÃO — cópia parametrizada da `Celebracao` da Missão do
+ * teste grátis (src/components/missao/MissaoDoTrial.tsx, "B3 pico"), a peça
+ * que converte no app. Copiada, não importada: aquele arquivo é o caminho do
+ * teste grátis e não se mexe. O visual é o mesmo, classe por classe: fundo
+ * rgba(15,12,20,.55), cartão branco com spring, o GRÁFICO QUE SOBE (path
+ * magenta com pathLength animado + a bolinha no fim), título, chip preto com
+ * 🔥 e a barra verde que pula de `de` pra `para`.
+ *
+ * Diferenças, todas de segurança: o texto do cartão tem cor fixa (no modo
+ * escuro o título herdaria branco sobre o branco), vai por portal (a barra de
+ * módulos tem backdrop-blur, que prende `fixed`), e com "reduzir movimento"
+ * aparece só o cartão pronto, sem animação.
+ * Regras de sempre: pointer-events none (nada engole toque), some sozinha em
+ * `duracao` e se declara camada de guia (`data-camada-guia`).
+ */
+export function ComemoracaoDaMissao({ titulo, chip, de, para, rodape, duracao, aoFim }: {
+  titulo: string;
+  chip: string;
+  de: number;
+  para: number;
+  rodape: string;
+  duracao: number;
+  aoFim: () => void;
+}) {
+  const reduzir = !!useReducedMotion();
+  const aoFimRef = useRef(aoFim);
+  aoFimRef.current = aoFim;
+  useEffect(() => {
+    const t = window.setTimeout(() => aoFimRef.current(), duracao);
+    return () => window.clearTimeout(t);
+  }, [duracao]);
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[210] pointer-events-none grid place-items-center px-8"
+      data-camada-guia="demo-comemoracao"
+      data-testid="demo-guia-comemoracao"
+      initial={reduzir ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.35 }}
+      aria-hidden
+    >
+      <div className="absolute inset-0" style={{ background: "rgba(15,12,20,.55)" }} />
+      <motion.div
+        initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }}
+        className="relative w-full max-w-[320px] rounded-3xl bg-white p-6 text-center text-[#16121c] shadow-2xl"
       >
-        <Adesivo id={ADESIVO_DO_TIPO[tipo]} tamanho={46} bordaGrossa />
-      </motion.span>
-    </span>
+        {/* o gráfico que sobe (Stripe: "o gráfico criou um cliente") */}
+        <svg viewBox="0 0 200 84" className="w-full h-[84px] mb-3">
+          <motion.path
+            d="M8 72 L58 58 L104 62 L150 30 L192 12"
+            fill="none" stroke="hsl(330 65% 50%)" strokeWidth="4" strokeLinecap="round"
+            initial={reduzir ? false : { pathLength: 0 }} animate={{ pathLength: 1 }}
+            transition={{ duration: 1.1, ease: "easeOut", delay: 0.25 }}
+          />
+          <motion.circle
+            cx="192" cy="12" r="6" fill="hsl(330 65% 50%)"
+            initial={reduzir ? false : { scale: 0 }} animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 16, delay: 1.3 }}
+          />
+        </svg>
+        <p className="text-[19px] font-black tracking-[-0.02em] leading-tight mb-1.5">{titulo}</p>
+        <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5 mb-4">{chip}</span>
+        <div className="h-2 rounded-full bg-black/10 overflow-hidden">
+          <motion.div
+            className="h-full rounded-full bg-emerald-500"
+            data-testid="demo-guia-comemoracao-barra"
+            initial={reduzir ? false : { width: `${de}%` }} animate={{ width: `${para}%` }}
+            transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }}
+          />
+        </div>
+        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{rodape}</p>
+      </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 
 /* ------------------------------------------------------------ folha "missão cumprida" */
 
-export function FolhaCumprida({ tipo, rotulo, titulo, sub, aoLevar, aoExplorar }: {
-  tipo: TipoDoItem;
+export function FolhaCumprida({ rotulo, titulo, sub, aoLevar, aoExplorar }: {
   rotulo: string;
   titulo: string;
   sub: string;
@@ -333,17 +331,8 @@ export function FolhaCumprida({ tipo, rotulo, titulo, sub, aoLevar, aoExplorar }
           <span className="text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-white">Missão cumprida</span>
           <span className="text-[11px] font-extrabold text-white/85 tabular-nums">3/3</span>
         </div>
-        <motion.div
-          className="absolute right-3 top-6 leading-none isolate"
-          initial={reduzir ? { opacity: 0 } : { scale: 0.4, rotate: -30, opacity: 0 }}
-          animate={reduzir ? { opacity: 1 } : { scale: 1, rotate: 7, opacity: 1 }}
-          transition={reduzir ? { duration: 0.2 } : { type: "spring", stiffness: 300, damping: 18, delay: 0.25 }}
-          aria-hidden
-        >
-          <Adesivo id={ADESIVO_DO_TIPO[tipo]} tamanho={64} bordaGrossa />
-        </motion.div>
         <div className="px-5 pt-3.5 pb-4">
-          <p className="text-[19px] font-extrabold tracking-tight leading-[1.2] pr-[72px]">
+          <p className="text-[19px] font-extrabold tracking-tight leading-[1.2]">
             <span className="px-1 -mx-1 rounded-sm" style={{ background: "#FFF3B0", color: "#262626" }}>{rotulo}</span>{" "}
             {titulo}
           </p>

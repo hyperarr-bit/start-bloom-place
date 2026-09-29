@@ -18,11 +18,10 @@ import { Lock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
-import { gravarEstadoDaMissao, itemDaDemo, rotuloDoItem, ADESIVO_DO_TIPO, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
+import { gravarEstadoDaMissao, itemDaDemo, rotuloDoItem, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
 import { levarItemParaConta } from "@/lib/demo-guiada-registro";
-import { Adesivo } from "@/components/conquistas/adesivos-arte";
 import { Faixa, SERIF_ITALICO } from "@/pages/funis/dia14/pecas-roi2";
-import { Quadradinho } from "./pecas";
+import { Quadradinho } from "./Quadradinho";
 
 const PRONTO: Record<TipoDoItem, string> = {
   gasto: "Finanças pronta",
@@ -85,10 +84,11 @@ function ConstruiuNaDemo() {
   if (!item) return null;
   return (
     <div className="relative rounded-2xl border border-border bg-card p-4 text-left overflow-hidden" data-testid="construiu">
-      <Faixa cor="verde">O que você já construiu</Faixa>
-      <span aria-hidden className="absolute right-3 top-2.5 leading-none" style={{ transform: "rotate(8deg)" }}>
-        <Adesivo id={ADESIVO_DO_TIPO[item.tipo]} tamanho={46} />
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <Faixa cor="verde">O que você já construiu</Faixa>
+        {/* o 🔥 do chip preto da comemoração da Missão (sem adesivo: 28/09) */}
+        <span aria-hidden className="grid place-items-center w-7 h-7 rounded-full bg-[#16121c] text-[13px] leading-none shrink-0">🔥</span>
+      </div>
       {/* tabela com grade, quadradinho marcado — a folha do planner */}
       <div className="mt-3.5 rounded-xl border border-border overflow-hidden divide-y divide-border">
         <Linha destaque>

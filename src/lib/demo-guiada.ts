@@ -194,8 +194,3 @@ export const rotuloCurto = (i: ItemDaDemo): string =>
 export const NOME_DO_MODULO: Record<TipoDoItem, string> = {
   gasto: "Finanças", habito: "Rotina", exercicio: "Treino", agua: "Saúde", meta: "Metas",
 };
-
-/** Adesivo do 1º registro (a arte das Conquistas), sempre com raridade comum. */
-export const ADESIVO_DO_TIPO: Record<TipoDoItem, string> = {
-  gasto: "first-expense", habito: "rotina-1", exercicio: "treino-1", agua: "agua-7", meta: "meta-1",
-};

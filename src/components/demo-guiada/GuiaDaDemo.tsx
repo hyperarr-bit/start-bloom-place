@@ -1,18 +1,22 @@
 /**
  * A MISSÃO DE 1 MINUTO — a demo da web vira o 1º registro da pessoa (28/09).
  *
- * Desenho (scratchpad funil-web-28-09/relatorio.md, seção b):
+ * Desenho (scratchpad funil-web-28-09/relatorio.md, seção b), no ritmo da
+ * Missão do teste grátis do app (dono: "quando o usuário faz algo aparece
+ * comemoração, porque isso converteu bem lá"):
  *   1/3  ÁREA ESCOLHIDA — nasce feito (progresso dado: cartão-fidelidade com o
  *        1º selo carimbado vence cartão vazio);
  *   2/3  ANOTAR — holofote no botão de adicionar do módulo; ela anota UM item
- *        dela (ex.: Café · R$ 12); o adesivo do 1º registro cola no canto com
- *        14 confetes (raridade comum, sem festa de tela cheia);
- *   3/3  OLHAR (4 s) — holofote no resumo que recalculou, com o número dela
+ *        dela (ex.: Café · R$ 12) → a COMEMORAÇÃO da Missão do app: "Primeiro
+ *        registro feito!", o gráfico que sobe, a barra verde de 33% → 66%;
+ *   3/3  OLHAR (~4 s) — holofote no resumo que recalculou, com o número dela
  *        subindo;
- *   →    folha "Missão cumprida" com DUAS saídas: "Levar isso pros meus
- *        números" (= o "Quase lá", com o item junto) e "Ver os outros
- *        módulos" (fecha, pulsa a barra de módulos e a demo segue igual à de
- *        hoje).
+ *   →    "Missão cumprida 🏆" (a comemoração do dia 3 do app, 66% → 100%) e a
+ *        folha com DUAS saídas: "Levar isso pros meus números" (= o "Quase lá",
+ *        com o item junto) e "Ver os outros módulos" (fecha, pulsa a barra de
+ *        módulos e a demo segue igual à de hoje).
+ * SEM adesivo: no app, o que converteu foi a comemoração da Missão sozinha (a
+ * 1.0.6 não tinha festa de adesivo; a da 1.0.7 atropelou a comemoração e saiu).
  * "Pular" sempre na faixa; o CTA fixo de baixo continua; a barra de módulos
  * continua funcionando o tempo todo (trocar de módulo encerra a missão sem
  * prender ninguém — quem registra isso é o Preview).
@@ -24,13 +28,15 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import { AREA_DO_TIPO, rotuloCurto, type FimDaMissao, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
-import { alvoDaMissao, type Numero } from "./alvos";
-import { Anel, ContaSubindo, FaixaDaMissao, FolhaCumprida } from "./pecas";
+import { alvoDaMissao, TEMPOS_DA_MISSAO, type Numero } from "./alvos";
+import { Anel, ComemoracaoDaMissao, ContaSubindo, FaixaDaMissao, FolhaCumprida } from "./pecas";
 
 /** Cada gravação da demo: chave, valor novo, valor de antes e se veio de um gesto da pessoa. */
 export type OuvinteDaDemo = (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
 
-type Fase = "achar" | "anotar" | "registrou" | "olhar" | "cumprida";
+/** achar/anotar = passo 2 · festa1 = "Primeiro registro feito!" · olhar = passo 3 ·
+ *  festa2 = "Missão cumprida 🏆" · cumprida = a folha com as duas saídas. */
+type Fase = "achar" | "anotar" | "festa1" | "olhar" | "festa2" | "cumprida";
 
 const visivel = (el: Element) => {
   const r = el.getBoundingClientRect();
@@ -120,15 +126,15 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
       if (++tentativas >= 17) { setFase("anotar"); return; }
       timers.push(window.setTimeout(procurar, 300));
     };
-    // ~1,2 s com a faixa em 1/3 ("área escolhida ✓") antes de a demo andar sozinha
-    timers.push(window.setTimeout(procurar, reduzir ? 400 : 1200));
+    const espera = TEMPOS_DA_MISSAO.antesDoHolofote;
+    timers.push(window.setTimeout(procurar, reduzir ? Math.min(400, espera) : espera));
     return () => { vivo = false; timers.forEach((t) => window.clearTimeout(t)); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
   /* O item nasce aqui: a gravação que veio de um gesto dela, na chave do
    * módulo, com algo que não estava lá antes. O número do passo 3 é lido
-   * AGORA — a tela ainda mostra o "antes". */
+   * AGORA — a tela ainda mostra o "antes". E sobe a comemoração. */
   useEffect(() => {
     ouvinte.current = (chave, valor, anterior, gesto) => {
       const f = faseRef.current;
@@ -137,12 +143,12 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
       if (!novo) return;
       let n: Numero | null = null;
       try { n = cfg.numero(valor, anterior, novo); } catch { n = null; }
-      faseRef.current = "registrou";
+      faseRef.current = "festa1";
       numeroRef.current = n;
       setItem(novo);
       setNumero(n);
       setAnelVivo(false);
-      setFase("registrou");
+      setFase("festa1");
       aoItem(novo);
       evento("demo_guia_passo", { n: 3, tipo: novo.tipo });
     };
@@ -150,23 +156,19 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* PASSO 3 — olhar o resumo que recalculou (sem âncora: direto pra folha). */
-  useEffect(() => {
-    if (fase !== "registrou") return;
-    const t = window.setTimeout(() => {
-      const o = cfg.olhar;
-      let el = o ? document.querySelector(o.seletor) : null;
-      if (el && o?.perto) el = o.perto(el);
-      // sem âncora ou sem número pra mostrar: direto pra folha (fail-open)
-      if (el && visivel(el) && numeroRef.current) { setOlharEm(el); setFase("olhar"); }
-      else setFase("cumprida");
-    }, reduzir ? 500 : 1150);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase]);
+  /* Depois do "Primeiro registro feito!": PASSO 3, olhar o resumo que
+   * recalculou (sem âncora ou sem número: direto pra "Missão cumprida"). */
+  const aposPrimeiraFesta = () => {
+    if (faseRef.current !== "festa1") return;
+    const o = cfg.olhar;
+    let el = o ? document.querySelector(o.seletor) : null;
+    if (el && o?.perto) el = o.perto(el);
+    if (el && visivel(el) && numeroRef.current) { setOlharEm(el); setFase("olhar"); }
+    else setFase("festa2");
+  };
 
   useEffect(() => {
-    if (fase !== "cumprida") return;
+    if (fase !== "festa2") return;
     evento("demo_guia_feito", { tipo, segundos: Math.round((Date.now() - t0.current) / 1000) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
@@ -189,10 +191,11 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     aoFim("explorar");
   };
 
-  const feitos = fase === "achar" || fase === "anotar" ? 1 : fase === "cumprida" ? 3 : 2;
+  const completa = fase === "festa2" || fase === "cumprida";
+  const feitos = fase === "achar" || fase === "anotar" ? 1 : completa ? 3 : 2;
   const rotulo = item ? rotuloCurto(item) : "";
   const texto =
-    fase === "cumprida"
+    completa
       ? <><strong>Missão cumprida ✓</strong> {rotulo} vai com você.</>
       : item
         ? <><strong>1º registro:</strong> {rotulo} ✓ · {cfg.olhe}</>
@@ -201,15 +204,27 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
 
   return (
     <div>
-      <FaixaDaMissao feitos={feitos} texto={texto} aoPular={fase === "cumprida" ? undefined : pular} cumprida={fase === "cumprida"} adesivo={item?.tipo ?? null} />
+      <FaixaDaMissao feitos={feitos} texto={texto} aoPular={completa ? undefined : pular} cumprida={completa} />
       <AnimatePresence>
         {anelVivo && alvo && fase === "anotar" && (
           <Anel key="anotar" alvo={alvo} rotulo="Passo 2 de 3 · anota" aoSair={() => setAnelVivo(false)}>
             <span className="block text-[13.5px] font-semibold leading-snug">{cfg.dica}</span>
           </Anel>
         )}
+        {fase === "festa1" && (
+          <ComemoracaoDaMissao
+            key="festa1"
+            titulo="Primeiro registro feito!"
+            chip="🔥 1º registro ✓"
+            de={33}
+            para={66}
+            rodape="Missão de 1 minuto · 66%"
+            duracao={TEMPOS_DA_MISSAO.primeiroRegistro}
+            aoFim={aposPrimeiraFesta}
+          />
+        )}
         {fase === "olhar" && olharEm && numero && (
-          <Anel key="olhar" alvo={olharEm} recorte={cfg.olhar?.recorte} rotulo="Passo 3 de 3 · olha" duracao={5200} aoSair={() => setFase("cumprida")}>
+          <Anel key="olhar" alvo={olharEm} recorte={cfg.olhar?.recorte} rotulo="Passo 3 de 3 · olha" duracao={TEMPOS_DA_MISSAO.olhar} aoSair={() => setFase("festa2")}>
             <span className="block text-[13px] font-semibold text-white/85 leading-snug">{numero.titulo} — já com {item ? `o seu ${item.nome}` : "o seu registro"}:</span>
             <span className="flex items-baseline gap-2 mt-1">
               <span className="text-[13px] text-white/50 line-through tabular-nums">{numero.formatar(numero.antes)}</span>
@@ -220,8 +235,20 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
             </span>
           </Anel>
         )}
+        {fase === "festa2" && (
+          <ComemoracaoDaMissao
+            key="festa2"
+            titulo="Missão cumprida 🏆"
+            chip="🔥🔥🔥 missão completa"
+            de={66}
+            para={100}
+            rodape="Missão de 1 minuto · 100%"
+            duracao={TEMPOS_DA_MISSAO.cumprida}
+            aoFim={() => setFase("cumprida")}
+          />
+        )}
         {fase === "cumprida" && item && cumprida && (
-          <FolhaCumprida key="folha" tipo={item.tipo} rotulo={rotulo} titulo={cumprida.titulo} sub={cumprida.sub} aoLevar={levar} aoExplorar={explorar} />
+          <FolhaCumprida key="folha" rotulo={rotulo} titulo={cumprida.titulo} sub={cumprida.sub} aoLevar={levar} aoExplorar={explorar} />
         )}
       </AnimatePresence>
     </div>

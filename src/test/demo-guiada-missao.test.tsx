@@ -1,8 +1,9 @@
 /**
  * A MISSÃO DE 1 MINUTO na demo (28/09) — o caminho inteiro, com módulos de
  * mentira no lugar dos de verdade:
- *   · braço "on": faixa 1/3, o item nasce do gesto dela, "Missão cumprida"
- *     com as DUAS saídas;
+ *   · braço "on": faixa 1/3, o item nasce do gesto dela, a COMEMORAÇÃO da
+ *     Missão do app ("Primeiro registro feito!" 33→66%, "Missão cumprida 🏆"
+ *     66→100%, sem adesivo nenhum) e a folha com as DUAS saídas;
  *   · a barra de módulos continua funcionando: trocar no meio encerra a
  *     missão (demo_guia_pular trocou_modulo) sem prender;
  *   · o item SOBREVIVE a 5 módulos de passeio (e ao storage zerado): volta
@@ -11,7 +12,7 @@
  *   · braço "off" (controle): a demo de hoje, com o braço no evento.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, act, within } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, act, within, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { MotionGlobalConfig } from "framer-motion";
 
@@ -90,6 +91,10 @@ import { PaywallDia14 } from "@/pages/funis/dia14/PaywallDia14";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { esquecerMissao, estadoDaMissao } from "@/lib/demo-guiada";
 import { idDoItem } from "@/lib/demo-guiada-registro";
+import { TEMPOS_DA_MISSAO } from "@/components/demo-guiada/alvos";
+
+// os tempos de verdade (os do app), guardados antes de o teste encurtar
+const TEMPOS_REAIS = { ...TEMPOS_DA_MISSAO };
 
 MotionGlobalConfig.skipAnimations = true;
 if (!("ResizeObserver" in globalThis)) {
@@ -139,8 +144,20 @@ beforeEach(() => {
   sorteio.chamadas = 0;
   analytics.trackEvent.mockClear();
   window.history.replaceState({}, "", "/");
+  // comemorações encurtadas no teste (o fluxo é o mesmo; os tempos reais estão travados abaixo)
+  Object.assign(TEMPOS_DA_MISSAO, { antesDoHolofote: 50, primeiroRegistro: 120, olhar: 150, cumprida: 120 });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  Object.assign(TEMPOS_DA_MISSAO, TEMPOS_REAIS);
+});
+
+describe("a comemoração é a da Missão do teste grátis do app", () => {
+  it("dura o mesmo que a do app: 2,8 s o 1º registro, 3,6 s a missão cumprida", () => {
+    expect(TEMPOS_REAIS.primeiroRegistro).toBe(2800);
+    expect(TEMPOS_REAIS.cumprida).toBe(3600);
+  });
+});
 
 describe("o sorteio do A/B é na ENTRADA da demo (e o braço vai carimbado na URL)", () => {
   it("fora do experimento (chave desligada): a URL e o evento ficam os de hoje", async () => {
@@ -199,15 +216,41 @@ describe("braço on: a missão", () => {
     expect(quaseLa()).toBeTruthy();
   });
 
-  it("o item nasce do gesto dela: pílulas e 'Quase lá' levam c=, a sessão guarda, e a folha tem as DUAS saídas", async () => {
+  it("o item nasce do gesto dela e sobe a comemoração da Missão do app: 'Primeiro registro feito!' → 'Missão cumprida 🏆' → folha", async () => {
     await abrirDemo(`${DEMO}&guia=1`);
     await anotarCafe();
     expect(pilula("Rotina").getAttribute("href")).toContain(C_CAFE);
     expect(quaseLa().getAttribute("href")).toContain(C_CAFE);
     expect(estadoDaMissao().item).toEqual({ tipo: "gasto", nome: "Café", valor: 12 });
     expect(eventos("demo_guia_passo")).toContainEqual(expect.objectContaining({ n: 3, tipo: "gasto" }));
-    // sem o resumo do mês no módulo de mentira, o "olhar" é pulado (fail-open) e a folha sobe
+
+    // 1ª comemoração: igual ao dia 1 da Missão do app — fundo escuro, cartão branco, o gráfico que
+    // sobe, o chip preto, a barra verde 33% → 66%; não engole toque; é camada de guia
+    const festa1 = await screen.findByTestId("demo-guia-comemoracao");
+    expect(festa1.textContent).toMatch(/Primeiro registro feito!/);
+    expect(festa1.textContent).toMatch(/🔥 1º registro ✓/);
+    expect(festa1.textContent).toMatch(/Missão de 1 minuto · 66%/);
+    expect(festa1.className).toMatch(/pointer-events-none/);
+    expect(festa1.getAttribute("data-camada-guia")).toBe("demo-comemoracao");
+    expect(festa1.querySelector("path")?.getAttribute("stroke")).toBe("hsl(330 65% 50%)");
+    expect(festa1.querySelector("circle")).toBeTruthy();
+    const barra1 = festa1.querySelector('[data-testid="demo-guia-comemoracao-barra"]') as HTMLElement;
+    await waitFor(() => expect(barra1.style.width).toBe("66%")); // nasce em 33% e pula
+    // SEM adesivo em lugar nenhum (a 1.0.6, que vendeu, não tinha festa de adesivo)
+    expect(document.querySelector("[data-adesivo]")).toBeNull();
+
+    // sem o resumo do mês no módulo de mentira, o "olhar" é pulado (fail-open) e vem a 2ª comemoração
+    await screen.findByText("Missão cumprida 🏆", {}, { timeout: 3000 });
+    const festa2 = screen.getByTestId("demo-guia-comemoracao");
+    expect(festa2.textContent).toMatch(/🔥🔥🔥 missão completa/);
+    expect(festa2.textContent).toMatch(/Missão de 1 minuto · 100%/);
+    const barra2 = festa2.querySelector('[data-testid="demo-guia-comemoracao-barra"]') as HTMLElement;
+    await waitFor(() => expect(barra2.style.width).toBe("100%"));
+    expect(eventos("demo_guia_feito")).toHaveLength(1);
+    expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/3\/3/);
+
     const folha = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
+    expect(document.querySelector("[data-adesivo]")).toBeNull();
     expect(folha.textContent).toMatch(/Missão cumprida/);
     expect(folha.textContent).toMatch(/Café · R\$ 12/);
     expect(folha.textContent).toMatch(/já está anotado/);
@@ -294,6 +337,9 @@ describe("a barra de módulos continua funcionando", () => {
     expect(bloco.textContent).toMatch(/Finanças pronta/);
     expect(bloco.textContent).toMatch(/16 módulos/);
     expect(bloco.textContent).toMatch(/Fica salvo quando liberar/);
+    // sem a arte do adesivo: no lugar, o 🔥 do chip da comemoração da Missão
+    expect(bloco.querySelector("[data-adesivo]")).toBeNull();
+    expect(bloco.textContent).toMatch(/🔥/);
     expect(eventos("paywall_construiu_view")).toContainEqual({ guia: "on", tipo: "gasto" });
   });
 });

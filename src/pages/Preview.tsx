@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useParams, Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { Sparkles, ArrowRight, X } from "lucide-react";
@@ -7,6 +7,17 @@ import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { DEMO_MODULES } from "@/lib/funnel";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
+import {
+  bracoDaDemo, comBraco, comItem, estadoDaMissao, gravarEstadoDaMissao, itemDaDemo, tipoDoModulo,
+  AREA_DO_TIPO, MODULO_DO_TIPO, PARAM_BRACO, type FimDaMissao, type ItemDaDemo,
+} from "@/lib/demo-guiada";
+import { aplicarItemNaDemo } from "@/lib/demo-guiada-registro";
+import { sortearBracoDaDemo } from "@/lib/demo-guiada-braco";
+import type { OuvinteDaDemo } from "@/components/demo-guiada/GuiaDaDemo";
+
+/* DEMO GUIADA (28/09): a "Missão de 1 minuto" só desce quando o braço da demo
+ * é "on" (src/lib/demo-guiada-braco.ts). Chave desligada = nada abaixo monta. */
+const GuiaDaDemo = lazy(() => import("@/components/demo-guiada/GuiaDaDemo"));
 
 // Fechamento ativo do tour (pico-fim): quem abre o 2º módulo já está engajado —
 // é a hora de puxar pro cadastro, antes de esfriar fuçando.
@@ -144,7 +155,16 @@ const PreviewBanner = ({ funnel, modulo }: { funnel?: boolean; modulo?: string }
  * header do módulo grudar LOGO ABAIXO em vez de disputar o mesmo topo. Altura
  * medida, não chutada: quem aumenta a fonte do sistema muda esse número.
  */
-const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
+const DemoTourNav = ({ current, from, ajustarLink, aoTrocar, faixa }: {
+  current: string;
+  from?: string;
+  /** Demo guiada: as pílulas levam o braço e o item junto (a URL sobrevive ao apagão de storage). */
+  ajustarLink?: (url: string) => string;
+  /** Demo guiada: trocar de módulo no meio da missão encerra a missão. */
+  aoTrocar?: (modulo: string) => void;
+  /** Demo guiada: a faixa "Missão de 1 minuto", grudada embaixo das pílulas. */
+  faixa?: ReactNode;
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -163,11 +183,12 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
     <div className="max-w-5xl mx-auto px-3 py-2 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
       {DEMO_MODULES.map((m) => {
         const active = m.key === current;
+        const destino = `/preview/${m.key}?funnel=1&tour=vida${from ? `&from=${from}` : ""}`;
         return (
           <Link
             key={m.key}
-            to={`/preview/${m.key}?funnel=1&tour=vida${from ? `&from=${from}` : ""}`}
-            onClick={() => trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key })}
+            to={ajustarLink ? ajustarLink(destino) : destino}
+            onClick={() => { trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key }); aoTrocar?.(m.key); }}
             // min-h-11 (44px): a auditoria de toque de 14/08 pegou estas
             // pílulas com 31px de altura — são a navegação mais tocada da
             // demo, e alvo curto vira "área não clicável" na avaliação.
@@ -185,6 +206,7 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
         +10 no app completo
       </span>
     </div>
+    {faixa}
   </div>
   );
 };
@@ -240,7 +262,12 @@ const useDialogoAberto = () => {
   return aberto;
 };
 
-const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
+const DemoCta = ({ funnel, tour, from, ajustarLink, aoTocar }: {
+  funnel?: boolean; tour?: boolean; from?: string;
+  /** Demo guiada: a volta leva o item que ela anotou (c=). */
+  ajustarLink?: (url: string) => string;
+  aoTocar?: () => void;
+}) => {
   const dialogoAberto = useDialogoAberto();
   const faixaRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -296,8 +323,8 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
               : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
         </p>
         <Link
-          to={to}
-          onClick={() => trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" })}
+          to={ajustarLink ? ajustarLink(to) : to}
+          onClick={() => { trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" }); aoTocar?.(); }}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
         >
           {shell ? "Quero o meu assim" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
@@ -309,7 +336,7 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
 
 /** Banner de fechamento ativo: aparece quando a pessoa abre o 2º módulo do
  *  tour — "você já viu N de 16, bora com os SEUS dados?". Some ao dispensar. */
-const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
+const DemoTourNudge = ({ count, from, ajustarLink }: { count: number; from?: string; ajustarLink?: (url: string) => string }) => {
   const [show, setShow] = useState(true);
   // No shell o destino é a porta do app; na web, o funil de origem. Fallback
   // em ?step=signup (o "plano" saiu — ver DemoCta).
@@ -334,7 +361,7 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
           <p className="text-[11.5px] text-muted-foreground">Bora montar tudo com os seus dados de verdade?</p>
         </div>
         <Link
-          to={to}
+          to={ajustarLink ? ajustarLink(to) : to}
           onClick={() => trackEvent("funnel_click", { cta: "demo_nudge_signup", modules: count })}
           className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary text-primary-foreground font-semibold text-[13px] px-3 py-2 hover:bg-primary/90 transition"
         >
@@ -398,6 +425,73 @@ const Preview = () => {
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
 
+  /* DEMO GUIADA (28/09) — a "Missão de 1 minuto" (src/lib/demo-guiada*.ts).
+   * `braco` null = fora do experimento (chave desligada): NADA abaixo muda a
+   * demo — sem faixa, sem item, links e eventos iguais aos de hoje (travado em
+   * src/test/demo-guiada-off.test.tsx). Só na web, só no funil com o tour.
+   * "off" = controle do A/B (a demo de hoje, com o braço nos eventos).
+   * O SORTEIO do A/B é aqui, na ENTRADA da demo do funil do dia 14 (a 1ª
+   * abertura, sem braço na URL) — e o braço é carimbado na URL logo abaixo. */
+  const navigate = useNavigate();
+  const [braco] = useState<"on" | "off" | null>(() => {
+    if (!funnel || !tour || embed || isNativeShell()) return null;
+    const naUrl = bracoDaDemo(params);
+    if (naUrl || from !== "dia14") return naUrl;
+    const sorteado = sortearBracoDaDemo(); // chave desligada = null = a demo de hoje
+    return sorteado === "1" ? "on" : sorteado === "0" ? "off" : null;
+  });
+  // braço carimbado na URL (replace): recarregar, voltar e trocar de módulo mantêm o braço
+  // mesmo com o storage zerado pelo navegador do Instagram
+  useEffect(() => {
+    if (!braco || params.get(PARAM_BRACO)) return;
+    const comOBraco = new URLSearchParams(params);
+    comOBraco.set(PARAM_BRACO, braco === "on" ? "1" : "0");
+    navigate({ search: `?${comOBraco.toString()}` }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [item, setItem] = useState<ItemDaDemo | null>(() => (braco === "on" ? itemDaDemo(params) : null));
+  const tipo = braco === "on" ? tipoDoModulo(key) : null;
+  const [guiaAberta, setGuiaAberta] = useState(() => {
+    if (!tipo) return false;
+    const e = estadoDaMissao();
+    // uma missão por demo: começa no módulo da área e não volta depois de acabar
+    return !e.fim && !e.item && !item && (!e.inicio || e.inicio === key);
+  });
+  useEffect(() => {
+    if (guiaAberta && !estadoDaMissao().inicio) gravarEstadoDaMissao({ inicio: key });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const ouvinteRef = useRef<OuvinteDaDemo | null>(null);
+  const encaminharGravacao = useCallback((k: string, v: unknown, a: unknown, g: boolean) => ouvinteRef.current?.(k, v, a, g), []);
+  const eventoDaMissao = (nome: string, extra: Record<string, unknown>) =>
+    trackEvent(nome, { guia: "on", modulo: key, ...(tipo ? { area: AREA_DO_TIPO[tipo], tipo } : {}), ...extra });
+  const encerrarMissao = (motivo: FimDaMissao) => {
+    gravarEstadoDaMissao({ fim: motivo });
+    setGuiaAberta(false);
+  };
+  // pílulas: o braço e o item vão junto (a URL sobrevive ao apagão de storage do Instagram)
+  const ajustarPilula = braco ? (url: string) => comItem(comBraco(url, braco), item) : undefined;
+  // volta pro cadastro ("Quase lá", aviso dos módulos, "Levar isso pros meus números"): o item vai junto
+  const ajustarVolta = item ? (url: string) => comItem(url, item) : undefined;
+  const aoTrocarModulo = guiaAberta
+    ? (destino: string) => {
+        if (destino === key) return;
+        // trocar de módulo NO MEIO da missão encerra a missão (sem prender, sem voltar sozinho);
+        // com o item já anotado, é só explorar
+        if (item) eventoDaMissao("demo_guia_explorar", { via: "barra", para: destino });
+        else eventoDaMissao("demo_guia_pular", { motivo: "trocou_modulo", para: destino });
+        encerrarMissao(item ? "explorar" : "trocou_modulo");
+      }
+    : undefined;
+  const aoTocarQuaseLa = guiaAberta
+    ? () => {
+        if (item) eventoDaMissao("demo_guia_levar", { via: "cta" });
+        else eventoDaMissao("demo_guia_pular", { motivo: "quase_la" });
+        encerrarMissao(item ? "levar" : "quase_la");
+      }
+    : undefined;
+  const voltaDaMissao = () => voltaMarcada() ?? (from && voltaFunilTeste(from, tour)) ?? "/comecar?step=signup";
+
   // CERCA DO TOUR (bug 24/07): a seta ← dos módulos navega pra "/" e o
   // RootGate mandava o visitante pro /comecar (funil de FINANÇAS) — fuga do
   // vitrine. Marca o tour ativo; o RootGate devolve pra /inicio?step=analise.
@@ -425,7 +519,7 @@ const Preview = () => {
   // Telemetria do funil: a demo (app real) é um passo do funil.
   // No tour, cada módulo visitado conta — mede quantos cômodos a pessoa abre.
   useEffect(() => {
-    if (funnel) trackEvent("funnel_view", { step: "demo", ...(tour ? { tour: "vida", module: key } : {}) });
+    if (funnel) trackEvent("funnel_view", { step: "demo", ...(tour ? { tour: "vida", module: key } : {}), ...(braco ? { guia: braco } : {}) });
     if (!tour) return;
     let visited: string[] = [];
     try { visited = JSON.parse(sessionStorage.getItem(TOUR_VISITED_KEY) || "[]"); } catch { visited = []; }
@@ -439,7 +533,7 @@ const Preview = () => {
       nudgeFiredRef.current = true;
       trackEvent("funnel_view", { step: "demo_nudge", tour: "vida", modules: visited.length });
     }
-  }, [funnel, tour, key]);
+  }, [funnel, tour, key, braco]);
 
   if (!Component) {
     return <Navigate to="/lp" replace />;
@@ -453,17 +547,41 @@ const Preview = () => {
           modulo={tour && funnel && !isNativeShell() && ehFunilRoi2() ? DEMO_MODULES.find((m) => m.key === key)?.label : undefined}
         />
       )}
-      {tour && <DemoTourNav current={key} from={from} />}
+      {tour && (
+        <DemoTourNav
+          current={key}
+          from={from}
+          ajustarLink={ajustarPilula}
+          aoTrocar={aoTrocarModulo}
+          faixa={guiaAberta && tipo ? (
+            <Suspense fallback={null}>
+              <GuiaDaDemo
+                modulo={key}
+                tipo={tipo}
+                ouvinte={ouvinteRef}
+                aoItem={(novo) => { gravarEstadoDaMissao({ item: novo }); setItem(novo); }}
+                aoFim={encerrarMissao}
+                irParaCadastro={(novo) => navigate(comItem(voltaDaMissao(), novo))}
+              />
+            </Suspense>
+          ) : undefined}
+        />
+      )}
       {tour && funnel && isNativeShell() && <DicaDemoShell />}
-      <PreviewUserDataProvider key={key} moduleKey={key}>
+      <PreviewUserDataProvider
+        key={key}
+        moduleKey={key}
+        semente={item && MODULO_DO_TIPO[item.tipo] === key ? (sementes) => aplicarItemNaDemo(sementes, item) : undefined}
+        aoGravar={guiaAberta ? encaminharGravacao : undefined}
+      >
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Suspense fallback={<CarregandoModulo />}>
             <Component />
           </Suspense>
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
-      {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} />}
-      {!embed && <DemoCta funnel={funnel} tour={tour} from={from} />}
+      {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} ajustarLink={ajustarVolta} />}
+      {!embed && <DemoCta funnel={funnel} tour={tour} from={from} ajustarLink={ajustarVolta} aoTocar={aoTocarQuaseLa} />}
     </div>
   );
 };

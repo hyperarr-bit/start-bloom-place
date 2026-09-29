@@ -11,9 +11,17 @@ import { trackEvent } from "@/lib/analytics";
 export const PreviewUserDataProvider = ({
   moduleKey,
   children,
+  semente,
+  aoGravar,
 }: {
   moduleKey: string;
   children: ReactNode;
+  /** Demo guiada (28/09): o item que a pessoa anotou volta pro snapshot quando
+   *  ela reabre o módulo dele. Sem ela, as sementes de sempre. */
+  semente?: (sementes: Record<string, unknown>) => Record<string, unknown>;
+  /** Demo guiada: cada gravação, com o valor de antes e se veio de um gesto da
+   *  pessoa (é assim que a missão acha o item dela). Sem ela, nada muda. */
+  aoGravar?: (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
 }) => {
   // Espelho global do store: componentes que leem localStorage direto
   // (storage-keys.ts) caem aqui quando não há usuário — sem isso os gráficos
@@ -21,10 +29,18 @@ export const PreviewUserDataProvider = ({
   // SÍNCRONO (no initializer, antes do primeiro render dos filhos): os
   // useMemo do Dashboard leem na montagem e não recalculam depois.
   const [store, setStore] = useState<Record<string, any>>(() => {
-    const seeds = getSeedsForModule(moduleKey);
+    let seeds = getSeedsForModule(moduleKey);
+    if (semente) {
+      try { seeds = semente(seeds); } catch { /* o item nunca derruba a demo: fica o snapshot de sempre */ }
+    }
     if (typeof window !== "undefined") (window as any).__PREVIEW_SEEDS__ = { ...seeds };
     return seeds;
   });
+  // Espelhos pra o `set` (estável) enxergar o valor de antes e o ouvinte da missão.
+  const storeRef = useRef(store);
+  storeRef.current = store;
+  const aoGravarRef = useRef(aoGravar);
+  aoGravarRef.current = aoGravar;
 
   useEffect(() => {
     (window as any).__PREVIEW_SEEDS__ = { ...store };
@@ -101,9 +117,13 @@ export const PreviewUserDataProvider = ({
   // Sem toast aqui: o banner do topo já sinaliza que é demo — deixa a pessoa
   // mexer à vontade sem interrupção.
   const set = useCallback((key: string, value: any) => {
-    if (Date.now() - ultimoGesto.current < 2000 && !jaContou.current.has(key)) {
+    const gesto = Date.now() - ultimoGesto.current < 2000;
+    if (gesto && !jaContou.current.has(key)) {
       jaContou.current.add(key);
       try { trackEvent("demo_interact", { modulo: moduleKey, chave: key }); } catch { /* medição nunca derruba a demo */ }
+    }
+    if (aoGravarRef.current) {
+      try { aoGravarRef.current(key, value, storeRef.current[key], gesto); } catch { /* a missão nunca derruba a demo */ }
     }
     try {
       if (key === "finance-dueDays" && isNativeShell()) {

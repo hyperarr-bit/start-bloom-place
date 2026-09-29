@@ -173,6 +173,11 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     "skincare-morning-checked": feitosManha,
     "skincare-night-checked": feitosNoite,
     "skincare-daily-checkin": { [hoje]: "oleosa" },
+    // o DIÁRIO de antes (Onda 1: vira "Fotos da pele" no fim de SKINCARE, mesma chave)
+    "skincare-diary": [
+      { id: "d1", date: diaMenos(hoje, 1), skinStatus: "oleosa", mood: "😊", notes: "Menos brilho na testa com a niacinamida", photoUrl: "" },
+      { id: "d2", date: diaMenos(hoje, 8), skinStatus: "acne", mood: "😐", notes: "Espinha no queixo — segurei o ácido 2 noites", photoUrl: "" },
+    ],
     "skincare-perfil": { pele: "oleosa", objetivo: "acne", nivel: "avancado" },
     "beauty-products": bancada,
     [CHAVE_LEMBRETE_SKINCARE]: { manha: { ligado: true, hora: "07:30" }, noite: { ligado: true, hora: "21:30" } },

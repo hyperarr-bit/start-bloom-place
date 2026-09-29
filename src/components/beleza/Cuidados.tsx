@@ -38,14 +38,14 @@ export function LinhaDoCuidado({ c, hoje, onAbrir }: { c: Cuidado; hoje: string;
     <button
       type="button"
       onClick={onAbrir}
-      className="w-full grid grid-cols-[minmax(0,1fr)_2.9rem_3.1rem_4.6rem] items-center gap-1.5 px-3 min-h-[58px] py-2 border-t border-bz-linha text-left bg-transparent active:bg-bz-blush/60"
+      className="w-full grid grid-cols-[minmax(0,1fr)_2.6rem_2.9rem_4.4rem] items-center gap-1.5 px-3 min-h-[58px] py-2 border-t border-bz-linha text-left bg-transparent active:bg-bz-blush/60"
       data-testid="linha-cuidado"
       aria-label={`${c.nome}: ${textoDaFalta(faltaDoCuidado(c, hoje))}`}
     >
       <span className="min-w-0 flex items-center gap-2">
-        <span className="w-8 h-8 shrink-0 rounded-full bg-bz-blush grid place-items-center text-[15px]" aria-hidden="true">{EMOJI_DO_TIPO[c.tipo]}</span>
+        <span className="hidden min-[380px]:grid w-8 h-8 shrink-0 rounded-full bg-bz-blush place-items-center text-[15px]" aria-hidden="true">{EMOJI_DO_TIPO[c.tipo]}</span>
         <span className="min-w-0">
-          <span className="block text-[13.5px] font-semibold leading-snug text-bz-tinta line-clamp-2 break-words">{c.nome}</span>
+          <span className="block text-[13.5px] font-semibold leading-snug text-bz-tinta line-clamp-2">{c.nome}</span>
           {sub && <span className="block text-[11px] text-bz-suave truncate">{sub}</span>}
         </span>
       </span>
@@ -109,7 +109,7 @@ export function Cuidados() {
         />
         {x.ordenados.length > 0 ? (
           <>
-            <div className="grid grid-cols-[minmax(0,1fr)_2.9rem_3.1rem_4.6rem] gap-1.5 px-3 py-2 bg-bz-blush text-[9.5px] font-extrabold uppercase tracking-[.1em] text-bz-suave" aria-hidden="true">
+            <div className="grid grid-cols-[minmax(0,1fr)_2.6rem_2.9rem_4.4rem] gap-1.5 px-3 py-2 bg-bz-blush text-[9.5px] font-extrabold uppercase tracking-[.1em] text-bz-suave" aria-hidden="true">
               <span>Cuidado</span><span className="text-center">Última</span><span className="text-center">Próxima</span><span className="text-right">Falta</span>
             </div>
             {x.ordenados.map((c) => <LinhaDoCuidado key={c.id} c={c} hoje={x.hoje} onAbrir={() => setAberto(c.id)} />)}

@@ -267,6 +267,27 @@ const unidadeCurta = (d: DefinicaoInsignia, valor: number): string => {
   }
 };
 
+/**
+ * O RÓTULO NO NÚMERO CERTO (29/09 — o dono viu "1 MESES NO AZUL" no card de
+ * compartilhar). O rótulo do selo é escrito no plural; com o número 1 (só nas
+ * contáveis, fmt "int"), cada palavra dele que existe no PLURAL da `unidade`
+ * vira a do singular: "MESES NO AZUL" → "MÊS NO AZUL", "DIAS DE" → "DIA DE",
+ * "QUITADAS" → "QUITADA", "SEGUIDOS NA DIETA" → "SEGUIDO NA DIETA". Rótulo
+ * que não é unidade ("RECORDE", "SEM RECAÍDA", "DO PET") fica como está.
+ */
+const SINGULAR_FORA_DA_UNIDADE: Record<string, string> = { feitas: "feita" }; // "METAS FEITAS" (a unidade diz "concluídas")
+export const rotuloPeloValor = (d: Pick<DefinicaoInsignia, "rotulo" | "unidade" | "fmt">, valor: number): string => {
+  if (d.fmt !== "int" || Math.round(valor) !== 1) return d.rotulo;
+  const singular = d.unidade[0].toLowerCase().split(/\s+/);
+  const plural = d.unidade[1].toLowerCase().split(/\s+/);
+  const mapa = new Map<string, string>();
+  if (singular.length === plural.length) plural.forEach((p, i) => { if (p && p !== singular[i]) mapa.set(p, singular[i]); });
+  return d.rotulo.split(" ").map((w) => {
+    const s = mapa.get(w.toLowerCase()) ?? SINGULAR_FORA_DA_UNIDADE[w.toLowerCase()];
+    return s ? s.toUpperCase() : w;
+  }).join(" ");
+};
+
 export interface Medida { valor: number; sub?: string; faixas?: [number, number, number] }
 export type Medidas = Record<string, Medida>;
 
@@ -277,6 +298,7 @@ export const montarInsignia = (d: DefinicaoInsignia, m: Medida | undefined): Ins
   const a = AREAS[d.area];
   return {
     ...d,
+    rotulo: rotuloPeloValor(d, valor),
     faixas,
     valor,
     faixa,

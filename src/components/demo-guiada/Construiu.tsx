@@ -33,7 +33,7 @@ const PRONTO: Record<TipoDoItem, string> = {
 };
 
 /** Grava o item na conta uma vez, quando a conta está carregada. Devolve se já gravou. */
-export function useLevarItemParaConta(item: ItemDaDemo | null): boolean {
+function useLevarItemParaConta(item: ItemDaDemo | null): boolean {
   const { user } = useAuth();
   const { get, set, loaded, isGuest } = useUserData();
   const feito = useRef(false);

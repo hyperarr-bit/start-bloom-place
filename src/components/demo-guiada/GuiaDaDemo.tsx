@@ -87,7 +87,10 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
   };
   const passoAtual = () => (faseRef.current === "achar" || faseRef.current === "anotar" ? 2 : 3);
 
-  useEffect(() => { evento("demo_guia_view"); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => {
+    evento("demo_guia_view");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* PASSO 2 — achar o botão de adicionar (a aba do módulo como reserva: a
    * missão toca nela sozinha). Módulo pesado monta tarde: procura a cada

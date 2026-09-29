@@ -18,10 +18,10 @@ export const PreviewUserDataProvider = ({
   children: ReactNode;
   /** Demo guiada (28/09): o item que a pessoa anotou volta pro snapshot quando
    *  ela reabre o módulo dele. Sem ela, as sementes de sempre. */
-  semente?: (sementes: Record<string, any>) => Record<string, any>;
+  semente?: (sementes: Record<string, unknown>) => Record<string, unknown>;
   /** Demo guiada: cada gravação, com o valor de antes e se veio de um gesto da
    *  pessoa (é assim que a missão acha o item dela). Sem ela, nada muda. */
-  aoGravar?: (chave: string, valor: any, anterior: any, gesto: boolean) => void;
+  aoGravar?: (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
 }) => {
   // Espelho global do store: componentes que leem localStorage direto
   // (storage-keys.ts) caem aqui quando não há usuário — sem isso os gráficos

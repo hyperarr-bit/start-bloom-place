@@ -60,7 +60,7 @@ export const PetWidget = ({ size = "small" }: { size?: WidgetSize }) => {
 
   return (
     <div className="tema-pet w-full bg-card rounded-2xl p-4 shadow-sm border border-border/50" data-testid="widget-pet">
-      <button onClick={() => navigate("/pet")} className="flex items-center gap-2 mb-2 min-h-[32px]">
+      <button onClick={() => navigate("/pet")} className="flex items-center gap-2 mb-1 min-h-[44px]">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Pet de hoje</h3>
       </button>
       <div className="space-y-3">
@@ -79,7 +79,7 @@ export const PetWidget = ({ size = "small" }: { size?: WidgetSize }) => {
                     role="checkbox"
                     aria-checked={i.feito}
                     onClick={() => marcar(r.pet.id, i.id, !i.feito)}
-                    className="w-full flex items-center gap-2.5 min-h-[40px] text-left"
+                    className="w-full flex items-center gap-2.5 min-h-[44px] text-left"
                   >
                     <span className={`w-5 h-5 rounded-[5px] border-2 grid place-items-center shrink-0 ${i.feito ? "bg-accent border-accent text-accent-foreground dark:text-background" : "border-foreground/30"}`}>
                       {i.feito && <Check className="w-3 h-3" strokeWidth={3.2} aria-hidden="true" />}
@@ -92,7 +92,7 @@ export const PetWidget = ({ size = "small" }: { size?: WidgetSize }) => {
               ))}
             </ul>
             {r.urgente && (r.urgente.status === "atrasado" || r.urgente.status === "hoje" || r.urgente.status === "logo") && (
-              <button onClick={() => navigate("/pet?aba=saude")} className={`mt-1 text-[11.5px] font-bold min-h-[32px] ${r.urgente.status === "atrasado" ? "text-[hsl(var(--pet-atraso))]" : "text-[hsl(var(--pet-logo))]"}`}>
+              <button onClick={() => navigate("/pet?aba=saude")} className={`mt-0.5 text-[11.5px] font-bold min-h-[44px] ${r.urgente.status === "atrasado" ? "text-[hsl(var(--pet-atraso))]" : "text-[hsl(var(--pet-logo))]"}`}>
                 {r.urgente.nome}: {quandoTexto(r.urgente)} →
               </button>
             )}

@@ -254,7 +254,7 @@ const Notificacoes = () => {
         <LinhaAviso
           icone={<PawPrint className="w-4 h-4" />}
           titulo="Cuidados do pet"
-          descricao="No dia da vacina, do vermífugo e do antipulgas (vacina e consulta também na véspera), e o remédio do pet na hora de cada dose."
+          descricao="No dia da vacina, do vermífugo e do antipulgas (vacina, consulta e banho também antes — você escolhe no Pet), e o remédio do pet na hora de cada dose."
           ligado={petLigado}
           onChange={(v) => void alternarPet({ ...prefsPet, cuidados: v, remedios: v })}
           rodape={rodapeDe("pet", petLigado, "Anote a última vacina ou vermífugo em Pet → Saúde")}

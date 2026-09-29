@@ -32,6 +32,7 @@ import { ComecoPronto } from "@/components/pet/comeco-pronto";
 import { FichaDoPet } from "@/components/pet/ficha-do-pet";
 import { PesoDoPet } from "@/components/pet/peso-do-pet";
 import { AvisosDoPet, DicaDoPet } from "@/components/pet/avisos-do-pet";
+import { MandarCarteirinha } from "@/components/pet/mandar-carteirinha";
 import type { TipoCuidado } from "@/lib/pet-cuidados";
 
 const ABAS = [
@@ -93,7 +94,7 @@ const Pet = () => {
       />
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-          <button type="button" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="w-9 h-9 -ml-2 shrink-0 grid place-items-center rounded-md hover:bg-muted">
+          <button type="button" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="w-11 h-11 -ml-3 shrink-0 grid place-items-center rounded-md hover:bg-muted">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-[hsl(var(--pet-mel))] shrink-0"><Pata className="w-5 h-5" /></span>
@@ -152,9 +153,12 @@ const Pet = () => {
 
         {loaded && pet && aba === "saude" && (
           <>
-            <div className="rounded-xl border border-border bg-card px-3.5 py-3 flex items-center gap-3">
-              <RgCurto pet={pet} hoje={hoje} />
-              <button type="button" onClick={() => setFichaAberta(true)} className="ml-auto min-h-[44px] px-2 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground">Ver RG</button>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="px-3.5 py-3 flex items-center gap-3">
+                <RgCurto pet={pet} hoje={hoje} />
+                <button type="button" onClick={() => setFichaAberta(true)} className="ml-auto min-h-[44px] px-2 -mr-2 text-[12.5px] font-semibold text-muted-foreground hover:text-foreground">Ver RG</button>
+              </div>
+              <MandarCarteirinha pet={pet} dados={dados} />
             </div>
             <Carteirinha pet={pet} dados={dados} />
             <PesoDoPet pet={pet} dados={dados} />

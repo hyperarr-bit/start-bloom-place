@@ -29,18 +29,23 @@ export interface PrefsLembretePet {
   remedios: boolean;
   /** hora dos avisos de cuidado (o remédio usa o horário de cada dose) */
   hora: number;
+  /** vacina, consulta e banho (coisa de marcar na clínica): avisar também N dias antes (0 = só no dia) */
+  antes: number;
 }
 
-export const PREFS_LEMBRETE_PET_PADRAO: PrefsLembretePet = { cuidados: false, remedios: false, hora: 10 };
+export const ANTECEDENCIAS = [0, 1, 3, 7] as const;
+export const PREFS_LEMBRETE_PET_PADRAO: PrefsLembretePet = { cuidados: false, remedios: false, hora: 10, antes: 1 };
 
 /** Só liga o que alguém disse `true` explicitamente — dado antigo/torto nunca liga aviso. */
 export function lerPrefsLembretePet(bruto: unknown): PrefsLembretePet {
   const p = (bruto && typeof bruto === "object" ? bruto : {}) as Partial<PrefsLembretePet>;
   const h = Number(p.hora);
+  const antes = Number(p.antes);
   return {
     cuidados: p.cuidados === true,
     remedios: p.remedios === true,
     hora: Number.isInteger(h) && h >= 6 && h <= 22 ? h : PREFS_LEMBRETE_PET_PADRAO.hora,
+    antes: (ANTECEDENCIAS as readonly number[]).includes(antes) ? antes : PREFS_LEMBRETE_PET_PADRAO.antes,
   };
 }
 
@@ -104,8 +109,9 @@ const juntar = (itens: string[]) => {
   const base = vis.length <= 1 ? vis.join("") : `${vis.slice(0, -1).join(", ")} e ${vis[vis.length - 1]}`;
   return resto > 0 ? `${base} e mais ${resto}` : base;
 };
-/** véspera só pro que pede planejamento (marcar a clínica); o resto é dado em casa, no dia */
-const PEDE_VESPERA: TipoCuidado[] = ["vacina", "consulta", "banho"];
+/** aviso ANTES só pro que pede planejamento (marcar a clínica, o banho); vermífugo e antipulgas se dão em casa, no dia */
+const PEDE_ANTES: TipoCuidado[] = ["vacina", "consulta", "banho"];
+const ROTULO_ANTES: Record<number, string> = { 1: "Amanhã", 3: "Em 3 dias", 7: "Em 1 semana" };
 
 export function planejarAvisosPet(dados: DadosDosAvisosPet, base: number, agora: Date = new Date()): AvisoPet[] {
   const hoje = diaDe(agora);
@@ -123,9 +129,9 @@ export function planejarAvisosPet(dados: DadosDosAvisosPet, base: number, agora:
         if (atraso <= ATRASO_MAX) pegar(proxHora).atrasado.push(item);
         continue;
       }
-      if (PEDE_VESPERA.includes(d.tipo)) {
-        const vespera = somarDias(d.proxima, -1);
-        if (naHora(vespera, dados.prefs.hora) > agora) pegar(vespera).vespera.push(item);
+      if (PEDE_ANTES.includes(d.tipo) && dados.prefs.antes > 0) {
+        const antes = somarDias(d.proxima, -dados.prefs.antes);
+        if (naHora(antes, dados.prefs.hora) > agora) pegar(antes).vespera.push(item);
       }
       if (naHora(d.proxima, dados.prefs.hora) > agora) pegar(d.proxima).noDia.push(item);
     }
@@ -139,7 +145,7 @@ export function planejarAvisosPet(dados: DadosDosAvisosPet, base: number, agora:
         title = `🐾 Hoje: ${g.noDia[0]}`;
         body = "Deu? Marque como feito no CORE e a próxima data se ajusta sozinha.";
       } else if (todos.length === 1 && g.vespera.length === 1) {
-        title = `🐾 Amanhã: ${g.vespera[0]}`;
+        title = `🐾 ${ROTULO_ANTES[dados.prefs.antes] ?? "Amanhã"}: ${g.vespera[0]}`;
         body = "Já marcou o horário? A carteirinha está no CORE, em Pet.";
       } else if (todos.length === 1) {
         title = `🐾 ${g.atrasado[0]} venceu`;
@@ -148,7 +154,7 @@ export function planejarAvisosPet(dados: DadosDosAvisosPet, base: number, agora:
         title = `🐾 ${todos.length} cuidados dos pets`;
         body = [
           g.noDia.length ? `Hoje: ${juntar(g.noDia)}.` : "",
-          g.vespera.length ? `Amanhã: ${juntar(g.vespera)}.` : "",
+          g.vespera.length ? `${ROTULO_ANTES[dados.prefs.antes] ?? "Amanhã"}: ${juntar(g.vespera)}.` : "",
           g.atrasado.length ? `Venceu: ${juntar(g.atrasado)}.` : "",
         ].filter(Boolean).join(" ");
       }

@@ -3,9 +3,16 @@
  * remédios com horário, com o que já foi marcado em `pet-routine-<dia>`.
  * Pura: a aba HOJE e o widget da Home montam a mesma lista daqui.
  */
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { rotinaValida, tarefasDoPet, type Pet } from "@/lib/pet";
 import { dosesDoDia, linhasDaCarteirinha, proximosCuidados, type LinhaDaCarteirinha } from "@/lib/pet-cuidados";
+
+const DIAS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+/** "Hoje · TER 29/09" — o título do cartão do dia (a caixa alta vem do CSS). */
+export const tituloDoDia = (hoje: string) => {
+  const d = parseLocalDay(hoje);
+  return `Hoje · ${DIAS[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 export interface ItemDeHoje {
   id: string;

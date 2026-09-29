@@ -46,7 +46,10 @@ export function usePet() {
   const rotinaHoje = get<unknown>(chaveRotinaDoDia(hoje), {});
   const prefsLembrete = lerPrefsLembretePet(get<unknown>(CHAVE_LEMBRETE, undefined));
   const dicasBrutas = get<unknown>(CHAVE_DICAS, {});
-  const dicas = (dicasBrutas && typeof dicasBrutas === "object" && !Array.isArray(dicasBrutas) ? dicasBrutas : {}) as DicasPet;
+  const dicas = useMemo(
+    () => (dicasBrutas && typeof dicasBrutas === "object" && !Array.isArray(dicasBrutas) ? dicasBrutas : {}) as DicasPet,
+    [dicasBrutas],
+  );
 
   /* ── pets ── */
   const salvarPet = useCallback((pet: Pet) => {

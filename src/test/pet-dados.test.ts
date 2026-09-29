@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  comMarca, comPeso, especieDe, faixaEtaria, idadeCurta, idadeExtenso, lerPeso, pesosDoPet, pesoTexto, petsValidos, rotinaPadraoDe,
+  comMarca, comPeso, especieDe, faixaEtaria, idadeCurta, idadeExtenso, lerPeso, pesoComUnidade, pesosDoPet, pesoTexto, petsValidos, rotinaPadraoDe,
   rotinaValida, somarDias, tarefasDoPet, type Pet,
 } from "@/lib/pet";
 import {
@@ -47,8 +47,14 @@ describe("pet-list antigo abre sem mudar nada", () => {
     expect(lerPeso("4.2kg")).toBe(4.2);
     expect(lerPeso("")).toBeNull();
     expect(lerPeso("gordinho")).toBeNull();
+    expect(lerPeso("65 g")).toBe(0.065); // calopsita
+    expect(lerPeso("65g")).toBe(0.065);
+    expect(lerPeso("1,2 kg")).toBe(1.2);
     expect(pesoTexto(18.4)).toBe("18,4");
     expect(pesoTexto(4)).toBe("4");
+    expect(pesoTexto(0.065)).toBe("0,065");
+    expect(pesoComUnidade(0.065)).toBe("65 g");
+    expect(pesoComUnidade(18.4)).toBe("18,4 kg");
   });
 
   it("sem histórico de peso, o weight antigo vira o ponto atual (e nada é gravado)", () => {
@@ -74,6 +80,7 @@ describe("pet-list antigo abre sem mudar nada", () => {
     expect(cao.map((t) => t.id)).not.toContain("bath");
     expect(tarefasDoPet(pet({ species: "gata" }), undefined).map((t) => t.id)).toContain("areia");
     expect(tarefasDoPet(pet({ species: "calopsita" }), null).map((t) => t.id)).toEqual(["food", "water"]);
+    expect(tarefasDoPet(pet({ species: "peixe betta" }), null).map((t) => t.id)).toEqual(["food"]);
   });
 
   it("pet-routine-<dia> continua objeto de objetos: marcar não mexe no dos outros", () => {
@@ -119,8 +126,9 @@ describe("espécie e idade", () => {
 
   it("fase da vida: filhote < 1 ano; idoso pelo porte", () => {
     expect(faixaEtaria(pet({ birthday: "2026-03-01" }), HOJE)).toBe("filhote");
-    expect(faixaEtaria(pet({ birthday: "2019-01-01", porte: "grande" }), HOJE)).toBe("idoso"); // 7 anos, grande
-    expect(faixaEtaria(pet({ birthday: "2019-01-01", porte: "pequeno" }), HOJE)).toBe("adulto");
+    expect(faixaEtaria(pet({ birthday: "2017-06-01", porte: "grande" }), HOJE)).toBe("idoso"); // 9,3 anos, grande (idoso ≥ 8,5)
+    expect(faixaEtaria(pet({ birthday: "2017-06-01", porte: "pequeno" }), HOJE)).toBe("adulto"); // pequeno só ≥ 10
+    expect(faixaEtaria(pet({ birthday: "2017-06-01" }), HOJE)).toBe("adulto"); // sem porte (≈ SRD): ≥ 9,5
     expect(faixaEtaria(pet({ species: "Gato", birthday: "2015-01-01" }), HOJE)).toBe("idoso");
     expect(faixaEtaria(pet({ faixa: "idoso" }), HOJE)).toBe("idoso");
     expect(faixaEtaria(pet(), HOJE)).toBe("adulto");
@@ -291,5 +299,28 @@ describe("começo pronto por espécie e fase da vida", () => {
   });
   it("a rotina padrão do cachorro tem o passeio com o id das insígnias", () => {
     expect(rotinaPadraoDe("cao").find((t) => t.id === "walk")?.label).toBe("Passeio");
+  });
+});
+
+describe("mandar a carteirinha (texto pro WhatsApp)", () => {
+  it("monta o texto do RG e da carteirinha, inclusive do formato antigo, sem inventar nada", async () => {
+    const { textoDaCarteirinha } = await import("@/lib/pet-compartilhar");
+    const thor = pet({ species: "cachorro", breed: "Golden", weight: "28 kg", birthday: "2021-04-15", sexo: "macho", castrado: true, chip: "985112004567890", alergias: "frango", vetNome: "Dra. Paula" });
+    const regs = [
+      reg({ id: "a", type: "vaccine", name: "V10", date: d(-340), nextDate: d(25), obs: "lote 2231" }),
+      reg({ id: "b", type: "deworming", name: "Drontal", date: d(-95), nextDate: d(-5) }),
+    ];
+    const linhas = linhasDaCarteirinha("p1", [{ id: "r1", petId: "p1", tipo: "remedio", nome: "Apoquel", dose: "1 comp.", horarios: ["20:00"] }], regs, HOJE);
+    const t = textoDaCarteirinha(thor, linhas, undefined, HOJE);
+    expect(t).toContain("🐾 Carteirinha de Thor");
+    expect(t).toContain("cachorro · Golden · macho · castrado · 5 anos e 5 meses");
+    expect(t).toContain("Peso: 28 kg");
+    expect(t).toContain("Microchip: 985112004567890");
+    expect(t).toContain("Alergias e cuidados: frango");
+    expect(t).toContain("VACINAS\n• V10 — última 24/10/2025 · próxima 24/10/2026 · todo ano (lote 2231)");
+    expect(t).toContain("• Drontal — última 26/06/2026 · venceu 24/09/2026 · a cada 3 meses");
+    expect(t).toContain("• Apoquel 1 comp. — 20:00 · uso contínuo");
+    expect(t).toContain("Veterinário: Dra. Paula");
+    expect(textoDaCarteirinha(pet(), [], undefined, HOJE)).toContain("Nenhuma vacina ou cuidado registrado ainda.");
   });
 });

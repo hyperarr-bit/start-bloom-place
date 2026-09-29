@@ -17,13 +17,13 @@ const BASE = 1800000;
 const agora = new Date(2026, 8, 29, 7, 30); // terça 29/09/2026 07:30
 const HOJE = "2026-09-29";
 const d = (n: number) => somarDias(HOJE, n);
-const ligado = { cuidados: true, remedios: true, hora: 10 };
+const ligado = { cuidados: true, remedios: true, hora: 10, antes: 1 };
 
 describe("preferências", () => {
   it("nascem DESLIGADAS; dado antigo/torto nunca liga aviso", () => {
     expect(lerPrefsLembretePet(undefined)).toEqual(PREFS_LEMBRETE_PET_PADRAO);
     expect(PREFS_LEMBRETE_PET_PADRAO).toMatchObject({ cuidados: false, remedios: false });
-    expect(lerPrefsLembretePet({ cuidados: "sim", remedios: 1, hora: 99 })).toEqual({ cuidados: false, remedios: false, hora: 10 });
+    expect(lerPrefsLembretePet({ cuidados: "sim", remedios: 1, hora: 99, antes: 5 })).toEqual({ cuidados: false, remedios: false, hora: 10, antes: 1 });
     expect(algumLigadoPet(lerPrefsLembretePet({ remedios: true }))).toBe(true);
   });
 
@@ -73,6 +73,16 @@ describe("cuidados com data", () => {
   it("vacina: véspera E dia (é coisa de marcar na clínica)", () => {
     const avisos = plano([{ pet: "Thor", de: "do Thor", nome: "V10", tipo: "vacina", proxima: d(10) }]);
     expect(avisos.map((a) => [a.quando.getDate(), a.title])).toEqual([[8, "🐾 Amanhã: V10 do Thor"], [9, "🐾 Hoje: V10 do Thor"]]);
+  });
+
+  it("antecedência escolhida: 1 semana antes da vacina; 0 = só no dia", () => {
+    const umaSemana = planejarAvisosPet({ prefs: { ...ligado, antes: 7 }, datas: [{ pet: "Thor", de: "do Thor", nome: "V10", tipo: "vacina", proxima: d(10) }], doses: [] }, BASE, agora);
+    expect(umaSemana.map((a) => [a.quando.getDate(), a.title])).toEqual([[2, "🐾 Em 1 semana: V10 do Thor"], [9, "🐾 Hoje: V10 do Thor"]]);
+    const soNoDia = planejarAvisosPet({ prefs: { ...ligado, antes: 0 }, datas: [{ pet: "Thor", de: "do Thor", nome: "V10", tipo: "vacina", proxima: d(10) }], doses: [] }, BASE, agora);
+    expect(soNoDia.map((a) => a.title)).toEqual(["🐾 Hoje: V10 do Thor"]);
+    // vermífugo é dado em casa: nunca tem aviso antes, qualquer que seja a antecedência
+    const verm = planejarAvisosPet({ prefs: { ...ligado, antes: 7 }, datas: [{ pet: "Thor", de: "do Thor", nome: "Vermífugo", tipo: "vermifugo", proxima: d(10) }], doses: [] }, BASE, agora);
+    expect(verm).toHaveLength(1);
   });
 
   it("dois cuidados no mesmo dia = UM aviso", () => {
@@ -157,8 +167,8 @@ describe("leitura dos dados e reagendamento", () => {
     const depois = assinaturaDos(lerDadosDosLembretes(leitor({ [chave]: { p1: { "rem:r1:20:00": true } } })), prefs);
     expect(depois).not.toBe(antes);
     // desligado, o pet nem entra na assinatura
-    const off = assinaturaDos(lerDadosDosLembretes(leitor({ "pet-lembrete-prefs": { cuidados: false, remedios: false, hora: 10 } })), prefs);
-    const off2 = assinaturaDos(lerDadosDosLembretes(leitor({ "pet-lembrete-prefs": { cuidados: false, remedios: false, hora: 10 }, [chave]: { p1: { "rem:r1:20:00": true } } })), prefs);
+    const off = assinaturaDos(lerDadosDosLembretes(leitor({ "pet-lembrete-prefs": { cuidados: false, remedios: false, hora: 10, antes: 1 } })), prefs);
+    const off2 = assinaturaDos(lerDadosDosLembretes(leitor({ "pet-lembrete-prefs": { cuidados: false, remedios: false, hora: 10, antes: 1 }, [chave]: { p1: { "rem:r1:20:00": true } } })), prefs);
     expect(off).toBe(off2);
   });
 });

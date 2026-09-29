@@ -42,7 +42,7 @@ describe("pet (29/09): faixa 1800000–1809999", () => {
   it("os avisos do pet (cuidados e remédio) moram na faixa própria", () => {
     expect(BASES_LEMBRETES.pet).toBe(1800000);
     const avisos = planejarAvisosPet({
-      prefs: { cuidados: true, remedios: true, hora: 10 },
+      prefs: { cuidados: true, remedios: true, hora: 10, antes: 1 },
       datas: [{ pet: "Thor", de: "do Thor", nome: "V10", tipo: "vacina", proxima: "2026-10-10" }, { pet: "Mia", de: "da Mia", nome: "Vermífugo", tipo: "vermifugo", proxima: "2026-12-31" }],
       doses: [{ pet: "Thor", de: "do Thor", nome: "Apoquel", hora: "20:00", dadaHoje: false }],
     }, BASES_LEMBRETES.pet, new Date(2026, 8, 26, 7, 0));

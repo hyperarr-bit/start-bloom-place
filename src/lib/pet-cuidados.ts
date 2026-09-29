@@ -113,6 +113,7 @@ export const INTERVALOS: { dias: number; rotulo: string }[] = [
   { dias: 15, rotulo: "a cada 15 dias" },
   { dias: 30, rotulo: "todo mês" },
   { dias: 60, rotulo: "a cada 2 meses" },
+  { dias: 84, rotulo: "a cada 12 semanas" }, // fluralaner (Bravecto)
   { dias: 90, rotulo: "a cada 3 meses" },
   { dias: 120, rotulo: "a cada 4 meses" },
   { dias: 180, rotulo: "a cada 6 meses" },
@@ -415,7 +416,12 @@ export function sugerirCuidados(pet: Pick<Pet, "species" | "birthday" | "faixa" 
   const lista: Sugestao[] = [
     { tipo: "vacina", nome: polivalente.nome, intervaloDias: 365, ...(filhote ? { doses: 3, intervaloSerie: 21 } : {}), nota: polivalente.nota },
     { tipo: "vacina", nome: "Antirrábica", intervaloDias: 365, nota: filhote ? "A partir de 12 semanas de vida, depois todo ano." : "Uma dose por ano." },
-    { tipo: "vermifugo", nome: "Vermífugo", intervaloDias: filhote ? 30 : 90, nota: filhote ? "Filhote: todo mês até os 6 meses." : "Adulto: a cada 3 meses (ou como o vet indicar)." },
+    {
+      tipo: "vermifugo", nome: "Vermífugo", intervaloDias: filhote ? 30 : 90,
+      nota: filhote
+        ? "Filhote: a cada 15 dias até 2 meses de vida, depois todo mês até os 6 meses."
+        : esp === "gato" ? "A cada 3 meses se sai de casa; só dentro de casa, o vet pode indicar 1 a 2 vezes por ano." : "Adulto: a cada 3 meses (mensal se vive solto ou caça).",
+    },
     { tipo: "antipulgas", nome: "Antipulgas e carrapatos", intervaloDias: 30, nota: "Começa mensal; muda conforme o produto (Bravecto 12 semanas, coleira até 8 meses…)." },
   ];
   if (!filhote) lista.push({ tipo: "consulta", nome: "Check-up", intervaloDias: fase === "idoso" ? 180 : 365, nota: fase === "idoso" ? "Idoso: a cada 6 meses." : "Uma consulta de rotina por ano." });

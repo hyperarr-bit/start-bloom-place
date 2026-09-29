@@ -5,7 +5,7 @@
  * Campo vazio vira "—" e o rodapé convida a completar.
  */
 import { Plus } from "lucide-react";
-import { idadeCurta, NOME_DA_ESPECIE, especieDe, pesosDoPet, pesoTexto, type Pet } from "@/lib/pet";
+import { idadeCurta, NOME_DA_ESPECIE, especieDe, pesoComUnidade, pesosDoPet, type Pet } from "@/lib/pet";
 import { FotoDoPet, Pata } from "./kit";
 
 export const SeletorDePets = ({
@@ -56,7 +56,7 @@ export const RgDoPet = ({
   const esp = especieDe(pet.species);
   const especie = pet.species?.trim() ? pet.species.trim().replace(/^./, (c) => c.toUpperCase()) : NOME_DA_ESPECIE[esp];
   const serie = pesosDoPet(pet, pesos);
-  const peso = serie.length ? `${pesoTexto(serie[serie.length - 1].kg)} kg` : "";
+  const peso = serie.length ? pesoComUnidade(serie[serie.length - 1].kg) : "";
   const sexo = pet.sexo === "macho" ? "Macho" : pet.sexo === "femea" ? "Fêmea" : "";
   const castrado = pet.castrado === true ? "Sim" : pet.castrado === false ? "Não" : "";
   const completo = !!(pet.chip || pet.vetNome);

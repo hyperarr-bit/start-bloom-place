@@ -99,14 +99,14 @@ export const FichaDoPet = ({ pet, dados, aberta, onFechar }: { pet: Pet; dados: 
         <div>
           <RotuloCampo htmlFor="rg-nasc">Nascimento</RotuloCampo>
           <input id="rg-nasc" type="date" max={localDayKey()} value={r.birthday} onChange={(e) => muda({ birthday: e.target.value })} className={campoClasse} />
-          <label className="mt-1.5 flex items-center gap-2 min-h-[36px] text-[12.5px] text-muted-foreground">
+          <label className="mt-1 flex items-center gap-2 min-h-[44px] text-[12.5px] text-muted-foreground">
             <input type="checkbox" checked={!!r.nascimentoAprox} onChange={(e) => muda({ nascimentoAprox: e.target.checked || undefined })} className="w-4 h-4 accent-[hsl(var(--accent))]" />
             A data é aproximada (adotado já crescido)
           </label>
           {!r.birthday && (
             <div className="flex gap-1.5 mt-1">
               {(["filhote", "adulto", "idoso"] as FaixaEtaria[]).map((f) => (
-                <Chip key={f} ativo={r.faixa === f} onClick={() => muda({ faixa: f })} className="flex-1 min-h-[40px] text-[12.5px]">{f === "filhote" ? "Filhote" : f === "adulto" ? "Adulto" : "Idoso"}</Chip>
+                <Chip key={f} ativo={r.faixa === f} onClick={() => muda({ faixa: f })} className="flex-1 min-h-[44px] text-[12.5px]">{f === "filhote" ? "Filhote" : f === "adulto" ? "Adulto" : "Idoso"}</Chip>
               ))}
             </div>
           )}

@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { isNativeShell } from "@/lib/native-shell";
 import { armarAvisos } from "@/lib/armar-avisos";
 import { CHAVE_LEMBRETE } from "@/lib/pet";
-import { algumLigadoPet, type PrefsLembretePet } from "@/lib/pet-avisos";
+import { ANTECEDENCIAS, algumLigadoPet, type PrefsLembretePet } from "@/lib/pet-avisos";
 import { BotaoPet, CartaoPet, Pata } from "./kit";
 import type { UsePet } from "./use-pet";
 
@@ -35,19 +35,38 @@ export const AvisosDoPet = ({ dados }: { dados: UsePet }) => {
       <label className="flex items-start gap-3 px-3.5 py-3 min-h-[56px]">
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-semibold text-foreground">Vacina, vermífugo, antipulgas</span>
-          <span className="block text-[12.5px] text-muted-foreground leading-snug mt-0.5">No dia de cada um, às {String(p.hora).padStart(2, "0")}:00. Vacina, consulta e banho também na véspera.</span>
+          <span className="block text-[12.5px] text-muted-foreground leading-snug mt-0.5">No dia de cada um, às {String(p.hora).padStart(2, "0")}:00. Vacina, consulta e banho também {p.antes === 0 ? "só no dia" : p.antes === 1 ? "na véspera" : `${p.antes === 7 ? "1 semana" : `${p.antes} dias`} antes`}.</span>
         </span>
         <Switch checked={p.cuidados} onCheckedChange={(v) => void aplicar({ ...p, cuidados: v })} aria-label="Avisos de vacina, vermífugo e antipulgas" />
       </label>
       {p.cuidados && (
-        <div className="px-3.5 pb-3 -mt-1 flex flex-wrap gap-1.5">
+        <div className="px-3.5 pb-3 -mt-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-1.5">Vacina, consulta e banho: avisar antes</p>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {ANTECEDENCIAS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                aria-pressed={p.antes === a}
+                onClick={() => void aplicar({ ...p, antes: a })}
+                className={`rounded-full px-3.5 min-h-[44px] text-[12.5px] font-semibold ${p.antes === a ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
+              >
+                {a === 0 ? "não" : a === 1 ? "véspera" : a === 3 ? "3 dias antes" : "1 semana antes"}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-1.5">Horário</p>
+        </div>
+      )}
+      {p.cuidados && (
+        <div className="px-3.5 pb-3 -mt-2 flex flex-wrap gap-1.5">
           {HORAS.map((h) => (
             <button
               key={h}
               type="button"
               aria-pressed={p.hora === h}
               onClick={() => void aplicar({ ...p, hora: h })}
-              className={`rounded-full px-3 min-h-[36px] text-[12.5px] font-semibold tabular-nums ${p.hora === h ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
+              className={`rounded-full px-3.5 min-h-[44px] text-[12.5px] font-semibold tabular-nums ${p.hora === h ? "bg-foreground text-background" : "bg-muted text-muted-foreground"}`}
             >
               {String(h).padStart(2, "0")}:00
             </button>
@@ -80,6 +99,8 @@ export const DicaDoPet = ({ dados, onAvisos }: { dados: UsePet; onAvisos: () => 
   if (feito) {
     return <p className="text-[12.5px] font-semibold text-[hsl(var(--pet-ok))] px-1" role="status">{feito}</p>;
   }
+  // na demonstração (/preview) não existe Home de verdade nem aviso: a dica só confundiria
+  try { if (window.location.pathname.startsWith("/preview")) return null; } catch { /* noop */ }
 
   const oferta: "home" | "avisos" | null = !naHome && dicas.home !== "nao" ? "home" : !algumLigadoPet(prefsLembrete) && dicas.avisos !== "nao" ? "avisos" : null;
   if (!oferta) return null;
@@ -104,10 +125,10 @@ export const DicaDoPet = ({ dados, onAvisos }: { dados: UsePet; onAvisos: () => 
         </p>
       </div>
       <div className="mt-2.5 flex gap-2">
-        <BotaoPet variante="secundario" onClick={oferta === "home" ? porNaHome : onAvisos} className="flex-1 min-h-[40px] text-[12.5px] bg-card border border-border" data-testid={oferta === "home" ? "dica-home" : "dica-avisos"}>
+        <BotaoPet variante="secundario" onClick={oferta === "home" ? porNaHome : onAvisos} className="flex-1 min-h-[44px] text-[12.5px] bg-card border border-border" data-testid={oferta === "home" ? "dica-home" : "dica-avisos"}>
           {oferta === "home" ? <><Home className="w-4 h-4" aria-hidden="true" /> Pôr na Home</> : <><Bell className="w-4 h-4" aria-hidden="true" /> Ver os avisos</>}
         </BotaoPet>
-        <BotaoPet variante="fantasma" onClick={() => salvarDicas(oferta === "home" ? { home: "nao" } : { avisos: "nao" })} className="min-h-[40px] text-[12.5px] text-muted-foreground">Agora não</BotaoPet>
+        <BotaoPet variante="fantasma" onClick={() => salvarDicas(oferta === "home" ? { home: "nao" } : { avisos: "nao" })} className="min-h-[44px] text-[12.5px] text-muted-foreground">Agora não</BotaoPet>
       </div>
     </div>
   );

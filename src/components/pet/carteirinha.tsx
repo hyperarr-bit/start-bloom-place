@@ -46,7 +46,7 @@ export const ProximosCuidados = ({ pet, dados, onVerTudo }: { pet: Pet; dados: U
   return (
     <CartaoPet
       titulo="Carteirinha · próximos"
-      direita={<button type="button" onClick={onVerTudo} className="inline-flex items-center gap-0.5 min-h-[40px] -my-1 px-1 hover:text-foreground">ver tudo <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" /></button>}
+      direita={<button type="button" onClick={onVerTudo} className="inline-flex items-center gap-0.5 min-h-[44px] -my-2 px-2 -mr-2 hover:text-foreground">ver tudo <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" /></button>}
       dataCard="CARTEIRINHA PROXIMOS"
     >
       {linhas.length === 0 ? (
@@ -69,14 +69,17 @@ export const ProximosCuidados = ({ pet, dados, onVerTudo }: { pet: Pet; dados: U
                 <Etiqueta tipo={l.tipo} />
                 <span className="min-w-0">
                   <span className="block text-[14px] font-semibold leading-tight truncate text-foreground">{l.nome}</span>
-                  <QuandoTexto linha={l} className="block text-[12.5px] leading-tight mt-0.5" />
+                  {/* longe (mais de 30 dias): a data já vai na coluna da direita — aqui só "em dia" */}
+                  {(l.diasAte ?? 0) > 30
+                    ? <span className="block text-[12.5px] leading-tight mt-0.5 text-muted-foreground">em dia</span>
+                    : <QuandoTexto linha={l} className="block text-[12.5px] leading-tight mt-0.5" />}
                 </span>
               </button>
               {(l.status === "atrasado" || l.status === "hoje") ? (
                 // só o que venceu (ou vence hoje) ganha o botão cheio: três magentas empilhados gritam igual e nenhum se destaca
-                <BotaoPet onClick={() => feito(l)} className="shrink-0 px-3 min-h-[40px] text-[12.5px]" data-testid={`feito-${l.chave}`}>Feito hoje</BotaoPet>
+                <BotaoPet onClick={() => feito(l)} className="shrink-0 px-3 min-h-[44px] text-[12.5px]" data-testid={`feito-${l.chave}`}>Feito hoje</BotaoPet>
               ) : l.status === "logo" ? (
-                <BotaoPet variante="secundario" onClick={() => feito(l)} className="shrink-0 px-3 min-h-[40px] text-[12.5px]" data-testid={`feito-${l.chave}`}>Feito</BotaoPet>
+                <BotaoPet variante="secundario" onClick={() => feito(l)} className="shrink-0 px-3 min-h-[44px] text-[12.5px]" data-testid={`feito-${l.chave}`}>Feito</BotaoPet>
               ) : (
                 <span className="text-[12px] text-muted-foreground tabular-nums shrink-0 pr-1.5">{ddmmaa(l.proxima)}</span>
               )}
@@ -185,14 +188,47 @@ const LinhaCarteirinha = ({ linha: l, primeira, onAbrir }: { linha: LinhaDaCarte
 
 const INTERVALOS_DO_TIPO: Record<TipoCuidado, number[]> = {
   vacina: [365, 180, 0],
-  vermifugo: [30, 60, 90, 120, 180],
-  antipulgas: [30, 90, 120, 240],
+  // ESCCAP: filhote todo mês; adulto 4×/ano; gato só de casa 1–2×/ano
+  vermifugo: [30, 90, 180, 365],
+  // mensal (pipeta/comprimido), 12 semanas (fluralaner), coleira de 8 meses, injetável anual
+  antipulgas: [30, 84, 240, 365],
   remedio: [7, 15, 30, 90, 0],
   consulta: [180, 365, 0],
   banho: [7, 15, 30],
   outro: [7, 15, 30, 90, 180, 365, 0],
 };
 const rotuloChip = (d: number) => (d === 0 ? "dose única" : rotuloIntervalo(d));
+
+/**
+ * "Ou a cada __ dias" — o pedido nº 2 das avaliações de apps de pet é lembrete
+ * flexível ("quero poder lembrar a cada X dias"). Os chips cobrem o comum; o
+ * campo cobre o resto (Simparic 35 dias, protocolo do vet de 21 dias…).
+ */
+const IntervaloLivre = ({ valor, opcoes, onMudar }: { valor?: number; opcoes: number[]; onMudar: (d: number | undefined) => void }) => {
+  const livre = valor && !opcoes.includes(valor) ? String(valor) : "";
+  const [texto, setTexto] = useState(livre);
+  useEffect(() => { setTexto(livre); }, [livre]);
+  const aplicar = () => {
+    const n = Math.round(Number(texto));
+    if (Number.isFinite(n) && n >= 1 && n <= 730) onMudar(n);
+  };
+  return (
+    <label className="mt-2 flex items-center gap-2 text-[12.5px] text-muted-foreground whitespace-nowrap">
+      ou a cada
+      <input
+        inputMode="numeric"
+        value={texto}
+        onChange={(e) => setTexto(e.target.value.replace(/\D/g, "").slice(0, 3))}
+        onBlur={aplicar}
+        onKeyDown={(e) => e.key === "Enter" && aplicar()}
+        placeholder="—"
+        aria-label="Intervalo em dias"
+        className="h-11 w-[72px] rounded-lg border border-input bg-card px-2 text-center text-[14px] tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      dias
+    </label>
+  );
+};
 
 export const FichaDoCuidado = ({ linha, pet, dados, onFechar }: { linha: LinhaDaCarteirinha; pet: Pet; dados: UsePet; onFechar: () => void }) => {
   const { hoje, aplicar, apagarRegistro, salvarCuidado, apagarCuidado } = dados;
@@ -268,9 +304,10 @@ export const FichaDoCuidado = ({ linha, pet, dados, onFechar }: { linha: LinhaDa
           <div className="flex flex-wrap gap-1.5">
             {INTERVALOS_DO_TIPO[linha.tipo].map((d) => {
               const ativo = (linha.intervaloDias ?? 0) === d;
-              return <Chip key={d} ativo={ativo} onClick={() => comPlano({ intervaloDias: d || undefined })} className="min-h-[40px] text-[12.5px]">{rotuloChip(d)}</Chip>;
+              return <Chip key={d} ativo={ativo} onClick={() => comPlano({ intervaloDias: d || undefined })} className="min-h-[44px] text-[12.5px]">{rotuloChip(d)}</Chip>;
             })}
           </div>
+          <IntervaloLivre valor={linha.intervaloDias} opcoes={INTERVALOS_DO_TIPO[linha.tipo]} onMudar={(d) => comPlano({ intervaloDias: d })} />
           <div className="mt-3">
             <RotuloCampo htmlFor="data-marcada">Data marcada (se o vet pediu outra)</RotuloCampo>
             <CampoData
@@ -402,6 +439,13 @@ const NOMES_SUGERIDOS: Record<TipoCuidado, { cao: string[]; gato: string[] }> = 
   outro: { cao: [], gato: [] },
 };
 const INTERVALO_PADRAO: Record<TipoCuidado, number> = { vacina: 365, vermifugo: 90, antipulgas: 30, remedio: 0, consulta: 365, banho: 15, outro: 30 };
+/** Escolheu o produto, o intervalo vem junto: fluralaner (Bravecto) 12 semanas, coleira Seresto até 8 meses — bula; o resto, mensal. */
+const intervaloDoProduto = (nome: string): number | null => {
+  const n = nome.toLowerCase();
+  if (n.includes("bravecto")) return 84;
+  if (n.includes("seresto") || n.includes("coleira")) return 240;
+  return null;
+};
 
 export const NovoCuidado = ({ tipoInicial, pet, dados, onFechar }: { tipoInicial: TipoCuidado | null; pet: Pet; dados: UsePet; onFechar: () => void }) => {
   const { hoje, salvarCuidado, aplicar } = dados;
@@ -450,7 +494,7 @@ export const NovoCuidado = ({ tipoInicial, pet, dados, onFechar }: { tipoInicial
       <RotuloCampo>O que é</RotuloCampo>
       <div className="flex flex-wrap gap-1.5">
         {(Object.keys(TIPOS) as TipoCuidado[]).map((t) => (
-          <Chip key={t} ativo={tipo === t} onClick={() => { setTipo(t); setIntervalo(INTERVALO_PADRAO[t]); if (t === "vermifugo" && !nome) setNome("Vermífugo"); }} className="min-h-[40px] text-[12.5px]">
+          <Chip key={t} ativo={tipo === t} onClick={() => { setTipo(t); setIntervalo(INTERVALO_PADRAO[t]); if (t === "vermifugo" && !nome) setNome("Vermífugo"); }} className="min-h-[44px] text-[12.5px]">
             <span aria-hidden="true">{TIPOS[t].emoji}</span> {TIPOS[t].rotulo.replace(" e carrapatos", "")}
           </Chip>
         ))}
@@ -458,12 +502,20 @@ export const NovoCuidado = ({ tipoInicial, pet, dados, onFechar }: { tipoInicial
 
       <div className="mt-3">
         <RotuloCampo htmlFor="cuidado-nome">Nome</RotuloCampo>
-        <input id="cuidado-nome" list="cuidado-nomes" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={tipo === "remedio" ? "Ex.: Apoquel" : "Ex.: V10"} className={campoClasse} />
+        <input
+          id="cuidado-nome"
+          list="cuidado-nomes"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          onBlur={() => { const d = intervaloDoProduto(nome); if (d && tipo === "antipulgas") setIntervalo(d); }}
+          placeholder={tipo === "remedio" ? "Ex.: Apoquel" : "Ex.: V10"}
+          className={campoClasse}
+        />
         <datalist id="cuidado-nomes">{NOMES_SUGERIDOS[tipo][esp].map((n) => <option key={n} value={n} />)}</datalist>
         {NOMES_SUGERIDOS[tipo][esp].length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {NOMES_SUGERIDOS[tipo][esp].slice(0, 5).map((n) => (
-              <button key={n} type="button" onClick={() => setNome(n)} className="rounded-full border border-border px-3 min-h-[36px] text-[12.5px] font-semibold text-muted-foreground hover:text-foreground">{n}</button>
+              <button key={n} type="button" onClick={() => { setNome(n); const d = intervaloDoProduto(n); if (d && tipo === "antipulgas") setIntervalo(d); }} className="rounded-full border border-border px-3 min-h-[44px] text-[12.5px] font-semibold text-muted-foreground hover:text-foreground">{n}</button>
             ))}
           </div>
         )}
@@ -471,8 +523,8 @@ export const NovoCuidado = ({ tipoInicial, pet, dados, onFechar }: { tipoInicial
 
       {tipo === "remedio" && (
         <div className="mt-3 flex gap-1.5">
-          <Chip ativo={diario} onClick={() => setDiario(true)} className="flex-1 min-h-[40px] text-[12.5px]">Todo dia, com horário</Chip>
-          <Chip ativo={!diario} onClick={() => { setDiario(false); setIntervalo(30); }} className="flex-1 min-h-[40px] text-[12.5px]">De tempos em tempos</Chip>
+          <Chip ativo={diario} onClick={() => setDiario(true)} className="flex-1 min-h-[44px] text-[12.5px]">Todo dia, com horário</Chip>
+          <Chip ativo={!diario} onClick={() => { setDiario(false); setIntervalo(30); }} className="flex-1 min-h-[44px] text-[12.5px]">De tempos em tempos</Chip>
         </div>
       )}
 
@@ -486,8 +538,9 @@ export const NovoCuidado = ({ tipoInicial, pet, dados, onFechar }: { tipoInicial
           <div className="mt-3">
             <RotuloCampo>De quanto em quanto tempo</RotuloCampo>
             <div className="flex flex-wrap gap-1.5">
-              {INTERVALOS_DO_TIPO[tipo].map((d) => <Chip key={d} ativo={intervalo === d} onClick={() => setIntervalo(d)} className="min-h-[40px] text-[12.5px]">{rotuloChip(d)}</Chip>)}
+              {INTERVALOS_DO_TIPO[tipo].map((d) => <Chip key={d} ativo={intervalo === d} onClick={() => setIntervalo(d)} className="min-h-[44px] text-[12.5px]">{rotuloChip(d)}</Chip>)}
             </div>
+            <IntervaloLivre valor={intervalo || undefined} opcoes={INTERVALOS_DO_TIPO[tipo]} onMudar={(d) => setIntervalo(d ?? 0)} />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div>

@@ -188,9 +188,10 @@ export function idadeCurta(pet: Pick<Pet, "birthday" | "nascimentoAprox" | "faix
 export const FAIXA_ROTULO: Record<FaixaEtaria, string> = { filhote: "Filhote", adulto: "Adulto", idoso: "Idoso" };
 
 /**
- * Fase da vida pras sugestões da carteirinha. Idoso por porte (diretrizes de
- * cuidado sênior AAHA/AAFP): cão grande a partir de ~7 anos, médio ~8, pequeno
- * e gato ~10. Filhote = menos de 12 meses.
+ * Fase da vida pras sugestões da carteirinha. Idoso = último quarto da vida
+ * (AAHA 2019) sobre a expectativa por porte de Montoya et al. 2023: cão grande
+ * ~8,5 anos, médio e SRD ~9,5, pequeno ~10; gato acima de 10 (AAHA/AAFP 2021).
+ * Filhote = menos de 12 meses. Fontes no relatório do módulo.
  */
 export function faixaEtaria(pet: Pick<Pet, "birthday" | "faixa" | "porte" | "species">, hoje: string = localDayKey()): FaixaEtaria {
   const meses = mesesDeVida(pet.birthday, hoje);
@@ -198,23 +199,29 @@ export function faixaEtaria(pet: Pick<Pet, "birthday" | "faixa" | "porte" | "spe
   if (meses < 12) return "filhote";
   const anos = meses / 12;
   const esp = especieDe(pet.species);
-  const idoso = esp === "cao" ? (pet.porte === "grande" ? 7 : pet.porte === "medio" ? 8 : 10) : 10;
+  const idoso = esp === "cao" ? (pet.porte === "grande" ? 8.5 : pet.porte === "pequeno" ? 10 : 9.5) : 10;
   return anos >= idoso ? "idoso" : "adulto";
 }
 
 /* ─────────────────────────────── peso ─────────────────────────────── */
 
-/** "28 kg" → 28 · "4,2" → 4.2 · "4.2kg" → 4.2 · lixo → null. */
+/** "28 kg" → 28 · "4,2" → 4.2 · "4.2kg" → 4.2 · "65 g" → 0.065 (calopsita, hamster) · lixo → null. */
 export function lerPeso(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) && v > 0 ? v : null;
-  const m = /(\d+(?:[.,]\d+)?)/.exec(texto(v));
+  const t = texto(v).toLowerCase();
+  const m = /(\d+(?:[.,]\d+)?)/.exec(t);
   if (!m) return null;
   const n = Number(m[1].replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n : null;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  // "65 g" / "65g" / "65 gramas" = gramas (mas "65 kg" não)
+  return /\d\s*(g|gr|grama|gramas)\b/.test(t) && !/kg/.test(t) ? n / 1000 : n;
 }
 
-/** 18.4 → "18,4" · 4 → "4" (o app antigo acrescenta " kg" na tela). */
-export const pesoTexto = (kg: number): string => (Math.round(kg * 100) / 100).toString().replace(".", ",");
+/** 18.4 → "18,4" · 4 → "4" · 0.065 → "0,065" (o app antigo acrescenta " kg" na tela). */
+export const pesoTexto = (kg: number): string => (Math.round(kg * 1000) / 1000).toString().replace(".", ",");
+
+/** Pra mostrar: "18,4 kg" · "65 g" (abaixo de 1 kg, em gramas — ninguém fala "0,065 kg" de calopsita). */
+export const pesoComUnidade = (kg: number): string => (kg < 1 ? `${Math.round(kg * 1000)} g` : `${pesoTexto(Math.round(kg * 100) / 100)} kg`);
 
 /** Histórico de peso do pet, do mais antigo pro mais novo. Sem histórico, o
  *  `weight` antigo vira um ponto só (sem data) — nada é gravado por isso. */
@@ -235,7 +242,7 @@ export function pesosDoPet(pet: Pet, todos: unknown): { dia: string; kg: number 
 export function comPeso(todos: unknown, petId: string, dia: string, kg: number): PesosPorPet {
   const mapa: PesosPorPet = todos && typeof todos === "object" && !Array.isArray(todos) ? { ...(todos as PesosPorPet) } : {};
   const lista = Array.isArray(mapa[petId]) ? mapa[petId].filter((x) => x?.dia !== dia) : [];
-  mapa[petId] = [...lista, { dia, kg: Math.round(kg * 100) / 100 }].sort((a, b) => a.dia.localeCompare(b.dia)).slice(-120);
+  mapa[petId] = [...lista, { dia, kg: Math.round(kg * 1000) / 1000 }].sort((a, b) => a.dia.localeCompare(b.dia)).slice(-120);
   return mapa;
 }
 
@@ -268,7 +275,11 @@ export const ROTINA_PADRAO: Record<"cao" | "gato" | "outro", TarefaDaRotina[]> =
 };
 
 export const rotinaPadraoDe = (especie: Especie): TarefaDaRotina[] =>
-  especie === "cao" ? ROTINA_PADRAO.cao : especie === "gato" ? ROTINA_PADRAO.gato : ROTINA_PADRAO.outro;
+  especie === "cao" ? ROTINA_PADRAO.cao
+    : especie === "gato" ? ROTINA_PADRAO.gato
+    // peixe não tem "água fresca" pra trocar todo dia: só a comida (o aquário é cuidado com data)
+    : especie === "peixe" ? ROTINA_PADRAO.outro.filter((t) => t.id === "food")
+    : ROTINA_PADRAO.outro;
 
 /** Tarefas do pet: a lista que a pessoa montou (`pet-routine-tasks-<id>`), ou a padrão da espécie. */
 export function tarefasDoPet(pet: Pet, gravada: unknown): TarefaDaRotina[] {

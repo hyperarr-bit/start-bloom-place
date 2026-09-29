@@ -6,17 +6,10 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { parseLocalDay } from "@/lib/utils";
-import { rotaDeHoje } from "@/lib/pet-hoje";
+import { rotaDeHoje, tituloDoDia } from "@/lib/pet-hoje";
 import { novoId, type Pet, type TarefaDaRotina } from "@/lib/pet";
 import { BotaoPet, CartaoPet, FolhaPet, Quadradinho, campoClasse } from "./kit";
 import type { UsePet } from "./use-pet";
-
-const DIAS = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-export const tituloDoDia = (hoje: string) => {
-  const d = parseLocalDay(hoje);
-  return `Hoje · ${DIAS[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
 
 const EMOJIS = ["🥣", "💧", "🦮", "🎾", "🧶", "🧹", "🪮", "🦷", "🛁", "💊", "🐾", "🏃", "🧸", "🌿"];
 

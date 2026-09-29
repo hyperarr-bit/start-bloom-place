@@ -174,7 +174,7 @@ export const PetExpenses = () => {
               <RotuloCampo>Categoria</RotuloCampo>
               <div className="flex flex-wrap gap-1.5">
                 {opcoes.map((c) => (
-                  <Chip key={c} ativo={form.category === c} onClick={() => setForm({ ...form, category: c })} className="min-h-[40px] text-[12.5px]">
+                  <Chip key={c} ativo={form.category === c} onClick={() => setForm({ ...form, category: c })} className="min-h-[44px] text-[12.5px]">
                     {EMOJI_CATEGORIA[c] ? `${EMOJI_CATEGORIA[c]} ` : ""}{c}
                   </Chip>
                 ))}
@@ -187,10 +187,10 @@ export const PetExpenses = () => {
               {categoriasCustom.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {categoriasCustom.map((c) => (
-                    <span key={c} className="inline-flex items-center h-9 rounded-full border border-border pl-3 text-[12px] text-foreground">
+                    <span key={c} className="inline-flex items-center h-11 rounded-full border border-border pl-3 text-[12px] text-foreground">
                       {c}
                       {emUso(c) ? <span className="px-2.5 text-[11px] text-muted-foreground">em uso</span> : (
-                        <button type="button" onClick={() => removeCategoria(c)} aria-label={`Apagar categoria ${c}`} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                        <button type="button" onClick={() => removeCategoria(c)} aria-label={`Apagar categoria ${c}`} className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" aria-hidden="true" /></button>
                       )}
                     </span>
                   ))}

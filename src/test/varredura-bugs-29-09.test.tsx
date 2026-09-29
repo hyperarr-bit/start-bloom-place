@@ -11,16 +11,30 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { toast } from "sonner";
 import { InstallmentTracker, type Installment } from "@/components/InstallmentTracker";
 import { EmergencyFund } from "@/components/finance/EmergencyFund";
+import { MonthTurnover } from "@/components/MonthTurnover";
+import { FinancialHealth } from "@/components/FinancialHealth";
 import { normalizeForKey } from "@/lib/data-normalizers";
 
 vi.mock("sonner", async (orig) => {
   const real = await orig<typeof import("sonner")>();
   return { ...real, toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) };
 });
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: vi.fn() } } }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    functions: { invoke: vi.fn() },
+    auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: null } }) },
+    from: () => ({ insert: async () => ({}), upsert: async () => ({}), select: () => ({ eq: async () => ({ data: [] }) }) }),
+  },
+}));
+const auth = vi.hoisted(() => ({ user: null as { id: string } | null }));
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: null, session: null, loading: false, isSubscribed: true, subLoaded: true }),
+  useAuth: () => ({ user: auth.user, session: null, loading: false, isSubscribed: true, subLoaded: true }),
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("@/lib/analytics", async (orig) => ({
+  ...(await orig<typeof import("@/lib/analytics")>()),
+  trackEvent: vi.fn(),
+  trackEventBeacon: vi.fn(),
 }));
 
 beforeAll(() => {
@@ -143,5 +157,66 @@ describe("Reserva de emergência — motor de Intl antigo", () => {
     const store = criarStore({ "finance-emergency-fund": { meses: 6, guardado: 5000, registrada: true } });
     expect(() => renderComStore(<EmergencyFund despesaMensal={3000} />, store)).not.toThrow();
     expect(document.body.textContent).toMatch(/18\.000/);
+  });
+});
+
+/* ============================================================
+ * 3. RESUMO DO MÊS NA VIRADA (01/10) COM UMA CASA DECIMAL
+ *    "🏆 Setembro acabou! … Despesas R$ 2.522,4" — visto na varredura com o
+ *    relógio em 01/10 00:01; o cartão "Resumo de Setembro" do topo também.
+ * ============================================================ */
+describe("Resumo do mês que acabou — dinheiro com 2 casas", () => {
+  const UID = "u-varredura";
+  afterEach(() => { vi.useRealTimers(); auth.user = null; localStorage.clear(); });
+
+  it("01/10: 'Setembro acabou!' mostra R$ 2.522,40 (não R$ 2.522,4)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 1, 9, 0));
+    auth.user = { id: UID };
+    const dados: Record<string, unknown> = {
+      "finance-2026-setembro-incomes": [{ id: "r", date: "2026-09-01", value: 6200, description: "Salário" }],
+      "finance-2026-setembro-expenses": [
+        { id: "e1", date: "2026-09-03", value: 640.5, description: "Mercado" },
+        { id: "e2", date: "2026-09-28", value: 31.9, description: "Uber" },
+      ],
+      "finance-2026-setembro-fixed": [{ id: "f", description: "Aluguel", value: 1850, day: 5 }],
+      "finance-last-seen-month": "Setembro-2026",
+    };
+    for (const [k, v] of Object.entries(dados)) localStorage.setItem(`u:${UID}:${k}`, JSON.stringify(v));
+    renderComStore(<MonthTurnover />, criarStore(dados));
+    expect(screen.getByText("Setembro acabou!")).toBeInTheDocument();
+    const texto = document.body.textContent ?? "";
+    expect(texto).toMatch(/R\$ 2\.522,40/);
+    expect(texto).not.toMatch(/R\$ 2\.522,4(?!\d)/);
+  });
+});
+
+/* ============================================================
+ * 4. SAÚDE FINANCEIRA — "NaN/100" e número com ponto
+ *    O card de Desejos já se defendia de preço antigo sem número; o score
+ *    somava o bruto (undefined → NaN, "100" → concatenação) e a parcela com
+ *    0 parcelas dividia por zero. E toFixed(1) mostrava "50.0%".
+ * ============================================================ */
+describe("Saúde Financeira", () => {
+  const base = {
+    totalIncome: 5001, totalExpenses: 1000, totalFixedExpenses: 1500, monthlyInstallments: 0, totalDebts: 0,
+    totalInvestments: 0, emergencyFundGoal: 0, dueDays: [], installments: [], wishlistItems: [], trips: [], investments: [],
+  };
+
+  it("desejo antigo sem preço + parcela com 0 parcelas: score é número, não 'NaN/100'", () => {
+    render(<FinancialHealth {...base}
+      wishlistItems={[{ id: "w", name: "iPad", price: undefined, savedAmount: "100" }] as never}
+      installments={[{ id: "p", totalValue: 1200, installmentValue: null, paidInstallments: 0, totalInstallments: 0 }] as never} />);
+    const texto = document.body.textContent ?? "";
+    expect(texto).not.toMatch(/NaN|Infinity/);
+    expect(texto).toMatch(/SCORE FINANCEIRO\s*\d{1,3}\/100/);
+  });
+
+  it("taxa de poupança com vírgula e reais com 2 casas (50,0% · R$ 2.500,50)", () => {
+    render(<FinancialHealth {...base} />);
+    const texto = document.body.textContent ?? "";
+    expect(texto).toMatch(/50,0%/);
+    expect(texto).not.toMatch(/\d\.\d%/);
+    expect(texto).toMatch(/Necessidades: R\$ 2\.500,50/);
   });
 });

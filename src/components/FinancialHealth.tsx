@@ -1,6 +1,11 @@
 import { AlertTriangle, CheckCircle, TrendingUp, Shield, Target, Lightbulb, CreditCard, Heart, Plane, PiggyBank } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { decimal, reais } from "@/lib/dinheiro";
+
+/** Número de lista gravada: texto/null/undefined/NaN viram 0 (29/09 — preço de desejo antigo
+ *  sem número deixava o score em "NaN/100"; parcela com 0 parcelas, idem). */
+const num = (v: unknown): number => (v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : 0);
 
 interface Bill {
   id: string;
@@ -109,7 +114,7 @@ export const FinancialHealth = ({
   const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * mesesDeReserva : emergencyFundGoal;
   const reservaAtual = reservaDeclarada?.registrada ? reservaDeclarada.guardado : totalInvestments;
   const emergencyProgress = realEmergencyGoal > 0 ? (reservaAtual / realEmergencyGoal) * 100 : 0;
-  const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
+  const monthlyContributions = investments.reduce((s, i) => s + num(i.monthlyContribution), 0);
   const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
   // Bills payment rate
@@ -136,12 +141,12 @@ export const FinancialHealth = ({
 
   // Installment progress (how much already paid off)
   const installmentProgress = installments.length > 0
-    ? installments.reduce((sum, i) => sum + (i.paidInstallments / i.totalInstallments) * 100, 0) / installments.length
+    ? installments.reduce((sum, i) => sum + (num(i.totalInstallments) > 0 ? (num(i.paidInstallments) / num(i.totalInstallments)) * 100 : 100), 0) / installments.length
     : 100;
 
   // Wishlist discipline (how much saved vs total desired)
-  const wishlistTotal = wishlistItems.reduce((s, i) => s + i.price, 0);
-  const wishlistSaved = wishlistItems.reduce((s, i) => s + i.savedAmount, 0);
+  const wishlistTotal = wishlistItems.reduce((s, i) => s + num(i.price), 0);
+  const wishlistSaved = wishlistItems.reduce((s, i) => s + num(i.savedAmount), 0);
   const wishlistDiscipline = wishlistTotal > 0 ? (wishlistSaved / wishlistTotal) * 100 : 100;
 
   // Investment diversification (more types = better)
@@ -205,19 +210,19 @@ export const FinancialHealth = ({
   const tips: { icon: typeof AlertTriangle; text: string; type: "warning" | "success" | "info" }[] = [];
 
   if (savingsRate < 20) {
-    tips.push({ icon: AlertTriangle, text: `Sua taxa de poupança é ${savingsRate.toFixed(1)}%. Tente poupar pelo menos 20% da renda.`, type: "warning" });
+    tips.push({ icon: AlertTriangle, text: `Sua taxa de poupança é ${decimal(savingsRate)}%. Tente poupar pelo menos 20% da renda.`, type: "warning" });
   } else {
-    tips.push({ icon: CheckCircle, text: `Ótimo! Você está poupando ${savingsRate.toFixed(1)}% da sua renda.`, type: "success" });
+    tips.push({ icon: CheckCircle, text: `Ótimo! Você está poupando ${decimal(savingsRate)}% da sua renda.`, type: "success" });
   }
 
   if (debtToIncome > 30) {
-    tips.push({ icon: AlertTriangle, text: `Suas dívidas representam ${debtToIncome.toFixed(1)}% da renda anual. Priorize quitá-las.`, type: "warning" });
+    tips.push({ icon: AlertTriangle, text: `Suas dívidas representam ${decimal(debtToIncome)}% da renda anual. Priorize quitá-las.`, type: "warning" });
   } else if (totalDebts > 0) {
-    tips.push({ icon: CheckCircle, text: `Dívidas sob controle: ${debtToIncome.toFixed(1)}% da renda anual.`, type: "success" });
+    tips.push({ icon: CheckCircle, text: `Dívidas sob controle: ${decimal(debtToIncome)}% da renda anual.`, type: "success" });
   }
 
   if (emergencyProgress < 100) {
-    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}).`, type: "info" });
+    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${reais(realEmergencyGoal)}).`, type: "info" });
   } else {
     tips.push({ icon: CheckCircle, text: "Reserva de emergência completa! 🎉", type: "success" });
   }
@@ -234,7 +239,7 @@ export const FinancialHealth = ({
   }
 
   if (wishlistTotal > totalIncome * 3 && wishlistItems.length > 0) {
-    tips.push({ icon: Heart, text: `Seus desejos somam R$ ${wishlistTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} — ${(wishlistTotal / totalIncome).toFixed(1)}x sua renda. Priorize os mais importantes.`, type: "warning" });
+    tips.push({ icon: Heart, text: `Seus desejos somam R$ ${reais(wishlistTotal)} — ${decimal(wishlistTotal / totalIncome)}x sua renda. Priorize os mais importantes.`, type: "warning" });
   }
 
   const monthlyBalance = totalIncome - totalRealExpenses;
@@ -301,28 +306,28 @@ export const FinancialHealth = ({
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Taxa de Poupança</p>
           <p className={`text-lg font-bold ${savingsRate >= 20 ? "text-green-400" : "text-orange-400"}`}>
-            {savingsRate.toFixed(1)}%
+            {decimal(savingsRate)}%
           </p>
           <p className="text-[10px] text-muted-foreground">Meta: ≥20%</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Dívida/Renda Anual</p>
           <p className={`text-lg font-bold ${debtToIncome <= 30 ? "text-green-400" : "text-red-400"}`}>
-            {debtToIncome.toFixed(1)}%
+            {decimal(debtToIncome)}%
           </p>
           <p className="text-[10px] text-muted-foreground">Meta: ≤30%</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Saldo Real Mensal</p>
           <p className={`text-lg font-bold ${realMonthlyBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {realMonthlyBalance >= 0 ? "+" : ""}R$ {realMonthlyBalance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+            {realMonthlyBalance >= 0 ? "+" : ""}R$ {reais(realMonthlyBalance)}
           </p>
           <p className="text-[10px] text-muted-foreground">Inclui fixas + parcelas</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Projeção Anual</p>
           <p className={`text-lg font-bold ${yearlyProjection >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {yearlyProjection >= 0 ? "+" : ""}R$ {yearlyProjection.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+            {yearlyProjection >= 0 ? "+" : ""}R$ {reais(yearlyProjection)}
           </p>
           <p className="text-[10px] text-muted-foreground">Economia em 12 meses</p>
         </div>
@@ -350,7 +355,7 @@ export const FinancialHealth = ({
                 <Progress value={(item.value / item.max) * 100} className="h-1.5" />
               </div>
               <span className="text-[10px] text-muted-foreground w-14 text-right">
-                {item.value.toFixed(1)}/{item.max}pts
+                {decimal(item.value)}/{item.max}pts
               </span>
             </div>
           ))}
@@ -423,15 +428,15 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-lg border border-green-500/30 p-3 cursor-pointer hover:border-green-500/50 transition-colors">
           <p className="text-xs font-bold text-green-400 mb-1">🎯 Regra 50/30/20</p>
           <p className="text-[10px] text-muted-foreground">
-            Necessidades: R$ {(totalIncome * 0.5).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} | 
-            Desejos: R$ {(totalIncome * 0.3).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} | 
-            Poupança: R$ {(totalIncome * 0.2).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+            Necessidades: R$ {reais(totalIncome * 0.5)} | 
+            Desejos: R$ {reais(totalIncome * 0.3)} | 
+            Poupança: R$ {reais(totalIncome * 0.2)}
           </p>
         </div>
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {reservaAtual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
+            R$ {reais(reservaAtual)} de R$ {reais(realEmergencyGoal)} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">

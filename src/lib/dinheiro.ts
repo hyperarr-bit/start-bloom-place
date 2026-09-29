@@ -9,3 +9,11 @@ export const reais = (n: number): string => {
     ? v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })
     : v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+
+/**
+ * Número com casas decimais do jeito brasileiro (29/09, varredura): `toFixed(1)`
+ * põe PONTO — a Saúde Financeira mostrava "Taxa de Poupança 59.0%", o IMC
+ * "23.5", a média de energia "3.5 ⚡". Aqui sai "59,0" / "23,5". Não-número vira 0.
+ */
+export const decimal = (n: number, casas = 1): string =>
+  (Number.isFinite(n) ? n : 0).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });

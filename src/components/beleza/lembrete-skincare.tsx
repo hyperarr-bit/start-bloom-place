@@ -11,6 +11,7 @@
  */
 import { Bell } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { CartaoBeleza, FaixaBeleza, IconePeriodo, ROTULO_BZ, Serif } from "./kit";
 import { useUserData } from "@/hooks/use-user-data";
 import { armarAvisos } from "@/lib/armar-avisos";
 import { isNativeShell } from "@/lib/native-shell";
@@ -21,8 +22,6 @@ import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerDadosDoSkincare, planejarSkinc
 import type { Periodo } from "@/lib/beleza-rotina";
 import { DIAS_CURTOS, diaDaSemana } from "@/lib/beleza-rotina";
 import type { Skincare } from "./use-skincare";
-
-const ROTULO = "text-[10.5px] font-extrabold tracking-[.12em] text-muted-foreground";
 
 /** "hoje, 21:30" · "amanhã, 07:30" · "qua, 07:30" */
 export const quandoDoAviso = (quando: Date, agora = new Date()): string => {
@@ -56,28 +55,29 @@ export function LembreteDoSkincare({ s }: { s: Skincare }) {
   const proximo = algumLigado(s.lembrete) ? planejarSkincare(lerDadosDoSkincare(get, s.hoje), 0)[0] : undefined;
 
   return (
-    <section className="rounded-2xl border border-amber-100 overflow-hidden bg-card" data-card="lembrete-skincare" data-testid="lembrete-skincare">
-      <div className="bg-amber-50 px-4 min-h-[44px] flex items-center gap-2 text-amber-900">
-        <Bell className="w-4 h-4" aria-hidden="true" />
-        <h2 className="text-[13px] font-extrabold tracking-wide">LEMBRETE</h2>
-        <span className="ml-auto text-[11.5px] font-semibold opacity-80">com os passos do dia</span>
-      </div>
+    <CartaoBeleza data-card="lembrete-skincare" data-testid="lembrete-skincare">
+      <FaixaBeleza
+        tom="dica"
+        icone={<Bell className="w-4 h-4 text-bz-acento" />}
+        titulo="LEMBRETE"
+        direita={<span className="font-semibold opacity-80">com os passos do dia</span>}
+      />
       {(["manha", "noite"] as const).map((periodo, k) => {
         const l = s.lembrete[periodo];
         const rotulo = periodo === "manha" ? "Manhã" : "Noite";
         return (
-          <div key={periodo} className={cn("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-4 min-h-[56px]", k > 0 && "border-t border-amber-100")}>
-            <span className={cn("text-[14px] font-semibold", !l.ligado && "text-muted-foreground")}>
-              {periodo === "manha" ? "☀️" : "🌙"} {rotulo}
-            </span>
+          <div key={periodo} className={cn("grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 min-h-[58px]", k > 0 && "border-t border-bz-linha")}>
+            <IconePeriodo periodo={periodo} className={periodo === "manha" ? "bg-bz-manha" : "bg-bz-noite"} />
+            <Serif className={cn("text-[20px] leading-none", l.ligado ? "text-bz-tinta" : "text-bz-suave")}>{periodo === "manha" ? "manhã" : "noite"}</Serif>
             <input
               type="time"
               value={l.hora}
               onChange={(e) => mudarHora(periodo, e.target.value)}
               aria-label={`Hora do lembrete da ${rotulo.toLowerCase()}`}
               className={cn(
-                "h-10 w-[96px] rounded-lg border border-border bg-card px-2 text-center text-[15px] font-bold tabular-nums outline-none focus:ring-2 focus:ring-ring",
-                l.ligado ? "text-foreground" : "text-muted-foreground",
+                // 116 px: com 98 o relógio do seletor (Chrome/Android) comia o "07:30"
+                "h-10 w-[116px] rounded-full border border-bz-linha-forte bg-bz-cartao px-3 text-center text-[15px] font-bold tabular-nums outline-none focus:ring-2 focus:ring-ring",
+                l.ligado ? "text-bz-tinta" : "text-bz-suave",
               )}
             />
             <Switch checked={l.ligado} onCheckedChange={(v) => ligar(periodo, v)} aria-label={`Lembrete da ${rotulo.toLowerCase()}`} />
@@ -85,20 +85,20 @@ export function LembreteDoSkincare({ s }: { s: Skincare }) {
         );
       })}
       {proximo && (
-        <div className="px-4 py-3 border-t border-amber-100" data-testid="proximo-aviso">
-          <p className={ROTULO}>O PRÓXIMO AVISO</p>
-          <div className="mt-1.5 rounded-xl border border-border bg-background px-3 py-2.5">
-            <p className="text-[11px] text-muted-foreground">CORE · {quandoDoAviso(proximo.quando)}</p>
-            <p className="text-[13.5px] font-bold leading-snug mt-0.5">{proximo.title}</p>
-            <p className="text-[12.5px] text-muted-foreground leading-snug">{proximo.body}</p>
+        <div className="px-4 py-3 border-t border-bz-linha" data-testid="proximo-aviso">
+          <p className={ROTULO_BZ}>O próximo aviso</p>
+          <div className="mt-1.5 rounded-2xl border border-bz-linha bg-bz-papel px-3.5 py-2.5">
+            <p className="text-[11px] text-bz-suave">CORE · {quandoDoAviso(proximo.quando)}</p>
+            <p className="text-[13.5px] font-bold leading-snug mt-0.5 text-bz-tinta">{proximo.title}</p>
+            <p className="text-[12.5px] text-bz-suave leading-snug">{proximo.body}</p>
           </div>
         </div>
       )}
       {!noApp && (
-        <p className="px-4 pb-3 pt-1 text-[11.5px] text-muted-foreground" data-testid="lembrete-so-no-app">
+        <p className="px-4 pb-3 pt-1 text-[11.5px] text-bz-suave" data-testid="lembrete-so-no-app">
           No site o lembrete não toca — ele toca no app do celular.
         </p>
       )}
-    </section>
+    </CartaoBeleza>
   );
 }

@@ -1,30 +1,32 @@
 /**
- * 📅 MINHA SEMANA (28/09, protótipo) — a agenda da rotina de pele numa tabela de
- * planner: uma linha por passo, uma coluna por dia (cabeçalho na cor do dia).
- * O quadradinho diz "entra nesse dia": pequeno e cinza pro que é TODO dia;
- * cheio e colorido pro que vai só em alguns dias (ácido em âmbar, retinol em
- * violeta, sérum em azul) — cor é sinal do que muda de um dia pro outro, não
- * enfeite. Tocar na linha abre a ficha do passo (dias e produto).
- *
- * É o ÚNICO jeito de ver a agenda desde 28/09 (o dono tirou o ciclo fixo de 4 dias,
- * que não sabia o que a pessoa passa). Rotina antiga, sem dias por passo, aparece
+ * MINHA SEMANA — a agenda da rotina de pele numa tabela de planner: uma linha
+ * por passo, uma coluna por dia. É o ÚNICO jeito de ver a agenda desde 28/09 (o
+ * dono tirou o ciclo fixo de 4 dias). Rotina antiga, sem dias por passo, aparece
  * com tudo "todo dia" — exatamente o que ela sempre foi.
+ *
+ * Visual da Beleza (28/09): cabeçalho rosé, dias em miúdo (sem as cores do dia
+ * do Treino), a coluna de hoje num rosé bem claro, e GOTAS pros ativos — retinol
+ * em ameixa, ácido em pêssego, sérum em rosé; o passo de base (limpeza,
+ * hidratante, protetor) é um pontinho nude. A legenda fica no pé.
+ * Tocar na linha abre a ficha do passo (dias e produto).
  */
 import { Fragment } from "react";
+import { CalendarHeart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  DIAS_CURTOS, TODOS_OS_DIAS, diaDaSemanaDaChave, diasDoPasso, ehTodoDia, nomeCurto, passoValido,
+  DIAS_CURTOS, TODOS_OS_DIAS, diaDaSemanaDaChave, diasDoPasso, nomeCurto, passoValido,
   type PassoDaRotina, type Periodo,
 } from "@/lib/beleza-rotina";
-import { COR_DO_DIA, DIAS_DA_SEMANA, textoDoDia } from "@/components/treino/planner";
-import { TOM_DO_PERIODO } from "./skincare-do-dia";
+import { DIAS_DA_SEMANA } from "@/components/treino/planner";
+import { CartaoBeleza, FaixaBeleza, Gota, IconePeriodo, Serif, type TipoGota } from "./kit";
 import type { Skincare } from "./use-skincare";
 
-const corDoPasso = (p: PassoDaRotina): string => {
-  if (p.tipo === "retinol" || /retin/i.test(p.name)) return "bg-violet-500";
-  if (p.isAcid) return "bg-amber-500";
-  if (p.tipo === "vitamina-c" || p.tipo === "niacinamida" || p.tipo === "hialuronico" || /s[ée]rum/i.test(p.name)) return "bg-sky-500";
-  return "";
+/** Que gota o passo leva: retinol, ácido (esfoliante), sérum — o resto é base. */
+export const gotaDoPasso = (p: PassoDaRotina): TipoGota => {
+  if (p.tipo === "retinol" || /retin/i.test(p.name)) return "retinol";
+  if (p.isAcid) return "acido";
+  if (p.tipo === "vitamina-c" || p.tipo === "niacinamida" || p.tipo === "hialuronico" || /s[ée]rum/i.test(p.name)) return "serum";
+  return "base";
 };
 
 export function SemanaDaRotina({ s, onAbrirPasso }: { s: Skincare; onAbrirPasso: (periodo: Periodo, i: number) => void }) {
@@ -35,29 +37,37 @@ export function SemanaDaRotina({ s, onAbrirPasso }: { s: Skincare; onAbrirPasso:
   const noitesComAtivo = TODOS_OS_DIAS.filter((d) => s.passos.noite.some((p) => passoValido(p) && p.isAcid && diasDoPasso(p).includes(d))).length;
 
   return (
-    <section className="rounded-2xl border border-pink-100 overflow-hidden bg-card" data-card="semana-skincare" data-testid="semana-skincare">
-      <div className="bg-pink-50 px-4 min-h-[44px] flex items-center gap-2 text-pink-900">
-        <h2 className="text-[13px] font-extrabold tracking-wide whitespace-nowrap">📅 MINHA SEMANA</h2>
-        {noitesComAtivo > 0 && (
-          <span className="ml-auto text-right text-[11px] font-bold tabular-nums leading-tight">
-            {noitesComAtivo} {noitesComAtivo === 1 ? "noite" : "noites"} de ativo
-            <span className="block font-semibold opacity-75">{7 - noitesComAtivo} de descanso</span>
-          </span>
-        )}
-      </div>
+    <CartaoBeleza data-card="semana-skincare" data-testid="semana-skincare">
+      <FaixaBeleza
+        icone={<CalendarHeart className="w-4 h-4 text-bz-acento" />}
+        titulo="MINHA SEMANA"
+        direita={
+          noitesComAtivo > 0 ? (
+            <span className="text-right leading-tight block">
+              {noitesComAtivo} {noitesComAtivo === 1 ? "noite" : "noites"} de ativo
+              <span className="block font-semibold opacity-75">{7 - noitesComAtivo} de descanso</span>
+            </span>
+          ) : undefined
+        }
+      />
+      {/* A cor de fundo mora na COLUNA (hoje) e na LINHA (manhã, noite), nunca na célula: no
+          escuro, a zebra das tabelas do app pinta a célula de azul-grafite (beleza.css a desliga). */}
       <table className="w-full table-fixed border-separate border-spacing-0">
         <colgroup>
           <col />
-          {DIAS_CURTOS.map((d) => <col key={d} className="w-[31px]" />)}
+          {DIAS_CURTOS.map((d, k) => <col key={d} className={cn("w-[31px]", k === hojeSemana && "bg-bz-hoje")} />)}
         </colgroup>
         <thead>
           <tr>
-            <th className="border-t border-pink-100 bg-pink-50" aria-label="Passo" />
+            <th className="border-t border-bz-linha" aria-label="Passo" />
             {DIAS_DA_SEMANA.map((d, k) => (
               <th
                 key={d}
                 scope="col"
-                className={cn(COR_DO_DIA[d], textoDoDia(d), "py-1 text-[9.5px] font-extrabold tracking-wide")}
+                className={cn(
+                  "border-t border-bz-linha py-2 text-[9.5px] font-extrabold tracking-[.06em]",
+                  k === hojeSemana ? "text-bz-acento" : "text-bz-suave",
+                )}
                 aria-label={`${d}${k === hojeSemana ? " (hoje)" : ""}`}
               >
                 {DIAS_CURTOS[k]}
@@ -67,43 +77,38 @@ export function SemanaDaRotina({ s, onAbrirPasso }: { s: Skincare; onAbrirPasso:
         </thead>
         <tbody>
           {(["manha", "noite"] as const).map((periodo) => {
-            const tom = TOM_DO_PERIODO[periodo];
             const itens = linhas(periodo);
             if (!itens.length) return null;
+            const manha = periodo === "manha";
             return (
               <Fragment key={periodo}>
-                <tr>
-                  <td colSpan={8} className={cn("px-3 py-1 text-[10px] font-extrabold tracking-[.12em] border-t", tom.claro, tom.titulo, tom.linha)}>
-                    {tom.emoji} {tom.rotulo}
+                <tr className={manha ? "bg-bz-manha text-bz-manha-tinta" : "bg-bz-noite text-bz-noite-tinta"}>
+                  <td colSpan={8} className="border-t border-bz-linha pl-1.5 pr-3 py-1">
+                    <span className="flex items-center gap-1.5">
+                      <IconePeriodo periodo={periodo} className="w-7 h-7" />
+                      <Serif className="text-[17px] leading-none">{manha ? "manhã" : "noite"}</Serif>
+                    </span>
                   </td>
                 </tr>
                 {itens.map(({ passo, i }) => {
                   const dias = diasDoPasso(passo);
-                  const cor = corDoPasso(passo);
+                  const gota = gotaDoPasso(passo);
                   return (
-                    <tr key={i} className="active:bg-muted/40" data-testid="linha-semana">
-                      <td className={cn("border-t h-10 p-0", tom.linha)}>
+                    <tr key={i} className="active:bg-bz-blush/60" data-testid="linha-semana">
+                      <td className="border-t border-bz-linha h-10 p-0">
                         <button
                           type="button"
                           onClick={() => onAbrirPasso(periodo, i)}
-                          className="w-full h-10 px-3 text-left truncate text-[12.5px] font-semibold"
+                          className="w-full h-10 px-3 text-left truncate text-[12.5px] font-semibold text-bz-tinta bg-transparent"
                           aria-label={`Dias e produto de ${passo.name}`}
                         >
                           {nomeCurto(passo.name)}
                         </button>
                       </td>
+                      {/* sem linha vertical: a coluna de hoje e as gotas já marcam o ritmo */}
                       {TODOS_OS_DIAS.map((k) => (
-                        <td
-                          key={k}
-                          onClick={() => onAbrirPasso(periodo, i)}
-                          className={cn("border-t border-l text-center align-middle cursor-pointer", tom.linha, k === hojeSemana && "bg-pink-50")}
-                        >
-                          {dias.includes(k) &&
-                            (ehTodoDia(passo) || !cor ? (
-                              <span className="inline-block w-2.5 h-2.5 rounded-[3px] bg-muted-foreground/35" aria-hidden="true" />
-                            ) : (
-                              <span className={cn("marca-grafico inline-block w-4 h-4 rounded-[4px]", cor)} aria-hidden="true" />
-                            ))}
+                        <td key={k} onClick={() => onAbrirPasso(periodo, i)} className="border-t border-bz-linha text-center align-middle cursor-pointer">
+                          {dias.includes(k) && <Gota tipo={gota} />}
                         </td>
                       ))}
                     </tr>
@@ -114,9 +119,15 @@ export function SemanaDaRotina({ s, onAbrirPasso }: { s: Skincare; onAbrirPasso:
           })}
         </tbody>
       </table>
-      <p className="px-4 py-2 border-t border-pink-100 text-[11.5px] text-muted-foreground leading-snug">
-        Toque num passo pra mudar os dias ou escolher o produto.
-      </p>
-    </section>
+      <div className="px-4 py-2.5 border-t border-bz-linha space-y-1">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-bz-suave" aria-label="Legenda">
+          <span className="inline-flex items-center gap-1"><Gota tipo="retinol" /> retinol</span>
+          <span className="inline-flex items-center gap-1"><Gota tipo="acido" /> ácido</span>
+          <span className="inline-flex items-center gap-1"><Gota tipo="serum" /> sérum</span>
+          <span className="inline-flex items-center gap-1"><Gota tipo="base" /> base</span>
+        </p>
+        <p className="text-[11.5px] text-bz-suave leading-snug">Toque num passo pra mudar os dias ou escolher o produto.</p>
+      </div>
+    </CartaoBeleza>
   );
 }

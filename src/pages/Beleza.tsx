@@ -11,7 +11,8 @@ import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { useSkincare } from "@/components/beleza/use-skincare";
 import type { PerfilDaPele } from "@/lib/beleza-rotina";
-import { ModuleTip } from "@/components/ModuleTip";
+import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
@@ -19,7 +20,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 // "Bancada" virou MEUS PRODUTOS (dono, 28/09): é o pedido nº 1 das avaliações, com o nome que a pessoa usa.
 const tabs = [
   { id: "routine", label: "ROTINA", icon: "✨" },
-  { id: "shelf", label: "MEUS PRODUTOS", icon: "🧪" },
+  { id: "shelf", label: "MEUS PRODUTOS", icon: "🧴" },
   { id: "diary", label: "DIÁRIO", icon: "📷" },
 ];
 
@@ -44,7 +45,10 @@ const Beleza = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
+    /* Visual próprio da Beleza (28/09, dono: "estética mais feminina, não azul"): os
+       tokens do app viram os da Beleza DENTRO desta raiz (components/beleza/beleza.css) —
+       papel blush, tinta ameixa, magenta da marca na ação; no escuro, ameixa profundo. */
+    <div className={cn(TEMA_BELEZA, "min-h-screen bg-background text-foreground pb-20")}>
       <SpotlightOverlay
         moduleKey="beleza"
         steps={[
@@ -58,7 +62,7 @@ const Beleza = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Droplets className="w-5 h-5 text-pink-600" />
+          <Droplets className="w-5 h-5 text-bz-acento" />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs">{currentMonth}</span>
@@ -82,9 +86,8 @@ const Beleza = () => {
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
         {rotinaNoTopo && rotina}
-        <ModuleTip
-          moduleId="beleza"
-          tips={[
+        <DicasDaBeleza
+          dicas={[
             "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
             "Toque num passo pra escolher o produto e os dias da semana",
             "Ligue o lembrete da manhã e da noite — ele diz o passo do dia",

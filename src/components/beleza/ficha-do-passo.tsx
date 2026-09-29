@@ -1,6 +1,7 @@
 /**
  * FICHA DO PASSO + ESCOLHER PRODUTO (28/09, protótipo). A folha de baixo do app,
- * com a faixa na cor do dia (a mesma das tarefas com horário):
+ * no visual da Beleza (kit): a faixa é a do PERÍODO do passo — pêssego com sol
+ * de manhã, malva com lua à noite — e o nome do passo vem em serifa:
  *  - DIAS: os 7 dias em quadrados na cor de cada dia — é a frequência do passo
  *    (o ácido ter/qui/sáb, o protetor todo dia);
  *  - PRODUTO: o da lista curada de produtos vendidos no Brasil (busca por nome
@@ -17,22 +18,22 @@ import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { cn, localDayKey } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import {
   DIAS_CURTOS, ativoEvitado, buscarProdutos, carregarCatalogo, diasDoPasso, diasPorExtenso, ehTodoDia, indicadosPara, nomeCurto,
   ritmoDoPasso, textoDoPao, tipoPeloNome, type CategoriaDoCatalogo, type PassoDaRotina, type Periodo, type ProdutoDaBancada,
   type ProdutoDoCatalogo, type TipoDoPasso,
 } from "@/lib/beleza-rotina";
-import { COR_DO_DIA, DIAS_DA_SEMANA, textoDoDia, textoDoDiaEmBotao } from "@/components/treino/planner";
+import { DIAS_DA_SEMANA } from "@/components/treino/planner";
 import { diaCurto } from "@/components/tarefas/tarefas-do-dia";
 import { getExpiryProgress } from "./utils";
-import { TOM_DO_PERIODO, nomeDoDia } from "./skincare-do-dia";
+import { BOTAO_CONTORNO, Chip, IconePeriodo, ROTULO_BZ, Serif, TEMA_BELEZA } from "./kit";
 import type { Skincare } from "./use-skincare";
 
 export type PassoAberto = { periodo: Periodo; i: number; vista: "ficha" | "escolher" };
 
-const ROTULO = "text-[10.5px] font-extrabold tracking-[.12em] text-muted-foreground";
+const ROTULO = ROTULO_BZ;
 const FOLHA = "rounded-t-3xl p-0 gap-0 overflow-hidden max-h-[92dvh] flex flex-col";
 
 /** Categoria da lista pra um produto digitado à mão (dá o PAO padrão). */
@@ -42,22 +43,24 @@ const CATEGORIA_DO_TIPO: Record<TipoDoPasso, CategoriaDoCatalogo> = {
   olhos: "olhos", labios: "labios", mascara: "mascara", tonico: "tonico",
 };
 
-function FaixaDaFicha({ titulo, sub, onFechar, onVoltar }: { titulo: ReactNode; sub: ReactNode; onFechar: () => void; onVoltar?: () => void }) {
-  const dia = nomeDoDia(localDayKey());
+function FaixaDaFicha({ periodo, titulo, sub, onFechar, onVoltar }: { periodo: Periodo; titulo: ReactNode; sub: ReactNode; onFechar: () => void; onVoltar?: () => void }) {
+  const manha = periodo === "manha";
   return (
-    <div className={cn(COR_DO_DIA[dia], textoDoDia(dia), "pl-2 pr-2 py-3 flex items-start gap-1")}>
+    <div className={cn(manha ? "bg-bz-manha text-bz-manha-tinta" : "bg-bz-noite text-bz-noite-tinta", "pl-2 pr-2 pt-3 pb-3.5 flex items-start gap-1.5")}>
       {onVoltar ? (
-        <button type="button" onClick={onVoltar} aria-label="Voltar pra ficha" className="w-10 h-10 -mt-1.5 shrink-0 grid place-items-center rounded-full hover:bg-white/15">
+        <button type="button" onClick={onVoltar} aria-label="Voltar pra ficha" className="w-10 h-10 -mt-1 shrink-0 grid place-items-center rounded-full bg-bz-cartao/60">
           <ArrowLeft className="w-4 h-4" />
         </button>
       ) : (
-        <span className="w-2 shrink-0" />
+        <IconePeriodo periodo={periodo} className="ml-1.5 mt-0.5" />
       )}
-      <div className="min-w-0 flex-1">
-        <SheetTitle className="text-[15px] font-extrabold tracking-wide text-current leading-tight">{titulo}</SheetTitle>
-        <SheetDescription className="text-[12.5px] text-current opacity-90 mt-0.5 truncate">{sub}</SheetDescription>
+      <div className="min-w-0 flex-1 pl-1">
+        <SheetTitle className="text-[11.5px] font-extrabold tracking-[.14em] uppercase text-current leading-tight opacity-85">{titulo}</SheetTitle>
+        <SheetDescription asChild>
+          <p className="mt-0.5 truncate"><Serif className={cn("text-[24px] leading-tight", manha ? "text-bz-manha-tinta" : "text-bz-noite-tinta")}>{sub}</Serif></p>
+        </SheetDescription>
       </div>
-      <button type="button" onClick={onFechar} aria-label="Fechar" className="w-10 h-10 -mt-1.5 shrink-0 grid place-items-center rounded-full hover:bg-white/15">
+      <button type="button" onClick={onFechar} aria-label="Fechar" className="w-10 h-10 -mt-1 shrink-0 grid place-items-center rounded-full bg-bz-cartao/60">
         <X className="w-4 h-4" />
       </button>
     </div>
@@ -70,33 +73,33 @@ function CartaoDoProduto({ produto, onTrocar, onTirar, onAbrirHoje }: { produto:
   const validade = produto.openedDate && produto.paoMonths ? getExpiryProgress(produto.openedDate, produto.paoMonths) : null;
   const ativos = Array.isArray(produto.ativos) ? produto.ativos : [];
   return (
-    <div className="mt-1 rounded-xl border border-border overflow-hidden" data-testid="produto-na-ficha">
+    <div className="mt-1.5 rounded-2xl border border-bz-linha bg-bz-papel overflow-hidden" data-testid="produto-na-ficha">
       <div className="px-3 py-2.5">
-        {produto.brand && <p className="text-[10.5px] font-extrabold tracking-[.1em] text-muted-foreground uppercase truncate">{produto.brand}</p>}
-        <p className="text-[15px] font-bold leading-snug break-words">{produto.name}</p>
+        {produto.brand && <p className="text-[10.5px] font-extrabold tracking-[.12em] text-bz-suave uppercase truncate">{produto.brand}</p>}
+        <p className="text-[15px] font-bold leading-snug break-words text-bz-tinta">{produto.name}</p>
         {ativos.length > 0 && (
           <p className="mt-1 flex flex-wrap gap-1">
             {ativos.slice(0, 4).map((a) => (
-              <span key={a} className="rounded px-1.5 py-px text-[10.5px] font-semibold bg-pink-100 text-pink-800 dark:bg-pink-500/20 dark:text-pink-300">{a}</span>
+              <Chip key={a} tom="rose">{a}</Chip>
             ))}
           </p>
         )}
-        <p className="mt-1.5 text-[12px] text-muted-foreground">
-          Validade depois de aberto: <b className="text-foreground/80">{textoDoPao(produto.paoMonths || 12, produto.paoPadrao)}</b>
+        <p className="mt-1.5 text-[12px] text-bz-suave">
+          Validade depois de aberto: <b className="text-bz-tinta">{textoDoPao(produto.paoMonths || 12, produto.paoPadrao)}</b>
         </p>
         {validade ? (
-          <p className={cn("mt-0.5 text-[12px] font-semibold", validade.expired ? "text-red-600 dark:text-red-400" : validade.daysLeft < 30 ? "text-amber-700 dark:text-amber-300" : "text-green-700 dark:text-green-300")}>
+          <p className={cn("mt-0.5 text-[12px] font-semibold", validade.expired || validade.daysLeft < 30 ? "text-bz-alerta-tinta" : "text-bz-ok-tinta")}>
             {validade.expired ? "⚠️ Venceu — hora de repor" : `Aberto em ${diaCurto(produto.openedDate)} · faltam ${validade.daysLeft} dias`}
           </p>
         ) : (
-          <button type="button" onClick={onAbrirHoje} className="mt-1.5 h-9 px-3 rounded-lg border border-border inline-flex items-center gap-1.5 text-[12.5px] font-semibold" data-testid="abri-hoje">
+          <button type="button" onClick={onAbrirHoje} className={cn(BOTAO_CONTORNO, "mt-2 inline-flex items-center gap-1.5 text-[12.5px]")} data-testid="abri-hoje">
             <PackageOpen className="w-3.5 h-3.5" aria-hidden="true" /> Abri hoje
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 border-t border-border">
-        <button type="button" onClick={onTrocar} className="h-11 text-[13px] font-semibold active:bg-muted/40">Trocar</button>
-        <button type="button" onClick={onTirar} className="h-11 border-l border-border text-[13px] font-semibold text-muted-foreground active:bg-muted/40">Tirar do passo</button>
+      <div className="grid grid-cols-2 border-t border-bz-linha bg-bz-cartao">
+        <button type="button" onClick={onTrocar} className="h-11 bg-transparent text-[13px] font-bold text-bz-acento active:bg-bz-blush">Trocar</button>
+        <button type="button" onClick={onTirar} className="h-11 bg-transparent border-l border-bz-linha text-[13px] font-semibold text-bz-suave active:bg-bz-blush">Tirar do passo</button>
       </div>
     </div>
   );
@@ -120,14 +123,14 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
           onBlur={salvarNome}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
           aria-label="Nome do passo"
-          className="mt-1 h-11 text-[15px] font-semibold"
+          className="mt-1 h-11 rounded-xl text-[15px] font-semibold bg-bz-cartao border-bz-linha-forte"
         />
       </label>
 
       <div>
         <div className="flex items-baseline gap-2">
           <span className={ROTULO}>DIAS</span>
-          <span className="ml-auto text-[12px] text-muted-foreground" data-testid="ritmo-na-ficha">
+          <span className="ml-auto text-[12px] text-bz-suave" data-testid="ritmo-na-ficha">
             {ehTodoDia(passo) ? "todo dia" : `${ritmoDoPasso(passo)} · ${diasPorExtenso(passo)}`}
           </span>
         </div>
@@ -144,8 +147,10 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
                   if (!s.alternarDiaDoPasso(periodo, i, k)) toast("O passo precisa de pelo menos 1 dia. Pra tirar, use Remover.");
                 }}
                 className={cn(
-                  "h-11 rounded-lg text-[11px] font-extrabold transition-colors",
-                  on ? cn(COR_DO_DIA[d], textoDoDiaEmBotao(d)) : "bg-card border border-border text-muted-foreground",
+                  "h-11 rounded-full text-[11px] font-extrabold tracking-wide transition-colors",
+                  on
+                    ? periodo === "manha" ? "bg-bz-manha-tinta text-bz-cartao" : "bg-bz-noite-tinta text-bz-cartao"
+                    : "bg-bz-cartao border border-bz-linha-forte text-bz-suave",
                 )}
               >
                 {DIAS_CURTOS[k]}
@@ -166,10 +171,10 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
           />
         ) : (
           <>
-            <Button variant="outline" className="mt-1 w-full h-11 justify-start text-[14px] font-semibold" onClick={onEscolher} data-testid="abrir-lista">
-              <Search className="w-4 h-4 mr-2" /> Escolher produto
-            </Button>
-            <p className="mt-1 text-[11.5px] text-muted-foreground leading-snug">
+            <button type="button" className="mt-1.5 w-full h-11 rounded-full bg-bz-acento text-bz-acento-tinta inline-flex items-center justify-center gap-2 text-[14px] font-bold active:scale-[.98] transition" onClick={onEscolher} data-testid="abrir-lista">
+              <Search className="w-4 h-4" /> Escolher produto
+            </button>
+            <p className="mt-1.5 text-[11.5px] text-bz-suave leading-snug">
               Da lista de produtos populares no Brasil, ou digite o seu. Ele entra em Meus produtos, com a validade.
             </p>
           </>
@@ -180,7 +185,7 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
         variant="outline"
         onClick={() => { s.removerPasso(periodo, i); onFechar(); }}
         aria-label={`Tirar ${passo.name} da rotina`}
-        className="w-full h-11 text-destructive border-destructive/40 font-semibold"
+        className="w-full h-11 rounded-full bg-bz-cartao text-bz-alerta-tinta border-bz-alerta-tinta/35 font-semibold"
       >
         <Trash2 className="w-4 h-4 mr-1.5" /> Remover da rotina
       </Button>
@@ -195,28 +200,26 @@ function LinhaDoProduto({ p, evitado, primeira, onEscolher }: { p: ProdutoDoCata
     <button
       type="button"
       onClick={onEscolher}
-      className={cn("w-full text-left px-3 py-2.5 flex items-start gap-3 min-h-[60px] active:bg-muted/40 transition-colors", !primeira && "border-t border-border")}
+      className={cn("w-full text-left px-3.5 py-2.5 flex items-start gap-3 min-h-[60px] bg-transparent active:bg-bz-blush transition-colors", !primeira && "border-t border-bz-linha")}
       data-testid="produto-da-lista"
       aria-label={`${p.marca} ${p.nome}`}
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-[10.5px] font-extrabold tracking-[.1em] text-muted-foreground uppercase truncate">{p.marca}</span>
-        <span className="block text-[14px] font-semibold leading-snug">{p.nome}</span>
+        <span className="block text-[10.5px] font-extrabold tracking-[.12em] text-bz-suave uppercase truncate">{p.marca}</span>
+        <span className="block text-[14px] font-semibold leading-snug text-bz-tinta">{p.nome}</span>
         {(p.ativos.length > 0 || p.fps || p.cor || p.textura) && (
           <span className="mt-1 flex flex-wrap gap-1">
-            {p.fps ? <span className="rounded px-1.5 py-px text-[10.5px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">FPS {p.fps}</span> : null}
-            {p.cor ? <span className="rounded px-1.5 py-px text-[10.5px] font-bold bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300">com cor</span> : null}
-            {p.textura ? <span className="rounded px-1.5 py-px text-[10.5px] font-semibold border border-border text-muted-foreground">{p.textura}</span> : null}
-            {p.ativos.slice(0, 3).map((a) => (
-              <span key={a} className="rounded px-1.5 py-px text-[10.5px] font-semibold bg-pink-100 text-pink-800 dark:bg-pink-500/20 dark:text-pink-300">{a}</span>
-            ))}
+            {p.fps ? <Chip tom="manha">FPS {p.fps}</Chip> : null}
+            {p.cor ? <Chip tom="noite">com cor</Chip> : null}
+            {p.textura ? <Chip tom="contorno">{p.textura}</Chip> : null}
+            {p.ativos.slice(0, 3).map((a) => <Chip key={a} tom="rose">{a}</Chip>)}
           </span>
         )}
-        {evitado && <span className="mt-1 block text-[11.5px] font-semibold text-red-600 dark:text-red-400">🚫 tem {evitado}, que você evita</span>}
+        {evitado && <span className="mt-1 block text-[11.5px] font-semibold text-bz-alerta-tinta">🚫 tem {evitado}, que você evita</span>}
       </span>
       <span className="shrink-0 text-right pt-0.5">
-        <span className="block text-[11.5px] font-bold tabular-nums">PAO {p.pao}M</span>
-        {p.paoPadrao && <span className="block text-[10px] text-muted-foreground">padrão</span>}
+        <span className="block text-[11.5px] font-bold tabular-nums text-bz-tinta">PAO {p.pao}M</span>
+        {p.paoPadrao && <span className="block text-[10px] text-bz-suave">padrão</span>}
       </span>
     </button>
   );
@@ -250,14 +253,14 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
     <div className="pt-3" data-testid="escolher-produto-lista">
       <div className="px-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou marca" aria-label="Buscar produto" className="h-11 pl-9 text-[15px]" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-bz-suave" aria-hidden="true" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou marca" aria-label="Buscar produto" className="h-11 pl-10 rounded-full text-[15px] bg-bz-papel border-bz-linha-forte" />
         </div>
       </div>
       {meus.length > 0 && (
         <>
           <p className={cn(ROTULO, "px-4 mt-3 mb-1.5")}>NOS SEUS PRODUTOS</p>
-          <div className="mx-4 rounded-xl border border-pink-200 overflow-hidden bg-card" data-testid="nos-seus-produtos">
+          <div className="mx-4 rounded-2xl border-2 border-bz-dica-borda overflow-hidden bg-bz-dica" data-testid="nos-seus-produtos">
             {meus.map((p, k) => (
               <LinhaDoProduto key={p.id} p={p} evitado={ativoEvitado(p, s.evitar)} primeira={k === 0} onEscolher={() => onEscolhido(p)} />
             ))}
@@ -269,33 +272,33 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
           {buscando ? `${achados?.length ?? 0} NA LISTA` : `INDICADOS PRA ${nomeCurto(passo.name).toUpperCase()}`}
         </p>
       </div>
-      <div className="mx-4 rounded-xl border border-border overflow-hidden bg-card">
-        {lista === null && <p className="px-3 py-4 text-[13px] text-muted-foreground">Carregando a lista…</p>}
+      <div className="mx-4 rounded-2xl border border-bz-linha overflow-hidden bg-bz-cartao">
+        {lista === null && <p className="px-3.5 py-4 text-[13px] text-bz-suave">Carregando a lista…</p>}
         {mostrar.map((p, k) => (
           <LinhaDoProduto key={p.id} p={p} evitado={ativoEvitado(p, s.evitar)} primeira={k === 0} onEscolher={() => onEscolhido(p)} />
         ))}
         {lista && mostrar.length === 0 && (
-          <p className="px-3 py-4 text-[13px] text-muted-foreground">
+          <p className="px-3.5 py-4 text-[13px] text-bz-suave">
             {buscando ? "Nada com esse nome na lista ainda. Digite o seu aqui embaixo." : "Ainda sem indicados pra este passo — busque pelo nome ou digite o seu."}
           </p>
         )}
       </div>
       <div className="px-4 pt-3">
         {digitando ? (
-          <div className="rounded-xl border border-dashed border-border p-3 space-y-2" data-testid="digitar-produto">
+          <div className="rounded-2xl border border-dashed border-bz-dica-borda bg-bz-dica p-3 space-y-2" data-testid="digitar-produto">
             <p className={ROTULO}>DIGITAR O MEU</p>
-            <Input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Marca" aria-label="Marca" className="h-11 text-[15px]" />
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do produto" aria-label="Nome do produto" className="h-11 text-[15px]" onKeyDown={(e) => e.key === "Enter" && usarDigitado()} />
-            <Button className="w-full h-11 text-[14px] font-bold" onClick={usarDigitado}>
+            <Input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Marca" aria-label="Marca" className="h-11 rounded-xl text-[15px] bg-bz-cartao" />
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do produto" aria-label="Nome do produto" className="h-11 rounded-xl text-[15px] bg-bz-cartao" onKeyDown={(e) => e.key === "Enter" && usarDigitado()} />
+            <Button className="w-full h-11 rounded-full text-[14px] font-bold" onClick={usarDigitado}>
               <Check className="w-4 h-4 mr-1.5" /> Usar este produto
             </Button>
           </div>
         ) : (
-          <button type="button" onClick={() => { setDigitando(true); if (!buscando) return; setNome(q.trim()); }} className="w-full h-11 rounded-xl border border-dashed border-border inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-muted-foreground">
+          <button type="button" onClick={() => { setDigitando(true); if (!buscando) return; setNome(q.trim()); }} className="w-full h-11 rounded-full border border-dashed border-bz-linha-forte bg-transparent inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-bz-suave">
             <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Não achei — digitar o meu
           </button>
         )}
-        <p className="mt-2 text-[11px] text-muted-foreground leading-snug">
+        <p className="mt-2 text-[11px] text-bz-suave leading-snug">
           Lista de produtos vendidos no Brasil, conferidos no site da marca ou de lojas grandes{lista?.length ? ` (${lista.length} por enquanto)` : ""}. PAO “padrão” = o rótulo não diz; confira o potinho na embalagem.
         </p>
       </div>
@@ -312,15 +315,15 @@ export function FichaDoPasso({ s, aberto, onFechar, onVista }: { s: Skincare; ab
   const atual = aberto ?? ultimo.current;
   const passo = atual ? s.passos[atual.periodo][atual.i] : null;
   const abertaDeVerdade = !!aberto && !!passo;
-  const tom = atual ? TOM_DO_PERIODO[atual.periodo] : TOM_DO_PERIODO.manha;
-  const titulo = atual ? `${tom.emoji} ${tom.rotulo} · ${atual.vista === "escolher" ? "ESCOLHER PRODUTO" : "PASSO"}` : "";
+  const titulo = atual ? `${atual.periodo === "manha" ? "Manhã" : "Noite"} · ${atual.vista === "escolher" ? "escolher produto" : "passo"}` : "";
 
   return (
     <Sheet open={abertaDeVerdade} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="ficha-passo">
+      <SheetContent side="bottom" semFechar className={cn(FOLHA, TEMA_BELEZA, "bg-bz-cartao")} data-testid="ficha-passo">
         {atual && passo && (
           <>
             <FaixaDaFicha
+              periodo={atual.periodo}
               titulo={titulo}
               sub={passo.name}
               onFechar={onFechar}

@@ -230,8 +230,9 @@ describe("Beleza 5 — Espelho, Rotina e Diário falam entre si na hora", () => 
     store.montar(<Beleza />);
     fireEvent.click(screen.getByRole("button", { name: /DIÁRIO/ })); // abas em caixa alta desde 28/09
     fireEvent.click(screen.getByRole("button", { name: /Registrar Hoje/ }));
-    const form = screen.getByText("Pele hoje").closest("div.rounded-xl") as HTMLElement;
-    expect(within(form).getByRole("button", { name: /Oleosa/ }).className).toMatch(/bg-emerald-100/);
+    // 28/09: o visual da Beleza mudou (rosé, não verde); o formulário tem testid próprio
+    const form = screen.getByTestId("form-diario");
+    expect(within(form).getByRole("button", { name: /Oleosa/ }).className).toMatch(/bg-bz-rose/);
 
     fireEvent.click(within(form).getByRole("button", { name: /Sensível/ }));
     expect(screen.getByText(/Pele sensível detectada/)).toBeInTheDocument(); // o Espelho acima já sabe

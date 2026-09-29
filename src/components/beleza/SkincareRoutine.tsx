@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ShieldCheck, RotateCcw } from "lucide-react";
+import { AlertTriangle, Bell, Home, ShieldCheck, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 import { armarAvisos } from "@/lib/armar-avisos";
@@ -11,7 +11,7 @@ import {
   type PassoDaRotina, type PerfilDaPele, type Periodo,
 } from "@/lib/beleza-rotina";
 import { CHAVE_WIDGETS_HOME, comWidget } from "@/hooks/use-home-widgets";
-import { PostIt } from "@/components/treino/planner";
+import { BOTAO_PILULA, CartaoBeleza, Dica, FaixaBeleza } from "./kit";
 import { useSkincare } from "./use-skincare";
 import { FolhaDoSkincare } from "./skincare-do-dia";
 import { FichaDoPasso, type PassoAberto } from "./ficha-do-passo";
@@ -121,25 +121,27 @@ export const SkincareRoutine = ({
     <div className="space-y-4 mt-4">
       {recemGerada && (
         <div ref={postIts} className="space-y-2.5 pt-1 scroll-mt-32" data-testid="rotina-pronta">
-          <PostIt testId="postit-pronta">
+          <Dica testId="postit-pronta" icone={<Sparkles className="w-4 h-4" />}>
             Rotina pronta pra pele <b>{rotuloPele}</b>, foco em <b>{rotuloObjetivo}</b>. Toque num passo pra escolher o seu produto ou mudar os dias.
             <span className="block mt-1 text-[11px] opacity-75" data-testid="aviso-dermatologista-pronta">{AVISO_DERMATOLOGISTA}</span>
-          </PostIt>
+          </Dica>
           {!s.lembrete.manha.ligado && !s.lembrete.noite.ligado && (
-            <PostIt
+            <Dica
               testId="postit-lembrete"
-              acao={<button type="button" onClick={ligarLembrete} className="shrink-0 h-10 px-3 rounded-md bg-amber-900 text-amber-50 text-[12.5px] font-bold active:scale-95 transition">Ligar</button>}
+              icone={<Bell className="w-4 h-4" />}
+              acao={<button type="button" onClick={ligarLembrete} className={BOTAO_PILULA}>Ligar</button>}
             >
               Quer que o CORE te lembre às <b>{s.lembrete.manha.hora}</b> e às <b>{s.lembrete.noite.hora}</b>?
-            </PostIt>
+            </Dica>
           )}
           {!naHome && (
-            <PostIt
+            <Dica
               testId="postit-home"
-              acao={<button type="button" onClick={porNaHome} className="shrink-0 h-10 px-3 rounded-md bg-amber-900 text-amber-50 text-[12.5px] font-bold active:scale-95 transition">Pôr</button>}
+              icone={<Home className="w-4 h-4" />}
+              acao={<button type="button" onClick={porNaHome} className={BOTAO_PILULA}>Pôr</button>}
             >
               Ver o <b>skincare de hoje</b> na Home, com o quadradinho pra marcar?
-            </PostIt>
+            </Dica>
           )}
         </div>
       )}
@@ -152,48 +154,45 @@ export const SkincareRoutine = ({
       />
 
       {conflicts.length > 0 && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800/30 overflow-hidden">
-          <div className="bg-red-200 dark:bg-red-800/50 px-3 py-1.5 flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">⚠️ CONFLITOS DETECTADOS</span>
-          </div>
-          <div className="bg-red-50 dark:bg-red-950/20 p-3 space-y-1.5">
+        <CartaoBeleza className="border-bz-alerta-tinta/25">
+          <FaixaBeleza tom="alerta" icone={<AlertTriangle className="w-4 h-4 text-bz-alerta-tinta" />} titulo="⚠️ CONFLITOS DETECTADOS" />
+          <div className="px-4 py-3 space-y-2">
             {conflicts.map((c, i) => (
               <div key={i}>
-                <p className="text-[11px] text-red-700 dark:text-red-300">{c.regra.message}</p>
-                <p className="text-[10.5px] text-muted-foreground">
+                <p className="text-[12.5px] font-semibold text-bz-alerta-tinta">{c.regra.message}</p>
+                <p className="text-[11.5px] text-bz-suave">
                   💡 {c.regra.suggestion}
                   {c.dias.length < 7 ? ` · caem juntos: ${c.dias.map((d) => ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"][d]).join(", ")}` : ""}
                 </p>
               </div>
             ))}
           </div>
-        </div>
+        </CartaoBeleza>
       )}
 
       {conflicts.length === 0 && nPassos > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800/30 bg-emerald-50 dark:bg-emerald-950/20">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <p className="text-[10.5px] text-emerald-700 dark:text-emerald-300 font-medium">Nenhum conflito de ativos ✅</p>
+        <div className="flex items-center gap-2 pl-2 pr-4 min-h-[40px] rounded-full bg-bz-ok text-bz-ok-tinta w-fit">
+          <span className="grid place-items-center w-7 h-7 rounded-full bg-bz-cartao/70" aria-hidden="true"><ShieldCheck className="w-3.5 h-3.5" /></span>
+          <p className="text-[12px] font-semibold">Nenhum conflito de ativos ✅</p>
         </div>
       )}
 
       {sugestao.length > 0 && (
         <div className="space-y-1.5" data-testid="sugestao-alternar">
-          <PostIt
+          <Dica
             acao={
               <button
                 type="button"
                 onClick={() => { s.aplicarDias("noite", sugestao); trackEvent("skincare_alternar", { passos: sugestao.length, conflito: conflicts.length > 0 }); }}
-                className="shrink-0 h-10 px-3 rounded-md bg-amber-900 text-amber-50 text-[12.5px] font-bold active:scale-95 transition"
+                className={BOTAO_PILULA}
               >
                 Alternar
               </button>
             }
           >
             {conflicts.length > 0 ? "Ativo junto na mesma noite irrita a pele." : "Agora cada passo tem os seus dias."} Quer alternar? <b>{descricaoSugestao}</b>.
-          </PostIt>
-          <button type="button" onClick={s.dispensarAlternar} className="ml-auto block h-9 px-2 text-[12px] font-semibold text-muted-foreground">
+          </Dica>
+          <button type="button" onClick={s.dispensarAlternar} className="ml-auto block h-10 px-3 rounded-full bg-transparent text-[12px] font-semibold text-bz-suave">
             Agora não
           </button>
         </div>
@@ -204,45 +203,39 @@ export const SkincareRoutine = ({
       {nPassos > 0 && <LembreteDoSkincare s={s} />}
 
       {/* Conflict guide */}
-      <Button variant="ghost" size="sm" className="w-full h-10 text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowGuide(!showGuide)}>
-        <AlertTriangle className="w-3 h-3 mr-1.5" /> Guia: Pode vs. Não Pode
+      <Button variant="ghost" size="sm" className="w-full h-10 rounded-full text-[12.5px] text-bz-suave hover:text-bz-tinta" onClick={() => setShowGuide(!showGuide)}>
+        <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Guia: Pode vs. Não Pode
       </Button>
       {showGuide && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="bg-amber-200 dark:bg-amber-800/50 px-4 py-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider">📋 COMBINAÇÕES A EVITAR</span>
-          </div>
-          <div className="bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+        <CartaoBeleza>
+          <FaixaBeleza tom="manha" titulo="📋 COMBINAÇÕES A EVITAR" />
+          <div className="px-4 py-3 space-y-2">
             {[
               { bad: "Retinol + AHA/BHA", tip: "Alterne os dias" },
               { bad: "Retinol + Vitamina C", tip: "Vit C de manhã, Retinol à noite" },
               { bad: "Peróxido de Benzoíla + Vitamina C", tip: "Nunca juntos" },
               { bad: "AHA + BHA juntos", tip: "Alterne os dias" },
             ].map((item, i) => (
-              <div key={i} className="flex items-start gap-2 text-[11px]">
-                <span className="text-red-500 font-bold">✗</span>
-                <div><span className="font-medium">{item.bad}</span> <span className="text-muted-foreground">— {item.tip}</span></div>
+              <div key={i} className="flex items-start gap-2 text-[12px]">
+                <span className="text-bz-alerta-tinta font-bold">✗</span>
+                <div><span className="font-semibold text-bz-tinta">{item.bad}</span> <span className="text-bz-suave">— {item.tip}</span></div>
               </div>
             ))}
           </div>
-        </div>
+        </CartaoBeleza>
       )}
 
       {/* Triggers banner */}
       {s.evitar.length > 0 && (
-        <div className="rounded-xl border border-red-200 dark:border-red-800/30 overflow-hidden">
-          <div className="bg-red-200 dark:bg-red-800/50 px-3 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider">🚫 INGREDIENTES A EVITAR</span>
-          </div>
-          <div className="bg-red-50 dark:bg-red-950/20 px-3 py-2">
-            <p className="text-[9px] text-red-700 dark:text-red-300">{s.evitar.join(", ")}</p>
-          </div>
-        </div>
+        <CartaoBeleza>
+          <FaixaBeleza tom="alerta" titulo="🚫 INGREDIENTES A EVITAR" />
+          <p className="px-4 py-2.5 text-[12px] text-bz-alerta-tinta">{s.evitar.join(", ")}</p>
+        </CartaoBeleza>
       )}
 
       {/* 28/09 (dono): a rotina que as 3 perguntas montam é orientação geral — dito sem alarde, no pé */}
       {nPassos > 0 && s.perfil?.pele && (
-        <p className="px-4 text-center text-[11px] leading-snug text-muted-foreground" data-testid="aviso-dermatologista">
+        <p className="px-4 text-center text-[11px] leading-snug text-bz-suave" data-testid="aviso-dermatologista">
           {AVISO_DERMATOLOGISTA}
         </p>
       )}
@@ -251,7 +244,7 @@ export const SkincareRoutine = ({
         <button
           type="button"
           onClick={() => setModo("trocar")}
-          className="w-full h-10 inline-flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-muted-foreground"
+          className="w-full h-10 rounded-full bg-transparent inline-flex items-center justify-center gap-1.5 text-[12.5px] font-semibold text-bz-suave"
           data-testid="refazer-perguntas"
         >
           <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Refazer as 3 perguntas

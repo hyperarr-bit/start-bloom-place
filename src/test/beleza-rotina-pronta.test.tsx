@@ -702,7 +702,7 @@ describe("MEUS PRODUTOS (a antiga Bancada)", () => {
     store.montar(<Beleza />);
     expect(screen.queryByText(/bancada/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /MEUS PRODUTOS/ }));
-    expect(screen.getByText("🧴 MEUS PRODUTOS")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /MEUS PRODUTOS/ })).toBeInTheDocument(); // o título da aba (a antiga Bancada)
     expect(screen.getByText(bancada[0].name)).toBeInTheDocument(); // o produto de sempre, lido de `beauty-products`
     expect(screen.queryByText(/bancada/i)).not.toBeInTheDocument();
     expect(Object.keys(store.dados)).toContain("beauty-products");

@@ -61,8 +61,9 @@ export const CHAVE_DICAS = "skincare-dicas-prefs";
 
 /* ------------------------------------------------------------ as perguntas */
 
+/* Sem emoji azul (28/09, "não azul"): oleosa ✨ (brilha), hidratação 🍉. É só enfeite — a chave guarda o id. */
 export const OPCOES_PELE: { id: TipoDePele; rotulo: string; emoji: string; dica: string }[] = [
-  { id: "oleosa", rotulo: "Oleosa", emoji: "💧", dica: "brilha ao longo do dia, poro aparente" },
+  { id: "oleosa", rotulo: "Oleosa", emoji: "✨", dica: "brilha ao longo do dia, poro aparente" },
   { id: "mista", rotulo: "Mista", emoji: "⚖️", dica: "oleosa na testa e no nariz, seca no resto" },
   { id: "normal", rotulo: "Normal", emoji: "🙂", dica: "nem oleosa nem seca" },
   { id: "seca", rotulo: "Seca", emoji: "🌵", dica: "repuxa depois de lavar, descama" },
@@ -72,9 +73,9 @@ export const OPCOES_PELE: { id: TipoDePele; rotulo: string; emoji: string; dica:
 export const OPCOES_OBJETIVO: { id: Objetivo; rotulo: string; emoji: string; dica: string }[] = [
   { id: "acne", rotulo: "Acne e espinhas", emoji: "🔴", dica: "cravos, espinhas, oleosidade" },
   { id: "manchas", rotulo: "Manchas", emoji: "🟤", dica: "marcas de espinha, melasma, sol" },
-  { id: "hidratacao", rotulo: "Hidratação", emoji: "💦", dica: "pele sem viço, repuxando" },
+  { id: "hidratacao", rotulo: "Hidratação", emoji: "🍉", dica: "pele sem viço, repuxando" },
   { id: "sinais", rotulo: "Sinais do tempo", emoji: "⏳", dica: "linhas finas, firmeza" },
-  { id: "basico", rotulo: "Só o básico bem feito", emoji: "✨", dica: "limpar, hidratar, proteger" },
+  { id: "basico", rotulo: "Só o básico bem feito", emoji: "👌", dica: "limpar, hidratar, proteger" },
 ];
 
 export const OPCOES_NIVEL: { id: Nivel; rotulo: string; emoji: string; dica: string }[] = [

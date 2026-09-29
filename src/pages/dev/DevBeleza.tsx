@@ -7,11 +7,15 @@ import { CHAVE_LEMBRETE_SKINCARE, lerDadosDoSkincare, planejarSkincare } from "@
 import {
   CHAVE_LAVAGENS, CHAVE_PERFIL_CABELO, CHAVE_PLANO_CABELO, criarPlano, perfilDasRespostas, type LavagemCapilar,
 } from "@/lib/beleza-cabelo";
+import { CHAVE_CUIDADOS, compromissoDoCuidado, novoCuidado, type Cuidado } from "@/lib/beleza-cuidados";
+import { CHAVE_COMPROMISSOS } from "@/lib/compromissos";
 import { BASES_LEMBRETES } from "@/lib/notificacoes";
 import { quandoDoAviso } from "@/components/beleza/lembrete-skincare";
 import catalogo from "@/data/produtos-beleza.json";
 import Home from "@/pages/Home";
 import Beleza from "@/pages/Beleza";
+import Rotina from "@/pages/Rotina";
+import Financas from "@/pages/Index";
 // as 3 direções de visual (28/09) pra comparar na mesma tela: ?direcao=a|b|c (só no dev)
 import "./beleza-direcoes.css";
 
@@ -29,6 +33,7 @@ import "./beleza-direcoes.css";
  *   &direcao=a|b|c · as 3 direções de visual (rosé & nude · pêssego & malva · creme & lavanda-rosada)
  *   &aba=cabelo|produtos|cuidados · abre a aba (o mesmo link das notificações)
  *   ?tela=cabelo-vazio · a Ana sem cronograma (as 4 perguntas do cabelo)
+ *   ?tela=cuidados-vazio · a Ana sem cuidados (os modelos pra adicionar)
  *   ?tela=avisos   · o que o celular recebe (o plano do lembrete, com o texto de cada dia)
  * O tema escuro vem do próprio app (localStorage "core-theme-mode").
  */
@@ -123,9 +128,27 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     [CHAVE_LAVAGENS]: lavagens,
   };
 
+  /* CUIDADOS (Onda 1): unha toda semana (vence hoje), sobrancelha em 2 dias, laser com
+     pacote e horário marcado (já está na Rotina) e a raiz atrasada. */
+  const semanas = (n: number) => diaMenos(hoje, 7 * n);
+  const cuidadosSeed: Cuidado[] = [
+    { ...novoCuidado("unha", "cu1"), ultima: semanas(1), local: "Manicure Rô", preco: 45,
+      historico: [4, 3, 2, 1].map((n) => ({ data: semanas(n), preco: 45, local: "Manicure Rô" })) },
+    { ...novoCuidado("sobrancelha", "cu2"), ultima: diaMenos(hoje, 19), local: "Studio Bela", preco: 60,
+      historico: [{ data: diaMenos(hoje, 40), preco: 60, local: "Studio Bela" }, { data: diaMenos(hoje, 19), preco: 60, local: "Studio Bela" }] },
+    { ...novoCuidado("laser", "cu3", "Laser axila"), ultima: diaMenos(hoje, 39), local: "Espaço Laser", pacote: { total: 10, feitas: 4 },
+      horario: { data: diaMenos(hoje, -4), hora: "15:30", compromissoId: "cmp-laser" },
+      historico: [{ data: diaMenos(hoje, 84) }, { data: diaMenos(hoje, 39) }] },
+    { ...novoCuidado("raiz", "cu4"), ultima: diaMenos(hoje, 43), preco: 120, historico: [{ data: diaMenos(hoje, 43), preco: 120 }] },
+  ];
+  const cuidados = tela === "cuidados-vazio" ? {} : {
+    [CHAVE_CUIDADOS]: cuidadosSeed,
+    [CHAVE_COMPROMISSOS]: [compromissoDoCuidado(cuidadosSeed[2], diaMenos(hoje, -4), "15:30", 1440, "cmp-laser")],
+  };
+
   return {
     ...base,
-    "core-home-widgets-v2": [{ id: "skincare", size: "large" }],
+    "core-home-widgets-v2": [{ id: "skincare", size: "large" }, { id: "cuidados", size: "large" }],
     "skincare-am-steps": am,
     "skincare-pm-steps": pm,
     "skincare-morning-checked": feitosManha,
@@ -135,6 +158,7 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     "beauty-products": bancada,
     [CHAVE_LEMBRETE_SKINCARE]: { manha: { ligado: true, hora: "07:30" }, noite: { ligado: true, hora: "21:30" } },
     ...cabelo,
+    ...cuidados,
   };
 };
 
@@ -184,7 +208,10 @@ const DevBeleza = () => {
     return () => { delete html.dataset.bzDirecao; };
   }, [direcao]);
   if (tela === "avisos") return <Avisos dados={inicial} />;
-  return <Provedor inicial={inicial}>{tela === "home" ? <Home /> : <Beleza />}</Provedor>;
+  // ?tela=rotina&aba=mes: a Rotina com os MESMOS dados (o compromisso que o "Marquei horário" criou).
+  // Trocar de tela navegando dentro da página mantém o que foi feito (o Provedor não remonta).
+  const pagina = tela === "home" ? <Home /> : tela === "rotina" ? <Rotina /> : tela === "financas" ? <Financas /> : <Beleza />;
+  return <Provedor inicial={inicial}>{pagina}</Provedor>;
 };
 
 export default DevBeleza;

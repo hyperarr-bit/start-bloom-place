@@ -10,6 +10,7 @@ import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { Cabelo } from "@/components/beleza/Cabelo";
+import { Cuidados } from "@/components/beleza/Cuidados";
 import { useSkincare } from "@/components/beleza/use-skincare";
 import type { PerfilDaPele } from "@/lib/beleza-rotina";
 import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
@@ -26,11 +27,12 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
  * Os ids ficam (medição por aba, tour, testes): `routine` = SKINCARE, `shelf` =
  * MEUS PRODUTOS. O id antigo `diary` redireciona pra SKINCARE, rolando até as fotos.
  */
-type Aba = "routine" | "hair" | "shelf";
+type Aba = "routine" | "hair" | "shelf" | "care";
 const tabs: { id: Aba; label: string; icon: string }[] = [
   { id: "routine", label: "SKINCARE", icon: "✨" },
   { id: "hair", label: "CABELO", icon: "💇‍♀️" },
   { id: "shelf", label: "MEUS PRODUTOS", icon: "🧴" },
+  { id: "care", label: "CUIDADOS", icon: "💅" },
 ];
 
 /** `/beleza?aba=…` (link de notificação, atalho, tour): nomes em português e os ids antigos. */
@@ -38,6 +40,7 @@ const ABA_DO_LINK: Record<string, Aba | "fotos"> = {
   skincare: "routine", routine: "routine", rotina: "routine",
   cabelo: "hair", hair: "hair",
   produtos: "shelf", "meus-produtos": "shelf", shelf: "shelf",
+  cuidados: "care", care: "care",
   diario: "fotos", diary: "fotos", fotos: "fotos",
 };
 
@@ -80,6 +83,7 @@ const Beleza = () => {
         steps={[
           { selector: '[data-spotlight="tab-hair"]', label: "Seu cronograma capilar em 4 perguntas.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os seus produtos.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-care"]', label: "Unha, sobrancelha, depilação: a próxima data sozinha.", advanceOnClick: true },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -99,6 +103,7 @@ const Beleza = () => {
             <button
               key={tab.id}
               data-spotlight={`tab-${tab.id}`}
+              data-active={activeTab === tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
@@ -128,6 +133,7 @@ const Beleza = () => {
         )}
         {activeTab === "hair" && <Cabelo />}
         {activeTab === "shelf" && <ProductShelf />}
+        {activeTab === "care" && <Cuidados />}
       </main>
     </div>
   );

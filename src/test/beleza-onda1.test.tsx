@@ -37,6 +37,13 @@ import {
   type LavagemCapilar, type PlanoCapilar,
 } from "@/lib/beleza-cabelo";
 import { BASES_LEMBRETES } from "@/lib/notificacoes";
+import {
+  CHAVE_CUIDADOS, MODELOS, faltaDoCuidado, gastoNoMes, marcarFeito, marcarHorario, noMesCorrente, novoCuidado, ordenarCuidados,
+  planejarCuidados, proximaDoCuidado, textoDaFalta, textoDoPacote, type Cuidado,
+} from "@/lib/beleza-cuidados";
+import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
+import { ExpenseTable } from "@/components/ExpenseTable";
+import { ProximosCompromissos } from "@/components/rotina/Compromissos";
 
 beforeAll(() => {
   window.scrollTo = () => {};
@@ -311,5 +318,131 @@ describe("CABELO — a aba: 4 perguntas → cronograma → cabelo de hoje", () =
     lav = store.dados[CHAVE_LAVAGENS] as LavagemCapilar[];
     expect(lav.find((l) => l.data === "2026-09-27")).toMatchObject({ noPlano: false, feita: true, etapa: null });
     expect(estadoDaFila(plano, lav).feitasNoCiclo).toBe(1);
+  });
+});
+
+/* ═════════════════════════════ F2 — CUIDADOS ═════════════════════════════ */
+
+describe("CUIDADOS — a próxima data (intervalos do dono, editáveis)", () => {
+  it("modelos com os intervalos padrão: unha 7, gel 21, sobrancelha 21, cera 28, laser 45 (com pacote), raiz 35", () => {
+    const dias = Object.fromEntries(MODELOS.map((m) => [m.tipo, m.intervaloDias]));
+    expect(dias).toEqual({ unha: 7, "unha-gel": 21, sobrancelha: 21, cera: 28, laser: 45, raiz: 35 });
+    expect(novoCuidado("laser", "x").pacote).toEqual({ total: 10, feitas: 0 });
+    expect(novoCuidado("unha", "x")).toMatchObject({ avisoLigado: false, avisoDiasAntes: 2, historico: [] });
+  });
+
+  it("próxima = última + intervalo; o horário marcado manda; FALTA em palavras; a tabela põe o atrasado no topo", () => {
+    const unha = { ...novoCuidado("unha", "a"), ultima: "2026-09-21" };
+    const sobr = { ...novoCuidado("sobrancelha", "b"), ultima: "2026-09-09" };
+    const raiz = { ...novoCuidado("raiz", "c"), ultima: "2026-08-16" };
+    const novo = novoCuidado("cera", "d");
+    expect(proximaDoCuidado(unha)).toBe(SEG);
+    expect(textoDaFalta(faltaDoCuidado(unha, SEG))).toBe("hoje");
+    expect(textoDaFalta(faltaDoCuidado(sobr, SEG))).toBe("2 dias");
+    expect(textoDaFalta(faltaDoCuidado(raiz, SEG))).toBe("venceu há 8 dias");
+    expect(proximaDoCuidado(novo)).toBeUndefined();
+    expect(ordenarCuidados([sobr, novo, unha, raiz], SEG).map((c) => c.id)).toEqual(["c", "a", "b", "d"]);
+    expect(proximaDoCuidado({ ...sobr, horario: { data: "2026-10-03", hora: "10:00", compromissoId: "k" } })).toBe("2026-10-03");
+  });
+
+  it("FEITO: vira a última, entra no histórico com preço e local, conta a sessão do pacote e cumpre o horário", () => {
+    const laser = { ...novoCuidado("laser", "l"), ultima: "2026-08-20", local: "Espaço Laser", pacote: { total: 10, feitas: 4 }, horario: { data: SEG, hora: "15:30", compromissoId: "k" } };
+    const depois = marcarFeito(laser, SEG, { preco: 89.9 });
+    expect(depois).toMatchObject({ ultima: SEG, preco: 89.9, pacote: { total: 10, feitas: 5 } });
+    expect(depois.horario).toBeUndefined();
+    expect(depois.historico).toEqual([{ data: SEG, preco: 89.9, local: "Espaço Laser" }]);
+    expect(proximaDoCuidado(depois)).toBe("2026-11-12"); // 28/09 + 45
+    expect(textoDoPacote(depois.pacote)).toBe("sessão 6 de 10");
+    // feito num dia ANTERIOR à última não volta a "última" pra trás
+    expect(marcarFeito({ ...novoCuidado("unha", "u"), ultima: SEG, historico: [] }, "2026-09-20").ultima).toBe(SEG);
+  });
+
+  it("gasto do mês por cuidado ('R$ 180 com unha em setembro')", () => {
+    const unha = { ...novoCuidado("unha", "a"), historico: ["2026-08-31", "2026-09-07", "2026-09-14", "2026-09-21"].map((data) => ({ data, preco: 45 })) };
+    expect(gastoNoMes(unha, "2026-09")).toEqual({ total: 135, vezes: 3 });
+    expect(noMesCorrente("2026-09-02", SEG)).toBe(true);
+    expect(noMesCorrente("2026-08-31", SEG)).toBe(false);
+  });
+
+  it("aviso sem horário: desligado não agenda; ligado, 2 dias antes às 09:00; com horário marcado, quem avisa é o compromisso", () => {
+    const sobr = { ...novoCuidado("sobrancelha", "b"), ultima: "2026-09-09" }; // próxima 30/09
+    const agora = new Date(2026, 8, 27, 20, 0);
+    expect(planejarCuidados([sobr], BASES_LEMBRETES.cuidados, agora)).toEqual([]);
+    const avisos = planejarCuidados([{ ...sobr, avisoLigado: true }], BASES_LEMBRETES.cuidados, agora);
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toMatchObject({ quando: new Date(2026, 8, 28, 9, 0), title: "✏️ Sobrancelha em 2 dias", id: 1720000 });
+    expect(planejarCuidados([{ ...sobr, avisoLigado: true, horario: { data: "2026-09-30", hora: "10:00", compromissoId: "k" } }], BASES_LEMBRETES.cuidados, agora)).toEqual([]);
+    expect(BASES_LEMBRETES.cuidados).toBe(1720000);
+  });
+
+  it("MARQUEI HORÁRIO: um compromisso da Rotina (origem beleza); marcar de novo troca o mesmo, sem duplicar", () => {
+    const laser = { ...novoCuidado("laser", "l", "Laser axila"), local: "Espaço Laser", pacote: { total: 10, feitas: 4 } };
+    const r1 = marcarHorario(laser, [], "2026-10-02", "15:30", 1440, "c1");
+    expect(r1.compromissos).toHaveLength(1);
+    expect(r1.compromissos[0]).toMatchObject({ id: "c1", titulo: "Laser axila · sessão 5 de 10", data: "2026-10-02", hora: "15:30", aviso: 1440, local: "Espaço Laser", origem: "beleza", ref: "l" });
+    const r2 = marcarHorario(r1.cuidado, [...r1.compromissos, { id: "outro", titulo: "Dentista", data: "2026-10-05", hora: "09:00" }], "2026-10-03", "10:00", 60, "c2");
+    expect(r2.compromissos.map((c) => c.id).sort()).toEqual(["c1", "outro"]);
+    expect(r2.cuidado.horario).toEqual({ data: "2026-10-03", hora: "10:00", compromissoId: "c1" });
+  });
+});
+
+describe("CUIDADOS — a aba: FEITO → gasto nas Finanças; marquei horário → compromisso na Rotina", () => {
+  it("adiciona sobrancelha, FEITO hoje com R$ 60 e 1 toque lança em Finanças · Beleza (perfil ativo, mês corrente) — e o gasto aparece na tabela de gastos", () => {
+    fixarHoje();
+    const store = criarStoreReativo({ "finance-perfil-ativo": "acme", "finance-expenses": [{ id: "antigo", description: "Mercado", value: 200, category: "mercado", date: "2026-09-02", paymentMethod: "pix" }] });
+    store.montar(<Beleza />, "/beleza?aba=cuidados");
+    expect(screen.getByRole("button", { name: /CUIDADOS/ }).className).toMatch(/notion-tab-active/);
+    fireEvent.click(screen.getByTestId("modelo-sobrancelha"));
+    const ficha = within(screen.getByTestId("ficha-cuidado"));
+    fireEvent.change(ficha.getByLabelText("Preço"), { target: { value: "60,00" } });
+    fireEvent.click(ficha.getByTestId("cuidado-feito"));
+    const cuidados = store.dados[CHAVE_CUIDADOS] as Cuidado[];
+    expect(cuidados[0]).toMatchObject({ tipo: "sobrancelha", ultima: SEG, preco: 60, historico: [{ data: SEG, preco: 60 }] });
+    expect(ficha.getByTestId("feito-ok")).toHaveTextContent(/Próxima: .*19\/10/);
+    // nada vai pra Finanças sozinho
+    expect((store.dados["finance-expenses"] as unknown[]).length).toBe(1);
+    fireEvent.click(ficha.getByTestId("lancar-financas"));
+    const gastos = store.dados["finance-expenses"] as Record<string, unknown>[];
+    expect(gastos).toHaveLength(2);
+    expect(gastos[1]).toMatchObject({ description: "Sobrancelha", value: 60, category: "beleza", date: SEG, perfil: "acme", paymentMethod: "pix" });
+    // aparece em Finanças: a tabela de gastos do mês mostra o lançamento na categoria Beleza
+    const { unmount } = render(<UserDataContext.Provider value={{ get: <T,>(k: string, f: T) => (k in store.dados ? (store.dados[k] as T) : f), set: () => {}, loaded: true, isGuest: true, fetchKey: async () => null }}><ExpenseTable expenses={gastos as never} setExpenses={() => {}} mes="2026-09" /></UserDataContext.Provider>);
+    const linha = screen.getByRole("button", { name: "Editar Sobrancelha" });
+    expect(within(linha).getByText("Beleza")).toBeInTheDocument();
+    unmount();
+  });
+
+  it("feito num dia do mês passado: registra, mas não oferece o balde deste mês", () => {
+    fixarHoje();
+    const store = criarStoreReativo({ [CHAVE_CUIDADOS]: [{ ...novoCuidado("unha", "u1"), ultima: "2026-08-20", preco: 45 }] });
+    store.montar(<Beleza />, "/beleza?aba=cuidados");
+    fireEvent.click(screen.getByTestId("linha-cuidado"));
+    const ficha = within(screen.getByTestId("ficha-cuidado"));
+    fireEvent.click(ficha.getByRole("button", { name: "Foi outro dia" }));
+    fireEvent.change(ficha.getByTestId("dia-feito"), { target: { value: "2026-08-27" } });
+    fireEvent.click(ficha.getByTestId("cuidado-feito-outro"));
+    expect((store.dados[CHAVE_CUIDADOS] as Cuidado[])[0]).toMatchObject({ ultima: "2026-08-27" });
+    expect(ficha.getByTestId("oferta-fora-do-mes")).toBeInTheDocument();
+    expect(ficha.queryByTestId("lancar-financas")).not.toBeInTheDocument();
+    expect(store.dados["finance-expenses"]).toBeUndefined();
+  });
+
+  it("MARQUEI HORÁRIO grava o compromisso e ele aparece nos PRÓXIMOS COMPROMISSOS da Rotina", () => {
+    fixarHoje();
+    const store = criarStoreReativo({ [CHAVE_CUIDADOS]: [{ ...novoCuidado("sobrancelha", "s1"), ultima: "2026-09-09", local: "Studio Bela" }] });
+    store.montar(<Beleza />, "/beleza?aba=cuidados");
+    fireEvent.click(screen.getByTestId("linha-cuidado"));
+    const ficha = within(screen.getByTestId("ficha-cuidado"));
+    fireEvent.click(ficha.getByTestId("marquei-horario"));
+    fireEvent.change(ficha.getByTestId("horario-dia"), { target: { value: "2026-09-30" } });
+    fireEvent.change(ficha.getByTestId("horario-hora"), { target: { value: "10:30" } });
+    fireEvent.click(ficha.getByTestId("salvar-horario"));
+    const compromissos = store.dados[CHAVE_COMPROMISSOS] as Compromisso[];
+    expect(compromissos).toHaveLength(1);
+    expect(compromissos[0]).toMatchObject({ titulo: "Sobrancelha", data: "2026-09-30", hora: "10:30", local: "Studio Bela", origem: "beleza", ref: "s1" });
+    expect((store.dados[CHAVE_CUIDADOS] as Cuidado[])[0].horario).toMatchObject({ data: "2026-09-30", hora: "10:30", compromissoId: compromissos[0].id });
+    // a Rotina lê a mesma chave: o compromisso está lá
+    store.montar(<ProximosCompromissos lista={compromissos} onChange={() => {}} onAbrirDia={() => {}} />);
+    expect(within(screen.getByTestId("proximos-compromissos")).getByText(/Sobrancelha/)).toBeInTheDocument();
   });
 });

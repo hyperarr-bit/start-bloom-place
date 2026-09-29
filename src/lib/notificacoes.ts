@@ -4,6 +4,7 @@ import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { algumLigado, planejarSkincare, type DadosDoSkincare } from "./beleza-lembrete";
 import { lembreteCabeloLigado, planejarCabelo, type DadosDoCabelo } from "./beleza-cabelo";
+import { algumAvisoDeCuidado, planejarCuidados, type Cuidado } from "./beleza-cuidados";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -33,7 +34,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "cabelo" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "cabelo" | "cuidados" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -62,6 +63,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
   cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
+  cuidados: 1720000, // 28/09 (Onda 1): "sobrancelha em 2 dias" — cuidado sem horário marcado (lib/beleza-cuidados)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -813,6 +815,15 @@ export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
 export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
   if (!dados.plano || !lembreteCabeloLigado(dados.prefs)) { await limparFaixa(BASES.cabelo); return 0; }
   return agendarSerie("cabelo", "/beleza?aba=cabelo", planejarCabelo(dados, BASES.cabelo));
+}
+
+/* ─── Cuidados sem horário marcado (28/09, Onda 1 da Beleza) ─────────────────
+   Um aviso por cuidado com o aviso LIGADO (nasce desligado), N dias antes da
+   próxima data, às 09:00. Com horário marcado quem avisa é o compromisso da
+   Rotina (faixa dos compromissos) — aqui não duplica. */
+export async function agendarCuidados(lista: Cuidado[]): Promise<number> {
+  if (!algumAvisoDeCuidado(lista)) { await limparFaixa(BASES.cuidados); return 0; }
+  return agendarSerie("cuidados", "/beleza?aba=cuidados", planejarCuidados(lista, BASES.cuidados));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

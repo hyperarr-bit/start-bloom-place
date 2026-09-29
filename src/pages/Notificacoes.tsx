@@ -10,6 +10,7 @@ import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
 import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
+import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos } from "@/lib/beleza-cuidados";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -163,6 +164,27 @@ const Notificacoes = () => {
     const novo = { dia: { ...cabelo.dia, ligado: valor }, vespera: { ...cabelo.vespera, ligado: valor && cabelo.vespera.ligado } };
     set(CHAVE_LEMBRETE_CABELO, novo);
     const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_CABELO ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Cuidados com data (28/09, Onda 1): cada cuidado tem o seu aviso (na Beleza);
+   *  aqui é o interruptor geral — liga ou desliga o de todos. */
+  const cuidados = cuidadosValidos(get<unknown>(CHAVE_CUIDADOS, []));
+  const alternarCuidados = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "cuidados", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = cuidados.map((c) => ({ ...c, avisoLigado: valor }));
+    set(CHAVE_CUIDADOS, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_CUIDADOS ? (novo as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -327,6 +349,15 @@ const Notificacoes = () => {
           ligado={lembreteCabeloLigado(cabelo)}
           onChange={(v) => void alternarCabelo(v)}
           rodape={rodapeDe("cabelo", lembreteCabeloLigado(cabelo), "Monte seu cronograma na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<CalendarClock className="w-4 h-4" />}
+          titulo="Cuidados"
+          descricao="Unha, sobrancelha, depilação: às 09:00, alguns dias antes da próxima vez. Com horário marcado, quem avisa é o compromisso. Os dias mudam em cada cuidado, na Beleza."
+          ligado={algumAvisoDeCuidado(cuidados)}
+          onChange={(v) => void alternarCuidados(v)}
+          rodape={rodapeDe("cuidados", algumAvisoDeCuidado(cuidados), "Marque a última vez de um cuidado na Beleza pra ter o que lembrar")}
         />
 
         <LinhaAviso

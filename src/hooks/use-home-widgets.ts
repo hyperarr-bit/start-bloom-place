@@ -21,7 +21,8 @@ export type WidgetId =
   | "countdown"
   | "week-calendar"
   | "tasks"
-  | "skincare";
+  | "skincare"
+  | "cuidados";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -49,6 +50,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "reading", label: "Leitura", description: "Livro atual e progresso", emoji: "📖", category: "bem-estar", defaultSize: "small" },
   // 28/09 (protótipo da Beleza): os passos de pele de hoje, manhã e noite, com o quadradinho
   { id: "skincare", label: "Skincare de hoje", description: "Os passos de pele de hoje, manhã e noite, com ✓", emoji: "🧴", category: "bem-estar", defaultSize: "large" },
+  // 28/09 (Onda 1 da Beleza): unha, sobrancelha, depilação — os 3 que vencem primeiro
+  { id: "cuidados", label: "Próximos cuidados", description: "Unha, sobrancelha, depilação: quanto falta", emoji: "💅", category: "bem-estar", defaultSize: "large" },
   // Custom widgets
   { id: "week-progress", label: "Progresso Semanal", description: "Gráfico do seu score ao longo da semana", emoji: "📊", category: "produtividade", defaultSize: "large" },
   { id: "budget-remaining", label: "Orçamento Restante", description: "Quanto ainda pode gastar este mês", emoji: "💸", category: "finanças", defaultSize: "large" },

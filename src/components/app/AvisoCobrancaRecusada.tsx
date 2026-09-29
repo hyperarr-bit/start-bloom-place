@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { problemaDeCobranca, type ProblemaDeCobranca } from "@/lib/revenuecat";
@@ -24,9 +25,29 @@ const fechadoAgora = () => {
   try { return Number(localStorage.getItem(CHAVE_FECHADO) || 0) > Date.now(); } catch { return false; }
 };
 
+/*
+ * SEM ACESSO, O AVISO MORA NO ALTO DO BLOQUEIO (28/09). Quando o acesso cai, o
+ * gate do TrialBanner (fixed inset-0 z-[310]) cobre a tela inteira e escondia
+ * esta faixa: justo quem teve o cartão recusado via "compre de novo por
+ * R$ 97,90" em vez de "atualize o pagamento". O gate abre uma VAGA no topo
+ * dele e, sem acesso, esta MESMA instância é desenhada lá (portal): empurra o
+ * paywall pra baixo, não cobre controle nenhum e continua sendo uma exibição
+ * só — um aviso_cobranca_view, sem contar de novo na troca de lugar. Com
+ * acesso (carência ligada), segue a faixa de cima, como sempre.
+ */
+let vagaNoGate: HTMLElement | null = null;
+const ouvintesDaVaga = new Set<() => void>();
+const registrarVaga = (el: HTMLDivElement | null) => { vagaNoGate = el; ouvintesDaVaga.forEach((f) => f()); };
+const assinarVaga = (f: () => void) => { ouvintesDaVaga.add(f); return () => { ouvintesDaVaga.delete(f); }; };
+const lerVaga = () => vagaNoGate;
+
+/** A vaga do aviso no topo do bloqueio (TrialBanner). Vazia, não ocupa nada. */
+export const VagaDoAvisoCobranca = () => <div ref={registrarVaga} data-vaga="aviso-cobranca" />;
+
 export const AvisoCobrancaRecusada = () => {
   const [p, setP] = useState<ProblemaDeCobranca | null>(null);
   const [fechado, setFechado] = useState(fechadoAgora);
+  const vaga = useSyncExternalStore(assinarVaga, lerVaga, () => null);
 
   useEffect(() => {
     if (!isNativeShell()) return;
@@ -52,7 +73,7 @@ export const AvisoCobrancaRecusada = () => {
     trackEvent("aviso_cobranca_fechar", {});
   };
 
-  return (
+  const faixa = (
     <div role="alert" className="w-full bg-amber-500/10 border-b border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-3">
       <div className="max-w-6xl mx-auto flex items-start gap-2.5">
         <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -78,4 +99,7 @@ export const AvisoCobrancaRecusada = () => {
       </div>
     </div>
   );
+  // Sem acesso e com o bloqueio aberto: no alto dele, abaixo da área segura do topo.
+  if (!p.comAcesso && vaga) return createPortal(<div className="pt-[var(--app-safe-top)]">{faixa}</div>, vaga);
+  return faixa;
 };

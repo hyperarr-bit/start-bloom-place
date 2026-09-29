@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { datasDeCheckin } from "@/lib/detox";
-import { localDayKey } from "@/lib/utils";
+import { datasDeCheckin, sequenciaDetox } from "@/lib/detox";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check, X, Heart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
-import { differenceInDays, format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,11 +96,11 @@ export const DetoxTracker = () => {
     set("detox-habits", updated);
   };
 
-  const getStreak = (h: DetoxHabit) => {
-    const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;
-    const from = lastRelapse || h.startDate;
-    return differenceInDays(new Date(), new Date(from));
-  };
+  // 28/09: dia LOCAL, a mesma conta do Stats e das Conquistas. Antes era
+  // differenceInDays(new Date(), new Date("AAAA-MM-DD")) — a data vira meia-noite
+  // UTC (21h no Brasil) e, das 21h à meia-noite, o Rastreador mostrava 1 dia a
+  // mais que o Stats; perto de um marco, a conquista "abria" antes da hora.
+  const getStreak = (h: DetoxHabit) => sequenciaDetox(h);
 
   
 
@@ -222,7 +222,7 @@ export const DetoxTracker = () => {
                         const isRelapse = h.relapses.includes(ds);
                         const isFuture = day > today;
                         const isCheckedIn = datasDeCheckin(h.checkins).includes(ds);
-                        const isPure = !isRelapse && !isFuture && day >= new Date(h.startDate);
+                        const isPure = !isRelapse && !isFuture && day >= parseLocalDay(h.startDate);
                         return (
                           <div
                             key={ds}

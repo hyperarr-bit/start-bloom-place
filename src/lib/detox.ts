@@ -13,6 +13,27 @@ export const datasDeCheckin = (c: unknown): string[] => {
   return [];
 };
 
+/* ── Qual hábito (28/09) ──────────────────────────────────────────────────────
+ * A ação rápida "Check-in Detox" da Home achava o hábito pelo NOME: dois
+ * hábitos com o mesmo nome ("Redes sociais" de manhã e à noite, ou o mesmo
+ * criado duas vezes) recebiam os dois o check-in de um toque só. A chave é o
+ * `id`; hábito antigo sem id cai na POSIÇÃO da lista (#0, #1…), que não
+ * muda entre abrir a folha e tocar. */
+export const chaveDoHabito = (h: unknown, indice: number): string => {
+  const id = h && typeof h === "object" ? (h as { id?: unknown }).id : undefined;
+  if (typeof id === "string" && id) return id;
+  if (typeof id === "number" && Number.isFinite(id)) return String(id);
+  return `#${indice}`;
+};
+
+/** Marca o check-in de HOJE só no hábito da chave (um por dia; converte o formato antigo de objeto). */
+export const marcarCheckin = <T,>(habitos: T[], chave: string, hoje: string): T[] =>
+  habitos.map((h, i) => {
+    if (chaveDoHabito(h, i) !== chave) return h;
+    const datas = datasDeCheckin((h as { checkins?: unknown }).checkins);
+    return { ...h, checkins: datas.includes(hoje) ? datas : [...datas, hoje] };
+  });
+
 /* ── Estatística (26/09) ─────────────────────────────────────────────────────
  * A recaída reescreve `startDate` (a sequência recomeça), então "dias desde o
  * startDate" encolhia enquanto as recaídas acumulavam: 2 dias × 4 recaídas =

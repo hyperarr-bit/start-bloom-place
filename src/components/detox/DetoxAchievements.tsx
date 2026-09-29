@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { Trophy, Lock } from "lucide-react";
-import { differenceInDays } from "date-fns";
+import { sequenciaDetox } from "@/lib/detox";
 
 interface DetoxHabit {
   id: string;
@@ -28,11 +28,9 @@ export const DetoxAchievements = () => {
   const { get } = useUserData();
   const habits = get<DetoxHabit[]>("detox-habits", []);
 
-  const getStreak = (h: DetoxHabit) => {
-    const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;
-    const from = lastRelapse || h.startDate;
-    return differenceInDays(new Date(), new Date(from));
-  };
+  // 28/09: dia LOCAL (lib/detox), igual ao Stats e às Conquistas do app — a
+  // conta em UTC destravava o marco 1 dia antes depois das 21h.
+  const getStreak = (h: DetoxHabit) => sequenciaDetox(h);
 
   if (habits.length === 0) {
     return (

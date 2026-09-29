@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { numeroBR } from "@/lib/data-normalizers";
-import { datasDeCheckin } from "@/lib/detox";
+import { chaveDoHabito, datasDeCheckin, marcarCheckin } from "@/lib/detox";
 import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
 import { CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
 
@@ -345,17 +345,13 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
-  const submitDetoxCheckin = (habitName: string) => {
-    const tStr = todayStr();
+  const submitDetoxCheckin = (chave: string, habitName: string) => {
     const habits = get<any[]>("detox-habits", []);
     // 26/09: o Detox guarda LISTA de datas; isto gravava um objeto {dia: n} que
     // virava [] no banco (e quebrava o Detox em hábito antigo). Um por dia.
-    const updated = habits.map((h: any) => {
-      if (h.name !== habitName) return h;
-      const datas = datasDeCheckin(h.checkins);
-      return datas.includes(tStr) ? { ...h, checkins: datas } : { ...h, checkins: [...datas, tStr] };
-    });
-    set("detox-habits", updated);
+    // 28/09: pelo ID (ou posição, em hábito antigo) — pelo nome, dois hábitos
+    // com o mesmo nome levavam o check-in juntos.
+    set("detox-habits", marcarCheckin(Array.isArray(habits) ? habits : [], chave, todayStr()));
     vibrate();
     showSuccess("detox");
     toast.success(`🛡️ Check-in: ${habitName}`, { action: { label: "Ver Detox", onClick: () => navigate("/detox") } });
@@ -364,7 +360,7 @@ export const QuickActions = () => {
 
   const close = () => { setActiveAction(null); setMealEscolhida(null); setMealKcal(""); };
 
-  const detoxHabits = get<any[]>("detox-habits", []);
+  const detoxHabits = ((h) => (Array.isArray(h) ? h : []))(get<any[]>("detox-habits", []));
 
   return (
     <div ref={raizRef} className="space-y-2">
@@ -681,10 +677,10 @@ export const QuickActions = () => {
                       <button onClick={() => navigate("/detox")} className="text-primary font-medium underline">Criar em Detox</button>
                     </p>
                   ) : (
-                    detoxHabits.map((h: any) => (
+                    detoxHabits.map((h: any, i: number) => (
                       <motion.button
-                        key={h.name}
-                        onClick={() => submitDetoxCheckin(h.name)}
+                        key={chaveDoHabito(h, i)}
+                        onClick={() => submitDetoxCheckin(chaveDoHabito(h, i), h.name)}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left"
                         whileTap={{ scale: 0.97 }}
                       >

@@ -4,7 +4,7 @@
  *  - DIAS: os 7 dias em quadrados na cor de cada dia — é a frequência do passo
  *    (o ácido ter/qui/sáb, o protetor todo dia);
  *  - PRODUTO: o da lista curada de produtos vendidos no Brasil (busca por nome
- *    ou marca) ou digitado à mão. Vai pra Bancada com a validade depois de
+ *    ou marca) ou digitado à mão. Vai pra MEUS PRODUTOS com a validade depois de
  *    aberto (PAO); "Abri hoje" começa a contar;
  *  - Remover da rotina, com Desfazer.
  * Os "indicados" são os da lista que encaixam no passo (categoria/ativo), a pele
@@ -161,7 +161,7 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
             produto={produto}
             onTrocar={onEscolher}
             onTirar={() => s.tirarProduto(periodo, i)}
-            onAbrirHoje={() => { s.abrirHoje(produto.id); toast.success("A validade começou a contar hoje", { description: "A Bancada avisa quando estiver perto de vencer." }); }}
+            onAbrirHoje={() => { s.abrirHoje(produto.id); toast.success("A validade começou a contar hoje", { description: "Em Meus produtos aparece quando estiver perto de vencer." }); }}
           />
         ) : (
           <>
@@ -169,7 +169,7 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
               <Search className="w-4 h-4 mr-2" /> Escolher produto
             </Button>
             <p className="mt-1 text-[11.5px] text-muted-foreground leading-snug">
-              Da lista de produtos populares no Brasil, ou digite o seu. Ele entra na sua Bancada, com a validade.
+              Da lista de produtos populares no Brasil, ou digite o seu. Ele entra em Meus produtos, com a validade.
             </p>
           </>
         )}
@@ -233,7 +233,7 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
   const pele = s.perfil?.pele;
   const tipo = (passo.tipo as TipoDoPasso | undefined) ?? tipoPeloNome(passo.name);
   const buscando = q.trim().length >= 2;
-  // "ter os MEUS produtos": o que já está na Bancada e serve pra este passo vem antes da lista
+  // "ter os MEUS produtos": o que a pessoa já tem e serve pra este passo vem antes da lista
   const naBancada = new Set(s.bancada.filter((b) => b && !b.finished && b.catalogoId).map((b) => b.catalogoId as string));
   const meus = lista && !buscando ? indicadosPara(lista, tipo, pele, s.evitar, 40, periodo).filter((p) => naBancada.has(p.id)) : [];
   const indicados = lista ? indicadosPara(lista, tipo, pele, s.evitar, 40, periodo).filter((p) => !naBancada.has(p.id)) : [];
@@ -253,8 +253,8 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
       </div>
       {meus.length > 0 && (
         <>
-          <p className={cn(ROTULO, "px-4 mt-3 mb-1.5")}>NA SUA BANCADA</p>
-          <div className="mx-4 rounded-xl border border-pink-200 overflow-hidden bg-card" data-testid="da-bancada">
+          <p className={cn(ROTULO, "px-4 mt-3 mb-1.5")}>NOS SEUS PRODUTOS</p>
+          <div className="mx-4 rounded-xl border border-pink-200 overflow-hidden bg-card" data-testid="nos-seus-produtos">
             {meus.map((p, k) => (
               <LinhaDoProduto key={p.id} p={p} evitado={ativoEvitado(p, s.evitar)} primeira={k === 0} onEscolher={() => onEscolhido(p)} />
             ))}
@@ -332,7 +332,7 @@ export function FichaDoPasso({ s, aberto, onFechar, onVista }: { s: Skincare; ab
                   onEscolhido={(p) => {
                     s.escolherProduto(atual.periodo, atual.i, p);
                     trackEvent("skincare_produto", { da_lista: "fonte" in p, passo: String(passo.tipo ?? "") });
-                    toast.success("Produto no passo e na Bancada", { description: "fonte" in p ? `Validade depois de aberto: ${textoDoPao(p.pao, p.paoPadrao)}` : undefined });
+                    toast.success("Produto no passo e em Meus produtos", { description: "fonte" in p ? `Validade depois de aberto: ${textoDoPao(p.pao, p.paoPadrao)}` : undefined });
                     onVista("ficha");
                   }}
                 />

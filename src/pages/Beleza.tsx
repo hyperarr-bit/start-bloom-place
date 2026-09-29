@@ -15,10 +15,11 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
-// 28/09: CAIXA ALTA como as abas do Treino e da Rotina (cara de planner); os ids ficam (medição por aba)
+// 28/09: CAIXA ALTA como as abas do Treino e da Rotina (cara de planner); os ids ficam (medição por aba).
+// "Bancada" virou MEUS PRODUTOS (dono, 28/09): é o pedido nº 1 das avaliações, com o nome que a pessoa usa.
 const tabs = [
   { id: "routine", label: "ROTINA", icon: "✨" },
-  { id: "shelf", label: "BANCADA", icon: "🧪" },
+  { id: "shelf", label: "MEUS PRODUTOS", icon: "🧪" },
   { id: "diary", label: "DIÁRIO", icon: "📷" },
 ];
 
@@ -48,7 +49,7 @@ const Beleza = () => {
         moduleKey="beleza"
         steps={[
           
-          { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os produtos da sua bancada.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os seus produtos.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-diary"]', label: "Diário pra acompanhar a evolução da pele.", advanceOnClick: true },
         ]}
       />

@@ -134,7 +134,7 @@ export const ProductShelf = () => {
     setProducts(prev => prev.filter(x => x.id !== p.id));
     setSelectedProduct(null);
     if (editId === p.id) fecharForm();
-    avisarApagado(`"${atual.name}" saiu da bancada`, () =>
+    avisarApagado(`"${atual.name}" saiu dos seus produtos`, () =>
       setProducts(prev => (prev.some(x => x.id === p.id) ? prev : inserirEm(prev, idx, atual))));
   };
 
@@ -158,7 +158,7 @@ export const ProductShelf = () => {
       {/* Header — Notion-style */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-pink-200 dark:bg-pink-800/50 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider">🧴 MINHA BANCADA</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">🧴 MEUS PRODUTOS</span>
           <div className="flex gap-1.5">
             <button onClick={() => setShowTriggers(true)} className="text-foreground/60 hover:text-foreground">
               <Ban className="w-3.5 h-3.5" />

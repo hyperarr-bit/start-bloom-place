@@ -251,7 +251,7 @@ describe("Beleza 5 — Espelho, Rotina e Diário falam entre si na hora", () => 
   });
 });
 
-describe("Beleza 6 — produto da bancada pode ser editado", () => {
+describe("Beleza 6 — produto de MEUS PRODUTOS (a antiga Bancada) pode ser editado", () => {
   it("Editar abre o formulário preenchido e grava no MESMO produto (id, 'acabou' e foto ficam)", () => {
     const store = criarStoreReativo({
       "beauty-products": [{ id: "p1", name: "Serum Niacinamida", brand: "Principia", category: "Skincare", opened: false, openedDate: "", paoMonths: 12, expiry: "", notes: "", rating: 4, repurchase: false, price: 0, sizeMl: 0, photoUrl: "https://x/foto.webp", frequency: "Diário", finished: false }],
@@ -329,14 +329,14 @@ describe("Beleza 8 — foto na demonstração", () => {
 });
 
 describe("Beleza 9 — apagar com Desfazer", () => {
-  it("produto: some da bancada e o Desfazer devolve no mesmo lugar", () => {
+  it("produto: some de MEUS PRODUTOS e o Desfazer devolve no mesmo lugar", () => {
     const p = (id: string, name: string) => ({ id, name, brand: "", category: "Skincare", opened: false, openedDate: "", paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false });
     const store = criarStoreReativo({ "beauty-products": [p("a", "Tônico"), p("b", "Sérum"), p("c", "Protetor")] });
     store.montar(<ProductShelf />);
     fireEvent.click(screen.getByText("Sérum"));
     fireEvent.click(screen.getByRole("button", { name: "Apagar produto" }));
     expect(nomes(store.dados["beauty-products"])).toEqual(["Tônico", "Protetor"]);
-    expect(toastMock).toHaveBeenLastCalledWith('"Sérum" saiu da bancada', expect.anything());
+    expect(toastMock).toHaveBeenLastCalledWith('"Sérum" saiu dos seus produtos', expect.anything());
     desfazerUltimo();
     expect(nomes(store.dados["beauty-products"])).toEqual(["Tônico", "Sérum", "Protetor"]);
   });

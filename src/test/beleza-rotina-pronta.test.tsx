@@ -13,7 +13,7 @@
  *  4. o AGENDAMENTO do lembrete (manhã/noite, texto do dia, hoje feito não
  *     avisa, sensível tira os ativos, faixa própria de id);
  *  5. as telas: 3 toques gravam a rotina; escolher produto liga passo e
- *     Bancada; o card da Home marca hoje e ontem; o lembrete grava a chave nova;
+ *     MEUS PRODUTOS (a antiga Bancada); o card da Home marca hoje e ontem; o lembrete grava a chave nova;
  *  6. a lista curada: formato, fonte, PAO padrão marcado, indicados pra cada passo.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
@@ -59,6 +59,7 @@ import catalogoBruto from "@/data/produtos-beleza.json";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { SkincareWidget } from "@/components/home/widgets/SkincareWidget";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
+import Beleza from "@/pages/Beleza";
 
 const CATALOGO = catalogoBruto as unknown as ProdutoDoCatalogo[];
 const SEG = new Date(2026, 8, 28, 9, 40); // segunda, 28/09/2026 09:40
@@ -598,10 +599,11 @@ describe("telas", () => {
     expect((store.dados["beauty-products"] as { openedDate: string }[])[0].openedDate).toBe(HOJE);
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
 
-    // o mesmo hidratante na noite: aparece em "NA SUA BANCADA" e reusa o item
+    // o mesmo hidratante na noite: aparece em "NOS SEUS PRODUTOS" e reusa o item
     const noiteHidratante = within(screen.getByTestId("periodo-noite")).getAllByTestId("passo-skincare").at(-1)!;
     fireEvent.click(within(noiteHidratante).getByTestId("escolher-produto"));
-    const meus = await screen.findByTestId("da-bancada");
+    const meus = await screen.findByTestId("nos-seus-produtos");
+    expect(within(meus.parentElement!).getByText("NOS SEUS PRODUTOS")).toBeInTheDocument();
     fireEvent.click(within(meus).getAllByTestId("produto-da-lista")[0]);
     expect(store.dados["beauty-products"] as unknown[]).toHaveLength(1);
     expect((store.dados["skincare-pm-steps"] as PassoDaRotina[]).at(-1)?.produtoId).toBe(bancada[0].id);
@@ -687,6 +689,23 @@ describe("telas", () => {
     expect(within(card).getByTestId("proximo-aviso")).toHaveTextContent("Hoje é noite de Retinol");
     fireEvent.change(within(card).getByLabelText("Hora do lembrete da noite"), { target: { value: "22:15" } });
     expect((store.dados["skincare-lembrete-prefs"] as { noite: { hora: string } }).noite.hora).toBe("22:15");
+  });
+});
+
+/* ═══════════════════ 5b. "Bancada" virou MEUS PRODUTOS (dono, 28/09) ═══════════════════ */
+
+describe("MEUS PRODUTOS (a antiga Bancada)", () => {
+  it("a aba e o título dizem MEUS PRODUTOS; nenhum texto da Beleza fala em bancada; a chave de dados é a mesma", () => {
+    fixarData(SEG);
+    const { bancada } = guardarNaBancada([], CATALOGO.find((p) => p.categoria === "protetor")!, "p1");
+    const store = criarStore({ "beauty-products": bancada, "skincare-am-steps": [{ name: "Protetor", isSunscreen: true, produtoId: "p1" }] });
+    store.montar(<Beleza />);
+    expect(screen.queryByText(/bancada/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /MEUS PRODUTOS/ }));
+    expect(screen.getByText("🧴 MEUS PRODUTOS")).toBeInTheDocument();
+    expect(screen.getByText(bancada[0].name)).toBeInTheDocument(); // o produto de sempre, lido de `beauty-products`
+    expect(screen.queryByText(/bancada/i)).not.toBeInTheDocument();
+    expect(Object.keys(store.dados)).toContain("beauty-products");
   });
 });
 

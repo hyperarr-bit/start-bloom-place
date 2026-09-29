@@ -75,7 +75,7 @@ export function MontarRotina({
         <p className={ROTULO}>PERGUNTA {passo + 1} DE 3</p>
         <h3 className="mt-1 text-[18px] font-bold leading-snug">{pergunta.titulo}</h3>
         {passosAtuais > 0 && passo === 0 && (
-          <p className="mt-1 text-[12px] text-amber-700 dark:text-amber-300">A rotina nova troca a de agora ({passosAtuais} passos). Os produtos da Bancada ficam. Dá pra desfazer.</p>
+          <p className="mt-1 text-[12px] text-amber-700 dark:text-amber-300">A rotina nova troca a de agora ({passosAtuais} passos). Os seus produtos ficam. Dá pra desfazer.</p>
         )}
       </div>
 

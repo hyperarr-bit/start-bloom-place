@@ -100,7 +100,7 @@ const ABAS: Record<string, string> = {
   "casa:seguranca": "Segurança",
   "casa:utilidades": "Utilidades",
   "beleza:routine": "Rotina",
-  "beleza:shelf": "Bancada",
+  "beleza:shelf": "Meus produtos",
   "beleza:diary": "Diário",
   "viagens:destinos": "Destinos",
   "viagens:passeios": "Passeios",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -7,6 +7,7 @@ import {
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid, Smartphone, Zap, MessageCircle,
 } from "lucide-react";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
+import { temItemDaDemo } from "@/lib/demo-guiada-volta";
 import { useProvaSocial, formatarPessoas, type ProvaSocial } from "@/lib/prova-social";
 import { Faixa, Grade16, PostIt, SERIF_ITALICO } from "./pecas-roi2";
 import { Button } from "@/components/ui/button";
@@ -748,6 +749,13 @@ function ConfiavelCard() {
   );
 }
 
+/** DEMO GUIADA (28/09): quem anotou algo na missão da demo chega com o item
+ *  (URL c= ou sessão). O bloco "O que você já construiu" — que também grava o
+ *  item na conta — desce sob demanda, em chunk próprio. Sem item, nada monta.
+ *  Fail-open: chunk que não desce = bloco nenhum (o erro de dentro do bloco
+ *  fica preso lá dentro, ver Construiu.tsx); o paywall segue igual. */
+const ConstruiuNaDemo = lazy(() => import("@/components/demo-guiada/Construiu").catch(() => ({ default: () => null })));
+
 /**
  * PAYWALL DO FUNIL ROI 2 (27/09, prancha aprovada pelo dono). Ordem
  * (benchmark Cal AI / Finch / Duolingo): promessa + prova viva → "O que você
@@ -778,6 +786,7 @@ function OfferScreenRoi2({
   };
   const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
   const prova = useProvaSocial();
+  const [construiu] = useState(() => context === "funnel" && !isNativeShell() && temItemDaDemo());
 
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10" data-testid="paywall-roi2">
@@ -817,6 +826,11 @@ function OfferScreenRoi2({
       <LaurelProva prova={prova} />
 
       <div className="space-y-3">
+        {construiu && (
+          <Suspense fallback={null}>
+            <motion.div {...stagger(2)}><ConstruiuNaDemo /></motion.div>
+          </Suspense>
+        )}
         <motion.div {...stagger(2)}><LevaCard area={area} /></motion.div>
         <motion.div {...stagger(3)}>
           {area === "dinheiro"

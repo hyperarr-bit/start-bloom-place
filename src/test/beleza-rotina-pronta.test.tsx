@@ -45,7 +45,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
-  ATIVO_DO_TIPO, OPCOES_NIVEL, OPCOES_OBJETIVO, OPCOES_PELE, PAO_PADRAO, alternarDia, buscarProdutos, conflitosDoPlano,
+  ATIVO_DO_TIPO, OPCOES_NIVEL, OPCOES_OBJETIVO, OPCOES_PELE, PAO_PADRAO, alternarDia, buscarProdutos, conflitosDoPlano, sugerirDias,
   diaDaSemanaDaChave, diasDoPasso, ehTodoDia, gerarRotina, guardarNaBancada, indicadosPara, passosDoDia, termosDoPasso,
   type PassoDaRotina, type ProdutoDoCatalogo, type TipoDoPasso,
 } from "@/lib/beleza-rotina";
@@ -252,7 +252,7 @@ describe("o que usar hoje (por dia da semana)", () => {
 /* ═══════════════════════════ 3. formato antigo × novo ═══════════════════════════ */
 
 describe("formato antigo continua abrindo (e o novo continua legível pelo app antigo)", () => {
-  it("rotina antiga (sem dias nem produto) abre na tabela do dia com os checks por índice; o ciclo de 4 dias continua", () => {
+  it("rotina antiga (sem dias nem produto) abre na tabela do dia com os checks por índice, SEM o ciclo de 4 dias", () => {
     fixarData(SEG);
     const store = criarStore({
       "skincare-am-steps": [{ name: "Vitamina C" }, { name: "Protetor solar", isSunscreen: true }],
@@ -263,8 +263,8 @@ describe("formato antigo continua abrindo (e o novo continua legível pelo app a
     store.montar(<SkincareRoutine />);
     const linhas = screen.getAllByTestId("passo-skincare");
     expect(linhas.map((l) => within(l).getByRole("checkbox").getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
-    expect(screen.getByText("Skin Cycling: Esfoliação")).toBeInTheDocument(); // rotina antiga: o ciclo de sempre
-    expect(screen.queryByTestId("semana-skincare")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Skin Cycling/)).not.toBeInTheDocument(); // o ciclo saiu pra todo mundo (28/09)
+    expect(screen.getByTestId("semana-skincare")).toBeInTheDocument();
     // marcar o protetor grava o índice 1 no MESMO formato
     fireEvent.click(within(linhas[1]).getByRole("checkbox"));
     expect(store.dados["skincare-morning-checked"]).toEqual({ [HOJE]: [0, 1] });
@@ -331,6 +331,102 @@ describe("formato antigo continua abrindo (e o novo continua legível pelo app a
     expect(comWidget([], "skincare", "large")).toEqual([{ id: "skincare", size: "large" }]);
     expect(comWidget([{ id: "skincare", size: "small" }], "skincare", "large")).toBeNull();
     expect(comWidget({ torto: true }, "skincare", "large")).toBeNull();
+  });
+});
+
+/* ═══════════════════ 3b. sem o ciclo de 4 dias: a migração ═══════════════════ */
+
+describe("sem o ciclo fixo de 4 dias (28/09): rotina antiga vira 'todo dia' e ganha a oferta de alternar", () => {
+  // como uma conta real que só usou o app antigo: nomes digitados, flags, checks por índice
+  const ANTIGA = {
+    "skincare-am-steps": [{ name: "Gel de limpeza" }, { name: "Vitamina C" }, { name: "Protetor solar", isSunscreen: true }],
+    "skincare-pm-steps": [{ name: "Demaquilante" }, { name: "Retinol", isAcid: true }, { name: "Ácido glicólico", isAcid: true }, { name: "Hidratante" }],
+    "skincare-morning-checked": { [HOJE]: [0, 1], [ONTEM]: [0, 1, 2] },
+    "skincare-night-checked": { [ONTEM]: [0, 3] },
+    "skincare-cycle-start": "2026-09-10",
+  };
+  const copia = () => JSON.parse(JSON.stringify(ANTIGA)) as typeof ANTIGA;
+
+  it("abre sem ciclo, com TODOS os passos hoje e na semana (todo dia), e sem gravar nada", () => {
+    fixarData(SEG);
+    const store = criarStore(copia());
+    store.montar(<SkincareRoutine />);
+    expect(screen.queryByText(/Skin Cycling|CICLO DE 4 DIAS/)).not.toBeInTheDocument();
+    // hoje: os 7 passos, nenhum some (o app antigo mostra exatamente estes)
+    expect(screen.getAllByTestId("passo-skincare")).toHaveLength(7);
+    expect(screen.queryByTestId("fora-manha")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fora-noite")).not.toBeInTheDocument();
+    // a semana: uma linha por passo, cada uma nos 7 dias
+    const semana = screen.getByTestId("semana-skincare");
+    expect(within(semana).getAllByTestId("linha-semana")).toHaveLength(7);
+    // checks de hoje no lugar (índice 0 e 1 da manhã)
+    expect(screen.getAllByRole("checkbox").map((c) => c.getAttribute("aria-checked")).slice(0, 3)).toEqual(["true", "true", "false"]);
+    // abrir não escreveu nada: formato e dados idênticos ao que o app antigo gravou
+    expect(store.dados).toEqual(copia());
+  });
+
+  it("retinol + ácido todo dia: o conflito aparece e o 'Alternar' põe retinol seg/qua/sex e ácido ter/qui/sáb — só esses dois mudam", () => {
+    fixarData(SEG);
+    const store = criarStore(copia());
+    store.montar(<SkincareRoutine />);
+    expect(screen.getByText(/CONFLITOS DETECTADOS/)).toBeInTheDocument();
+    const oferta = screen.getByTestId("sugestao-alternar");
+    expect(oferta).toHaveTextContent("Retinol seg · qua · sex; Ácido glicólico ter · qui · sáb");
+    fireEvent.click(within(oferta).getByRole("button", { name: "Alternar" }));
+
+    const pm = store.dados["skincare-pm-steps"] as PassoDaRotina[];
+    expect(pm).toEqual([
+      { name: "Demaquilante" },
+      { name: "Retinol", isAcid: true, dias: [0, 2, 4] },
+      { name: "Ácido glicólico", isAcid: true, dias: [1, 3, 5] },
+      { name: "Hidratante" },
+    ]);
+    expect(store.dados["skincare-am-steps"]).toEqual(ANTIGA["skincare-am-steps"]); // manhã intocada
+    expect(store.dados["skincare-night-checked"]).toEqual(ANTIGA["skincare-night-checked"]); // checks intocados
+    expect(screen.queryByText(/CONFLITOS DETECTADOS/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sugestao-alternar")).not.toBeInTheDocument();
+    // segunda = noite de retinol; o ácido fica pra terça
+    expect(screen.getByTestId("fora-noite")).toHaveTextContent("Hoje não: Ácido glicólico (ter · qui · sáb)");
+
+    // Desfazer volta a rotina exatamente como era
+    const ultimo = toastMock.mock.calls[toastMock.mock.calls.length - 1];
+    expect(ultimo[0]).toBe("Ativos em dias alternados");
+    act(() => { ultimo[1].action.onClick(); });
+    expect(store.dados["skincare-pm-steps"]).toEqual(ANTIGA["skincare-pm-steps"]);
+  });
+
+  it("'Agora não' guarda a escolha em chave NOVA (objeto) e a oferta não volta", () => {
+    fixarData(SEG);
+    const store = criarStore(copia());
+    const t = store.montar(<SkincareRoutine />);
+    fireEvent.click(within(screen.getByTestId("sugestao-alternar")).getByRole("button", { name: "Agora não" }));
+    expect(store.dados["skincare-dicas-prefs"]).toEqual({ alternarDispensado: true });
+    expect(screen.queryByTestId("sugestao-alternar")).not.toBeInTheDocument();
+    t.unmount();
+    criarStore({ ...copia(), "skincare-dicas-prefs": { alternarDispensado: true } }).montar(<SkincareRoutine />);
+    expect(screen.queryByTestId("sugestao-alternar")).not.toBeInTheDocument();
+  });
+
+  it("rotina só com o básico (sem ativo à noite) não recebe oferta nenhuma", () => {
+    fixarData(SEG);
+    criarStore({ "skincare-am-steps": [{ name: "Limpeza" }, { name: "Protetor", isSunscreen: true }], "skincare-pm-steps": [{ name: "Hidratante" }] })
+      .montar(<SkincareRoutine />);
+    expect(screen.queryByTestId("sugestao-alternar")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("semana-skincare")).getAllByTestId("linha-semana")).toHaveLength(3);
+  });
+
+  it("sugerirDias: retinoide nas vagas seg/qua/sex; 1 ácido ter/qui/sáb; 2 ácidos dividem (AHA e BHA nunca juntos); passo com dias fica", () => {
+    expect(sugerirDias([{ name: "Retinol", isAcid: true }])).toEqual([{ i: 0, dias: [0, 2, 4] }]);
+    expect(sugerirDias([{ name: "Limpeza" }, { name: "AHA", isAcid: true }, { name: "BHA", isAcid: true }])).toEqual([
+      { i: 1, dias: [1, 5] }, { i: 2, dias: [3] },
+    ]);
+    expect(sugerirDias([{ name: "Retinol", isAcid: true, dias: [0] }, { name: "Hidratante" }])).toEqual([]);
+    expect(sugerirDias("lixo")).toEqual([]);
+    // o que a sugestão monta não tem conflito
+    const noite: PassoDaRotina[] = [{ name: "Retinol", isAcid: true }, { name: "Ácido glicólico (AHA)", isAcid: true }, { name: "Ácido salicílico (BHA)", isAcid: true }];
+    const aplicada = noite.map((p, i) => ({ ...p, ...(sugerirDias(noite).find((m) => m.i === i) ? { dias: sugerirDias(noite).find((m) => m.i === i)!.dias } : {}) }));
+    expect(conflitosDoPlano([], paraConflito(aplicada))).toEqual([]);
+    expect(conflitosDoPlano([], paraConflito(noite)).length).toBeGreaterThan(0);
   });
 });
 

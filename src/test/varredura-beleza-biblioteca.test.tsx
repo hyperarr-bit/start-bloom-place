@@ -40,7 +40,7 @@ import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
-import { conflitosDaRotina, faseDoCiclo, marcadosAposInserir, marcadosAposRemover, inserirEm } from "@/components/beleza/utils";
+import { conflitosDaRotina, marcadosAposInserir, marcadosAposRemover, inserirEm } from "@/components/beleza/utils";
 
 beforeAll(() => {
   window.scrollTo = () => {};
@@ -108,7 +108,9 @@ const desfazerUltimo = () => {
 };
 
 const nomes = (v: unknown) => (v as { name: string }[]).map(s => s.name);
-const linhaDe = (texto: string) => screen.getByText(texto).closest("div.group") as HTMLElement;
+// 28/09: a MINHA SEMANA (o plano) lista todos os passos sempre; "o que aparece HOJE" é a tabela do dia
+const hoje = () => within(screen.getByTestId("skincare-do-dia"));
+const linhaDe = (texto: string) => hoje().getByText(texto).closest("div.group") as HTMLElement;
 const marcado = (texto: string) => within(linhaDe(texto)).getByRole("checkbox").getAttribute("aria-checked") === "true";
 
 /* ═════════════════════════════ BELEZA ═════════════════════════════ */
@@ -123,7 +125,7 @@ describe("Beleza 1 — modo Sensível: o X apaga o passo certo", () => {
     });
     store.montar(<><DailyMirror /><SkincareRoutine /></>);
 
-    expect(screen.queryByText("Retinol")).not.toBeInTheDocument(); // ácido escondido no sensível
+    expect(hoje().queryByText("Retinol")).not.toBeInTheDocument(); // ácido escondido no sensível
     expect(marcado("Hidratante noturno")).toBe(true); // check pelo índice ORIGINAL (2)
     expect(marcado("Demaquilante")).toBe(false);
 
@@ -154,42 +156,24 @@ describe("Beleza 1 — modo Sensível: o X apaga o passo certo", () => {
   });
 });
 
-describe("Beleza 2 — skin cycling anda", () => {
-  // 28/09 (protótipo): o ciclo fixo aparece pra rotina ANTIGA (passos sem dias próprios);
-  // rotina vazia mostra as 3 perguntas e a rotina com agenda mostra a semana.
-  const ANTIGA = { "skincare-pm-steps": [{ name: "Hidratante" }] };
+describe("Beleza 2 — sem o ciclo fixo de 4 dias (28/09, dono)", () => {
+  // O "skin cycling anda" (26/09) saiu junto com o ciclo: a agenda agora é por passo
+  // (MINHA SEMANA). A rotina não grava mais nada ao abrir — nem o início do ciclo.
+  const ANTIGA = { "skincare-pm-steps": [{ name: "Hidratante" }], "skincare-cycle-start": diaMais(-2) };
 
-  it("grava o início na 1ª vez (escrita de SISTEMA) e hoje é o Dia 1/4", () => {
+  it("rotina antiga abre sem o ciclo e sem gravar nada; a semana mostra o passo todo dia", () => {
     const store = criarStoreReativo({ ...ANTIGA });
     store.montar(<SkincareRoutine />);
-    expect(store.dados["skincare-cycle-start"]).toBe(HOJE);
-    expect(store.escritas.find(e => e.chave === "skincare-cycle-start")?.opts).toEqual({ system: true });
-    expect(screen.getByText("Skin Cycling: Esfoliação")).toBeInTheDocument();
-    expect(screen.getByText("Dia 1/4")).toBeInTheDocument();
-  });
-
-  it("antes de carregar não grava nada (aparelho novo não atropela o início do servidor)", () => {
-    const store = criarStoreReativo({}, { loaded: false });
-    store.montar(<SkincareRoutine />);
-    expect(store.escritas.filter(e => e.chave === "skincare-cycle-start")).toHaveLength(0);
-  });
-
-  it("início há 2 dias = Recuperação, Dia 3/4; quem já tem início não é regravado", () => {
-    const store = criarStoreReativo({ ...ANTIGA, "skincare-cycle-start": diaMais(-2) });
-    store.montar(<SkincareRoutine />);
-    expect(screen.getByText("Skin Cycling: Recuperação")).toBeInTheDocument();
-    expect(screen.getByText("Dia 3/4")).toBeInTheDocument();
+    expect(screen.queryByText(/Skin Cycling/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/CICLO DE 4 DIAS/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("semana-skincare")).toBeInTheDocument();
     expect(store.escritas).toHaveLength(0);
   });
 
-  it("faseDoCiclo conta dias locais e nunca dá NaN", () => {
-    expect(faseDoCiclo("2026-09-26", "2026-09-26")).toBe(0);
-    expect(faseDoCiclo("2026-09-26", "2026-09-27")).toBe(1);
-    expect(faseDoCiclo("2026-09-26", "2026-09-29")).toBe(3);
-    expect(faseDoCiclo("2026-09-26", "2026-09-30")).toBe(0);
-    expect(faseDoCiclo("2026-09-27", "2026-09-26")).toBe(3); // início "no futuro" não quebra
-    expect(faseDoCiclo("", "2026-09-26")).toBe(0);
-    expect(faseDoCiclo("lixo", "2026-09-26")).toBe(0);
+  it("rotina vazia também não grava o início do ciclo (antes gravava na 1ª abertura)", () => {
+    const store = criarStoreReativo({});
+    store.montar(<SkincareRoutine />);
+    expect(store.escritas.filter(e => e.chave === "skincare-cycle-start")).toHaveLength(0);
   });
 });
 
@@ -197,7 +181,7 @@ describe("Beleza 3 — passo ácido mostra o próprio nome", () => {
   it("\"Retinol\" aparece como Retinol, não como a fase do ciclo", () => {
     const store = criarStoreReativo({ "skincare-pm-steps": [{ name: "Retinol", isAcid: true }], "skincare-cycle-start": HOJE });
     store.montar(<SkincareRoutine />);
-    expect(screen.getByText("Retinol")).toBeInTheDocument();
+    expect(hoje().getByText("Retinol")).toBeInTheDocument();
     expect(screen.queryByText(/\(Ácido Glicólico ou Lático\)/)).not.toBeInTheDocument();
   });
 });
@@ -230,9 +214,9 @@ describe("Beleza 5 — Espelho, Rotina e Diário falam entre si na hora", () => 
       "skincare-cycle-start": HOJE,
     });
     store.montar(<Beleza />);
-    expect(screen.getByText("Retinol")).toBeInTheDocument();
+    expect(hoje().getByText("Retinol")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Sensível/ }));
-    expect(screen.queryByText("Retinol")).not.toBeInTheDocument();
+    expect(hoje().queryByText("Retinol")).not.toBeInTheDocument();
     expect(screen.getByText(/Pele sensível detectada/)).toBeInTheDocument();
 
     expect(screen.getByText("Comece sua sequência hoje!")).toBeInTheDocument();

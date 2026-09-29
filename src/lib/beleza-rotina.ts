@@ -54,6 +54,8 @@ export type ProdutoDaBancada = Product & { catalogoId?: string; ativos?: string[
 export const CHAVE_PASSOS: Record<Periodo, string> = { manha: "skincare-am-steps", noite: "skincare-pm-steps" };
 export const CHAVE_FEITOS: Record<Periodo, string> = { manha: "skincare-morning-checked", noite: "skincare-night-checked" };
 export const CHAVE_PERFIL = "skincare-perfil";
+/** Chave NOVA (objeto) das dicas já dispensadas — `-prefs`: é ajuste, não conta pra sequência. */
+export const CHAVE_DICAS = "skincare-dicas-prefs";
 
 /* ------------------------------------------------------------ as perguntas */
 
@@ -133,7 +135,7 @@ export const passosForaDoDia = (passos: unknown, dia: number): { passo: PassoDaR
     .map((passo, i) => ({ passo, i }))
     .filter((x): x is { passo: PassoDaRotina; i: number } => passoValido(x.passo) && !diasDoPasso(x.passo).includes(dia));
 
-/** Alguma etapa com dias próprios? Aí a semana substitui o ciclo fixo de 4 dias. */
+/** Alguma etapa com dias próprios? (Sem nenhuma, é rotina "todo dia" — a antiga, ou montada assim.) */
 export const temAgenda = (manha: unknown, noite: unknown): boolean =>
   [manha, noite].some((l) => Array.isArray(l) && l.some((p) => passoValido(p) && !ehTodoDia(p)));
 
@@ -145,6 +147,30 @@ export const alternarDia = (p: PassoDaRotina, dia: number): PassoDaRotina => {
   const { dias: _d, ...resto } = p;
   return novos.length === 7 ? resto : { ...resto, dias: novos };
 };
+
+/**
+ * SEM O CICLO FIXO DE 4 DIAS (28/09, dono: "a MINHA SEMANA passa a ser o único
+ * jeito"). Rotina antiga — ou montada à mão — com ativo à noite TODO DIA (retinol
+ * e ácido juntos, de novo e de novo): a sugestão é a mesma agenda que o gerador
+ * usa. Retinoide nas vagas seg/qua/sex; ácidos nas ter/qui/sáb (dois ácidos
+ * dividem as vagas, pra AHA e BHA também não caírem no mesmo dia); domingo livre.
+ * Só mexe em passo ativo que está todo dia; o resto fica como está. É OFERTA:
+ * a tela mostra e só aplica no toque ("Alternar"), com Desfazer.
+ */
+export function sugerirDias(noite: unknown): { i: number; dias: number[] }[] {
+  const ativos = (Array.isArray(noite) ? noite : [])
+    .map((passo, i) => ({ passo, i }))
+    .filter((x): x is { passo: PassoDaRotina; i: number } => passoValido(x.passo) && !!x.passo.isAcid && ehTodoDia(x.passo));
+  const retinoide = (p: PassoDaRotina) => p.tipo === "retinol" || /retin/i.test(p.name);
+  const retinoides = ativos.filter(({ passo }) => retinoide(passo));
+  const acidos = ativos.filter(({ passo }) => !retinoide(passo));
+  const diasDosAcidos = (k: number, n: number): number[] =>
+    n === 1 ? VAGA_ACIDO[3] : n === 2 ? (k === 0 ? [1, 5] : [3]) : [VAGA_ACIDO[3][k % 3]];
+  return [
+    ...retinoides.map(({ i }) => ({ i, dias: VAGA_RETINOL[3] })),
+    ...acidos.map(({ i }, k) => ({ i, dias: diasDosAcidos(k, acidos.length) })),
+  ];
+}
 
 /** "Vitamina C", "Ácido salicílico", "Hidratante leve" — o nome curto da grade da semana. */
 export const nomeCurto = (nome: string): string =>

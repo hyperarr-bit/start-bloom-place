@@ -19,6 +19,7 @@ import Beleza from "@/pages/Beleza";
  *   (padrão)       · a Beleza com a rotina da Ana (pele oleosa, acne, avançado)
  *   ?tela=home     · a Home com o card "Skincare de hoje"
  *   ?tela=vazia    · a Beleza sem rotina (as 3 perguntas)
+ *   ?tela=antiga   · rotina ANTIGA (do tempo do ciclo de 4 dias): tudo todo dia + a oferta "Alternar"
  *   ?tela=avisos   · o que o celular recebe (o plano do lembrete, com o texto de cada dia)
  * O tema escuro vem do próprio app (localStorage "core-theme-mode").
  */
@@ -39,9 +40,20 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
   const base: Record<string, unknown> = {
     "core-user-name": "Ana Beatriz",
     "spotlight-done-beleza": "true",
-    "skincare-cycle-start": "2026-09-01",
   };
   if (tela === "vazia") return base;
+  if (tela === "antiga") {
+    // como uma conta real do app antigo: nomes digitados à mão, flags, checks por índice, sem dias
+    const ontem = diaMenos(hoje, 1);
+    return {
+      ...base,
+      "skincare-am-steps": [{ name: "Gel de limpeza" }, { name: "Vitamina C" }, { name: "Protetor solar", isSunscreen: true }],
+      "skincare-pm-steps": [{ name: "Demaquilante" }, { name: "Retinol", isAcid: true }, { name: "Ácido glicólico", isAcid: true }, { name: "Hidratante" }],
+      "skincare-morning-checked": { [hoje]: [0, 1], [ontem]: [0, 1, 2] },
+      "skincare-night-checked": { [ontem]: [0, 3] },
+      "skincare-cycle-start": "2026-09-10",
+    };
+  }
 
   // a rotina que as 3 respostas da Ana geram (o gerador de verdade)
   const { manha, noite } = gerarRotina({ pele: "oleosa", objetivo: "acne", nivel: "avancado" });

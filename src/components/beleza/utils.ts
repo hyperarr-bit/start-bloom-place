@@ -1,4 +1,3 @@
-import { parseLocalDay } from "@/lib/utils";
 
 // ============= CONFLICT DATABASE =============
 export interface ConflictRule {
@@ -94,15 +93,9 @@ export const inserirEm = <T,>(lista: T[], idx: number, item: T): T[] => {
   return [...lista.slice(0, pos), item, ...lista.slice(pos)];
 };
 
-/** Fase do skin cycling (0–3) contando dias LOCAIS desde o início gravado.
- *  Início vazio ou inválido = hoje é o dia 1 (nunca NaN na tela). */
-export const faseDoCiclo = (inicio: string, hoje: string): number => {
-  const ehDia = (s: unknown) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-  if (!ehDia(inicio) || !ehDia(hoje)) return 0;
-  // round, não floor: dia com horário de verão tem 23 ou 25 h
-  const dias = Math.round((parseLocalDay(hoje).getTime() - parseLocalDay(inicio).getTime()) / 86_400_000);
-  return ((dias % 4) + 4) % 4;
-};
+/* (28/09) O ciclo fixo de 4 dias (faseDoCiclo) saiu: a agenda agora é por passo
+   (MINHA SEMANA, lib/beleza-rotina). A chave `skincare-cycle-start` segue existindo
+   na nuvem — o app antigo ainda grava e lê a dele; o novo não mexe. */
 
 // ============= COST PER DOSE =============
 const DOSE_ESTIMATES: Record<string, number> = {

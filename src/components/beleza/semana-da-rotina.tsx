@@ -6,8 +6,9 @@
  * violeta, sérum em azul) — cor é sinal do que muda de um dia pro outro, não
  * enfeite. Tocar na linha abre a ficha do passo (dias e produto).
  *
- * Aparece quando algum passo tem dias próprios (a rotina pronta já nasce assim);
- * aí ela substitui o ciclo fixo de 4 dias, que não sabia o que a pessoa passa.
+ * É o ÚNICO jeito de ver a agenda desde 28/09 (o dono tirou o ciclo fixo de 4 dias,
+ * que não sabia o que a pessoa passa). Rotina antiga, sem dias por passo, aparece
+ * com tudo "todo dia" — exatamente o que ela sempre foi.
  */
 import { Fragment } from "react";
 import { cn } from "@/lib/utils";

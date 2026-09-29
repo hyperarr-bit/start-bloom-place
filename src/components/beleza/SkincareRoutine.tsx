@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ShieldCheck, RotateCcw } from "lucide-react";
@@ -8,11 +7,11 @@ import { trackEvent } from "@/lib/analytics";
 import { armarAvisos } from "@/lib/armar-avisos";
 import { CHAVE_LEMBRETE_SKINCARE } from "@/lib/beleza-lembrete";
 import {
-  OPCOES_OBJETIVO, OPCOES_PELE, conflitosDoPlano, diasDoPasso, passoValido, temAgenda, termosDoPasso, type PerfilDaPele, type Periodo,
+  OPCOES_OBJETIVO, OPCOES_PELE, conflitosDoPlano, diasDoPasso, diasPorExtenso, nomeCurto, passoValido, sugerirDias, temAgenda, termosDoPasso,
+  type PassoDaRotina, type PerfilDaPele, type Periodo,
 } from "@/lib/beleza-rotina";
 import { CHAVE_WIDGETS_HOME, comWidget } from "@/hooks/use-home-widgets";
 import { PostIt } from "@/components/treino/planner";
-import { faseDoCiclo } from "./utils";
 import { useSkincare } from "./use-skincare";
 import { FolhaDoSkincare } from "./skincare-do-dia";
 import { FichaDoPasso, type PassoAberto } from "./ficha-do-passo";
@@ -20,14 +19,6 @@ import { SemanaDaRotina } from "./semana-da-rotina";
 import { LembreteDoSkincare } from "./lembrete-skincare";
 import { MontarRotina } from "./montar-rotina";
 
-const getDateKey = () => localDayKey();
-
-const SKIN_CYCLE_PHASES = [
-  { label: "Esfoliação", emoji: "✨", desc: "Ácido Glicólico ou Lático", color: "text-emerald-600 dark:text-emerald-400" },
-  { label: "Retinol", emoji: "💎", desc: "Anti-idade e renovação", color: "text-purple-600 dark:text-purple-400" },
-  { label: "Recuperação", emoji: "🧊", desc: "Só hidratação e calmantes", color: "text-muted-foreground" },
-  { label: "Recuperação", emoji: "🧊", desc: "Só hidratação e calmantes", color: "text-muted-foreground" },
-];
 
 /**
  * ROTINA DA BELEZA (28/09, protótipo "rotina pronta em 3 toques + skincare de
@@ -37,8 +28,10 @@ const SKIN_CYCLE_PHASES = [
  *  - sem rotina → as 3 perguntas ali mesmo (MontarRotina) ou "montar do zero";
  *  - SKINCARE DE HOJE: os passos do DIA (agenda por passo), com o produto de
  *    cada um, o quadradinho e HOJE | ONTEM;
- *  - MINHA SEMANA: a agenda em tabela; substitui o ciclo de 4 dias quando algum
- *    passo tem dias próprios (rotina antiga, sem dias, segue com o ciclo);
+ *  - MINHA SEMANA: a agenda em tabela — o ÚNICO jeito desde 28/09 (o dono tirou o
+ *    ciclo fixo de 4 dias pra todo mundo). Rotina antiga, sem dias por passo, vale
+ *    "todo dia" (é o que ela sempre foi e o que o app antigo mostra) e ganha a
+ *    oferta de alternar os ativos da noite;
  *  - LEMBRETE manhã/noite; conflito de ativos olhando dias + ativos do produto.
  * Tocar num passo abre a ficha: dias, produto (lista curada ou digitado),
  * remover. Tudo nas chaves de sempre (ver lib/beleza-rotina).
@@ -51,8 +44,7 @@ export const SkincareRoutine = ({
   recemGerada?: PerfilDaPele | null;
   onGerada?: (p: PerfilDaPele | null) => void;
 } = {}) => {
-  const today = getDateKey();
-  const { loaded, get, set: gravarChave } = useUserData();
+  const { get, set: gravarChave } = useUserData();
   const s = useSkincare();
   const [modo, setModo] = useState<"normal" | "zero" | "trocar">("normal");
   const [recemInterna, setRecemInterna] = useState<PerfilDaPele | null>(null);
@@ -65,20 +57,8 @@ export const SkincareRoutine = ({
   }, [recemGerada]);
   const [aberto, setAberto] = useState<PassoAberto | null>(null);
   const [showGuide, setShowGuide] = useState(false);
-  const cycleStart = get<string>("skincare-cycle-start", "");
-
-  /* SKIN CYCLING PARADO NO DIA 1 (26/09, varredura): o início do ciclo nunca
-     era gravado — o padrão era "hoje", então todo dia virava "Esfoliação ·
-     Dia 1/4". Grava na 1ª vez que a rotina abre, só depois de carregar (senão
-     um aparelho novo gravaria "hoje" por cima do início que está no servidor),
-     e como escrita de SISTEMA (não é gesto da pessoa, não conta ativação). */
-  useEffect(() => {
-    if (!loaded || (typeof cycleStart === "string" && cycleStart)) return;
-    gravarChave("skincare-cycle-start", today, { system: true });
-  }, [loaded, cycleStart, today, gravarChave]);
-
-  const cyclePhase = faseDoCiclo(typeof cycleStart === "string" && cycleStart ? cycleStart : today, today);
-  const currentPhase = SKIN_CYCLE_PHASES[cyclePhase];
+  /* SEM O CICLO FIXO DE 4 DIAS (28/09): a Rotina não grava mais nada ao abrir
+     (o `skincare-cycle-start` era do ciclo; o app antigo grava o dele sozinho). */
   const comAgenda = temAgenda(s.passos.manha, s.passos.noite);
   const nPassos = [...s.passos.manha, ...s.passos.noite].filter(passoValido).length;
 
@@ -86,6 +66,13 @@ export const SkincareRoutine = ({
   const paraConflito = (periodo: Periodo) =>
     s.passos[periodo].filter(passoValido).map((p) => ({ nome: p.name, termos: termosDoPasso(p, s.produtoDe(p)), dias: diasDoPasso(p) }));
   const conflicts = conflitosDoPlano(paraConflito("manha"), paraConflito("noite"));
+
+  /* ALTERNAR (a migração de quem vinha do ciclo de 4 dias): rotina SEM dias por
+     passo e com ativo à noite todo dia ganha a oferta dos dias que o gerador usa.
+     Só aparece nesse caso, só aplica no toque, e "Agora não" não volta. */
+  const sugestao = !comAgenda && !s.alternarDispensado ? sugerirDias(s.passos.noite) : [];
+  const nomeDe = (i: number) => nomeCurto((s.passos.noite[i] as PassoDaRotina).name);
+  const descricaoSugestao = sugestao.map(({ i, dias }) => `${nomeDe(i)} ${diasPorExtenso({ dias })}`).join("; ");
 
   const gerar = (perfil: PerfilDaPele) => {
     const trocando = modo === "trocar";
@@ -187,42 +174,28 @@ export const SkincareRoutine = ({
         </div>
       )}
 
-      {comAgenda ? (
-        <SemanaDaRotina s={s} onAbrirPasso={(periodo, i) => setAberto({ periodo, i, vista: "ficha" })} />
-      ) : (
-        nPassos > 0 && (
-          /* rotina antiga (sem dias por passo): o ciclo fixo de sempre */
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="bg-indigo-200 dark:bg-indigo-800/50 px-4 py-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider">🔄 CICLO DE 4 DIAS</span>
-            </div>
-            <div className="bg-indigo-50 dark:bg-indigo-950/20 p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{currentPhase.emoji}</span>
-                <div className="flex-1">
-                  <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300">Skin Cycling: {currentPhase.label}</p>
-                  <p className="text-[9px] text-muted-foreground">{currentPhase.desc}</p>
-                </div>
-                <span className="text-[8px] text-muted-foreground">Dia {cyclePhase + 1}/4</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-[9px] text-muted-foreground">Esfoliação → Retinol → Recuperação × 2</p>
-                <div className="flex gap-1">
-                  {SKIN_CYCLE_PHASES.map((p, i) => (
-                    <div
-                      key={i}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-all ${i === cyclePhase ? "border-indigo-400 bg-indigo-100 dark:bg-indigo-800/30 scale-110" : "border-border"}`}
-                    >
-                      {p.emoji}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <p className="text-[10.5px] text-muted-foreground">Quer que cada passo tenha os seus dias? Toque no passo e escolha os dias da semana.</p>
-            </div>
-          </div>
-        )
+      {sugestao.length > 0 && (
+        <div className="space-y-1.5" data-testid="sugestao-alternar">
+          <PostIt
+            acao={
+              <button
+                type="button"
+                onClick={() => { s.aplicarDias("noite", sugestao); trackEvent("skincare_alternar", { passos: sugestao.length, conflito: conflicts.length > 0 }); }}
+                className="shrink-0 h-10 px-3 rounded-md bg-amber-900 text-amber-50 text-[12.5px] font-bold active:scale-95 transition"
+              >
+                Alternar
+              </button>
+            }
+          >
+            {conflicts.length > 0 ? "Ativo junto na mesma noite irrita a pele." : "Agora cada passo tem os seus dias."} Quer alternar? <b>{descricaoSugestao}</b>.
+          </PostIt>
+          <button type="button" onClick={s.dispensarAlternar} className="ml-auto block h-9 px-2 text-[12px] font-semibold text-muted-foreground">
+            Agora não
+          </button>
+        </div>
       )}
+
+      {nPassos > 0 && <SemanaDaRotina s={s} onAbrirPasso={(periodo, i) => setAberto({ periodo, i, vista: "ficha" })} />}
 
       {nPassos > 0 && <LembreteDoSkincare s={s} />}
 

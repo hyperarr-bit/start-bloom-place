@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  CHAVE_FEITOS, CHAVE_PASSOS, CHAVE_PERFIL, alternarDia, gerarRotina, guardarNaBancada, passoDigitado, passoValido, ritmoDoPasso,
+  CHAVE_DICAS, CHAVE_FEITOS, CHAVE_PASSOS, CHAVE_PERFIL, alternarDia, gerarRotina, guardarNaBancada, passoDigitado, passoValido, ritmoDoPasso,
   type CategoriaDoCatalogo, type PassoDaRotina, type PerfilDaPele, type Periodo, type ProdutoDaBancada, type ProdutoDoCatalogo,
 } from "@/lib/beleza-rotina";
 import { CHAVE_LEMBRETE_SKINCARE, LEMBRETE_PADRAO, lerLembreteSkincare, type LembreteDoPeriodo, type LembreteSkincare } from "@/lib/beleza-lembrete";
@@ -41,6 +41,7 @@ export function useSkincare() {
   const [evitar] = useChaveDaBeleza<string[]>("skincare-triggers", []);
   const [lembreteBruto, setLembreteBruto] = useChaveDaBeleza<LembreteSkincare>(CHAVE_LEMBRETE_SKINCARE, LEMBRETE_PADRAO);
   const [perfilBruto, setPerfil] = useChaveDaBeleza<Partial<PerfilDaPele>>(CHAVE_PERFIL, {});
+  const [dicasBruto, setDicas] = useChaveDaBeleza<{ alternarDispensado?: boolean }>(CHAVE_DICAS, {});
 
   const passos = { manha: lista<PassoDaRotina>(manha), noite: lista<PassoDaRotina>(noite) };
   const setPassos = { manha: setManha, noite: setNoite };
@@ -172,6 +173,24 @@ export function useSkincare() {
     return r;
   };
 
+  /**
+   * "Alternar" (sem o ciclo de 4 dias, 28/09): grava `dias` SÓ nos passos
+   * sugeridos (campo opcional; nome, ordem e checks ficam), com Desfazer.
+   */
+  const aplicarDias = (periodo: Periodo, mudancas: { i: number; dias: number[] }[]) => {
+    if (!mudancas.length) return;
+    const antes = passos[periodo];
+    setPassos[periodo]((prev) =>
+      lista<PassoDaRotina>(prev).map((p, j) => {
+        const m = mudancas.find((x) => x.i === j);
+        return m && passoValido(p) ? { ...p, dias: [...m.dias] } : p;
+      }));
+    avisarApagado("Ativos em dias alternados", () => setPassos[periodo](() => antes));
+  };
+
+  /** "Agora não" no post-it do Alternar: não volta a oferecer. */
+  const dispensarAlternar = () => setDicas((d) => ({ ...(d && typeof d === "object" ? d : {}), alternarDispensado: true }));
+
   const mudarLembrete = useCallback(
     (periodo: Periodo, muda: Partial<LembreteDoPeriodo>): LembreteSkincare => {
       const atual = lerLembreteSkincare(lembreteBruto);
@@ -191,9 +210,9 @@ export function useSkincare() {
 
   return {
     hoje, ontem, passos, feitos, feitosDoDia, checkins, bancada: lista<ProdutoDaBancada>(bancada), evitar: lista<string>(evitar),
-    lembrete, perfil, vazia,
+    lembrete, perfil, vazia, alternarDispensado: dicasBruto?.alternarDispensado === true,
     alternar, produtoDe, adicionarPasso, removerPasso, alternarDiaDoPasso, renomear, escolherProduto, tirarProduto, abrirHoje,
-    gerar, mudarLembrete, ligarLembretes,
+    gerar, mudarLembrete, ligarLembretes, aplicarDias, dispensarAlternar,
   };
 }
 

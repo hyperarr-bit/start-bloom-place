@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { mesAtualExtenso } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Sparkles, Droplets } from "lucide-react";
+import { ArrowLeft, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
@@ -16,17 +16,33 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
-// 28/09: CAIXA ALTA como as abas do Treino e da Rotina (cara de planner); os ids ficam (medição por aba).
-// "Bancada" virou MEUS PRODUTOS (dono, 28/09): é o pedido nº 1 das avaliações, com o nome que a pessoa usa.
-const tabs = [
-  { id: "routine", label: "ROTINA", icon: "✨" },
+/*
+ * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
+ * com skincare" — e existe o módulo Rotina); o DIÁRIO deixou de ser aba e virou
+ * "Fotos da pele" no fim de SKINCARE (mesma tela, mesma chave: quem tem foto não
+ * perde nada). CAIXA ALTA como as outras abas do app (cara de planner).
+ *
+ * Os ids ficam (medição por aba, tour, testes): `routine` = SKINCARE, `shelf` =
+ * MEUS PRODUTOS. O id antigo `diary` redireciona pra SKINCARE, rolando até as fotos.
+ */
+type Aba = "routine" | "shelf";
+const tabs: { id: Aba; label: string; icon: string }[] = [
+  { id: "routine", label: "SKINCARE", icon: "✨" },
   { id: "shelf", label: "MEUS PRODUTOS", icon: "🧴" },
-  { id: "diary", label: "DIÁRIO", icon: "📷" },
 ];
+
+/** `/beleza?aba=…` (link de notificação, atalho, tour): nomes em português e os ids antigos. */
+const ABA_DO_LINK: Record<string, Aba | "fotos"> = {
+  skincare: "routine", routine: "routine", rotina: "routine",
+  produtos: "shelf", "meus-produtos": "shelf", shelf: "shelf",
+  diario: "fotos", diary: "fotos", fotos: "fotos",
+};
 
 const Beleza = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("routine");
+  const [params] = useSearchParams();
+  const pedida = ABA_DO_LINK[(params.get("aba") ?? "").toLowerCase()];
+  const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
@@ -39,7 +55,14 @@ const Beleza = () => {
   const rotinaNoTopo = activeTab === "routine" && vazia;
   const rotina = <SkincareRoutine recemGerada={recemGerada} onGerada={setRecemGerada} />;
 
-  const handleTabChange = (tabId: string) => {
+  // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
+  useEffect(() => {
+    if (pedida !== "fotos") return;
+    const t = window.setTimeout(() => document.getElementById("fotos-da-pele")?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 250);
+    return () => window.clearTimeout(t);
+  }, [pedida]);
+
+  const handleTabChange = (tabId: Aba) => {
     setActiveTab(tabId);
     reportTab?.(tabId);
   };
@@ -52,9 +75,7 @@ const Beleza = () => {
       <SpotlightOverlay
         moduleKey="beleza"
         steps={[
-          
           { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os seus produtos.", advanceOnClick: true },
-          { selector: '[data-spotlight="tab-diary"]', label: "Diário pra acompanhar a evolução da pele.", advanceOnClick: true },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -85,21 +106,23 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        {rotinaNoTopo && rotina}
-        <DicasDaBeleza
-          dicas={[
-            "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
-            "Toque num passo pra escolher o produto e os dias da semana",
-            "Ligue o lembrete da manhã e da noite — ele diz o passo do dia",
-            "Cadastre seus produtos para rastrear validade e custo por dose",
-          ]}
-        />
-
-        <DailyMirror />
-
-        {activeTab === "routine" && !rotinaNoTopo && rotina}
+        {activeTab === "routine" && (
+          <>
+            {rotinaNoTopo && rotina}
+            <DicasDaBeleza
+              dicas={[
+                "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
+                "Toque num passo pra escolher o produto e os dias da semana",
+                "Ligue o lembrete da manhã e da noite — ele diz o passo do dia",
+                "Cadastre seus produtos para rastrear validade e custo por dose",
+              ]}
+            />
+            <DailyMirror />
+            {!rotinaNoTopo && rotina}
+            <SkinDiary />
+          </>
+        )}
         {activeTab === "shelf" && <ProductShelf />}
-        {activeTab === "diary" && <SkinDiary />}
       </main>
     </div>
   );

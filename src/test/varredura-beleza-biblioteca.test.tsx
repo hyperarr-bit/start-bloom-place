@@ -228,8 +228,8 @@ describe("Beleza 5 — Espelho, Rotina e Diário falam entre si na hora", () => 
   it("'Pele hoje' do Diário é a mesma resposta do Espelho (abre com ela, escolher lá marca aqui, o registro leva junto)", () => {
     const store = criarStoreReativo({ "skincare-daily-checkin": { [HOJE]: "oleosa" }, "skincare-cycle-start": HOJE });
     store.montar(<Beleza />);
-    fireEvent.click(screen.getByRole("button", { name: /DIÁRIO/ })); // abas em caixa alta desde 28/09
-    fireEvent.click(screen.getByRole("button", { name: /Registrar Hoje/ }));
+    // 28/09: o DIÁRIO deixou de ser aba — virou "Fotos da pele" no fim de SKINCARE, na mesma tela
+    fireEvent.click(within(screen.getByTestId("fotos-da-pele")).getByRole("button", { name: /Registrar Hoje/ }));
     // 28/09: o visual da Beleza mudou (rosé, não verde); o formulário tem testid próprio
     const form = screen.getByTestId("form-diario");
     expect(within(form).getByRole("button", { name: /Oleosa/ }).className).toMatch(/bg-bz-rose/);

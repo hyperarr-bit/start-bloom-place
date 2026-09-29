@@ -99,9 +99,9 @@ const ABAS: Record<string, string> = {
   "casa:coop": "Co-op",
   "casa:seguranca": "Segurança",
   "casa:utilidades": "Utilidades",
-  "beleza:routine": "Rotina",
+  "beleza:routine": "Skincare", // 28/09: a aba ROTINA virou SKINCARE (mesmo id)
   "beleza:shelf": "Meus produtos",
-  "beleza:diary": "Diário",
+  "beleza:diary": "Diário (até 28/09)", // virou "Fotos da pele" dentro de SKINCARE
   "viagens:destinos": "Destinos",
   "viagens:passeios": "Passeios",
   "viagens:cronograma": "Roteiro",

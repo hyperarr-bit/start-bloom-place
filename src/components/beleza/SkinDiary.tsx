@@ -131,31 +131,32 @@ export const SkinDiary = () => {
 
   const photosEntries = entries.filter(e => e.photoUrl);
 
+  /* FOTOS DA PELE (28/09, dono): a aba DIÁRIO deu lugar a CUIDADOS e o diário virou
+     esta seção no fim de SKINCARE — mesma tela, mesma chave (`skincare-diary`),
+     nada some pra quem já tem foto. Um cartão só: faixa, contagem, comparar,
+     o formulário e a lista. */
   return (
-    <div className="space-y-4 mt-4">
-      {/* Cabeçalho: o diário no rosé da Beleza (28/09) */}
-      <CartaoBeleza>
-        <FaixaBeleza
-          icone={<Camera className="w-4 h-4 text-bz-acento" />}
-          titulo="DIÁRIO DE PELE"
-          direita={
-            photosEntries.length >= 2 ? (
-              <button onClick={() => setCompareMode(!compareMode)}
-                className={cn("h-10 px-3.5 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5", compareMode ? "bg-bz-acento text-bz-acento-tinta" : "bg-bz-cartao/70 text-bz-rose-tinta")}>
-                <ArrowLeftRight className="w-3.5 h-3.5" /> Comparar
-              </button>
-            ) : undefined
-          }
-        />
-        <div className="px-4 py-2 border-t border-bz-linha flex items-center justify-between gap-2">
-          <p className="text-[12px] text-bz-suave">{entries.length} registros • {photosEntries.length} fotos</p>
-          {todayEntry && <Chip tom="ok">✅ Registro de hoje feito</Chip>}
-        </div>
-      </CartaoBeleza>
+    <CartaoBeleza className="scroll-mt-28" id="fotos-da-pele" data-testid="fotos-da-pele">
+      <FaixaBeleza
+        icone={<Camera className="w-4 h-4 text-bz-acento" />}
+        titulo="FOTOS DA PELE"
+        direita={
+          photosEntries.length >= 2 ? (
+            <button onClick={() => setCompareMode(!compareMode)}
+              className={cn("h-10 px-3.5 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5", compareMode ? "bg-bz-acento text-bz-acento-tinta" : "bg-bz-cartao/70 text-bz-rose-tinta")}>
+              <ArrowLeftRight className="w-3.5 h-3.5" /> Comparar
+            </button>
+          ) : undefined
+        }
+      />
+      <div className="px-4 py-2 border-t border-bz-linha flex items-center justify-between gap-2">
+        <p className="text-[12px] text-bz-suave">{entries.length} registros • {photosEntries.length} fotos</p>
+        {todayEntry && <Chip tom="ok">✅ Registro de hoje feito</Chip>}
+      </div>
 
       {/* Compare mode */}
       {compareMode && (
-        <CartaoBeleza>
+        <div className="border-t border-bz-linha">
           <div className="bg-bz-blush px-4 py-2">
             <span className="text-[11.5px] font-bold text-bz-suave">📸 Selecione 2 fotos para comparar</span>
           </div>
@@ -177,12 +178,12 @@ export const SkinDiary = () => {
               </div>
             ))}
           </div>
-        </CartaoBeleza>
+        </div>
       )}
 
       {/* Form */}
       {showForm && (
-        <div className="rounded-[var(--bz-raio,24px)] border border-bz-linha bg-bz-cartao p-4 space-y-3" data-testid="form-diario">
+        <div className="border-t border-bz-linha bg-bz-cartao p-4 space-y-3" data-testid="form-diario">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
           {form.photoUrl ? (
             <div className="relative">
@@ -233,7 +234,7 @@ export const SkinDiary = () => {
       )}
 
       {/* Timeline — always-visible Notion-style table */}
-      <CartaoBeleza>
+      <div className="border-t border-bz-linha">
         <div className="bg-bz-blush px-3.5 py-2 grid grid-cols-12 gap-1 text-[10px] font-extrabold text-bz-suave uppercase tracking-[.12em]">
           <span className="col-span-2">Foto</span>
           <span className="col-span-3">Data</span>
@@ -302,7 +303,7 @@ export const SkinDiary = () => {
             </div>
           )}
         </div>
-      </CartaoBeleza>
-    </div>
+      </div>
+    </CartaoBeleza>
   );
 };

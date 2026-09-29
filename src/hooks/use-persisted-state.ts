@@ -21,6 +21,17 @@ import { normalizeForKey } from "@/lib/data-normalizers";
  */
 const EVENTO_MESMA_CHAVE = "core:persisted-state";
 type AvisoDeEscrita = { key: string; json: string; value: unknown; origem: symbol };
+
+/**
+ * Escrita feita FORA de um usePersistedState (ex.: `set(..., { system: true })`
+ * de um hook do App) que uma tela aberta com a mesma chave precisa enxergar na
+ * hora — senão a próxima gravação dela, feita a partir do retrato velho,
+ * apaga o que foi escrito (29/09: fechamento do desafio da semana).
+ */
+export const avisarEscritaDeFora = (key: string, value: unknown) => {
+  const aviso: AvisoDeEscrita = { key, json: JSON.stringify(value), value, origem: Symbol("fora") };
+  queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));
+};
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
   const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
 

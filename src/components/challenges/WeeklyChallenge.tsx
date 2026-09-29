@@ -5,8 +5,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
+import { PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import {
-  CHALLENGES, challengeByKey, mondayOf, weekDates,
+  CHALLENGES, challengeByKey, mondayOf, avaliarDesafio, fecharSemanaDoDesafio, gastosParaDesafio,
   EMPTY_CHALLENGES, type ChallengesState,
 } from "./challenges";
 
@@ -27,47 +28,35 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
      a linha tracejada fica no lugar onde o card estava — quem escondeu ali
      reencontra ali. (Lida pelo store, não por snapshot: o adesivo "Desafiante"
      em Conquistas também religa, e o card tem que voltar na hora.) */
-  const { get, set } = useUserData();
+  const { get, set, loaded } = useUserData();
   const hidden = get<unknown>("finance-challenges-hidden", false) === true;
   const setHidden = (v: boolean) => set("finance-challenges-hidden", v);
+  const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+  /* Gastos da semana do desafio e da anterior em TODOS os baldes (29/09): a
+     semana que cruza o mês tem metade no arquivo do mês passado. */
+  const gastosDa = (weekStart: string) => gastosParaDesafio((chave) => get<unknown>(chave, undefined), weekStart, perfil, expenses);
 
   const thisMonday = mondayOf(new Date());
 
-  // Finaliza semana antiga (derrota se não venceu) — lazy, sem cron.
+  // Fecha a semana antiga AVALIANDO os 7 dias (29/09) — antes marcava derrota
+  // sem olhar a semana, e quem cumpria sem abrir o Painel no domingo perdia.
+  // O mesmo fechamento roda na abertura do app (hooks/use-fechamento-desafio);
+  // os dois chegam ao mesmo resultado, e o repetido não entra duas vezes.
   useEffect(() => {
-    if (!state.active || state.active.weekStart === thisMonday) return;
-    const already = state.history.some(
-      (h) => h.weekStart === state.active!.weekStart && h.key === state.active!.key,
-    );
-    setState({
-      active: null,
-      history: already
-        ? state.history
-        : [...state.history, { key: state.active.key, weekStart: state.active.weekStart, result: "loss" as const }],
-    });
-  }, [state, thisMonday, setState]);
+    if (!loaded) return;
+    const fechado = fecharSemanaDoDesafio(state, gastosDa, new Date());
+    if (fechado) setState(fechado);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, thisMonday, setState, loaded]);
 
   const active = state.active && state.active.weekStart === thisMonday ? state.active : null;
   const def = active ? challengeByKey(active.key) : null;
 
   const evaluation = useMemo(() => {
     if (!active || !def) return null;
-    const days = weekDates(active.weekStart);
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    const elapsedDays = Math.min(Math.max(days.indexOf(todayStr) + 1, 1), 7);
-    const weekSet = new Set(days);
-    const weekExpenses = expenses.filter((e) => weekSet.has(e.date));
-
-    const prevBase = new Date(`${active.weekStart}T12:00:00`);
-    prevBase.setDate(prevBase.getDate() - 7);
-    const prevSet = new Set(weekDates(mondayOf(prevBase)));
-    const prevWeekTotal = expenses
-      .filter((e) => prevSet.has(e.date))
-      .reduce((s, e) => s + (e.value || 0), 0);
-
-    return def.evaluate({ weekExpenses, prevWeekTotal, elapsedDays });
-  }, [active, def, expenses]);
+    return avaliarDesafio(def, active.weekStart, gastosDa(active.weekStart), new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, def, expenses, get, perfil]);
 
   // Vitória vira histórico imediatamente (dedupe por semana+key) — alimenta
   // as insígnias de desafio sem esperar a semana acabar.

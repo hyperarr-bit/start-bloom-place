@@ -34,6 +34,7 @@ import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
+import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -508,6 +509,9 @@ const AnimatedRoutes = () => {
   // notificação não passa por Finanças — e era essa pessoa que via o mês
   // vazio. Ver use-virada-do-mes.ts pro diagnóstico completo.
   useViradaDoMes();
+  // O desafio da semana que passou fecha AVALIADO na abertura do app, sem
+  // depender do Painel de Finanças aberto no domingo (29/09).
+  useFechamentoDoDesafio();
   // Uma vez só, com navigate por ref (mesmo padrão do DeepLinks abaixo): com
   // [navigate] nas deps o ouvinte era reinstalado a cada navegação e o toque
   // na notificação navegava — e contava — N vezes (revisão 02/09).

@@ -66,9 +66,10 @@ const juntarFilhos = (quantos: number) => (el: Element): Retangulo | null => {
   return { top, left, width: right - left, height: bottom - top, bottom };
 };
 
-/** O card em volta de um elemento (a moldura arredondada mais próxima). */
+/** O card em volta de um elemento (a moldura arredondada mais próxima ACIMA dele —
+ *  o próprio botão também é arredondado, e o anel tem que abraçar o card). */
 const cardEmVolta = (el: Element): Element | null =>
-  el.closest(".rounded-2xl, .rounded-xl, .rounded-lg") ?? el.parentElement;
+  el.parentElement?.closest(".rounded-2xl, .rounded-xl") ?? el.parentElement;
 
 /** "↓ Saiu R$ 3.718" do MEU MÊS → 3718. */
 export const lerReais = (texto: string | null | undefined): number | null => {

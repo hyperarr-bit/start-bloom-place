@@ -210,7 +210,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
       />
       <div
         ref={balaoRef}
-        className="absolute left-1/2 -translate-x-1/2 w-[88%] max-w-[340px] rounded-2xl px-4 py-3 text-white shadow-2xl pointer-events-none"
+        className="absolute left-1/2 -translate-x-1/2 w-[88%] max-w-[340px] rounded-2xl px-4 py-3 text-white shadow-2xl ring-1 ring-white/15 pointer-events-none"
         style={{ background: GRAFITE, top: balao?.top ?? -9999, visibility: balao ? "visible" : "hidden" }}
       >
         <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{rotulo}</span>

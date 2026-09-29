@@ -48,7 +48,7 @@ export const RelacoesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
                 <p className="text-[11.5px] font-bold text-[hsl(var(--rl-lacre))]">{i.dias === 0 ? "hoje! 🎉" : `${String(i.dia).padStart(2, "0")} ${mesCurto(i.mes).toLowerCase()} · ${quandoFalta(i.dias)}`}</p>
               </>
             ) : praFalar[0] ? (
-              <p className="mt-1.5 text-[12px] leading-snug">💌 Faz tempo que você não fala com <b>{praFalar[0].pessoa.name}</b></p>
+              <p className="mt-1.5 text-[12px] leading-snug">💌 Que tal mandar um oi pra <b>{praFalar[0].pessoa.name}</b>?</p>
             ) : (
               <p className="mt-1.5 text-[11.5px] text-muted-foreground leading-snug">Guarde os aniversários de quem você ama</p>
             )}
@@ -75,7 +75,7 @@ export const RelacoesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
             {proximas.length > 0 && (
               <div className="flex gap-2.5 px-3.5 pb-3">
                 {proximas.map((i) => (
-                  <button key={i.id} onClick={abrir} className="rl-selo !w-auto flex-1 basis-0 min-w-0" aria-label={`${i.titulo}, ${quandoFalta(i.dias)}`}>
+                  <button key={i.id} onClick={abrir} className="rl-selo !w-auto !flex-1 min-w-0" aria-label={`${i.titulo}, ${quandoFalta(i.dias)}`}>
                     <span className="rl-selo-in !py-1.5">
                       <span className="rl-serif text-[22px] leading-none text-[hsl(var(--rl-lacre))]">{String(i.dia).padStart(2, "0")}</span>
                       <span className="rl-mini text-[hsl(var(--rl-tinta))]">{mesCurto(i.mes)}</span>
@@ -91,7 +91,7 @@ export const RelacoesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
               <button onClick={abrir} className="flex w-full items-center gap-2 border-t border-border px-3.5 py-2.5 text-left text-[12.5px] min-h-[44px]">
                 <span aria-hidden="true">💌</span>
                 <span className="flex-1 leading-snug">
-                  Faz tempo: <b>{praFalar[0].pessoa.name}</b>
+                  Pra mandar um oi: <b>{praFalar[0].pessoa.name}</b>
                   {praFalar[0].situacao.desde != null && <span className="text-muted-foreground"> · {haQuanto(praFalar[0].situacao.desde)}</span>}
                   {praFalar.length > 1 && <span className="text-muted-foreground"> e mais {praFalar.length - 1}</span>}
                 </span>

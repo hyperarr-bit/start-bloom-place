@@ -237,8 +237,8 @@ function CartaoEvento({ id, hoje, passado }: { id: string; hoje: Date; passado?:
           <p className="rl-serif text-[21px] leading-tight">{e.name}</p>
           <p className="text-[12px] text-muted-foreground">
             {dataSegura(e.date, "dd/MM/yyyy")}{dias != null && dias >= 0 ? ` · ${quandoFalta(dias)}` : ""}
-            {e.location && <span className="inline-flex items-center gap-1"> · <MapPin className="w-3 h-3" />{e.location}</span>}
           </p>
+          {e.location && <p className="flex items-center gap-1 text-[12px] text-muted-foreground"><MapPin className="w-3 h-3 shrink-0" />{e.location}</p>}
         </div>
         <button type="button" onClick={() => rel.ciclarRsvp(e.id)} className={cn("min-h-[36px] rounded-full border-[1.5px] px-3 text-[11.5px] font-bold", r.cls)} aria-label={`Presença: ${r.rotulo}. Tocar muda`}>
           {r.rotulo}
@@ -262,7 +262,7 @@ function CartaoEvento({ id, hoje, passado }: { id: string; hoje: Date; passado?:
       )}
       {!passado && (
         <div className="mt-2 flex gap-2">
-          <input className={cn(CAMPO, "!min-h-[40px]")} placeholder="O que falta? (levar carvão, comprar presente…)" value={tarefa} onChange={(ev) => setTarefa(ev.target.value)}
+          <input className={cn(CAMPO, "!min-h-[40px]")} placeholder="O que falta resolver?" value={tarefa} onChange={(ev) => setTarefa(ev.target.value)}
             onKeyDown={(ev) => ev.key === "Enter" && addTarefa()} aria-label={`Nova tarefa de ${e.name}`} />
           <button type="button" onClick={addTarefa} aria-label="Adicionar tarefa" className="rl-contorno border !px-0 w-11 shrink-0"><Plus className="w-4 h-4" /></button>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
@@ -9,6 +9,8 @@ import { quandoDoAviso } from "@/components/beleza/lembrete-skincare";
 import catalogo from "@/data/produtos-beleza.json";
 import Home from "@/pages/Home";
 import Beleza from "@/pages/Beleza";
+// as 3 direções de visual (28/09) pra comparar na mesma tela: ?direcao=a|b|c (só no dev)
+import "./beleza-direcoes.css";
 
 /**
  * /dev/beleza — SÓ NO SERVIDOR DE DESENVOLVIMENTO (App.tsx monta a rota dentro de
@@ -21,6 +23,7 @@ import Beleza from "@/pages/Beleza";
  *   ?tela=vazia    · a Beleza sem rotina (as 3 perguntas)
  *   ?tela=antiga   · rotina ANTIGA (do tempo do ciclo de 4 dias): tudo todo dia + a oferta "Alternar"
  *   ?tela=labios   · a rotina da Ana + um passo digitado "Protetor labial" (acha os produtos de lábios)
+ *   &direcao=a|b|c · as 3 direções de visual (rosé & nude · pêssego & malva · creme & lavanda-rosada)
  *   ?tela=avisos   · o que o celular recebe (o plano do lembrete, com o texto de cada dia)
  * O tema escuro vem do próprio app (localStorage "core-theme-mode").
  */
@@ -136,6 +139,13 @@ const DevBeleza = () => {
   const hoje = localDayKey();
   const tela = params.get("tela") ?? "beleza";
   const inicial = useMemo(() => seeds(hoje, tela), [hoje, tela]);
+  const direcao = params.get("direcao");
+  useEffect(() => {
+    const html = document.documentElement;
+    if (direcao) html.dataset.bzDirecao = direcao;
+    else delete html.dataset.bzDirecao;
+    return () => { delete html.dataset.bzDirecao; };
+  }, [direcao]);
   if (tela === "avisos") return <Avisos dados={inicial} />;
   return <Provedor inicial={inicial}>{tela === "home" ? <Home /> : <Beleza />}</Provedor>;
 };

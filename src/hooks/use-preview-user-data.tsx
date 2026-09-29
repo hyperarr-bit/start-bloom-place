@@ -1,7 +1,8 @@
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { getSeedsForModule } from "@/lib/preview-seeds";
 import { isNativeShell } from "@/lib/native-shell";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * Provider de modo preview: substitui o contexto de useUserData por uma
@@ -79,9 +80,31 @@ export const PreviewUserDataProvider = ({
     } catch { /* noop */ }
   }, [nomesDaSeed]);
 
+  /* O QUE A PESSOA FAZ NA DEMO (28/09): até aqui só a navegação era medida, e
+   * "mexeu × só olhou" não tinha resposta (0 eventos de card em 979 sessões da
+   * Kenny G — o TrackedModule só envolve as rotas de verdade, não o /preview).
+   * Conta como mexida a gravação que vem logo depois de um toque ou tecla da
+   * pessoa: as gravações automáticas da montagem (o sync custo fixo → contas)
+   * ficam de fora. Uma vez por chave por demo aberta — é medição, não rastro. */
+  const ultimoGesto = useRef(0);
+  const jaContou = useRef(new Set<string>());
+  useEffect(() => {
+    const marcar = () => { ultimoGesto.current = Date.now(); };
+    window.addEventListener("pointerdown", marcar, true);
+    window.addEventListener("keydown", marcar, true);
+    return () => {
+      window.removeEventListener("pointerdown", marcar, true);
+      window.removeEventListener("keydown", marcar, true);
+    };
+  }, []);
+
   // Sem toast aqui: o banner do topo já sinaliza que é demo — deixa a pessoa
   // mexer à vontade sem interrupção.
   const set = useCallback((key: string, value: any) => {
+    if (Date.now() - ultimoGesto.current < 2000 && !jaContou.current.has(key)) {
+      jaContou.current.add(key);
+      try { trackEvent("demo_interact", { modulo: moduleKey, chave: key }); } catch { /* medição nunca derruba a demo */ }
+    }
     try {
       if (key === "finance-dueDays" && isNativeShell()) {
         const nova = ((Array.isArray(value) ? value : []) as Array<{ bills?: Array<{ name?: string }> }>)
@@ -93,7 +116,7 @@ export const PreviewUserDataProvider = ({
       }
     } catch { /* endowment nunca derruba a demo */ }
     setStore((prev) => ({ ...prev, [key]: value }));
-  }, [nomesDaSeed]);
+  }, [nomesDaSeed, moduleKey]);
 
   const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
     return (key in store ? store[key] : null) as T | null;

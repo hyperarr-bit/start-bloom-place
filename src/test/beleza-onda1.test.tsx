@@ -43,6 +43,12 @@ import {
 } from "@/lib/beleza-cuidados";
 import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
 import { ExpenseTable } from "@/components/ExpenseTable";
+import { ProductShelf } from "@/components/beleza/ProductShelf";
+import {
+  CATEGORIAS_PRODUTO, categoriaDe, lerLembreteValidade, paoPadraoDe, planejarValidade, rotuloDaCategoria, textoDoVencimento, vencendo,
+  vencimentoDoProduto, type ProdutoDeCabelo,
+} from "@/lib/beleza-produtos";
+import catalogoCabelo from "@/data/produtos-cabelo.json";
 import { ProximosCompromissos } from "@/components/rotina/Compromissos";
 
 beforeAll(() => {
@@ -444,5 +450,131 @@ describe("CUIDADOS — a aba: FEITO → gasto nas Finanças; marquei horário �
     // a Rotina lê a mesma chave: o compromisso está lá
     store.montar(<ProximosCompromissos lista={compromissos} onChange={() => {}} onAbrirDia={() => {}} />);
     expect(within(screen.getByTestId("proximos-compromissos")).getByText(/Sobrancelha/)).toBeInTheDocument();
+  });
+});
+
+/* ═════════════════════════════ F3 — MEUS PRODUTOS completo ═════════════════════════════ */
+
+/** Um produto no formato de SEMPRE (o do app antigo). */
+const produtoAntigo = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+  id, name, category: "Skincare", brand: "", opened: false, openedDate: "", paoMonths: 12, expiry: "", notes: "", rating: 0,
+  repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false, ...extra,
+});
+const TIPO_DE_SEMPRE: Record<string, string> = {
+  id: "string", name: "string", category: "string", brand: "string", opened: "boolean", openedDate: "string", paoMonths: "number",
+  expiry: "string", notes: "string", rating: "number", repurchase: "boolean", price: "number", sizeMl: "number", photoUrl: "string",
+  frequency: "string", finished: "boolean",
+};
+const mesmoFormato = (p: Record<string, unknown>) => { for (const [k, t] of Object.entries(TIPO_DE_SEMPRE)) expect(typeof p[k], k).toBe(t); };
+
+describe("MEUS PRODUTOS — categorias, as duas datas e o PAO padrão", () => {
+  it("'Skincare' (o valor de sempre) é a Pele; as novas: Cabelo, Corpo, Maquiagem, Unhas, Perfume", () => {
+    expect(categoriaDe("Skincare")).toBe("Skincare");
+    expect(rotuloDaCategoria("Skincare")).toBe("Pele");
+    expect(categoriaDe("pele")).toBe("Skincare");
+    expect(categoriaDe("Maquiagem")).toBe("Maquiagem");
+    expect(categoriaDe("qualquer")).toBe("Outro");
+    expect(CATEGORIAS_PRODUTO.map((c) => c.rotulo)).toEqual(["Pele", "Cabelo", "Corpo", "Maquiagem", "Unhas", "Perfume", "Outro"]);
+  });
+
+  it("PAO padrão do dono: rímel 3, base 12, batom 18, perfume 36, cabelo 12, corpo 12", () => {
+    expect([paoPadraoDe("Maquiagem", "rimel"), paoPadraoDe("Maquiagem", "base"), paoPadraoDe("Maquiagem", "batom"), paoPadraoDe("Perfume"), paoPadraoDe("Cabelo"), paoPadraoDe("Corpo")])
+      .toEqual([3, 12, 18, 36, 12, 12]);
+  });
+
+  it("vale a data que vence PRIMEIRO: impressa (fim do mês) × depois de aberto (aberto + PAO)", () => {
+    const hoje = SEG;
+    expect(vencimentoDoProduto({ expiry: "2026-10", openedDate: "", paoMonths: 12 }, hoje)).toEqual({ dia: "2026-10-31", motivo: "impressa", dias: 33 });
+    expect(vencimentoDoProduto({ expiry: "", openedDate: "2026-07-10", paoMonths: 3 }, hoje)).toEqual({ dia: "2026-10-10", motivo: "aberto", dias: 12 });
+    expect(vencimentoDoProduto({ expiry: "2027-03", openedDate: "2026-09-01", paoMonths: 3 }, hoje)?.motivo).toBe("aberto");
+    expect(vencimentoDoProduto({ expiry: "2026-11", openedDate: "2026-08-10", paoMonths: 12 }, hoje)).toMatchObject({ dia: "2026-11-30", motivo: "impressa" });
+    expect(vencimentoDoProduto({ expiry: "", openedDate: "", paoMonths: 12 }, hoje)).toBeNull();
+    expect(vencimentoDoProduto({ expiry: "lixo", openedDate: "2026-99-99", paoMonths: 12 }, hoje)).toBeNull();
+    expect(textoDoVencimento({ dia: "2026-10-10", motivo: "aberto", dias: 12 })).toBe("vence em 12 dias (depois de aberto)");
+    expect(textoDoVencimento({ dia: "2027-03-31", motivo: "impressa", dias: 184 })).toBe("vence 03/2027 (data impressa)");
+    expect(textoDoVencimento({ dia: "2026-09-25", motivo: "aberto", dias: -3 }, false)).toBe("venceu há 3 dias");
+  });
+
+  it("VENCENDO: até 30 dias (e os vencidos), o mais urgente primeiro; acabado não entra", () => {
+    const lista = [
+      produtoAntigo("a", "Rímel", { category: "Maquiagem", openedDate: "2026-07-10", paoMonths: 3 }),
+      produtoAntigo("b", "Base", { category: "Maquiagem", expiry: "2026-10" }),
+      produtoAntigo("c", "Sérum", { openedDate: "2026-03-01", paoMonths: 6 }),
+      produtoAntigo("d", "Acabado", { openedDate: "2026-03-01", paoMonths: 6, finished: true }),
+    ];
+    expect(vencendo(lista, SEG).map((x) => x.p.id)).toEqual(["c", "a"]);
+  });
+
+  it("aviso 7 dias antes: desligado por padrão; ligado, às 09:00 na faixa 1730000", () => {
+    const lista = [produtoAntigo("a", "Rímel", { category: "Maquiagem", openedDate: "2026-07-10", paoMonths: 3 })]; // vence 10/10
+    const agora = new Date(2026, 8, 28, 10, 0);
+    expect(lerLembreteValidade(undefined)).toEqual({ ligado: false, hora: "09:00", diasAntes: 7 });
+    expect(planejarValidade(lista, lerLembreteValidade(undefined), BASES_LEMBRETES.validade, agora)).toEqual([]);
+    const avisos = planejarValidade(lista, { ligado: true, hora: "09:00", diasAntes: 7 }, BASES_LEMBRETES.validade, agora);
+    expect(avisos).toEqual([expect.objectContaining({ quando: new Date(2026, 9, 3, 9, 0), title: "🧴 Rímel vence em 7 dias", id: 1730000 })]);
+  });
+
+  it("a lista de cabelo: ~100 produtos reais, cada um com fonte, sem repetido, PAO 12 padrão", () => {
+    const lista = catalogoCabelo as unknown as ProdutoDeCabelo[];
+    expect(lista.length).toBeGreaterThanOrEqual(100);
+    const ids = new Set(lista.map((p) => p.id));
+    expect(ids.size).toBe(lista.length);
+    const nomes = new Set(lista.map((p) => `${p.marca}|${p.nome}`.toLowerCase()));
+    expect(nomes.size).toBe(lista.length);
+    for (const p of lista) {
+      expect(p.fonte, p.id).toMatch(/^https:\/\//);
+      expect(["pagina", "listagem"]).toContain(p.verificacao);
+      expect(p.pao).toBe(12);
+      expect(p.paoPadrao).toBe(true);
+      expect([null, "hidratacao", "nutricao", "reconstrucao"]).toContain(p.etapa);
+    }
+    expect(new Set(lista.map((p) => p.marca)).size).toBeGreaterThanOrEqual(15);
+  });
+});
+
+describe("MEUS PRODUTOS — a tela: formato antigo abre; as duas datas gravam em campos de sempre", () => {
+  it("o formato ANTIGO abre sem mexer em nada: 'Skincare' aparece como Pele, sem data não inventa data", () => {
+    fixarHoje();
+    const antigos = [produtoAntigo("p1", "Gel de limpeza"), produtoAntigo("p2", "Protetor", { opened: true, openedDate: "2026-08-10", paoMonths: 6 })];
+    const store = criarStoreReativo({ "beauty-products": antigos });
+    store.montar(<ProductShelf />);
+    expect(screen.getByText("Gel de limpeza")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pele 2" })).toBeInTheDocument();
+    expect(screen.getByText("vence 02/2027 (depois de aberto)")).toBeInTheDocument();
+    expect(store.dados["beauty-products"]).toEqual(antigos); // abrir não grava
+  });
+
+  it("cadastro com as duas datas: maquiagem › rímel (PAO 3 padrão), vence em out/2026, aberto em 20/09 — campos de sempre, tipos de sempre", () => {
+    fixarHoje();
+    const store = criarStoreReativo({ "beauty-products": [produtoAntigo("p1", "Gel de limpeza")] });
+    store.montar(<ProductShelf />);
+    fireEvent.click(screen.getByRole("button", { name: "+ Detalhes" }));
+    const form = within(screen.getByTestId("form-produto"));
+    fireEvent.change(form.getByPlaceholderText("Nome do produto"), { target: { value: "Máscara de cílios" } });
+    fireEvent.click(form.getByRole("button", { name: "Maquiagem" }));
+    fireEvent.click(form.getByRole("button", { name: /Rímel · 3m/ }));
+    fireEvent.change(form.getByLabelText("Vence em (mês e ano impressos)"), { target: { value: "2026-10" } });
+    fireEvent.change(form.getByLabelText("Aberto em"), { target: { value: "2026-09-20" } });
+    fireEvent.click(form.getByRole("button", { name: "Salvar" }));
+    const lista = store.dados["beauty-products"] as Record<string, unknown>[];
+    expect(lista).toHaveLength(2);
+    expect(lista[1]).toMatchObject({ name: "Máscara de cílios", category: "Maquiagem", tipo: "rimel", paoMonths: 3, paoPadrao: true, expiry: "2026-10", openedDate: "2026-09-20", opened: true });
+    for (const p of lista) mesmoFormato(p);
+    // a tela mostra a que vence primeiro: a impressa (31/10) antes do PAO (20/12)
+    expect(screen.getByText("vence em 33 dias (data impressa)")).toBeInTheDocument();
+  });
+
+  it("da lista de cabelo em 1 toque: entra com a categoria Cabelo, o PAO padrão e o formato de sempre", async () => {
+    fixarHoje();
+    const store = criarStoreReativo({});
+    store.montar(<ProductShelf />);
+    fireEvent.change(screen.getByLabelText("Buscar na lista ou digitar o nome"), { target: { value: "lola morte" } });
+    const achado = await screen.findAllByTestId("achado");
+    fireEvent.click(achado[0]);
+    const lista = store.dados["beauty-products"] as Record<string, unknown>[];
+    expect(lista).toHaveLength(1);
+    expect(lista[0]).toMatchObject({ category: "Cabelo", brand: "Lola Cosmetics", paoMonths: 12, paoPadrao: true });
+    expect(String(lista[0].catalogoId)).toMatch(/^lola-cosmetics-/);
+    mesmoFormato(lista[0]);
   });
 });

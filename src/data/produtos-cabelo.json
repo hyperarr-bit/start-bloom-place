@@ -1,0 +1,1826 @@
+[
+ {
+  "id": "amend-condicionador-nutritivo-expertise-marula-fabulous-nutrition",
+  "marca": "Amend",
+  "nome": "Condicionador Nutritivo Expertise Marula Fabulous Nutrition",
+  "categoria": "condicionador",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/condicionador-amend-expertise-nutrit-marula-fabulous-250ml/1121-1.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "amend-fluido-modelador-essencial-segura-a-onda",
+  "marca": "Amend",
+  "nome": "Fluido Modelador Essencial Segura a Onda",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/p/1670-1.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "amend-mascara-hidratante-science",
+  "marca": "Amend",
+  "nome": "Máscara Hidratante Science",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/p/1637-1.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "amend-mascara-nutritiva-science",
+  "marca": "Amend",
+  "nome": "Máscara Nutritiva Science",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/p/1638-1.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "amend-mascara-reconstrutora-science",
+  "marca": "Amend",
+  "nome": "Máscara Reconstrutora Science",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/p/1636.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "amend-serum-reconstrutor-noturno-essencial-reparacao-noturna",
+  "marca": "Amend",
+  "nome": "Sérum Reconstrutor Noturno Essencial Reparação Noturna",
+  "categoria": "leave-in",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.amend.com.br/p/1671-1.html",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "aussie-3-minute-miracle-moist-creme-de-tratamento",
+  "marca": "Aussie",
+  "nome": "3 Minute Miracle Moist - Creme De Tratamento",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/aussie-3-minute-miracle-moist---creme-de-tratamento-236ml-118945/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "aussie-miracle-curls-condicionador",
+  "marca": "Aussie",
+  "nome": "Miracle Curls - Condicionador",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/aussie-miracle-curls---condicionador-221137/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "aussie-miracle-curls-shampoo",
+  "marca": "Aussie",
+  "nome": "Miracle Curls - Shampoo",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/aussie-miracle-curls---shampoo-360ml-121511/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "aussie-serum-hidratacao",
+  "marca": "Aussie",
+  "nome": "Sérum Hidratação",
+  "categoria": "leave-in",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/serum-aussie-hidratacao-95ml-206444/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-antiencolhimento-be-use",
+  "marca": "Bio Extratus",
+  "nome": "Antiencolhimento be.use",
+  "categoria": "leave-in",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/antiencolhimento-be-use-250g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-banho-de-creme-tutano",
+  "marca": "Bio Extratus",
+  "nome": "Banho de Creme Tutano",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/banho-de-creme-tutano-500g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-mascara-queravit",
+  "marca": "Bio Extratus",
+  "nome": "Máscara Queravit",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/mascara-queravit-250g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-oleo-nutricao",
+  "marca": "Bio Extratus",
+  "nome": "Óleo +Nutrição",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/oleo-mais-nutricao-40ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-reconstrutor-uso-indispensavel-be-use",
+  "marca": "Bio Extratus",
+  "nome": "Reconstrutor Uso Indispensável be.use",
+  "categoria": "finalizador",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/reconstrutor-uso-indispensavel-be-use-210ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-shampoo-tutano",
+  "marca": "Bio Extratus",
+  "nome": "Shampoo Tutano",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/shampoo-tutano-250ml/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "bio-extratus-supermascara-cronograma-be-use",
+  "marca": "Bio Extratus",
+  "nome": "Supermáscara Cronograma be.use",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.bioextratus.com.br/supermascara-cronograma-be-use-250g/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-condicionador-hidratacao-hialuron-vit",
+  "marca": "Dove",
+  "nome": "Condicionador Hidratação + Hialuron-VIT",
+  "categoria": "condicionador",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/condicionador-dove-hidratacao---hialuron-vit-370ml-142644/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-creme-para-pentear-cachos-ativos-biotina",
+  "marca": "Dove",
+  "nome": "Creme para Pentear Cachos Ativos + Biotina",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/creme-para-pentear-dove-cachos-ativos---biotina-355ml-168083/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-mascara-capilar-10-em-1-bond-intense-repair-peptideo",
+  "marca": "Dove",
+  "nome": "Máscara Capilar 10 em 1 Bond Intense Repair + Peptídeo",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/dove-mascara-capilar-10-em-1-bond-intense-repair---peptideo-250g-167669/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-mascara-de-reconstrucao-aminoacido",
+  "marca": "Dove",
+  "nome": "Máscara de Reconstrução + Aminoácido",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/dove-mascara-de-reconstrucao---aminoacido-320g-198255/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-oleo-serum-bifasico-para-cabelos",
+  "marca": "Dove",
+  "nome": "Óleo Sérum Bifásico Para Cabelos",
+  "categoria": "oleo",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/dove-oleo-serum-bifasico-para-cabelos-110ml-169525/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "dove-shampoo-hidratacao-hialuron-vit",
+  "marca": "Dove",
+  "nome": "Shampoo Hidratação + Hialuron-VIT",
+  "categoria": "shampoo",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/shampoo-dove-hidratacao---hialuron-vit-600ml-167760/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-condicionador-pro-cronology",
+  "marca": "Eudora Siàge",
+  "nome": "Condicionador Pro Cronology",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/eudora-siage-condicionador-pro-cronology/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-hair-plastia-mascara-capilar",
+  "marca": "Eudora Siàge",
+  "nome": "Hair-Plastia Máscara Capilar",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/eudora-siage-hair-plastia-mascara-capilar/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-hair-plastia-shampoo",
+  "marca": "Eudora Siàge",
+  "nome": "Hair-Plastia Shampoo",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/eudora-siage-hair-plastia-shampoo/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-hidratacao-micelar-mascara",
+  "marca": "Eudora Siàge",
+  "nome": "Hidratação Micelar Máscara",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/eudora-siage-hidratacao-micelar-mascara/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-liso-intenso-condicionador",
+  "marca": "Eudora Siàge",
+  "nome": "Liso Intenso Condicionador",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/eudora-siage-liso-intenso-condicionador-200/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-mascara-capilar-nutri-rose",
+  "marca": "Eudora Siàge",
+  "nome": "Máscara Capilar Nutri Rosé",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/siage-mascara-capilar-nutri-rose-250g-266303/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-oleo-em-creme-nutri-acid-complex",
+  "marca": "Eudora Siàge",
+  "nome": "Óleo em Creme Nutri Acid.Complex",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/oleo-em-creme-eudora-siage-nutri-acid-complex/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "eudora-siage-shampoo-ultra-bond-reset",
+  "marca": "Eudora Siàge",
+  "nome": "Shampoo Ultra Bond Reset",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/shampoo-eudora-siage-ultra-bond-reset/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-creme-de-pentear-se-curve",
+  "marca": "Haskell",
+  "nome": "Creme de Pentear Se Curve",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/creme-de-pentear-se-curve-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-mascara-3-manteigas-se-curve",
+  "marca": "Haskell",
+  "nome": "Máscara 3 Manteigas Se Curve",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/mascara-3-manteigas-se-curve-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-mascara-de-tratamento-cavalo-forte",
+  "marca": "Haskell",
+  "nome": "Máscara de Tratamento Cavalo Forte",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/mascara-de-tratamento-cavalo-forte-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-mascara-hidronutricao-se-curve",
+  "marca": "Haskell",
+  "nome": "Máscara Hidronutrição Se Curve",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/mascara-hidronutricao-se-curve-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-mascara-poder-dos-oleos-se-curve",
+  "marca": "Haskell",
+  "nome": "Máscara Poder dos Óleos Se Curve",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/mascara-poder-dos-oleos-se-curve-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-mousse-forma-cachos-se-curve",
+  "marca": "Haskell",
+  "nome": "Mousse Forma Cachos Se Curve",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/mousse-se-curve-180ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-oleo-do-poder-se-curve",
+  "marca": "Haskell",
+  "nome": "Óleo do Poder Se Curve",
+  "categoria": "oleo",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/oleo-do-poder-se-curve-60ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-shampoo-se-curve",
+  "marca": "Haskell",
+  "nome": "Shampoo Se Curve",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/shampoo-se-curve-500ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "haskell-tonico-fortalecedor-jaborandi-antiqueda",
+  "marca": "Haskell",
+  "nome": "Tônico Fortalecedor Jaborandi Antiqueda",
+  "categoria": "tonico",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://haskellcosmeticos.com.br/produtos/tonico-fortalecedor-jaborandi-antiqueda-120ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-ampola-glycolic-force-super-brilho-e-hidratacao-profunda",
+  "marca": "Inoar",
+  "nome": "Ampola Glycolic Force - Super Brilho e Hidratação Profunda",
+  "categoria": "ampola",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-glycolic-force-ampola-45ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-condicionador-cicatrifios-hidratacao-brilho-e-reconstrucao-capilar",
+  "marca": "Inoar",
+  "nome": "Condicionador Cicatrifios - Hidratação, Brilho e Reconstrução Capilar",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/condicionadores/inoar-cicatrifios-condicionador-1l",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-creme-4x1-poder-das-vitaminas-morango-nutricao-profunda-e-brilho-radiante",
+  "marca": "Inoar",
+  "nome": "Creme 4x1 Poder das Vitaminas Morango - Nutrição Profunda e Brilho Radiante",
+  "categoria": "creme-de-pentear",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-creme-poder-das-vitaminas-morango-1kg",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-gelatina-meu-cacho-meu-crush-hidratacao-intensa",
+  "marca": "Inoar",
+  "nome": "Gelatina Meu Cacho Meu Crush - Hidratação Intensa",
+  "categoria": "finalizador",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-meu-cacho-meu-crush-gelatina-500g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-mascara-kalice-maciez-e-brilho-intenso",
+  "marca": "Inoar",
+  "nome": "Máscara Kálice - Maciez e Brilho Intenso",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-kalice-mascara-250ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-mascara-meu-cacho-meu-crush-hidratacao-brilho-e-definicao",
+  "marca": "Inoar",
+  "nome": "Máscara Meu Cacho, Meu Crush - Hidratação, Brilho e Definição",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-meu-cacho-meu-crush-mascara-500ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-oleo-argan-oil-system-hidratacao-profunda-brilho-imediato-e-protecao-termica",
+  "marca": "Inoar",
+  "nome": "Óleo Argan Oil System - Hidratação Profunda, Brilho Imediato e Proteção Térmica",
+  "categoria": "oleo",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-argan-oleo-60ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-oleo-reparador-elixir-absoluto-nutricao-intensa-e-brilho-radiante",
+  "marca": "Inoar",
+  "nome": "Óleo Reparador Elixir Absoluto - Nutrição Intensa e Brilho Radiante",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-absoluto-oleo-elixir-110ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "inoar-shampoo-meu-cacho-meu-crush-hidratacao-e-definicao",
+  "marca": "Inoar",
+  "nome": "Shampoo Meu Cacho, Meu Crush - Hidratação e Definição",
+  "categoria": "shampoo",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.inoar.com.br/shampoos/inoar-meu-cacho-meu-crush-shampoo-500ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-glycolic-gloss-serum-elixir-prolongador-de-gloss",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Glycolic Gloss Sérum Elixir Prolongador de Gloss",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/glycolic-gloss/serum-elixir-prolongador-de-gloss",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-glycolic-gloss-shampoo-extra-gloss-acido-glicolico",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Glycolic Gloss Shampoo Extra Gloss Ácido Glicólico",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/glycolic-gloss/shampoo-extra-gloss",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-hidra-hialuronico-creme-de-tratamento-hidratacao",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Hidra Hialurônico Creme de Tratamento Hidratação",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/hidra-hialuronico/creme-de-tratamento-300g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-hidra-hialuronico-creme-preenchedor",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Hidra Hialurônico Creme Preenchedor",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/hidra-hialuronico/creme-preenchedor-250ml",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-liso-dos-sonhos-tratamento-intensivo-alinhador",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Liso dos Sonhos Tratamento Intensivo Alinhador",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "liso"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/liso-dos-sonhos/tratamento-intensivo-alinhador-liso-dos-sonhos-300g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-oleo-extraordinario-nutricao-intensa-creme-de-tratamento",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Óleo Extraordinário Nutrição Intensa Creme de Tratamento",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/oleo-extraordinario-nutricao-intensa/creme-de-tratamento-300gr",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-oleo-extraordinario-nutricao-para-os-cabelos",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Óleo Extraordinário Nutrição para os Cabelos",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/oleo-extraordinario/oleo-extraordinario",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "l-oreal-paris-elseve-reparacao-total-5-creme-de-tratamento-cicatrizacao",
+  "marca": "L'Oréal Paris Elseve",
+  "nome": "Reparação Total 5 Creme de Tratamento Cicatrização",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.loreal-paris.com.br/elseve/reparacao-total-5/creme-de-tratamento-300g",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-condicionador-morte-subita",
+  "marca": "Lola Cosmetics",
+  "nome": "Condicionador Morte Súbita",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/morte-subita-lola-cosmetics-condicionador-hidratante/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-creme-de-pentear-meu-cacho-minha-vida",
+  "marca": "Lola Cosmetics",
+  "nome": "Creme de Pentear Meu Cacho Minha Vida",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/meu-cacho-minha-vida-lola-cosmetics-creme-de-pentear/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-mascara-capilar-be-m-dita-ghee-papaya-e-queratina-vegetal",
+  "marca": "Lola Cosmetics",
+  "nome": "Máscara Capilar Be(m)dita Ghee Papaya e Queratina Vegetal",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/lola-cosmetics-bemdita-ghee-papaya-e-queratina-vegetal-mascara-de-reconstrucao/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-mascara-de-hidratacao-dream-cream",
+  "marca": "Lola Cosmetics",
+  "nome": "Máscara de Hidratação Dream Cream",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/lola-cosmetics-dream-cream-masscara-de-tratamento-1/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-mascara-de-nutricao-be-m-dita-ghee-abacaxi-e-manteiga-de-bacuri",
+  "marca": "Lola Cosmetics",
+  "nome": "Máscara de Nutrição Be(m)dita Ghee Abacaxi e Manteiga de Bacuri",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/lola-cosmetics-bemdita-ghee-abacaxi-manteiga-de-bacuri-mascara-de-nutricao/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-oleo-capilar-argan-oil",
+  "marca": "Lola Cosmetics",
+  "nome": "Óleo Capilar Argan Oil",
+  "categoria": "oleo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/lola-cosmetics-argan-oil-oleo-capilar/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "lola-cosmetics-tonico-do-crescimento-rapunzel",
+  "marca": "Lola Cosmetics",
+  "nome": "Tônico do Crescimento Rapunzel",
+  "categoria": "tonico",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/rapunzel-tonico-do-crescimento-lola-cosmetics-tratamento-antiqueda/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "natura-lumina-mascara-regeneradora-para-cabelos-quimicamente-danificados",
+  "marca": "Natura Lumina",
+  "nome": "Máscara Regeneradora para Cabelos Quimicamente Danificados",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-regeneradora-para-cabelos-quimicamente-danificados-natura-lumina-mini-50ml-278505/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "natura-lumina-mascara-reparadora-para-cabelos-secos",
+  "marca": "Natura Lumina",
+  "nome": "Máscara Reparadora Para Cabelos Secos",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mini-mascara-reparadora-para-cabelos-secos-lumina-natura-50ml-ref-140034-279438/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-condicionador-meus-cachos-magicos",
+  "marca": "Novex",
+  "nome": "Condicionador Meus Cachos Mágicos",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://embelleze.com/products/condicionador-novex-meus-cachos",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-creme-para-pentear-meus-cachos-de-cinema",
+  "marca": "Novex",
+  "nome": "Creme para Pentear Meus Cachos de Cinema",
+  "categoria": "creme-de-pentear",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://embelleze.com/products/creme-para-pentear-novex-meus-cachos-de-cinema",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-leave-in-cicatrizacao-dos-fios-revitalizante",
+  "marca": "Novex",
+  "nome": "Leave-In Cicatrização dos Fios Revitalizante",
+  "categoria": "leave-in",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://embelleze.com/products/leave-in-novex-cicatrizacao-dos-fios-revitalizante",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-oleo-capilar-longo-poderoso-efeito-gloss",
+  "marca": "Novex",
+  "nome": "Óleo Capilar Longo Poderoso Efeito Gloss",
+  "categoria": "oleo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/oleo-capilar-novex-longo-poderoso-efeito-gloss-100ml-293133/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-shampoo-hidratante-regenerador-recarga-de-queratina-brasileira",
+  "marca": "Novex",
+  "nome": "Shampoo Hidratante Regenerador Recarga de Queratina Brasileira",
+  "categoria": "shampoo",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://embelleze.com/products/shampoo-novex-hidratante-regenerador-recarga-de-queratina-brasileira",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "novex-tratamento-reconstrutor-recarga-de-queratina-brasileira",
+  "marca": "Novex",
+  "nome": "Tratamento Reconstrutor Recarga de Queratina Brasileira",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/tratamento-reconstrutor-novex-recarga-de-queratina-brasileira-80g-139737/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "o-boticario-match-condicionador-agente-anti-oleosidade",
+  "marca": "O Boticário Match",
+  "nome": "Condicionador Agente Anti Oleosidade",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/condicionador-agente-anti-oleosidade-match-250ml-qhs---o-boticario-172245/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-mascara-hidratante-colageno-hidrata-e-resgata",
+  "marca": "Pantene",
+  "nome": "Máscara Hidratante Colágeno Hidrata e Resgata",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/tratamentos/mascara-hidratante-colageno-hidrata-resgata",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-mascara-intensiva-reconstrucao-molecular",
+  "marca": "Pantene",
+  "nome": "Máscara Intensiva Reconstrução Molecular",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/tratamentos/mascara-intensiva-molecular",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-mascara-nutritiva-bambu-nutre-e-cresce",
+  "marca": "Pantene",
+  "nome": "Máscara Nutritiva Bambu Nutre e Cresce",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/tratamentos/mascara-bambu-reparacao-para-cabelo-danificado",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-serum-leave-in-forca-e-nutricao",
+  "marca": "Pantene",
+  "nome": "Sérum Leave-in Força e Nutrição",
+  "categoria": "leave-in",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/tratamentos/serum-pantene-forca-nutricao",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-shampoo-hidratacao",
+  "marca": "Pantene",
+  "nome": "Shampoo Hidratação",
+  "categoria": "shampoo",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/shampoo/hidratacao",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "pantene-tonico-capilar-antiqueda",
+  "marca": "Pantene",
+  "nome": "Tônico Capilar Antiqueda⁺",
+  "categoria": "tonico",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.pantene.com.br/pt-br/produtos/tratamentos/tonico-cabelo-biotinamina-antiqueda-nutricao",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-creme-para-pentear-definicao-intensa",
+  "marca": "Salon Line",
+  "nome": "Creme para Pentear Definição Intensa",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/creme-para-pentear-salon-line-definicao-intensa-1kg-183429/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-gelatina-capilar-definicao-natural",
+  "marca": "Salon Line",
+  "nome": "Gelatina Capilar Definição Natural",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/gelatina-capilar-definicao-natural-salon-line-500g-155779/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-mascara-capilar-meu-liso-amido-de-milho",
+  "marca": "Salon Line",
+  "nome": "Máscara Capilar Meu Liso Amido de Milho",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-capilar-salon-line-meu-liso-amido-de-milho-300g-172629/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-sos-azeite-de-oliva-condicionador",
+  "marca": "Salon Line",
+  "nome": "SOS Azeite de Oliva Condicionador",
+  "categoria": "condicionador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/salon-line-sos-azeite-de-oliva-condicionador/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-sos-cachos-oleo-de-manga-ativador-de-cachos",
+  "marca": "Salon Line",
+  "nome": "SOS Cachos Óleo de Manga Ativador de Cachos",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/salon-line-sos-cachos-oleo-de-manga-ativador-de-cachos-1kg-110269/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-sos-oleo-de-manga-mascara",
+  "marca": "Salon Line",
+  "nome": "SOS Óleo de Manga Máscara",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/salon-line-sos-oleo-de-manga-mascara/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "salon-line-sos-oleo-de-manga-shampoo",
+  "marca": "Salon Line",
+  "nome": "SOS Óleo de Manga Shampoo",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/salon-line-sos-oleo-de-manga-shampoo/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "seda-boom-definicao-intensa-creme-de-pentear",
+  "marca": "Seda",
+  "nome": "Boom Definição Intensa Creme de Pentear",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/seda-boom-definicao-intensa-creme-de-pentear-350ml-136949/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "seda-geleia-boom-volume-maximo",
+  "marca": "Seda",
+  "nome": "Geleia Boom Volume Máximo",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/geleia-seda-boom-volume-maximo-500g-167659/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "seda-mascara-de-tratamento-by-niina-secrets-colageno-vitamina-c",
+  "marca": "Seda",
+  "nome": "Máscara de Tratamento By Niina Secrets Colágeno + Vitamina C",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-seda-by-niina-secrets-colageno---vitamina-c-300g-167581/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "seda-mascara-de-tratamento-by-rayza-forca-crescimento",
+  "marca": "Seda",
+  "nome": "Máscara de Tratamento by Rayza Força & Crescimento",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-seda-by-rayza-forca---crescimento-300ml-278804/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "seda-shampoo-toque-de-seda",
+  "marca": "Seda",
+  "nome": "Shampoo Toque de Seda",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/shampoo-seda-toque-de-seda-300ml-167750/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-expert-creme-tratamento-mais-cachinhos",
+  "marca": "Skala",
+  "nome": "Expert Creme Tratamento Mais Cachinhos",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/skala-expert-creme-tratamento-mais-cachinhos-1000g-152573/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-mascara-de-tratamento-hidratacao",
+  "marca": "Skala",
+  "nome": "Máscara de Tratamento Hidratação",
+  "categoria": "mascara",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-skala-brasil-hidratacao-450g-294353/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-mascara-de-tratamento-nutricao",
+  "marca": "Skala",
+  "nome": "Máscara de Tratamento Nutrição",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-skala-brasil-nutricao-450g-294400/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-mascara-de-tratamento-reconstrucao",
+  "marca": "Skala",
+  "nome": "Máscara de Tratamento Reconstrução",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-skala-brasil-reconstrucao-450g-294403/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-oleo-capilar-estilo-radiante-5-em-1-abacate",
+  "marca": "Skala",
+  "nome": "Óleo Capilar Estilo Radiante 5 em 1 Abacate",
+  "categoria": "oleo",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/oleo-capilar-skala-estilo-radiante-5-em-1-abacate-90ml-209845/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "skala-tratamento-capilar-2-em-1-mais-crespos-expert",
+  "marca": "Skala",
+  "nome": "Tratamento Capilar 2 Em 1 Mais Crespos Expert",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/tratamento-capilar-2-em-1-mais-crespos-expert-skala-1kg-294014/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tresemme-creme-leave-in-hidratacao-profunda",
+  "marca": "TRESemmé",
+  "nome": "Creme Leave-In Hidratação Profunda",
+  "categoria": "leave-in",
+  "etapa": "hidratacao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/creme-leave-in-tresemme-hidratacao-profunda-200ml-155847/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tresemme-creme-tratamento-capilar-reconstrucao-forca",
+  "marca": "TRESemmé",
+  "nome": "Creme Tratamento Capilar Reconstrução Força",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/creme-tratamento-capilar-tresemme-reconstrucao-forca-400g-146590/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tresemme-leave-in-creme-cachos-definidos",
+  "marca": "TRESemmé",
+  "nome": "Leave-In Creme Cachos Definidos",
+  "categoria": "leave-in",
+  "etapa": null,
+  "curvaturas": [
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/leave-in-creme-tresemme-cachos-definidos-380ml-167633/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tresemme-mascara-de-tratamento-blindagem-antiumidade",
+  "marca": "TRESemmé",
+  "nome": "Máscara de Tratamento Blindagem Antiumidade",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/mascara-de-tratamento-tresemme-blindagem-antiumidade-400g-145525/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "tresemme-shampoo-brilho-lamelar",
+  "marca": "TRESemmé",
+  "nome": "Shampoo Brilho Lamelar",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/tresemme-shampoo-brilho-lamelar-650ml-163054/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-amino-protetor-termico",
+  "marca": "Truss",
+  "nome": "Amino - Protetor Térmico",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-amino---protetor-termico-225ml-118393/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-mascara-capilar-specific",
+  "marca": "Truss",
+  "nome": "Máscara Capilar Specific",
+  "categoria": "mascara",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-specific-mascara-capilar-180g-68079/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-nutri-infusion-mascara",
+  "marca": "Truss",
+  "nome": "Nutri Infusion - Máscara",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-nutri-infusion---mascara-180g-113509/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-nutritivo-nutri-infusion-oleo",
+  "marca": "Truss",
+  "nome": "Nutritivo Nutri Infusion Óleo",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-professional-nutritivo-nutri-infusion-oleo-30ml-138583/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-serum-noturno-night-spa",
+  "marca": "Truss",
+  "nome": "Sérum Noturno Night Spa",
+  "categoria": "outro",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-professional-night-spa-serum-250ml-80035/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-shampoo-miracle",
+  "marca": "Truss",
+  "nome": "Shampoo Miracle",
+  "categoria": "shampoo",
+  "etapa": null,
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/shampoo-truss-miracle-300ml-287470/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-uso-obrigatorio-mascara-capilar-resistencia",
+  "marca": "Truss",
+  "nome": "Uso Obrigatorio - Mascara Capilar Resistência",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-uso-obrigatorio---mascara-capilar-resistencia--180g-68183/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "truss-uso-obrigatorio-tratamento-liquido-reconstrutor",
+  "marca": "Truss",
+  "nome": "Uso Obrigatório - Tratamento Líquido Reconstrutor",
+  "categoria": "leave-in",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://www.epocacosmeticos.com.br/truss-uso-obrigatorio---tratamento-liquido-reconstrutor-260ml-118378/p",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-condicionador-nutritivo-phytomanga",
+  "marca": "Widi Care",
+  "nome": "Condicionador Nutritivo Phytomanga",
+  "categoria": "condicionador",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "liso",
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/condicionador-nutritivo-phytomanga-300ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-creme-de-pentear-encaracolando-a-juba",
+  "marca": "Widi Care",
+  "nome": "Creme de Pentear Encaracolando A Juba",
+  "categoria": "creme-de-pentear",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/creme-de-pentear-encaracolando-a-juba-500-ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-gelatina-juba-modeladora-super-volume",
+  "marca": "Widi Care",
+  "nome": "Gelatina Juba Modeladora Super Volume",
+  "categoria": "finalizador",
+  "etapa": null,
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/gelatina-widi-care-juba-modeladora-super-volume-300g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-mascara-nutricao-juba-butter-oil",
+  "marca": "Widi Care",
+  "nome": "Máscara Nutrição Juba Butter Oil",
+  "categoria": "mascara",
+  "etapa": "nutricao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/mascara-nutricao-juba-butter-oil-500g/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-mascara-reconstrucao-operacao-resgate",
+  "marca": "Widi Care",
+  "nome": "Máscara Reconstrução Operação Resgate",
+  "categoria": "mascara",
+  "etapa": "reconstrucao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/mascara-reconstrucao-operacao-resgate-300-ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-oleo-reparador-porosidade-e-nutricao-salva",
+  "marca": "Widi Care",
+  "nome": "Óleo Reparador Porosidade e Nutrição Salva",
+  "categoria": "oleo",
+  "etapa": "nutricao",
+  "curvaturas": [],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/salva-oleo-reparador-porosidade-e-nutricao-wd-70-ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ },
+ {
+  "id": "widi-care-shampoo-cremoso-ultra-hidratante-curvas-magicas",
+  "marca": "Widi Care",
+  "nome": "Shampoo Cremoso Ultra Hidratante Curvas Mágicas",
+  "categoria": "shampoo",
+  "etapa": "hidratacao",
+  "curvaturas": [
+   "ondulado",
+   "cacheado",
+   "crespo"
+  ],
+  "pao": 12,
+  "paoPadrao": true,
+  "fonte": "https://lojawidicare.com.br/produtos/shampoo-cremoso-ultra-hidratante-curvas-magicas-300ml/",
+  "fontePao": null,
+  "verificacao": "pagina"
+ }
+]

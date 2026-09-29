@@ -8,6 +8,8 @@ import {
   CHAVE_LAVAGENS, CHAVE_PERFIL_CABELO, CHAVE_PLANO_CABELO, criarPlano, perfilDasRespostas, type LavagemCapilar,
 } from "@/lib/beleza-cabelo";
 import { CHAVE_CUIDADOS, compromissoDoCuidado, novoCuidado, type Cuidado } from "@/lib/beleza-cuidados";
+import { itemDoCabelo, paoPadraoDe, produtoDaLista, type ProdutoDeCabelo, type ProdutoMeu } from "@/lib/beleza-produtos";
+import catalogoCabelo from "@/data/produtos-cabelo.json";
 import { CHAVE_COMPROMISSOS } from "@/lib/compromissos";
 import { BASES_LEMBRETES } from "@/lib/notificacoes";
 import { quandoDoAviso } from "@/components/beleza/lembrete-skincare";
@@ -105,6 +107,23 @@ const seeds = (hoje: string, tela: string): Record<string, unknown> => {
     ...bancada,
     { id: "c1", name: "Shampoo sem sulfato", brand: "", category: "Cabelo", opened: true, openedDate: "2026-08-20", paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
     { id: "c2", name: "Máscara de hidratação", brand: "", category: "Cabelo", opened: true, openedDate: "2026-08-20", paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+  ];
+  /* MEUS PRODUTOS completo (Onda 1): as duas datas. O protetor tem data IMPRESSA antes do
+     PAO (vale a impressa); o rímel aberto em julho vence pelo PAO de 3 meses; o perfume e a
+     base, fechados, pela data impressa; um da lista de cabelo; um esmalte sem data nenhuma. */
+  const produtoDigitado = (id: string, name: string, category: string, extra: Partial<ProdutoMeu> = {}): ProdutoMeu => ({
+    id, name, brand: "", category, opened: false, openedDate: "", paoMonths: paoPadraoDe(category, extra.tipo), expiry: "", notes: "", rating: 0,
+    repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false, paoPadrao: true, ...extra,
+  });
+  bancada = (bancada as ProdutoMeu[]).map((p) => (p.id === "b4" ? { ...p, expiry: "2026-11" } : p));
+  const lolaCabelo = (catalogoCabelo as unknown as ProdutoDeCabelo[]).find((p) => p.marca === "Lola Cosmetics" && p.categoria === "mascara");
+  bancada = [
+    ...bancada,
+    produtoDigitado("m1", "Máscara de cílios", "Maquiagem", { tipo: "rimel", opened: true, openedDate: "2026-07-10" }),
+    produtoDigitado("m2", "Base líquida", "Maquiagem", { tipo: "base", expiry: "2026-10" }),
+    produtoDigitado("m3", "Perfume floral", "Perfume", { expiry: "2027-03" }),
+    produtoDigitado("m4", "Esmalte rosé", "Unhas"),
+    ...(lolaCabelo ? [{ ...produtoDaLista(itemDoCabelo(lolaCabelo), "c3"), opened: true, openedDate: "2026-06-02" }] : []),
   ];
   const perfilCabelo = perfilDasRespostas({ curvaturas: ["ondulado", "cacheado"], quimica: "coloracao", frequencia: { porSemana: 3 }, porosidade: [2, 2, 2] }, diaMenos(hoje, 14));
   const planoCabelo = criarPlano(perfilCabelo, diaMenos(hoje, 14), "cab1");

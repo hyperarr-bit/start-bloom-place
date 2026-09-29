@@ -5,6 +5,7 @@ import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { algumLigado, planejarSkincare, type DadosDoSkincare } from "./beleza-lembrete";
 import { lembreteCabeloLigado, planejarCabelo, type DadosDoCabelo } from "./beleza-cabelo";
 import { algumAvisoDeCuidado, planejarCuidados, type Cuidado } from "./beleza-cuidados";
+import { planejarValidade, type LembreteValidade, type ProdutoMeu } from "./beleza-produtos";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -34,7 +35,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "cabelo" | "cuidados" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "beleza" | "cabelo" | "cuidados" | "validade" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -64,6 +65,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
   cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
   cuidados: 1720000, // 28/09 (Onda 1): "sobrancelha em 2 dias" — cuidado sem horário marcado (lib/beleza-cuidados)
+  validade: 1730000, // 28/09 (Onda 1): produto de MEUS PRODUTOS que vence em 7 dias (lib/beleza-produtos)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -824,6 +826,14 @@ export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
 export async function agendarCuidados(lista: Cuidado[]): Promise<number> {
   if (!algumAvisoDeCuidado(lista)) { await limparFaixa(BASES.cuidados); return 0; }
   return agendarSerie("cuidados", "/beleza?aba=cuidados", planejarCuidados(lista, BASES.cuidados));
+}
+
+/* ─── Validade dos produtos (28/09, Onda 1 da Beleza) ────────────────────────
+   Nasce DESLIGADO. Ligado: 7 dias antes da data que vence primeiro (impressa ou
+   depois de aberto), às 09:00. Toque abre MEUS PRODUTOS. */
+export async function agendarValidade(produtos: ProdutoMeu[], prefs: LembreteValidade): Promise<number> {
+  if (!prefs.ligado) { await limparFaixa(BASES.validade); return 0; }
+  return agendarSerie("validade", "/beleza?aba=produtos", planejarValidade(produtos, prefs, BASES.validade));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

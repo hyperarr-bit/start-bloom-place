@@ -11,6 +11,7 @@ import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
 import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
 import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos } from "@/lib/beleza-cuidados";
+import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade } from "@/lib/beleza-produtos";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -193,6 +194,26 @@ const Notificacoes = () => {
     await filaRef.current;
   };
 
+  /** Validade dos produtos (28/09, Onda 1): 7 dias antes, às 09:00 (chave própria, nasce desligado). */
+  const validade = lerLembreteValidade(get<unknown>(CHAVE_LEMBRETE_VALIDADE, undefined));
+  const alternarValidade = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "validade", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { ...validade, ligado: valor };
+    set(CHAVE_LEMBRETE_VALIDADE, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_VALIDADE ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
   const rodapeDe = (tipo: TipoDeLembrete, ligado: boolean, vazio: string) => {
     if (!ligado || !naLoja || !permitido) return undefined;
     const n = agendados[tipo] ?? 0;
@@ -358,6 +379,15 @@ const Notificacoes = () => {
           ligado={algumAvisoDeCuidado(cuidados)}
           onChange={(v) => void alternarCuidados(v)}
           rodape={rodapeDe("cuidados", algumAvisoDeCuidado(cuidados), "Marque a última vez de um cuidado na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<AlarmClock className="w-4 h-4" />}
+          titulo="Validade dos produtos"
+          descricao={`${validade.diasAntes} dias antes de um produto de MEUS PRODUTOS vencer (a data impressa ou a de depois de aberto, a que vier primeiro), às ${validade.hora}.`}
+          ligado={validade.ligado}
+          onChange={(v) => void alternarValidade(v)}
+          rodape={rodapeDe("validade", validade.ligado, "Cadastre a validade de um produto na Beleza pra ter o que lembrar")}
         />
 
         <LinhaAviso

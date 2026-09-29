@@ -1,10 +1,11 @@
 import {
-  agendarAniversarios, agendarCabelo, agendarCompromissos, agendarCuidados, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
+  agendarAniversarios, agendarCabelo, agendarCompromissos, agendarCuidados, agendarValidade, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
   agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { lembreteCabeloLigado, lerDadosDoCabelo, type DadosDoCabelo } from "@/lib/beleza-cabelo";
 import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos, type Cuidado } from "@/lib/beleza-cuidados";
+import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade, type LembreteValidade, type ProdutoMeu } from "@/lib/beleza-produtos";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -97,6 +98,8 @@ export interface DadosDosLembretes {
   cabelo?: DadosDoCabelo;
   /** cuidados com data (28/09, Onda 1): o aviso N dias antes, só dos que não têm horário marcado */
   cuidados?: Cuidado[];
+  /** validade dos produtos (28/09, Onda 1): MEUS PRODUTOS + o interruptor (nasce desligado) */
+  validade?: { produtos: ProdutoMeu[]; prefs: LembreteValidade };
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -230,6 +233,10 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     skincare: lerDadosDoSkincare(get, hoje),
     cabelo: lerDadosDoCabelo(get),
     cuidados: cuidadosValidos(get<unknown>(CHAVE_CUIDADOS, [])),
+    validade: {
+      produtos: (() => { const l = get<unknown>("beauty-products", []); return Array.isArray(l) ? (l as ProdutoMeu[]) : []; })(),
+      prefs: lerLembreteValidade(get<unknown>(CHAVE_LEMBRETE_VALIDADE, undefined)),
+    },
   };
 }
 
@@ -269,6 +276,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     !!dados.cabelo && lembreteCabeloLigado(dados.cabelo.prefs) && dados.cabelo,
     // (28/09) cuidados: FEITO muda a próxima data; ligar/desligar o aviso muda o plano
     !!dados.cuidados && algumAvisoDeCuidado(dados.cuidados) && dados.cuidados,
+    // (28/09) validade: só as datas e o PAO de cada produto contam (e o interruptor)
+    !!dados.validade && dados.validade.prefs.ligado && [dados.validade.prefs, dados.validade.produtos.filter((p) => p && !p.finished).map((p) => [p.id, p.expiry, p.openedDate, p.paoMonths])],
   ]);
 }
 
@@ -304,5 +313,6 @@ export async function reagendarTudo(
     beleza: d.skincare ? await agendarSkincare(d.skincare) : 0,
     cabelo: d.cabelo ? await agendarCabelo(d.cabelo) : 0,
     cuidados: d.cuidados ? await agendarCuidados(d.cuidados) : 0,
+    validade: d.validade ? await agendarValidade(d.validade.produtos, d.validade.prefs) : 0,
   };
 }

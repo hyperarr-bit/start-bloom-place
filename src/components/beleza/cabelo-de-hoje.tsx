@@ -18,6 +18,7 @@ import { DIAS_DA_SEMANA } from "@/components/treino/planner";
 import { diaCurto } from "@/components/tarefas/tarefas-do-dia";
 import { HAIR_RESULT_TAGS } from "./utils";
 import { ETAPAS, EXTRAS, passosDaLavagem, somarDias, type Etapa, type LavagemCapilar } from "@/lib/beleza-cabelo";
+import { buscarNaLista, carregarCatalogoCabelo, itemDoCabelo, produtoDaLista, type ItemDaLista } from "@/lib/beleza-produtos";
 import {
   BOTAO_CONTORNO, BOTAO_PILULA, CartaoBeleza, Chip, LetraDaEtapa, Marcar, ROTULO_BZ, Serif, TEMA_BELEZA, TOM_DA_ETAPA,
 } from "./kit";
@@ -44,9 +45,17 @@ function ChipAlterna({ ativo, onClick, children, testId }: { ativo: boolean; onC
   );
 }
 
-/** O produto usado num passo: MEUS PRODUTOS › Cabelo em chips, ou digitado. */
-function EscolherProdutoDoPasso({ valor, produtos, onEscolher, onFechar }: { valor: string; produtos: ProdutoDaBancada[]; onEscolher: (v: string) => void; onFechar: () => void }) {
+/** O produto usado num passo: MEUS PRODUTOS › Cabelo em chips, a lista de cabelo (busca) ou digitado. */
+function EscolherProdutoDoPasso({ valor, produtos, onEscolher, onDaLista, onFechar }: { valor: string; produtos: ProdutoDaBancada[]; onEscolher: (v: string) => void; onDaLista: (i: ItemDaLista) => void; onFechar: () => void }) {
   const [texto, setTexto] = useState(produtos.some((p) => p.id === valor) ? "" : valor);
+  const [lista, setLista] = useState<ItemDaLista[] | null>(null);
+  useEffect(() => {
+    if (lista || texto.trim().length < 2) return;
+    let vivo = true;
+    void carregarCatalogoCabelo().then((l) => { if (vivo) setLista(l.map(itemDoCabelo)); });
+    return () => { vivo = false; };
+  }, [texto, lista]);
+  const achados = lista ? buscarNaLista(lista, texto, 5) : [];
   return (
     <div className="px-3 pb-3 pt-1 space-y-2" data-testid="produto-do-passo-cabelo">
       {produtos.length > 0 && (
@@ -62,22 +71,42 @@ function EscolherProdutoDoPasso({ valor, produtos, onEscolher, onFechar }: { val
         <Input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder={produtos.length ? "ou digite o produto" : "Qual produto? (ex.: Máscara Lola)"}
+          placeholder={produtos.length ? "busque na lista ou digite" : "Qual produto? (busque ou digite)"}
           aria-label="Produto usado"
           className="h-10 rounded-full px-4 text-[13px] bg-bz-cartao border-bz-linha-forte"
           onKeyDown={(e) => { if (e.key === "Enter") { onEscolher(texto); onFechar(); } }}
         />
         <button type="button" onClick={() => { onEscolher(texto); onFechar(); }} className={BOTAO_PILULA}>OK</button>
       </div>
-      {!produtos.length && <p className="text-[11.5px] text-bz-suave">Os produtos de cabelo que você cadastrar em MEUS PRODUTOS aparecem aqui.</p>}
+      {achados.length > 0 && (
+        <div className="rounded-2xl border border-bz-linha overflow-hidden divide-y divide-bz-linha" data-testid="achados-cabelo">
+          {achados.map((i) => (
+            <button key={i.id} type="button" onClick={() => { onDaLista(i); onFechar(); }} className="w-full text-left px-3 py-2 min-h-[44px] flex items-center gap-2 bg-bz-cartao active:bg-bz-blush/60">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-extrabold tracking-[.12em] uppercase text-bz-suave truncate">{i.marca}</span>
+                <span className="block text-[12.5px] font-semibold text-bz-tinta line-clamp-2">{i.nome}</span>
+              </span>
+              <Chip tom="blush" className="shrink-0">{i.rotulo}</Chip>
+            </button>
+          ))}
+        </div>
+      )}
+      {!produtos.length && <p className="text-[11.5px] text-bz-suave">O que você escolher da lista entra em MEUS PRODUTOS › Cabelo.</p>}
     </div>
   );
 }
 
 /** A lavagem de um dia: faixa da etapa, passos, extras, resultado, nota e o FEITO. */
 function FolhaDaLavagem({ c, dia, lavagem, etapa }: { c: Cabelo; dia: string; lavagem: LavagemCapilar | null; etapa: Etapa }) {
-  const [produtosBrutos] = useChaveDaBeleza<ProdutoDaBancada[]>("beauty-products", []);
+  const [produtosBrutos, setProdutos] = useChaveDaBeleza<ProdutoDaBancada[]>("beauty-products", []);
   const cabelo = (Array.isArray(produtosBrutos) ? produtosBrutos : []).filter((p) => p && !p.finished && p.category === "Cabelo");
+  /** Da lista de cabelo: entra em MEUS PRODUTOS (se ainda não está) e vira o produto do passo. */
+  const daLista = (passo: string, i: ItemDaLista) => {
+    const ja = cabelo.find((p) => (p as ProdutoDaBancada & { catalogoId?: string }).catalogoId === i.id);
+    const id = ja?.id ?? (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`);
+    if (!ja) setProdutos((prev) => [...(Array.isArray(prev) ? prev : []), produtoDaLista(i, id)]);
+    c.mudarProduto(dia, passo, id);
+  };
   const [abrindo, setAbrindo] = useState<string | null>(null);
   const feita = !!lavagem?.feita;
   const etapaAtual = (lavagem?.etapa as Etapa | null) ?? etapa;
@@ -147,7 +176,7 @@ function FolhaDaLavagem({ c, dia, lavagem, etapa }: { c: Cabelo; dia: string; la
               </div>
             </div>
             {abrindo === p.id && (
-              <EscolherProdutoDoPasso valor={produto ?? ""} produtos={cabelo} onEscolher={(v) => c.mudarProduto(dia, p.id, v)} onFechar={() => setAbrindo(null)} />
+              <EscolherProdutoDoPasso valor={produto ?? ""} produtos={cabelo} onEscolher={(v) => c.mudarProduto(dia, p.id, v)} onDaLista={(i) => daLista(p.id, i)} onFechar={() => setAbrindo(null)} />
             )}
           </div>
         );

@@ -12,9 +12,11 @@ import { compartilharAlbum, compartilharConquista, compartilharRoseta, compartil
 import { suporteVideo } from "./video/suporte";
 // 29/09 — os cards novos de compartilhar (atrás da chave COMPARTILHAR_V2, desligada): com ela ligada,
 // a "Minha conquista do mês" vira o card do assunto (o calendário dos treinos, a água do mês no azul…)
-import { useCardDaConquista } from "@/components/compartilhar/BotaoPostarCard";
-import { CardDeCompartilhar } from "@/components/compartilhar/cards";
-import { PreviaDoCard } from "@/components/compartilhar/PreviaDoCard";
+// (os cards e a prévia só baixam quando existe um card — com a chave desligada, nunca)
+import { useCardDaConquista } from "@/components/compartilhar/use-cards-do-app";
+import { legendaDoCard } from "@/components/compartilhar/legenda";
+const CardDeCompartilhar = lazy(() => import("@/components/compartilhar/cards").then((m) => ({ default: m.CardDeCompartilhar })));
+const PreviaDoCard = lazy(() => import("@/components/compartilhar/PreviaDoCard").then((m) => ({ default: m.PreviaDoCard })));
 
 export type { DadosArtes } from "./artes-dados";
 
@@ -349,8 +351,9 @@ export const SeletorDeArte = ({ aberto, onFechar, dados, direto, onDiretoConsumi
   }, [direto, onDiretoConsumido]);
 
   const dadosEfetivos: DadosArtes = heroiEscolhido ? { ...dados, heroi: heroiEscolhido } : dados;
-  const artes = artesDisponiveis(dadosEfetivos);
   const cardV2 = useCardDaConquista(dadosEfetivos.heroi, dadosEfetivos.mesIdx, dadosEfetivos.ano);
+  // com o card novo, a legenda da miniatura diz o número e o período (e não mais "Setembro foi de academia.")
+  const artes = artesDisponiveis(dadosEfetivos).map((a) => (a.id === "conquista" && cardV2 ? { ...a, frase: legendaDoCard(cardV2) } : a));
   const escolher = (id: ArteId) => {
     trackEvent("arte_escolhida", { arte: id, origem: "seletor" });
     setEscolhida(id);
@@ -373,13 +376,14 @@ export const SeletorDeArte = ({ aberto, onFechar, dados, direto, onDiretoConsumi
             <SheetDescription className="text-[12px] text-muted-foreground mt-0.5">Vídeo com a sua conquista do mês — os números de verdade. Dinheiro sai em %; R$ só com "mostrar valores" ligado.</SheetDescription>
             <div className="grid grid-cols-2 mt-3.5" style={{ gap: "12px 10px" }}>
               {artes.map((a, i) => (
-                <Miniatura key={a.id} arte={a} videoSuportado={!!suporte} indice={i} dados={dadosEfetivos} largura={wMini} onEscolher={escolher} substituto={a.id === "conquista" && cardV2 ? <CardDeCompartilhar dados={cardV2} formato="stories" /> : undefined} />
+                <Miniatura key={a.id} arte={a} videoSuportado={!!suporte} indice={i} dados={dadosEfetivos} largura={wMini} onEscolher={escolher} substituto={a.id === "conquista" && cardV2 ? <Suspense fallback={null}><CardDeCompartilhar dados={cardV2} formato="stories" /></Suspense> : undefined} />
               ))}
             </div>
           </div>
         </SheetContent>
       </Sheet>
       {arte && aberto && arte.id === "conquista" && cardV2 && (
+        <Suspense fallback={null}>
         <PreviaDoCard
           dados={cardV2}
           origem="conquista"
@@ -403,6 +407,7 @@ export const SeletorDeArte = ({ aberto, onFechar, dados, direto, onDiretoConsumi
             )}
           </AnimatePresence>
         </PreviaDoCard>
+        </Suspense>
       )}
       {arte && elemento && aberto && !(arte.id === "conquista" && cardV2) && (
         <Previa

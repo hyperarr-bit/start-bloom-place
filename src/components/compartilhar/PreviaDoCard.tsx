@@ -1,6 +1,8 @@
 import { lazy, memo, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Clapperboard, Image as ImagemIcone, Loader2, Sticker, X } from "lucide-react";
+import { Clapperboard, Image as ImagemIcone, Link2, Loader2, Sticker, X } from "lucide-react";
+import { toast } from "sonner";
+import { EMPRESA } from "@/lib/empresa";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/lib/analytics";
 import { suporteVideo } from "@/components/conquistas/video/suporte";
@@ -28,6 +30,8 @@ interface Props {
   titulo: string;
   onFechar: () => void;
   formatos?: Formato[];
+  /** O formato que abre (padrão: o 1º da lista). */
+  formatoInicial?: Formato;
   /** A moeda de verdade (MoedaEstatica) no card da insígnia. */
   moeda?: ReactNode;
   /** Botões extras no rodapé (o "Trocar conquista"). */
@@ -48,13 +52,21 @@ const CardEscalado = memo(({ elemento, largura, w, h }: { elemento: ReactElement
 });
 CardEscalado.displayName = "CardEscalado";
 
+/**
+ * O link pra figurinha de LINK do Instagram (o card não leva link nem QR):
+ * com utm próprio, pra dar pra medir quem chega pelo Story de alguém — hoje
+ * isso cai junto com o link da bio e não dá pra separar.
+ */
+export const linkDoCard = (tipo: string) =>
+  `${EMPRESA.site}/inicio?utm_source=ig&utm_medium=story_card&utm_campaign=compartilhar&utm_content=${encodeURIComponent(tipo)}`;
+
 /** O card tem R$ pra mostrar (e a pessoa ainda não escolheu)? */
 const temValorEmReais = (d: DadosCard) =>
   (d.tipo === "azul" && d.meses.some((m) => (m.saldo ?? 0) > 0)) || (d.tipo === "poupanca" && (d.valor ?? 0) > 0);
 
-export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["stories", "feed", "adesivo"], moeda, acoes, children }: Props) => {
+export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["stories", "feed", "adesivo"], formatoInicial, moeda, acoes, children }: Props) => {
   const reduzir = useReducedMotion();
-  const [formato, setFormato] = useState<Formato>(formatos[0]);
+  const [formato, setFormato] = useState<Formato>(formatoInicial && formatos.includes(formatoInicial) ? formatoInicial : formatos[0]);
   const [valores, setValores] = useState(false);
   const [enviando, setEnviando] = useState<"video" | "imagem" | null>(null);
   const [progresso, setProgresso] = useState(0);
@@ -188,6 +200,20 @@ export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["sto
             <button type="button" onClick={postarImagem} disabled={!!enviando} className={`h-11 rounded-xl text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${video ? "border border-border bg-card" : "bg-foreground text-background"}`} data-testid="postar-card-imagem">
               {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagemIcone className="w-4 h-4" aria-hidden />} Postar imagem
             </button>
+            {formato === "stories" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(linkDoCard(dados.tipo)); toast.success("Link copiado! No Story, use a figurinha de Link e cole."); }
+                  catch { toast.error("Não consegui copiar agora."); }
+                  trackEvent("card_link_copiado", { tipo: dados.tipo, origem });
+                }}
+                className="h-9 rounded-xl text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 text-muted-foreground hover:text-foreground"
+                data-testid="copiar-link-card"
+              >
+                <Link2 className="w-4 h-4" aria-hidden /> Copiar o link pra figurinha de Link
+              </button>
+            )}
           </>
         )}
         <button type="button" onClick={onFechar} className="h-10 rounded-xl text-[13px] font-bold text-muted-foreground hover:text-foreground" data-testid="previa-card-voltar">Voltar</button>

@@ -5,7 +5,7 @@ import { AnelRaridadeSvg } from "@/components/conquistas/adesivos-raridade";
 import { AssinaturaCore, IconeCore, INTER, SERIF } from "./marca";
 import { CalendarioDoMes, FaixaDeSemanas, Numero, Rotulo, type CoresDoCalendario } from "./pecas";
 import { caminhoDaOnda } from "./onda";
-import { diasMarcadosNoMes, maiorCorrida } from "./calendario";
+import { LETRAS_DA_SEMANA, diasMarcadosNoMes, maiorCorrida } from "./calendario";
 import { TEMAS, fundoDo, temaDaCor, type TemaDoCard } from "./temas";
 import { FORMATOS, type DadosNumero, type DadosAgua, type DadosAzul, type DadosCard, type DadosFigurinha, type DadosHabitos, type DadosInsignia, type DadosLivros, type DadosMetas, type DadosPoupanca, type DadosSequencia, type DadosSono, type DadosTreinos, type Formato, type Livro, type NivelMoeda } from "./tipos";
 import { capitalizar, desdeMes, diaDoMes, diasNoMes, lerMesId, mesAno, mesCurto, nomeDoMes, numeroBR, palavra, plural, porcento, reais, UNIDADES } from "./textos";
@@ -449,14 +449,14 @@ export const CardSequencia = ({ d, formato }: { d: DadosSequencia; formato: "sto
   const tema = TEMAS.sequencia;
   const stories = formato === "stories";
   const passo = stories ? 130 : 96;
-  const lado = passo * 0.78;
+  const lado = passo * (stories ? 0.78 : 0.72);
   const ult = d.ultimos.slice(-28);
   return (
     <Moldura tipo="sequencia" formato={formato} periodo={d.marco ? `MARCO DE ${d.marco} DIAS` : "AGORA"}>
       <Heroi numero={numeroBR(d.dias)} rotulo={<>{palavra(d.dias, UNIDADES.diaSeguido)}</>} sub="anotando no CORE, sem falhar" base={stories ? 420 : 320} tema={tema} />
-      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: 0, top: stories ? 560 : 380, display: "grid", gridTemplateColumns: `repeat(7, ${passo}px)`, rowGap: stories ? 8 : 4 }}>
+      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 120, top: stories ? 560 : 440, display: "grid", gridTemplateColumns: `repeat(7, ${passo}px)`, rowGap: stories ? 8 : 2 }}>
         {ult.map((feito, i) => (
-          <div key={i} style={{ width: passo, height: passo * (stories ? 0.86 : 0.8), display: "grid", placeItems: "center" }}>
+          <div key={i} style={{ width: passo, height: passo * (stories ? 0.86 : 0.76), display: "grid", placeItems: "center" }}>
             <DiscoDeChama feito={feito} lado={lado} tema={tema} indice={i} />
           </div>
         ))}
@@ -511,7 +511,10 @@ export const CardAgua = ({ d, formato }: { d: DadosAgua; formato: "stories" | "f
   return (
     <Moldura tipo="agua" formato={formato} periodo={mesAno(d.mesIdx, d.ano)}>
       <Heroi numero={String(naMeta)} rotulo={<>{palavra(naMeta, UNIDADES.dia)} na meta de água</>} sub={`em ${nomeDoMes(d.mesIdx)}`} base={stories ? 370 : 270} tema={tema} />
-      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 106, top: stories ? 530 : 380, display: "grid", gridTemplateColumns: `repeat(7, ${passo}px)` }}>
+      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 106, top: stories ? 500 : 360, display: "grid", gridTemplateColumns: `repeat(7, ${passo}px)` }}>
+        {LETRAS_DA_SEMANA.map((l, i) => (
+          <div key={`l${i}`} style={{ width: passo, textAlign: "center", fontSize: passo * 0.26, fontWeight: 800, letterSpacing: ".08em", color: tema.suave, paddingBottom: passo * 0.08, visibility: c === "aceso" ? "hidden" : undefined }}>{l}</div>
+        ))}
         {Array.from({ length: inicio }, (_, i) => <div key={`v${i}`} />)}
         {Array.from({ length: total }, (_, i) => {
           const dia = diaDoMes(d.ano, d.mesIdx, i + 1);
@@ -669,7 +672,7 @@ export const VagaDaMoeda = ({ nivel, cor, lado }: { nivel: NivelMoeda; cor: stri
 export const CardInsignia = ({ d, formato, moeda }: { d: DadosInsignia; formato: "stories" | "feed"; moeda?: ReactNode }) => {
   const tema = { ...TEMAS.insignia, modulo: d.moduloNome };
   const stories = formato === "stories";
-  const lado = stories ? 700 : 520;
+  const lado = stories ? 700 : 460;
   const [c1, c2, c3] = NIVEIS[d.nivel].metal;
   const topoMoeda = stories ? 20 : 0;
   return (
@@ -696,7 +699,7 @@ export const CardInsignia = ({ d, formato, moeda }: { d: DadosInsignia; formato:
           </div>
         )}
       </Na>
-      <Na de="textos" bloco="nivel" style={{ position: "absolute", left: 0, right: 0, top: topoMoeda + lado + (stories ? 190 : 130), textAlign: "center" }}>
+      <Na de="textos" bloco="nivel" style={{ position: "absolute", left: 0, right: 0, top: topoMoeda + lado + (stories ? 190 : 150), textAlign: "center" }}>
         <div style={{ display: "inline-block", fontSize: stories ? 210 : 150, fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 0.9, backgroundImage: `linear-gradient(180deg, ${c1} 10%, ${c2} 55%, ${c3} 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: c2 }}>
           {NIVEIS[d.nivel].nome.toUpperCase()}
         </div>

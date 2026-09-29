@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import { Dumbbell, PiggyBank } from "lucide-react";
 import { AssinaturaCore, INTER, SERIF } from "@/components/compartilhar/marca";
+import { CardDeCompartilhar } from "@/components/compartilhar/cards";
 import { Agua, CalendarioDoMes, Estatistica, Numero, Rotulo } from "@/components/compartilhar/pecas";
 import { diasMarcadosNoMes, maiorCorrida } from "@/components/compartilhar/calendario";
 import { capitalizar, lerMesId, mesAno, nomeDoMes, palavra, plural, porcento, UNIDADES } from "@/components/compartilhar/textos";
@@ -30,37 +30,8 @@ const dadosDoTreino = (d: DadosTreinos) => {
   return { feitos, set: new Set(feitos), n: feitos.length, corrida: d.melhorSequencia ?? maiorCorrida(feitos) };
 };
 
-export const TreinoPoster = ({ d }: { d: DadosTreinos }) => {
-  const t = dadosDoTreino(d);
-  return (
-    <div style={{ ...base, background: "linear-gradient(165deg,#3b82f6 0%,#2563eb 38%,#1d4ed8 100%)" }} data-direcao="poster">
-      <div style={{ ...pontos("rgba(255,255,255,.10)", 44) }} />
-      <div style={{ position: "absolute", left: 84, right: 84, top: 262, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, height: 60, padding: "0 26px 0 20px", borderRadius: 999, background: "rgba(255,255,255,.16)", color: "#fff" }}>
-          <Dumbbell size={30} strokeWidth={2.6} />
-          <Rotulo cor="#fff" tam={24}>Treino</Rotulo>
-        </div>
-        <Rotulo cor="rgba(255,255,255,.82)" tam={24}>{mesAno(d.mesIdx, d.ano)}</Rotulo>
-      </div>
-      <Numero tam={470} cor="#fff" style={{ position: "absolute", left: 70, top: 390 }}>{t.n}</Numero>
-      <div style={{ position: "absolute", left: 84, top: 790, color: "#fff", fontSize: 76, fontWeight: 900, letterSpacing: "-0.035em", lineHeight: 1 }}>
-        {palavra(t.n, UNIDADES.treino)} em {nomeDoMes(d.mesIdx)}
-      </div>
-      <div style={{ position: "absolute", left: 84, top: 930 }}>
-        <CalendarioDoMes
-          ano={d.ano} mesIdx={d.mesIdx} feitos={t.set} hoje={d.hoje} largura={912}
-          cores={{ letras: "rgba(255,255,255,.7)", feito: "#ffffff", feitoTexto: "#1d4ed8", vazio: "rgba(255,255,255,.14)", vazioTexto: "rgba(255,255,255,.75)", futuro: "rgba(255,255,255,.05)", futuroTexto: "rgba(255,255,255,.35)" }}
-        />
-      </div>
-      <div style={{ position: "absolute", left: 84, right: 84, top: 1500, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 }}>
-        <Estatistica valor={t.corrida} legenda={`${palavra(t.corrida, UNIDADES.diaSeguido)} no melhor trecho`} cor="#fff" corLegenda="rgba(255,255,255,.8)" tam={62} />
-        <Estatistica valor={d.semanasNaMeta ?? 0} legenda={`${palavra(d.semanasNaMeta ?? 0, UNIDADES.semana)} na meta`} cor="#fff" corLegenda="rgba(255,255,255,.8)" tam={62} />
-        <Estatistica valor={d.recordes ?? 0} legenda={`${palavra(d.recordes ?? 0, UNIDADES.recorde)} batidos`} cor="#fff" corLegenda="rgba(255,255,255,.8)" tam={62} />
-      </div>
-      <div style={{ position: "absolute", left: 84, top: 1700 }}><AssinaturaCore tom="#ffffff" tamanho={58} /></div>
-    </div>
-  );
-};
+/** A · Pôster — é o card de produção (a direção escolhida). */
+export const TreinoPoster = ({ d }: { d: DadosTreinos }) => <CardDeCompartilhar dados={d} formato="stories" />;
 
 export const TreinoPlanner = ({ d }: { d: DadosTreinos }) => {
   const t = dadosDoTreino(d);
@@ -79,13 +50,13 @@ export const TreinoPlanner = ({ d }: { d: DadosTreinos }) => {
         </div>
       </div>
       {/* a página do planner com a grade */}
-      <div style={{ position: "absolute", left: 90, top: 880, width: 900, padding: "30px 24px 18px", background: "#fffdf8", borderRadius: 28, boxShadow: "0 30px 60px -34px rgba(60,40,20,.45), inset 0 0 0 2px rgba(43,43,47,.06)" }}>
+      <div style={{ position: "absolute", left: 90, top: 860, width: 900, padding: "26px 24px 14px", background: "#fffdf8", borderRadius: 28, boxShadow: "0 30px 60px -34px rgba(60,40,20,.45), inset 0 0 0 2px rgba(43,43,47,.06)" }}>
         <CalendarioDoMes
-          ano={d.ano} mesIdx={d.mesIdx} feitos={t.set} hoje={d.hoje} largura={852} estilo="carimbo"
+          ano={d.ano} mesIdx={d.mesIdx} feitos={t.set} hoje={d.hoje} largura={852} alturaLinha={96} estilo="carimbo"
           cores={{ letras: "#8c8272", feito: azul, feitoTexto: "#fff", vazio: "transparent", vazioTexto: "#8c8272", futuro: "transparent", futuroTexto: "#c9c0b0", grade: "rgba(43,43,47,.08)" }}
         />
       </div>
-      <div style={{ position: "absolute", left: 110, right: 110, top: 1520, display: "flex", flexDirection: "column", gap: 12, fontSize: 32, fontWeight: 700, color: "#2b2b2f" }}>
+      <div style={{ position: "absolute", left: 110, right: 110, top: 1500, display: "flex", flexDirection: "column", gap: 12, fontSize: 32, fontWeight: 700, color: "#2b2b2f" }}>
         {[`${plural(d.semanasNaMeta ?? 0, UNIDADES.semana)} seguidas na meta`, `${plural(d.recordes ?? 0, UNIDADES.recorde)} batidos`].map((s) => (
           <div key={s} style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <span style={{ width: 34, height: 34, borderRadius: 8, border: `3px solid ${azul}`, display: "grid", placeItems: "center", color: azul, fontSize: 26, fontWeight: 900 }}>✓</span>{s}
@@ -107,9 +78,9 @@ export const TreinoNoite = ({ d }: { d: DadosTreinos }) => {
         <Numero tam={440} cor="#fff" style={{ display: "inline-block", backgroundImage: "linear-gradient(180deg,#ffffff 30%,#93c5fd 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>{t.n}</Numero>
         <div style={{ color: "#fff", fontSize: 64, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 20 }}>{palavra(t.n, UNIDADES.treino)} em {nomeDoMes(d.mesIdx)}</div>
       </div>
-      <div style={{ position: "absolute", left: 124, top: 920 }}>
+      <div style={{ position: "absolute", left: 124, top: 860 }}>
         <CalendarioDoMes
-          ano={d.ano} mesIdx={d.mesIdx} feitos={t.set} hoje={d.hoje} largura={832} estilo="brilho"
+          ano={d.ano} mesIdx={d.mesIdx} feitos={t.set} hoje={d.hoje} largura={832} alturaLinha={92} estilo="brilho"
           cores={{ letras: "rgba(255,255,255,.45)", feito: "#3b82f6", feitoTexto: "#fff", vazio: "rgba(255,255,255,.06)", vazioTexto: "rgba(255,255,255,.45)", futuro: "rgba(255,255,255,.02)", futuroTexto: "rgba(255,255,255,.2)" }}
         />
       </div>
@@ -131,34 +102,8 @@ const dadosDoAzul = (d: DadosAzul) => {
   return { n: d.meses.length, mesIdx, ano, pct: ultimo?.pct ?? null };
 };
 
-export const AzulPoster = ({ d }: { d: DadosAzul }) => {
-  const a = dadosDoAzul(d);
-  const superficie = 820;
-  return (
-    <div style={{ ...base, background: "#f5efe3" }} data-direcao="poster">
-      <div style={{ ...pontos("rgba(60,50,40,.12)", 44) }} />
-      <Agua largura={W} altura={H} superficie={superficie} cor1="#3b82f6" cor2="#1e40af" />
-      <div style={{ position: "absolute", left: 84, right: 84, top: 262, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, height: 60, padding: "0 26px 0 20px", borderRadius: 999, background: "rgba(30,64,175,.10)", color: "#1e3a8a" }}>
-          <PiggyBank size={32} strokeWidth={2.4} />
-          <Rotulo cor="#1e3a8a" tam={24}>Finanças</Rotulo>
-        </div>
-        <Rotulo cor="#6b6258" tam={24}>{mesAno(a.mesIdx, a.ano)}</Rotulo>
-      </div>
-      <div style={{ position: "absolute", left: 84, top: 420, color: "#1f1f24", fontSize: 150, fontWeight: 900, letterSpacing: "-0.055em", lineHeight: 0.92 }}>
-        {capitalizar(nomeDoMes(a.mesIdx))}
-        <br />
-        fechou
-      </div>
-      <div style={{ position: "absolute", left: 80, top: superficie + 70, color: "#fff", fontSize: 230, fontWeight: 900, letterSpacing: "-0.06em", lineHeight: 0.85 }}>no azul.</div>
-      <div style={{ position: "absolute", left: 84, right: 84, top: 1330, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 30 }}>
-        {a.pct != null && <Estatistica valor={porcento(a.pct)} legenda="do que entrou, sobrou" cor="#fff" corLegenda="rgba(255,255,255,.85)" tam={96} />}
-        <Estatistica valor={a.n} legenda={`${palavra(a.n, UNIDADES.mesNoAzul)} seguido${a.n === 1 ? "" : "s"}`} cor="#fff" corLegenda="rgba(255,255,255,.85)" tam={96} />
-      </div>
-      <div style={{ position: "absolute", left: 84, top: 1700 }}><AssinaturaCore tom="#ffffff" tamanho={58} /></div>
-    </div>
-  );
-};
+/** A · Pôster — é o card de produção (a direção escolhida). */
+export const AzulPoster = ({ d }: { d: DadosAzul }) => <CardDeCompartilhar dados={d} formato="stories" />;
 
 export const AzulPlanner = ({ d }: { d: DadosAzul }) => {
   const a = dadosDoAzul(d);

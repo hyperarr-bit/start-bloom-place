@@ -224,7 +224,8 @@ export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: nu
       if (u <= 0) return;
       acesas++;
       const e = unica ? 1.25 - 0.25 * saiVolta(u) : 0.55 + 0.45 * saiVolta(u);
-      pedaco(ctx, cam.aceso, c, { alfa: Math.min(1, u * 3), escala: e, folga: unica ? 60 : 10 });
+      // a folga do recorte não pode pegar a casa vizinha (nos quadradinhos pequenos do "desde março")
+      pedaco(ctx, cam.aceso, c, { alfa: Math.min(1, u * 3), escala: e, folga: unica ? 60 : Math.max(2, Math.min(10, Math.min(c.w, c.h) * 0.12)) });
       // o brilho de acender
       if (u < 1) {
         const r = Math.max(c.w, c.h) * (0.5 + 0.7 * u);
@@ -410,7 +411,8 @@ export function prepararRoteiroDoCard(dados: DadosCard, formato: Formato916, moe
   if (!p) {
     p = prepararCamadasDoCard(dados, formato, moeda, onPasso).then((cam) => (cam ? roteiroDoCard(dados, cam, formato) : null));
     cache.set(chave, p);
-    if (cache.size > 3) cache.delete(cache.keys().next().value!);
+    // cada roteiro guarda 4 camadas de 1080×1920 (~33 MB): no máximo 2 na memória
+    if (cache.size > 2) cache.delete(cache.keys().next().value!);
     p.then((r) => { if (!r) cache.delete(chave); }, () => cache.delete(chave));
   }
   return p;

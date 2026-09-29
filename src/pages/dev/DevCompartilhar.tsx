@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CardDeCompartilhar, type Camada } from "@/components/compartilhar/cards";
+import { PreviaDoCard } from "@/components/compartilhar/PreviaDoCard";
+import { CHAVE_FORCA } from "@/components/compartilhar/chave";
+import { TreinoConcluido } from "@/components/treino/TreinoConcluido";
+import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { FORMATOS, type DadosCard, type Formato } from "@/components/compartilhar/tipos";
 import { DIRECOES } from "./compartilhar-direcoes";
 import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "./compartilhar-exemplos";
@@ -18,6 +22,8 @@ import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVRO
  *                                              (servida em /__moeda/<nome>.png pelo script de captura)
  *   /dev/compartilhar?video=<chave>            gera o MP4 com o gerador DO APP (window.__video)
  *   /dev/compartilhar?quadros=<chave>&t=0,1,2  os quadros da animação nesses instantes
+ *   /dev/compartilhar?previa=<id>&formato=feed a prévia do app (a folha de postar), com dados de exemplo
+ *   /dev/compartilhar?treino=1                 o "Treino concluído" com o botão novo (liga a chave só aqui)
  */
 
 type Entrada = { chave: string; grupo: string; nome: string; w: number; h: number; el: (o: Opcoes) => ReactElement };
@@ -105,6 +111,31 @@ const Quadros = ({ chave, tempos, moeda }: { chave: string; tempos: number[]; mo
   return <div ref={ref} data-quadros={pronto ? "prontos" : "preparando"} style={{ display: "flex", flexWrap: "wrap", padding: 8, background: "#222" }} />;
 };
 
+/** O "Treino concluído" de verdade, com a chave ligada SÓ nesta página e os treinos de exemplo no contexto. */
+const TreinoConcluidoExemplo = () => {
+  const [pronto] = useState(() => { try { localStorage.setItem(CHAVE_FORCA, "on"); } catch { /* sem storage */ } return true; });
+  const semente: Record<string, unknown> = { "saude-workout-log": TREINOS_MES.dias };
+  const ctx = { get: (k: string, fb: unknown) => (k in semente ? semente[k] : fb), set: () => {}, loaded: true, fetchKey: async () => undefined, isGuest: false, apagarTudo: async () => {} } as unknown as UserDataContextType;
+  if (!pronto) return null;
+  return (
+    <UserDataContext.Provider value={ctx}>
+      <TreinoConcluido
+        aberto
+        onFechar={() => {}}
+        resumo={{
+          diaNome: "TERÇA", dataTexto: "29 DE SETEMBRO", titulo: "Treino B · Costas e bíceps", minutos: 52,
+          linhas: [
+            { nome: "Puxada frente", series: 4, melhor: { carga: 45, reps: 10 }, recorde: true },
+            { nome: "Remada baixa", series: 4, melhor: { carga: 40, reps: 12 }, recorde: false },
+            { nome: "Rosca direta", series: 3, melhor: { carga: 12, reps: 12 }, recorde: false },
+          ],
+          volume: 5420, vsUltima: 6, sequencia: 4, nota: "", recorde: true,
+        }}
+      />
+    </UserDataContext.Provider>
+  );
+};
+
 const comValores = (d: DadosCard, v: boolean): DadosCard => ("valoresLigados" in d ? { ...d, valoresLigados: v } as DadosCard : d);
 
 export const entradasDaGaleria = (): Entrada[] => {
@@ -153,6 +184,14 @@ const DevCompartilhar = () => {
   useEffect(() => { (window as unknown as { __chavesCompartilhar?: string[] }).__chavesCompartilhar = entradas.map((e) => e.chave); }, [entradas]);
   if (params.get("video")) return <GerarVideo chave={params.get("video")!} moeda={o.moeda} />;
   if (params.get("quadros")) return <Quadros chave={params.get("quadros")!} tempos={tempos} moeda={o.moeda} />;
+  if (params.get("treino")) return <TreinoConcluidoExemplo />;
+  if (params.get("previa")) {
+    const ex = EXEMPLOS.find((e) => e.id === params.get("previa"));
+    if (!ex) return <div style={{ padding: 24 }}>Não achei a prévia.</div>;
+    const f = (params.get("formato") as Formato) || "stories";
+    const dados = ex.dados.tipo === "insignia" && o.moeda ? { ...ex.dados, imagem: `/__moeda/${o.moeda}.png` } : ex.dados;
+    return <PreviaDoCard key={f} dados={dados} origem="dev" titulo={ex.nome.replace(/\s*\(.*\)$/, "")} onFechar={() => {}} formatoInicial={f} />;
+  }
   if (so) {
     const e = entradas.find((x) => x.chave === so);
     if (!e) return <div style={{ padding: 24 }}>Não achei "{so}".</div>;

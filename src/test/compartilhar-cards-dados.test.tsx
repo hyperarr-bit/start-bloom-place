@@ -114,13 +114,15 @@ describe("a chave COMPARTILHAR_V2", () => {
     localStorage.setItem(CHAVE_FORCA, "on");
     const B = await Botao();
     render(<UserDataContext.Provider value={ctx(semente())}><B tipo="treinos" origem="teste" /></UserDataContext.Provider>);
-    expect(screen.getByTestId("postar-card-treinos")).toBeTruthy();
+    // a parte pesada carrega sob demanda (só com a chave ligada)
+    expect(await screen.findByTestId("postar-card-treinos")).toBeTruthy();
   });
 
   it("fora do provedor de dados, nunca quebra (sem cards)", async () => {
     localStorage.setItem(CHAVE_FORCA, "on");
     const B = await Botao();
     render(<B tipo="treinos" origem="teste" />);
+    await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByTestId("postar-card-treinos")).toBeNull();
   });
 });

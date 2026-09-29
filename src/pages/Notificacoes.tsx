@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Flame, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
+import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -9,6 +9,7 @@ import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao,
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
+import { CHAVE_LEMBRETE_RELACOES, lerLembreteRelacoes, type LembreteRelacoes } from "@/lib/relacoes-lembrete";
 
 /**
  * Central de notificações (27/07).
@@ -127,6 +128,27 @@ const Notificacoes = () => {
     await filaRef.current;
   };
 
+  /* Relações (29/09): "parabéns no dia" e "faz tempo que não falo com…" — chave própria
+     (`rel-lembrete-prefs`), nascem desligados; o horário se escolhe em Relações → Avisos. */
+  const relLembrete = lerLembreteRelacoes(get<unknown>(CHAVE_LEMBRETE_RELACOES, undefined));
+  const alternarRelacoes = async (tipo: keyof LembreteRelacoes, valor: boolean) => {
+    trackEvent("notif_pref", { campo: `rel_${tipo}`, valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo: LembreteRelacoes = { ...relLembrete, [tipo]: { ...relLembrete[tipo], ligado: valor } };
+    set(CHAVE_LEMBRETE_RELACOES, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_RELACOES ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
   const rodapeDe = (tipo: TipoDeLembrete, ligado: boolean, vazio: string) => {
     if (!ligado || !naLoja || !permitido) return undefined;
     const n = agendados[tipo] ?? 0;
@@ -207,6 +229,33 @@ const Notificacoes = () => {
           rodape={rodapeDe("aniversario", p.aniversario, "Cadastre alguém com data de aniversário em Relações")}
           hora={p.aniversario ? p.horaAniversario : undefined}
           onHora={(h) => void aplicar({ horaAniversario: h })}
+        />
+
+        <LinhaAviso
+          icone={<PartyPopper className="w-4 h-4" />}
+          titulo="Parabéns no dia"
+          descricao={`No dia do aniversário de quem está em Relações, às ${relLembrete.noDia.hora}, pra mandar os parabéns. O horário muda em Relações → Avisos.`}
+          ligado={relLembrete.noDia.ligado}
+          onChange={(v) => void alternarRelacoes("noDia", v)}
+          rodape={rodapeDe("relacoes", relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações")}
+        />
+
+        <LinhaAviso
+          icone={<Gift className="w-4 h-4" />}
+          titulo="Aniversário daqui a uma semana"
+          descricao={`Sete dias antes, às ${relLembrete.semana.hora}, com as ideias de presente que você guardou em Relações.`}
+          ligado={relLembrete.semana.ligado}
+          onChange={(v) => void alternarRelacoes("semana", v)}
+          rodape={rodapeDe("relacoes", relLembrete.semana.ligado && !relLembrete.noDia.ligado, "Cadastre alguém com data de aniversário em Relações")}
+        />
+
+        <LinhaAviso
+          icone={<Mail className="w-4 h-4" />}
+          titulo="Pra mandar um oi"
+          descricao="Pra quem tem “lembrar de falar” na ficha, em Relações. Se a conversa não for anotada, repete de 7 em 7 dias — nunca todo dia."
+          ligado={relLembrete.contato.ligado}
+          onChange={(v) => void alternarRelacoes("contato", v)}
+          rodape={rodapeDe("relacoes", relLembrete.contato.ligado && !relLembrete.noDia.ligado && !relLembrete.semana.ligado, "Na ficha de alguém em Relações, escolha de quanto em quanto tempo lembrar")}
         />
 
         <LinhaAviso

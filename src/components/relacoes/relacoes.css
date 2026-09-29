@@ -1,0 +1,289 @@
+/*
+ * RELAÇÕES — o visual próprio do módulo (29/09, direção A "Correio").
+ *
+ * Por que "correio": o assunto é gente e carinho — carta, selo, lacre. Das 3
+ * direções desenhadas na tela de PESSOAS (correio · álbum de polaroids ·
+ * caderninho de telefones), esta é a única que nenhum outro módulo lembra: o
+ * menu já usa rosa aqui e a Beleza foi pra pêssego/malva, então nada de rosa.
+ * Azul-carta + vermelho-lacre + kraft, a faixa listrada da carta aérea no topo
+ * das seções, o SELO pra cada data que vem aí e o LACRE com a inicial de cada
+ * pessoa (a cor do lacre é o círculo: família, amigos, amor, trabalho).
+ *
+ * REGRAS DE COR (noite de 29/09):
+ *  - papel, cartão, tinta e borda vêm SEMPRE do tema (6 paletas × claro/escuro):
+ *    aqui só existem cores de ACENTO e DECORAÇÃO, com escopo em .tema-relacoes;
+ *  - nenhum token global muda, nada no tailwind.config, nada no escuro.css;
+ *  - contraste AA conferido pelo teste relacoes-cores (texto sobre o cartão de
+ *    cada tema, texto sobre o lacre e sobre o kraft).
+ */
+
+.tema-relacoes {
+  /* azul-carta: títulos das seções, datas */
+  --rl-tinta: 216 53% 28%;
+  /* vermelho-lacre: o que está perto (hoje, amanhã, em 4 dias), o número do selo */
+  --rl-lacre: 5 59% 41%;
+  --rl-lacre-claro: 6 53% 54%;
+  /* kraft: o papel do selo e as faixinhas de recado */
+  --rl-kraft: 40 55% 87%;
+  --rl-kraft-tinta: 35 35% 31%;
+  /* os lacres dos círculos (fundo) e a letra em cima deles */
+  --rl-selo-familia: 5 59% 41%;
+  --rl-selo-amigos: 218 52% 39%;
+  --rl-selo-amor: 38 64% 31%;
+  --rl-selo-trabalho: 152 39% 30%;
+  --rl-selo-outros: 26 13% 37%;
+  --rl-selo-texto: 32 76% 94%;
+  /* "vou" do evento, "entregue" */
+  --rl-ok: 152 45% 28%;
+  /* a ação principal é o magenta da marca (o --accent: no Original é o magenta;
+     nos outros temas, o acento do tema — a mesma regra do resto do app) */
+  --rl-acao: var(--accent);
+  --rl-acao-texto: var(--accent-foreground);
+}
+
+.dark .tema-relacoes {
+  --rl-tinta: 218 58% 76%;
+  --rl-lacre: 7 63% 68%;
+  --rl-lacre-claro: 7 70% 76%;
+  --rl-kraft: 34 18% 15%;
+  --rl-kraft-tinta: 38 45% 75%;
+  --rl-selo-familia: 6 49% 37%;
+  --rl-selo-amigos: 218 42% 35%;
+  --rl-selo-amor: 41 56% 31%;
+  --rl-selo-trabalho: 151 32% 27%;
+  --rl-selo-outros: 27 12% 28%;
+  --rl-selo-texto: 33 58% 90%;
+  --rl-ok: 150 42% 64%;
+  /* de noite o acento é claro: a letra do botão é o papel do tema, não branco (branco no magenta claro dava 3:1) */
+  --rl-acao-texto: var(--background);
+}
+
+.tema-relacoes .rl-serif,
+.rl-serif {
+  font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.tema-relacoes .rl-caps {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.tema-relacoes .rl-mini {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  font-size: 9.5px;
+  line-height: 1.2;
+}
+
+/* ---------------------------------------------------------------- cartão com faixa de carta aérea */
+.tema-relacoes .rl-cartao {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  overflow: hidden;
+}
+.tema-relacoes .rl-aviao {
+  height: 6px;
+  background: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--rl-lacre)) 0 9px,
+    transparent 9px 14px,
+    hsl(var(--rl-tinta)) 14px 23px,
+    transparent 23px 28px
+  );
+}
+
+/* ---------------------------------------------------------------- o selo (data que vem aí) */
+.tema-relacoes .rl-selo {
+  flex: none;
+  width: 108px;
+  padding: 5px;
+  /* a serrilha: furos na cor do cartão por cima do papel kraft */
+  background:
+    radial-gradient(circle at 5px 5px, hsl(var(--card)) 2.6px, transparent 3px) -5px -5px / 10px 10px,
+    hsl(var(--rl-kraft));
+  text-align: center;
+  scroll-snap-align: start;
+}
+.tema-relacoes .rl-selo-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  padding: 8px 6px 7px;
+  min-height: 100%;
+}
+.tema-relacoes .rl-selo.rl-hoje .rl-selo-in {
+  border-color: hsl(var(--rl-lacre));
+  box-shadow: inset 0 0 0 1px hsl(var(--rl-lacre));
+}
+
+/* ---------------------------------------------------------------- o lacre (inicial da pessoa) */
+.tema-relacoes .rl-lacre,
+.rl-lacre {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9999px;
+  color: hsl(var(--rl-selo-texto));
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  line-height: 1;
+  /* brilho de cera: luz branca no alto à esquerda, por cima da cor do círculo (igual no claro e no escuro) */
+  background:
+    radial-gradient(circle at 32% 28%, hsl(0 0% 100% / 0.2), transparent 58%),
+    hsl(var(--rl-cor-lacre));
+  box-shadow: inset 0 0 0 3px hsl(0 0% 100% / 0.12), 0 1px 0 hsl(0 0% 0% / 0.08);
+}
+.rl-lacre-familia { --rl-cor-lacre: var(--rl-selo-familia); }
+.rl-lacre-amigos { --rl-cor-lacre: var(--rl-selo-amigos); }
+.rl-lacre-amor { --rl-cor-lacre: var(--rl-selo-amor); }
+.rl-lacre-trabalho { --rl-cor-lacre: var(--rl-selo-trabalho); }
+.rl-lacre-outros { --rl-cor-lacre: var(--rl-selo-outros); }
+
+/* ---------------------------------------------------------------- linhas pautadas (o que lembrar) */
+.tema-relacoes .rl-pautado {
+  line-height: 26px;
+  background-image: repeating-linear-gradient(transparent 0 25px, hsl(var(--border)) 25px 26px);
+  background-attachment: local;
+  background-position: 0 4px;
+  padding-top: 4px;
+}
+
+/* ---------------------------------------------------------------- botões */
+.tema-relacoes .rl-acao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: hsl(var(--rl-acao));
+  color: hsl(var(--rl-acao-texto));
+  font-weight: 700;
+  font-size: 13.5px;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.tema-relacoes .rl-acao:active { transform: scale(0.98); }
+.tema-relacoes .rl-acao:disabled { opacity: 0.5; }
+.tema-relacoes .rl-contorno {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.tema-relacoes .rl-contorno:active { background: hsl(var(--muted)); }
+
+/* ---------------------------------------------------------------- quadradinho de marcar */
+.tema-relacoes .rl-quadradinho {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1.5px solid hsl(var(--foreground) / 0.75);
+  background: transparent;
+  color: hsl(var(--rl-acao-texto));
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.tema-relacoes .rl-quadradinho[data-marcado="true"] {
+  background: hsl(var(--rl-acao));
+  border-color: hsl(var(--rl-acao));
+}
+
+/* ---------------------------------------------------------------- chips */
+.tema-relacoes .rl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tema-relacoes .rl-chip[aria-pressed="true"] {
+  border-color: hsl(var(--rl-tinta));
+  background: hsl(var(--rl-tinta) / 0.1);
+  color: hsl(var(--rl-tinta));
+}
+
+/* ---------------------------------------------------------------- faixinha de recado (kraft) */
+.tema-relacoes .rl-recado {
+  background: hsl(var(--rl-kraft));
+  color: hsl(var(--rl-kraft-tinta));
+  border-radius: 10px;
+}
+
+/* ---------------------------------------------------------------- carimbo (entregue / falei hoje) */
+.tema-relacoes .rl-carimbo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1.5px solid hsl(var(--rl-lacre));
+  border-radius: 4px;
+  color: hsl(var(--rl-lacre));
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tema-relacoes .rl-carimbar { animation: rl-carimbar 0.32s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+  @keyframes rl-carimbar {
+    from { transform: rotate(-4deg) scale(1.6); opacity: 0; }
+    to { transform: rotate(-4deg) scale(1); opacity: 1; }
+  }
+}
+
+/* rolagem horizontal dos selos sem barra visível */
+.tema-relacoes .rl-rolagem {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tema-relacoes .rl-rolagem::-webkit-scrollbar { display: none; }
+
+/* select nativo no tom do app (dia/mês do aniversário: a roda do celular é o melhor seletor) */
+.tema-relacoes .rl-select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 44px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--input));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding: 0 28px 0 12px;
+  font-size: 16px; /* 16px: o iPhone não dá zoom no toque */
+  background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%), linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}

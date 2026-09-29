@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { BASES_LEMBRETES, FAIXAS_AVULSAS, planejarRemedios, planejarLimiteDoDia } from "@/lib/notificacoes";
+import { planejarRelacoes } from "@/lib/relacoes-lembrete";
+import { pessoasValidas } from "@/lib/relacoes";
 
 const LARGURA = 10000;
 const faixa = (base: number) => [base, base + LARGURA] as const;
@@ -34,6 +36,27 @@ describe("faixas de id dos lembretes", () => {
       expect(a.id! >= BASES_LEMBRETES.saude && a.id! < BASES_LEMBRETES.saude + LARGURA).toBe(true);
       expect([FAIXAS_AVULSAS.teste + 1, FAIXAS_AVULSAS.teste + 2, FAIXAS_AVULSAS.teste + 3]).not.toContain(a.id);
     }
+  });
+});
+
+describe("Relações (29/09): faixa própria 1900000–1999999", () => {
+  it("o tipo relacoes mora em 1900000, longe de todo o resto", () => {
+    expect(BASES_LEMBRETES.relacoes).toBe(1900000);
+    for (const [tipo, base] of Object.entries(BASES_LEMBRETES)) {
+      if (tipo === "relacoes") continue;
+      expect(sobrepoe(faixa(1900000), faixa(base)), `relacoes × ${tipo}`).toBe(false);
+    }
+  });
+  it("os avisos planejados (no dia + manter contato) ficam dentro da faixa", () => {
+    const avisos = planejarRelacoes({
+      prefs: { noDia: { ligado: true, hora: "09:00" }, semana: { ligado: false, hora: "12:00" }, contato: { ligado: true, hora: "19:30" } },
+      pessoas: pessoasValidas([{ id: "a", name: "Ana", birthday: "1990-10-02", cadencia: 7, cadenciaDesde: "2026-09-01" }]),
+      momentos: [],
+      datas: [],
+      presentes: [],
+    }, BASES_LEMBRETES.relacoes, new Date(2026, 8, 28, 7, 0));
+    expect(avisos.length).toBeGreaterThan(0);
+    for (const a of avisos) expect(a.id >= 1900000 && a.id < 1900000 + LARGURA).toBe(true);
   });
 });
 

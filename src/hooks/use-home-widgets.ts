@@ -20,7 +20,8 @@ export type WidgetId =
   | "sleep-log"
   | "countdown"
   | "week-calendar"
-  | "tasks";
+  | "tasks"
+  | "relacoes";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -57,6 +58,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "sleep-log", label: "Sono", description: "Registre horas dormidas rapidamente", emoji: "😴", category: "saúde", defaultSize: "large" },
   { id: "countdown", label: "Contagem Regressiva", description: "Dias restantes até uma meta ou evento", emoji: "🎯", category: "bem-estar", defaultSize: "large" },
   { id: "week-calendar", label: "Visão da Semana", description: "Mini calendário com status de cada dia", emoji: "📅", category: "produtividade", defaultSize: "large" },
+  // 29/09 (Relações, Onda 1): próximos aniversários + quem está esperando um "oi" — opcional
+  { id: "relacoes", label: "Relações", description: "Próximos aniversários e quem faz tempo que você não fala", emoji: "💌", category: "bem-estar", defaultSize: "large" },
 ];
 
 const KEY = "core-home-widgets-v2";

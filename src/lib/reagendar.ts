@@ -3,6 +3,8 @@ import {
   agendarRetrospectiva, agendarRotina, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { agendarRelacoes } from "@/lib/notificacoes";
+import { assinaturaDasRelacoes, lerDadosDasRelacoes, type DadosDasRelacoes } from "@/lib/relacoes-lembrete";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -88,6 +90,8 @@ export interface DadosDosLembretes {
   abriuFinancasHoje: boolean;
   /** sequência de dias anotados das Conquistas (26/09) */
   seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
+  /** Relações (29/09): parabéns no dia + manter contato — as escolhas moram em `rel-lembrete-prefs` */
+  relacoes?: DadosDasRelacoes;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -218,6 +222,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
       return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
     })(),
+    relacoes: lerDadosDasRelacoes(get),
   };
 }
 
@@ -251,6 +256,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.tarefas && dados.tarefas,
     prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
+    // (29/09) Relações: as escolhas moram na chave própria; "Falei hoje" muda o plano
+    dados.relacoes ? assinaturaDasRelacoes(dados.relacoes) : false,
   ]);
 }
 
@@ -283,5 +290,6 @@ export async function reagendarTudo(
       { hora: prefs.horaLimite, ligado: prefs.limite },
     ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
+    relacoes: d.relacoes ? await agendarRelacoes(d.relacoes) : 0,
   };
 }

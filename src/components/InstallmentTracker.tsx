@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { avisarApagado } from "@/lib/desfazer";
+import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -63,7 +65,14 @@ export type NovoParcelamentoDetalhe = { installment: Installment; handled: boole
 const CAT_LEGADA: Record<string, string> = { roupa: "vestuario" };
 const catValue = (v?: string) => (v ? CAT_LEGADA[v] ?? v : "outros");
 
-const brl = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/* NÚMERO QUE NÃO É NÚMERO NÃO DERRUBA MAIS O FINANÇAS (29/09, varredura).
+   Parcelamento com "Total parcelas" = 0 gravava parcela = 1200/0 = Infinity; o
+   JSON transforma Infinity (e NaN) em null, e ao REABRIR o app `null.toLocaleString`
+   derrubava o módulo inteiro na tela "Algo deu errado" — em todo aparelho da
+   conta, porque a chave sincroniza (route_error 22–25/09: 17×, 3 pessoas).
+   A entrada agora recusa o valor e a leitura cura o que já está salvo
+   (normalizador de `finance-installments`); isto aqui é a última rede. */
+const brl = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const InstallmentTracker = ({
   installments, setInstallments, variableExpenses = [], variableExpensesAnterior = [], mes, projetadas = [],
@@ -96,27 +105,36 @@ export const InstallmentTracker = ({
     return () => window.removeEventListener(NOVO_PARCELAMENTO_EVENT, onNovo);
   }, [installments, setInstallments, mesDaChave]);
 
+  /* Mesma régua do "Parcelar" do + Novo gasto e da edição (29/09): antes o
+     Salvar ficava mudo com campo vazio e aceitava "0" parcelas — a parcela
+     virava Infinity ("R$ ∞" na tela) e, depois de salva, derrubava o módulo. */
   const addInstallment = () => {
-    if (newItem.description && newItem.totalValue && newItem.totalInstallments) {
-      const totalValue = parseFloat(newItem.totalValue);
-      const totalInstallments = parseInt(newItem.totalInstallments);
-      gravar([
-        ...installments,
-        {
-          id: Date.now().toString(),
-          description: newItem.description,
-          totalValue,
-          installmentValue: totalValue / totalInstallments,
-          paidInstallments: parseInt(newItem.paidInstallments) || 0,
-          totalInstallments,
-          cardName: newItem.cardName || "outro",
-          category: newItem.category || "outros",
-          date: newItem.date || localDayKey(),
-        },
-      ]);
-      setNewItem({ description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "" });
-      setShowForm(false);
+    const descricao = newItem.description.trim();
+    const totalValue = numeroBR(newItem.totalValue);
+    const totalInstallments = Number(newItem.totalInstallments);
+    if (!descricao) { toast.error("Dê um nome ao parcelamento."); return; }
+    if (!Number.isFinite(totalValue) || totalValue <= 0) { toast.error("Informe o valor TOTAL da compra."); return; }
+    if (!Number.isInteger(totalInstallments) || totalInstallments < 1 || totalInstallments > 99) {
+      toast.error("Diga em quantas parcelas (de 1 a 99).");
+      return;
     }
+    const pagas = parseInt(newItem.paidInstallments, 10);
+    gravar([
+      ...installments,
+      {
+        id: Date.now().toString(),
+        description: descricao,
+        totalValue,
+        installmentValue: totalValue / totalInstallments,
+        paidInstallments: Math.max(0, Math.min(Number.isInteger(pagas) ? pagas : 0, totalInstallments)),
+        totalInstallments,
+        cardName: newItem.cardName || "outro",
+        category: newItem.category || "outros",
+        date: newItem.date || localDayKey(),
+      },
+    ]);
+    setNewItem({ description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "" });
+    setShowForm(false);
   };
 
   // Desfazer (26/09): um toque apagava o parcelamento inteiro, sem volta.

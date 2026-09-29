@@ -178,7 +178,44 @@ const normalizeMoneyList = (v: any) => {
   });
 };
 
+/**
+ * PARCELAMENTOS (29/09, varredura de bugs). `installmentValue: null` derrubava o
+ * Finanças INTEIRO ao reabrir (o card fazia `null.toLocaleString`): o formulário
+ * do card aceitava "0" parcelas → 1200/0 = Infinity, e o JSON grava Infinity/NaN
+ * como null. Aqui a leitura cura o que já está salvo, sem mudar o formato:
+ *  - nº de parcelas inválido (0, vazio, negativo) → deduzido de total÷parcela, ou 1;
+ *  - parcela inválida → total ÷ nº de parcelas (ou 0);
+ *  - total inválido → parcela × nº de parcelas;
+ *  - pagas inválidas → 0.
+ * Item saudável volta o MESMO objeto (nada é reescrito à toa).
+ */
+const numeroOuNaN = (v: any): number => (v === null || v === undefined || v === "" ? NaN : numeroBR(v));
+const normalizeInstallments = (v: any) => {
+  if (!Array.isArray(v)) return [];
+  return v.map((item) => {
+    if (!isPlainObject(item)) return item;
+    const total = numeroOuNaN(item.totalValue);
+    const parcela = numeroOuNaN(item.installmentValue);
+    const n = numeroOuNaN(item.totalInstallments);
+    const pagas = numeroOuNaN(item.paidInstallments);
+    const nOk = Number.isInteger(n) && n >= 1;
+    if (nOk && Number.isFinite(total) && Number.isFinite(parcela) && Number.isFinite(pagas)) return item;
+    const nParcelas = nOk ? n
+      : Number.isFinite(total) && Number.isFinite(parcela) && parcela > 0 && total > 0 ? Math.max(1, Math.round(total / parcela))
+      : 1;
+    const valorParcela = Number.isFinite(parcela) ? parcela : Number.isFinite(total) ? total / nParcelas : 0;
+    return {
+      ...item,
+      totalInstallments: nParcelas,
+      installmentValue: valorParcela,
+      totalValue: Number.isFinite(total) ? total : valorParcela * nParcelas,
+      paidInstallments: Number.isFinite(pagas) ? Math.max(0, Math.trunc(pagas)) : 0,
+    };
+  });
+};
+
 const NORMALIZERS: Record<string, (value: any) => any> = {
+  "finance-installments": normalizeInstallments,
   "dp-gratitude": normalizeGratitude,
   "core-mood-log": normalizeMoodLog,
   "saude-meals": normalizeSaudeMeals,

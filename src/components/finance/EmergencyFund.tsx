@@ -45,7 +45,13 @@ export const useReservaEmergencia = () => {
   return [segura, setReserva] as const;
 };
 
-const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+/* minimumFractionDigits EXPLÍCITO (29/09, varredura) — o mesmo crash que o
+   MonthCalendar já tinha curado em 04/08: com style currency, motor antigo
+   (Chrome < 106, Safari < 15.4) assume mínimo 2 para BRL, e máximo 0 < mínimo 2
+   lança "RangeError: maximumFractionDigits value is out of range" — o Finanças
+   inteiro caía em "Algo deu errado" (route_error 25/09). */
+const brl = (v: number) =>
+  (Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 export const EmergencyFund = ({ despesaMensal }: { despesaMensal: number }) => {
   const [reserva, setReserva] = useReservaEmergencia();

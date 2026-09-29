@@ -2,9 +2,9 @@
  * PET (refeito em 29/09) — RG do pet, o dia dele e a carteirinha.
  *
  * Antes: 5 abas (PETS, SAÚDE, ROTINA, GASTOS, DIÁRIO) e um módulo que abria
- * vazio. 24% das pessoas abriam; 62% saíam em menos de 10 s; só 4 pessoas
- * abriram a Rotina com um pet dentro (module_analytics + cards, 30–60 dias
- * até 28/09 — relatório do módulo). Agora são 4 abas:
+ * vazio. 24% das pessoas abriam; 62% ficavam menos de 10 s no mês inteiro;
+ * desde 13/09 só 4 abriram a Rotina com um pet dentro (module_analytics +
+ * cards, 30–60 dias até 28/09 — relatório do módulo). Agora são 4 abas:
  *   ☀️ HOJE    — o RG (foto em destaque), o dia do pet (rotina + remédio) e
  *                os próximos cuidados da carteirinha
  *   💉 SAÚDE   — a carteirinha inteira, peso e avisos

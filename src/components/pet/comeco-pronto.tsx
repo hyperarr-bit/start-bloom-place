@@ -2,8 +2,8 @@
  * COMEÇO PRONTO (29/09) — o módulo nasce útil em 3 perguntas.
  *
  * Antes: tela vazia + formulário de texto livre (espécie digitada, peso,
- * raça). Desde 13/09, 9 em cada 10 pessoas que viram o Pet vazio nunca
- * cadastraram um bicho. Agora: QUEM É (cachorro, gato, outro) → NOME (e foto
+ * raça). Desde 13/09, de 183 pessoas que viram o Pet vazio, só 22 voltaram
+ * outro dia já com um bicho cadastrado. Agora: QUEM É (cachorro, gato, outro) → NOME (e foto
  * e sexo, se quiser) → IDADE (data ou fase da vida; porte pro cachorro). Sai
  * daqui com o RG, a rotina do dia da espécie e a carteirinha com o básico da
  * idade — cada item pode ser desmarcado antes de criar.

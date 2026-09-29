@@ -1,9 +1,10 @@
 /**
  * PET — os dados do módulo e as contas que não dependem de tela (29/09).
  *
- * Por que o módulo foi refeito: 24% das pessoas abrem o Pet e 62% delas saem
- * em menos de 10 segundos; de quem viu a tela vazia desde 13/09, 9 em 10 nunca
- * cadastraram um bicho, e só 4 pessoas abriram a Rotina com um pet dentro. O
+ * Por que o módulo foi refeito: 24% das pessoas abrem o Pet e 62% delas ficam
+ * menos de 10 segundos no mês inteiro; de 183 que viram a tela vazia desde
+ * 13/09, só 22 voltaram outro dia com um pet cadastrado, e só 4 abriram a
+ * Rotina com um pet dentro. O
  * módulo abria VAZIO, pedia um formulário de texto livre e depois não dava
  * motivo nenhum pra voltar (sem lembrete, sem nada na Home).
  *

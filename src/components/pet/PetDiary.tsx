@@ -1,10 +1,22 @@
-import { useState, useEffect } from "react";
-import { Plus, Trash2, BookOpen, Pencil, Check, X } from "lucide-react";
+/**
+ * DIÁRIO DO PET (visual novo em 29/09; dados como sempre).
+ *
+ * `pet-diary` intocado: [{ id, petName, date (ISO completo), text, mood,
+ * photoUrl? }] — o diário guarda o NOME do pet (renomear na ficha leva os
+ * momentos junto). As insígnias "Registros do pet no mês" e "Diário do Pet"
+ * leem esta chave. O que mudou: os momentos viram páginas com a foto grande
+ * e a data em caixa alta; escrever e editar abrem uma folha (campos de 44 px).
+ */
+import { useMemo, useState } from "react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
+import { ptBR } from "date-fns/locale";
 import { dataSegura } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
+import { petsValidos } from "@/lib/pet";
+import { BotaoPet, CartaoPet, Chip, FolhaPet, RotuloCampo } from "./kit";
 
 interface DiaryEntry {
   id: string;
@@ -15,171 +27,120 @@ interface DiaryEntry {
   photoUrl?: string;
 }
 
-const moods = ["😍", "😊", "😴", "🤒", "😈", "🥺"];
+const HUMORES: { emoji: string; rotulo: string }[] = [
+  { emoji: "😍", rotulo: "apaixonante" },
+  { emoji: "😊", rotulo: "feliz" },
+  { emoji: "😴", rotulo: "sonolento" },
+  { emoji: "🤒", rotulo: "doentinho" },
+  { emoji: "😈", rotulo: "arteiro" },
+  { emoji: "🥺", rotulo: "carente" },
+];
 
 export const PetDiary = () => {
   const { get, set } = useUserData();
-  const entries = get<DiaryEntry[]>("pet-diary", []);
-  const pets = get<any[]>("pet-list", []);
-  const [petName, setPetName] = useState("");
-  const [text, setText] = useState("");
-  const [mood, setMood] = useState("😊");
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
+  const pets = petsValidos(get<unknown>("pet-list", []));
+  const brutos = get<unknown>("pet-diary", []);
+  const entries = useMemo(
+    () => (Array.isArray(brutos) ? brutos : [])
+      .filter((e): e is DiaryEntry => !!e && typeof e === "object" && typeof (e as DiaryEntry).id === "string" && typeof (e as DiaryEntry).text === "string")
+      .sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    [brutos],
+  );
+  const [form, setForm] = useState<null | { id?: string; petName: string; text: string; mood: string; photoUrl?: string }>(null);
 
-  // Auto-select if only one pet
-  useEffect(() => {
-    if (pets.length === 1 && !petName) {
-      setPetName(pets[0].name);
+  const abrirNovo = () => setForm({ petName: pets.length === 1 ? pets[0].name : "", text: "", mood: "😊" });
+  const abrirEdicao = (e: DiaryEntry) => setForm({ id: e.id, petName: e.petName || "", text: e.text, mood: e.mood || "😊", photoUrl: e.photoUrl });
+
+  const salvar = () => {
+    if (!form || !form.text.trim()) return;
+    const atual = Array.isArray(get<unknown>("pet-diary", [])) ? (get<unknown>("pet-diary", []) as DiaryEntry[]) : [];
+    if (form.id) {
+      // id e `date` intocados: a data é o registro do momento, não da edição
+      set("pet-diary", atual.map((e) => (e?.id !== form.id ? e : { ...e, petName: form.petName.trim(), text: form.text.trim(), mood: form.mood, photoUrl: form.photoUrl?.trim() || undefined })));
+    } else {
+      set("pet-diary", [
+        { id: Date.now().toString(), petName: form.petName.trim(), date: new Date().toISOString(), text: form.text.trim(), mood: form.mood, photoUrl: form.photoUrl?.trim() || undefined },
+        ...atual,
+      ]);
     }
-  }, [pets, petName]);
-
-  const addEntry = () => {
-    if (!text.trim()) return;
-    const updated = [
-      // photoUrl começa undefined e o "limpar foto" volta pra undefined:
-      // `photoUrl.trim()` estourava TypeError e o momento NUNCA era salvo,
-      // sem aviso nenhum — sintoma idêntico a "cadastrei e sumiu" (08/08).
-      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl?.trim() || undefined },
-      ...entries,
-    ];
-    set("pet-diary", updated);
-    setText(""); setPetName(""); setMood("😊"); setPhotoUrl(undefined);
+    setForm(null);
   };
 
-  const removeEntry = (id: string) => {
-    set("pet-diary", entries.filter(e => e.id !== id));
+  const apagar = (e: DiaryEntry) => {
+    const atual = get<unknown>("pet-diary", []) as DiaryEntry[];
+    set("pet-diary", atual.filter((x) => x?.id !== e.id));
+    avisarApagado("Momento apagado", () => set("pet-diary", [e, ...(get<unknown>("pet-diary", []) as DiaryEntry[])]));
   };
 
-  /* Edição na própria linha (padrão do IncomeTable). Diário é texto corrido:
-     erro de digitação era motivo pra apagar o momento inteiro e reescrever —
-     perdendo a data original, que é justamente o valor do diário. */
-  const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [rascunho, setRascunho] = useState({ petName: "", text: "", mood: "😊", photoUrl: undefined as string | undefined });
-
-  const comecarEdicao = (e: DiaryEntry) => {
-    setEditandoId(e.id);
-    setRascunho({ petName: e.petName || "", text: e.text, mood: e.mood || "😊", photoUrl: e.photoUrl });
-  };
-
-  const salvarEdicao = () => {
-    const texto = rascunho.text.trim();
-    if (!texto) return;
-    set("pet-diary", entries.map(e => e.id !== editandoId ? e : {
-      ...e, // id e `date` intocados: a data é o registro do momento, não da edição
-      petName: rascunho.petName.trim(),
-      text: texto,
-      mood: rascunho.mood,
-      photoUrl: rascunho.photoUrl?.trim() || undefined,
-    }));
-    setEditandoId(null);
-  };
+  // nomes pra escolher: os pets de hoje + o nome já gravado (pet apagado ou renomeado em outro aparelho)
+  const nomes = Array.from(new Set([...pets.map((p) => p.name), ...(form?.petName ? [form.petName] : [])]));
 
   return (
-    <div className="mt-3">
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-violet-200 dark:bg-violet-900/60 px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-3.5 h-3.5 text-violet-700 dark:text-violet-300" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-violet-800 dark:text-violet-200">Diário</span>
-          </div>
-          <span className="text-[10px] text-violet-600 dark:text-violet-300">{entries.length}</span>
+    <div className="space-y-3">
+      <CartaoPet titulo="Diário" direita={<span className="tabular-nums">{entries.length || ""}</span>} dataCard="DIARIO">
+        <div className="p-2">
+          <BotaoPet onClick={abrirNovo} className="w-full" data-testid="momento-novo"><Plus className="w-4 h-4" aria-hidden="true" /> Registrar um momento</BotaoPet>
         </div>
+        {entries.length === 0 && (
+          <p className="px-3.5 pb-3.5 text-[13px] text-muted-foreground">A primeira vez que subiu no sofá, o passeio no parque, o dia que ficou doentinho. Com foto, fica pra sempre.</p>
+        )}
+      </CartaoPet>
 
-        <div className="bg-violet-50/50 dark:bg-violet-950/20 p-2 space-y-1.5">
-          {entries.map(entry => editandoId === entry.id ? (
-            <div key={entry.id} className="border border-primary/40 bg-background/70 rounded-lg p-2 space-y-1.5">
-              <div className="grid grid-cols-2 gap-1.5">
-                <Select value={rascunho.petName} onValueChange={v => setRascunho(r => ({ ...r, petName: v }))}>
-                  <SelectTrigger className="h-9 text-[11px]">
-                    <SelectValue placeholder={pets.length === 0 ? "Cadastre um pet primeiro" : "Selecionar pet"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* inclui o nome já gravado mesmo se o pet foi apagado da
-                        lista — senão o select abriria vazio e salvaria sem pet */}
-                    {Array.from(new Set([...pets.map((p: any) => p.name), ...(rascunho.petName ? [rascunho.petName] : [])])).map((nome: string) => (
-                      <SelectItem key={nome} value={nome} className="text-[11px]">{nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex gap-1 items-center">
-                  {moods.map(m => (
-                    <button key={m} onClick={() => setRascunho(r => ({ ...r, mood: m }))} aria-label={`Humor ${m}`} className={`text-sm p-1 rounded transition-all ${rascunho.mood === m ? "bg-primary/20 ring-1 ring-primary scale-110" : "opacity-50 hover:opacity-80"}`}>
-                      {m}
-                    </button>
-                  ))}
+      {entries.map((e) => (
+        <article key={e.id} className="rounded-xl border border-border bg-card overflow-hidden" data-testid="momento">
+          {e.photoUrl && <img src={e.photoUrl} alt={`Foto de ${e.petName || "pet"}`} className="w-full max-h-[260px] object-cover" />}
+          <div className="px-3.5 pt-3 pb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[20px] leading-none" aria-hidden="true">{e.mood}</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{dataSegura(e.date, "EEE dd/MM · HH:mm", { locale: ptBR }).replace(".", "")}</span>
+              {e.petName && <span className="ml-auto text-[12px] font-bold text-foreground truncate max-w-[40%]">{e.petName}</span>}
+            </div>
+            <p className="mt-2 text-[14.5px] leading-relaxed text-foreground whitespace-pre-wrap">{e.text}</p>
+          </div>
+          <div className="flex justify-end px-1 pb-1">
+            <button type="button" onClick={() => abrirEdicao(e)} aria-label={`Editar momento de ${e.petName || "meu pet"}`} className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground"><Pencil className="w-4 h-4" aria-hidden="true" /></button>
+            <button type="button" onClick={() => apagar(e)} aria-label={`Apagar momento de ${e.petName || "meu pet"}`} className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" aria-hidden="true" /></button>
+          </div>
+        </article>
+      ))}
+
+      <FolhaPet aberta={!!form} onFechar={() => setForm(null)} titulo={form?.id ? "Editar momento" : "Novo momento"} testId="folha-momento">
+        {form && (
+          <div className="space-y-3">
+            {nomes.length > 0 && (
+              <div>
+                <RotuloCampo>De quem</RotuloCampo>
+                <div className="flex flex-wrap gap-1.5">
+                  {nomes.map((n) => <Chip key={n} ativo={form.petName === n} onClick={() => setForm({ ...form, petName: form.petName === n ? "" : n })}>{n}</Chip>)}
                 </div>
               </div>
-              <Textarea autoFocus value={rascunho.text} onChange={e => setRascunho(r => ({ ...r, text: e.target.value }))} className="text-[11px] min-h-[60px]" rows={3} />
-              <PhotoPicker value={rascunho.photoUrl} onChange={url => setRascunho(r => ({ ...r, photoUrl: url }))} onClear={() => setRascunho(r => ({ ...r, photoUrl: undefined }))} label="Trocar foto" />
-              <div className="flex items-center gap-1.5">
-                <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
-                  <Check className="w-3.5 h-3.5" /> Salvar
-                </button>
-                <button onClick={() => setEditandoId(null)} className="h-9 px-3 rounded-md border border-border text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
-                  <X className="w-3.5 h-3.5" /> Cancelar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div key={entry.id} className="bg-background/60 rounded-lg px-2.5 py-2">
-              <div className="flex items-start justify-between gap-1">
-                {/* o momento inteiro abre a edição; lápis e lixeira SEMPRE
-                    visíveis (hover não existe no celular) */}
-                <button onClick={() => comecarEdicao(entry)} aria-label={`Editar momento de ${entry.petName || "meu pet"}`} className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm">{entry.mood}</span>
-                    <span className="text-xs font-bold">{entry.petName || "Meu pet"}</span>
-                    <span className="text-[10px] text-muted-foreground">{dataSegura(entry.date, "dd/MM 'às' HH:mm")}</span>
-                  </div>
-                  <p className="text-xs leading-relaxed">{entry.text}</p>
-                  {entry.photoUrl && (
-                    <img src={entry.photoUrl} alt={`Foto de ${entry.petName || "pet"}`} className="mt-1.5 rounded-lg w-full max-h-32 object-cover" />
-                  )}
-                </button>
-                <div className="flex flex-col shrink-0">
-                  <button onClick={() => comecarEdicao(entry)} aria-label={`Editar momento de ${entry.petName || "meu pet"}`} className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                  <button onClick={() => removeEntry(entry.id)} aria-label={`Apagar momento de ${entry.petName || "meu pet"}`} className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {entries.length === 0 && (
-            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum momento registrado ainda</p>
-          )}
-
-          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
-            <div className="grid grid-cols-2 gap-1.5">
-              <Select value={petName} onValueChange={setPetName}>
-                <SelectTrigger className="h-7 text-[11px]">
-                  <SelectValue placeholder={pets.length === 0 ? "Cadastre um pet primeiro" : "Selecionar pet"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {pets.map((p: any) => (
-                    <SelectItem key={p.id} value={p.name} className="text-[11px]">{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-1 items-center">
-                {moods.map(m => (
-                  <button key={m} onClick={() => setMood(m)} className={`text-sm p-0.5 rounded transition-all ${mood === m ? "bg-primary/20 ring-1 ring-primary scale-110" : "opacity-50 hover:opacity-80"}`}>
-                    {m}
+            )}
+            <div>
+              <RotuloCampo>Como estava</RotuloCampo>
+              <div className="flex gap-1.5">
+                {HUMORES.map((h) => (
+                  <button
+                    key={h.emoji}
+                    type="button"
+                    aria-pressed={form.mood === h.emoji}
+                    aria-label={h.rotulo}
+                    onClick={() => setForm({ ...form, mood: h.emoji })}
+                    className={`flex-1 h-11 rounded-lg border text-[20px] ${form.mood === h.emoji ? "border-foreground bg-muted" : "border-border bg-card"}`}
+                  >
+                    {h.emoji}
                   </button>
                 ))}
               </div>
             </div>
-            <Textarea placeholder="O que aconteceu hoje?" value={text} onChange={e => setText(e.target.value)} className="text-[11px] min-h-[40px]" rows={2} />
-            <PhotoPicker value={photoUrl} onChange={setPhotoUrl} onClear={() => setPhotoUrl(undefined)} />
-            <button onClick={addEntry} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
-              <Plus className="w-3 h-3" /> Registrar momento
-            </button>
+            <div>
+              <RotuloCampo htmlFor="momento-texto">O que aconteceu</RotuloCampo>
+              <Textarea id="momento-texto" value={form.text} onChange={(ev) => setForm({ ...form, text: ev.target.value })} rows={3} placeholder="O que aconteceu hoje?" className="text-[14px] min-h-[88px]" data-testid="momento-texto" />
+            </div>
+            <PhotoPicker value={form.photoUrl} onChange={(url) => setForm({ ...form, photoUrl: url })} onClear={() => setForm({ ...form, photoUrl: undefined })} label={form.photoUrl ? "Trocar a foto" : "Pôr uma foto"} previewSize="md" className="min-h-[44px] text-[13px]" />
+            <BotaoPet className="w-full" onClick={salvar} disabled={!form.text.trim()} data-testid="momento-salvar">{form.id ? "Salvar" : "Guardar o momento"}</BotaoPet>
           </div>
-        </div>
-      </div>
+        )}
+      </FolhaPet>
     </div>
   );
 };

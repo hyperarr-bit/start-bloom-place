@@ -3,6 +3,7 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
+import { algumLigadoPet, planejarAvisosPet, type DadosDosAvisosPet } from "./pet-avisos";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -32,7 +33,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -59,6 +60,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   aniversario: 1400000, // era 900000 (colidia com a missão)
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
+  pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -790,6 +792,16 @@ export async function agendarCompromissos(lista: Compromisso[], opcoes: { ligado
 export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.tarefa); return 0; }
   return agendarSerie("tarefa", "/rotina", planejarTarefas(lista, BASES.tarefa));
+}
+
+/* ─── Cuidados do pet (29/09, módulo Pet refeito) ──────────────────────────────
+   A conta mora em lib/pet-avisos (pura): no dia (e na véspera, se é coisa de
+   marcar na clínica) da vacina, do vermífugo, do antipulgas, da consulta; o
+   remédio na hora de cada dose. Nasce desligado; marcar como feito muda o
+   dado → o useLembretes reagenda → o aviso some. */
+export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
+  if (!algumLigadoPet(dados.prefs)) { await limparFaixa(BASES.pet); return 0; }
+  return agendarSerie("pet", "/pet", planejarAvisosPet(dados, BASES.pet));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

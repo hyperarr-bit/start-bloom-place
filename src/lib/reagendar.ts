@@ -3,6 +3,8 @@ import {
   agendarRetrospectiva, agendarRotina, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { agendarPet } from "@/lib/notificacoes";
+import { algumLigadoPet, lerDadosDosAvisosPet, type DadosDosAvisosPet } from "@/lib/pet-avisos";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -88,6 +90,8 @@ export interface DadosDosLembretes {
   abriuFinancasHoje: boolean;
   /** sequência de dias anotados das Conquistas (26/09) */
   seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
+  /** cuidados do pet (29/09): prefs na chave própria, datas da carteirinha e doses de remédio de hoje */
+  pet?: DadosDosAvisosPet;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -218,6 +222,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
       return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
     })(),
+    pet: lerDadosDosAvisosPet(get, hoje),
   };
 }
 
@@ -251,6 +256,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.tarefas && dados.tarefas,
     prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
+    // (29/09) pet: as prefs moram na chave própria; marcar vacina/dose muda o plano
+    !!dados.pet && algumLigadoPet(dados.pet.prefs) && dados.pet,
   ]);
 }
 
@@ -283,5 +290,6 @@ export async function reagendarTudo(
       { hora: prefs.horaLimite, ligado: prefs.limite },
     ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
+    pet: d.pet ? await agendarPet(d.pet) : 0,
   };
 }

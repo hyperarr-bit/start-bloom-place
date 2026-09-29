@@ -14,6 +14,7 @@ import { TEMAS, contraste, temaDaCor } from "@/components/compartilhar/temas";
 import { desdeMes, noMes, palavra, plural, porcento, primeiroNome, reais, UNIDADES } from "@/components/compartilhar/textos";
 import { diasMarcadosNoMes, faixaDeSemanas, maiorCorrida, semanasDoMes } from "@/components/compartilhar/calendario";
 import { partesDoNumero, temposDoCard, textoContando } from "@/components/compartilhar/video-card";
+import { legendaDoCard } from "@/components/compartilhar/legenda";
 import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "@/pages/dev/compartilhar-exemplos";
 
 afterEach(cleanup);
@@ -152,6 +153,18 @@ describe("os cards", () => {
     const { container } = render(<CardDeCompartilhar dados={INSIGNIA_OURO} formato="stories" moeda={<svg data-testid="moeda-real" />} />);
     expect(container.querySelector("[data-testid='moeda-real']")).toBeTruthy();
     expect(container.querySelector("[data-vaga-moeda]")).toBeNull();
+  });
+});
+
+describe("a legenda da miniatura (a folha de postar)", () => {
+  it("diz o número e o período, com o plural certo — e nunca R$", () => {
+    expect(legendaDoCard(TREINOS_MES)).toBe("18 treinos em setembro.");
+    expect(legendaDoCard(TREINOS_TOTAL)).toBe("35 treinos desde março.");
+    expect(legendaDoCard(AZUL_1)).toBe("Agosto fechou no azul.");
+    expect(legendaDoCard(AZUL_3)).toBe("3 meses seguidos no azul.");
+    expect(legendaDoCard({ ...LIVROS_MES, livros: LIVROS_MES.livros.slice(0, 1) })).toBe("1 livro lido em setembro.");
+    expect(legendaDoCard({ ...METAS, feitas: 1, total: 1 })).toBe("1/1 meta do mês batida.");
+    for (const d of TODOS) expect(legendaDoCard({ ...d, ...("valoresLigados" in d ? { valoresLigados: false } : {}) } as DadosCard)).not.toMatch(/R\$/);
   });
 });
 

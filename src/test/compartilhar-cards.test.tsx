@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
-import { CardDeCompartilhar } from "@/components/compartilhar/cards";
+import { CardDeCompartilhar, coresDoLeque, fonteDoTituloDaCapa, posicoesDoLeque } from "@/components/compartilhar/cards";
 import { FORMATOS, type DadosCard, type Formato } from "@/components/compartilhar/tipos";
 import { TEMAS, contraste, temaDaCor } from "@/components/compartilhar/temas";
 import { desdeMes, noMes, palavra, plural, porcento, primeiroNome, reais, UNIDADES } from "@/components/compartilhar/textos";
@@ -201,6 +201,87 @@ describe("a contagem do vídeo", () => {
     const t60 = temposDoCard(60);
     expect(t60.duracao).toBeLessThan(6.5);
     expect(temposDoCard(0).duracao).toBe(5.5);
+  });
+});
+
+describe("as capas em leque: o texto da capa não some embaixo da vizinha", () => {
+  // Geometria do leque como o CSS desenha: cada capa numa caixa de largura w,
+  // puxada `sobrepoe·w` pra esquerda, descida `desce·|i−meio|` e girada no centro.
+  // Mede quanto a vizinha de cima entra na capa (na altura da própria capa) e
+  // confere que o recuo do texto cobre isso — com folga pequena, sem desperdiçar.
+  const invadido = (n: number, w: number, passo: number, desce: number, sobrepoe: number) => {
+    const h = Math.round(w * 1.5);
+    const pos = posicoesDoLeque(n, w, h, passo, sobrepoe);
+    const rad = (g: number) => (g * Math.PI) / 180;
+    const centro = (i: number) => ({ x: i * (w - w * sobrepoe) + w / 2, y: h / 2 + pos[i].desce * desce });
+    return pos.map((p, i) => {
+      if (!p.tapado) return { p, entra: 0 };
+      const v = p.tapado.lado === "esquerda" ? i - 1 : i + 1;
+      const cv = centro(v), ci = centro(i), gv = rad(pos[v].giro), gi = rad(p.giro);
+      const bordaU = p.tapado.lado === "esquerda" ? w / 2 : -w / 2; // a borda da vizinha que entra na capa
+      let entra = 0;
+      for (let k = 0; k <= 200; k++) {
+        const t = -h / 2 + (h * k) / 200;
+        const x = cv.x + bordaU * Math.cos(gv) - t * Math.sin(gv);
+        const y = cv.y + bordaU * Math.sin(gv) + t * Math.cos(gv);
+        const u = (x - ci.x) * Math.cos(gi) + (y - ci.y) * Math.sin(gi);
+        const vv = -(x - ci.x) * Math.sin(gi) + (y - ci.y) * Math.cos(gi);
+        if (Math.abs(vv) > h / 2) continue;
+        entra = Math.max(entra, p.tapado.lado === "esquerda" ? u + w / 2 : w / 2 - u);
+      }
+      return { p, entra };
+    });
+  };
+
+  for (const [nome, w, passo, desce, sobrepoe] of [["stories", 300, 5, 18, 0.08], ["stories 4+", 230, 5, 18, 0.08], ["feed", 190, 5, 18, 0.08], ["adesivo", 130, 4, 6, 0.12]] as const) {
+    it(`${nome}: de 1 a 5 capas, o recuo cobre o que a vizinha tapa`, () => {
+      for (let n = 1; n <= 5; n++) {
+        const medidas = invadido(n, w, passo, desce, sobrepoe);
+        expect(medidas.filter((m) => m.p.tapado).length, `${n} capas`).toBe(n - 1); // só a de cima fica inteira
+        for (const { p, entra } of medidas) {
+          if (!p.tapado) continue;
+          expect(p.tapado.px, `${n} capas`).toBeGreaterThanOrEqual(entra);
+          expect(p.tapado.px - entra, `${n} capas`).toBeLessThanOrEqual(14);
+        }
+      }
+    });
+  }
+
+  it("o 'Itamar' do Torto arado: a capa da direita recua o texto da esquerda, a do meio não", () => {
+    const { container } = render(<CardDeCompartilhar dados={LIVROS_MES} formato="stories" />);
+    const textos = [...container.querySelectorAll<HTMLElement>("[data-capa-texto]")];
+    expect(textos).toHaveLength(3);
+    const esquerda = (el: HTMLElement) => parseFloat(el.style.padding.split(" ")[3]);
+    const direita = (el: HTMLElement) => parseFloat(el.style.padding.split(" ")[1]);
+    expect(esquerda(textos[2])).toBeGreaterThan(esquerda(textos[1]) + 40);
+    expect(direita(textos[0])).toBeGreaterThan(direita(textos[1]) + 40);
+    expect(esquerda(textos[1])).toBe(direita(textos[1]));
+    expect(container.textContent).toContain("Itamar Vieira Junior");
+  });
+
+  it("título com palavra longa diminui até caber na largura livre", () => {
+    expect(fonteDoTituloDaCapa("Torto arado", 300, 240)).toBe(48);
+    const f = fonteDoTituloDaCapa("Essencialismo", 300, 190);
+    expect(f).toBeLessThan(48);
+    expect(f * 13 * 0.44).toBeLessThanOrEqual(190 + 1e-9);
+  });
+
+  it("capas do leque em cores diferentes (até 6), e vizinhas nunca iguais", () => {
+    const cinco = coresDoLeque(["Essencialismo", "A psicologia financeira", "Pai rico, pai pobre", "O poder do hábito", "Mindset"]);
+    expect(new Set(cinco).size).toBe(5);
+    expect(new Set(coresDoLeque(["Tudo é rio", "Hábitos atômicos", "Torto arado"])).size).toBe(3);
+    const oito = coresDoLeque(["a", "b", "c", "d", "e", "f", "g", "h"]);
+    for (let i = 1; i < oito.length; i++) expect(oito[i]).not.toBe(oito[i - 1]);
+  });
+
+  it("capas vizinhas nunca da mesma cor (e cada livro mantém a cor dele quando pode)", () => {
+    const titulos = ["Essencialismo", "A psicologia financeira", "Pai rico, pai pobre", "O poder do hábito", "Mindset", "Tudo é rio", "Hábitos atômicos", "Torto arado"];
+    for (let a = 0; a < titulos.length; a++) for (let b = 0; b < titulos.length; b++) {
+      const cores = coresDoLeque([titulos[a], titulos[b], titulos[a], titulos[a], titulos[b]]);
+      for (let i = 1; i < cores.length; i++) expect(cores[i], `${titulos[a]} × ${titulos[b]}`).not.toBe(cores[i - 1]);
+    }
+    const sozinho = coresDoLeque(["Torto arado"]);
+    expect(coresDoLeque(["Tudo é rio", "Torto arado"])[1] === sozinho[0] || coresDoLeque(["Tudo é rio"])[0] === sozinho[0]).toBe(true);
   });
 });
 

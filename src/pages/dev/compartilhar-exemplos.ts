@@ -64,6 +64,21 @@ export const LIVROS_MES: DadosLivros = {
   noAno: 17,
 };
 
+/** O leque cheio (5 capas) com título comprido e palavra longa — pra conferir que nada some embaixo da vizinha. */
+export const LIVROS_5: DadosLivros = {
+  tipo: "livros",
+  periodo: "mes",
+  ano: 2026,
+  mesIdx: 8,
+  livros: [
+    { titulo: "Essencialismo", autor: "Greg McKeown", paginas: 272 },
+    { titulo: "A psicologia financeira", autor: "Morgan Housel", paginas: 304 },
+    { titulo: "Pai rico, pai pobre", autor: "Robert Kiyosaki", paginas: 336 },
+    { titulo: "O poder do hábito", autor: "Charles Duhigg", paginas: 408 },
+    { titulo: "Mindset", autor: "Carol S. Dweck", paginas: 312 },
+  ],
+};
+
 export const SEQUENCIA: DadosSequencia = {
   tipo: "sequencia",
   dias: 30,

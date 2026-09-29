@@ -386,26 +386,92 @@ const Moeda = ({ indice, fracao, lado }: { indice: number; fracao: number; lado:
  * LIVROS — as capas
  * ------------------------------------------------------------------------- */
 
-const CORES_DE_CAPA = ["#1e3a8a", "#7c2d12", "#14532d", "#581c87", "#9f1239", "#0f766e", "#78350f", "#312e81"];
+// Seis cores bem diferentes entre si (os dois marrons saíram: sumiam no terracota do card de Leitura).
+const CORES_DE_CAPA = ["#1e3a8a", "#14532d", "#581c87", "#9f1239", "#0f766e", "#27272a"];
 const hash = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+const corDaCapa = (titulo: string) => CORES_DE_CAPA[hash(titulo) % CORES_DE_CAPA.length];
+
+/** As cores do leque: cada livro na cor dele, sem repetir cor no leque enquanto sobrar cor
+ *  (duas roxas coladas viravam uma capa só); com mais livros que cores, ao menos a vizinha é outra. */
+export const coresDoLeque = (titulos: string[]): string[] => {
+  const cores: string[] = [];
+  titulos.forEach((t, i) => {
+    let k = CORES_DE_CAPA.indexOf(corDaCapa(t));
+    const ocupada = (c: string) => (cores.length < CORES_DE_CAPA.length ? cores.includes(c) : c === cores[i - 1]);
+    for (let passo = 0; passo < CORES_DE_CAPA.length && ocupada(CORES_DE_CAPA[k]); passo++) k = (k + 1) % CORES_DE_CAPA.length;
+    cores.push(CORES_DE_CAPA[k]);
+  });
+  return cores;
+};
+
+/** O pedaço da capa que fica embaixo da vizinha no leque (o texto da capa tipográfica foge dali). */
+export interface Tapado { lado: "esquerda" | "direita"; px: number }
+
+/** Título da capa tipográfica: a maior palavra cabe na largura livre ("Essencialismo" não passa da borda).
+ *  A Instrument Serif itálica gasta ~0,39 em por letra; a conta usa 0,44 pra sobrar. */
+export const fonteDoTituloDaCapa = (titulo: string, w: number, livre: number): number => {
+  const maior = Math.max(1, ...titulo.split(/\s+/).map((p) => p.length));
+  return Math.min(w * 0.16, livre / (maior * 0.44));
+};
 
 /** A capa: a imagem quando existe (e carregou); senão, uma capa tipográfica (cor fixa pelo título). */
-export const CapaDoLivro = ({ livro, w, h, giro = 0 }: { livro: Livro; w: number; h: number; giro?: number }) => {
-  const cor = CORES_DE_CAPA[hash(livro.titulo) % CORES_DE_CAPA.length];
+export const CapaDoLivro = ({ livro, w, h, giro = 0, tapado, cor = corDaCapa(livro.titulo) }: { livro: Livro; w: number; h: number; giro?: number; tapado?: Tapado; cor?: string }) => {
+  const folga = w * 0.1;
+  const esq = folga + (tapado?.lado === "esquerda" ? tapado.px : 0);
+  const dir = folga + (tapado?.lado === "direita" ? tapado.px : 0);
+  const livre = Math.max(w * 0.4, w - esq - dir);
   return (
     <div data-capa="" style={{ width: w, height: h, borderRadius: 10, overflow: "hidden", transform: giro ? `rotate(${giro}deg)` : undefined, boxShadow: "0 30px 50px -20px rgba(0,0,0,.55), 0 4px 10px rgba(0,0,0,.25)", background: cor, position: "relative", flexShrink: 0 }}>
       {livro.capa ? (
         <img src={livro.capa} alt="" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       ) : (
-        <div style={{ position: "absolute", inset: 0, padding: w * 0.1, display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }}>
-          <div style={{ height: 4, width: w * 0.3, background: "rgba(255,255,255,.7)", borderRadius: 2 }} />
-          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: w * 0.16, lineHeight: 1.02 }}>{livro.titulo}</div>
-          <div style={{ fontFamily: INTER, fontSize: w * 0.07, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.85 }}>{livro.autor ?? ""}</div>
+        <div data-capa-texto="" style={{ position: "absolute", inset: 0, padding: `${folga}px ${dir}px ${folga}px ${esq}px`, display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff" }}>
+          <div style={{ height: 4, width: Math.min(w * 0.3, livre), background: "rgba(255,255,255,.7)", borderRadius: 2 }} />
+          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: fonteDoTituloDaCapa(livro.titulo, w, livre), lineHeight: 1.02, overflowWrap: "break-word" }}>{livro.titulo}</div>
+          <div style={{ fontFamily: INTER, fontSize: w * 0.07, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.85, overflowWrap: "break-word" }}>{livro.autor ?? ""}</div>
         </div>
       )}
       {/* a lombada: um brilho na borda esquerda */}
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: w * 0.06, background: "linear-gradient(90deg, rgba(0,0,0,.28), rgba(255,255,255,.12) 60%, rgba(0,0,0,0))" }} />
     </div>
+  );
+};
+
+/**
+ * O leque de capas (card e adesivo): a do meio por cima, as de fora giradas e
+ * um pouco mais baixas. Cada capa fica em parte embaixo da vizinha de dentro —
+ * a sobreposição mais o que o giro das duas empurra no canto (o de baixo, onde
+ * mora o autor): sobrepõe + h/2 · |sen giro − sen giro da vizinha|. A capa
+ * tipográfica afasta o texto desse lado (o "Itamar" perdia o "I", 29/09).
+ */
+export const posicoesDoLeque = (n: number, w: number, h: number, passo: number, sobrepoe: number) => {
+  const meio = (n - 1) / 2;
+  const giro = (i: number) => (i - meio) * passo;
+  const z = (i: number) => 10 - Math.abs(Math.round(i - meio));
+  const sen = (g: number) => Math.sin((g * Math.PI) / 180);
+  const ov = w * sobrepoe;
+  return Array.from({ length: n }, (_, i) => {
+    const vizinha = i > 0 && z(i - 1) > z(i) ? i - 1 : i < n - 1 && z(i + 1) > z(i) ? i + 1 : null;
+    const tapado: Tapado | undefined = vizinha == null ? undefined : {
+      lado: vizinha < i ? "esquerda" : "direita",
+      px: Math.ceil(ov + (h / 2) * Math.abs(sen(giro(i)) - sen(giro(vizinha))) + 6),
+    };
+    return { giro: giro(i), z: z(i), desce: Math.abs(i - meio), tapado };
+  });
+};
+
+const LequeDeCapas = ({ livros, w, passo, desce, sobrepoe }: { livros: Livro[]; w: number; passo: number; desce: number; sobrepoe: number }) => {
+  const h = Math.round(w * 1.5);
+  const pos = posicoesDoLeque(livros.length, w, h, passo, sobrepoe);
+  const cores = coresDoLeque(livros.map((l) => l.titulo));
+  return (
+    <>
+      {livros.map((l, i) => (
+        <div key={i} style={{ marginLeft: i ? -w * sobrepoe : 0, transform: `translateY(${pos[i].desce * desce}px)`, zIndex: pos[i].z }}>
+          <CapaDoLivro livro={l} w={w} h={h} giro={pos[i].giro} tapado={pos[i].tapado} cor={cores[i]} />
+        </div>
+      ))}
+    </>
   );
 };
 
@@ -416,20 +482,14 @@ export const CardLivros = ({ d, formato }: { d: DadosLivros; formato: "stories" 
   const paginas = d.livros.reduce((s, l) => s + Math.max(0, l.paginas ?? 0), 0);
   const quando = d.periodo === "mes" ? `em ${nomeDoMes(d.mesIdx)}` : `em ${d.ano}`;
   const mostrar = d.livros.slice(0, 5);
-  const cw = stories ? (mostrar.length <= 3 ? 300 : 230) : 190;
+  // 5 capas de 230 passavam da borda do Stories; 196 cabe com o giro das de fora
+  const cw = stories ? (mostrar.length <= 3 ? 300 : mostrar.length === 4 ? 230 : 196) : 190;
   const ch = Math.round(cw * 1.5);
   return (
     <Moldura tipo="livros" formato={formato} periodo={d.periodo === "mes" ? mesAno(d.mesIdx, d.ano) : String(d.ano)}>
       <Heroi numero={String(n)} rotulo={<>{palavra(n, UNIDADES.livro)} {n === 1 ? "lido" : "lidos"} {quando}</>} base={stories ? 400 : 300} tema={tema} />
       <Na de="aceso" bloco="prova" style={{ position: "absolute", left: -20, right: -20, top: stories ? 500 : 330, height: ch + 80, display: "flex", justifyContent: "center", alignItems: "center" }}>
-        {mostrar.map((l, i) => {
-          const meio = (mostrar.length - 1) / 2;
-          return (
-            <div key={i} style={{ marginLeft: i ? -cw * 0.08 : 0, transform: `translateY(${Math.abs(i - meio) * 18}px)`, zIndex: 10 - Math.abs(Math.round(i - meio)) }}>
-              <CapaDoLivro livro={l} w={cw} h={ch} giro={(i - meio) * 5} />
-            </div>
-          );
-        })}
+        <LequeDeCapas livros={mostrar} w={cw} passo={5} desce={18} sobrepoe={0.08} />
       </Na>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
         <Estatisticas tema={tema} tam={stories ? 64 : 54} itens={[
@@ -779,7 +839,7 @@ export const resumoDoAdesivo = (d: DadosCard): ResumoDoAdesivo => {
     }
     case "azul": { const u = d.meses[d.meses.length - 1]; const { mesIdx } = lerMesId(u?.mes ?? "1970-01"); return { ...base, cor: "#1d4ed8", numero: u?.pct != null ? porcento(u.pct) : String(d.meses.length), rotulo: "no azul", sub: u?.pct != null ? `sobrou em ${nomeDoMes(mesIdx)}` : `${palavra(d.meses.length, UNIDADES.mes)} seguidos` }; }
     case "poupanca": return { ...base, numero: porcento(d.pct), rotulo: "guardado", sub: `do que ganhei em ${nomeDoMes(d.mesIdx)}` };
-    case "livros": return { ...base, numero: String(d.livros.length), rotulo: `${palavra(d.livros.length, UNIDADES.livro)} ${d.livros.length === 1 ? "lido" : "lidos"}`, sub: d.periodo === "mes" ? `em ${nomeDoMes(d.mesIdx)}` : `em ${d.ano}`, prova: <div style={{ display: "flex", justifyContent: "center" }}>{d.livros.slice(0, 4).map((l, i) => <div key={i} style={{ marginLeft: i ? -30 : 0 }}><CapaDoLivro livro={l} w={130} h={195} giro={(i - 1.5) * 4} /></div>)}</div> };
+    case "livros": return { ...base, numero: String(d.livros.length), rotulo: `${palavra(d.livros.length, UNIDADES.livro)} ${d.livros.length === 1 ? "lido" : "lidos"}`, sub: d.periodo === "mes" ? `em ${nomeDoMes(d.mesIdx)}` : `em ${d.ano}`, prova: <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start" }}><LequeDeCapas livros={d.livros.slice(0, 4)} w={130} passo={4} desce={6} sobrepoe={0.12} /></div> };
     case "sequencia": return { ...base, numero: numeroBR(d.dias), rotulo: palavra(d.dias, UNIDADES.diaSeguido), sub: "anotando no CORE" };
     case "agua": { const n = d.porDia.filter((f) => f >= 1).length; return { ...base, numero: String(n), rotulo: `${palavra(n, UNIDADES.dia)} na meta de água`, sub: `em ${nomeDoMes(d.mesIdx)}` }; }
     case "sono": { const n = d.horas.filter((h) => h != null && h >= d.meta).length; return { ...base, numero: String(n), rotulo: `${palavra(n, UNIDADES.noite)} com ${numeroBR(d.meta, 1)} h ou mais`, sub: `em ${nomeDoMes(d.mesIdx)}` }; }

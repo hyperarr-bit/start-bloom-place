@@ -7,7 +7,7 @@ import { TreinoConcluido } from "@/components/treino/TreinoConcluido";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { FORMATOS, type DadosCard, type Formato } from "@/components/compartilhar/tipos";
 import { DIRECOES } from "./compartilhar-direcoes";
-import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "./compartilhar-exemplos";
+import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, LIVROS_5, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "./compartilhar-exemplos";
 
 /**
  * /dev/compartilhar — SÓ NO SERVIDOR DE DESENVOLVIMENTO (App.tsx monta a rota
@@ -36,6 +36,7 @@ const EXEMPLOS: { id: string; nome: string; dados: DadosCard }[] = [
   { id: "azul-3", nome: "3 meses no azul", dados: AZUL_3 },
   { id: "poupanca", nome: "Guardei X%", dados: POUPANCA },
   { id: "livros", nome: "Livros do mês", dados: LIVROS_MES },
+  { id: "livros-5", nome: "Livros (5 capas, títulos longos)", dados: LIVROS_5 },
   { id: "sequencia", nome: "Sequência (marco)", dados: SEQUENCIA },
   { id: "agua", nome: "Água", dados: AGUA },
   { id: "sono", nome: "Sono", dados: SONO },

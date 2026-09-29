@@ -11,6 +11,7 @@ import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce, temPixEmConfirmacao } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
+import { VagaDoAvisoCobranca } from "@/components/app/AvisoCobrancaRecusada";
 
 /** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
  *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
@@ -176,7 +177,13 @@ export const TrialBanner = () => {
             /* 23/08: bg-background (não white) — a barra fixa de CTA do
                paywall fecha com degradê from-background; fundo divergente
                criava emenda visível. pt menor: a barra cuida do rodapé. */
-            ? <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
+            ? <>
+                {/* 28/09: cartão recusado na loja — sem acesso, o "Seu pagamento
+                    não passou" é desenhado nesta vaga (antes ficava atrás do
+                    bloqueio e a pessoa só via "compre de novo"). */}
+                <VagaDoAvisoCobranca />
+                <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
+              </>
             : <PaywallFlow context="app" />}
         </RouteErrorBoundary>
       </motion.div>

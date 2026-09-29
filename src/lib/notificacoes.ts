@@ -2,6 +2,7 @@ import { isNativeShell } from "./native-shell";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
+import { missaoAtual } from "./teste-gratis";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -1066,6 +1067,38 @@ export async function cancelarReguaDoTeste(): Promise<void> {
  * ROTA_DA_AREA). Push nosso = USO; aviso de cobrança é do Google. */
 const BASE_MISSAO = 900000;
 
+/**
+ * QUANDO SAI O "DIA 2 DA SUA MISSÃO" (28/09) — pura, testável sem plugin.
+ *
+ * A Missão conta o dia em janelas de 24 h desde o início (diaDaMissao). O
+ * aviso antigo caía no 1º horário preferido a +14 h: quem começava entre 8h30
+ * e 18h30 recebia "Fechar o dia de hoje" ainda no DIA 1 — registrava, e o app
+ * não contava nem comemorava o dia 2. Agora ele cai SEMPRE dentro do dia 2 da
+ * Missão, [início + 24 h, início + 48 h), em hora decente (08:00–21:30):
+ *   (a) o horário preferido, se a 1ª ocorrência dele a partir de +24 h vier
+ *       até +36 h (e for hora decente);
+ *   (b) senão, +24 h + 5 min, se for hora decente;
+ *   (c) senão, o próximo 08:30 depois de +24 h (no pior caso, +35 h).
+ */
+const horaDecente = (d: Date): boolean => {
+  const min = d.getHours() * 60 + d.getMinutes() + (d.getSeconds() * 1000 + d.getMilliseconds()) / 60_000;
+  return min >= 8 * 60 && min <= 21 * 60 + 30;
+};
+
+export function quandoAvisarDia2(inicioMs: number, horaPreferida: number): Date {
+  const comecoDia2 = inicioMs + 24 * 3600_000;
+  const preferido = new Date(comecoDia2);
+  preferido.setHours(Math.floor(horaPreferida), Math.round((horaPreferida % 1) * 60), 0, 0);
+  while (preferido.getTime() < comecoDia2) preferido.setDate(preferido.getDate() + 1);
+  if (preferido.getTime() <= inicioMs + 36 * 3600_000 && horaDecente(preferido)) return preferido;
+  const logo = new Date(comecoDia2 + 5 * 60_000);
+  if (horaDecente(logo)) return logo;
+  const manha = new Date(comecoDia2);
+  manha.setHours(8, 30, 0, 0);
+  while (manha.getTime() <= comecoDia2) manha.setDate(manha.getDate() + 1);
+  return manha;
+}
+
 export async function agendarReguaDaMissao(area: string | null, nomeArea: string, preferencia?: string | null): Promise<void> {
   // INSTRUMENTADA (20/08): a régua morria MUDA sem permissão — 9 de 13
   // trials sem rastro de lembrete e ninguém sabia se a régua existia. Agora
@@ -1080,14 +1113,18 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
   await garantirCanal();
   await limparFaixa(BASE_MISSAO);
   const { LN } = p;
-  const inicioMs = Date.now();
+  // O relógio é o da MISSÃO (diaDaMissao conta de missao.inicio), não o do
+  // toque: quem deixou as boas-vindas abertas e tocou horas depois continua
+  // recebendo o aviso dentro do dia 2 dela.
+  const inicioMs = missaoAtual()?.inicio ?? Date.now();
   const rotaModulo = ROTA_DA_AREA[area ?? ""] ?? "/home";
-  // Dia 2 na hora que a pessoa escolheu (primeira ocorrência ≥ +14h);
-  // véspera da cobrança fixa em +52h ~ manhã do dia 3 (a cobrança é +72h).
+  // Dia 2 da Missão, no horário que a pessoa escolheu quando cabe (quandoAvisarDia2).
   const hora = HORA_PREFERIDA[preferencia ?? ""] ?? 8.5;
-  const alvo = new Date(inicioMs + 14 * 3600_000);
-  alvo.setHours(Math.floor(hora), Math.round((hora % 1) * 60), 0, 0);
-  while (alvo.getTime() < inicioMs + 14 * 3600_000) alvo.setDate(alvo.getDate() + 1);
+  const alvo = quandoAvisarDia2(inicioMs, hora);
+  // Tocou só no dia 2 (ou depois) e a hora do aviso já passou: ela está no
+  // app agora. Agendar no passado é recusado no iPhone e dispara na hora no
+  // Android — nenhum dos dois é o aviso da volta.
+  if (alvo.getTime() <= Date.now()) { trackEvent("regua_missao_armada", { ok: false, motivo: "dia2_passou", area }); return; }
   const avisos = [
     {
       id: BASE_MISSAO + 1, at: alvo,
@@ -1109,7 +1146,7 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
         extra: { rota: a.rota },
       })),
     });
-    trackEvent("regua_missao_armada", { ok: true, area, preferencia: preferencia ?? "sem" });
+    trackEvent("regua_missao_armada", { ok: true, area, preferencia: preferencia ?? "sem", dia2_em_h: Math.round((alvo.getTime() - inicioMs) / 360_000) / 10 });
   } catch (e) {
     // régua nunca derruba o app — mas o fracasso vira evento, não silêncio
     trackEvent("regua_missao_armada", { ok: false, motivo: "erro_agendar", area });

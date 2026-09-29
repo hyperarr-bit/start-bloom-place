@@ -344,6 +344,11 @@ export function MissaoDoTrial() {
 
   const cfg = ALVO[missao.area] ?? ALVO.dinheiro;
   const noModulo = pathname.startsWith(cfg.rota);
+  // A MESMA chamada nos dois botões do B1 (28/09): "Explorar por conta
+  // própria" não armava o aviso do dia 2 — quem saía sem guia ficava sem o
+  // toque da volta. Permissão ainda não decidida: a régua pede na hora.
+  const armarReguaDaMissao = () =>
+    void agendarReguaDaMissao(missao.area, AREAS[missao.area as AreaKey]?.nome ?? "seu módulo", localStorage.getItem("core-lembrete-hora"));
 
   /* B1 — boas-vindas do pagante (uma vez) */
   if (!missao.vista) {
@@ -409,7 +414,7 @@ export function MissaoDoTrial() {
                 // do anel aparecer. Pedindo AQUI, o diálogo abre sobre o B1;
                 // a régua (abaixo) encontra a permissão já decidida.
                 try { await pedirPermissao(); } catch { /* nunca trava o CTA */ }
-                void agendarReguaDaMissao(missao.area, AREAS[missao.area as AreaKey]?.nome ?? "seu módulo", localStorage.getItem("core-lembrete-hora"));
+                armarReguaDaMissao();
                 navigate(cfg.rota);
               }}
               className="w-full min-h-[54px] rounded-full text-[16.5px] font-extrabold text-white bg-[#16121c] shadow-[0_18px_38px_-10px_rgba(22,18,28,.5)] active:scale-[0.985] transition-transform grid place-items-center"
@@ -417,7 +422,7 @@ export function MissaoDoTrial() {
               <span className="flex items-center gap-1.5">Fazer meu primeiro registro <ArrowRight className="w-4 h-4" /></span>
             </motion.button>
             <button
-              onClick={() => { trackEvent("missao_explorar", {}); salvarMissao({ ...missao, vista: true, holofote: "dispensado" }); setMissao(missaoAtual()); }}
+              onClick={() => { trackEvent("missao_explorar", {}); salvarMissao({ ...missao, vista: true, holofote: "dispensado" }); setMissao(missaoAtual()); armarReguaDaMissao(); }}
               className="w-full text-center text-[12.5px] text-[#4f5a64] mt-3 py-1"
             >
               Explorar por conta própria

@@ -9,9 +9,10 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  CHAVES_DO_ITEM, gravacoesDoItem, levarItemParaConta, aplicarItemNaDemo, idDoItem, type ChaveDoItem,
+  CHAVES_DO_ITEM, gravacoesDoItem, levarItemParaConta, aplicarItemNaDemo, idDoItem, DIAS_DA_SEMANA, exercicioDoItem, type ChaveDoItem,
 } from "@/lib/demo-guiada-registro";
 import { exercicioNovo } from "@/lib/treino-plano";
+import { DIAS } from "@/lib/treino-constancia";
 import { getSeedsForModule } from "@/lib/preview-seeds";
 import { TIPOS_DO_ITEM, type ItemDaDemo } from "@/lib/demo-guiada";
 
@@ -119,6 +120,11 @@ describe("hábito (Rotina: rotina-habits)", () => {
 });
 
 describe("exercício (Treino: saude-workouts-v2)", () => {
+  it("os espelhos batem com as funções do Treino (mudou lá, quebra aqui)", () => {
+    expect(DIAS_DA_SEMANA).toEqual(DIAS);
+    expect(exercicioDoItem("Remada")).toEqual(exercicioNovo("Remada"));
+  });
+
   it("entra no dia de HOJE, no formato do exercicioNovo, sem apagar o resto do plano", () => {
     const plano = { SEGUNDA: { muscles: ["Peito"], exercises: [exercicioNovo("Supino")] } };
     const c = conta({ "saude-workouts-v2": plano });

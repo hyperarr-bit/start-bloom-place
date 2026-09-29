@@ -1,7 +1,7 @@
 /**
  * O ITEM DA DEMO NA CONTA (e de volta na demo) — 28/09.
  *
- * Regras, todas travadas em src/test/demo-guiada.test.ts:
+ * Regras, todas travadas em src/test/demo-guiada-registro.test.ts:
  *   · LISTA FECHADA de chaves: o item só grava nas chaves REAIS dos módulos
  *     abaixo. Nada de chave inventada, nada de `core-demo-*`.
  *   · SÓ O ITEM DELA. Nunca dado de exemplo: o que vai pra conta é o valor que
@@ -20,9 +20,15 @@
  *     Rotina leem.
  */
 import { localDayKey } from "@/lib/utils";
-import { exercicioNovo } from "@/lib/treino-plano";
-import { DIAS, indiceDoDia } from "@/lib/treino-constancia";
 import { codificarItem, type ItemDaDemo } from "@/lib/demo-guiada";
+
+/* Espelhos de treino-constancia (DIAS, indiceDoDia) e treino-plano
+ * (exercicioNovo) — copiados, não importados, pra a demo de HOJE (chave
+ * desligada) não baixar as bibliotecas do Treino junto com o Preview. O teste
+ * (demo-guiada-registro.test.ts) compara com as de verdade: mudou lá, quebra aqui. */
+export const DIAS_DA_SEMANA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+const indiceDoDia = (d: Date): number => (d.getDay() + 6) % 7;
+export const exercicioDoItem = (nome: string) => ({ name: nome, sets: "", reps: "", carga: "", done: false, obs: "" });
 
 export const CHAVES_DO_ITEM = [
   "finance-expenses",
@@ -87,7 +93,7 @@ export function gravacoesDoItem(item: ItemDaDemo, hoje: Date = new Date(), modo:
       return [{ chave: "rotina-habits", proximo: naLista((x) => mesmoNome(nomeDe(x), item.nome), item.nome) }];
     }
     case "exercicio": {
-      const diaDaSemana = DIAS[indiceDoDia(hoje)];
+      const diaDaSemana = DIAS_DA_SEMANA[indiceDoDia(hoje)];
       const g: Gravacao[] = [{
         chave: "saude-workouts-v2",
         proximo: (atual) => {
@@ -100,7 +106,7 @@ export function gravacoesDoItem(item: ItemDaDemo, hoje: Date = new Date(), modo:
           if (!vazio(lista) && !Array.isArray(lista)) return undefined;
           const exs = (lista ?? []) as unknown[];
           if (exs.some((e) => ehMapa(e) && mesmoNome(e.name, item.nome))) return undefined;
-          return { ...plano, [diaDaSemana]: { ...doDia, muscles: Array.isArray(doDia.muscles) ? doDia.muscles : [], exercises: [...exs, exercicioNovo(item.nome)] } };
+          return { ...plano, [diaDaSemana]: { ...doDia, muscles: Array.isArray(doDia.muscles) ? doDia.muscles : [], exercises: [...exs, exercicioDoItem(item.nome)] } };
         },
       }];
       // dia que recebe exercício vira dia de treino (mesma regra do adicionarExercicio)

@@ -13,6 +13,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { localDayKey, dataSegura } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { petsValidos } from "@/lib/pet";
+import { CampoData } from "@/components/ui/campo-data";
 import { BotaoPet, CartaoPet, Chip, FolhaPet, RotuloCampo, campoClasse } from "./kit";
 
 interface PetExpense {
@@ -204,7 +205,7 @@ export const PetExpenses = () => {
               </div>
               <div>
                 <RotuloCampo htmlFor="gasto-data">Data</RotuloCampo>
-                <input id="gasto-data" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={campoClasse} />
+                <CampoData id="gasto-data" rotulo="Hoje" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={campoClasse} />
               </div>
             </div>
             <div>

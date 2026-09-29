@@ -11,6 +11,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
+import { CampoData } from "@/components/ui/campo-data";
 import { localDayKey } from "@/lib/utils";
 import { rotinaPadraoDe, type Especie, type FaixaEtaria, type Pet, type Porte, type Sexo } from "@/lib/pet";
 import { TIPOS, cuidadosDasSugestoes, sugerirCuidados } from "@/lib/pet-cuidados";
@@ -19,6 +20,13 @@ import { BotaoPet, Chip, Pata, RotuloCampo, campoClasse } from "./kit";
 import { novoPetId, type UsePet } from "./use-pet";
 
 type Passo = 1 | 2 | 3 | 4;
+
+/** Idoso = último quarto da vida (AAHA): cão médio/SRD ~9,5 anos, gato acima de 10 (AAHA/AAFP 2021). */
+const FAIXA_TEXTO: Record<"cao" | "gato" | "outro", Record<FaixaEtaria, string>> = {
+  cao: { filhote: "até 1 ano", adulto: "1 a 8 anos", idoso: "9 anos ou +" },
+  gato: { filhote: "até 1 ano", adulto: "1 a 10 anos", idoso: "11 anos ou +" },
+  outro: { filhote: "novinho", adulto: "já crescido", idoso: "mais velho" },
+};
 
 const ESPECIES: { id: "cao" | "gato" | "outro"; emoji: string; rotulo: string }[] = [
   { id: "cao", emoji: "🐶", rotulo: "Cachorro" },
@@ -161,13 +169,13 @@ export const ComecoPronto = ({
             <>
               {cabeca(`Qual a idade de ${nome.trim()}?`, "É o que decide as vacinas e o vermífugo da carteirinha.")}
               <RotuloCampo htmlFor="pet-nascimento">Data de nascimento</RotuloCampo>
-              <input id="pet-nascimento" type="date" max={hoje} value={nascimento} onChange={(e) => { setNascimento(e.target.value); if (e.target.value) setFaixa(undefined); }} className={campoClasse} />
+              <CampoData id="pet-nascimento" rotulo="Escolher a data" max={hoje} value={nascimento} onChange={(e) => { setNascimento(e.target.value); if (e.target.value) setFaixa(undefined); }} className={campoClasse} />
               <p className="text-[12px] text-muted-foreground my-2">Não sabe? Escolha a fase:</p>
               <div className="flex gap-1.5">
                 {(["filhote", "adulto", "idoso"] as FaixaEtaria[]).map((f) => (
                   <Chip key={f} ativo={!nascimento && faixa === f} onClick={() => { setNascimento(""); setFaixa(f); }} className="flex-1 flex-col gap-0 py-1.5 leading-tight" data-testid={`faixa-${f}`}>
                     <span>{f === "filhote" ? "Filhote" : f === "adulto" ? "Adulto" : "Idoso"}</span>
-                    <span className="text-[10.5px] font-medium opacity-70">{f === "filhote" ? "até 1 ano" : f === "adulto" ? "1 a 7 anos" : "8 anos ou +"}</span>
+                    <span className="text-[10.5px] font-medium opacity-70">{FAIXA_TEXTO[especie === "gato" ? "gato" : especie === "cao" ? "cao" : "outro"][f]}</span>
                   </Chip>
                 ))}
               </div>

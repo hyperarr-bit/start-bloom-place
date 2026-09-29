@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
+import { CampoData } from "@/components/ui/campo-data";
 import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { especieDe, type FaixaEtaria, type Pet, type Porte, type Sexo } from "@/lib/pet";
@@ -98,7 +99,7 @@ export const FichaDoPet = ({ pet, dados, aberta, onFechar }: { pet: Pet; dados: 
         </div>
         <div>
           <RotuloCampo htmlFor="rg-nasc">Nascimento</RotuloCampo>
-          <input id="rg-nasc" type="date" max={localDayKey()} value={r.birthday} onChange={(e) => muda({ birthday: e.target.value })} className={campoClasse} />
+          <CampoData id="rg-nasc" rotulo="Sem data" max={localDayKey()} value={r.birthday} onChange={(e) => muda({ birthday: e.target.value })} className={campoClasse} />
           <label className="mt-1 flex items-center gap-2 min-h-[44px] text-[12.5px] text-muted-foreground">
             <input type="checkbox" checked={!!r.nascimentoAprox} onChange={(e) => muda({ nascimentoAprox: e.target.checked || undefined })} className="w-4 h-4 accent-[hsl(var(--accent))]" />
             A data é aproximada (adotado já crescido)

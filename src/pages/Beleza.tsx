@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { mesAtualExtenso } from "@/lib/utils";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Droplets } from "lucide-react";
@@ -45,7 +46,8 @@ const ABA_DO_LINK: Record<string, Aba | "fotos"> = {
 };
 
 const Beleza = () => {
-  const navigate = useNavigate();
+  // P5 (30/09): na demo a seta vai pro destino do botão de baixo (o funil); no app, pra /home
+  const voltarDoModulo = useVoltarDoModulo();
   const [params] = useSearchParams();
   const pedida = ABA_DO_LINK[(params.get("aba") ?? "").toLowerCase()];
   const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
@@ -88,7 +90,7 @@ const Beleza = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={voltarDoModulo} aria-label="Voltar">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Droplets className="w-5 h-5 text-bz-acento" />

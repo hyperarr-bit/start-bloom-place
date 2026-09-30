@@ -58,11 +58,15 @@ const MODULOS: Modulo[] = [
   { chave: "carreira", rota: "/carreira", carregar: () => import("@/pages/Carreira") },
   { chave: "hiperfoco", rota: "/hiperfoco", carregar: () => import("@/pages/Hiperfoco") }, // "mente" é o mesmo componente
   { chave: "detox", rota: "/detox", carregar: () => import("@/pages/Detox") },
+  // 30/09 (integração): os três módulos refeitos, já com o useVoltarDoModulo
+  { chave: "pet", rota: "/pet", carregar: () => import("@/pages/Pet") },
+  { chave: "relacionamentos", rota: "/relacionamentos", carregar: () => import("@/pages/Relacionamentos") },
+  { chave: "beleza", rota: "/beleza", carregar: () => import("@/pages/Beleza") },
 ];
 
-/** Em reescrita por outro agente (30/09): quem integrar troca a seta pelo hook e
- *  MOVE a linha pra MODULOS, ex.: { chave: "pet", rota: "/pet", carregar: () => import("@/pages/Pet") }. */
-const O_INTEGRADOR_APLICA = ["pet", "relacionamentos", "beleza"];
+/** Módulo que ainda NÃO usa o hook (vira `it.todo`). Vazio desde a integração de 30/09:
+ *  Pet, Relações e Beleza entraram em MODULOS. */
+const O_INTEGRADOR_APLICA: string[] = [];
 
 MotionGlobalConfig.skipAnimations = true;
 beforeAll(() => {

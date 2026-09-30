@@ -13,10 +13,10 @@
  * Sem pet nenhum, o HOJE e a SAÚDE mostram o começo pronto (3 perguntas).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { mesAtualExtenso } from "@/lib/utils";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -46,9 +46,8 @@ type Aba = (typeof ABAS)[number]["id"];
 const ABA_ANTIGA: Record<string, Aba> = { pets: "hoje", rotina: "hoje" };
 
 const Pet = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  // P5 (30/09): na demo a seta vai pro destino do botão de baixo (o funil); no app, pra /home
+  const voltarDoModulo = useVoltarDoModulo();
   const dados = usePet();
   const { pets, loaded, hoje, pesosBrutos } = dados;
 
@@ -94,7 +93,7 @@ const Pet = () => {
       />
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-          <button type="button" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="w-11 h-11 -ml-3 shrink-0 grid place-items-center rounded-md hover:bg-muted">
+          <button type="button" onClick={voltarDoModulo} aria-label="Voltar" className="w-11 h-11 -ml-3 shrink-0 grid place-items-center rounded-md hover:bg-muted">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-[hsl(var(--pet-mel))] shrink-0"><Pata className="w-5 h-5" /></span>

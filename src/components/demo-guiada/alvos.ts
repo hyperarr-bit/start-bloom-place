@@ -21,8 +21,12 @@ import { localDayKey } from "@/lib/utils";
  * cumprida). Objeto (e não constantes soltas) só pra os testes encurtarem.
  */
 export const TEMPOS_DA_MISSAO = {
-  /** a faixa fica em 1/3 ("área escolhida ✓") antes de a demo andar sozinha até o botão */
-  antesDoHolofote: 1200,
+  /** PASSO 1 (30/09, dono: "no passo 1 já vai pro 2 sem ver nada"): o cartão
+   *  "Passo 1 de 3 ✓ · você começou por X" fica na tela antes de a demo andar
+   *  sozinha até o botão ("Mostrar onde →" adianta) */
+  inicio: 2600,
+  /** depois do cartão do passo 1, o módulo já montou: só o respiro da troca de aba */
+  antesDoHolofote: 300,
   /** "Primeiro registro feito!" */
   primeiroRegistro: 2800,
   /** holofote no resumo que recalculou, com o número subindo */

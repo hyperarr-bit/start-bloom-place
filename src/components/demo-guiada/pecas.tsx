@@ -55,6 +55,36 @@ export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false }: { fe
   );
 }
 
+/* ------------------------------------------------------------ passo 1 */
+
+/**
+ * PASSO 1 DE 3 (30/09): o passo que já nasce feito ("área escolhida ✓") agora
+ * aparece — antes a demo trocava de aba e rolava até o botão em 1,2 s, sem
+ * mostrar nada. Cartão solto embaixo do topo fixo: não escurece nada, a demo
+ * continua tocável; só o botão recebe toque. Sai pelo tempo ou por "Mostrar onde".
+ */
+export function CartaoDoPasso1({ modulo, pedido, aoContinuar }: { modulo: string; pedido: string; aoContinuar: () => void }) {
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => { setTop(fundoDoTopoFixo() + 12); }, []);
+  return createPortal(
+    <motion.div
+      className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none"
+      style={{ top: top ?? -9999, visibility: top == null ? "hidden" : "visible" }}
+      data-camada-guia="demo-passo-1"
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}
+    >
+      <div className="w-[88%] max-w-[340px] rounded-2xl px-4 py-3 text-white shadow-2xl ring-1 ring-white/15 pointer-events-auto" style={{ background: GRAFITE }} role="status" data-testid="demo-guia-passo1">
+        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Passo 1 de 3 · feito ✓</span>
+        <span className="block text-[13.5px] font-semibold leading-snug">Você começou por {modulo}. Agora: {pedido} — eu te mostro onde.</span>
+        <button type="button" onClick={aoContinuar} className="mt-2.5 min-h-9 px-3.5 rounded-full bg-white text-[12.5px] font-bold" style={{ color: GRAFITE }} data-testid="demo-guia-mostrar">
+          Mostrar onde →
+        </button>
+      </div>
+    </motion.div>,
+    document.body,
+  );
+}
+
 /* ------------------------------------------------------------ holofote */
 
 /** Onde acaba o que gruda no topo (barra de módulos + cabeçalho do módulo). */
@@ -72,15 +102,39 @@ const alturaDoRodapeFixo = (): number => {
   return parseFloat(v) || 0;
 };
 
-export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair }: {
+/**
+ * `fixo` (30/09, dono: "quando clicamos em algo ela simplesmente pula o passo"):
+ * toque fora, toque no próprio alvo e rolagem NÃO fecham o anel — ele segue o
+ * alvo na rolagem e o escuro fica mais claro (a demo continua 100% tocável; o
+ * escuro nunca intercepta toque). Só sai se o alvo sumir da tela (troca de aba)
+ * ou pelo tempo (`duracao`; `null` = sem tempo). Sem `fixo`, as saídas de antes.
+ */
+export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair, fixo = false }: {
   alvo: Element;
   recorte?: (el: Element) => Retangulo | null;
   rotulo: string;
   children: ReactNode;
-  duracao?: number;
+  duracao?: number | null;
   aoSair: (motivo: string) => void;
+  fixo?: boolean;
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
+  const [leve, setLeve] = useState(false);
+  /* DIGITANDO (30/09, print do dono no iPhone): com o teclado aberto o Safari
+   * mexe na área visível — o anel ia parar em cima das abas, o balão tapava o
+   * campo e a tela ficava escura enquanto ela escrevia. Campo em foco = o anel
+   * sai de cena (sem escuro, sem balão); fechou o teclado, volta no lugar. */
+  const [digitando, setDigitando] = useState(false);
+  useEffect(() => {
+    const ehCampo = (el: unknown) => el instanceof HTMLElement
+      && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) setDigitando(true); };
+    const saiu = () => { window.setTimeout(() => { if (!ehCampo(document.activeElement)) setDigitando(false); }, 60); };
+    if (ehCampo(document.activeElement)) setDigitando(true);
+    document.addEventListener("focusin", entrou);
+    document.addEventListener("focusout", saiu);
+    return () => { document.removeEventListener("focusin", entrou); document.removeEventListener("focusout", saiu); };
+  }, []);
   const [balao, setBalao] = useState<{ top: number } | null>(null);
   const balaoRef = useRef<HTMLDivElement>(null);
   const reduzir = useReducedMotion();
@@ -107,7 +161,19 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
       const delta = r.top - destino;
       if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
     } catch { /* noop */ }
-    const aoRolar = () => sair("rolagem");
+    let quadro = 0;
+    const aoRolar = () => {
+      if (!fixo) { sair("rolagem"); return; }
+      // fixo: o anel acompanha o alvo (um quadro por vez, barato em Android fraco)
+      if (quadro) return;
+      quadro = window.requestAnimationFrame(() => {
+        quadro = 0;
+        if (!vivo) return;
+        const r = medir();
+        if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
+        setRect(r);
+      });
+    };
     // O anel só aparece com a rolagem ASSENTADA (2 leituras iguais): rolagem
     // longa passa de 800 ms, e medir no meio deixava o anel no lugar errado.
     let ultimoY = -1, estaveis = 0;
@@ -119,16 +185,29 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
         if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
         setRect(r);
         window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
+        // fixo: a tela muda de tamanho sem rolar (ela abriu a edição de outra conta, um
+        // formulário cresceu) — o anel segue o alvo onde ele estiver
+        if (fixo) {
+          const seguir = window.setInterval(() => {
+            if (!vivo) return;
+            const n = medir();
+            if (!alvo.isConnected || n.width < 8 || n.height < 8) { sair("ancora_invisivel"); return; }
+            setRect((ant) => (ant && Math.abs(ant.top - n.top) < 1 && Math.abs(ant.left - n.left) < 1
+              && Math.abs(ant.width - n.width) < 1 && Math.abs(ant.height - n.height) < 1 ? ant : n));
+          }, 250);
+          timers.push(seguir);
+        }
         return;
       }
       if (y !== ultimoY) { estaveis = 0; ultimoY = y; }
       timers.push(window.setTimeout(assentar, 200));
     };
     timers.push(window.setTimeout(assentar, 300));
-    timers.push(window.setTimeout(() => sair("timeout"), duracao));
+    if (duracao != null) timers.push(window.setTimeout(() => sair("timeout"), duracao));
 
     // Saídas passivas — NUNCA preventDefault: a demo continua 100% tocável.
     const aoTocar = (e: Event) => {
+      if (fixo) { setLeve(true); return; } // fixo: o passo continua na tela, só o escuro clareia
       if (e.target instanceof Node && alvo.contains(e.target)) {
         // tocou o alvo: a ação segue e o anel se despede sozinho
         window.setTimeout(() => sair("alvo_tocado"), 450);
@@ -146,7 +225,8 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     if (barra) barra.style.zIndex = "205";
     return () => {
       vivo = false;
-      timers.forEach((t) => window.clearTimeout(t));
+      timers.forEach((t) => { window.clearTimeout(t); window.clearInterval(t); });
+      if (quadro) window.cancelAnimationFrame(quadro);
       window.removeEventListener("scroll", aoRolar, { capture: true } as EventListenerOptions);
       document.removeEventListener("pointerdown", aoTocar, { capture: true } as EventListenerOptions);
       document.removeEventListener("visibilitychange", aoEsconder);
@@ -168,7 +248,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     setBalao({ top: Math.max(topoLivre, top) });
   }, [rect]);
 
-  if (!rect) return null;
+  if (!rect || digitando) return null;
   const pad = 8;
   const largura = Math.min(window.innerWidth - 12, rect.width + pad * 2);
   const esquerda = Math.max(6, Math.min(rect.left - pad, window.innerWidth - 6 - largura));
@@ -182,7 +262,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
       {/* o escuro é a sombra do anel — um elemento só, nada clicável */}
       <div
         className="absolute rounded-2xl pointer-events-none"
-        style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2, boxShadow: "0 0 0 9999px rgba(15,12,20,.58)" }}
+        style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2, boxShadow: `0 0 0 9999px rgba(15,12,20,${leve ? 0.22 : 0.58})`, transition: "box-shadow .3s ease" }}
       />
       {/* o contorno pulsa (elemento pequeno: barato em Android fraco) */}
       <motion.div

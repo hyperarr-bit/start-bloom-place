@@ -11,7 +11,7 @@ import { Check } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 import { localDayKey } from "@/lib/utils";
-import { EMOJI_DA_ESPECIE, chaveRotinaDoDia, comMarca, especieDe, petsValidos } from "@/lib/pet";
+import { EMOJI_DA_ESPECIE, especieDe, marcarNaRotina, petsValidos } from "@/lib/pet";
 import { resumoDosPets } from "@/lib/pet-hoje";
 import { quandoTexto } from "@/lib/pet-cuidados";
 import "@/components/pet/pet.css";
@@ -36,10 +36,8 @@ export const PetWidget = ({ size = "small" }: { size?: WidgetSize }) => {
     );
   }
 
-  const marcar = (petId: string, itemId: string, valor: boolean) => {
-    const chave = chaveRotinaDoDia(localDayKey());
-    set(chave, comMarca(get<unknown>(chave, {}), petId, itemId, valor));
-  };
+  // a mesma marcação do HOJE do Pet (o 1º gesto grava a lista vista, pro app antigo mostrar a mesma rotina)
+  const marcar = (petId: string, itemId: string, valor: boolean) => marcarNaRotina(get, set, petId, itemId, valor);
 
   if (size === "small") {
     const r = resumos[0];

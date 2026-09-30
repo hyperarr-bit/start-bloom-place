@@ -64,7 +64,10 @@ function OfertaFinancas({ c, dia, x, onFechar }: { c: Cuidado; dia: string; x: C
   }
   const lancar = () => {
     if (!ok) return;
-    x.lancar(c, dia, Math.round(n * 100) / 100);
+    if (!x.lancar(c, dia, Math.round(n * 100) / 100)) {
+      toast.error("Não deu pra lançar daqui. Abre Finanças e lança por lá.");
+      return;
+    }
     setLancado(true);
     trackEvent("cuidado_gasto_lancado", { tipo: c.tipo });
     toast.success(`💸 ${reais(n)} em Beleza`, { action: { label: "Ver Finanças", onClick: () => navigate("/financas") } });

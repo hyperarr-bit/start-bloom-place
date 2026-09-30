@@ -196,7 +196,10 @@ export const QuickActions = () => {
     if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
     const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
     // 28/09: o mesmo caminho do "Lançar em Finanças · Beleza" (lib/finance-lancar) — balde do mês, perfil ativo
-    lancarGasto(get, set, { descricao: expenseCategory, valor: amount, categoria: catMap[expenseCategory] || "outros", data: todayStr() });
+    if (!lancarGasto(get, set, { descricao: expenseCategory, valor: amount, categoria: catMap[expenseCategory] || "outros", data: todayStr() })) {
+      toast.error("Não deu pra lançar daqui. Abre Finanças e lança por lá.");
+      return;
+    }
     vibrate();
     showSuccess("expense");
     toast.success(`💸 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em ${expenseCategory}`);

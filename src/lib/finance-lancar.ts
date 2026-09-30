@@ -29,8 +29,13 @@ export type GastoLancado = { id: string; description: string; value: number; cat
 
 const novoId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
 
-export function lancarGasto(get: Leitor, set: Gravador, g: GastoNovo): GastoLancado {
+/**
+ * `null` = não lançou: `finance-expenses` guardado tem algo que não é lista (30/09, teste de
+ * compatibilidade). Trocar isso por `[item]` apagaria os gastos do mês — quem chama avisa a pessoa.
+ */
+export function lancarGasto(get: Leitor, set: Gravador, g: GastoNovo): GastoLancado | null {
   const atuais = get<unknown>("finance-expenses", []);
+  if (atuais != null && !Array.isArray(atuais)) return null;
   const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
   const item = etiquetar<GastoLancado>({
     id: novoId(),

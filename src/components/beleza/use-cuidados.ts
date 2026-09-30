@@ -105,7 +105,7 @@ export function useCuidados() {
   };
 
   /** "Lançar em Finanças · Beleza": o gasto do cuidado no mês corrente (1 toque, nunca sozinho). */
-  const lancar = (c: Cuidado, dia: string, valor: number): GastoLancado =>
+  const lancar = (c: Cuidado, dia: string, valor: number): GastoLancado | null =>
     lancarGasto(get, set, { descricao: c.nome, valor, categoria: "beleza", data: dia });
 
   return { hoje, cuidados, ordenados, adicionar, mudar, feito, marcar, desmarcar, remover, lancar };

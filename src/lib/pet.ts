@@ -321,6 +321,30 @@ export function comMarca(rotina: unknown, petId: string, tarefaId: string, valor
   return { ...r, [petId]: { ...(r[petId] ?? {}), [tarefaId]: valor } };
 }
 
+type LeitorPet = <T>(chave: string, padrao: T) => T;
+type GravadorPet = (chave: string, valor: unknown) => void;
+
+/**
+ * Marcar no dia do pet (o HOJE e o widget da Home passam por aqui).
+ *
+ * UMA ROTINA SÓ PRO MESMO PET (30/09, teste de compatibilidade): pet que nunca teve a lista
+ * gravada (`pet-routine-tasks-<id>` ausente — todo pet cadastrado no app antigo) mostra no
+ * app novo a rotina da ESPÉCIE e no app antigo as 6 de sempre (com banho e escovar diários).
+ * Sem nada gravado, "Comida · noite" marcada aqui não existia lá. No 1º gesto na rotina, a
+ * lista que a pessoa está vendo vai pra chave de sempre (o mesmo formato que o "Editar
+ * rotina" e o começo pronto já gravam) — dali em diante os dois apps mostram e marcam a
+ * mesma rotina. Abrir continua não gravando nada; valor que não é lista não é tocado.
+ */
+export function marcarNaRotina(get: LeitorPet, set: GravadorPet, petId: string, itemId: string, valor: boolean, dia: string = localDayKey()): void {
+  const chave = chaveRotinaDoDia(dia);
+  set(chave, comMarca(get<unknown>(chave, {}), petId, itemId, valor));
+  const chaveTarefas = chaveTarefasDoPet(petId);
+  const gravada = get<unknown>(chaveTarefas, undefined);
+  if (gravada !== undefined && gravada !== null) return;
+  const pet = petsValidos(get<unknown>(CHAVE_PETS, [])).find((p) => p.id === petId);
+  if (pet) set(chaveTarefas, tarefasDoPet(pet, undefined));
+}
+
 /* ─────────────────────────────── ids ─────────────────────────────── */
 
 export const novoId = (prefixo = "") => `${prefixo}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

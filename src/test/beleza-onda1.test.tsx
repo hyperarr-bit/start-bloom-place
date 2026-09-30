@@ -42,6 +42,7 @@ import {
   planejarCuidados, proximaDoCuidado, textoDaFalta, textoDoPacote, type Cuidado,
 } from "@/lib/beleza-cuidados";
 import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
+import { lancarGasto } from "@/lib/finance-lancar";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import {
@@ -397,6 +398,18 @@ describe("CUIDADOS — a próxima data (intervalos do dono, editáveis)", () => 
     const torto = { id: "x2", algoDeUmaVersaoFutura: true };
     const r = marcarHorario(unha, [semHora, null, torto], "2026-10-02", "18:00", 60, "c9");
     expect(r.compromissos).toEqual([semHora, null, torto, expect.objectContaining({ id: "c9", origem: "beleza" })]);
+  });
+
+  it("'Lançar em Finanças' nunca troca por [gasto] um `finance-expenses` que não é lista: não grava e devolve null (30/09)", () => {
+    const gravados: Record<string, unknown> = {};
+    const set = (k: string, v: unknown) => { gravados[k] = v; };
+    const comLixo = <T,>(k: string, f: T): T => (k === "finance-expenses" ? ({ algo: "que não é lista" } as unknown as T) : f);
+    expect(lancarGasto(comLixo, set, { descricao: "Unha", valor: 45, categoria: "beleza", data: "2026-09-30" })).toBeNull();
+    expect(gravados).toEqual({});
+    // sem nada gravado ainda (ou lista), lança normal
+    const vazio = <T,>(_k: string, f: T): T => f;
+    expect(lancarGasto(vazio, set, { descricao: "Unha", valor: 45, categoria: "beleza", data: "2026-09-30" })).toMatchObject({ description: "Unha", value: 45, category: "beleza" });
+    expect(gravados["finance-expenses"]).toHaveLength(1);
   });
 });
 

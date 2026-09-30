@@ -284,6 +284,13 @@ describe("remédio de todo dia", () => {
     expect(dosesDoDia("p1", [rem({ horarios: ["8h", "25:00"] })], HOJE)).toEqual([]);
   });
 
+  it("remédio criado às 22h30 (no Brasil já é o dia seguinte em UTC) tem as doses de HOJE — dia local, não o do ISO (30/09)", () => {
+    const criadoAs2230 = new Date(2026, 8, 29, 22, 30).toISOString(); // terça 22:30 local = quarta 01:30 UTC
+    expect(dosesDoDia("p1", [rem({ criadoEm: criadoAs2230 })], HOJE)).toHaveLength(2);
+    // criado amanhã (local) ainda não tem dose hoje
+    expect(dosesDoDia("p1", [rem({ criadoEm: new Date(2026, 8, 30, 9, 0).toISOString() })], HOJE)).toEqual([]);
+  });
+
   it("o dia do pet junta a rotina e as doses, com o que já foi marcado", () => {
     const itens = rotaDeHoje(pet(), null, [rem({})], { p1: { walk: true, "rem:r1:08:00": true } }, HOJE);
     expect(itens.find((i) => i.id === "walk")?.feito).toBe(true);

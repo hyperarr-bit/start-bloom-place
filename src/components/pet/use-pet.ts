@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { localDayKey } from "@/lib/utils";
 import {
-  CHAVE_CUIDADOS, CHAVE_DICAS, CHAVE_LEMBRETE, CHAVE_PESOS, CHAVE_PETS, CHAVE_REGISTROS, chaveRotinaDoDia, chaveTarefasDoPet, comMarca, comPeso,
+  CHAVE_CUIDADOS, CHAVE_DICAS, CHAVE_LEMBRETE, CHAVE_PESOS, CHAVE_PETS, CHAVE_REGISTROS, chaveRotinaDoDia, chaveTarefasDoPet, comPeso, marcarNaRotina,
   novoId, pesoTexto, petsValidos, type Pet, type TarefaDaRotina,
 } from "@/lib/pet";
 import { comCuidado, registrarAplicacao, type Cuidado, type LinhaDaCarteirinha, type Registro } from "@/lib/pet-cuidados";
@@ -67,9 +67,9 @@ export function usePet() {
   }, [get, set]);
 
   /* ── rotina do dia ── */
+  // o 1º gesto grava a lista que a pessoa vê, pro app antigo mostrar a mesma rotina (lib/pet → marcarNaRotina)
   const marcar = useCallback((petId: string, itemId: string, valor: boolean) => {
-    const chave = chaveRotinaDoDia(localDayKey());
-    set(chave, comMarca(get<unknown>(chave, {}), petId, itemId, valor));
+    marcarNaRotina(get, set, petId, itemId, valor);
   }, [get, set]);
 
   const salvarTarefas = useCallback((petId: string, tarefas: TarefaDaRotina[]) => {

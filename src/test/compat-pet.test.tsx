@@ -311,6 +311,8 @@ describe("3. o que o Pet novo grava, o app antigo lê", () => {
     expect(pets.find((p) => p.id === THOR)).toMatchObject({ weight: "29,5", sexo: "macho", porte: "grande", chip: "985112004321987", photoUrl: FOTO_THOR });
     // a rotina da gata vai GRAVADA (o app antigo mostra a mesma lista)
     expect(lista<{ id: string }>(nuvem, `pet-routine-tasks-${frida.id}`).map((t) => t.id)).toEqual(["food", "water", "areia", "food-noite", "play"]);
+    // o Thor (sem lista, do app antigo): o 1º gesto na rotina gravou a lista que o app novo mostra (30/09)
+    expect(lista<{ id: string }>(nuvem, `pet-routine-tasks-${THOR}`).map((t) => t.id)).toEqual(["food", "walk", "water", "food-noite", "play"]);
     // o dia: as marcas do app antigo ficam; a água e a dose do remédio entram como booleano
     const apoquel = lista<{ id: string; nome: string; horarios: string[] }>(nuvem, "pet-cuidados").find((c) => c.nome === "Apoquel")!;
     expect(apoquel.horarios).toEqual(["08:00"]);
@@ -350,9 +352,12 @@ describe("3. o que o Pet novo grava, o app antigo lê", () => {
     expect(saude.getByText("Thor · Vermífugo · 30/09")).toBeInTheDocument();
     expect(saude.getByText("29/12")).toBeInTheDocument();
 
-    // PetRoutine: a água marcada no app novo aparece marcada; a rotina gravada da Frida aparece
+    // PetRoutine: a água marcada no app novo aparece marcada; a rotina gravada da Frida aparece.
+    // O Thor não tinha lista: o 1º gesto no app novo gravou a que ele mostra (a do cachorro), então o
+    // antigo mostra a MESMA rotina — com as marcas de antes (food, walk) e a de agora (água)
     const thor = within(cartaoDaRotina("Thor"));
-    for (const t of ["Comida", "Água", "Passeio"]) expect(thor.getByRole("button", { name: `Desmarcar ${t}` })).toBeInTheDocument();
+    for (const t of ["Comida · manhã", "Água fresca", "Passeio"]) expect(thor.getByRole("button", { name: `Desmarcar ${t}` })).toBeInTheDocument();
+    expect(thor.queryByRole("button", { name: /Banho/ })).not.toBeInTheDocument();
     const frida = within(cartaoDaRotina("Frida"));
     expect(frida.getByRole("button", { name: "Marcar Limpar a areia" })).toBeInTheDocument();
     expect(frida.getByRole("button", { name: "Marcar Comida · noite" })).toBeInTheDocument();
@@ -524,15 +529,15 @@ describe("5. ida e volta: o antigo edita o que o novo gravou, e o novo reabre ce
   });
 });
 
-/* ═════════════════════════ achados (it.fails = bug de compatibilidade aberto) ═════════════════════════ */
+/* ═════════════════════════ achados (eram it.fails; consertados em 30/09 — ver o relatório da integração) ═════════════════════════ */
 
-describe("achados de compatibilidade (it.fails: o teste descreve o certo e hoje falha)", () => {
+describe("achados de compatibilidade — consertados na integração de 30/09 (eram it.fails)", () => {
   /*
    * BUG — peso: `pesosDoPet` (src/lib/pet.ts:229) prefere o histórico `pet-pesos` e só usa o
    * `weight` de sempre quando não há histórico. Depois que alguém pesa no app novo, o peso que
    * o app ANTIGO edita (PetList grava só `weight`) nunca mais aparece no RG nem em PESO do novo.
    */
-  it.fails("peso editado no app antigo depois de pesar no novo: o RG novo mostra o peso que o antigo gravou", () => {
+  it("peso editado no app antigo depois de pesar no novo: o RG novo mostra o peso que o antigo gravou", () => {
     const nuvem = criarNuvem(ANTIGO);
     const novo = nuvem.montar(<Pet />, "/pet");
     fireEvent.click(screen.getByTestId("aba-saude"));
@@ -552,14 +557,13 @@ describe("achados de compatibilidade (it.fails: o teste descreve o certo e hoje 
   });
 
   /*
-   * DIVERGÊNCIA — rotina de pet SEM `pet-routine-tasks-<id>` (todo pet cadastrado no app antigo
+   * ERA DIVERGÊNCIA — rotina de pet SEM `pet-routine-tasks-<id>` (todo pet cadastrado no app antigo
    * que nunca teve hábito editado): o app antigo mostra as 6 de sempre (Comida, Água, Passeio,
-   * Banho, Brincar, Escovar — PetRoutine.defaultTasks); o novo mostra a rotina da espécie
-   * (`tarefasDoPet` → `rotinaPadraoDe`, src/lib/pet.ts:286) sem gravar a lista. O mesmo pet tem
-   * duas rotinas: "Comida · noite" marcada no novo não existe no antigo; "Banho"/"Escovar"
-   * marcados no antigo não existem no novo.
+   * Banho, Brincar, Escovar — PetRoutine.defaultTasks); o novo mostra a rotina da espécie.
+   * Consertado em 30/09 (`marcarNaRotina`, src/lib/pet.ts): o 1º gesto na rotina grava a lista que
+   * o app novo mostra — dali em diante os dois mostram e marcam a mesma. Abrir continua sem gravar.
    */
-  it.fails("pet antigo sem lista gravada: o que o HOJE novo mostra e marca aparece no PetRoutine antigo", () => {
+  it("pet antigo sem lista gravada: o que o HOJE novo mostra e marca aparece no PetRoutine antigo", () => {
     const nuvem = criarNuvem(ANTIGO);
     const novo = nuvem.montar(<Pet />, "/pet");
     fireEvent.click(screen.getByRole("checkbox", { name: "Marcar Comida · noite" }));
@@ -574,7 +578,7 @@ describe("achados de compatibilidade (it.fails: o teste descreve o certo e hoje 
    * descarta registro sem dia válido: a vacina some da carteirinha nova (continua na nuvem e
    * no app antigo).
    */
-  it.fails("registro de saúde que o app antigo gravou sem data (campo Data apagado) aparece na carteirinha nova", () => {
+  it("registro de saúde que o app antigo gravou sem data (campo Data apagado) aparece na carteirinha nova", () => {
     const nuvem = criarNuvem(ANTIGO);
     const antigo = nuvem.montar(<PetHealth />);
     const [seletorDoPet] = Array.from(document.querySelectorAll("select"));

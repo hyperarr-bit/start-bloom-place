@@ -375,12 +375,22 @@ export interface DoseDoDia {
   hora: string;
 }
 
+/** "AAAA-MM-DD" LOCAL de um `criadoEm` (ISO completo ou só o dia); lixo → null. */
+const diaLocalDoCriado = (v: unknown): string | null => {
+  if (typeof v !== "string" || !v) return null;
+  if (ehDia(v)) return v;
+  const t = new Date(v);
+  return Number.isNaN(t.getTime()) ? null : localDayKey(t);
+};
+
 /** As doses de hoje dos remédios com horário (id `rem:<cuidado>:<HH:MM>` em `pet-routine-<dia>`). */
 export function dosesDoDia(petId: string, cuidadosBrutos: unknown, hoje: string = localDayKey()): DoseDoDia[] {
   return cuidadosValidos(cuidadosBrutos)
     .filter((c) => c.petId === petId && !c.arquivado && c.tipo === "remedio" && c.horarios?.length)
     .filter((c) => !c.ate || c.ate >= hoje)
-    .filter((c) => !ehDia(c.criadoEm?.slice(0, 10)) || (c.criadoEm as string).slice(0, 10) <= hoje)
+    // o dia LOCAL em que o remédio foi criado (o `criadoEm` é ISO em UTC: criado às 22h no Brasil
+    // já é "amanhã" no UTC e ficava sem as doses de hoje — 30/09, regra da casa: dia = localDayKey)
+    .filter((c) => { const dia = diaLocalDoCriado(c.criadoEm); return !dia || dia <= hoje; })
     .flatMap((c) => (c.horarios ?? []).map((hora) => ({
       id: `rem:${c.id}:${hora}`,
       cuidadoId: c.id,

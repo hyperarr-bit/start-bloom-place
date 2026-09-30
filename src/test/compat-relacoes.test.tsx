@@ -181,8 +181,9 @@ describe("1. abrir Relações novo com o dado do app antigo", () => {
     const tabela = screen.getByTestId("lista-pessoas");
     for (const nome of ["Mãe", "Ana", "Dona Lúcia", "Pedro"]) expect(within(tabela).getByRole("button", { name: `Abrir ${nome}` })).toBeInTheDocument();
     for (const dia of ["12/10", "05/10", "04/03"]) expect(within(tabela).getByText(dia)).toBeInTheDocument();
-    // o "Aniversário chegando" que a pessoa ligou na central do app antigo (notif-prefs) aparece ligado
-    expect(screen.getByText("Avisos ligados · na véspera")).toBeInTheDocument();
+    // o "Aniversário chegando" que a pessoa ligou na central do app antigo (notif-prefs) segue ligado lá;
+    // na WEB não aparece linha de aviso nenhuma (30/09: lembrete só no app — ver relacoes-tela › avisos)
+    expect(screen.queryByText(/Avisos ligados/)).not.toBeInTheDocument();
     // as notas antigas moram na ficha ("o que lembrar"); abrir e fechar não grava
     fireEvent.click(within(tabela).getByRole("button", { name: "Abrir Mãe" }));
     let ficha = screen.getByTestId("ficha-pessoa");
@@ -454,16 +455,16 @@ describe("5. ida e volta: o antigo edita o que o novo gravou, e o novo reabre ce
   });
 });
 
-/* ═════════════════════════ achados (it.fails = bug de compatibilidade aberto) ═════════════════════════ */
+/* ═════════════════════════ achados (eram it.fails; consertados em 30/09 — ver o relatório da integração) ═════════════════════════ */
 
-describe("achados de compatibilidade (it.fails: o teste descreve o certo e hoje falha)", () => {
+describe("achados de compatibilidade — consertados na integração de 30/09 (eram it.fails)", () => {
   /*
    * BUG — `semAno` fica velho: a pessoa guardada SEM ano (birthday "2000-MM-DD" + semAno) ganha
    * o ano de verdade no PeoplePanel antigo (que só conhece `birthday` e preserva o resto com
    * `...p`). O novo continua lendo `semAno: true` (src/lib/relacoes.ts:126, `semAno: p.semAno === true`)
    * e esconde a idade para sempre ("faz 30" nunca aparece).
    */
-  it.fails("pessoa 'sem ano' que ganha o ano no app antigo: o app novo passa a mostrar a idade", () => {
+  it("pessoa 'sem ano' que ganha o ano no app antigo: o app novo passa a mostrar a idade", () => {
     const comJu = { ...ANTIGO, "rel-people": [...(ANTIGO["rel-people"] as Pessoa[]), { id: "1727000000009", name: "Ju", relation: "Amiga", birthday: "2000-10-02", notes: "", semAno: true, circulo: "amigos" }] };
     const nuvem = criarNuvem(comJu);
     const antigo = nuvem.montar(<PeoplePanel />);

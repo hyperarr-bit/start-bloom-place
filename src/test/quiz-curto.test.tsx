@@ -68,8 +68,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("a chave", () => {
-  it("nasce DESLIGADA (o funil de hoje) e o rollback é uma constante", () => {
-    expect(QUIZ_CURTO).toBe("off");
+  it("a chave é uma das três (30/09: \"on\" — Dia 1 do ROI 2 pra todos, decisão do dono) e desligada devolve o funil de hoje", () => {
+    expect(["off", "ab", "on"]).toContain(QUIZ_CURTO);
     expect(sortearBracoDoQuiz("off")).toBeNull();
     expect(bracoGuardadoDoQuiz("off")).toBeNull();
   });
@@ -116,6 +116,8 @@ describe("as perguntas de cada braço", () => {
 
 describe("no funil (/inicio)", () => {
   it("DESLIGADA: 'Meu dinheiro' abre a 1ª pergunta de hoje e nenhum evento leva o campo quiz", async () => {
+    // a chave de produção pode estar ligada (30/09: "on"); a força "off" é o mesmo caminho do rollback
+    localStorage.setItem(CHAVE_FORCA_QUIZ_CURTO, "off");
     porta();
     fireEvent.click(screen.getByText("Meu dinheiro"));
     await screen.findByTestId("quiz-pilula", {}, { timeout: 4000 });

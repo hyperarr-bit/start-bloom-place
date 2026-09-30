@@ -188,14 +188,28 @@ export const compromissoDoCuidado = (c: Cuidado, data: string, hora: string, avi
   };
 };
 
-/** O cuidado com o horário, e a lista de compromissos com ele (troca o anterior do mesmo cuidado, sem duplicar). */
-export function marcarHorario(c: Cuidado, compromissos: Compromisso[], data: string, hora: string, aviso: number, novoId: string): { cuidado: Cuidado; compromissos: Compromisso[] } {
+/** Id de um item cru da lista de compromissos (item torto → undefined). */
+const idDoItem = (x: unknown): unknown => (x && typeof x === "object" ? (x as { id?: unknown }).id : undefined);
+
+/**
+ * O cuidado com o horário, e a lista de compromissos com ele (troca o anterior do mesmo cuidado, sem duplicar).
+ *
+ * `rotina-compromissos` é chave da ROTINA (e do app antigo): a escrita parte da lista CRUA,
+ * como veio — item que não passa em `compromissosValidos` (sem hora, de uma versão futura…)
+ * continua lá. Filtrar antes de gravar apagaria compromisso da pessoa (30/09, integração).
+ */
+export function marcarHorario(c: Cuidado, compromissosBrutos: unknown, data: string, hora: string, aviso: number, novoId: string): { cuidado: Cuidado; compromissos: unknown[] } {
+  const cru: unknown[] = Array.isArray(compromissosBrutos) ? compromissosBrutos : [];
   const anterior = c.horario?.compromissoId;
-  const id = anterior && compromissos.some((x) => x.id === anterior) ? anterior : novoId;
+  const id = anterior && cru.some((x) => idDoItem(x) === anterior) ? anterior : novoId;
   const comp = compromissoDoCuidado(c, data, hora, aviso, id);
-  const outros = compromissos.filter((x) => x.id !== id);
+  const outros = cru.filter((x) => idDoItem(x) !== id);
   return { cuidado: { ...c, horario: { data, hora, compromissoId: id } }, compromissos: [...outros, comp] };
 }
+
+/** A lista crua de compromissos sem o de `id` (o resto, inclusive item torto, fica como estava). */
+export const semCompromisso = (compromissosBrutos: unknown, id: string): unknown[] =>
+  (Array.isArray(compromissosBrutos) ? compromissosBrutos : []).filter((x) => idDoItem(x) !== id);
 
 /* ------------------------------------------------------------ aviso sem horário */
 

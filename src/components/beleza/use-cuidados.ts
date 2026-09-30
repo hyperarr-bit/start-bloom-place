@@ -1,10 +1,10 @@
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarApagado } from "@/lib/desfazer";
-import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
+import { CHAVE_COMPROMISSOS } from "@/lib/compromissos";
 import { lancarGasto, type GastoLancado } from "@/lib/finance-lancar";
 import {
-  CHAVE_CUIDADOS, cuidadosValidos, marcarFeito, marcarHorario, novoCuidado, ordenarCuidados,
+  CHAVE_CUIDADOS, cuidadosValidos, marcarFeito, marcarHorario, novoCuidado, ordenarCuidados, semCompromisso,
   type Cuidado, type TipoCuidado,
 } from "@/lib/beleza-cuidados";
 import { armarAvisos } from "@/lib/armar-avisos";
@@ -22,7 +22,15 @@ export function useCuidados() {
   const hoje = localDayKey();
   const { get, set } = useUserData();
   const [bruto, setCuidados] = useChaveDaBeleza<Cuidado[]>(CHAVE_CUIDADOS, []);
-  const [compromissosBrutos, setCompromissos] = useChaveDaBeleza<Compromisso[]>(CHAVE_COMPROMISSOS, []);
+  const [, setCompromissosDaBeleza] = useChaveDaBeleza<unknown[]>(CHAVE_COMPROMISSOS, []);
+  /* `rotina-compromissos` é da ROTINA (e o app antigo lê a mesma nuvem): toda escrita daqui parte
+     da lista CRUA de agora — nada de filtrar por `compromissosValidos` antes de gravar, senão um
+     compromisso que a tela não entende some da conta. Valor que não é lista (lixo) não é tocado. */
+  const compromissosCrus = (): unknown[] | null => {
+    const v = get<unknown>(CHAVE_COMPROMISSOS, []);
+    return Array.isArray(v) ? v : v == null ? [] : null;
+  };
+  const setCompromissos = (lista: unknown[]) => { if (compromissosCrus() !== null) setCompromissosDaBeleza(lista); };
   const cuidados = cuidadosValidos(bruto);
   const ordenados = ordenarCuidados(cuidados, hoje);
 
@@ -56,7 +64,9 @@ export function useCuidados() {
   const marcar = (id: string, data: string, hora: string, aviso: number) => {
     const c = cuidados.find((x) => x.id === id);
     if (!c) return;
-    const r = marcarHorario(c, compromissosValidos(compromissosBrutos), data, hora, aviso, novoId());
+    const crus = compromissosCrus();
+    if (crus === null) return;
+    const r = marcarHorario(c, crus, data, hora, aviso, novoId());
     const lista = cuidados.map((x) => (x.id === id ? r.cuidado : x));
     setCuidados(lista);
     setCompromissos(r.compromissos);
@@ -67,7 +77,7 @@ export function useCuidados() {
   const desmarcar = (id: string) => {
     const c = cuidados.find((x) => x.id === id);
     if (!c?.horario) return;
-    const compromissos = compromissosValidos(compromissosBrutos).filter((x) => x.id !== c.horario!.compromissoId);
+    const compromissos = semCompromisso(compromissosCrus() ?? [], c.horario.compromissoId);
     const { horario: _h, ...resto } = c;
     const lista = cuidados.map((x) => (x.id === id ? (resto as Cuidado) : x));
     setCuidados(lista);
@@ -79,12 +89,12 @@ export function useCuidados() {
     const idx = cuidados.findIndex((x) => x.id === id);
     const alvo = cuidados[idx];
     if (!alvo) return;
-    const compromissosAntes = compromissosValidos(compromissosBrutos);
+    const compromissosAntes = compromissosCrus() ?? [];
     const futuro = alvo.horario && alvo.horario.data >= hoje ? alvo.horario.compromissoId : null;
     const lista = cuidados.filter((x) => x.id !== id);
     setCuidados(lista);
-    if (futuro) setCompromissos(compromissosAntes.filter((x) => x.id !== futuro));
-    rearmar({ [CHAVE_CUIDADOS]: lista, ...(futuro ? { [CHAVE_COMPROMISSOS]: compromissosAntes.filter((x) => x.id !== futuro) } : {}) }, false);
+    if (futuro) setCompromissos(semCompromisso(compromissosAntes, futuro));
+    rearmar({ [CHAVE_CUIDADOS]: lista, ...(futuro ? { [CHAVE_COMPROMISSOS]: semCompromisso(compromissosAntes, futuro) } : {}) }, false);
     avisarApagado(`"${alvo.nome}" saiu dos cuidados`, () => {
       setCuidados((prev) => {
         const atual = cuidadosValidos(prev);

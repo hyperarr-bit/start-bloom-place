@@ -387,8 +387,16 @@ describe("CUIDADOS — a próxima data (intervalos do dono, editáveis)", () => 
     expect(r1.compromissos).toHaveLength(1);
     expect(r1.compromissos[0]).toMatchObject({ id: "c1", titulo: "Laser axila · sessão 5 de 10", data: "2026-10-02", hora: "15:30", aviso: 1440, local: "Espaço Laser", origem: "beleza", ref: "l" });
     const r2 = marcarHorario(r1.cuidado, [...r1.compromissos, { id: "outro", titulo: "Dentista", data: "2026-10-05", hora: "09:00" }], "2026-10-03", "10:00", 60, "c2");
-    expect(r2.compromissos.map((c) => c.id).sort()).toEqual(["c1", "outro"]);
+    expect(r2.compromissos.map((c) => (c as { id: string }).id).sort()).toEqual(["c1", "outro"]);
     expect(r2.cuidado.horario).toEqual({ data: "2026-10-03", hora: "10:00", compromissoId: "c1" });
+  });
+
+  it("MARQUEI HORÁRIO parte da lista CRUA de `rotina-compromissos`: item que a tela não entende (sem hora, torto) continua lá (30/09)", () => {
+    const unha = novoCuidado("unha", "u", "Unha");
+    const semHora = { id: "x1", titulo: "Reunião sem hora", data: "2026-10-01" };
+    const torto = { id: "x2", algoDeUmaVersaoFutura: true };
+    const r = marcarHorario(unha, [semHora, null, torto], "2026-10-02", "18:00", 60, "c9");
+    expect(r.compromissos).toEqual([semHora, null, torto, expect.objectContaining({ id: "c9", origem: "beleza" })]);
   });
 });
 

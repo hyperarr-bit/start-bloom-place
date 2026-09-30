@@ -130,7 +130,7 @@ const Relacionamentos = () => {
               "Guarde suas pessoas com o dia do aniversário — o ano é opcional",
               "Na ficha de cada pessoa: o que lembrar, ideias de presente e momentos",
               "Peça pra lembrar de falar com alguém de tempos em tempos",
-              "Ligue os avisos: na véspera, no dia e o “faz tempo que…”",
+              "No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”",
             ]}
           />
           {aba === "pessoas" && <AbaPessoas avisos={avisos} />}
@@ -155,7 +155,8 @@ const Relacionamentos = () => {
           alvo={mensagem && pessoaDaMensagem ? { pessoa: pessoaDaMensagem, tipo: mensagem.tipo } : null}
           onFechar={() => setMensagem(null)}
         />
-        <FolhaDeAvisos aberta={avisosAberto} onFechar={() => {
+        {/* lembrete só no app (30/09): na web a folha nem abre, nem pelo ?avisos=1 */}
+        <FolhaDeAvisos aberta={avisosAberto && avisos.disponiveis} onFechar={() => {
           setAvisosAberto(false);
           if (params.get("avisos")) { params.delete("avisos"); setParams(params, { replace: true }); }
         }} avisos={avisos} />

@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Bell, Home } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { isNativeShell } from "@/lib/native-shell";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { armarAvisos } from "@/lib/armar-avisos";
 import { CHAVE_LEMBRETE } from "@/lib/pet";
 import { ANTECEDENCIAS, algumLigadoPet, type PrefsLembretePet } from "@/lib/pet-avisos";
@@ -22,7 +22,18 @@ export const CHAVE_WIDGETS_HOME = "core-home-widgets-v2";
 
 export const AvisosDoPet = ({ dados }: { dados: UsePet }) => {
   const { prefsLembrete: p, salvarPrefsLembrete, get } = dados;
-  const noApp = isNativeShell();
+
+  /* Na web e na demo não há interruptor (30/09): o aviso é notificação do celular e ligar
+     aqui seria botão morto. Fica só o recado de onde ele mora. */
+  if (!avisosNoApp()) {
+    return (
+      <CartaoPet titulo="Avisos" dataCard="AVISOS DO PET">
+        <p className="px-3.5 py-3 text-[12.5px] text-muted-foreground leading-snug" data-testid="avisos-pet-so-no-app">
+          O aviso no dia da vacina, do vermífugo e do remédio toca no <b className="text-foreground">app do celular</b>, com a mesma conta. É lá que você liga (Pet → Saúde → Avisos) — ele nasce desligado.
+        </p>
+      </CartaoPet>
+    );
+  }
 
   const aplicar = async (novas: PrefsLembretePet) => {
     salvarPrefsLembrete(novas);
@@ -80,11 +91,6 @@ export const AvisosDoPet = ({ dados }: { dados: UsePet }) => {
         </span>
         <Switch checked={p.remedios} onCheckedChange={(v) => void aplicar({ ...p, remedios: v })} aria-label="Avisos de remédio na hora" />
       </label>
-      {!noApp && (
-        <p className="px-3.5 py-2.5 border-t border-dashed border-border text-[12px] text-muted-foreground">
-          No site o aviso não toca — ele toca no app do celular, com a mesma conta.
-        </p>
-      )}
     </CartaoPet>
   );
 };
@@ -102,7 +108,8 @@ export const DicaDoPet = ({ dados, onAvisos }: { dados: UsePet; onAvisos: () => 
   // na demonstração (/preview) não existe Home de verdade nem aviso: a dica só confundiria
   try { if (window.location.pathname.startsWith("/preview")) return null; } catch { /* noop */ }
 
-  const oferta: "home" | "avisos" | null = !naHome && dicas.home !== "nao" ? "home" : !algumLigadoPet(prefsLembrete) && dicas.avisos !== "nao" ? "avisos" : null;
+  // o convite dos avisos só no app (na web o aviso não toca: seria botão morto)
+  const oferta: "home" | "avisos" | null = !naHome && dicas.home !== "nao" ? "home" : avisosNoApp() && !algumLigadoPet(prefsLembrete) && dicas.avisos !== "nao" ? "avisos" : null;
   if (!oferta) return null;
 
   const porNaHome = () => {

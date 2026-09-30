@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { cn, parseLocalDay } from "@/lib/utils";
 import { numeroBR } from "@/lib/data-normalizers";
 import { trackEvent } from "@/lib/analytics";
@@ -237,7 +238,8 @@ export function FichaDoCuidado({ x, id, onFechar }: { x: Cuidados; id: string | 
                 </div>
               )}
 
-              <div className="flex items-center gap-3 rounded-2xl border border-bz-linha px-3 py-2.5">
+              {/* o aviso só no app (30/09): na web ele não toca — seria botão morto */}
+              {avisosNoApp() && <div className="flex items-center gap-3 rounded-2xl border border-bz-linha px-3 py-2.5">
                 <Bell className="w-4 h-4 text-bz-acento shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-bz-tinta">Avisar {c.avisoDiasAntes} {c.avisoDiasAntes === 1 ? "dia" : "dias"} antes</p>
@@ -252,7 +254,7 @@ export function FichaDoCuidado({ x, id, onFechar }: { x: Cuidados; id: string | 
                   </div>
                 </div>
                 <Switch checked={!!c.avisoLigado} onCheckedChange={(v) => x.mudar(c.id, { avisoLigado: v }, v)} aria-label={`Aviso antes de ${c.nome}`} data-testid="aviso-cuidado" />
-              </div>
+              </div>}
 
               <div>
                 <p className={ROTULO_BZ}>Histórico</p>

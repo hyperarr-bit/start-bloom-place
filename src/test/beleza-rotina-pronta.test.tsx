@@ -35,7 +35,8 @@ vi.mock("@/lib/analytics", async (orig) => ({
   trackEventBeacon: vi.fn(),
   markActivation: vi.fn(async () => {}),
 }));
-vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => false }));
+// web por padrão; `comoNoApp()` liga o app da loja (só lá existe lembrete)
+vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.() === true }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     functions: { invoke: vi.fn() },
@@ -80,8 +81,10 @@ beforeAll(() => {
   }
 });
 beforeEach(() => { toastMock.mockClear(); toastMock.success.mockClear(); });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => { vi.useRealTimers(); delete (window as { Capacitor?: unknown }).Capacitor; });
 const fixarData = (d: Date) => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(d); };
+/** O app da loja (Capacitor): só lá existe lembrete (30/09 — na web não aparece botão de aviso). */
+const comoNoApp = () => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "android" }; };
 
 /** Store reativo (a Beleza lê direto do store a cada render, como no app). */
 const criarStore = (inicial: Record<string, unknown> = {}) => {
@@ -519,8 +522,9 @@ describe("agendamento do lembrete do skincare", () => {
 /* ═══════════════════════════ 5. as telas ═══════════════════════════ */
 
 describe("telas", () => {
-  it("rotina vazia: 3 toques gravam a rotina de manhã e de noite; aparece o 'rotina pronta' com lembrete e Home", () => {
+  it("rotina vazia: 3 toques gravam a rotina de manhã e de noite; aparece o 'rotina pronta' com lembrete (no app) e Home", () => {
     fixarData(SEG);
+    comoNoApp();
     const store = criarStore({});
     store.montar(<SkincareRoutine />);
     expect(screen.getByText("Como é a sua pele?")).toBeInTheDocument();
@@ -676,13 +680,28 @@ describe("telas", () => {
     expect(screen.getByTestId("skincare-vazio")).toHaveTextContent(/3 perguntas/);
   });
 
-  it("lembrete: ligar grava a chave nova (objeto) e o site avisa que só toca no app do celular", () => {
+  it("na WEB não aparece lembrete nenhum (nem o cartão, nem o convite 'Ligar'): seria botão morto (30/09)", () => {
     fixarData(SEG);
+    const store = criarStore({});
+    store.montar(<SkincareRoutine />);
+    fireEvent.click(screen.getByTestId("opcao-mista"));
+    fireEvent.click(screen.getByTestId("opcao-manchas"));
+    fireEvent.click(screen.getByTestId("opcao-intermediario"));
+    expect(screen.getByTestId("postit-pronta")).toBeInTheDocument();
+    expect(screen.queryByTestId("postit-lembrete")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lembrete-skincare")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+    expect(store.dados["skincare-lembrete-prefs"]).toBeUndefined();
+  });
+
+  it("lembrete (no app): ligar grava a chave nova (objeto) e mostra o próximo aviso", () => {
+    fixarData(SEG);
+    comoNoApp();
     const { manha, noite } = gerarRotina({ pele: "oleosa", objetivo: "acne", nivel: "avancado" });
     const store = criarStore({ "skincare-am-steps": manha, "skincare-pm-steps": noite });
     store.montar(<SkincareRoutine />);
     const card = screen.getByTestId("lembrete-skincare");
-    expect(within(card).getByTestId("lembrete-so-no-app")).toHaveTextContent("No site o lembrete não toca — ele toca no app do celular.");
+    expect(within(card).queryByTestId("lembrete-so-no-app")).not.toBeInTheDocument();
     fireEvent.click(within(card).getByRole("switch", { name: "Lembrete da noite" }));
     expect(store.dados["skincare-lembrete-prefs"]).toEqual({ manha: { ligado: false, hora: "07:30" }, noite: { ligado: true, hora: "21:30" } });
     // a prévia do próximo aviso é o texto que o celular recebe

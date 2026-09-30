@@ -191,7 +191,7 @@ const OQueVemPronto = () => (
         ["🪪", "RG do pet", "Foto, idade, peso, microchip e o contato do veterinário — o que perguntam na clínica."],
         ["☑️", "O dia do pet", "Comida, passeio, água e remédio com quadradinho. Dá pra marcar da tela inicial."],
         ["💉", "Carteirinha", "Vacinas, vermífugo e antipulgas da idade, com a próxima data calculada sozinha."],
-        ["🔔", "Aviso no dia", "Da vacina, do vermífugo e do remédio. Nasce desligado — você liga se quiser."],
+        ["🔔", "Aviso no dia", "No app do celular: da vacina, do vermífugo e do remédio. Nasce desligado — você liga se quiser."],
       ].map(([emoji, titulo, texto], i) => (
         <li key={titulo} className={`flex gap-3 px-3.5 py-3 ${i ? "border-t border-border" : ""}`}>
           <span className="text-[18px] leading-none mt-0.5" aria-hidden="true">{emoji}</span>

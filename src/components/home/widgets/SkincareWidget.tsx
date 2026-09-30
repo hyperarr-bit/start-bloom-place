@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Bell, BellOff, ChevronRight, Sparkles } from "lucide-react";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { cn } from "@/lib/utils";
 import { diaDaSemanaDaChave, passosDoDia } from "@/lib/beleza-rotina";
 import { diaCurto } from "@/components/tarefas/tarefas-do-dia";
@@ -78,7 +79,7 @@ export const SkincareWidget = ({ size = "large" }: { size?: "small" | "large" })
         </div>
         <div className="px-3 py-2.5">
           <p className="text-[22px] font-extrabold tabular-nums leading-none text-bz-tinta">{feitos}/{lista.length}</p>
-          <p className="text-[11.5px] text-bz-suave mt-1">feitos hoje{horas ? ` · 🔔 ${horas}` : ""}</p>
+          <p className="text-[11.5px] text-bz-suave mt-1">feitos hoje{horas && avisosNoApp() ? ` · 🔔 ${horas}` : ""}</p>
         </div>
       </button>
     );
@@ -94,8 +95,9 @@ export const SkincareWidget = ({ size = "large" }: { size?: "small" | "large" })
         <>
           {linhaCabelo}
           <button type="button" onClick={abrir} className="w-full flex items-center gap-2 px-4 h-12 border-t border-bz-linha bg-bz-papel text-[13px] font-semibold text-bz-suave active:bg-bz-blush" data-testid="abrir-beleza">
-            {horas ? <Bell className="w-4 h-4 text-bz-acento" aria-hidden="true" /> : <BellOff className="w-4 h-4" aria-hidden="true" />}
-            <span className="text-[12px] font-medium">{horas ? `Lembrete ${horas}` : "Sem lembrete"}</span>
+            {/* o estado do lembrete só no app (30/09): na web ele não existe */}
+            {avisosNoApp() && (horas ? <Bell className="w-4 h-4 text-bz-acento" aria-hidden="true" /> : <BellOff className="w-4 h-4" aria-hidden="true" />)}
+            {avisosNoApp() && <span className="text-[12px] font-medium">{horas ? `Lembrete ${horas}` : "Sem lembrete"}</span>}
             <span className="ml-auto inline-flex items-center gap-0.5 text-bz-acento font-bold">Abrir Beleza <ChevronRight className="w-4 h-4" aria-hidden="true" /></span>
           </button>
         </>

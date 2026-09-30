@@ -16,6 +16,7 @@ import { MontarCronograma } from "./montar-cronograma";
 import { CabeloDeHoje } from "./cabelo-de-hoje";
 import { MeuMesCabelo } from "./meu-mes-cabelo";
 import { LembreteDoCabelo } from "./lembrete-cabelo";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { useCabelo } from "./use-cabelo";
 
 const diaMes = (dia: string) => parseLocalDay(dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
@@ -58,7 +59,8 @@ export function Cabelo() {
           <span className="block mt-1 text-[11.5px] opacity-80">Orientação geral — não substitui a avaliação de um dermatologista.</span>
         </Dica>
       )}
-      {pronto && !c.lembrete.dia.ligado && (
+      {/* o convite do lembrete só no app (30/09): na web o aviso não toca — seria botão morto */}
+      {pronto && avisosNoApp() && !c.lembrete.dia.ligado && (
         <Dica icone={<Bell className="w-4 h-4" />} testId="oferta-lembrete-cabelo" acao={<button type="button" onClick={ligarLembrete} className={BOTAO_PILULA}>Ligar</button>}>
           Quer que o CORE avise no dia de lavar, às <b>{c.lembrete.dia.hora}</b>?
         </Dica>
@@ -89,7 +91,7 @@ export function Cabelo() {
         </CartaoBeleza>
       )}
 
-      <LembreteDoCabelo c={c} />
+      {avisosNoApp() && <LembreteDoCabelo c={c} />}
       <p className="text-center text-[11.5px] text-bz-suave px-6">Orientação geral — não substitui a avaliação de um dermatologista.</p>
     </div>
   );

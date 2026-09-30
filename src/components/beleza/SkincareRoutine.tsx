@@ -17,6 +17,7 @@ import { FolhaDoSkincare } from "./skincare-do-dia";
 import { FichaDoPasso, type PassoAberto } from "./ficha-do-passo";
 import { SemanaDaRotina } from "./semana-da-rotina";
 import { LembreteDoSkincare } from "./lembrete-skincare";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { MontarRotina } from "./montar-rotina";
 
 
@@ -125,7 +126,8 @@ export const SkincareRoutine = ({
             Rotina pronta pra pele <b>{rotuloPele}</b>, foco em <b>{rotuloObjetivo}</b>. Toque num passo pra escolher o seu produto ou mudar os dias.
             <span className="block mt-1 text-[11px] opacity-75" data-testid="aviso-dermatologista-pronta">{AVISO_DERMATOLOGISTA}</span>
           </Dica>
-          {!s.lembrete.manha.ligado && !s.lembrete.noite.ligado && (
+          {/* o convite do lembrete só no app (30/09): na web o aviso não toca — seria botão morto */}
+          {avisosNoApp() && !s.lembrete.manha.ligado && !s.lembrete.noite.ligado && (
             <Dica
               testId="postit-lembrete"
               icone={<Bell className="w-4 h-4" />}
@@ -200,7 +202,7 @@ export const SkincareRoutine = ({
 
       {nPassos > 0 && <SemanaDaRotina s={s} onAbrirPasso={(periodo, i) => setAberto({ periodo, i, vista: "ficha" })} />}
 
-      {nPassos > 0 && <LembreteDoSkincare s={s} />}
+      {nPassos > 0 && avisosNoApp() && <LembreteDoSkincare s={s} />}
 
       {/* Conflict guide */}
       <Button variant="ghost" size="sm" className="w-full h-10 rounded-full text-[12.5px] text-bz-suave hover:text-bz-tinta" onClick={() => setShowGuide(!showGuide)}>

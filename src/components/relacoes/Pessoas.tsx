@@ -63,7 +63,7 @@ function ComecoPronto({ completo, onCompletar, onFechar, avisos }: { completo: b
               As datas aparecem nos selos aqui embaixo. Quer que o CORE avise antes de cada aniversário?
             </p>
             <div className="flex gap-2">
-              {!avisos.algumLigado && (
+              {avisos.disponiveis && !avisos.algumLigado && (
                 <BotaoAcao className="flex-[2]" onClick={abrirAvisos}><Bell className="w-4 h-4" /> Me avisa antes</BotaoAcao>
               )}
               <BotaoContorno className="flex-1" onClick={() => { onFechar(); set(CHAVE_COMECO_VISTO, true); }}>Fechar</BotaoContorno>
@@ -164,7 +164,8 @@ function ProximasDatas({ avisos, semConvite }: { avisos: AvisosRelacoes; semConv
 
       {pPresente && <RecadoDePresente pessoa={pPresente} />}
 
-      {!semConvite && <div className="px-3.5 pb-3.5">
+      {/* o convite dos avisos só no app (na web o aviso não toca: seria botão morto) */}
+      {!semConvite && avisos.disponiveis && <div className="px-3.5 pb-3.5">
         {avisos.algumLigado ? (
           <button type="button" onClick={abrirAvisos} className="flex min-h-[44px] w-full items-center gap-2 text-left text-[12.5px] text-muted-foreground">
             <Bell className="w-4 h-4 text-[hsl(var(--rl-tinta))]" />

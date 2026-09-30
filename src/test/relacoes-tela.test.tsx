@@ -247,7 +247,22 @@ describe("faz tempo que… → Falei hoje → Desfazer", () => {
 /* ------------------------------------------------------------------ avisos */
 
 describe("avisos ligados de dentro do módulo (nascem desligados)", () => {
+  afterEach(() => { delete (window as { Capacitor?: unknown }).Capacitor; });
+
+  it("na WEB nenhum botão de aviso aparece (o aviso só toca no app do celular) — nem pelo ?avisos=1 (30/09)", () => {
+    const store = criarStore({
+      ...BASE,
+      "rel-comeco-visto": true,
+      "rel-people": [{ id: "1", name: "Ju", relation: "amiga", birthday: "1997-10-02" }],
+    });
+    abrir(store, "/relacionamentos?avisos=1");
+    expect(screen.queryByRole("button", { name: /Me avisa antes/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("folha-avisos")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+  });
+
   it("'no dia' grava só a chave nova; 'véspera' liga o mesmo interruptor da central sem apagar campo nenhum", () => {
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "android" }; // só no app da loja
     const store = criarStore({
       ...BASE,
       "rel-comeco-visto": true, // sem o começo pronto na tela, o convite pros avisos mora na seção de datas

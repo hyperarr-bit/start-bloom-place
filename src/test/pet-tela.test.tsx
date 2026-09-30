@@ -204,3 +204,30 @@ describe("widget da Home", () => {
     expect(screen.getByText(/NexGard: venceu há 2 dias/)).toBeInTheDocument();
   });
 });
+
+describe("avisos só no app (30/09: na web não aparece botão morto)", () => {
+  afterEach(() => { delete (window as { Capacitor?: unknown }).Capacitor; });
+
+  it("na WEB a SAÚDE mostra só o recado de onde o aviso mora (sem interruptor) e a dica não oferece aviso", () => {
+    const s = criarStore({ ...COM_PET, "core-home-widgets-v2": [{ id: "pet", size: "large" }] });
+    s.montar();
+    // já está na Home: sem o convite dos avisos na web, a dica some
+    expect(screen.queryByTestId("dica-avisos")).toBeNull();
+    fireEvent.click(screen.getByTestId("aba-saude"));
+    expect(screen.getByTestId("avisos-pet-so-no-app")).toHaveTextContent(/app do celular/);
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+    expect(s.escritasDeDado()).toEqual([]);
+  });
+
+  it("no APP os interruptores aparecem, nascem desligados e gravam a chave nova (objeto)", () => {
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "android" };
+    const s = criarStore({ ...COM_PET, "core-home-widgets-v2": [{ id: "pet", size: "large" }] });
+    s.montar();
+    expect(screen.getByTestId("dica-avisos")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("aba-saude"));
+    const cuidados = screen.getByRole("switch", { name: "Avisos de vacina, vermífugo e antipulgas" });
+    expect(cuidados).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(cuidados);
+    expect(s.dados["pet-lembrete-prefs"]).toMatchObject({ cuidados: true, remedios: false });
+  });
+});

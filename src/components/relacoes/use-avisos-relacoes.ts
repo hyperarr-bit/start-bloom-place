@@ -3,6 +3,7 @@ import { CHAVE_PREFS, lerPrefs, PREFS_PADRAO } from "@/lib/prefs-notificacoes";
 import { armarAvisos } from "@/lib/armar-avisos";
 import type { Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { CHAVE_LEMBRETE_RELACOES, lerLembreteRelacoes, type LembreteRelacoes } from "@/lib/relacoes-lembrete";
 
 /**
@@ -42,6 +43,8 @@ export function useAvisosRelacoes() {
   };
 
   return {
+    /** Lembrete só no app da loja (30/09): na web e na demo nenhum botão de aviso aparece. */
+    disponiveis: avisosNoApp(),
     vespera, rel, algumLigado,
     ligarVespera: (v: boolean) => { trackEvent("notif_pref", { campo: "aniversario", valor: v, origem: "relacoes" }); aplicar({ aniversario: v }, {}, v); },
     horaVespera: (h: number) => aplicar({ horaAniversario: h }, {}, false),

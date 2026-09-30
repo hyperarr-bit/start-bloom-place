@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { avisosNoApp } from "@/lib/avisos-no-app";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Plus, Trash2, X, ShoppingCart, Package, AlarmClock, Ban, Edit2, Pipette, ChevronRight, Droplets, Waves, HandHeart, Sparkles, Palette,
@@ -267,14 +268,15 @@ export const ProductShelf = () => {
           <p className="text-[12px] text-bz-suave">{activeProducts.length} produtos ativos</p>
           {activeProducts.length > 0 && <ChipsDeCategoria valor={filtro} onValor={setFiltro} contagem={contagem} todos={activeProducts.length} />}
         </div>
-        <div className="px-4 py-2 border-t border-bz-linha flex items-center gap-3" data-testid="lembrete-validade">
+        {/* o aviso de validade só no app (30/09): na web ele não toca — seria botão morto */}
+        {avisosNoApp() && <div className="px-4 py-2 border-t border-bz-linha flex items-center gap-3" data-testid="lembrete-validade">
           <Bell className="w-4 h-4 text-bz-acento shrink-0" aria-hidden="true" />
           <span className="flex-1 min-w-0">
             <span className="block text-[13px] font-semibold text-bz-tinta">Avisar {lembrete.diasAntes} dias antes de vencer</span>
             <span className="block text-[11.5px] text-bz-suave">às {lembrete.hora}, no app do celular</span>
           </span>
           <Switch checked={lembrete.ligado} onCheckedChange={(v) => { gravarLembrete({ ...lembrete, ligado: v }, v); trackEvent("validade_lembrete", { ligado: v }); }} aria-label="Avisar antes de vencer" />
-        </div>
+        </div>}
       </CartaoBeleza>
 
       {/* VENCENDO: a data que vence primeiro (impressa ou depois de aberto), até 30 dias */}

@@ -122,7 +122,7 @@ const Beleza = () => {
               dicas={[
                 "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
                 "Toque num passo pra escolher o produto e os dias da semana",
-                "Ligue o lembrete da manhã e da noite — ele diz o passo do dia",
+                "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
                 "Cadastre seus produtos para rastrear validade e custo por dose",
               ]}
             />

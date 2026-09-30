@@ -3,12 +3,15 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
-import { algumLigadoPet, planejarAvisosPet, type DadosDosAvisosPet } from "./pet-avisos";
-import { algumLembreteRelacoes, planejarRelacoes, type DadosDasRelacoes } from "./relacoes-lembrete";
-import { algumLigado, planejarSkincare, type DadosDoSkincare } from "./beleza-lembrete";
-import { lembreteCabeloLigado, planejarCabelo, type DadosDoCabelo } from "./beleza-cabelo";
-import { algumAvisoDeCuidado, planejarCuidados, type Cuidado } from "./beleza-cuidados";
-import { planejarValidade, type LembreteValidade, type ProdutoMeu } from "./beleza-produtos";
+/* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
+   este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
+   funil da web não precisa carregar a conta de avisos de três módulos. Aqui só os TIPOS. */
+import type { DadosDosAvisosPet } from "./pet-avisos";
+import type { DadosDasRelacoes } from "./relacoes-lembrete";
+import type { DadosDoSkincare } from "./beleza-lembrete";
+import type { DadosDoCabelo } from "./beleza-cabelo";
+import type { Cuidado } from "./beleza-cuidados";
+import type { LembreteValidade, ProdutoMeu } from "./beleza-produtos";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -810,6 +813,7 @@ export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado:
    remédio na hora de cada dose. Nasce desligado; marcar como feito muda o
    dado → o useLembretes reagenda → o aviso some. */
 export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
+  const { algumLigadoPet, planejarAvisosPet } = await import("./pet-avisos");
   if (!algumLigadoPet(dados.prefs)) { await limparFaixa(BASES.pet); return 0; }
   return agendarSerie("pet", "/pet", planejarAvisosPet(dados, BASES.pet));
 }
@@ -820,6 +824,7 @@ export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
    conversa ("Falei hoje") muda o dado → o useLembretes reagenda → o aviso
    daquela pessoa sai. O toque abre Relações. */
 export async function agendarRelacoes(dados: DadosDasRelacoes): Promise<number> {
+  const { algumLembreteRelacoes, planejarRelacoes } = await import("./relacoes-lembrete");
   if (!algumLembreteRelacoes(dados.prefs)) { await limparFaixa(BASES.relacoes); return 0; }
   return agendarSerie("relacoes", "/relacionamentos", planejarRelacoes(dados, BASES.relacoes));
 }
@@ -831,6 +836,7 @@ export async function agendarRelacoes(dados: DadosDasRelacoes): Promise<number> 
    semana. Marcar os passos de hoje muda o dado → o useLembretes reagenda → o
    aviso de hoje some. O toque abre a Beleza. */
 export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
+  const { algumLigado, planejarSkincare } = await import("./beleza-lembrete");
   if (!algumLigado(dados.prefs)) { await limparFaixa(BASES.beleza); return 0; }
   return agendarSerie("beleza", "/beleza", planejarSkincare(dados, BASES.beleza));
 }
@@ -840,6 +846,7 @@ export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
    10 dias, com a etapa da vez (a R espera 15 dias). FEITO muda a fila → muda a
    agenda → o reagendador refaz a série. O toque abre a aba CABELO. */
 export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
+  const { lembreteCabeloLigado, planejarCabelo } = await import("./beleza-cabelo");
   if (!dados.plano || !lembreteCabeloLigado(dados.prefs)) { await limparFaixa(BASES.cabelo); return 0; }
   return agendarSerie("cabelo", "/beleza?aba=cabelo", planejarCabelo(dados, BASES.cabelo));
 }
@@ -849,6 +856,7 @@ export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
    próxima data, às 09:00. Com horário marcado quem avisa é o compromisso da
    Rotina (faixa dos compromissos) — aqui não duplica. */
 export async function agendarCuidados(lista: Cuidado[]): Promise<number> {
+  const { algumAvisoDeCuidado, planejarCuidados } = await import("./beleza-cuidados");
   if (!algumAvisoDeCuidado(lista)) { await limparFaixa(BASES.cuidados); return 0; }
   return agendarSerie("cuidados", "/beleza?aba=cuidados", planejarCuidados(lista, BASES.cuidados));
 }
@@ -858,6 +866,7 @@ export async function agendarCuidados(lista: Cuidado[]): Promise<number> {
    depois de aberto), às 09:00. Toque abre MEUS PRODUTOS. */
 export async function agendarValidade(produtos: ProdutoMeu[], prefs: LembreteValidade): Promise<number> {
   if (!prefs.ligado) { await limparFaixa(BASES.validade); return 0; }
+  const { planejarValidade } = await import("./beleza-produtos");
   return agendarSerie("validade", "/beleza?aba=produtos", planejarValidade(produtos, prefs, BASES.validade));
 }
 

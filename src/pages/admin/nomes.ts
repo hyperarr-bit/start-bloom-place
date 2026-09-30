@@ -120,9 +120,10 @@ const ABAS: Record<string, string> = {
   "relacionamentos:momentos": "Momentos",
   "relacionamentos:presentes": "Presentes",
   "relacionamentos:eventos": "Eventos (até 29/09)",
-  "pet:pets": "Pets",
+  "pet:hoje": "Hoje", // 30/09: PETS e ROTINA viraram HOJE (RG + o dia do pet)
+  "pet:pets": "Pets (até 29/09)",
   "pet:saude": "Saúde",
-  "pet:rotina": "Rotina",
+  "pet:rotina": "Rotina (até 29/09)",
   "pet:gastos": "Gastos",
   "pet:diario": "Diário",
   "detox:rastreador": "Rastreador",

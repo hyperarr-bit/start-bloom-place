@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
-import { useNavigate } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,8 @@ const tabs = [
 ];
 
 const Saude = () => {
-  const navigate = useNavigate();
+  // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
+  const voltarDoModulo = useVoltarDoModulo();
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
@@ -44,7 +45,7 @@ const Saude = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Heart className="w-5 h-5 text-red-600" />

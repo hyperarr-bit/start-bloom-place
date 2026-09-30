@@ -27,7 +27,7 @@
  * plano, minutos e músculos — o carimbo do mês e as horas saem daqui).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Dumbbell, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { localDayKey, mesAtualExtenso, parseLocalDay, semanaAtualId } from "@/lib/utils";
@@ -167,7 +167,8 @@ const abaDaUrl = (): Aba | null => {
 };
 
 const Treino = () => {
-  const navigate = useNavigate();
+  // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
+  const voltarDoModulo = useVoltarDoModulo();
   const [abaPedida] = useState(abaDaUrl);
   const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
   useScrollActiveTabIntoView(activeTab);
@@ -681,7 +682,7 @@ const Treino = () => {
       />
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-2">
-          <button type="button" onClick={() => navigate("/home")} aria-label="Voltar" className="w-9 h-9 -ml-2 shrink-0 grid place-items-center rounded-md hover:bg-muted">
+          <button type="button" onClick={voltarDoModulo} aria-label="Voltar" className="w-9 h-9 -ml-2 shrink-0 grid place-items-center rounded-md hover:bg-muted">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Dumbbell className="w-5 h-5 text-blue-600 shrink-0" aria-hidden="true" />

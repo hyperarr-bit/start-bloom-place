@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { mesAtualExtenso } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane } from "lucide-react";
@@ -38,7 +38,8 @@ const tabs = [
 ];
 
 const Viagens = () => {
-  const navigate = useNavigate();
+  // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
+  const voltarDoModulo = useVoltarDoModulo();
   const [activeTab, setActiveTab] = useState("destinos");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -61,7 +62,7 @@ const Viagens = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={voltarDoModulo} aria-label="Voltar">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Plane className="w-5 h-5 text-teal-600" />

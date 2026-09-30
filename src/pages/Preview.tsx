@@ -13,6 +13,7 @@ import {
 } from "@/lib/demo-guiada";
 import { aplicarItemNaDemo } from "@/lib/demo-guiada-registro";
 import { sortearBracoDaDemo } from "@/lib/demo-guiada-braco";
+import { VoltaDaDemoProvider, useVoltaDaDemo, type VoltaDaDemo } from "@/lib/volta-da-demo";
 import type { OuvinteDaDemo } from "@/components/demo-guiada/GuiaDaDemo";
 
 /* DEMO GUIADA (28/09): a "Missão de 1 minuto" só desce quando o braço da demo
@@ -241,6 +242,38 @@ const voltaFunilTeste = (from: string, tour?: boolean) => {
   return `${path}?step=${f.volta}${tour ? "&porta=vida" : ""}`;
 };
 
+/** Pra onde o botão de baixo da demo leva (sem o item da demo guiada — quem
+ *  põe o item é o Preview, antes de publicar pro botão e pra seta ←).
+ *  P5 (30/09): saiu de dentro do DemoCta pra seta ← dos módulos usar a MESMA
+ *  conta (src/lib/volta-da-demo.tsx). */
+const destinoDoBotaoDaDemo = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }): string =>
+  // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
+  // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
+  // quando eu fechei o vazamento do Pix. A trava manda pra ENTRADA_APP, que
+  // abre no welcome azul: a pessoa tocava em "Criar conta" no fim da demo e
+  // era devolvida ao começo do funil. Bug que eu mesmo introduzi.
+  //
+  // O fallback do tour na web era "/inicio?step=plano" — e o /inicio (dia 14)
+  // NUNCA entendeu "plano": caía em "start" e reiniciava o funil. Só não
+  // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
+  // Corrigido de passagem.
+  isNativeShell()
+    // v83.1 (dono, 28/08): a demo virou o passo do FUNIL Me+ — a volta cai no
+    // "quer organizar sua vida?" (compromissos → contrato → paywall), não
+    // direto no offer: o contrato assinado é o preditor de 3× da autópsia.
+    // Funil W (29/08): quem armou a demo pode deixar outra volta em
+    // core-demo-volta — senão, o /app de sempre.
+    ? voltaDaDemoShell()
+    /* 31/08 (bronca do dono: "na demo, quando clica em voltar, vai pra um
+       funil diferente"). O W abre a demo com ?from=w, e `from` só é resolvido
+       pela lista FUNIS_TESTE — que tem dia14/radar/v1 e NÃO tem o w. Sem
+       correspondência, caía no /comecar: outro funil, outro paywall, outra
+       oferta. A marca que o próprio funil deixou (core-demo-volta) vale mais
+       que qualquer tabela, porque ela carrega o caminho REAL de origem. */
+    : voltaMarcada()
+      ?? (from && voltaFunilTeste(from, tour))
+      ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
+
 /** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
  *  27/07: a demo PROVA e devolve direto pro CADASTRO, como no dia 14. (Antes
  *  devolvia pra tela SEU PLANO, que saiu do funil do app.) */
@@ -262,12 +295,10 @@ const useDialogoAberto = () => {
   return aberto;
 };
 
-const DemoCta = ({ funnel, tour, from, ajustarLink, aoTocar }: {
-  funnel?: boolean; tour?: boolean; from?: string;
-  /** Demo guiada: a volta leva o item que ela anotou (c=). */
-  ajustarLink?: (url: string) => string;
-  aoTocar?: () => void;
-}) => {
+const DemoCta = ({ funnel }: { funnel?: boolean }) => {
+  // P5 (30/09): o destino (já com o item da demo guiada) e o efeito do toque
+  // vêm do que o Preview publica — a MESMA fonte da seta ← dos módulos.
+  const volta = useVoltaDaDemo();
   const dialogoAberto = useDialogoAberto();
   const faixaRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -280,34 +311,8 @@ const DemoCta = ({ funnel, tour, from, ajustarLink, aoTocar }: {
     ro?.observe(el);
     return () => { ro?.disconnect(); raiz.removeProperty("--teste-banner-h"); };
   }, [dialogoAberto]);
-  // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
-  // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
-  // quando eu fechei o vazamento do Pix. A trava manda pra ENTRADA_APP, que
-  // abre no welcome azul: a pessoa tocava em "Criar conta" no fim da demo e
-  // era devolvida ao começo do funil. Bug que eu mesmo introduzi.
-  //
-  // O fallback do tour na web era "/inicio?step=plano" — e o /inicio (dia 14)
-  // NUNCA entendeu "plano": caía em "start" e reiniciava o funil. Só não
-  // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
-  // Corrigido de passagem.
   const shell = isNativeShell();
-  const to = shell
-    // v83.1 (dono, 28/08): a demo virou o passo do FUNIL Me+ — a volta cai no
-    // "quer organizar sua vida?" (compromissos → contrato → paywall), não
-    // direto no offer: o contrato assinado é o preditor de 3× da autópsia.
-    // Funil W (29/08): quem armou a demo pode deixar outra volta em
-    // core-demo-volta — senão, o /app de sempre.
-    ? voltaDaDemoShell()
-    /* 31/08 (bronca do dono: "na demo, quando clica em voltar, vai pra um
-       funil diferente"). O W abre a demo com ?from=w, e `from` só é resolvido
-       pela lista FUNIS_TESTE — que tem dia14/radar/v1 e NÃO tem o w. Sem
-       correspondência, caía no /comecar: outro funil, outro paywall, outra
-       oferta. A marca que o próprio funil deixou (core-demo-volta) vale mais
-       que qualquer tabela, porque ela carrega o caminho REAL de origem. */
-    : voltaMarcada()
-      ?? (from && voltaFunilTeste(from, tour))
-      ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
-  if (dialogoAberto) return null;
+  if (dialogoAberto || !volta) return null;
   return (
     <div
       ref={faixaRef}
@@ -323,8 +328,8 @@ const DemoCta = ({ funnel, tour, from, ajustarLink, aoTocar }: {
               : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
         </p>
         <Link
-          to={ajustarLink ? ajustarLink(to) : to}
-          onClick={() => { trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" }); aoTocar?.(); }}
+          to={volta.destino}
+          onClick={() => { trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" }); volta.aoTocar?.(); }}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
         >
           {shell ? "Quero o meu assim" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
@@ -483,14 +488,26 @@ const Preview = () => {
         encerrarMissao(item ? "explorar" : "trocou_modulo");
       }
     : undefined;
+  // o "Quase lá" e a seta ← dos módulos (P5): a missão acaba do mesmo jeito; `via` só mede por onde saiu
   const aoTocarQuaseLa = guiaAberta
-    ? () => {
-        if (item) eventoDaMissao("demo_guia_levar", { via: "cta" });
-        else eventoDaMissao("demo_guia_pular", { motivo: "quase_la" });
+    ? (via?: "seta") => {
+        if (item) eventoDaMissao("demo_guia_levar", { via: via ?? "cta" });
+        else eventoDaMissao("demo_guia_pular", { motivo: "quase_la", ...(via ? { via } : {}) });
         encerrarMissao(item ? "levar" : "quase_la");
       }
     : undefined;
   const voltaDaMissao = () => voltaMarcada() ?? (from && voltaFunilTeste(from, tour)) ?? "/comecar?step=signup";
+  /* P5 (30/09): o que o botão de baixo faz, publicado pra seta ← do cabeçalho
+   * de todo módulo (src/lib/volta-da-demo.tsx) — mesmo destino, com o item da
+   * demo guiada, e o mesmo fim de missão. Antes a seta ia pro /auth (Treino,
+   * Dieta, Saúde…) ou pro /comecar (Finanças, Rotina, Metas…). */
+  const destinoDaVolta = destinoDoBotaoDaDemo({ funnel, tour, from });
+  const volta: VoltaDaDemo = {
+    destino: ajustarVolta ? ajustarVolta(destinoDaVolta) : destinoDaVolta,
+    aoTocar: aoTocarQuaseLa,
+    modulo: key,
+    ...(braco ? { extras: { guia: braco } } : {}),
+  };
 
   // CERCA DO TOUR (bug 24/07): a seta ← dos módulos navega pra "/" e o
   // RootGate mandava o visitante pro /comecar (funil de FINANÇAS) — fuga do
@@ -503,6 +520,8 @@ const Preview = () => {
   // CERCA DO SHELL (28/08): arma a guarda que devolve pro funil quem sai da
   // demo pela seta ← dos módulos (navigate("/home") → parecia "outro funil").
   // Quem consome é o GuardaDemoShell no App. Só no app da loja + funil.
+  // P5 (30/09): a seta agora vai direto pra volta do funil (volta-da-demo);
+  // a cerca fica como rede de segurança (Voltar do Android, links soltos).
   useEffect(() => {
     if (!funnel || !isNativeShell()) return;
     try { sessionStorage.setItem("core-demo-guarda", "1"); } catch { /* noop */ }
@@ -540,6 +559,7 @@ const Preview = () => {
   }
 
   return (
+    <VoltaDaDemoProvider value={volta}>
     <div className={`min-h-screen bg-background pb-20 ${tour ? "demo-com-tour" : ""}`}>
       {!embed && (
         <PreviewBanner
@@ -581,8 +601,9 @@ const Preview = () => {
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
       {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} ajustarLink={ajustarVolta} />}
-      {!embed && <DemoCta funnel={funnel} tour={tour} from={from} ajustarLink={ajustarVolta} aoTocar={aoTocarQuaseLa} />}
+      {!embed && <DemoCta funnel={funnel} />}
     </div>
+    </VoltaDaDemoProvider>
   );
 };
 

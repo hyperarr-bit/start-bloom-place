@@ -10,6 +10,7 @@ import { enviarParaMercado } from "@/lib/mercado";
 import { avisarApagado } from "@/lib/desfazer";
 import { fotografarDias, itensDoCardapio, primeiraMaiuscula, restaurarDias, statusAderencia } from "@/components/dieta/cardapio";
 import { useNavigate } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
@@ -325,6 +326,8 @@ const RecipeFields = ({ draft, setDraft, cats, onSave, onCancel, saveLabel, clas
 
 const Dieta = () => {
   const navigate = useNavigate();
+  // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
+  const voltarDoModulo = useVoltarDoModulo();
   const [activeTab, setActiveTab] = useState("cardapio");
   const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);
@@ -727,7 +730,7 @@ const Dieta = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" aria-label="Voltar" onClick={() => { salvarEdicaoAberta(); navigate("/home"); }}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Voltar" onClick={() => { salvarEdicaoAberta(); voltarDoModulo(); }}><ArrowLeft className="w-5 h-5" /></Button>
           <Apple className="w-5 h-5 text-green-600" />
           <h1 className="text-base font-bold tracking-tight">DIETA</h1>
           <div className="flex items-center gap-2 ml-auto">

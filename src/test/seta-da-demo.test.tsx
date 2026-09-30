@@ -174,10 +174,11 @@ describe("demo guiada", () => {
     montar(`/preview/treino${DEMO}&guia=1`);
     await screen.findByTestId("demo-guia-faixa", {}, { timeout: 12_000 });
     const seta = await acharSeta();
-    const destino = botaoDeBaixo().getAttribute("href");
+    // 30/09: no começo da missão o botão de baixo está na TRAVA SUAVE ("1 toque e é
+    // seu →", sem link) — a seta não trava: sai direto pro destino do "Quase lá"
+    expect(screen.getByTestId("demo-cta-travado")).toBeTruthy();
     act(() => { fireEvent.click(seta); });
     await screen.findByTestId("fora");
-    expect(url()).toBe(destino);
     expect(url()).toBe(VOLTA_DO_DIA14);
     expect(estadoDaMissao().fim).toBe("quase_la");
     expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "quase_la", via: "seta", modulo: "treino", guia: "on" }));
@@ -187,7 +188,11 @@ describe("demo guiada", () => {
   it("o 'Quase lá' continua medindo igual ao de antes (sem `via` no pulo)", async () => {
     montar(`/preview/treino${DEMO}&guia=1`);
     await screen.findByTestId("demo-guia-faixa", {}, { timeout: 12_000 });
-    act(() => { fireEvent.click(botaoDeBaixo()); });
+    // 30/09: o 1º toque no botão de baixo é a trava suave (reacende a missão, não sai);
+    // o 2º é o "Quase lá" de sempre — e é ele que precisa medir igual ao de antes
+    act(() => { fireEvent.click(screen.getByTestId("demo-cta-travado")); });
+    const quaseLa = await waitFor(() => botaoDeBaixo());
+    act(() => { fireEvent.click(quaseLa); });
     await screen.findByTestId("fora");
     expect(url()).toBe(VOLTA_DO_DIA14);
     expect(estadoDaMissao().fim).toBe("quase_la");

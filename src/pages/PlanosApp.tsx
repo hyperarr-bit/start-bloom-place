@@ -8,6 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 import { initRevenueCat, restaurar, abrirResgateApple } from "@/lib/revenuecat";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
+import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { estadoTeste, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura, ehApple } from "@/lib/loja";
@@ -276,6 +277,10 @@ const PlanosApp = () => {
           >
             {restaurando ? "Restaurando…" : "Restaurar compras"}
           </button>
+          {/* P6 (30/09): no teste grátis sem conta, quem pagou pelo site entra
+              com o e-mail (a compra da web mora na conta, não na loja). Quem
+              já entrou não vê: está numa conta. */}
+          <JaPagouPeloSite origem="planos" logado={!!user} className="block mx-auto py-1 text-[11px] text-muted-foreground" />
           {msg && <p className="text-[11px] text-muted-foreground">{msg}</p>}
           {/* "Segue e ganha 7 dias" (14/09) — conta já existe: resgata na hora
               e recarrega, que o gate lê o check-subscription de novo. */}

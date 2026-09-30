@@ -773,7 +773,7 @@ export function PaywallAssinatura({
           letra miúda mora na barra fixa. */}
       {contexto !== "funil" && (
         <div className="mt-2">
-          <AppLegalFooter />
+          <AppLegalFooter origem={`paywall_${contexto}`} />
         </div>
       )}
 

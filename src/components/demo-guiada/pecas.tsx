@@ -120,6 +120,21 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
+  /* DIGITANDO (30/09, print do dono no iPhone): com o teclado aberto o Safari
+   * mexe na área visível — o anel ia parar em cima das abas, o balão tapava o
+   * campo e a tela ficava escura enquanto ela escrevia. Campo em foco = o anel
+   * sai de cena (sem escuro, sem balão); fechou o teclado, volta no lugar. */
+  const [digitando, setDigitando] = useState(false);
+  useEffect(() => {
+    const ehCampo = (el: unknown) => el instanceof HTMLElement
+      && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) setDigitando(true); };
+    const saiu = () => { window.setTimeout(() => { if (!ehCampo(document.activeElement)) setDigitando(false); }, 60); };
+    if (ehCampo(document.activeElement)) setDigitando(true);
+    document.addEventListener("focusin", entrou);
+    document.addEventListener("focusout", saiu);
+    return () => { document.removeEventListener("focusin", entrou); document.removeEventListener("focusout", saiu); };
+  }, []);
   const [balao, setBalao] = useState<{ top: number } | null>(null);
   const balaoRef = useRef<HTMLDivElement>(null);
   const reduzir = useReducedMotion();
@@ -233,7 +248,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     setBalao({ top: Math.max(topoLivre, top) });
   }, [rect]);
 
-  if (!rect) return null;
+  if (!rect || digitando) return null;
   const pad = 8;
   const largura = Math.min(window.innerWidth - 12, rect.width + pad * 2);
   const esquerda = Math.max(6, Math.min(rect.left - pad, window.innerWidth - 6 - largura));

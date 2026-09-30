@@ -49,6 +49,7 @@ import { CountdownWidget } from "@/components/home/widgets/CountdownWidget";
 import { WeekCalendarWidget } from "@/components/home/widgets/WeekCalendarWidget";
 import { TasksWidget } from "@/components/home/widgets/TasksWidget";
 import { PetWidget } from "@/components/home/widgets/PetWidget";
+import { RelacoesWidget } from "@/components/home/widgets/RelacoesWidget";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
 
 type WidgetComponent = React.FC<{ size?: "small" | "large" }>;
@@ -72,6 +73,7 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
   "week-calendar": WeekCalendarWidget as WidgetComponent,
   tasks: TasksWidget as WidgetComponent,
   pet: PetWidget as WidgetComponent,
+  relacoes: RelacoesWidget as WidgetComponent,
 };
 
 const HomePage = () => {

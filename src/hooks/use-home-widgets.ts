@@ -21,7 +21,8 @@ export type WidgetId =
   | "countdown"
   | "week-calendar"
   | "tasks"
-  | "pet";
+  | "pet"
+  | "relacoes";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -60,6 +61,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "week-calendar", label: "Visão da Semana", description: "Mini calendário com status de cada dia", emoji: "📅", category: "produtividade", defaultSize: "large" },
   // 29/09 (Pet refeito): a rotina do pet com ✓ e a vacina/vermífugo mais perto de vencer
   { id: "pet", label: "Pet de hoje", description: "Comida, passeio e remédio do pet com ✓, e a próxima vacina", emoji: "🐾", category: "bem-estar", defaultSize: "large" },
+  // 29/09 (Relações, Onda 1): próximos aniversários + quem está esperando um "oi" — opcional
+  { id: "relacoes", label: "Relações", description: "Próximos aniversários e quem faz tempo que você não fala", emoji: "💌", category: "bem-estar", defaultSize: "large" },
 ];
 
 const KEY = "core-home-widgets-v2";

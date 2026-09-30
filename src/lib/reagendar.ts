@@ -5,6 +5,8 @@ import {
 } from "@/lib/notificacoes";
 import { agendarPet } from "@/lib/notificacoes";
 import { algumLigadoPet, lerDadosDosAvisosPet, type DadosDosAvisosPet } from "@/lib/pet-avisos";
+import { agendarRelacoes } from "@/lib/notificacoes";
+import { assinaturaDasRelacoes, lerDadosDasRelacoes, type DadosDasRelacoes } from "@/lib/relacoes-lembrete";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -92,6 +94,8 @@ export interface DadosDosLembretes {
   seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
   /** cuidados do pet (29/09): prefs na chave própria, datas da carteirinha e doses de remédio de hoje */
   pet?: DadosDosAvisosPet;
+  /** Relações (29/09): parabéns no dia + manter contato — as escolhas moram em `rel-lembrete-prefs` */
+  relacoes?: DadosDasRelacoes;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -223,6 +227,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
     })(),
     pet: lerDadosDosAvisosPet(get, hoje),
+    relacoes: lerDadosDasRelacoes(get),
   };
 }
 
@@ -258,6 +263,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
     // (29/09) pet: as prefs moram na chave própria; marcar vacina/dose muda o plano
     !!dados.pet && algumLigadoPet(dados.pet.prefs) && dados.pet,
+    // (29/09) Relações: as escolhas moram na chave própria; "Falei hoje" muda o plano
+    dados.relacoes ? assinaturaDasRelacoes(dados.relacoes) : false,
   ]);
 }
 
@@ -291,5 +298,6 @@ export async function reagendarTudo(
     ),
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
     pet: d.pet ? await agendarPet(d.pet) : 0,
+    relacoes: d.relacoes ? await agendarRelacoes(d.relacoes) : 0,
   };
 }

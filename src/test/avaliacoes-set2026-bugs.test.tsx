@@ -11,9 +11,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { format } from "date-fns";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
-import { PeoplePanel } from "@/components/relacionamentos/PeoplePanel";
 import SmartPantry from "@/components/casa/SmartPantry";
 import GroceryList from "@/components/casa/GroceryList";
 import { kcalDoPlano, kcalRegistradas, lerKcal } from "@/pages/Dieta";
@@ -37,53 +35,9 @@ const renderComStore = (ui: React.ReactElement, store: ReturnType<typeof criarSt
 /* ============================================================
  * RELAÇÕES — "na aba social não temos como editar informações das pessoas,
  * a data de nascimento é difícil de colocar e está colocando sempre um dia
- * anterior"
+ * anterior": as travas moram em relacoes-tela.test.tsx desde o módulo novo
+ * (29/09) — o PeoplePanel saiu, as asserções foram junto pra tela nova.
  * ============================================================ */
-describe("Relações: aniversário no dia certo e pessoa editável", () => {
-  it("o fuso do teste reproduz o bug: new Date('YYYY-MM-DD') cai no dia anterior", () => {
-    // Se isto falhar, o TZ não pegou e os testes abaixo não provam nada.
-    expect(format(new Date("2000-05-10"), "dd/MM")).toBe("09/05");
-  });
-
-  it("aniversário 10/05 aparece como 10/05 (não 09/05)", () => {
-    const store = criarStore({ "rel-people": [{ id: "1", name: "Ana", relation: "irmã", birthday: "2000-05-10", notes: "" }] });
-    renderComStore(<PeoplePanel />, store);
-    expect(screen.getByText("10/05")).toBeInTheDocument();
-    expect(screen.queryByText("09/05")).not.toBeInTheDocument();
-  });
-
-  it("aniversário de HOJE acende 'Hoje!' (comparava meia-noite com a hora atual e pulava um ano)", () => {
-    const hoje = new Date();
-    const chave = `1990-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
-    const store = criarStore({ "rel-people": [{ id: "1", name: "Bia", relation: "", birthday: chave, notes: "" }] });
-    renderComStore(<PeoplePanel />, store);
-    expect(screen.getByText("Hoje!")).toBeInTheDocument();
-  });
-
-  it("edita nome, aniversário e notas; sai; reabre e o dado persistiu com o mesmo id", () => {
-    const store = criarStore({ "rel-people": [{ id: "abc", name: "Ana", relation: "irmã", birthday: "2000-05-10" }] }); // sem `notes`: pessoa antiga
-    const tela = renderComStore(<PeoplePanel />, store);
-
-    fireEvent.click(screen.getByRole("button", { name: /Editar Ana/i }));
-    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Ana Paula" } });
-    fireEvent.change(screen.getByLabelText("Aniversário"), { target: { value: "2000-05-11" } });
-    fireEvent.change(screen.getByLabelText("Notas"), { target: { value: "alérgica a camarão" } });
-    fireEvent.click(screen.getByRole("button", { name: /Salvar pessoa/i }));
-
-    const salvo = (store.dados["rel-people"] as { id: string; name: string; birthday: string; notes: string }[])[0];
-    expect(salvo.id).toBe("abc");
-    expect(salvo.name).toBe("Ana Paula");
-    expect(salvo.birthday).toBe("2000-05-11");
-    expect(salvo.notes).toBe("alérgica a camarão");
-
-    // sai e reabre
-    tela.unmount();
-    renderComStore(<PeoplePanel />, store);
-    expect(screen.getByText("Ana Paula")).toBeInTheDocument();
-    expect(screen.getByText("alérgica a camarão")).toBeInTheDocument();
-    expect(screen.getByText("11/05")).toBeInTheDocument();
-  });
-});
 
 /* ============================================================
  * CASA — "os itens voltam todos para o armário, poderia voltar o item para

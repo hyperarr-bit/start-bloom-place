@@ -4,6 +4,7 @@ import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
 import { algumLigadoPet, planejarAvisosPet, type DadosDosAvisosPet } from "./pet-avisos";
+import { algumLembreteRelacoes, planejarRelacoes, type DadosDasRelacoes } from "./relacoes-lembrete";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -33,7 +34,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -61,6 +62,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
+  relacoes: 1900000, // 29/09: aniversário NO DIA + "faz tempo que não fala com…" (Relações, lib/relacoes-lembrete)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -802,6 +804,16 @@ export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado:
 export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
   if (!algumLigadoPet(dados.prefs)) { await limparFaixa(BASES.pet); return 0; }
   return agendarSerie("pet", "/pet", planejarAvisosPet(dados, BASES.pet));
+}
+
+/* ─── Relações: parabéns no dia e manter contato (29/09, Onda 1) ─────────────
+   A conta mora em lib/relacoes-lembrete (pura). Os dois nascem desligados e
+   se ligam na própria Relações (chave `rel-lembrete-prefs`). Registrar a
+   conversa ("Falei hoje") muda o dado → o useLembretes reagenda → o aviso
+   daquela pessoa sai. O toque abre Relações. */
+export async function agendarRelacoes(dados: DadosDasRelacoes): Promise<number> {
+  if (!algumLembreteRelacoes(dados.prefs)) { await limparFaixa(BASES.relacoes); return 0; }
+  return agendarSerie("relacoes", "/relacionamentos", planejarRelacoes(dados, BASES.relacoes));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

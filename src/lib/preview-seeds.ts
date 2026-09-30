@@ -478,21 +478,29 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   },
   relacionamentos: {
     ...COMMON,
+    // 29/09 (Onda 1): datas RELATIVAS a hoje (o selo "em 3 dias" tem que existir em qualquer dia da demo),
+    // círculos, "lembrar de falar" e presentes com preço. Ano de nascimento + dia/mês de daqui a N dias.
     "rel-people": [
-      { id: "1", name: "Mãe", relation: "Família", birthday: "1965-08-12", notes: "Gosta de orquídea" },
-      { id: "2", name: "Ana", relation: "Namorada", birthday: "1998-03-04", notes: "Ama café coado" },
-      { id: "3", name: "João", relation: "Amigo", birthday: "1997-11-21", notes: "Aniversário sempre no bar do Zé" },
-      { id: "4", name: "Pedro", relation: "Irmão", birthday: "2001-05-09", notes: "" },
-      { id: "5", name: "Dona Lúcia", relation: "Cliente", birthday: "", notes: "Sempre pergunta dos filhos" },
+      { id: "1", name: "Ju", relation: "Melhor amiga", birthday: `1997${daysAgo(-3).slice(4)}`, notes: "Ama café gelado e Clarice Lispector. Tamanho M.", circulo: "amigos", cadencia: 14, cadenciaDesde: daysAgo(60) },
+      { id: "2", name: "Vó Cida", relation: "Avó", birthday: `1946${daysAgo(-16).slice(4)}`, notes: "Adora orquídea e novela das 9.", circulo: "familia", cadencia: 7, cadenciaDesde: daysAgo(30) },
+      { id: "3", name: "Mãe", relation: "Mãe", birthday: `1965${daysAgo(-75).slice(4)}`, notes: "Gosta de orquídea", circulo: "familia" },
+      { id: "4", name: "Ana", relation: "Namorada", birthday: `1998${daysAgo(-150).slice(4)}`, notes: "Ama café coado", circulo: "amor" },
+      { id: "5", name: "Carol", relation: "Amiga da faculdade", birthday: `1996${daysAgo(-200).slice(4)}`, notes: "Começou no emprego novo em agosto.", circulo: "amigos", cadencia: 14, cadenciaDesde: daysAgo(90) },
+      { id: "6", name: "Dona Lúcia", relation: "Cliente", birthday: "", notes: "Sempre pergunta dos filhos", circulo: "trabalho" },
     ],
     "rel-dates": [
-      { id: "1", title: "Aniversário da mãe", person: "Mãe", date: "2026-08-12", type: "birthday" },
-      { id: "2", title: "1 ano de namoro", person: "Ana", date: "2026-09-20", type: "anniversary" },
-      { id: "3", title: "Aniversário do João", person: "João", date: "2026-11-21", type: "birthday" },
+      { id: "1", title: "Namoro com a Ana", person: "Ana", pessoaId: "4", date: `2023${daysAgo(-21).slice(4)}`, type: "anniversary" },
     ],
     "rel-moments": [
-      { id: "1", date: daysAgo(2), person: "Ana", description: "Jantar surpresa em casa" },
-      { id: "2", date: daysAgo(9), person: "Mãe", description: "Almoço de domingo com a família toda" },
+      { id: "1", date: daysAgo(2), person: "Ana", pessoaId: "4", description: "Jantar surpresa em casa" },
+      { id: "2", date: daysAgo(9), person: "Mãe", pessoaId: "3", description: "Almoço de domingo com a família toda", tipo: "encontro" },
+      { id: "3", date: daysAgo(12), person: "Ju", pessoaId: "1", description: "Conversamos sobre a viagem de dezembro", tipo: "conversa" },
+      { id: "4", date: daysAgo(36), person: "Carol", pessoaId: "5", description: "Ela ia começar no emprego novo", tipo: "conversa" },
+    ],
+    "rel-gifts": [
+      { id: "1", person: "Ju", pessoaId: "1", idea: "A hora da estrela (capa dura)", link: "", status: "idea", preco: 59.9 },
+      { id: "2", person: "Ju", pessoaId: "1", idea: "Vale de massagem", link: "", status: "bought", preco: 120 },
+      { id: "3", person: "Vó Cida", pessoaId: "2", idea: "Porta-retrato com a foto da família", link: "", status: "idea" },
     ],
     "rel-events": [
       { id: "1", name: "Churrasco do Pedro", date: daysAgo(-5), location: "Casa do Pedro", rsvp: "confirmed", tasks: [{ id: "1", text: "Levar carvão", done: false }] },

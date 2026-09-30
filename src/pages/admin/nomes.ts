@@ -114,10 +114,10 @@ const ABAS: Record<string, string> = {
   "viagens:seguranca": "SOS",
   "viagens:countdown": "Contagem",
   "relacionamentos:pessoas": "Pessoas",
-  "relacionamentos:agenda": "Agenda",
+  "relacionamentos:agenda": "Datas (era Agenda)", // 29/09: a aba virou DATAS e engoliu os Eventos; o id ficou
   "relacionamentos:momentos": "Momentos",
   "relacionamentos:presentes": "Presentes",
-  "relacionamentos:eventos": "Eventos",
+  "relacionamentos:eventos": "Eventos (até 29/09)",
   "pet:pets": "Pets",
   "pet:saude": "Saúde",
   "pet:rotina": "Rotina",

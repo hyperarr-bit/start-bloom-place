@@ -87,6 +87,8 @@ interface Props {
    *  Cakto caiu — docs da conta em análise); onConfirmado deixa o funil levar
    *  o pagante pro T17 em vez de jogar direto pro app. */
   v2?: { mascote?: React.ReactNode; missao?: string | null; onConfirmado?: () => void };
+  /** FUNIL B (30/09): o checkout do funil "o app é o funil" — e-mail ACIMA do QR, copiar exige e-mail (escanear não), e o pagamento confirmado sai direto pro "Pronto" do funil (sem a tela confirmed daqui). Sem a prop, o checkout fica byte a byte igual. */
+  funilB?: { aoConfirmar: () => void };
 }
 
 // Gateway do Pix de TODO o app (16/07 noite, ordem do dono: Cakto não volta
@@ -520,13 +522,23 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
   );
 }
 
-export function PixCheckout({ offer, onClose, context, v2 }: Props) {
+/* Marca dos eventos do Funil B (30/09). Constantes do módulo de propósito: a
+ * identidade é estável, então `marca` entra em deps de efeito sem refazê-lo. */
+const MARCA_B = { funil: "b" as const };
+const SEM_MARCA = {} as const;
+
+export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   // APP DA LOJA (22/07): dentro do shell Capacitor, Pix in-app viola o Play
   // Billing (obrigatório no BR p/ conteúdo digital). ESTE é o único ponto de
   // bifurcação — todo caminho que abre PixCheckout vira Play Billing no app.
   // 06/08: o destino é o sheet do VITALÍCIO (produto único 47,90) — o
   // SubscriptionPaywall de anual/mensal aposentou junto com a assinatura.
   if (isNativeShell()) return <AppPurchaseSheet onClose={onClose} />;
+  /* FUNIL B (30/09): todo evento deste componente sai carimbado `funil: "b"`
+   * — a régua do B (checkout → QR → copiou → pagou) é lida por esse campo,
+   * separada do funil de sempre. Sem a prop, o objeto é vazio e nada muda.
+   * (pix_adiantado é do módulo, não do componente: fica sem marca.) */
+  const marca = funilB ? MARCA_B : SEM_MARCA;
   const { user: abUser } = useAuth();
   // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
   const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id, offer));
@@ -601,6 +613,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
    * ficaram sem e-mail e não conseguem entrar pelo app. Ao copiar, o campo
    * ganha destaque, rola pra tela e recebe o foco. Não barra nada. */
   const emailQrRef = useRef<HTMLInputElement>(null);
+  /* FUNIL B (30/09): o callback do pai, sempre o mais recente — o polling é um
+   * efeito que nasce quando o QR aparece e não é refeito por causa de prop. */
+  const aoConfirmarB = useRef(funilB?.aoConfirmar);
+  aoConfirmarB.current = funilB?.aoConfirmar;
 
   /* SAÍDA DA TELA DO QR (22/09, telemetria só). Nos dias 21–22, 34% de quem viu
    * o QR não copiou e 71% deles não deixaram evento nenhum depois — não dá pra
@@ -617,7 +633,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     const sair = (motivo: string) => {
       if (mandou) return;
       mandou = true;
-      trackEvent("pix_qr_saida", { offer, context, motivo, segundos: Math.round((Date.now() - t0) / 1000), copiou: copiadoJaRef.current });
+      trackEvent("pix_qr_saida", { offer, context, motivo, segundos: Math.round((Date.now() - t0) / 1000), copiou: copiadoJaRef.current, ...marca });
     };
     const aoEsconder = () => { if (document.visibilityState === "hidden") sair("escondeu"); };
     const aoSumir = () => sair("pagehide");
@@ -637,7 +653,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // servidor; CPF é opcional no gateway). Cakto: prefill do profile — com CPF
   // já salvo, pula o form direto pro QR.
   useEffect(() => {
-    trackEvent("pix_checkout_open", { offer, context, gateway: braco });
+    trackEvent("pix_checkout_open", { offer, context, gateway: braco, ...marca });
     // Cakto: aquece instância+token OAuth enquanto a pessoa digita o CPF —
     // o create dela leva 5-7s frio; isso tira 1-2s da espera real.
     if (braco === "cakto") aquecerCakto();
@@ -674,7 +690,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
          * QR sai já, e o e-mail é pedido NA TELA DO QR, enquanto a pessoa paga
          * (`salvarEmailNoQr`). E-mail de conta existente: entra e ganha um QR
          * novo na conta; o anônimo fica sem uso. */
-        trackEvent("funnel_view", { step: "pix_qr_primeiro", offer, context });
+        trackEvent("funnel_view", { step: "pix_qr_primeiro", offer, context, ...marca });
         setPedirEmailNoQr(true);
         generate("", "");
       })();
@@ -706,10 +722,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         const { erro } = await entrarNaContaExistente(emailCompra, senhaExistente);
         if (erro) {
           setEmailErr("Senha incorreta. Tenta de novo ou usa outro e-mail.");
-          trackEvent("funnel_error", { where: "pix_email_login", offer });
+          trackEvent("funnel_error", { where: "pix_email_login", offer, ...marca });
           return;
         }
-        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer });
+        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer, ...marca });
         await generate("", "");
         return;
       }
@@ -720,16 +736,16 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         setContaExiste(true);
         void guardarCompraAnonima();
         setEmailErr(null);
-        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer });
+        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer, ...marca });
         return;
       }
       if (r.erro) {
         setEmailErr("Não consegui seguir agora. Tenta de novo?");
-        trackEvent("funnel_error", { where: "pix_email", offer, message: (r.mensagem || "").slice(0, 120) });
+        trackEvent("funnel_error", { where: "pix_email", offer, message: (r.mensagem || "").slice(0, 120), ...marca });
         return;
       }
       setAnonima(true);
-      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context });
+      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context, ...marca });
       await generate("", "");
     } finally {
       setEmailIndo(false);
@@ -748,10 +764,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         const { erro } = await entrarNaContaExistente(emailCompra, senhaExistente);
         if (erro) {
           setEmailErr("Senha incorreta. Tenta de novo ou usa outro e-mail.");
-          trackEvent("funnel_error", { where: "pix_email_login", offer, no_qr: true });
+          trackEvent("funnel_error", { where: "pix_email_login", offer, no_qr: true, ...marca });
           return;
         }
-        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer, no_qr: true });
+        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer, no_qr: true, ...marca });
         setEmailSalvo(true);
         await generate("", ""); // QR novo, agora na conta dela
         return;
@@ -762,17 +778,17 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         setContaExiste(true);
         void guardarCompraAnonima();
         setEmailErr(null);
-        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer, no_qr: true });
+        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer, no_qr: true, ...marca });
         return;
       }
       if (r.erro) {
         setEmailErr("Não consegui salvar agora. Tenta de novo?");
-        trackEvent("funnel_error", { where: "pix_email", offer, no_qr: true, message: (r.mensagem || "").slice(0, 120) });
+        trackEvent("funnel_error", { where: "pix_email", offer, no_qr: true, message: (r.mensagem || "").slice(0, 120), ...marca });
         return;
       }
       setAnonima(true);
       setEmailSalvo(true);
-      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context, no_qr: true });
+      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context, no_qr: true, ...marca });
     } finally {
       setEmailIndo(false);
     }
@@ -781,7 +797,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   /** Entrou pela conta existente com o código do e-mail: mesmo destino da senha. */
   const entrouPorCodigo = async (noQr: boolean) => {
     limparBatismo();
-    trackEvent("funnel_click", { cta: "pix_email_login_ok", via: "codigo", offer, ...(noQr ? { no_qr: true } : {}) });
+    trackEvent("funnel_click", { cta: "pix_email_login_ok", via: "codigo", offer, ...(noQr ? { no_qr: true } : {}), ...marca });
     if (noQr) setEmailSalvo(true);
     await generate("", "");
   };
@@ -807,14 +823,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     sessaoCedo.current = null;
     const estadoSessao = await (cedo ?? garantirSessao());
     if (estadoSessao === "indisponivel") {
-      trackEvent("pix_error", { offer, context, message: "sem_sessao" });
+      trackEvent("pix_error", { offer, context, message: "sem_sessao", ...marca });
       setSemSessao(true);
       setErrMsg("Sua sessão expirou. Entra de novo rapidinho e o Pix sai na hora.");
       setStep("error");
       return;
     }
     if (estadoSessao === "anonima") {
-      setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context });
+      setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context, ...marca });
       // 06/09: no caminho COM form (Cakto/Pagar.me) o anônimo ainda não deu
       // e-mail — pede na tela do QR, senão paga e não tem como recuperar o acesso.
       if (!SEM_FORM) setPedirEmailNoQr(true);
@@ -905,6 +921,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             offer, context, de: "cakto", para: "asaas", ms: Date.now() - t0,
             motivo: String(error?.message || data?.error || "sem_qr").slice(0, 120),
             adiantado: !!usado,
+            ...marca,
           });
           usado = null;
           gwUsado = "asaas";
@@ -935,7 +952,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       /* pix_generated SÓ sai aqui, com o QR na tela — é ele que alimenta o
        * e-mail de Pix pendente e o ROI da web. 26/09: + adiantado e espera_ms
        * (do toque até o QR). O pedido adiantado que ninguém viu não vira evento. */
-      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco, adiantado: !!usado, espera_ms: Date.now() - tToque });
+      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco, adiantado: !!usado, espera_ms: Date.now() - tToque, ...marca });
       if (usado) relatarAdiantado(usado.reg, "ok", { idade_ms: usado.idadeMs, esperou_ms: usado.esperouMs, pronto: usado.pronto });
       // dia-14: o CPF digitado vira tax_id no perfil → próximo open pula o
       // form. Pagar.me/Cakto salvam no servidor; Asaas/Abacate ignoram o doc,
@@ -954,7 +971,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       // tela de confirmação), o rescue no app dispara o Purchase mesmo assim.
       markPixPurchasePending({ offer, orderId: data.orderId ?? null });
     } catch (e: any) {
-      trackEvent("pix_error", { offer, context, message: String(e?.message || e).slice(0, 200) });
+      trackEvent("pix_error", { offer, context, message: String(e?.message || e).slice(0, 200), ...marca });
       setErrMsg("Não consegui gerar o Pix. Tenta de novo em alguns segundos.");
       setStep("error");
     }
@@ -968,13 +985,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setSecondsLeft(Math.max(0, s));
       if (s <= 0) {
         setStep("expired");
-        trackEvent("pix_expired", { offer, context });
+        trackEvent("pix_expired", { offer, context, ...marca });
       }
     };
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, [step, pix?.expiresAt, offer, context]);
+  }, [step, pix?.expiresAt, offer, context, marca]);
 
   // Polling: pagou? Cakto: o webhook grava a assinatura e a gente pergunta ao
   // check-subscription. AbacatePay (v2): perguntamos direto à abacate-pix, que
@@ -1032,11 +1049,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           : await supabase.functions.invoke("check-subscription");
         if (proprio ? data?.paid : data?.subscribed) {
           doneRef.current = true;
-          trackEvent("pix_confirmed", { offer, context, gateway: gwDoPix, braco });
+          trackEvent("pix_confirmed", { offer, context, gateway: gwDoPix, braco, ...marca });
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
           // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
           firePixPurchaseOnce("checkout");
-          setStep("confirmed");
+          /* FUNIL B (30/09): o "Pronto" é do funil (senha DEPOIS de pagar), não a
+           * tela confirmed daqui — avisa o pai e fica no QR até ele desmontar. */
+          if (aoConfirmarB.current) aoConfirmarB.current();
+          else setStep("confirmed");
           return;
         }
       } catch { /* tenta de novo */ }
@@ -1068,8 +1088,49 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, offer, context, pix?.orderId, gwDoPix]);
 
+  /* FUNIL B (30/09): rola até o campo de e-mail e foca — na hora, sem os 350 ms
+   * do checkout de sempre (lá o bloco troca de lugar ao copiar; aqui ele já
+   * está na tela, acima do botão). */
+  const focarEmailQr = () => {
+    emailQrRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    emailQrRef.current?.focus({ preventScroll: true });
+  };
+
   const copyCode = async () => {
     if (!pix) return;
+    /* FUNIL B (30/09): COPIAR EXIGE E-MAIL. Dado (21–28/07, 383 QRs): quem copia
+     * paga 75%, quem não copia 4,6% — o toque em copiar é o momento em que a
+     * compra ganha dona. Sem e-mail, o Pix pago não tem a quem pertencer (risco
+     * nº 1 do funil sem conta). Escanear o QR NÃO passa por aqui. */
+    if (funilB && pedirEmailNoQr && !emailSalvo) {
+      if (contaExiste) {
+        // O e-mail já tem conta e ela ainda não entrou: o código copiado iria pro
+        // pedido anônimo — o Pix tem que nascer na conta dela (entrouPorCodigo).
+        setEmailErr("Entra na sua conta ali em cima (código no e-mail) e o Pix vai pra ela.");
+        setEmailEmDestaque(true);
+        trackEvent("funnel_view", { step: "pix_email_obrigatorio", motivo: "conta_existe", offer, context, ...marca });
+        focarEmailQr();
+        return;
+      }
+      if (!/\S+@\S+\.\S+/.test(emailCompra.trim())) {
+        setEmailErr("Coloca seu e-mail pra copiar o código — é pra onde vai o acesso.");
+        setEmailEmDestaque(true);
+        trackEvent("funnel_view", { step: "pix_email_obrigatorio", motivo: emailCompra.trim() ? "invalido" : "vazio", offer, context, ...marca });
+        focarEmailQr();
+        return;
+      }
+      /* A ORDEM IMPORTA: a gravação do e-mail dispara ANTES do clipboard e NÃO é
+       * esperada. `salvarEmailNoQr` roda síncrono até o 1º await, então o pedido
+       * de rede (definirEmailDaCompra → updateUser) já saiu neste mesmo tick; o
+       * clipboard vem logo em seguida, ainda dentro do gesto do toque — o Safari
+       * (e o webview do Instagram) negam writeText depois de um await de rede.
+       * Se a gravação voltar "email_em_uso", o bloco "já tem conta" aparece na
+       * tela de copiado e o código copiado continua válido: a compra anônima
+       * fica guardada (guardarCompraAnonima, dentro do salvarEmailNoQr) e o
+       * use-auth traz o Pix pra conta em que ela entrar. Falhou por rede: o
+       * erro fica no bloco, com "Salvar e-mail" pra tentar de novo. */
+      void salvarEmailNoQr();
+    }
     try {
       await navigator.clipboard.writeText(pix.qrCode);
     } catch {
@@ -1083,11 +1144,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     }
     setCopied(true);
     setCopiadoJa(true);
-    trackEvent("pix_copied", { offer, context });
+    trackEvent("pix_copied", { offer, context, ...marca });
     setTimeout(() => setCopied(false), 2500);
-    if (pedirEmailNoQr && !emailSalvo) {
+    // No B o e-mail já foi dado (ou está sendo gravado): não há campo pra destacar.
+    if (!funilB && pedirEmailNoQr && !emailSalvo) {
       setEmailEmDestaque(true);
-      trackEvent("funnel_view", { step: "pix_email_destaque", offer, context });
+      trackEvent("funnel_view", { step: "pix_email_destaque", offer, context, ...marca });
       window.setTimeout(() => {
         emailQrRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
         emailQrRef.current?.focus({ preventScroll: true });
@@ -1103,12 +1165,72 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const mm = secondsLeft != null ? String(Math.floor(secondsLeft / 60)).padStart(2, "0") : null;
   const ss = secondsLeft != null ? String(secondsLeft % 60).padStart(2, "0") : null;
 
+  /* BLOCO DO E-MAIL NA TELA DO QR (02/09). UM JSX, DUAS posições: no checkout
+   * de sempre entra DEPOIS do botão de copiar, sem barrar nada; no Funil B
+   * (30/09) entra ANTES do botão — e antes do passo a passo, depois de copiar —
+   * porque lá copiar exige e-mail (ver copyCode). Título e sub mudam no B; o
+   * campo, o "já tem conta" (código por e-mail), a senha e o erro são os mesmos. */
+  const blocoEmailQr = pedirEmailNoQr && !emailSalvo ? (
+    <div
+      data-testid="pix-email-qr"
+      data-destaque={emailEmDestaque ? "1" : "0"}
+      className={`text-left rounded-xl border p-3 mb-3 transition-colors ${emailEmDestaque ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+    >
+      <p className="text-[12.5px] font-bold leading-tight">
+        {funilB ? "Onde mando o acesso?" : emailEmDestaque ? "Código copiado ✓ — pra onde mando seu acesso?" : "Pra onde mandamos seu acesso?"}
+      </p>
+      <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">
+        {funilB
+          ? "Só o e-mail — é por ele que você entra no app do celular e em outro aparelho."
+          : emailEmDestaque
+            ? "Só o e-mail. É por ele que você entra pelo app do celular e em outro aparelho."
+            : "Só o e-mail. Se fechar a aba depois de pagar, é por ele que você entra."}
+      </p>
+      <input
+        ref={emailQrRef}
+        type="email" inputMode="email" autoComplete="email"
+        value={emailCompra}
+        onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) { setContaExiste(false); setUsarSenha(false); } }}
+        placeholder="seu@email.com"
+        className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors"
+      />
+      {contaExiste && !usarSenha && (
+        <div className="mt-2" data-testid="pix-ja-tem-conta-qr">
+          <p className="text-[12px] leading-snug mb-2">Esse e-mail já tem conta no CORE. Te mando um código pra entrar e o Pix vai pra ela.</p>
+          <EntrarComCodigo rotulo="Receber código no e-mail" email={emailCompra} funil="pix_ja_tem_conta_qr" onSession={() => void entrouPorCodigo(true)} />
+          <button type="button" className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-2" onClick={() => { setUsarSenha(true); setEmailErr(null); }}>
+            Prefiro usar minha senha
+          </button>
+        </div>
+      )}
+      {contaExiste && usarSenha && (
+        <input
+          type="password" autoComplete="current-password"
+          value={senhaExistente}
+          onChange={(e) => { setSenhaExistente(e.target.value); setEmailErr(null); }}
+          placeholder="sua senha"
+          className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors mt-2"
+        />
+      )}
+      {emailErr && <p className="text-[12px] text-destructive mt-1.5 leading-snug">{emailErr}</p>}
+      {(!contaExiste || usarSenha) && (
+        <Button
+          size="sm" variant="outline" className="w-full h-10 mt-2 font-semibold"
+          disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
+          onClick={() => void salvarEmailNoQr()}
+        >
+          {emailIndo ? "Salvando…" : contaExiste ? "Entrar e passar o Pix pra minha conta" : "Salvar e-mail"}
+        </Button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="fixed inset-0 z-[400] bg-background overflow-y-auto">
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
         {step !== "confirmed" && (
           <button
-            onClick={() => { trackEvent("pix_checkout_close", { offer, context, step }); onClose(step); }}
+            onClick={() => { trackEvent("pix_checkout_close", { offer, context, step, ...marca }); onClose(step); }}
             aria-label="Fechar"
             className="fixed top-3 right-3 z-10 grid place-items-center w-9 h-9 rounded-full bg-black/[0.06] text-muted-foreground/70 hover:text-foreground transition-colors"
           >
@@ -1376,6 +1498,16 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     <Check className="w-6 h-6" strokeWidth={3} />
                   </motion.div>
                   <h2 className="text-[22px] font-bold tracking-tight mb-1">Código copiado!</h2>
+                  {/* FUNIL B (30/09): o e-mail é quem dá dona à compra. Se a gravação
+                      do toque em copiar não fechou (falhou, ou o e-mail já tem
+                      conta), o bloco fica AQUI, antes do passo a passo, com o erro;
+                      fechou, a linha diz pra onde vai o acesso. */}
+                  {funilB && blocoEmailQr && <div className="mt-3">{blocoEmailQr}</div>}
+                  {funilB && pedirEmailNoQr && emailSalvo && (
+                    <p className="text-[12px] text-muted-foreground mt-2 mb-3" data-testid="pix-email-salvo">
+                      Acesso vai pra <strong className="text-foreground">{emailCompra.trim().toLowerCase()}</strong> — pode fechar esta tela sem medo.
+                    </p>
+                  )}
                   <p className="text-[13px] text-muted-foreground mb-4">Agora é só colar no app do seu banco:</p>
                   <div className="text-left bg-muted/40 rounded-xl p-4 text-[14px] space-y-2.5 mb-4">
                     <p><strong className="text-foreground">1.</strong> Abra o app do seu <strong className="text-foreground">banco</strong></p>
@@ -1392,7 +1524,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     <p className="text-[11.5px] text-muted-foreground mb-1.5">Não colou? Segura no código e copia na mão:</p>
                     <p
                       className="select-all break-all font-mono text-[10.5px] leading-snug bg-muted/60 border border-border rounded-lg p-2.5 text-foreground/80"
-                      onCopy={() => trackEvent("pix_copied", { offer, context, via: "selecao" })}
+                      onCopy={() => trackEvent("pix_copied", { offer, context, via: "selecao", ...marca })}
                     >
                       {pix.qrCode}
                     </p>
@@ -1435,6 +1567,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     <span aria-hidden>·</span>
                     <span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-accent" /> acesso na hora</span>
                   </div>
+                  {/* FUNIL B (30/09): e-mail ACIMA do botão — copiar exige e-mail (copyCode). */}
+                  {funilB && blocoEmailQr}
+                  {funilB && pedirEmailNoQr && emailSalvo && (
+                    <p className="text-[12px] text-muted-foreground mb-3" data-testid="pix-email-salvo">
+                      Acesso vai pra <strong className="text-foreground">{emailCompra.trim().toLowerCase()}</strong>.
+                    </p>
+                  )}
                 </>
               )}
 
@@ -1447,60 +1586,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                 {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> {copiadoJa ? "Copiar de novo" : "Copiar código Pix"}</>}
               </Button>
 
-              {/* QR primeiro (02/09): o e-mail entra AQUI, depois do código, sem barrar nada. */}
-              {pedirEmailNoQr && !emailSalvo && (
-                <div
-                  data-testid="pix-email-qr"
-                  data-destaque={emailEmDestaque ? "1" : "0"}
-                  className={`text-left rounded-xl border p-3 mb-3 transition-colors ${emailEmDestaque ? "border-accent bg-accent/5" : "border-border bg-card"}`}
-                >
-                  <p className="text-[12.5px] font-bold leading-tight">
-                    {emailEmDestaque ? "Código copiado ✓ — pra onde mando seu acesso?" : "Pra onde mandamos seu acesso?"}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">
-                    {emailEmDestaque
-                      ? "Só o e-mail. É por ele que você entra pelo app do celular e em outro aparelho."
-                      : "Só o e-mail. Se fechar a aba depois de pagar, é por ele que você entra."}
-                  </p>
-                  <input
-                    ref={emailQrRef}
-                    type="email" inputMode="email" autoComplete="email"
-                    value={emailCompra}
-                    onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) { setContaExiste(false); setUsarSenha(false); } }}
-                    placeholder="seu@email.com"
-                    className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors"
-                  />
-                  {contaExiste && !usarSenha && (
-                    <div className="mt-2" data-testid="pix-ja-tem-conta-qr">
-                      <p className="text-[12px] leading-snug mb-2">Esse e-mail já tem conta no CORE. Te mando um código pra entrar e o Pix vai pra ela.</p>
-                      <EntrarComCodigo rotulo="Receber código no e-mail" email={emailCompra} funil="pix_ja_tem_conta_qr" onSession={() => void entrouPorCodigo(true)} />
-                      <button type="button" className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-2" onClick={() => { setUsarSenha(true); setEmailErr(null); }}>
-                        Prefiro usar minha senha
-                      </button>
-                    </div>
-                  )}
-                  {contaExiste && usarSenha && (
-                    <input
-                      type="password" autoComplete="current-password"
-                      value={senhaExistente}
-                      onChange={(e) => { setSenhaExistente(e.target.value); setEmailErr(null); }}
-                      placeholder="sua senha"
-                      className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors mt-2"
-                    />
-                  )}
-                  {emailErr && <p className="text-[12px] text-destructive mt-1.5 leading-snug">{emailErr}</p>}
-                  {(!contaExiste || usarSenha) && (
-                    <Button
-                      size="sm" variant="outline" className="w-full h-10 mt-2 font-semibold"
-                      disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
-                      onClick={() => void salvarEmailNoQr()}
-                    >
-                      {emailIndo ? "Salvando…" : contaExiste ? "Entrar e passar o Pix pra minha conta" : "Salvar e-mail"}
-                    </Button>
-                  )}
-                </div>
-              )}
-              {pedirEmailNoQr && emailSalvo && (
+              {/* QR primeiro (02/09): o e-mail entra AQUI, depois do código, sem barrar nada.
+                  (No Funil B ele já apareceu lá em cima — ver blocoEmailQr.) */}
+              {!funilB && blocoEmailQr}
+              {!funilB && pedirEmailNoQr && emailSalvo && (
                 <p className="text-[12px] text-muted-foreground mb-3">
                   Acesso vai pra <strong className="text-foreground">{emailCompra.trim().toLowerCase()}</strong>.
                 </p>
@@ -1515,16 +1604,26 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               )}
 
               {mostrarQR ? (
-                <div className="bg-white rounded-2xl border border-border p-4 mx-auto w-fit mb-3 shadow-sm">
-                  {pix.qrCodeBase64 ? (
-                    <img src={pix.qrCodeBase64} alt="QR Code Pix" className="w-[170px] h-[170px]" />
-                  ) : (
-                    <QRCodeSVG value={pix.qrCode} size={170} />
+                <>
+                  <div className="bg-white rounded-2xl border border-border p-4 mx-auto w-fit mb-3 shadow-sm">
+                    {pix.qrCodeBase64 ? (
+                      <img src={pix.qrCodeBase64} alt="QR Code Pix" className="w-[170px] h-[170px]" />
+                    ) : (
+                      <QRCodeSVG value={pix.qrCode} size={170} />
+                    )}
+                  </div>
+                  {/* FUNIL B (30/09): escanear NÃO exige e-mail (quem escaneia paga de
+                      outro aparelho e nunca toca em copiar) — mas precisa saber que o
+                      e-mail vem depois, nesta mesma tela, pra não fechar sem dar. */}
+                  {funilB && pedirEmailNoQr && !emailSalvo && (
+                    <p className="text-[11.5px] text-muted-foreground leading-snug px-3 mb-3" data-testid="pix-escanear-sem-email">
+                      Escaneou sem e-mail? Depois de pagar, a gente pede seu e-mail aqui mesmo — não fecha esta tela.
+                    </p>
                   )}
-                </div>
+                </>
               ) : (
                 <button
-                  onClick={() => { setMostrarQR(true); trackEvent("pix_qr_reveal", { offer, context }); }}
+                  onClick={() => { setMostrarQR(true); trackEvent("pix_qr_reveal", { offer, context, ...marca }); }}
                   className="block mx-auto text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 mb-3"
                 >
                   {copiadoJa ? "Pagar de outro celular? Mostrar QR code" : "Prefiro escanear o QR code"}

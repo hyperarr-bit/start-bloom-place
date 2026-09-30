@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { guardarCompraAnonima } from "@/lib/sessao-anonima";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { anonimoLigado, guardarCompraAnonima } from "@/lib/sessao-anonima";
+import { aquecerCheckoutPix } from "@/components/paywall/PixCheckout";
+import { PARAM_BRACO } from "@/lib/demo-guiada-braco";
+import { itemDaDemo } from "@/lib/demo-guiada";
+import { STEP_GUARDANDO, STEP_PRONTO, abrirUrl, comFunilB, decidirFunilB, ehFunilB, marcaDoFunilB, respostasDaUrl } from "@/lib/funil-b";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { varianteCadastro } from "@/lib/cadastro-ab";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,14 +11,17 @@ import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
-import { PaywallDia14 as PaywallFlow } from "./PaywallDia14";
+import { PaywallDia14 as PaywallFlow, OFERTA_WEB } from "./PaywallDia14";
+/* FUNIL B (30/09): a tela "Pronto + senha" só existe depois do Pix — desce sob
+ * demanda, fora do chunk da porta (a 1ª tela do tráfego pago). */
+const ProntoB = lazy(() => import("./ProntoB"));
 import { Button } from "@/components/ui/button";
 import { ehApple } from "@/lib/loja";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { trackEvent, trackEventBeacon, captureLandingMeta } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon, captureLandingMeta, getAttributionParams } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
@@ -51,7 +58,7 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "prova" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
+type Step = "start" | "quiz" | "prova" | "progress" | "result" | "central" | "signup" | "offer" | "confirm" | "guardando" | "pronto";
 
 const DEMO_URL = "/preview/financas?funnel=1&from=dia14";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -59,6 +66,9 @@ const DEMO_URL = "/preview/financas?funnel=1&from=dia14";
  *  direto na aba Metas — a promessa da porta, não o "Sobre mim". */
 const demoUrlFor = (area: AreaKey) =>
   `/preview/${AREAS[area].module}?funnel=1&tour=vida&from=dia14${area === "metas" ? "&tab=metas" : ""}`;
+/** FUNIL B (src/lib/funil-b.ts): a porta abre a demo DIRETO, já com a missão
+ *  (guia=1) e o braço (f=b) na URL — o quiz vira toques dentro da demo. */
+const demoUrlDoFunilB = (area: AreaKey) => comFunilB(`${demoUrlFor(area)}&${PARAM_BRACO}=1`);
 
 // Funil sempre em tema claro (fundo branco), mesmo se o visitante estiver no dark.
 const LIGHT_VARS = {
@@ -785,7 +795,7 @@ export function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
   );
 }
 
-export function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
+export function ProgressScreen({ onDone, steps = PREP_STEPS, titulo = "Preparando seu plano…" }: { onDone: () => void; steps?: string[]; titulo?: string }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
     if (done >= steps.length) {
@@ -807,7 +817,7 @@ export function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => v
         </svg>
         <div className="absolute inset-0 grid place-items-center text-2xl font-bold tabular-nums">{pct}%</div>
       </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu plano…</h2>
+      <h2 className="text-2xl font-bold tracking-tight mb-1">{titulo}</h2>
       <p className="text-muted-foreground text-sm mb-8">Isso leva só alguns segundos.</p>
       <div className="space-y-3 text-left max-w-xs mx-auto">
         {steps.map((s, i) => {
@@ -826,6 +836,32 @@ export function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => v
           da prova social — funil de volta ao estado de 29/07. */}
     </div>
   );
+}
+
+/* ------------------------------------------------ FUNIL B: "Guardando…" (T3) */
+
+const PASSOS_GUARDANDO = ["Guardando o que você fez", "Ligando os 16 módulos", "Preparando seu acesso"];
+
+/**
+ * FUNIL B (30/09): 2–3 s entre a demo e o preço. Guarda o que ela fez (o item
+ * e as respostas já vieram na URL), aquece a função do Pix (sem criar pedido —
+ * o Pix adiantado foi vetado em 27/09) e pergunta se a chave de sessão anônima
+ * está ligada: sem ela, o preço sem conta não existe e o funil volta ao
+ * cadastro de hoje (degrada, não quebra). Nunca falha pro lado novo.
+ */
+function GuardandoB({ onDone }: { onDone: (semConta: boolean) => void }) {
+  const anonimoRef = useRef<Promise<boolean> | null>(null);
+  useEffect(() => {
+    anonimoRef.current = Promise.race([
+      anonimoLigado().catch(() => false),
+      new Promise<boolean>((r) => setTimeout(() => r(false), 4000)),
+    ]);
+    aquecerCheckoutPix(undefined, OFERTA_WEB);
+  }, []);
+  const terminou = useCallback(() => {
+    void (anonimoRef.current ?? Promise.resolve(false)).then(onDone);
+  }, [onDone]);
+  return <ProgressScreen steps={PASSOS_GUARDANDO} titulo="Guardando o que você fez…" onDone={terminou} />;
 }
 
 /** Diagnóstico derivado das respostas — barras que dão o momento "isso sou eu". */
@@ -1215,20 +1251,33 @@ function ConfirmScreen({ email }: { email: string }) {
 export default function ComecarDia14() {
   const [params] = useSearchParams();
   const { user, isSubscribed, subLoaded } = useAuth();
-  // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
-  // (?step=offer, via /auth/callback) cai direto no paywall.
-  // ("trial" é aceito por compat com links antigos.)
-  const [step, setStep] = useState<Step>(() => {
-    const s = params.get("step");
-    return s === "signup" ? "signup" : s === "offer" || s === "trial" ? "offer" : "start";
-  });
-  const [confirmEmail, setConfirmEmail] = useState("");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   // Funil vitrine: /inicio (URL limpa dos anúncios) ou ?porta=vida (compat).
   // Criativo "app pra vida inteira". A área escolhida persiste — quem volta
   // da demo (?step=signup) segue na trilha.
   const { pathname } = useLocation();
   const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
+  /* FUNIL B (30/09, src/lib/funil-b.ts). A decisão é tomada NA PORTA, pela
+   * campanha (chave "kenny" = só a kenny g); dali em diante o braço viaja na
+   * URL (`f=b`): a volta da demo chega em `?step=guardando&f=b`. Quem está no
+   * meio do funil de hoje (`?step=signup`/`offer`) nunca é puxado pro B. */
+  const [bracoB] = useState<boolean>(() => {
+    if (ehFunilB(params)) return true;
+    if (params.get("step")) return false;
+    return vitrine && decidirFunilB(getAttributionParams().utm_campaign ?? null);
+  });
+  // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
+  // (?step=offer, via /auth/callback) cai direto no paywall.
+  // ("trial" é aceito por compat com links antigos.)
+  const [step, setStep] = useState<Step>(() => {
+    const s = params.get("step");
+    // B: a volta da demo é "guardando" (preço antes da conta) e a recarga depois
+    // do Pix é "pronto". Com a chave desligada (rollback no meio do caminho), os
+    // dois caem no cadastro de hoje — ninguém fica preso num passo que não existe.
+    if (s === STEP_GUARDANDO || s === STEP_PRONTO) return bracoB ? s : "signup";
+    return s === "signup" ? "signup" : s === "offer" || s === "trial" ? "offer" : "start";
+  });
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
       const a = localStorage.getItem(FUNNEL_AREA_KEY);
@@ -1295,8 +1344,13 @@ export default function ComecarDia14() {
   // Prova social viva do paywall: busca já no cadastro (cache em memória),
   // pra o número estar na tela junto com a oferta. Falhou → texto fixo.
   useEffect(() => {
-    if (roi2 && (step === "signup" || step === "offer")) void buscarProvaSocial();
+    if (roi2 && (step === "signup" || step === "offer" || step === "guardando")) void buscarProvaSocial();
   }, [step, roi2]);
+
+  // Funil B: pagou (a checagem periódica viu antes do checkout) → "Pronto", nunca o app direto.
+  useEffect(() => {
+    if (bracoB && step === "offer" && subLoaded && isSubscribed) setStep("pronto");
+  }, [bracoB, step, subLoaded, isSubscribed]);
 
   // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
   // qual campanha/origem trouxe cada sessão.
@@ -1309,13 +1363,16 @@ export default function ComecarDia14() {
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
   // e o paywall emite offer/wheel/downsell por conta própria).
   useEffect(() => {
-    if (step !== "quiz" && step !== "offer") {
+    // ("pronto" é emitido pela própria tela, com o que ela sabe a mais)
+    if (step !== "quiz" && step !== "offer" && step !== "pronto") {
       trackEvent("funnel_view", {
         step,
         // Segmenta o funil vitrine ("vida") do funil padrão (finanças) no admin.
         ...(vitrine ? { porta: "vida" } : {}),
         // Quiz curto (30/09): o braço segue em toda tela do funil; sem experimento, nada.
         ...(bracoQuiz ? { quiz: bracoQuiz } : {}),
+        // Funil B (30/09): a marca em toda tela — kenny g no B × as outras no funil de hoje.
+        ...marcaDoFunilB(bracoB),
         // Só na 1ª tela: sinal pra distinguir visita real de pré-carregamento
         // do webview (Instagram/TikTok pré-abrem a página antes do tap real —
         // isso chega com visibilityState "hidden"/"prerender").
@@ -1330,12 +1387,23 @@ export default function ComecarDia14() {
   // que ele escolheu. Caso real de 12/07: pagante voltou pro /inicio pelo
   // link do anúncio, reviu o quiz, tentou recriar a conta ("User already
   // registered") e cancelou achando que era problema técnico.
-  if (user && subLoaded && isSubscribed) {
+  /* FUNIL B: no preço e no "Pronto" a assinatura pode virar ativa a qualquer
+   * momento (o webhook do Pix grava antes de a tela saber) — e a conta ainda é
+   * ANÔNIMA, sem senha. Mandar pro app aqui seria largar quem acabou de pagar
+   * sem e-mail/senha num app que ela não consegue reabrir. O checkout leva pro
+   * "Pronto" (aoConfirmar); se a checagem periódica chegar antes, o efeito
+   * abaixo faz o mesmo. */
+  const noPosPagoDoB = bracoB && (step === "offer" || step === "pronto");
+  if (user && subLoaded && isSubscribed && !noPosPagoDoB) {
     return <Navigate to={area && area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
   }
 
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
-  if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;
+  if (step === "offer") {
+    return bracoB
+      ? <PaywallFlow context="funnel" answers={{ ...answers, ...(area ? { area } : {}), ...respostasDaUrl(params) }} funilB onPagoSemConta={() => setStep("pronto")} />
+      : <PaywallFlow context="funnel" answers={answers} />;
+  }
 
   return (
     <div style={LIGHT_VARS} className="tema-claro min-h-dvh bg-white text-foreground flex flex-col">
@@ -1351,6 +1419,15 @@ export default function ComecarDia14() {
                   const first = { area: picked };
                   setAnswers(first);
                   try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
+                  /* FUNIL B: sem quiz, sem "preparando", sem radar, sem central —
+                   * a porta abre o app de verdade, e o quiz vira toques lá dentro. */
+                  if (bracoB) {
+                    try { localStorage.setItem("funnel-quiz-answers", JSON.stringify(first)); } catch { /* noop */ }
+                    trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked, funil: "b", ...(portaAntigaNesteAparelho() ? { porta_v: "antiga" } : {}) });
+                    trackEvent("funnel_quiz_answer", { q: "area", answer: label, funil: "b" });
+                    abrirUrl(demoUrlDoFunilB(picked));
+                    return;
+                  }
                   // Quiz curto (30/09): sorteio do braço NA PORTA; porta por aparelho (30/09): marca qual porta ela viu.
                   const sorteado = sortearBracoDoQuiz();
                   setBracoQuiz(sorteado);
@@ -1417,6 +1494,19 @@ export default function ComecarDia14() {
               />
             )}
             {step === "confirm" && <ConfirmScreen email={confirmEmail} />}
+            {/* FUNIL B: "Guardando…" → preço sem conta (ou o cadastro de hoje, se a sessão anônima estiver desligada) */}
+            {step === "guardando" && (
+              <GuardandoB onDone={(semConta) => {
+                if (!semConta) trackEvent("funnel_view", { step: "b_sem_anonimo", funil: "b" });
+                setStep(semConta ? "offer" : "signup");
+              }} />
+            )}
+            {/* FUNIL B: pagou → Pronto + senha (a conta anônima vira a dela) */}
+            {step === "pronto" && (
+              <Suspense fallback={null}>
+                <ProntoB area={area} item={itemDaDemo(params)} respostas={respostasDaUrl(params)} />
+              </Suspense>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>

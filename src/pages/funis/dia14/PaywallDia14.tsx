@@ -7,7 +7,9 @@ import {
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid, Smartphone, Zap, MessageCircle,
 } from "lucide-react";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
-import { temItemDaDemo } from "@/lib/demo-guiada-volta";
+import { PARAM_ITEM, temItemDaDemo } from "@/lib/demo-guiada-volta";
+import { PARAM_BRACO } from "@/lib/demo-guiada-braco";
+import { PARAM_CONSISTENCIA, PARAM_FUNIL_B, PARAM_GASTO, PARAM_VITORIA, VALOR_FUNIL_B, marcaDoFunilB } from "@/lib/funil-b";
 import { useProvaSocial, formatarPessoas, type ProvaSocial } from "@/lib/prova-social";
 import { Faixa, Grade16, PostIt, SERIF_ITALICO } from "./pecas-roi2";
 import { Button } from "@/components/ui/button";
@@ -75,8 +77,8 @@ const semViuva = (frase: string) => frase.replace(/ (\S+)$/, "\u00A0$1");
 
 /** Sinal de intenção de compra + abre o Pix in-app. A Compra (Purchase) em si
  *  continua server-side (CAPI da Cakto via webhook). */
-function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: PixOffer) => void) {
-  trackEvent("funnel_click", { cta, context });
+function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: PixOffer) => void, extra: Record<string, unknown> = {}) {
+  trackEvent("funnel_click", { cta, context, ...extra });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
     value: Number(PIX_PRICES[offer].replace(",", ".")),
@@ -769,8 +771,8 @@ const ConstruiuNaDemo = lazy(() => import("@/components/demo-guiada/Construiu").
  * Rollback = FUNIL_ROI2 = false (volta o OfferScreen abaixo, intocado).
  */
 function OfferScreenRoi2({
-  context, answers, onBuy, onEscape,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; onEscape: () => void }) {
+  context, answers, onBuy, onEscape, funilB = false,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; onEscape: () => void; funilB?: boolean }) {
   const [showClose, setShowClose] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setShowClose(true), 1800);
@@ -786,7 +788,8 @@ function OfferScreenRoi2({
   };
   const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
   const prova = useProvaSocial();
-  const [construiu] = useState(() => context === "funnel" && !isNativeShell() && temItemDaDemo());
+  // Funil B: o bloco "O que você já construiu" entra sempre (as respostas do quiz também são registros dela)
+  const [construiu] = useState(() => context === "funnel" && !isNativeShell() && (temItemDaDemo() || funilB));
 
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10" data-testid="paywall-roi2">
@@ -856,7 +859,7 @@ function OfferScreenRoi2({
             <Button
               size="lg"
               className="w-full h-14 rounded-full px-3 text-[14px] min-[390px]:text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy)}
+              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy, marcaDoFunilB(funilB))}
             >
               Liberar os 16 módulos — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4 shrink-0" />
             </Button>
@@ -1137,12 +1140,18 @@ export function PaywallDia14({
   context,
   answers,
   onPagoSemConta,
+  funilB = false,
 }: {
   context: "funnel" | "app";
   answers?: Record<string, string>;
   /** 07/09: no funil W da web, quem paga sem conta segue pro cadastro
    *  (batismo) e depois pro "liberando" — o mesmo caminho do PaywallW. */
   onPagoSemConta?: () => void;
+  /** FUNIL B (30/09, src/lib/funil-b.ts): paywall SEM conta. Muda: a marca
+   *  `funil: "b"` nos eventos, o bloco "construiu" sempre, o checkout no modo B
+   *  (e-mail acima do QR, copiar exige e-mail, pagou → `onPagoSemConta` direto)
+   *  e o X volta pra demo em vez do módulo (não existe conta ainda). */
+  funilB?: boolean;
 }) {
   /**
    * DOWNSELL COM ROLETA (05/08, ordem do dono). Três fases: oferta → roleta →
@@ -1265,9 +1274,9 @@ export function PaywallDia14({
     const name = context === "funnel" ? "funnel_view" : "paywall_view";
     // paywall_ab vai junto pra dar pra separar os dois braços na leitura do dia.
     trackEvent(name, context === "funnel"
-      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco, roi2 }
+      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco, roi2, ...marcaDoFunilB(funilB) }
       : { phase: `v2_${phase}`, paywall_ab: braco, roi2 });
-  }, [phase, context, braco, roi2]);
+  }, [phase, context, braco, roi2, funilB]);
 
   /* PAYWALL_SAIDA (27/09, medição — copiado do PaywallW, com beacon): 72% de
    * quem vê o paywall não toca em pagar e não dava pra saber se saía no topo
@@ -1288,7 +1297,7 @@ export function PaywallDia14({
       const a = quiz?.area && quiz.area in AREAS ? quiz.area : "dinheiro";
       trackEventBeacon("funnel_view", {
         step: "paywall_saida", context, motivo, segundos: Math.round((Date.now() - s.t0) / 1000),
-        rolou_pct: s.rolou, tocou_cta: s.tocou, area: a, paywall_ab: braco, roi2,
+        rolou_pct: s.rolou, tocou_cta: s.tocou, area: a, paywall_ab: braco, roi2, ...marcaDoFunilB(funilB),
       });
     };
     const aoEsconder = () => { if (document.visibilityState === "hidden") sair("escondeu"); };
@@ -1316,7 +1325,13 @@ export function PaywallDia14({
   return (
     <div style={LIGHT_VARS} className="tema-claro min-h-dvh w-full bg-white text-foreground overflow-y-auto">
       {pixOffer && (
-        <PixCheckout offer={pixOffer} context={context} onClose={fecharPix} v2={onPagoSemConta ? { onConfirmado: onPagoSemConta } : undefined} />
+        <PixCheckout
+          offer={pixOffer}
+          context={context}
+          onClose={fecharPix}
+          v2={!funilB && onPagoSemConta ? { onConfirmado: onPagoSemConta } : undefined}
+          funilB={funilB ? { aoConfirmar: () => onPagoSemConta?.() } : undefined}
+        />
       )}
       <div className="px-5">
         <AnimatePresence mode="wait">
@@ -1326,11 +1341,20 @@ export function PaywallDia14({
                 context={context}
                 answers={quiz}
                 onBuy={abrirPix}
+                funilB={funilB}
                 onEscape={() => {
                   if (abrirResgate("x")) return;
-                  trackEvent("funnel_click", { cta: "paywall_escape", context });
+                  trackEvent("funnel_click", { cta: "paywall_escape", context, ...marcaDoFunilB(funilB) });
                   if (context !== "funnel") return;
                   const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
+                  if (funilB) {
+                    // B: não existe conta — o X devolve pra demo, com o que ela fez (item, respostas, braço)
+                    const atual = new URLSearchParams(window.location.search);
+                    const q = new URLSearchParams({ funnel: "1", tour: "vida", from: "dia14", [PARAM_BRACO]: "1", [PARAM_FUNIL_B]: VALOR_FUNIL_B });
+                    for (const k of [PARAM_ITEM, PARAM_GASTO, PARAM_VITORIA, PARAM_CONSISTENCIA]) { const v = atual.get(k); if (v) q.set(k, v); }
+                    navigate(`/preview/${AREAS[a].module}?${q.toString()}`);
+                    return;
+                  }
                   navigate(`/${AREAS[a].module}`);
                 }}
               />

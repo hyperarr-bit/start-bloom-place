@@ -20,6 +20,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { gravarEstadoDaMissao, itemDaDemo, rotuloDoItem, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
 import { levarItemParaConta } from "@/lib/demo-guiada-registro";
+import { ehFunilB, respostasDaUrl, type RespostasDoFunilB } from "@/lib/funil-b";
+import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { Faixa, SERIF_ITALICO } from "@/pages/funis/dia14/pecas-roi2";
 import { Quadradinho } from "./Quadradinho";
 
@@ -75,13 +77,31 @@ export default function ConstruiuNaDemoSemFalha() {
   return <SemFalha><ConstruiuNaDemo /></SemFalha>;
 }
 
+/** FUNIL B (30/09): as respostas do quiz que viraram toques na demo também
+ *  são registros dela — entram como linhas do bloco (até 3 itens no total). */
+function linhasDasRespostas(r: RespostasDoFunilB): ReactNode[] {
+  const out: ReactNode[] = [];
+  if (r.gasto) {
+    const a = GASTO_ANCHOR[r.gasto];
+    out.push(a
+      ? <><strong className="font-bold">Seu mês:</strong> ~{a.month} saindo sem você ver</>
+      : <><strong className="font-bold">Seu mês:</strong> descobrir pra onde vai o dinheiro</>);
+  }
+  if (r.vitoria) out.push(<><strong className="font-bold">Vitória da semana:</strong> {VICTORY_PHRASE[r.vitoria] ?? r.vitoria}</>);
+  return out;
+}
+
 function ConstruiuNaDemo() {
   const [item] = useState<ItemDaDemo | null>(() => itemDaDemo(window.location.search));
+  const [b] = useState(() => ehFunilB(window.location.search));
+  const [respostas] = useState<RespostasDoFunilB>(() => (b ? respostasDaUrl(window.location.search) : {}));
   useLevarItemParaConta(item);
+  const extras = b ? linhasDasRespostas(respostas) : [];
   useEffect(() => {
-    if (item) trackEvent("paywall_construiu_view", { guia: "on", tipo: item.tipo });
+    if (item || extras.length) trackEvent("paywall_construiu_view", { guia: "on", ...(item ? { tipo: item.tipo } : {}), ...(b ? { funil: "b", respostas: extras.length } : {}) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item]);
-  if (!item) return null;
+  if (!item && !extras.length) return null;
   return (
     <div className="relative rounded-2xl border border-border bg-card p-4 text-left overflow-hidden" data-testid="construiu">
       <div className="flex items-center justify-between gap-2">
@@ -91,11 +111,14 @@ function ConstruiuNaDemo() {
       </div>
       {/* tabela com grade, quadradinho marcado — a folha do planner */}
       <div className="mt-3.5 rounded-xl border border-border overflow-hidden divide-y divide-border">
-        <Linha destaque>
-          <strong className="font-bold">{rotuloDoItem(item)}</strong>{" "}
-          <span className="text-accent text-[16px] leading-none whitespace-nowrap" style={SERIF_ITALICO}>por você</span>
-        </Linha>
-        <Linha>{PRONTO[item.tipo]}</Linha>
+        {item && (
+          <Linha destaque>
+            <strong className="font-bold">{rotuloDoItem(item)}</strong>{" "}
+            <span className="text-accent text-[16px] leading-none whitespace-nowrap" style={SERIF_ITALICO}>por você</span>
+          </Linha>
+        )}
+        {extras.map((l, i) => <Linha key={i}>{l}</Linha>)}
+        {item && <Linha>{PRONTO[item.tipo]}</Linha>}
         <Linha>16 módulos no mesmo acesso</Linha>
       </div>
       <p className="mt-2.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">

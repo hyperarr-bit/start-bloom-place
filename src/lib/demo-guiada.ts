@@ -116,7 +116,20 @@ export interface EstadoDaMissao {
   inicio?: string;
   item?: ItemDaDemo;
   fim?: FimDaMissao;
+  /** FUNIL B (30/09): as respostas do quiz que viraram toques na missão (gasto/consistência e vitória). */
+  respostas?: Record<string, string>;
 }
+
+const RESPOSTA_MAX = 60;
+const limparRespostas = (x: unknown): Record<string, string> | undefined => {
+  if (!x || typeof x !== "object") return undefined;
+  const out: Record<string, string> = {};
+  for (const k of ["gasto", "consistencia", "vitoria"]) {
+    const v = (x as Record<string, unknown>)[k];
+    if (typeof v === "string" && v.trim()) out[k] = limparNome(v).slice(0, RESPOSTA_MAX);
+  }
+  return Object.keys(out).length ? out : undefined;
+};
 
 const CHAVE_SESSAO = CHAVE_SESSAO_DA_MISSAO;
 let memoria: EstadoDaMissao = {};
@@ -130,6 +143,7 @@ const lerSessao = (): EstadoDaMissao => {
       inicio: typeof o?.inicio === "string" ? o.inicio : undefined,
       item: normalizarItem(o?.item) ?? undefined,
       fim: o?.fim,
+      respostas: limparRespostas(o?.respostas),
     };
   } catch {
     return {};
@@ -139,7 +153,10 @@ const lerSessao = (): EstadoDaMissao => {
 export const estadoDaMissao = (): EstadoDaMissao => ({ ...lerSessao(), ...memoria });
 
 export function gravarEstadoDaMissao(parcial: EstadoDaMissao): EstadoDaMissao {
-  memoria = { ...estadoDaMissao(), ...parcial };
+  const antes = estadoDaMissao();
+  memoria = { ...antes, ...parcial };
+  // as respostas somam (gasto num toque, vitória no outro), não substituem
+  if (parcial.respostas) memoria.respostas = { ...(antes.respostas ?? {}), ...parcial.respostas };
   try { sessionStorage.setItem(CHAVE_SESSAO, JSON.stringify(memoria)); } catch { /* memória + URL seguram */ }
   return memoria;
 }

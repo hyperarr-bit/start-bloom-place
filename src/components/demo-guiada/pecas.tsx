@@ -696,3 +696,80 @@ export function MissaoCumprida({ linhas, destaque, titulo, sub, aoLevar, aoExplo
   );
 }
 
+/* ------------------------------------------------------------ FUNIL B: o post-it das perguntas */
+
+/**
+ * O POST-IT SOLTO DAS PERGUNTAS (Funil B, 30/09): as 2 respostas do quiz viram
+ * toques da missão. Papel amarelo com fita magenta, a pergunta e os chips das
+ * opções (1 toque = a resposta dela). Sem anel e sem escuro: ele fica preso
+ * embaixo do topo fixo, como o cartão do passo 1, e a demo continua tocável.
+ * Em `eco`, o mesmo papel devolve o que ela disse (a tela de impacto do quiz
+ * de hoje, dentro do app) com o botão de seguir.
+ */
+export function PostItDaPergunta({ passo, pergunta, chips, tocado, aoChip, eco, testid = "demo-guia-pergunta" }: {
+  passo: string;
+  pergunta: string;
+  chips: Array<{ emoji: string; label: string }>;
+  tocado?: string | null;
+  aoChip: (label: string) => void;
+  /** o eco da resposta: texto + botão de seguir (o papel troca de conteúdo) */
+  eco?: { texto: ReactNode; botao: string; aoBotao: () => void } | null;
+  testid?: string;
+}) {
+  const reduzir = useReducedMotion();
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => { setTop(fundoDoTopoFixo() + 12); }, []);
+  return createPortal(
+    <motion.div
+      className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none"
+      style={{ top: top ?? -9999, visibility: top == null ? "hidden" : "visible" }}
+      data-camada-guia="demo-pergunta"
+      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}
+    >
+      <div className="relative w-[92%] max-w-[360px] pointer-events-auto" data-testid={testid} data-eco={eco ? "1" : "0"}>
+        <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
+        <motion.div
+          className="rounded-md px-4 pt-3.5 pb-3.5 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)]"
+          style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
+          initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
+        >
+          <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{passo}</span>
+          {eco ? (
+            <div data-testid={`${testid}-eco`}>
+              <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{eco.texto}</span>
+              <div className="mt-3">
+                <BotaoSeguir onClick={eco.aoBotao} testid={`${testid}-seguir`}>{eco.botao}</BotaoSeguir>
+              </div>
+            </div>
+          ) : (
+            <>
+              <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {chips.map((c, i) => {
+                  const marcado = tocado === c.label;
+                  return (
+                    <motion.button
+                      key={c.label}
+                      type="button"
+                      onClick={() => aoChip(c.label)}
+                      data-testid={`${testid}-chip`}
+                      className="min-h-11 pl-3 pr-3.5 rounded-full text-[13.5px] font-bold inline-flex items-center gap-1.5 shadow-[0_2px_0_rgba(0,0,0,.12)] active:scale-95 transition-[transform,background-color,color]"
+                      style={marcado ? { background: GRAFITE, color: "#fff" } : { background: "#fff", color: TINTA_POST_IT }}
+                      initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, scale: marcado ? [1, 1.08, 1] : 1 }}
+                      transition={{ delay: reduzir ? 0 : 0.1 + i * 0.06, duration: 0.3 }}
+                    >
+                      {marcado ? <Check className="w-4 h-4" strokeWidth={3.5} /> : <span aria-hidden>{c.emoji}</span>}
+                      <span>{c.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </motion.div>
+      </div>
+    </motion.div>,
+    document.body,
+  );
+}
+

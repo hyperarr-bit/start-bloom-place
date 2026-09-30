@@ -41,6 +41,8 @@ export const TEMPOS_DA_MISSAO = {
   olhar: 8000,
   /** trava suave do CTA fixo: "1 toque e é seu →" até o 1º registro OU este tempo OU 1 toque nele */
   trava: 20_000,
+  /** FUNIL B: o eco da 1ª resposta ("R$ 300 somem por mês…") anda sozinho depois disso; "Continuar →" adianta */
+  eco: 4500,
 };
 
 export interface Numero {

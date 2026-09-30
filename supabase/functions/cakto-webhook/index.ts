@@ -56,6 +56,8 @@ const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 // consegui entrar". O e-mail mostra O e-mail da conta + relembra a senha do
 // cadastro e aponta pra /bem-vindo, que repete a instrução na tela.
 const APP_URL = "https://www.coreaplicativo.com.br";
+/** O e-mail-apelido que a cakto-pix manda pra Cakto quando a sessão é anônima (não é entregável). */
+const ehApelidoAnonimo = (e: string | null): boolean => !!e && /^pix-[0-9a-f]{8}@coreaplicativo\.com\.br$/i.test(e);
 
 const welcomeHtml = (firstName: string | null, email: string, acessarUrl: string, resetUrl: string) => `<!doctype html>
 <html lang="pt-BR"><body style="margin:0;padding:0;background:#f5f2ec;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -158,7 +160,7 @@ serve(async (req) => {
 
     const purchaseId: string | null = data.id ? String(data.id) : null;
     const subscriptionId: string | null = sub.id ? String(sub.id) : purchaseId;
-    const customerEmail: string | null = customer.email || null;
+    let customerEmail: string | null = customer.email || null;
     const offerId: string = String(offer.id ?? "").toLowerCase();
 
     logStep("Webhook received", { event, purchaseId, offerId, email: customerEmail });
@@ -820,6 +822,16 @@ serve(async (req) => {
       if (!userId) {
         logStep("Cannot associate payment — no user found", { event, purchaseId, customerEmail });
         return jsonResponse({ received: true, warning: "no_user_found" });
+      }
+      /* FUNIL B (30/09) — compra ANÔNIMA com o QR primeiro: o pedido nasceu na
+       * Cakto com o apelido pix-<uid8>@coreaplicativo.com.br (cakto-pix) e o
+       * e-mail de verdade entrou na conta DEPOIS, na tela do QR. O apelido não
+       * é entregável: o boas-vindas, o customer_email da assinatura, a CAPI e
+       * a UTMify passam a usar o e-mail da conta (se ela já tiver um). */
+      if (ehApelidoAnonimo(customerEmail)) {
+        const { data: u } = await supabaseClient.auth.admin.getUserById(userId);
+        customerEmail = u?.user?.email ?? null;
+        logStep("Anonymous alias replaced by account email", { userId, temEmail: !!customerEmail });
       }
       // trial_converted só na 1ª cobrança; renovação não é conversão
       await saveActiveSubscription(userId, event === "purchase_approved");

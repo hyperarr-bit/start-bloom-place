@@ -32,13 +32,15 @@
  * Esta peça só é montada pelo Preview quando o braço da demo é "on"; ela
  * mesma não sabe de A/B. O escuro nunca intercepta toque (ver pecas.tsx).
  */
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { AREA_DO_TIPO, NOME_DO_MODULO, rotuloCurto, type FimDaMissao, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
+import { AREA_PROOF, AREA_TRACKS, GASTO_ANCHOR, QUIZ, VICTORY_PHRASE, type AreaKey, type QuizQ } from "@/lib/funnel";
+import { CHAVE_DA_PERGUNTA_1 } from "@/lib/funil-b";
 import { alvoDaMissao, gravacoesDoChip, itemDoChip, TEMPOS_DA_MISSAO, type ChipDaMissao, type Numero, type ViaDoRegistro } from "./alvos";
-import { Anel, BalaoDoPasso3, CartaoDoPasso1, ComemoracaoDaMissao, FaixaDaMissao, MissaoCumprida, PostItDaMissao } from "./pecas";
+import { Anel, BalaoDoPasso3, CartaoDoPasso1, ComemoracaoDaMissao, FaixaDaMissao, MissaoCumprida, PostItDaMissao, PostItDaPergunta } from "./pecas";
 
 /** Cada gravação da demo: chave, valor novo, valor de antes e se veio de um gesto da pessoa. */
 export type OuvinteDaDemo = (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
@@ -57,8 +59,30 @@ export interface TravaDoCta {
 
 /** inicio = passo 1 · achar/anotar = passo 2 (procurando o alvo / post-it na tela) ·
  *  registrou = o chip virou ✓ e a linha apareceu · festa1 = "Primeiro registro
- *  feito!" · olhar = passo 3 · cumprida = "Missão cumprida" com as duas saídas. */
-type Fase = "inicio" | "achar" | "anotar" | "registrou" | "festa1" | "olhar" | "cumprida";
+ *  feito!" · olhar = passo 3 · cumprida = "Missão cumprida" com as duas saídas.
+ *  FUNIL B (30/09): perguntaB1/ecoB1 = a 1ª pergunta do quiz (quanto sai por
+ *  mês / quanto tempo mantém um hábito) no lugar do cartão do passo 1, com o
+ *  eco da resposta; perguntaB3 = a vitória da semana, antes da "Missão cumprida". */
+type Fase = "inicio" | "achar" | "anotar" | "registrou" | "festa1" | "olhar" | "cumprida" | "perguntaB1" | "ecoB1" | "perguntaB3";
+
+/** As 2 perguntas do quiz que viram toques no B (as MESMAS chaves que o paywall lê). */
+const perguntasDoB = (area: AreaKey): { chave1: "gasto" | "consistencia"; p1: QuizQ | null; p3: QuizQ | null } => {
+  const trilha: QuizQ[] = area === "dinheiro" ? QUIZ : AREA_TRACKS[area];
+  const chave1 = CHAVE_DA_PERGUNTA_1[area];
+  return { chave1, p1: trilha.find((q) => q.key === chave1) ?? null, p3: trilha.find((q) => q.key === "vitoria") ?? null };
+};
+
+/** O eco da 1ª resposta — a tela de impacto do quiz de hoje, dentro do app. */
+const ecoDaResposta = (area: AreaKey, label: string, pedido: string): ReactNode => {
+  if (area === "dinheiro") {
+    const a = GASTO_ANCHOR[label];
+    return a
+      ? <>Pela sua estimativa, <span className="underline decoration-2 underline-offset-2">{a.month} somem por mês</span> sem você ver — {a.year} no ano. Agora {pedido} e vê ele no seu mês.</>
+      : <>A maioria não faz ideia — e é assim que o dinheiro some. Agora {pedido} e vê ele no seu mês.</>;
+  }
+  const p = AREA_PROOF[area];
+  return <>{p.echo[label] ?? ""} {p.reframe} Agora: {pedido}.</>;
+};
 
 const visivel = (el: Element) => {
   const r = el.getBoundingClientRect();
@@ -98,12 +122,19 @@ export interface PropsDaMissao {
   irParaCadastro: (item: ItemDaDemo) => void;
   /** A trava suave do CTA fixo: `null` = o CTA de sempre. */
   aoTravar: (trava: TravaDoCta | null) => void;
+  /** FUNIL B (30/09): as 2 respostas do quiz viram toques da missão. `respostas` = o que já foi
+   *  respondido (a URL/sessão); `aoResposta` guarda (memória, sessão, aparelho, URL da volta). */
+  funilB?: { area: AreaKey; respostas: Record<string, string>; aoResposta: (chave: "gasto" | "consistencia" | "vitoria", label: string) => void };
 }
 
-export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim, irParaCadastro, aoTravar }: PropsDaMissao) {
+export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim, irParaCadastro, aoTravar, funilB }: PropsDaMissao) {
   const cfg = alvoDaMissao(tipo);
   const reduzir = !!useReducedMotion();
-  const [fase, setFase] = useState<Fase>("inicio");
+  const perguntas = funilB ? perguntasDoB(funilB.area) : null;
+  // B: a 1ª pergunta abre a missão (se ela ainda não respondeu — a URL/sessão lembra)
+  const [fase, setFase] = useState<Fase>(() => (perguntas?.p1 && !funilB?.respostas[perguntas.chave1] ? "perguntaB1" : "inicio"));
+  const [resposta1, setResposta1] = useState<string | null>(() => (perguntas ? funilB?.respostas[perguntas.chave1] ?? null : null));
+  const [resposta3, setResposta3] = useState<string | null>(() => funilB?.respostas.vitoria ?? null);
   const faseRef = useRef<Fase>(fase);
   faseRef.current = fase;
   const [alvo, setAlvo] = useState<Element | null>(null);
@@ -123,11 +154,11 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
   const segundos = () => Math.round((Date.now() - t0.current) / 1000);
 
   const evento = (nome: string, extra: Record<string, unknown> = {}) => {
-    try { trackEvent(nome, { guia: "on", area: AREA_DO_TIPO[tipo], modulo, ...extra }); } catch { /* medição nunca derruba a demo */ }
+    try { trackEvent(nome, { guia: "on", area: AREA_DO_TIPO[tipo], modulo, ...(funilB ? { funil: "b" } : {}), ...extra }); } catch { /* medição nunca derruba a demo */ }
   };
   const passoAtual = () => {
     const f = faseRef.current;
-    return f === "inicio" ? 1 : f === "achar" || f === "anotar" ? 2 : 3;
+    return f === "inicio" || f === "perguntaB1" || f === "ecoB1" ? 1 : f === "achar" || f === "anotar" ? 2 : 3;
   };
 
   /* A TRAVA SUAVE do CTA fixo. Acaba com o 1º registro, com o tempo, com 1
@@ -148,6 +179,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
     const f = faseRef.current;
     if (f === "inicio") setFase("achar");
     else if (f === "anotar") setAcende((n) => n + 1);
+    // (B: nas perguntas o post-it já está na tela — só destrava)
   };
   useEffect(() => {
     evento("demo_guia_view");
@@ -167,6 +199,35 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
+
+  /* FUNIL B — as perguntas do quiz como toques da missão. A 1ª abre a missão
+   * (no lugar do cartão do passo 1) e o eco da resposta anda sozinho depois de
+   * um tempo (o botão adianta); a 3ª vem depois de olhar o número. */
+  useEffect(() => {
+    if (fase === "perguntaB1" && perguntas) evento("demo_guia_pergunta", { chave: perguntas.chave1, n: 1 });
+    if (fase === "perguntaB3") evento("demo_guia_pergunta", { chave: "vitoria", n: 3 });
+    if (fase !== "ecoB1") return;
+    const t = window.setTimeout(() => {
+      if (faseRef.current === "ecoB1") setFase("achar");
+    }, reduzir ? 900 : TEMPOS_DA_MISSAO.eco);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
+  const responder1 = (label: string) => {
+    if (!perguntas || !funilB || faseRef.current !== "perguntaB1") return;
+    setResposta1(label);
+    funilB.aoResposta(perguntas.chave1, label);
+    setFase("ecoB1");
+  };
+  const responder3 = (label: string) => {
+    if (!funilB || faseRef.current !== "perguntaB3") return;
+    setResposta3(label);
+    funilB.aoResposta("vitoria", label);
+    // o chip vira ✓ antes de a "Missão cumprida" entrar (causa → efeito)
+    window.setTimeout(() => { if (faseRef.current === "perguntaB3") setFase("cumprida"); }, reduzir ? 0 : 350);
+  };
+  /** Depois do passo 3 (olhar): no B, a vitória da semana; senão, "Missão cumprida". */
+  const irParaOFim = () => setFase(perguntas?.p3 && !resposta3 ? "perguntaB3" : "cumprida");
 
   /* PASSO 2 — achar o formulário (a aba do módulo como reserva: a missão toca
    * nela sozinha). Módulo pesado monta tarde: procura a cada 300 ms por ~5 s;
@@ -294,7 +355,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
     if (faseRef.current !== "festa1") return;
     evento("demo_guia_continuar", { de: "festa1", via });
     const o = cfg.olhar;
-    if (!o || !numeroRef.current) { setFase("cumprida"); return; }
+    if (!o || !numeroRef.current) { irParaOFim(); return; }
     const acharResumo = () => {
       const el = o.achar();
       return el && visivel(el) ? el : null;
@@ -304,14 +365,14 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
     // anotou por outro caminho e o resumo está em outra aba: a missão leva até lá antes de mostrar
     const aba = cfg.passos.find((p) => p.aba);
     const botao = aba ? document.querySelector<HTMLElement>(aba.seletor) : null;
-    if (!botao) { setFase("cumprida"); return; }
+    if (!botao) { irParaOFim(); return; }
     botao.click();
     let tentativas = 0;
     const tentar = () => {
       if (faseRef.current !== "festa1") return;
       const el = acharResumo();
       if (el) { setOlharEm(el); setFase("olhar"); return; }
-      if (++tentativas >= 10) { setFase("cumprida"); return; }
+      if (++tentativas >= 10) { irParaOFim(); return; }
       window.setTimeout(tentar, 200);
     };
     window.setTimeout(tentar, 200);
@@ -319,7 +380,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
   const cumprir = (via: "botao" | "auto") => {
     if (faseRef.current !== "olhar") return;
     evento("demo_guia_continuar", { de: "olhar", via });
-    setFase("cumprida");
+    irParaOFim();
   };
 
   const mostrarOnde = () => {
@@ -354,11 +415,15 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
   };
 
   const completa = fase === "cumprida";
-  const feitos = fase === "inicio" || fase === "achar" || fase === "anotar" ? 1 : completa ? 3 : 2;
+  const feitos = fase === "inicio" || fase === "achar" || fase === "anotar" || fase === "perguntaB1" || fase === "ecoB1" ? 1 : completa ? 3 : 2;
   const rotulo = item ? rotuloCurto(item) : "";
   const texto =
     completa
       ? <><strong>Missão cumprida ✓</strong> {rotulo} vai com você.</>
+      : fase === "perguntaB3"
+        ? <><strong>1º registro:</strong> {rotulo} ✓ · <strong>Agora: sua vitória da semana</strong></>
+        : fase === "perguntaB1" || fase === "ecoB1"
+          ? <>Área escolhida ✓ · <strong>Agora: 1 toque, {funilB?.area === "dinheiro" ? "quanto sai por mês?" : "quanto tempo dura seu hábito?"}</strong></>
       : item
         ? <><strong>1º registro:</strong> {rotulo} ✓ · {cfg.olhe}</>
         : (
@@ -371,6 +436,8 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
         );
   const cumprida = item ? cfg.cumprida(item) : null;
   const viu = cfg.olhe.replace(/^olha /, "Olhou ");
+  // B: a 3ª linha da missão é a vitória que ela escolheu (a promessa do paywall)
+  const terceiraLinha = resposta3 ? `Vitória: ${VICTORY_PHRASE[resposta3] ?? resposta3}` : viu;
 
   return (
     <div>
@@ -378,6 +445,33 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
       <AnimatePresence>
         {fase === "inicio" && (
           <CartaoDoPasso1 key="inicio" modulo={NOME_DO_MODULO[tipo]} pedido={cfg.pedido} aoContinuar={() => { evento("demo_guia_mostrar"); setFase("achar"); }} />
+        )}
+        {(fase === "perguntaB1" || fase === "ecoB1") && perguntas?.p1 && funilB && (
+          <PostItDaPergunta
+            key="perguntaB1"
+            testid="demo-guia-pergunta1"
+            passo="Passo 1 de 3 · 1 toque"
+            pergunta={perguntas.p1.q}
+            chips={perguntas.p1.opts}
+            tocado={resposta1}
+            aoChip={responder1}
+            eco={fase === "ecoB1" && resposta1 ? {
+              texto: ecoDaResposta(funilB.area, resposta1, cfg.pedido),
+              botao: "Continuar",
+              aoBotao: () => { evento("demo_guia_continuar", { de: "ecoB1", via: "botao" }); setFase("achar"); },
+            } : null}
+          />
+        )}
+        {fase === "perguntaB3" && perguntas?.p3 && (
+          <PostItDaPergunta
+            key="perguntaB3"
+            testid="demo-guia-pergunta3"
+            passo="Passo 3 de 3 · 1 toque"
+            pergunta={perguntas.p3.q}
+            chips={perguntas.p3.opts}
+            tocado={resposta3}
+            aoChip={responder3}
+          />
         )}
         {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
           <Anel
@@ -427,7 +521,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim
         {fase === "cumprida" && item && cumprida && (
           <MissaoCumprida
             key="cumprida"
-            linhas={[`Área escolhida: ${NOME_DO_MODULO[tipo]}`, cumprida.feito, viu]}
+            linhas={[`Área escolhida: ${NOME_DO_MODULO[tipo]}`, cumprida.feito, terceiraLinha]}
             destaque={rotulo}
             titulo={cumprida.titulo}
             sub={cumprida.sub}

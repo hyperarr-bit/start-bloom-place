@@ -13,6 +13,7 @@ import {
 } from "@/lib/demo-guiada";
 import { aplicarItemNaDemo } from "@/lib/demo-guiada-registro";
 import { sortearBracoDaDemo } from "@/lib/demo-guiada-braco";
+import { comFunilB, comRespostas, ehFunilB, guardarRespostasNoAparelho, marcaDoFunilB, normalizarRespostas, respostasDaUrl, type RespostasDoFunilB } from "@/lib/funil-b";
 import { VoltaDaDemoProvider, useVoltaDaDemo, type VoltaDaDemo } from "@/lib/volta-da-demo";
 import type { OuvinteDaDemo, PonteDaDemo, TravaDoCta } from "@/components/demo-guiada/GuiaDaDemo";
 
@@ -467,13 +468,25 @@ const Preview = () => {
    * O SORTEIO do A/B é aqui, na ENTRADA da demo do funil do dia 14 (a 1ª
    * abertura, sem braço na URL) — e o braço é carimbado na URL logo abaixo. */
   const navigate = useNavigate();
+  /* FUNIL B (30/09, src/lib/funil-b.ts): o braço vem na URL (`f=b`, carimbado na
+   * porta). Na demo ele muda três coisas: a missão ganha os 2 toques do quiz
+   * (quanto sai por mês / vitória da semana), as pílulas e a volta levam `f=b`
+   * + as respostas junto, e a volta cai em `?step=guardando` (preço antes da
+   * conta) em vez do cadastro. Chave desligada = `f=b` ignorado = a demo de hoje. */
+  const [funilB] = useState<boolean>(() => !!funnel && !!tour && !embed && !isNativeShell() && ehFunilB(params));
   const [braco] = useState<"on" | "off" | null>(() => {
     if (!funnel || !tour || embed || isNativeShell()) return null;
+    if (funilB) return "on"; // o B é a missão: não depende da chave da demo guiada
     const naUrl = bracoDaDemo(params);
     if (naUrl || from !== "dia14") return naUrl;
     const sorteado = sortearBracoDaDemo(); // chave desligada = null = a demo de hoje
     return sorteado === "1" ? "on" : sorteado === "0" ? "off" : null;
   });
+  // B: as respostas do quiz que viraram toques (URL > sessão), e a memória mais nova pra volta
+  const [respostas, setRespostas] = useState<RespostasDoFunilB>(() =>
+    funilB ? { ...normalizarRespostas(estadoDaMissao().respostas), ...respostasDaUrl(params) } : {});
+  const respostasRef = useRef(respostas);
+  respostasRef.current = respostas;
   // braço carimbado na URL (replace): recarregar, voltar e trocar de módulo mantêm o braço
   // mesmo com o storage zerado pelo navegador do Instagram
   useEffect(() => {
@@ -501,15 +514,26 @@ const Preview = () => {
   const ponteRef = useRef<PonteDaDemo | null>(null);
   const [trava, setTrava] = useState<TravaDoCta | null>(null);
   const eventoDaMissao = (nome: string, extra: Record<string, unknown>) =>
-    trackEvent(nome, { guia: "on", modulo: key, ...(tipo ? { area: AREA_DO_TIPO[tipo], tipo } : {}), ...extra });
+    trackEvent(nome, { guia: "on", modulo: key, ...(tipo ? { area: AREA_DO_TIPO[tipo], tipo } : {}), ...marcaDoFunilB(funilB), ...extra });
   const encerrarMissao = (motivo: FimDaMissao) => {
     gravarEstadoDaMissao({ fim: motivo });
     setGuiaAberta(false);
   };
+  // B: a resposta do quiz virou um toque na missão — guarda (memória, sessão, aparelho) e leva na URL
+  const aoResposta = (chave: "gasto" | "consistencia" | "vitoria", label: string) => {
+    const novas = normalizarRespostas({ ...respostasRef.current, [chave]: label });
+    respostasRef.current = novas;
+    setRespostas(novas);
+    gravarEstadoDaMissao({ respostas: { [chave]: label } });
+    guardarRespostasNoAparelho(tipo ? AREA_DO_TIPO[tipo] : null, novas);
+    eventoDaMissao("demo_guia_resposta", { chave, answer: label });
+  };
+  // B: tudo que sai da demo leva o braço (f=b), as respostas e — na volta — o passo "guardando"
+  const comB = (url: string) => (funilB ? comRespostas(comFunilB(url), respostasRef.current) : url);
   // pílulas: o braço e o item vão junto (a URL sobrevive ao apagão de storage do Instagram)
-  const ajustarPilula = braco ? (url: string) => comItem(comBraco(url, braco), item) : undefined;
+  const ajustarPilula = braco ? (url: string) => comB(comItem(comBraco(url, braco), item)) : undefined;
   // volta pro cadastro ("Quase lá", aviso dos módulos, "Levar isso pros meus números"): o item vai junto
-  const ajustarVolta = item ? (url: string) => comItem(url, item) : undefined;
+  const ajustarVolta = item || funilB ? (url: string) => comB(comItem(url, item)) : undefined;
   const aoTrocarModulo = guiaAberta
     ? (destino: string) => {
         if (destino === key) return;
@@ -538,7 +562,7 @@ const Preview = () => {
     destino: ajustarVolta ? ajustarVolta(destinoDaVolta) : destinoDaVolta,
     aoTocar: aoTocarQuaseLa,
     modulo: key,
-    ...(braco ? { extras: { guia: braco } } : {}),
+    ...(braco ? { extras: { guia: braco, ...marcaDoFunilB(funilB) } } : {}),
   };
 
   // CERCA DO TOUR (bug 24/07): a seta ← dos módulos navega pra "/" e o
@@ -570,7 +594,7 @@ const Preview = () => {
   // Telemetria do funil: a demo (app real) é um passo do funil.
   // No tour, cada módulo visitado conta — mede quantos cômodos a pessoa abre.
   useEffect(() => {
-    if (funnel) trackEvent("funnel_view", { step: "demo", ...(tour ? { tour: "vida", module: key } : {}), ...(braco ? { guia: braco } : {}) });
+    if (funnel) trackEvent("funnel_view", { step: "demo", ...(tour ? { tour: "vida", module: key } : {}), ...(braco ? { guia: braco } : {}), ...marcaDoFunilB(funilB) });
     if (!tour) return;
     let visited: string[] = [];
     try { visited = JSON.parse(sessionStorage.getItem(TOUR_VISITED_KEY) || "[]"); } catch { visited = []; }
@@ -584,7 +608,7 @@ const Preview = () => {
       nudgeFiredRef.current = true;
       trackEvent("funnel_view", { step: "demo_nudge", tour: "vida", modules: visited.length });
     }
-  }, [funnel, tour, key, braco]);
+  }, [funnel, tour, key, braco, funilB]);
 
   if (!Component) {
     return <Navigate to="/lp" replace />;
@@ -614,8 +638,9 @@ const Preview = () => {
                 ponte={ponteRef}
                 aoItem={(novo) => { gravarEstadoDaMissao({ item: novo }); setItem(novo); }}
                 aoFim={encerrarMissao}
-                irParaCadastro={(novo) => navigate(comItem(voltaDaMissao(), novo))}
+                irParaCadastro={(novo) => navigate(comB(comItem(voltaDaMissao(), novo)))}
                 aoTravar={setTrava}
+                funilB={funilB && tipo ? { area: AREA_DO_TIPO[tipo], respostas, aoResposta } : undefined}
               />
             </Suspense>
           ) : undefined}

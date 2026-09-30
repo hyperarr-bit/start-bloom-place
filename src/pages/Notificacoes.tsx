@@ -9,6 +9,9 @@ import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao,
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
+import { CHAVE_LEMBRETE as CHAVE_LEMBRETE_PET } from "@/lib/pet";
+import { algumLigadoPet, lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
+import { PawPrint } from "lucide-react";
 
 /**
  * Central de notificações (27/07).
@@ -127,6 +130,27 @@ const Notificacoes = () => {
     await filaRef.current;
   };
 
+  /** Pet (29/09): as prefs moram na chave própria (`pet-lembrete-prefs`), como os remédios —
+   *  aqui um interruptor liga/desliga os dois (cuidados com data e remédio na hora). */
+  const prefsPet = lerPrefsLembretePet(get<unknown>(CHAVE_LEMBRETE_PET, undefined));
+  const petLigado = algumLigadoPet(prefsPet);
+  const alternarPet = async (novas: PrefsLembretePet) => {
+    trackEvent("notif_pref", { campo: "pet", valor: algumLigadoPet(novas) });
+    if (algumLigadoPet(novas) && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    set(CHAVE_LEMBRETE_PET, novas);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_PET ? (novas as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
   const rodapeDe = (tipo: TipoDeLembrete, ligado: boolean, vazio: string) => {
     if (!ligado || !naLoja || !permitido) return undefined;
     const n = agendados[tipo] ?? 0;
@@ -225,6 +249,17 @@ const Notificacoes = () => {
           ligado={p.tarefas}
           onChange={(v) => void alternar("tarefas", v)}
           rodape={rodapeDe("tarefa", p.tarefas, "Ponha um horário numa tarefa de hoje (Home ou Rotina)")}
+        />
+
+        <LinhaAviso
+          icone={<PawPrint className="w-4 h-4" />}
+          titulo="Cuidados do pet"
+          descricao="No dia da vacina, do vermífugo e do antipulgas (vacina, consulta e banho também antes — você escolhe no Pet), e o remédio do pet na hora de cada dose."
+          ligado={petLigado}
+          onChange={(v) => void alternarPet({ ...prefsPet, cuidados: v, remedios: v })}
+          rodape={rodapeDe("pet", petLigado, "Anote a última vacina ou vermífugo em Pet → Saúde")}
+          hora={prefsPet.cuidados ? prefsPet.hora : undefined}
+          onHora={(h) => void alternarPet({ ...prefsPet, hora: h })}
         />
 
         <LinhaAviso

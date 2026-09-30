@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { BASES_LEMBRETES, FAIXAS_AVULSAS, planejarRemedios, planejarLimiteDoDia } from "@/lib/notificacoes";
+import { planejarAvisosPet } from "@/lib/pet-avisos";
 
 const LARGURA = 10000;
 const faixa = (base: number) => [base, base + LARGURA] as const;
@@ -34,6 +35,19 @@ describe("faixas de id dos lembretes", () => {
       expect(a.id! >= BASES_LEMBRETES.saude && a.id! < BASES_LEMBRETES.saude + LARGURA).toBe(true);
       expect([FAIXAS_AVULSAS.teste + 1, FAIXAS_AVULSAS.teste + 2, FAIXAS_AVULSAS.teste + 3]).not.toContain(a.id);
     }
+  });
+});
+
+describe("pet (29/09): faixa 1800000–1809999", () => {
+  it("os avisos do pet (cuidados e remédio) moram na faixa própria", () => {
+    expect(BASES_LEMBRETES.pet).toBe(1800000);
+    const avisos = planejarAvisosPet({
+      prefs: { cuidados: true, remedios: true, hora: 10, antes: 1 },
+      datas: [{ pet: "Thor", de: "do Thor", nome: "V10", tipo: "vacina", proxima: "2026-10-10" }, { pet: "Mia", de: "da Mia", nome: "Vermífugo", tipo: "vermifugo", proxima: "2026-12-31" }],
+      doses: [{ pet: "Thor", de: "do Thor", nome: "Apoquel", hora: "20:00", dadaHoje: false }],
+    }, BASES_LEMBRETES.pet, new Date(2026, 8, 26, 7, 0));
+    expect(avisos.length).toBeGreaterThan(3);
+    for (const a of avisos) expect(a.id >= BASES_LEMBRETES.pet && a.id < BASES_LEMBRETES.pet + LARGURA, `${a.id}`).toBe(true);
   });
 });
 

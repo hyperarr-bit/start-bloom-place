@@ -20,7 +20,8 @@ export type WidgetId =
   | "sleep-log"
   | "countdown"
   | "week-calendar"
-  | "tasks";
+  | "tasks"
+  | "pet";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -57,6 +58,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "sleep-log", label: "Sono", description: "Registre horas dormidas rapidamente", emoji: "😴", category: "saúde", defaultSize: "large" },
   { id: "countdown", label: "Contagem Regressiva", description: "Dias restantes até uma meta ou evento", emoji: "🎯", category: "bem-estar", defaultSize: "large" },
   { id: "week-calendar", label: "Visão da Semana", description: "Mini calendário com status de cada dia", emoji: "📅", category: "produtividade", defaultSize: "large" },
+  // 29/09 (Pet refeito): a rotina do pet com ✓ e a vacina/vermífugo mais perto de vencer
+  { id: "pet", label: "Pet de hoje", description: "Comida, passeio e remédio do pet com ✓, e a próxima vacina", emoji: "🐾", category: "bem-estar", defaultSize: "large" },
 ];
 
 const KEY = "core-home-widgets-v2";

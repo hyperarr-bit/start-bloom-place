@@ -1,9 +1,20 @@
-import { useState } from "react";
-import { localDayKey, dataSegura } from "@/lib/utils";
-import { Plus, Trash2, TrendingUp, Pencil, Check, X } from "lucide-react";
+/**
+ * GASTOS DO PET (visual novo em 29/09; dados como sempre).
+ *
+ * Chaves e formato intocados: `pet-expenses` [{ id, petId, category,
+ * description, value, date }] e `pet-expense-categories` (só as criadas pela
+ * pessoa). O que mudou: o resumo do mês virou o "extrato" do documento, com
+ * o total por pet e por categoria; o formulário (campos de 28 px, pequenos
+ * demais pro dedo) virou folha com campos de 44 px; lápis e lixeira na linha.
+ */
+import { useMemo, useState } from "react";
+import { Pencil, Plus, Trash2, X, Check } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
-import { Input } from "@/components/ui/input";
+import { localDayKey, dataSegura } from "@/lib/utils";
+import { avisarApagado } from "@/lib/desfazer";
+import { petsValidos } from "@/lib/pet";
 import { CampoData } from "@/components/ui/campo-data";
+import { BotaoPet, CartaoPet, Chip, FolhaPet, RotuloCampo, campoClasse } from "./kit";
 
 interface PetExpense {
   id: string;
@@ -17,263 +28,206 @@ interface PetExpense {
 // As 6 de sempre continuam FIXAS no código: são o padrão de quem acabou de
 // abrir o app e não podem depender de nada gravado.
 const CATEGORIAS_PADRAO = ["Ração", "Veterinário", "Banho/Tosa", "Medicamento", "Brinquedo", "Outro"];
+const EMOJI_CATEGORIA: Record<string, string> = { "Ração": "🥣", "Veterinário": "🩺", "Banho/Tosa": "🛁", "Medicamento": "💊", "Brinquedo": "🎾", "Outro": "🐾" };
+
+const reais = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const valorOk = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+/** "1.234,56" → 1234.56 · "189,9" → 189.9 · "189.90" (ponto como decimal, sem vírgula) → 189.9 */
+const lerValor = (s: string): number => {
+  const t = s.trim();
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) ? n : NaN;
+};
 
 export const PetExpenses = () => {
   const { get, set } = useUserData();
-  const pets = get<any[]>("pet-list", []);
-  const expenses = get<PetExpense[]>("pet-expenses", []);
+  const pets = petsValidos(get<unknown>("pet-list", []));
+  const brutos = get<unknown>("pet-expenses", []);
+  const expenses = useMemo(
+    () => (Array.isArray(brutos) ? brutos : []).filter((e): e is PetExpense => !!e && typeof e === "object" && typeof (e as PetExpense).date === "string" && valorOk((e as PetExpense).value)),
+    [brutos],
+  );
   // Só as criadas pela pessoa vão pro banco — as padrão ficam fora da chave
   // pra que renomear/remover uma delas no futuro não exija migração de dados.
-  const categoriasCustom = get<string[]>("pet-expense-categories", []);
-  const categories = [...CATEGORIAS_PADRAO, ...categoriasCustom.filter(c => !CATEGORIAS_PADRAO.includes(c))];
+  const categoriasCustom = (get<unknown>("pet-expense-categories", []) as string[]).filter((c) => typeof c === "string");
+  const categories = [...CATEGORIAS_PADRAO, ...categoriasCustom.filter((c) => !CATEGORIAS_PADRAO.includes(c))];
 
-  const [petId, setPetId] = useState("");
-  const [category, setCategory] = useState("Ração");
-  const [description, setDescription] = useState("");
-  const [value, setValue] = useState("");
-  const [date, setDate] = useState(localDayKey());
+  const [form, setForm] = useState<null | { id?: string; petId: string; category: string; description: string; value: string; date: string }>(null);
   const [novaCat, setNovaCat] = useState("");
-  const [mostrarNovaCat, setMostrarNovaCat] = useState(false);
 
-  const addExpense = () => {
-    const v = parseFloat(value);
-    if (!v || v <= 0) return;
-    const updated = [...expenses, { id: Date.now().toString(), petId, category, description: description.trim(), value: v, date }];
-    set("pet-expenses", updated);
-    setDescription(""); setValue("");
+  // Mês pelo fuso LOCAL (regra fixada depois do bug de datas de julho)
+  const mes = localDayKey().slice(0, 7);
+  const doMes = expenses.filter((e) => e.date.startsWith(mes)).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const total = doMes.reduce((s, e) => s + e.value, 0);
+  // O resumo sai dos GASTOS (não da lista de categorias): gasto de categoria apagada ou de versão antiga também soma
+  const porCategoria = Array.from(new Set(doMes.map((e) => e.category || "Outro")))
+    .map((cat) => ({ cat, total: doMes.filter((e) => (e.category || "Outro") === cat).reduce((s, e) => s + e.value, 0) }))
+    .sort((a, b) => b.total - a.total);
+  const porPet = pets.map((p) => ({ p, total: doMes.filter((e) => e.petId === p.id).reduce((s, e) => s + e.value, 0) })).filter((x) => x.total > 0);
+  const nomeDoMes = new Date().toLocaleDateString("pt-BR", { month: "long" });
+
+  const abrirNovo = () => setForm({ petId: pets.length === 1 ? pets[0].id : "", category: "Ração", description: "", value: "", date: localDayKey() });
+  const abrirEdicao = (e: PetExpense) => setForm({ id: e.id, petId: e.petId, category: e.category, description: e.description || "", value: String(e.value).replace(".", ","), date: e.date });
+
+  const salvar = () => {
+    if (!form) return;
+    const v = lerValor(form.value);
+    if (!Number.isFinite(v) || v <= 0) return;
+    const atual = Array.isArray(get<unknown>("pet-expenses", [])) ? (get<unknown>("pet-expenses", []) as PetExpense[]) : [];
+    if (form.id) {
+      set("pet-expenses", atual.map((e) => (e?.id !== form.id ? e : { ...e, petId: form.petId, category: form.category, description: form.description.trim(), value: v, date: form.date || e.date })));
+    } else {
+      set("pet-expenses", [...atual, { id: Date.now().toString(), petId: form.petId, category: form.category, description: form.description.trim(), value: v, date: form.date || localDayKey() }]);
+    }
+    setForm(null);
   };
 
-  const removeExpense = (id: string) => set("pet-expenses", expenses.filter(e => e.id !== id));
+  const apagar = (e: PetExpense) => {
+    const atual = get<unknown>("pet-expenses", []) as PetExpense[];
+    set("pet-expenses", atual.filter((x) => x?.id !== e.id));
+    avisarApagado("Gasto apagado", () => set("pet-expenses", [...(get<unknown>("pet-expenses", []) as PetExpense[]), e]));
+  };
 
-  /* ---------- categorias que a pessoa cria ---------- */
-
+  /* categorias da pessoa */
   const addCategoria = () => {
     const nome = novaCat.trim();
     if (!nome) return;
-    // Compara ignorando acento e caixa: "racao" e "Ração" como duas categorias
-    // diferentes quebraria o resumo do mês em dois pedaços da mesma coisa.
-    const existente = categories.find(c => c.localeCompare(nome, "pt-BR", { sensitivity: "base" }) === 0);
+    // "racao" e "Ração" como duas categorias quebraria o resumo em dois pedaços da mesma coisa
+    const existente = categories.find((c) => c.localeCompare(nome, "pt-BR", { sensitivity: "base" }) === 0);
     if (!existente) set("pet-expense-categories", [...categoriasCustom, nome]);
-    setCategory(existente || nome); // já deixa selecionada pro gasto que ela ia lançar
+    setForm((f) => (f ? { ...f, category: existente || nome } : f));
     setNovaCat("");
-    setMostrarNovaCat(false);
   };
-
-  // Trava dura: gasto já lançado ficaria órfão de categoria no extrato/resumo.
-  const categoriaEmUso = (cat: string) => expenses.some(e => e.category === cat);
-
+  // Trava dura: gasto já lançado ficaria órfão de categoria no resumo
+  const emUso = (cat: string) => expenses.some((e) => e.category === cat);
   const removeCategoria = (cat: string) => {
-    if (categoriaEmUso(cat)) return;
-    set("pet-expense-categories", categoriasCustom.filter(c => c !== cat));
-    if (category === cat) setCategory(CATEGORIAS_PADRAO[0]);
+    if (emUso(cat)) return;
+    set("pet-expense-categories", categoriasCustom.filter((c) => c !== cat));
+    setForm((f) => (f && f.category === cat ? { ...f, category: CATEGORIAS_PADRAO[0] } : f));
   };
-
-  // Um gasto antigo pode estar numa categoria que não existe mais na lista
-  // (apagada quando ainda estava vazia). Sem isso o select da edição abriria
-  // mostrando outra categoria e salvaria a errada sem a pessoa perceber.
-  const opcoesCom = (cat: string) => categories.includes(cat) ? categories : [...categories, cat];
-
-  /* ---------- edição na própria linha (padrão do IncomeTable) ---------- */
-
-  const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [rascunho, setRascunho] = useState({ category: "", description: "", value: "", date: "" });
-
-  const comecarEdicao = (e: PetExpense) => {
-    setEditandoId(e.id);
-    setRascunho({ category: e.category, description: e.description || "", value: String(e.value), date: e.date });
-  };
-
-  const salvarEdicao = () => {
-    const v = parseFloat(rascunho.value);
-    if (!Number.isFinite(v) || v <= 0) return;
-    set("pet-expenses", expenses.map(e => e.id !== editandoId ? e : {
-      ...e, // mantém id e petId
-      category: rascunho.category,
-      description: rascunho.description.trim(),
-      value: v,
-      date: rascunho.date || e.date,
-    }));
-    setEditandoId(null);
-  };
-
-  // Mês pelo fuso LOCAL: com toISOString, das 21h do dia 30 em diante o mês
-  // virava antes da hora e o gasto lançado (que usa localDayKey) sumia do
-  // extrato. É a regra fixada depois do bug de datas de julho.
-  const currentMonth = localDayKey().slice(0, 7);
-  const monthExpenses = expenses.filter(e => e.date.startsWith(currentMonth));
-  const totalMonth = monthExpenses.reduce((s, e) => s + e.value, 0);
-
-  // O resumo sai dos GASTOS, não da lista de categorias: montado a partir da
-  // lista, um gasto numa categoria que saiu de lá (ou que veio de versão antiga
-  // do app) simplesmente não aparecia — a soma por categoria não fechava com o
-  // total do mês e parecia dinheiro sumido.
-  const byCat = Array.from(new Set(monthExpenses.map(e => e.category || "Outro")))
-    .map(cat => ({ cat, total: monthExpenses.filter(e => (e.category || "Outro") === cat).reduce((s, e) => s + e.value, 0) }))
-    .filter(c => c.total > 0)
-    .sort((a, b) => b.total - a.total);
+  // gasto antigo numa categoria que saiu da lista: a opção dele continua na edição
+  const opcoes = form && !categories.includes(form.category) ? [...categories, form.category] : categories;
 
   return (
-    <div className="mt-3 space-y-3">
-      {/* Summary */}
-      <div className="bg-card rounded-xl border border-border p-3 text-center">
-        <p className="text-[10px] text-muted-foreground">Gastos este mês</p>
-        <p className="text-xl font-bold">R$ {totalMonth.toFixed(2)}</p>
-        {byCat.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1.5 mt-2">
-            {byCat.map(c => (
-              <span key={c.cat} className="text-[9px] bg-muted px-1.5 py-0.5 rounded-full">
-                {c.cat}: R$ {c.total.toFixed(0)}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-blue-200 dark:bg-blue-900/60 px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-200">Gastos</span>
-          </div>
-          <span className="text-[10px] text-blue-600 dark:text-blue-300">{expenses.length}</span>
-        </div>
-
-        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-2 space-y-1.5">
-          {/* A tabela de 5 colunas saiu: com lápis e lixeira de 36px (o mínimo
-              pro dedo) não sobrava largura nenhuma pro texto num celular. Vira
-              a linha de duas alturas do IncomeTable — o que importa em cima,
-              o resto embaixo em cinza. */}
-          {monthExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => {
-            const pet = pets.find((p: any) => p.id === e.petId);
-
-            if (editandoId === e.id) {
-              return (
-                <div key={e.id} className="border border-primary/40 bg-background/70 rounded-lg p-2 space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground">Editando · {pet?.name || "sem pet"}</p>
-                  <select value={rascunho.category} onChange={ev => setRascunho({ ...rascunho, category: ev.target.value })} className="h-9 w-full text-[11px] bg-background border border-input rounded-md px-2">
-                    {opcoesCom(rascunho.category).map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <Input autoFocus placeholder="Descrição" value={rascunho.description} onChange={ev => setRascunho({ ...rascunho, description: ev.target.value })} className="h-9 text-[11px]" />
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Input type="number" inputMode="decimal" placeholder="R$" value={rascunho.value} onChange={ev => setRascunho({ ...rascunho, value: ev.target.value })} className="h-9 text-[11px]" />
-                    <CampoData rotulo="Data" value={rascunho.date} onChange={ev => setRascunho({ ...rascunho, date: ev.target.value })} className="h-9 text-[11px]" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
-                      <Check className="w-3.5 h-3.5" /> Salvar
-                    </button>
-                    <button onClick={() => setEditandoId(null)} className="h-9 px-3 rounded-md border border-border text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
-                      <X className="w-3.5 h-3.5" /> Cancelar
-                    </button>
-                  </div>
-                </div>
-              );
-            }
-
-            const rotulo = e.description || e.category;
-            return (
-              <div key={e.id} className="flex items-center gap-0.5 bg-background/60 rounded-lg px-2 py-1">
-                {/* ações sempre visíveis: o group-hover de antes era invisível no celular */}
-                <button onClick={() => comecarEdicao(e)} aria-label={`Editar gasto ${rotulo}`} className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-9">
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-xs truncate">{rotulo}</span>
-                    <span className="block text-[10px] text-muted-foreground truncate">
-                      {[pet?.name, e.category, dataSegura(e.date, "dd/MM")].filter(Boolean).join(" · ")}
-                    </span>
-                  </span>
-                  <span className="text-xs font-bold text-destructive shrink-0">-R${e.value.toFixed(0)}</span>
-                </button>
-                <button onClick={() => comecarEdicao(e)} aria-label={`Editar gasto ${rotulo}`} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
-                  <Pencil className="w-3 h-3" />
-                </button>
-                <button onClick={() => removeExpense(e.id)} aria-label={`Apagar gasto ${rotulo}`} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors">
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            );
-          })}
-
-          {monthExpenses.length === 0 && (
-            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum gasto este mês</p>
+    <div className="space-y-3">
+      <CartaoPet titulo={`Gastos de ${nomeDoMes}`} direita={<span className="tabular-nums">{doMes.length} {doMes.length === 1 ? "lançamento" : "lançamentos"}</span>} dataCard="GASTOS DO MES">
+        <div className="px-3.5 py-3">
+          <p className="text-[30px] font-extrabold tracking-tight leading-none tabular-nums text-foreground" data-testid="gastos-total">{reais(total)}</p>
+          {porPet.length > 1 && (
+            <p className="text-[12.5px] text-muted-foreground mt-1.5">{porPet.map((x) => `${x.p.name} ${reais(x.total)}`).join(" · ")}</p>
           )}
+          {porCategoria.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {porCategoria.map((c) => (
+                <li key={c.cat} className="text-[12.5px]">
+                  <div className="flex justify-between gap-2"><span className="text-foreground">{EMOJI_CATEGORIA[c.cat] ?? "🐾"} {c.cat}</span><span className="tabular-nums font-semibold text-foreground">{reais(c.total)}</span></div>
+                  <div className="mt-1 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-[hsl(var(--pet-mel))]" style={{ width: `${Math.max(4, Math.round((c.total / (total || 1)) * 100))}%` }} /></div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CartaoPet>
 
-          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
-            <div className="grid grid-cols-2 gap-1.5">
-              <select value={petId} onChange={e => setPetId(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
-                {/* idem PetHealth: placeholder virava "pet fantasma" na lista */}
-                <option value="" disabled hidden>Selecione o pet</option>
-                {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+      <CartaoPet titulo="Lançamentos" dataCard="GASTOS">
+        {doMes.length === 0 ? (
+          <p className="px-3.5 py-3 text-[13px] text-muted-foreground">Nenhum gasto este mês. Ração, vet, banho — tudo soma aqui.</p>
+        ) : (
+          <ul>
+            {doMes.map((e, idx) => {
+              const pet = pets.find((p) => p.id === e.petId);
+              const rotulo = e.description || e.category;
+              return (
+                <li key={e.id} className={`flex items-center gap-1 pl-3.5 pr-1 min-h-[56px] ${idx ? "border-t border-border" : ""}`}>
+                  <button type="button" onClick={() => abrirEdicao(e)} aria-label={`Editar gasto ${rotulo}`} className="flex-1 min-w-0 flex items-center gap-3 text-left min-h-[48px]">
+                    <span className="text-[17px] w-6 text-center shrink-0" aria-hidden="true">{EMOJI_CATEGORIA[e.category] ?? "🐾"}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold truncate text-foreground">{rotulo}</span>
+                      <span className="block text-[12px] text-muted-foreground truncate">{[pet?.name, e.category, dataSegura(e.date, "dd/MM")].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className="text-[14px] font-bold tabular-nums shrink-0 text-foreground">{reais(e.value)}</span>
+                  </button>
+                  {/* lápis sempre visível (no celular não existe hover); apagar mora na folha de edição —
+                      com lixeira na linha, o nome do gasto e o pet viravam "Ração Premier 1…" */}
+                  <button type="button" onClick={() => abrirEdicao(e)} aria-label={`Editar gasto ${rotulo}`} className="w-11 h-11 shrink-0 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground"><Pencil className="w-4 h-4" aria-hidden="true" /></button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="border-t border-border p-2">
+          <BotaoPet onClick={abrirNovo} className="w-full" data-testid="gasto-novo"><Plus className="w-4 h-4" aria-hidden="true" /> Novo gasto</BotaoPet>
+        </div>
+      </CartaoPet>
 
-            {/* Categoria da pessoa, não a nossa: "Adestramento", "Areia",
-                "Plano de saúde"… quem não achava a sua jogava tudo em "Outro"
-                e o resumo do mês virava um bolo só. */}
-            {!mostrarNovaCat ? (
-              <button
-                onClick={() => setMostrarNovaCat(true)}
-                className="w-full h-9 flex items-center justify-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
-              >
-                <Plus className="w-3 h-3" /> Nova categoria
-              </button>
-            ) : (
-              <div className="rounded-md border border-dashed border-primary/40 bg-background/60 p-2 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    autoFocus
-                    placeholder="Ex: Adestramento"
-                    value={novaCat}
-                    onChange={e => setNovaCat(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addCategoria()}
-                    className="h-9 text-[11px] flex-1"
-                  />
-                  <button onClick={addCategoria} aria-label="Salvar categoria" className="w-9 h-9 shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center">
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => { setMostrarNovaCat(false); setNovaCat(""); }} aria-label="Cancelar nova categoria" className="w-9 h-9 shrink-0 rounded-md border border-border text-muted-foreground flex items-center justify-center">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+      <FolhaPet aberta={!!form} onFechar={() => setForm(null)} titulo={form?.id ? "Editar gasto" : "Novo gasto"} testId="folha-gasto">
+        {form && (
+          <div className="space-y-3">
+            {pets.length > 0 && (
+              <div>
+                <RotuloCampo>De quem</RotuloCampo>
+                <div className="flex flex-wrap gap-1.5">
+                  {pets.map((p) => <Chip key={p.id} ativo={form.petId === p.id} onClick={() => setForm({ ...form, petId: form.petId === p.id ? "" : p.id })}>{p.name}</Chip>)}
                 </div>
-                {categoriasCustom.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {categoriasCustom.map(c => {
-                      const emUso = categoriaEmUso(c);
-                      return (
-                        <span key={c} className="inline-flex items-center h-9 rounded-full border border-border bg-background pl-3 text-[10px]">
-                          {c}
-                          {emUso ? (
-                            // Apagar com gasto lançado deixaria o extrato apontando
-                            // pra uma categoria inexistente — some do resumo e vira
-                            // mais um caso de "meu dado sumiu".
-                            <span className="px-2 text-[9px] text-muted-foreground">em uso</span>
-                          ) : (
-                            <button onClick={() => removeCategoria(c)} aria-label={`Apagar categoria ${c}`} className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors">
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             )}
-            <div className="grid grid-cols-3 gap-1.5">
-              <Input placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} className="h-7 text-[11px]" />
-              <Input type="number" placeholder="R$" value={value} onChange={e => setValue(e.target.value)} className="h-7 text-[11px]" />
-              <div className="relative">
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+            <div>
+              <RotuloCampo>Categoria</RotuloCampo>
+              <div className="flex flex-wrap gap-1.5">
+                {opcoes.map((c) => (
+                  <Chip key={c} ativo={form.category === c} onClick={() => setForm({ ...form, category: c })} className="min-h-[44px] text-[12.5px]">
+                    {EMOJI_CATEGORIA[c] ? `${EMOJI_CATEGORIA[c]} ` : ""}{c}
+                  </Chip>
+                ))}
+              </div>
+              {/* Categoria da pessoa, não a nossa: "Adestramento", "Areia", "Plano de saúde"… */}
+              <div className="mt-2 flex gap-2">
+                <input value={novaCat} onChange={(e) => setNovaCat(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCategoria()} placeholder="Nova categoria (ex.: Adestramento)" className={campoClasse} aria-label="Nova categoria" />
+                <BotaoPet variante="secundario" onClick={addCategoria} aria-label="Criar categoria" className="w-11 px-0 shrink-0"><Check className="w-4 h-4" aria-hidden="true" /></BotaoPet>
+              </div>
+              {categoriasCustom.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {categoriasCustom.map((c) => (
+                    <span key={c} className="inline-flex items-center h-11 rounded-full border border-border pl-3 text-[12px] text-foreground">
+                      {c}
+                      {emUso(c) ? <span className="px-2.5 text-[11px] text-muted-foreground">em uso</span> : (
+                        <button type="button" onClick={() => removeCategoria(c)} aria-label={`Apagar categoria ${c}`} className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" aria-hidden="true" /></button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <RotuloCampo htmlFor="gasto-valor">Valor (R$)</RotuloCampo>
+                <input id="gasto-valor" inputMode="decimal" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value.replace(/[^\d.,]/g, "") })} placeholder="0,00" className={`${campoClasse} tabular-nums`} data-testid="gasto-valor" />
+              </div>
+              <div>
+                <RotuloCampo htmlFor="gasto-data">Data</RotuloCampo>
+                <CampoData id="gasto-data" rotulo="Hoje" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={campoClasse} />
               </div>
             </div>
-            <button onClick={addExpense} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
-              <Plus className="w-3 h-3" /> Adicionar gasto
-            </button>
+            <div>
+              <RotuloCampo htmlFor="gasto-desc">Descrição (opcional)</RotuloCampo>
+              <input id="gasto-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex.: Ração 15 kg" className={campoClasse} />
+            </div>
+            <BotaoPet className="w-full" onClick={salvar} disabled={!(lerValor(form.value) > 0)} data-testid="gasto-salvar">
+              {form.id ? "Salvar gasto" : "Lançar gasto"}
+            </BotaoPet>
+            {form.id && (
+              <BotaoPet
+                variante="perigo"
+                className="w-full"
+                onClick={() => { const e = expenses.find((x) => x.id === form.id); if (e) apagar(e); setForm(null); }}
+                data-testid="gasto-apagar"
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" /> Apagar este gasto
+              </BotaoPet>
+            )}
           </div>
-        </div>
-      </div>
+        )}
+      </FolhaPet>
     </div>
   );
 };

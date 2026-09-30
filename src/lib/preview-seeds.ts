@@ -498,17 +498,33 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "1", name: "Churrasco do Pedro", date: daysAgo(-5), location: "Casa do Pedro", rsvp: "confirmed", tasks: [{ id: "1", text: "Levar carvão", done: false }] },
     ],
   },
+  // 29/09 (Pet refeito): o RG completo, a carteirinha com plano (pet-cuidados), o dia do pet e o peso.
+  // As linhas antigas de pet-health ficam no formato de sempre (vaccine/deworming/visit).
   pet: {
     ...COMMON,
     "pet-list": [
-      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", weight: "28 kg", birthday: "2023-04-15" },
-      { id: "2", name: "Tom", species: "Gato", breed: "SRD", weight: "4,2 kg", birthday: "2022-10-02" },
+      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", weight: "28", birthday: "2023-04-15", sexo: "femea", castrado: true, porte: "grande", chip: "985112004567890", vetNome: "Dra. Paula" },
+      { id: "2", name: "Tom", species: "Gato", breed: "SRD", weight: "4,2", birthday: "2022-10-02", sexo: "macho", castrado: true },
     ],
     "pet-health": [
       { id: "1", petId: "1", type: "vaccine", name: "V10", date: daysAgo(40), nextDate: daysAgo(-325) },
       { id: "2", petId: "1", type: "deworming", name: "Vermífugo", date: daysAgo(70), nextDate: daysAgo(-20) },
       { id: "3", petId: "2", type: "visit", name: "Check-up anual", date: daysAgo(10), nextDate: daysAgo(-355) },
+      { id: "4", petId: "1", type: "antipulgas", name: "NexGard", date: daysAgo(32), nextDate: daysAgo(2), cuidadoId: "c-pulga" },
     ],
+    "pet-cuidados": [
+      { id: "c-pulga", petId: "1", tipo: "antipulgas", nome: "NexGard", intervaloDias: 30 },
+      { id: "c-raiva", petId: "1", tipo: "vacina", nome: "Antirrábica", intervaloDias: 365, sugerido: true },
+      { id: "c-apoquel", petId: "1", tipo: "remedio", nome: "Apoquel", dose: "1 comp.", horarios: ["20:00"], ate: daysAgo(-6) },
+    ],
+    "pet-routine-tasks-1": [
+      { id: "food", label: "Comida · manhã", emoji: "🥣", hora: "08:00" },
+      { id: "walk", label: "Passeio", emoji: "🦮" },
+      { id: "water", label: "Água fresca", emoji: "💧" },
+      { id: "food-noite", label: "Comida · noite", emoji: "🥣", hora: "19:00" },
+    ],
+    [`pet-routine-${daysAgo(0)}`]: { "1": { food: true, walk: true } },
+    "pet-pesos": { "1": [{ dia: daysAgo(120), kg: 26.8 }, { dia: daysAgo(60), kg: 27.5 }, { dia: daysAgo(5), kg: 28 }] },
     "pet-expenses": [
       { id: "1", petId: "1", category: "Ração", description: "Ração 15 kg", value: 189.9, date: daysAgo(3) },
       { id: "2", petId: "1", category: "Banho", description: "Banho e tosa", value: 80, date: daysAgo(12) },

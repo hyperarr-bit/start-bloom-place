@@ -1,22 +1,30 @@
 /**
- * PEÇAS DA DEMO GUIADA (28/09) — só descem dentro da demo, junto com a missão.
+ * PEÇAS DA DEMO GUIADA (28/09 · redesenho 30/09) — só descem dentro da demo,
+ * junto com a missão.
  *
  * Cara de PLANNER (memória feedback_identidade_planner): faixa colorida com
- * título em CAIXA ALTA, quadradinho de marcar (não bolinha). Tokens do funil
- * ROI 2 (pecas-roi2).
+ * título em CAIXA ALTA, quadradinho de marcar (não bolinha), POST-IT amarelo
+ * com fita magenta pros chips. Tokens do funil ROI 2 (pecas-roi2).
  *
- * A COMEMORAÇÃO é a da Missão do teste grátis (28/09, dono: "quando o usuário
- * faz algo aparece comemoração, porque isso converteu bem lá") — e SEM adesivo:
- * a 1.0.6, que vendeu bem, não tinha festa de adesivo; a 1.0.7 pôs a festa por
- * cima da comemoração e a 1.0.8 tirou.
+ * Redesenho de 30/09 (dono, no iPhone: "fica um tempo e o usuário fica meio
+ * que perdido, não sabe onde clicar pra continuar"; "o passo 3 só aparece o
+ * popup mas não tem botão"; "quando escrevemos a tela fica escura"):
+ *   · toda peça tem UMA ação óbvia e um botão de seguir; nada some sem dizer
+ *     o que fazer (o que anda sozinho é rede de segurança, não o caminho);
+ *   · o post-it do passo 2 tem os chips prontos (1 toque) e "✎ escrever o meu";
+ *   · com o teclado aberto (campo em foco OU o visualViewport encolheu, que é
+ *     como o Safari do iPhone avisa) o anel não desenha NADA: sem escuro, sem
+ *     balão em cima do campo; fechou o teclado, volta no lugar;
+ *   · a "Missão cumprida" é UMA peça só (comemoração + as duas saídas), não
+ *     duas empilhadas — a festa empilhada da 1.0.7 atrapalhou no app.
  *
  * O holofote segue as regras de aço da Missão do teste grátis
  * (MissaoDoTrial.tsx — "sempre que fizemos overlay, bugou"):
- *   1. NADA intercepta toque — tudo pointer-events:none; o escuro é a sombra
- *      do anel, não um véu clicável;
+ *   1. o escuro NUNCA intercepta toque (é a sombra do anel, pointer-events:none);
+ *      só o balão/post-it e os botões das comemorações recebem toque;
  *   2. fail-open: sem âncora, nada monta (a faixa guia por texto);
- *   3. morre com rolagem, toque, troca de tamanho, app em segundo plano ou
- *      tempo — nenhum caminho deixa ele pendurado;
+ *   3. nenhum caminho deixa peça pendurada: tudo tem saída por botão, tempo ou
+ *      pela âncora sumir;
  *   4. z-index abaixo de diálogo/folha do sistema.
  * A barra de módulos sobe acima do escuro enquanto o anel existe: trocar de
  * módulo tem que continuar à mão a missão inteira.
@@ -24,24 +32,47 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { animate, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { VERDE_OK } from "@/pages/funis/dia14/pecas-roi2";
-import type { Retangulo } from "./alvos";
+import { reais } from "@/lib/demo-guiada";
+import type { ChipDaMissao, Retangulo } from "./alvos";
 import { Quadradinho } from "./Quadradinho";
 
 export const GRAFITE = "#16121c";
+const AMARELO_POST_IT = "#FFF3B0";
+const TINTA_POST_IT = "#262626";
+const MAGENTA = "hsl(330 65% 50%)";
+
+/* ------------------------------------------------------------ viewport */
+
+/** O que está VISÍVEL de verdade: no Safari do iPhone, com o teclado aberto, a
+ *  janela continua com a altura de sempre e é o visualViewport que encolhe. */
+const vv = () => (typeof window !== "undefined" ? window.visualViewport : null);
+export const alturaVisivel = (): number => vv()?.height ?? window.innerHeight;
+export const topoVisivel = (): number => vv()?.offsetTop ?? 0;
+/** Teclado aberto: a área visível encolheu bem mais do que uma barra do navegador. */
+export const tecladoAberto = (): boolean => {
+  const v = vv();
+  return !!v && v.height < window.innerHeight - 140;
+};
 
 /* ------------------------------------------------------------ faixa */
 
 /** A faixa da missão, grudada embaixo da barra de módulos (sticky junto com ela). */
 export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false }: { feitos: number; texto: ReactNode; aoPular?: () => void; cumprida?: boolean }) {
+  const reduzir = useReducedMotion();
   return (
     <div className="border-t border-border" style={{ background: cumprida ? `${VERDE_OK}14` : "hsl(var(--accent) / 0.07)" }} data-testid="demo-guia-faixa">
       <div className="max-w-5xl mx-auto pl-3 pr-1.5 pt-1 flex items-center gap-2 min-h-9">
         <span aria-hidden className="inline-block w-1.5 h-4 rounded-[3px] shrink-0" style={{ background: cumprida ? VERDE_OK : "hsl(var(--accent))" }} />
         <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] whitespace-nowrap text-foreground">Missão de 1 minuto</span>
         <span className="flex items-center gap-1" role="img" aria-label={`${feitos} de 3 feitos`}>
-          {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitos} />)}
+          {[0, 1, 2].map((i) => (
+            // o quadradinho recém-marcado dá um pulo (planner: o ✓ é a recompensa)
+            <motion.span key={i} className="inline-flex" animate={i < feitos && !reduzir ? { scale: [1, 1.35, 1] } : { scale: 1 }} transition={{ duration: 0.45, ease: "easeOut" }}>
+              <Quadradinho marcado={i < feitos} />
+            </motion.span>
+          ))}
         </span>
         <span className="text-[11px] font-extrabold tabular-nums text-foreground/80">{feitos}/3</span>
         {aoPular && (
@@ -55,13 +86,45 @@ export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false }: { fe
   );
 }
 
+/* ------------------------------------------------------------ botões */
+
+/** O botão de seguir de cada passo: branco em fundo grafite, grafite em fundo claro. */
+export function BotaoSeguir({ children, onClick, claro = false, testid, cheio = false }: { children: ReactNode; onClick: () => void; claro?: boolean; testid?: string; cheio?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testid}
+      className={`${cheio ? "w-full min-h-12 rounded-xl text-[15px]" : "min-h-10 px-4 rounded-full text-[13px]"} inline-flex items-center justify-center gap-1.5 font-bold active:scale-[0.98] transition-transform`}
+      style={claro ? { background: "#fff", color: GRAFITE } : { background: GRAFITE, color: "#fff" }}
+    >
+      {children} <ArrowRight className="w-4 h-4" />
+    </button>
+  );
+}
+
 /* ------------------------------------------------------------ passo 1 */
 
+/** Onde acaba o que gruda no topo (barra de módulos + cabeçalho do módulo). */
+const fundoDoTopoFixo = (): number => {
+  let fundo = 0;
+  document.querySelectorAll(".demo-tour-nav, header.sticky").forEach((el) => {
+    const r = el.getBoundingClientRect();
+    if (r.bottom > 0 && r.top < alturaVisivel() / 2) fundo = Math.max(fundo, r.bottom);
+  });
+  return fundo;
+};
+/** Altura do CTA fixo de baixo ("Quase lá"), pra o balão não cair atrás dele. */
+const alturaDoRodapeFixo = (): number => {
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--teste-banner-h");
+  return parseFloat(v) || 0;
+};
+
 /**
- * PASSO 1 DE 3 (30/09): o passo que já nasce feito ("área escolhida ✓") agora
- * aparece — antes a demo trocava de aba e rolava até o botão em 1,2 s, sem
- * mostrar nada. Cartão solto embaixo do topo fixo: não escurece nada, a demo
- * continua tocável; só o botão recebe toque. Sai pelo tempo ou por "Mostrar onde".
+ * PASSO 1 DE 3 (30/09): o passo que já nasce feito ("área escolhida ✓") aparece
+ * antes de a demo andar sozinha. Cartão solto embaixo do topo fixo: não
+ * escurece nada, a demo continua tocável; só o botão recebe toque. Sai pelo
+ * tempo ou por "Começar →".
  */
 export function CartaoDoPasso1({ modulo, pedido, aoContinuar }: { modulo: string; pedido: string; aoContinuar: () => void }) {
   const [top, setTop] = useState<number | null>(null);
@@ -73,12 +136,14 @@ export function CartaoDoPasso1({ modulo, pedido, aoContinuar }: { modulo: string
       data-camada-guia="demo-passo-1"
       initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}
     >
-      <div className="w-[88%] max-w-[340px] rounded-2xl px-4 py-3 text-white shadow-2xl ring-1 ring-white/15 pointer-events-auto" style={{ background: GRAFITE }} role="status" data-testid="demo-guia-passo1">
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Passo 1 de 3 · feito ✓</span>
-        <span className="block text-[13.5px] font-semibold leading-snug">Você começou por {modulo}. Agora: {pedido} — eu te mostro onde.</span>
-        <button type="button" onClick={aoContinuar} className="mt-2.5 min-h-9 px-3.5 rounded-full bg-white text-[12.5px] font-bold" style={{ color: GRAFITE }} data-testid="demo-guia-mostrar">
-          Mostrar onde →
-        </button>
+      <div className="w-[88%] max-w-[340px] rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15 pointer-events-auto" style={{ background: GRAFITE }} role="status" data-testid="demo-guia-passo1">
+        <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1.5">
+          <Quadradinho marcado claro tam={13} /> Passo 1 de 3 · feito
+        </span>
+        <span className="block text-[14px] font-semibold leading-snug">Você começou por {modulo}. Próximo passo: <strong className="font-extrabold">{pedido}</strong> — é 1 toque, eu te mostro onde.</span>
+        <div className="mt-3">
+          <BotaoSeguir claro onClick={aoContinuar} testid="demo-guia-mostrar">Começar</BotaoSeguir>
+        </div>
       </div>
     </motion.div>,
     document.body,
@@ -87,20 +152,36 @@ export function CartaoDoPasso1({ modulo, pedido, aoContinuar }: { modulo: string
 
 /* ------------------------------------------------------------ holofote */
 
-/** Onde acaba o que gruda no topo (barra de módulos + cabeçalho do módulo). */
-const fundoDoTopoFixo = (): number => {
-  let fundo = 0;
-  document.querySelectorAll(".demo-tour-nav, header.sticky").forEach((el) => {
-    const r = el.getBoundingClientRect();
-    if (r.bottom > 0 && r.top < window.innerHeight / 2) fundo = Math.max(fundo, r.bottom);
-  });
-  return fundo;
-};
-/** Altura do CTA fixo de baixo ("Quase lá"), pra o balão não cair atrás dele. */
-const alturaDoRodapeFixo = (): number => {
-  const v = getComputedStyle(document.documentElement).getPropertyValue("--teste-banner-h");
-  return parseFloat(v) || 0;
-};
+/** Campo de texto em foco (o teclado do celular abre pra ele). */
+const ehCampo = (el: unknown) => el instanceof HTMLElement
+  && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+
+/**
+ * DIGITANDO (30/09, print do dono no iPhone): com o teclado aberto o Safari
+ * encolhe a área visível — o anel ia parar em cima das abas, o balão tapava o
+ * campo e a tela ficava escura enquanto ela escrevia. Campo em foco OU teclado
+ * aberto (visualViewport encolhido) = nada desenhado; fechou, volta no lugar.
+ */
+export function useDigitando(): boolean {
+  const [digitando, setDigitando] = useState(false);
+  useEffect(() => {
+    const conferir = () => setDigitando(ehCampo(document.activeElement) || tecladoAberto());
+    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) setDigitando(true); };
+    // o Safari demora um instante pra devolver a área visível depois do blur
+    const saiu = () => { window.setTimeout(conferir, 80); window.setTimeout(conferir, 400); };
+    conferir();
+    document.addEventListener("focusin", entrou);
+    document.addEventListener("focusout", saiu);
+    const v = vv();
+    v?.addEventListener("resize", conferir);
+    return () => {
+      document.removeEventListener("focusin", entrou);
+      document.removeEventListener("focusout", saiu);
+      v?.removeEventListener("resize", conferir);
+    };
+  }, []);
+  return digitando;
+}
 
 /**
  * `fixo` (30/09, dono: "quando clicamos em algo ela simplesmente pula o passo"):
@@ -108,34 +189,26 @@ const alturaDoRodapeFixo = (): number => {
  * alvo na rolagem e o escuro fica mais claro (a demo continua 100% tocável; o
  * escuro nunca intercepta toque). Só sai se o alvo sumir da tela (troca de aba)
  * ou pelo tempo (`duracao`; `null` = sem tempo). Sem `fixo`, as saídas de antes.
+ *
+ * `balao` é a peça que acompanha o anel (o post-it dos chips, o número do
+ * passo 3) — com `interativo`, ela recebe toque (chips, botão de seguir).
  */
-export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair, fixo = false }: {
+export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false }: {
   alvo: Element;
   recorte?: (el: Element) => Retangulo | null;
-  rotulo: string;
-  children: ReactNode;
+  balao: ReactNode;
+  interativo?: boolean;
   duracao?: number | null;
   aoSair: (motivo: string) => void;
   fixo?: boolean;
+  testid?: string;
+  /** o balão prefere ficar EMBAIXO do anel (se couber) */
+  abaixo?: boolean;
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
-  /* DIGITANDO (30/09, print do dono no iPhone): com o teclado aberto o Safari
-   * mexe na área visível — o anel ia parar em cima das abas, o balão tapava o
-   * campo e a tela ficava escura enquanto ela escrevia. Campo em foco = o anel
-   * sai de cena (sem escuro, sem balão); fechou o teclado, volta no lugar. */
-  const [digitando, setDigitando] = useState(false);
-  useEffect(() => {
-    const ehCampo = (el: unknown) => el instanceof HTMLElement
-      && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
-    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) setDigitando(true); };
-    const saiu = () => { window.setTimeout(() => { if (!ehCampo(document.activeElement)) setDigitando(false); }, 60); };
-    if (ehCampo(document.activeElement)) setDigitando(true);
-    document.addEventListener("focusin", entrou);
-    document.addEventListener("focusout", saiu);
-    return () => { document.removeEventListener("focusin", entrou); document.removeEventListener("focusout", saiu); };
-  }, []);
-  const [balao, setBalao] = useState<{ top: number } | null>(null);
+  const digitando = useDigitando();
+  const [posicao, setPosicao] = useState<{ top: number } | null>(null);
   const balaoRef = useRef<HTMLDivElement>(null);
   const reduzir = useReducedMotion();
   const saiuRef = useRef(false);
@@ -156,8 +229,9 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     try {
       const r = medir();
       const topo = fundoDoTopoFixo();
-      const livre = window.innerHeight - alturaDoRodapeFixo() - topo;
-      const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * 0.58;
+      const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
+      // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
+      const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
       const delta = r.top - destino;
       if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
     } catch { /* noop */ }
@@ -186,7 +260,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
         setRect(r);
         window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
         // fixo: a tela muda de tamanho sem rolar (ela abriu a edição de outra conta, um
-        // formulário cresceu) — o anel segue o alvo onde ele estiver
+        // formulário cresceu, o teclado fechou) — o anel segue o alvo onde ele estiver
         if (fixo) {
           const seguir = window.setInterval(() => {
             if (!vivo) return;
@@ -219,6 +293,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     document.addEventListener("pointerdown", aoTocar, { passive: true, capture: true });
     document.addEventListener("visibilitychange", aoEsconder);
     window.addEventListener("resize", aoRolar);
+    vv()?.addEventListener("resize", aoRolar);
     // a barra de módulos (e a faixa da missão) ficam ACIMA do escuro
     const barra = document.querySelector<HTMLElement>(".demo-tour-nav");
     const zAntes = barra?.style.zIndex ?? "";
@@ -231,6 +306,7 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
       document.removeEventListener("pointerdown", aoTocar, { capture: true } as EventListenerOptions);
       document.removeEventListener("visibilitychange", aoEsconder);
       window.removeEventListener("resize", aoRolar);
+      vv()?.removeEventListener("resize", aoRolar);
       if (barra) barra.style.zIndex = zAntes;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,15 +314,17 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
 
   // balão: acima do anel se couber entre o topo fixo e o anel; senão, embaixo
   useLayoutEffect(() => {
-    if (!rect || !balaoRef.current) return;
+    if (!rect || !balaoRef.current || digitando) return;
     const h = balaoRef.current.offsetHeight;
     const topoLivre = fundoDoTopoFixo() + 8;
-    const fundoLivre = window.innerHeight - alturaDoRodapeFixo() - 8;
-    const acima = rect.top - 14 - h;
-    const abaixo = rect.bottom + 16;
-    const top = acima >= topoLivre ? acima : Math.min(abaixo, fundoLivre - h);
-    setBalao({ top: Math.max(topoLivre, top) });
-  }, [rect]);
+    const fundoLivre = topoVisivel() + alturaVisivel() - alturaDoRodapeFixo() - 8;
+    const emCima = rect.top - 14 - h;
+    const embaixo = rect.bottom + 16;
+    const cabeEmbaixo = embaixo + h <= fundoLivre;
+    const top = abaixo && cabeEmbaixo ? embaixo : emCima >= topoLivre ? emCima : Math.min(embaixo, fundoLivre - h);
+    setPosicao({ top: Math.max(topoLivre, top) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rect, digitando]);
 
   if (!rect || digitando) return null;
   const pad = 8;
@@ -256,13 +334,13 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
     <motion.div
       className="fixed inset-0 z-[200] pointer-events-none"
       data-camada-guia="demo-holofote"
+      data-testid={testid}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-      aria-hidden
     >
       {/* o escuro é a sombra do anel — um elemento só, nada clicável */}
       <div
         className="absolute rounded-2xl pointer-events-none"
-        style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2, boxShadow: `0 0 0 9999px rgba(15,12,20,${leve ? 0.22 : 0.58})`, transition: "box-shadow .3s ease" }}
+        style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2, boxShadow: `0 0 0 9999px rgba(15,12,20,${leve ? 0.22 : 0.5})`, transition: "box-shadow .3s ease" }}
       />
       {/* o contorno pulsa (elemento pequeno: barato em Android fraco) */}
       <motion.div
@@ -273,14 +351,111 @@ export function Anel({ alvo, recorte, rotulo, children, duracao = 12_000, aoSair
       />
       <div
         ref={balaoRef}
-        className="absolute left-1/2 -translate-x-1/2 w-[88%] max-w-[340px] rounded-2xl px-4 py-3 text-white shadow-2xl ring-1 ring-white/15 pointer-events-none"
-        style={{ background: GRAFITE, top: balao?.top ?? -9999, visibility: balao ? "visible" : "hidden" }}
+        className={`absolute left-1/2 -translate-x-1/2 w-[92%] max-w-[360px] ${interativo ? "pointer-events-auto" : "pointer-events-none"}`}
+        style={{ top: posicao?.top ?? -9999, visibility: posicao ? "visible" : "hidden" }}
       >
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{rotulo}</span>
-        {children}
+        {balao}
       </div>
     </motion.div>,
     document.body,
+  );
+}
+
+/* ------------------------------------------------------------ post-it dos chips (passo 2) */
+
+/**
+ * O POST-IT DO PASSO 2: papel amarelo com fita magenta (o post-it do planner),
+ * a pergunta e os chips prontos — 1 toque = o registro dela. "✎ escrever o
+ * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
+ * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
+ */
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica }: {
+  pergunta: string;
+  chips: ChipDaMissao[];
+  /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
+  tocado?: string | null;
+  aoChip: (chip: ChipDaMissao) => void;
+  aoEscrever?: () => void;
+  /** frase pequena embaixo (ex.: "ou escreve direto no campo") */
+  dica?: string;
+}) {
+  const reduzir = useReducedMotion();
+  return (
+    <div className="relative" data-testid="demo-guia-postit">
+      <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
+      <motion.div
+        className="rounded-md px-4 pt-3.5 pb-3.5 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)]"
+        style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
+        initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      >
+        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>Passo 2 de 3 · 1 toque</span>
+        <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {chips.map((c, i) => {
+              const marcado = tocado === c.nome;
+              return (
+                <motion.button
+                  key={c.nome}
+                  type="button"
+                  onClick={() => aoChip(c)}
+                  data-testid="demo-guia-chip"
+                  className="min-h-11 pl-3 pr-3.5 rounded-full text-[13.5px] font-bold inline-flex items-center gap-1.5 shadow-[0_2px_0_rgba(0,0,0,.12)] active:scale-95 transition-[transform,background-color,color]"
+                  style={marcado ? { background: GRAFITE, color: "#fff" } : { background: "#fff", color: TINTA_POST_IT }}
+                  initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, scale: marcado ? [1, 1.08, 1] : 1 }}
+                  transition={{ delay: reduzir ? 0 : 0.12 + i * 0.07, duration: 0.3 }}
+                >
+                  {marcado ? <Check className="w-4 h-4" strokeWidth={3.5} /> : <span aria-hidden>{c.emoji}</span>}
+                  <span>{c.nome}</span>
+                  {c.valor != null && <span className={marcado ? "text-white/70 font-semibold" : "font-semibold"} style={marcado ? undefined : { color: "rgba(38,38,38,.55)" }}>· R$ {reais(c.valor)}</span>}
+                </motion.button>
+              );
+            })}
+            {aoEscrever && (
+              <motion.button
+                type="button"
+                onClick={aoEscrever}
+                data-testid="demo-guia-escrever"
+                className="min-h-11 px-3.5 rounded-full text-[13px] font-semibold border border-dashed active:scale-95 transition-transform"
+                style={{ borderColor: "rgba(38,38,38,.45)", color: "rgba(38,38,38,.85)" }}
+                initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduzir ? 0 : 0.12 + chips.length * 0.07, duration: 0.3 }}
+              >
+                ✎ escrever o meu
+              </motion.button>
+            )}
+          </div>
+        )}
+        {dica && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ balão grafite (passo 3) */
+
+/** O balão do passo 3: o número dela subindo e o botão de seguir. */
+export function BalaoDoPasso3({ titulo, antes, depois, formatar, aoContinuar }: {
+  titulo: ReactNode;
+  antes: number;
+  depois: number;
+  formatar: (n: number) => string;
+  aoContinuar: () => void;
+}) {
+  return (
+    <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: GRAFITE }} data-testid="demo-guia-passo3">
+      <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Passo 3 de 3 · olha</span>
+      <span className="block text-[13px] font-semibold text-white/85 leading-snug">{titulo}</span>
+      <span className="flex items-baseline gap-2 mt-1">
+        <span className="text-[13px] text-white/50 line-through tabular-nums">{formatar(antes)}</span>
+        <span className="text-white/50 text-[13px]">→</span>
+        <span className="text-[26px] font-black tracking-tight leading-none">
+          <ContaSubindo de={antes} para={depois} formatar={formatar} />
+        </span>
+      </span>
+      <div className="mt-3">
+        <BotaoSeguir claro onClick={aoContinuar} testid="demo-guia-continuar">Continuar</BotaoSeguir>
+      </div>
+    </div>
   );
 }
 
@@ -300,71 +475,83 @@ export function ContaSubindo({ de, para, formatar, atraso = 0.35, duracao = 1.1 
   return <span className="tabular-nums">{formatar(inteiros ? Math.round(v) : v)}</span>;
 }
 
-/* ------------------------------------------------------------ comemoração */
+/* ------------------------------------------------------------ comemoração (1º registro) */
+
+/** O fundo escuro das comemorações: pointer-events none — o cartão é a única coisa tocável. */
+function FundoDaFesta({ children, testid, camada }: { children: ReactNode; testid: string; camada: string }) {
+  const reduzir = !!useReducedMotion();
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[210] pointer-events-none grid place-items-center px-6"
+      data-camada-guia={camada}
+      data-testid={testid}
+      initial={reduzir ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.3 }}
+    >
+      <div className="absolute inset-0" style={{ background: "rgba(15,12,20,.55)" }} />
+      {children}
+    </motion.div>,
+    document.body,
+  );
+}
 
 /**
- * A COMEMORAÇÃO DA MISSÃO — cópia parametrizada da `Celebracao` da Missão do
- * teste grátis (src/components/missao/MissaoDoTrial.tsx, "B3 pico"), a peça
- * que converte no app. Copiada, não importada: aquele arquivo é o caminho do
- * teste grátis e não se mexe. O visual é o mesmo, classe por classe: fundo
+ * A COMEMORAÇÃO DO 1º REGISTRO — cópia parametrizada da `Celebracao` da
+ * Missão do teste grátis (src/components/missao/MissaoDoTrial.tsx, "B3
+ * pico"), a peça que converte no app. Copiada, não importada: aquele arquivo
+ * é o caminho do teste grátis e não se mexe. O visual é o mesmo: fundo
  * rgba(15,12,20,.55), cartão branco com spring, o GRÁFICO QUE SOBE (path
  * magenta com pathLength animado + a bolinha no fim), título, chip preto com
  * 🔥 e a barra verde que pula de `de` pra `para`.
  *
- * Diferenças, todas de segurança: o texto do cartão tem cor fixa (no modo
- * escuro o título herdaria branco sobre o branco), vai por portal (a barra de
- * módulos tem backdrop-blur, que prende `fixed`), e com "reduzir movimento"
- * aparece só o cartão pronto, sem animação.
- * Regras de sempre: pointer-events none (nada engole toque), some sozinha em
- * `duracao` e se declara camada de guia (`data-camada-guia`).
+ * 30/09: ganhou o BOTÃO de seguir ("Ver meu mês →") — o cartão não some mais
+ * sem dizer o que fazer; andar sozinho (`duracao`) é só rede de segurança.
+ * Texto do cartão com cor fixa (no modo escuro o título herdaria branco), por
+ * portal (a barra de módulos tem backdrop-blur, que prende `fixed`), e com
+ * "reduzir movimento" aparece o cartão pronto, sem animação.
  */
-export function ComemoracaoDaMissao({ titulo, chip, de, para, rodape, duracao, aoFim }: {
+export function ComemoracaoDaMissao({ titulo, chip, de, para, rodape, duracao, aoFim, botao, aoBotao }: {
   titulo: string;
   chip: string;
   de: number;
   para: number;
   rodape: string;
-  duracao: number;
+  duracao: number | null;
   aoFim: () => void;
+  botao: string;
+  aoBotao: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const aoFimRef = useRef(aoFim);
   aoFimRef.current = aoFim;
   useEffect(() => {
+    if (duracao == null) return;
     const t = window.setTimeout(() => aoFimRef.current(), duracao);
     return () => window.clearTimeout(t);
   }, [duracao]);
-  return createPortal(
-    <motion.div
-      className="fixed inset-0 z-[210] pointer-events-none grid place-items-center px-8"
-      data-camada-guia="demo-comemoracao"
-      data-testid="demo-guia-comemoracao"
-      initial={reduzir ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.35 }}
-      aria-hidden
-    >
-      <div className="absolute inset-0" style={{ background: "rgba(15,12,20,.55)" }} />
+  return (
+    <FundoDaFesta testid="demo-guia-comemoracao" camada="demo-comemoracao">
       <motion.div
         initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }}
-        className="relative w-full max-w-[320px] rounded-3xl bg-white p-6 text-center text-[#16121c] shadow-2xl"
+        className="relative w-full max-w-[320px] rounded-3xl bg-white p-6 text-center text-[#16121c] shadow-2xl pointer-events-auto"
       >
         {/* o gráfico que sobe (Stripe: "o gráfico criou um cliente") */}
         <svg viewBox="0 0 200 84" className="w-full h-[84px] mb-3">
           <motion.path
             d="M8 72 L58 58 L104 62 L150 30 L192 12"
-            fill="none" stroke="hsl(330 65% 50%)" strokeWidth="4" strokeLinecap="round"
+            fill="none" stroke={MAGENTA} strokeWidth="4" strokeLinecap="round"
             initial={reduzir ? false : { pathLength: 0 }} animate={{ pathLength: 1 }}
             transition={{ duration: 1.1, ease: "easeOut", delay: 0.25 }}
           />
           <motion.circle
-            cx="192" cy="12" r="6" fill="hsl(330 65% 50%)"
+            cx="192" cy="12" r="6" fill={MAGENTA}
             initial={reduzir ? false : { scale: 0 }} animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 500, damping: 16, delay: 1.3 }}
           />
         </svg>
         <p className="text-[19px] font-black tracking-[-0.02em] leading-tight mb-1.5">{titulo}</p>
-        <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5 mb-4">{chip}</span>
+        <span className="inline-block max-w-full truncate rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5 mb-4">{chip}</span>
         <div className="h-2 rounded-full bg-black/10 overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-emerald-500"
@@ -374,68 +561,138 @@ export function ComemoracaoDaMissao({ titulo, chip, de, para, rodape, duracao, a
           />
         </div>
         <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{rodape}</p>
+        <div className="mt-4">
+          <BotaoSeguir cheio onClick={aoBotao} testid="demo-guia-ver">{botao}</BotaoSeguir>
+        </div>
       </motion.div>
-    </motion.div>,
-    document.body,
+    </FundoDaFesta>
   );
 }
 
-/* ------------------------------------------------------------ folha "missão cumprida" */
+/* ------------------------------------------------------------ confete */
 
-export function FolhaCumprida({ rotulo, titulo, sub, aoLevar, aoExplorar }: {
-  rotulo: string;
+const CORES_DO_CONFETE = [MAGENTA, "#FFD84D", VERDE_OK, "#3B82F6", GRAFITE];
+
+/** Uma chuva curta de quadradinhos de papel (planner), sem biblioteca: 22 pedaços, 1,8 s, nunca toca nada. */
+export function Confete({ pedacos = 22 }: { pedacos?: number }) {
+  const reduzir = useReducedMotion();
+  if (reduzir) return null;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden data-testid="demo-guia-confete">
+      {Array.from({ length: pedacos }).map((_, i) => {
+        const x = 4 + ((i * 37) % 92);
+        const largura = 6 + (i % 3) * 2;
+        const lado = i % 2 ? 1 : -1;
+        return (
+          <motion.span
+            key={i}
+            className="absolute rounded-[2px]"
+            style={{ left: `${x}%`, top: "-4%", width: largura, height: largura * 1.7, background: CORES_DO_CONFETE[i % CORES_DO_CONFETE.length] }}
+            initial={{ y: 0, opacity: 0, rotate: 0, x: 0 }}
+            animate={{ y: ["0vh", "110vh"], opacity: [0, 1, 1, 0.9, 0], rotate: lado * (240 + (i % 5) * 60), x: lado * (14 + (i % 4) * 10) }}
+            transition={{ duration: 1.9 + (i % 4) * 0.25, delay: 0.15 + (i % 6) * 0.06, ease: [0.3, 0.6, 0.6, 1] }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ missão cumprida (final) */
+
+/**
+ * MISSÃO CUMPRIDA — a comemoração grande e a folha das duas saídas numa peça
+ * só (30/09). O cartão do planner: a lista da missão com os 3 quadradinhos
+ * marcando um a um (o que ela construiu), a barra 66 → 100%, confete, e as
+ * duas saídas sempre visíveis: "Levar pros meus números →" (o mesmo destino do
+ * "Quase lá", com o item) e "Ver os outros módulos". Não some sozinha: é ela
+ * quem escolhe.
+ */
+export function MissaoCumprida({ linhas, destaque, titulo, sub, aoLevar, aoExplorar }: {
+  /** as 3 linhas da missão, na ordem (a 2ª é o item dela) */
+  linhas: [string, string, string];
+  /** o rótulo do item ("Café · R$ 12") */
+  destaque: string;
   titulo: string;
   sub: string;
   aoLevar: () => void;
   aoExplorar: () => void;
 }) {
-  const reduzir = useReducedMotion();
-  return createPortal(
-    <motion.div
-      role="dialog"
-      aria-modal="false"
-      aria-label="Missão cumprida"
-      data-state="open"
-      data-testid="demo-guia-cumprida"
-      className="fixed inset-x-0 bottom-0 z-[95] px-3 pointer-events-none"
-      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      initial={reduzir ? { opacity: 0 } : { y: "110%" }}
-      animate={reduzir ? { opacity: 1 } : { y: 0 }}
-      exit={reduzir ? { opacity: 0 } : { y: "110%" }}
-      transition={reduzir ? { duration: 0.2 } : { type: "spring", stiffness: 320, damping: 32 }}
-    >
-      <div className="pointer-events-auto relative max-w-md mx-auto rounded-3xl border border-border bg-card text-card-foreground overflow-hidden shadow-[0_-12px_44px_-12px_rgba(0,0,0,.38)]">
+  const reduzir = !!useReducedMotion();
+  const passo = reduzir ? 0 : 0.28;
+  return (
+    <FundoDaFesta testid="demo-guia-cumprida" camada="demo-missao-cumprida">
+      <Confete />
+      <motion.div
+        role="dialog"
+        aria-modal="false"
+        aria-label="Missão cumprida"
+        data-state="open"
+        initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }}
+        className="relative w-full max-w-[340px] rounded-3xl bg-white text-[#16121c] shadow-2xl overflow-hidden pointer-events-auto"
+      >
         {/* faixa verde do planner */}
         <div className="flex items-center gap-2 px-4 py-2.5" style={{ background: VERDE_OK }}>
           <Quadradinho marcado claro tam={15} />
           <span className="text-[11.5px] font-extrabold uppercase tracking-[0.12em] text-white">Missão cumprida</span>
           <span className="text-[11px] font-extrabold text-white/85 tabular-nums">3/3</span>
+          <motion.span
+            aria-hidden
+            className="ml-auto text-[22px] leading-none"
+            initial={reduzir ? false : { scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 14, delay: 0.25 + passo * 3 }}
+          >
+            🏆
+          </motion.span>
         </div>
-        <div className="px-5 pt-3.5 pb-4">
-          <p className="text-[19px] font-extrabold tracking-tight leading-[1.2]">
-            <span className="px-1 -mx-1 rounded-sm" style={{ background: "#FFF3B0", color: "#262626" }}>{rotulo}</span>{" "}
+        <div className="px-5 pt-4 pb-4 text-left">
+          {/* a lista da missão: os 3 quadradinhos marcando um a um */}
+          <div className="rounded-xl border border-black/10 overflow-hidden divide-y divide-black/10" data-testid="demo-guia-lista">
+            {linhas.map((l, i) => (
+              <motion.div
+                key={l}
+                className={`flex items-center gap-2.5 px-3 py-2.5 text-[13.5px] leading-snug ${i === 1 ? "font-bold" : ""}`}
+                style={i === 1 ? { background: "#FFF8D6" } : undefined}
+                initial={reduzir ? false : { opacity: 0.35, x: -6 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + i * passo, duration: 0.25 }}
+              >
+                <motion.span className="inline-flex" initial={reduzir ? false : { scale: 0.6 }} animate={{ scale: [0.6, 1.3, 1] }} transition={{ delay: 0.2 + i * passo, duration: 0.4 }}>
+                  <Quadradinho marcado tam={16} />
+                </motion.span>
+                <span className="min-w-0 flex-1">{l}</span>
+              </motion.div>
+            ))}
+          </div>
+          <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
+            <motion.div
+              className="h-full rounded-full bg-emerald-500"
+              data-testid="demo-guia-comemoracao-barra"
+              initial={reduzir ? false : { width: "66%" }} animate={{ width: "100%" }}
+              transition={{ duration: 0.7, delay: 0.2 + passo * 3, ease: "easeOut" }}
+            />
+          </div>
+          <p className="text-[11px] text-black/50 mt-1.5 font-semibold text-center">Missão de 1 minuto · 100%</p>
+          <p className="text-[17px] font-extrabold tracking-tight leading-[1.25] mt-3.5">
+            <span className="px-1 -mx-1 rounded-sm" style={{ background: "#FFF3B0", color: TINTA_POST_IT }}>{destaque}</span>{" "}
             {titulo}
           </p>
-          <p className="text-[13px] leading-snug text-muted-foreground mt-2 pr-8">{sub}</p>
-          <button
-            type="button"
-            onClick={aoLevar}
-            data-testid="demo-guia-levar"
-            className="mt-4 w-full min-h-12 rounded-xl bg-foreground text-background font-bold text-[15px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
-          >
-            Levar isso pros meus números <ArrowRight className="w-4 h-4" />
-          </button>
+          <p className="text-[12.5px] leading-snug text-black/60 mt-1.5">{sub}</p>
+          <div className="mt-4">
+            <BotaoSeguir cheio onClick={aoLevar} testid="demo-guia-levar">Levar pros meus números</BotaoSeguir>
+          </div>
           <button
             type="button"
             onClick={aoExplorar}
             data-testid="demo-guia-explorar"
-            className="mt-1.5 w-full min-h-11 rounded-xl text-[13.5px] font-semibold text-foreground/80 hover:text-foreground"
+            className="mt-1 w-full min-h-11 rounded-xl text-[13.5px] font-semibold text-black/65 hover:text-black"
           >
             Ver os outros módulos
           </button>
         </div>
-      </div>
-    </motion.div>,
-    document.body,
+      </motion.div>
+    </FundoDaFesta>
   );
 }
+

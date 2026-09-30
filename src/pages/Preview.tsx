@@ -14,7 +14,7 @@ import {
 import { aplicarItemNaDemo } from "@/lib/demo-guiada-registro";
 import { sortearBracoDaDemo } from "@/lib/demo-guiada-braco";
 import { VoltaDaDemoProvider, useVoltaDaDemo, type VoltaDaDemo } from "@/lib/volta-da-demo";
-import type { OuvinteDaDemo } from "@/components/demo-guiada/GuiaDaDemo";
+import type { OuvinteDaDemo, PonteDaDemo, TravaDoCta } from "@/components/demo-guiada/GuiaDaDemo";
 
 /* DEMO GUIADA (28/09): a "Missão de 1 minuto" só desce quando o braço da demo
  * é "on" (src/lib/demo-guiada-braco.ts). Chave desligada = nada abaixo monta. */
@@ -295,7 +295,13 @@ const useDialogoAberto = () => {
   return aberto;
 };
 
-const DemoCta = ({ funnel }: { funnel?: boolean }) => {
+const DemoCta = ({ funnel, trava }: {
+  funnel?: boolean;
+  /** Demo guiada (30/09, trava SUAVE): enquanto existe, o botão vira "1 toque e é
+   *  seu →" e o toque reacende a missão em vez de sair — a missão desarma no 1º
+   *  registro, em 20 s ou nesse 1º toque (o 2º toque é o "Quase lá" de sempre). */
+  trava?: TravaDoCta | null;
+}) => {
   // P5 (30/09): o destino (já com o item da demo guiada) e o efeito do toque
   // vêm do que o Preview publica — a MESMA fonte da seta ← dos módulos.
   const volta = useVoltaDaDemo();
@@ -313,6 +319,29 @@ const DemoCta = ({ funnel }: { funnel?: boolean }) => {
   }, [dialogoAberto]);
   const shell = isNativeShell();
   if (dialogoAberto || !volta) return null;
+  if (trava) {
+    return (
+      <div
+        ref={faixaRef}
+        className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="max-w-md mx-auto px-4 pt-3 flex items-center gap-3">
+          <p className="text-xs text-muted-foreground leading-tight flex-1">
+            Missão de 1 minuto · <strong className="text-foreground">falta 1 toque</strong>
+          </p>
+          <button
+            type="button"
+            onClick={trava.aoTocar}
+            data-testid="demo-cta-travado"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
+          >
+            {trava.rotulo} <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       ref={faixaRef}
@@ -468,6 +497,9 @@ const Preview = () => {
   }, []);
   const ouvinteRef = useRef<OuvinteDaDemo | null>(null);
   const encaminharGravacao = useCallback((k: string, v: unknown, a: unknown, g: boolean) => ouvinteRef.current?.(k, v, a, g), []);
+  // 30/09: os chips da missão gravam no snapshot pela ponte; a trava suave do CTA fixo vem da missão
+  const ponteRef = useRef<PonteDaDemo | null>(null);
+  const [trava, setTrava] = useState<TravaDoCta | null>(null);
   const eventoDaMissao = (nome: string, extra: Record<string, unknown>) =>
     trackEvent(nome, { guia: "on", modulo: key, ...(tipo ? { area: AREA_DO_TIPO[tipo], tipo } : {}), ...extra });
   const encerrarMissao = (motivo: FimDaMissao) => {
@@ -579,9 +611,11 @@ const Preview = () => {
                 modulo={key}
                 tipo={tipo}
                 ouvinte={ouvinteRef}
+                ponte={ponteRef}
                 aoItem={(novo) => { gravarEstadoDaMissao({ item: novo }); setItem(novo); }}
                 aoFim={encerrarMissao}
                 irParaCadastro={(novo) => navigate(comItem(voltaDaMissao(), novo))}
+                aoTravar={setTrava}
               />
             </Suspense>
           ) : undefined}
@@ -593,6 +627,7 @@ const Preview = () => {
         moduleKey={key}
         semente={item && MODULO_DO_TIPO[item.tipo] === key ? (sementes) => aplicarItemNaDemo(sementes, item) : undefined}
         aoGravar={guiaAberta ? encaminharGravacao : undefined}
+        ponte={guiaAberta ? ponteRef : undefined}
       >
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Suspense fallback={<CarregandoModulo />}>
@@ -601,7 +636,7 @@ const Preview = () => {
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
       {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} ajustarLink={ajustarVolta} />}
-      {!embed && <DemoCta funnel={funnel} />}
+      {!embed && <DemoCta funnel={funnel} trava={guiaAberta ? trava : null} />}
     </div>
     </VoltaDaDemoProvider>
   );

@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { getSeedsForModule } from "@/lib/preview-seeds";
 import { isNativeShell } from "@/lib/native-shell";
@@ -13,6 +13,7 @@ export const PreviewUserDataProvider = ({
   children,
   semente,
   aoGravar,
+  ponte,
 }: {
   moduleKey: string;
   children: ReactNode;
@@ -22,6 +23,9 @@ export const PreviewUserDataProvider = ({
   /** Demo guiada: cada gravação, com o valor de antes e se veio de um gesto da
    *  pessoa (é assim que a missão acha o item dela). Sem ela, nada muda. */
   aoGravar?: (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
+  /** Demo guiada (30/09): os chips da missão gravam no snapshot pelo MESMO
+   *  `get`/`set` dos módulos — a ponte recebe os dois, sempre atuais. */
+  ponte?: MutableRefObject<{ get: <T>(chave: string, padrao: T) => T; set: (chave: string, valor: unknown) => void } | null>;
 }) => {
   // Espelho global do store: componentes que leem localStorage direto
   // (storage-keys.ts) caem aqui quando não há usuário — sem isso os gráficos
@@ -149,6 +153,10 @@ export const PreviewUserDataProvider = ({
     isGuest: true,
     fetchKey,
   }), [get, set, fetchKey]);
+
+  // a ponte da missão vê sempre o `get` mais novo (ele muda a cada gravação)
+  if (ponte) ponte.current = { get, set };
+  useEffect(() => () => { if (ponte) ponte.current = null; }, [ponte]);
 
   return (
     <UserDataContext.Provider value={value}>

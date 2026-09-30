@@ -1,9 +1,17 @@
 /**
- * A MISSÃO DE 1 MINUTO na demo (28/09) — o caminho inteiro, com módulos de
- * mentira no lugar dos de verdade:
- *   · braço "on": faixa 1/3, o item nasce do gesto dela, a COMEMORAÇÃO da
- *     Missão do app ("Primeiro registro feito!" 33→66%, "Missão cumprida 🏆"
- *     66→100%, sem adesivo nenhum) e a folha com as DUAS saídas;
+ * A MISSÃO DE 1 MINUTO na demo (28/09, redesenhada 30/09) — o caminho inteiro,
+ * com módulos de mentira no lugar dos de verdade:
+ *   · braço "on": faixa 1/3 + cartão do passo 1 com "Começar →"; o post-it dos
+ *     CHIPS no formulário (1 toque = o registro dela, gravado pelo mesmo `set`
+ *     do módulo e visto pela tela na hora); a COMEMORAÇÃO da Missão do app
+ *     ("Primeiro registro feito!" 33→66%) com o botão "Ver meu mês →"; o passo
+ *     3 com o número dela subindo e "Continuar →"; a "MISSÃO CUMPRIDA" numa
+ *     peça só (lista com 3 quadradinhos, 100%, confete, as DUAS saídas);
+ *   · a TRAVA SUAVE do CTA fixo: "1 toque e é seu →" até o 1º registro OU o
+ *     tempo OU 1 toque nele; "Pular" e a barra de módulos sempre vivos;
+ *   · teclado aberto (campo em foco) = o holofote some; fechou, volta;
+ *   · Rotina: a ação é MARCAR o quadradinho de hoje (rotina-habits-checked);
+ *   · digitar continua valendo (o "+" do módulo);
  *   · a barra de módulos continua funcionando: trocar no meio encerra a
  *     missão (demo_guia_pular trocou_modulo) sem prender;
  *   · o item SOBREVIVE a 5 módulos de passeio (e ao storage zerado): volta
@@ -52,26 +60,67 @@ vi.mock("@/components/paywall/PixCheckout", async (orig) => ({
   prepararPixAdiantado: () => ({ tocou: () => {}, parar: () => {} }),
 }));
 
-/* Módulos de mentira: mostram os gastos da memória da demo e têm o botão de
- * adicionar com a MESMA âncora do módulo real (add-expense), numa linha com
- * campo — igual ao ExpenseTable. */
+/* Módulos de mentira. Finanças lê os gastos como o Index de verdade
+ * (usePersistedState — é assim que a escrita do chip tem que chegar na tela),
+ * tem o formulário com a MESMA âncora do módulo real (add-expense) numa linha
+ * com campos, e o MEU MÊS (add-bill) com o "Saiu" que o passo 3 lê. */
 const moduloDeMentira = async (nome: string) => {
   const { useUserData } = await import("@/hooks/use-user-data");
+  const { usePersistedState } = await import("@/hooks/use-persisted-state");
   const Modulo = () => {
-    const { get, set } = useUserData();
-    const gastos = get<Array<{ id: string; description: string; value: number }>>("finance-expenses", []);
+    const { get } = useUserData();
+    const [gastos, setGastos] = usePersistedState<Array<{ id: string; description: string; value: number }>>("finance-expenses", []);
+    const lista = Array.isArray(gastos) ? gastos : [];
+    const habitos = get<string[]>("rotina-habits", []);
+    const [checked, setChecked] = usePersistedState<Record<string, boolean[]>>("rotina-habits-checked", {});
+    const hoje = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"][(new Date().getDay() + 6) % 7];
     return (
       <div data-testid={`modulo-${nome}`}>
-        <ul>{(Array.isArray(gastos) ? gastos : []).map((g) => <li key={g.id}>{g.description}</li>)}</ul>
+        <ul>{lista.map((g) => <li key={g.id} data-testid="gasto">{g.description}</li>)}</ul>
         {nome === "financas" && (
-          <div>
-            <input placeholder="+ Novo gasto" readOnly />
-            <button
-              data-spotlight="add-expense"
-              onClick={() => set("finance-expenses", [...gastos, { id: "novo-1", description: "Café", value: 12, category: "outros", date: "2026-09-28", paymentMethod: "pix" }])}
-            >
-              +
-            </button>
+          <>
+            <div>
+              <input placeholder="+ Novo gasto" data-testid="campo-nome" readOnly />
+              <input placeholder="Valor" readOnly />
+              <button
+                data-spotlight="add-expense"
+                onClick={() => setGastos([...lista, { id: "novo-1", description: "Pão", value: 7, category: "outros", date: "2026-09-30", paymentMethod: "pix" } as never])}
+              >
+                +
+              </button>
+            </div>
+            <div data-spotlight="add-bill">
+              <div>MEU MÊS</div>
+              <div><span>↓ Saiu R$ 3.718</span></div>
+            </div>
+          </>
+        )}
+        {nome === "rotina" && (
+          <div className="rounded-lg">
+            <div><button data-spotlight="add-habit">+ Hábito</button></div>
+            <table>
+              <tbody>
+                {["SEGUNDA", "TERÇA", hoje].filter((d, i, a) => a.indexOf(d) === i).map((dia) => (
+                  <tr key={dia} data-testid={`linha-${dia}`}>
+                    <td>{dia}</td>
+                    {(Array.isArray(habitos) ? habitos : []).map((h, i) => (
+                      <td key={h}>
+                        <button
+                          role="checkbox"
+                          aria-checked={!!checked?.[dia]?.[i]}
+                          data-testid={dia === hoje ? `check-${i}` : undefined}
+                          onClick={() => {
+                            const novo = { ...checked, [dia]: [...(checked?.[dia] ?? habitos.map(() => false))] };
+                            novo[dia][i] = !novo[dia][i];
+                            setChecked(novo);
+                          }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -93,13 +142,18 @@ import { esquecerMissao, estadoDaMissao } from "@/lib/demo-guiada";
 import { idDoItem } from "@/lib/demo-guiada-registro";
 import { TEMPOS_DA_MISSAO } from "@/components/demo-guiada/alvos";
 
-// os tempos de verdade (os do app), guardados antes de o teste encurtar
+// os tempos de verdade, guardados antes de o teste encurtar
 const TEMPOS_REAIS = { ...TEMPOS_DA_MISSAO };
 
 MotionGlobalConfig.skipAnimations = true;
 if (!("ResizeObserver" in globalThis)) {
   (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 }
+// jsdom não mede nada: todo elemento tem um retângulo de mentira (o anel precisa ver o alvo)
+Element.prototype.getBoundingClientRect = function () {
+  return { top: 200, left: 10, width: 300, height: 40, bottom: 240, right: 310, x: 10, y: 200, toJSON() { return this; } } as DOMRect;
+};
+window.scrollBy = () => {};
 
 /** Como no App: cada módulo é uma página nova (Routes com key = pathname). */
 const Rotas = () => {
@@ -126,13 +180,25 @@ const irPara = async (nome: string, modulo: string) => {
 const eventos = (nome: string) => analytics.trackEvent.mock.calls.filter((c) => c[0] === nome).map((c) => c[1]);
 const quaseLa = () => screen.getByText("Quase lá").closest("a") as HTMLAnchorElement;
 const DEMO = "/preview/financas?funnel=1&tour=vida&from=dia14";
+const ROTINA = "/preview/rotina?funnel=1&tour=vida&from=dia14";
 const C_CAFE = "c=gasto%7CCaf%C3%A9%7C12";
 
-const anotarCafe = async () => {
-  await screen.findByTestId("demo-guia-faixa");
-  const mais = document.querySelector('[data-spotlight="add-expense"]') as HTMLElement;
-  act(() => { fireEvent.pointerDown(mais); fireEvent.click(mais); });
-  await screen.findByText(/2\/3/);
+/** Espera o post-it do passo 2 (o anel só aparece com a rolagem assentada: ~500 ms). */
+const esperarPostIt = () => screen.findByTestId("demo-guia-postit", {}, { timeout: 4000 });
+/** Toca num chip (o aviso pras telas da mesma chave sai num microtask: por isso o act assíncrono). */
+const tocarChip = async (nome: string) => {
+  const postit = await esperarPostIt();
+  const chip = within(postit).getAllByTestId("demo-guia-chip").find((b) => b.textContent?.includes(nome)) as HTMLElement;
+  await act(async () => { fireEvent.pointerDown(chip); fireEvent.click(chip); await Promise.resolve(); });
+};
+/** O caminho inteiro até a "Missão cumprida", pelos botões. */
+const cumprirComCafe = async () => {
+  await tocarChip("Café");
+  const festa = await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+  act(() => { fireEvent.click(within(festa).getByTestId("demo-guia-ver")); });
+  const passo3 = await screen.findByTestId("demo-guia-passo3", {}, { timeout: 4000 });
+  act(() => { fireEvent.click(within(passo3).getByTestId("demo-guia-continuar")); });
+  return screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
 };
 
 beforeEach(() => {
@@ -145,17 +211,21 @@ beforeEach(() => {
   analytics.trackEvent.mockClear();
   window.history.replaceState({}, "", "/");
   // comemorações encurtadas no teste (o fluxo é o mesmo; os tempos reais estão travados abaixo)
-  Object.assign(TEMPOS_DA_MISSAO, { inicio: 60, antesDoHolofote: 50, primeiroRegistro: 120, olhar: 150, cumprida: 120 });
+  Object.assign(TEMPOS_DA_MISSAO, { inicio: 60, antesDoHolofote: 50, registrou: 30, primeiroRegistro: 900, olhar: 900, trava: 60_000 });
 });
 afterEach(() => {
   cleanup();
   Object.assign(TEMPOS_DA_MISSAO, TEMPOS_REAIS);
 });
 
-describe("a comemoração é a da Missão do teste grátis do app", () => {
-  it("dura o mesmo que a do app: 2,8 s o 1º registro, 3,6 s a missão cumprida", () => {
-    expect(TEMPOS_REAIS.primeiroRegistro).toBe(2800);
-    expect(TEMPOS_REAIS.cumprida).toBe(3600);
+describe("os tempos da missão", () => {
+  it("a 1ª comemoração é a do app (2,8 s) mais o tempo de ler o botão; o resto só anda sozinho como rede de segurança", () => {
+    expect(TEMPOS_REAIS.primeiroRegistro).toBeGreaterThanOrEqual(2800);
+    expect(TEMPOS_REAIS.primeiroRegistro).toBeLessThanOrEqual(5000);
+    expect(TEMPOS_REAIS.olhar).toBeGreaterThanOrEqual(6000);
+    expect(TEMPOS_REAIS.inicio).toBe(3000);
+    // a trava suave do CTA: 20 s (mediana de quem pula é 13 s; p75 30 s — segura os apressados por 7 s, não por 41)
+    expect(TEMPOS_REAIS.trava).toBe(20_000);
   });
 });
 
@@ -168,6 +238,8 @@ describe("o sorteio do A/B é na ENTRADA da demo (e o braço vai carimbado na UR
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
     const vista = eventos("funnel_view").find((e) => e.step === "demo");
     expect(vista).toEqual({ step: "demo", tour: "vida", module: "financas" });
+    expect(quaseLa()).toBeTruthy(); // e o CTA de sempre, sem trava
+    expect(screen.queryByTestId("demo-cta-travado")).toBeNull();
   });
 
   it("sorteou a missão: a URL ganha guia=1 (replace) e a faixa aparece", async () => {
@@ -201,63 +273,105 @@ describe("o sorteio do A/B é na ENTRADA da demo (e o braço vai carimbado na UR
   });
 });
 
-describe("braço on: a missão", () => {
-  it("nasce em 1/3 (área escolhida ✓), com Pular, e as pílulas levam o braço", async () => {
+describe("braço on: a missão, passo a passo", () => {
+  it("nasce em 1/3 (área escolhida ✓) com o cartão do passo 1 e 'Começar →'; Pular; as pílulas levam o braço", async () => {
     await abrirDemo(`${DEMO}&guia=1`);
     const faixa = await screen.findByTestId("demo-guia-faixa");
     expect(faixa.textContent).toMatch(/Missão de 1 minuto/i);
     expect(faixa.textContent).toMatch(/1\/3/);
     expect(faixa.textContent).toMatch(/Área escolhida ✓/);
+    expect(faixa.textContent).toMatch(/toca em 1 gasto seu/);
     expect(screen.getByTestId("demo-guia-pular")).toBeTruthy();
+    const passo1 = screen.getByTestId("demo-guia-passo1");
+    expect(passo1.textContent).toMatch(/Passo 1 de 3 · feito/);
+    expect(passo1.textContent).toMatch(/Você começou por Finanças/);
+    expect(within(passo1).getByTestId("demo-guia-mostrar").textContent).toMatch(/Começar/);
     expect(pilula("Rotina").getAttribute("href")).toContain("guia=1");
-    expect(eventos("funnel_view")).toContainEqual(expect.objectContaining({ step: "demo", module: "financas", guia: "on" }));
     expect(eventos("demo_guia_view")).toContainEqual(expect.objectContaining({ guia: "on", area: "dinheiro", modulo: "financas" }));
-    // o CTA fixo de baixo continua lá
-    expect(quaseLa()).toBeTruthy();
+    expect(eventos("demo_guia_passo")).toContainEqual(expect.objectContaining({ n: 1 }));
   });
 
-  it("o item nasce do gesto dela e sobe a comemoração da Missão do app: 'Primeiro registro feito!' → 'Missão cumprida 🏆' → folha", async () => {
+  it("passo 2: o POST-IT com os 3 gastos prontos e '✎ escrever o meu' em cima do formulário; o escuro nunca intercepta toque", async () => {
     await abrirDemo(`${DEMO}&guia=1`);
-    await anotarCafe();
-    expect(pilula("Rotina").getAttribute("href")).toContain(C_CAFE);
-    expect(quaseLa().getAttribute("href")).toContain(C_CAFE);
+    const postit = await esperarPostIt();
+    expect(postit.textContent).toMatch(/Passo 2 de 3 · 1 toque/i);
+    expect(postit.textContent).toMatch(/Qual foi o seu último gasto\?/);
+    const chips = within(postit).getAllByTestId("demo-guia-chip").map((b) => b.textContent);
+    expect(chips).toEqual(["☕Café· R$ 12", "🚗Uber· R$ 23", "🍔Almoço· R$ 35"]);
+    expect(within(postit).getByTestId("demo-guia-escrever").textContent).toMatch(/escrever o meu/);
+    const anel = screen.getByTestId("demo-guia-anel-2");
+    expect(anel.className).toMatch(/pointer-events-none/);
+    expect(eventos("demo_guia_passo")).toContainEqual(expect.objectContaining({ n: 2 }));
+    // o cartão do passo 1 já saiu
+    expect(screen.queryByTestId("demo-guia-passo1")).toBeNull();
+  });
+
+  it("1 TOQUE no chip: o gasto entra na lista do módulo (pelo mesmo caminho do +), o chip vira ✓ e vem a comemoração com 'Ver meu mês →'", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    await tocarChip("Café");
+    // a tela do módulo (usePersistedState, como o Index de verdade) mostra o gasto na hora
+    await waitFor(() => expect(screen.getAllByTestId("gasto").map((li) => li.textContent)).toContain("Café"));
     expect(estadoDaMissao().item).toEqual({ tipo: "gasto", nome: "Café", valor: 12 });
-    expect(eventos("demo_guia_passo")).toContainEqual(expect.objectContaining({ n: 3, tipo: "gasto" }));
+    expect(pilula("Rotina").getAttribute("href")).toContain(C_CAFE);
+    // o chip tocado vira ✓ enquanto a linha aparece
+    const chip = within(screen.getByTestId("demo-guia-postit")).getAllByTestId("demo-guia-chip").find((b) => b.textContent?.includes("Café")) as HTMLElement;
+    expect(chip.querySelector("svg")).toBeTruthy();
+    expect(eventos("demo_guia_chip")).toContainEqual(expect.objectContaining({ tipo: "gasto", nome: "Café", valor: 12, ok: true }));
+    expect(eventos("demo_guia_registro")).toContainEqual(expect.objectContaining({ tipo: "gasto", via: "chip" }));
+    expect(eventos("demo_guia_passo")).toContainEqual(expect.objectContaining({ n: 3, tipo: "gasto", via: "chip" }));
+    expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/2\/3/);
 
     // 1ª comemoração: igual ao dia 1 da Missão do app — fundo escuro, cartão branco, o gráfico que
-    // sobe, o chip preto, a barra verde 33% → 66%; não engole toque; é camada de guia
-    const festa1 = await screen.findByTestId("demo-guia-comemoracao");
+    // sobe, o chip preto com o item dela, a barra verde 33% → 66%; e o BOTÃO de seguir
+    const festa1 = await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+    expect(screen.queryByTestId("demo-guia-postit")).toBeNull(); // uma peça de cada vez
     expect(festa1.textContent).toMatch(/Primeiro registro feito!/);
-    expect(festa1.textContent).toMatch(/🔥 1º registro ✓/);
-    expect(festa1.textContent).toMatch(/Missão de 1 minuto · 66%/);
+    expect(festa1.textContent).toMatch(/🔥 Café · R\$ 12 ✓/);
+    expect(festa1.textContent).toMatch(/Missão de 1 minuto · 2 de 3/);
     expect(festa1.className).toMatch(/pointer-events-none/);
     expect(festa1.getAttribute("data-camada-guia")).toBe("demo-comemoracao");
     expect(festa1.querySelector("path")?.getAttribute("stroke")).toBe("hsl(330 65% 50%)");
-    expect(festa1.querySelector("circle")).toBeTruthy();
     const barra1 = festa1.querySelector('[data-testid="demo-guia-comemoracao-barra"]') as HTMLElement;
-    await waitFor(() => expect(barra1.style.width).toBe("66%")); // nasce em 33% e pula
-    // SEM adesivo em lugar nenhum (a 1.0.6, que vendeu, não tinha festa de adesivo)
+    await waitFor(() => expect(barra1.style.width).toBe("66%"));
+    expect(within(festa1).getByTestId("demo-guia-ver").textContent).toMatch(/Ver meu mês/);
     expect(document.querySelector("[data-adesivo]")).toBeNull();
+  });
 
-    // sem o resumo do mês no módulo de mentira, o "olhar" é pulado (fail-open) e vem a 2ª comemoração
-    await screen.findByText("Missão cumprida 🏆", {}, { timeout: 3000 });
-    const festa2 = screen.getByTestId("demo-guia-comemoracao");
-    expect(festa2.textContent).toMatch(/🔥🔥🔥 missão completa/);
-    expect(festa2.textContent).toMatch(/Missão de 1 minuto · 100%/);
-    const barra2 = festa2.querySelector('[data-testid="demo-guia-comemoracao-barra"]') as HTMLElement;
-    await waitFor(() => expect(barra2.style.width).toBe("100%"));
+  it("passo 3: o número dela subindo (Saiu no mês R$ 3.718 → R$ 3.730) com o botão 'Continuar →'; depois a MISSÃO CUMPRIDA numa peça só", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    await tocarChip("Café");
+    const festa1 = await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+    act(() => { fireEvent.click(within(festa1).getByTestId("demo-guia-ver")); });
+    expect(eventos("demo_guia_continuar")).toContainEqual(expect.objectContaining({ de: "festa1", via: "botao" }));
+    const passo3 = await screen.findByTestId("demo-guia-passo3", {}, { timeout: 4000 });
+    expect(screen.queryByTestId("demo-guia-comemoracao")).toBeNull();
+    expect(passo3.textContent).toMatch(/Passo 3 de 3 · olha/i);
+    expect(passo3.textContent).toMatch(/Saiu no mês — já com o seu Café/);
+    expect(passo3.textContent).toMatch(/R\$ 3\.718/);
+    await waitFor(() => expect(passo3.textContent).toMatch(/R\$ 3\.730/));
+    expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/1º registro: Café · R\$ 12 ✓ · olha o seu mês/);
+    act(() => { fireEvent.click(within(passo3).getByTestId("demo-guia-continuar")); });
+    expect(eventos("demo_guia_continuar")).toContainEqual(expect.objectContaining({ de: "olhar", via: "botao" }));
+
+    const fim = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
+    expect(screen.queryByTestId("demo-guia-passo3")).toBeNull();
+    expect(fim.textContent).toMatch(/Missão cumprida/);
+    const lista = within(fim).getByTestId("demo-guia-lista");
+    expect(lista.textContent).toMatch(/Área escolhida: Finanças/);
+    expect(lista.textContent).toMatch(/Café · R\$ 12 anotado/);
+    expect(lista.textContent).toMatch(/Olhou o seu mês/);
+    expect(fim.textContent).toMatch(/Missão de 1 minuto · 100%/);
+    expect(fim.textContent).toMatch(/já está anotado/);
+    expect(within(fim).getByTestId("demo-guia-confete")).toBeTruthy();
+    expect(within(fim).getByTestId("demo-guia-levar").textContent).toMatch(/Levar pros meus números/);
+    expect(within(fim).getByTestId("demo-guia-explorar").textContent).toMatch(/Ver os outros módulos/);
     expect(eventos("demo_guia_feito")).toHaveLength(1);
+    expect(eventos("demo_guia_feito")[0]).toEqual(expect.objectContaining({ tipo: "gasto", via: "chip" }));
     expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/3\/3/);
-
-    const folha = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
     expect(document.querySelector("[data-adesivo]")).toBeNull();
-    expect(folha.textContent).toMatch(/Missão cumprida/);
-    expect(folha.textContent).toMatch(/Café · R\$ 12/);
-    expect(folha.textContent).toMatch(/já está anotado/);
-    expect(eventos("demo_guia_feito")).toHaveLength(1);
-    expect(within(folha).getByTestId("demo-guia-levar").textContent).toMatch(/Levar isso pros meus números/);
+
     // "Ver os outros módulos": fecha, a faixa sai e a demo segue igual à de hoje
-    act(() => { fireEvent.click(within(folha).getByTestId("demo-guia-explorar")); });
+    act(() => { fireEvent.click(within(fim).getByTestId("demo-guia-explorar")); });
     expect(screen.queryByTestId("demo-guia-cumprida")).toBeNull();
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
     expect(eventos("demo_guia_explorar")).toContainEqual(expect.objectContaining({ via: "folha" }));
@@ -265,26 +379,135 @@ describe("braço on: a missão", () => {
     expect(quaseLa().getAttribute("href")).toContain(C_CAFE);
   });
 
-  it("'Levar isso pros meus números' vai pro cadastro com o item", async () => {
+  it("sem tocar em nada, a missão anda sozinha até a MISSÃO CUMPRIDA — e lá ela para: só sai por um dos dois botões", async () => {
+    Object.assign(TEMPOS_DA_MISSAO, { primeiroRegistro: 120, olhar: 120 });
     await abrirDemo(`${DEMO}&guia=1`);
-    await anotarCafe();
-    const folha = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
-    act(() => { fireEvent.click(within(folha).getByTestId("demo-guia-levar")); });
+    await tocarChip("Uber");
+    const fim = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 5000 });
+    expect(eventos("demo_guia_continuar")).toEqual([
+      expect.objectContaining({ de: "festa1", via: "auto" }),
+      expect.objectContaining({ de: "olhar", via: "auto" }),
+    ]);
+    await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+    expect(screen.getByTestId("demo-guia-cumprida")).toBe(fim);
+    expect(fim.textContent).toMatch(/Uber · R\$ 23/);
+  });
+
+  it("digitar continua valendo: o + do módulo anota o gasto dela e a missão segue igual (via 'digitado')", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    await screen.findByTestId("demo-guia-faixa");
+    const mais = document.querySelector('[data-spotlight="add-expense"]') as HTMLElement;
+    act(() => { fireEvent.pointerDown(mais); fireEvent.click(mais); });
+    await screen.findByText(/2\/3/);
+    expect(estadoDaMissao().item).toEqual({ tipo: "gasto", nome: "Pão", valor: 7 });
+    expect(eventos("demo_guia_registro")).toContainEqual(expect.objectContaining({ tipo: "gasto", via: "digitado" }));
+    const festa1 = await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+    expect(festa1.textContent).toMatch(/🔥 Pão · R\$ 7 ✓/);
+  });
+
+  it("'✎ escrever o meu' leva o foco pro campo do módulo — e com o teclado aberto o holofote SOME (nada escuro, nada em cima do campo); fechou, volta", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    const postit = await esperarPostIt();
+    const campo = screen.getByTestId("campo-nome") as HTMLInputElement;
+    act(() => { fireEvent.click(within(postit).getByTestId("demo-guia-escrever")); });
+    expect(document.activeElement).toBe(campo);
+    expect(eventos("demo_guia_escrever")).toHaveLength(1);
+    await waitFor(() => expect(document.querySelector('[data-camada-guia="demo-holofote"]')).toBeNull());
+    expect(screen.queryByTestId("demo-guia-postit")).toBeNull();
+    expect(eventos("demo_guia_teclado")).toContainEqual(expect.objectContaining({ passo: 2 }));
+    // a faixa continua guiando por texto
+    expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/toca em 1 gasto seu/);
+    act(() => { campo.blur(); });
+    await screen.findByTestId("demo-guia-postit", {}, { timeout: 3000 });
+  });
+
+  it("'Levar pros meus números' vai pro cadastro com o item (o mesmo destino do 'Quase lá')", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    const fim = await cumprirComCafe();
+    act(() => { fireEvent.click(within(fim).getByTestId("demo-guia-levar")); });
     await screen.findByTestId("cadastro");
-    // o mesmo destino do "Quase lá" de hoje (/inicio?step=signup&porta=vida), com o item junto
     expect(screen.getByTestId("url").textContent).toBe(`/inicio?step=signup&porta=vida&${C_CAFE}`);
     expect(eventos("demo_guia_levar")).toHaveLength(1);
     expect(eventos("funnel_click")).toContainEqual({ cta: "demo_quase_la", via: "guia" });
   });
 
-  it("Pular: a faixa sai e a demo segue (sem item nenhum)", async () => {
+  it("Pular: a faixa sai, a trava sai e a demo segue (sem item nenhum)", async () => {
     await abrirDemo(`${DEMO}&guia=1`);
     await screen.findByTestId("demo-guia-faixa");
+    expect(screen.getByTestId("demo-cta-travado")).toBeTruthy();
     act(() => { fireEvent.click(screen.getByTestId("demo-guia-pular")); });
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
+    expect(screen.queryByTestId("demo-guia-passo1")).toBeNull();
     // 30/09: a missão começa no cartão do passo 1 — pular logo de cara é pular no passo 1
     expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "botao", passo: 1 }));
+    expect(eventos("demo_guia_trava")).toContainEqual(expect.objectContaining({ motivo: "pular" }));
+    await screen.findByText("Quase lá");
     expect(quaseLa().getAttribute("href")).not.toContain("c=");
+  });
+});
+
+describe("a TRAVA SUAVE do CTA fixo", () => {
+  it("nasce '1 toque e é seu →' no lugar do 'Quase lá'; 1 toque nela reacende a missão (não sai da demo) e o CTA volta a ser o de sempre", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    await screen.findByTestId("demo-guia-faixa");
+    const travado = screen.getByTestId("demo-cta-travado");
+    expect(travado.textContent).toMatch(/1 toque e é seu/);
+    expect(screen.queryByText("Quase lá")).toBeNull();
+    expect(document.body.textContent).toMatch(/falta 1 toque/);
+    act(() => { fireEvent.click(travado); });
+    expect(screen.getByTestId("url").textContent).toContain("/preview/financas"); // continua na demo
+    expect(eventos("demo_guia_cta")).toContainEqual(expect.objectContaining({ estado: "travado", passo: 1 }));
+    expect(eventos("demo_guia_trava")).toContainEqual(expect.objectContaining({ motivo: "cta" }));
+    await screen.findByText("Quase lá");
+    expect(screen.queryByTestId("demo-cta-travado")).toBeNull();
+    // o toque no CTA travado pulou o cartão do passo 1 e foi direto pro post-it
+    await esperarPostIt();
+    // o 2º toque é o "Quase lá" de sempre: sai pro cadastro e conta como pular
+    act(() => { fireEvent.click(quaseLa()); });
+    await screen.findByTestId("cadastro");
+    expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "quase_la" }));
+  });
+
+  it("acaba sozinha com o tempo (20 s de verdade)", async () => {
+    Object.assign(TEMPOS_DA_MISSAO, { trava: 200 });
+    await abrirDemo(`${DEMO}&guia=1`);
+    await screen.findByTestId("demo-cta-travado");
+    await screen.findByText("Quase lá", {}, { timeout: 3000 });
+    expect(eventos("demo_guia_trava")).toContainEqual(expect.objectContaining({ motivo: "tempo" }));
+    expect(screen.getByTestId("demo-guia-faixa")).toBeTruthy(); // a missão continua
+  });
+
+  it("acaba com o 1º registro (e o CTA passa a levar o item)", async () => {
+    await abrirDemo(`${DEMO}&guia=1`);
+    await tocarChip("Café");
+    await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+    expect(eventos("demo_guia_trava")).toContainEqual(expect.objectContaining({ motivo: "item" }));
+    expect(screen.queryByTestId("demo-cta-travado")).toBeNull();
+  });
+});
+
+describe("Rotina: a missão é MARCAR 1 hábito de hoje (o toque mais comum da demo)", () => {
+  it("o post-it pede o quadradinho; marcar 'Treinar' hoje vira o item dela, com 'Feitos hoje' subindo e 'Ver minha sequência →'", async () => {
+    await abrirDemo(`${ROTINA}&guia=1`, "rotina");
+    const faixa = await screen.findByTestId("demo-guia-faixa");
+    expect(faixa.textContent).toMatch(/marca 1 hábito de hoje/);
+    const postit = await esperarPostIt();
+    expect(postit.textContent).toMatch(/Toca no quadradinho/);
+    expect(within(postit).queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+    const check = screen.getByTestId("check-1");
+    act(() => { fireEvent.pointerDown(check); fireEvent.click(check); });
+    await screen.findByText(/2\/3/);
+    expect(estadoDaMissao().item).toEqual({ tipo: "habito", nome: "Treinar" });
+    expect(eventos("demo_guia_registro")).toContainEqual(expect.objectContaining({ tipo: "habito", via: "toque" }));
+    const festa1 = await screen.findByTestId("demo-guia-comemoracao", {}, { timeout: 4000 });
+    expect(festa1.textContent).toMatch(/🔥 Treinar ✓/);
+    expect(within(festa1).getByTestId("demo-guia-ver").textContent).toMatch(/Ver minha sequência/);
+    act(() => { fireEvent.click(within(festa1).getByTestId("demo-guia-ver")); });
+    // sem o card CONSISTÊNCIA no módulo de mentira, o passo 3 é pulado (fail-open) e vem a missão cumprida
+    const fim = await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
+    expect(fim.textContent).toMatch(/Treinar marcado hoje/);
+    expect(fim.textContent).toMatch(/já está na sua semana/);
+    expect(screen.getByTestId("demo-guia-faixa").textContent).toMatch(/Missão cumprida ✓ Treinar vai com você/);
   });
 });
 
@@ -295,6 +518,7 @@ describe("a barra de módulos continua funcionando", () => {
     await irPara("Rotina", "rotina");
     expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "trocou_modulo", para: "rotina", guia: "on" }));
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
+    expect(screen.queryByTestId("demo-cta-travado")).toBeNull();
     expect(screen.getByTestId("url").textContent).toContain("/preview/rotina");
     await irPara("Finanças", "financas");
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
@@ -306,9 +530,8 @@ describe("a barra de módulos continua funcionando", () => {
 
   it("O ITEM SOBREVIVE: 5 módulos de passeio (com o storage zerado no meio), volta pro módulo dele e chega no paywall", async () => {
     await abrirDemo(`${DEMO}&guia=1`);
-    await anotarCafe();
-    await screen.findByTestId("demo-guia-cumprida", {}, { timeout: 4000 });
-    act(() => { fireEvent.click(screen.getByTestId("demo-guia-explorar")); });
+    const fim = await cumprirComCafe();
+    act(() => { fireEvent.click(within(fim).getByTestId("demo-guia-explorar")); });
     for (const [pil, mod] of [["Rotina", "rotina"], ["Treino", "treino"], ["Dieta", "dieta"]] as const) {
       await irPara(pil, mod);
       expect(screen.getByTestId("url").textContent).toContain(C_CAFE);
@@ -388,10 +611,11 @@ describe("o bloco nunca derruba o paywall", () => {
 });
 
 describe("braço off (controle do A/B)", () => {
-  it("é a demo de hoje: sem faixa, sem item — só o braço nos eventos e nas pílulas", async () => {
+  it("é a demo de hoje: sem faixa, sem item, sem trava — só o braço nos eventos e nas pílulas", async () => {
     await abrirDemo(`${DEMO}&guia=0`);
     await act(async () => { await new Promise((r) => setTimeout(r, 1500)); });
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
+    expect(screen.queryByTestId("demo-cta-travado")).toBeNull();
     expect(pilula("Rotina").getAttribute("href")).toBe("/preview/rotina?funnel=1&tour=vida&from=dia14&guia=0");
     expect(quaseLa().getAttribute("href")).toBe("/inicio?step=signup&porta=vida");
     expect(eventos("funnel_view")).toContainEqual(expect.objectContaining({ step: "demo", guia: "off" }));

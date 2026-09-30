@@ -1,46 +1,64 @@
 /**
- * A MISSÃO DE 1 MINUTO — a demo da web vira o 1º registro da pessoa (28/09).
+ * A MISSÃO DE 1 MINUTO — a demo da web vira o 1º registro da pessoa (28/09,
+ * redesenhada em 30/09).
  *
- * Desenho (scratchpad funil-web-28-09/relatorio.md, seção b), no ritmo da
- * Missão do teste grátis do app (dono: "quando o usuário faz algo aparece
- * comemoração, porque isso converteu bem lá"):
- *   1/3  ÁREA ESCOLHIDA — nasce feito (progresso dado: cartão-fidelidade com o
- *        1º selo carimbado vence cartão vazio);
- *   2/3  ANOTAR — holofote no botão de adicionar do módulo; ela anota UM item
- *        dela (ex.: Café · R$ 12) → a COMEMORAÇÃO da Missão do app: "Primeiro
- *        registro feito!", o gráfico que sobe, a barra verde de 33% → 66%;
- *   3/3  OLHAR (~4 s) — holofote no resumo que recalculou, com o número dela
- *        subindo;
- *   →    "Missão cumprida 🏆" (a comemoração do dia 3 do app, 66% → 100%) e a
- *        folha com DUAS saídas: "Levar isso pros meus números" (= o "Quase lá",
- *        com o item junto) e "Ver os outros módulos" (fecha, pulsa a barra de
- *        módulos e a demo segue igual à de hoje).
- * SEM adesivo: no app, o que converteu foi a comemoração da Missão sozinha (a
- * 1.0.6 não tinha festa de adesivo; a da 1.0.7 atropelou a comemoração e saiu).
- * "Pular" sempre na faixa; o CTA fixo de baixo continua; a barra de módulos
- * continua funcionando o tempo todo (trocar de módulo encerra a missão sem
- * prender ninguém — quem registra isso é o Preview).
+ * O ritmo é o da Missão do teste grátis do app (dono: "quando o usuário faz
+ * algo aparece comemoração, porque isso converteu bem lá") — e cada passo tem
+ * UMA ação óbvia e um botão de seguir (dono, 30/09, no iPhone: "fica um tempo
+ * e o usuário fica meio que perdido, não sabe onde clicar pra continuar"):
+ *   1/3  ÁREA ESCOLHIDA — nasce feito (cartão "Passo 1 de 3 · feito ✓",
+ *        botão "Começar →"; anda sozinho em 3 s);
+ *   2/3  1 TOQUE — holofote no formulário do módulo com o POST-IT dos chips
+ *        prontos ("☕ Café · R$ 12", "🚗 Uber · R$ 23"…) e "✎ escrever o meu";
+ *        na Rotina o toque é o quadradinho de HOJE da tabela de hábitos, na
+ *        Saúde o "+ Copo". 9% completavam digitando (41 s); agora é 1 toque.
+ *        → a COMEMORAÇÃO da Missão do app ("Primeiro registro feito!", o
+ *        gráfico que sobe, a barra 33 → 66%) com o botão "Ver meu mês →";
+ *   3/3  OLHAR — holofote no resumo que recalculou, com o número dela subindo
+ *        e o botão "Continuar →";
+ *   →    "MISSÃO CUMPRIDA" numa peça só: a lista da missão com os 3
+ *        quadradinhos marcando, 66 → 100%, confete, e as DUAS saídas sempre
+ *        visíveis: "Levar pros meus números →" (= o "Quase lá", com o item) e
+ *        "Ver os outros módulos" (fecha, pulsa a barra de módulos e a demo
+ *        segue igual à de hoje).
+ * TRAVA SUAVE (plano funil-novo-plano/plano.md, 1.2): o CTA fixo de baixo vira
+ * "1 toque e é seu →" até o 1º registro OU 20 s OU 1 toque nele (tocar nele
+ * não sai da demo: reacende o post-it; o 2º toque é o "Quase lá" de sempre).
+ * 52% pulam pelo "Quase lá" em 13 s e são a maioria de quem compra — a trava
+ * dura custaria venda. "Pular" na faixa, a barra de módulos e o "Quase lá"
+ * continuam vivos o tempo todo.
+ * SEM adesivo e sem festa empilhada: uma peça de cada vez.
  *
  * Esta peça só é montada pelo Preview quando o braço da demo é "on"; ela
- * mesma não sabe de A/B. Nada aqui intercepta toque (ver pecas.tsx).
+ * mesma não sabe de A/B. O escuro nunca intercepta toque (ver pecas.tsx).
  */
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
+import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { AREA_DO_TIPO, NOME_DO_MODULO, rotuloCurto, type FimDaMissao, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
-import { alvoDaMissao, TEMPOS_DA_MISSAO, type Numero } from "./alvos";
-import { Anel, CartaoDoPasso1, ComemoracaoDaMissao, ContaSubindo, FaixaDaMissao, FolhaCumprida } from "./pecas";
+import { alvoDaMissao, gravacoesDoChip, itemDoChip, TEMPOS_DA_MISSAO, type ChipDaMissao, type Numero, type ViaDoRegistro } from "./alvos";
+import { Anel, BalaoDoPasso3, CartaoDoPasso1, ComemoracaoDaMissao, FaixaDaMissao, MissaoCumprida, PostItDaMissao } from "./pecas";
 
 /** Cada gravação da demo: chave, valor novo, valor de antes e se veio de um gesto da pessoa. */
 export type OuvinteDaDemo = (chave: string, valor: unknown, anterior: unknown, gesto: boolean) => void;
 
-/** inicio = passo 1 (o cartão "Passo 1 de 3 ✓") · achar/anotar = passo 2 ·
- *  festa1 = "Primeiro registro feito!" · olhar = passo 3 · festa2 = "Missão
- *  cumprida 🏆" · cumprida = a folha com as duas saídas.
- *  30/09 (dono: "quando clicamos em algo ela simplesmente pula o passo"): toque
- *  fora não fecha mais o passo 2 nem o 3 (Anel `fixo`); o alvo saiu da tela →
- *  "mostrar onde" na faixa; o resumo do passo 3 em outra aba → a missão leva até lá. */
-type Fase = "inicio" | "achar" | "anotar" | "festa1" | "olhar" | "festa2" | "cumprida";
+/** A ponte pro snapshot da demo (o `get`/`set` do PreviewUserDataProvider): é por ela que os chips gravam. */
+export interface PonteDaDemo {
+  get: <T>(chave: string, padrao: T) => T;
+  set: (chave: string, valor: unknown) => void;
+}
+
+/** O estado "trava suave" do CTA fixo de baixo: o rótulo e o que fazer no toque. */
+export interface TravaDoCta {
+  rotulo: string;
+  aoTocar: () => void;
+}
+
+/** inicio = passo 1 · achar/anotar = passo 2 (procurando o alvo / post-it na tela) ·
+ *  registrou = o chip virou ✓ e a linha apareceu · festa1 = "Primeiro registro
+ *  feito!" · olhar = passo 3 · cumprida = "Missão cumprida" com as duas saídas. */
+type Fase = "inicio" | "achar" | "anotar" | "registrou" | "festa1" | "olhar" | "cumprida";
 
 const visivel = (el: Element) => {
   const r = el.getBoundingClientRect();
@@ -70,15 +88,19 @@ export interface PropsDaMissao {
   tipo: TipoDoItem;
   /** O Preview repassa pra cá cada gravação do PreviewUserDataProvider. */
   ouvinte: MutableRefObject<OuvinteDaDemo | null>;
+  /** O `get`/`set` do snapshot da demo (os chips gravam por aqui). */
+  ponte: MutableRefObject<PonteDaDemo | null>;
   /** O item nasceu: o Preview guarda (URL das pílulas, CTA, sessão). */
   aoItem: (item: ItemDaDemo) => void;
   /** A missão acabou (a faixa sai). */
   aoFim: (motivo: FimDaMissao) => void;
-  /** "Levar isso pros meus números": o mesmo destino do "Quase lá", com o item. */
+  /** "Levar pros meus números": o mesmo destino do "Quase lá", com o item. */
   irParaCadastro: (item: ItemDaDemo) => void;
+  /** A trava suave do CTA fixo: `null` = o CTA de sempre. */
+  aoTravar: (trava: TravaDoCta | null) => void;
 }
 
-export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irParaCadastro }: PropsDaMissao) {
+export default function GuiaDaDemo({ modulo, tipo, ouvinte, ponte, aoItem, aoFim, irParaCadastro, aoTravar }: PropsDaMissao) {
   const cfg = alvoDaMissao(tipo);
   const reduzir = !!useReducedMotion();
   const [fase, setFase] = useState<Fase>("inicio");
@@ -86,25 +108,56 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
   faseRef.current = fase;
   const [alvo, setAlvo] = useState<Element | null>(null);
   const [anelVivo, setAnelVivo] = useState(false);
+  /** remonta o anel do passo 2 (rola de novo até o post-it) quando o CTA travado é tocado */
+  const [acende, setAcende] = useState(0);
   const [item, setItem] = useState<ItemDaDemo | null>(null);
   const [numero, setNumero] = useState<Numero | null>(null);
   const numeroRef = useRef<Numero | null>(null);
   const [olharEm, setOlharEm] = useState<Element | null>(null);
   /** o anel do passo 2 saiu porque o alvo sumiu da tela (trocou de aba): a faixa oferece "mostrar onde" */
   const [perdeuAlvo, setPerdeuAlvo] = useState(false);
+  /** o chip que ela tocou (vira ✓ no post-it enquanto a linha aparece) */
+  const [tocado, setTocado] = useState<string | null>(null);
+  const viaRef = useRef<ViaDoRegistro | null>(null);
   const t0 = useRef(Date.now());
+  const segundos = () => Math.round((Date.now() - t0.current) / 1000);
 
   const evento = (nome: string, extra: Record<string, unknown> = {}) => {
     try { trackEvent(nome, { guia: "on", area: AREA_DO_TIPO[tipo], modulo, ...extra }); } catch { /* medição nunca derruba a demo */ }
   };
-  const passoAtual = () => (faseRef.current === "inicio" ? 1 : faseRef.current === "achar" || faseRef.current === "anotar" ? 2 : 3);
+  const passoAtual = () => {
+    const f = faseRef.current;
+    return f === "inicio" ? 1 : f === "achar" || f === "anotar" ? 2 : 3;
+  };
 
+  /* A TRAVA SUAVE do CTA fixo. Acaba com o 1º registro, com o tempo, com 1
+   * toque nela ou com o "Pular" — o que vier primeiro, uma vez só. */
+  const travadaRef = useRef(true);
+  const aoTravarRef = useRef(aoTravar);
+  aoTravarRef.current = aoTravar;
+  const destravar = (motivo: "item" | "tempo" | "cta" | "pular") => {
+    if (!travadaRef.current) return;
+    travadaRef.current = false;
+    evento("demo_guia_trava", { motivo, segundos: segundos(), passo: passoAtual() });
+    aoTravarRef.current(null);
+  };
+  const reacender = () => {
+    evento("demo_guia_cta", { estado: "travado", segundos: segundos(), passo: passoAtual() });
+    destravar("cta");
+    // tocar no CTA travado não sai da demo: leva pro post-it (e o 2º toque é o "Quase lá" de sempre)
+    const f = faseRef.current;
+    if (f === "inicio") setFase("achar");
+    else if (f === "anotar") setAcende((n) => n + 1);
+  };
   useEffect(() => {
     evento("demo_guia_view");
+    aoTravarRef.current({ rotulo: "1 toque e é seu", aoTocar: reacender });
+    const t = window.setTimeout(() => destravar("tempo"), TEMPOS_DA_MISSAO.trava);
+    return () => { window.clearTimeout(t); aoTravarRef.current(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* PASSO 1 — o cartão fica na tela antes de a demo andar sozinha ("Mostrar onde →" adianta). */
+  /* PASSO 1 — o cartão fica na tela antes de a demo andar sozinha ("Começar →" adianta). */
   useEffect(() => {
     if (fase !== "inicio") return;
     evento("demo_guia_passo", { n: 1 });
@@ -115,9 +168,9 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
-  /* PASSO 2 — achar o botão de adicionar (a aba do módulo como reserva: a
-   * missão toca nela sozinha). Módulo pesado monta tarde: procura a cada
-   * 300 ms por ~5 s; não achou → segue só com a faixa (fail-open). */
+  /* PASSO 2 — achar o formulário (a aba do módulo como reserva: a missão toca
+   * nela sozinha). Módulo pesado monta tarde: procura a cada 300 ms por ~5 s;
+   * não achou → segue só com a faixa (fail-open). */
   useEffect(() => {
     if (fase !== "achar") return;
     evento("demo_guia_passo", { n: 2 });
@@ -149,39 +202,101 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
-  /* O item nasce aqui: a gravação que veio de um gesto dela, na chave do
+  /* Ela abriu o teclado no meio do passo 2 (o anel some sozinho): só medição, 1× por missão. */
+  useEffect(() => {
+    if (fase !== "anotar") return;
+    let contou = false;
+    const aoFocar = (e: FocusEvent) => {
+      const el = e.target;
+      if (contou || !(el instanceof HTMLElement) || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return;
+      contou = true;
+      evento("demo_guia_teclado", { passo: 2, segundos: segundos() });
+    };
+    document.addEventListener("focusin", aoFocar);
+    return () => document.removeEventListener("focusin", aoFocar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
+
+  /* O item nasce aqui: a gravação que veio de um gesto dela, numa chave do
    * módulo, com algo que não estava lá antes. O número do passo 3 é lido
-   * AGORA — a tela ainda mostra o "antes". E sobe a comemoração. */
+   * AGORA — a tela ainda mostra o "antes". */
   useEffect(() => {
     ouvinte.current = (chave, valor, anterior, gesto) => {
       const f = faseRef.current;
-      if ((f !== "inicio" && f !== "achar" && f !== "anotar") || !gesto || chave !== cfg.chave) return;
-      const novo = cfg.achar(valor, anterior);
-      if (!novo) return;
+      if ((f !== "inicio" && f !== "achar" && f !== "anotar") || !gesto || !cfg.chaves.includes(chave)) return;
+      const ler = (k: string) => {
+        try {
+          if (ponte.current) return ponte.current.get<unknown>(k, undefined);
+        } catch { /* cai no espelho */ }
+        return (window as unknown as { __PREVIEW_SEEDS__?: Record<string, unknown> }).__PREVIEW_SEEDS__?.[k];
+      };
+      let achado: ReturnType<typeof cfg.achar> = null;
+      try { achado = cfg.achar(chave, valor, anterior, ler); } catch { achado = null; }
+      if (!achado) return;
+      const novo = achado.item;
+      const via: ViaDoRegistro = viaRef.current === "chip" ? "chip" : achado.via;
       let n: Numero | null = null;
-      try { n = cfg.numero(valor, anterior, novo); } catch { n = null; }
-      faseRef.current = "festa1";
+      try { n = cfg.numero(chave, valor, anterior, novo); } catch { n = null; }
+      faseRef.current = "registrou";
       numeroRef.current = n;
       setItem(novo);
       setNumero(n);
-      setAnelVivo(false);
-      setFase("festa1");
+      setFase("registrou");
       aoItem(novo);
-      evento("demo_guia_passo", { n: 3, tipo: novo.tipo });
+      evento("demo_guia_passo", { n: 3, tipo: novo.tipo, via });
+      evento("demo_guia_registro", { tipo: novo.tipo, via, segundos: segundos() });
+      destravar("item");
     };
     return () => { ouvinte.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* REGISTROU → a comemoração (o chip ficou ✓ e a linha apareceu: causa → efeito). */
+  useEffect(() => {
+    if (fase !== "registrou") return;
+    const t = window.setTimeout(() => {
+      if (faseRef.current !== "registrou") return;
+      setAnelVivo(false);
+      setFase("festa1");
+    }, reduzir ? 150 : TEMPOS_DA_MISSAO.registrou);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
+
+  /* CHIPS — 1 toque grava no snapshot da demo pelo mesmo `set` do módulo, no
+   * formato que ele já lê (alvos.ts); a tela que mostra a chave é avisada
+   * (avisarEscritaDeFora) e o ouvinte acima faz o resto. */
+  const tocarChip = (chip: ChipDaMissao) => {
+    const novo = itemDoChip(tipo, chip);
+    const p = ponte.current;
+    evento("demo_guia_chip", { tipo, nome: chip.nome, valor: chip.valor, ok: !!(novo && p) });
+    if (!novo || !p) return; // fail-open: sem ponte, o post-it continua e ela pode escrever
+    viaRef.current = "chip";
+    setTocado(chip.nome);
+    try {
+      for (const g of gravacoesDoChip(novo, chip)) {
+        const proximo = g.proximo(p.get<unknown>(g.chave, undefined));
+        if (proximo === undefined) continue;
+        p.set(g.chave, proximo);
+        avisarEscritaDeFora(g.chave, proximo);
+      }
+    } catch { /* a missão nunca derruba a demo */ }
+  };
+  const escreverOMeu = () => {
+    evento("demo_guia_escrever", { tipo, segundos: segundos() });
+    const campo = alvo?.querySelector<HTMLInputElement>("input, textarea");
+    try { campo?.focus(); } catch { /* noop */ }
+  };
+
   /* Depois do "Primeiro registro feito!": PASSO 3, olhar o resumo que
    * recalculou (sem âncora ou sem número: direto pra "Missão cumprida"). */
-  const aposPrimeiraFesta = () => {
+  const aposPrimeiraFesta = (via: "botao" | "auto") => {
     if (faseRef.current !== "festa1") return;
+    evento("demo_guia_continuar", { de: "festa1", via });
     const o = cfg.olhar;
-    if (!o || !numeroRef.current) { setFase("festa2"); return; }
+    if (!o || !numeroRef.current) { setFase("cumprida"); return; }
     const acharResumo = () => {
-      let el = document.querySelector(o.seletor);
-      if (el && o.perto) el = o.perto(el);
+      const el = o.achar();
       return el && visivel(el) ? el : null;
     };
     const agora = acharResumo();
@@ -189,17 +304,22 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     // anotou por outro caminho e o resumo está em outra aba: a missão leva até lá antes de mostrar
     const aba = cfg.passos.find((p) => p.aba);
     const botao = aba ? document.querySelector<HTMLElement>(aba.seletor) : null;
-    if (!botao) { setFase("festa2"); return; }
+    if (!botao) { setFase("cumprida"); return; }
     botao.click();
     let tentativas = 0;
     const tentar = () => {
       if (faseRef.current !== "festa1") return;
       const el = acharResumo();
       if (el) { setOlharEm(el); setFase("olhar"); return; }
-      if (++tentativas >= 10) { setFase("festa2"); return; }
+      if (++tentativas >= 10) { setFase("cumprida"); return; }
       window.setTimeout(tentar, 200);
     };
     window.setTimeout(tentar, 200);
+  };
+  const cumprir = (via: "botao" | "auto") => {
+    if (faseRef.current !== "olhar") return;
+    evento("demo_guia_continuar", { de: "olhar", via });
+    setFase("cumprida");
   };
 
   const mostrarOnde = () => {
@@ -209,13 +329,14 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
   };
 
   useEffect(() => {
-    if (fase !== "festa2") return;
-    evento("demo_guia_feito", { tipo, segundos: Math.round((Date.now() - t0.current) / 1000) });
+    if (fase !== "cumprida") return;
+    evento("demo_guia_feito", { tipo, segundos: segundos(), via: viaRef.current ?? "digitado" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
   const pular = () => {
     evento("demo_guia_pular", { motivo: "botao", passo: passoAtual() });
+    destravar("pular");
     aoFim("pulou");
   };
   const levar = () => {
@@ -232,7 +353,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
     aoFim("explorar");
   };
 
-  const completa = fase === "festa2" || fase === "cumprida";
+  const completa = fase === "cumprida";
   const feitos = fase === "inicio" || fase === "achar" || fase === "anotar" ? 1 : completa ? 3 : 2;
   const rotulo = item ? rotuloCurto(item) : "";
   const texto =
@@ -249,6 +370,7 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
           </>
         );
   const cumprida = item ? cfg.cumprida(item) : null;
+  const viu = cfg.olhe.replace(/^olha /, "Olhou ");
 
   return (
     <div>
@@ -257,52 +379,61 @@ export default function GuiaDaDemo({ modulo, tipo, ouvinte, aoItem, aoFim, irPar
         {fase === "inicio" && (
           <CartaoDoPasso1 key="inicio" modulo={NOME_DO_MODULO[tipo]} pedido={cfg.pedido} aoContinuar={() => { evento("demo_guia_mostrar"); setFase("achar"); }} />
         )}
-        {anelVivo && alvo && fase === "anotar" && (
+        {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
           <Anel
-            key="anotar" fixo duracao={null} alvo={alvo} rotulo="Passo 2 de 3 · anota"
+            key={`anotar-${acende}`} fixo interativo duracao={null} alvo={alvo} testid="demo-guia-anel-2" abaixo={!!cfg.postItAbaixo}
             aoSair={() => { setAnelVivo(false); if (faseRef.current === "anotar") setPerdeuAlvo(true); }}
-          >
-            <span className="block text-[13.5px] font-semibold leading-snug">{cfg.dica}</span>
-          </Anel>
+            balao={(
+              <PostItDaMissao
+                pergunta={cfg.pergunta}
+                chips={cfg.chips}
+                tocado={tocado}
+                aoChip={tocarChip}
+                aoEscrever={cfg.escrever ? escreverOMeu : undefined}
+                dica={cfg.chips.length && cfg.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+              />
+            )}
+          />
         )}
-        {fase === "festa1" && (
+        {fase === "festa1" && item && (
           <ComemoracaoDaMissao
             key="festa1"
             titulo="Primeiro registro feito!"
-            chip="🔥 1º registro ✓"
+            chip={`🔥 ${rotulo} ✓`}
             de={33}
             para={66}
-            rodape="Missão de 1 minuto · 66%"
+            rodape="Missão de 1 minuto · 2 de 3"
             duracao={TEMPOS_DA_MISSAO.primeiroRegistro}
-            aoFim={aposPrimeiraFesta}
+            aoFim={() => aposPrimeiraFesta("auto")}
+            botao={cfg.botaoOlhar}
+            aoBotao={() => aposPrimeiraFesta("botao")}
           />
         )}
         {fase === "olhar" && olharEm && numero && (
-          <Anel key="olhar" fixo alvo={olharEm} recorte={cfg.olhar?.recorte} rotulo="Passo 3 de 3 · olha" duracao={TEMPOS_DA_MISSAO.olhar} aoSair={() => setFase("festa2")}>
-            <span className="block text-[13px] font-semibold text-white/85 leading-snug">{numero.titulo} — já com {item ? `o seu ${item.nome}` : "o seu registro"}:</span>
-            <span className="flex items-baseline gap-2 mt-1">
-              <span className="text-[13px] text-white/50 line-through tabular-nums">{numero.formatar(numero.antes)}</span>
-              <span className="text-white/50 text-[13px]">→</span>
-              <span className="text-[26px] font-black tracking-tight leading-none">
-                <ContaSubindo de={numero.antes} para={numero.depois} formatar={numero.formatar} />
-              </span>
-            </span>
-          </Anel>
-        )}
-        {fase === "festa2" && (
-          <ComemoracaoDaMissao
-            key="festa2"
-            titulo="Missão cumprida 🏆"
-            chip="🔥🔥🔥 missão completa"
-            de={66}
-            para={100}
-            rodape="Missão de 1 minuto · 100%"
-            duracao={TEMPOS_DA_MISSAO.cumprida}
-            aoFim={() => setFase("cumprida")}
+          <Anel
+            key="olhar" fixo interativo alvo={olharEm} recorte={cfg.olhar?.recorte} duracao={TEMPOS_DA_MISSAO.olhar} testid="demo-guia-anel-3"
+            aoSair={() => cumprir("auto")}
+            balao={(
+              <BalaoDoPasso3
+                titulo={<>{numero.titulo} — já com {item ? `o seu ${item.nome}` : "o seu registro"}:</>}
+                antes={numero.antes}
+                depois={numero.depois}
+                formatar={numero.formatar}
+                aoContinuar={() => cumprir("botao")}
+              />
+            )}
           />
         )}
         {fase === "cumprida" && item && cumprida && (
-          <FolhaCumprida key="folha" rotulo={rotulo} titulo={cumprida.titulo} sub={cumprida.sub} aoLevar={levar} aoExplorar={explorar} />
+          <MissaoCumprida
+            key="cumprida"
+            linhas={[`Área escolhida: ${NOME_DO_MODULO[tipo]}`, cumprida.feito, viu]}
+            destaque={rotulo}
+            titulo={cumprida.titulo}
+            sub={cumprida.sub}
+            aoLevar={levar}
+            aoExplorar={explorar}
+          />
         )}
       </AnimatePresence>
     </div>

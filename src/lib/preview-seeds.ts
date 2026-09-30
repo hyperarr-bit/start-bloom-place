@@ -47,7 +47,9 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
         [true, true, true, true, true, false],
       ];
       const hoje = (today.getDay() + 6) % 7;
-      return Object.fromEntries(dias.map((d, i) => [d, i < hoje ? feitos[i] : i === hoje ? [true, true, false, false, false, false] : Array(6).fill(false)]));
+      // hoje: 1º e 3º feitos — o 2º ("Treinar") fica vazio e VISÍVEL na largura
+      // de celular (a missão da demo pede pra marcar 1 quadradinho de hoje, 30/09)
+      return Object.fromEntries(dias.map((d, i) => [d, i < hoje ? feitos[i] : i === hoje ? [true, false, true, false, false, false] : Array(6).fill(false)]));
     })(),
     "rotina-habits-week": semanaAtualId(),
     "rotina-schedule": {

@@ -33,7 +33,8 @@
  * pílulas, "Quase lá", "Guardando", paywall e Pronto carregam `f=b`.
  * ROLLBACK = "off" + push: quem estiver no meio (`?step=guardando&f=b`) cai no
  * cadastro de hoje — o `f=b` só é lido com a chave ligada.
- * QA sem mexer em ninguém: localStorage `funil-b-force` = "on" | "off".
+ * QA sem mexer em ninguém: localStorage `funil-b-force` = "on" | "off", ou o
+ * link `/inicio?funil-b=on` (`auto` desfaz).
  */
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREA_PROOF, type AreaKey } from "@/lib/funnel";
 
@@ -56,7 +57,23 @@ export const PARAM_CONSISTENCIA = "qc";
 export const STEP_GUARDANDO = "guardando";
 export const STEP_PRONTO = "pronto";
 
+/**
+ * A força de QA pelo LINK (o dono testa no celular, sem console):
+ * `/inicio?funil-b=on` liga o B só neste navegador; `off` força o de hoje;
+ * `auto` apaga a força e volta a valer a chave. Fica gravada no aparelho,
+ * porque a porta → demo é navegação completa e o link não vai junto.
+ */
+export const PARAM_QA_FUNIL_B = "funil-b";
+export function guardarForcaDaUrl(busca?: string | URLSearchParams): void {
+  try {
+    const v = (busca instanceof URLSearchParams ? busca : new URLSearchParams(busca ?? window.location.search)).get(PARAM_QA_FUNIL_B);
+    if (v === "on" || v === "off") localStorage.setItem(CHAVE_FORCA_FUNIL_B, v);
+    else if (v === "auto") localStorage.removeItem(CHAVE_FORCA_FUNIL_B);
+  } catch { /* sem window ou storage: vale a chave */ }
+}
+
 export const forcaDoFunilB = (): "on" | "off" | null => {
+  guardarForcaDaUrl();
   try {
     const f = localStorage.getItem(CHAVE_FORCA_FUNIL_B);
     return f === "on" || f === "off" ? f : null;

@@ -188,6 +188,27 @@ describe("a chave", () => {
     expect(decidirFunilB(KENNY, "on")).toBe(false);
     expect(ehFunilB("?f=b", "on")).toBe(false);
   });
+  it("o link de QA (?funil-b=on|off|auto) grava a força no aparelho e vale nas páginas seguintes, sem o link", () => {
+    const antes = window.location.pathname + window.location.search;
+    try {
+      window.history.replaceState({}, "", "/inicio?funil-b=on");
+      expect(decidirFunilB(OUTRA, "off")).toBe(true);
+      expect(localStorage.getItem(CHAVE_FORCA_FUNIL_B)).toBe("on");
+      window.history.replaceState({}, "", "/preview/financas?funnel=1&guia=1");
+      expect(ehFunilB(undefined, "off")).toBe(true);
+      window.history.replaceState({}, "", "/inicio?funil-b=off");
+      expect(decidirFunilB(KENNY, "on")).toBe(false);
+      window.history.replaceState({}, "", "/inicio?funil-b=auto");
+      expect(decidirFunilB(KENNY, "kenny")).toBe(true);
+      expect(decidirFunilB(OUTRA, "kenny")).toBe(false);
+      expect(localStorage.getItem(CHAVE_FORCA_FUNIL_B)).toBeNull();
+      window.history.replaceState({}, "", "/inicio?funil-b=sim");
+      expect(decidirFunilB(OUTRA, "off")).toBe(false);
+      expect(localStorage.getItem(CHAVE_FORCA_FUNIL_B)).toBeNull();
+    } finally {
+      window.history.replaceState({}, "", antes);
+    }
+  });
   it("depois da porta, a URL manda (f=b) — mas só com a chave ligada (rollback total)", () => {
     expect(ehFunilB("?step=guardando&f=b", "kenny")).toBe(true);
     expect(ehFunilB("?step=guardando&f=b", "on")).toBe(true);

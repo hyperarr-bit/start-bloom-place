@@ -20,6 +20,7 @@ import DesenvolvimentoPessoal, { cartaPodeAbrir, amanhaLocal } from "@/pages/Des
 import Rotina, { sequenciaDoCard, marcaDoDia, semanaDaRevisao, lerRevisaoDaSemana } from "@/pages/Rotina";
 import Estudos, { corDaProva, ordenarProvas, provaPassou } from "@/pages/Estudos";
 import Carreira, { dataCurtaCarreira } from "@/pages/Carreira";
+import { VoltaDaDemoProvider } from "@/lib/volta-da-demo";
 
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ user: null, session: null, loading: false, isSubscribed: false, subLoaded: true }),
@@ -50,17 +51,28 @@ const criarStore = (inicial: Record<string, unknown> = {}) => {
 
 /** Mostra onde a navegação parou (pra seta ←). */
 const Onde = () => <p data-testid="onde">{useLocation().pathname}</p>;
-const montar = (store: ReturnType<typeof criarStore>, rota: string, Pagina: React.ComponentType) =>
-  render(
+/* P5 (30/09): na demo de verdade o Preview publica pra onde a seta ← vai — o
+ * MESMO destino do botão de baixo da demo (antes: /lp → /comecar, outro funil).
+ * Aqui, como no Preview, as rotas /preview ganham esse destino. O caminho
+ * inteiro (Preview + módulos de verdade) está em seta-da-demo.test.tsx. */
+const VOLTA_DA_DEMO = "/inicio?step=signup&porta=vida";
+const montar = (store: ReturnType<typeof criarStore>, rota: string, Pagina: React.ComponentType) => {
+  const paginas = (
+    <Routes>
+      <Route path={rota.split("?")[0]} element={<Pagina />} />
+      <Route path="*" element={<Onde />} />
+    </Routes>
+  );
+  return render(
     <MemoryRouter initialEntries={[rota]}>
       <UserDataContext.Provider value={store.valor}>
-        <Routes>
-          <Route path={rota.split("?")[0]} element={<Pagina />} />
-          <Route path="*" element={<Onde />} />
-        </Routes>
+        {rota.startsWith("/preview/")
+          ? <VoltaDaDemoProvider value={{ destino: VOLTA_DA_DEMO, modulo: rota.split("/")[2] }}>{paginas}</VoltaDaDemoProvider>
+          : paginas}
       </UserDataContext.Provider>
     </MemoryRouter>,
   );
+};
 
 /** Relógio só do Date (os timers do React seguem reais). */
 const fixarData = (d: Date) => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(d); };
@@ -252,7 +264,7 @@ describe("Rotina: foco, tarefas e mês", () => {
     expect(screen.getByText("📝 Notas — 28/09")).toBeInTheDocument();
   });
 
-  it("Atividade em linha própria; prioridade 'média' com acento; seta ← da demo vai pra LP", () => {
+  it("Atividade em linha própria; prioridade 'média' com acento; seta ← da demo vai pro destino do botão de baixo", () => {
     window.history.replaceState({}, "", "/preview/rotina?aba=foco");
     const store = criarStore({ "todo-list": [{ id: "1", text: "Responder e-mail", priority: "media", done: false }] });
     montar(store, "/preview/rotina", Rotina);
@@ -264,7 +276,7 @@ describe("Rotina: foco, tarefas e mês", () => {
     expect(screen.queryByText("media")).not.toBeInTheDocument();
     expect((store.dados["todo-list"] as { priority: string }[])[0].priority).toBe("media"); // valor gravado igual
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    expect(screen.getByTestId("onde")).toHaveTextContent("/lp");
+    expect(screen.getByTestId("onde")).toHaveTextContent("/inicio");
   });
 });
 
@@ -348,7 +360,7 @@ describe("Estudos", () => {
     expect((store.dados["estudos-cursos-andamento"] as { id: string; link?: string }[]).at(-1)).toEqual({ id: "d1", name: "Oratória", link: "https://ex.com/oratoria" });
   });
 
-  it("caderno: data em dd/mm/aaaa e apagar anotação tem Desfazer; seta ← da demo vai pra LP", () => {
+  it("caderno: data em dd/mm/aaaa e apagar anotação tem Desfazer; seta ← da demo vai pro destino do botão de baixo", () => {
     const store = estudosStore();
     montar(store, "/preview/estudos", Estudos);
     fireEvent.click(document.querySelector('[data-spotlight="tab-caderno"]')!);
@@ -358,7 +370,7 @@ describe("Estudos", () => {
     act(() => desfazeres[0]());
     expect((store.dados["estudos-notebooks"] as { id: string }[]).map((n) => n.id)).toEqual(["n1"]);
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    expect(screen.getByTestId("onde")).toHaveTextContent("/lp");
+    expect(screen.getByTestId("onde")).toHaveTextContent("/inicio");
   });
 });
 
@@ -436,13 +448,13 @@ describe("Carreira", () => {
     expect(screen.getByPlaceholderText("Nome da skill")).toBeInTheDocument();
   });
 
-  it("vagas mostram a data em dd/mm; seta ← da demo vai pra LP", () => {
+  it("vagas mostram a data em dd/mm; seta ← da demo vai pro destino do botão de baixo", () => {
     const store = criarStore({ "career-jobs": [{ id: "1", company: "Studio Norte", role: "Designer", link: "", status: "aplicado", date: `${new Date().getFullYear()}-09-23`, salary: "", notes: "", favorite: false }] });
     montar(store, "/preview/carreira", Carreira);
     fireEvent.click(screen.getByRole("button", { name: /Vagas/ }));
     expect(screen.getByText("23/09")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
-    expect(screen.getByTestId("onde")).toHaveTextContent("/lp");
+    expect(screen.getByTestId("onde")).toHaveTextContent("/inicio");
   });
 });
 

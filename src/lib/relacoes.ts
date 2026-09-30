@@ -123,7 +123,10 @@ export const pessoasValidas = (v: unknown): Pessoa[] =>
       birthday: ehDiaValido(texto(p.birthday)) ? texto(p.birthday) : "",
       notes: texto(p.notes),
       ...(ehCirculo(p.circulo) ? { circulo: p.circulo } : { circulo: undefined }),
-      semAno: p.semAno === true,
+      /* "sem ano" só vale enquanto o aniversário ainda está no ano de marcação (2000). O app
+         ANTIGO só conhece `birthday`: quando a pessoa põe o ano de verdade lá, o `semAno` que
+         ficou no item (ele preserva o resto com `...p`) não pode esconder a idade pra sempre (30/09). */
+      semAno: p.semAno === true && texto(p.birthday).startsWith(`${ANO_SEM_ANO}-`),
       cadencia: Number.isFinite(Number(p.cadencia)) && Number(p.cadencia) > 0 ? Math.round(Number(p.cadencia)) : 0,
     })) as Pessoa[];
 

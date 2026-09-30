@@ -29,7 +29,8 @@ export const PesoDoPet = ({ pet, dados }: { pet: Pet; dados: UsePet }) => {
   const [valor, setValor] = useState("");
   const ultimo = serie[serie.length - 1];
   const datados = serie.filter((p) => p.dia);
-  const anterior = datados.length >= 2 ? datados[datados.length - 2] : undefined;
+  // o atual pode ser o `weight` sem data (mudado no app antigo depois da última pesagem): compara com a última pesada
+  const anterior = ultimo && !ultimo.dia ? datados[datados.length - 1] : datados.length >= 2 ? datados[datados.length - 2] : undefined;
   const delta = anterior && ultimo ? Math.round((ultimo.kg - anterior.kg) * 1000) / 1000 : null;
   const kg = lerPeso(valor);
 

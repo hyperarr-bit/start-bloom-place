@@ -234,8 +234,16 @@ export function pesosDoPet(pet: Pet, todos: unknown): { dia: string; kg: number 
     .filter((x) => ehDia(x?.dia) && lerPeso(x?.kg) !== null)
     .map((x) => ({ dia: x.dia as string, kg: lerPeso(x.kg) as number }))
     .sort((a, b) => a.dia.localeCompare(b.dia));
-  if (limpos.length) return limpos;
   const antigo = lerPeso(pet.weight);
+  if (limpos.length) {
+    /* O `weight` de sempre anda junto com o último ponto quando a pessoa pesa no app novo
+       (`registrarPeso` grava os dois). Se ele DIFERE do último ponto, alguém mudou depois —
+       o app ANTIGO só grava `weight`: esse é o peso atual (30/09, teste de compatibilidade).
+       Entra no fim, sem data (não vira ponto do gráfico, que só usa os datados). */
+    const ultimo = limpos[limpos.length - 1];
+    if (antigo !== null && Math.abs(antigo - ultimo.kg) > 0.0005) return [...limpos, { dia: "", kg: antigo }];
+    return limpos;
+  }
   return antigo !== null ? [{ dia: "", kg: antigo }] : [];
 }
 

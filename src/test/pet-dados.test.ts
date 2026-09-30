@@ -60,7 +60,9 @@ describe("pet-list antigo abre sem mudar nada", () => {
   it("sem histórico de peso, o weight antigo vira o ponto atual (e nada é gravado)", () => {
     const [thor] = petsValidos(antigo);
     expect(pesosDoPet(thor, undefined)).toEqual([{ dia: "", kg: 28 }]);
-    expect(pesosDoPet(thor, { "1727000000000": [{ dia: "2026-09-01", kg: 27.5 }, { dia: "lixo", kg: 3 }] })).toEqual([{ dia: "2026-09-01", kg: 27.5 }]);
+    expect(pesosDoPet(thor, { "1727000000000": [{ dia: "2026-09-01", kg: 28 }, { dia: "lixo", kg: 3 }] })).toEqual([{ dia: "2026-09-01", kg: 28 }]);
+    // 30/09: `weight` DIFERENTE do último ponto = alguém mudou depois (o app antigo só grava `weight`): ele é o atual, sem data
+    expect(pesosDoPet(thor, { "1727000000000": [{ dia: "2026-09-01", kg: 27.5 }] })).toEqual([{ dia: "2026-09-01", kg: 27.5 }, { dia: "", kg: 28 }]);
   });
 
   it("peso novo substitui o do mesmo dia e mantém a ordem", () => {
@@ -169,8 +171,24 @@ describe("carteirinha a partir do pet-health ANTIGO (sem plano nenhum)", () => {
     expect(proximosCuidados(linhas, 3).map((l) => l.nome)).toEqual(["Drontal", "Bravecto", "V10"]);
   });
 
-  it("registro torto (sem data, sem nome) fica de fora sem derrubar a tela", () => {
-    expect(linhasDaCarteirinha("p1", "lixo", [{ id: "x", petId: "p1", name: "", date: HOJE }, { id: "y", petId: "p1", name: "V8", date: "ontem" }, null], HOJE)).toEqual([]);
+  it("registro torto (sem nome, nulo) fica de fora sem derrubar a tela", () => {
+    expect(linhasDaCarteirinha("p1", "lixo", [{ id: "x", petId: "p1", name: "", date: HOJE }, null, "lixo"], HOJE)).toEqual([]);
+  });
+
+  it("registro SEM data (o app antigo deixava apagar o campo Data) continua na carteirinha, como '—' e sem conta de data (30/09)", () => {
+    const [so] = linhasDaCarteirinha("p1", [], [{ id: "y", petId: "p1", type: "visit", name: "V8", date: "ontem" }], HOJE);
+    expect(so).toMatchObject({ nome: "V8", ultima: undefined, status: "feito" });
+    expect(so.registros.map((r) => r.date)).toEqual([""]);
+    // com a próxima anotada, vale a próxima
+    const [comProxima] = linhasDaCarteirinha("p1", [], [{ id: "z", petId: "p1", type: "vaccine", name: "Giárdia", date: "", nextDate: "2026-10-15" }], HOJE);
+    expect(comProxima).toMatchObject({ nome: "Giárdia", proxima: "2026-10-15" });
+    // e o datado continua mandando nas contas quando existe
+    const [misto] = linhasDaCarteirinha("p1", [], [
+      { id: "a", petId: "p1", type: "vaccine", name: "V10", date: "", nextDate: "" },
+      { id: "b", petId: "p1", type: "vaccine", name: "V10", date: "2025-10-24", nextDate: "2026-10-24" },
+    ], HOJE);
+    expect(misto).toMatchObject({ ultima: "2025-10-24", proxima: "2026-10-24" });
+    expect(misto.registros.map((r) => r.id)).toEqual(["b", "a"]);
   });
 });
 

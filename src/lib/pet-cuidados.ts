@@ -167,14 +167,17 @@ export function registrosValidos(bruto: unknown): Registro[] {
     if (!r || typeof r !== "object") continue;
     const o = r as Record<string, unknown>;
     const id = txt(o.id), name = txt(o.name).trim();
-    if (!id || !name || !ehDia(o.date)) continue;
+    /* Registro SEM data (o PetHealth antigo deixava lançar com o campo "Data" apagado e
+       gravava `date: ""`) continua na carteirinha: entra no histórico como "—" e não conta
+       pras contas de data (30/09, teste de compatibilidade — antes ele sumia da tela). */
+    if (!id || !name) continue;
     out.push({
       ...(o as Partial<Registro>),
       id,
       petId: txt(o.petId),
       type: (typeof o.type === "string" ? o.type : "visit") as Registro["type"],
       name,
-      date: o.date,
+      date: ehDia(o.date) ? o.date : "",
       nextDate: ehDia(o.nextDate) ? o.nextDate : "",
     });
   }
@@ -226,7 +229,9 @@ export function statusDe(proxima: string | undefined, hoje: string): { status: S
 
 function montarLinha(petId: string, tipo: TipoCuidado, nome: string, regs: Registro[], hoje: string, c?: Cuidado): LinhaDaCarteirinha {
   const registros = [...regs].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  const ult = registros[0];
+  // as contas de data usam o último registro COM data (o sem data vai pro fim do histórico, como "—")
+  const ult = registros.find((r) => ehDia(r.date));
+  const semData = ult ? undefined : registros.find((r) => ehDia(r.nextDate));
   const base: LinhaDaCarteirinha = { chave: c ? c.id : `hist:${familiaDe(tipo, nome)}`, petId, tipo, nome, cuidado: c, registros, ultima: ult?.date, status: "sem-data" };
 
   // remédio de todo dia (com horários): não tem "próxima data", tem tratamento em andamento
@@ -259,10 +264,13 @@ function montarLinha(petId: string, tipo: TipoCuidado, nome: string, regs: Regis
     proxima = ult.nextDate;
   } else if (ult && intervalo) {
     proxima = somarDias(ult.date, intervalo);
+  } else if (semData) {
+    // só há registro sem data, mas com a próxima anotada: vale a próxima
+    proxima = semData.nextDate;
   }
 
   if (!proxima) {
-    return { ...base, intervaloDias: intervalo, doseDaSerie, status: ult ? (intervalo ? "sem-data" : "feito") : "sem-data" };
+    return { ...base, intervaloDias: intervalo, doseDaSerie, status: ult ? (intervalo ? "sem-data" : "feito") : registros.length ? "feito" : "sem-data" };
   }
   return { ...base, intervaloDias: intervalo, doseDaSerie, proxima, ...statusDe(proxima, hoje) };
 }

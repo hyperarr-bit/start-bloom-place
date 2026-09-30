@@ -11,7 +11,8 @@ import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Textarea } from "@/components/ui/textarea";
-import { PhotoPicker } from "@/components/ui/PhotoPicker";
+// foto vai pro Storage (URL curta no `photoUrl`), nunca base64 dentro da chave — 30/09
+import { FotoNaNuvem } from "@/components/ui/foto-na-nuvem";
 import { ptBR } from "date-fns/locale";
 import { dataSegura } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
@@ -136,7 +137,7 @@ export const PetDiary = () => {
               <RotuloCampo htmlFor="momento-texto">O que aconteceu</RotuloCampo>
               <Textarea id="momento-texto" value={form.text} onChange={(ev) => setForm({ ...form, text: ev.target.value })} rows={3} placeholder="O que aconteceu hoje?" className="text-[14px] min-h-[88px]" data-testid="momento-texto" />
             </div>
-            <PhotoPicker value={form.photoUrl} onChange={(url) => setForm({ ...form, photoUrl: url })} onClear={() => setForm({ ...form, photoUrl: undefined })} label={form.photoUrl ? "Trocar a foto" : "Pôr uma foto"} previewSize="md" className="min-h-[44px] text-[13px]" />
+            <FotoNaNuvem pasta="pet-diario" value={form.photoUrl} onChange={(url) => setForm({ ...form, photoUrl: url })} onClear={() => setForm({ ...form, photoUrl: undefined })} label={form.photoUrl ? "Trocar a foto" : "Pôr uma foto"} previewSize="md" className="min-h-[44px] text-[13px]" />
             <BotaoPet className="w-full" onClick={salvar} disabled={!form.text.trim()} data-testid="momento-salvar">{form.id ? "Salvar" : "Guardar o momento"}</BotaoPet>
           </div>
         )}

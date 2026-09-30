@@ -5,7 +5,8 @@
  * pra ele) e todo campo que já existia no item.
  */
 import { useEffect, useState } from "react";
-import { PhotoPicker } from "@/components/ui/PhotoPicker";
+// foto vai pro Storage (URL curta no `photoUrl`), nunca base64 dentro da chave — 30/09
+import { FotoNaNuvem } from "@/components/ui/foto-na-nuvem";
 import { CampoData } from "@/components/ui/campo-data";
 import { localDayKey } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
@@ -60,7 +61,7 @@ export const FichaDoPet = ({ pet, dados, aberta, onFechar }: { pet: Pet; dados: 
     <FolhaPet aberta={aberta} onFechar={onFechar} titulo={`RG de ${pet.name}`} testId="ficha-do-pet">
       <div className="flex items-center gap-3">
         <FotoDoPet pet={{ ...r, photoUrl: r.photoUrl }} className="w-16 h-20 rounded-[10px] shrink-0" emojiClass="text-3xl" />
-        <PhotoPicker value={undefined} onChange={(url) => muda({ photoUrl: url })} onClear={() => muda({ photoUrl: undefined })} label={r.photoUrl ? "Trocar a foto" : "Pôr uma foto"} className="min-h-[44px] text-[13px] font-semibold" />
+        <FotoNaNuvem pasta="pet" value={undefined} onChange={(url) => muda({ photoUrl: url })} onClear={() => muda({ photoUrl: undefined })} label={r.photoUrl ? "Trocar a foto" : "Pôr uma foto"} className="min-h-[44px] text-[13px] font-semibold" />
         {r.photoUrl && (
           <button type="button" onClick={() => muda({ photoUrl: undefined })} className="ml-auto min-h-[44px] px-2 text-[12.5px] font-semibold text-muted-foreground hover:text-destructive">Tirar</button>
         )}

@@ -10,7 +10,8 @@
  */
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
-import { PhotoPicker } from "@/components/ui/PhotoPicker";
+// foto vai pro Storage (URL curta no `photoUrl`), nunca base64 dentro da chave — 30/09
+import { FotoNaNuvem } from "@/components/ui/foto-na-nuvem";
 import { CampoData } from "@/components/ui/campo-data";
 import { localDayKey } from "@/lib/utils";
 import { rotinaPadraoDe, type Especie, type FaixaEtaria, type Pet, type Porte, type Sexo } from "@/lib/pet";
@@ -159,7 +160,7 @@ export const ComecoPronto = ({
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3 min-h-[44px]">
-                <PhotoPicker value={foto} onChange={setFoto} onClear={() => setFoto(undefined)} label="Pôr uma foto (opcional)" className="min-h-[44px] text-[13px]" />
+                <FotoNaNuvem pasta="pet" value={foto} onChange={setFoto} onClear={() => setFoto(undefined)} label="Pôr uma foto (opcional)" className="min-h-[44px] text-[13px]" />
               </div>
               <BotaoPet className="mt-4 w-full" onClick={() => setPasso(3)} disabled={!nome.trim()} data-testid="pet-seguir-2">Seguir</BotaoPet>
             </>

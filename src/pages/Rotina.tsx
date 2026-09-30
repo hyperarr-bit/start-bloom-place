@@ -5,7 +5,7 @@ import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
@@ -1193,11 +1193,9 @@ const Rotina = () => {
       .map(([k]) => k),
   )), [heatmapDoConvite]);
 
-  const navigate = useNavigate();
-  // Demo (/preview/rotina): a seta sai pra LP, como em Finanças — /home sem
-  // conta caía no login (26/09, varredura).
-  const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  // A seta ←: no app, o hub; na demo (/preview/rotina), o mesmo destino do
+  // botão de baixo dela (P5, 30/09). Antes: /lp → /comecar, outro funil.
+  const voltarDoModulo = useVoltarDoModulo();
   // `?aba=mes` (22/09): o toque na notificação de compromisso abre direto o
   // Meu mês; qualquer outra rota chega como sempre, na semana.
   const [activeTab, setActiveTab] = useState(() => {
@@ -1352,7 +1350,7 @@ const Rotina = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Calendar className="w-5 h-5 text-emerald-600" />

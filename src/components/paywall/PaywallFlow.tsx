@@ -15,6 +15,7 @@ import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, lojaParaCancelar, erroSemFalarComALoja, erroSemAbrirALoja } from "@/lib/loja";
 // (TrialTimeline saiu em 06/08 — o app vitalício usa a GuaranteeTimeline da web)
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { restaurar, initRevenueCat, estadoRevenueCat, comprarVitalicio, prefetchVitalicio, motivoUltimaCompra } from "@/lib/revenuecat";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { useUserData } from "@/hooks/use-user-data";
@@ -520,7 +521,11 @@ function LifetimeCard() {
  *     apagar conta. Aqui o não-pagante (e o revisor) consegue apagar. */
 // exportado: o paywall do teste (v53) precisa das MESMAS exigências de loja
 // (Restaurar/Privacidade/Termos/Excluir conta) sem duplicar o componente.
-export function AppLegalFooter() {
+/* P6 (30/09): logo abaixo do "Restaurar compras", pra quem ainda não entrou,
+ * a linha "Já pagou pelo site? Entre com seu e-mail" (no iPhone, "Já é
+ * cliente?") — quem pagou na web procurava a compra na loja. Mesmo tamanho e
+ * cor da linha legal; só no app. `origem` só vai no evento. */
+export function AppLegalFooter({ origem = "rodape_legal" }: { origem?: string } = {}) {
   const { user } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
   return (
@@ -535,6 +540,7 @@ export function AppLegalFooter() {
       >
         Restaurar compras
       </button>
+      <JaPagouPeloSite origem={origem} logado={!!user} className="block mx-auto py-1 text-[11px] text-muted-foreground" />
       <p className="text-[11px] text-muted-foreground">
         <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>
         {" · "}
@@ -834,7 +840,7 @@ function OfferScreen({
             aqui não se repete; o paywall só vende e o sheet só cobra. */}
         {!nativo && <motion.div {...stagger(10)}><LifetimeCard /></motion.div>}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
-        {nativo && <AppLegalFooter />}
+        {nativo && <AppLegalFooter origem="paywall_flow" />}
       </div>
 
       {/*

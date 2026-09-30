@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
 import { parseLocalDay, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
@@ -142,9 +143,9 @@ const TABS = [
 ];
 
 const Estudos = () => {
-  const navigate = useNavigate();
-  // Demo (/preview/estudos): a seta sai pra LP, como em Finanças — /home sem
-  // conta caía no login (26/09, varredura).
+  // A seta ←: no app, o hub; na demo (/preview/estudos), o mesmo destino do
+  // botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
+  const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
   const isPreview = location.pathname.startsWith("/preview");
   const reportTab = useTabReporter();
@@ -470,7 +471,7 @@ const Estudos = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label={isPreview ? "Voltar" : "Todos os módulos"}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={voltarDoModulo} aria-label={isPreview ? "Voltar" : "Todos os módulos"}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <GraduationCap className="w-5 h-5 text-indigo-600" />

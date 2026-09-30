@@ -5,7 +5,8 @@ import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, DollarSign, Sparkles } from "lucide-react";
 import { AskCore } from "@/components/ask/AskCore";
@@ -72,9 +73,9 @@ interface PropsDoConteudo {
 }
 
 const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
-  const navigate = useNavigate();
+  // A seta ←: no app, o hub; na demo, o mesmo destino do botão de baixo (P5, 30/09).
+  const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
-  // No demo aberto (/preview/financas) o "voltar" deve sair pra LP, não pro app.
   const isPreview = location.pathname.startsWith("/preview");
   const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
@@ -411,9 +412,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           {/* Faxina 16/07: hambúrguer saiu — a seta leva pro hub (o menu de
-              conta mora lá, no GreetingHeader). No preview, volta pra /lp. */}
+              conta mora lá, no GreetingHeader). Na demo, pro mesmo lugar do
+              botão de baixo dela (P5, 30/09 — antes ia pro /lp → /comecar). */}
           <button
-            onClick={() => navigate(isPreview ? "/lp" : "/home")}
+            onClick={voltarDoModulo}
             aria-label={isPreview ? "Voltar" : "Todos os módulos"}
             className="hover:bg-muted rounded-md p-1 transition-colors"
           >

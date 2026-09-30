@@ -6,7 +6,8 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -292,9 +293,9 @@ const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorCl
 
 
 const DesenvolvimentoPessoal = () => {
-  const navigate = useNavigate();
-  // Demo (/preview/desenvolvimento): a seta sai pra LP, como em Finanças —
-  // /home sem conta caía no login (26/09, varredura).
+  // A seta ←: no app, o hub; na demo (/preview/desenvolvimento), o mesmo
+  // destino do botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
+  const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
   const isPreview = location.pathname.startsWith("/preview");
   // ?tab= permite deep-link (a demo do funil de metas abre direto na aba Metas)
@@ -499,7 +500,7 @@ const DesenvolvimentoPessoal = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label={isPreview ? "Voltar" : "Todos os módulos"}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={voltarDoModulo} aria-label={isPreview ? "Voltar" : "Todos os módulos"}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
           <div className="flex items-center gap-2 ml-auto">

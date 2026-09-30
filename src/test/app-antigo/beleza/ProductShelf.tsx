@@ -1,0 +1,440 @@
+// @ts-nocheck
+// cópia congelada de 78883beb:src/components/beleza/ProductShelf.tsx (o app das lojas: iPhone 1.0.7/1.0.8, Android 125) — NÃO editar; é o leitor antigo dos testes de compatibilidade
+import { useEffect, useRef, useState } from "react";
+import { avisarApagado } from "@/lib/desfazer";
+import { numeroBR } from "@/lib/data-normalizers";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Trash2, X, ShoppingCart, Package, AlertTriangle, Ban, Edit2 } from "lucide-react";
+import { type Product, calculateCostPerDose, getExpiryProgress, inserirEm } from "./utils";
+import { useChaveDaBeleza } from "./estado-compartilhado";
+
+
+/** Número com vírgula (26/09, varredura): `type="number"` + parseFloat zerava
+ *  "12,90" digitado no teclado do iPhone. Rascunho em texto; o número sai do
+ *  numeroBR. Quando o valor muda por fora (outro produto, formulário limpo), o
+ *  rascunho acompanha. */
+const CampoDecimal = ({ valor, onValor, rotulo }: { valor: number; onValor: (n: number) => void; rotulo: string }) => {
+  const mostra = (n: number) => (n ? String(n).replace(".", ",") : "");
+  const [txt, setTxt] = useState(() => mostra(valor));
+  useEffect(() => {
+    const atual = numeroBR(txt);
+    if ((Number.isFinite(atual) ? atual : 0) !== (valor || 0)) setTxt(mostra(valor));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor]);
+  return (
+    <Input type="text" inputMode="decimal" placeholder="0" aria-label={rotulo} value={txt} className="h-9 text-sm"
+      onChange={e => { setTxt(e.target.value); const n = numeroBR(e.target.value); onValor(Number.isFinite(n) && n > 0 ? n : 0); }} />
+  );
+};
+
+const genId = () => crypto.randomUUID();
+
+const categories = ["Skincare", "Cabelo", "Corpo", "Outro"];
+const catEmoji: Record<string, string> = { Skincare: "🧴", Cabelo: "💇", Corpo: "🧼", Outro: "✨" };
+const paoOptions = [3, 6, 9, 12, 18, 24];
+
+const DEFAULT_PRODUCTS: Product[] = [];
+
+const emptyProduct: Partial<Product> = {
+  category: "Skincare", opened: false, rating: 0, repurchase: false,
+  price: 0, sizeMl: 0, paoMonths: 12, frequency: "Diário",
+  finished: false, photoUrl: "", openedDate: "", brand: "", name: "", notes: "",
+};
+
+export const ProductShelf = () => {
+  // Sem cópia local (useChaveDaBeleza): o Desfazer do apagar funciona mesmo
+  // depois de trocar de aba, e a Rotina vê os ingredientes a evitar na hora.
+  const [products, setProducts] = useChaveDaBeleza<Product[]>("beauty-products", DEFAULT_PRODUCTS);
+  const [shoppingList, setShoppingList] = useChaveDaBeleza<Product[]>("beauty-shopping-list", []);
+  const [triggers, setTriggers] = useChaveDaBeleza<string[]>("skincare-triggers", []);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<Partial<Product>>({ ...emptyProduct });
+  /* EDITAR PRODUTO (26/09, varredura): o detalhe só tinha "Acabou" e a
+     lixeira — errou a marca ou o preço, tinha que apagar e cadastrar de novo.
+     O "Editar" reaproveita o formulário de detalhes, preenchido. */
+  const [editId, setEditId] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [showForm, editId]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showShopping, setShowShopping] = useState(false);
+  const [showTriggers, setShowTriggers] = useState(false);
+  const [newTrigger, setNewTrigger] = useState("");
+  const [quickName, setQuickName] = useState("");
+  const [quickBrand, setQuickBrand] = useState("");
+  const [quickCategory, setQuickCategory] = useState("Skincare");
+
+  const activeProducts = products.filter(p => !p.finished);
+  const expiringSoon = activeProducts.filter(p => {
+    if (!p.openedDate || !p.paoMonths) return false;
+    const { daysLeft } = getExpiryProgress(p.openedDate, p.paoMonths);
+    return daysLeft > 0 && daysLeft < 30;
+  });
+
+  const quickAdd = () => {
+    if (!quickName.trim()) return;
+    const product: Product = {
+      id: genId(), name: quickName.trim(), category: quickCategory, brand: quickBrand.trim(),
+      opened: false, openedDate: "", paoMonths: 12,
+      expiry: "", notes: "", rating: 0, repurchase: false,
+      price: 0, sizeMl: 0, photoUrl: "",
+      frequency: "Diário", finished: false,
+    };
+    setProducts(prev => [...prev, product]);
+    setQuickName("");
+    setQuickBrand("");
+  };
+
+  const save = () => {
+    if (!form.name?.trim()) return;
+    if (editId) {
+      // edição: troca só o que o formulário mostra; id, "acabou", nota e foto ficam
+      const id = editId;
+      setProducts(prev => prev.map(x => x.id === id ? {
+        ...x, name: form.name!.trim(), category: form.category || x.category || "Outro", brand: form.brand || "",
+        opened: !!form.openedDate, openedDate: form.openedDate || "", paoMonths: form.paoMonths || 12,
+        notes: form.notes || "", repurchase: form.repurchase || false,
+        price: form.price || 0, sizeMl: form.sizeMl || 0,
+      } : x));
+    } else {
+      const product: Product = {
+        id: genId(), name: form.name.trim(), category: form.category || "Outro", brand: form.brand || "",
+        opened: !!form.openedDate, openedDate: form.openedDate || "", paoMonths: form.paoMonths || 12,
+        expiry: "", notes: form.notes || "", rating: 0, repurchase: form.repurchase || false,
+        price: form.price || 0, sizeMl: form.sizeMl || 0, photoUrl: form.photoUrl || "",
+        frequency: form.frequency || "Diário", finished: false,
+      };
+      setProducts(prev => [...prev, product]);
+    }
+    fecharForm();
+  };
+
+  const fecharForm = () => {
+    setForm({ ...emptyProduct });
+    setEditId(null);
+    setShowForm(false);
+  };
+
+  const abrirEdicao = (p: Product) => {
+    setForm({ ...emptyProduct, ...(products.find(x => x.id === p.id) ?? p) });
+    setEditId(p.id);
+    setSelectedProduct(null);
+    setShowForm(true);
+  };
+
+  // Apaga já e oferece Desfazer (26/09, varredura: a lixeira apagava sem volta).
+  const apagarProduto = (p: Product) => {
+    const idx = products.findIndex(x => x.id === p.id);
+    const atual = products[idx] ?? p;
+    setProducts(prev => prev.filter(x => x.id !== p.id));
+    setSelectedProduct(null);
+    if (editId === p.id) fecharForm();
+    avisarApagado(`"${atual.name}" saiu da bancada`, () =>
+      setProducts(prev => (prev.some(x => x.id === p.id) ? prev : inserirEm(prev, idx, atual))));
+  };
+
+  const markFinished = (p: Product) => {
+    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, finished: true } : x));
+    setShoppingList(prev => [...prev, { ...p, id: genId(), finished: false }]);
+  };
+
+  const buyFromList = (id: string) => {
+    const item = shoppingList.find(x => x.id === id);
+    if (item) {
+      setProducts(prev => [...prev, { ...item, id: genId(), finished: false, openedDate: "", opened: false }]);
+    }
+    setShoppingList(prev => prev.filter(x => x.id !== id));
+  };
+
+  const costPerDose = (p: Product) => p.price && p.sizeMl ? calculateCostPerDose(p.price, p.sizeMl, p.category) : null;
+
+  return (
+    <div className="space-y-4 mt-4">
+      {/* Header — Notion-style */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-pink-200 dark:bg-pink-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">🧴 MINHA BANCADA</span>
+          <div className="flex gap-1.5">
+            <button onClick={() => setShowTriggers(true)} className="text-foreground/60 hover:text-foreground">
+              <Ban className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setShowShopping(true)} className="relative text-foreground/60 hover:text-foreground">
+              <ShoppingCart className="w-3.5 h-3.5" />
+              {shoppingList.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[7px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
+                  {shoppingList.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+        <div className="bg-pink-50 dark:bg-pink-950/20 px-4 py-2 flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground">{activeProducts.length} produtos ativos</p>
+          <div className="flex gap-2 flex-wrap">
+            {categories.map(c => {
+              const count = activeProducts.filter(p => p.category === c).length;
+              if (!count) return null;
+              return <span key={c} className="text-[9px] text-muted-foreground">{catEmoji[c]} {count}</span>;
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Expiring alerts */}
+      {expiringSoon.length > 0 && (
+        <div className="rounded-xl border border-red-200 dark:border-red-800/30 overflow-hidden">
+          <div className="bg-red-200 dark:bg-red-800/50 px-3 py-1.5 flex items-center gap-2">
+            <AlertTriangle className="w-3 h-3" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">⏰ VENCENDO EM BREVE</span>
+          </div>
+          <div className="bg-red-50 dark:bg-red-950/20 p-3">
+            {expiringSoon.map(p => {
+              const { daysLeft } = getExpiryProgress(p.openedDate, p.paoMonths);
+              return <p key={p.id} className="text-[10px] text-red-700 dark:text-red-300">⏰ {p.name} — {daysLeft} dias. Hora de repor!</p>;
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Triggers banner */}
+      {triggers.length > 0 && (
+        <div className="rounded-xl border border-red-200 dark:border-red-800/30 overflow-hidden">
+          <div className="bg-red-100 dark:bg-red-900/20 px-3 py-2">
+            <p className="text-[9px] text-red-700 dark:text-red-300 font-bold">🚫 Lembrete: Evite produtos com {triggers.join(", ")}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Product table — always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-8 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+          <span className="col-span-3">Produto</span>
+          <span className="col-span-2">Marca</span>
+          <span className="col-span-2">Categoria</span>
+          <span className="col-span-1 text-right hidden sm:block">Validade</span>
+        </div>
+        <div className="divide-y divide-border bg-card">
+          {activeProducts.map(p => {
+            const cpd = costPerDose(p);
+            const expiry = p.openedDate && p.paoMonths ? getExpiryProgress(p.openedDate, p.paoMonths) : null;
+            return (
+              <div key={p.id} className="px-3 py-2 grid grid-cols-8 gap-1 items-center cursor-pointer hover:bg-muted/30 transition-colors group"
+                onClick={() => setSelectedProduct(p)}>
+                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                  <span className="text-sm shrink-0">{catEmoji[p.category] || "✨"}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium truncate">{p.name}</p>
+                    {cpd !== null && <span className="text-[8px] text-emerald-600 dark:text-emerald-400">R${cpd.toFixed(2)}/dose</span>}
+                  </div>
+                </div>
+                <span className="col-span-2 text-[10px] text-muted-foreground truncate">{p.brand || "—"}</span>
+                <div className="col-span-2 flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">{p.category}</span>
+                  {p.repurchase && <span className="text-[8px]">🔄</span>}
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  <button onClick={e => { e.stopPropagation(); markFinished(p); }} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100">
+                    <Package className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {activeProducts.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[11px] text-muted-foreground italic">Nenhum produto ainda — adicione abaixo</p>
+            </div>
+          )}
+
+          {/* Inline quick-add row */}
+          <div className="px-3 py-2 space-y-1.5 bg-muted/20">
+            <Input
+              placeholder="Nome do produto"
+              value={quickName}
+              onChange={e => setQuickName(e.target.value)}
+              className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+              onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+            />
+            <div className="grid grid-cols-2 gap-1.5">
+              <Input
+                placeholder="Marca"
+                value={quickBrand}
+                onChange={e => setQuickBrand(e.target.value)}
+                className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+                onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+              />
+              <Select value={quickCategory} onValueChange={setQuickCategory}>
+                <SelectTrigger className="h-7 text-[10px] border-dashed border-border/60 bg-background/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-7 px-3 text-[10px] flex-1" onClick={quickAdd}>
+                <Plus className="w-3 h-3 mr-0.5" /> Adicionar
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-3 text-[10px]" onClick={() => { if (editId) { setEditId(null); setForm({ ...emptyProduct }); } setShowForm(true); }}>
+                + Detalhes
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add form (detailed) — o mesmo serve pra editar */}
+      {showForm && (
+        <div ref={formRef} className="rounded-xl border border-border bg-card p-4 space-y-3 scroll-mt-32">
+          {editId && <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✏️ Editar produto</p>}
+          <Input placeholder="Nome do produto" value={form.name || ""} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-sm" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input placeholder="Marca" value={form.brand || ""} onChange={e => setForm(p => ({ ...p, brand: e.target.value }))} className="h-9 text-sm" />
+            <Select value={form.category} onValueChange={v => setForm(p => ({ ...p, category: v }))}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] text-muted-foreground">Preço (R$)</label>
+              <CampoDecimal rotulo="Preço" valor={form.price || 0} onValor={n => setForm(p => ({ ...p, price: n }))} />
+            </div>
+            <div>
+              <label className="text-[9px] text-muted-foreground">Tamanho (ml/g)</label>
+              <CampoDecimal rotulo="Tamanho" valor={form.sizeMl || 0} onValor={n => setForm(p => ({ ...p, sizeMl: n }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] text-muted-foreground">Data de Abertura</label>
+              <Input type="date" value={form.openedDate || ""} onChange={e => setForm(p => ({ ...p, openedDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" />
+            </div>
+            <div>
+              <label className="text-[9px] text-muted-foreground">PAO (meses)</label>
+              <Select value={String(form.paoMonths || 12)} onValueChange={v => setForm(p => ({ ...p, paoMonths: parseInt(v) }))}>
+                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{paoOptions.map(m => <SelectItem key={m} value={String(m)}>{m}M</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Textarea placeholder="Notas (ingredientes, resultados...)" value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Checkbox checked={form.repurchase} onCheckedChange={v => setForm(p => ({ ...p, repurchase: !!v }))} /> Recomprar quando acabar
+          </label>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
+            <Button size="sm" variant="ghost" onClick={fecharForm}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Product detail dialog */}
+      <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
+        <DialogContent className="max-w-sm">
+          {selectedProduct && (() => {
+            const p = selectedProduct;
+            const cpd = costPerDose(p);
+            const expiry = p.openedDate && p.paoMonths ? getExpiryProgress(p.openedDate, p.paoMonths) : null;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2"><span>{catEmoji[p.category]}</span> {p.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-muted-foreground text-[10px]">Marca</span><p className="font-medium">{p.brand || "—"}</p></div>
+                    <div><span className="text-muted-foreground text-[10px]">Preço</span><p className="font-medium">{p.price ? `R$ ${p.price.toFixed(2)}` : "—"}</p></div>
+                    <div><span className="text-muted-foreground text-[10px]">Tamanho</span><p className="font-medium">{p.sizeMl ? `${p.sizeMl} ml` : "—"}</p></div>
+                    {cpd !== null && <div><span className="text-muted-foreground text-[10px]">Custo/dose</span><p className="font-medium text-emerald-600">R$ {cpd.toFixed(2)}</p></div>}
+                  </div>
+                  {expiry && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Validade PAO {p.paoMonths}M</p>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${expiry.daysLeft < 15 ? "bg-red-500" : expiry.daysLeft < 30 ? "bg-amber-500" : "bg-emerald-500"}`}
+                          style={{ width: `${Math.min(100, expiry.percent)}%` }} />
+                      </div>
+                      <p className="text-[9px] mt-1 text-muted-foreground">{expiry.expired ? "⚠️ Vencido!" : `${expiry.daysLeft} dias restantes`}</p>
+                    </div>
+                  )}
+                  {p.notes && <p className="text-xs text-muted-foreground">{p.notes}</p>}
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => abrirEdicao(p)}>
+                      <Edit2 className="w-3.5 h-3.5 mr-1" /> Editar
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => { markFinished(p); setSelectedProduct(null); }}>
+                      <Package className="w-3.5 h-3.5 mr-1" /> Acabou
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => apagarProduto(p)} aria-label="Apagar produto">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Shopping list dialog */}
+      <Dialog open={showShopping} onOpenChange={setShowShopping}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>🛒 Lista de Compras</DialogTitle></DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {shoppingList.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Lista vazia</p>}
+            {shoppingList.map(p => (
+              <div key={p.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border">
+                <Checkbox onCheckedChange={() => buyFromList(p.id)} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-[9px] text-muted-foreground">{p.brand} • {p.price ? `R$ ${p.price.toFixed(2)}` : ""}</p>
+                </div>
+              </div>
+            ))}
+            {shoppingList.length > 0 && (
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground">Total: <span className="font-bold text-foreground">R$ {shoppingList.reduce((s, p) => s + (p.price || 0), 0).toFixed(2)}</span></p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Triggers dialog */}
+      <Dialog open={showTriggers} onOpenChange={setShowTriggers}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>🚫 Ingredientes a Evitar</DialogTitle></DialogHeader>
+          <p className="text-[11px] text-muted-foreground">Adicione ingredientes que causam reação na sua pele.</p>
+          <div className="space-y-2">
+            {triggers.map((t, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+                <span className="text-xs flex-1 text-red-700 dark:text-red-300 font-medium">{t}</span>
+                <button onClick={() => setTriggers(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Input placeholder="Ex: Ácido Salicílico" value={newTrigger} onChange={e => setNewTrigger(e.target.value)}
+                className="h-8 text-xs"
+                onKeyDown={e => { if (e.key === "Enter" && newTrigger.trim()) { setTriggers(prev => [...prev, newTrigger.trim()]); setNewTrigger(""); } }} />
+              <Button size="sm" className="h-8" onClick={() => { if (newTrigger.trim()) { setTriggers(prev => [...prev, newTrigger.trim()]); setNewTrigger(""); } }}>
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};

@@ -1,12 +1,15 @@
 import {
-  agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
-  agendarRetrospectiva, agendarRotina, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  agendarAniversarios, agendarCabelo, agendarCompromissos, agendarCuidados, agendarValidade, agendarContas, agendarDieta, agendarLeitura, agendarLembreteSequencia, agendarLimiteDoDia, agendarManutencao, agendarRemedios,
+  agendarRetrospectiva, agendarRotina, agendarSkincare, agendarTarefas, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { agendarPet } from "@/lib/notificacoes";
 import { algumLigadoPet, lerDadosDosAvisosPet, type DadosDosAvisosPet } from "@/lib/pet-avisos";
 import { agendarRelacoes } from "@/lib/notificacoes";
 import { assinaturaDasRelacoes, lerDadosDasRelacoes, type DadosDasRelacoes } from "@/lib/relacoes-lembrete";
+import { lembreteCabeloLigado, lerDadosDoCabelo, type DadosDoCabelo } from "@/lib/beleza-cabelo";
+import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos, type Cuidado } from "@/lib/beleza-cuidados";
+import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade, type LembreteValidade, type ProdutoMeu } from "@/lib/beleza-produtos";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acaoMaisUsada } from "@/lib/conquistas-acao";
 import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
@@ -20,6 +23,7 @@ import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
 import { localDayKey } from "@/lib/utils";
+import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
 
 /**
  * A fonte única de "o que agendar" (27/07).
@@ -96,6 +100,14 @@ export interface DadosDosLembretes {
   pet?: DadosDosAvisosPet;
   /** Relações (29/09): parabéns no dia + manter contato — as escolhas moram em `rel-lembrete-prefs` */
   relacoes?: DadosDasRelacoes;
+  /** skincare de manhã e de noite (28/09): horários, passos da agenda e o que já foi marcado hoje */
+  skincare?: DadosDoSkincare;
+  /** cabelo (28/09, Onda 1): o cronograma, as lavagens feitas e os avisos do dia de lavar/véspera */
+  cabelo?: DadosDoCabelo;
+  /** cuidados com data (28/09, Onda 1): o aviso N dias antes, só dos que não têm horário marcado */
+  cuidados?: Cuidado[];
+  /** validade dos produtos (28/09, Onda 1): MEUS PRODUTOS + o interruptor (nasce desligado) */
+  validade?: { produtos: ProdutoMeu[]; prefs: LembreteValidade };
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -228,6 +240,13 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     })(),
     pet: lerDadosDosAvisosPet(get, hoje),
     relacoes: lerDadosDasRelacoes(get),
+    skincare: lerDadosDoSkincare(get, hoje),
+    cabelo: lerDadosDoCabelo(get),
+    cuidados: cuidadosValidos(get<unknown>(CHAVE_CUIDADOS, [])),
+    validade: {
+      produtos: (() => { const l = get<unknown>("beauty-products", []); return Array.isArray(l) ? (l as ProdutoMeu[]) : []; })(),
+      prefs: lerLembreteValidade(get<unknown>(CHAVE_LEMBRETE_VALIDADE, undefined)),
+    },
   };
 }
 
@@ -265,6 +284,14 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     !!dados.pet && algumLigadoPet(dados.pet.prefs) && dados.pet,
     // (29/09) Relações: as escolhas moram na chave própria; "Falei hoje" muda o plano
     dados.relacoes ? assinaturaDasRelacoes(dados.relacoes) : false,
+    // (28/09) skincare: as prefs moram na chave própria; marcar um passo de hoje muda o plano
+    !!dados.skincare && algumLigado(dados.skincare.prefs) && dados.skincare,
+    // (28/09) cabelo: FEITO muda a fila, e a fila muda a agenda dos avisos
+    !!dados.cabelo && lembreteCabeloLigado(dados.cabelo.prefs) && dados.cabelo,
+    // (28/09) cuidados: FEITO muda a próxima data; ligar/desligar o aviso muda o plano
+    !!dados.cuidados && algumAvisoDeCuidado(dados.cuidados) && dados.cuidados,
+    // (28/09) validade: só as datas e o PAO de cada produto contam (e o interruptor)
+    !!dados.validade && dados.validade.prefs.ligado && [dados.validade.prefs, dados.validade.produtos.filter((p) => p && !p.finished).map((p) => [p.id, p.expiry, p.openedDate, p.paoMonths])],
   ]);
 }
 
@@ -299,5 +326,9 @@ export async function reagendarTudo(
     sequencia: await agendarLembreteSequencia(d.seqAnotada, { hora: prefs.horaSequencia, ligado: prefs.sequencia }),
     pet: d.pet ? await agendarPet(d.pet) : 0,
     relacoes: d.relacoes ? await agendarRelacoes(d.relacoes) : 0,
+    beleza: d.skincare ? await agendarSkincare(d.skincare) : 0,
+    cabelo: d.cabelo ? await agendarCabelo(d.cabelo) : 0,
+    cuidados: d.cuidados ? await agendarCuidados(d.cuidados) : 0,
+    validade: d.validade ? await agendarValidade(d.validade.produtos, d.validade.prefs) : 0,
   };
 }

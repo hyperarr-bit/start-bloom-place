@@ -1,44 +1,89 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { mesAtualExtenso } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Sparkles, Droplets } from "lucide-react";
+import { ArrowLeft, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
-import { ModuleTip } from "@/components/ModuleTip";
+import { Cabelo } from "@/components/beleza/Cabelo";
+import { Cuidados } from "@/components/beleza/Cuidados";
+import { useSkincare } from "@/components/beleza/use-skincare";
+import type { PerfilDaPele } from "@/lib/beleza-rotina";
+import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
-const tabs = [
-  { id: "routine", label: "Rotina", icon: "✨" },
-  { id: "shelf", label: "Bancada", icon: "🧪" },
-  { id: "diary", label: "Diário", icon: "📷" },
+/*
+ * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
+ * com skincare" — e existe o módulo Rotina); o DIÁRIO deixou de ser aba e virou
+ * "Fotos da pele" no fim de SKINCARE (mesma tela, mesma chave: quem tem foto não
+ * perde nada). CAIXA ALTA como as outras abas do app (cara de planner).
+ *
+ * Os ids ficam (medição por aba, tour, testes): `routine` = SKINCARE, `shelf` =
+ * MEUS PRODUTOS. O id antigo `diary` redireciona pra SKINCARE, rolando até as fotos.
+ */
+type Aba = "routine" | "hair" | "shelf" | "care";
+const tabs: { id: Aba; label: string; icon: string }[] = [
+  { id: "routine", label: "SKINCARE", icon: "✨" },
+  { id: "hair", label: "CABELO", icon: "💇‍♀️" },
+  { id: "shelf", label: "MEUS PRODUTOS", icon: "🧴" },
+  { id: "care", label: "CUIDADOS", icon: "💅" },
 ];
+
+/** `/beleza?aba=…` (link de notificação, atalho, tour): nomes em português e os ids antigos. */
+const ABA_DO_LINK: Record<string, Aba | "fotos"> = {
+  skincare: "routine", routine: "routine", rotina: "routine",
+  cabelo: "hair", hair: "hair",
+  produtos: "shelf", "meus-produtos": "shelf", shelf: "shelf",
+  cuidados: "care", care: "care",
+  diario: "fotos", diary: "fotos", fotos: "fotos",
+};
 
 const Beleza = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("routine");
+  const [params] = useSearchParams();
+  const pedida = ABA_DO_LINK[(params.get("aba") ?? "").toLowerCase()];
+  const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
+  /* ROTINA VAZIA VAI PRO TOPO (28/09, protótipo): quem ainda não tem rotina vê as
+     3 perguntas antes das dicas e do Espelho — é a ação da tela. Depois de montar,
+     a Rotina volta pro lugar de sempre (abaixo do Espelho); o "rotina pronta"
+     mora aqui em cima pra não se perder na troca de lugar. */
+  const { vazia } = useSkincare();
+  const [recemGerada, setRecemGerada] = useState<PerfilDaPele | null>(null);
+  const rotinaNoTopo = activeTab === "routine" && vazia;
+  const rotina = <SkincareRoutine recemGerada={recemGerada} onGerada={setRecemGerada} />;
 
-  const handleTabChange = (tabId: string) => {
+  // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
+  useEffect(() => {
+    if (pedida !== "fotos") return;
+    const t = window.setTimeout(() => document.getElementById("fotos-da-pele")?.scrollIntoView?.({ behavior: "smooth", block: "start" }), 250);
+    return () => window.clearTimeout(t);
+  }, [pedida]);
+
+  const handleTabChange = (tabId: Aba) => {
     setActiveTab(tabId);
     reportTab?.(tabId);
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
+    /* Visual próprio da Beleza (28/09, dono: "estética mais feminina, não azul"): os
+       tokens do app viram os da Beleza DENTRO desta raiz (components/beleza/beleza.css) —
+       papel blush, tinta ameixa, magenta da marca na ação; no escuro, ameixa profundo. */
+    <div className={cn(TEMA_BELEZA, "min-h-screen bg-background text-foreground pb-20")}>
       <SpotlightOverlay
         moduleKey="beleza"
         steps={[
-          
-          { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os produtos da sua bancada.", advanceOnClick: true },
-          { selector: '[data-spotlight="tab-diary"]', label: "Diário pra acompanhar a evolução da pele.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-hair"]', label: "Seu cronograma capilar em 4 perguntas.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os seus produtos.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-care"]', label: "Unha, sobrancelha, depilação: a próxima data sozinha.", advanceOnClick: true },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -46,7 +91,7 @@ const Beleza = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Droplets className="w-5 h-5 text-pink-600" />
+          <Droplets className="w-5 h-5 text-bz-acento" />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs">{currentMonth}</span>
@@ -58,6 +103,7 @@ const Beleza = () => {
             <button
               key={tab.id}
               data-spotlight={`tab-${tab.id}`}
+              data-active={activeTab === tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
@@ -69,21 +115,25 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <ModuleTip
-          moduleId="beleza"
-          tips={[
-            "Registre o estado da sua pele diariamente para acompanhar padrões",
-            "O Skin Cycling alterna tratamentos noturnos automaticamente",
-            "Cadastre seus produtos para rastrear validade e custo por dose",
-            "Tire fotos semanais para acompanhar a evolução da pele"
-          ]}
-        />
-
-        <DailyMirror />
-
-        {activeTab === "routine" && <SkincareRoutine />}
+        {activeTab === "routine" && (
+          <>
+            {rotinaNoTopo && rotina}
+            <DicasDaBeleza
+              dicas={[
+                "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
+                "Toque num passo pra escolher o produto e os dias da semana",
+                "Ligue o lembrete da manhã e da noite — ele diz o passo do dia",
+                "Cadastre seus produtos para rastrear validade e custo por dose",
+              ]}
+            />
+            <DailyMirror />
+            {!rotinaNoTopo && rotina}
+            <SkinDiary />
+          </>
+        )}
+        {activeTab === "hair" && <Cabelo />}
         {activeTab === "shelf" && <ProductShelf />}
-        {activeTab === "diary" && <SkinDiary />}
+        {activeTab === "care" && <Cuidados />}
       </main>
     </div>
   );

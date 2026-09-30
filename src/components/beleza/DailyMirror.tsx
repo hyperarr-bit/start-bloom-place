@@ -1,5 +1,8 @@
 import { localDayKey } from "@/lib/utils";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useChaveDaBeleza } from "./estado-compartilhado";
+import { CartaoBeleza, FaixaBeleza } from "./kit";
 
 const getDateKey = () => localDayKey();
 
@@ -47,66 +50,63 @@ export const DailyMirror = () => {
   const circ = 2 * Math.PI * r;
   const offset = circ * (1 - pct);
 
+  /* Visual da Beleza (28/09): era a faixa verde-esmeralda de sempre; agora o rosé
+     do módulo, o anel no magenta da marca e as peles em pílula. */
   return (
-    <div className="space-y-3">
-      {/* Consistency Ring + Check-in — Notion-style */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-emerald-200 dark:bg-emerald-800/50 px-4 py-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider">✨ ESPELHO DO DIA</span>
-        </div>
-        <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4">
-          <div className="flex items-center gap-4">
-            {/* Ring */}
-            <div className="relative shrink-0">
-              <svg width="68" height="68" className="transform -rotate-90">
-                <circle cx="34" cy="34" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-                <circle cx="34" cy="34" r={r} fill="none" stroke="hsl(142, 76%, 56%)" strokeWidth="4"
-                  strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-                  className="transition-all duration-700" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{Math.min(streak, 7)}</span>
-                <span className="text-[8px] text-muted-foreground">/7 dias</span>
-              </div>
-            </div>
-
-            {/* min-w-0: sem isso o flex-1 não encolhe abaixo do conteúdo e a
-                coluna toda escapava 31px pela direita a 360px (29/07) */}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground mb-0.5">Como está sua pele hoje?</p>
-              <p className="text-[10px] text-muted-foreground mb-2.5">
-                {streak > 0 ? `🔥 ${streak} ${streak === 1 ? "dia" : "dias consecutivos"} de rotina` : "Comece sua sequência hoje!"}
-              </p>
-
-              {/* Quebra linha em vez de rolar de lado: a 360 px "Boa" e
-                  "Sensível" ficavam escondidos sem indicação (26/09, varredura). */}
-              <div className="flex flex-wrap gap-1.5">
-                {skinOptions.map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => selectSkin(s.id)}
-                    className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-all border ${
-                      todaySkin === s.id
-                        ? "bg-emerald-100 dark:bg-emerald-800/30 border-emerald-300 dark:border-emerald-600 text-emerald-700 dark:text-emerald-300"
-                        : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-                    }`}
-                  >
-                    {s.emoji} {s.label}
-                  </button>
-                ))}
-              </div>
+    <CartaoBeleza data-card="espelho-do-dia">
+      <FaixaBeleza icone={<Sparkles className="w-4 h-4 text-bz-acento" />} titulo="ESPELHO DO DIA" />
+      <div className="px-4 py-3.5">
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            <svg width="68" height="68" className="transform -rotate-90" aria-hidden="true">
+              <circle cx="34" cy="34" r={r} fill="none" stroke="hsl(var(--bz-blush))" strokeWidth="5" />
+              <circle cx="34" cy="34" r={r} fill="none" stroke="hsl(var(--bz-acento))" strokeWidth="5"
+                strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+                className="transition-all duration-700" />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[16px] font-extrabold text-bz-acento leading-none">{Math.min(streak, 7)}</span>
+              <span className="text-[8.5px] text-bz-suave mt-0.5">/7 dias</span>
             </div>
           </div>
 
-          {todaySkin === "sensivel" && (
-            <div className="mt-3 px-3 py-2 rounded-lg bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
-              <p className="text-[10px] text-red-700 dark:text-red-300 font-medium">
-                🛑 Pele sensível detectada — ácidos e esfoliantes foram ocultados da rotina noturna. Foco em hidratação!
-              </p>
+          {/* min-w-0: sem isso o flex-1 não encolhe abaixo do conteúdo e a
+              coluna toda escapava 31px pela direita a 360px (29/07) */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] font-semibold text-bz-tinta mb-0.5">Como está sua pele hoje?</p>
+            <p className="text-[11.5px] text-bz-suave mb-2.5">
+              {streak > 0 ? `🔥 ${streak} ${streak === 1 ? "dia" : "dias consecutivos"} de rotina` : "Comece sua sequência hoje!"}
+            </p>
+
+            {/* Quebra linha em vez de rolar de lado: a 360 px "Boa" e
+                "Sensível" ficavam escondidos sem indicação (26/09, varredura). */}
+            <div className="flex flex-wrap gap-1.5">
+              {skinOptions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => selectSkin(s.id)}
+                  className={cn(
+                    "shrink-0 h-9 px-3 rounded-full text-[11.5px] font-semibold transition-all border",
+                    todaySkin === s.id
+                      ? "bg-bz-rose border-bz-acento/45 text-bz-rose-tinta"
+                      : "bg-bz-cartao border-bz-linha-forte text-bz-suave",
+                  )}
+                >
+                  {s.emoji} {s.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
+
+        {todaySkin === "sensivel" && (
+          <div className="mt-3 px-3 py-2 rounded-2xl bg-bz-alerta">
+            <p className="text-[11.5px] text-bz-alerta-tinta font-medium">
+              🛑 Pele sensível detectada — ácidos e esfoliantes foram ocultados da rotina noturna. Foco em hidratação!
+            </p>
+          </div>
+        )}
       </div>
-    </div>
+    </CartaoBeleza>
   );
 };

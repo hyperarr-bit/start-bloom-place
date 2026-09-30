@@ -50,6 +50,8 @@ import { WeekCalendarWidget } from "@/components/home/widgets/WeekCalendarWidget
 import { TasksWidget } from "@/components/home/widgets/TasksWidget";
 import { PetWidget } from "@/components/home/widgets/PetWidget";
 import { RelacoesWidget } from "@/components/home/widgets/RelacoesWidget";
+import { SkincareWidget } from "@/components/home/widgets/SkincareWidget";
+import { CuidadosWidget } from "@/components/home/widgets/CuidadosWidget";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
 
 type WidgetComponent = React.FC<{ size?: "small" | "large" }>;
@@ -74,6 +76,8 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
   tasks: TasksWidget as WidgetComponent,
   pet: PetWidget as WidgetComponent,
   relacoes: RelacoesWidget as WidgetComponent,
+  skincare: SkincareWidget as WidgetComponent,
+  cuidados: CuidadosWidget as WidgetComponent,
 };
 
 const HomePage = () => {

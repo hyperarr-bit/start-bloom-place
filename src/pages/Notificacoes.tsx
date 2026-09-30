@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
+import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -8,6 +8,10 @@ import { isNativeShell } from "@/lib/native-shell";
 import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
+import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
+import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
+import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos } from "@/lib/beleza-cuidados";
+import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade } from "@/lib/beleza-produtos";
 import { trackEvent } from "@/lib/analytics";
 import { CHAVE_LEMBRETE as CHAVE_LEMBRETE_PET } from "@/lib/pet";
 import { algumLigadoPet, lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
@@ -165,6 +169,89 @@ const Notificacoes = () => {
     const novo: LembreteRelacoes = { ...relLembrete, [tipo]: { ...relLembrete[tipo], ligado: valor } };
     set(CHAVE_LEMBRETE_RELACOES, novo);
     const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_RELACOES ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Skincare (28/09): chave própria (horários de manhã e de noite escolhidos na
+   *  Beleza). Aqui é o interruptor geral: liga/desliga os dois períodos. */
+  const skincare = lerLembreteSkincare(get<unknown>(CHAVE_LEMBRETE_SKINCARE, undefined));
+  const alternarSkincare = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "skincare", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { manha: { ...skincare.manha, ligado: valor }, noite: { ...skincare.noite, ligado: valor } };
+    set(CHAVE_LEMBRETE_SKINCARE, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_SKINCARE ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Cabelo (28/09, Onda 1 da Beleza): chave própria (dia de lavar + véspera). Aqui
+   *  liga/desliga o aviso do DIA de lavar; a véspera e os horários mudam na Beleza. */
+  const cabelo = lerLembreteCabelo(get<unknown>(CHAVE_LEMBRETE_CABELO, undefined));
+  const alternarCabelo = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "cabelo", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { dia: { ...cabelo.dia, ligado: valor }, vespera: { ...cabelo.vespera, ligado: valor && cabelo.vespera.ligado } };
+    set(CHAVE_LEMBRETE_CABELO, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_CABELO ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Cuidados com data (28/09, Onda 1): cada cuidado tem o seu aviso (na Beleza);
+   *  aqui é o interruptor geral — liga ou desliga o de todos. */
+  const cuidados = cuidadosValidos(get<unknown>(CHAVE_CUIDADOS, []));
+  const alternarCuidados = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "cuidados", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = cuidados.map((c) => ({ ...c, avisoLigado: valor }));
+    set(CHAVE_CUIDADOS, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_CUIDADOS ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Validade dos produtos (28/09, Onda 1): 7 dias antes, às 09:00 (chave própria, nasce desligado). */
+  const validade = lerLembreteValidade(get<unknown>(CHAVE_LEMBRETE_VALIDADE, undefined));
+  const alternarValidade = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "validade", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { ...validade, ligado: valor };
+    set(CHAVE_LEMBRETE_VALIDADE, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_VALIDADE ? (novo as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -349,6 +436,42 @@ const Notificacoes = () => {
           rodape={rodapeDe("sequencia", p.sequencia, "Anote qualquer coisa hoje pra começar uma sequência")}
           hora={p.sequencia ? p.horaSequencia : undefined}
           onHora={(h) => void aplicar({ horaSequencia: h })}
+        />
+
+        <LinhaAviso
+          icone={<Droplets className="w-4 h-4" />}
+          titulo="Skincare"
+          descricao={`De manhã (${skincare.manha.hora}) e à noite (${skincare.noite.hora}), com os passos do dia da sua rotina de pele. Os horários mudam na Beleza.`}
+          ligado={algumLigado(skincare)}
+          onChange={(v) => void alternarSkincare(v)}
+          rodape={rodapeDe("beleza", algumLigado(skincare), "Monte sua rotina na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<Sparkles className="w-4 h-4" />}
+          titulo="Cabelo"
+          descricao={`No dia de lavar (${cabelo.dia.hora}), com a etapa do cronograma: hidratação, nutrição ou reconstrução. A véspera e o horário mudam na Beleza.`}
+          ligado={lembreteCabeloLigado(cabelo)}
+          onChange={(v) => void alternarCabelo(v)}
+          rodape={rodapeDe("cabelo", lembreteCabeloLigado(cabelo), "Monte seu cronograma na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<CalendarClock className="w-4 h-4" />}
+          titulo="Cuidados"
+          descricao="Unha, sobrancelha, depilação: às 09:00, alguns dias antes da próxima vez. Com horário marcado, quem avisa é o compromisso. Os dias mudam em cada cuidado, na Beleza."
+          ligado={algumAvisoDeCuidado(cuidados)}
+          onChange={(v) => void alternarCuidados(v)}
+          rodape={rodapeDe("cuidados", algumAvisoDeCuidado(cuidados), "Marque a última vez de um cuidado na Beleza pra ter o que lembrar")}
+        />
+
+        <LinhaAviso
+          icone={<AlarmClock className="w-4 h-4" />}
+          titulo="Validade dos produtos"
+          descricao={`${validade.diasAntes} dias antes de um produto de MEUS PRODUTOS vencer (a data impressa ou a de depois de aberto, a que vier primeiro), às ${validade.hora}.`}
+          ligado={validade.ligado}
+          onChange={(v) => void alternarValidade(v)}
+          rodape={rodapeDe("validade", validade.ligado, "Cadastre a validade de um produto na Beleza pra ter o que lembrar")}
         />
 
         <LinhaAviso

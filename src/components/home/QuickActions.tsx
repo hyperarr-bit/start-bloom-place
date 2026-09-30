@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
+import { lancarGasto } from "@/lib/finance-lancar";
 import { numeroBR } from "@/lib/data-normalizers";
 import { chaveDoHabito, datasDeCheckin, marcarCheckin } from "@/lib/detox";
 import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
@@ -193,18 +194,9 @@ export const QuickActions = () => {
     // numeroBR (26/09): parseFloat trocando só a 1ª vírgula gravava "1.250,50" como R$ 1,25
     const amount = numeroBR(expenseValue);
     if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
-    const expenses = get<any[]>("finance-expenses", []);
-    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
     const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
-    expenses.push(etiquetar({
-      id: crypto.randomUUID(),
-      description: expenseCategory,
-      value: amount,
-      category: catMap[expenseCategory] || "outros",
-      date: todayStr(),
-      paymentMethod: "pix",
-    }, perfil));
-    set("finance-expenses", expenses);
+    // 28/09: o mesmo caminho do "Lançar em Finanças · Beleza" (lib/finance-lancar) — balde do mês, perfil ativo
+    lancarGasto(get, set, { descricao: expenseCategory, valor: amount, categoria: catMap[expenseCategory] || "outros", data: todayStr() });
     vibrate();
     showSuccess("expense");
     toast.success(`💸 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em ${expenseCategory}`);

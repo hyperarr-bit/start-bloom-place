@@ -542,7 +542,59 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "1", petName: "Mel", date: daysAgo(1), text: "Passeio longo no parque, cansou gostoso.", mood: "😄" },
     ],
   },
-  beleza: { ...COMMON },
+  // 30/09 (Beleza Onda 1 na web): a demo abria VAZIA (só as 3 perguntas). Agora é a conta de um
+  // mês: a rotina que as 3 respostas "mista · manchas · intermediário" geram (saída literal do
+  // gerarRotina — importar o gerador pesaria no pedaço da demo), o cronograma capilar em curso,
+  // MEUS PRODUTOS com as duas datas e os CUIDADOS com a próxima data. Datas relativas a hoje.
+  beleza: {
+    ...COMMON,
+    "spotlight-done-beleza": "true",
+    "skincare-perfil": { pele: "mista", objetivo: "manchas", nivel: "intermediario" },
+    "skincare-am-steps": [
+      { name: "Gel de limpeza", tipo: "limpeza", produtoId: "demo-limpeza" },
+      { name: "Sérum de vitamina C", tipo: "vitamina-c", produtoId: "demo-vitc" },
+      { name: "Hidratante leve (gel)", tipo: "hidratante" },
+      { name: "Protetor solar (toque seco)", tipo: "protetor", isSunscreen: true, produtoId: "demo-protetor" },
+    ],
+    "skincare-pm-steps": [
+      { name: "Gel de limpeza", tipo: "limpeza", produtoId: "demo-limpeza" },
+      { name: "Ácido glicólico (AHA)", tipo: "acido-glicolico", isAcid: true, dias: [1, 5] },
+      { name: "Hidratante leve (gel)", tipo: "hidratante" },
+    ],
+    "skincare-morning-checked": { [daysAgo(0)]: [0, 1], [daysAgo(1)]: [0, 1, 2, 3], [daysAgo(2)]: [0, 1, 2, 3], [daysAgo(3)]: [0, 1, 2, 3] },
+    "skincare-night-checked": { [daysAgo(1)]: [0, 1, 2], [daysAgo(2)]: [0, 2], [daysAgo(3)]: [0, 1, 2] },
+    "skincare-daily-checkin": { [daysAgo(0)]: "boa" },
+    "skincare-diary": [
+      { id: "d1", date: daysAgo(2), skinStatus: "boa", mood: "😊", notes: "As manchas da bochecha mais claras com a vitamina C", photoUrl: "" },
+      { id: "d2", date: daysAgo(9), skinStatus: "oleosa", mood: "😐", notes: "Testa brilhando no calor — troquei pro protetor toque seco", photoUrl: "" },
+    ],
+    "beauty-products": [
+      { id: "demo-limpeza", name: "Gel de Limpeza Effaclar", brand: "La Roche-Posay", category: "Skincare", opened: true, openedDate: daysAgo(40), paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: true, price: 89.9, sizeMl: 150, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-vitc", name: "Sérum Vitamina C 10", brand: "Principia", category: "Skincare", opened: true, openedDate: daysAgo(75), paoMonths: 3, expiry: "", notes: "Guardar longe da luz", rating: 0, repurchase: false, price: 69.9, sizeMl: 30, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-protetor", name: "Fusion Water FPS 60", brand: "ISDIN", category: "Skincare", opened: true, openedDate: daysAgo(20), paoMonths: 12, expiry: `${daysAgo(-60).slice(0, 7)}`, notes: "", rating: 0, repurchase: true, price: 119.9, sizeMl: 50, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-mascara", name: "Máscara Morte Súbita", brand: "Lola Cosmetics", category: "Cabelo", opened: true, openedDate: daysAgo(30), paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 49.9, sizeMl: 230, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-rimel", name: "Máscara de cílios", brand: "", category: "Maquiagem", tipo: "rimel", paoPadrao: true, opened: true, openedDate: daysAgo(80), paoMonths: 3, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-perfume", name: "Perfume floral", brand: "", category: "Perfume", paoPadrao: true, opened: false, openedDate: "", paoMonths: 36, expiry: `${daysAgo(-400).slice(0, 7)}`, notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+    ],
+    "cabelo-perfil": { curvaturas: ["ondulado", "cacheado"], quimica: "coloracao", frequencia: { porSemana: 3 }, porosidade: "media", respostasPorosidade: [2, 2, 2], criadoEm: daysAgo(14) },
+    "cabelo-plano": {
+      id: "cab-demo",
+      sequencia: ["hidratacao", "nutricao", "hidratacao", "nutricao", "nutricao", "hidratacao", "nutricao", "nutricao", "hidratacao", "nutricao", "hidratacao", "reconstrucao"],
+      ritmo: { tipo: "semana", dias: [0, 2, 4] },
+      inicio: daysAgo(14),
+    },
+    "cabelo-lavagens": [
+      { id: "l1", data: daysAgo(14), etapa: "hidratacao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: [], produtos: { mascara: "demo-mascara" }, tags: ["maciez", "brilho"], nota: "" },
+      { id: "l2", data: daysAgo(12), etapa: "nutricao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: [], produtos: {}, tags: ["definicao"], nota: "" },
+      { id: "l3", data: daysAgo(10), etapa: "hidratacao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador"], extras: [], produtos: {}, tags: [], nota: "" },
+      { id: "l4", data: daysAgo(7), etapa: "nutricao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: ["umectacao"], produtos: {}, tags: ["brilho"], nota: "deixei a máscara 20 min" },
+    ],
+    "beleza-cuidados": [
+      { id: "cu1", tipo: "unha", nome: "Unha", intervaloDias: 7, ultima: daysAgo(6), local: "Manicure Rô", preco: 45, avisoLigado: false, avisoDiasAntes: 2, historico: [{ data: daysAgo(20), preco: 45 }, { data: daysAgo(13), preco: 45 }, { data: daysAgo(6), preco: 45 }] },
+      { id: "cu2", tipo: "sobrancelha", nome: "Sobrancelha", intervaloDias: 21, ultima: daysAgo(19), local: "Studio Bela", preco: 60, avisoLigado: false, avisoDiasAntes: 2, historico: [{ data: daysAgo(40), preco: 60 }, { data: daysAgo(19), preco: 60 }] },
+      { id: "cu3", tipo: "laser", nome: "Depilação a laser", intervaloDias: 45, ultima: daysAgo(39), local: "Espaço Laser", avisoLigado: false, avisoDiasAntes: 2, pacote: { total: 10, feitas: 4 }, historico: [{ data: daysAgo(84) }, { data: daysAgo(39) }] },
+    ],
+  },
   detox: {
     ...COMMON,
     "detox-habits": [

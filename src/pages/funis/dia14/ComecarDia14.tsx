@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { guardarCompraAnonima } from "@/lib/sessao-anonima";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { varianteCadastro } from "@/lib/cadastro-ab";
@@ -24,6 +24,8 @@ import {
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
+import { bracoGuardadoDoQuiz, guardarBracoDoQuiz, perguntasDoBraco, sortearBracoDoQuiz, type BracoQuiz } from "@/lib/quiz-curto";
+import { portaAntigaNesteAparelho } from "@/lib/porta-aparelho";
 import { buscarProvaSocial } from "@/lib/prova-social";
 import { Faixa, Grade16, LinhaInclusos } from "./pecas-roi2";
 
@@ -176,8 +178,11 @@ export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey,
    * e 62% escolhem uma. Agora a 1ª frase responde a dúvida antes de ela
    * nascer ("todos vêm juntos… só me diz por onde a gente começa"), cada
    * opção diz o que tem dentro, e o selo das lojas entra no topo. SEM preço
-   * (ordem do dono, 23/08) e "Entrar" vira linha discreta. */
-  if (ehFunilRoi2()) {
+   * (ordem do dono, 23/08) e "Entrar" vira linha discreta.
+   * PORTA POR APARELHO (30/09, src/lib/porta-aparelho.ts, desligada por
+   * padrão): ligada, o Android volta à porta de 19/09 (abaixo) — a nova
+   * derrubou o Android de 47% pra 40% e subiu o iPhone de 23% pra 27%. */
+  if (ehFunilRoi2() && !portaAntigaNesteAparelho()) {
     return (
       <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto" data-testid="porta-roi2">
         <div className="grid grid-cols-8 gap-1.5 mb-3 px-1 opacity-90" aria-hidden>
@@ -580,7 +585,7 @@ export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string, comEc
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, pilula }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, pilula, braco = null }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -604,6 +609,9 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
    *  Dinheiro") — a pessoa lê o tempo todo que escolheu o COMEÇO, não o
    *  produto. Entra no lugar do contador (barra sem número, regra de 31/08). */
   pilula?: string;
+  /** QUIZ CURTO (30/09, src/lib/quiz-curto.ts): o braço do A/B vai nos eventos
+   *  de cada tela do quiz. `null` = fora do experimento: evento igual ao de hoje. */
+  braco?: BracoQuiz | null;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -622,7 +630,8 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
     const it = items[idx];
-    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : it.kind === "eco" ? `quiz_eco_${it.qIdx + 1}` : "quiz_proof" });
+    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : it.kind === "eco" ? `quiz_eco_${it.qIdx + 1}` : "quiz_proof", ...(braco ? { quiz: braco } : {}) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
@@ -1226,11 +1235,19 @@ export default function ComecarDia14() {
       return a && a in AREAS ? (a as AreaKey) : null;
     } catch { return null; }
   });
-  const track: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
+  /* QUIZ CURTO (30/09, A/B do Dia 1 — src/lib/quiz-curto.ts). Sorteado no
+   * toque na área; `null` = chave desligada = o quiz de hoje, byte a byte
+   * (as listas abaixo são as mesmas constantes de sempre). */
+  const [bracoQuiz, setBracoQuiz] = useState<BracoQuiz | null>(() => bracoGuardadoDoQuiz());
+  const trackBase: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
+  const track: QuizQ[] = vitrine && area ? perguntasDoBraco(trackBase, area, bracoQuiz) : trackBase;
   // Trilhas de vida ganham a tela de PICO depois da pergunta de consistência.
-  const trackItems = vitrine && area && area !== "dinheiro"
-    ? buildQuizItems(track, "consistencia")
-    : QUIZ_ITEMS;
+  const trackItems = useMemo(
+    () => (vitrine && area && area !== "dinheiro"
+      ? buildQuizItems(track, "consistencia")
+      : track === QUIZ ? QUIZ_ITEMS : buildQuizItems(track, PROOF_AFTER_KEY)),
+    [vitrine, area, track],
+  );
   const roi2 = ehFunilRoi2();
   /* ROI 2 (27/09): "Preparando o módulo de X" era a 1ª vez que o funil
    * falava em "módulo" — e falava de UM. Agora liga os 16 e destaca o começo. */
@@ -1297,6 +1314,8 @@ export default function ComecarDia14() {
         step,
         // Segmenta o funil vitrine ("vida") do funil padrão (finanças) no admin.
         ...(vitrine ? { porta: "vida" } : {}),
+        // Quiz curto (30/09): o braço segue em toda tela do funil; sem experimento, nada.
+        ...(bracoQuiz ? { quiz: bracoQuiz } : {}),
         // Só na 1ª tela: sinal pra distinguir visita real de pré-carregamento
         // do webview (Instagram/TikTok pré-abrem a página antes do tap real —
         // isso chega com visibilityState "hidden"/"prerender").
@@ -1332,7 +1351,15 @@ export default function ComecarDia14() {
                   const first = { area: picked };
                   setAnswers(first);
                   try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
-                  trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked });
+                  // Quiz curto (30/09): sorteio do braço NA PORTA; porta por aparelho (30/09): marca qual porta ela viu.
+                  const sorteado = sortearBracoDoQuiz();
+                  setBracoQuiz(sorteado);
+                  guardarBracoDoQuiz(sorteado);
+                  trackEvent("funnel_click", {
+                    cta: "start", porta: "vida", area: picked,
+                    ...(sorteado ? { quiz: sorteado } : {}),
+                    ...(portaAntigaNesteAparelho() ? { porta_v: "antiga" } : {}),
+                  });
                   trackEvent("funnel_quiz_answer", { q: "area", answer: label });
                   setStep("quiz");
                 }}
@@ -1359,6 +1386,7 @@ export default function ComecarDia14() {
                 skipFirstAnswered={!vitrine}
                 proofArea={vitrine && area ? area : undefined}
                 pilula={roi2 && vitrine && area ? `16 módulos · começo: ${AREAS[area].nome}` : undefined}
+                braco={vitrine && area ? bracoQuiz : null}
                 initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {

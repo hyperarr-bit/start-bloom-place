@@ -6,6 +6,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { ehApple } from "@/lib/loja";
+import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 
 /**
  * TELA 1 DO APP DAS LOJAS (Capacitor) — welcome "grade viva" aprovada nos
@@ -197,6 +198,14 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
               {restaurando ? "Verificando…" : "Restaurar compras"}
             </button>
           )}
+          {/* P6 (30/09): 1.092 toques no Restaurar em 305 sessões, 9 viraram
+              acesso — quem pagou pelo SITE procura a compra na loja. Logo
+              abaixo, o caminho certo (o mesmo do "Já tenho conta? Entrar").
+              Quem veio do card pós-compra do site já tem o aviso e o botão
+              de entrar lá em cima: aqui seria repetição. */}
+          {!veioDoSite && (
+            <JaPagouPeloSite origem="welcome" onEntrar={onEntrar} className="apw-ja-pagou" classeAcao="apw-ja-pagou-acao" />
+          )}
           {msgRestore && <span className="apw-msg">{msgRestore}</span>}
           <span className="apw-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
         </motion.div>
@@ -299,6 +308,13 @@ const CSS_APW = `
 .apw-restore { border: 0; background: none; padding: 12px 16px; font-size: 13px; color: #4f5a64; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .apw-restore:disabled { opacity: .6; }
+/* P6 (30/09): "Já pagou pelo site? Entre com seu e-mail" — discreta, colada no
+   restaurar (a margem negativa come parte do respiro de 11px e do padding de
+   baixo do restaurar: a linha soma ~25px ao rodapé, não 40). */
+.apw-rodape > .apw-ja-pagou { margin-top: -6px; }
+.apw-ja-pagou { border: 0; background: none; padding: 6px 16px 10px; font-size: 12.5px; color: #4f5a64;
+  font-family: inherit; cursor: pointer; line-height: 1.25; }
+.apw-ja-pagou-acao { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .apw-msg { font-size: 11.5px; color: #4f5a64; }
 .apw-termos { font-size: 11px; color: #9aa6b1; text-align: center; line-height: 1.5; }
 .apw-trial { display: block; text-align: center; font-size: 11.5px; color: #4f5a64; font-weight: 600; margin-top: -2px; }

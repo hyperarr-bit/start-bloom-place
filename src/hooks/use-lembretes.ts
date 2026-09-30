@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
-import { temPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
-import { assinaturaDos, lerDadosDosLembretes, reagendarTudo } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -37,7 +35,16 @@ export function useLembretes() {
     let cancelado = false;
 
     (async () => {
-      if (!(await temPermissao())) return;
+      /* 30/09: o reagendador (com a conta de avisos de todos os módulos) desce SÓ no app
+         da loja — no site este hook não faz nada e o funil não precisa carregar isso. */
+      let libs: [typeof import("@/lib/notificacoes"), typeof import("@/lib/reagendar")];
+      try {
+        libs = await Promise.all([import("@/lib/notificacoes"), import("@/lib/reagendar")]);
+      } catch {
+        return; // o pedaço não desceu: a próxima mudança de dado tenta de novo
+      }
+      const [{ temPermissao }, { assinaturaDos, lerDadosDosLembretes, reagendarTudo }] = libs;
+      if (cancelado || !(await temPermissao())) return;
 
       const prefs = lerPrefs(get<unknown>(CHAVE_PREFS, undefined));
       const assinatura = assinaturaDos(lerDadosDosLembretes(get), prefs);

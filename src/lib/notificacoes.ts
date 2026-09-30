@@ -3,6 +3,15 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
+/* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
+   este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
+   funil da web não precisa carregar a conta de avisos de três módulos. Aqui só os TIPOS. */
+import type { DadosDosAvisosPet } from "./pet-avisos";
+import type { DadosDasRelacoes } from "./relacoes-lembrete";
+import type { DadosDoSkincare } from "./beleza-lembrete";
+import type { DadosDoCabelo } from "./beleza-cabelo";
+import type { Cuidado } from "./beleza-cuidados";
+import type { LembreteValidade, ProdutoMeu } from "./beleza-produtos";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -32,7 +41,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -59,6 +68,12 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   aniversario: 1400000, // era 900000 (colidia com a missão)
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
+  pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
+  relacoes: 1900000, // 29/09: aniversário NO DIA + "faz tempo que não fala com…" (Relações, lib/relacoes-lembrete)
+  beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
+  cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
+  cuidados: 1720000, // 28/09 (Onda 1): "sobrancelha em 2 dias" — cuidado sem horário marcado (lib/beleza-cuidados)
+  validade: 1730000, // 28/09 (Onda 1): produto de MEUS PRODUTOS que vence em 7 dias (lib/beleza-produtos)
 };
 /** Pra teste: as faixas dos tipos acima. */
 export const BASES_LEMBRETES: Readonly<Record<string, number>> = BASES;
@@ -790,6 +805,69 @@ export async function agendarCompromissos(lista: Compromisso[], opcoes: { ligado
 export async function agendarTarefas(lista: TarefaAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.tarefa); return 0; }
   return agendarSerie("tarefa", "/rotina", planejarTarefas(lista, BASES.tarefa));
+}
+
+/* ─── Cuidados do pet (29/09, módulo Pet refeito) ──────────────────────────────
+   A conta mora em lib/pet-avisos (pura): no dia (e na véspera, se é coisa de
+   marcar na clínica) da vacina, do vermífugo, do antipulgas, da consulta; o
+   remédio na hora de cada dose. Nasce desligado; marcar como feito muda o
+   dado → o useLembretes reagenda → o aviso some. */
+export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
+  const { algumLigadoPet, planejarAvisosPet } = await import("./pet-avisos");
+  if (!algumLigadoPet(dados.prefs)) { await limparFaixa(BASES.pet); return 0; }
+  return agendarSerie("pet", "/pet", planejarAvisosPet(dados, BASES.pet));
+}
+
+/* ─── Relações: parabéns no dia e manter contato (29/09, Onda 1) ─────────────
+   A conta mora em lib/relacoes-lembrete (pura). Os dois nascem desligados e
+   se ligam na própria Relações (chave `rel-lembrete-prefs`). Registrar a
+   conversa ("Falei hoje") muda o dado → o useLembretes reagenda → o aviso
+   daquela pessoa sai. O toque abre Relações. */
+export async function agendarRelacoes(dados: DadosDasRelacoes): Promise<number> {
+  const { algumLembreteRelacoes, planejarRelacoes } = await import("./relacoes-lembrete");
+  if (!algumLembreteRelacoes(dados.prefs)) { await limparFaixa(BASES.relacoes); return 0; }
+  return agendarSerie("relacoes", "/relacionamentos", planejarRelacoes(dados, BASES.relacoes));
+}
+
+/* ─── Skincare de manhã e de noite (28/09, protótipo da Beleza: lembrete é o
+   pedido funcional mais repetido nas avaliações de apps de pele) ─────────────
+   A conta mora em lib/beleza-lembrete (pura): um aviso por período ligado, na
+   hora escolhida, com os passos que a agenda da rotina diz pra aquele dia da
+   semana. Marcar os passos de hoje muda o dado → o useLembretes reagenda → o
+   aviso de hoje some. O toque abre a Beleza. */
+export async function agendarSkincare(dados: DadosDoSkincare): Promise<number> {
+  const { algumLigado, planejarSkincare } = await import("./beleza-lembrete");
+  if (!algumLigado(dados.prefs)) { await limparFaixa(BASES.beleza); return 0; }
+  return agendarSerie("beleza", "/beleza", planejarSkincare(dados, BASES.beleza));
+}
+
+/* ─── Cabelo: dia de lavar e véspera (28/09, Onda 1 da Beleza) ───────────────
+   A conta mora em lib/beleza-cabelo (pura): a agenda do cronograma nos próximos
+   10 dias, com a etapa da vez (a R espera 15 dias). FEITO muda a fila → muda a
+   agenda → o reagendador refaz a série. O toque abre a aba CABELO. */
+export async function agendarCabelo(dados: DadosDoCabelo): Promise<number> {
+  const { lembreteCabeloLigado, planejarCabelo } = await import("./beleza-cabelo");
+  if (!dados.plano || !lembreteCabeloLigado(dados.prefs)) { await limparFaixa(BASES.cabelo); return 0; }
+  return agendarSerie("cabelo", "/beleza?aba=cabelo", planejarCabelo(dados, BASES.cabelo));
+}
+
+/* ─── Cuidados sem horário marcado (28/09, Onda 1 da Beleza) ─────────────────
+   Um aviso por cuidado com o aviso LIGADO (nasce desligado), N dias antes da
+   próxima data, às 09:00. Com horário marcado quem avisa é o compromisso da
+   Rotina (faixa dos compromissos) — aqui não duplica. */
+export async function agendarCuidados(lista: Cuidado[]): Promise<number> {
+  const { algumAvisoDeCuidado, planejarCuidados } = await import("./beleza-cuidados");
+  if (!algumAvisoDeCuidado(lista)) { await limparFaixa(BASES.cuidados); return 0; }
+  return agendarSerie("cuidados", "/beleza?aba=cuidados", planejarCuidados(lista, BASES.cuidados));
+}
+
+/* ─── Validade dos produtos (28/09, Onda 1 da Beleza) ────────────────────────
+   Nasce DESLIGADO. Ligado: 7 dias antes da data que vence primeiro (impressa ou
+   depois de aberto), às 09:00. Toque abre MEUS PRODUTOS. */
+export async function agendarValidade(produtos: ProdutoMeu[], prefs: LembreteValidade): Promise<number> {
+  if (!prefs.ligado) { await limparFaixa(BASES.validade); return 0; }
+  const { planejarValidade } = await import("./beleza-produtos");
+  return agendarSerie("validade", "/beleza?aba=produtos", planejarValidade(produtos, prefs, BASES.validade));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

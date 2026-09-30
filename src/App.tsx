@@ -307,6 +307,12 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
+// 29/09: o Pet refeito (RG, carteirinha, começo pronto) com dados de exemplo — só no dev
+const DevPet = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPet")) : null;
+// 29/09: Relações (Onda 1) com as pessoas da Ana em memória — só no dev, pra fotografar
+const DevRelacoes = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevRelacoes")) : null;
+// 28/09: a Beleza e a Home com uma rotina de pele de exemplo (rotina pronta, skincare de hoje, lembrete) — só no dev
+const DevBeleza = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevBeleza")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -572,6 +578,15 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevPet && (
+          <Route path="/dev/pet" element={<Suspense fallback={null}><DevPet /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevRelacoes && (
+          <Route path="/dev/relacoes" element={<Suspense fallback={null}><DevRelacoes /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevBeleza && (
+          <Route path="/dev/beleza" element={<Suspense fallback={null}><DevBeleza /></Suspense>} />
         )}
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

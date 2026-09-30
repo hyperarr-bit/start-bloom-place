@@ -99,9 +99,11 @@ const ABAS: Record<string, string> = {
   "casa:coop": "Co-op",
   "casa:seguranca": "Segurança",
   "casa:utilidades": "Utilidades",
-  "beleza:routine": "Rotina",
-  "beleza:shelf": "Bancada",
-  "beleza:diary": "Diário",
+  "beleza:routine": "Skincare", // 28/09: a aba ROTINA virou SKINCARE (mesmo id)
+  "beleza:hair": "Cabelo", // 28/09 (Onda 1)
+  "beleza:shelf": "Meus produtos",
+  "beleza:care": "Cuidados", // 28/09 (Onda 1)
+  "beleza:diary": "Diário (até 28/09)", // virou "Fotos da pele" dentro de SKINCARE
   "viagens:destinos": "Destinos",
   "viagens:passeios": "Passeios",
   "viagens:cronograma": "Roteiro",
@@ -114,13 +116,14 @@ const ABAS: Record<string, string> = {
   "viagens:seguranca": "SOS",
   "viagens:countdown": "Contagem",
   "relacionamentos:pessoas": "Pessoas",
-  "relacionamentos:agenda": "Agenda",
+  "relacionamentos:agenda": "Datas (era Agenda)", // 29/09: a aba virou DATAS e engoliu os Eventos; o id ficou
   "relacionamentos:momentos": "Momentos",
   "relacionamentos:presentes": "Presentes",
-  "relacionamentos:eventos": "Eventos",
-  "pet:pets": "Pets",
+  "relacionamentos:eventos": "Eventos (até 29/09)",
+  "pet:hoje": "Hoje", // 30/09: PETS e ROTINA viraram HOJE (RG + o dia do pet)
+  "pet:pets": "Pets (até 29/09)",
   "pet:saude": "Saúde",
-  "pet:rotina": "Rotina",
+  "pet:rotina": "Rotina (até 29/09)",
   "pet:gastos": "Gastos",
   "pet:diario": "Diário",
   "detox:rastreador": "Rastreador",

@@ -480,37 +480,61 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   },
   relacionamentos: {
     ...COMMON,
+    // 29/09 (Onda 1): datas RELATIVAS a hoje (o selo "em 3 dias" tem que existir em qualquer dia da demo),
+    // círculos, "lembrar de falar" e presentes com preço. Ano de nascimento + dia/mês de daqui a N dias.
     "rel-people": [
-      { id: "1", name: "Mãe", relation: "Família", birthday: "1965-08-12", notes: "Gosta de orquídea" },
-      { id: "2", name: "Ana", relation: "Namorada", birthday: "1998-03-04", notes: "Ama café coado" },
-      { id: "3", name: "João", relation: "Amigo", birthday: "1997-11-21", notes: "Aniversário sempre no bar do Zé" },
-      { id: "4", name: "Pedro", relation: "Irmão", birthday: "2001-05-09", notes: "" },
-      { id: "5", name: "Dona Lúcia", relation: "Cliente", birthday: "", notes: "Sempre pergunta dos filhos" },
+      { id: "1", name: "Ju", relation: "Melhor amiga", birthday: `1997${daysAgo(-3).slice(4)}`, notes: "Ama café gelado e Clarice Lispector. Tamanho M.", circulo: "amigos", cadencia: 14, cadenciaDesde: daysAgo(60) },
+      { id: "2", name: "Vó Cida", relation: "Avó", birthday: `1946${daysAgo(-16).slice(4)}`, notes: "Adora orquídea e novela das 9.", circulo: "familia", cadencia: 7, cadenciaDesde: daysAgo(30) },
+      { id: "3", name: "Mãe", relation: "Mãe", birthday: `1965${daysAgo(-75).slice(4)}`, notes: "Gosta de orquídea", circulo: "familia" },
+      { id: "4", name: "Ana", relation: "Namorada", birthday: `1998${daysAgo(-150).slice(4)}`, notes: "Ama café coado", circulo: "amor" },
+      { id: "5", name: "Carol", relation: "Amiga da faculdade", birthday: `1996${daysAgo(-200).slice(4)}`, notes: "Começou no emprego novo em agosto.", circulo: "amigos", cadencia: 14, cadenciaDesde: daysAgo(90) },
+      { id: "6", name: "Dona Lúcia", relation: "Cliente", birthday: "", notes: "Sempre pergunta dos filhos", circulo: "trabalho" },
     ],
     "rel-dates": [
-      { id: "1", title: "Aniversário da mãe", person: "Mãe", date: "2026-08-12", type: "birthday" },
-      { id: "2", title: "1 ano de namoro", person: "Ana", date: "2026-09-20", type: "anniversary" },
-      { id: "3", title: "Aniversário do João", person: "João", date: "2026-11-21", type: "birthday" },
+      { id: "1", title: "Namoro com a Ana", person: "Ana", pessoaId: "4", date: `2023${daysAgo(-21).slice(4)}`, type: "anniversary" },
     ],
     "rel-moments": [
-      { id: "1", date: daysAgo(2), person: "Ana", description: "Jantar surpresa em casa" },
-      { id: "2", date: daysAgo(9), person: "Mãe", description: "Almoço de domingo com a família toda" },
+      { id: "1", date: daysAgo(2), person: "Ana", pessoaId: "4", description: "Jantar surpresa em casa" },
+      { id: "2", date: daysAgo(9), person: "Mãe", pessoaId: "3", description: "Almoço de domingo com a família toda", tipo: "encontro" },
+      { id: "3", date: daysAgo(12), person: "Ju", pessoaId: "1", description: "Conversamos sobre a viagem de dezembro", tipo: "conversa" },
+      { id: "4", date: daysAgo(36), person: "Carol", pessoaId: "5", description: "Ela ia começar no emprego novo", tipo: "conversa" },
+    ],
+    "rel-gifts": [
+      { id: "1", person: "Ju", pessoaId: "1", idea: "A hora da estrela (capa dura)", link: "", status: "idea", preco: 59.9 },
+      { id: "2", person: "Ju", pessoaId: "1", idea: "Vale de massagem", link: "", status: "bought", preco: 120 },
+      { id: "3", person: "Vó Cida", pessoaId: "2", idea: "Porta-retrato com a foto da família", link: "", status: "idea" },
     ],
     "rel-events": [
       { id: "1", name: "Churrasco do Pedro", date: daysAgo(-5), location: "Casa do Pedro", rsvp: "confirmed", tasks: [{ id: "1", text: "Levar carvão", done: false }] },
     ],
   },
+  // 29/09 (Pet refeito): o RG completo, a carteirinha com plano (pet-cuidados), o dia do pet e o peso.
+  // As linhas antigas de pet-health ficam no formato de sempre (vaccine/deworming/visit).
   pet: {
     ...COMMON,
     "pet-list": [
-      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", weight: "28 kg", birthday: "2023-04-15" },
-      { id: "2", name: "Tom", species: "Gato", breed: "SRD", weight: "4,2 kg", birthday: "2022-10-02" },
+      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", weight: "28", birthday: "2023-04-15", sexo: "femea", castrado: true, porte: "grande", chip: "985112004567890", vetNome: "Dra. Paula" },
+      { id: "2", name: "Tom", species: "Gato", breed: "SRD", weight: "4,2", birthday: "2022-10-02", sexo: "macho", castrado: true },
     ],
     "pet-health": [
       { id: "1", petId: "1", type: "vaccine", name: "V10", date: daysAgo(40), nextDate: daysAgo(-325) },
       { id: "2", petId: "1", type: "deworming", name: "Vermífugo", date: daysAgo(70), nextDate: daysAgo(-20) },
       { id: "3", petId: "2", type: "visit", name: "Check-up anual", date: daysAgo(10), nextDate: daysAgo(-355) },
+      { id: "4", petId: "1", type: "antipulgas", name: "NexGard", date: daysAgo(32), nextDate: daysAgo(2), cuidadoId: "c-pulga" },
     ],
+    "pet-cuidados": [
+      { id: "c-pulga", petId: "1", tipo: "antipulgas", nome: "NexGard", intervaloDias: 30 },
+      { id: "c-raiva", petId: "1", tipo: "vacina", nome: "Antirrábica", intervaloDias: 365, sugerido: true },
+      { id: "c-apoquel", petId: "1", tipo: "remedio", nome: "Apoquel", dose: "1 comp.", horarios: ["20:00"], ate: daysAgo(-6) },
+    ],
+    "pet-routine-tasks-1": [
+      { id: "food", label: "Comida · manhã", emoji: "🥣", hora: "08:00" },
+      { id: "walk", label: "Passeio", emoji: "🦮" },
+      { id: "water", label: "Água fresca", emoji: "💧" },
+      { id: "food-noite", label: "Comida · noite", emoji: "🥣", hora: "19:00" },
+    ],
+    [`pet-routine-${daysAgo(0)}`]: { "1": { food: true, walk: true } },
+    "pet-pesos": { "1": [{ dia: daysAgo(120), kg: 26.8 }, { dia: daysAgo(60), kg: 27.5 }, { dia: daysAgo(5), kg: 28 }] },
     "pet-expenses": [
       { id: "1", petId: "1", category: "Ração", description: "Ração 15 kg", value: 189.9, date: daysAgo(3) },
       { id: "2", petId: "1", category: "Banho", description: "Banho e tosa", value: 80, date: daysAgo(12) },
@@ -520,7 +544,59 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "1", petName: "Mel", date: daysAgo(1), text: "Passeio longo no parque, cansou gostoso.", mood: "😄" },
     ],
   },
-  beleza: { ...COMMON },
+  // 30/09 (Beleza Onda 1 na web): a demo abria VAZIA (só as 3 perguntas). Agora é a conta de um
+  // mês: a rotina que as 3 respostas "mista · manchas · intermediário" geram (saída literal do
+  // gerarRotina — importar o gerador pesaria no pedaço da demo), o cronograma capilar em curso,
+  // MEUS PRODUTOS com as duas datas e os CUIDADOS com a próxima data. Datas relativas a hoje.
+  beleza: {
+    ...COMMON,
+    "spotlight-done-beleza": "true",
+    "skincare-perfil": { pele: "mista", objetivo: "manchas", nivel: "intermediario" },
+    "skincare-am-steps": [
+      { name: "Gel de limpeza", tipo: "limpeza", produtoId: "demo-limpeza" },
+      { name: "Sérum de vitamina C", tipo: "vitamina-c", produtoId: "demo-vitc" },
+      { name: "Hidratante leve (gel)", tipo: "hidratante" },
+      { name: "Protetor solar (toque seco)", tipo: "protetor", isSunscreen: true, produtoId: "demo-protetor" },
+    ],
+    "skincare-pm-steps": [
+      { name: "Gel de limpeza", tipo: "limpeza", produtoId: "demo-limpeza" },
+      { name: "Ácido glicólico (AHA)", tipo: "acido-glicolico", isAcid: true, dias: [1, 5] },
+      { name: "Hidratante leve (gel)", tipo: "hidratante" },
+    ],
+    "skincare-morning-checked": { [daysAgo(0)]: [0, 1], [daysAgo(1)]: [0, 1, 2, 3], [daysAgo(2)]: [0, 1, 2, 3], [daysAgo(3)]: [0, 1, 2, 3] },
+    "skincare-night-checked": { [daysAgo(1)]: [0, 1, 2], [daysAgo(2)]: [0, 2], [daysAgo(3)]: [0, 1, 2] },
+    "skincare-daily-checkin": { [daysAgo(0)]: "boa" },
+    "skincare-diary": [
+      { id: "d1", date: daysAgo(2), skinStatus: "boa", mood: "😊", notes: "As manchas da bochecha mais claras com a vitamina C", photoUrl: "" },
+      { id: "d2", date: daysAgo(9), skinStatus: "oleosa", mood: "😐", notes: "Testa brilhando no calor — troquei pro protetor toque seco", photoUrl: "" },
+    ],
+    "beauty-products": [
+      { id: "demo-limpeza", name: "Gel de Limpeza Effaclar", brand: "La Roche-Posay", category: "Skincare", opened: true, openedDate: daysAgo(40), paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: true, price: 89.9, sizeMl: 150, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-vitc", name: "Sérum Vitamina C 10", brand: "Principia", category: "Skincare", opened: true, openedDate: daysAgo(75), paoMonths: 3, expiry: "", notes: "Guardar longe da luz", rating: 0, repurchase: false, price: 69.9, sizeMl: 30, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-protetor", name: "Fusion Water FPS 60", brand: "ISDIN", category: "Skincare", opened: true, openedDate: daysAgo(20), paoMonths: 12, expiry: `${daysAgo(-60).slice(0, 7)}`, notes: "", rating: 0, repurchase: true, price: 119.9, sizeMl: 50, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-mascara", name: "Máscara Morte Súbita", brand: "Lola Cosmetics", category: "Cabelo", opened: true, openedDate: daysAgo(30), paoMonths: 12, expiry: "", notes: "", rating: 0, repurchase: false, price: 49.9, sizeMl: 230, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-rimel", name: "Máscara de cílios", brand: "", category: "Maquiagem", tipo: "rimel", paoPadrao: true, opened: true, openedDate: daysAgo(80), paoMonths: 3, expiry: "", notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+      { id: "demo-perfume", name: "Perfume floral", brand: "", category: "Perfume", paoPadrao: true, opened: false, openedDate: "", paoMonths: 36, expiry: `${daysAgo(-400).slice(0, 7)}`, notes: "", rating: 0, repurchase: false, price: 0, sizeMl: 0, photoUrl: "", frequency: "Diário", finished: false },
+    ],
+    "cabelo-perfil": { curvaturas: ["ondulado", "cacheado"], quimica: "coloracao", frequencia: { porSemana: 3 }, porosidade: "media", respostasPorosidade: [2, 2, 2], criadoEm: daysAgo(14) },
+    "cabelo-plano": {
+      id: "cab-demo",
+      sequencia: ["hidratacao", "nutricao", "hidratacao", "nutricao", "nutricao", "hidratacao", "nutricao", "nutricao", "hidratacao", "nutricao", "hidratacao", "reconstrucao"],
+      ritmo: { tipo: "semana", dias: [0, 2, 4] },
+      inicio: daysAgo(14),
+    },
+    "cabelo-lavagens": [
+      { id: "l1", data: daysAgo(14), etapa: "hidratacao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: [], produtos: { mascara: "demo-mascara" }, tags: ["maciez", "brilho"], nota: "" },
+      { id: "l2", data: daysAgo(12), etapa: "nutricao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: [], produtos: {}, tags: ["definicao"], nota: "" },
+      { id: "l3", data: daysAgo(10), etapa: "hidratacao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador"], extras: [], produtos: {}, tags: [], nota: "" },
+      { id: "l4", data: daysAgo(7), etapa: "nutricao", noPlano: true, plano: "cab-demo", feita: true, passos: ["shampoo", "mascara", "condicionador", "finalizador"], extras: ["umectacao"], produtos: {}, tags: ["brilho"], nota: "deixei a máscara 20 min" },
+    ],
+    "beleza-cuidados": [
+      { id: "cu1", tipo: "unha", nome: "Unha", intervaloDias: 7, ultima: daysAgo(6), local: "Manicure Rô", preco: 45, avisoLigado: false, avisoDiasAntes: 2, historico: [{ data: daysAgo(20), preco: 45 }, { data: daysAgo(13), preco: 45 }, { data: daysAgo(6), preco: 45 }] },
+      { id: "cu2", tipo: "sobrancelha", nome: "Sobrancelha", intervaloDias: 21, ultima: daysAgo(19), local: "Studio Bela", preco: 60, avisoLigado: false, avisoDiasAntes: 2, historico: [{ data: daysAgo(40), preco: 60 }, { data: daysAgo(19), preco: 60 }] },
+      { id: "cu3", tipo: "laser", nome: "Depilação a laser", intervaloDias: 45, ultima: daysAgo(39), local: "Espaço Laser", avisoLigado: false, avisoDiasAntes: 2, pacote: { total: 10, feitas: 4 }, historico: [{ data: daysAgo(84) }, { data: daysAgo(39) }] },
+    ],
+  },
   detox: {
     ...COMMON,
     "detox-habits": [

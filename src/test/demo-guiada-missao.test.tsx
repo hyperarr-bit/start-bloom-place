@@ -145,7 +145,7 @@ beforeEach(() => {
   analytics.trackEvent.mockClear();
   window.history.replaceState({}, "", "/");
   // comemorações encurtadas no teste (o fluxo é o mesmo; os tempos reais estão travados abaixo)
-  Object.assign(TEMPOS_DA_MISSAO, { antesDoHolofote: 50, primeiroRegistro: 120, olhar: 150, cumprida: 120 });
+  Object.assign(TEMPOS_DA_MISSAO, { inicio: 60, antesDoHolofote: 50, primeiroRegistro: 120, olhar: 150, cumprida: 120 });
 });
 afterEach(() => {
   cleanup();
@@ -282,7 +282,8 @@ describe("braço on: a missão", () => {
     await screen.findByTestId("demo-guia-faixa");
     act(() => { fireEvent.click(screen.getByTestId("demo-guia-pular")); });
     expect(screen.queryByTestId("demo-guia-faixa")).toBeNull();
-    expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "botao", passo: 2 }));
+    // 30/09: a missão começa no cartão do passo 1 — pular logo de cara é pular no passo 1
+    expect(eventos("demo_guia_pular")).toContainEqual(expect.objectContaining({ motivo: "botao", passo: 1 }));
     expect(quaseLa().getAttribute("href")).not.toContain("c=");
   });
 });

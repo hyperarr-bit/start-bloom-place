@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
 import { localDayKey, parseLocalDay, mesAtualExtenso, dataSegura } from "@/lib/utils";
 import { uploadFromInput } from "@/lib/image-upload";
@@ -205,7 +205,8 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
 
 // ── Main Component ──
 const Biblioteca = () => {
-  const navigate = useNavigate();
+  // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
+  const voltarDoModulo = useVoltarDoModulo();
   const [booksBrutos, setBooks] = usePersistedState<Book[]>("lib-books", []);
   /* LIMPEZA NA LEITURA (10/09): quem importou por link antes da correção de
      09/09 ficou com "Seguir" de autor, "Jo&atilde;o" e "… eBook : Prado,
@@ -559,7 +560,7 @@ const Biblioteca = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={voltarDoModulo} aria-label="Voltar"><ArrowLeft className="w-5 h-5" /></Button>
           <BookOpen className="w-5 h-5 text-orange-600" />
           <h1 className="text-base font-bold tracking-tight">BIBLIOTECA</h1>
           <div className="flex items-center gap-2 ml-auto">

@@ -348,6 +348,23 @@ serve(async (req) => {
       return json({ ok: true, de: { plan: row.plan, billing_period: row.billing_period }, para: { plan: c.plano, billing_period: c.periodo, current_period_end: fim.toISOString() } });
     }
 
+    /* soltar_da_loja (01/10): linha de Pix/Cakto que o bug antigo deixou com o
+     * revenuecat_subscription_id da Apple/Play (o grant fazia UPDATE na linha
+     * da loja). Com o id lá, o RevenueCat pode devolvê-la pra anual pela chave
+     * dele e cancelar no fim da carência. Tira só o id; nada mais muda. Só
+     * age em linha que NÃO é da loja. */
+    if (action === "soltar_da_loja") {
+      const id = String(body.id ?? "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "id" }, 400);
+      const { data: row } = await admin.from("subscriptions")
+        .select("id, user_id, payment_method, billing_period, status, revenuecat_subscription_id").eq("id", id).maybeSingle();
+      if (!row) return json({ error: "nao_encontrada" }, 404);
+      if (row.payment_method === "play_store" || !row.revenuecat_subscription_id) return json({ error: "nao_se_aplica", row }, 409);
+      const { error: e } = await admin.from("subscriptions").update({ revenuecat_subscription_id: null }).eq("id", id);
+      if (e) return json({ error: e.message }, 500);
+      return json({ ok: true, id, tirado: row.revenuecat_subscription_id, payment_method: row.payment_method, billing_period: row.billing_period, status: row.status });
+    }
+
     if (action === "liberar_vitalicio") {
       const uid = String(body.uid ?? "");
       const email = String(body.email ?? "").trim().toLowerCase();

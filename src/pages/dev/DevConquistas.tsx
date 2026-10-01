@@ -4,7 +4,7 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
 import { TelaConquistas } from "@/components/conquistas/TelaConquistas";
-import { MomentoAdesivo } from "@/components/conquistas/Momentos";
+import { MomentoAdesivo, MomentoPopup } from "@/components/conquistas/Momentos";
 import { useConquistas } from "@/components/conquistas/use-conquistas";
 
 /**
@@ -12,6 +12,8 @@ import { useConquistas } from "@/components/conquistas/use-conquistas";
  * dentro de `import.meta.env.DEV`; some do build). A tela de Conquistas de
  * verdade com os dados da demo "Ana Beatriz", pra olhar, fotografar e filmar
  * sem conta: ?semana=completa · ?momento=epico|lendario|raro|comum ·
+ * ?momento=popup (1 comum no cartão) · popup3 (3 comuns, carrossel) ·
+ * popup-cheia (a tela cheia aberta pelo botão do cartão) ·
  * ?sem=1 (pouco dado: 1 adesivo, as primeiras insígnias) · ?zero=1 (nada
  * colado: "COMEÇANDO O ÁLBUM") · ?desafios=off · ?bar=0 · ?valores=1
  * (mostrar R$/peso) · ?dica=0 (sem a dica do planner) · ?novas=2 (pacotinho
@@ -135,6 +137,15 @@ const Provedor = ({ inicial, children }: { inicial: Record<string, unknown>; chi
 
 const MomentoDemo = ({ raridade, onFechar }: { raridade: string; onFechar: () => void }) => {
   const conq = useConquistas();
+  const [cheia, setCheia] = useState<string | null>(raridade === "popup-cheia" ? "first-expense" : null);
+  if (raridade.startsWith("popup")) {
+    const ids = raridade === "popup3" ? ["first-expense", "saver-20", "mes-fechado"] : ["first-expense"];
+    const badges = ids.map((id) => conq.adesivos.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b).map((b) => ({ ...b, unlocked: true }));
+    if (!badges.length) return null;
+    const emCheia = cheia ? badges.find((b) => b.id === cheia) : null;
+    if (emCheia) return <MomentoAdesivo badge={emCheia} nome="Ana Beatriz" membroDesde="julho de 2026" origem="popup" onContinuar={() => setCheia(null)} />;
+    return <MomentoPopup badges={badges} onContinuar={onFechar} onTelaCheia={(b) => setCheia(b.id)} onVerAdesivos={onFechar} />;
+  }
   const id = { lendario: "ano-365", epico: "rotina-21", raro: "rotina-7", comum: "first-income" }[raridade] ?? "rotina-21";
   const badge = conq.adesivos.find((b) => b.id === id);
   if (!badge) return null;

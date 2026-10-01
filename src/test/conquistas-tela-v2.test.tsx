@@ -491,8 +491,8 @@ describe("ciclo completo: abrir → conquistar → sair → reabrir", () => {
   });
 });
 
-describe("momentos: no máximo 3 festas de uma vez", () => {
-  it("quando muitos adesivos abrem juntos, celebra os 3 mais raros e marca o resto como visto (colados na folha do mesmo jeito)", async () => {
+describe("momentos: no máximo 3 festas de tela cheia de uma vez (01/10: comuns vão pro popup)", () => {
+  it("quando muitos adesivos abrem juntos, celebra em tela cheia os 3 mais raros, o 4º raro cola quieto e os comuns ficam pra UM popup", async () => {
     const { MomentosConquistas } = await import("@/components/conquistas/Momentos");
     // 5 adesivos novos de uma vez: 1º Salário (comum), Múltiplas Rendas (raro), Patrimônio 100k (lendário), Contas em Dia (comum), Lista de Desejos (comum)
     const store = montarStore(cenario({
@@ -509,10 +509,12 @@ describe("momentos: no máximo 3 festas de uma vez", () => {
     );
     await waitFor(() => {
       const v = store.dados["conquistas-vistas"] as { adesivos: string[] };
-      // os comuns extras entram como vistos; os mais raros ficam FORA de vistas (ganham festa, até o Continuar)
-      expect(v.adesivos).toEqual(expect.arrayContaining(["bills-ok", "wishlist"]));
+      // raros+: lendário 100k, raros multi-income/10k/50k → 3 ganham tela cheia, 1 raro cola quieto
       expect(v.adesivos).not.toContain("investor-100k");
-      expect(v.adesivos).not.toContain("multi-income");
+      const rarosQuietos = ["multi-income", "investor-10k", "investor-50k"].filter((id) => v.adesivos.includes(id));
+      expect(rarosQuietos).toHaveLength(1);
+      // os comuns NÃO entram como vistos: esperam o popup (um só, com os 4 em carrossel)
+      for (const id of ["first-income", "investor-1k", "bills-ok", "wishlist"]) expect(v.adesivos).not.toContain(id);
     });
     // tudo continua gravado como conquistado
     const gravadas = store.dados["conquistas-desbloqueadas"] as Record<string, string>;

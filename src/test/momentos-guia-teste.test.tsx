@@ -75,6 +75,7 @@ describe("festa do adesivo × teste grátis e tutorial", () => {
     montar(store);
     await espera(2400);
     expect(screen.queryByTestId("momento-adesivo")).toBeNull();
+    expect(screen.queryByTestId("momento-popup")).toBeNull();
     await waitFor(() => expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toEqual(expect.arrayContaining(["first-expense", "first-income"])));
   });
 
@@ -84,18 +85,20 @@ describe("festa do adesivo × teste grátis e tutorial", () => {
     document.body.appendChild(guia);
     montar(montarStore(cenario()));
     await espera(2200);
-    expect(screen.queryByTestId("momento-adesivo")).toBeNull();
+    expect(screen.queryByTestId("momento-popup")).toBeNull();
     guia.remove();
-    expect(await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 })).toBeInTheDocument();
+    // os dois comuns (Primeira Despesa + Primeiro Salário) chegam num popup só
+    expect(await screen.findByTestId("momento-popup", {}, { timeout: 3000 })).toHaveAttribute("data-quantidade", "2");
   });
 
-  it("conta nova: uma festa só — o outro adesivo cola quieto", async () => {
+  it("conta nova: uma festa só — popup com 1 comum; o outro adesivo cola quieto", async () => {
     const store = montarStore(cenario());
     montar(store, true);
-    expect(await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("momento-popup", {}, { timeout: 3000 })).toHaveAttribute("data-quantidade", "1");
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await waitFor(() => expect(screen.queryByTestId("momento-adesivo")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("momento-popup")).toBeNull());
     await espera(2200);
+    expect(screen.queryByTestId("momento-popup")).toBeNull();
     expect(screen.queryByTestId("momento-adesivo")).toBeNull();
     expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toEqual(expect.arrayContaining(["first-expense", "first-income"]));
   });

@@ -179,18 +179,20 @@ describe("momentos", () => {
     expect(vistas.marcos).toEqual([7]);
     await act(async () => { await new Promise((r) => setTimeout(r, 1300)); });
     expect(screen.queryByTestId("momento-adesivo")).toBeNull();
+    expect(screen.queryByTestId("momento-popup")).toBeNull();
     expect(screen.queryByTestId("momento-marco")).toBeNull();
   });
 
-  it("adesivo novo: aparece uma vez, e Continuar marca como visto", async () => {
+  it("adesivo novo (comum): aparece uma vez NO POPUP (01/10), e Continuar marca como visto", async () => {
     // "Primeiro Salário" abriu agora (há receita) e ainda não foi comemorado
     const store = montarStore(cenario({ "finance-expenses": [], "finance-incomes": [{ id: 1, value: 3000 }] }));
     montar(store);
-    expect(await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 })).toHaveTextContent("Primeiro Salário");
+    expect(await screen.findByTestId("momento-popup", {}, { timeout: 3000 })).toHaveTextContent("Primeiro Salário");
+    expect(screen.queryByTestId("momento-adesivo")).toBeNull(); // comum não ocupa a tela toda
     expect(eventos).toContainEqual(["adesivo_desbloqueado", { id: "first-income" }]);
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     await waitFor(() => expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toContain("first-income"));
-    await waitFor(() => expect(screen.queryByTestId("momento-adesivo")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("momento-popup")).toBeNull());
   });
 
   it("marco de 7 dias: roseta (não o adesivo da sequência) e sequencia_marco", async () => {

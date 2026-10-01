@@ -13,7 +13,8 @@
  * O que "igual ao 97" quer dizer (lido da API em 01/10, não de memória):
  *   grupo CORE Pro 22349268 · ONE_YEAR · groupLevel 1 · familySharable false
  *   · localização pt-BR "CORE Anual" / "16 módulos. 3 dias grátis, depois renova por ano." (≤ 55 chars)
- *   · preço BRA R$ 97,90 = tier 10269 + equalizações nos outros 174 territórios (175 preços)
+ *   · disponível em 175 territórios ANTES do preço (a API recusa preço sem disponibilidade)
+   · preço BRA R$ 97,90 = tier 10269 + equalizações nos outros 174 territórios (175 preços)
  *   · disponível em 175 territórios, availableInNewTerritories true
  *   · oferta introdutória FREE_TRIAL · THREE_DAYS · 1 período · UPFRONT, 1 por território (175)
  *   · screenshot de revisão 1206×2622 (reaproveitado)
@@ -160,27 +161,45 @@ async function diff() {
 
 /* ------------------------------------------------------------ criação (ensaio por padrão) */
 async function criar() {
-  if (await acharNovo()) { console.log(`${NOVO.productId} já existe no grupo ${GRUPO} — nada a criar. Rode "diff".`); process.exit(0); }
   console.log(executar ? "\n⚠ EXECUTANDO de verdade no App Store Connect.\n" : "\n[ENSAIO] nada será criado — cada chamada abaixo é só impressa. Rode com --executar quando o dono autorizar.\n");
   console.log("lendo o irmão core_anual_97 pra copiar territórios…");
   const irmao = await lerProduto(IRMAO);
   if (irmao.disponibilidade.total !== 175 || irmao.precos.total !== 175 || irmao.intros.total !== 175) {
     console.error(`✗ o irmão não está como eu esperava (territórios ${irmao.disponibilidade.total}, preços ${irmao.precos.total}, intros ${irmao.intros.total}) — pare e confira antes.`); process.exit(1);
   }
+  /* RETOMÁVEL (01/10): cada etapa confere o que já existe antes de criar — a 1ª execução
+   * parou no preço com HTTP 409 "territory is not supported for your subscription"
+   * porque a DISPONIBILIDADE tem que vir ANTES do preço (foi assim no 97 em 18/09). */
 
   // 1. a assinatura no grupo
   console.log("\n1) assinatura");
-  const sub = await api("POST", "/v1/subscriptions", { data: { type: "subscriptions", attributes: { name: NOVO.name, productId: NOVO.productId, subscriptionPeriod: "ONE_YEAR", familySharable: false, reviewNote: NOVO.reviewNote, groupLevel: 1 }, relationships: { group: { data: { type: "subscriptionGroups", id: GRUPO } } } } });
-  const id = sub.data.id;
-  console.log("   id:", id);
+  let sub = await acharNovo();
+  if (sub) console.log("   já existe:", sub.id);
+  else {
+    sub = (await api("POST", "/v1/subscriptions", { data: { type: "subscriptions", attributes: { name: NOVO.name, productId: NOVO.productId, subscriptionPeriod: "ONE_YEAR", familySharable: false, reviewNote: NOVO.reviewNote, groupLevel: 1 }, relationships: { group: { data: { type: "subscriptionGroups", id: GRUPO } } } } })).data;
+    console.log("   id:", sub.id);
+  }
+  const id = sub.id;
+  const existe = id !== "ENSAIO";
 
   // 2. localização pt-BR (descrição ≤ 55 chars — a Apple recusa mais)
   console.log("\n2) localização pt-BR");
   if (NOVO.localizacao.description.length > 55) { console.error("✗ descrição > 55 chars"); process.exit(1); }
-  await api("POST", "/v1/subscriptionLocalizations", { data: { type: "subscriptionLocalizations", attributes: NOVO.localizacao, relationships: { subscription: { data: { type: "subscriptions", id } } } } });
+  const locs = existe ? ((await api("GET", `/v1/subscriptions/${id}/subscriptionLocalizations`)).data ?? []) : [];
+  if (locs.some((l) => l.attributes.locale === "pt-BR")) console.log("   já existe");
+  else await api("POST", "/v1/subscriptionLocalizations", { data: { type: "subscriptionLocalizations", attributes: NOVO.localizacao, relationships: { subscription: { data: { type: "subscriptions", id } } } } });
 
-  // 3. preço BRA (tier 10227 = R$ 69,90) + equalizações nos outros territórios
-  console.log("\n3) preço BRA R$ 69,90 + equalizações");
+  // 3. disponibilidade: os mesmos 175 territórios do irmão (ANTES do preço)
+  console.log("\n3) disponibilidade (175 territórios, availableInNewTerritories true)");
+  const disp = existe ? await api("GET", `/v1/subscriptions/${id}/subscriptionAvailability`, undefined, { tolerar: true }) : null;
+  const terrAtuais = disp ? (await todos(`/v1/subscriptionAvailabilities/${id}/availableTerritories?limit=200`)).map((t) => t.id) : [];
+  if (terrAtuais.length === irmao.disponibilidade.total) console.log("   já existe:", terrAtuais.length, "territórios");
+  else await api("POST", "/v1/subscriptionAvailabilities", { data: { type: "subscriptionAvailabilities", attributes: { availableInNewTerritories: true }, relationships: { subscription: { data: { type: "subscriptions", id } }, availableTerritories: { data: irmao.disponibilidade.territorios.map((t) => ({ type: "territories", id: t })) } } } });
+
+  // 4. preço BRA (tier 10227 = R$ 69,90) + equalizações nos outros territórios
+  console.log("\n4) preço BRA R$ 69,90 + equalizações");
+  const precosAtuais = existe ? await todos(`/v1/subscriptions/${id}/prices?include=territory&limit=50`) : [];
+  const terrComPreco = new Set(precosAtuais.map((p) => p.relationships?.territory?.data?.id).filter(Boolean));
   let ppBRA = b64url(JSON.stringify({ s: id, t: "BRA", p: NOVO.tierBRA }));
   if (executar) {
     const pps = await todos(`/v1/subscriptions/${id}/pricePoints?filter[territory]=BRA&limit=200`);
@@ -189,34 +208,42 @@ async function criar() {
     ppBRA = certo.id;
     console.log("   price point BRA:", ppBRA, decodeId(ppBRA));
   }
-  await api("POST", "/v1/subscriptionPrices", { data: { type: "subscriptionPrices", relationships: { subscription: { data: { type: "subscriptions", id } }, subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: ppBRA } }, territory: { data: { type: "territories", id: "BRA" } } } } });
+  if (terrComPreco.has("BRA")) console.log("   BRA já tem preço");
+  else await api("POST", "/v1/subscriptionPrices", { data: { type: "subscriptionPrices", relationships: { subscription: { data: { type: "subscriptions", id } }, subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: ppBRA } }, territory: { data: { type: "territories", id: "BRA" } } } } });
   const equal = executar ? await todos(`/v1/subscriptionPricePoints/${ppBRA}/equalizations?include=territory&limit=200`) : [];
-  console.log(`   equalizações: ${executar ? equal.length : "(ensaio: lidas na execução, ~174)"}`);
+  console.log(`   equalizações: ${executar ? equal.length : "(ensaio: lidas na execução, ~174)"}; já com preço: ${terrComPreco.size}`);
+  let criados = 0;
   for (const e of equal) {
     const terr = e.relationships?.territory?.data?.id ?? decodeId(e.id).t;
-    if (!terr || terr === "BRA") continue;
-    await api("POST", "/v1/subscriptionPrices", { data: { type: "subscriptionPrices", relationships: { subscription: { data: { type: "subscriptions", id } }, subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: e.id } }, territory: { data: { type: "territories", id: terr } } } } }, { tolerar: true });
+    if (!terr || terr === "BRA" || terrComPreco.has(terr)) continue;
+    const r = await api("POST", "/v1/subscriptionPrices", { data: { type: "subscriptionPrices", relationships: { subscription: { data: { type: "subscriptions", id } }, subscriptionPricePoint: { data: { type: "subscriptionPricePoints", id: e.id } }, territory: { data: { type: "territories", id: terr } } } } }, { tolerar: true });
+    if (r) criados++;
     await dorme(120);
   }
-
-  // 4. disponibilidade: os mesmos 175 territórios do irmão
-  console.log("\n4) disponibilidade (175 territórios, availableInNewTerritories true)");
-  await api("POST", "/v1/subscriptionAvailabilities", { data: { type: "subscriptionAvailabilities", attributes: { availableInNewTerritories: true }, relationships: { subscription: { data: { type: "subscriptions", id } }, availableTerritories: { data: irmao.disponibilidade.territorios.map((t) => ({ type: "territories", id: t })) } } } });
+  if (executar) console.log(`   preços criados agora: ${criados}`);
 
   // 5. oferta introdutória: 3 dias grátis, 1 POST por território (a API exige territory)
   console.log("\n5) oferta introdutória FREE_TRIAL · THREE_DAYS em cada um dos 175 territórios");
+  const introsAtuais = existe ? await todos(`/v1/subscriptions/${id}/introductoryOffers?include=territory&limit=50`) : [];
+  const terrComIntro = new Set(introsAtuais.map((i) => i.relationships?.territory?.data?.id).filter(Boolean));
+  let introsCriadas = 0;
   for (const t of irmao.disponibilidade.territorios) {
-    await api("POST", "/v1/subscriptionIntroductoryOffers", { data: { type: "subscriptionIntroductoryOffers", attributes: { duration: "THREE_DAYS", offerMode: "FREE_TRIAL", numberOfPeriods: 1 }, relationships: { subscription: { data: { type: "subscriptions", id } }, territory: { data: { type: "territories", id: t } } } } }, { tolerar: true });
+    if (terrComIntro.has(t)) continue;
+    const r = await api("POST", "/v1/subscriptionIntroductoryOffers", { data: { type: "subscriptionIntroductoryOffers", attributes: { duration: "THREE_DAYS", offerMode: "FREE_TRIAL", numberOfPeriods: 1 }, relationships: { subscription: { data: { type: "subscriptions", id } }, territory: { data: { type: "territories", id: t } } } } }, { tolerar: true });
+    if (r) introsCriadas++;
     if (!executar) break; // no ensaio, mostra um só
     await dorme(120);
   }
+  if (executar) console.log(`   já tinham: ${terrComIntro.size}; criadas agora: ${introsCriadas}`);
 
   // 6. screenshot de revisão: a mesma imagem do irmão (baixa do templateUrl → reserva → PUT → PATCH com md5)
   console.log("\n6) screenshot de revisão (cópia do irmão)");
+  const shotAtual = existe ? (await api("GET", `/v1/subscriptions/${id}/appStoreReviewScreenshot`, undefined, { tolerar: true }))?.data : null;
   const shot = (await api("GET", `/v1/subscriptions/${IRMAO}/appStoreReviewScreenshot`)).data;
   const tpl = shot.attributes.imageAsset.templateUrl; const w = shot.attributes.imageAsset.width; const h = shot.attributes.imageAsset.height;
   const urlImg = tpl.replace("{w}", w).replace("{h}", h).replace("{f}", "png");
-  if (executar) {
+  if (shotAtual?.attributes?.assetDeliveryState?.state === "COMPLETE") console.log("   já existe (COMPLETE)");
+  else if (executar) {
     const bytes = Buffer.from(await (await fetch(urlImg)).arrayBuffer());
     const criado = await api("POST", "/v1/subscriptionAppStoreReviewScreenshots", { data: { type: "subscriptionAppStoreReviewScreenshots", attributes: { fileSize: bytes.length, fileName: "revisao-core-anual-69.png" }, relationships: { subscription: { data: { type: "subscriptions", id } } } } });
     const op = criado.data.attributes.uploadOperations?.[0];
@@ -224,11 +251,12 @@ async function criar() {
     if (!put.ok) { console.error("✗ upload do screenshot falhou", put.status); process.exit(1); }
     const md5 = createHash("md5").update(bytes).digest("hex");
     await api("PATCH", `/v1/subscriptionAppStoreReviewScreenshots/${criado.data.id}`, { data: { type: "subscriptionAppStoreReviewScreenshots", id: criado.data.id, attributes: { uploaded: true, sourceFileChecksum: md5 } } });
+    console.log("   enviado:", bytes.length, "bytes, md5", md5);
   } else {
     console.log("   [ensaio] baixaria", urlImg, "→ POST reserva → PUT bytes → PATCH uploaded+md5");
   }
 
-  console.log(`\n${executar ? "✓ criado." : "[ensaio terminado]"} Próximos passos (mão do dono):
+  console.log(`\n${executar ? "✓ criado/completado." : "[ensaio terminado]"} Próximos passos (mão do dono):
    a) node scripts/asc-anual-69.mjs diff   ← tem que terminar em ✓ (trava de catálogo)
    b) App Store Connect → Assinaturas → CORE Pro → ${NOVO.productId} → "Adicionar para revisão" (vai junto com a 1.0.9)
    c) RevenueCat → Product catalog → produto ${NOVO.productId} (App Store) → anexar ao entitlement "CORE APP Pro"

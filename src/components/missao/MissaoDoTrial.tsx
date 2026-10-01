@@ -36,8 +36,26 @@ import {
   guiaSemente, type Missao,
 } from "@/lib/teste-gratis";
 import { agendarReguaDaMissao, pedirPermissao } from "@/lib/notificacoes";
+import { CHAVES_FUNIL_W, lerChave } from "@/pages/funis/w/retomada";
 
 const GRAFITE = "#16121c";
+
+/**
+ * A ÁREA QUE A PESSOA ESCOLHEU NA PORTA DO FUNIL (01/10, bug 136/136 em Finanças).
+ *
+ * A Missão lia só `core-funnel-area` (FUNNEL_AREA_KEY, o funil antigo da
+ * vitrine). O funil W — o que o iPhone e o Android usam desde 02/09 — grava a
+ * área em `core-funil-w-area`, no formato {v, t} da retomada (retomada.ts).
+ * Resultado medido: 162 de 162 testes do iPhone caíram em "dinheiro", mesmo
+ * quem escolheu rotina (33) ou treino (6). Agora a ordem é: guia da semente
+ * (o teste sem cartão) → área do funil W → área do funil antigo → dinheiro.
+ * "Tudo, sinceramente" já é gravada como "dinheiro" pela própria porta.
+ */
+export function areaEscolhidaNoFunil(): string | null {
+  const w = lerChave<string>(CHAVES_FUNIL_W.area);
+  if (typeof w === "string" && w) return w;
+  try { return localStorage.getItem(FUNNEL_AREA_KEY); } catch { return null; }
+}
 
 /** Âncora + rota + instrução por área — TODOS os seletores já existem nos
  *  módulos (inventário 19/08: add-expense/add-todo/add-exercise/add-water/
@@ -297,10 +315,10 @@ export function MissaoDoTrial() {
   // Nasce a missão na primeira entrada elegível (a área vem do guia/funil).
   useEffect(() => {
     if (!elegivel || missao) return;
-    let areaSalva: string | null = null;
-    try { areaSalva = localStorage.getItem(FUNNEL_AREA_KEY); } catch { /* noop */ }
-    const area = guiaSemente()?.area ?? areaSalva ?? "dinheiro";
-    setMissao(iniciarMissao(area in ALVO ? area : "dinheiro"));
+    const area = guiaSemente()?.area ?? areaEscolhidaNoFunil() ?? "dinheiro";
+    const areaFinal = area in ALVO ? area : "dinheiro";
+    trackEvent("missao_area", { escolhida: area, usada: areaFinal, origem: guiaSemente()?.area ? "guia" : lerChave<string>(CHAVES_FUNIL_W.area) ? "funil_w" : "funil_antigo_ou_padrao" });
+    setMissao(iniciarMissao(areaFinal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elegivel]);
 

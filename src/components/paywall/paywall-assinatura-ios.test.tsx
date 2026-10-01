@@ -30,6 +30,7 @@ vi.mock("@/lib/revenuecat", () => ({
   diasTrialIos: () => 3,
   anualIosTemTrial: () => true,
   ultimaCompraAnualFoiTrial: () => true,
+  fimDaUltimaCompraTrial: () => null,
   estadoRevenueCat: () => "pronto",
   comprarAnualIos: vi.fn(), comprar: vi.fn(), comprarVitalicio: vi.fn(), comprarAnual97: vi.fn(), comprarMensalVista: vi.fn(),
   restaurar: vi.fn().mockResolvedValue(false),
@@ -40,7 +41,7 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null, loading: fals
 vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ data: {}, loaded: true }) }));
 vi.mock("@/lib/teste-gratis", () => ({ estadoTeste: () => ({ fase: "nunca" }), limparGuiaSemente: vi.fn() }));
 vi.mock("@/lib/notificacoes", () => ({
-  agendarResgateDoPlano: vi.fn(), cancelarResgateDoPlano: vi.fn(), cancelarReguaDoTeste: vi.fn(),
+  agendarResgateDoPlano: vi.fn(), cancelarResgateDoPlano: vi.fn(), cancelarReguaDoTeste: vi.fn(), pedirLembreteDoTeste: vi.fn(async () => "pendente"),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), getAttributionParams: () => ({}) }));
 

@@ -186,23 +186,30 @@ export async function sincronizarAssinatura(tentativas = 3): Promise<boolean> {
  *  app da loja, só pra quem o banco já diz que é assinante. */
 export async function conferirTrialCartao(): Promise<void> {
   if (!isNativeShell()) return;
-  if (trialCartaoAtivo()) return; // a compra na própria sessão já marcou
   if (!configurado) await initRevenueCat();
   if (!Purchases || !configurado) return;
   try {
     const { customerInfo } = await Purchases.getCustomerInfo();
     const ativos =
       ((customerInfo as unknown as {
-        entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> };
+        entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null; willRenew?: boolean }> };
       })?.entitlements?.active) ?? {};
-    for (const e of Object.values(ativos)) {
-      if (e?.periodType === "TRIAL") {
-        // fallback 7d (23/08): o único trial da vitrine nova é o anual de 7
-        // dias — o fim REAL continua vindo do expirationDateMillis.
-        marcarTrialCartaoAte(e.expirationDateMillis ?? Date.now() + 7 * 86_400_000);
-        return;
-      }
+    const trial = Object.values(ativos).find((e) => e?.periodType === "TRIAL");
+    if (trial && !trialCartaoAtivo()) {
+      // fallback 7d (23/08): o único trial da vitrine nova é o anual de 7
+      // dias — o fim REAL continua vindo do expirationDateMillis.
+      marcarTrialCartaoAte(trial.expirationDateMillis ?? Date.now() + 7 * 86_400_000);
     }
+    /* 01/10: o lembrete "acaba amanhã" prometido no paywall segue a verdade da
+     * loja — fim real do teste reagenda; cancelou (willRenew false) ou já virou
+     * cobrança (sem TRIAL ativo) desarma. Solto: nunca segura o boot. */
+    void import("@/lib/notificacoes")
+      .then((n) => n.sincronizarLembreteDoTeste({
+        emTeste: !!trial,
+        vaiRenovar: trial?.willRenew !== false,
+        fimMs: typeof trial?.expirationDateMillis === "number" ? trial.expirationDateMillis : null,
+      }))
+      .catch(() => { /* noop */ });
   } catch { /* rede de segurança: nunca pode quebrar o boot */ }
 }
 
@@ -803,9 +810,13 @@ export const precoMensalDoAnualIos = (): string | null => {
 };
 
 let ultimaCompraFoiTrial = false;
+let ultimaCompraFimMs: number | null = null;
 /** A última compra do anual entrou em período de TESTE (a Apple aplicou a
  *  oferta)? É o que decide se o app arma o lembrete "acaba amanhã". */
 export const ultimaCompraAnualFoiTrial = (): boolean => ultimaCompraFoiTrial;
+/** Fim REAL do teste que a última compra abriu (expirationDateMillis do
+ *  entitlement), ou null se a loja não disse — aí o app conta `dias` da compra. */
+export const fimDaUltimaCompraTrial = (): number | null => ultimaCompraFimMs;
 
 
 export async function comprarAnualIos(): Promise<boolean> {
@@ -832,10 +843,12 @@ export async function comprarAnualIos(): Promise<boolean> {
     marcarFolhaAberta();
     const resultado = await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
     const ativos = Object.values(
-      (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string }> } } } | undefined)
+      (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> } } } | undefined)
         ?.customerInfo?.entitlements?.active ?? {},
     );
     ultimaCompraFoiTrial = ativos.length ? ativos.some((e) => e?.periodType === "TRIAL") : anualIosTemTrial();
+    const fim = ativos.find((e) => e?.periodType === "TRIAL")?.expirationDateMillis;
+    ultimaCompraFimMs = typeof fim === "number" && fim > Date.now() ? fim : null;
     /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
      * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
      * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe

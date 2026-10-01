@@ -1034,13 +1034,141 @@ export async function cancelarResgateDoPlano(): Promise<void> {
 
 /*
  * O LEMBRETE "ACABA AMANHÃ" do iPhone (20/09, ids 910000+) SAIU em 24/09 por
- * ordem do dono: os 6 primeiros testes que venceram cancelaram, 5 deles com
- * o aviso armado ("…se não, cancela hoje em Ajustes › Assinaturas"). O
- * paywall parou de prometer aviso junto (selo, cronograma, "avisamos 1 dia
- * antes"). Os avisos que builds ≤ 1.0.5 já agendaram continuam no aparelho
- * de propósito — quem começou o teste antes recebeu essa promessa na compra.
- * Não reusar a faixa 910000 enquanto esses avisos puderem existir.
+ * ordem do dono (os 6 primeiros testes que venceram cancelaram, 5 com o aviso
+ * armado) — e VOLTOU em 01/10, por dado: as turmas SEM a promessa pioraram
+ * (1.0.6: renovação ligada 44% × 56% com a promessa; cancelamento 84% × 43–47%
+ * na turma de 26/09). A faixa 910000 fica reservada (avisos de builds ≤ 1.0.5
+ * podem ter sobrado no aparelho); a versão nova mora em 920000.
+ *
+ * COMO FUNCIONA (01/10):
+ *  - `pedirLembreteDoTeste` é chamada logo depois da compra em teste (PaywallIOS
+ *    e gate): guarda o PEDIDO (`core-lembrete-teste`: fim do teste + preço) e,
+ *    se a permissão de notificação já foi dada, agenda na hora. Sem permissão,
+ *    NÃO abre diálogo nenhum entre a folha e o cadastro — a Missão dos 3 dias
+ *    (B1) já pede a permissão no momento certo e chama `armarLembreteDoTeste
+ *    SePuder`, que agenda o que ficou pendente.
+ *  - `conferirTrialCartao` (boot, revenuecat.ts) sincroniza com a verdade do
+ *    RevenueCat: fim REAL do teste → reagenda; teste cancelado (willRenew
+ *    false) ou já virou cobrança → desarma. O aviso nunca chega pra quem
+ *    cancelou nem depois de cobrar.
+ *  - Horário: 36 h antes do fim, puxado pra 9h–20h30 do MESMO dia (sempre
+ *    entre 24 h e 48 h antes do fim — a Apple exige cancelar com 24 h de
+ *    antecedência; depois das 48 h "amanhã" seria mentira). Fuso do aparelho.
  */
+const BASE_LEMBRETE_TESTE = 920000;
+const CHAVE_LEMBRETE_TESTE = "core-lembrete-teste";
+
+export type PedidoDeLembreteDoTeste = { fimMs: number; precoAno: string };
+
+/** Quando o aviso sai: fim − 36 h, puxado pra 9h–20h30 do mesmo dia. Devolve
+ *  null se já é tarde demais pra prometer "amanhã" com honestidade (< 24 h). */
+export function quandoLembrarDoTeste(fimMs: number, agora = Date.now()): Date | null {
+  const alvo = new Date(fimMs - 36 * 3600e3);
+  if (alvo.getHours() < 9) alvo.setHours(9, 0, 0, 0);
+  else if (alvo.getHours() >= 21 || (alvo.getHours() === 20 && alvo.getMinutes() > 30)) alvo.setHours(20, 30, 0, 0);
+  if (alvo.getTime() > agora + 60e3) return alvo;
+  // armado tarde (app morto entre a folha e o cadastro, permissão dada no dia 2):
+  // ainda dá se faltarem ≥ 24 h — sai em 10 min, numa hora decente
+  const logo = new Date(agora + 10 * 60e3);
+  if (fimMs - logo.getTime() < 24 * 3600e3) return null;
+  if (logo.getHours() < 9) { logo.setHours(9, 0, 0, 0); if (fimMs - logo.getTime() < 24 * 3600e3) return null; }
+  else if (logo.getHours() >= 21 || (logo.getHours() === 20 && logo.getMinutes() > 30)) return null;
+  return logo;
+}
+
+export function copyDoLembreteDoTeste(precoAno: string) {
+  return {
+    title: "Seu teste grátis do CORE acaba amanhã",
+    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica. Se não, cancele hoje em Ajustes › Assinaturas e não paga nada.`,
+  };
+}
+
+const lerPedidoDeLembrete = (): PedidoDeLembreteDoTeste | null => {
+  try {
+    const p = JSON.parse(localStorage.getItem(CHAVE_LEMBRETE_TESTE) ?? "null") as PedidoDeLembreteDoTeste | null;
+    return p && typeof p.fimMs === "number" && typeof p.precoAno === "string" ? p : null;
+  } catch { return null; }
+};
+const guardarPedidoDeLembrete = (p: PedidoDeLembreteDoTeste | null): void => {
+  try { if (p) localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify(p)); else localStorage.removeItem(CHAVE_LEMBRETE_TESTE); } catch { /* noop */ }
+};
+/** Pra teste e pro Meu acesso: o pedido pendente/armado, se houver. */
+export const pedidoDeLembreteDoTeste = (): PedidoDeLembreteDoTeste | null => lerPedidoDeLembrete();
+
+/** Agenda de fato (exige permissão já dada). Substitui o anterior. */
+export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promise<boolean> {
+  const plug = await plugin();
+  if (!plug) return false;
+  if (!(await temPermissao())) return false;
+  await garantirCanal();
+  await limparFaixa(BASE_LEMBRETE_TESTE);
+  const at = quandoLembrarDoTeste(p.fimMs);
+  if (!at) { trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "tarde_demais", antes_do_fim_h: Math.round((p.fimMs - Date.now()) / 3600e3) }); return false; }
+  const { LN } = plug;
+  const copy = copyDoLembreteDoTeste(p.precoAno);
+  try {
+    await LN.schedule({
+      notifications: [{
+        id: BASE_LEMBRETE_TESTE + 1,
+        title: copy.title,
+        body: copy.body,
+        schedule: { at, allowWhileIdle: true },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { rota: "/planos" },
+      }],
+    });
+    trackEvent("notif_lembrete_teste_armada", { ok: true, em_h: Math.round((at.getTime() - Date.now()) / 3600e3), antes_do_fim_h: Math.round((p.fimMs - at.getTime()) / 3600e3) });
+    return true;
+  } catch {
+    trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "erro_agendar" });
+    return false;
+  }
+}
+
+/**
+ * Logo depois da compra em teste: guarda o pedido e arma se já puder. Nunca
+ * abre diálogo (quem pede a permissão é a Missão B1, no momento certo).
+ */
+export async function pedirLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promise<"armado" | "pendente" | "sem_permissao" | "indisponivel"> {
+  guardarPedidoDeLembrete(p);
+  const estado = await estadoPermissao();
+  if (estado === "indisponivel") { trackEvent("trial_aviso", { acao: "indisponivel" }); return "indisponivel"; }
+  if (estado === "granted") {
+    const ok = await agendarLembreteDoTeste(p);
+    trackEvent("trial_aviso", { acao: ok ? "ja_permitido" : "falhou" });
+    return ok ? "armado" : "sem_permissao";
+  }
+  trackEvent("trial_aviso", { acao: estado === "denied" ? "sem_permissao" : "pendente" });
+  return estado === "denied" ? "sem_permissao" : "pendente";
+}
+
+/** Depois de a permissão ser decidida (Missão B1, central de avisos): arma o
+ *  pedido que ficou pendente. Idempotente — reagendar substitui. */
+export async function armarLembreteDoTesteSePuder(): Promise<boolean> {
+  const p = lerPedidoDeLembrete();
+  if (!p || p.fimMs <= Date.now()) return false;
+  return agendarLembreteDoTeste(p);
+}
+
+/**
+ * Sincroniza com a verdade da loja (boot): fim real do teste → reagenda com
+ * a data certa; cancelou ou já cobrou → desarma. Chamada pelo conferirTrialCartao.
+ */
+export async function sincronizarLembreteDoTeste(estado: { emTeste: boolean; vaiRenovar: boolean; fimMs: number | null }): Promise<void> {
+  if (!estado.emTeste || !estado.vaiRenovar) { await cancelarLembreteDoTeste(); return; }
+  const p = lerPedidoDeLembrete();
+  if (!p) return; // nunca prometeu (compra em build antiga): não inventa aviso
+  const fimMs = estado.fimMs && estado.fimMs > Date.now() ? estado.fimMs : p.fimMs;
+  if (fimMs !== p.fimMs) guardarPedidoDeLembrete({ ...p, fimMs });
+  await armarLembreteDoTesteSePuder();
+}
+
+export async function cancelarLembreteDoTeste(): Promise<void> {
+  guardarPedidoDeLembrete(null);
+  await limparFaixa(BASE_LEMBRETE_TESTE);
+}
 
 /* ------------------------------------------------------- régua do teste 3d */
 
@@ -1188,6 +1316,9 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
   let permitido = await temPermissao();
   if (!permitido) permitido = await pedirPermissao();
   if (!permitido) { trackEvent("regua_missao_armada", { ok: false, motivo: "sem_permissao", area }); return; }
+  // 01/10: a permissão acabou de ser decidida — o lembrete "acaba amanhã"
+  // prometido no paywall (pedido guardado na compra) é armado aqui.
+  void armarLembreteDoTesteSePuder().catch(() => { /* nunca segura a régua */ });
   await garantirCanal();
   await limparFaixa(BASE_MISSAO);
   const { LN } = p;
@@ -1236,5 +1367,5 @@ export async function cancelarReguaDaMissao(): Promise<void> {
 }
 
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
- *  é a faixa antiga da missão, ainda reservada (ver comentário acima). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000 } as const;
+ *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE } as const;

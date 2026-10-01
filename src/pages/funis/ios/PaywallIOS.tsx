@@ -55,6 +55,7 @@ import { APP_PRECOS } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { type AreaKey } from "@/lib/funnel";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+import { pedirLembreteDoTeste } from "@/lib/notificacoes";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -94,12 +95,15 @@ const PLANO_INICIAL: "anual" | "mensal" = "anual";
  * aviso antes de cobrar e cancelar em um toque. Sem teste, ou no mensal,
  * falam da assinatura como ela é.
  * 24/09 (ordem do dono): o aviso antes de cobrar SAIU — os 6 primeiros testes
- * que venceram cancelaram, 5 deles com o aviso armado. Sem aviso, nenhuma
- * tela pode prometer aviso: o selo saiu (e não virou "Acesso na hora" — o
- * quadro "⚡ Na hora · acesso liberado" logo acima já diz isso). */
+ * que venceram cancelaram, 5 deles com o aviso armado.
+ * 01/10 (dado das turmas seguintes): VOLTOU. Sem a promessa, renovação ligada
+ * caiu de 56% pra 44% e o cancelamento foi a 84% (turma 26/09) — a promessa
+ * tira o medo de "vão me cobrar sem eu ver". O aviso é armado de verdade
+ * (lib/notificacoes, pedirLembreteDoTeste) — tela só promete o que cumpre. */
 const selosPara = (teste: boolean) => teste
   ? [
       { emoji: "", label: "Compra pela App Store" },
+      { emoji: "🔔", label: "Aviso 1 dia antes de cobrar" },
       { emoji: "✕", label: "Cancele em 1 toque" },
     ]
   : [
@@ -113,12 +117,13 @@ const PRECO_MES_PADRAO = "R$ 8,16";
 
 /* (B) CRONOGRAMA DO TESTE — o bloco que deu +23% no Blinkist e que a Apple
  * recomenda na sessão sobre testes: a pessoa sabe exatamente quando (e se)
- * vai pagar. O dia da cobrança vem da duração lida da loja (trocar 3 por 7
- * dias no App Store Connect muda o texto sozinho). 24/09: o passo "Dia 2 · a
- * gente te avisa" saiu junto com o aviso (ver selosPara). */
+ * vai pagar. O dia do aviso e o da cobrança vêm da duração lida da loja
+ * (trocar 3 por 7 dias no App Store Connect muda o texto sozinho). 01/10: o
+ * passo "a gente te avisa" voltou junto com o aviso (ver selosPara). */
 function ComoFuncionaOTeste({ dias, precoAnual }: { dias: number; precoAnual: string }) {
   const passos = [
     { cheio: true, t: "Hoje · acesso a tudo", s: "Sem cobrança nenhuma agora." },
+    { cheio: false, t: `Dia ${Math.max(1, dias - 1)} · a gente te avisa`, s: "Notificação 1 dia antes do teste acabar. Nada é cobrado sem aviso." },
     { cheio: false, t: `Dia ${dias} · só se você continuar`, s: `${precoAnual} pelo ano inteiro. Cancelou antes, não paga nada.` },
   ];
   return (
@@ -284,10 +289,15 @@ export function PaywallIOS({
         : await rc.comprarAnualIos();
       if (ok) {
         trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios" });
-        /* 24/09 (ordem do dono): compra em teste NÃO arma mais o lembrete
-         * "acaba amanhã" nem pede permissão pra ele — segue direto pro
-         * cadastro. Quem começou o teste antes disso ainda recebe o aviso que
-         * já estava agendado no aparelho (foi prometido na hora da compra). */
+        /* (D) LEMBRETE DO TESTE (01/10, de volta): a Apple não avisa antes de
+         * cobrar. Compra que entrou em teste guarda o pedido do aviso "acaba
+         * amanhã" e arma na hora se a permissão já existe. SEM diálogo aqui —
+         * segue direto pro cadastro (24/09: o pedido entre a folha e o cadastro
+         * foi o que o dono mandou tirar); quem pede a permissão é a Missão
+         * B1, e ela arma o que ficou pendente. Nunca segura quem acabou de pagar. */
+        if (produto === "anual" && rc.ultimaCompraAnualFoiTrial()) {
+          void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + dias * 86400e3, precoAno: precoAnual }).catch(() => { /* noop */ });
+        }
         setSegundaChance("usada");
         onPagoSemConta();
         return;
@@ -520,12 +530,13 @@ export function PaywallIOS({
                     : <>Quero o ano — {precoAnual} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
-          {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje
-              (Cal AI: "No payment due now"). 24/09: o "· avisamos 1 dia antes
-              de cobrar" saiu junto com o aviso. */}
+          {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje e o
+              app avisa antes de cobrar (Cal AI: "No payment due now"). 01/10: a
+              promessa voltou — e é cumprida pelo lembrete local. */}
           {!mostraMensal && comTrial && (
             <p className="text-[11.5px] text-center mt-2 font-semibold" data-testid="ios-sem-cobranca">
               <span className="text-foreground">Sem cobrança hoje</span>
+              <span className="text-muted-foreground"> · a gente te avisa 1 dia antes do teste acabar</span>
             </p>
           )}
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">

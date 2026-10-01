@@ -22,16 +22,19 @@ import { PaywallIOS } from "./PaywallIOS";
 // 20/09: preço "da loja" mutável por teste — a App Store manda a string já
 // formatada e ela muda com a vitrine ("R$ 97,90" no Brasil, "$14.99" nos EUA).
 const loja = vi.hoisted(() => ({ preco: "R$ 97,90", mes: "R$ 8,16", dias: 3, trial: true, compraOk: true, motivo: null as string | null }));
-// 24/09: o paywall não pede mais permissão nem arma o lembrete do teste. O mock
-// fica pra provar isso — se alguém religar, estes espiões acusam.
+// 01/10: o paywall NÃO abre diálogo de permissão (24/09) — mas a compra em
+// teste GUARDA o pedido do lembrete "acaba amanhã" (pedirLembreteDoTeste), que
+// a Missão arma depois de a permissão ser decidida. Espiões pros dois lados.
 const notif = vi.hoisted(() => ({
   pedir: vi.fn(async () => true),
   agendar: vi.fn(async () => true),
+  pedirLembrete: vi.fn(async (_p: { fimMs: number; precoAno: string }) => "pendente" as const),
 }));
 vi.mock("@/lib/notificacoes", () => ({
   estadoPermissao: async () => "prompt",
   pedirPermissao: () => notif.pedir(),
   agendarLembreteDoTeste: () => notif.agendar(),
+  pedirLembreteDoTeste: (p: { fimMs: number; precoAno: string }) => notif.pedirLembrete(p),
 }));
 
 vi.mock("@/lib/revenuecat", () => ({
@@ -45,6 +48,7 @@ vi.mock("@/lib/revenuecat", () => ({
   diasTrialIos: () => (loja.trial ? loja.dias : 0),
   anualIosTemTrial: () => loja.trial,
   ultimaCompraAnualFoiTrial: () => loja.trial,
+  fimDaUltimaCompraTrial: () => null,
   comprarAnualIos: vi.fn(async () => loja.compraOk),
   estadoRevenueCat: () => "pronto",
   temVitalicio97: () => true,
@@ -74,7 +78,7 @@ const montar = (opts: { area?: "dinheiro" | "corpo" | "saude"; onPago?: () => vo
 beforeEach(() => {
   localStorage.clear();
   loja.preco = "R$ 97,90"; loja.mes = "R$ 8,16"; loja.dias = 3; loja.trial = true; loja.compraOk = true; loja.motivo = null;
-  notif.pedir.mockClear(); notif.agendar.mockClear();
+  notif.pedir.mockClear(); notif.agendar.mockClear(); notif.pedirLembrete.mockClear();
   vi.mocked(trackEvent).mockClear(); vi.mocked(comprarAnualIos).mockClear(); vi.mocked(comprarAssinatura).mockClear();
 });
 afterEach(cleanup);
@@ -89,13 +93,14 @@ describe("Paywall do iPhone", () => {
     expect(screen.getByText("por mês · R$ 97,90/ano")).toBeInTheDocument(); // sub da âncora (uma linha)
   });
 
-  it("(B) cronograma do teste: hoje / dia 3 cobrança, com o preço do ano — sem passo de aviso (24/09)", async () => {
+  it("(B) cronograma do teste: hoje / dia 2 aviso / dia 3 cobrança, com o preço do ano (promessa de volta, 01/10)", async () => {
     montar();
     expect(await screen.findByText("Como funciona o teste")).toBeInTheDocument();
     expect(screen.getByText("Hoje · acesso a tudo")).toBeInTheDocument();
+    expect(screen.getByText("Dia 2 · a gente te avisa")).toBeInTheDocument();
+    expect(screen.getByText(/1 dia antes do teste acabar\. Nada é cobrado sem aviso/)).toBeInTheDocument();
     expect(screen.getByText("Dia 3 · só se você continuar")).toBeInTheDocument();
     expect(screen.getByText(/R\$ 97,90 pelo ano inteiro/)).toBeInTheDocument();
-    expect(screen.queryByText(/te avisa/)).not.toBeInTheDocument();
   });
 
   it("(C) botão, 'sem cobrança hoje' e selos coerentes com uma assinatura que renova", async () => {
@@ -104,8 +109,9 @@ describe("Paywall do iPhone", () => {
     expect(screen.getByText("Sem cobrança hoje")).toBeInTheDocument();
     expect(screen.getByText("Compra pela App Store")).toBeInTheDocument();
     expect(screen.getByText("Cancele em 1 toque")).toBeInTheDocument();
-    // 24/09: sem aviso agendado, nenhuma tela pode prometer aviso
-    expect(document.body.textContent).not.toMatch(/avisamos|aviso antes|te avisa/i);
+    // 01/10: a promessa de aviso voltou — clara, abaixo do botão e no selo
+    expect(screen.getByTestId("ios-sem-cobranca")).toHaveTextContent("Sem cobrança hoje · a gente te avisa 1 dia antes do teste acabar");
+    expect(screen.getByText("Aviso 1 dia antes de cobrar")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/sem mensalidade/i);
     expect(document.body.textContent).toMatch(/3 dias grátis, depois R\$ 97,90\/ano pela App Store · renova automaticamente/);
   });
@@ -115,6 +121,7 @@ describe("Paywall do iPhone", () => {
     montar();
     expect(await screen.findByRole("button", { name: /Começar 7 dias grátis/ })).toBeInTheDocument();
     expect(screen.getByText("7 DIAS GRÁTIS")).toBeInTheDocument();
+    expect(screen.getByText("Dia 6 · a gente te avisa")).toBeInTheDocument();
     expect(screen.getByText("Dia 7 · só se você continuar")).toBeInTheDocument();
     expect(document.body.textContent).toMatch(/7 dias grátis, depois/);
     expect(document.body.textContent).not.toMatch(/3 dias/);
@@ -140,14 +147,40 @@ describe("Paywall do iPhone", () => {
     expect(document.body.textContent).toMatch(/Assinatura de R\$ 24,90\/mês pela App Store · renova automaticamente/);
   });
 
-  it("(D, 24/09) compra em teste segue direto pro cadastro — sem pedir permissão e sem armar lembrete", async () => {
+  it("(D, 01/10) compra em teste: guarda o pedido do lembrete (3 dias, preço da loja) e segue DIRETO pro cadastro — sem diálogo de permissão", async () => {
+    const onPago = vi.fn();
+    vi.setSystemTime(new Date(2026, 9, 1, 15, 0));
+    try {
+      montar({ onPago });
+      fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+      await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(/Te aviso/)).not.toBeInTheDocument();
+      expect(notif.pedir).not.toHaveBeenCalled(); // o diálogo é da Missão B1, não do paywall
+      expect(notif.pedirLembrete).toHaveBeenCalledTimes(1);
+      const pedido = notif.pedirLembrete.mock.calls[0][0];
+      expect(pedido.precoAno).toBe("R$ 97,90");
+      expect(pedido.fimMs).toBe(new Date(2026, 9, 4, 15, 0).getTime()); // 3 dias depois da compra
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("(D) sem direito ao teste (cobra na hora): compra do anual NÃO guarda lembrete nenhum", async () => {
+    loja.trial = false;
     const onPago = vi.fn();
     montar({ onPago });
-    fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Quero o ano/ }));
     await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText(/Te aviso/)).not.toBeInTheDocument();
-    expect(notif.pedir).not.toHaveBeenCalled();
-    expect(notif.agendar).not.toHaveBeenCalled();
+    expect(notif.pedirLembrete).not.toHaveBeenCalled();
+  });
+
+  it("(D) mensal: nada de lembrete de teste", async () => {
+    const onPago = vi.fn();
+    vi.mocked(comprarAssinatura).mockResolvedValueOnce(true);
+    montar({ onPago });
+    await screen.findByText("Como funciona o teste");
+    fireEvent.click(screen.getByText("mês"));
+    fireEvent.click(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ }));
+    await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+    expect(notif.pedirLembrete).not.toHaveBeenCalled();
   });
 
   it("depoimento com 'pagamento único' NÃO aparece no iPhone (áreas corpo e saúde)", async () => {

@@ -54,7 +54,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { estadoTeste, limparGuiaSemente } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
-import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
+import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste, pedirLembreteDoTeste } from "@/lib/notificacoes";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
@@ -348,8 +348,12 @@ export function PaywallAssinatura({
       trackEvent("app_sheet_success", { contexto, produto });
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
-      // 24/09 (ordem do dono): o teste do iPhone não arma mais o lembrete
-      // "acaba amanhã" — ver PaywallIOS.
+      // (D) iPhone (01/10, de volta): compra que entrou em teste guarda o pedido
+      // do lembrete "acaba amanhã" e arma se a permissão já existe — sem
+      // diálogo aqui (a Missão B1 pede e arma o pendente). Ver PaywallIOS.
+      if (apple && produto === "core_anual_97" && rc.ultimaCompraAnualFoiTrial()) {
+        void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + anualApple.dias * 86400e3, precoAno: anualApple.preco }).catch(() => { /* noop */ });
+      }
       limparGuiaSemente();
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
       if (!user) { navigate("/app?step=signup", { replace: true }); return; }
@@ -437,7 +441,7 @@ export function PaywallAssinatura({
           ? <>Começar {anualApple.dias} dias grátis <ArrowRight className="w-4 h-4" /></>
           : <>Quero o ano — {anualApple.preco} <ArrowRight className="w-4 h-4" /></>,
         legal: anualApple.trial
-          ? `${anualApple.dias} dias grátis, depois ${anualApple.preco}/ano pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada`
+          ? `${anualApple.dias} dias grátis, depois ${anualApple.preco}/ano pela App Store · renova automaticamente até você cancelar · a gente te avisa 1 dia antes do teste acabar · cancele antes do fim e não paga nada`
           : `Assinatura de ${anualApple.preco}/ano pela App Store · renova automaticamente até você cancelar`,
       }
     : vitalicio

@@ -854,6 +854,17 @@ const formatarMoeda = (valor: number, moeda: string): string => {
   }
 };
 
+/** Valor numérico do anual na moeda da loja (97.9 / 69.9), ou null. */
+export const valorAnualIos = (): number | null => {
+  const p = produtoAnualIos as { price?: number } | undefined;
+  return p?.price && p.price > 0 ? p.price : null;
+};
+/** "4 meses de mensal = 1 ano inteiro": quantos meses de 24,90 pagam o ano, pelo preço REAL
+ *  (97,90 → 4; 69,90 → 3). null enquanto a loja não respondeu. */
+export const mesesDeMensalQuePagamOAno = (mensal = 24.9): number | null => {
+  const v = valorAnualIos();
+  return v ? Math.max(1, Math.ceil(v / mensal - 1e-9)) : null;
+};
 /** O anual dividido por 12, na moeda da loja ("R$ 8,16") — é o número que a
  *  pessoa compara com o mensal. null enquanto a loja não respondeu. */
 export const precoMensalDoAnualIos = (): string | null => {

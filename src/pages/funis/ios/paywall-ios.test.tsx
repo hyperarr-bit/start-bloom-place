@@ -51,6 +51,7 @@ vi.mock("@/lib/revenuecat", () => ({
   temAnualIos: () => true,
   precoAnualIos: () => loja.preco,
   idProdutoAnualIos: () => loja.produto,
+  mesesDeMensalQuePagamOAno: () => (loja.preco === "R$ 69,90" ? 3 : 4),
   ofertaAnualIos: () => loja.produto.replace(/^core_/, ""),
   dadosDaOfertaIos: () => ({ oferta: loja.produto.replace(/^core_/, ""), produto: loja.produto, offering: loja.offering, preco: loja.preco, pacote: !!loja.offering }),
   precoMensalDoAnualIos: () => loja.mes,
@@ -203,6 +204,7 @@ describe("Paywall do iPhone", () => {
       expect(screen.getByText(/R\$ 69,90 pelo ano inteiro/)).toBeInTheDocument();
       expect(document.body.textContent).toMatch(/3 dias grátis, depois R\$ 69,90\/ano pela App Store/);
       expect(document.body.textContent).not.toMatch(/97,90|8,16/);
+      expect(document.body.textContent).toMatch(/3 meses de mensal/); // 24,90 × 3 = 74,70 ≥ 69,90 (não "4 meses")
       // o braço vai junto em cada evento: o que ela viu…
       await waitFor(() => expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("paywall_oferta_vista", expect.objectContaining({ oferta: "anual_69", produto: "core_anual_69", offering: "anual_69", preco: "R$ 69,90" })));
       // …o toque no botão…
@@ -216,6 +218,7 @@ describe("Paywall do iPhone", () => {
     it("braço A (core_anual_97): segue 97,90 e os eventos dizem anual_97", async () => {
       montar();
       await screen.findByText("por mês · R$ 97,90/ano");
+      expect(document.body.textContent).toMatch(/4 meses de mensal/);
       await waitFor(() => expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("paywall_oferta_vista", expect.objectContaining({ oferta: "anual_97", produto: "core_anual_97" })));
       fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
       expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("funnel_click", expect.objectContaining({ produto: "core_anual_97", oferta: "anual_97" }));

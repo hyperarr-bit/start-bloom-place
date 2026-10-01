@@ -202,8 +202,8 @@ export function PaywallAssinatura({
   /* 01/10 (teste de preço 97,90 × 69,90): o produto anual vem da offering atual
    * do RevenueCat (core_anual_97 ou core_anual_69) e NENHUM preço fica chumbado
    * — antes da loja responder o lugar do preço mostra um traço. */
-  const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean; id: string; oferta: string }>({
-    preco: "R$ —", mes: "R$ —", dias: 3, trial: true, id: "core_anual_97", oferta: "anual_97",
+  const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean; id: string; oferta: string; meses: number | null }>({
+    preco: "R$ —", mes: "R$ —", dias: 3, trial: true, id: "core_anual_97", oferta: "anual_97", meses: null,
   });
   const cancelamentos = useRef(0);
   const pixVencendoJaFoi = useRef(false);
@@ -242,6 +242,7 @@ export function PaywallAssinatura({
             trial: rc.anualIosTemTrial(),
             id: rc.idProdutoAnualIos(),
             oferta: rc.ofertaAnualIos(),
+            meses: rc.mesesDeMensalQuePagamOAno(),
           });
           trackEvent("paywall_oferta_vista", { contexto, loja: "ios", ...rc.dadosDaOfertaIos(), dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial() });
         }
@@ -726,7 +727,7 @@ export function PaywallAssinatura({
           <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
             {apple
-              ? <>4 meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b></>
+              ? <>{anualApple.meses ?? "…"} meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b></>
               : vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
           </span>
         </button>

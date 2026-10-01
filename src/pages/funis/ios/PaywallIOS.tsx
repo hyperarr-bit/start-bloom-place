@@ -155,8 +155,8 @@ function ComoFuncionaOTeste({ dias, precoAnual }: { dias: number; precoAnual: st
  * que faz a comparação sem precisar de tabela.
  */
 function DuasColunas({
-  plano, onSelect, precoAnual, precoMes, comTrial, dias,
-}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; precoMes: string; comTrial: boolean; dias: number }) {
+  plano, onSelect, precoAnual, precoMes, comTrial, dias, mesesDeMensal,
+}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; precoMes: string; comTrial: boolean; dias: number; mesesDeMensal: number | null }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -194,8 +194,9 @@ function DuasColunas({
             por mês · {precoAnual}/ano{comTrial ? `, depois dos ${dias} dias` : ""}
           </span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
+          {/* 01/10: a conta vem do preço REAL (97,90 → 4 meses; 69,90 → 3) — nunca chumbada */}
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            4 meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b>
+            {mesesDeMensal ?? "…"} meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b>
           </span>
         </div>
       </div>
@@ -217,6 +218,7 @@ export function PaywallIOS({
   const [comTrial, setComTrial] = useState(true);
   const [dias, setDias] = useState(3);
   const [precoMes, setPrecoMes] = useState<string | null>(null);
+  const [mesesDeMensal, setMesesDeMensal] = useState<number | null>(null);
   const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
   // O que a loja serviu pra ESTA pessoa (braço do experimento): vai em todo evento.
   const [oferta, setOferta] = useState<{ oferta: string; produto: string; offering: string | null; preco: string | null; pacote: boolean }>({
@@ -247,6 +249,7 @@ export function PaywallIOS({
           setComTrial(rc.anualIosTemTrial());
           setDias(rc.diasTrialIos() || 3);
           setPrecoMes(rc.precoMensalDoAnualIos());
+          setMesesDeMensal(rc.mesesDeMensalQuePagamOAno());
           const d = rc.dadosDaOfertaIos();
           setOferta(d);
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
@@ -422,6 +425,7 @@ export function PaywallIOS({
             precoMes={precoMesTxt}
             dias={dias}
             comTrial={comTrial}
+            mesesDeMensal={mesesDeMensal}
             onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual }); }}
           />
         </motion.div>

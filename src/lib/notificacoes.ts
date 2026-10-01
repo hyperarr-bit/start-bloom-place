@@ -101,14 +101,19 @@ type DueDay = { day?: number; bills?: Bill[] };
  */
 type PluginLN = { LN: typeof import("@capacitor/local-notifications").LocalNotifications };
 
+/* 01/10: a importação é feita UMA vez e compartilhada. Dois `import()` ao mesmo
+ * tempo (a folha de avisos de Relações lendo a permissão enquanto o "ligar"
+ * agenda) viravam duas cargas do mesmo plugin — e, no runner de testes, uma
+ * delas vinha sem o mock. Uma promessa só resolve os dois lados. */
+let carregandoPlugin: Promise<PluginLN | null> | null = null;
 const plugin = async (): Promise<PluginLN | null> => {
   if (!isNativeShell()) return null;
-  try {
-    const mod = await import("@capacitor/local-notifications");
-    return { LN: mod.LocalNotifications };
-  } catch {
-    return null;
+  if (!carregandoPlugin) {
+    carregandoPlugin = import("@capacitor/local-notifications")
+      .then((mod) => ({ LN: mod.LocalNotifications }))
+      .catch(() => { carregandoPlugin = null; return null; });
   }
+  return carregandoPlugin;
 };
 
 /**

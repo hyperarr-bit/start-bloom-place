@@ -90,7 +90,7 @@ describe("adesivo comum → popup", () => {
     expect(screen.queryByTestId("momento-adesivo")).toBeNull();
     expect(screen.getByText("Adesivo novo")).toBeInTheDocument();
     expect(screen.getByTestId("momento-popup-tela-cheia")).toBeInTheDocument();
-    expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ raridade: "comum", formato: "popup", quantidade: 1 })]);
+    await waitFor(() => expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ raridade: "comum", formato: "popup", quantidade: 1 })]));
     fireEvent.click(screen.getByTestId("momento-popup-continuar"));
     await waitFor(() => expect(vistas(store)).toContain("first-expense"));
     await waitFor(() => expect(screen.queryByTestId("momento-popup")).toBeNull());
@@ -132,8 +132,8 @@ describe("adesivo comum → popup", () => {
     expect(cheia).toHaveTextContent("Primeira Despesa");
     expect(cheia).toHaveAttribute("data-raridade", "comum");
     expect(screen.queryByTestId("momento-popup")).toBeNull();
-    expect(eventos).toContainEqual(["festa_tela_cheia_click", expect.objectContaining({ id: "first-expense", raridade: "comum", quantidade: 1 })]);
-    expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ formato: "tela_cheia", origem: "popup", id: "first-expense" })]);
+    await waitFor(() => expect(eventos).toContainEqual(["festa_tela_cheia_click", expect.objectContaining({ id: "first-expense", raridade: "comum", quantidade: 1 })]));
+    await waitFor(() => expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ formato: "tela_cheia", origem: "popup", id: "first-expense" })]));
     expect(vistas(store)).not.toContain("first-expense");
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
     expect(await screen.findByTestId("momento-popup")).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("raro, épico e lendário seguem em tela cheia", () => {
     expect(cheia).toHaveTextContent("Múltiplas Rendas");
     expect(cheia).toHaveAttribute("data-raridade", "raro");
     expect(screen.queryByTestId("momento-popup")).toBeNull();
-    expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ raridade: "raro", formato: "tela_cheia", origem: "direto" })]);
+    await waitFor(() => expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ raridade: "raro", formato: "tela_cheia", origem: "direto" })]));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     await waitFor(() => expect(vistas(store)).toContain("multi-income"));
     const popup = await screen.findByTestId("momento-popup", {}, { timeout: 3000 });

@@ -50,6 +50,7 @@ const info = () => ({
 // ensaiar outra vitrine da App Store — ex.: "$14.99" na storefront dos EUA.
 const PRECOS_BASE: Record<string, string> = {
   core_anual_97: "R$ 97,90",
+  core_anual_69: "R$ 69,90", // 01/10: braço B do teste de preço do iPhone
   core_mensal: "R$ 24,90",
   core_vitalicio_97: "R$ 97,90",
   core_vitalicio: "R$ 27,90",
@@ -70,6 +71,20 @@ const PRECOS: Record<string, string> = new Proxy(PRECOS_BASE, {
 // Oferta introdutória só no anual do iPhone (3 dias grátis), como na App Store.
 const INTRO: Record<string, unknown> = {
   core_anual_97: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
+  core_anual_69: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
+};
+// 01/10: no iPhone a offering ATUAL decide o braço do teste de preço. `localStorage.__rc_mock_offering`
+// = "anual_69" ensaia o braço B (produto core_anual_69); o padrão é "default" (core_anual_97).
+const produtoMock = (id: string) => ({ identifier: id, priceString: PRECOS[id] ?? "R$ 0,00", ...VALOR(PRECOS[id] ?? "R$ 0,00"), title: `CORE ${id} (mock)`, ...(INTRO[id] ? { introPrice: INTRO[id] } : {}) });
+const ehIos = () => { try { return (window as any).Capacitor?.getPlatform?.() === "ios"; } catch { return false; } };
+const offeringIos = () => {
+  let nome = "default";
+  try { nome = localStorage.getItem("__rc_mock_offering") || "default"; } catch { /* noop */ }
+  const anual = nome === "anual_69" ? "core_anual_69" : "core_anual_97";
+  return { identifier: nome, availablePackages: [
+    { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock(anual) },
+    { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal") },
+  ] };
 };
 
 export const PRODUCT_CATEGORY = { NON_SUBSCRIPTION: "NON_SUBSCRIPTION", SUBSCRIPTION: "SUBSCRIPTION" } as const;
@@ -92,6 +107,7 @@ export const Purchases: any = {
     // de "pronto" se existir pacote). Esvaziar só o getProducts não simulava
     // nada — o app seguia achando que tinha o que vender.
     if (modo() === "catalogo_vazio") return { current: { availablePackages: [] } };
+    if (ehIos()) return { current: offeringIos() };
     // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
     return {
       current: {

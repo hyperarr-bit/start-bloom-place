@@ -324,6 +324,8 @@ const DevBeleza = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevBeleza
 const DevAssine = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAssine")) : null;
 // 01/10: a Home com dados de exemplo pra fotografar o hero da landing — só no dev
 const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHomeLanding")) : null;
+// 01/10: o paywall do iPhone sozinho (teste de preço 97,90 × 69,90), pra fotografar com a loja simulada
+const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPaywallIos")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -608,6 +610,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevHomeLanding && (
           <Route path="/dev/home-landing" element={<Suspense fallback={null}><DevHomeLanding /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevPaywallIos && (
+          <Route path="/dev/paywall-ios" element={<Suspense fallback={null}><DevPaywallIos /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />

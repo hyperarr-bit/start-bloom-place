@@ -49,7 +49,7 @@ vi.mock("@/lib/revenuecat", () => ({
   prefetchVitalicio: vi.fn().mockResolvedValue(undefined),
   prefetchAnualIos: vi.fn().mockResolvedValue(undefined),
   temAnualIos: () => true,
-  precoAnualIos: () => "R$ 97,90", idProdutoAnualIos: () => "core_anual_97", ofertaAnualIos: () => "anual_97", dadosDaOfertaIos: () => ({ oferta: "anual_97", produto: "core_anual_97", offering: "default", preco: "R$ 97,90", pacote: true }),
+  precoAnualIos: () => "R$ 97,90", idProdutoAnualIos: () => "core_anual_97", mesesDeMensalQuePagamOAno: () => 4, ofertaAnualIos: () => "anual_97", dadosDaOfertaIos: () => ({ oferta: "anual_97", produto: "core_anual_97", offering: "default", preco: "R$ 97,90", pacote: true }),
   precoMensalDoAnualIos: () => "R$ 8,16",
   diasTrialIos: () => 3,
   anualIosTemTrial: () => true,

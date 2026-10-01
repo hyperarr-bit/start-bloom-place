@@ -32,6 +32,7 @@ vi.mock("@/lib/revenuecat", () => ({
   ultimaCompraAnualFoiTrial: () => true,
   fimDaUltimaCompraTrial: () => null,
   idProdutoAnualIos: () => "core_anual_97",
+  mesesDeMensalQuePagamOAno: () => 4,
   ofertaAnualIos: () => "anual_97",
   dadosDaOfertaIos: () => ({ oferta: "anual_97", produto: "core_anual_97", offering: "default", preco: "R$ 97,90", pacote: true }),
   estadoRevenueCat: () => "pronto",

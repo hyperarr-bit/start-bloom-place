@@ -13,6 +13,10 @@ export const RodapeSite = () => (
   <footer className="border-t border-border bg-muted/30">
     <div className="max-w-5xl mx-auto px-5 py-10 space-y-7">
       <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+        {/* 01/10: quem já tem conta usa o site logado — a porta fica em todo rodapé */}
+        <Link to="/entrar" className="font-semibold text-foreground hover:text-accent transition-colors">
+          Já tenho conta — entrar
+        </Link>
         <Link to="/suporte" className="text-foreground/80 hover:text-accent transition-colors">
           Suporte
         </Link>

@@ -25,6 +25,8 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
+import { ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
+import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
@@ -113,7 +115,7 @@ const temMarcaDeAnuncio = () => {
  * de estilo próprio. Ele foi congelado em /funil-radar no dia 25/07 e ficou
  * inalcançável pelo app.
  */
-const ENTRADA_APP = "/app";
+// 01/10: ENTRADA_APP mora em src/lib/rotas-web.ts (junto da chave VENDA_NA_WEB).
 
 const SoNaWeb = ({ children }: { children: ReactNode }) =>
   isNativeShell() ? <Navigate to={ENTRADA_APP} replace /> : <>{children}</>;
@@ -186,7 +188,7 @@ const RootGate = () => {
   }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
-  if (!user) {
+  if (!user && (isNativeShell() || VENDA_NA_WEB)) {
     try {
       const t = Number(sessionStorage.getItem("core-demo-tour") ?? 0);
       // no app o retorno da demo tem que voltar pra porta do shell, não pro
@@ -217,8 +219,13 @@ const RootGate = () => {
    * tráfego mais quente — e o revisor de loja, que antes via um quiz. */
   if (!user) {
     if (ehPwa()) return <Navigate to="/entrar" replace />;
-    if (temMarcaDeAnuncio()) return <Navigate to={`/inicio${window.location.search}`} replace />;
-    return <SiteHome />;
+    /* 01/10 (dono: "desisti da web… deixa só o domínio do CORE original e faz
+     * uma landing bonita pra converter [pro app]"). Com VENDA_NA_WEB
+     * desligada, quem chega com utm/fbclid também cai na landing — o anúncio
+     * agora vende o APP, e a landing preserva a atribuição (utm na URL,
+     * captureLandingMeta). Rollback: VENDA_NA_WEB true devolve o /inicio. */
+    if (VENDA_NA_WEB && temMarcaDeAnuncio()) return <Navigate to={`/inicio${window.location.search}`} replace />;
+    return <Landing />;
   }
 
   const area = getFunnelArea();
@@ -277,7 +284,6 @@ import Entrar from "./pages/Entrar";
 import AuthCallback from "./pages/AuthCallback";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
-import LandingPage from "./pages/lp/LpFinancas";
 // 02/09: fora do bundle principal — a porta do /inicio não usa (49 KB raw);
 // o Suspense das rotas já cobre o flash.
 const Comecar = lazy(() => import("./pages/Comecar"));
@@ -300,7 +306,8 @@ const MomentosNoApp = () => {
 // dia14 é o funil do /inicio (25/07; de volta em 19/09) — import EAGER: a URL
 // do tráfego de anúncio não pode ter flash de loading (lazy quebraria fora do
 // Suspense). O W segue lazy: vende no app (/app) e fica de teste em /funil-w.
-import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
+// 01/10: o /inicio deixou de ser a porta do tráfego pago (venda só nas lojas) —
+// o dia14 saiu do bundle inicial e segue como chunk próprio (ComecarDia14, abaixo).
 const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 // Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
 // (some do build — a condição é substituída por `false` e o import cai fora).
@@ -313,6 +320,8 @@ const DevPet = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPet")) : 
 const DevRelacoes = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevRelacoes")) : null;
 // 28/09: a Beleza e a Home com uma rotina de pele de exemplo (rotina pronta, skincare de hoje, lembrete) — só no dev
 const DevBeleza = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevBeleza")) : null;
+// 01/10: a tela "Assine no app" da web sem acesso, pra fotografar — só no dev
+const DevAssine = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAssine")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -334,7 +343,9 @@ const lazyPage = <T,>(carregar: () => Promise<T>) =>
     throw new Error("Failed to fetch dynamically imported module (módulo resolveu vazio)");
   });
 
-const Planos = lazyPage(() => import("./pages/Planos"));
+// 01/10: na web, /planos passa por PlanosWeb — Planos.tsx (Pix) só com ?oferta=
+// ou pra quem já tem acesso ("Meu acesso"); sem acesso → "Assine no app".
+const PlanosWeb = lazyPage(() => import("./pages/site/PlanosWeb"));
 // A /planos do SHELL (24/07): a web vende vitalício no Pix, e Pix dentro do
 // binário da loja é pagamento externo — motivo exato da remoção do Cal AI.
 const PlanosApp = lazyPage(() => import("./pages/PlanosApp"));
@@ -345,7 +356,9 @@ const ExcluirConta = lazyPage(() => import("./pages/Legal").then((m) => ({ defau
 // Site institucional da WEB (24/08) — home na raiz e página de suporte.
 // Exigência da Apple pra inscrição da empresa: site completo, público, com
 // contato. Ver src/pages/site/SiteHome.tsx e src/lib/empresa.ts.
-const SiteHome = lazyPage(() => import("./pages/site/SiteHome"));
+// 01/10: a raiz da web é a LANDING "baixe o app" (import EAGER: é a porta do
+// site, não pode esperar chunk). Ver src/pages/site/Landing.tsx.
+import Landing from "./pages/site/Landing";
 const Suporte = lazyPage(() => import("./pages/site/Suporte"));
 // 24/09: passo a passo de como entrar no app com a conta da compra da web
 const ComoEntrar = lazyPage(() => import("./pages/ComoEntrar"));
@@ -547,7 +560,7 @@ const AnimatedRoutes = () => {
       <Routes location={location} key={location.pathname}>
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
-        <Route path="/planos" element={<ProtectedRoute><PageTransition>{isNativeShell() ? <PlanosApp /> : <Planos />}</PageTransition></ProtectedRoute>} />
+        <Route path="/planos" element={<ProtectedRoute><PageTransition>{isNativeShell() ? <PlanosApp /> : <PlanosWeb />}</PageTransition></ProtectedRoute>} />
         {/* Legais: públicas de propósito — o revisor do Google abre sem conta */}
         <Route path="/privacidade" element={<PageTransition><Privacidade /></PageTransition>} />
         <Route path="/termos" element={<PageTransition><Termos /></PageTransition>} />
@@ -562,11 +575,11 @@ const AnimatedRoutes = () => {
         <Route path="/como-entrar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="como-entrar"><ComoEntrar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
-        <Route path="/lp" element={<Navigate to="/comecar" replace />} />
+        <Route path="/lp" element={<FunilAposentado web={<Navigate to="/comecar" replace />} />} />
         {/* 20/09: só-web. Dentro do app este funil vendia vitalício no Pix
             (PaywallFlow) e era alcançável por link antigo — no iPhone isso
             contradiz a assinatura e cita Pix (3.1.1). */}
-        <Route path="/comecar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/comecar" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />} />
         {/* Só no servidor de desenvolvimento (some do build): o paywall de
             quem entra logado sem assinatura, pra olhar a tela sem precisar de
             uma conta sem pagamento. */}
@@ -588,11 +601,14 @@ const AnimatedRoutes = () => {
         {import.meta.env.DEV && DevBeleza && (
           <Route path="/dev/beleza" element={<Suspense fallback={null}><DevBeleza /></Suspense>} />
         )}
-        <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        {import.meta.env.DEV && DevAssine && (
+          <Route path="/dev/assine" element={<Suspense fallback={null}><DevAssine /></Suspense>} />
+        )}
+        <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
+        <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />
+        <Route path="/plano" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition>} />} />
+        <Route path="/funil-dia14" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition>} />} />
+        <Route path="/funil-radar" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
         {/* ENTRADA_APP: a porta do app da loja. v53 (16/08): no SHELL renderiza
             o funil do TESTE GRÁTIS (4 perguntas → app real em modo guiado →
             paywall de assinatura no dia 3). Na web, /app continua o radar de
@@ -603,10 +619,10 @@ const AnimatedRoutes = () => {
             vitalício foco único) vira A porta do shell — comparação
             dia-contra-dia com o funil de colunas do v84. Rollback = trocar
             ComecarW por ComecarTeste aqui. */}
-        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app">{isNativeShell() ? <ComecarW /> : <ComecarRadar />}</RouteErrorBoundary></PageTransition>} />
+        <Route path="/app" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
         {/* Funil W em teste: só no shell (vende via RC; na web quebraria). */}
-        <Route path="/funil-w" element={isNativeShell() ? <PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition> : <Navigate to="/lp" replace />} />
-        <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-w" element={<FunilAposentado nativo={<PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition>} web={<Navigate to="/lp" replace />} />} />
+        <Route path="/funil-v1" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
@@ -701,7 +717,7 @@ const App = () => {
                       desistência. SoNaWeb continua obrigatório: sem ele, um
                       link no histórico ou deep link recoloca pagamento
                       externo dentro do app, que é violação de política da Play. */}
-                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary></SoNaWeb>} />
+                  <Route path="/inicio" element={<FunilAposentado web={<Suspense fallback={<div className="min-h-screen bg-background" />}><RouteErrorBoundary routeName="funil"><ComecarDia14 /></RouteErrorBoundary></Suspense>} />} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

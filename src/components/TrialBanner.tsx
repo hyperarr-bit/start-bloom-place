@@ -12,6 +12,8 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce, temPixEmConfirmacao } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
 import { VagaDoAvisoCobranca } from "@/components/app/AvisoCobrancaRecusada";
+import { AssineNoApp } from "@/components/site/AssineNoApp";
+import { VENDA_NA_WEB } from "@/lib/rotas-web";
 
 /** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
  *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
@@ -184,8 +186,21 @@ export const TrialBanner = () => {
                 <VagaDoAvisoCobranca />
                 <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
               </>
-            : <PaywallFlow context="app" />}
+            /* 01/10: venda na web desligada (src/lib/rotas-web.ts) — a conta
+               logada sem acesso vê "Assine no app e use aqui também" no lugar
+               do Pix. Rollback = VENDA_NA_WEB true (volta o PaywallFlow). */
+            : VENDA_NA_WEB ? <PaywallFlow context="app" /> : <AssineNoApp variante="gate" />}
         </RouteErrorBoundary>
+      </motion.div>
+    );
+  }
+
+  // 01/10: na WEB, conta antiga com o trial de 7 dias vencido também vai pro
+  // "Assine no app" — o "Ver planos" dela levava ao Pix. O app segue abaixo.
+  if (trialExpired && !isNativeShell() && !VENDA_NA_WEB) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[310] overflow-y-auto bg-white">
+        <RouteErrorBoundary routeName="paywall-gate"><AssineNoApp variante="gate" /></RouteErrorBoundary>
       </motion.div>
     );
   }

@@ -1,6 +1,7 @@
 import { WinbackFlow } from "@/components/retention/WinbackFlow";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 import { isNativeShell } from "@/lib/native-shell";
+import { VENDA_NA_WEB } from "@/lib/rotas-web";
 
 /**
  * Mounts the WinbackFlow on any route that includes <TrialBanner />.
@@ -18,6 +19,9 @@ import { isNativeShell } from "@/lib/native-shell";
  */
 export const GlobalWinback = () => {
   if (isNativeShell()) return null;
+  // 01/10: venda na web desligada (ver src/lib/rotas-web.ts) — a roleta é
+  // oferta de Pix, então não monta. Rollback = VENDA_NA_WEB true.
+  if (!VENDA_NA_WEB) return null;
   return <WinbackNaWeb />;
 };
 

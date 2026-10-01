@@ -311,15 +311,30 @@ const Auth = () => {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
+              {isNativeShell() ? (
               <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                 <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
   <li>• Acesso completo aos 16 módulos</li>
                   {!isNativeShell() && <li>• Por <strong>7 dias</strong>, sem cartão de crédito</li>}
                   <li>• Cancele quando quiser</li>
-                  
+
                 </ul>
               </div>
+              ) : (
+              /* WEB (01/10): conta nova na web NÃO tem teste de 7 dias desde
+                 04/07 (check-subscription, PAYWALL_CUTOFF) — a lista antiga
+                 prometia isso. Agora diz o que acontece de verdade: a conta
+                 vale no computador e no celular, e a assinatura é pelo app. */
+              <div className="rounded-xl border border-border bg-card p-4 space-y-2" data-testid="auth-como-funciona-web">
+                <p className="text-xs font-medium">✨ Como funciona a conta:</p>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>• Uma conta só, pro computador e pro celular — tudo sincroniza</li>
+                  <li>• Pra liberar os 16 módulos, assine no app (App Store ou Google Play)</li>
+                  <li>• No iPhone tem 3 dias grátis; no Android é pagamento único</li>
+                </ul>
+              </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -153,7 +153,9 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     estado.problema = { temProblema: true, comAcesso: false, url: null };
     estado.auth = { user: usuario, subLoaded: true, isSubscribed: false, noTrial: true, trialExpired: false };
     montarApp();
-    expect(await screen.findByTestId("paywall-web")).toBeInTheDocument();
+    // 01/10: na web o bloqueio virou "Assine no app" (venda só nas lojas); o
+    // aviso de cobrança continua sendo coisa do app, então aqui não aparece.
+    expect(await screen.findByTestId("assine-no-app")).toBeInTheDocument();
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
     expect(views()).toHaveLength(0);

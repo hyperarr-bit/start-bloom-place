@@ -199,8 +199,11 @@ export function PaywallAssinatura({
    * R$ 97,90 com dias grátis, e preço, dias e elegibilidade vêm da App Store
    * (a mesma leitura do PaywallIOS do funil). O Android segue intocado. */
   const [apple] = useState(() => ehApple());
-  const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean }>({
-    preco: APP_PRECOS.anual97.preco, mes: "R$ 8,16", dias: 3, trial: true,
+  /* 01/10 (teste de preço 97,90 × 69,90): o produto anual vem da offering atual
+   * do RevenueCat (core_anual_97 ou core_anual_69) e NENHUM preço fica chumbado
+   * — antes da loja responder o lugar do preço mostra um traço. */
+  const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean; id: string; oferta: string }>({
+    preco: "R$ —", mes: "R$ —", dias: 3, trial: true, id: "core_anual_97", oferta: "anual_97",
   });
   const cancelamentos = useRef(0);
   const pixVencendoJaFoi = useRef(false);
@@ -233,11 +236,14 @@ export function PaywallAssinatura({
         await rc.prefetchAnualIos();
         if (vivoRef.current && rc.temAnualIos()) {
           setAnualApple({
-            preco: rc.precoAnualIos() ?? APP_PRECOS.anual97.preco,
-            mes: rc.precoMensalDoAnualIos() ?? "R$ 8,16",
+            preco: rc.precoAnualIos() ?? "R$ —",
+            mes: rc.precoMensalDoAnualIos() ?? "R$ —",
             dias: rc.diasTrialIos() || 3,
             trial: rc.anualIosTemTrial(),
+            id: rc.idProdutoAnualIos(),
+            oferta: rc.ofertaAnualIos(),
           });
+          trackEvent("paywall_oferta_vista", { contexto, loja: "ios", ...rc.dadosDaOfertaIos(), dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial() });
         }
       }
       // Produto criado por API demora a propagar (varredura: o herói ficava
@@ -340,19 +346,19 @@ export function PaywallAssinatura({
     // qualquer ação de compra desarma a contagem de reabertura
     setReabrindoEm(null);
     if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
-    trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto });
+    trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto, ...(apple && /^core_anual/.test(produto) ? { oferta: anualApple.oferta, preco: anualApple.preco } : {}) });
     const t0 = Date.now();
     const rc = await import("@/lib/revenuecat");
     const ok = await fn();
     if (ok) {
-      trackEvent("app_sheet_success", { contexto, produto });
+      trackEvent("app_sheet_success", { contexto, produto, ...(apple && /^core_anual/.test(produto) ? rc.dadosDaOfertaIos() : {}) });
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
       // (D) iPhone (01/10, de volta): compra que entrou em teste guarda o pedido
       // do lembrete "acaba amanhã" e arma se a permissão já existe — sem
       // diálogo aqui (a Missão B1 pede e arma o pendente). Ver PaywallIOS.
-      if (apple && produto === "core_anual_97" && rc.ultimaCompraAnualFoiTrial()) {
-        void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + anualApple.dias * 86400e3, precoAno: anualApple.preco }).catch(() => { /* noop */ });
+      if (apple && /^core_anual/.test(produto) && rc.ultimaCompraAnualFoiTrial()) {
+        void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + anualApple.dias * 86400e3, precoAno: rc.precoAnualIos() ?? anualApple.preco }).catch(() => { /* noop */ });
       }
       limparGuiaSemente();
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
@@ -436,7 +442,7 @@ export function PaywallAssinatura({
   const colunaDireita = apple
     ? {
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnualIos(),
-        id: "core_anual_97",
+        id: anualApple.id,
         cta: anualApple.trial
           ? <>Começar {anualApple.dias} dias grátis <ArrowRight className="w-4 h-4" /></>
           : <>Quero o ano — {anualApple.preco} <ArrowRight className="w-4 h-4" /></>,

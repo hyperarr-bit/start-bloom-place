@@ -28,7 +28,7 @@ vi.mock("@/lib/revenuecat", () => ({
   prefetchAssinaturas: vi.fn().mockResolvedValue(undefined),
   prefetchAnualIos: vi.fn().mockResolvedValue(undefined),
   temVitalicio97: () => true, temAnual97: () => false, temMensalVista: () => false, temAnualIos: () => true,
-  precoAnualIos: () => "R$ 97,90", precoMensalDoAnualIos: () => "R$ 8,16", diasTrialIos: () => 3,
+  precoAnualIos: () => "R$ 97,90", idProdutoAnualIos: () => "core_anual_97", ofertaAnualIos: () => "anual_97", dadosDaOfertaIos: () => ({ oferta: "anual_97", produto: "core_anual_97", offering: "default", preco: "R$ 97,90", pacote: true }), precoMensalDoAnualIos: () => "R$ 8,16", diasTrialIos: () => 3,
   anualIosTemTrial: () => true, ultimaCompraAnualFoiTrial: () => true, estadoRevenueCat: () => "pronto",
   comprarAnualIos: vi.fn(), comprar: vi.fn(), comprarVitalicio: vi.fn(), comprarAnual97: vi.fn(), comprarMensalVista: vi.fn(),
   restaurar: vi.fn().mockResolvedValue(false), motivoUltimaCompra: () => null, marcarToqueDeCompra: vi.fn(),

@@ -5,7 +5,8 @@ import { ArrowLeft, Check, Crown, ShieldCheck, Loader2, CalendarClock, ExternalL
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
-import { initRevenueCat, restaurar, abrirResgateApple } from "@/lib/revenuecat";
+import { initRevenueCat, restaurar, abrirResgateApple, prefetchAnualIos, precoAnualIos } from "@/lib/revenuecat";
+import { pedidoDeLembreteDoTeste } from "@/lib/notificacoes";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
@@ -72,6 +73,8 @@ const PlanosApp = () => {
   // Data por extenso: "12 de agosto de 2027" lê melhor que 12/08/2027 numa
   // frase. Vitalício não tem renovação — dizer "renova em 2099" seria mentira
   // de interface.
+  // 01/10: preço do ano do iPhone lido da loja (97,90 × 69,90), nunca chumbado
+  const [precoAnoLoja, setPrecoAnoLoja] = useState<string | null>(null);
   const linhaRenovacao = (() => {
     if (vitalicio) return "Acesso permanente nesta conta — não expira e não renova.";
     if (!subscriptionEnd) return null;
@@ -83,8 +86,12 @@ const PlanosApp = () => {
     // 20/09: assinante em TESTE GRÁTIS (anual do iPhone) lê a verdade inteira:
     // até quando é grátis, quanto cobra depois, e que cancelar antes é de graça.
     if (ehAssinaturaDaLoja && billingPeriod === "annual" && trialCartaoAtivo()) {
-      const precoAno = ehApple() ? APP_PRECOS.anual97.preco : APP_PRECOS.anual.preco;
-      return `Teste grátis até ${quando}. Depois, ${precoAno} por ano, renovando automaticamente — cancele antes e não paga nada.`;
+      // 01/10: no iPhone o preço do ano é o que a pessoa COMPROU (guardado com o
+      // pedido do lembrete) ou o que a loja serve agora (97,90 × 69,90) — nunca chumbado.
+      const precoAno = ehApple() ? (pedidoDeLembreteDoTeste()?.precoAno ?? precoAnoLoja) : APP_PRECOS.anual.preco;
+      return precoAno
+        ? `Teste grátis até ${quando}. Depois, ${precoAno} por ano, renovando automaticamente — cancele antes e não paga nada.`
+        : `Teste grátis até ${quando}. Depois renova por ano no valor mostrado na App Store — cancele antes e não paga nada.`;
     }
     return ehAssinaturaDaLoja
       ? `Renova automaticamente em ${quando}. Você pode cancelar antes disso.`
@@ -95,7 +102,11 @@ const PlanosApp = () => {
     trackEvent("planos_view", { source: "app" });
     // Aquece o RevenueCat: se a pessoa tocar em "Ver planos", o sheet já
     // abre com as offerings carregadas em vez de piscar o botão desligado.
-    initRevenueCat();
+    void (async () => {
+      await initRevenueCat();
+      if (!ehApple()) return;
+      try { await prefetchAnualIos(); setPrecoAnoLoja(precoAnualIos()); } catch { /* texto cai no genérico */ }
+    })();
   }, []);
 
   const voltar = () => {

@@ -112,8 +112,11 @@ const selosPara = (teste: boolean) => teste
       { emoji: "✕", label: "Cancele quando quiser" },
     ];
 
-/** Enquanto a loja não responde: R$ 97,90 ÷ 12. */
-const PRECO_MES_PADRAO = "R$ 8,16";
+/* 01/10 (teste de preço 97,90 × 69,90): NENHUM preço chumbado. Enquanto a loja
+ * não responde, o lugar do preço mostra um traço — um "R$ 97,90" de reserva
+ * seria o preço ERRADO pra metade das pessoas (o braço 69,90) por 1–2 s, e a
+ * troca na frente dela pareceria desconto de mentira. */
+const SEM_PRECO = "R$ —";
 
 /* (B) CRONOGRAMA DO TESTE — o bloco que deu +23% no Blinkist e que a Apple
  * recomenda na sessão sobre testes: a pessoa sabe exatamente quando (e se)
@@ -210,11 +213,17 @@ export function PaywallIOS({
   const vivoRef = useRef(true);
   // Disponibilidade real do vitalício: otimista até resposta NEGATIVA da loja.
   const [anualNaLoja, setAnualNaLoja] = useState<boolean | null>(null);
-  const [precoAnual, setPrecoAnual] = useState<string>(APP_PRECOS.anual97.preco);
+  const [precoAnual, setPrecoAnual] = useState<string | null>(null);
   const [comTrial, setComTrial] = useState(true);
   const [dias, setDias] = useState(3);
-  const [precoMes, setPrecoMes] = useState<string>(PRECO_MES_PADRAO);
+  const [precoMes, setPrecoMes] = useState<string | null>(null);
   const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
+  // O que a loja serviu pra ESTA pessoa (braço do experimento): vai em todo evento.
+  const [oferta, setOferta] = useState<{ oferta: string; produto: string; offering: string | null; preco: string | null; pacote: boolean }>({
+    oferta: "anual_97", produto: "core_anual_97", offering: null, preco: null, pacote: false,
+  });
+  const precoAnualTxt = precoAnual ?? SEM_PRECO;
+  const precoMesTxt = precoMes ?? SEM_PRECO;
 
   useEffect(() => {
     vivoRef.current = true;
@@ -234,10 +243,14 @@ export function PaywallIOS({
       const lido = () => {
         if (rc.estadoRevenueCat() === "pronto") setAnualNaLoja(rc.temAnualIos());
         if (rc.temAnualIos()) {
-          setPrecoAnual(rc.precoAnualIos() ?? APP_PRECOS.anual97.preco);
+          setPrecoAnual(rc.precoAnualIos());
           setComTrial(rc.anualIosTemTrial());
           setDias(rc.diasTrialIos() || 3);
-          setPrecoMes(rc.precoMensalDoAnualIos() ?? PRECO_MES_PADRAO);
+          setPrecoMes(rc.precoMensalDoAnualIos());
+          const d = rc.dadosDaOfertaIos();
+          setOferta(d);
+          // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
+          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial() });
         }
       };
       lido();
@@ -262,7 +275,7 @@ export function PaywallIOS({
    * grátis, 1 vez por sessão do paywall; some quando a compra dá certo. */
   const [segundaChance, setSegundaChance] = useState<"nunca" | "visivel" | "usada">("nunca");
   useEffect(() => {
-    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: "core_anual_97", dias });
+    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segundaChance]);
 
@@ -283,12 +296,12 @@ export function PaywallIOS({
     setComprando(true);
     try {
       const rc = await import("@/lib/revenuecat");
-      const idProduto = produto === "mensal" ? "core_mensal" : "core_anual_97";
+      const idProduto = produto === "mensal" ? "core_mensal" : rc.idProdutoAnualIos();
       const ok = produto === "mensal"
         ? await rc.comprar("core_mensal", { semTrial: true })
         : await rc.comprarAnualIos();
       if (ok) {
-        trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios" });
+        trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
         /* (D) LEMBRETE DO TESTE (01/10, de volta): a Apple não avisa antes de
          * cobrar. Compra que entrou em teste guarda o pedido do aviso "acaba
          * amanhã" e arma na hora se a permissão já existe. SEM diálogo aqui —
@@ -296,7 +309,7 @@ export function PaywallIOS({
          * foi o que o dono mandou tirar); quem pede a permissão é a Missão
          * B1, e ela arma o que ficou pendente. Nunca segura quem acabou de pagar. */
         if (produto === "anual" && rc.ultimaCompraAnualFoiTrial()) {
-          void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + dias * 86400e3, precoAno: precoAnual }).catch(() => { /* noop */ });
+          void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + dias * 86400e3, precoAno: rc.precoAnualIos() ?? precoAnualTxt }).catch(() => { /* noop */ });
         }
         setSegundaChance("usada");
         onPagoSemConta();
@@ -379,13 +392,13 @@ export function PaywallIOS({
             /* (A) 20/09: no anual a âncora mostra o POR MÊS (R$ 8,16) — é o
              * número comparável com o mensal e com o que some por mês; o
              * valor cheio do ano vai na linha de baixo. */
-            const valor = mostraMensal ? APP_PRECOS.mensal.preco : precoMes;
+            const valor = mostraMensal ? APP_PRECOS.mensal.preco : precoMesTxt;
             const emReais = /^R\$/.test(valor);
             const preco = emReais ? valor.replace(/^R\$\s?/, "") : valor;
             const prefixo = emReais ? "R$ " : "";
             // (sub curto de propósito: cabe numa linha; o teste grátis já grita
             // no selo da coluna, no cronograma e no botão)
-            const precoSub = mostraMensal ? "por mês" : `por mês · ${precoAnual}/ano`;
+            const precoSub = mostraMensal ? "por mês" : `por mês · ${precoAnualTxt}/ano`;
             const precoTitulo = mostraMensal
               ? <>CORE mensal,<br />pra começar hoje</>
               : area === "dinheiro"
@@ -397,7 +410,7 @@ export function PaywallIOS({
           })()}
         </motion.div>
         {comTrial && !mostraMensal && (
-          <motion.div {...stagger(1)}><ComoFuncionaOTeste dias={dias} precoAnual={precoAnual} /></motion.div>
+          <motion.div {...stagger(1)}><ComoFuncionaOTeste dias={dias} precoAnual={precoAnualTxt} /></motion.div>
         )}
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />
@@ -405,11 +418,11 @@ export function PaywallIOS({
         <motion.div {...stagger(3)}>
           <DuasColunas
             plano={plano}
-            precoAnual={precoAnual}
-            precoMes={precoMes}
+            precoAnual={precoAnualTxt}
+            precoMes={precoMesTxt}
             dias={dias}
             comTrial={comTrial}
-            onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios" }); }}
+            onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual }); }}
           />
         </motion.div>
         <MuralDepoimentos area={area} semLoja soAssinatura />
@@ -498,7 +511,7 @@ export function PaywallIOS({
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
                 onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: "core_anual_97", dias });
+                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias });
                   setSegundaChance("usada");
                   void comprar("anual");
                 }}
@@ -516,7 +529,9 @@ export function PaywallIOS({
               onClick={() => {
                 trackEvent("funnel_click", {
                   cta: "app_paywall_cta", funil: "ios", loja: "ios",
-                  produto: mostraMensal ? "core_mensal" : "core_anual_97",
+                  produto: mostraMensal ? "core_mensal" : oferta.produto,
+                  oferta: mostraMensal ? "mensal" : oferta.oferta,
+                  offering: oferta.offering, preco: mostraMensal ? APP_PRECOS.mensal.preco : precoAnual,
                 });
                 void comprar(plano);
               }}
@@ -527,7 +542,7 @@ export function PaywallIOS({
                   ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
                   : comTrial
                     ? <>Começar {dias} dias grátis <ArrowRight className="w-4 h-4" /></>
-                    : <>Quero o ano — {precoAnual} <ArrowRight className="w-4 h-4" /></>}
+                    : <>Quero o ano — {precoAnualTxt} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje e o
@@ -547,8 +562,8 @@ export function PaywallIOS({
               {mostraMensal
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar</>
                 : comTrial
-                  ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnual}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
-                  : <>Assinatura de {precoAnual}/ano pela App Store · renova automaticamente até você cancelar</>}
+                  ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
+                  : <>Assinatura de {precoAnualTxt}/ano pela App Store · renova automaticamente até você cancelar</>}
             </span>
           </p>
         </div>

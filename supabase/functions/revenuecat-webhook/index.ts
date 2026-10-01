@@ -149,6 +149,11 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // 18/09 iOS: anual de R$ 97,90 com 3 dias grátis (substitui o vitalício no
   // iPhone). ANTES do genérico: "core_anual_97".startsWith("core_anual").
   core_anual_97: { billing: "annual", cents: 9790 },
+  // 01/10 iOS, teste de preço (RevenueCat Experiments 50/50): braço B = R$ 69,90.
+  // Sem esta linha a venda casaria "core_anual" e entraria como 159,90 — a
+  // armadilha que já custou caro 4 vezes. A escolha é pela chave MAIS LONGA
+  // (infoProduto), então a ordem não salva: a linha tem que existir.
+  core_anual_69: { billing: "annual", cents: 6990 },
   core_anual: { billing: "annual", cents: 15990 },
   core_mensal: { billing: "monthly", cents: 2490 },
   // 06/08: era do produto único — compra ÚNICA do Play (não assinatura).
@@ -421,6 +426,7 @@ async function mandarCompraProMeta(
     const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
       1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"], junto: MENSAL_GERAL },
       2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"], junto: MENSAL_GERAL },
+      6990:  { evento: "compra_anual_69",   sufixo: "a69", aceita: ["annual"] }, // 01/10: braço B do teste de preço do iPhone (core_anual_69)
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid", "annual"] }, // 18/09: + anual iOS (core_anual_97)
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };

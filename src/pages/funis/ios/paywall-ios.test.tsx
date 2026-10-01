@@ -21,7 +21,13 @@ import { PaywallIOS } from "./PaywallIOS";
 
 // 20/09: preço "da loja" mutável por teste — a App Store manda a string já
 // formatada e ela muda com a vitrine ("R$ 97,90" no Brasil, "$14.99" nos EUA).
-const loja = vi.hoisted(() => ({ preco: "R$ 97,90", mes: "R$ 8,16", dias: 3, trial: true, compraOk: true, motivo: null as string | null }));
+const loja = vi.hoisted(() => ({
+  preco: "R$ 97,90", mes: "R$ 8,16", dias: 3, trial: true, compraOk: true, motivo: null as string | null,
+  // 01/10: o produto/braço que a offering atual serviu (97,90 × 69,90) e um
+  // "segura" pra ensaiar a tela ANTES de a loja responder
+  produto: "core_anual_97", offering: "default" as string | null,
+  segurar: null as null | (() => void),
+}));
 // 01/10: o paywall NÃO abre diálogo de permissão (24/09) — mas a compra em
 // teste GUARDA o pedido do lembrete "acaba amanhã" (pedirLembreteDoTeste), que
 // a Missão arma depois de a permissão ser decidida. Espiões pros dois lados.
@@ -41,9 +47,12 @@ vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   prefetchVitalicio: vi.fn().mockResolvedValue(undefined),
   // 18/09: anual com 3 dias grátis no lugar do vitalício
-  prefetchAnualIos: vi.fn().mockResolvedValue(undefined),
+  prefetchAnualIos: vi.fn(() => (loja.segurar ? new Promise<void>((r) => { loja.segurar = r; }) : Promise.resolve())),
   temAnualIos: () => true,
   precoAnualIos: () => loja.preco,
+  idProdutoAnualIos: () => loja.produto,
+  ofertaAnualIos: () => loja.produto.replace(/^core_/, ""),
+  dadosDaOfertaIos: () => ({ oferta: loja.produto.replace(/^core_/, ""), produto: loja.produto, offering: loja.offering, preco: loja.preco, pacote: !!loja.offering }),
   precoMensalDoAnualIos: () => loja.mes,
   diasTrialIos: () => (loja.trial ? loja.dias : 0),
   anualIosTemTrial: () => loja.trial,
@@ -78,6 +87,7 @@ const montar = (opts: { area?: "dinheiro" | "corpo" | "saude"; onPago?: () => vo
 beforeEach(() => {
   localStorage.clear();
   loja.preco = "R$ 97,90"; loja.mes = "R$ 8,16"; loja.dias = 3; loja.trial = true; loja.compraOk = true; loja.motivo = null;
+  loja.produto = "core_anual_97"; loja.offering = "default"; loja.segurar = null;
   notif.pedir.mockClear(); notif.agendar.mockClear(); notif.pedirLembrete.mockClear();
   vi.mocked(trackEvent).mockClear(); vi.mocked(comprarAnualIos).mockClear(); vi.mocked(comprarAssinatura).mockClear();
 });
@@ -183,6 +193,55 @@ describe("Paywall do iPhone", () => {
     expect(notif.pedirLembrete).not.toHaveBeenCalled();
   });
 
+  // ---------- 01/10: teste de preço 97,90 × 69,90 (RevenueCat Experiments) ----------
+  describe("teste de preço: o paywall lê o anual da offering atual", () => {
+    it("braço B (core_anual_69, R$ 69,90): coluna, âncora, cronograma, botão e legal mudam com a loja — e nenhum 97,90 sobra", async () => {
+      loja.produto = "core_anual_69"; loja.preco = "R$ 69,90"; loja.mes = "R$ 5,83"; loja.offering = "anual_69";
+      montar();
+      expect(await screen.findByText("por mês · R$ 69,90/ano")).toBeInTheDocument();
+      expect(screen.getAllByText(/R\$ 5,83/).length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText(/R\$ 69,90 pelo ano inteiro/)).toBeInTheDocument();
+      expect(document.body.textContent).toMatch(/3 dias grátis, depois R\$ 69,90\/ano pela App Store/);
+      expect(document.body.textContent).not.toMatch(/97,90|8,16/);
+      // o braço vai junto em cada evento: o que ela viu…
+      await waitFor(() => expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("paywall_oferta_vista", expect.objectContaining({ oferta: "anual_69", produto: "core_anual_69", offering: "anual_69", preco: "R$ 69,90" })));
+      // …o toque no botão…
+      fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("funnel_click", expect.objectContaining({ cta: "app_paywall_cta", produto: "core_anual_69", oferta: "anual_69", preco: "R$ 69,90" }));
+      // …e a compra (o produto NÃO é mais um id fixo; o lembrete leva o preço do braço)
+      await waitFor(() => expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("app_sheet_success", expect.objectContaining({ produto: "core_anual_69", oferta: "anual_69" })));
+      expect(notif.pedirLembrete).toHaveBeenCalledWith(expect.objectContaining({ precoAno: "R$ 69,90" }));
+    });
+
+    it("braço A (core_anual_97): segue 97,90 e os eventos dizem anual_97", async () => {
+      montar();
+      await screen.findByText("por mês · R$ 97,90/ano");
+      await waitFor(() => expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("paywall_oferta_vista", expect.objectContaining({ oferta: "anual_97", produto: "core_anual_97" })));
+      fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("funnel_click", expect.objectContaining({ produto: "core_anual_97", oferta: "anual_97" }));
+    });
+
+    it("ANTES de a loja responder não aparece preço nenhum (um traço no lugar) — nada de 97,90 chumbado", async () => {
+      loja.segurar = () => {};
+      montar();
+      expect(await screen.findByText(/pela sua estimativa/)).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/97,90|8,16|69,90/);
+      expect(screen.getByText("por mês · R$ —/ano")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeInTheDocument(); // o botão não precisa do preço
+      // a loja responde: os números entram
+      loja.segurar?.(); loja.segurar = null;
+      expect(await screen.findByText("por mês · R$ 97,90/ano")).toBeInTheDocument();
+    });
+
+    it("segunda chance leva o braço junto", async () => {
+      loja.produto = "core_anual_69"; loja.preco = "R$ 69,90"; loja.compraOk = false; loja.motivo = "cancelou";
+      montar();
+      fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+      await screen.findByTestId("ios-segunda-chance");
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("folha_segunda_chance_view", expect.objectContaining({ produto: "core_anual_69", oferta: "anual_69", preco: "R$ 69,90" }));
+    });
+  });
+
   it("depoimento com 'pagamento único' NÃO aparece no iPhone (áreas corpo e saúde)", async () => {
     montar({ area: "corpo" });
     await screen.findByText("O que dizem quem já usa");
@@ -213,12 +272,12 @@ describe("Paywall do iPhone", () => {
     }
   });
 
-  it("mostra os DOIS preços — spec do dono", () => {
+  it("mostra os DOIS preços — spec do dono", async () => {
     montar();
     expect(screen.getByText("meses")).toBeInTheDocument(); // 18/09: anual com 3 dias grátis no lugar do vitalício
     expect(screen.getByText("mês")).toBeInTheDocument();
-    // 20/09: o anual mostra o POR MÊS em destaque e o ano ao lado
-    expect(screen.getAllByText(/R\$ 97,90\/ano/).length).toBeGreaterThan(0);
+    // 20/09: o anual mostra o POR MÊS em destaque e o ano ao lado (01/10: só depois de a loja responder)
+    expect((await screen.findAllByText(/R\$ 97,90\/ano/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText("R$ 24,90").length).toBeGreaterThan(0);
   });
 

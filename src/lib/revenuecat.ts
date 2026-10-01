@@ -740,37 +740,90 @@ type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct
 // única do paywall. Mesma família = herda todas as guardas startsWith.
 /* ANUAL DO iPHONE (18/09): `core_anual_97` — R$ 97,90/ano com 3 dias grátis
  * (oferta introdutória da própria App Store; a folha aplica sozinha pra quem
- * é elegível). Comprado DIRETO pelo produto, como o vitalício, pra não
- * depender de um offering novo no painel do RevenueCat. */
-const ID_ANUAL_IOS = "core_anual_97";
+ * é elegível). Até 01/10 era comprado DIRETO pelo produto, preso ao id.
+ *
+ * TESTE DE PREÇO 97,90 × 69,90 (01/10, RevenueCat Experiments). O experimento
+ * troca a OFFERING por pessoa (50/50): a de controle tem o pacote anual =
+ * core_anual_97, a "anual_69" tem o pacote anual = core_anual_69. Por isso o
+ * app lê o pacote ANUAL da offering ATUAL (`getOfferings().current`) e compra
+ * pelo PACOTE (`purchasePackage`) — é assim que o RevenueCat atribui a compra
+ * ao braço certo; comprar pelo produto solto ficaria fora do experimento.
+ * Reserva segura: se a offering atual não tiver pacote anual (painel ainda sem
+ * o pacote, rede falhou no getOfferings), cai no getProducts(core_anual_97)
+ * de sempre — a folha abre com o 97,90, nunca botão morto.
+ * Preço, por-mês e dias grátis vêm SEMPRE do produto que a loja devolveu —
+ * nada de "97,90" chumbado no texto (o braço 69,90 leria o preço errado). */
+const ID_ANUAL_IOS_PADRAO = "core_anual_97";
+type PacoteRC = import("@revenuecat/purchases-capacitor").PurchasesPackage;
 let produtoAnualIos: ProdutoRC | undefined;
+let pacoteAnualIos: PacoteRC | undefined;
+let offeringAnualIos: string | null = null;
 let prefetchAnualDesfecho = "nao_rodou";
+
+/** Oferta da App Store = o anual da família core_anual_* (97, 69…), nunca o pré-pago do Play. */
+const ehAnualDaAppStore = (id: string | undefined): boolean => !!id && /^core_anual(_\d+)?$/.test(id);
 
 export async function prefetchAnualIos(): Promise<void> {
   if (produtoAnualIos) return;
   if (!configurado || !Purchases) { prefetchAnualDesfecho = "nao_configurado"; return; }
+  // 1) o pacote anual da offering ATUAL (o experimento decide qual é)
   try {
-    const mod = await import("@revenuecat/purchases-capacitor");
-    const { products } = await Purchases.getProducts({ productIdentifiers: [ID_ANUAL_IOS], type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
-    produtoAnualIos = (products ?? []).find((p) => p?.identifier === ID_ANUAL_IOS || p?.identifier?.startsWith(ID_ANUAL_IOS + ":"));
-    prefetchAnualDesfecho = `respondeu_${(products ?? []).length}`;
-    if (produtoAnualIos) {
-      try {
-        const r = await Purchases.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: [ID_ANUAL_IOS] });
-        // INTRO_ELIGIBILITY_STATUS: 0 desconhecido · 1 inelegível · 2 elegível · 3 sem oferta
-        const st = (r as Record<string, { status?: number }> | null)?.[ID_ANUAL_IOS]?.status;
-        elegivelIntroAnual = st === 1 ? "ineligible" : st === 2 ? "eligible" : "unknown";
-      } catch { elegivelIntroAnual = "unknown"; }
+    const offerings = await Purchases.getOfferings();
+    const atual = offerings?.current;
+    const pacote = (atual?.availablePackages ?? []).find((p) => ehAnualDaAppStore(p?.product?.identifier))
+      ?? (ehAnualDaAppStore((atual as { annual?: PacoteRC } | undefined)?.annual?.product?.identifier) ? (atual as { annual?: PacoteRC }).annual : undefined);
+    if (pacote?.product) {
+      pacoteAnualIos = pacote;
+      produtoAnualIos = pacote.product;
+      offeringAnualIos = atual?.identifier ?? null;
+      prefetchAnualDesfecho = `offering_${offeringAnualIos ?? "?"}`;
     }
   } catch (e) {
-    prefetchAnualDesfecho = "lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 80);
+    prefetchAnualDesfecho = "offerings_lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 60);
+  }
+  // 2) reserva: o produto padrão direto da loja (como era até 01/10)
+  if (!produtoAnualIos) {
+    try {
+      const mod = await import("@revenuecat/purchases-capacitor");
+      const { products } = await Purchases.getProducts({ productIdentifiers: [ID_ANUAL_IOS_PADRAO], type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
+      produtoAnualIos = (products ?? []).find((p) => p?.identifier === ID_ANUAL_IOS_PADRAO || p?.identifier?.startsWith(ID_ANUAL_IOS_PADRAO + ":"));
+      pacoteAnualIos = undefined;
+      offeringAnualIos = null;
+      prefetchAnualDesfecho += `_produtos_${(products ?? []).length}`;
+    } catch (e) {
+      prefetchAnualDesfecho += "_lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 60);
+    }
+  }
+  if (produtoAnualIos) {
+    const id = idProdutoAnualIos();
+    try {
+      const r = await Purchases.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: [id] });
+      // INTRO_ELIGIBILITY_STATUS: 0 desconhecido · 1 inelegível · 2 elegível · 3 sem oferta
+      const st = (r as Record<string, { status?: number }> | null)?.[id]?.status;
+      elegivelIntroAnual = st === 1 ? "ineligible" : st === 2 ? "eligible" : "unknown";
+    } catch { elegivelIntroAnual = "unknown"; }
   }
 }
 
 /** A loja já carregou o anual? (a vitrine só promete o que a loja tem) */
 export const temAnualIos = (): boolean => !!produtoAnualIos;
-/** Preço real do anual na moeda da loja (ex.: "R$ 97,90"), se já carregou. */
+/** Preço real do anual na moeda da loja (ex.: "R$ 97,90" ou "R$ 69,90"), se já carregou. */
 export const precoAnualIos = (): string | null => produtoAnualIos?.priceString ?? null;
+/** Id do produto anual que a loja serviu (core_anual_97 / core_anual_69). Antes de carregar, o padrão. */
+export const idProdutoAnualIos = (): string => {
+  const id = produtoAnualIos?.identifier ?? ID_ANUAL_IOS_PADRAO;
+  return id.includes(":") ? id.split(":")[0] : id;
+};
+/** "anual_97" / "anual_69": o rótulo do braço, pra TODO evento de paywall/compra. */
+export const ofertaAnualIos = (id: string = idProdutoAnualIos()): string => id.replace(/^core_/, "");
+/** O que a pessoa está vendo — vai junto em cada evento do paywall e da compra. */
+export const dadosDaOfertaIos = (): { oferta: string; produto: string; offering: string | null; preco: string | null; pacote: boolean } => ({
+  oferta: ofertaAnualIos(),
+  produto: idProdutoAnualIos(),
+  offering: offeringAnualIos,
+  preco: precoAnualIos(),
+  pacote: !!pacoteAnualIos,
+});
 /* ELEGIBILIDADE (20/09): o StoreKit devolve a oferta introdutória no produto
  * pra TODO MUNDO; quem já usou o teste no grupo não ganha de novo e a folha
  * cobra na hora. O RevenueCat sabe dizer quem é (checkTrialOrIntroductory-
@@ -823,25 +876,30 @@ export async function comprarAnualIos(): Promise<boolean> {
   ultimoMotivo = null;
   if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_ANUAL_IOS, retentou: true });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: idProdutoAnualIos(), oferta: ofertaAnualIos(), retentou: true });
     return false;
   }
   try {
     if (!produtoAnualIos) { await initRevenueCat(); await prefetchAnualIos(); }
     if (!produtoAnualIos) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_ANUAL_IOS, retentou: true, estado_rc: estado, prefetch: prefetchAnualDesfecho });
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_ANUAL_IOS_PADRAO, oferta: ofertaAnualIos(ID_ANUAL_IOS_PADRAO), retentou: true, estado_rc: estado, prefetch: prefetchAnualDesfecho });
       return false;
     }
     trackEventBeacon("app_compra_opcao", {
       desde_toque_ms: consumirToque(),
-      produto: ID_ANUAL_IOS,
-      escolhida: produtoAnualIos.identifier ?? ID_ANUAL_IOS,
+      produto: idProdutoAnualIos(),
+      escolhida: produtoAnualIos.identifier ?? idProdutoAnualIos(),
       preco: produtoAnualIos.priceString ?? null,
       trial: anualIosTemTrial(),
+      ...dadosDaOfertaIos(),
     });
     marcarFolhaAberta();
-    const resultado = await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    // Pelo PACOTE quando veio da offering (é o que amarra a compra ao braço do
+    // experimento); pelo produto só na reserva.
+    const resultado = pacoteAnualIos
+      ? await Purchases.purchasePackage({ aPackage: pacoteAnualIos })
+      : await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
     const ativos = Object.values(
       (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> } } } | undefined)
         ?.customerInfo?.entitlements?.active ?? {},
@@ -860,7 +918,7 @@ export async function comprarAnualIos(): Promise<boolean> {
     await sincronizarAssinatura();
     return true;
   } catch (e) {
-    return desfechoDaFalha(e, ID_ANUAL_IOS);
+    return desfechoDaFalha(e, idProdutoAnualIos());
   }
 }
 

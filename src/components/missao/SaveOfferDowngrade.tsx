@@ -27,6 +27,7 @@ export function SaveOfferDowngrade() {
   const [mostrar, setMostrar] = useState(false);
   const [comprando, setComprando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [precoAno, setPrecoAno] = useState<string | null>(null);
   const checou = useRef(false);
 
   const elegivel =
@@ -39,6 +40,13 @@ export function SaveOfferDowngrade() {
     void (async () => {
       const rc = await import("@/lib/revenuecat");
       if (await rc.estadoTrialCancelado()) {
+        // 01/10: o preço do ano é o que ela comprou (pedido do lembrete) ou o da loja agora
+        try {
+          const { pedidoDeLembreteDoTeste } = await import("@/lib/notificacoes");
+          let preco = pedidoDeLembreteDoTeste()?.precoAno ?? null;
+          if (!preco && ehApple()) { await rc.prefetchAnualIos(); preco = rc.precoAnualIos(); }
+          setPrecoAno(preco);
+        } catch { /* texto cai no genérico */ }
         trackEvent("save_offer_view", { de: "anual", para: "mensal" });
         setMostrar(true);
       }
@@ -86,7 +94,7 @@ export function SaveOfferDowngrade() {
             {/* 20/09: no iPhone o anual é R$ 97,90 por ano (assinatura), não
                 159,90 "de uma vez" — o texto errado dispararia pra quem
                 cancelar o teste de 3 dias. */}
-            em vez de {ehApple() ? `${APP_PRECOS.anual97.preco} por ano` : `${APP_PRECOS.anual.preco} de uma vez`} · muda em 1 toque
+            {ehApple() ? (precoAno ? `em vez de ${precoAno} por ano` : "em vez do anual") : `em vez de ${APP_PRECOS.anual.preco} de uma vez`} · muda em 1 toque
           </p>
         </motion.div>
 

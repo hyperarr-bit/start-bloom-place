@@ -286,7 +286,11 @@ async function mandarCompraProMeta(
     const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
       1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"], junto: MENSAL_GERAL },
       2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"], junto: MENSAL_GERAL },
-      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
+      // 01/10: o anual do iPhone é billing "annual" (core_anual_97 = 9790, core_anual_69 = 6990, braço B do
+      // teste de preço) — o webhook já aceitava "annual" no 9790; aqui faltava, e a venda saía só como
+      // Purchase genérico quando este caminho chegava primeiro. Dedup por tx (marcador) continua igual.
+      6990:  { evento: "compra_anual_69",   sufixo: "a69", aceita: ["annual"] },
+      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid", "annual"] },
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
     // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par

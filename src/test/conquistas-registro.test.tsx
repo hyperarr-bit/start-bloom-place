@@ -70,7 +70,9 @@ describe("mesclarDesbloqueios (puro)", () => {
   it("a 1ª receita sem gasto nenhum não vira '100% poupado' (agora seria pra sempre)", () => {
     const soReceita = buildBadgesFinancas(leitor({ "finance-incomes": [{ value: 3000 }] }));
     expect(soReceita.filter((b) => b.id.startsWith("saver-") && b.unlocked)).toEqual([]);
-    const gastos = Array.from({ length: 5 }, (_, i) => ({ value: 100, date: `2026-09-0${i + 1}` }));
+    // dias do mês CORRENTE (as datas fixas em setembro quebraram o teste em 01/10: a meta é do mês)
+    const agora = new Date(); const mes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+    const gastos = Array.from({ length: 5 }, (_, i) => ({ value: 100, date: `${mes}-0${i + 1}` }));
     const mesAnotado = buildBadgesFinancas(leitor({ "finance-incomes": [{ value: 3000 }], "finance-expenses": gastos }));
     expect(mesAnotado.filter((b) => b.id.startsWith("saver-") && b.unlocked).map((b) => b.id)).toEqual(["saver-20", "saver-40", "saver-60"]);
   });

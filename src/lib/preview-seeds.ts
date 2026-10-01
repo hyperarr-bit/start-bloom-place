@@ -11,6 +11,13 @@ const daysAgo = (n: number) => {
   d.setDate(d.getDate() - n);
   return iso(d);
 };
+/** Como daysAgo, mas sem sair do mês CORRENTE (01/10: no dia 1 a aba de
+ *  gastos do Pet, que soma o mês, abria vazia — os 3 gastos caíam em setembro). */
+const noMes = (n: number) => {
+  const d = new Date(today);
+  d.setDate(Math.max(1, d.getDate() - n));
+  return iso(d);
+};
 
 const COMMON: Record<string, any> = {
   "core-user-name": "Visitante",
@@ -536,9 +543,9 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
     [`pet-routine-${daysAgo(0)}`]: { "1": { food: true, walk: true } },
     "pet-pesos": { "1": [{ dia: daysAgo(120), kg: 26.8 }, { dia: daysAgo(60), kg: 27.5 }, { dia: daysAgo(5), kg: 28 }] },
     "pet-expenses": [
-      { id: "1", petId: "1", category: "Ração", description: "Ração 15 kg", value: 189.9, date: daysAgo(3) },
-      { id: "2", petId: "1", category: "Banho", description: "Banho e tosa", value: 80, date: daysAgo(12) },
-      { id: "3", petId: "2", category: "Ração", description: "Ração de gato 3 kg", value: 95, date: daysAgo(6) },
+      { id: "1", petId: "1", category: "Ração", description: "Ração 15 kg", value: 189.9, date: noMes(3) },
+      { id: "2", petId: "1", category: "Banho", description: "Banho e tosa", value: 80, date: noMes(12) },
+      { id: "3", petId: "2", category: "Ração", description: "Ração de gato 3 kg", value: 95, date: noMes(6) },
     ],
     "pet-diary": [
       { id: "1", petName: "Mel", date: daysAgo(1), text: "Passeio longo no parque, cansou gostoso.", mood: "😄" },

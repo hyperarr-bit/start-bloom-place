@@ -51,7 +51,8 @@ describe("TrialBanner (o gate) na WEB", () => {
     expect(tela.textContent).toContain("ana@exemplo.com");
     const selos = screen.getAllByRole("link").filter((a) => a.hasAttribute("data-loja"));
     expect(selos.map((a) => a.getAttribute("href"))).toEqual(["/baixar?origem=web_paywall&loja=ios", "/baixar?origem=web_paywall&loja=android"]);
-    expect(screen.getByTestId("assine-oferta").textContent).toMatch(/3 dias grátis no iPhone/);
+    expect(screen.getByTestId("assine-oferta").textContent).not.toMatch(/R\$|dias grátis/); // 01/10: sem preço
+    expect(screen.getByTestId("assine-no-app").textContent).not.toMatch(/R\$/);
     expect(trackEvent).toHaveBeenCalledWith("assine_no_app_view", { variante: "gate", aparelho: "iphone" });
     // saídas: como entrar no app, suporte, sair da conta — ninguém fica preso
     expect(screen.getByRole("link", { name: "Como entrar no app" }).getAttribute("href")).toBe("/como-entrar");

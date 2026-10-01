@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 import { aparelhoDaWeb } from "@/components/LojasCard";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
-import { OFERTA_ANDROID, OFERTA_IOS } from "@/lib/ofertas-lojas";
 
 /**
  * "ASSINE NO APP E USE AQUI TAMBÉM" (01/10) — o que a pessoa logada na WEB sem
@@ -30,11 +29,6 @@ export function AssineNoApp({ variante }: { variante: "gate" | "pagina" }) {
   useEffect(() => { trackEvent("assine_no_app_view", { variante, aparelho: ap }); }, [variante, ap]);
 
   const email = user?.email ?? "";
-  const ofertaDoAparelho =
-    ap === "iphone" ? `${OFERTA_IOS.diasGratis} dias grátis no iPhone, depois ${OFERTA_IOS.anual} por ano`
-      : ap === "android" ? `No Android é pagamento único de ${OFERTA_ANDROID.vitalicio} — ou ${OFERTA_ANDROID.mensal} por mês`
-        : `iPhone: ${OFERTA_IOS.diasGratis} dias grátis, depois ${OFERTA_IOS.anual}/ano · Android: ${OFERTA_ANDROID.vitalicio} uma vez só`;
-
   return (
     <div className="min-h-dvh bg-background text-foreground" data-testid="assine-no-app" data-variante={variante}>
       <div className="max-w-md mx-auto px-5 pt-5 pb-10">
@@ -61,7 +55,8 @@ export function AssineNoApp({ variante }: { variante: "gate" | "pagina" }) {
             </p>
 
             <SelosDasLojas onde="paywall" prefixo="web" altura={48} className="mt-5" />
-            <p className="mt-2.5 text-[12.5px] text-muted-foreground" data-testid="assine-oferta">{ofertaDoAparelho}.</p>
+            {/* 01/10: sem preço aqui (dono) — o app mostra as opções antes de assinar */}
+            <p className="mt-2.5 text-[12.5px] text-muted-foreground" data-testid="assine-oferta">O app mostra as opções antes de você assinar{ap === "iphone" ? " — e no iPhone dá pra testar antes" : ""}.</p>
           </div>
         </div>
 

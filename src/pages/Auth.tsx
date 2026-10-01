@@ -331,7 +331,7 @@ const Auth = () => {
                 <ul className="text-xs text-muted-foreground space-y-1">
                   <li>• Uma conta só, pro computador e pro celular — tudo sincroniza</li>
                   <li>• Pra liberar os 16 módulos, assine no app (App Store ou Google Play)</li>
-                  <li>• No iPhone tem 3 dias grátis; no Android é pagamento único</li>
+                  <li>• O app mostra as opções antes de você assinar</li>
                 </ul>
               </div>
               )}

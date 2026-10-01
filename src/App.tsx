@@ -322,6 +322,8 @@ const DevRelacoes = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevRela
 const DevBeleza = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevBeleza")) : null;
 // 01/10: a tela "Assine no app" da web sem acesso, pra fotografar — só no dev
 const DevAssine = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAssine")) : null;
+// 01/10: a Home com dados de exemplo pra fotografar o hero da landing — só no dev
+const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHomeLanding")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -603,6 +605,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevAssine && (
           <Route path="/dev/assine" element={<Suspense fallback={null}><DevAssine /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevHomeLanding && (
+          <Route path="/dev/home-landing" element={<Suspense fallback={null}><DevHomeLanding /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />

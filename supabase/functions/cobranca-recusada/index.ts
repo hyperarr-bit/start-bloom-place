@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { assuntoEmailPix, htmlEmailPix, textoEmailPix } from "../_shared/email-cobranca-pix.ts";
 
 /**
  * cobranca-recusada — e-mail pra quem quis continuar no CORE e o cartão não
@@ -18,12 +19,24 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
  *  - admin logado, o lote de quem JÁ está com o cartão recusado:
  *    POST {dry_run:true} só conta; POST {enviar:true} manda.
  * Nas duas o estado é conferido na API do RevenueCat (o evento não é fonte de
- * verdade) e cada pessoa recebe no máximo 1 e-mail a cada 20 dias (marcador
- * `cobranca_recusada_email` em analytics_events — serve também pra medir
- * quantos recuperam depois do e-mail).
+ * verdade).
  *
- * O e-mail fala só da App Store (forma de pagamento da Conta Apple): nada de
- * Pix nem pagamento fora da loja.
+ * DOIS MODOS do lote (01/10):
+ *  - "apple" (padrão, o de 28/09): só manda atualizar o pagamento na App
+ *    Store. Marcador `cobranca_recusada_email`, 1 e-mail a cada 20 dias.
+ *    Recuperou 0 de 23+ — por isso o modo abaixo.
+ *  - "pix" (POST {modo:"pix", dry_run:true} / {modo:"pix", enviar:true}):
+ *    oferece ficar no CORE pagando R$ 97,90 UMA VEZ no Pix (oferta `w97`,
+ *    vitalícia, Asaas) no lugar dos 97,90/ano da Apple, com link mágico que
+ *    cai LOGADO em /planos?oferta=w97 (link vencido → /entrar com o e-mail
+ *    preenchido e volta pra oferta). Marcador próprio
+ *    `cobranca_recusada_pix_email` {via, com_acesso, oferta, link}, 1 envio
+ *    por pessoa, na vida. Texto em _shared/email-cobranca-pix.ts (testado).
+ *    POST {modo:"pix", preview:true} manda o e-mail pro PRÓPRIO admin logado,
+ *    com link de verdade, sem gravar marcador — é o QA do dono.
+ *  Endereços @privaterelay.appleid.com saem contados à parte no dry_run: só
+ *  chegam se o domínio de envio estiver registrado na Apple (Sign in with
+ *  Apple → "Configure Email Communication").
  */
 
 const log = (step: string, d?: unknown) =>
@@ -33,13 +46,19 @@ const RC_API = "https://api.revenuecat.com/v2";
 const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
 const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
 const MARCADOR = "cobranca_recusada_email";
+const MARCADOR_PIX = "cobranca_recusada_pix_email";
 const INTERVALO_MS = 20 * 86400_000;
 const URL_PAGAMENTO = "https://apps.apple.com/account/billing";
+const SITE = "https://www.coreaplicativo.com.br";
+// Destino do link: a oferta w97 no /planos (o `from` entra no planos_view)
+const DESTINO_PIX = "/planos?oferta=w97&from=cobranca_recusada_pix";
 // Cartão recusado com a pessoa ainda querendo continuar: na carência (com
 // acesso) ou depois dela, com a Apple ainda tentando (sem acesso).
 const RECUSADO = new Set(["in_grace_period", "in_billing_retry"]);
 const EH_TESTE = (email?: string | null) => !!email && /(^|[+.])teste|testeghg|jv20101958/i.test(email);
+const EH_PRIVATERELAY = (email: string) => /@privaterelay\.appleid\.com$/i.test(email);
 
+type Modo = "apple" | "pix";
 type SubRC = { id?: string; status?: string; store?: string; gives_access?: boolean; auto_renewal_status?: string };
 type Alvo = { id: string; email: string; nome: string; comAcesso: boolean };
 
@@ -98,14 +117,16 @@ async function montarAlvo(supabase: SupabaseClient, uid: string, secret: string)
   return { id: uid, email, nome, comAcesso: est.comAcesso };
 }
 
-async function jaRecebeu(supabase: SupabaseClient, ids: string[]): Promise<Set<string>> {
+/** Quem já recebeu: o marcador do modo. Apple = 1 a cada 20 dias; Pix = 1 na vida. */
+async function jaRecebeu(supabase: SupabaseClient, ids: string[], modo: Modo): Promise<Set<string>> {
   if (!ids.length) return new Set();
-  const { data } = await supabase
+  let q = supabase
     .from("analytics_events")
     .select("user_id")
-    .eq("event_name", MARCADOR)
-    .in("user_id", ids)
-    .gte("created_at", new Date(Date.now() - INTERVALO_MS).toISOString());
+    .eq("event_name", modo === "pix" ? MARCADOR_PIX : MARCADOR)
+    .in("user_id", ids);
+  if (modo === "apple") q = q.gte("created_at", new Date(Date.now() - INTERVALO_MS).toISOString());
+  const { data } = await q;
   return new Set((data || []).map((r: { user_id: string }) => r.user_id));
 }
 
@@ -123,6 +144,43 @@ async function enviar(supabase: SupabaseClient, a: Alvo, via: string, resendKey:
   });
 }
 
+/** Link do e-mail do Pix: mágico (entra logado e cai na oferta) ou, se o
+ *  GoTrue falhar, o /entrar com o e-mail preenchido e o mesmo destino. O
+ *  callback recebe `next` (só caminho interno — destino-seguro.ts) e `e`. */
+async function linkPix(supabase: SupabaseClient, email: string): Promise<{ link: string; tipo: "magic" | "comum" }> {
+  const q = new URLSearchParams({ next: DESTINO_PIX, e: email });
+  const comum = `${SITE}/entrar?${q.toString()}`;
+  try {
+    const { data: ml, error } = await supabase.auth.admin.generateLink({
+      type: "magiclink", email, options: { redirectTo: `${SITE}/auth/callback?${q.toString()}` },
+    });
+    if (error) throw error;
+    if (ml?.properties?.action_link) return { link: ml.properties.action_link, tipo: "magic" };
+  } catch (e) {
+    log("magic link falhou, vai o link comum", { msg: String((e as Error)?.message ?? e).slice(0, 120) });
+  }
+  return { link: comum, tipo: "comum" };
+}
+
+async function enviarPix(
+  supabase: SupabaseClient, a: Alvo, via: string, resendKey: string, from: string, opts: { gravar: boolean },
+) {
+  const { link, tipo } = await linkPix(supabase, a.email);
+  const dados = { nome: a.nome, comAcesso: a.comAcesso, email: a.email, link };
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [a.email], subject: assuntoEmailPix(a.nome), html: htmlEmailPix(dados), text: textoEmailPix(dados) }),
+  });
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  if (!opts.gravar) return;
+  await supabase.from("analytics_events").insert({
+    user_id: a.id,
+    event_name: MARCADOR_PIX,
+    event_data: { via, loja: "app_store", com_acesso: a.comAcesso, oferta: "w97", link: tipo, privaterelay: EH_PRIVATERELAY(a.email) },
+  });
+}
+
 serve(async (req) => {
   if (req.method !== "POST") return new Response("método", { status: 405 });
 
@@ -132,6 +190,7 @@ serve(async (req) => {
 
   // Quem chama: o revenuecat-webhook (service role) ou um admin logado.
   const doWebhook = !!serviceKey && jwt === serviceKey;
+  let adminEmail: string | null = null;
   if (!doWebhook) {
     const { data: quem } = await supabase.auth.getUser(jwt);
     if (!quem?.user) return Response.json({ error: "não autenticado" }, { status: 401 });
@@ -139,6 +198,7 @@ serve(async (req) => {
     if (!ehAdmin && !ADMIN_EMAILS.includes(String(quem.user.email ?? "").toLowerCase())) {
       return Response.json({ error: "não autorizado" }, { status: 403 });
     }
+    adminEmail = quem.user.email ?? null;
   }
 
   const body = await req.json().catch(() => ({}));
@@ -147,18 +207,27 @@ serve(async (req) => {
   if (!secret || !resendKey) return Response.json({ error: "sem REVENUECAT_SECRET_KEY/RESEND_API_KEY" }, { status: 500 });
   const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
   const from = fromBase.includes("<") ? `João do CORE <${fromBase.split("<")[1]}` : fromBase;
+  const modo: Modo = body?.modo === "pix" ? "pix" : "apple";
 
   try {
-    // Porta 1 — o webhook: uma pessoa.
+    // Porta 1 — o webhook: uma pessoa (sempre o e-mail da Apple; o Pix é o lote).
     if (doWebhook) {
       const uid = String(body?.userId ?? "");
       if (!/^[0-9a-f-]{36}$/i.test(uid)) return Response.json({ error: "userId" }, { status: 400 });
-      if ((await jaRecebeu(supabase, [uid])).has(uid)) return Response.json({ enviado: false, motivo: "ja_recebeu" });
+      if ((await jaRecebeu(supabase, [uid], "apple")).has(uid)) return Response.json({ enviado: false, motivo: "ja_recebeu" });
       const alvo = await montarAlvo(supabase, uid, secret);
       if (!alvo) return Response.json({ enviado: false, motivo: "fora_do_alvo" });
       await enviar(supabase, alvo, "webhook", resendKey, from);
       log("enviado", { uid: uid.slice(0, 8), comAcesso: alvo.comAcesso });
       return Response.json({ enviado: true });
+    }
+
+    // QA do dono: o e-mail do Pix pra ele mesmo, com link de verdade, sem marcador.
+    if (modo === "pix" && body?.preview === true) {
+      if (!adminEmail) return Response.json({ error: "sem e-mail do admin" }, { status: 400 });
+      await enviarPix(supabase, { id: "preview", email: adminEmail, nome: "João", comAcesso: true }, "preview", resendKey, from, { gravar: false });
+      log("preview enviado", { para: adminEmail.slice(0, 3) + "***" });
+      return Response.json({ preview: true, para: adminEmail });
     }
 
     // Porta 2 — o lote: toda assinatura da App Store (o prefixo subAap é da
@@ -169,7 +238,7 @@ serve(async (req) => {
       .eq("payment_method", "play_store")
       .like("revenuecat_subscription_id", "subAap%");
     const ids = [...new Set((subs || []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
-    const recebeu = await jaRecebeu(supabase, ids);
+    const recebeu = await jaRecebeu(supabase, ids, modo);
     const pendentes = ids.filter((id) => !recebeu.has(id));
 
     const alvos: Alvo[] = [];
@@ -178,23 +247,29 @@ serve(async (req) => {
       for (const a of lote) if (a) alvos.push(a);
     }
     const resumo = {
+      modo,
       assinaturas_apple: ids.length,
       ja_receberam: recebeu.size,
       cartao_recusado: alvos.length,
       com_acesso: alvos.filter((a) => a.comAcesso).length,
       sem_acesso: alvos.filter((a) => !a.comAcesso).length,
-      email_privaterelay: alvos.filter((a) => /privaterelay\.appleid\.com$/i.test(a.email)).length,
+      // só chegam se o domínio de envio estiver registrado na Apple
+      email_privaterelay: alvos.filter((a) => EH_PRIVATERELAY(a.email)).length,
     };
     if (!body?.enviar) {
       log("dry_run", resumo);
       return Response.json({ dry_run: true, ...resumo });
     }
 
+    const via = String(body?.via ?? (modo === "pix" ? "lote_pix_0110" : "lote_2809")).slice(0, 40);
     let enviados = 0;
     const erros: string[] = [];
     for (const a of alvos) {
-      try { await enviar(supabase, a, "lote_2809", resendKey, from); enviados++; }
-      catch (e) { erros.push(`${a.id.slice(0, 8)}: ${String(e).slice(0, 120)}`); }
+      try {
+        if (modo === "pix") await enviarPix(supabase, a, via, resendKey, from, { gravar: true });
+        else await enviar(supabase, a, via, resendKey, from);
+        enviados++;
+      } catch (e) { erros.push(`${a.id.slice(0, 8)}: ${String(e).slice(0, 120)}`); }
     }
     log("lote", { ...resumo, enviados, erros: erros.length });
     return Response.json({ ...resumo, enviados, erros });

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { persistLeadSource } from "@/lib/lead-source";
+import { destinoSeguro, pegarDestinoGuardado, urlEntrar } from "@/lib/destino-seguro";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -17,11 +18,29 @@ const AuthCallback = () => {
           ? window.location.hash.slice(1)
           : window.location.hash;
         const params = new URLSearchParams(hash);
+        const query = new URLSearchParams(window.location.search);
         const access_token = params.get("access_token");
         const refresh_token = params.get("refresh_token");
-        const errorDesc = params.get("error_description");
+        // implícito: erro vem no hash; PKCE: na query — lê os dois
+        const errorDesc = params.get("error_description") ?? query.get("error_description");
+
+        /* DESTINO DO LINK DE E-MAIL (01/10): `?next=` só com caminho interno
+         * permitido (destino-seguro.ts) — o e-mail de cartão recusado manda
+         * o link mágico pra /planos?oferta=w97. Login pelo Google/Apple perde
+         * a query na volta, então o /entrar guarda o destino antes de sair.
+         * `e` é o e-mail da pessoa, pro /entrar vir preenchido se o link
+         * mágico tiver vencido (ele vale pouco e é de uso único — leitores de
+         * e-mail que "abrem" links pra prévia já o gastam). */
+        const next = destinoSeguro(query.get("next")) ?? pegarDestinoGuardado();
+        const emailDoLink = query.get("e");
 
         if (errorDesc) {
+          if (next) {
+            trackEvent("auth_callback_link_vencido", { next });
+            toast({ title: "Esse link já venceu", description: "Entra com seu e-mail e você volta direto pra oferta." });
+            navigate(urlEntrar(next, emailDoLink), { replace: true });
+            return;
+          }
           toast({ title: "Erro ao confirmar conta", description: errorDesc, variant: "destructive" });
           navigate("/auth", { replace: true });
           return;
@@ -58,6 +77,18 @@ const AuthCallback = () => {
         const createdAt = u?.user?.created_at ? new Date(u.user.created_at).getTime() : 0;
         const isNewUser = createdAt > 0 && Date.now() - createdAt < 10 * 60 * 1000;
         if (isNewUser && u?.user?.id) await persistLeadSource(supabase, u.user.id);
+
+        if (next) {
+          // sem sessão (link já usado, aba antiga): a porta é o /entrar, que volta pro destino
+          if (!u?.user) {
+            navigate(urlEntrar(next, emailDoLink), { replace: true });
+            return;
+          }
+          trackEvent("auth_callback_next", { next });
+          window.history.replaceState({}, "", next);
+          navigate(next, { replace: true });
+          return;
+        }
 
         if (funnelPath) {
           if (isNewUser) {

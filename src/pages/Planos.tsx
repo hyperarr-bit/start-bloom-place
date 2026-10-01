@@ -216,24 +216,13 @@ const Planos = () => {
   // pega pelo teste de guarda em 20/07).
   const querDs = searchParams.get("oferta") === "ds";
   const ofertaDs = querDs && !isSubscribed;
-  // O preço na tela TEM que ser o que o QR vai cobrar. Antes era string fixa:
-  // quem chegava pelo h24 (link com ?oferta=ds) via o preço cheio na página e
-  // o valor com desconto no QR. Enquanto o QR abre sozinho isso passa batido,
-  // mas basta fechar o QR pra ficar de cara com a contradição.
-  // 20/09: web a 27,90 (oferta w27, a mesma do funil) — ver PaywallFlow
-  const precoNaTela = PIX_PRICES[ofertaDs ? "downsell" : "w27"];
-  const dsJaAbriu = useRef(false);
-  useEffect(() => {
-    if (!querDs || !subLoaded || isSubscribed || dsJaAbriu.current) return;
-    dsJaAbriu.current = true;
-    trackEvent("planos_ds_email_open");
-    setPixOpen(true);
-  }, [querDs, subLoaded, isSubscribed]);
   // Assinante lifetime não tem o que cancelar (nada renova) — esconde o botão.
   const [isLifetime, setIsLifetime] = useState(false);
   // 24/09: assinatura feita no APP (App Store/Google Play) só se cancela na
   // loja — o "Cancelar assinatura" daqui vira o passo a passo de lá.
   const [loja, setLoja] = useState<LojaDaAssinatura | null>(null);
+  // 01/10: a linha de assinatura já foi lida? (a oferta w97 abaixo espera por isto)
+  const [linhaLida, setLinhaLida] = useState(false);
   useEffect(() => {
     if (!isSubscribed || !user) return;
     // .limit(1) + order: contas antigas podem ter MAIS de uma linha (maybeSingle
@@ -245,8 +234,43 @@ const Planos = () => {
         const s = (data as unknown as Array<{ billing_period?: string | null; plan?: string | null; payment_method?: string | null; revenuecat_subscription_id?: string | null }> | null)?.[0];
         if (s?.billing_period === "lifetime" || s?.plan === "lifetime" || s?.plan === "premium") setIsLifetime(true);
         if (s?.payment_method === "play_store") setLoja(/Aap/.test(String(s.revenuecat_subscription_id ?? "")) ? "app_store" : "google_play");
+        setLinhaLida(true);
       });
   }, [isSubscribed, user]);
+
+  /* ?oferta=w97 (01/10): o e-mail de CARTÃO RECUSADO na App Store (cobranca-
+   * recusada, modo pix) oferece ficar no CORE pagando R$ 97,90 UMA VEZ no Pix,
+   * vitalício, no lugar dos 97,90 por ano da Apple. Quem chega está, em geral,
+   * na carência da Apple: `isSubscribed` é TRUE (a linha play_store ainda dá
+   * acesso) — sem este caminho a página diria "assinante" e travaria o botão.
+   * Regras: a oferta vale pra quem NÃO tem assinatura ou cujo acesso vem SÓ da
+   * loja; quem já é vitalício não a vê. Como depende da linha lida, enquanto
+   * não souber mostra "preparando" em vez de um preço que pode estar errado. */
+  const querW97 = searchParams.get("oferta") === "w97";
+  const prontoPraOferta = subLoaded && (!isSubscribed || linhaLida);
+  const acessoSoDaLoja = isSubscribed && loja !== null && !isLifetime;
+  const ofertaW97 = querW97 && prontoPraOferta && (!isSubscribed || acessoSoDaLoja);
+  const offer = ofertaW97 ? "w97" : ofertaDs ? "downsell" : "w27";
+  // O preço na tela TEM que ser o que o QR vai cobrar. Antes era string fixa:
+  // quem chegava pelo h24 (link com ?oferta=ds) via o preço cheio na página e
+  // o valor com desconto no QR. Enquanto o QR abre sozinho isso passa batido,
+  // mas basta fechar o QR pra ficar de cara com a contradição.
+  // 20/09: web a 27,90 (oferta w27, a mesma do funil) — ver PaywallFlow
+  const precoNaTela = PIX_PRICES[offer];
+  const dsJaAbriu = useRef(false);
+  useEffect(() => {
+    if (!querDs || !subLoaded || isSubscribed || dsJaAbriu.current) return;
+    dsJaAbriu.current = true;
+    trackEvent("planos_ds_email_open");
+    setPixOpen(true);
+  }, [querDs, subLoaded, isSubscribed]);
+  const w97JaAbriu = useRef(false);
+  useEffect(() => {
+    if (!ofertaW97 || w97JaAbriu.current) return;
+    w97JaAbriu.current = true;
+    trackEvent("planos_w97_email_open", { loja, assinante: isSubscribed });
+    setPixOpen(true);
+  }, [ofertaW97, loja, isSubscribed]);
 
   const handleCheckout = async () => {
     const { data: { user: u } } = await supabase.auth.getUser();
@@ -261,9 +285,18 @@ const Planos = () => {
 
   if (paymentReturn) return <PaymentSuccess />;
 
+  if (querW97 && !prontoPraOferta) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 px-4" data-testid="planos-preparando">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Preparando sua oferta…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {pixOpen && <PixCheckout offer={ofertaDs ? "downsell" : "w27"} context="app" onClose={() => setPixOpen(false)} />}
+      {pixOpen && <PixCheckout offer={offer} context="app" onClose={() => setPixOpen(false)} />}
       <PaymentStatus />
 
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
@@ -283,7 +316,11 @@ const Planos = () => {
         {isSubscribed && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center space-y-3">
             <p className="text-sm font-medium text-primary">
-              {isLifetime ? "Seu acesso ao CORE é VITALÍCIO 🎉 — nada a pagar, nunca." : "Você já é assinante CORE PRO"}
+              {isLifetime
+                ? "Seu acesso ao CORE é VITALÍCIO 🎉 — nada a pagar, nunca."
+                : ofertaW97
+                  ? `A ${loja === "app_store" ? "Apple" : "loja"} não conseguiu cobrar sua assinatura. Tudo o que você organizou continua aqui — e dá pra ficar no CORE pagando uma vez só, no Pix.`
+                  : "Você já é assinante CORE PRO"}
             </p>
             {!isLifetime && (
               <Button
@@ -336,9 +373,15 @@ const Planos = () => {
           </div>
 
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground line-through">
-              R$ 99,90
-            </p>
+            {ofertaW97 ? (
+              <p className="text-sm text-muted-foreground">
+                Em vez de R$ 97,90 <u>por ano</u> na {loja === "app_store" ? "App Store" : "loja"}:
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground line-through">
+                R$ 99,90
+              </p>
+            )}
             <div className="flex items-baseline gap-1">
               <span className="text-5xl font-bold tracking-tight">R$ {precoNaTela}</span>
               <span className="text-muted-foreground">uma vez</span>
@@ -352,10 +395,33 @@ const Planos = () => {
             className="w-full"
             size="lg"
             onClick={handleCheckout}
-            disabled={loading || isSubscribed}
+            disabled={loading || (isSubscribed && !ofertaW97)}
           >
-            {isSubscribed ? "Acesso já liberado" : `Gerar meu Pix de R$ ${precoNaTela}`}
+            {ofertaW97
+              ? `Pagar R$ ${precoNaTela} no Pix — uma vez só`
+              : isSubscribed ? "Acesso já liberado" : `Gerar meu Pix de R$ ${precoNaTela}`}
           </Button>
+
+          {/* Honestidade (01/10): depois do Pix, a renovação na loja tem que ser
+              cancelada pela pessoa — senão a Apple pode cobrar o anual se o
+              cartão voltar a passar. O e-mail diz o mesmo; aqui fica à mão. */}
+          {ofertaW97 && loja && (
+            <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 text-xs text-foreground/90 leading-relaxed space-y-1" data-testid="aviso-cancelar-loja">
+              <p className="font-semibold">Pra não pagar duas vezes</p>
+              {loja === "app_store" ? (
+                <p>
+                  Depois do Pix, cancele a renovação na Apple: <b>Ajustes → seu nome → Assinaturas → CORE → Cancelar assinatura</b>{" "}
+                  (ou <a className="underline" href="https://apps.apple.com/account/subscriptions" target="_blank" rel="noreferrer">apps.apple.com/account/subscriptions</a>).
+                  Se a Apple cobrar mesmo assim, me responde o e-mail que a gente resolve.
+                </p>
+              ) : (
+                <p>
+                  Depois do Pix, cancele a renovação no Google Play: <b>Play Store → seu perfil → Pagamentos e assinaturas → Assinaturas → CORE → Cancelar</b>.
+                  Se cobrarem mesmo assim, me responde o e-mail que a gente resolve.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -405,7 +471,7 @@ const Planos = () => {
       </main>
 
       {/* Sticky CTA mobile */}
-      {!isSubscribed && (
+      {(!isSubscribed || ofertaW97) && (
         <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-3">
             <div className="leading-tight">

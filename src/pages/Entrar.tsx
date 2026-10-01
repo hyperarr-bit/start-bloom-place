@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { destinoSeguro, guardarDestino } from "@/lib/destino-seguro";
 import { entrarComGoogle, entrarComApple } from "@/lib/auth-nativo";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ehApple } from "@/lib/loja";
@@ -59,8 +60,19 @@ const AppleIcon = () => (
 const Entrar = () => {
   const { user, loading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const app = isNativeShell();
-  const [email, setEmail] = useState("");
+  /* LINK DE E-MAIL (01/10): `?next=` (só caminho interno permitido — ver
+   * destino-seguro.ts) e `?e=` (e-mail preenchido). É a porta de quem clicou
+   * o link mágico do e-mail de cartão recusado depois de ele vencer: entra
+   * aqui e volta direto pra /planos?oferta=w97. O prefill de e-mail só existe
+   * neste caminho (fora dele a decisão do dono de não preencher continua). */
+  const next = destinoSeguro(params.get("next"));
+  const emailDoLink = (params.get("e") ?? "").trim();
+  const destinoPos = next ?? "/home";
+  // Quem veio pelo link não "comprou no tutorial": copy neutra, igual à do app.
+  const neutro = app || !!next;
+  const [email, setEmail] = useState(next && /\S+@\S+\.\S+/.test(emailDoLink) ? emailDoLink : "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,20 +96,21 @@ const Entrar = () => {
       setFailedOnce(true);
       setErrorMsg(
         error.message === "Invalid login credentials"
-          ? app
+          ? neutro
             ? "E-mail ou senha não bateram. Confere e tenta de novo."
             : "E-mail ou senha não bateram. Confere se é o mesmo e-mail que você usou no tutorial."
           : error.message,
       );
       setLoading(false);
     } else {
-      trackEvent("login_completed", { method: "password", source: "email_access" });
-      navigate("/home");
+      trackEvent("login_completed", { method: "password", source: "email_access", ...(next ? { next } : {}) });
+      navigate(destinoPos);
     }
   };
 
   const handleApple = async () => {
     setAppleLoading(true);
+    guardarDestino(next); // o OAuth sai do site; o /auth/callback lê isto na volta
     const { error } = await entrarComApple();
     if (error) {
       setErrorMsg("Não foi possível entrar com a Apple. Tente com e-mail e senha.");
@@ -107,6 +120,7 @@ const Entrar = () => {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
+    guardarDestino(next);
     // entrarComGoogle bifurca: web segue igual, app usa Custom Tab + core://auth
     // (no app o redirect antigo devolvia a pessoa no SITE — ver auth-nativo.ts)
     const { error } = await entrarComGoogle();
@@ -124,6 +138,9 @@ const Entrar = () => {
       </div>
     );
   }
+
+  // Veio do link de e-mail já logado: vai direto pro destino (a oferta).
+  if (user && next) return <Navigate to={next} replace />;
 
   // Já está logado (comprou e nem fechou o app): não pede nada, só abre a porta.
   if (user) {
@@ -187,15 +204,15 @@ const Entrar = () => {
             transition={{ delay: 0.15 }}
             className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 text-xs font-semibold"
           >
-            {app ? <Sparkles className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            {app ? "Bem-vindo de volta" : "Compra confirmada"}
+            {neutro ? <Sparkles className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            {neutro ? "Bem-vindo de volta" : "Compra confirmada"}
           </motion.div>
           <div className="space-y-1.5">
             <h1 className="text-[26px] leading-tight font-bold tracking-tight">
-              {app ? "Entrar no seu CORE" : "Seu acesso está liberado 🎉"}
+              {neutro ? "Entrar no seu CORE" : "Seu acesso está liberado 🎉"}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {app ? (
+              {neutro ? (
                 <>
                   Use o <strong className="text-foreground">e-mail</strong> e a{" "}
                   <strong className="text-foreground">senha</strong> da sua conta CORE.
@@ -290,7 +307,7 @@ const Entrar = () => {
             e não quer sair pro navegador (ver EntrarComCodigo). */}
         {/\S+@\S+\.\S+/.test(email) && (
           <div className="mt-3">
-            <EntrarComCodigo email={email} funil="entrar" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access" }); navigate("/home"); }} />
+            <EntrarComCodigo email={email} funil="entrar" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
           </div>
         )}
 
@@ -382,7 +399,7 @@ const Entrar = () => {
             contradição reprova na revisão do Play. */}
         <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          {app
+          {neutro
             ? "Seus dados ficam salvos na sua conta, em qualquer aparelho."
             : "Acesso vitalício: pagou uma vez, é seu pra sempre."}
         </p>

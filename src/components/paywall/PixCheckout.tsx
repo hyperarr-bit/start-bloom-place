@@ -196,7 +196,7 @@ const sementeSemConta = (): string => {
 
 /** Braço de quem abre o checkout — com a trava de preço: oferta fora de
  *  OFERTAS_NA_CAKTO nunca vai pra Cakto, venha o braço de onde vier. */
-const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer): Gateway => {
+export const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer): Gateway => {
   const braco = bracoSemTrava(uid, offer);
   return braco === "cakto" && !OFERTAS_NA_CAKTO.includes(offer) ? "asaas" : braco;
 };

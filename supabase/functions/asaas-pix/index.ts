@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -404,37 +405,42 @@ serve(async (req) => {
       }
 
       const now = new Date();
-      const { data: existing } = await supabaseAdmin.from("subscriptions")
-        .select("id, status, plan, billing_period, current_period_end").eq("user_id", user.id).maybeSingle();
-      const jaLiberado = existing?.status === "active" && existing?.plan === "lifetime";
+      /* 01/10: TODAS as linhas da pessoa, e a decisão em `decidirGrantPix`
+       * (_shared/linha-pix.ts). Antes era maybeSingle + update na linha que
+       * houvesse — e pra quem tinha a linha da App Store em carência o update
+       * virava ESSA linha em pix/vitalício; o RevenueCat depois a devolvia pra
+       * anual pela chave revenuecat_subscription_id e, no fim da carência, quem
+       * pagou 97,90 no Pix ficava sem acesso. A linha da loja agora nunca é
+       * tocada: o Pix escreve na própria ou insere uma nova. */
+      const { data: linhas } = await supabaseAdmin.from("subscriptions")
+        .select(COLUNAS_DECISAO).eq("user_id", user.id);
       const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
-      const eraVitalicio = existing?.status === "active" && existing?.billing_period === "lifetime";
-      if (eraVitalicio && concessao.dias !== null) {
+      const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], concessao, now);
+      if (decisao.acao === "preservar") {
         // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
         // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.
         logStep("Vitalício pagou o mês — linha preservada", { userId: user.id, offer, id });
         return jsonResponse({ paid: true, status: "CONFIRMED", jaVitalicio: true });
       }
+      const jaLiberado = decisao.jaLiberado;
       const vitalicio = concessao.dias === null;
-      const fim = new Date(now);
-      if (vitalicio) fim.setFullYear(fim.getFullYear() + 100);
-      else {
-        // mês pré-pago EMPILHA sobre período vigente — pagar de novo antes de vencer não encurta
-        const atual = existing?.current_period_end ? new Date(existing.current_period_end) : null;
-        fim.setTime((atual && atual > now ? atual : now).getTime());
-        fim.setDate(fim.getDate() + (concessao.dias ?? 30));
-      }
       const payload = {
         user_id: user.id, status: "active",
         plan: vitalicio ? "lifetime" : concessao.plano,
         billing_period: vitalicio ? "lifetime" : concessao.periodo,
         payment_method: "pix", abacatepay_billing_id: id, customer_email: user.email ?? null,
-        current_period_start: now.toISOString(), current_period_end: fim.toISOString(),
+        current_period_start: now.toISOString(), current_period_end: decisao.fim,
         amount_cents: PRECOS_CENTAVOS[offer],
       };
-      if (existing?.id) await supabaseAdmin.from("subscriptions").update(payload).eq("id", existing.id);
-      else await supabaseAdmin.from("subscriptions").insert(payload);
-      logStep("Access granted", { userId: user.id, offer, id, plano: payload.plan, ate: payload.current_period_end, jaLiberado });
+      const { error: grantErr } = decisao.acao === "atualizar"
+        ? await supabaseAdmin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
+        : await supabaseAdmin.from("subscriptions").insert(payload);
+      if (grantErr) {
+        // pagou e não gravou: o polling tenta de novo em 3 s e o pix-reconcile é a rede
+        logStep("Grant FALHOU", { userId: user.id, offer, id, message: grantErr.message });
+        return jsonResponse({ paid: false, status: "GRANT_ERROR" });
+      }
+      logStep("Access granted", { userId: user.id, offer, id, plano: payload.plan, ate: payload.current_period_end, jaLiberado, acao: decisao.acao });
 
       if (!jaLiberado) {
         const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();

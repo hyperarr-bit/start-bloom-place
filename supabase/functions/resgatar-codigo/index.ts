@@ -30,6 +30,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 interface Codigo {
   dias: number;
@@ -110,7 +111,7 @@ serve(async (req) => {
 
     const { data: linhas } = await admin
       .from("subscriptions")
-      .select("id, status, current_period_end, payment_method")
+      .select(COLUNAS_DECISAO)
       .eq("user_id", user.id);
     const agora = new Date();
     const lista = linhas ?? [];
@@ -135,7 +136,9 @@ serve(async (req) => {
     };
     // Uma linha por pessoa (é como o liberar_vitalicio e o webhook tratam a
     // tabela): se existe linha vencida/cancelada, vira a do código.
-    const existente = lista[0];
+    // 01/10: nunca a linha da LOJA (play_store / revenuecat_subscription_id) —
+    // ela é do RevenueCat, que a devolveria ao estado dele e apagaria o código.
+    const existente = linhaParaEscrever(lista as LinhaAssinatura[]);
     const { error } = existente
       ? await admin.from("subscriptions").update(payload).eq("id", existente.id)
       : await admin.from("subscriptions").insert(payload);

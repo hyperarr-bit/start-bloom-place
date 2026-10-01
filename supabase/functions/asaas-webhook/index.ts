@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -218,52 +219,42 @@ serve(async (req) => {
     const amountCents = PRECOS_CENTAVOS[offer];
 
     // grant idempotente + dedup com o polling do app
-    const { data: existing } = await admin.from("subscriptions")
-      .select("id, status, plan, billing_period, current_period_end").eq("user_id", userId).maybeSingle();
-    const jaLiberado = existing?.status === "active" && existing?.plan === "lifetime";
+    /* 01/10: TODAS as linhas da pessoa e a decisão em `decidirGrantPix`
+     * (_shared/linha-pix.ts) — a linha da App Store/Play é do RevenueCat e o
+     * Pix nunca escreve nela (antes o update virava a linha da loja em pix e o
+     * RC a devolvia pra anual pela chave revenuecat_subscription_id: no fim da
+     * carência da Apple quem pagou o Pix perdia o acesso). A trava de
+     * rebaixamento (vitalício que paga o mês → linha preservada, caso de
+     * reembolso) e o empilhamento do mês pré-pago vivem lá, testados. */
+    const { data: linhas } = await admin.from("subscriptions")
+      .select(COLUNAS_DECISAO).eq("user_id", userId);
     const { data: u } = await admin.auth.admin.getUserById(userId);
     const email = u?.user?.email ?? null;
     const now = new Date();
     const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
-
-    /* TRAVA DE REBAIXAMENTO: quem já é VITALÍCIO nunca pode virar linha de 30
-     * dias. Sem isto, um vitalício que passasse pelo checkout do mês (link
-     * antigo, aba esquecida, suporte) perderia o acesso em 30 dias sem que
-     * ninguém percebesse — o erro só apareceria um mês depois, como "sumiu
-     * meu acesso". Na dúvida o acesso maior vence. */
-    const eraVitalicio = existing?.billing_period === "lifetime";
-
-    /* Vitalício que paga o MÊS: a linha dele não se toca. Sobrescrever
-     * carimbaria amount_cents 2490 numa venda de 97,90 (o relatório de caixa
-     * passaria a mentir) e não daria nada a ele, que já tem tudo. O dinheiro
-     * fica visível no Asaas e no pix_order_created pro suporte devolver. */
-    if (eraVitalicio && concessao.dias !== null) {
+    const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], concessao, now);
+    if (decisao.acao === "preservar") {
       logStep("Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
       return jsonResponse({ received: true, granted: true, jaVitalicio: true });
     }
+    const jaLiberado = decisao.jaLiberado;
     const vitalicio = concessao.dias === null;
-
-    /* Mês pré-pago EMPILHA: se a pessoa ainda tem período válido, os 30 dias
-     * contam do fim dele, não de hoje — senão pagar de novo antes de vencer
-     * ENCURTA o acesso. Mesmo desenho do extend30 do cakto-webhook. */
-    const periodEnd = new Date(now);
-    if (vitalicio) periodEnd.setFullYear(periodEnd.getFullYear() + 100);
-    else {
-      const atual = existing?.current_period_end ? new Date(existing.current_period_end) : null;
-      const base = atual && atual > now ? atual : now;
-      periodEnd.setTime(base.getTime());
-      periodEnd.setDate(periodEnd.getDate() + (concessao.dias ?? 30));
-    }
     const payload = {
       user_id: userId, status: "active",
       plan: vitalicio ? "lifetime" : concessao.plano,
       billing_period: vitalicio ? "lifetime" : concessao.periodo,
       payment_method: "pix", abacatepay_billing_id: qrCodeId, customer_email: email, amount_cents: amountCents,
-      current_period_start: now.toISOString(), current_period_end: periodEnd.toISOString(),
+      current_period_start: now.toISOString(), current_period_end: decisao.fim,
     };
-    if (existing?.id) await admin.from("subscriptions").update(payload).eq("id", existing.id);
-    else await admin.from("subscriptions").insert(payload);
-    logStep("Access granted", { userId, offer, plano: payload.plan, ate: payload.current_period_end, qrCodeId: qrCodeId.slice(0, 20), jaLiberado });
+    const { error: grantErr } = decisao.acao === "atualizar"
+      ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
+      : await admin.from("subscriptions").insert(payload);
+    if (grantErr) {
+      // 200 mesmo assim (a fila do Asaas não pode pausar); o pix-reconcile credita depois
+      logStep("Grant FALHOU", { userId, offer, qrCodeId: qrCodeId.slice(0, 20), message: grantErr.message });
+      return jsonResponse({ received: true, granted: false, error: "grant_failed" });
+    }
+    logStep("Access granted", { userId, offer, plano: payload.plan, ate: payload.current_period_end, qrCodeId: qrCodeId.slice(0, 20), jaLiberado, acao: decisao.acao });
 
     if (!jaLiberado) {
       const { data: p } = await admin.from("profiles").select("display_name").eq("id", userId).maybeSingle();

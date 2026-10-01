@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, decidirGrantPix, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * Operações de SUPORTE do dono (17/07). Primeira: trocar o e-mail de login de
@@ -33,11 +34,16 @@ export async function transferirCompraPix(
 
   const { data: subDe } = await admin.from("subscriptions")
     .select("id, plan, billing_period, amount_cents, status, payment_method, created_at")
-    .eq("user_id", deUid).eq("payment_method", "pix").maybeSingle();
+    .eq("user_id", deUid).eq("payment_method", "pix").eq("status", "active")
+    .order("current_period_end", { ascending: false }).limit(1).maybeSingle();
   if (!subDe || subDe.status !== "active") return { erro: "origem_sem_pix_ativo" };
-  const { data: subPara } = await admin.from("subscriptions").select("id, status").eq("user_id", paraUid).maybeSingle();
-  if (subPara?.status === "active") return { erro: "destino_ja_tem_assinatura" };
-  if (subPara?.id) await admin.from("subscriptions").delete().eq("id", subPara.id); // casca inativa (expirada/cancelada) dá lugar à paga
+  /* 01/10: no destino só as linhas PRÓPRIAS contam — a da App Store/Play é do
+   * RevenueCat: nem barra a transferência (quem está na carência da Apple e
+   * pagou o Pix anônimo PRECISA receber a linha) nem pode ser apagada. */
+  const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", paraUid);
+  const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
+  if (propriasPara.some((l) => l.status === "active")) return { erro: "destino_ja_tem_assinatura" };
+  for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca inativa (expirada/cancelada) dá lugar à paga
 
   const emailPara = para.user.email ?? null;
   const { error } = await admin.from("subscriptions")
@@ -364,9 +370,13 @@ serve(async (req) => {
         ...(billing ? { abacatepay_billing_id: billing } : {}),
         current_period_start: now.toISOString(), current_period_end: fim.toISOString(),
       };
-      const { data: existing } = await admin.from("subscriptions").select("id").eq("user_id", alvo).maybeSingle();
-      if (existing?.id) await admin.from("subscriptions").update(payload).eq("id", existing.id);
-      else await admin.from("subscriptions").insert(payload);
+      // 01/10: nunca na linha da loja (ver _shared/linha-pix.ts)
+      const { data: linhas } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", alvo);
+      const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], { dias: null }, now);
+      const { error: grantErr } = decisao.acao === "atualizar"
+        ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
+        : await admin.from("subscriptions").insert(payload);
+      if (grantErr) return json({ error: `grant: ${grantErr.message}` }, 500);
 
       // boas-vindas (não-bloqueante) — ela já tem login, mas reforça o acesso
       let emailEnviado = false;

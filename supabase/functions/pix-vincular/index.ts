@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * VINCULAR COMPRA ANÔNIMA À CONTA DE VERDADE (17/09).
@@ -70,11 +71,16 @@ serve(async (req) => {
 
     const { data: subDe } = await admin.from("subscriptions")
       .select("id, plan, billing_period, amount_cents, status, created_at")
-      .eq("user_id", origem.id).eq("payment_method", "pix").maybeSingle();
+      .eq("user_id", origem.id).eq("payment_method", "pix").eq("status", "active")
+      .order("current_period_end", { ascending: false }).limit(1).maybeSingle();
     if (!subDe || subDe.status !== "active") return json({ ok: false, motivo: "origem_sem_pix" });
-    const { data: subPara } = await admin.from("subscriptions").select("id, status").eq("user_id", destino.id).maybeSingle();
-    if (subPara?.status === "active") return json({ ok: false, motivo: "destino_ja_tem_assinatura" });
-    if (subPara?.id) await admin.from("subscriptions").delete().eq("id", subPara.id); // casca expirada dá lugar à paga
+    /* 01/10: no destino só as linhas PRÓPRIAS contam — a da App Store/Play é do
+     * RevenueCat: nem barra o vínculo (carência da Apple + Pix pago) nem pode
+     * ser apagada (ver _shared/linha-pix.ts). */
+    const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", destino.id);
+    const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
+    if (propriasPara.some((l) => l.status === "active")) return json({ ok: false, motivo: "destino_ja_tem_assinatura" });
+    for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca expirada dá lugar à paga
 
     const { error } = await admin.from("subscriptions")
       .update({ user_id: destino.id, customer_email: destino.email ?? null }).eq("id", subDe.id);

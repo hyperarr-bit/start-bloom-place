@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, decidirGrantPix, ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -256,9 +257,13 @@ serve(async (req) => {
     for (let i = 0; i < uids.length; i += 100) {
       const lote = uids.slice(i, i + 100);
       const { data: subs } = await admin
-        .from("subscriptions").select("user_id, status, plan, billing_period, current_period_end").in("user_id", lote);
+        .from("subscriptions").select("id, user_id, status, plan, billing_period, current_period_end, payment_method, revenuecat_subscription_id").in("user_id", lote);
       for (const s of subs ?? []) {
         if (s.status !== "active") continue;
+        /* 01/10: linha da LOJA não tira ninguém da fila — quem está na carência
+         * da App Store (linha play_store ativa até o fim da carência) e pagou o
+         * Pix de 97,90 ficava "já tem" aqui e nunca era creditado pela rede. */
+        if (ehDaLoja(s as LinhaAssinatura)) continue;
         if (s.billing_period === "lifetime" || s.plan === "lifetime") { jaTem.add(String(s.user_id)); continue; }
         if (s.current_period_end && new Date(s.current_period_end) > new Date()) jaTem.add(String(s.user_id));
       }
@@ -306,10 +311,15 @@ serve(async (req) => {
           current_period_end: fim.toISOString(),
           amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer],
         };
-        const { data: existing } = await admin
-          .from("subscriptions").select("id").eq("user_id", uid).maybeSingle();
-        const { error: gErr } = existing?.id
-          ? await admin.from("subscriptions").update(payload).eq("id", existing.id)
+        /* 01/10: nunca na linha da loja (ver _shared/linha-pix.ts). `fim` vem
+         * daqui (contado da criação do QR), não da decisão — a decisão só diz
+         * em qual linha escrever. */
+        const { data: linhas } = await admin
+          .from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", uid);
+        const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], { dias }, inicio);
+        if (decisao.acao === "preservar") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
+        const { error: gErr } = decisao.acao === "atualizar"
+          ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
           : await admin.from("subscriptions").insert(payload);
         if (gErr) {
           falhas.push({ orderId: o.orderId, erro: gErr.message.slice(0, 120) });

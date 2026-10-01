@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 // ============================================================================
 // Webhook da Cakto — substitui o abacatepay-webhook para novas assinaturas.
@@ -296,11 +297,12 @@ serve(async (req) => {
         }
 
         const extend30 = async (uid: string) => {
-          const { data: s } = await supabaseClient
+          // 01/10: só a linha PRÓPRIA (a da loja é do RevenueCat; com 2+ linhas o maybeSingle dava erro)
+          const { data: todas } = await supabaseClient
             .from("subscriptions")
-            .select("id, current_period_end, plan, status")
-            .eq("user_id", uid)
-            .maybeSingle();
+            .select(COLUNAS_DECISAO)
+            .eq("user_id", uid);
+          const s = linhaParaEscrever((todas ?? []) as LinhaAssinatura[]);
           if (!s?.current_period_end || s.plan === "lifetime") return;
           const base = new Date(s.current_period_end);
           const from = base > new Date() ? base : new Date();
@@ -361,13 +363,26 @@ serve(async (req) => {
         ...(paidAmount > 0 ? { amount_cents: Math.round(paidAmount * 100) } : {}),
       };
 
-      const { data: updated, error: updateError } = await supabaseClient
-        .from("subscriptions")
-        .update(payload)
-        .eq("user_id", userId)
-        .select("id");
-      if (updateError) {
-        logStep("Update error", { message: updateError.message, userId });
+      /* 01/10: o update era `.eq("user_id", userId)` — TODAS as linhas da
+       * pessoa, inclusive a da App Store/Play (payment_method play_store +
+       * revenuecat_subscription_id). O RevenueCat depois devolvia essa linha
+       * pra anual pela chave dele e, no fim da carência da Apple, quem pagou a
+       * w27 no Pix perdia o acesso. Agora escreve só na linha PRÓPRIA
+       * (_shared/linha-pix.ts) ou insere. */
+      const { data: linhas } = await supabaseClient
+        .from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", userId);
+      const alvo = linhaParaEscrever((linhas ?? []) as LinhaAssinatura[]);
+      let updated: Array<{ id: string }> | null = null;
+      if (alvo) {
+        const { data: upd, error: updateError } = await supabaseClient
+          .from("subscriptions")
+          .update(payload)
+          .eq("id", alvo.id)
+          .select("id");
+        updated = upd as Array<{ id: string }> | null;
+        if (updateError) {
+          logStep("Update error", { message: updateError.message, userId });
+        }
       }
       if (!updated || updated.length === 0) {
         const { error: insertError } = await supabaseClient.from("subscriptions").insert(payload);
@@ -805,7 +820,8 @@ serve(async (req) => {
     async function updateStatus(userId: string | null, status: string) {
       let query = supabaseClient.from("subscriptions").update({ status });
       if (userId) {
-        query = query.eq("user_id", userId);
+        // 01/10: reembolso/cancelamento da Cakto não mexe na linha da LOJA (é do RevenueCat)
+        query = query.eq("user_id", userId).or("payment_method.is.null,payment_method.neq.play_store").is("revenuecat_subscription_id", null);
       } else if (subscriptionId) {
         query = query.eq("abacatepay_subscription_id", subscriptionId);
       } else {

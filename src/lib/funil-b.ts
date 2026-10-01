@@ -40,7 +40,7 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREA_PROOF, type AreaKey } from "@/lib/fu
 
 export type ModoFunilB = "off" | "kenny" | "on";
 
-export const FUNIL_B: ModoFunilB = "off";
+export const FUNIL_B: ModoFunilB = "kenny";
 
 /** A campanha kenny g (Meta, id da campanha — é o que vem em utm_campaign). */
 export const CAMPANHA_KENNY_G = "120250474048320041";

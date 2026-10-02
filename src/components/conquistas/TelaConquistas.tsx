@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Instagram, Trophy } from "lucide-react";
+import { ArrowLeft, Instagram, Lock, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -11,7 +11,8 @@ import { trackEvent } from "@/lib/analytics";
 import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { BadgeDetailSheet } from "@/components/gamification/BadgeDetailSheet";
 import { LEVELS, raridadeDe, type Badge } from "@/components/gamification/types";
-import { CAPAS, ORDEM_CAPAS, ehCapa, type CapaId } from "./CapaPlanner";
+import { AmostraDaCapa, CAPAS, CHAVE_CAPA, ORDEM_CAPAS, ehCapa, type CapaId } from "./CapaPlanner";
+import { capaLiberada, fraseDaCapaTravada, requisitoEmTexto } from "@/lib/fogo-sequencia";
 import { CardSequencia } from "./CardSequencia";
 import { CardProximo, GradeAdesivos } from "./GradeAdesivos";
 import { PlannerAberto, mesDaPagina } from "./PlannerAberto";
@@ -30,7 +31,7 @@ import { useInsignias } from "./use-insignias";
 import { useConquistas, usePerfilConquistas, useSequencia } from "./use-conquistas";
 import "./conquistas.css";
 
-export const CHAVE_CAPA = "conquistas-capa";
+export { CHAVE_CAPA };
 /** Quem escondeu o card "Desafio da semana" no Painel de Finanças (o adesivo Desafiante oferece religar). */
 export const CHAVE_DESAFIOS_OCULTOS = "finance-challenges-hidden";
 /** As figurinhas que a pessoa já viu no álbum (o pacotinho conta o que colou desde então). */
@@ -81,7 +82,8 @@ export const TelaConquistas = () => {
   const [dica, setDica] = useState(false);
   const desafiosOcultos = get<unknown>(CHAVE_DESAFIOS_OCULTOS, false) === true;
   const capaGravada = get<unknown>(CHAVE_CAPA, "grafite");
-  const capa: CapaId = ehCapa(capaGravada) ? capaGravada : "grafite";
+  // uma capa gravada que (ainda) não está liberada cai na grafite — o recorde nunca desce, então é só lixo
+  const capa: CapaId = ehCapa(capaGravada) && capaLiberada(capaGravada, seq.recorde) ? capaGravada : "grafite";
   const hoje = localDayKey();
 
   useEffect(() => {
@@ -130,6 +132,11 @@ export const TelaConquistas = () => {
     if (id === capa) return;
     set(CHAVE_CAPA, id);
     trackEvent("capa_trocar", { capa: id });
+  };
+  /** Capa travada (02/10): tocar mostra o requisito ("libera com 14 dias seguidos — faltam 9"). */
+  const avisarCapaTravada = (id: CapaId) => {
+    trackEvent("capa_travada_toque", { capa: id, recorde: seq.recorde });
+    toast(fraseDaCapaTravada(CAPAS[id].nome, id, seq.recorde), { id: "capa-travada", icon: "🔒" });
   };
 
   const faltaXp = conq.proximoNivel ? Math.max(0, conq.proximoNivel.minXP - conq.xp) : 0;
@@ -255,27 +262,34 @@ export const TelaConquistas = () => {
             <DicaDoPlanner aberta={dica && !plannerAberto} onAbrir={abrirPlanner} onEntendi={() => encerrarDica("entendi")} onFechar={fecharDica} />
           </div>
 
-          {/* no 360 o rótulo "CAPA" sai pra caber na mesma fileira (as bolinhas logo embaixo da capa já dizem) */}
-          <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-2.5 entra-sobe" style={{ "--d": "120ms" } as React.CSSProperties}>
-            <div role="radiogroup" aria-label="Capa do planner" className="h-11 rounded-xl border border-border flex items-center justify-center gap-2 px-1.5">
-              <span className="hidden min-[400px]:inline text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground">CAPA</span>
-              <span className="flex items-center">
+          {/* o seletor de CAPA (02/10): amostras do MATERIAL de cada capa; as que o tempo libera
+              (Bordô · 14 dias, Noite · 30) ficam com cadeado e dizem o requisito ao toque — sem bloco novo.
+              Em 360 o rótulo "CAPA" sai pra caber na mesma fileira. */}
+          <div className="grid gap-2.5 entra-sobe" style={{ "--d": "120ms", gridTemplateColumns: "1fr auto" } as React.CSSProperties}>
+            <div role="radiogroup" aria-label="Capa do planner" className="h-11 min-w-0 rounded-xl border border-border flex items-center gap-1.5 px-2" data-testid="seletor-capa">
+              <span className="hidden min-[430px]:inline text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground shrink-0">CAPA</span>
+              <span className="flex items-center justify-center flex-1 min-w-0">
                 {ORDEM_CAPAS.map((id) => {
                   const ativa = id === capa;
+                  const travada = !capaLiberada(id, seq.recorde);
                   return (
                     <button
                       key={id}
                       type="button"
                       role="radio"
                       aria-checked={ativa}
-                      aria-label={CAPAS[id].nome}
-                      onClick={() => trocarCapa(id)}
-                      className="w-6 h-6 grid place-items-center rounded-full"
+                      aria-label={travada ? `${CAPAS[id].nome} — ${requisitoEmTexto(id)}` : CAPAS[id].nome}
+                      data-capa-opcao={id}
+                      data-travada={travada ? "" : undefined}
+                      onClick={() => (travada ? avisarCapaTravada(id) : trocarCapa(id))}
+                      className="relative w-[22px] h-7 grid place-items-center shrink-0"
                     >
-                      <i
-                        className={`block w-[18px] h-[18px] rounded-full ${ativa ? "ring-2 ring-offset-1 ring-foreground ring-offset-background" : "border border-black/10 dark:border-white/25"}`}
-                        style={{ background: CAPAS[id].amostra }}
-                      />
+                      <AmostraDaCapa capa={id} tamanho={18} style={{ opacity: travada ? 0.42 : 1, outline: ativa ? "2px solid hsl(var(--foreground))" : undefined, outlineOffset: 1.5 }} />
+                      {travada && (
+                        <span className="absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full grid place-items-center bg-foreground text-background" aria-hidden>
+                          <Lock className="w-2 h-2" strokeWidth={3} />
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -284,7 +298,7 @@ export const TelaConquistas = () => {
             <button
               type="button"
               onClick={() => setSeletorAberto(true)}
-              className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+              className="h-11 px-3.5 rounded-xl bg-foreground text-background font-bold text-[13px] inline-flex items-center justify-center gap-1.5 active:scale-[0.99] transition-transform whitespace-nowrap"
               data-testid="postar-stories"
             >
               <Instagram className="w-[18px] h-[18px]" aria-hidden />

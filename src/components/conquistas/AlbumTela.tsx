@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight, Instagram, Lock, X } from "lucide-react";
 import { RARIDADE_PLURAL, categoriaDe, fracaoDe, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
 import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
@@ -205,31 +205,44 @@ export interface AlbumTelaProps {
 }
 
 /**
- * A VIRADA (02/10, vídeo do dono no iPhone: a animação passava por uma PÁGINA
- * BEGE VAZIA antes da página seguinte). A virada antiga girava a folha de 0°
- * a 180° com `backface-visibility: hidden` e um fade por keyframes, e a capa
- * trocava de z-index no instante em que começava a girar — três coisas que
- * cada motor (WebKit do iPhone, Chromium) resolve de um jeito, e no iPhone
- * sobrava uma folha em branco. Agora:
- *   · a folha que SAI gira só de 0° a −90° (até ficar de perfil) e some; a
- *     página de destino já está montada e inteira por baixo desde o 1º
- *     quadro — não existe estado em que a mesa mostra uma folha sem conteúdo;
- *   · voltar é o espelho: a página de destino DESDOBRA da lombada (−90° → 0°)
- *     por cima da atual;
- *   · a capa gira só até o perfil (0° → −90°), sempre na frente, e as
- *     figurinhas da 1ª página começam a colar no instante em que a capa
- *     revela a página (não 400 ms depois);
+ * A VIRADA 2.5D (02/10 à noite; a de b6e2dfad — folha só até o perfil — tirou
+ * a página em branco do iPhone, mas o dono viu "sobreposição/bug": "quero
+ * parecer um livro de verdade"). Agora a folha é uma FOLHA:
+ *   · duas faces (frente = a página, verso = o papel), girando na lombada de
+ *     0° a −180° com perspectiva; a partir de 90° aparece o verso;
+ *   · o sombreamento da frente escurece conforme deita, o verso nasce com luz
+ *     e um brilho de "dobra" corre pela folha com o ângulo (leve curvatura);
+ *   · a folha PROJETA sombra na página de baixo (cresce até 90°, some a 180°);
+ *   · ARRASTAR com o dedo: a folha acompanha; soltar passada de 1/3 (ou com
+ *     velocidade) completa, senão volta; voltar é o espelho (a folha de
+ *     destino desdobra da lombada, −180° → 0°);
+ *   · NUNCA página em branco: o destino está montado e inteiro por baixo
+ *     desde o 1º quadro; toques rápidos trocam a folha na hora (chave nova);
+ *   · a capa é a mesma folha (frente = capa, verso = a 2ª capa, "este álbum
+ *     pertence a…"), sempre na frente, até deitar;
+ *   · tudo em transform/opacity (compositor; fluido no WebView); "reduzir
+ *     movimento" = troca simples, sem folha;
  *   · cada página é um contexto de empilhamento (`isolation`): a pílula do
- *     progresso de uma página não vaza por cima da folha que está virando.
- * Nada de backface nem de ordenação 3D entre irmãos: só uma folha girando até
- * o perfil por cima de uma página pronta.
+ *     progresso não vaza por cima da folha.
+ * Avaliei StPageFlip/react-pageflip: no modo HTML a folha também é rígida
+ * (a dobra "soft" é só pra imagens em canvas), exige tamanho fixo e pesa ~45
+ * KB gzip — não ganharia nada sobre isto aqui.
  */
-export const DURACAO_VIRADA_MS = 340;
+export const DURACAO_VIRADA_MS = 560;
 /** A capa fica parada este tempo antes de virar (a pessoa vê a capa). */
 export const CAPA_PARADA_MS = 500;
-export const CAPA_GIRO_MS = 420;
-/** O instante em que a capa revela a 1ª página = quando as figurinhas começam a colar. */
-export const CAPA_REVELA_MS = CAPA_PARADA_MS + CAPA_GIRO_MS;
+export const CAPA_GIRO_MS = 640;
+/** O instante em que a capa revela a 1ª página (passa do perfil) = quando as figurinhas começam a colar. */
+export const CAPA_REVELA_MS = CAPA_PARADA_MS + Math.round(CAPA_GIRO_MS * 0.45);
+/** Quando a capa deitou de vez e sai da tela (com a folga da rede de segurança). */
+export const CAPA_SAI_MS = CAPA_PARADA_MS + CAPA_GIRO_MS + 120;
+/** Passada desta fração, soltar completa a virada. */
+export const FRACAO_PRA_COMPLETAR = 0.34;
+/** Velocidade (graus/ms) que completa mesmo antes da fração. */
+const VELOCIDADE_PRA_COMPLETAR = 0.35;
+/** Arrasto mínimo (px) pra virar um gesto. */
+const ARRASTO_MINIMO = 8;
+const EASE_FRENTE: [number, number, number, number] = [0.42, 0, 0.3, 1];
 
 interface Virada {
   /** A folha que gira por cima: pra frente é a página que sai; pra trás, a que entra. */
@@ -240,7 +253,84 @@ interface Virada {
   fundoIndice: number;
   dir: 1 | -1;
   chave: number;
+  /** Onde a folha termina quando completa (índice de página). */
+  alvo: number;
+  /** Veio do dedo (o ângulo é do gesto) ou de um toque (anima sozinha). */
+  manual: boolean;
 }
+
+/** O ângulo por onde a folha passa de perfil (a frente some, o verso aparece). */
+const PERFIL = -90;
+/** Câmera lenta SÓ no servidor de desenvolvimento (prints/vídeo): `window.__coreCameraLenta = 6` deixa a virada 6× mais lenta. */
+const lento = (): number => {
+  if (!import.meta.env.DEV || typeof window === "undefined") return 1;
+  const v = Number((window as unknown as { __coreCameraLenta?: unknown }).__coreCameraLenta);
+  return Number.isFinite(v) && v >= 1 ? v : 1;
+};
+
+/**
+ * A FOLHA 3D: frente, verso, o sombreamento e o brilho de dobra — tudo
+ * derivado do ângulo (motion value), sem re-render.
+ */
+const Folha3D = ({ rot, frente, verso, zIndex, raio, testid, dir, pagina }: {
+  rot: MotionValue<number>; frente: ReactNode; verso: ReactNode; zIndex: number; raio: string; testid: string; dir: 1 | -1; pagina?: string;
+}) => {
+  // a frente escurece até o perfil; o verso nasce iluminado e assenta
+  const sombraFrente = useTransform(rot, [0, PERFIL], [0, 0.55]);
+  const luzVerso = useTransform(rot, [PERFIL, -180], [0.5, 0]);
+  // QUAL FACE APARECE é decidida pelo ângulo, não por `backface-visibility` (02/10: no WebKit, uma face com
+  // overflow/stacking próprio ignora o backface e o verso era pintado por cima da frente — a "folha em branco")
+  const frenteVisivel = useTransform(rot, (v) => (v > PERFIL ? 1 : 0));
+  const versoVisivel = useTransform(rot, (v) => (v > PERFIL ? 0 : 1));
+  // o brilho da dobra corre da borda externa até a lombada enquanto a folha levanta
+  const dobraX = useTransform(rot, [0, PERFIL], ["78%", "-20%"]);
+  const dobraOpacidade = useTransform(rot, [0, -25, -70, PERFIL], [0, 0.35, 0.35, 0]);
+  return (
+    <motion.div
+      className="alb-folha-3d"
+      data-testid={testid}
+      data-dir={dir > 0 ? "frente" : "tras"}
+      data-pagina={pagina}
+      style={{ rotateY: rot, zIndex, borderRadius: raio }}
+      aria-hidden
+    >
+      <motion.div className="alb-face alb-face-frente" style={{ borderRadius: raio, opacity: frenteVisivel }}>
+        {frente}
+        <motion.div className="alb-face-sombra" style={{ opacity: sombraFrente }} />
+        <motion.div className="alb-face-dobra" style={{ left: dobraX, opacity: dobraOpacidade }} />
+      </motion.div>
+      <motion.div className="alb-face alb-face-verso" style={{ borderRadius: raio, opacity: versoVisivel }}>
+        {verso}
+        <motion.div className="alb-face-luz" style={{ opacity: luzVerso }} />
+      </motion.div>
+    </motion.div>
+  );
+};
+
+/** A sombra que a folha projeta na página de baixo (cresce até o perfil, some deitada). */
+const SombraProjetada = ({ rot }: { rot: MotionValue<number> }) => {
+  const opacidade = useTransform(rot, [0, -30, PERFIL, -150, -180], [0, 0.3, 0.5, 0.3, 0]);
+  const escala = useTransform(rot, (v) => Math.max(0.05, Math.abs(Math.sin((v * Math.PI) / 180))));
+  return <motion.div className="alb-sombra-projetada" style={{ opacity: opacidade, scaleX: escala }} aria-hidden />;
+};
+
+/** O verso de uma página do álbum: papel com a trama e um carimbo discreto. */
+const VersoDaPagina = ({ ano }: { ano: number }) => (
+  <div className="alb-verso">
+    <span className="alb-verso-carimbo">ÁLBUM CORE · {ano}</span>
+  </div>
+);
+
+/** A 2ª capa (o verso da capa): "este álbum pertence a …". */
+const VersoDaCapa = ({ nome, ano }: { nome: string; ano: number }) => (
+  <div className="alb-verso alb-verso-capa">
+    <div className="alb-verso-dono">
+      <span>este álbum pertence a</span>
+      <b>{nome}</b>
+      <i>CORE · {ano}</i>
+    </div>
+  </div>
+);
 
 export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = useReducedMotion();
@@ -262,6 +352,10 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
    */
   const [abertura, setAbertura] = useState(true);
   const novasSet = useRef<Set<string>>(new Set());
+  /** O ângulo da folha que está virando (0 → −180 pra frente; −180 → 0 pra trás). */
+  const rot = useMotionValue(0);
+  const rotCapa = useMotionValue(0);
+  const animacao = useRef<ReturnType<typeof animate> | null>(null);
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined") setLargura(Math.min(330, Math.max(240, window.innerWidth - 48)));
@@ -280,10 +374,15 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     if (reduzir) return;
     setCapaVisivel(true);
     setCapaGirada(false);
-    const t1 = setTimeout(() => setCapaGirada(true), CAPA_PARADA_MS);
+    rotCapa.set(0);
+    let a: ReturnType<typeof animate> | null = null;
+    const t1 = setTimeout(() => {
+      setCapaGirada(true);
+      a = animate(rotCapa, -180, { duration: (CAPA_GIRO_MS * lento()) / 1000, ease: EASE_FRENTE, onComplete: () => setCapaVisivel(false) });
+    }, CAPA_PARADA_MS);
     // rede de segurança: se o fim da animação não avisar, a capa sai no tempo dela
-    const t2 = setTimeout(() => setCapaVisivel(false), CAPA_REVELA_MS + 120);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    const t2 = setTimeout(() => setCapaVisivel(false), CAPA_PARADA_MS + CAPA_GIRO_MS * lento() + 120);
+    return () => { clearTimeout(t1); clearTimeout(t2); a?.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
 
@@ -302,29 +401,97 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   }, [aberto, detalhe, onFechar]);
 
   const chaveDaVirada = useRef(0);
+  const terminarVirada = useCallback((chave: number) => setVirando((v) => (v && v.chave === chave ? null : v)), []);
+
+  /** Monta a virada de `de` pra `alvo` (sem animar): a folha e o que fica por baixo. */
+  const montarVirada = useCallback((de: number, alvo: number, manual: boolean): Virada => {
+    const dir: 1 | -1 = alvo > de ? 1 : -1;
+    chaveDaVirada.current += 1;
+    return dir > 0
+      ? { sobre: paginas[de], sobreIndice: de, fundo: paginas[alvo], fundoIndice: alvo, dir, chave: chaveDaVirada.current, alvo, manual }
+      : { sobre: paginas[alvo], sobreIndice: alvo, fundo: paginas[de], fundoIndice: de, dir, chave: chaveDaVirada.current, alvo, manual };
+  }, [paginas]);
+
   const irPara = useCallback((i: number) => {
     const alvo = Math.max(0, Math.min(n - 1, i));
     if (alvo === atual) return;
     if (!reduzir) {
-      const dir: 1 | -1 = alvo > atual ? 1 : -1;
       // toques rápidos em sequência: cada toque é uma virada nova (chave própria); a anterior sai na hora
-      chaveDaVirada.current += 1;
-      setVirando(dir > 0
-        ? { sobre: paginas[atual], sobreIndice: atual, fundo: paginas[alvo], fundoIndice: alvo, dir, chave: chaveDaVirada.current }
-        : { sobre: paginas[alvo], sobreIndice: alvo, fundo: paginas[atual], fundoIndice: atual, dir, chave: chaveDaVirada.current });
+      animacao.current?.stop();
+      const v = montarVirada(atual, alvo, false);
+      rot.set(v.dir > 0 ? 0 : -180);
+      setVirando(v);
+      animacao.current = animate(rot, v.dir > 0 ? -180 : 0, { duration: (DURACAO_VIRADA_MS * lento()) / 1000, ease: EASE_FRENTE, onComplete: () => terminarVirada(v.chave) });
     }
     setAtual(alvo);
     setAbertura(false);
     trackEvent("album_pagina", { indice: alvo, secao: paginas[alvo]?.id });
-  }, [atual, n, paginas, reduzir]);
+  }, [atual, n, paginas, reduzir, montarVirada, rot, terminarVirada]);
 
-  // a folha some quando a animação termina (onAnimationComplete); este relógio é a rede de segurança
+  // a folha some quando a animação termina (onComplete); este relógio é a rede de segurança
   useEffect(() => {
-    if (!virando) return;
-    const t = setTimeout(() => setVirando((v) => (v && v.chave === virando.chave ? null : v)), DURACAO_VIRADA_MS + 200);
+    if (!virando || virando.manual) return;
+    const t = setTimeout(() => setVirando((v) => (v && v.chave === virando.chave ? null : v)), DURACAO_VIRADA_MS * lento() + 200);
     return () => clearTimeout(t);
   }, [virando]);
-  const terminarVirada = useCallback((chave: number) => setVirando((v) => (v && v.chave === chave ? null : v)), []);
+
+  /* ------------------------------------------------------------ o dedo */
+  const gesto = useRef<{ x0: number; t0: number; ultimoX: number; ultimoT: number; virada: Virada | null; arrastou: boolean } | null>(null);
+  const aoPressionar = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (detalhe || capaVisivel || e.pointerType === "mouse" && e.button !== 0) return;
+    gesto.current = { x0: e.clientX, t0: Date.now(), ultimoX: e.clientX, ultimoT: Date.now(), virada: null, arrastou: false };
+  };
+  const aoMover = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gesto.current;
+    if (!g) return;
+    const dx = e.clientX - g.x0;
+    if (!g.virada) {
+      if (Math.abs(dx) < ARRASTO_MINIMO) return;
+      const alvo = dx < 0 ? atual + 1 : atual - 1;
+      if (alvo < 0 || alvo >= n) { gesto.current = null; return; }
+      if (reduzir) { gesto.current = null; irPara(alvo); return; }
+      animacao.current?.stop();
+      // uma folha já animando: o gesto assume o controle dela
+      const v = montarVirada(atual, alvo, true);
+      g.virada = v;
+      g.arrastou = true;
+      rot.set(v.dir > 0 ? 0 : -180);
+      setVirando(v);
+      setAbertura(false);
+      try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch { /* jsdom */ }
+    }
+    const v = g.virada;
+    // o ângulo acompanha o dedo: a largura inteira = 180° (um pouco mais rápido que o dedo, como papel)
+    const fracao = Math.max(0, Math.min(1, (Math.abs(dx) / Math.max(120, largura)) * 1.25));
+    rot.set(v.dir > 0 ? -180 * fracao : -180 + 180 * fracao);
+    g.ultimoX = e.clientX;
+    g.ultimoT = Date.now();
+  };
+  const aoSoltar = () => {
+    const g = gesto.current;
+    gesto.current = null;
+    if (!g || !g.virada) return;
+    const v = g.virada;
+    const angulo = rot.get();
+    const fracao = v.dir > 0 ? Math.abs(angulo) / 180 : 1 - Math.abs(angulo) / 180;
+    const dt = Math.max(1, Date.now() - g.ultimoT);
+    const velocidade = Math.abs(g.ultimoX - g.x0) / Math.max(1, Date.now() - g.t0) * (180 / Math.max(120, largura)) * 1.25; // graus/ms, média do gesto
+    const completa = fracao >= FRACAO_PRA_COMPLETAR || (velocidade >= VELOCIDADE_PRA_COMPLETAR && dt < 160);
+    const fim = completa ? (v.dir > 0 ? -180 : 0) : (v.dir > 0 ? 0 : -180);
+    const restante = Math.abs(fim - angulo) / 180;
+    if (completa) {
+      setAtual(v.alvo);
+      trackEvent("album_pagina", { indice: v.alvo, secao: paginas[v.alvo]?.id, via: "arrasto" });
+    }
+    animacao.current?.stop();
+    animacao.current = animate(rot, fim, { duration: Math.max(0.16, (DURACAO_VIRADA_MS * lento() / 1000) * restante), ease: EASE_FRENTE, onComplete: () => terminarVirada(v.chave) });
+    // rede de segurança do gesto
+    setTimeout(() => terminarVirada(v.chave), DURACAO_VIRADA_MS * lento() + 200);
+  };
+  // um arrasto não vira toque numa vaga
+  const aoClicarCapturando = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (virando?.manual) { e.stopPropagation(); e.preventDefault(); }
+  };
 
   // cada figurinha NOVA cola UMA vez: depois que a página dela apareceu, sai da lista (voltar à página não cola de novo)
   useEffect(() => {
@@ -343,6 +510,11 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const abas = [{ id: "mais-raros", rot: "★", rar: "destaque" as const }, ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", rot: TITULO_SECAO[r].slice(0, 3), rar: r })).filter((s) => s.id)];
   const ativaAba = (s: { id: string; rar: string }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar);
   const alturaCapa = Math.round(largura * 1.42);
+  const RAIO = "6px 14px 14px 6px";
+  // o que fica por baixo enquanto a folha gira: pra frente é o destino; pra trás, a que sai. Quando a virada
+  // manual volta atrás (soltou cedo), `atual` não mudou e a folha deita de novo sobre a mesma página.
+  const fundo = virando ? virando.fundo : pagina;
+  const fundoIndice = virando ? virando.fundoIndice : atual;
 
   return (
     <motion.div className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
@@ -368,28 +540,51 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
         <motion.div className="alb-livro" style={{ width: largura }} initial={reduzir ? false : { y: 26, scale: 0.965 }} animate={{ y: 0, scale: 1 }} transition={{ duration: 0.48, ease: "easeOut" }}>
           <div className="alb-lombada" />
           <div className="alb-pilha" />
-          <div className="alb-folha" data-folha="" style={{ perspective: 1200 }}>
+          <div
+            className="alb-folha"
+            data-folha=""
+            data-arrastavel=""
+            onPointerDown={aoPressionar}
+            onPointerMove={aoMover}
+            onPointerUp={aoSoltar}
+            onPointerCancel={aoSoltar}
+            onClickCapture={aoClicarCapturando}
+          >
             {/* a página de baixo: pra frente já é a de destino (inteira, desde o 1º quadro); pra trás é a que sai */}
-            <Pagina p={virando ? virando.fundo : pagina} indice={virando ? virando.fundoIndice : atual} total={n} largura={largura} adesivos={adesivos} ativa={!virando} colar={colar} atrasoBase={capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />
-            {/* a folha que gira: sem animação de saída (a −90° ela está de perfil, invisível) — some na hora, e um
+            <Pagina p={fundo} indice={fundoIndice} total={n} largura={largura} adesivos={adesivos} ativa={!virando} colar={colar} atrasoBase={capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />
+            {virando && <SombraProjetada rot={rot} />}
+            {/* a folha que gira: frente = a página, verso = o papel; some deitada (−180°, fora do livro) — um
                 toque rápido em sequência troca a folha pela nova (chave) sem sobra */}
             {virando && (
-              <motion.div
+              <Folha3D
                 key={virando.chave}
-                className="alb-pag-vira"
-                data-testid="album-virando"
-                data-dir={virando.dir > 0 ? "frente" : "tras"}
-                data-pagina={virando.sobre.id}
-                initial={{ rotateY: virando.dir > 0 ? 0 : -90 }}
-                animate={{ rotateY: virando.dir > 0 ? -90 : 0 }}
-                transition={{ duration: DURACAO_VIRADA_MS / 1000, ease: virando.dir > 0 ? [0.5, 0, 0.9, 0.4] : [0.1, 0.6, 0.5, 1] }}
-                onAnimationComplete={() => terminarVirada(virando.chave)}
-                aria-hidden
-              >
-                <Pagina p={virando.sobre} indice={virando.sobreIndice} total={n} largura={largura} adesivos={adesivos} ativa={false} colar={null} atrasoBase={0} diasDeSequencia={diasDeSequencia} onSelecionar={() => undefined} />
-                {/* a sombra da folha dobrando (escurece conforme deita) */}
-                <motion.div aria-hidden className="alb-pag-sombra" initial={{ opacity: virando.dir > 0 ? 0 : 0.35 }} animate={{ opacity: virando.dir > 0 ? 0.35 : 0 }} transition={{ duration: DURACAO_VIRADA_MS / 1000 }} />
-              </motion.div>
+                rot={rot}
+                zIndex={3}
+                raio={RAIO}
+                testid="album-virando"
+                dir={virando.dir}
+                pagina={virando.sobre.id}
+                frente={<Pagina p={virando.sobre} indice={virando.sobreIndice} total={n} largura={largura} adesivos={adesivos} ativa={false} colar={null} atrasoBase={0} diasDeSequencia={diasDeSequencia} onSelecionar={() => undefined} />}
+                verso={<VersoDaPagina ano={ano} />}
+              />
+            )}
+            {/* a capa, por cima, girando na lombada ao abrir — sempre NA FRENTE, deita até −180° e sai; a partir do
+                perfil as figurinhas da 1ª página começam a colar */}
+            {capaVisivel && (
+              <>
+                <SombraProjetada rot={rotCapa} />
+                <div data-testid="album-capa-3d" data-girada={capaGirada ? "" : undefined} style={{ zIndex: 6, position: "absolute", inset: 0, pointerEvents: "none" }}>
+                  <Folha3D
+                    rot={rotCapa}
+                    zIndex={6}
+                    raio={RAIO}
+                    testid="album-capa-folha"
+                    dir={1}
+                    frente={<CapaAlbum largura={largura} altura={alturaCapa} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
+                    verso={<VersoDaCapa nome={nome} ano={ano} />}
+                  />
+                </div>
+              </>
             )}
           </div>
           <div className="alb-abas" role="tablist" aria-label="Seções do álbum">
@@ -397,25 +592,6 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
               <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-ativa={ativaAba(s) ? "" : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.rar}`}>{s.rot}</button>
             ))}
           </div>
-          {/* a capa, por cima, girando na lombada ao abrir — sempre NA FRENTE, só até o perfil (−90°), e sai */}
-          {capaVisivel && (
-            <>
-              <motion.div
-                aria-hidden
-                className="absolute inset-0"
-                style={{ transformOrigin: "0 50%", zIndex: 6, borderRadius: "6px 14px 14px 6px", willChange: "transform" }}
-                initial={{ rotateY: 0 }}
-                animate={{ rotateY: capaGirada ? -90 : 0 }}
-                transition={{ duration: CAPA_GIRO_MS / 1000, ease: [0.5, 0, 0.85, 0.5] }}
-                onAnimationComplete={() => { if (capaGirada) setCapaVisivel(false); }}
-                data-testid="album-capa-3d"
-                data-girada={capaGirada ? "" : undefined}
-              >
-                <CapaAlbum largura={largura} altura={alturaCapa} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />
-              </motion.div>
-              <motion.div aria-hidden className="absolute inset-0 pointer-events-none" style={{ zIndex: 5, borderRadius: "6px 14px 14px 6px", background: "linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 70%)" }} initial={{ opacity: 0 }} animate={{ opacity: capaGirada ? 0.4 : 0 }} transition={{ duration: CAPA_GIRO_MS / 1000 }} />
-            </>
-          )}
         </motion.div>
         <div className="alb-nav2">
           <button type="button" className="alb-seta border-0" onClick={() => irPara(atual - 1)} disabled={atual === 0} aria-label="Página anterior" data-testid="album-tela-anterior"><ChevronLeft className="w-5 h-5" /></button>

@@ -4,7 +4,8 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
 import { TelaConquistas } from "@/components/conquistas/TelaConquistas";
-import { MomentoAdesivo, MomentoPopup } from "@/components/conquistas/Momentos";
+import { MomentoAdesivo, MomentoCapa, MomentoPopup } from "@/components/conquistas/Momentos";
+import { ehCapa, type CapaId } from "@/components/conquistas/CapaPlanner";
 import { useConquistas } from "@/components/conquistas/use-conquistas";
 
 /**
@@ -18,6 +19,12 @@ import { useConquistas } from "@/components/conquistas/use-conquistas";
  * colado: "COMEÇANDO O ÁLBUM") · ?desafios=off · ?bar=0 · ?valores=1
  * (mostrar R$/peso) · ?dica=0 (sem a dica do planner) · ?novas=2 (pacotinho
  * com 2 figurinhas novas) · ?tema=escuro.
+ *
+ * (02/10) capas, fogo e ação do dia: ?capa=grafite|vichy|salvia|lavanda|kraft|marinho|bordo|noite ·
+ * ?dias=N (N dias seguidos até ontem; &hoje=1 inclui hoje) · ?recorde=N (uma corrida antiga de N dias:
+ * libera as capas sem mexer na sequência de agora) · ?faixa-vista=0..4 (a última faixa vista: menor que a
+ * de agora = toca a subida) · ?perfil=financas|rotina-treino|tudo (quem a pessoa é, pra ação do dia) ·
+ * ?momento=capa (o popup "Capa nova liberada") · ?sem-fogo-visto=1.
  */
 
 const dias = (de: number, ate: number, hoje: string, pular: string[] = []) => {
@@ -173,6 +180,41 @@ const BarraDev = ({ hoje }: { hoje: string }) => {
 import { useContext } from "react";
 const useContextDev = () => useContext(UserDataContext)!;
 
+/** Os dias da semana (0 = domingo) em que a pessoa do perfil "rotina-treino" treina: terça, quinta e sábado. */
+const DIAS_DE_TREINO = new Set([2, 4, 6]);
+
+/** Perfis pra ação do dia: só Finanças · Rotina+Treino (treino ter/qui/sáb) · usa tudo (as sementes de sempre). */
+const aplicarPerfil = (s: Record<string, unknown>, perfil: string | null, hoje: string) => {
+  if (!perfil || perfil === "tudo") return;
+  for (const k of ["heatmap-log", "rotina-habit-log", "saude-workout-log", "dieta-diary-v2", "water-log", "mood-log", "sleep-log", "lib-read-log", "pomodoro-log", "journal-entries", "treino-weekly-volume", "finance-expenses", "finance-incomes", "detox-habits"]) delete s[k];
+  if (perfil === "financas") {
+    // gasto em 11 dos últimos 14 dias (até ontem), e mais nada
+    s["finance-expenses"] = dias(14, 1, hoje).filter((_, i) => i % 5 !== 4).map((d, i) => ({ id: `p${i}`, name: "Mercado", value: 40 + i, category: "mercado", date: d }));
+    return;
+  }
+  if (perfil === "rotina-treino") {
+    // hábito em 10 dos últimos 14 dias; treino só nas terças, quintas e sábados das últimas 4 semanas
+    s["heatmap-log"] = Object.fromEntries(dias(14, 1, hoje).filter((_, i) => i % 7 !== 3 && i % 7 !== 5).map((d) => [d, true]));
+    s["saude-workout-log"] = dias(28, 1, hoje).filter((d) => DIAS_DE_TREINO.has(new Date(`${d}T12:00:00`).getDay()));
+    s["treino-active-days"] = ["TERÇA", "QUINTA", "SÁBADO"];
+  }
+};
+
+const MomentoCapaDemo = ({ onFechar }: { onFechar: () => void }) => {
+  const ctx = useContextDev();
+  return (
+    <MomentoCapa
+      capas={["bordo"]}
+      nome="Ana Beatriz"
+      membroDesde="julho de 2026"
+      dias={14}
+      nivel="Ouro"
+      onUsar={(c) => { ctx.set("conquistas-capa", c); onFechar(); }}
+      onContinuar={onFechar}
+    />
+  );
+};
+
 const DevConquistas = () => {
   const [params, setParams] = useSearchParams();
   const hoje = localDayKey();
@@ -182,6 +224,23 @@ const DevConquistas = () => {
   const momento = params.get("momento");
   const inicial = useMemo(() => {
     const s = seeds(hoje, semanaCompleta, poucos, zero);
+    // (02/10) a sequência de agora, o recorde antigo, a capa, a faixa vista e o perfil
+    const nDias = Number(params.get("dias") || 0);
+    if (nDias > 0) {
+      const ate = params.get("hoje") === "1" ? 0 : 1;
+      s["core-dias-anotados"] = ["2026-07-12", ...dias(nDias - 1 + ate, ate, hoje)];
+    }
+    const recorde = Number(params.get("recorde") || 0);
+    if (recorde > 0) {
+      const lista = Array.isArray(s["core-dias-anotados"]) ? (s["core-dias-anotados"] as string[]) : [];
+      const antiga = dias(recorde + 122, 123, hoje);
+      s["core-dias-anotados"] = [...new Set([...antiga, ...lista])].sort();
+    }
+    const capa = params.get("capa");
+    if (ehCapa(capa)) s["conquistas-capa"] = capa as CapaId;
+    const faixaVista = params.get("faixa-vista");
+    if (faixaVista !== null) s["conquistas-fogo-visto"] = Number(faixaVista);
+    aplicarPerfil(s, params.get("perfil"), hoje);
     if (params.get("desafios") === "off") s["finance-challenges-hidden"] = true;
     if (params.get("valores") === "1") s["conquistas-mostrar-valores"] = true;
     if (params.get("dica") === "0") s["conquistas-dica-planner"] = { vistas: 3, fim: true };
@@ -201,7 +260,8 @@ const DevConquistas = () => {
   return (
     <Provedor inicial={inicial}>
       <TelaConquistas />
-      {momento && <MomentoDemo raridade={momento} onFechar={() => setParams((p) => { p.delete("momento"); return p; })} />}
+      {momento === "capa" && <MomentoCapaDemo onFechar={() => setParams((p) => { p.delete("momento"); return p; })} />}
+      {momento && momento !== "capa" && <MomentoDemo raridade={momento} onFechar={() => setParams((p) => { p.delete("momento"); return p; })} />}
       {params.get("bar") !== "0" && <BarraDev hoje={hoje} />}
     </Provedor>
   );

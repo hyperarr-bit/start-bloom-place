@@ -7,7 +7,8 @@ import {
   CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, CHAVE_PROTETORES,
   calcularSequencia, diasEfetivos, semearDoHub, somarDias, type EstadoSequencia,
 } from "@/lib/sequencia";
-import { acaoMaisUsada, type AcaoDoDia } from "@/lib/conquistas-acao";
+import { acaoDoDia, type AcaoDoDia } from "@/lib/acao-do-dia";
+import { faixaDoFogo, type Faixa } from "@/lib/fogo-sequencia";
 import { CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
@@ -24,8 +25,10 @@ export interface Sequencia extends EstadoSequencia {
   hoje: string;
   /** Os dias anotados (lista limpa) — a linha da semana lê daqui. */
   lista: string[];
-  /** O que sugerir no "falta 1 coisa" (módulo que a pessoa mais usa). */
+  /** A ação do dia — DA PESSOA, do dia da semana, com rodízio (lib/acao-do-dia.ts). */
   acao: AcaoDoDia;
+  /** A faixa do fogo (laranja → vermelho → roxo → azul → dourado) pelos dias seguidos. */
+  faixa: Faixa;
   /** Ontem ficou vazio e um protetor segurou (pra contar na tela). */
   protegidoOntem: boolean;
 }
@@ -37,8 +40,9 @@ export function useSequencia(): Sequencia {
   const hub = get<unknown>(CHAVE_HUB_STREAK, null);
   const efetivos = useMemo(() => diasEfetivos(lista, hub, hoje), [lista, hub, hoje]);
   const estado = useMemo(() => calcularSequencia(efetivos, hoje), [efetivos, hoje]);
-  const acao = useMemo(() => acaoMaisUsada(get, hoje), [get, hoje]);
-  return { ...estado, hoje, lista: efetivos, acao, protegidoOntem: estado.usados.includes(somarDias(hoje, -1)) };
+  const acao = useMemo(() => acaoDoDia(get, hoje), [get, hoje]);
+  const faixa = useMemo(() => faixaDoFogo(estado.dias), [estado.dias]);
+  return { ...estado, hoje, lista: efetivos, acao, faixa, protegidoOntem: estado.usados.includes(somarDias(hoje, -1)) };
 }
 
 /**

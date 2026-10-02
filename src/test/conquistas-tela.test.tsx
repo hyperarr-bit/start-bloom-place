@@ -24,7 +24,8 @@ import { MomentosConquistas } from "@/components/conquistas/Momentos";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { somarDias } from "@/lib/sequencia";
 import { localDayKey } from "@/lib/utils";
-import { ACAO_PADRAO } from "@/lib/conquistas-acao";
+import { ACAO_PADRAO } from "@/lib/acao-do-dia";
+import { faixaDoFogo } from "@/lib/fogo-sequencia";
 
 const HOJE = "2026-09-26";
 const corrida = (fim: string, n: number) => Array.from({ length: n }, (_, i) => somarDias(fim, -(n - 1 - i)));
@@ -87,7 +88,9 @@ describe("tela de Conquistas", () => {
     expect(screen.getByText(/SEQUÊNCIA · 12 DIAS/)).toBeInTheDocument();
     expect(screen.getByText(/1 protetor/)).toBeInTheDocument();
     expect(screen.getByText(/Hoje falta/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "registrar um gasto" })).toBeInTheDocument();
+    // (02/10) a ação é DA PESSOA: só Finanças vivo → "anote o gasto de hoje", com o chip "não gastei nada hoje"
+    expect(screen.getByRole("button", { name: "anote o gasto de hoje" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /não gastei nada hoje/ })).toBeInTheDocument();
     expect(screen.getByText("MEUS ADESIVOS")).toBeInTheDocument();
     expect(screen.getAllByText(/de 65/).length).toBeGreaterThan(0);
     // a semana: 12 dias até ontem (sexta) → SEG…SEX feitos, SÁB (hoje) em aberto, DOM futuro
@@ -125,13 +128,13 @@ describe("tela de Conquistas", () => {
 
   it("a ação sugerida leva pro módulo", () => {
     abrir(montarStore(cenario()));
-    fireEvent.click(screen.getByRole("button", { name: "registrar um gasto" }));
+    fireEvent.click(screen.getByRole("button", { name: "anote o gasto de hoje" }));
     expect(screen.getByText("outra tela")).toBeInTheDocument();
   });
 });
 
 describe("linha da sequência na Home", () => {
-  const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: ACAO_PADRAO, protegidoOntem: false, ...p });
+  const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: ACAO_PADRAO, faixa: faixaDoFogo(12), protegidoOntem: false, ...p });
   const Onde = () => { const l = useLocation(); return <p data-testid="onde">{l.pathname}|{JSON.stringify(l.state)}</p>; };
 
   it("'12 dias · falta 1 coisa hoje' e abre as Conquistas com origem home", () => {

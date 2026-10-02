@@ -6,7 +6,7 @@
  *   (b) a virada passava por uma PÁGINA EM BRANCO: a página de destino agora
  *       está montada e inteira por baixo desde o 1º quadro da virada (pra
  *       frente), ou a de destino desdobra por cima da atual (pra trás); a
- *       capa gira só até o perfil e as figurinhas colam no instante em que
+ *       capa deita de verdade (duas faces) e as figurinhas colam no instante em que
  *       ela revela a página; toques rápidos em sequência terminam na página
  *       certa, com UMA folha virando por vez.
  */
@@ -34,7 +34,7 @@ vi.mock("framer-motion", async (importOriginal) => {
 
 import { UserDataContext } from "@/hooks/use-user-data";
 import { TelaConquistas, CHAVE_ALBUM_VISTO } from "@/components/conquistas/TelaConquistas";
-import { AlbumTela, CAPA_REVELA_MS, DURACAO_VIRADA_MS } from "@/components/conquistas/AlbumTela";
+import { AlbumTela, CAPA_REVELA_MS, CAPA_SAI_MS, DURACAO_VIRADA_MS } from "@/components/conquistas/AlbumTela";
 import { montarAlbum } from "@/components/conquistas/album-paginas";
 import { CHAVE_DICA_PLANNER } from "@/components/conquistas/DicaDoPlanner";
 import { CHAVE_NIVEL_PISO, type Badge, type Raridade } from "@/components/gamification/types";
@@ -69,7 +69,7 @@ const montarAlbumTela = (extra: Partial<Parameters<typeof AlbumTela>[0]> = {}) =
 };
 
 const tela = () => screen.getByTestId("album-tela");
-/** A página de baixo (filha direta da folha — a que gira fica dentro de .alb-pag-vira). */
+/** A página de baixo (filha direta da folha — a que gira fica dentro de .alb-folha-3d). */
 const paginaDeBaixo = () => tela().querySelector(".alb-folha > .alb-pag") as HTMLElement;
 const folhaVirando = () => screen.queryByTestId("album-virando");
 /** As vagas coladas de uma página: colam com atraso (`data-cola` + --d) ou já estão inteiras (null)? */
@@ -93,7 +93,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
 
   it("pra frente: a página de DESTINO está por baixo, inteira, desde o 1º quadro; a folha que gira é a que SAI (com o conteúdo dela); ao terminar sobra só o destino", () => {
     const { paginas } = montarAlbumTela();
-    avancar(CAPA_REVELA_MS + 400); // a capa já saiu
+    avancar(CAPA_SAI_MS + 400); // a capa já saiu
     expect(screen.queryByTestId("album-capa-3d")).toBeNull();
     expect(tela()).toHaveAttribute("data-atual", "0");
 
@@ -126,7 +126,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
 
   it("pra trás: a página de destino DESDOBRA por cima da atual (a atual fica por baixo até a folha assentar)", () => {
     montarAlbumTela();
-    avancar(CAPA_REVELA_MS + 400);
+    avancar(CAPA_SAI_MS + 400);
     fireEvent.click(screen.getByTestId("album-tela-proxima"));
     avancar(DURACAO_VIRADA_MS + 400);
     expect(tela()).toHaveAttribute("data-atual", "1");
@@ -146,7 +146,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
 
   it("toques rápidos em sequência: termina na página certa, com UMA folha virando por vez (a anterior sai na hora)", () => {
     montarAlbumTela();
-    avancar(CAPA_REVELA_MS + 400);
+    avancar(CAPA_SAI_MS + 400);
     const proxima = screen.getByTestId("album-tela-proxima");
     fireEvent.click(proxima);
     avancar(60);
@@ -166,7 +166,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
 
   it("as abas também viram com a folha e param na seção certa", () => {
     montarAlbumTela();
-    avancar(CAPA_REVELA_MS + 400);
+    avancar(CAPA_SAI_MS + 400);
     fireEvent.click(screen.getByTestId("album-aba-comum"));
     expect(tela()).toHaveAttribute("data-atual", "4");
     expect(folhaVirando()).toHaveAttribute("data-dir", "frente");
@@ -175,7 +175,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
     expect(folhaVirando()).toBeNull();
   });
 
-  it("ao abrir: a capa fica na frente (z 6) e gira só até o perfil; a 1ª página está montada por baixo com a faixa, e as figurinhas começam a colar NO INSTANTE em que a capa revela a página", () => {
+  it("ao abrir: a capa fica na frente (z 6) e deita até −180° (frente e verso); a 1ª página está montada por baixo com a faixa, e as figurinhas começam a colar NO INSTANTE em que a capa revela a página", () => {
     montarAlbumTela();
     const capa = screen.getByTestId("album-capa-3d");
     expect(capa.style.zIndex).toBe("6");
@@ -191,7 +191,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
     avancar(600);
     expect(screen.getByTestId("album-capa-3d")).toHaveAttribute("data-girada");
     expect(screen.getByTestId("album-capa-3d").style.zIndex).toBe("6"); // continua na frente enquanto gira
-    avancar(CAPA_REVELA_MS);
+    avancar(CAPA_SAI_MS);
     expect(screen.queryByTestId("album-capa-3d")).toBeNull();
     expect(eventos).toContainEqual(["album_abrir", { adesivos: 6, novas: 0, via: "card", pagina: 0 }]);
   });

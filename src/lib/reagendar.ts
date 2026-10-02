@@ -11,8 +11,10 @@ import { lembreteCabeloLigado, lerDadosDoCabelo, type DadosDoCabelo } from "@/li
 import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos, type Cuidado } from "@/lib/beleza-cuidados";
 import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade, type LembreteValidade, type ProdutoMeu } from "@/lib/beleza-produtos";
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
-import { acaoMaisUsada } from "@/lib/conquistas-acao";
-import { calcularSequencia, diasEfetivos, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
+import { acoesDoDia, textoDoLembrete } from "@/lib/acao-do-dia";
+import { calcularSequencia, diasEfetivos, somarDias, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
+/** Quantos dias à frente a frase do aviso é prevista (o agendador olha 10). */
+const HORIZONTE_DOS_AVISOS = 10;
 import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
 import { CARD_CONFIG_KEY, CUSTOM_CARDS_KEY, DEFAULT_CARDS, type CustomCard } from "@/lib/finance-cards";
 import type { CardConfig } from "@/lib/finance-fatura";
@@ -95,7 +97,8 @@ export interface DadosDosLembretes {
   temFinancas: boolean;
   abriuFinancasHoje: boolean;
   /** sequência de dias anotados das Conquistas (26/09) */
-  seqAnotada: { dias: number; anotouHoje: boolean; acao: string };
+  /** (02/10) a frase de hoje e as previstas pros próximos dias — da PESSOA (lib/acao-do-dia.ts). */
+  seqAnotada: { dias: number; anotouHoje: boolean; acao: string; avisos: Array<{ title: string; body: string }> };
   /** cuidados do pet (29/09): prefs na chave própria, datas da carteirinha e doses de remédio de hoje */
   pet?: DadosDosAvisosPet;
   /** Relações (29/09): parabéns no dia + manter contato — as escolhas moram em `rel-lembrete-prefs` */
@@ -236,7 +239,8 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     abriuFinancasHoje: get<string>(CHAVE_FINANCAS_VISTO, "") === hoje,
     seqAnotada: (() => {
       const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
-      return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acaoMaisUsada(get, hoje).texto };
+      const acoes = acoesDoDia(get, hoje, { aFrente: HORIZONTE_DOS_AVISOS });
+      return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acoes[0].texto, avisos: acoes.map((a, i) => textoDoLembrete(a, seq.dias + i, somarDias(hoje, i))) };
     })(),
     pet: lerDadosDosAvisosPet(get, hoje),
     relacoes: lerDadosDasRelacoes(get),
@@ -279,7 +283,7 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.compromissos && dados.compromissos,
     prefs.tarefas && dados.tarefas,
     prefs.limite && [dados.temFinancas, dados.abriuFinancasHoje],
-    prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje],
+    prefs.sequencia && [dados.seqAnotada.dias, dados.seqAnotada.anotouHoje, dados.seqAnotada.acao],
     // (29/09) pet: as prefs moram na chave própria; marcar vacina/dose muda o plano
     !!dados.pet && algumLigadoPet(dados.pet.prefs) && dados.pet,
     // (29/09) Relações: as escolhas moram na chave própria; "Falei hoje" muda o plano

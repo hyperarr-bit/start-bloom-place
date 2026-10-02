@@ -11,6 +11,8 @@ import { AdesivoRaro, ChipRaridade } from "./adesivos-raridade";
 import { Roseta } from "./Roseta";
 import { compartilharAdesivo, compartilharRoseta } from "./compartilhar-conquistas";
 import { useConquistas, useEfeitosSequencia, usePerfilConquistas, useSequencia } from "./use-conquistas";
+import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
+import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import "./conquistas.css";
@@ -58,7 +60,7 @@ const lerVistas = (v: unknown): Vistas | null => {
  *  - nada aparece no meio de um registro (teclado aberto, folha/diálogo na tela).
  * Medição: festa_view {raridade, formato}, festa_fechada {ms, como}, festa_tela_cheia_click.
  */
-type Item = { tipo: "marco"; dias: number } | { tipo: "adesivo"; badge: Badge } | { tipo: "popup"; badges: Badge[] };
+type Item = { tipo: "marco"; dias: number } | { tipo: "adesivo"; badge: Badge } | { tipo: "popup"; badges: Badge[] } | { tipo: "capa"; capas: CapaId[] };
 
 /** Quantos adesivos RAROS+ ganham festa de tela cheia de uma vez; o resto só cola na folha. */
 export const MAX_FESTAS_DE_UMA_VEZ = 3;
@@ -499,6 +501,109 @@ export const MomentoPopup = ({ badges, onContinuar, onTelaCheia, onVerAdesivos }
   );
 };
 
+/* ------------------------------------------------------------ capa nova */
+
+/**
+ * "CAPA NOVA LIBERADA!" (02/10): o mesmo cartão do adesivo comum, com a capa
+ * de verdade (em miniatura, torta) colando com mola, confete e faixa dourada.
+ * Uma capa por página (várias liberadas de uma vez = carrossel). "Usar esta
+ * capa" grava `conquistas-capa`; "Deixar como está" só fecha. O evento
+ * `capa_desbloqueada {capa}` sai ao mostrar.
+ */
+export const MomentoCapa = ({ capas, nome, membroDesde, dias, nivel, onUsar, onContinuar }: {
+  capas: CapaId[]; nome: string; membroDesde: string; dias: number; nivel: string;
+  onUsar: (capa: CapaId) => void; onContinuar: () => void;
+}) => {
+  const reduzir = useReducedMotion();
+  const trilho = useRef<HTMLDivElement>(null);
+  const [pagina, setPagina] = useState(0);
+  const atual = capas[Math.min(pagina, capas.length - 1)] ?? capas[0];
+  const fechar = useMedirFesta({ raridade: "capa", formato: "popup", quantidade: capas.length, ids: capas.join(",") });
+  useEffect(() => {
+    for (const c of capas) trackEvent("capa_desbloqueada", { capa: c, dias: diasPraCapa(c) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capas.join(",")]);
+  const irPara = (n: number) => {
+    const t = trilho.current;
+    if (!t) return;
+    const alvo = Math.max(0, Math.min(capas.length - 1, n));
+    if (typeof t.scrollTo === "function") t.scrollTo({ left: alvo * t.clientWidth, behavior: reduzir ? "auto" : "smooth" });
+    else t.scrollLeft = alvo * t.clientWidth;
+    setPagina(alvo);
+  };
+  const aoRolar = () => {
+    const t = trilho.current;
+    if (!t || !t.clientWidth) return;
+    setPagina(Math.round(t.scrollLeft / t.clientWidth));
+  };
+  return (
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label={capas.length > 1 ? `${capas.length} capas novas liberadas` : `Capa nova liberada: ${CAPAS[atual].nome}`}
+      data-momento=""
+      data-testid="momento-capa"
+      data-capa={atual}
+      className="fixed inset-0 z-[400] flex items-center justify-center px-5 overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <button type="button" aria-label="Fechar" data-testid="momento-capa-fora" className="absolute inset-0 bg-black/45" onClick={() => { fechar("fora"); onContinuar(); }} />
+      {!reduzir && <div aria-hidden className="absolute inset-0 pointer-events-none"><Confete raridade="lendario" quantidade={CONFETES_DO_POPUP} /></div>}
+      <motion.div
+        className="relative w-full max-w-[340px] rounded-3xl bg-card text-foreground shadow-[0_30px_60px_-20px_rgba(0,0,0,.55)] overflow-hidden"
+        initial={reduzir ? { opacity: 0 } : { scale: 0.82, y: 28, opacity: 0 }}
+        animate={reduzir ? { opacity: 1 } : { scale: 1, y: 0, opacity: 1 }}
+        transition={reduzir ? { duration: 0.2 } : { type: "spring", stiffness: 330, damping: 24, mass: 0.9 }}
+      >
+        <div className="mo-popup-faixa mo-faixa-ouro">{capas.length > 1 ? `${capas.length} capas novas liberadas` : "Capa nova liberada"}</div>
+        <div className="relative" style={pontilhado}>
+          <div ref={trilho} className="alb-trilho" onScroll={aoRolar} data-testid="momento-capa-trilho">
+            {capas.map((c, i) => (
+              <div key={c} className="alb-pagina px-5 pt-6 pb-2 text-center" data-testid={`momento-capa-item-${c}`} data-ativo={i === pagina ? "" : undefined}>
+                <div className="relative inline-block" style={{ transform: "rotate(-3deg)" }}>
+                  {!reduzir && <span aria-hidden className="mo-brilho" />}
+                  {!reduzir && i === pagina && <Faiscas />}
+                  <Colando>
+                    <div style={{ filter: "drop-shadow(0 14px 18px rgba(0,0,0,.35))" }}>
+                      <CapaResponsiva capa={c} largura={250} nome={nome} membroDesde={membroDesde} dias={dias} nivel={nivel} />
+                    </div>
+                  </Colando>
+                </div>
+                <motion.h2 className="mt-4 text-[22px] font-black tracking-tight leading-[1.08]" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
+                  Capa {CAPAS[c].nome}
+                </motion.h2>
+                <motion.p className="mt-1 text-[13px] text-muted-foreground leading-snug min-h-[2.4em]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+                  {CAPAS[c].descricao.split(" · ").slice(0, 2).join(" · ")}. <b className="text-foreground">{diasPraCapa(c)} dias seguidos</b> — é sua.
+                </motion.p>
+              </div>
+            ))}
+          </div>
+          {capas.length > 1 && (
+            <div className="flex items-center justify-center gap-1 pb-1">
+              <button type="button" className="alb-nav" aria-label="Capa anterior" disabled={pagina === 0} onClick={() => irPara(pagina - 1)}>‹</button>
+              <div className="alb-dots" aria-label={`${pagina + 1} de ${capas.length}`}>
+                {capas.map((c, i) => <button key={c} type="button" className="alb-dot" data-ativo={i === pagina ? "" : undefined} aria-label={`Capa ${i + 1}`} onClick={() => irPara(i)}><i /></button>)}
+              </div>
+              <button type="button" className="alb-nav" aria-label="Próxima capa" disabled={pagina === capas.length - 1} onClick={() => irPara(pagina + 1)}>›</button>
+            </div>
+          )}
+        </div>
+        <div className="px-4 pb-4 pt-2 space-y-2 bg-card">
+          <button type="button" onClick={() => { fechar("usar", { capa: atual }); onUsar(atual); }} className={`${botaoPrimario} w-full`} data-testid="momento-capa-usar">
+            Usar esta capa
+          </button>
+          <button type="button" onClick={() => { fechar("continuar"); onContinuar(); }} className={`${botaoSecundario} w-full h-10 text-[13px]`} data-testid="momento-capa-continuar">
+            Deixar como está
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 /* ------------------------------------------------------------ orquestra */
 
 /** Orquestra a fila de momentos + as escritas da sequência (uma vez por tela). */
@@ -512,6 +617,9 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   const perfil = usePerfilConquistas();
   const vistasCru = get<unknown>(CHAVE_VISTAS, undefined);
   const vistas = useMemo(() => lerVistas(vistasCru), [vistasCru]);
+  // (02/10) as capas que o tempo libera: a festa de cada uma passa UMA vez (lista de ids)
+  const capasVistasCru = get<unknown>(CHAVE_CAPAS_VISTAS, undefined);
+  const capasVistas = useMemo(() => lerCapasVistas(capasVistasCru) ?? [], [capasVistasCru]);
 
   // linha de base (1ª abertura): o que já está conquistado não vira festa atrasada
   useEffect(() => {
@@ -535,6 +643,9 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     // pelo RECORDE: quem bateu 7 e quebrou antes de abrir a Home ainda ganha a roseta dos 7
     const marco = [...MARCOS_SEQUENCIA].reverse().find((m) => seq.recorde >= m && !vistas.marcos.includes(m));
     if (marco && !emTesteComMissao()) itens.push({ tipo: "marco", dias: marco });
+    // capa nova pelo RECORDE (nunca é tirada): uma festa só, com todas as liberadas desde a última vez
+    const capas = capasNovas(seq.recorde, capasVistas);
+    if (capas.length && !emTesteComMissao()) itens.push({ tipo: "capa", capas });
     const novos = conq.folha
       .filter((b) => b.unlocked && !/^sequencia-/.test(b.id) && !vistas.adesivos.includes(b.id))
       .sort((a, b) => pesoDaRaridade(b) - pesoDaRaridade(a));
@@ -550,7 +661,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, conq.folha, contaNova]);
+  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");
@@ -581,7 +692,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   }, [temFila]);
 
   const atual = liberado ? fila[0] : undefined;
-  const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" ? `popup-${atual.badges.map((b) => b.id).join("+")}` : atual.badge.id) : null;
+  const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" ? `popup-${atual.badges.map((b) => b.id).join("+")}` : atual.tipo === "capa" ? `capa-${atual.capas.join("+")}` : atual.badge.id) : null;
   // "Ver em tela cheia" do popup: a festa de hoje do adesivo escolhido, por cima; "Voltar" devolve ao cartão
   const [telaCheia, setTelaCheia] = useState<Badge | null>(null);
   useEffect(() => { setTelaCheia(null); }, [chaveAtual]);
@@ -599,6 +710,9 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
       set(CHAVE_VISTAS, { adesivos, marcos }, { system: true });
     } else if (item.tipo === "popup") {
       set(CHAVE_VISTAS, { ...v, adesivos: [...new Set([...v.adesivos, ...item.badges.map((b) => b.id)])] }, { system: true });
+    } else if (item.tipo === "capa") {
+      const vistasAgora = lerCapasVistas(get<unknown>(CHAVE_CAPAS_VISTAS, undefined)) ?? [];
+      set(CHAVE_CAPAS_VISTAS, [...new Set([...vistasAgora, ...item.capas])], { system: true });
     } else {
       set(CHAVE_VISTAS, { ...v, adesivos: [...new Set([...v.adesivos, item.badge.id])] }, { system: true });
     }
@@ -616,6 +730,18 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     <AnimatePresence mode="wait">
       {atual?.tipo === "marco" && (
         <MomentoMarco key={chaveAtual!} dias={atual.dias} nome={perfil.nome} membroDesde={perfil.membroDesde} nivel={conq.nivel.name} onContinuar={continuar} />
+      )}
+      {atual?.tipo === "capa" && (
+        <MomentoCapa
+          key={chaveAtual!}
+          capas={atual.capas}
+          nome={perfil.nome}
+          membroDesde={perfil.membroDesde}
+          dias={seq.dias}
+          nivel={conq.nivel.name}
+          onUsar={(c) => { set(CHAVE_CAPA, c); trackEvent("capa_trocar", { capa: c, via: "festa" }); continuar(); }}
+          onContinuar={continuar}
+        />
       )}
       {atual?.tipo === "adesivo" && (
         <MomentoAdesivo key={chaveAtual!} badge={atual.badge} nome={perfil.nome} membroDesde={perfil.membroDesde} onContinuar={continuar} onVerAdesivos={verAdesivos} />

@@ -88,34 +88,75 @@
 .alb-dot[data-ativo] > i { width: 14px; background: hsl(var(--accent)); }
 
 /* ============================== SEMANA DA SEQUÊNCIA ============================== */
+/* (02/10) as cores vêm da FAIXA DO FOGO em variáveis no card (--fg-*, ver varsDaFaixa); os valores
+   soltos são o laranja de sempre, pra quem renderiza o disco fora do card */
+.seq-card { border: 1px solid var(--fg-borda, #fed7aa); }
+.dark .seq-card { border-color: var(--fg-borda-escuro, #5a3a25); }
+.seq-cabecalho { background: linear-gradient(90deg, var(--fg-a, #fb923c), var(--fg-b, #f43f5e)); color: var(--fg-texto, #fff); }
+.seq-card[data-faixa="apagado"] .seq-cabecalho { background: linear-gradient(90deg, #a8a29e, #78716c); color: #fff; }
 .seq-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 12px 8px 2px; }
 .seq-dia { display: flex; flex-direction: column; align-items: center; gap: 7px; }
 .seq-dia-rot { font-size: 10px; font-weight: 800; letter-spacing: .06em; color: hsl(var(--foreground)); transition: color .3s; }
 .seq-disco { width: 36px; height: 36px; border-radius: 50%; position: relative; display: grid; place-items: center; }
 .seq-disco > * { grid-area: 1 / 1; }
-.seq-dia[data-estado="feito"] .seq-disco, .seq-dia[data-estado="feito-agora"] .seq-disco { background: radial-gradient(circle at 35% 28%, #fdba74, #f97316 55%, #ea580c); box-shadow: 0 3px 8px -2px rgba(234,88,12,.55), inset 0 -2px 3px rgba(0,0,0,.14); }
-.seq-dia[data-estado="feito-agora"] .seq-disco { background: #fff7ed; box-shadow: none; }
-.dark .seq-dia[data-estado="feito-agora"] .seq-disco { background: rgba(230,162,118,.12); }
+.seq-dia[data-estado="feito"] .seq-disco, .seq-dia[data-estado="feito-agora"] .seq-disco { background: radial-gradient(circle at 35% 28%, var(--fg-claro, #fdba74), var(--fg-meio, #f97316) 55%, var(--fg-escuro, #ea580c)); box-shadow: 0 3px 8px -2px var(--fg-brilho, rgba(234,88,12,.55)), inset 0 -2px 3px rgba(0,0,0,.14); }
+.seq-dia[data-estado="feito-agora"] .seq-disco { background: var(--fg-hoje, #fff7ed); box-shadow: none; }
+.dark .seq-dia[data-estado="feito-agora"] .seq-disco { background: var(--fg-hoje-escuro, rgba(230,162,118,.12)); }
 .seq-dia[data-estado="gelo"] .seq-disco { background: radial-gradient(circle at 35% 28%, #f0f9ff, #bae6fd 60%, #7dd3fc); box-shadow: inset 0 0 0 1.5px #93c5fd, 0 3px 8px -3px rgba(56,189,248,.5); }
 .seq-dia[data-estado="gelo"] .seq-dia-rot { color: hsl(var(--muted-foreground)); }
-.seq-dia[data-estado="hoje"] .seq-disco { background: #fff7ed; }
-.dark .seq-dia[data-estado="hoje"] .seq-disco { background: rgba(230,162,118,.12); }
-.seq-dia[data-estado="hoje"] .seq-dia-rot { color: #ea580c; }
-.dark .seq-dia[data-estado="hoje"] .seq-dia-rot { color: #E6A276; }
+.seq-dia[data-estado="hoje"] .seq-disco { background: var(--fg-hoje, #fff7ed); }
+.dark .seq-dia[data-estado="hoje"] .seq-disco { background: var(--fg-hoje-escuro, rgba(230,162,118,.12)); }
+.seq-dia[data-estado="hoje"] .seq-dia-rot { color: var(--fg-hoje-texto, #ea580c); }
+.dark .seq-dia[data-estado="hoje"] .seq-dia-rot { color: var(--fg-hoje-texto-escuro, #E6A276); }
 .seq-dia[data-estado="futuro"] .seq-disco, .seq-dia[data-estado="vazio"] .seq-disco { background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .seq-dia[data-estado="futuro"] .seq-dia-rot, .seq-dia[data-estado="vazio"] .seq-dia-rot { color: hsl(var(--muted-foreground) / .7); }
 .seq-glifo { width: 19px; height: 19px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
 .seq-glifo-gelo { width: 18px; height: 18px; fill: none; stroke: #0369a1; stroke-width: 2; stroke-linejoin: round; }
 .seq-anel { width: 36px; height: 36px; transform-origin: center; }
-.seq-fantasma { width: 18px; height: 18px; fill: none; stroke: #f97316; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
-.seq-fill { width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #fdba74, #f97316 55%, #ea580c); box-shadow: 0 3px 8px -2px rgba(234,88,12,.55); opacity: 0; transform: scale(.5); }
+.seq-fantasma { width: 18px; height: 18px; fill: none; stroke: var(--fg-meio, #f97316); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.seq-fill { width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle at 35% 28%, var(--fg-claro, #fdba74), var(--fg-meio, #f97316) 55%, var(--fg-escuro, #ea580c)); box-shadow: 0 3px 8px -2px var(--fg-brilho, rgba(234,88,12,.55)); opacity: 0; transform: scale(.5); }
 .seq-chama-cheia { opacity: 0; transform: scale(0); }
-.seq-ripple { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fb923c; opacity: 0; }
-.seq-spark { width: 5px; height: 5px; border-radius: 50%; background: #fde047; opacity: 0; box-shadow: 0 0 4px #fb923c; }
+.seq-ripple { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--fg-meio, #fb923c); opacity: 0; }
+.seq-spark { width: 5px; height: 5px; border-radius: 50%; background: var(--fg-claro, #fde047); opacity: 0; box-shadow: 0 0 4px var(--fg-meio, #fb923c); }
 @media (max-width: 370px) {
   .seq-disco, .seq-fill, .seq-ripple, .seq-anel { width: 33px; height: 33px; }
   .seq-dias { padding: 12px 6px 2px; }
 }
+
+/* a linha da faixa: "FOGO VERMELHO · faltam 2 dias pro fogo roxo" */
+.seq-faixa-linha { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; font-size: 10.5px; color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; }
+.seq-faixa-selo { flex-shrink: 0; height: 18px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 8.5px; font-weight: 900; letter-spacing: .14em; color: #fff; background: linear-gradient(90deg, var(--fg-meio, #f97316), var(--fg-escuro, #c2410c)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
+.seq-faixa-prox { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+
+/* a ação do dia: a principal em destaque, os chips "ou …" embaixo, o motivo numa linha */
+.seq-acao { white-space: nowrap; border-radius: 6px; background: #fef3c7; color: #713f12; font-weight: 700; padding: 1px 7px; text-underline-offset: 2px; }
+.seq-acao:hover { text-decoration: underline; }
+.dark .seq-acao { background: #4a3a12; color: #fde68a; }
+.seq-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; }
+.seq-ou { font-size: 11.5px; font-weight: 600; color: hsl(var(--muted-foreground)); margin-right: 1px; }
+.seq-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 11.5px; font-weight: 700; white-space: nowrap; line-height: 1; }
+.seq-chip:active { transform: scale(.97); }
+.seq-chip[data-tipo="sem-gasto"] { border-style: dashed; border-color: hsl(var(--success, 142 60% 40%) / .6); color: hsl(var(--success, 142 60% 30%)); }
+.seq-motivo { margin-top: 5px; font-size: 11px; color: hsl(var(--muted-foreground)); line-height: 1.3; }
+
+/* o FOGO: balança de leve (só transform), e o dourado pulsa */
+.fogo-viva { transform-origin: 50% 92%; animation: fogo-balanca 1.7s ease-in-out infinite; }
+@keyframes fogo-balanca { 0%, 100% { transform: rotate(-3deg) scaleY(1); } 50% { transform: rotate(3deg) scaleY(1.05); } }
+.fogo-dourado.fogo-viva { animation: fogo-balanca-ouro 1.7s ease-in-out infinite; }
+@keyframes fogo-balanca-ouro { 0%, 100% { transform: rotate(-3deg) scale(1); } 50% { transform: rotate(3deg) scale(1.08); } }
+
+/* a SUBIDA DE FAIXA: por cima do card, 1,6 s — o fogo novo cresce, anéis, faíscas, o rótulo */
+.seq-sobe { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; pointer-events: none; background: hsl(var(--card) / .78); animation: seq-sobe-some .4s ease-in 1.25s both; }
+.seq-sobe > * { grid-area: 1 / 1; }
+.seq-sobe-fogo { display: block; line-height: 0; animation: seq-sobe-fogo .9s cubic-bezier(.34, 1.56, .64, 1) both; transform-origin: 50% 85%; }
+@keyframes seq-sobe-fogo { 0% { transform: scale(.2) translateY(20px); opacity: 0; } 55% { transform: scale(1.22) translateY(-6px); opacity: 1; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+.seq-sobe-anel { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--fg-meio, #f97316); opacity: 0; animation: seq-sobe-anel .9s ease-out .15s both; }
+.seq-sobe-anel-2 { animation-delay: .35s; border-width: 2px; }
+@keyframes seq-sobe-anel { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(2.4); opacity: 0; } }
+.seq-sobe-faisca { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-claro, #fde047); box-shadow: 0 0 6px var(--fg-meio, #fb923c); opacity: 0; animation: seq-faisca .7s ease-out both; }
+.seq-sobe-rotulo { align-self: end; margin-bottom: 14px; font-size: 12px; font-weight: 900; letter-spacing: .2em; color: #fff; background: linear-gradient(90deg, var(--fg-meio, #f97316), var(--fg-escuro, #c2410c)); padding: 5px 14px; border-radius: 999px; box-shadow: 0 6px 16px -6px var(--fg-brilho, rgba(0,0,0,.4)); animation: seq-sobe-rotulo .5s cubic-bezier(.34, 1.4, .64, 1) .45s both; }
+@keyframes seq-sobe-rotulo { from { transform: translateY(14px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes seq-sobe-some { to { opacity: 0; } }
 
 /* micro-animação de "hoje garantido": anel gira e some, disco cresce, chama entra, onda, faíscas */
 .seq-dia[data-estado="feito-agora"] .seq-anel { animation: seq-anel-some .32s ease-in both; }
@@ -170,7 +211,7 @@
 @media (prefers-reduced-motion: reduce) {
   .ad-anel, .ad-sheen::before, .ad-faisca, .capa-tag-pula { animation: none !important; }
   .seq-dia[data-estado="feito-agora"] * { animation: none !important; }
-  .alb-pop { animation: none !important; }
+  .alb-pop, .fogo-viva, .seq-sobe, .seq-sobe * { animation: none !important; }
   .alb-trilho { scroll-behavior: auto; }
 }
 
@@ -284,9 +325,31 @@
 .alb-folha { position: relative; z-index: 2; background: #fbf6ea; border-radius: 6px 14px 14px 6px; background-image: radial-gradient(circle, rgba(60,50,40,.12) 1.2px, transparent 1.5px); background-size: 20px 20px; overflow: hidden; transform-style: preserve-3d; }
 /* cada página é um contexto de empilhamento (02/10): a pílula do progresso (z 4) de uma página não vaza por cima da folha que está virando */
 .alb-pag { padding: 12px 12px 18px 22px; min-height: 470px; position: relative; isolation: isolate; }
-/* a folha que gira: só até o perfil (−90°), por cima da página pronta — sem backface, sem fade (ver AlbumTela) */
-.alb-pag-vira { position: absolute; inset: 0; z-index: 3; isolation: isolate; background: #fbf6ea; background-image: radial-gradient(circle, rgba(60,50,40,.12) 1.2px, transparent 1.5px); background-size: 20px 20px; transform-origin: 0 50%; will-change: transform; border-radius: 6px 14px 14px 6px; overflow: hidden; }
-.alb-pag-sombra { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.08) 60%, rgba(0,0,0,0)); }
+/* A VIRADA 2.5D (02/10 à noite): a folha tem duas faces e gira na lombada com perspectiva; o dedo arrasta.
+   Só transform/opacity; `overflow: hidden` fica no .alb-folha (a folha deitada a −180° cai fora do livro e some). */
+/* a folha NÃO é recortada pelo livro: passada a lombada ela deita por cima da mesa (o verso aparece, com a sombra) e só então some */
+.alb-folha[data-arrastavel] { perspective: 1100px; perspective-origin: 50% 50%; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; overflow: visible; }
+.alb-folha[data-arrastavel] > .alb-pag { border-radius: 6px 14px 14px 6px; overflow: hidden; }
+.alb-folha[data-arrastavel]:active { cursor: grabbing; }
+.alb-folha-3d { position: absolute; inset: 0; transform-origin: 0 50%; transform-style: preserve-3d; will-change: transform; pointer-events: none; }
+.alb-face { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background: #fbf6ea; background-image: radial-gradient(circle, rgba(60,50,40,.12) 1.2px, transparent 1.5px); background-size: 20px 20px; }
+.alb-face-frente { transform: translateZ(.5px); }
+.alb-face-verso { transform: rotateY(180deg) translateZ(.5px); background-color: #f6efdd; }
+/* o sombreamento da frente conforme deita, a luz do verso ao nascer, o brilho da dobra que corre pela folha */
+.alb-face-sombra { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: linear-gradient(90deg, rgba(40,30,20,.75), rgba(40,30,20,.35) 45%, rgba(40,30,20,.12)); }
+.alb-face-luz { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: linear-gradient(270deg, rgba(255,255,255,.7), rgba(255,255,255,.25) 40%, rgba(0,0,0,.08)); }
+.alb-face-dobra { position: absolute; top: 0; bottom: 0; width: 42%; z-index: 6; pointer-events: none; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.55) 45%, rgba(255,255,255,0)); }
+/* a sombra que a folha projeta na página de baixo (escala com o seno do ângulo, a partir da lombada) */
+.alb-sombra-projetada { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(30,20,10,.75), rgba(30,20,10,.35) 38%, rgba(30,20,10,.12) 70%, rgba(30,20,10,0)); }
+/* o verso de uma página: só o papel e um carimbo discreto; o verso da capa diz de quem é o álbum */
+.alb-verso { position: absolute; inset: 0; display: grid; place-items: center; }
+.alb-verso-carimbo { font-size: 9px; font-weight: 900; letter-spacing: .22em; color: rgba(120,100,70,.35); transform: rotate(-90deg); }
+.alb-verso-capa { background: linear-gradient(90deg, rgba(0,0,0,.08), rgba(0,0,0,0) 14%); }
+.alb-verso-dono { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 22px; border: 1.5px solid rgba(120,100,70,.35); border-radius: 10px; color: #6f665a; text-align: center; }
+.alb-verso-dono span { font-size: 9.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+.alb-verso-dono b { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: 26px; color: #2b2b2f; line-height: 1.05; }
+.alb-verso-dono i { font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .2em; color: #a39a8a; }
+@media (prefers-reduced-motion: reduce) { .alb-folha-3d { transition: none !important; } }
 .alb-secao { display: flex; align-items: center; justify-content: space-between; height: 30px; padding: 0 10px 0 12px; border-radius: 8px; font-size: 10.5px; font-weight: 900; letter-spacing: .14em; color: #fff; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
 .alb-secao b { font-size: 10px; font-weight: 800; letter-spacing: .02em; opacity: .9; font-variant-numeric: tabular-nums; }
 .alb-secao[data-rar="destaque"] { background: linear-gradient(90deg, #a81f62, #d22d80 60%, #a81f62); }
@@ -349,6 +412,8 @@
 /* ============================== POPUP DO ADESIVO COMUM (01/10) ============================== */
 /* faixa colorida no topo com o título em caixa alta — a mesma gramática das seções do planner */
 .mo-popup-faixa { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font-size: 11px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; text-align: center; padding: 9px 12px 8px; }
+/* a faixa dourada da capa nova (objeto: igual nos dois temas) */
+.mo-popup-faixa.mo-faixa-ouro { background: linear-gradient(90deg, #8f6a0c, #e9c65a 35%, #fff1b0 50%, #d4a629 70%, #8f6a0c); color: #4a3305; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
 /* brilho atrás do adesivo: pulsa uma vez ao colar e fica suave (transform/opacity só) */
 .mo-brilho { position: absolute; inset: -22%; border-radius: 50%; z-index: 0; pointer-events: none; background: radial-gradient(circle, hsl(var(--accent) / .32) 0%, hsl(var(--accent) / .12) 42%, transparent 68%); animation: mo-brilho 1.1s cubic-bezier(.34, 1.3, .64, 1) .25s both; }
 @keyframes mo-brilho { 0% { transform: scale(.4); opacity: 0; } 55% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); opacity: .85; } }

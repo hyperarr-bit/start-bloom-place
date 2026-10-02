@@ -81,6 +81,10 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, pa
   const [fase, setFase] = useState<Fase>("fechado");
   const rot = useMotionValue(0);
   const zCapa = useTransform(rot, (v) => (v > -90 ? 3 : 0));
+  // (02/10) qual face da capa aparece é decidida pelo ÂNGULO, não só pelo backface-visibility: no WebKit, com a
+  // face cheia de camadas (textura, filtros do hot stamping), o verso grafite era pintado por cima da capa
+  const frenteVisivel = useTransform(rot, (v) => (v > -90 ? 1 : 0));
+  const versoVisivel = useTransform(rot, (v) => (v > -90 ? 0 : 1));
   const sombra = useTransform(rot, (v) => Math.sin((Math.abs(v) / -ANGULO) * Math.PI) * 0.4);
   const mostrarPagina = fase !== "fechado";
 
@@ -145,12 +149,12 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, pa
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (fase === "aberto" ? onFechar : onAbrir)(); } }}
           style={{ position: "absolute", left: 0, top: 0, width: wCapa, height: hCapa, transformStyle: "preserve-3d", transformOrigin: `${14 * k}px 50%`, rotateY: rot, zIndex: zCapa, cursor: "pointer", opacity: reduzir && mostrarPagina ? 0 : 1, transition: reduzir ? "opacity .18s" : undefined }}
         >
-          <div className="entra-capa" style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}>
+          <motion.div className="entra-capa" style={{ position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", opacity: frenteVisivel }}>
             <div style={{ width: W, height: H, transform: `scale(${k})`, transformOrigin: "top left" }}>
               <CapaPlanner capa={capa} nome={nome} membroDesde={membroDesde} dias={dias} nivel={nivel} onSelo={onSelo} semEspiral={mostrarPagina} formato="app" />
             </div>
-          </div>
-          <div aria-hidden style={{ position: "absolute", inset: 0, transform: "rotateY(180deg)", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", background: "#35363c", borderRadius: `${18 * k}px ${5 * k}px ${5 * k}px ${18 * k}px`, boxShadow: "inset 0 0 0 1px rgba(255,255,255,.05)" }} />
+          </motion.div>
+          <motion.div aria-hidden style={{ position: "absolute", inset: 0, transform: "rotateY(180deg)", backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", background: "#35363c", borderRadius: `${18 * k}px ${5 * k}px ${5 * k}px ${18 * k}px`, boxShadow: "inset 0 0 0 1px rgba(255,255,255,.05)", opacity: versoVisivel }} />
         </motion.div>
 
         {fase === "fechado" && dica}

@@ -601,7 +601,7 @@ export async function agendarLimiteDoDia(
  * abrir até lá) e são refeitos a cada registro — anotar cancela o de hoje.
  */
 export function planejarLembreteSequencia(
-  dados: { dias: number; anotouHoje: boolean; acao: string },
+  dados: { dias: number; anotouHoje: boolean; acao: string; avisos?: Array<{ title: string; body: string }> },
   hora = 20,
   agora = new Date(),
 ): Planejado[] {
@@ -611,22 +611,25 @@ export function planejarLembreteSequencia(
   for (let i = 0; i <= HORIZONTE_DIAS; i++) {
     const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, hora, 0, 0, 0);
     if (d.getTime() <= agora.getTime()) continue;
+    // (02/10) a frase é a da PESSOA: hoje com a ação de hoje; os dias seguintes com a prevista pelo
+    // dia da semana dela (lib/acao-do-dia.ts) — "Terça é dia de treino 🔥", não um texto fixo
+    const previsto = dados.avisos?.[i];
     if (localDia(d) === hoje) {
       if (dados.anotouHoje) continue;
       out.push({
         quando: d,
-        title: `Sua sequência de ${dados.dias} ${dados.dias === 1 ? "dia" : "dias"} acaba hoje 🔥`,
-        body: `Falta 1 coisa: ${dados.acao}. Leva 10 segundos.`,
+        title: previsto?.title ?? `Sua sequência de ${dados.dias} ${dados.dias === 1 ? "dia" : "dias"} acaba hoje 🔥`,
+        body: previsto?.body ?? `Falta 1 coisa: ${dados.acao}. Leva 10 segundos.`,
       });
     } else {
-      out.push({ quando: d, title: "Sua sequência tá te esperando 🔥", body: "Anota 1 coisa do seu dia e ela continua." });
+      out.push({ quando: d, title: previsto?.title ?? "Sua sequência tá te esperando 🔥", body: previsto?.body ?? "Anota 1 coisa do seu dia e ela continua." });
     }
   }
   return out;
 }
 
 export async function agendarLembreteSequencia(
-  dados: { dias: number; anotouHoje: boolean; acao: string },
+  dados: { dias: number; anotouHoje: boolean; acao: string; avisos?: Array<{ title: string; body: string }> },
   opcoes: { hora: number; ligado: boolean },
 ): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.sequencia); return 0; }

@@ -25,6 +25,10 @@ import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { cn, localDayKey } from "@/lib/utils";
 import { rotuloAviso } from "@/lib/compromissos";
+import { FicouDeOntem } from "./ficou-de-ontem";
+import {
+  apagarTarefas, concluirNoDiaOriginal, restaurarTarefas, tarefasDosItens, trazerParaHoje, type ItemFicou,
+} from "@/lib/ficou-de-ontem";
 import {
   AVISO_PADRAO_TAREFA, AVISOS_TAREFA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, horaDaTarefa, horaDoAviso,
   normalizarHora, ordenarPorHora, resumoDosDetalhes, textoDoAviso, type TarefaDoDia,
@@ -103,7 +107,32 @@ export function useTarefasDoDia(chave: string) {
   const alternar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).map((x) => (x.id === id ? { ...x, feito: !x.feito } : x)));
   const apagar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== id));
 
-  return { lista: atual, adicionar, salvar, alternar, apagar };
+  /*
+   * "FICOU DE ONTEM" (02/10): as três saídas do bloco e o desfazer. Cada uma devolve
+   * o retrato das tarefas ANTES do gesto (pro Desfazer devolver só elas). Trazer
+   * pra hoje reagenda o aviso se ele já estava armado no aparelho (sem pedir
+   * permissão: quem decide isso é quem cria a tarefa com horário).
+   */
+  const rearmar = (nova: TarefaDoDia[]) => {
+    if (nova.some((t) => t.dia >= localDayKey() && avisoDaTarefa(t) >= 0)) void armarAvisos(get, { [chave]: nova }, false, { nome: "tarefa_permissao", total: nova.length });
+  };
+  const aplicar = (muda: (prev: unknown) => TarefaDoDia[], itens: ItemFicou[]): TarefaDoDia[] => {
+    const antes = tarefasDosItens(atual, itens);
+    let nova: TarefaDoDia[] = [];
+    setLista((prev) => (nova = muda(prev)));
+    rearmar(nova);
+    return antes;
+  };
+  const trazer = (itens: ItemFicou[]) => aplicar((prev) => trazerParaHoje(prev, itens, localDayKey()), itens);
+  const concluirAntigas = (itens: ItemFicou[]) => aplicar((prev) => concluirNoDiaOriginal(prev, itens), itens);
+  const apagarAntigas = (itens: ItemFicou[]) => aplicar((prev) => apagarTarefas(prev, itens), itens);
+  const restaurar = (originais: TarefaDoDia[]) => {
+    let nova: TarefaDoDia[] = [];
+    setLista((prev) => (nova = restaurarTarefas(prev, originais)));
+    rearmar(nova);
+  };
+
+  return { chave, lista: atual, adicionar, salvar, alternar, apagar, trazer, concluirAntigas, apagarAntigas, restaurar };
 }
 
 /* ------------------------------------------------------------ a tabela */
@@ -186,8 +215,7 @@ export function LinhaDeTarefa({ l, tom, primeira }: { l: LinhaVisivel; tom: TomD
 
 /* ------------------------------------------------------- faixa das folhas */
 
-function FaixaDaFolha({ titulo, sub, onFechar }: { titulo: ReactNode; sub: ReactNode; onFechar: () => void }) {
-  const dia = nomeDoDiaDeHoje();
+export function FaixaDaFolha({ titulo, sub, onFechar, dia = nomeDoDiaDeHoje() }: { titulo: ReactNode; sub: ReactNode; onFechar: () => void; dia?: string }) {
   return (
     <div className={cn(COR_DO_DIA[dia], textoDoDia(dia), "pl-4 pr-2 py-3 flex items-start gap-2")}>
       <div className="min-w-0 flex-1">
@@ -202,7 +230,7 @@ function FaixaDaFolha({ titulo, sub, onFechar }: { titulo: ReactNode; sub: React
 }
 
 /** Folha de baixo do app (a do Conquistas). Sem o X padrão (`semFechar`): o X mora na faixa do dia. */
-const FOLHA = "rounded-t-3xl p-0 gap-0 overflow-hidden max-h-[92dvh] flex flex-col";
+export const FOLHA = "rounded-t-3xl p-0 gap-0 overflow-hidden max-h-[92dvh] flex flex-col";
 
 /* ------------------------------------------------------------ formulário */
 
@@ -525,6 +553,8 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
 
   return (
     <>
+      {/* 02/10: o que ficou sem fazer nos últimos 7 dias, no topo — a pessoa decide (trazer, concluir, apagar) */}
+      <FicouDeOntem fontes={[{ chave: tarefas.chave, tarefas }]} />
       {/* Tarefas de hoje — tabela de planner (28/09): HORA | TAREFA | FEITO, as com
           horário primeiro. Tocar no texto abre a ficha (detalhes, editar, apagar);
           o ⏰ ao lado do + abre a folha com horário, aviso e detalhes. */}
@@ -547,6 +577,7 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
                     primeira={i === 0}
                     l={{
                       key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+                      detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
                       onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
                     }}
                   />

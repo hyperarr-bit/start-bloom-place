@@ -314,6 +314,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
+// 02/10: "Ficou de ontem" e "Esqueceu de marcar?" nas telas de verdade (modo visitante) — só no dev, pra fotografar
+const DevOntem = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevOntem")) : null;
 // 29/09: o Pet refeito (RG, carteirinha, começo pronto) com dados de exemplo — só no dev
 const DevPet = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPet")) : null;
 // 29/09: Relações (Onda 1) com as pessoas da Ana em memória — só no dev, pra fotografar
@@ -595,6 +597,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevOntem && (
+          <Route path="/dev/ontem" element={<Suspense fallback={null}><DevOntem /></Suspense>} />
         )}
         {import.meta.env.DEV && DevPet && (
           <Route path="/dev/pet" element={<Suspense fallback={null}><DevPet /></Suspense>} />

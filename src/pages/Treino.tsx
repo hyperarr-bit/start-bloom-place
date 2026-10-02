@@ -84,6 +84,9 @@ import { TreinoEvolucao, type RecordeAnotado } from "@/components/treino/TreinoE
 import { TreinoConcluido, type ResumoDoTreino } from "@/components/treino/TreinoConcluido";
 import { TreinoPlano, type AcoesDoPlano } from "@/components/treino/TreinoPlano";
 import { tomDoDia } from "@/components/treino/planner";
+import { PeDoEsqueceu, TreinoDeOntem, type PedidoDeSalvar } from "@/components/treino/TreinoDeOntem";
+import { gravarTreinoDeOutroDia, treinouNoDia } from "@/lib/treino-outro-dia";
+import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { aplicarModelo, exercicioNovo, moverNaLista, planoVazio, type DiaDoPlano } from "@/lib/treino-plano";
 
 type WorkoutPlan = Record<string, DiaDoPlano>;
@@ -544,6 +547,25 @@ const Treino = () => {
     setConcluidoAberto(true);
   };
 
+  /* ---------------- ESQUECEU DE MARCAR? ontem / anteontem (02/10) ---------------- */
+  const marcarOutroDia = useMarcarOntem();
+  const [diaEsquecido, setDiaEsquecido] = useState<string | null>(null);
+  const salvarOutroDia = ({ dia, diaDoPlano, series }: PedidoDeSalvar) => {
+    const exs = workoutPlan[diaDoPlano]?.exercises ?? [];
+    const g = gravarTreinoDeOutroDia({
+      dia, diaDoPlano, musculos: workoutPlan[diaDoPlano]?.muscles ?? [], exercicios: exs, chaves: chavesDosExercicios(exs), series,
+      historico: exerciseHistory, log: workoutLog, volume: weeklyVolume, sessoes: sessoesMeta,
+    });
+    // tudo no escopo do dia: a sequência anota ONTEM (ou nada, se o treino foi tirado), nunca hoje
+    marcarOutroDia("treino", dia, g.feitas > 0, () => {
+      setExerciseHistory(g.historico);
+      setWorkoutLog(g.log);
+      setWeeklyVolume(g.volume);
+      setSessoesMeta(g.sessoes);
+    });
+    setDiaEsquecido(null);
+  };
+
   /* ---------------- semana, constância, evolução ---------------- */
   const { semanas, sequencia } = useMemo(() => semanasNaMeta(log, meta, hojeData), [log, meta, hojeData]);
   const fonte: FonteDosTreinos = useMemo(() => ({ sessoes: sessoesMeta ?? {}, historico, plano: workoutPlan }), [sessoesMeta, historico, workoutPlan]);
@@ -739,6 +761,8 @@ const Treino = () => {
           ]}
         />
 
+        {activeTab === "hoje" && !treinoVazio && <PeDoEsqueceu hoje={today} log={log} onAbrir={setDiaEsquecido} />}
+
         {activeTab === "hoje" && (
           <TreinoHoje
             hoje={today}
@@ -851,6 +875,17 @@ const Treino = () => {
           onAltura={setAlturaRodape}
         />
       )}
+
+      <TreinoDeOntem
+        dia={diaEsquecido}
+        hoje={today}
+        plano={workoutPlan}
+        historico={historico}
+        onFechar={() => setDiaEsquecido(null)}
+        onTrocarDia={setDiaEsquecido}
+        onSalvar={salvarOutroDia}
+        podeLimpar={(d) => treinouNoDia(log, d)}
+      />
 
       <TreinoConcluido resumo={resumo} aberto={concluidoAberto} onFechar={() => setConcluidoAberto(false)} />
     </div>

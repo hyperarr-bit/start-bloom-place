@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
+import { alternarHabitoNoDia, marcaDoDia, marcadosDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
+import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
+import { HabitosDeOntem } from "@/components/rotina/habitos-de-ontem";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
@@ -1242,31 +1244,45 @@ const Rotina = () => {
   const [editingCell, setEditingCell] = useState<{ hour: string; day: string } | null>(null);
   const [editCellValue, setEditCellValue] = useState("");
 
+  const marcarOutroDia = useMarcarOntem();
+  /**
+   * Marca/desmarca um hábito num DIA (a data real: "2026-10-01"). O toque na
+   * grade (qualquer coluna da semana) e a folha "esqueceu de marcar?" (ontem e
+   * anteontem — que na segunda-feira cai na semana passada, fora da grade)
+   * passam por aqui: escreve a grade (se o dia é desta semana), o log por data e o
+   * heatmap, e anota o dia na sequência (hoje, ontem/anteontem; outro dia não anota nada).
+   */
+  const alternarHabitoNaData = (chave: string, habitIndex: number) => {
+    const hoje = localDayKey();
+    const r = alternarHabitoNoDia({
+      nomes: habitNames, checked: checkedAtual, semana: semanaChecks, habitLog, heatmap: heatmapDoConvite, indice: habitIndex, dia: chave, hoje,
+    });
+    marcarOutroDia("rotina", chave, r.marcando, () => {
+      if (r.semana !== semanaChecks) setSemanaChecks(r.semana);
+      if (r.checked !== checkedAtual) setHabitsChecked(r.checked);
+      // Espelha o DIA INTEIRO no log por data. Reescrever a entrada toda é
+      // auto-curativo: check e uncheck ficam sempre consistentes.
+      setHabitLog(prev => ({ ...prev, [chave]: r.habitLog[chave] }));
+      // A marca do heatmap segue o toque (26/09, varredura): desmarcar o último
+      // hábito do dia desfaz o quadradinho verde e a sequência. Dia futuro da
+      // semana não entra — o heatmap termina hoje.
+      if (chave <= hoje) setHeatmapLog(prev => marcaDoDia(prev, chave, r.feitos));
+    });
+  };
+  /** HOJE / ONTEM / ANTEONTEM na linha da grade (a semana corrente), pra ver qual é qual. */
+  const rotuloDaLinha = (i: number): string | null => {
+    const hoje = new Date();
+    const dow = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
+    return i === dow ? "HOJE" : i === dow - 1 ? "ONTEM" : i === dow - 2 ? "ANTEONTEM" : null;
+  };
   const toggleHabit = (day: string, habitIndex: number) => {
-    if (!semanaValida) setSemanaChecks(semanaAtualId());
-    const newChecked = { ...checkedAtual };
-    if (!newChecked[day]) newChecked[day] = habitNames.map(() => false);
-    newChecked[day] = [...newChecked[day]];
-    newChecked[day][habitIndex] = !newChecked[day][habitIndex];
-    setHabitsChecked(newChecked);
-    // Espelha o DIA INTEIRO no log por data real (a coluna tocada pode ser
-    // qualquer dia da semana corrente). Reescrever a entrada toda a partir da
-    // grade é auto-curativo: check e uncheck ficam sempre consistentes.
+    // a coluna tocada é um dia da semana corrente: acha a data real
     const idx = days.indexOf(day);
     const hoje = new Date();
     const dow = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
     const dataReal = new Date(hoje);
     dataReal.setDate(hoje.getDate() - dow + idx);
-    const chave = getDateKey(dataReal);
-    const feitos = habitNames.filter((_, i) => newChecked[day][i]);
-    setHabitLog(prev => ({ ...prev, [chave]: feitos }));
-    // A marca do heatmap segue o toque (26/09, varredura): desmarcar o último
-    // hábito do dia desfaz o quadradinho verde e a sequência. Dia futuro da
-    // semana não entra — o heatmap termina hoje.
-    if (chave <= localDayKey()) {
-      const quantos = newChecked[day].filter(Boolean).length;
-      setHeatmapLog(prev => marcaDoDia(prev, chave, quantos));
-    }
+    alternarHabitoNaData(getDateKey(dataReal), habitIndex);
   };
 
   const addHabit = () => {
@@ -1397,6 +1413,16 @@ const Rotina = () => {
                 </Button>
               </div>
 
+              {/* 02/10: "esqueci de marcar ontem" — ontem e anteontem, numa folha (a tela de hoje não muda) */}
+              {habitNames.length > 0 && (
+                <HabitosDeOntem
+                  nomes={habitNames}
+                  hoje={localDayKey()}
+                  marcados={(dia) => marcadosDoDia({ nomes: habitNames, checked: checkedAtual, semana: semanaChecks, habitLog, dia, hoje: localDayKey() })}
+                  onAlternar={alternarHabitoNaData}
+                />
+              )}
+
               {showAddHabit && (
                 <div className="p-3 bg-green-50 dark:bg-[hsl(var(--rt-card-2))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] flex gap-2">
                   <Input placeholder="Nome do hábito..." value={newHabit} onChange={(e) => setNewHabit(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addHabit()} className="h-8 text-xs flex-1" autoFocus />
@@ -1431,7 +1457,15 @@ const Rotina = () => {
                   <tbody>
                     {days.map((day, di) => (
                       <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""}`}>
-                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
+                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">
+                          {day}
+                          {/* 02/10: qual linha é hoje — e quais dá pra marcar como "esqueci" (ontem e anteontem) */}
+                          {rotuloDaLinha(di) && (
+                            <span className={`block text-[9px] font-extrabold tracking-wide ${rotuloDaLinha(di) === "HOJE" ? "text-[hsl(var(--accent))]" : "text-muted-foreground"}`} data-testid={`linha-${rotuloDaLinha(di)?.toLowerCase()}`}>
+                              {rotuloDaLinha(di)}
+                            </span>
+                          )}
+                        </td>
                         {habitNames.map((_, hi) => (
                           <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
                             <Checkbox checked={checkedAtual[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />

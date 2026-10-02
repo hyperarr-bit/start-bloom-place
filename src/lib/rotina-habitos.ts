@@ -1,4 +1,4 @@
-import { localDayKey, semanaAtualId } from "@/lib/utils";
+import { localDayKey, parseLocalDay, semanaAtualId } from "@/lib/utils";
 
 /**
  * Hábitos da Rotina — regras compartilhadas entre o módulo e o widget da Home
@@ -62,5 +62,69 @@ export const alternarHabitoDeHoje = (p: {
     semana: semanaAtualId(),
     habitLog: { ...(p.habitLog ?? {}), [hoje]: feitos },
     heatmap: marcaDoDia(p.heatmap ?? {}, hoje, feitos.length),
+  };
+};
+
+/* ------------------------------------------------------------------------- *
+ * Marcar OUTRO dia (02/10): "esqueci de marcar ontem"
+ * ------------------------------------------------------------------------- */
+
+/** Id da semana (a segunda-feira) de uma data "YYYY-MM-DD". */
+export const semanaDoDia = (dia: string): string => {
+  const d = parseLocalDay(dia);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return localDayKey(d);
+};
+
+/** "QUINTA" de uma data "YYYY-MM-DD" (a grade da Rotina é por nome de dia). */
+export const nomeDoDiaDaRotina = (dia: string): string => DIAS_DA_ROTINA[(parseLocalDay(dia).getDay() + 6) % 7];
+
+/**
+ * Quais hábitos estão marcados num dia, na ordem de `nomes`. Dia da semana
+ * corrente com a grade carimbada nesta semana: a grade (é o que a tabela mostra).
+ * Qualquer outro caso — dia da semana PASSADA (domingo visto numa segunda) ou
+ * grade ainda sem carimbo —: o log por data, que não zera na virada da semana.
+ */
+export const marcadosDoDia = (p: {
+  nomes: string[]; checked: Record<string, boolean[]>; semana: string; habitLog: Record<string, string[]>; dia: string; hoje: string;
+}): boolean[] => {
+  const naSemana = semanaDoDia(p.dia) === semanaDoDia(p.hoje) && p.semana === semanaDoDia(p.hoje);
+  if (naSemana) {
+    const linha = p.checked?.[nomeDoDiaDaRotina(p.dia)];
+    return p.nomes.map((_, i) => !!(Array.isArray(linha) && linha[i]));
+  }
+  const feitos = Array.isArray(p.habitLog?.[p.dia]) ? p.habitLog[p.dia] : [];
+  return p.nomes.map((n) => feitos.includes(n));
+};
+
+/**
+ * Marca/desmarca o hábito `indice` num dia QUALQUER (hoje, ontem, anteontem,
+ * ou a coluna que a pessoa tocou na grade). Escreve as mesmas três coisas de
+ * sempre — a grade da semana (só se o dia é desta semana), o log por data e o
+ * heatmap (só até hoje) — então a tela, o card de Consistência e a Home não
+ * discordam. Auto-curativo: reescreve o dia inteiro a partir do que está marcado.
+ */
+export const alternarHabitoNoDia = (p: {
+  nomes: string[]; checked: Record<string, boolean[]>; semana: string; habitLog: Record<string, string[]>;
+  heatmap: LogDoHeatmap; indice: number; dia: string; hoje: string;
+}) => {
+  const atuais = marcadosDoDia(p);
+  const novo = [...atuais];
+  novo[p.indice] = !novo[p.indice];
+  const feitos = p.nomes.filter((_, i) => novo[i]);
+  const semanaCorrente = semanaDoDia(p.hoje);
+  let checked = p.checked;
+  let semana = p.semana;
+  if (semanaDoDia(p.dia) === semanaCorrente) {
+    checked = { ...(p.semana === semanaCorrente ? p.checked ?? {} : {}), [nomeDoDiaDaRotina(p.dia)]: novo };
+    semana = semanaCorrente;
+  }
+  return {
+    checked,
+    semana,
+    habitLog: { ...(p.habitLog ?? {}), [p.dia]: feitos },
+    heatmap: p.dia <= p.hoje ? marcaDoDia(p.heatmap ?? {}, p.dia, feitos.length) : (p.heatmap ?? {}),
+    marcando: !!novo[p.indice],
+    feitos: feitos.length,
   };
 };

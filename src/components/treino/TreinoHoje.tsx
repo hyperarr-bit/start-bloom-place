@@ -65,7 +65,7 @@ export interface PropsDoHoje {
 }
 
 /** "3 × 12 · 14 kg" a partir das séries (o que está valendo hoje). */
-const alvoDaLinha = (lista: SerieDaSessao[]): string => {
+export const alvoDaLinha = (lista: SerieDaSessao[]): string => {
   if (!lista.length) return "";
   const feitas = lista.filter((s) => s.feito).length;
   if (feitas > 0 && feitas < lista.length) return `${feitas} de ${lista.length} séries`;

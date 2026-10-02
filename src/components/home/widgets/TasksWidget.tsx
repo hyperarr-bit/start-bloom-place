@@ -10,6 +10,7 @@ import {
   type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
+import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
 import {
   CabecalhoDaTabela, FichaDaTarefa, FolhaNovaTarefa, LinhaDeTarefa, LinhaNovaTarefa, diaCurto, nomeDoDiaDeHoje, useTarefasDoDia,
   type FichaAberta, type LinhaVisivel,
@@ -112,7 +113,7 @@ export const TasksWidget = () => {
     fonte.lista.filter((t): t is TarefaDoDia => !!t && t.dia === hoje && typeof t.texto === "string").forEach((t) => {
       const key = `${prefixo}-${t.id}`;
       linhas.push({
-        key, origem, texto: t.texto, feito: !!t.feito,
+        key, origem, texto: t.texto, feito: !!t.feito, detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
         hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
         onAlternar: () => fonte.alternar(t.id), onAbrir: () => setAberta(key),
         ficha: { onde: origem, tarefa: t, onAlternar: () => fonte.alternar(t.id), onSalvar: (c) => fonte.salvar(t.id, c), onApagar: () => fonte.apagar(t.id) },
@@ -187,6 +188,9 @@ export const TasksWidget = () => {
           </div>
         )}
       </div>
+
+      {/* 02/10: o que ficou sem fazer nos últimos 7 dias, no topo — a pessoa decide (trazer, concluir, apagar) */}
+      <FicouDeOntem fontes={[{ chave: CHAVE_TAREFAS_ROTINA, tarefas: rotina }, { chave: CHAVE_TAREFAS_CARREIRA, tarefas: carreira }]} envolver />
 
       {linhas.length === 0 ? (
         <div className="px-4 py-3 space-y-1">

@@ -151,6 +151,51 @@ export const registrarDia = (lista: unknown, hoje: string, hub?: unknown): strin
 };
 
 /* ------------------------------------------------------------------------- *
+ * Marcar OUTRO dia (02/10): "esqueci de marcar ontem"
+ * ------------------------------------------------------------------------- */
+
+/** Até quantos dias pra trás dá pra marcar (ontem e anteontem). */
+export const DIAS_PRA_TRAS = 2;
+
+export interface DiaRetroativo {
+  dia: string;
+  diasAtras: 1 | 2;
+  /** "ontem" | "anteontem" */
+  rotulo: string;
+}
+
+/** Os dias que ainda dá pra marcar, do mais perto pro mais longe. */
+export const diasRetroativos = (hoje: string): DiaRetroativo[] => [
+  { dia: somarDias(hoje, -1), diasAtras: 1, rotulo: "ontem" },
+  { dia: somarDias(hoje, -2), diasAtras: 2, rotulo: "anteontem" },
+];
+
+/** 0 = hoje, 1 = ontem, 2 = anteontem; qualquer outro dia (futuro ou mais velho) = null. */
+export const diasAtras = (dia: unknown, hoje: string): 0 | 1 | 2 | null => {
+  if (!ehDia(dia)) return null;
+  if (dia === hoje) return 0;
+  const r = diasRetroativos(hoje).find((d) => d.dia === dia);
+  return r ? r.diasAtras : null;
+};
+
+/**
+ * Anota um dia PASSADO (ontem ou anteontem) na lista. Devolve a lista nova, ou
+ * `null` quando não há nada a gravar (o dia já está lá, ou está fora da janela
+ * de 2 dias). Lista ausente = primeira vez: nasce da semente do hub.
+ *
+ * Não mexe em hoje: marcar ontem não faz hoje contar. A sequência é refeita
+ * do zero pelos dias (calcularSequencia), então o dia que entrou fecha o
+ * buraco sozinho — e entrar duas vezes é a mesma lista (nada duplica).
+ */
+export const registrarDiaRetroativo = (lista: unknown, dia: string, hoje: string, hub?: unknown): string[] | null => {
+  const atras = diasAtras(dia, hoje);
+  if (atras === null || atras === 0) return null;
+  const base = Array.isArray(lista) ? normalizarDias(lista) : semearDoHub(hub, hoje);
+  if (base.includes(dia)) return null;
+  return normalizarDias([...base, dia]);
+};
+
+/* ------------------------------------------------------------------------- *
  * A conta
  * ------------------------------------------------------------------------- */
 

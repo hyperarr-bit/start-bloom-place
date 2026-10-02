@@ -10,10 +10,12 @@
  * quadradinho magenta à direita. Kit em ./kit.
  *
  * Só aparecem os passos do DIA (a agenda por passo); os que ficam de fora vão no
- * rodapé ("hoje não: …"). HOJE | ONTEM: esqueceu de marcar ontem, marca ontem.
+ * rodapé ("hoje não: …"). HOJE | ONTEM | ANTEONTEM: esqueceu de marcar, marca no dia (02/10:
+ * "quero voltar no dia 28/09 e marcar a rotina da noite que esqueci" — até 2 dias pra
+ * trás; a marca anota ESSE dia na sequência e uma faixa avisa que não é hoje).
  */
 import { useState, type ReactNode } from "react";
-import { Bell, Plus } from "lucide-react";
+import { Bell, History, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,7 @@ import {
 } from "@/lib/beleza-rotina";
 import { DIAS_DA_SEMANA } from "@/components/treino/planner";
 import { diaCurto } from "@/components/tarefas/tarefas-do-dia";
+import { diaEmMiudo } from "@/hooks/use-marcar-ontem";
 import { CartaoBeleza, Chip, FaixaDoPeriodo, Marcar, Serif, TEMA_BELEZA } from "./kit";
 import type { Skincare } from "./use-skincare";
 
@@ -106,9 +109,9 @@ export function FolhaDoSkincare({
   rodape?: ReactNode;
   testId?: string;
 }) {
-  const [qual, setQual] = useState<"hoje" | "ontem">("hoje");
+  const [qual, setQual] = useState<"hoje" | "ontem" | "anteontem">("hoje");
   const [novo, setNovo] = useState<Record<Periodo, string>>({ manha: "", noite: "" });
-  const dia = qual === "hoje" ? s.hoje : s.ontem;
+  const dia = qual === "hoje" ? s.hoje : qual === "ontem" ? s.ontem : s.anteontem;
   const nome = nomeDoDia(dia);
   const semana = diaDaSemanaDaChave(dia);
   const sensivel = s.checkins?.[dia] === "sensivel";
@@ -138,38 +141,46 @@ export function FolhaDoSkincare({
     <CartaoBeleza className={TEMA_BELEZA} data-card="skincare-de-hoje" data-testid={testId}>
       {/* o dia num cabeçalho rosé delicado — o dia em miúdo, "Skincare de hoje" com acento em serifa */}
       <div className="bg-bz-rose text-bz-rose-tinta px-4 pt-3 pb-3.5">
-        {/* celular estreito (360): o título encolhe um pouco; ainda mais estreito, o HOJE | ONTEM desce */}
-        <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-          <div className="min-w-0">
-            <p className="text-[11px] font-extrabold tracking-[.16em] opacity-80">{nome} · {diaCurto(dia)}</p>
-            <h3 className="mt-0.5 text-[length:clamp(18px,5.4vw,21px)] leading-[1.1] font-bold tracking-tight whitespace-nowrap">
-              Skincare <Serif className="text-[length:clamp(21px,6.4vw,25px)] font-normal">{qual === "hoje" ? "de hoje" : "de ontem"}</Serif>
-            </h3>
-            <p className="mt-1 text-[12px] font-semibold opacity-85">
-              <b className="tabular-nums" data-testid="contagem-skincare">{feitos}/{total}</b> {qual === "hoje" ? "feitos hoje" : "feitos ontem"}
-            </p>
-          </div>
-          <div className="ml-auto shrink-0 flex rounded-full bg-bz-cartao/55 p-0.5" role="group" aria-label="Qual dia marcar">
-            {(["hoje", "ontem"] as const).map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => setQual(q)}
-                aria-pressed={qual === q}
-                className={cn(
-                  "h-10 px-3 rounded-full text-[11px] font-extrabold tracking-[.1em] transition-colors",
-                  qual === q ? "bg-bz-cartao text-bz-rose-tinta shadow-[0_2px_8px_-4px_hsl(var(--bz-sombra)/0.5)]" : "bg-transparent text-bz-rose-tinta/75",
-                )}
-              >
-                {q === "hoje" ? "HOJE" : "ONTEM"}
-              </button>
-            ))}
-          </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-extrabold tracking-[.16em] opacity-80">{nome} · {diaCurto(dia)}</p>
+          <h3 className="mt-0.5 text-[length:clamp(18px,5.4vw,21px)] leading-[1.1] font-bold tracking-tight whitespace-nowrap">
+            Skincare <Serif className="text-[length:clamp(21px,6.4vw,25px)] font-normal">{qual === "hoje" ? "de hoje" : `de ${qual}`}</Serif>
+          </h3>
+          <p className="mt-1 text-[12px] font-semibold opacity-85">
+            <b className="tabular-nums" data-testid="contagem-skincare">{feitos}/{total}</b> {qual === "hoje" ? "feitos hoje" : `feitos ${qual}`}
+          </p>
+        </div>
+        {/* esqueceu de marcar? até 2 dias pra trás — discreto: um seletor só, a tela de hoje não muda */}
+        <div className="mt-3 grid grid-cols-3 rounded-full bg-bz-cartao/55 p-0.5" role="group" aria-label="Qual dia marcar">
+          {(["hoje", "ontem", "anteontem"] as const).map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => setQual(q)}
+              aria-pressed={qual === q}
+              className={cn(
+                "h-10 rounded-full text-[11px] font-extrabold tracking-[.1em] transition-colors",
+                qual === q ? "bg-bz-cartao text-bz-rose-tinta shadow-[0_2px_8px_-4px_hsl(var(--bz-sombra)/0.5)]" : "bg-transparent text-bz-rose-tinta/75",
+              )}
+            >
+              {q.toUpperCase()}
+            </button>
+          ))}
         </div>
         <div className="mt-2.5 h-1.5 rounded-full bg-bz-cartao/70 overflow-hidden" aria-hidden="true">
           <span className="block h-full rounded-full bg-bz-acento transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {qual !== "hoje" && (
+        <div className="px-4 py-2.5 bg-bz-alerta text-bz-alerta-tinta text-[12px] font-semibold flex items-center gap-2" data-testid="faixa-outro-dia">
+          <History className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 leading-snug">Marcando em <b>{qual}</b> ({diaEmMiudo(dia)}). Conta na sua sequência.</span>
+          <button type="button" onClick={() => setQual("hoje")} className="shrink-0 h-9 px-2.5 -mr-1.5 rounded-full text-[11.5px] font-extrabold underline underline-offset-2" data-testid="voltar-pra-hoje">
+            voltar pra hoje
+          </button>
+        </div>
+      )}
 
       {periodos.map(({ periodo, visiveis, escondidos, feitos: marcados, nFeitos, fora }) => {
         const lembrete = s.lembrete[periodo];
@@ -238,7 +249,7 @@ export function FolhaDoSkincare({
             )}
             {fora.length > 0 && (
               <p className="px-4 py-2 border-t border-bz-linha text-[12px] text-bz-suave" data-testid={`fora-${periodo}`}>
-                {`${qual === "hoje" ? "Hoje" : "Ontem"} não: ${fora.map(({ passo }) => `${nomeCurto(passo.name)} (${diasPorExtenso(passo)})`).join(", ")}`}
+                {`${qual === "hoje" ? "Hoje" : qual === "ontem" ? "Ontem" : "Anteontem"} não: ${fora.map(({ passo }) => `${nomeCurto(passo.name)} (${diasPorExtenso(passo)})`).join(", ")}`}
               </p>
             )}
             {modo === "modulo" && qual === "hoje" && (

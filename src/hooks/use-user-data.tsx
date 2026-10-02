@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { markActivation, trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
-import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, temConteudo } from "@/lib/sequencia";
+import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, registrarDiaRetroativo, temConteudo } from "@/lib/sequencia";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
@@ -199,6 +199,14 @@ interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
   set: (key: string, value: any, opts?: { system?: boolean }) => void;
   loaded: boolean;
+  /**
+   * Marcar OUTRO dia (02/10): roda `fn` (uma ou várias escritas, SÍNCRONAS) dizendo
+   * a que dia elas pertencem. `dia` = ontem/anteontem → a anotação entra na
+   * sequência NAQUELE dia, não em hoje; `null` → não anota dia nenhum (ex.:
+   * desmarcar, ou dia fora da janela de 2 dias). Opcional no tipo pra não obrigar
+   * os mocks de teste: sem ele, quem chama só roda a função.
+   */
+  comDia?: <T>(dia: string | null, fn: () => T) => T;
   /** True when running without an authenticated user (data is local-only). */
   isGuest: boolean;
   /** Lazy fetch a single heavy key from Supabase on demand. */
@@ -489,6 +497,24 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
    * servidor responder não registra: gravar a lista sem a do servidor apagaria
    * o histórico (o próximo registro do dia registra).
    */
+  // Escopo do "marcar outro dia": enquanto a função roda, as escritas valem pro dia dito.
+  const escopoDiaRef = useRef<{ dia: string | null; feito?: boolean } | null>(null);
+  const registrarDiaRetro = useCallback((key: string, value: any, dia: string | null) => {
+    if (!dia || !loadedRef.current || escopoDiaRef.current?.feito) return;
+    if (!contaComoAnotacao(key) || !temConteudo(value)) return;
+    try { if (JSON.stringify(value) === JSON.stringify(storeRef.current[key])) return; } catch { return; }
+    const nova = registrarDiaRetroativo(storeRef.current[CHAVE_DIAS_ANOTADOS], dia, localDayKey(), storeRef.current[CHAVE_HUB_STREAK]);
+    if (!nova) return; // o dia já estava na lista (ou fora da janela de 2 dias)
+    // um gesto que grava várias chaves (Treino: histórico, registro, volume…) anota o dia UMA vez
+    if (escopoDiaRef.current) escopoDiaRef.current.feito = true;
+    setRef.current(CHAVE_DIAS_ANOTADOS, nova, { system: true });
+  }, []);
+  const comDia = useCallback(<T,>(dia: string | null, fn: () => T): T => {
+    const antes = escopoDiaRef.current;
+    escopoDiaRef.current = { dia };
+    try { return fn(); } finally { escopoDiaRef.current = antes; }
+  }, []);
+
   const registrarDiaAnotado = useCallback((key: string, value: any) => {
     const hoje = localDayKey();
     if (diaAnotadoRef.current === hoje || !loadedRef.current) return;
@@ -537,9 +563,11 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     // celebram degrau no BOOT, sem ninguém ter feito nada (review 16/08).
     if (!opts?.system) {
       checkActivation(key, value);
-      registrarDiaAnotado(key, value);
+      const escopo = escopoDiaRef.current;
+      if (escopo) registrarDiaRetro(key, value, escopo.dia);
+      else registrarDiaAnotado(key, value);
     }
-  }, [flush, registrarDiaAnotado]);
+  }, [flush, registrarDiaAnotado, registrarDiaRetro]);
   setRef.current = set;
 
   // Force flush on tab hide / unload.
@@ -587,7 +615,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <UserDataContext.Provider value={{ get, set, loaded, fetchKey, isGuest: !user, apagarTudo }}>
+    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo }}>
       {children}
     </UserDataContext.Provider>
   );

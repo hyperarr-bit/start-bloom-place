@@ -8,6 +8,7 @@ import {
 import { CHAVE_LEMBRETE_SKINCARE, LEMBRETE_PADRAO, lerLembreteSkincare, type LembreteDoPeriodo, type LembreteSkincare } from "@/lib/beleza-lembrete";
 import { inserirEm, marcadosAposInserir, marcadosAposRemover } from "./utils";
 import { useChaveDaBeleza } from "./estado-compartilhado";
+import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 
 /** "2026-09-27" a partir de "2026-09-28" (dia LOCAL). */
 export const diaAnterior = (dia: string): string => {
@@ -32,6 +33,8 @@ const doDia = (mapa: Feitos, dia: string): number[] => (Array.isArray(mapa?.[dia
 export function useSkincare() {
   const hoje = localDayKey();
   const ontem = diaAnterior(hoje);
+  const anteontem = diaAnterior(ontem);
+  const marcarOutroDia = useMarcarOntem();
   const [manha, setManha] = useChaveDaBeleza<PassoDaRotina[]>(CHAVE_PASSOS.manha, []);
   const [noite, setNoite] = useChaveDaBeleza<PassoDaRotina[]>(CHAVE_PASSOS.noite, []);
   const [feitosManha, setFeitosManha] = useChaveDaBeleza<Feitos>(CHAVE_FEITOS.manha, {});
@@ -53,15 +56,22 @@ export function useSkincare() {
 
   const feitosDoDia = (periodo: Periodo, dia: string): number[] => doDia(feitos[periodo], dia);
 
-  /** Marca/desmarca um passo NUM dia (hoje ou ontem) — o índice é o do array inteiro. */
-  const alternar = (periodo: Periodo, i: number, dia: string = hoje) =>
-    setFeitos[periodo]((prev) => {
-      const atual = [...doDia(prev, dia)];
-      const pos = atual.indexOf(i);
-      if (pos >= 0) atual.splice(pos, 1);
-      else atual.push(i);
-      return { ...prev, [dia]: atual };
-    });
+  /**
+   * Marca/desmarca um passo NUM dia (hoje, ontem ou anteontem — 02/10, "quero voltar
+   * no dia 28/09 e marcar a rotina da noite que esqueci") — o índice é o do array
+   * inteiro. Marcar ontem/anteontem anota ESSE dia na sequência, não hoje.
+   */
+  const alternar = (periodo: Periodo, i: number, dia: string = hoje) => {
+    const marcando = !doDia(feitos[periodo], dia).includes(i);
+    marcarOutroDia("beleza", dia, marcando, () =>
+      setFeitos[periodo]((prev) => {
+        const atual = [...doDia(prev, dia)];
+        const pos = atual.indexOf(i);
+        if (pos >= 0) atual.splice(pos, 1);
+        else atual.push(i);
+        return { ...prev, [dia]: atual };
+      }));
+  };
 
   /** O produto do passo na Bancada. Acabou e já tem outro igual? Segue o novo (repôs pela lista de compras). */
   const produtoDe = (p: PassoDaRotina | null | undefined): ProdutoDaBancada | null => {
@@ -82,19 +92,21 @@ export function useSkincare() {
   };
 
   /**
-   * Tira o passo e oferece Desfazer (como sempre foi). Os checks de HOJE e de
-   * ONTEM andam junto com os índices (dá pra marcar ontem desde 28/09); dias mais
-   * antigos só contam pra sequência e ficam como estão.
+   * Tira o passo e oferece Desfazer (como sempre foi). Os checks de HOJE, ONTEM e
+   * ANTEONTEM andam junto com os índices (dá pra marcar ontem desde 28/09, e
+   * anteontem desde 02/10); dias mais antigos só contam pra sequência e ficam
+   * como estão.
    */
   const removerPasso = (periodo: Periodo, i: number) => {
     const passo = passos[periodo][i];
     if (!passo) return;
-    const antes = { [hoje]: feitosDoDia(periodo, hoje).includes(i), [ontem]: feitosDoDia(periodo, ontem).includes(i) };
-    const tinha = { [hoje]: hoje in (feitos[periodo] ?? {}), [ontem]: ontem in (feitos[periodo] ?? {}) };
+    const dias = [hoje, ontem, anteontem];
+    const antes = Object.fromEntries(dias.map((d) => [d, feitosDoDia(periodo, d).includes(i)]));
+    const tinha = Object.fromEntries(dias.map((d) => [d, d in (feitos[periodo] ?? {})]));
     setPassos[periodo]((prev) => lista<PassoDaRotina>(prev).filter((_, j) => j !== i));
     setFeitos[periodo]((prev) => {
       const n = { ...prev };
-      for (const d of [hoje, ontem]) if (tinha[d]) n[d] = marcadosAposRemover(doDia(prev, d), i);
+      for (const d of dias) if (tinha[d]) n[d] = marcadosAposRemover(doDia(prev, d), i);
       return n;
     });
     avisarApagado(`"${passo.name}" saiu da rotina`, () => {
@@ -102,7 +114,7 @@ export function useSkincare() {
       setPassos[periodo]((prev) => { pos = Math.min(i, lista(prev).length); return inserirEm(lista<PassoDaRotina>(prev), pos, passo); });
       setFeitos[periodo]((prev) => {
         const n = { ...prev };
-        for (const d of [hoje, ontem]) if (tinha[d]) n[d] = marcadosAposInserir(doDia(prev, d), pos, antes[d]);
+        for (const d of dias) if (tinha[d]) n[d] = marcadosAposInserir(doDia(prev, d), pos, antes[d]);
         return n;
       });
     });
@@ -209,7 +221,7 @@ export function useSkincare() {
   };
 
   return {
-    hoje, ontem, passos, feitos, feitosDoDia, checkins, bancada: lista<ProdutoDaBancada>(bancada), evitar: lista<string>(evitar),
+    hoje, ontem, anteontem, passos, feitos, feitosDoDia, checkins, bancada: lista<ProdutoDaBancada>(bancada), evitar: lista<string>(evitar),
     lembrete, perfil, vazia, alternarDispensado: dicasBruto?.alternarDispensado === true,
     alternar, produtoDe, adicionarPasso, removerPasso, alternarDiaDoPasso, renomear, escolherProduto, tirarProduto, abrirHoje,
     gerar, mudarLembrete, ligarLembretes, aplicarDias, dispensarAlternar,

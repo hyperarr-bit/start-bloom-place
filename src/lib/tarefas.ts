@@ -37,6 +37,8 @@ export type TarefaDoDia = {
   aviso?: number;
   /** Texto livre, várias linhas: passo a passo, telefone, o que levar. */
   detalhes?: string;
+  /** "YYYY-MM-DD" — o dia em que ela nasceu, quando veio do "Ficou de ontem" (02/10). Só informa. */
+  veioDe?: string;
 };
 
 /** As duas listas de "tarefas de hoje" (BlocoDeFases): Rotina e Carreira. */

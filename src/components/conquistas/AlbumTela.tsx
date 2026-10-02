@@ -264,8 +264,8 @@ const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, 
 /* ------------------------------------------------------------ a folha 3D */
 
 export const DURACAO_VIRADA_MS = 600;
-/** A capa fica parada este tempo antes de virar (a pessoa vê a capa). */
-export const CAPA_PARADA_MS = 500;
+/** A capa fica parada este tempo antes de virar (02/10, dono: "parece só um pulo da capa" — 0,5 s era pouco pra ver a capa). */
+export const CAPA_PARADA_MS = 1400;
 export const CAPA_GIRO_MS = 700;
 /** O instante em que a capa revela a 1ª página (passa do perfil) = quando as figurinhas começam a colar. */
 export const CAPA_REVELA_MS = CAPA_PARADA_MS + Math.round(CAPA_GIRO_MS * 0.45);
@@ -649,6 +649,8 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       rot.set(v.dir > 0 ? 0 : -180);
       setVirando(v);
       try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch { /* jsdom */ }
+      // o que está dentro da folha sai do teste de toque enquanto o dedo arrasta (CSS [data-arrastando]); direto no DOM, sem render
+      e.currentTarget.setAttribute("data-arrastando", "");
     }
     const v = g.virada;
     // o ângulo acompanha o dedo: a largura inteira = 180° (um pouco mais rápido que o dedo, como papel)
@@ -657,7 +659,8 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     g.ultimoX = e.clientX;
     g.ultimoT = Date.now();
   };
-  const aoSoltar = () => {
+  const aoSoltar = (e?: React.PointerEvent<HTMLDivElement>) => {
+    e?.currentTarget.removeAttribute("data-arrastando");
     const g = gesto.current;
     gesto.current = null;
     if (!g || !g.virada) return;

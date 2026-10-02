@@ -337,7 +337,7 @@
 .alb-lombada::after { content: ""; position: absolute; left: 3px; right: 3px; top: 16px; bottom: 16px; border-left: 1px solid rgba(255,255,255,.14); border-right: 1px solid rgba(0,0,0,.18); }
 /* a FOLHA (o bloco das páginas): a CENA 3D (perspectiva + preserve-3d) onde as folhas (.alb-sheet) empilham — ordenadas por
    PROFUNDIDADE (translateZ), que o compositor resolve sem repintar; z-index trocado numa camada composta repinta a camada no WebKit */
-.alb-folha { position: absolute; inset: 0; z-index: 2; border-radius: 6px 14px 14px 6px; perspective: 1100px; perspective-origin: 50% 50%; transform-style: preserve-3d; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.alb-folha { position: absolute; inset: 0; z-index: 2; border-radius: 6px 14px 14px 6px; perspective: 1100px; perspective-origin: 50% 50%; transform-style: preserve-3d; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .alb-folha:active { cursor: grabbing; }
 /* CADA FOLHA é uma camada própria (will-change) enquanto o álbum está aberto: rasterizada uma vez, virar é só transform.
    Papel: fundo (parada, visível) · sobre (gira, por cima) · espera (pré-montada, invisível, pronta) · capa */
@@ -398,6 +398,33 @@
 .alb-cap-titulo h3 { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: -.01em; color: #2b2b2f; margin: 0; }
 .alb-cap-titulo b { font-size: 10px; font-weight: 800; color: #6f665a; white-space: nowrap; }
 .alb-cap-frase { margin: 3px 0 0; font-size: 9.5px; color: #8c8272; line-height: 1.25; }
+/* (02/10, dono: "antes dava pra ver a diferença — as lendárias brilhavam dourado") A PLACA DO CAPÍTULO: o cabeçalho vira
+   uma faixa de ponta a ponta no material da raridade — ouro escovado, holográfico, safira, kraft; magenta nos mais raros.
+   Tudo parado (nada anima: a página é rasterizada uma vez e a virada só gira a camada). */
+.alb-cap { flex-shrink: 0; margin: -12px -12px 7px -24px; padding: 10px 12px 7px 24px; overflow: hidden; box-shadow: inset 0 -1px 0 rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.6); }
+.alb-cap::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(112deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.38) 44%, rgba(255,255,255,0) 56%); }
+.alb-cap > * { position: relative; z-index: 1; }
+.alb-cap-linha > i { display: none; }
+.alb-pag[data-rar="destaque"] .alb-cap { background: linear-gradient(100deg, #8d1a52, #c42674 45%, #d22d80 60%, #a81f62); }
+.alb-pag[data-rar="destaque"] .alb-cap-linha, .alb-pag[data-rar="destaque"] .alb-cap-titulo h3, .alb-pag[data-rar="destaque"] .alb-cap-titulo b { color: #fff; }
+.alb-pag[data-rar="destaque"] .alb-cap-frase { color: rgba(255,255,255,.82); }
+.alb-pag[data-rar="lendario"] .alb-cap { background: linear-gradient(100deg, #8f6a0c 0%, #c9a032 22%, #f6e3a1 46%, #fff6d6 52%, #d9ad3c 70%, #9a7414 100%), repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 1px, transparent 1px 3px); background-blend-mode: overlay; }
+.alb-pag[data-rar="lendario"] .alb-cap-linha { color: #5a3f05; }
+.alb-pag[data-rar="lendario"] .alb-cap-titulo h3 { color: #3f2c02; text-shadow: 0 1px 0 rgba(255,246,214,.6); }
+.alb-pag[data-rar="lendario"] .alb-cap-titulo b, .alb-pag[data-rar="lendario"] .alb-cap-frase { color: #5a3f05; }
+.alb-pag[data-rar="epico"] .alb-cap { background: linear-gradient(100deg, #f7b7e6 0%, #ffe3a3 20%, #bff5d6 40%, #b5defd 60%, #d6c2ff 80%, #f7b7e6 100%); }
+.alb-pag[data-rar="epico"] .alb-cap-linha { color: #5b21b6; }
+.alb-pag[data-rar="epico"] .alb-cap-titulo h3 { color: #2e1065; }
+.alb-pag[data-rar="epico"] .alb-cap-titulo b, .alb-pag[data-rar="epico"] .alb-cap-frase { color: #4c1d95; }
+.alb-pag[data-rar="raro"] .alb-cap { background: linear-gradient(100deg, #1e3a8a, #2563eb 50%, #3b82f6 62%, #1d4ed8); }
+.alb-pag[data-rar="raro"] .alb-cap-linha, .alb-pag[data-rar="raro"] .alb-cap-titulo h3, .alb-pag[data-rar="raro"] .alb-cap-titulo b { color: #fff; }
+.alb-pag[data-rar="raro"] .alb-cap-frase { color: rgba(255,255,255,.8); }
+.alb-pag[data-rar="comum"] .alb-cap { background: linear-gradient(100deg, #cdbf9f, #e6dbc2 50%, #d6c8a8); }
+.alb-pag[data-rar="comum"] .alb-cap-linha, .alb-pag[data-rar="comum"] .alb-cap-titulo b, .alb-pag[data-rar="comum"] .alb-cap-frase { color: #5c5243; }
+/* o papel ganha um tom da raridade, bem leve */
+.alb-pag[data-rar="lendario"] { background-color: #fcf4dc; }
+.alb-pag[data-rar="epico"] { background-color: #faf6ff; }
+.alb-pag[data-rar="raro"] { background-color: #f4f7fe; }
 .alb-grade { position: relative; z-index: 1; display: grid; justify-content: space-between; }
 .alb-subsecao { position: relative; z-index: 1; margin: 10px 0 6px; font-size: 8px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: #a39a8a; display: flex; align-items: center; gap: 8px; }
 .alb-subsecao::after { content: ""; flex: 1; height: 1px; background: #e2d9c6; }
@@ -438,6 +465,15 @@
 .vaga[data-aberta="false"][data-rar="lendario"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(184,134,11,.45), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(184,134,11,.22), inset 0 2px 4px rgba(60,40,10,.10); background: rgba(255,250,230,.6); }
 .vaga[data-aberta="false"][data-rar="epico"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(124,58,237,.35), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(124,58,237,.16), inset 0 2px 4px rgba(60,40,10,.10); background: rgba(250,246,255,.6); }
 .vaga[data-aberta="false"][data-rar="raro"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(29,78,216,.32), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(29,78,216,.14), inset 0 2px 4px rgba(60,40,10,.10); }
+/* (02/10) a moldura da vaga mais forte na cor da raridade: ouro / holográfico / safira */
+.vaga[data-aberta="false"][data-rar="lendario"] .vaga-caixa { background: linear-gradient(160deg, rgba(255,246,214,.9), rgba(246,227,161,.45)); box-shadow: inset 0 0 0 1.5px #d4a629, inset 0 0 0 3.5px #fff8e1, inset 0 0 0 4.5px rgba(184,134,11,.35), inset 0 2px 5px rgba(120,80,0,.14); }
+.vaga[data-aberta="false"][data-rar="epico"] .vaga-caixa { background: linear-gradient(160deg, rgba(253,240,250,.9), rgba(226,240,255,.7) 55%, rgba(240,232,255,.85)); box-shadow: inset 0 0 0 1.5px #b98bff, inset 0 0 0 3.5px #fdfaff, inset 0 0 0 4.5px rgba(110,200,255,.4), inset 0 2px 5px rgba(60,20,120,.10); }
+.vaga[data-aberta="false"][data-rar="raro"] .vaga-caixa { background: rgba(236,243,255,.75); box-shadow: inset 0 0 0 1.5px #60a5fa, inset 0 0 0 3.5px #f8fbff, inset 0 0 0 4.5px rgba(29,78,216,.18), inset 0 2px 5px rgba(20,40,120,.10); }
+.vaga[data-rar="lendario"] .vaga-n { color: #a07a14; }
+.vaga[data-rar="epico"] .vaga-n { color: #7c3aed; }
+.vaga[data-rar="raro"] .vaga-n { color: #2563eb; }
+/* (02/10, dono: "os números entram na figurinha") como no álbum de papel: a figurinha colada cobre o número da vaga */
+.vaga[data-aberta="true"] .vaga-n { visibility: hidden; }
 .vaga-n { position: absolute; right: 4px; top: 3px; z-index: 1; font-size: 9px; font-weight: 900; letter-spacing: .02em; color: #8c8272; font-variant-numeric: tabular-nums; line-height: 1; }
 .vaga-n small { font-size: 6px; font-weight: 800; letter-spacing: .08em; vertical-align: top; margin-right: 1px; }
 .vaga[data-aberta="true"] .vaga-n { color: rgba(140,130,114,.55); }
@@ -478,6 +514,10 @@
 .fig-vazia > svg { filter: saturate(0) brightness(.62) contrast(.5); opacity: .5; }
 .fig-vazia[data-rar="lendario"] > svg { filter: saturate(0) brightness(.62) contrast(.5) drop-shadow(0 0 4px rgba(212,166,41,.9)); opacity: .55; }
 .fig-vazia[data-rar="epico"] > svg { filter: saturate(0) brightness(.62) contrast(.5) drop-shadow(0 0 4px rgba(139,92,246,.8)); opacity: .55; }
+/* (02/10) a silhueta tingida da raridade (ouro, lilás, azul) em vez do cinza */
+.alb-pag .fig-vazia[data-rar="lendario"] > svg { filter: saturate(0) brightness(.7) contrast(.55) sepia(1) saturate(2.6) hue-rotate(-8deg) drop-shadow(0 0 3px rgba(212,166,41,.7)); opacity: .62; }
+.alb-pag .fig-vazia[data-rar="epico"] > svg { filter: saturate(0) brightness(.75) contrast(.5) sepia(1) saturate(2) hue-rotate(215deg) drop-shadow(0 0 3px rgba(185,139,255,.7)); opacity: .55; }
+.alb-pag .fig-vazia[data-rar="raro"] > svg { filter: saturate(0) brightness(.75) contrast(.5) sepia(1) saturate(2.2) hue-rotate(180deg); opacity: .5; }
 /* o PEEL ao colar: a figurinha desce de um canto levantado e assenta; o canto do papel-base encolhe */
 /* promovida (will-change): no WebKit a camada nascer/morrer a cada figurinha que cola repintava a página 16 vezes na abertura */
 .vaga-fig[data-cola] { animation: fig-peel .62s cubic-bezier(.3, 1.25, .5, 1) both; animation-delay: var(--d, 0ms); transform-origin: 50% 100%; will-change: transform; }
@@ -516,3 +556,6 @@ html[data-album-aberto] [data-testid="tela-conquistas"] *, html[data-album-abert
 @keyframes mo-faisca { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(0, 0) scale(1.2); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); } }
 @media (prefers-reduced-motion: reduce) { .mo-brilho, .mo-faisca { animation: none; } .mo-faisca { display: none; } }
 .alb-capa .ad-rar[data-trancado] > svg { filter: saturate(0) brightness(.5) contrast(.55); opacity: .28; }
+/* (02/10, dono: "arrastando fica travado") durante o arrasto o dedo é da folha (pointer capture): o que está dentro dela sai do
+   teste de toque — uma troca só, no começo do gesto — e o WebKit não refaz a geometria das figurinhas a cada movimento */
+.alb-folha[data-arrastando] > * { pointer-events: none; }

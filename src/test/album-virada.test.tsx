@@ -34,7 +34,7 @@ vi.mock("framer-motion", async (importOriginal) => {
 
 import { UserDataContext } from "@/hooks/use-user-data";
 import { TelaConquistas, CHAVE_ALBUM_VISTO } from "@/components/conquistas/TelaConquistas";
-import { AlbumTela, CAPA_REVELA_MS, CAPA_SAI_MS, DURACAO_VIRADA_MS } from "@/components/conquistas/AlbumTela";
+import { AlbumTela, CAPA_PARADA_MS, CAPA_REVELA_MS, CAPA_SAI_MS, DURACAO_VIRADA_MS } from "@/components/conquistas/AlbumTela";
 import { montarAlbum } from "@/components/conquistas/album-paginas";
 import { CHAVE_DICA_PLANNER } from "@/components/conquistas/DicaDoPlanner";
 import { CHAVE_NIVEL_PISO, type Badge, type Raridade } from "@/components/gamification/types";
@@ -189,7 +189,7 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
     expect(d).toHaveLength(6);
     expect(d[0]).toBe(CAPA_REVELA_MS);
     expect(d[1]).toBe(CAPA_REVELA_MS + 90);
-    avancar(600);
+    avancar(CAPA_PARADA_MS + 100);
     expect(screen.getByTestId("album-capa-3d")).toHaveAttribute("data-girada");
     expect(screen.getByTestId("album-capa-3d").style.zIndex).toBe("6"); // continua na frente enquanto gira
     avancar(CAPA_SAI_MS);

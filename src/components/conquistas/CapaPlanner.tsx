@@ -240,14 +240,10 @@ export const ARGOLAS_APP = Array.from({ length: G.espiral.n }, (_, i) => G.espir
  * sombra da prensa pra cima/esquerda, luz pra baixo/direita, contorno fino.
  * SVG (o `background-clip: text` não sai na foto do Safari).
  */
-export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, sombra, luz, contorno, largura, altura, style, fonte, italico, contornoFino }: {
+export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, sombra, luz, contorno, largura, altura, style }: {
   texto: string; paradas: string[]; tamanho: number; peso?: number; espaco?: number; sombra: string; luz: string;
   /** Contorno escuro do metal (tom do próprio metal): a leitura em capa clara e escura. */
   contorno?: string; largura: number; altura: number; style?: CSSProperties;
-  /** Outra fonte (a capa do álbum grava o título em serif itálico). */
-  fonte?: string; italico?: boolean;
-  /** Contorno mais fino (serif): o traço grosso engole a letra. */
-  contornoFino?: boolean;
 }) => {
   const uid = `hs${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const fotoWebKit = useContext(FotoWebKit);
@@ -258,7 +254,7 @@ export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, somb
           {paradas.map((c, i) => <stop key={i} offset={i / (paradas.length - 1)} stopColor={c} />)}
         </linearGradient>
       </defs>
-      <text x="0" y={tamanho * 0.86} fontFamily={fonte ?? INTER} fontStyle={italico ? "italic" : undefined} fontSize={tamanho} fontWeight={peso} letterSpacing={espaco} fill={`url(#${uid})`} stroke={contorno ?? sombra} strokeWidth={contorno ? (contornoFino ? Math.max(0.7, tamanho * 0.04) : Math.max(1.1, tamanho * 0.075)) : 0.35} strokeLinejoin="round" paintOrder="stroke">
+      <text x="0" y={tamanho * 0.86} fontFamily={INTER} fontSize={tamanho} fontWeight={peso} letterSpacing={espaco} fill={`url(#${uid})`} stroke={contorno ?? sombra} strokeWidth={contorno ? Math.max(1.1, tamanho * 0.075) : 0.35} strokeLinejoin="round" paintOrder="stroke">
         {texto}
       </text>
     </svg>

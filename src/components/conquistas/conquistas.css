@@ -295,22 +295,23 @@
 /* ============================== A CAPA DO ÁLBUM (02/10: herda a capa premium do planner) ============================== */
 /* um OBJETO: cor fixa, igual no claro e no escuro; tudo escala com --k (largura ÷ 200) */
 .alb-capa { position: relative; --k: 1; font-family: Inter, -apple-system, sans-serif; color: #2b2b2f; flex-shrink: 0; }
-.alb-capa-face { position: absolute; inset: 0; border-radius: calc(6px * var(--k)) calc(14px * var(--k)) calc(14px * var(--k)) calc(6px * var(--k)); overflow: hidden; }
-.alb-capa-costura { position: absolute; left: calc(14px * var(--k)); top: calc(8px * var(--k)); right: calc(8px * var(--k)); bottom: calc(8px * var(--k)); border: 1.4px dashed; border-radius: calc(3px * var(--k)) calc(10px * var(--k)) calc(10px * var(--k)) calc(3px * var(--k)); pointer-events: none; }
-.alb-capa-dobra { position: absolute; left: 0; top: 0; bottom: 0; width: calc(9px * var(--k)); background: linear-gradient(90deg, rgba(0,0,0,.42), rgba(0,0,0,.18) 55%, rgba(255,255,255,.08) 85%, rgba(0,0,0,.14)); pointer-events: none; }
-.alb-capa-topo { position: absolute; left: calc(22px * var(--k)); top: calc(16px * var(--k)); line-height: 0; }
-.alb-capa-titulo { position: absolute; left: calc(22px * var(--k)); top: calc(34px * var(--k)); line-height: 0; display: flex; flex-direction: column; gap: 0; }
-.alb-capa-janela { position: absolute; left: 50%; top: calc(116px * var(--k)); width: calc(118px * var(--k)); height: calc(118px * var(--k)); margin-left: calc(-54px * var(--k)); border-radius: 50%; display: grid; place-items: center; }
-.alb-capa-heroi { display: inline-block; line-height: 0; filter: drop-shadow(0 calc(4px * var(--k)) calc(6px * var(--k)) rgba(0,0,0,.35)); }
-.alb-capa-heroi[data-vazio] { width: calc(78px * var(--k)); height: calc(78px * var(--k)); border: calc(2px * var(--k)) dashed rgba(255,255,255,.35); border-radius: 50%; display: grid; place-items: center; font-size: calc(34px * var(--k)); color: rgba(255,255,255,.4); font-weight: 900; line-height: 1; }
-.alb-capa-mini { position: absolute; line-height: 0; }
-.alb-capa-mini[data-pos="0"] { right: calc(22px * var(--k)); top: calc(104px * var(--k)); }
-.alb-capa-mini[data-pos="1"] { left: calc(26px * var(--k)); top: calc(196px * var(--k)); }
-.alb-capa-etiqueta { position: absolute; left: calc(22px * var(--k)); bottom: calc(16px * var(--k)); padding: calc(5px * var(--k)) calc(9px * var(--k)) calc(5px * var(--k)); border-radius: calc(3px * var(--k)); transform: rotate(-1.5deg); display: flex; flex-direction: column; gap: calc(1px * var(--k)); font-size: calc(8px * var(--k)); color: #6f665a; font-weight: 600; line-height: 1.2; min-width: calc(74px * var(--k)); }
-.alb-capa-etiqueta > i { position: absolute; inset: calc(2.5px * var(--k)); border: 1px solid; border-radius: calc(2px * var(--k)); pointer-events: none; }
-.alb-capa-etiqueta b { font-size: calc(15px * var(--k)); color: #2b2b2f; font-weight: 900; line-height: 1; }
-.alb-capa-dono { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(10px * var(--k)); color: #2b2b2f; }
-.alb-capa-core { position: absolute; right: calc(16px * var(--k)); bottom: calc(14px * var(--k)); line-height: 0; }
+.alb-capa-face { position: absolute; inset: 0; border-radius: calc(6px * var(--k)) calc(14px * var(--k)) calc(14px * var(--k)) calc(6px * var(--k)); overflow: hidden; background: #fbf3e2; background-image: radial-gradient(circle, rgba(60,50,40,.13) calc(1px * var(--k)), transparent calc(1.3px * var(--k))); background-size: calc(12px * var(--k)) calc(12px * var(--k)); box-shadow: 0 calc(14px * var(--k)) calc(28px * var(--k)) calc(-12px * var(--k)) rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.06); }
+.alb-capa-lombada { position: absolute; left: 0; top: calc(2px * var(--k)); bottom: calc(2px * var(--k)); width: calc(9px * var(--k)); border-radius: calc(4px * var(--k)) 0 0 calc(4px * var(--k)); background: linear-gradient(90deg, #7a1547, #a81f62 45%, #c2307a 62%, #8d1a52); z-index: 2; box-shadow: inset -1px 0 0 rgba(0,0,0,.25), inset 1px 0 0 rgba(255,255,255,.12); }
+.alb-capa-faixa { position: absolute; left: 0; right: 0; top: 0; height: calc(34px * var(--k)); background: linear-gradient(90deg, #a81f62, #d22d80 55%, #a81f62); color: #fff; display: flex; flex-direction: column; justify-content: center; padding-left: calc(20px * var(--k)); }
+.alb-capa-faixa span { font-size: calc(6.5px * var(--k)); font-weight: 800; letter-spacing: .22em; opacity: .9; line-height: 1.2; }
+.alb-capa-faixa b { font-size: calc(11px * var(--k)); font-weight: 900; letter-spacing: .08em; line-height: 1.2; }
+.alb-capa-titulo { position: absolute; left: calc(20px * var(--k)); top: calc(44px * var(--k)); font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(21px * var(--k)); line-height: 1.02; color: #2b2b2f; }
+.alb-capa-arte { position: absolute; left: calc(12px * var(--k)); right: calc(8px * var(--k)); top: calc(96px * var(--k)); height: calc(120px * var(--k)); }
+.alb-capa-heroi { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 3; filter: drop-shadow(0 calc(6px * var(--k)) calc(8px * var(--k)) rgba(0,0,0,.25)); }
+.alb-capa-heroi[data-vazio] { width: calc(92px * var(--k)); height: calc(92px * var(--k)); border: calc(2px * var(--k)) dashed #c9c1b2; border-radius: 50%; display: grid; place-items: center; font-size: calc(36px * var(--k)); color: #c9c1b2; font-weight: 900; }
+.alb-capa-mini { position: absolute; z-index: 2; opacity: .95; }
+.alb-capa-rodape { position: absolute; left: calc(20px * var(--k)); right: calc(12px * var(--k)); bottom: calc(12px * var(--k)); display: flex; align-items: baseline; justify-content: space-between; font-size: calc(9px * var(--k)); color: #6f665a; font-weight: 600; }
+.alb-capa-rodape b { font-size: calc(16px * var(--k)); color: #2b2b2f; font-weight: 900; }
+.alb-capa-dono { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(11px * var(--k)); }
+.alb-capa-conta { display: flex; flex-direction: column; gap: calc(3px * var(--k)); }
+.alb-capa-barra { display: block; width: calc(58px * var(--k)); height: calc(2.5px * var(--k)); border-radius: 99px; background: rgba(60,50,40,.12); overflow: hidden; }
+.alb-capa-barra > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a81f62, #d22d80); }
+.alb-capa-brilho { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 60%); pointer-events: none; }
 
 .alb-card-barra { flex: 1; height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .alb-card-barra > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a81f62, #e0438f); }
@@ -514,3 +515,4 @@ html[data-album-aberto] [data-testid="tela-conquistas"] *, html[data-album-abert
 .mo-faisca { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; z-index: 3; pointer-events: none; opacity: 0; animation: mo-faisca .75s ease-out both; }
 @keyframes mo-faisca { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(0, 0) scale(1.2); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); } }
 @media (prefers-reduced-motion: reduce) { .mo-brilho, .mo-faisca { animation: none; } .mo-faisca { display: none; } }
+.alb-capa .ad-rar[data-trancado] > svg { filter: saturate(0) brightness(.5) contrast(.55); opacity: .28; }

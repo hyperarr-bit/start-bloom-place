@@ -10,7 +10,6 @@ import { trackEvent } from "@/lib/analytics";
 import { ChipRaridade } from "./adesivos-raridade";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { CapaAlbum } from "./CapaAlbum";
-import type { CapaId } from "./CapaPlanner";
 import { FigurinhaColada, FigurinhaVazia, soltarFoils, useGiroscopioDoFoil } from "./FigurinhaAlbum";
 import { Destacar } from "./GradeAdesivos";
 import { ORDEM_RARIDADE, RARIDADE_FEM, contagemDaPagina, proximosDoAlbum, resumoRaridades, tituloDaPagina, type PaginaAlbum } from "./album-paginas";
@@ -146,8 +145,10 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
   const gapX = grande ? 10 : 6;
   const interno = largura - 24 - 14;
   const tam = grande ? Math.min(78, Math.floor((interno - gapX * 2) / 3) - 16) : Math.min(54, Math.floor((interno - gapX * 3) / 4) - 14);
-  // a 1ª página sempre mostra as 3 mais perto de colar (a página de `album-paginas` só traz com pouco colado; com 6 raras, a metade de baixo ficava vazia)
-  const proximas = useMemo(() => (grande ? (p.proximos.length ? p.proximos : proximosDoAlbum(adesivos)) : []), [grande, p.proximos, adesivos]);
+  // (02/10, dono: "os mais raros é só pra mostrar os mais raros do usuário") as próximas a colar só aparecem com o álbum
+  // ainda vazio ("Começando o álbum"); com alguma colada, a página é só delas — a grade desce pro meio da folha
+  const vazia = grande && !p.vagas.length;
+  const proximas = useMemo(() => (vazia ? (p.proximos.length ? p.proximos : proximosDoAlbum(adesivos)) : []), [vazia, p.proximos, adesivos]);
   const proximo = proximas[0];
   const cap = p.raridade ? CAPITULO[p.raridade] : null;
   const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && (abertura || colar.has(b.id)) ? atrasoBase + j * 90 : undefined);
@@ -164,7 +165,7 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
         <div className="alb-cap-titulo"><h3>{titulo}</h3><b className="tabular-nums">{contagem}</b></div>
         <p className="alb-cap-frase">{frase}</p>
       </header>
-      <div className="alb-grade" style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${grande ? 8 : 5}px ${gapX}px` }}>
+      <div className="alb-grade" data-raros-no-meio={grande && !vazia ? "" : undefined} style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${grande ? (vazia ? 8 : 22) : 5}px ${gapX}px`, marginBlock: grande && !vazia ? "auto" : undefined }}>
         {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} onSelecionar={onSelecionar} />)}
       </div>
       {grande && proximas.length > 0 && (
@@ -177,8 +178,7 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
       )}
       {grande && proximo && (
         <p className="alb-dica" data-testid="album-tela-dica">
-          {p.vagas.length ? "As próximas já têm vaga marcada. " : "Cada coisa anotada cola uma figurinha aqui. "}
-          A mais perto: <b>{proximo.name}</b> — <mark><Destacar texto={textoFalta(proximo, diasDeSequencia)} /></mark>.
+          Cada coisa anotada cola uma figurinha aqui. A mais perto: <b>{proximo.name}</b> — <mark><Destacar texto={textoFalta(proximo, diasDeSequencia)} /></mark>.
         </p>
       )}
       <footer className="alb-pe">
@@ -477,8 +477,6 @@ export interface AlbumTelaProps {
   nome: string;
   nivel: string;
   ano: number;
-  /** A capa escolhida no planner: o álbum herda. */
-  capa?: CapaId;
   diasDeSequencia: number;
   /** Abre direto nesta página (o pacotinho abre na página da figurinha nova). */
   paginaInicial?: number;
@@ -489,7 +487,7 @@ export interface AlbumTelaProps {
   onCompartilharFigurinha: (b: Badge) => void;
 }
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, capa = "grafite", diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
@@ -718,7 +716,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const papelDe = (i: number): Papel => (virando ? (i === virando.sobreIndice ? "sobre" : i === virando.fundoIndice ? "fundo" : "espera") : i === atual ? "fundo" : "espera");
 
   return (
-    <motion.div ref={raiz} className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} data-capa={capa} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
+    <motion.div ref={raiz} className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
       {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
           câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
           --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
@@ -780,7 +778,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     papel="capa"
                     dir={1}
                     testid="album-capa-folha"
-                    frente={<CapaAlbum largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} capa={capa} nivel={nivel} style={{ height: "100%" }} />}
+                    frente={<CapaAlbum largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
                     verso={<VersoDaCapa nome={nome} ano={ano} />}
                   />
                 </div>

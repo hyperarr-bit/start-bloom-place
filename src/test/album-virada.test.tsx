@@ -110,8 +110,8 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
     expect(folha).toHaveAttribute("data-pagina", "mais-raros");
     expect(folha).toHaveTextContent("OS MAIS RAROS");
     // a folha que gira vai com o conteúdo dela (não é uma folha bege vazia)
-    // (02/10) a 1ª página sempre traz as 3 "próximas a colar" embaixo das 6 mais raras
-    expect(folha.querySelectorAll(".vaga")).toHaveLength(9);
+    // (02/10, dono) a 1ª página traz só as 6 mais raras (sem "próximas a colar")
+    expect(folha.querySelectorAll(".vaga")).toHaveLength(6);
 
     // no meio da virada: tudo igual (destino por baixo, folha por cima)
     avancar(DURACAO_VIRADA_MS / 2);

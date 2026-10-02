@@ -53,7 +53,7 @@ const montar = (extra: Partial<Parameters<typeof AlbumTela>[0]> = {}) => {
     <MemoryRouter>
       <AlbumTela
         aberto paginas={paginas} adesivos={ADESIVOS} desbloqueadas={DESBLOQUEADAS} novas={[]} maisRaros={paginas[0].vagas}
-        abertos={7} total={ADESIVOS.length} porRaridade={POR_RARIDADE} nome="Ana" nivel="Ouro" ano={2026} diasDeSequencia={3} capa="vichy"
+        abertos={7} total={ADESIVOS.length} porRaridade={POR_RARIDADE} nome="Ana" nivel="Ouro" ano={2026} diasDeSequencia={3}
         onFechar={() => undefined} onCompartilhar={() => undefined} onCompartilharFigurinha={() => undefined}
         {...extra}
       />
@@ -92,8 +92,8 @@ describe("as folhas pré-montadas", () => {
     const { paginas } = montar();
     expect(paginas).toHaveLength(6);
     expect(papeis()).toEqual({ "mais-raros": "fundo", "lendario-1": "espera" });
-    // a capa, por cima, com a capa premium herdada
-    expect(screen.getByTestId("album-capa-3d").querySelector('[data-capa-album="vichy"]')).toBeInTheDocument();
+    // a capa, por cima (a capa clássica do álbum: faixa magenta, 02/10 dono "a capa deixa como tá hoje")
+    expect(screen.getByTestId("album-capa-3d").querySelector("[data-capa-album]")).toBeInTheDocument();
     avancar(CAPA_SAI_MS + 400);
     expect(screen.queryByTestId("album-capa-3d")).toBeNull();
     // as extras começam ~0,9 s depois da capa sair, uma a cada 160 ms (um act por relógio: o React agenda o próximo no fim do act)
@@ -258,24 +258,31 @@ describe("o foil das épicas e lendárias", () => {
 });
 
 describe("a capa, as páginas e o peel", () => {
-  it("a capa do álbum herda a capa premium do planner (material + gravação no metal do nível) — na tela cheia, no card e na foto", () => {
+  it("a capa do álbum é a clássica de hoje (faixa magenta, título em serif, a mais rara no meio) — na tela cheia, no card e na foto", () => {
     const base = { maisRaros: ADESIVOS.filter((b) => b.unlocked), abertos: 7, total: 28, nome: "Ana", ano: 2026 };
-    const { container, unmount } = render(<CapaAlbum largura={200} {...base} capa="noite" nivel="Diamante" />);
+    const { container, unmount } = render(<CapaAlbum largura={200} {...base} />);
     const capa = container.querySelector("[data-capa-album]")!;
-    expect(capa).toHaveAttribute("data-capa-album", "noite");
-    expect(capa).toHaveTextContent("ÁLBUM DE FIGURINHAS · 2026");
-    expect(capa.querySelector("[data-titulo-capa]")).toHaveTextContent("Figurinhas daminha vida.");
+    expect(capa.querySelector(".alb-capa-faixa")).toHaveTextContent("ÁLBUM DE FIGURINHAS");
+    expect(capa.querySelector(".alb-capa-faixa")).toHaveTextContent("CORE · 2026");
+    expect(capa.querySelector(".alb-capa-titulo")).toHaveTextContent("Figurinhas daminha vida.");
     expect(capa).toHaveTextContent("7 de 28");
     expect(capa).toHaveTextContent("de Ana");
-    expect(capa.querySelector(".alb-capa-janela .fig")).toBeInTheDocument();
     unmount();
-    const r2 = render(<CapaAlbum largura={200} {...base} capa="kraft" nivel="Prata" foto />);
-    expect(r2.container.querySelector("[data-capa-album]")).toHaveAttribute("data-capa-album", "kraft");
+    const r2 = render(<CapaAlbum largura={200} {...base} foto />);
     // a foto não leva o foil (o html-to-image não garante a máscara)
     expect(r2.container.querySelector(".fig-foil")).toBeNull();
     r2.unmount();
-    render(<CardAlbum {...base} porRaridade={POR_RARIDADE} proximo={null} novas={0} capa="bordo" nivel="Ouro" onAbrir={() => undefined} onCompartilhar={() => undefined} />);
-    expect(screen.getByTestId("album-card").querySelector("[data-capa-album]")).toHaveAttribute("data-capa-album", "bordo");
+    render(<CardAlbum {...base} porRaridade={POR_RARIDADE} proximo={null} novas={0} onAbrir={() => undefined} onCompartilhar={() => undefined} />);
+    expect(screen.getByTestId("album-card").querySelector("[data-capa-album] .alb-capa-faixa")).toBeInTheDocument();
+  });
+
+  it("'Os mais raros' mostra SÓ as mais raras da pessoa — sem 'Próximas a colar' (02/10, dono); com o álbum vazio, as próximas aparecem", () => {
+    montar();
+    avancar(CAPA_SAI_MS + 400);
+    const primeira = screen.getByTestId("album-tela-pagina-0");
+    expect(primeira).not.toHaveTextContent("PRÓXIMAS A COLAR");
+    expect(primeira.querySelector("[data-raros-no-meio]")).toBeInTheDocument();
+    expect(screen.queryByTestId("album-tela-dica")).toBeNull();
   });
 
   it("cada página é um capítulo: linha 'CAPÍTULO 02 · LENDÁRIOS', título em serif, a frase do material, o número grande na vaga, a barrinha de progresso (sem pílula preta) e o rodapé 'A mais perto'", () => {

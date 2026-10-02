@@ -379,10 +379,11 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     expect(p0).toHaveTextContent("OS MAIS RAROS");
     const vagas = Array.from(p0.querySelectorAll("[data-vaga]")).map((el) => [el.getAttribute("data-vaga"), el.getAttribute("data-aberta")]);
     expect(vagas.slice(0, 2)).toEqual([["leitura-1", "true"], ["sequencia-7", "true"]]);
-    expect(vagas).toHaveLength(5);
-    expect(p0).toHaveTextContent("PRÓXIMAS A COLAR");
+    // (02/10, dono) "Os mais raros" é só das mais raras da pessoa: sem "Próximas a colar" nem a dica
+    expect(vagas).toHaveLength(2);
+    expect(p0).not.toHaveTextContent("PRÓXIMAS A COLAR");
     expect(p0.querySelector('[data-vaga="sequencia-7"] .vaga-n')).toHaveTextContent("Nº 01");
-    expect(within(tela).getByTestId("album-tela-dica")).toHaveTextContent(/A mais perto:/);
+    expect(within(tela).queryByTestId("album-tela-dica")).toBeNull();
     expect(eventos).toContainEqual(["album_abrir", { adesivos: 2, novas: 0, via: "card", pagina: 0 }]);
     // as abas
     fireEvent.click(within(tela).getByTestId("album-aba-epico"));

@@ -169,8 +169,8 @@ export const TelaConquistas = () => {
     nome: perfil.nome, membroDesde: perfil.membroDesde, dias: seq.dias, nivel: conq.nivel.name, xp: conq.xp,
     adesivos: conq.abertos, total: conq.adesivos.length,
     maisRaros: paginas[0].vagas, proximos: paginas[0].proximos, porRaridade: conq.porRaridade, figurinhas: conq.adesivos, mes, mesIdx: insig.mesIdx, ano: insig.ano,
-    heroi: insig.heroi, tres: insig.tres, candidatas: insig.candidatas, valoresLigados: insig.valoresLigados, capa,
-  }), [perfil.nome, perfil.membroDesde, seq.dias, conq.nivel.name, conq.xp, conq.abertos, conq.adesivos, conq.porRaridade, paginas, mes, insig.mesIdx, insig.ano, insig.heroi, insig.tres, insig.candidatas, insig.valoresLigados, capa]);
+    heroi: insig.heroi, tres: insig.tres, candidatas: insig.candidatas, valoresLigados: insig.valoresLigados,
+  }), [perfil.nome, perfil.membroDesde, seq.dias, conq.nivel.name, conq.xp, conq.abertos, conq.adesivos, conq.porRaridade, paginas, mes, insig.mesIdx, insig.ano, insig.heroi, insig.tres, insig.candidatas, insig.valoresLigados]);
 
   const abrirPlanner = useCallback(() => {
     setPlannerAberto(true);
@@ -332,8 +332,6 @@ export const TelaConquistas = () => {
               novas={novas.length}
               nome={perfil.nome}
               ano={insig.ano}
-              capa={capa}
-              nivel={conq.nivel.name}
               onAbrir={abrirAlbum}
               onAbrirPacotinho={abrirPacotinho}
               onCompartilhar={compartilharAlbum}
@@ -374,7 +372,6 @@ export const TelaConquistas = () => {
             nome={perfil.nome}
             nivel={conq.nivel.name}
             ano={insig.ano}
-            capa={capa}
             diasDeSequencia={seq.dias}
             paginaInicial={albumDe.pagina}
             via={albumDe.via}

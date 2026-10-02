@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { alternarHabitoNoDia, marcaDoDia, marcadosDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
+import { alternarHabitoNoDia, marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
-import { HabitosDeOntem } from "@/components/rotina/habitos-de-ontem";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
@@ -1269,12 +1268,6 @@ const Rotina = () => {
       if (chave <= hoje) setHeatmapLog(prev => marcaDoDia(prev, chave, r.feitos));
     });
   };
-  /** HOJE / ONTEM / ANTEONTEM na linha da grade (a semana corrente), pra ver qual é qual. */
-  const rotuloDaLinha = (i: number): string | null => {
-    const hoje = new Date();
-    const dow = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
-    return i === dow ? "HOJE" : i === dow - 1 ? "ONTEM" : i === dow - 2 ? "ANTEONTEM" : null;
-  };
   const toggleHabit = (day: string, habitIndex: number) => {
     // a coluna tocada é um dia da semana corrente: acha a data real
     const idx = days.indexOf(day);
@@ -1413,15 +1406,6 @@ const Rotina = () => {
                 </Button>
               </div>
 
-              {/* 02/10: "esqueci de marcar ontem" — ontem e anteontem, numa folha (a tela de hoje não muda) */}
-              {habitNames.length > 0 && (
-                <HabitosDeOntem
-                  nomes={habitNames}
-                  hoje={localDayKey()}
-                  marcados={(dia) => marcadosDoDia({ nomes: habitNames, checked: checkedAtual, semana: semanaChecks, habitLog, dia, hoje: localDayKey() })}
-                  onAlternar={alternarHabitoNaData}
-                />
-              )}
 
               {showAddHabit && (
                 <div className="p-3 bg-green-50 dark:bg-[hsl(var(--rt-card-2))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] flex gap-2">
@@ -1457,15 +1441,7 @@ const Rotina = () => {
                   <tbody>
                     {days.map((day, di) => (
                       <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""}`}>
-                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">
-                          {day}
-                          {/* 02/10: qual linha é hoje — e quais dá pra marcar como "esqueci" (ontem e anteontem) */}
-                          {rotuloDaLinha(di) && (
-                            <span className={`block text-[9px] font-extrabold tracking-wide ${rotuloDaLinha(di) === "HOJE" ? "text-[hsl(var(--accent))]" : "text-muted-foreground"}`} data-testid={`linha-${rotuloDaLinha(di)?.toLowerCase()}`}>
-                              {rotuloDaLinha(di)}
-                            </span>
-                          )}
-                        </td>
+                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
                         {habitNames.map((_, hi) => (
                           <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
                             <Checkbox checked={checkedAtual[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />

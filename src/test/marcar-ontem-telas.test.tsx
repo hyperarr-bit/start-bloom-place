@@ -226,90 +226,14 @@ describe("Treino: marcar o treino de ontem", () => {
 
 /* ═══════════════════════════ HÁBITOS DA ROTINA ═══════════════════════════ */
 
-describe("Rotina: hábitos de ontem e anteontem", () => {
-  const semana = (d: string) => d; // a segunda-feira de 02/10 (sexta) é 28/09
-  const abrirHabitos = async (qual: "ontem" | "anteontem") => {
-    fireEvent.click(await screen.findByTestId(`habitos-${qual}`));
-    await screen.findByTestId("folha-habitos-ontem");
-    return within(screen.getByTestId("folha-habitos-ontem"));
-  };
-
-  it("ciclo completo: marca ontem e anteontem na folha → a tabela mostra → sai e REABRE → a sequência ficou com os dois dias", async () => {
-    fixar(SEXTA);
-    servidor({
-      "rotina-habits": ["Beber água", "Ler 20 min"], "rotina-habits-week": semana("2026-09-28"), "rotina-habits-checked": {},
-      [CHAVE_DIAS_ANOTADOS]: ["2026-09-29", HOJE],
-    });
-    const { unmount } = await montar(<Rotina />);
-    expect(screen.getByTestId("esqueceu-de-marcar")).toHaveTextContent("ESQUECEU?");
-    expect(screen.getByTestId("habitos-ontem")).toHaveTextContent("0/2");
-
-    let folha = await abrirHabitos("ontem");
-    expect(screen.getByTestId("folha-habitos-ontem")).toHaveTextContent("QUI · HÁBITOS DE ONTEM");
-    expect(screen.getByTestId("aviso-outro-dia")).toHaveTextContent("Marcando em ontem (qui 01/10). Conta na sua sequência.");
-    fireEvent.click(folha.getByRole("checkbox", { name: "Marcar Beber água em ontem" }));
-    expect(screen.getByTestId("folha-habitos-ontem")).toHaveTextContent("1/2 marcados");
-    expect(dados("rotina-habit-log", {})).toEqual({ [ONTEM]: ["Beber água"] });
-    expect((dados<Record<string, boolean[]>>("rotina-habits-checked", {})).QUINTA).toEqual([true, false]);
-    expect(dados<Record<string, unknown>>("heatmap-log", {})[ONTEM]).toBeTruthy();
-    expect(anotados()).toEqual(["2026-09-29", ONTEM, HOJE]); // quinta entrou NO LUGAR CERTO (e hoje já estava)
-
-    // troca pra anteontem sem fechar
-    fireEvent.click(folha.getByTestId("dia-anteontem"));
-    expect(screen.getByTestId("folha-habitos-ontem")).toHaveTextContent("QUA · HÁBITOS DE ANTEONTEM");
-    fireEvent.click(folha.getByRole("checkbox", { name: "Marcar Ler 20 min em anteontem" }));
-    expect(dados("rotina-habit-log", {})).toEqual({ [ONTEM]: ["Beber água"], [ANTEONTEM]: ["Ler 20 min"] });
-    expect(anotados()).toEqual([ANTEONTEM, "2026-09-29", ONTEM, HOJE].sort());
-    expect(eventos).toContainEqual(["marcou_ontem", { modulo: "rotina", dias_atras: 1 }]);
-    expect(eventos).toContainEqual(["marcou_ontem", { modulo: "rotina", dias_atras: 2 }]);
-    fireEvent.click(folha.getByRole("button", { name: "Pronto" }));
-    await waitFor(() => expect(screen.queryByTestId("folha-habitos-ontem")).not.toBeInTheDocument());
-
-    // a TABELA da semana também mostra (QUINTA: água; QUARTA: leitura)
-    const linha = (dia: string) => screen.getByText(dia, { selector: "td" }).closest("tr") as HTMLElement;
-    expect(within(linha("QUINTA")).getAllByRole("checkbox").map((c) => c.getAttribute("aria-checked"))).toEqual(["true", "false"]);
-    expect(within(linha("QUARTA")).getAllByRole("checkbox").map((c) => c.getAttribute("aria-checked"))).toEqual(["false", "true"]);
-    expect(screen.getByTestId("habitos-ontem")).toHaveTextContent("1/2");
-
-    unmount();
-    await montar(<Rotina />);
-    expect(screen.getByTestId("habitos-ontem")).toHaveTextContent("1/2");
-    expect(screen.getByTestId("habitos-anteontem")).toHaveTextContent("1/2");
-    folha = await abrirHabitos("ontem");
-    expect(folha.getByRole("checkbox", { name: "Desmarcar Beber água em ontem" })).toBeInTheDocument();
-    // desmarcar também funciona, e NÃO anota dia (o dia já estava; nada novo)
-    fireEvent.click(folha.getByRole("checkbox", { name: "Desmarcar Beber água em ontem" }));
-    expect(dados("rotina-habit-log", {})[ONTEM]).toEqual([]);
-    expect(dados<Record<string, unknown>>("heatmap-log", {})[ONTEM]).toBeUndefined();
-    expect(anotados()).not.toContain("2026-10-03");
-  });
-
-  it("segunda-feira: ontem é domingo, da semana PASSADA — a grade da semana nova fica limpa e o domingo marca mesmo assim", async () => {
-    fixar(new Date(2026, 9, 5, 10, 0)); // segunda 05/10 → ontem = domingo 04/10 (semana de 28/09), anteontem = sábado
-    servidor({
-      "rotina-habits": ["Beber água"], "rotina-habits-week": "2026-09-28", "rotina-habits-checked": { DOMINGO: [false], SEGUNDA: [true] },
-      [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"],
-    });
-    await montar(<Rotina />);
-    // a tabela já é a da semana nova (carimbo velho = grade zerada)
-    expect(screen.getByText("SEGUNDA", { selector: "td" }).closest("tr")!.querySelector("[role=checkbox]")?.getAttribute("aria-checked")).toBe("false");
-    const folha = await abrirHabitos("ontem");
-    fireEvent.click(folha.getByRole("checkbox", { name: "Marcar Beber água em ontem" }));
-    expect(dados("rotina-habit-log", {})).toEqual({ "2026-10-04": ["Beber água"] });
-    expect(dados<Record<string, unknown>>("heatmap-log", {})["2026-10-04"]).toBeTruthy();
-    expect(dados("rotina-habits-week", "")).toBe("2026-09-28"); // carimbo não mexe: não é da semana corrente
-    expect(anotados()).toEqual(["2026-10-03", "2026-10-04"]);
-    expect(folha.getByRole("checkbox", { name: "Desmarcar Beber água em ontem" })).toBeInTheDocument();
-  });
-
+describe("Rotina: marcar na grade conta o dia certo na sequência", () => {
   it("tocar numa linha PASSADA da grade da semana também anota aquele dia (e não hoje); na linha de hoje, hoje", async () => {
     fixar(SEXTA);
     servidor({ "rotina-habits": ["Beber água"], "rotina-habits-week": "2026-09-28", "rotina-habits-checked": {}, [CHAVE_DIAS_ANOTADOS]: ["2026-09-29"] });
     await montar(<Rotina />);
-    // a grade diz qual linha é qual
-    expect(screen.getByTestId("linha-hoje").closest("tr")).toHaveTextContent("SEXTA");
-    expect(screen.getByTestId("linha-ontem").closest("tr")).toHaveTextContent("QUINTA");
-    expect(screen.getByTestId("linha-anteontem").closest("tr")).toHaveTextContent("QUARTA");
+    // 02/10 (dono): sem faixa "esqueceu?" nem rótulos HOJE/ONTEM/ANTEONTEM na grade — a própria grade já é a semana
+    expect(screen.queryByTestId("esqueceu-de-marcar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("linha-hoje")).not.toBeInTheDocument();
     const caixa = (dia: string) => within(screen.getByText(dia, { selector: "td" }).closest("tr") as HTMLElement).getByRole("checkbox");
     fireEvent.click(caixa("QUINTA")); // ontem
     expect(anotados()).toEqual(["2026-09-29", ONTEM]);

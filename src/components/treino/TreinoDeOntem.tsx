@@ -229,7 +229,7 @@ function Rascunho({
       </div>
 
       <div className={cn("px-4 pt-3 border-t space-y-2", tom.linha)}>
-        <p className="text-[12.5px] font-bold tabular-nums text-center" data-testid="contagem-ontem">{feitas}/{total} {unidade} marcados</p>
+        <p className="text-[12.5px] font-bold tabular-nums text-center" data-testid="contagem-ontem">{feitas}/{total} {unidade} {soCardio ? "marcados" : "marcadas"}</p>
         <Button
           onClick={() => onSalvar({ dia, diaDoPlano, series })}
           disabled={!podeSalvar}

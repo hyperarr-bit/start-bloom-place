@@ -121,7 +121,7 @@ describe("Treino: marcar o treino de ontem", () => {
     expect(folha.getByTestId("salvar-treino-ontem")).toBeDisabled(); // nada marcado ainda
 
     fireEvent.click(folha.getByRole("button", { name: "Marcar Supino reto inteiro em ontem" }));
-    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("3/5 séries marcados");
+    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("3/5 séries marcadas");
     // foi mais leve na 3ª série: abre o exercício, muda a carga e desmarca nada
     fireEvent.click(folha.getByRole("button", { name: "Ajustar as séries de Supino reto" }));
     fireEvent.click(within(folha.getByTestId("serie-Supino reto-3")).getAllByRole("cell")[1]); // a linha vira "ativa" (−/+ e digitar)
@@ -130,7 +130,7 @@ describe("Treino: marcar o treino de ontem", () => {
     fireEvent.change(campo, { target: { value: "35" } });
     fireEvent.keyDown(campo, { key: "Enter" });
     fireEvent.click(folha.getByRole("button", { name: "Marcar Crucifixo inteiro em ontem" }));
-    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("5/5 séries marcados");
+    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("5/5 séries marcadas");
 
     fireEvent.click(folha.getByTestId("salvar-treino-ontem"));
     await waitFor(() => expect(screen.queryByTestId("folha-treino-ontem")).not.toBeInTheDocument());
@@ -154,7 +154,7 @@ describe("Treino: marcar o treino de ontem", () => {
     await montar(<Treino />);
     expect(screen.getByRole("button", { name: /Marcar o treino de ontem, qui 01\/10 \(já marcado\)/ })).toBeInTheDocument();
     folha = await abrirOntem();
-    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("5/5 séries marcados");
+    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("5/5 séries marcadas");
     expect(folha.getByTestId("salvar-treino-ontem")).toHaveTextContent("Salvar treino de ontem");
     // e hoje segue sem treino e sem dia anotado
     expect(anotados()).not.toContain(HOJE);
@@ -210,10 +210,10 @@ describe("Treino: marcar o treino de ontem", () => {
     expect(screen.getByTestId("treino-ontem")).toHaveTextContent("ONTEM");
     const folha = await abrirOntem();
     // o que foi salvo vem de volta (1 série feita de 3): marca tudo e desmarca tudo = nada feito
-    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("1/5 séries marcados");
+    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("1/5 séries marcadas");
     fireEvent.click(folha.getByRole("button", { name: "Marcar Supino reto inteiro em ontem" }));
     fireEvent.click(folha.getByRole("button", { name: "Desmarcar Supino reto inteiro em ontem" }));
-    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("0/5 séries marcados");
+    expect(folha.getByTestId("contagem-ontem")).toHaveTextContent("0/5 séries marcadas");
     expect(folha.getByTestId("salvar-treino-ontem")).toHaveTextContent("Tirar o treino de ontem");
     fireEvent.click(folha.getByTestId("salvar-treino-ontem"));
     await waitFor(() => expect(screen.queryByTestId("folha-treino-ontem")).not.toBeInTheDocument());

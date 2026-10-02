@@ -11,7 +11,7 @@ interface NextHoursTimelineProps {
   data: LifeHubData;
 }
 
-interface PendingItem {
+export interface PendingItem {
   label: string;
   done: boolean;
   emoji: string;
@@ -21,17 +21,26 @@ interface PendingItem {
   action?: ActionId;
 }
 
-export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
-  const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(false);
-  const { get } = useUserData();
+export interface PendenciasDeHoje {
+  pending: PendingItem[];
+  done: PendingItem[];
+  avisoTreino: boolean;
+  avisoConta: { nome: string; dias: number } | null;
+}
+
+/**
+ * A LISTA DE PENDÊNCIAS DE HOJE, como função pura (02/10): a mesma conta que
+ * esta seção sempre fez, agora também lida pelo card "SEU DIA" da missão em
+ * doses (missao-doses). Nada mudou na regra — só saiu de dentro do componente.
+ */
+export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[], agora: Date = new Date()): PendenciasDeHoje {
   const items: PendingItem[] = [];
 
   /* COMPROMISSOS DE HOJE (22/09, chamado: "tarefas criadas em Rotina não
      aparecem no dashboard"). O que tem hora vem PRIMEIRO — é a única linha
      desta lista que perde sentido se passar. Só os que ainda não passaram;
      o de 15h ainda aparece até 15h30. Toque abre o Meu mês. */
-  proximosDeHoje(get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date()).forEach((o, i) => {
+  proximosDeHoje(compromissos, agora).forEach((o, i) => {
     items.push({
       label: `${o.compromisso.hora} · ${o.compromisso.titulo}${o.compromisso.local ? ` · ${o.compromisso.local}` : ""}`,
       done: false,
@@ -237,8 +246,14 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   // Sort by priority
   items.sort((a, b) => a.priority - b.priority);
 
-  const pending = items.filter(i => !i.done);
-  const done = items.filter(i => i.done);
+  return { pending: items.filter(i => !i.done), done: items.filter(i => i.done), avisoTreino, avisoConta };
+}
+
+export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const { get } = useUserData();
+  const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date());
 
   return (
     <div>

@@ -59,13 +59,13 @@ export const tecladoAberto = (): boolean => {
 /* ------------------------------------------------------------ faixa */
 
 /** A faixa da missão, grudada embaixo da barra de módulos (sticky junto com ela). */
-export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false }: { feitos: number; texto: ReactNode; aoPular?: () => void; cumprida?: boolean }) {
+export function FaixaDaMissao({ feitos, texto, aoPular, cumprida = false, titulo = "Missão de 1 minuto" }: { feitos: number; texto: ReactNode; aoPular?: () => void; cumprida?: boolean; /** o título à esquerda (a missão em doses diz "Missão · dia 1 de 3") */ titulo?: ReactNode }) {
   const reduzir = useReducedMotion();
   return (
     <div className="border-t border-border" style={{ background: cumprida ? `${VERDE_OK}14` : "hsl(var(--accent) / 0.07)" }} data-testid="demo-guia-faixa">
       <div className="max-w-5xl mx-auto pl-3 pr-1.5 pt-1 flex items-center gap-2 min-h-9">
         <span aria-hidden className="inline-block w-1.5 h-4 rounded-[3px] shrink-0" style={{ background: cumprida ? VERDE_OK : "hsl(var(--accent))" }} />
-        <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] whitespace-nowrap text-foreground">Missão de 1 minuto</span>
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] whitespace-nowrap text-foreground">{titulo}</span>
         <span className="flex items-center gap-1" role="img" aria-label={`${feitos} de 3 feitos`}>
           {[0, 1, 2].map((i) => (
             // o quadradinho recém-marcado dá um pulo (planner: o ✓ é a recompensa)
@@ -369,7 +369,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
  * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
  * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
  */
-export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica }: {
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao }: {
   pergunta: string;
   chips: ChipDaMissao[];
   /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
@@ -378,6 +378,10 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
   aoEscrever?: () => void;
   /** frase pequena embaixo (ex.: "ou escreve direto no campo") */
   dica?: string;
+  /** o rótulo pequeno em cima da pergunta (a missão em doses diz "Agora · 1 toque") */
+  rotulo?: string;
+  /** uma frase explicando o toque, entre a pergunta e os chips */
+  descricao?: string;
 }) {
   const reduzir = useReducedMotion();
   return (
@@ -388,8 +392,9 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
         style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
         initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
       >
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>Passo 2 de 3 · 1 toque</span>
+        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{rotulo}</span>
         <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
+        {descricao && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
         {chips.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {chips.map((c, i) => {

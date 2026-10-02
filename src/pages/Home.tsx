@@ -13,6 +13,7 @@ import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
 import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
 import { LinhaSequencia } from "@/components/conquistas/LinhaSequencia";
+import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
 import { RetrospectivaNaHome } from "@/components/wrapped/RetrospectivaNaHome";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 // Momentos (adesivo novo, marco de sequência) sob demanda: a arte e o gerador dos Stories não pesam a abertura da Home
@@ -332,6 +333,9 @@ const HomePage = () => {
               (164px entre umas, 56px entre outras). Respiro maior e igual
               separa os blocos sem inflar o conteúdo. */}
           <div className="flex-1 max-w-lg md:max-w-4xl mx-auto w-full px-4 pt-4 pb-5 space-y-8 flex flex-col justify-center">
+
+            {/* "SEU DIA" (missão em doses, 02/10): só com a chave ligada — desligada, não existe nem o nó */}
+            <CardSeuDia lifeData={lifeData} sequencia={sequencia} />
 
             <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
               <DayScoreRing score={lifeData.dayScore} streak={sequencia.dias} mostrarSequencia={false} />

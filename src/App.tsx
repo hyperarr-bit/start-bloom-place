@@ -33,6 +33,7 @@ import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/test
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
+import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
@@ -747,6 +748,8 @@ const App = () => {
                 <TrilhaDoTeste />
                 <RetomadaPosCompra />
                 <MissaoDoTrial />
+                {/* 02/10: a missão em doses + card SEU DIA — protótipo na web, atrás da chave MISSAO_DOSES ("off") e do link ?missao-doses=on */}
+                <MissaoDosesNaWeb />
             <SaveOfferDowngrade />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}

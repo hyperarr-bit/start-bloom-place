@@ -1,0 +1,40 @@
+/* MISSÃO EM DOSES (protótipo web, 02/10) — a faixa da missão fica grudada no topo da tela,
+   por cima do cabeçalho do módulo; a página desce a altura dela enquanto o passo está na tela. */
+:root { --missao-doses-faixa-h: 40px; }
+html[data-missao-doses-faixa] body { padding-top: var(--missao-doses-faixa-h); }
+html[data-missao-doses-faixa] header.sticky { top: var(--missao-doses-faixa-h) !important; }
+
+.md-faixa { position: fixed; left: 0; right: 0; top: 0; z-index: 210; height: var(--missao-doses-faixa-h); background: #16121c; color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; font-family: Inter, -apple-system, sans-serif; box-shadow: 0 6px 18px -10px rgba(0,0,0,.6); }
+.md-faixa-quadros { display: inline-flex; gap: 3px; }
+.md-faixa-titulo { font-size: 12.5px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.md-faixa-titulo b { color: rgba(255,255,255,.6); font-weight: 700; }
+.md-faixa-pular { margin-left: auto; min-height: 36px; padding: 0 10px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.7); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; }
+.md-faixa-onde { font-size: 12px; font-weight: 700; color: #ffd36e; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0 4px; }
+
+/* a faixa colorida com título em caixa alta — a gramática das seções do planner */
+.md-secao { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #fff; }
+.md-secao b { font-size: 11px; font-weight: 800; letter-spacing: .02em; text-transform: none; opacity: .9; font-variant-numeric: tabular-nums; }
+.md-secao[data-cor="grafite"] { background: #16121c; }
+.md-secao[data-cor="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.md-secao[data-cor="verde"] { background: #1a8f5a; }
+.md-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.md-pill[data-tom="hoje"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.md-pill[data-tom="feito"] { background: #d7f5e3; color: #146c43; }
+.md-pill[data-tom="dia"] { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.md-linha { display: flex; align-items: center; gap: 10px; padding: 10px 14px; text-align: left; width: 100%; background: none; border: 0; color: inherit; }
+.md-linha[data-hoje] { background: #FFF8D6; }
+.dark .md-linha[data-hoje] { background: rgba(255,211,110,.12); }
+.md-linha-rotulo { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.md-linha-texto { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.md-linha-texto[data-feito] { text-decoration: line-through; color: hsl(var(--muted-foreground)); }
+.md-tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1; border-radius: 16px; border: 2px solid transparent; color: #2b2b2f; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.md-tile[data-marcado] { border-color: #16121c; }
+.md-tile-n { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: #16121c; color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
+.md-tile-emoji { font-size: 28px; line-height: 1; }
+.md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
+.md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }
+.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+.md-hora[data-marcada] { background: #16121c; color: #fff; }
+.md-hora[data-sem] { border-color: rgba(22,18,28,.35); color: rgba(22,18,28,.55); }
+.md-hora[data-sem][data-marcada] { background: rgba(22,18,28,.75); color: #fff; }

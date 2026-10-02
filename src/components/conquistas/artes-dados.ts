@@ -1,3 +1,4 @@
+import type { CapaId } from "./CapaPlanner";
 import type { Badge, Raridade } from "@/components/gamification/types";
 import type { Insignia } from "./insignias";
 
@@ -11,6 +12,8 @@ export interface DadosArtes {
   membroDesde: string;
   dias: number;
   nivel: string;
+  /** A capa escolhida no planner (a capa do álbum herda; grafite se faltar). */
+  capa?: CapaId;
   xp: number;
   adesivos: number;
   total: number;

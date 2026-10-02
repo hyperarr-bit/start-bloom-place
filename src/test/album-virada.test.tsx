@@ -69,8 +69,8 @@ const montarAlbumTela = (extra: Partial<Parameters<typeof AlbumTela>[0]> = {}) =
 };
 
 const tela = () => screen.getByTestId("album-tela");
-/** A página de baixo (filha direta da folha — a que gira fica dentro de .alb-folha-3d). */
-const paginaDeBaixo = () => tela().querySelector(".alb-folha > .alb-pag") as HTMLElement;
+/** A página de baixo (a folha com o papel "fundo"; a que gira é a de papel "sobre", testid album-virando). */
+const paginaDeBaixo = () => tela().querySelector('[data-papel="fundo"] .alb-pag') as HTMLElement;
 const folhaVirando = () => screen.queryByTestId("album-virando");
 /** As vagas coladas de uma página: colam com atraso (`data-cola` + --d) ou já estão inteiras (null)? */
 const atrasos = (el: HTMLElement) => Array.from(el.querySelectorAll('.vaga[data-aberta="true"] .vaga-fig')).map((v) => (v.hasAttribute("data-cola") ? parseInt((v as HTMLElement).style.getPropertyValue("--d"), 10) : null));
@@ -110,7 +110,8 @@ describe("(b) a virada nunca mostra uma página em branco", () => {
     expect(folha).toHaveAttribute("data-pagina", "mais-raros");
     expect(folha).toHaveTextContent("OS MAIS RAROS");
     // a folha que gira vai com o conteúdo dela (não é uma folha bege vazia)
-    expect(folha.querySelectorAll(".vaga")).toHaveLength(6);
+    // (02/10) a 1ª página sempre traz as 3 "próximas a colar" embaixo das 6 mais raras
+    expect(folha.querySelectorAll(".vaga")).toHaveLength(9);
 
     // no meio da virada: tudo igual (destino por baixo, folha por cima)
     avancar(DURACAO_VIRADA_MS / 2);

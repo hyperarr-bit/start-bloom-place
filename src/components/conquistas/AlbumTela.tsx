@@ -1,30 +1,56 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import "@fontsource/instrument-serif/latin-400-italic.css";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from "framer-motion";
-import { ChevronLeft, ChevronRight, Instagram, Lock, X } from "lucide-react";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
+import { ChevronLeft, ChevronRight, Instagram, X } from "lucide-react";
 import { RARIDADE_PLURAL, categoriaDe, fracaoDe, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
 import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
 import { parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
-import { AdesivoRaro, ChipRaridade } from "./adesivos-raridade";
-import { giroDoAdesivo } from "./adesivos-arte";
+import { ChipRaridade } from "./adesivos-raridade";
+import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { CapaAlbum } from "./CapaAlbum";
+import type { CapaId } from "./CapaPlanner";
+import { FigurinhaColada, FigurinhaVazia, soltarFoils, useGiroscopioDoFoil } from "./FigurinhaAlbum";
 import { Destacar } from "./GradeAdesivos";
-import { ORDEM_RARIDADE, RARIDADE_FEM, TITULO_SECAO, contagemDaPagina, resumoRaridades, tituloDaPagina, type PaginaAlbum } from "./album-paginas";
+import { ORDEM_RARIDADE, RARIDADE_FEM, contagemDaPagina, proximosDoAlbum, resumoRaridades, tituloDaPagina, type PaginaAlbum } from "./album-paginas";
 import "./conquistas.css";
 
 /**
- * O ÁLBUM DE FIGURINHAS EM TELA CHEIA (27/09): mesa escura, o álbum com a
- * lombada magenta e a pilha de páginas à direita; a capa VIRA na lombada e
- * revela a página 1, e as figurinhas COLAM uma a uma. Páginas: OS MAIS RAROS
- * (banda magenta; com pouca figurinha, PRÓXIMAS A COLAR e a dica), depois
- * LENDÁRIOS (foil ouro) · ÉPICOS (holográfico) · RAROS (azul) · COMUNS
- * (grafite) — cada VAGA numerada ("Nº 46"), tracejada quando vazia com a
- * silhueta e a pílula do progresso; colada, a figurinha cobre o número, um
- * pouco torta. Abas coloridas na borda pulam de seção; setas e bolinhas
- * embaixo; a página vira como folha. Toque numa vaga abre o detalhe.
+ * O ÁLBUM DE FIGURINHAS EM TELA CHEIA — 3D (02/10; dono: "essa direção 3
+ * ficou massa, quero algo 3D mesmo — e hoje está dando uns engasgos ao
+ * trocar de página").
  *
- * A lógica das páginas é a de `album-paginas.ts` (não muda nada dela).
+ * O LIVRO: capa que herda a capa premium do planner, lombada com volume,
+ * pilha de páginas na lateral e embaixo, leve inclinação na mesa. Cada
+ * página é um CAPÍTULO (linha fina + "CAPÍTULO 02 · LENDÁRIOS", título em
+ * serif, a frase do material), molduras de papel com o NÚMERO grande,
+ * silhueta visível nas vagas vazias, barrinha fina de progresso (sai a
+ * pílula preta), até 16 figurinhas por página, marca-d'água da figurinha
+ * emblemática. Figurinha colada com relevo; épicas e lendárias com FOIL que
+ * reage ao dedo (e ao giroscópio quando já há permissão). Ao colar uma
+ * nova, o "peel". Abas com ícone + nome.
+ *
+ * POR QUE ENGASGAVA (medido no Chromium com CPU 4× mais lenta e no WebKit):
+ *   1. a folha que gira era MONTADA no toque (React + layout de 12 SVGs com
+ *      filtro) → o 1º quadro da virada levava 50–66 ms;
+ *   2. as sobreposições de sombra/dobra mudavam `opacity` e `left` DENTRO da
+ *      mesma camada da face → a face inteira (12 SVGs filtrados) era repintada
+ *      e re-rasterizada a cada quadro (Paint ×48, Raster ×360 por virada);
+ *   3. parado, anel/brilho/faíscas em loop mantinham o compositor ocupado
+ *      (Layerize ×61 por segundo sem gesto nenhum).
+ * COMO FICOU:
+ *   · as páginas VIZINHAS (atual −1, atual, atual +1) ficam PRÉ-MONTADAS como
+ *     FOLHAS próprias (uma camada cada, `will-change: transform` só enquanto
+ *     o álbum está aberto), rasterizadas uma vez; virar = trocar o PAPEL da
+ *     folha (fundo / sobre / espera) — nenhuma montagem, nenhum re-render
+ *     da página (`memo`) durante a animação;
+ *   · o ângulo é um motion value que escreve DIRETO no DOM (transform e
+ *     opacity de camadas promovidas): sombra, dobra, luz, verso e a sombra
+ *     projetada são camadas próprias com `will-change`, nada de `left`;
+ *   · nenhuma animação em loop; o foil só repinta a própria figurinha e só
+ *     durante o toque/movimento.
+ * A lógica das páginas é a de `album-paginas.ts`.
  */
 
 /** O número da figurinha = a posição na coleção (a ordem do catálogo, como num álbum de verdade). */
@@ -33,40 +59,69 @@ export const nDeDois = (n: number) => String(n).padStart(2, "0");
 
 const ROTA_PADRAO = (b: Badge) => b.rota ?? { caminho: categoriaDe(b.category).rota, nome: b.category === "sequencia" || b.category === "geral" ? "Home" : categoriaDe(b.category).label };
 
+/** O capítulo de cada raridade: o material, a frase, o ícone da aba e a figurinha emblemática (marca-d'água). */
+export const CAPITULO: Record<Raridade, { titulo: string; material: string; frase: string; icone: string; aba: string; emblema: string }> = {
+  lendario: { titulo: "Lendárias", material: "Foil dourado", frase: "As mais difíceis do álbum.", icone: "♛", aba: "LENDÁRIAS", emblema: "ano-365" },
+  epico: { titulo: "Épicas", material: "Holográficas", frase: "Só quem persiste por meses.", icone: "✦", aba: "ÉPICAS", emblema: "rotina-21" },
+  raro: { titulo: "Raras", material: "Borda azul", frase: "Pra quem já pegou o ritmo.", icone: "◆", aba: "RARAS", emblema: "rotina-7" },
+  comum: { titulo: "Comuns", material: "Grafite", frase: "Os primeiros passos de cada área.", icone: "●", aba: "COMUNS", emblema: "first-income" },
+};
+
+/* ------------------------------------------------------------ a vaga */
+
+/**
+ * A vaga só responde na página de BAIXO (a visível). Checado no DOM, e não
+ * por `pointer-events` no papel da folha: `pointer-events` é herdado, e
+ * trocá-lo na folha recalculava o estilo das ~400 vagas por baixo no 1º
+ * quadro de cada virada (20 ms num celular médio).
+ */
+const ehFundo = (el: Element): boolean => (el.closest("[data-papel]") as HTMLElement | null)?.dataset.papel !== "espera" && (el.closest("[data-papel]") as HTMLElement | null)?.dataset.papel !== "sobre";
+
 interface VagaProps {
   b: Badge;
   n: number;
   tam: number;
   indice: number;
-  /** Atraso (ms) pra colar com o pop; undefined = já colada. */
+  /** Atraso (ms) pra colar com o peel; undefined = já colada. */
   cola?: number;
-  ativa: boolean;
   onSelecionar: (b: Badge) => void;
 }
 
-const Vaga = ({ b, n, tam, indice, cola, ativa, onSelecionar }: VagaProps) => {
+const Vaga = memo(({ b, n, tam, indice, cola, onSelecionar }: VagaProps) => {
   const raridade = raridadeDe(b);
   const cx = tam + 14;
+  // o "colar" é de UMA vez: quem já recebeu o atraso fica com ele (uma troca de papel da folha não descola a figurinha)
+  const colaFixo = useRef(cola);
+  if (cola !== undefined) colaFixo.current = cola;
+  const atraso = colaFixo.current;
   const rotulo = b.unlocked ? null : rotuloProgresso(b);
+  const comProgresso = !b.unlocked && !!b.progresso && b.progresso.atual > 0;
   return (
-    <button type="button" className="vaga" data-id={b.id} data-vaga={b.id} data-aberta={b.unlocked ? "true" : "false"} data-rar={raridade} onClick={() => onSelecionar(b)} tabIndex={ativa ? 0 : -1} style={{ width: cx }}>
+    <button type="button" className="vaga" data-id={b.id} data-vaga={b.id} data-aberta={b.unlocked ? "true" : "false"} data-rar={raridade} onClick={(e) => { if (ehFundo(e.currentTarget)) onSelecionar(b); }} style={{ width: cx }}>
       <span className="vaga-caixa" style={{ width: cx, height: cx }}>
-        <span className="vaga-n">Nº {nDeDois(n)}</span>
+        <span className="vaga-n"><small>Nº</small> {nDeDois(n)}</span>
         {b.unlocked ? (
-          <span className="vaga-fig" data-cola={cola !== undefined ? "" : undefined} style={{ "--d": `${cola ?? 0}ms` } as CSSProperties}>
-            <AdesivoRaro id={b.id} raridade={raridade} tamanho={tam} giro={giroDoAdesivo(indice)} />
+          <span className="vaga-fig" data-cola={atraso !== undefined ? "" : undefined} style={{ "--d": `${atraso ?? 0}ms` } as CSSProperties}>
+            <FigurinhaColada id={b.id} raridade={raridade} tamanho={tam} giro={giroDoAdesivo(indice)} peel={atraso !== undefined} />
           </span>
         ) : (
-          <span className="vaga-fig" style={{ opacity: 0.9 }}>
-            <AdesivoRaro id={b.id} raridade={raridade} tamanho={tam - 8} trancado />
+          <span className="vaga-fig">
+            <FigurinhaVazia id={b.id} raridade={raridade} tamanho={tam - 6} />
           </span>
         )}
-        {!b.unlocked && b.progresso && b.progresso.atual > 0 && <span className="vaga-pill" data-testid="pilula-figurinha">{rotulo ?? <Lock className="w-3 h-3" aria-label="Trancado" />}</span>}
       </span>
       <span className="vaga-nome" data-falta={b.unlocked ? undefined : ""}>{b.name}</span>
+      {comProgresso && (
+        <span className="vaga-barra" data-testid="barra-figurinha" aria-label={rotulo ?? undefined} title={rotulo ?? undefined}>
+          <i style={{ transform: `scaleX(${Math.max(0.04, Math.min(1, fracaoDe(b)))})` }} />
+        </span>
+      )}
     </button>
   );
-};
+});
+Vaga.displayName = "Vaga";
+
+/* ------------------------------------------------------------ a página */
 
 interface PaginaProps {
   p: PaginaAlbum;
@@ -74,35 +129,49 @@ interface PaginaProps {
   total: number;
   largura: number;
   adesivos: Badge[];
+  /** É a página visível (de baixo)? Só nela as figurinhas colam agora. */
   ativa: boolean;
-  /** Ids que colam com o pop nesta montagem (com o atraso base). */
-  colar: Set<string> | null;
+  /** É a página de ABERTURA, ainda abrindo: todas as coladas dela colam com o peel (uma vez; as mesmas figurinhas nas páginas de seção não). */
+  abertura: boolean;
+  /** As NOVAS (colam com o peel na página delas; conjunto estável, os ids saem dele depois de colar). */
+  colar: Set<string>;
   atrasoBase: number;
   diasDeSequencia: number;
   onSelecionar: (b: Badge) => void;
 }
 
-const Pagina = ({ p, indice, total, largura, adesivos, ativa, colar, atrasoBase, diasDeSequencia, onSelecionar }: PaginaProps) => {
+const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, onSelecionar }: PaginaProps) => {
   const grande = p.tipo === "mais-raros";
-  const col = grande ? 3 : 4, gap = grande ? 10 : 6;
-  const tam = grande ? Math.min(84, Math.floor((largura - 34 - gap * 2) / 3) - 14) : Math.min(60, Math.floor((largura - 34 - gap * 3) / 4) - 14);
-  const proximo = p.proximos[0];
-  const colaDe = (b: Badge, j: number) => (colar && b.unlocked && colar.has(b.id) ? atrasoBase + j * 90 : undefined);
+  const col = grande ? 3 : 4;
+  const gapX = grande ? 10 : 6;
+  const interno = largura - 24 - 14;
+  const tam = grande ? Math.min(78, Math.floor((interno - gapX * 2) / 3) - 16) : Math.min(54, Math.floor((interno - gapX * 3) / 4) - 14);
+  // a 1ª página sempre mostra as 3 mais perto de colar (a página de `album-paginas` só traz com pouco colado; com 6 raras, a metade de baixo ficava vazia)
+  const proximas = useMemo(() => (grande ? (p.proximos.length ? p.proximos : proximosDoAlbum(adesivos)) : []), [grande, p.proximos, adesivos]);
+  const proximo = proximas[0];
+  const cap = p.raridade ? CAPITULO[p.raridade] : null;
+  const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && (abertura || colar.has(b.id)) ? atrasoBase + j * 90 : undefined);
+  // nas páginas de seção: a vaga vazia mais perto de colar (o rodapé convida)
+  const perto = useMemo(() => (grande ? null : p.vagas.filter((b) => !b.unlocked && b.progresso && b.progresso.atual > 0).sort((a, b) => fracaoDe(b) - fracaoDe(a))[0] ?? null), [grande, p.vagas]);
+  const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : cap!.titulo;
+  const contagem = grande ? `${p.abertos} de ${p.total}` : p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`;
+  const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : `${cap!.material} · ${cap!.frase}`;
   return (
-    <div className="alb-pag" data-pagina={p.id} data-testid={`album-tela-pagina-${indice}`} aria-hidden={!ativa}>
-      {grande ? (
-        <div className="alb-secao" data-rar="destaque"><span>{p.titulo}</span><b>{p.abertos} de {p.total}</b></div>
-      ) : (
-        <div className="alb-secao" data-rar={p.raridade}><span>{tituloDaPagina(p)}</span><b>{p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`}</b></div>
-      )}
-      <div className="alb-grade" style={{ gridTemplateColumns: `repeat(${col}, 1fr)`, gap: `${grande ? 10 : 4}px ${gap}px` }}>
-        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} ativa={ativa} onSelecionar={onSelecionar} />)}
+    <div className="alb-pag" data-pagina={p.id} data-rar={p.raridade ?? "destaque"} data-testid={`album-tela-pagina-${indice}`}>
+      <span className="alb-marca" aria-hidden><Adesivo id={cap ? cap.emblema : "sequencia-100"} tamanho={Math.round(largura * 0.5)} /></span>
+      <header className="alb-cap">
+        <div className="alb-cap-linha"><span>Capítulo {nDeDois(indice + 1)} · {grande ? p.titulo : tituloDaPagina(p)}</span><i /></div>
+        <div className="alb-cap-titulo"><h3>{titulo}</h3><b className="tabular-nums">{contagem}</b></div>
+        <p className="alb-cap-frase">{frase}</p>
+      </header>
+      <div className="alb-grade" style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${grande ? 8 : 5}px ${gapX}px` }}>
+        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} onSelecionar={onSelecionar} />)}
       </div>
-      {grande && p.proximos.length > 0 && (
+      {grande && proximas.length > 0 && (
         <>
           <div className="alb-subsecao">PRÓXIMAS A COLAR</div>
-          <div className="alb-grade" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: `10px ${gap}px` }}>
-            {p.proximos.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} ativa={ativa} onSelecionar={onSelecionar} />)}
+          <div className="alb-grade" style={{ gridTemplateColumns: `repeat(3, ${tam + 14}px)`, gap: `8px ${gapX}px` }}>
+            {proximas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} onSelecionar={onSelecionar} />)}
           </div>
         </>
       )}
@@ -112,10 +181,20 @@ const Pagina = ({ p, indice, total, largura, adesivos, ativa, colar, atrasoBase,
           A mais perto: <b>{proximo.name}</b> — <mark><Destacar texto={textoFalta(proximo, diasDeSequencia)} /></mark>.
         </p>
       )}
-      <div className="alb-pag-num">{indice + 1} / {total}</div>
+      <footer className="alb-pe">
+        {perto ? (
+          <span className="alb-pe-perto">A mais perto: <b>{perto.name}</b> · <Destacar texto={textoFalta(perto, diasDeSequencia)} /></span>
+        ) : !grande && p.abertos >= p.total ? (
+          <span className="alb-pe-perto">Página completa — todas coladas.</span>
+        ) : <span />}
+        <span className="alb-pag-num">{indice + 1} / {total}</span>
+      </footer>
     </div>
   );
-};
+});
+Pagina.displayName = "Pagina";
+
+/* ------------------------------------------------------------ o detalhe */
 
 interface DetalheProps {
   b: Badge;
@@ -140,7 +219,9 @@ const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, 
       <motion.div className="fig-detalhe" role="dialog" aria-modal="true" aria-label={b.name} data-testid="detalhe-vaga" data-vaga-detalhe={b.id} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
         <div className="fig-detalhe-puxador" />
         <div className="flex items-center gap-3.5">
-          <span className="shrink-0 w-[116px] h-[116px] grid place-items-center"><AdesivoRaro id={b.id} raridade={raridade} tamanho={112} bordaGrossa trancado={!b.unlocked} /></span>
+          <span className="shrink-0 w-[120px] h-[120px] grid place-items-center">
+            {b.unlocked ? <FigurinhaColada id={b.id} raridade={raridade} tamanho={108} grande /> : <FigurinhaVazia id={b.id} raridade={raridade} tamanho={108} />}
+          </span>
           <div className="min-w-0">
             <div className="pin-rot text-muted-foreground">Figurinha Nº {nDeDois(n)}</div>
             <div className="text-[20px] font-black tracking-tight leading-[1.1] mt-0.5 mb-1.5">{b.name}</div>
@@ -150,7 +231,7 @@ const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, 
         {b.unlocked ? (
           <p className="text-[13px] text-muted-foreground mt-3.5 leading-[1.4]">
             {colada ? <>Colada em <b className="text-foreground">{colada}</b>. </> : null}
-            {conta ? `Uma das ${conta.total} ${RARIDADE_PLURAL[raridade]} do CORE` : RARIDADE_FEM[raridade]}{raridade === "epico" ? " — vem com a borda holográfica." : raridade === "lendario" ? " — brilha em ouro." : "."}
+            {conta ? `Uma das ${conta.total} ${RARIDADE_PLURAL[raridade]} do CORE` : RARIDADE_FEM[raridade]}{raridade === "epico" ? " — holográfica: toque e mexa o dedo." : raridade === "lendario" ? " — foil de ouro: toque e mexa o dedo." : "."}
           </p>
         ) : (
           <>
@@ -180,58 +261,12 @@ const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, 
   );
 };
 
-export interface AlbumTelaProps {
-  aberto: boolean;
-  paginas: PaginaAlbum[];
-  adesivos: Badge[];
-  desbloqueadas: Record<string, string>;
-  /** Coladas desde a última abertura: colam com o pop quando a página aparece. */
-  novas: string[];
-  maisRaros: Badge[];
-  abertos: number;
-  total: number;
-  porRaridade: Record<Raridade, { abertos: number; total: number }>;
-  nome: string;
-  nivel: string;
-  ano: number;
-  diasDeSequencia: number;
-  /** Abre direto nesta página (o pacotinho abre na página da figurinha nova). */
-  paginaInicial?: number;
-  /** De onde veio a abertura (vai no evento `album_abrir`). */
-  via?: "card" | "pacotinho";
-  onFechar: () => void;
-  onCompartilhar: () => void;
-  onCompartilharFigurinha: (b: Badge) => void;
-}
+/* ------------------------------------------------------------ a folha 3D */
 
-/**
- * A VIRADA 2.5D (02/10 à noite; a de b6e2dfad — folha só até o perfil — tirou
- * a página em branco do iPhone, mas o dono viu "sobreposição/bug": "quero
- * parecer um livro de verdade"). Agora a folha é uma FOLHA:
- *   · duas faces (frente = a página, verso = o papel), girando na lombada de
- *     0° a −180° com perspectiva; a partir de 90° aparece o verso;
- *   · o sombreamento da frente escurece conforme deita, o verso nasce com luz
- *     e um brilho de "dobra" corre pela folha com o ângulo (leve curvatura);
- *   · a folha PROJETA sombra na página de baixo (cresce até 90°, some a 180°);
- *   · ARRASTAR com o dedo: a folha acompanha; soltar passada de 1/3 (ou com
- *     velocidade) completa, senão volta; voltar é o espelho (a folha de
- *     destino desdobra da lombada, −180° → 0°);
- *   · NUNCA página em branco: o destino está montado e inteiro por baixo
- *     desde o 1º quadro; toques rápidos trocam a folha na hora (chave nova);
- *   · a capa é a mesma folha (frente = capa, verso = a 2ª capa, "este álbum
- *     pertence a…"), sempre na frente, até deitar;
- *   · tudo em transform/opacity (compositor; fluido no WebView); "reduzir
- *     movimento" = troca simples, sem folha;
- *   · cada página é um contexto de empilhamento (`isolation`): a pílula do
- *     progresso não vaza por cima da folha.
- * Avaliei StPageFlip/react-pageflip: no modo HTML a folha também é rígida
- * (a dobra "soft" é só pra imagens em canvas), exige tamanho fixo e pesa ~45
- * KB gzip — não ganharia nada sobre isto aqui.
- */
-export const DURACAO_VIRADA_MS = 560;
+export const DURACAO_VIRADA_MS = 600;
 /** A capa fica parada este tempo antes de virar (a pessoa vê a capa). */
 export const CAPA_PARADA_MS = 500;
-export const CAPA_GIRO_MS = 640;
+export const CAPA_GIRO_MS = 700;
 /** O instante em que a capa revela a 1ª página (passa do perfil) = quando as figurinhas começam a colar. */
 export const CAPA_REVELA_MS = CAPA_PARADA_MS + Math.round(CAPA_GIRO_MS * 0.45);
 /** Quando a capa deitou de vez e sai da tela (com a folga da rede de segurança). */
@@ -242,14 +277,27 @@ export const FRACAO_PRA_COMPLETAR = 0.34;
 const VELOCIDADE_PRA_COMPLETAR = 0.35;
 /** Arrasto mínimo (px) pra virar um gesto. */
 const ARRASTO_MINIMO = 8;
-const EASE_FRENTE: [number, number, number, number] = [0.42, 0, 0.3, 1];
+/** … e quando o toque começou numa figurinha com foil (o dedo passeia nela antes de virar). */
+const ARRASTO_MINIMO_NO_FOIL = 40;
+const EASE_FRENTE: [number, number, number, number] = [0.4, 0, 0.26, 1];
+/** O ângulo por onde a folha passa de perfil (a frente some, o verso aparece). */
+const PERFIL = -90;
+/** A face que não aparece fica nisto, nunca em 0 (ver pintarFolha). Medido no WebKit: a 0,4 % ele já descarta a camada e repinta ao voltar; a 1,2 % não. */
+export const OPACIDADE_ESCONDIDA = 0.012;
+
+/** Câmera lenta SÓ no servidor de desenvolvimento (prints/vídeo): `window.__coreCameraLenta = 6` deixa a virada 6× mais lenta. */
+const lento = (): number => {
+  if (!import.meta.env.DEV || typeof window === "undefined") return 1;
+  const v = Number((window as unknown as { __coreCameraLenta?: unknown }).__coreCameraLenta);
+  return Number.isFinite(v) && v >= 1 ? v : 1;
+};
+
+type Papel = "fundo" | "sobre" | "espera" | "capa";
 
 interface Virada {
   /** A folha que gira por cima: pra frente é a página que sai; pra trás, a que entra. */
-  sobre: PaginaAlbum;
   sobreIndice: number;
   /** O que fica por baixo enquanto gira: pra frente é a página de destino; pra trás, a que sai. */
-  fundo: PaginaAlbum;
   fundoIndice: number;
   dir: 1 | -1;
   chave: number;
@@ -259,60 +307,141 @@ interface Virada {
   manual: boolean;
 }
 
-/** O ângulo por onde a folha passa de perfil (a frente some, o verso aparece). */
-const PERFIL = -90;
-/** Câmera lenta SÓ no servidor de desenvolvimento (prints/vídeo): `window.__coreCameraLenta = 6` deixa a virada 6× mais lenta. */
-const lento = (): number => {
-  if (!import.meta.env.DEV || typeof window === "undefined") return 1;
-  const v = Number((window as unknown as { __coreCameraLenta?: unknown }).__coreCameraLenta);
-  return Number.isFinite(v) && v >= 1 ? v : 1;
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const rampa = (v: number, de: number, ate: number) => clamp01((v - de) / (ate - de));
+
+/**
+ * ESCREVE o quadro da folha direto no DOM a partir do ângulo (0 → −180):
+ * transform da folha, qual face aparece (por ângulo, não por
+ * backface-visibility: no WebKit o verso era pintado por cima da frente),
+ * o sombreamento da frente, a luz do verso, o brilho da dobra correndo pela
+ * folha, a folha esmaecendo nos últimos graus e a sombra projetada na página
+ * de baixo. Nada disto passa pelo React.
+ */
+export interface PartesDaFolha {
+  el: HTMLElement;
+  /** A largura da folha (px): as tiras de luz/sombra são escaladas por ela. */
+  largura: number;
+  /** A profundidade da folha (px): a que gira fica à frente da de baixo, a capa à frente de tudo — ordem por translateZ, nunca z-index
+   *  (no WebKit, trocar o z-index de uma camada composta repinta a camada inteira). */
+  z: number;
+  frente: HTMLElement | null;
+  verso: HTMLElement | null;
+  sombra: HTMLElement | null;
+  dobra: HTMLElement | null;
+  luz: HTMLElement | null;
+  sombraProjetada?: HTMLElement | null;
+}
+export const PROFUNDIDADE: Record<string, number> = { capa: 3, sobre: 1, fundo: 0, espera: -2 };
+export const partesDaFolha = (el: HTMLElement, largura: number, sombraProjetada?: HTMLElement | null): PartesDaFolha => ({
+  el,
+  largura,
+  z: PROFUNDIDADE[el.dataset.papel ?? "sobre"] ?? 1,
+  frente: el.querySelector<HTMLElement>(".alb-face-frente"),
+  verso: el.querySelector<HTMLElement>(".alb-face-verso"),
+  sombra: el.querySelector<HTMLElement>(".alb-face-sombra"),
+  dobra: el.querySelector<HTMLElement>(".alb-face-dobra"),
+  luz: el.querySelector<HTMLElement>(".alb-face-luz"),
+  sombraProjetada,
+});
+export const pintarFolha = ({ el, largura, z, frente, verso, sombra, dobra, luz, sombraProjetada }: PartesDaFolha, v: number) => {
+  const naFrente = v > PERFIL;
+  // QUAL FACE APARECE é decidida pelo ângulo, por opacidade: o WebKit não ordena as duas faces pela profundidade nem respeita
+  // backface-visibility (02/10, provado de novo no headless: o verso pintava por cima da frente em repouso) — e a face
+  // "escondida" fica a 1,2 %, NUNCA 0: uma camada que volta de opacidade 0 é repintada inteira no WebKit (45–70 ms no quadro
+  // do perfil / de voltar a página), e a 1,2 % por baixo da face opaca ninguém vê. Deitada (os últimos 22°) a folha esmaece
+  // pelas FACES (planas, sem filhos compostos): NUNCA opacidade na folha — obrigaria o preserve-3d a virar flat e achataria
+  // as faces numa camada nova (re-raster da página inteira).
+  const fade = Math.max(OPACIDADE_ESCONDIDA, 1 - rampa(v, -158, -180));
+  el.style.transform = `rotateY(${v}deg) translateZ(${z}px)`;
+  if (frente) frente.style.opacity = (naFrente ? fade : OPACIDADE_ESCONDIDA).toFixed(3);
+  if (verso) verso.style.opacity = (naFrente ? OPACIDADE_ESCONDIDA : fade).toFixed(3);
+  if (sombra) sombra.style.opacity = (naFrente ? rampa(v, 0, PERFIL) * 0.55 : 0).toFixed(3);
+  if (dobra) {
+    const t = rampa(v, 0, PERFIL);
+    // a dobra (tira de 4 px esticada a 42 % da folha) corre da borda externa (78 % da folha) até a lombada (−20 %)
+    dobra.style.transform = `translateX(${((0.78 - 0.98 * t) * largura).toFixed(1)}px) translateZ(.6px) scaleX(${(largura * 0.105).toFixed(2)})`;
+    dobra.style.opacity = (naFrente ? Math.min(rampa(v, 0, -25), 1 - rampa(v, -70, PERFIL)) * 0.35 : 0).toFixed(3);
+  }
+  if (luz) luz.style.opacity = (naFrente ? 0 : 0.5 * (1 - rampa(v, PERFIL, -180)) * fade).toFixed(3);
+  if (sombraProjetada) {
+    const o = v > -30 ? rampa(v, 0, -30) * 0.3 : v > PERFIL ? 0.3 + rampa(v, -30, PERFIL) * 0.2 : v > -150 ? 0.5 - rampa(v, PERFIL, -150) * 0.2 : 0.3 * (1 - rampa(v, -150, -180));
+    sombraProjetada.style.opacity = o.toFixed(3);
+    sombraProjetada.style.transform = `translateZ(.3px) scaleX(${(Math.max(0.05, Math.abs(Math.sin((v * Math.PI) / 180))) * (largura / 4)).toFixed(2)})`;
+  }
+};
+
+/** Põe a folha em repouso (0°, faces como no CSS). */
+const repousarFolha = (el: HTMLElement) => {
+  el.removeAttribute("style");
+  for (const parte of Array.from(el.querySelectorAll<HTMLElement>(".alb-face, .alb-face-sombra, .alb-face-dobra, .alb-face-luz"))) parte.removeAttribute("style");
+};
+/**
+ * "Deita" a folha de vez: as duas faces apagadas (a 1,2 %) e a folha de volta a 0° por trás da página de baixo — e não
+ * deitada a −180° fora do livro, onde 1,2 % de papel creme sobre a mesa escura ainda se via. Em pé, atrás da página (ou,
+ * no WebKit, por cima dela a 1,2 %: creme sobre creme), não se vê nada.
+ */
+const deitarFolha = (partes: PartesDaFolha) => {
+  pintarFolha({ ...partes, z: PROFUNDIDADE.espera }, -180);
+  partes.el.style.transform = `rotateY(0deg) translateZ(${PROFUNDIDADE.espera}px)`;
+};
+
+/** Conduz a folha `seletor` (dentro de `raiz`) pelo motion value, enquanto `ativo`. */
+const useConduzir = (raiz: React.RefObject<HTMLDivElement>, seletor: string, rot: MotionValue<number>, largura: number, ativo: unknown) => {
+  useLayoutEffect(() => {
+    if (!ativo) return;
+    const base = raiz.current;
+    const el = base?.querySelector<HTMLElement>(seletor);
+    if (!base || !el) return;
+    const partes = partesDaFolha(el, largura, base.querySelector<HTMLElement>(`[data-sombra-projetada="${el.dataset.papel}"]`));
+    // a folha de FUNDO precisa estar em repouso (uma folha que já virou guarda o ângulo deitado): só mexe se não estiver
+    const fundo = base.querySelector<HTMLElement>('[data-papel="fundo"]');
+    if (fundo && fundo !== el && fundo.style.transform && fundo.style.transform !== "rotateY(0deg)") repousarFolha(fundo);
+    // um quadro por rAF: o dedo manda pointermove a 60–120 Hz, e cada escrita de estilo fora do quadro era um recálculo a mais
+    let quadro = 0;
+    let pendente = rot.get();
+    const aplicar = (v: number) => {
+      pendente = v;
+      if (!quadro) quadro = requestAnimationFrame(() => { quadro = 0; pintarFolha(partes, pendente); });
+    };
+    pintarFolha(partes, pendente);
+    const parar = rot.on("change", aplicar);
+    return () => {
+      parar();
+      if (quadro) cancelAnimationFrame(quadro);
+      // a folha vai pro repouso do PAPEL novo (o React já trocou o atributo): espera = deitada (−180°, faces apagadas), fundo = em pé
+      // (0°, como o CSS). Nada de opacidade na folha; uma virada interrompida no meio (toques rápidos) não fica saindo do livro.
+      if (el.dataset.papel === "espera") deitarFolha(partes);
+      else if (el.dataset.papel === "fundo") repousarFolha(el);
+    };
+  }, [raiz, seletor, rot, largura, ativo]);
 };
 
 /**
- * A FOLHA 3D: frente, verso, o sombreamento e o brilho de dobra — tudo
- * derivado do ângulo (motion value), sem re-render.
+ * UMA FOLHA do livro: frente (a página) e verso (o papel), as camadas de
+ * sombra/dobra/luz (promovidas: mudar a opacidade delas não repinta a
+ * página). O PAPEL diz o que ela é agora: `fundo` (parada, visível, é a
+ * página de verdade), `sobre` (a que gira), `espera` (pré-montada e
+ * rasterizada, invisível, pronta pra virar fundo sem montar nada) ou `capa`.
  */
-const Folha3D = ({ rot, frente, verso, zIndex, raio, testid, dir, pagina }: {
-  rot: MotionValue<number>; frente: ReactNode; verso: ReactNode; zIndex: number; raio: string; testid: string; dir: 1 | -1; pagina?: string;
-}) => {
-  // a frente escurece até o perfil; o verso nasce iluminado e assenta
-  const sombraFrente = useTransform(rot, [0, PERFIL], [0, 0.55]);
-  const luzVerso = useTransform(rot, [PERFIL, -180], [0.5, 0]);
-  // QUAL FACE APARECE é decidida pelo ângulo, não por `backface-visibility` (02/10: no WebKit, uma face com
-  // overflow/stacking próprio ignora o backface e o verso era pintado por cima da frente — a "folha em branco")
-  const frenteVisivel = useTransform(rot, (v) => (v > PERFIL ? 1 : 0));
-  const versoVisivel = useTransform(rot, (v) => (v > PERFIL ? 0 : 1));
-  // o brilho da dobra corre da borda externa até a lombada enquanto a folha levanta
-  const dobraX = useTransform(rot, [0, PERFIL], ["78%", "-20%"]);
-  const dobraOpacidade = useTransform(rot, [0, -25, -70, PERFIL], [0, 0.35, 0.35, 0]);
-  return (
-    <motion.div
-      className="alb-folha-3d"
-      data-testid={testid}
-      data-dir={dir > 0 ? "frente" : "tras"}
-      data-pagina={pagina}
-      style={{ rotateY: rot, zIndex, borderRadius: raio }}
-      aria-hidden
-    >
-      <motion.div className="alb-face alb-face-frente" style={{ borderRadius: raio, opacity: frenteVisivel }}>
-        {frente}
-        <motion.div className="alb-face-sombra" style={{ opacity: sombraFrente }} />
-        <motion.div className="alb-face-dobra" style={{ left: dobraX, opacity: dobraOpacidade }} />
-      </motion.div>
-      <motion.div className="alb-face alb-face-verso" style={{ borderRadius: raio, opacity: versoVisivel }}>
-        {verso}
-        <motion.div className="alb-face-luz" style={{ opacity: luzVerso }} />
-      </motion.div>
-    </motion.div>
-  );
-};
-
-/** A sombra que a folha projeta na página de baixo (cresce até o perfil, some deitada). */
-const SombraProjetada = ({ rot }: { rot: MotionValue<number> }) => {
-  const opacidade = useTransform(rot, [0, -30, PERFIL, -150, -180], [0, 0.3, 0.5, 0.3, 0]);
-  const escala = useTransform(rot, (v) => Math.max(0.05, Math.abs(Math.sin((v * Math.PI) / 180))));
-  return <motion.div className="alb-sombra-projetada" style={{ opacity: opacidade, scaleX: escala }} aria-hidden />;
-};
+const Folha = ({ papel, dir, pagina, frente, verso, testid }: { papel: Papel; dir?: 1 | -1; pagina?: string; frente: ReactNode; verso: ReactNode; testid?: string }) => (
+  <div
+    className="alb-sheet"
+    data-papel={papel}
+    data-pagina={pagina}
+    data-dir={dir ? (dir > 0 ? "frente" : "tras") : undefined}
+    data-testid={testid}
+    aria-hidden={papel !== "fundo"}
+  >
+    <div className="alb-face alb-face-frente">{frente}</div>
+    <div className="alb-face alb-face-verso">{verso}</div>
+    {/* as camadas de luz são IRMÃS das faces (profundidade própria): uma face com filho composto + opacidade fracionária
+        obriga o WebKit a agrupar e repintar a página inteira no instante em que o verso começa a esmaecer */}
+    <div className="alb-face-sombra" aria-hidden />
+    <div className="alb-face-dobra" aria-hidden />
+    <div className="alb-face-luz" aria-hidden />
+  </div>
+);
 
 /** O verso de uma página do álbum: papel com a trama e um carimbo discreto. */
 const VersoDaPagina = ({ ano }: { ano: number }) => (
@@ -332,46 +461,99 @@ const VersoDaCapa = ({ nome, ano }: { nome: string; ano: number }) => (
   </div>
 );
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
-  const reduzir = useReducedMotion();
+/* ------------------------------------------------------------ a tela */
+
+export interface AlbumTelaProps {
+  aberto: boolean;
+  paginas: PaginaAlbum[];
+  adesivos: Badge[];
+  desbloqueadas: Record<string, string>;
+  /** Coladas desde a última abertura: colam com o peel quando a página aparece. */
+  novas: string[];
+  maisRaros: Badge[];
+  abertos: number;
+  total: number;
+  porRaridade: Record<Raridade, { abertos: number; total: number }>;
+  nome: string;
+  nivel: string;
+  ano: number;
+  /** A capa escolhida no planner: o álbum herda. */
+  capa?: CapaId;
+  diasDeSequencia: number;
+  /** Abre direto nesta página (o pacotinho abre na página da figurinha nova). */
+  paginaInicial?: number;
+  /** De onde veio a abertura (vai no evento `album_abrir`). */
+  via?: "card" | "pacotinho";
+  onFechar: () => void;
+  onCompartilhar: () => void;
+  onCompartilharFigurinha: (b: Badge) => void;
+}
+
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, capa = "grafite", diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+  const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
   const inicial = Math.max(0, Math.min(n - 1, paginaInicial));
   const [atual, setAtual] = useState(inicial);
   const [virando, setVirando] = useState<Virada | null>(null);
-  const [capaVisivel, setCapaVisivel] = useState(false);
+  // já no 1º render (a página de abertura calcula o atraso do "colar" a partir da capa): o efeito de abrir confirma
+  const [capaVisivel, setCapaVisivel] = useState(aberto && !reduzir);
   const [capaGirada, setCapaGirada] = useState(false);
   const [detalhe, setDetalhe] = useState<Badge | null>(null);
   const [largura, setLargura] = useState(330);
   /**
-   * Ainda na página de abertura? As figurinhas dela colam com o pop quando a
-   * capa revela a página — e SÓ ali. (02/10: a lista de "colar" levava as 6
-   * mais raras, que também moram nas páginas das seções: virar pra LENDÁRIOS
-   * ou ÉPICOS logo depois de abrir mostrava a página sem as figurinhas por
-   * 260 ms + a cadência — a "página bege vazia" do vídeo.)
+   * As folhas MONTADAS: as vizinhas de `base` (que só muda quando NÃO há
+   * virada em curso — montar uma página no 1º quadro da virada custava
+   * 60–80 ms) e, aos poucos depois da abertura, TODAS as outras (uma a cada
+   * 160 ms, nunca durante uma virada): daí em diante virar nunca monta nada.
    */
-  const [abertura, setAbertura] = useState(true);
-  const novasSet = useRef<Set<string>>(new Set());
+  const [base, setBase] = useState(inicial);
+  const [extras, setExtras] = useState(0);
+  /**
+   * O que cola com o peel: as NOVAS (na página delas, quando ela aparece) e,
+   * UMA vez, todas as coladas da página de abertura (`abertura`, que vira
+   * falso 2,6 s depois — e vale só pra ESSA página: as mesmas figurinhas nas
+   * páginas de seção não colam de novo, mesmo virando logo depois de abrir;
+   * 02/10: era a "página bege vazia" do vídeo do dono). As novas ficam num
+   * conjunto ESTÁVEL (ref) desde o 1º render: os ids saem dele 2,6 s depois
+   * de a página deles aparecer, sem re-render.
+   */
+  const colar = useRef<Set<string>>(new Set(novas));
+  const [abertura, setAbertura] = useState(!reduzir);
   /** O ângulo da folha que está virando (0 → −180 pra frente; −180 → 0 pra trás). */
   const rot = useMotionValue(0);
   const rotCapa = useMotionValue(0);
   const animacao = useRef<ReturnType<typeof animate> | null>(null);
+  const raiz = useRef<HTMLDivElement>(null);
+  const livro = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined") setLargura(Math.min(330, Math.max(240, window.innerWidth - 48)));
   }, [aberto]);
 
+  // a base das vizinhas acompanha a página atual, mas só com a folha parada
+  useEffect(() => { if (!virando) setBase(atual); }, [virando, atual]);
+  // depois da abertura, as outras páginas montam uma a uma — e nunca no meio de uma virada (o relógio para e volta com a folha parada)
+  const extrasComecaram = useRef(false);
+  useEffect(() => {
+    if (!aberto || extras >= n || virando) return;
+    const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : reduzir ? 300 : CAPA_SAI_MS + 900);
+    return () => clearTimeout(t);
+  }, [aberto, extras, n, reduzir, virando]);
+
   // abrir: a capa vira na lombada e as figurinhas da página de abertura colam uma a uma
   useEffect(() => {
-    if (!aberto) { setAtual(0); setVirando(null); setDetalhe(null); setCapaVisivel(false); setCapaGirada(false); return; }
+    if (!aberto) { setAtual(0); setVirando(null); setDetalhe(null); setCapaVisivel(false); setCapaGirada(false); setExtras(0); return; }
     setAtual(inicial);
+    setBase(inicial);
+    setExtras(0);
+    extrasComecaram.current = false;
     setVirando(null);
-    setAbertura(true);
-    // só as figurinhas NOVAS colam com o pop nas páginas delas; as da página de
-    // abertura colam uma vez, na abertura (ver `colar` abaixo)
-    novasSet.current = new Set(novas);
+    colar.current = new Set(novas);
+    setAbertura(!reduzir);
+    const tAbertura = setTimeout(() => setAbertura(false), 2600 + (reduzir ? 0 : CAPA_REVELA_MS));
     trackEvent("album_abrir", { adesivos: abertos, novas: novas.length, via, pagina: inicial });
-    if (reduzir) return;
+    if (reduzir) return () => clearTimeout(tAbertura);
     setCapaVisivel(true);
     setCapaGirada(false);
     rotCapa.set(0);
@@ -382,7 +564,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     }, CAPA_PARADA_MS);
     // rede de segurança: se o fim da animação não avisar, a capa sai no tempo dela
     const t2 = setTimeout(() => setCapaVisivel(false), CAPA_PARADA_MS + CAPA_GIRO_MS * lento() + 120);
-    return () => { clearTimeout(t1); clearTimeout(t2); a?.stop(); };
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(tAbertura); a?.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
 
@@ -391,14 +573,19 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     if (!aberto) return;
     const anterior = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // as animações da tela de trás (o fogo da capa, a entrada) param: nada pinta por baixo do álbum
+    document.documentElement.setAttribute("data-album-aberto", "");
     const tecla = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (detalhe) setDetalhe(null);
       else onFechar();
     };
     window.addEventListener("keydown", tecla);
-    return () => { document.body.style.overflow = anterior; window.removeEventListener("keydown", tecla); };
+    return () => { document.body.style.overflow = anterior; document.documentElement.removeAttribute("data-album-aberto"); window.removeEventListener("keydown", tecla); };
   }, [aberto, detalhe, onFechar]);
+
+  // o giroscópio (só quando já funciona) move o foil das épicas/lendárias
+  useGiroscopioDoFoil(raiz, aberto && !reduzir);
 
   const chaveDaVirada = useRef(0);
   const terminarVirada = useCallback((chave: number) => setVirando((v) => (v && v.chave === chave ? null : v)), []);
@@ -408,9 +595,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     const dir: 1 | -1 = alvo > de ? 1 : -1;
     chaveDaVirada.current += 1;
     return dir > 0
-      ? { sobre: paginas[de], sobreIndice: de, fundo: paginas[alvo], fundoIndice: alvo, dir, chave: chaveDaVirada.current, alvo, manual }
-      : { sobre: paginas[alvo], sobreIndice: alvo, fundo: paginas[de], fundoIndice: de, dir, chave: chaveDaVirada.current, alvo, manual };
-  }, [paginas]);
+      ? { sobreIndice: de, fundoIndice: alvo, dir, chave: chaveDaVirada.current, alvo, manual }
+      : { sobreIndice: alvo, fundoIndice: de, dir, chave: chaveDaVirada.current, alvo, manual };
+  }, []);
 
   const irPara = useCallback((i: number) => {
     const alvo = Math.max(0, Math.min(n - 1, i));
@@ -424,7 +611,6 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       animacao.current = animate(rot, v.dir > 0 ? -180 : 0, { duration: (DURACAO_VIRADA_MS * lento()) / 1000, ease: EASE_FRENTE, onComplete: () => terminarVirada(v.chave) });
     }
     setAtual(alvo);
-    setAbertura(false);
     trackEvent("album_pagina", { indice: alvo, secao: paginas[alvo]?.id });
   }, [atual, n, paginas, reduzir, montarVirada, rot, terminarVirada]);
 
@@ -435,29 +621,35 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     return () => clearTimeout(t);
   }, [virando]);
 
+  // a folha que gira e a capa: o ângulo escreve direto no DOM
+  useConduzir(raiz, '[data-papel="sobre"]', rot, largura, virando);
+  useConduzir(raiz, '[data-papel="capa"]', rotCapa, largura, capaVisivel);
+
   /* ------------------------------------------------------------ o dedo */
-  const gesto = useRef<{ x0: number; t0: number; ultimoX: number; ultimoT: number; virada: Virada | null; arrastou: boolean } | null>(null);
+  const gesto = useRef<{ x0: number; t0: number; ultimoX: number; ultimoT: number; virada: Virada | null; limiar: number } | null>(null);
   const aoPressionar = (e: React.PointerEvent<HTMLDivElement>) => {
     if (detalhe || capaVisivel || e.pointerType === "mouse" && e.button !== 0) return;
-    gesto.current = { x0: e.clientX, t0: Date.now(), ultimoX: e.clientX, ultimoT: Date.now(), virada: null, arrastou: false };
+    // o dedo numa figurinha com foil pode passear nela (o brilho corre) sem virar a página: o arrasto só começa mais longe
+    const noFoil = !!(e.target as Element | null)?.closest?.("[data-foil-tem]");
+    gesto.current = { x0: e.clientX, t0: Date.now(), ultimoX: e.clientX, ultimoT: Date.now(), virada: null, limiar: noFoil ? ARRASTO_MINIMO_NO_FOIL : ARRASTO_MINIMO };
   };
   const aoMover = (e: React.PointerEvent<HTMLDivElement>) => {
     const g = gesto.current;
     if (!g) return;
     const dx = e.clientX - g.x0;
     if (!g.virada) {
-      if (Math.abs(dx) < ARRASTO_MINIMO) return;
+      if (Math.abs(dx) < g.limiar) return;
       const alvo = dx < 0 ? atual + 1 : atual - 1;
       if (alvo < 0 || alvo >= n) { gesto.current = null; return; }
       if (reduzir) { gesto.current = null; irPara(alvo); return; }
       animacao.current?.stop();
+      // o arrasto assume o dedo: o foil que estava brilhando solta
+      soltarFoils(e.currentTarget);
       // uma folha já animando: o gesto assume o controle dela
       const v = montarVirada(atual, alvo, true);
       g.virada = v;
-      g.arrastou = true;
       rot.set(v.dir > 0 ? 0 : -180);
       setVirando(v);
-      setAbertura(false);
       try { (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); } catch { /* jsdom */ }
     }
     const v = g.virada;
@@ -493,39 +685,46 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     if (virando?.manual) { e.stopPropagation(); e.preventDefault(); }
   };
 
-  // cada figurinha NOVA cola UMA vez: depois que a página dela apareceu, sai da lista (voltar à página não cola de novo)
+  // cada figurinha cola UMA vez: depois que a página dela apareceu, sai da lista (voltar à página não cola de novo)
   useEffect(() => {
     if (!aberto) return;
     const ids = [...paginas[Math.min(atual, n - 1)].vagas, ...paginas[Math.min(atual, n - 1)].proximos].map((b) => b.id);
-    const t = setTimeout(() => { for (const id of ids) novasSet.current.delete(id); }, 2600);
+    const t = setTimeout(() => { for (const id of ids) colar.current.delete(id); }, 2600);
     return () => clearTimeout(t);
   }, [aberto, atual, paginas, n]);
 
   if (!aberto) return null;
   const pagina = paginas[Math.min(atual, n - 1)];
-  // o que cola com o pop nesta página: as novas (sempre) + as da página de abertura (só na abertura)
-  const colar: Set<string> | null = abertura && !reduzir
-    ? new Set([...novasSet.current, ...paginas[inicial].vagas.map((b) => b.id)])
-    : novasSet.current.size ? novasSet.current : null;
-  const abas = [{ id: "mais-raros", rot: "★", rar: "destaque" as const }, ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", rot: TITULO_SECAO[r].slice(0, 3), rar: r })).filter((s) => s.id)];
+  const abas = [
+    { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" as const },
+    ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", icone: CAPITULO[r].icone, nome: CAPITULO[r].aba, rar: r })).filter((s) => s.id),
+  ];
   const ativaAba = (s: { id: string; rar: string }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar);
-  const alturaCapa = Math.round(largura * 1.42);
-  const RAIO = "6px 14px 14px 6px";
-  // o que fica por baixo enquanto a folha gira: pra frente é o destino; pra trás, a que sai. Quando a virada
-  // manual volta atrás (soltou cedo), `atual` não mudou e a folha deita de novo sobre a mesma página.
-  const fundo = virando ? virando.fundo : pagina;
-  const fundoIndice = virando ? virando.fundoIndice : atual;
+  const alturaLivro = Math.round(largura * 1.42);
+  /**
+   * As folhas montadas: as vizinhas da página atual (pré-rasterizadas) e as
+   * duas da virada em curso. Cada uma tem a chave da página: trocar o papel
+   * não remonta nada.
+   */
+  // da mais perto da base pra mais longe, as `extras` já montadas
+  const porDistancia = paginas.map((_, i) => i).filter((i) => Math.abs(i - base) > 1).sort((a, b) => Math.abs(a - base) - Math.abs(b - base) || a - b).slice(0, extras);
+  /**
+   * ORDEM NO DOM = ordem de pintura no WebKit (ele não ordena as folhas pela profundidade, e trocar z-index repinta a camada):
+   * da página de MAIOR índice pra MENOR. A folha que gira é sempre a de menor índice do par (pra frente é a que sai; pra trás,
+   * a que entra) e assim fica por cima da de baixo; as em espera somem pelas faces a 1,2 %. No Chromium a profundidade (translateZ)
+   * decide igual.
+   */
+  const montadas = [...new Set([base - 1, base, base + 1, ...porDistancia, virando?.sobreIndice, virando?.fundoIndice].filter((i): i is number => i !== undefined && i >= 0 && i < n))].sort((a, b) => b - a);
+  const papelDe = (i: number): Papel => (virando ? (i === virando.sobreIndice ? "sobre" : i === virando.fundoIndice ? "fundo" : "espera") : i === atual ? "fundo" : "espera");
 
   return (
-    <motion.div className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
+    <motion.div ref={raiz} className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} data-capa={capa} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
       {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
           câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
           --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
       <div className="shrink-0" style={{ paddingTop: "var(--app-safe-top)" }}>
-      {/* `border-0` nos botões redondos (varredura 27/09): o fundo deles vem do conquistas.css, então a regra
-          global do alvo de toque (index.css, botão só-ícone "sem fundo") os pegava — 8 px de padding em
-          content-box e margem −8 px: o círculo de 40 virava 56 e colava na borda da tela (as setas, 34 → 50).
-          A classe "border" é uma das saídas daquela regra; a borda já é 0 no CSS. */}
+      {/* `border-0` nos botões redondos (varredura 27/09): a regra global do alvo de toque pegava os botões
+          só-ícone "sem fundo" (o fundo deles vem do conquistas.css). */}
       <div className="alb-topo">
         <button type="button" className="alb-redondo border-0" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">
@@ -537,50 +736,51 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       </div>
 
       <div className="alb-mesa">
-        <motion.div className="alb-livro" style={{ width: largura }} initial={reduzir ? false : { y: 26, scale: 0.965 }} animate={{ y: 0, scale: 1 }} transition={{ duration: 0.48, ease: "easeOut" }}>
-          <div className="alb-lombada" />
-          <div className="alb-pilha" />
+        {/* (sem inclinação do livro: ela exigia perspectiva na mesa, que somava com a da cena das folhas) */}
+        <motion.div ref={livro} className="alb-livro" style={{ width: largura, height: alturaLivro }} initial={reduzir ? false : { y: 26, scale: 0.965, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ duration: 0.48, ease: "easeOut" }}>
+          <div className="alb-pilha" aria-hidden><i /><i /><i /><i /></div>
+          <div className="alb-lombada" aria-hidden />
           <div
             className="alb-folha"
             data-folha=""
             data-arrastavel=""
+            style={{ "--w": largura } as CSSProperties}
             onPointerDown={aoPressionar}
             onPointerMove={aoMover}
             onPointerUp={aoSoltar}
             onPointerCancel={aoSoltar}
             onClickCapture={aoClicarCapturando}
           >
-            {/* a página de baixo: pra frente já é a de destino (inteira, desde o 1º quadro); pra trás é a que sai */}
-            <Pagina p={fundo} indice={fundoIndice} total={n} largura={largura} adesivos={adesivos} ativa={!virando} colar={colar} atrasoBase={capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />
-            {virando && <SombraProjetada rot={rot} />}
-            {/* a folha que gira: frente = a página, verso = o papel; some deitada (−180°, fora do livro) — um
-                toque rápido em sequência troca a folha pela nova (chave) sem sobra */}
-            {virando && (
-              <Folha3D
-                key={virando.chave}
-                rot={rot}
-                zIndex={3}
-                raio={RAIO}
-                testid="album-virando"
-                dir={virando.dir}
-                pagina={virando.sobre.id}
-                frente={<Pagina p={virando.sobre} indice={virando.sobreIndice} total={n} largura={largura} adesivos={adesivos} ativa={false} colar={null} atrasoBase={0} diasDeSequencia={diasDeSequencia} onSelecionar={() => undefined} />}
-                verso={<VersoDaPagina ano={ano} />}
-              />
-            )}
+            {/* a sombra que a folha projeta na página de baixo (só existe durante a virada) */}
+            {montadas.map((i) => {
+              const p = paginas[i];
+              const papel = papelDe(i);
+              return (
+                <Fragment key={p.id}>
+                  <Folha
+                    papel={papel}
+                    dir={papel === "sobre" ? virando?.dir : undefined}
+                    pagina={p.id}
+                    testid={papel === "sobre" ? "album-virando" : undefined}
+                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />}
+                    verso={<VersoDaPagina ano={ano} />}
+                  />
+                  {/* a sombra que a folha projeta na página de baixo: logo DEPOIS dela no DOM (por cima dela, por baixo da que gira) */}
+                  {virando && papel === "fundo" && <div className="alb-sombra-projetada" data-sombra-projetada="sobre" aria-hidden />}
+                </Fragment>
+              );
+            })}
             {/* a capa, por cima, girando na lombada ao abrir — sempre NA FRENTE, deita até −180° e sai; a partir do
                 perfil as figurinhas da 1ª página começam a colar */}
             {capaVisivel && (
               <>
-                <SombraProjetada rot={rotCapa} />
-                <div data-testid="album-capa-3d" data-girada={capaGirada ? "" : undefined} style={{ zIndex: 6, position: "absolute", inset: 0, pointerEvents: "none" }}>
-                  <Folha3D
-                    rot={rotCapa}
-                    zIndex={6}
-                    raio={RAIO}
-                    testid="album-capa-folha"
+                <div className="alb-sombra-projetada" data-sombra-projetada="capa" style={{ zIndex: 5 }} aria-hidden />
+                <div data-testid="album-capa-3d" data-girada={capaGirada ? "" : undefined} style={{ zIndex: 6, position: "absolute", inset: 0, pointerEvents: "none", transformStyle: "preserve-3d" }}>
+                  <Folha
+                    papel="capa"
                     dir={1}
-                    frente={<CapaAlbum largura={largura} altura={alturaCapa} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
+                    testid="album-capa-folha"
+                    frente={<CapaAlbum largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} capa={capa} nivel={nivel} style={{ height: "100%" }} />}
                     verso={<VersoDaCapa nome={nome} ano={ano} />}
                   />
                 </div>
@@ -589,7 +789,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           </div>
           <div className="alb-abas" role="tablist" aria-label="Seções do álbum">
             {abas.map((s) => (
-              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-ativa={ativaAba(s) ? "" : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.rar}`}>{s.rot}</button>
+              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-ativa={ativaAba(s) ? "" : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.rar}`} aria-label={s.nome}>
+                <i aria-hidden>{s.icone}</i><span>{s.nome}</span>
+              </button>
             ))}
           </div>
         </motion.div>

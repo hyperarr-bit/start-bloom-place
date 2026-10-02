@@ -53,7 +53,7 @@ async function montarAlbum(d: DadosArtes, passo: () => void): Promise<Camadas | 
   );
   const fundo = await gerarCanvas(<StoriesAlbum {...d} parte="fundo" />, { largura: STORIES.w, altura: STORIES.h });
   passo();
-  const capa = await gerarCanvas(envelope(<CapaAlbumFoto maisRaros={d.maisRaros} adesivos={d.adesivos} total={d.total} nome={d.nome} ano={d.ano} />, "none"), comMargem);
+  const capa = await gerarCanvas(envelope(<CapaAlbumFoto maisRaros={d.maisRaros} adesivos={d.adesivos} total={d.total} nome={d.nome} ano={d.ano} capa={d.capa} nivel={d.nivel} />, "none"), comMargem);
   passo();
   const pagina = await gerarCanvas(envelope(<StoriesAlbum {...d} parte="pagina" />, "0 60px 90px -40px rgba(0,0,0,.45)"), comMargem);
   passo();

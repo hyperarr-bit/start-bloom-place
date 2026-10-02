@@ -22,8 +22,13 @@ export const TITULO_SECAO: Record<Raridade, string> = { lendario: "LENDÁRIOS", 
 export const RARIDADE_FEM: Record<Raridade, string> = { comum: "Comum", raro: "Rara", epico: "Épica", lendario: "Lendária" };
 /** Quantos adesivos a página "OS MAIS RAROS" mostra. */
 export const MAIS_RAROS = 6;
-/** Vagas por página das seções (4 × 3, como a folha). */
-export const VAGAS_POR_PAGINA = 12;
+/**
+ * Vagas por página das seções, no MÁXIMO (4 × 4; 02/10, álbum 3D: "mais
+ * figurinhas por página"). Uma seção que não cabe numa página é dividida em
+ * páginas PARELHAS (21 raros = 11 + 10, não 16 + 5): nenhuma página fica
+ * quase vazia.
+ */
+export const VAGAS_POR_PAGINA = 16;
 /** Com menos que isto colado, a 1ª página mostra os próximos a colar. */
 export const POUCOS = 3;
 export const PROXIMOS_NO_ALBUM = 3;
@@ -81,6 +86,7 @@ export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, str
     const da = adesivos.filter((b) => raridadeDe(b) === r);
     if (!da.length) continue;
     const n = Math.ceil(da.length / VAGAS_POR_PAGINA);
+    const porPagina = Math.ceil(da.length / n);
     const abertosDa = da.filter((b) => b.unlocked).length;
     for (let i = 0; i < n; i++) {
       secoes.push({
@@ -91,7 +97,7 @@ export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, str
         abertos: abertosDa,
         total: da.length,
         parte: n > 1 ? [i + 1, n] : undefined,
-        vagas: da.slice(i * VAGAS_POR_PAGINA, (i + 1) * VAGAS_POR_PAGINA),
+        vagas: da.slice(i * porPagina, (i + 1) * porPagina),
         proximos: [],
       });
     }

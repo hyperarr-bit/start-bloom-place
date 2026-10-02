@@ -370,8 +370,8 @@ export const PaginaFigurinhasFoto = ({ maisRaros, proximos, figurinhas, adesivos
 };
 
 /** A capa do álbum no tamanho da página (a camada que vira no vídeo). */
-export const CapaAlbumFoto = ({ maisRaros, adesivos, total, nome, ano }: Pick<DadosArtes, "maisRaros" | "adesivos" | "total" | "nome" | "ano">) => (
-  <CapaAlbum largura={LIVRO_FOTO.w} altura={LIVRO_FOTO.h} maisRaros={maisRaros} abertos={adesivos} total={total} nome={nome} ano={ano} foto />
+export const CapaAlbumFoto = ({ maisRaros, adesivos, total, nome, ano, capa, nivel }: Pick<DadosArtes, "maisRaros" | "adesivos" | "total" | "nome" | "ano" | "capa" | "nivel">) => (
+  <CapaAlbum largura={LIVRO_FOTO.w} altura={LIVRO_FOTO.h} maisRaros={maisRaros} abertos={adesivos} total={total} nome={nome} ano={ano} capa={capa} nivel={nivel} foto />
 );
 
 /**

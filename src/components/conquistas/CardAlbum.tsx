@@ -2,6 +2,7 @@ import { Instagram } from "lucide-react";
 import type { Badge, Raridade } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { CapaAlbum } from "./CapaAlbum";
+import type { CapaId } from "./CapaPlanner";
 import { resumoRaridades } from "./album-paginas";
 import "./conquistas.css";
 
@@ -23,6 +24,9 @@ interface Props {
   novas: number;
   nome: string;
   ano: number;
+  /** A capa escolhida no planner (a mini-capa herda) e o nível (o metal da gravação). */
+  capa?: CapaId;
+  nivel?: string;
   onAbrir: () => void;
   /**
    * O PACOTINHO (02/10, vídeo do dono no iPhone: "toque pra abrir o pacotinho"
@@ -36,13 +40,13 @@ interface Props {
   onCompartilhar: () => void;
 }
 
-export const CardAlbum = ({ maisRaros, abertos, total, porRaridade, proximo, novas, nome, ano, onAbrir, onAbrirPacotinho, onCompartilhar }: Props) => {
+export const CardAlbum = ({ maisRaros, abertos, total, porRaridade, proximo, novas, nome, ano, capa, nivel, onAbrir, onAbrirPacotinho, onCompartilhar }: Props) => {
   const pct = total > 0 ? Math.round((abertos / total) * 100) : 0;
   return (
     <section className="rounded-2xl border border-border bg-card p-3.5" aria-labelledby="titulo-album" data-testid="album-card" data-novas={novas}>
       <div className="grid gap-x-3.5" style={{ gridTemplateColumns: "104px 1fr" }}>
         <button type="button" onClick={onAbrir} aria-label="Abrir o álbum" className="text-left active:scale-[0.98] transition-transform" style={{ transform: "rotate(-3deg)", transformOrigin: "center" }}>
-          <CapaAlbum largura={104} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} />
+          <CapaAlbum largura={104} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} capa={capa} nivel={nivel} />
         </button>
         <div className="min-w-0">
           <h2 id="titulo-album" className="pin-rot" style={{ color: "hsl(var(--accent))" }}>Álbum de figurinhas</h2>

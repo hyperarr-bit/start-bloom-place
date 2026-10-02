@@ -387,12 +387,14 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     // as abas
     fireEvent.click(within(tela).getByTestId("album-aba-epico"));
     expect(tela).toHaveAttribute("data-atual", "2");
-    expect(within(tela).getByTestId("album-tela-pagina-2")).toHaveTextContent("ÉPICOS · 1/2");
+    // (02/10, álbum 3D) até 16 por página: os 14 épicos cabem numa página só; os 21 raros vão em 11 + 10
+    expect(within(tela).getByTestId("album-tela-pagina-2")).toHaveTextContent("ÉPICOS");
+    expect(within(tela).getByTestId("album-tela-pagina-2")).toHaveTextContent("Épicas");
     expect(eventos).toContainEqual(["album_pagina", { indice: 2, secao: "epico-1" }]);
     fireEvent.click(within(tela).getByTestId("album-tela-proxima"));
-    expect(within(tela).getByTestId("album-tela-pagina-3")).toHaveTextContent("ÉPICOS · 2/2");
+    expect(within(tela).getByTestId("album-tela-pagina-3")).toHaveTextContent("RAROS · 1/2");
     fireEvent.click(within(tela).getByTestId("album-aba-raro"));
-    const raros = within(tela).getByTestId("album-tela-pagina-4");
+    const raros = within(tela).getByTestId("album-tela-pagina-3");
     expect(raros).toHaveTextContent("RAROS · 1/2");
     expect(raros).toHaveTextContent("2 de 21 · faltam 19");
     fireEvent.click(raros.querySelector('[data-vaga="sequencia-7"]')!);

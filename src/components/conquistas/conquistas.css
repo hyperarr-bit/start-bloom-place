@@ -292,111 +292,204 @@
 .dica-abrir { height: 38px; padding: 0 16px; border-radius: 999px; border: 0; background: #2b2b2f; color: #fff; font-weight: 800; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
 .dica-entendi { height: 38px; padding: 0 8px; border: 0; background: none; color: #6f665a; font-weight: 700; font-size: 12px; }
 
-/* ============================== ÁLBUM DE FIGURINHAS (card + tela cheia) ============================== */
+/* ============================== A CAPA DO ÁLBUM (02/10: herda a capa premium do planner) ============================== */
+/* um OBJETO: cor fixa, igual no claro e no escuro; tudo escala com --k (largura ÷ 200) */
 .alb-capa { position: relative; --k: 1; font-family: Inter, -apple-system, sans-serif; color: #2b2b2f; flex-shrink: 0; }
-.alb-capa-face { position: absolute; inset: 0; border-radius: calc(6px * var(--k)) calc(14px * var(--k)) calc(14px * var(--k)) calc(6px * var(--k)); overflow: hidden; background: #fbf3e2; background-image: radial-gradient(circle, rgba(60,50,40,.13) calc(1px * var(--k)), transparent calc(1.3px * var(--k))); background-size: calc(12px * var(--k)) calc(12px * var(--k)); box-shadow: 0 calc(14px * var(--k)) calc(28px * var(--k)) calc(-12px * var(--k)) rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.06); }
-.alb-capa-lombada { position: absolute; left: 0; top: calc(2px * var(--k)); bottom: calc(2px * var(--k)); width: calc(9px * var(--k)); border-radius: calc(4px * var(--k)) 0 0 calc(4px * var(--k)); background: linear-gradient(90deg, #7a1547, #a81f62 60%, #8d1a52); z-index: 2; box-shadow: inset -1px 0 0 rgba(0,0,0,.25); }
-.alb-capa-faixa { position: absolute; left: 0; right: 0; top: 0; height: calc(34px * var(--k)); background: linear-gradient(90deg, #a81f62, #d22d80 55%, #a81f62); color: #fff; display: flex; flex-direction: column; justify-content: center; padding-left: calc(20px * var(--k)); }
-.alb-capa-faixa span { font-size: calc(6.5px * var(--k)); font-weight: 800; letter-spacing: .22em; opacity: .9; line-height: 1.2; }
-.alb-capa-faixa b { font-size: calc(11px * var(--k)); font-weight: 900; letter-spacing: .08em; line-height: 1.2; }
-.alb-capa-titulo { position: absolute; left: calc(20px * var(--k)); top: calc(44px * var(--k)); font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(21px * var(--k)); line-height: 1.02; color: #2b2b2f; }
-.alb-capa-arte { position: absolute; left: calc(12px * var(--k)); right: calc(8px * var(--k)); top: calc(96px * var(--k)); height: calc(120px * var(--k)); }
-.alb-capa-heroi { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 3; filter: drop-shadow(0 calc(6px * var(--k)) calc(8px * var(--k)) rgba(0,0,0,.25)); }
-.alb-capa-heroi[data-vazio] { width: calc(92px * var(--k)); height: calc(92px * var(--k)); border: calc(2px * var(--k)) dashed #c9c1b2; border-radius: 50%; display: grid; place-items: center; font-size: calc(36px * var(--k)); color: #c9c1b2; font-weight: 900; }
-.alb-capa-mini { position: absolute; z-index: 2; opacity: .95; }
-.alb-capa-rodape { position: absolute; left: calc(20px * var(--k)); right: calc(12px * var(--k)); bottom: calc(12px * var(--k)); display: flex; align-items: baseline; justify-content: space-between; font-size: calc(9px * var(--k)); color: #6f665a; font-weight: 600; }
-.alb-capa-rodape b { font-size: calc(16px * var(--k)); color: #2b2b2f; font-weight: 900; }
-.alb-capa-dono { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(11px * var(--k)); }
-.alb-capa-brilho { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 60%); pointer-events: none; }
+.alb-capa-face { position: absolute; inset: 0; border-radius: calc(6px * var(--k)) calc(14px * var(--k)) calc(14px * var(--k)) calc(6px * var(--k)); overflow: hidden; }
+.alb-capa-costura { position: absolute; left: calc(14px * var(--k)); top: calc(8px * var(--k)); right: calc(8px * var(--k)); bottom: calc(8px * var(--k)); border: 1.4px dashed; border-radius: calc(3px * var(--k)) calc(10px * var(--k)) calc(10px * var(--k)) calc(3px * var(--k)); pointer-events: none; }
+.alb-capa-dobra { position: absolute; left: 0; top: 0; bottom: 0; width: calc(9px * var(--k)); background: linear-gradient(90deg, rgba(0,0,0,.42), rgba(0,0,0,.18) 55%, rgba(255,255,255,.08) 85%, rgba(0,0,0,.14)); pointer-events: none; }
+.alb-capa-topo { position: absolute; left: calc(22px * var(--k)); top: calc(16px * var(--k)); line-height: 0; }
+.alb-capa-titulo { position: absolute; left: calc(22px * var(--k)); top: calc(34px * var(--k)); line-height: 0; display: flex; flex-direction: column; gap: 0; }
+.alb-capa-janela { position: absolute; left: 50%; top: calc(116px * var(--k)); width: calc(118px * var(--k)); height: calc(118px * var(--k)); margin-left: calc(-54px * var(--k)); border-radius: 50%; display: grid; place-items: center; }
+.alb-capa-heroi { display: inline-block; line-height: 0; filter: drop-shadow(0 calc(4px * var(--k)) calc(6px * var(--k)) rgba(0,0,0,.35)); }
+.alb-capa-heroi[data-vazio] { width: calc(78px * var(--k)); height: calc(78px * var(--k)); border: calc(2px * var(--k)) dashed rgba(255,255,255,.35); border-radius: 50%; display: grid; place-items: center; font-size: calc(34px * var(--k)); color: rgba(255,255,255,.4); font-weight: 900; line-height: 1; }
+.alb-capa-mini { position: absolute; line-height: 0; }
+.alb-capa-mini[data-pos="0"] { right: calc(22px * var(--k)); top: calc(104px * var(--k)); }
+.alb-capa-mini[data-pos="1"] { left: calc(26px * var(--k)); top: calc(196px * var(--k)); }
+.alb-capa-etiqueta { position: absolute; left: calc(22px * var(--k)); bottom: calc(16px * var(--k)); padding: calc(5px * var(--k)) calc(9px * var(--k)) calc(5px * var(--k)); border-radius: calc(3px * var(--k)); transform: rotate(-1.5deg); display: flex; flex-direction: column; gap: calc(1px * var(--k)); font-size: calc(8px * var(--k)); color: #6f665a; font-weight: 600; line-height: 1.2; min-width: calc(74px * var(--k)); }
+.alb-capa-etiqueta > i { position: absolute; inset: calc(2.5px * var(--k)); border: 1px solid; border-radius: calc(2px * var(--k)); pointer-events: none; }
+.alb-capa-etiqueta b { font-size: calc(15px * var(--k)); color: #2b2b2f; font-weight: 900; line-height: 1; }
+.alb-capa-dono { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: calc(10px * var(--k)); color: #2b2b2f; }
+.alb-capa-core { position: absolute; right: calc(16px * var(--k)); bottom: calc(14px * var(--k)); line-height: 0; }
 
 .alb-card-barra { flex: 1; height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .alb-card-barra > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a81f62, #e0438f); }
 .alb-pacote { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 10px 6px 6px; border-radius: 12px; border: 1px dashed #e0438f; background: linear-gradient(90deg, rgba(210,45,128,.08), rgba(255,211,110,.12)); text-align: left; width: 100%; }
 .alb-pacote-fig { width: 28px; height: 36px; border-radius: 4px; background: repeating-linear-gradient(135deg, #e0438f 0 4px, #ffd36e 4px 8px, #6ec8ff 8px 12px, #b98bff 12px 16px); box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), 0 2px 4px rgba(0,0,0,.2); transform: rotate(-8deg); flex-shrink: 0; }
 
-/* a tela cheia: mesa escura (objeto: igual nos dois temas) */
-.alb-tela { position: fixed; inset: 0; z-index: 290; display: flex; flex-direction: column; background: #221d1f; color: #fff; font-family: Inter, -apple-system, sans-serif; }
+/* ============================== O ÁLBUM 3D EM TELA CHEIA (02/10) ============================== */
+.alb-tela { position: fixed; inset: 0; z-index: 290; display: flex; flex-direction: column; background: #221d1f; background-image: radial-gradient(120% 70% at 50% 38%, #352b2e 0%, #221d1f 60%, #171314 100%); color: #fff; font-family: Inter, -apple-system, sans-serif; }
 .alb-topo { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px; flex-shrink: 0; }
 .alb-redondo { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
-.alb-mesa { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 6px 16px; perspective: 1400px; overflow-y: auto; }
-.alb-livro { position: relative; background: #fbf6ea; border-radius: 6px 14px 14px 6px; box-shadow: 0 30px 50px -22px rgba(0,0,0,.8), inset 0 0 0 1px rgba(0,0,0,.06); color: #2b2b2f; transform-style: preserve-3d; }
-.alb-lombada { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; border-radius: 6px 0 0 6px; background: linear-gradient(90deg, #7a1547, #a81f62 60%, #8d1a52); z-index: 4; }
-.alb-pilha { position: absolute; right: -6px; top: 6px; bottom: -4px; width: 8px; background: repeating-linear-gradient(180deg, #f2ead8 0 2px, #d9d0bc 2px 3px); border-radius: 0 8px 8px 0; z-index: 0; box-shadow: 2px 3px 6px rgba(0,0,0,.25); }
-.alb-folha { position: relative; z-index: 2; background: #fbf6ea; border-radius: 6px 14px 14px 6px; background-image: radial-gradient(circle, rgba(60,50,40,.12) 1.2px, transparent 1.5px); background-size: 20px 20px; overflow: hidden; transform-style: preserve-3d; }
-/* cada página é um contexto de empilhamento (02/10): a pílula do progresso (z 4) de uma página não vaza por cima da folha que está virando */
-.alb-pag { padding: 12px 12px 18px 22px; min-height: 470px; position: relative; isolation: isolate; }
-/* A VIRADA 2.5D (02/10 à noite): a folha tem duas faces e gira na lombada com perspectiva; o dedo arrasta.
-   Só transform/opacity; `overflow: hidden` fica no .alb-folha (a folha deitada a −180° cai fora do livro e some). */
-/* a folha NÃO é recortada pelo livro: passada a lombada ela deita por cima da mesa (o verso aparece, com a sombra) e só então some */
-.alb-folha[data-arrastavel] { perspective: 1100px; perspective-origin: 50% 50%; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; overflow: visible; }
-.alb-folha[data-arrastavel] > .alb-pag { border-radius: 6px 14px 14px 6px; overflow: hidden; }
-.alb-folha[data-arrastavel]:active { cursor: grabbing; }
-.alb-folha-3d { position: absolute; inset: 0; transform-origin: 0 50%; transform-style: preserve-3d; will-change: transform; pointer-events: none; }
-.alb-face { position: absolute; inset: 0; overflow: hidden; isolation: isolate; background: #fbf6ea; background-image: radial-gradient(circle, rgba(60,50,40,.12) 1.2px, transparent 1.5px); background-size: 20px 20px; }
+/* a MESA (sem perspectiva própria: uma perspectiva aqui SOMAVA com a da cena das folhas e esticava a folha que gira) */
+.alb-mesa { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px 16px 6px; overflow-y: auto; }
+/* o LIVRO: um objeto com volume — a pilha de páginas na lateral e embaixo, a lombada, a sombra na mesa */
+.alb-livro { position: relative; border-radius: 6px 14px 14px 6px; color: #2b2b2f; transform-origin: 50% 60%; }
+/* a sombra do livro na mesa: num elemento PARADO (um filter no livro refaria a sombra a cada quadro da virada) */
+.alb-pilha::before { content: ""; position: absolute; left: 6px; right: -8px; top: 10px; bottom: -8px; border-radius: 10px 18px 18px 10px; box-shadow: 0 30px 34px rgba(0,0,0,.6), 0 8px 12px rgba(0,0,0,.35); }
+.alb-pilha { position: absolute; inset: 0; pointer-events: none; }
+.alb-pilha > i { position: absolute; left: 4px; top: 3px; right: -3px; bottom: -3px; border-radius: 6px 14px 14px 6px; background: #efe6d2; box-shadow: inset 0 0 0 1px rgba(90,70,40,.18); }
+.alb-pilha > i:nth-child(2) { right: -6px; bottom: -6px; top: 6px; background: #e6dcc6; }
+.alb-pilha > i:nth-child(3) { right: -9px; bottom: -9px; top: 9px; background: #dcd1b9; }
+.alb-pilha > i:nth-child(4) { right: -11px; bottom: -11px; top: 11px; background: #cfc3aa; box-shadow: inset 0 0 0 1px rgba(90,70,40,.22), 0 2px 0 rgba(0,0,0,.08); }
+.alb-lombada { position: absolute; left: -7px; top: -2px; bottom: 1px; width: 16px; border-radius: 7px 2px 2px 7px; background: linear-gradient(90deg, #5e0f36 0%, #8d1a52 30%, #c0286f 55%, #8d1a52 80%, #6a1240 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -1px 0 rgba(0,0,0,.3), 2px 0 3px rgba(0,0,0,.25); z-index: 4; }
+.alb-lombada::after { content: ""; position: absolute; left: 3px; right: 3px; top: 16px; bottom: 16px; border-left: 1px solid rgba(255,255,255,.14); border-right: 1px solid rgba(0,0,0,.18); }
+/* a FOLHA (o bloco das páginas): a CENA 3D (perspectiva + preserve-3d) onde as folhas (.alb-sheet) empilham — ordenadas por
+   PROFUNDIDADE (translateZ), que o compositor resolve sem repintar; z-index trocado numa camada composta repinta a camada no WebKit */
+.alb-folha { position: absolute; inset: 0; z-index: 2; border-radius: 6px 14px 14px 6px; perspective: 1100px; perspective-origin: 50% 50%; transform-style: preserve-3d; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.alb-folha:active { cursor: grabbing; }
+/* CADA FOLHA é uma camada própria (will-change) enquanto o álbum está aberto: rasterizada uma vez, virar é só transform.
+   Papel: fundo (parada, visível) · sobre (gira, por cima) · espera (pré-montada, invisível, pronta) · capa */
+/* NUNCA opacidade na folha (nem em will-change): opacidade < 1 obriga o preserve-3d a virar flat, e as faces são achatadas numa camada
+   nova = re-raster da página. A folha em espera fica ESCONDIDA pela ordem: em pé (0°) por baixo da página de cima, ou deitada (−180°)
+   com as duas faces apagadas. */
+.alb-sheet { position: absolute; inset: 0; transform-origin: 0 50%; transform-style: preserve-3d; will-change: transform; border-radius: 6px 14px 14px 6px; }
+.alb-sheet[data-papel="fundo"] { transform: rotateY(0deg); }
+/* "espera" fica QUASE invisível (0,01) e não 0: com opacity 0 o compositor não rasteriza a camada, e o 1º quadro da virada pagava a pintura inteira */
+/* (sem pointer-events por papel: é herdado, e trocá-lo recalculava a página inteira no 1º quadro; a vaga checa o papel no clique) */
+.alb-sheet[data-papel="espera"] { transform: rotateY(0deg) translateZ(-2px); }
+/* em espera as duas faces ficam a 1,2 % (o WebKit pinta as folhas na ordem do DOM: sem isto a última montada cobriria a página de baixo) */
+.alb-sheet[data-papel="espera"] .alb-face { opacity: .012; }
+/* os <text> das figurinhas ("21", "$", "365"): sem geometricPrecision o Blink refaz a métrica do texto a cada mudança de escala na tela
+   (a folha girando) e invalida a pintura da página inteira a cada quadro */
+.alb-sheet svg text, .alb-capa svg text { text-rendering: geometricPrecision; }
+.alb-sheet[data-papel="sobre"] { transform: rotateY(0deg) translateZ(1px); }
+.alb-sheet[data-papel="capa"] { transform: rotateY(0deg) translateZ(3px); }
+.alb-face { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; isolation: isolate; background: #fbf6ea; will-change: transform; }
 .alb-face-frente { transform: translateZ(.5px); }
-.alb-face-verso { transform: rotateY(180deg) translateZ(.5px); background-color: #f6efdd; }
-/* o sombreamento da frente conforme deita, a luz do verso ao nascer, o brilho da dobra que corre pela folha */
-.alb-face-sombra { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: linear-gradient(90deg, rgba(40,30,20,.75), rgba(40,30,20,.35) 45%, rgba(40,30,20,.12)); }
-.alb-face-luz { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: linear-gradient(270deg, rgba(255,255,255,.7), rgba(255,255,255,.25) 40%, rgba(0,0,0,.08)); }
-.alb-face-dobra { position: absolute; top: 0; bottom: 0; width: 42%; z-index: 6; pointer-events: none; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.55) 45%, rgba(255,255,255,0)); }
-/* a sombra que a folha projeta na página de baixo (escala com o seno do ângulo, a partir da lombada) */
-.alb-sombra-projetada { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(30,20,10,.75), rgba(30,20,10,.35) 38%, rgba(30,20,10,.12) 70%, rgba(30,20,10,0)); }
+/* em repouso o verso fica "escondido" a 1,2 % (não 0: ver pintarFolha) — o WebKit não ordena as faces pela profundidade: pintaria o verso
+   por cima da frente (a "página em branco" do iPhone) */
+.alb-face-verso { transform: rotateY(180deg) translateZ(.5px); background-color: #f4ecd9; opacity: .012; pointer-events: none; }
+/* as camadas da luz: TIRAS de 4 px com o degradê horizontal, esticadas pelo compositor (scaleX = largura ÷ 4, via --w na folha) e
+   PROMOVIDAS sempre — raster minúsculo, e mudar opacidade/posição delas não repinta a página por baixo */
+/* (filhas da FOLHA, irmãs das faces, a 0,6 px de profundidade — na frente da face da frente; a luz é virada pro verso) */
+.alb-face-sombra, .alb-face-luz, .alb-face-dobra { position: absolute; top: 0; bottom: 0; left: 0; width: 4px; pointer-events: none; opacity: 0; transform-origin: 0 0; will-change: transform, opacity; border-radius: inherit; }
+.alb-face-sombra { transform: translateZ(.6px) scaleX(calc(var(--w, 330) / 4)); background: linear-gradient(90deg, rgba(40,30,20,.78), rgba(40,30,20,.38) 45%, rgba(40,30,20,.12)); }
+.alb-face-luz { transform: translateX(calc(var(--w, 330) * 1px)) rotateY(180deg) translateZ(.6px) scaleX(calc(var(--w, 330) / 4)); background: linear-gradient(270deg, rgba(255,255,255,.7), rgba(255,255,255,.25) 40%, rgba(0,0,0,.08)); }
+/* a dobra: a tira vira uma faixa de 42 % da folha (scaleX) que corre da borda externa até a lombada (translateX, no quadro) */
+.alb-face-dobra { transform: translateZ(.6px) scaleX(calc(var(--w, 330) * 0.105)); background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.6) 45%, rgba(255,255,255,0)); }
+/* a sombra que a folha projeta na página de baixo (tira escalada pelo seno do ângulo, a partir da lombada) */
+.alb-sombra-projetada { position: absolute; top: 0; bottom: 0; left: 0; width: 4px; pointer-events: none; opacity: 0; transform-origin: 0 50%; transform: translateZ(.3px); will-change: transform, opacity; background: linear-gradient(90deg, rgba(30,20,10,.75), rgba(30,20,10,.35) 38%, rgba(30,20,10,.12) 70%, rgba(30,20,10,0)); }
 /* o verso de uma página: só o papel e um carimbo discreto; o verso da capa diz de quem é o álbum */
-.alb-verso { position: absolute; inset: 0; display: grid; place-items: center; }
+.alb-verso { position: absolute; inset: 0; display: grid; place-items: center; background-image: repeating-linear-gradient(0deg, rgba(120,100,70,.035) 0 1px, transparent 1px 3px); }
 .alb-verso-carimbo { font-size: 9px; font-weight: 900; letter-spacing: .22em; color: rgba(120,100,70,.35); transform: rotate(-90deg); }
 .alb-verso-capa { background: linear-gradient(90deg, rgba(0,0,0,.08), rgba(0,0,0,0) 14%); }
 .alb-verso-dono { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 22px; border: 1.5px solid rgba(120,100,70,.35); border-radius: 10px; color: #6f665a; text-align: center; }
 .alb-verso-dono span { font-size: 9.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .alb-verso-dono b { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: 26px; color: #2b2b2f; line-height: 1.05; }
 .alb-verso-dono i { font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .2em; color: #a39a8a; }
-@media (prefers-reduced-motion: reduce) { .alb-folha-3d { transition: none !important; } }
-.alb-secao { display: flex; align-items: center; justify-content: space-between; height: 30px; padding: 0 10px 0 12px; border-radius: 8px; font-size: 10.5px; font-weight: 900; letter-spacing: .14em; color: #fff; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,.15); }
-.alb-secao b { font-size: 10px; font-weight: 800; letter-spacing: .02em; opacity: .9; font-variant-numeric: tabular-nums; }
-.alb-secao[data-rar="destaque"] { background: linear-gradient(90deg, #a81f62, #d22d80 60%, #a81f62); }
-.alb-secao[data-rar="lendario"] { background: linear-gradient(90deg, #8f6a0c, #e9c65a 35%, #fff1b0 50%, #d4a629 70%, #8f6a0c); color: #4a3305; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
-.alb-secao[data-rar="epico"] { background: linear-gradient(90deg, #ff7ad9, #ffd36e, #7dffb3, #6ec8ff, #b98bff); color: #2b2b2f; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
-.alb-secao[data-rar="raro"] { background: linear-gradient(90deg, #1d4ed8, #3b82f6 60%, #1d4ed8); }
-.alb-secao[data-rar="comum"] { background: linear-gradient(90deg, #57534e, #78716c 60%, #57534e); }
-.alb-grade { display: grid; justify-items: center; }
-.alb-subsecao { margin: 14px 0 8px; font-size: 9px; font-weight: 900; letter-spacing: .18em; color: #a39a8a; display: flex; align-items: center; gap: 8px; }
+
+/* ---------- a PÁGINA: papel com fibra, margem interna, o capítulo ---------- */
+.alb-pag { position: relative; height: 100%; padding: 12px 12px 10px 24px; display: flex; flex-direction: column; overflow: hidden; isolation: isolate; color: #2b2b2f;
+  background-color: #fbf6ea; background-image: linear-gradient(90deg, rgba(90,70,40,.10), rgba(90,70,40,0) 14px), repeating-linear-gradient(0deg, rgba(120,100,70,.04) 0 1px, transparent 1px 4px), repeating-linear-gradient(90deg, rgba(120,100,70,.025) 0 1px, transparent 1px 5px); }
+.alb-pag::before { content: ""; position: absolute; left: 17px; top: 0; bottom: 0; width: 1px; background: rgba(210,45,128,.22); }
+/* a marca-d'água: a figurinha emblemática do capítulo, bem clara, atrás de tudo */
+.alb-marca { position: absolute; right: -8%; bottom: 2%; z-index: 0; line-height: 0; opacity: .07; filter: saturate(0) contrast(.8); transform: rotate(-12deg); pointer-events: none; }
+.alb-cap { position: relative; z-index: 1; margin-bottom: 8px; }
+.alb-cap-linha { display: flex; align-items: center; gap: 8px; font-size: 7.5px; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; color: #a08a4a; }
+.alb-cap-linha > i { flex: 1; height: 1px; background: linear-gradient(90deg, currentColor, rgba(160,138,74,0)); opacity: .7; }
+.alb-pag[data-rar="destaque"] .alb-cap-linha { color: #b4245f; }
+.alb-pag[data-rar="epico"] .alb-cap-linha { color: #7c3aed; }
+.alb-pag[data-rar="epico"] .alb-cap-linha > i { background: linear-gradient(90deg, #ff7ad9, #ffd36e, #7dffb3, #6ec8ff, #b98bff, rgba(185,139,255,0)); height: 1.5px; opacity: .9; }
+.alb-pag[data-rar="raro"] .alb-cap-linha { color: #1d4ed8; }
+.alb-pag[data-rar="comum"] .alb-cap-linha { color: #6f665a; }
+.alb-cap-titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.alb-cap-titulo h3 { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: -.01em; color: #2b2b2f; margin: 0; }
+.alb-cap-titulo b { font-size: 10px; font-weight: 800; color: #6f665a; white-space: nowrap; }
+.alb-cap-frase { margin: 3px 0 0; font-size: 9.5px; color: #8c8272; line-height: 1.25; }
+.alb-grade { position: relative; z-index: 1; display: grid; justify-content: space-between; }
+.alb-subsecao { position: relative; z-index: 1; margin: 10px 0 6px; font-size: 8px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: #a39a8a; display: flex; align-items: center; gap: 8px; }
 .alb-subsecao::after { content: ""; flex: 1; height: 1px; background: #e2d9c6; }
-.alb-dica { font-size: 11px; color: #6f665a; line-height: 1.35; margin: 12px 0 0; }
+.alb-dica { position: relative; z-index: 1; font-size: 10.5px; color: #6f665a; line-height: 1.35; margin: 10px 0 0; }
 .alb-dica mark { background: #fef3c7; color: #7c5a0a; padding: 0 3px; border-radius: 3px; }
-.alb-pag-num { position: absolute; right: 14px; bottom: 6px; font-size: 9.5px; font-weight: 700; color: #a39a8a; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
-.alb-abas { position: absolute; right: -14px; top: 54px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
-.alb-aba { width: 20px; height: 44px; border: 0; border-radius: 0 7px 7px 0; font-size: 8px; font-weight: 900; letter-spacing: .04em; writing-mode: vertical-rl; text-orientation: mixed; color: #fff; box-shadow: 2px 2px 4px rgba(0,0,0,.25); opacity: .85; padding: 0; }
-.alb-aba[data-ativa] { opacity: 1; width: 24px; }
-.alb-aba[data-rar="destaque"] { background: #d22d80; height: 34px; font-size: 11px; }
-.alb-aba[data-rar="lendario"] { background: linear-gradient(180deg, #e9c65a, #b8860b); color: #4a3305; }
-.alb-aba[data-rar="epico"] { background: linear-gradient(180deg, #b98bff, #6ec8ff); color: #2b2b2f; }
-.alb-aba[data-rar="raro"] { background: #3b82f6; }
-.alb-aba[data-rar="comum"] { background: #78716c; }
+.alb-pe { position: relative; z-index: 1; margin-top: auto; padding-top: 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #6f665a; line-height: 1.3; }
+.alb-pe-perto { min-width: 0; }
+.alb-pe-perto b { color: #2b2b2f; }
+.alb-pag-num { font-size: 9px; font-weight: 700; color: #a39a8a; letter-spacing: .08em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- as ABAS na borda: ícone + nome ---------- */
+.alb-abas { position: absolute; right: -22px; top: 40px; display: flex; flex-direction: column; gap: 5px; z-index: 3; }
+.alb-aba { width: 24px; padding: 7px 0 8px; border: 0; border-radius: 0 7px 7px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #fff; box-shadow: 2px 2px 4px rgba(0,0,0,.28), inset 1px 0 0 rgba(0,0,0,.12); opacity: .86; transform-origin: 0 50%; transition: transform .15s, opacity .15s; will-change: transform, opacity; }
+.alb-aba > i { font-style: normal; font-size: 10px; line-height: 1; }
+.alb-aba > span { writing-mode: vertical-rl; text-orientation: mixed; font-size: 7.5px; font-weight: 900; letter-spacing: .08em; line-height: 1; }
+.alb-aba[data-ativa] { opacity: 1; transform: translateX(3px); }
+.alb-aba[data-rar="destaque"] { background: linear-gradient(180deg, #e0438f, #b4245f); }
+.alb-aba[data-rar="lendario"] { background: linear-gradient(180deg, #f1d070, #b8860b); color: #4a3305; }
+.alb-aba[data-rar="epico"] { background: linear-gradient(180deg, #c4a6ff, #6ec8ff); color: #2b2b2f; }
+.alb-aba[data-rar="raro"] { background: linear-gradient(180deg, #4f8ff7, #1d4ed8); }
+.alb-aba[data-rar="comum"] { background: linear-gradient(180deg, #8a8580, #57534e); }
 .alb-nav2 { display: flex; align-items: center; gap: 10px; }
 .alb-seta { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; }
 .alb-seta:disabled { opacity: .25; }
 .alb-dots2 { display: flex; gap: 5px; }
-.alb-dots2 > i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.28); transition: transform .2s, background .2s; }
+.alb-dots2 > i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.28); transition: transform .2s; will-change: transform; }
 .alb-dots2 > i[data-ativo] { background: #fff; transform: scale(1.35); }
 .alb-dots2 > i[data-rar="lendario"][data-ativo] { background: #e9c65a; }
 .alb-dots2 > i[data-rar="epico"][data-ativo] { background: #b98bff; }
 .alb-dots2 > i[data-rar="raro"][data-ativo] { background: #3b82f6; }
 .alb-rodape2 { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); flex-shrink: 0; }
 .alb-rodape2-linha { display: flex; justify-content: space-between; font-size: 10.5px; color: rgba(255,255,255,.6); margin-top: 8px; font-weight: 600; }
-/* a VAGA numerada */
-.vaga { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; border: 0; background: none; min-width: 0; }
-.vaga-caixa { position: relative; display: grid; place-items: center; border-radius: 10px; }
-.vaga[data-aberta="false"] .vaga-caixa { border: 1.5px dashed #c8bfad; background: rgba(255,255,255,.35); }
-.vaga[data-aberta="true"] .vaga-caixa { border: 1.5px solid transparent; }
-.vaga-n { position: absolute; left: 4px; top: 3px; font-size: 7.5px; font-weight: 800; letter-spacing: .06em; color: #a39a8a; z-index: 1; font-variant-numeric: tabular-nums; }
-.vaga[data-aberta="true"] .vaga-n { color: #c8bfad; }
-.vaga-fig { position: relative; z-index: 2; }
-.vaga-fig[data-cola] { animation: fig-cola .5s cubic-bezier(.34, 1.5, .64, 1) both; animation-delay: var(--d, 0ms); }
-@keyframes fig-cola { from { transform: scale(.35) rotate(-22deg); opacity: 0; } 45% { opacity: 1; } to { transform: none; opacity: 1; } }
-.vaga-pill { position: absolute; right: 2px; bottom: 2px; z-index: 4; height: 17px; padding: 0 6px; border-radius: 999px; background: #2b2b2f; color: #fff; font-size: 9.5px; font-weight: 800; display: inline-flex; align-items: center; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-variant-numeric: tabular-nums; line-height: 1; }
-.vaga-nome { font-size: 9.5px; font-weight: 800; line-height: 1.1; text-align: center; color: #2b2b2f; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.vaga-nome[data-falta] { color: #a39a8a; font-weight: 700; }
-/* a figurinha trancada na página clara do álbum: silhueta (a regra do tema escuro não vale — o papel é sempre claro) */
-.alb-folha .ad-rar[data-trancado] > svg, .alb-capa .ad-rar[data-trancado] > svg { filter: saturate(0) brightness(.5) contrast(.55); opacity: .28; }
+
+/* ---------- a VAGA: moldura de papel com o número grande ---------- */
+.vaga { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; border: 0; background: none; min-width: 0; -webkit-tap-highlight-color: transparent; }
+.vaga-caixa { position: relative; display: grid; place-items: center; border-radius: 9px; }
+.vaga[data-aberta="false"] .vaga-caixa { background: rgba(255,255,255,.42); box-shadow: inset 0 0 0 1px rgba(120,100,70,.28), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(120,100,70,.14), inset 0 2px 4px rgba(60,40,10,.10); }
+.vaga[data-aberta="false"][data-rar="lendario"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(184,134,11,.45), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(184,134,11,.22), inset 0 2px 4px rgba(60,40,10,.10); background: rgba(255,250,230,.6); }
+.vaga[data-aberta="false"][data-rar="epico"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(124,58,237,.35), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(124,58,237,.16), inset 0 2px 4px rgba(60,40,10,.10); background: rgba(250,246,255,.6); }
+.vaga[data-aberta="false"][data-rar="raro"] .vaga-caixa { box-shadow: inset 0 0 0 1px rgba(29,78,216,.32), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(29,78,216,.14), inset 0 2px 4px rgba(60,40,10,.10); }
+.vaga-n { position: absolute; right: 4px; top: 3px; z-index: 1; font-size: 9px; font-weight: 900; letter-spacing: .02em; color: #8c8272; font-variant-numeric: tabular-nums; line-height: 1; }
+.vaga-n small { font-size: 6px; font-weight: 800; letter-spacing: .08em; vertical-align: top; margin-right: 1px; }
+.vaga[data-aberta="true"] .vaga-n { color: rgba(140,130,114,.55); }
+.vaga-fig { position: relative; z-index: 2; line-height: 0; }
+.vaga-nome { font-size: 8.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; text-align: center; color: #2b2b2f; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vaga-nome[data-falta] { color: #8c8272; }
+/* a barrinha fina de progresso (sai a pílula preta) — cresce por transform, nunca por width */
+.vaga-barra { display: block; width: 72%; height: 3px; border-radius: 999px; background: rgba(120,100,70,.16); overflow: hidden; margin-top: 1px; }
+.vaga-barra > i { display: block; height: 100%; width: 100%; border-radius: 999px; transform-origin: 0 50%; background: #d4a629; }
+.vaga[data-rar="epico"] .vaga-barra > i { background: linear-gradient(90deg, #b98bff, #6ec8ff); }
+.vaga[data-rar="raro"] .vaga-barra > i { background: #3b82f6; }
+.vaga[data-rar="comum"] .vaga-barra > i { background: #8c8272; }
+
+/* ---------- a FIGURINHA: relevo, aro, foil, peel ---------- */
+.fig { position: relative; display: inline-block; line-height: 0; isolation: isolate; transform: rotate(var(--giro, 0deg)); filter: drop-shadow(0 1px 1px rgba(0,0,0,.24)) drop-shadow(0 5px 6px rgba(0,0,0,.16)); }
+/* (pointer-events: none nos SVGs: o toque cai na caixa da vaga; sem isto o WebKit testa a geometria de 16 desenhos filtrados a cada
+   movimento do dedo durante o arrasto) */
+.fig > svg { position: relative; z-index: 1; display: block; overflow: visible; pointer-events: none; }
+.fig-vazia > svg, .alb-marca svg { pointer-events: none; }
+.fig[data-rar="raro"] > svg:first-of-type { filter: drop-shadow(1.5px 0 0 #3b82f6) drop-shadow(-1.5px 0 0 #3b82f6) drop-shadow(0 1.5px 0 #3b82f6) drop-shadow(0 -1.5px 0 #3b82f6); }
+/* o aro por trás das épicas/lendárias: PARADO (nada gira), um disco de holográfico ou ouro escovado */
+.fig-aro { position: absolute; inset: -10%; z-index: 0; border-radius: 50%; -webkit-mask: radial-gradient(circle, transparent 60%, #000 61%); mask: radial-gradient(circle, transparent 60%, #000 61%); }
+.fig[data-rar="epico"] .fig-aro { background: conic-gradient(from 200deg, #ff7ad9, #ffd36e, #7dffb3, #6ec8ff, #b98bff, #ff7ad9); opacity: .85; }
+.fig[data-rar="lendario"] .fig-aro { background: conic-gradient(from 20deg, #fff1b0, #d4a629, #8f6a0c, #fff3c4, #e9c65a, #8f6a0c, #fff1b0), repeating-conic-gradient(rgba(255,255,255,.12) 0 1deg, transparent 1deg 3deg); background-blend-mode: overlay; }
+/* o FOIL: a própria arte vira máscara (mask-image, posto pelo componente); parado é um brilho discreto; no toque/movimento, forte */
+.fig-foil { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; mix-blend-mode: overlay; opacity: .55; transition: opacity .35s ease-out; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.fig[data-rar="lendario"] .fig-foil { mix-blend-mode: soft-light; opacity: .8; }
+.fig[data-foil-ativo] .fig-foil, [data-giro-ativo] .fig-foil { opacity: 1; transition: opacity .1s ease-out; }
+.fig[data-rar="lendario"][data-foil-ativo] .fig-foil, [data-giro-ativo] .fig[data-rar="lendario"] .fig-foil { mix-blend-mode: overlay; }
+/* a faixa de cor (300 % da figurinha) corre com o dedo (--fx/--fy na figurinha) ou com o aparelho (--gx/--gy na raiz); o reflexo corre mais (paralaxe) */
+.fig-foil > i { position: absolute; left: -100%; top: -100%; width: 300%; height: 300%; display: block; transition: transform .45s cubic-bezier(.2,.7,.3,1); }
+.fig-foil-faixa { background: repeating-linear-gradient(115deg, #ff7ad9 0, #ffd36e 7%, #7dffb3 14%, #6ec8ff 21%, #b98bff 28%, #ff7ad9 35%); transform: translate(calc(var(--fx, var(--gx, 0)) * 0.34%), calc(var(--fy, var(--gy, 0)) * 0.2%)); }
+[data-foil="lendario"] .fig-foil-faixa { background: repeating-linear-gradient(115deg, #8f6a0c 0, #e9c65a 9%, #fff6d0 16%, #d4a629 24%, #8f6a0c 35%); }
+.fig-foil-reflexo { background: linear-gradient(115deg, rgba(255,255,255,0) 40%, rgba(255,255,255,.75) 50%, rgba(255,255,255,0) 60%); transform: translate(calc(var(--fx, var(--gx, 0)) * 0.55%), calc(var(--fy, var(--gy, 0)) * 0.12%)); }
+.fig[data-foil-ativo] .fig-foil > i, [data-giro-ativo] .fig-foil > i { transition: none; }
+/* a silhueta da vaga vazia: cinza médio, visível (é o convite) */
+.fig-vazia { filter: none; transform: none; }
+.fig-vazia > svg { filter: saturate(0) brightness(.62) contrast(.5); opacity: .5; }
+.fig-vazia[data-rar="lendario"] > svg { filter: saturate(0) brightness(.62) contrast(.5) drop-shadow(0 0 4px rgba(212,166,41,.9)); opacity: .55; }
+.fig-vazia[data-rar="epico"] > svg { filter: saturate(0) brightness(.62) contrast(.5) drop-shadow(0 0 4px rgba(139,92,246,.8)); opacity: .55; }
+/* o PEEL ao colar: a figurinha desce de um canto levantado e assenta; o canto do papel-base encolhe */
+/* promovida (will-change): no WebKit a camada nascer/morrer a cada figurinha que cola repintava a página 16 vezes na abertura */
+.vaga-fig[data-cola] { animation: fig-peel .62s cubic-bezier(.3, 1.25, .5, 1) both; animation-delay: var(--d, 0ms); transform-origin: 50% 100%; will-change: transform; }
+@keyframes fig-peel { 0% { transform: perspective(260px) rotateX(-58deg) rotateY(16deg) translateZ(28px) scale(1.14); opacity: 0; } 22% { opacity: 1; } 70% { transform: perspective(260px) rotateX(-9deg) rotateY(3deg) translateZ(7px) scale(1.04); } 100% { transform: none; opacity: 1; } }
+.fig-canto { position: absolute; right: 2%; top: 2%; width: 26%; height: 26%; z-index: 3; pointer-events: none; transform-origin: 100% 0; opacity: 0; background: linear-gradient(225deg, rgba(255,255,255,.95) 0 44%, rgba(215,205,185,.9) 44% 50%, rgba(0,0,0,.12) 50% 54%, transparent 54%); animation: fig-canto .62s cubic-bezier(.3, 1, .5, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes fig-canto { 0% { transform: scale(1.1); opacity: 0; } 15% { opacity: .95; } 55% { transform: scale(.5); opacity: .9; } 80%, 100% { transform: scale(0); opacity: 0; } }
+/* com o álbum aberto, a tela de trás não anima (o fogo da capa, a entrada): nada pinta por baixo */
+html[data-album-aberto] [data-testid="tela-conquistas"] *, html[data-album-aberto] [data-testid="tela-conquistas"] *::before, html[data-album-aberto] [data-testid="tela-conquistas"] *::after { animation-play-state: paused !important; }
+/* "reduzir movimento": sem foil, sem peel, sem 3D */
+.alb-tela[data-reduzir] .fig-foil, .alb-tela[data-reduzir] .fig-canto { display: none; }
+.alb-tela[data-reduzir] .vaga-fig[data-cola] { animation: none; }
+.alb-tela[data-reduzir] .alb-livro { filter: none; }
+@media (prefers-reduced-motion: reduce) { .alb-sheet { transition: none !important; } .vaga-fig[data-cola], .fig-canto { animation: none !important; } .fig-canto { display: none; } }
 /* o detalhe da figurinha (folha por cima da mesa) */
 .fig-detalhe { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: hsl(var(--background)); color: hsl(var(--foreground)); border-radius: 24px 24px 0 0; padding: 12px 18px calc(22px + env(safe-area-inset-bottom)); max-height: 82vh; overflow-y: auto; box-shadow: 0 -20px 50px rgba(0,0,0,.45); }
 .fig-detalhe-puxador { width: 40px; height: 4px; border-radius: 999px; background: hsl(var(--border)); margin: 0 auto 14px; }

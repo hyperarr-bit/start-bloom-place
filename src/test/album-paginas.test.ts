@@ -52,18 +52,19 @@ describe("os mais raros", () => {
 });
 
 describe("as páginas", () => {
-  it("1ª = OS MAIS RAROS (X de todos); depois LENDÁRIOS · ÉPICOS · RAROS · COMUNS com vaga FIXA (na ordem da coleção) e 12 por página", () => {
-    const epicos = Array.from({ length: 14 }, (_, i) => b(`e${i}`, "epico", i === 3 || i === 9 || i === 13));
+  it("1ª = OS MAIS RAROS (X de todos); depois LENDÁRIOS · ÉPICOS · RAROS · COMUNS com vaga FIXA (na ordem da coleção) e até 16 por página (02/10: 4 × 4), divididas PARELHAS", () => {
+    const epicos = Array.from({ length: 20 }, (_, i) => b(`e${i}`, "epico", i === 3 || i === 9 || i === 13));
     const lendarios = Array.from({ length: 7 }, (_, i) => b(`l${i}`, "lendario", false));
     const lista = [...epicos, b("r0", "raro", true), b("r1", "raro", false), ...lendarios, b("c0", "comum", true)];
     const paginas = montarAlbum(lista, { e3: "2026-09-01", e9: "2026-09-02", e13: "2026-09-03", r0: "2026-09-04", c0: "2026-09-05" });
+    expect(VAGAS_POR_PAGINA).toBe(16);
     expect(paginas.map((p) => p.id)).toEqual(["mais-raros", "lendario-1", "epico-1", "epico-2", "raro-1", "comum-1"]);
 
     const primeira = paginas[0];
     expect(primeira.titulo).toBe("OS MAIS RAROS");
     expect(primeira.vagas.map((x) => x.id)).toEqual(["e13", "e9", "e3", "r0", "c0"]);
     expect(primeira.proximos).toEqual([]);
-    expect(contagemDaPagina(primeira)).toBe("5 de 24");
+    expect(contagemDaPagina(primeira)).toBe("5 de 30");
 
     const lend = paginas[1];
     expect(lend.vagas).toHaveLength(7);
@@ -73,16 +74,17 @@ describe("as páginas", () => {
     expect(tituloDaPagina(lend)).toBe("LENDÁRIOS");
 
     const [ep1, ep2] = [paginas[2], paginas[3]];
-    expect(ep1.vagas).toHaveLength(VAGAS_POR_PAGINA);
-    expect(ep2.vagas).toHaveLength(2);
+    // 20 épicos não cabem em 16: duas páginas PARELHAS (10 + 10), não 16 + 4
+    expect(ep1.vagas).toHaveLength(10);
+    expect(ep2.vagas).toHaveLength(10);
     // a vaga é a posição na coleção, não "colados primeiro": e3 continua na 4ª vaga
-    expect(ep1.vagas.map((x) => x.id)).toEqual(epicos.slice(0, 12).map((x) => x.id));
+    expect(ep1.vagas.map((x) => x.id)).toEqual(epicos.slice(0, 10).map((x) => x.id));
     expect(ep1.vagas[3].unlocked).toBe(true);
     expect(ep1.vagas[4].unlocked).toBe(false);
     expect(tituloDaPagina(ep1)).toBe("ÉPICOS · 1/2");
     expect(tituloDaPagina(ep2)).toBe("ÉPICOS · 2/2");
-    expect(contagemDaPagina(ep1)).toBe("3 de 14 · faltam 11");
-    expect(contagemDaPagina(ep2)).toBe("3 de 14 · faltam 11");
+    expect(contagemDaPagina(ep1)).toBe("3 de 20 · faltam 17");
+    expect(contagemDaPagina(ep2)).toBe("3 de 20 · faltam 17");
     expect(contagemDaPagina(paginas[5])).toBe("1 de 1");
   });
 
@@ -109,15 +111,16 @@ describe("as páginas", () => {
     expect(tres.proximos).toEqual([]);
   });
 
-  it("na coleção de verdade (65): 8 páginas — 1 + lendários 1 + épicos 2 + raros 2 + comuns 2 — e o total fecha", () => {
+  it("na coleção de verdade (65): 7 páginas — 1 + lendários 1 + épicos 1 (14 cabem) + raros 2 (11 + 10) + comuns 2 (12 + 11) — e o total fecha", () => {
     const { adesivos, desbloqueadas } = colecao({ "sequencia-7": "2026-09-20", "leitura-1": "2026-09-21", "rotina-21": "2026-09-10" });
     const paginas = montarAlbum(adesivos, desbloqueadas);
-    expect(paginas.map((p) => p.id)).toEqual(["mais-raros", "lendario-1", "epico-1", "epico-2", "raro-1", "raro-2", "comum-1", "comum-2"]);
+    expect(paginas.map((p) => p.id)).toEqual(["mais-raros", "lendario-1", "epico-1", "raro-1", "raro-2", "comum-1", "comum-2"]);
     expect(paginas[0].vagas.map((x) => x.id)).toEqual(["rotina-21", "leitura-1", "sequencia-7"]);
     expect(paginas[0].total).toBe(65);
     const soma = paginas.slice(1).reduce((s, p) => s + p.vagas.length, 0);
     expect(soma).toBe(65);
-    expect(paginas.filter((p) => p.raridade === "epico").map((p) => p.vagas.length)).toEqual([12, 2]);
+    expect(paginas.filter((p) => p.raridade === "epico").map((p) => p.vagas.length)).toEqual([14]);
+    expect(paginas.filter((p) => p.raridade === "raro").map((p) => p.vagas.length)).toEqual([11, 10]);
     expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([12, 11]);
   });
 });

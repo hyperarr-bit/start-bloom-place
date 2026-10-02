@@ -38,6 +38,18 @@ import type { TipoDoItem } from "@/lib/demo-guiada";
 export type ModoMissaoDoses = "off" | "on";
 export const MISSAO_DOSES: ModoMissaoDoses = "off";
 
+/**
+ * O LINK DE QA (`?missao-doses=on`) — DESLIGADO em 02/10 (dono: "desativa aquele
+ * link do tutorial, tem muita coisa a melhorar, mas agora vamos esperar — fazer
+ * sem métricas é a mesma coisa que nada"). Com `false`, o link não liga nada e
+ * quem já tinha a força gravada volta ao normal na próxima visita. O código da
+ * missão fica guardado pra quando voltarmos a ela. Religar = `true` + push.
+ * (Os testes ligam por `globalThis.__QA_MISSAO_DOSES__`.)
+ */
+export const QA_MISSAO_DOSES = false;
+const qaHabilitado = (): boolean =>
+  QA_MISSAO_DOSES || (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ === true;
+
 export const CHAVE_FORCA_MISSAO_DOSES = "missao-doses-force";
 export const CHAVE_DIA_QA = "missao-doses-dia";
 export const CHAVE_ESTADO_MISSAO_DOSES = "missao-doses";
@@ -55,6 +67,7 @@ const ls = {
  * a Home → módulo → Home passa por várias páginas e o link não vai junto.
  */
 export function guardarForcaDaUrl(busca?: string | URLSearchParams): void {
+  if (!qaHabilitado()) { ls.del(CHAVE_FORCA_MISSAO_DOSES); ls.del(CHAVE_DIA_QA); return; }
   let p: URLSearchParams;
   try {
     p = busca instanceof URLSearchParams ? busca : new URLSearchParams(busca ?? window.location.search);
@@ -82,6 +95,7 @@ export const diaDeQa = (): 1 | 2 | 3 | null => {
 /** A missão em doses está ligada NESTE navegador? Nativo: nunca (nesta etapa). Força de QA > chave. */
 export function missaoDosesLigada(modo: ModoMissaoDoses = MISSAO_DOSES): boolean {
   if (isNativeShell()) return false;
+  if (!qaHabilitado()) return modo === "on";
   const f = forcaDaMissaoDoses();
   if (f === "on") return true;
   if (f === "off") return false;

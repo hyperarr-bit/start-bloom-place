@@ -108,6 +108,7 @@ const passarPeloOlhar = () => { esperarOlharOuFesta(); const b = screen.queryByT
 
 beforeEach(() => {
   localStorage.clear();
+  (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = true; // o link de QA está desligado no código (02/10); aqui o protótipo é testado como se estivesse ligado
   eventos.length = 0;
   nativo.v = false;
   // o jsdom não tem tamanho: o anel/olhar se posicionam por getBoundingClientRect
@@ -118,6 +119,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 /* ------------------------------------------------------------ a chave */
+
+describe("link de QA desligado (02/10)", () => {
+  it("com QA_MISSAO_DOSES=false, ?missao-doses=on não liga nada e apaga a força que já estava gravada", () => {
+    (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = false;
+    localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");
+    expect(missaoDosesLigada()).toBe(false);
+    guardarForcaDaUrl("?missao-doses=on");
+    expect(localStorage.getItem(CHAVE_FORCA_MISSAO_DOSES)).toBeNull();
+    expect(missaoDosesLigada()).toBe(false);
+  });
+});
 
 describe("a chave desligada = o app de hoje, byte a byte", () => {
   it("MISSAO_DOSES nasce 'off'", () => {

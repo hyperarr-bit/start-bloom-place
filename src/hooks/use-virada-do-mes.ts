@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import {
   mesclarSemDuplicar, separarPorMes, chaveArquivada, viradaDeFixos, CHAVE_FIXOS, CHAVE_CARIMBO_FIXOS, type Lancamento,
+  adotarMesPreenchido, chavesDatadasDoMes, temMesPreenchido, BALDE_CORRENTE, type ConteudoDoMes,
 } from "@/lib/virada-do-mes";
 import {
   aplicarViradaDeContas,
@@ -203,7 +204,19 @@ export const useViradaDoMes = () => {
     // As parcelas entram na mesma espera (07/09): balde vazio + contas vazias
     // + lançamentos vazios = ainda não há o que olhar.
     const parcelas = lerBalde(CHAVE_PARCELAS) as unknown as Parcela[];
-    if (carregados.every((itens) => itens.length === 0) && !temContas(contas) && parcelas.length === 0) return;
+    // (02/10) As chaves DATADAS do próprio mês corrente — o que a pessoa
+    // pré-preencheu pra este mês quando ele ainda era "o próximo". Entram na
+    // mesma espera e são adotadas mais abaixo (lib/virada-do-mes,
+    // "O MÊS PRÉ-PREENCHIDO QUE SUMIA NA VIRADA").
+    const datadas = chavesDatadasDoMes(agora);
+    const preenchido: ConteudoDoMes = {
+      incomes: lerBalde(datadas.incomes),
+      expenses: lerBalde(datadas.expenses),
+      fixed: lerBalde(datadas.fixed),
+      dueDays: readMonthData(uid, datadas.dueDays) ?? get<unknown>(datadas.dueDays, []),
+      notes: lerBalde(datadas.notes),
+    };
+    if (carregados.every((itens) => itens.length === 0) && !temContas(contas) && parcelas.length === 0 && !temMesPreenchido(preenchido)) return;
     feitoPara.current = alvo;
     // (26/09) Toda escrita desta passada passa por `gravar`: se alguma tocou
     // DADO (não só carimbo), a tela de Finanças remonta no fim — ver "A TELA
@@ -217,6 +230,10 @@ export const useViradaDoMes = () => {
     // é o "teve movimento" dos fixos, e vale até pra convidado, cujo `get`
     // ainda não enxerga a escrita feita neste mesmo efeito.
     const chavesArquivadas = new Set<string>();
+    // (02/10) O balde de cada sufixo COMO FICA depois desta passada — a adoção
+    // do mês pré-preenchido mescla em cima disto, não do `get` (que ainda não
+    // enxerga as gravações feitas neste mesmo efeito).
+    const correntes: Record<"expenses" | "incomes", Lancamento[]> = { expenses: carregados[0], incomes: carregados[1] };
 
     for (let i = 0; i < BALDES.length; i++) {
       const balde = BALDES[i];
@@ -225,6 +242,7 @@ export const useViradaDoMes = () => {
 
       const { ficam, arquivar, movidos } = separarPorMes(atuais, hoje, balde.sufixo);
       if (movidos === 0) continue;
+      correntes[balde.sufixo] = ficam;
 
       // Arquiva ANTES de encolher o balde corrente: se algo falhar no meio, o
       // pior cenário é lançamento duplicado (que a mesclagem por id resolve na
@@ -256,13 +274,14 @@ export const useViradaDoMes = () => {
      * `useVersaoDaVirada`.)
      */
     const virada = viradaDeContas(contas, get<string>(CHAVE_CARIMBO_CONTAS, ""), hoje);
+    let contasAgora: DiaDeContas[] = contas;
     if (virada) {
       const r = aplicarViradaDeContas(virada, {
         ler: (chave, padrao) => get(chave, padrao),
         gravar: (chave, valor) => gravar(chave, valor),
         gravarContas: (zeradas) => gravar(CHAVE_CONTAS, zeradas),
       });
-      if (r.zerou) trackEvent("virada_mes_zerou_contas", { arquivou: r.arquivou ? 1 : 0 });
+      if (r.zerou) { contasAgora = virada.zeradas; trackEvent("virada_mes_zerou_contas", { arquivou: r.arquivou ? 1 : 0 }); }
     }
 
     /*
@@ -281,11 +300,37 @@ export const useViradaDoMes = () => {
     const fixosAgora = readMonthData(uid, CHAVE_FIXOS) ?? get<unknown[]>(CHAVE_FIXOS, []);
     const vf = viradaDeFixos(fixosAgora, get<string>(CHAVE_CARIMBO_FIXOS, ""), hoje, teveMovimento);
     if (vf) {
-      if (vf.arquivo && (readMonthData(uid, vf.arquivo.chave) ?? get<unknown>(vf.arquivo.chave, null)) == null) {
+      // (02/10) Chave que existe mas está VAZIA também recebe o retrato: é
+      // como a adoção abaixo deixa a chave datada do mês depois de levar o
+      // conteúdo pro balde — e um retrato por cima de lista vazia não perde nada.
+      const retrato = vf.arquivo ? (readMonthData(uid, vf.arquivo.chave) ?? get<unknown>(vf.arquivo.chave, null)) : null;
+      if (vf.arquivo && (retrato == null || (Array.isArray(retrato) && retrato.length === 0))) {
         gravar(vf.arquivo.chave, vf.arquivo.fixos);
         trackEvent("virada_mes_fixos", { itens: vf.arquivo.fixos.length });
       }
       gravar(CHAVE_CARIMBO_FIXOS, vf.carimbo);
+    }
+
+    /*
+     * O MÊS PRÉ-PREENCHIDO ENTRA NO BALDE (02/10) — regra em lib/virada-do-mes
+     * (`adotarMesPreenchido`, cabeçalho "O MÊS PRÉ-PREENCHIDO QUE SUMIA NA
+     * VIRADA"). Roda DEPOIS de arquivar o mês que acabou e zerar os ✓, em
+     * cima dos baldes como ficaram nesta passada: o que a pessoa planejou pra
+     * este mês na planilha dele (quando ainda era "o próximo") passa a ser
+     * lido pela tela, sem apagar nem duplicar o que já está no balde. A chave
+     * datada fica vazia — é isso que faz rodar de novo (ou noutro aparelho)
+     * ser inofensivo.
+     */
+    const adocao = adotarMesPreenchido(preenchido, {
+      incomes: correntes.incomes,
+      expenses: correntes.expenses,
+      fixed: Array.isArray(fixosAgora) ? fixosAgora : [],
+      dueDays: contasAgora,
+      notes: lerBalde(BALDE_CORRENTE.notes),
+    }, agora);
+    if (adocao) {
+      for (const [chave, valor] of Object.entries(adocao.gravar)) gravar(chave, valor);
+      trackEvent("virada_mes_adotou", { ...adocao.adotados, mes: agora });
     }
 
     /*

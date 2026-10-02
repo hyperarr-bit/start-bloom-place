@@ -357,19 +357,31 @@ describe("CORRIGIDO (26/09): o aluguel de setembro não some de setembro no dia 
     expect(buildWrappedData("Setembro", UID, 2026)).toBeNull();
   });
 
-  it("planilha de setembro já editada (chave existe, mesmo vazia) nunca é sobrescrita; a 2ª abertura do mês não regrava", () => {
+  it("planilha de setembro já editada (chave existe COM conteúdo) nunca é sobrescrita; chave VAZIA recebe o retrato (02/10); a 2ª abertura do mês não regrava", () => {
     vi.setSystemTime(em(2026, 10, 1, 0, 1));
     const c = {} as Controle;
-    const editada = { ...base, "finance-2026-setembro-fixed": [] };
-    semear(editada);
-    montarApp(editada, c);
-    expect(c.dados()["finance-2026-setembro-fixed"]).toEqual([]);
+    // (02/10) Chave existente e VAZIA é como a adoção do mês pré-preenchido a
+    // deixa depois de levar o conteúdo pro balde (lib/virada-do-mes) — o
+    // retrato entra por cima de uma lista vazia sem perder nada. Antes
+    // (26/09) qualquer chave existente barrava o retrato.
+    const vazia = { ...base, "finance-2026-setembro-fixed": [] };
+    semear(vazia);
+    montarApp(vazia, c);
+    expect(c.dados()["finance-2026-setembro-fixed"]).toEqual(fixos);
     const fim = { ...c.dados() };
     cleanup();
     localStorage.removeItem(lsKey("finance-2026-setembro-fixed"));
     vi.setSystemTime(em(2026, 10, 2, 9));
     montarApp({ ...fim, "finance-2026-setembro-fixed": undefined }, c);
     expect(c.dados()["finance-2026-setembro-fixed"]).toBeUndefined(); // carimbo já é outubro: não mexe
+    cleanup();
+    localStorage.clear();
+    // chave existente COM conteúdo (planilha editada pela pessoa): segue intocada
+    vi.setSystemTime(em(2026, 10, 1, 0, 1));
+    const editada = { ...base, "finance-2026-setembro-fixed": [{ id: "meu", description: "Só isto", value: 1 }] };
+    semear(editada);
+    montarApp(editada, c);
+    expect(c.dados()["finance-2026-setembro-fixed"]).toEqual(editada["finance-2026-setembro-fixed"]);
   });
 
   it("regra pura: sem carimbo (transição de 01/10/2026) usa o mês anterior; dez → jan vira o ano; carimbo do futuro não anda pra trás", () => {

@@ -12,7 +12,7 @@ import { Roseta } from "./Roseta";
 import { compartilharAdesivo, compartilharRoseta } from "./compartilhar-conquistas";
 import { useConquistas, useEfeitosSequencia, usePerfilConquistas, useSequencia } from "./use-conquistas";
 import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
-import { CHAVE_CAPAS_VISTAS, capasLiberadas, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
+import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import "./conquistas.css";
@@ -621,14 +621,11 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   const capasVistasCru = get<unknown>(CHAVE_CAPAS_VISTAS, undefined);
   const capasVistas = useMemo(() => lerCapasVistas(capasVistasCru) ?? [], [capasVistasCru]);
 
-  // linha de base das CAPAS (dono 02/10: "não precisa fazer o 1"): quem já tinha
-  // recorde ≥14/30 quando as capas chegaram ganha a capa EM SILÊNCIO — sem popup
-  // atrasado. Só quem alcança o marco daqui pra frente vê "Capa nova liberada".
-  useEffect(() => {
-    if (!loaded || capasVistasCru !== undefined) return;
-    set(CHAVE_CAPAS_VISTAS, capasLiberadas(seq.recorde), { system: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, capasVistasCru === undefined]);
+  // (02/10, dono) "Capa nova liberada" só aparece QUANDO A PESSOA ABRE A TELA DE CONQUISTAS — nunca
+  // por cima da Home, do Treino etc. Sem linha de base silenciosa: quem já tinha recorde ≥14/30
+  // quando as capas chegaram também vê o popup UMA vez, na 1ª abertura de Conquistas (as capas já
+  // estão liberadas no seletor desde antes — o popup só avisa).
+  const emConquistas = pathname.startsWith("/conquistas");
 
   // linha de base (1ª abertura): o que já está conquistado não vira festa atrasada
   useEffect(() => {
@@ -653,7 +650,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     const marco = [...MARCOS_SEQUENCIA].reverse().find((m) => seq.recorde >= m && !vistas.marcos.includes(m));
     if (marco && !emTesteComMissao()) itens.push({ tipo: "marco", dias: marco });
     // capa nova pelo RECORDE (nunca é tirada): uma festa só, com todas as liberadas desde a última vez
-    const capas = capasVistasCru === undefined ? [] : capasNovas(seq.recorde, capasVistas); // sem linha de base ainda: nada de festa
+    const capas = emConquistas ? capasNovas(seq.recorde, capasVistas) : []; // só com a tela de Conquistas aberta
     if (capas.length && !emTesteComMissao()) itens.push({ tipo: "capa", capas });
     const novos = conq.folha
       .filter((b) => b.unlocked && !/^sequencia-/.test(b.id) && !vistas.adesivos.includes(b.id))
@@ -670,7 +667,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas, capasVistasCru]);
+  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas, emConquistas]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");

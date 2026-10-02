@@ -4,15 +4,16 @@ import { TextoEmAnel } from "./TextoEmAnel";
 /**
  * Metais dos níveis (26/09) — o selo em foil da capa muda de cor com o nível.
  * `foil`: o disco (6 paradas, diagonal); `plano`: os dentes; `tinta`: texto e
- * estrela gravados; `txtClara`/`txtEscura`: o "NÍVEL Ouro" escrito ao lado —
- * claro em capa escura, escurecido em capa clara (senão some no vichy).
+ * estrela gravados; `contorno`: o tom escuro do MESMO metal que contorna o
+ * "NÍVEL", o nome e o "core" na capa (02/10, dono: a gravação segue o metal
+ * do nível, igual em todas as capas — o contorno garante a leitura em capa
+ * clara e escura, sem trocar a cor do metal).
  */
 export interface Metal {
   foil: string[];
   plano: [string, string];
   tinta: string;
-  txtClara: string[];
-  txtEscura: string[];
+  contorno: string;
 }
 
 const PARADAS_FOIL = [0, 0.25, 0.5, 0.65, 0.8, 1];
@@ -22,36 +23,31 @@ export const METAIS: Record<string, Metal> = {
     foil: ["#fde2c8", "#e3a574", "#a55d2c", "#f9d2ae", "#c47c45", "#7a3e17"],
     plano: ["#ebb487", "#b8703c"],
     tinta: "#5a2b0e",
-    txtClara: ["#fde2c8", "#e3a574", "#b8703c", "#f9d2ae", "#d08a52", "#a55d2c"],
-    txtEscura: ["#b8703c", "#7a3e17", "#d99a66", "#7a3e17", "#a55d2c"],
+    contorno: "#391504",
   },
   Prata: {
     foil: ["#ffffff", "#dfe4ea", "#8e99a6", "#f4f6f9", "#b9c2cc", "#5f6a77"],
     plano: ["#eef1f4", "#aeb7c2"],
     tinta: "#39424d",
-    txtClara: ["#ffffff", "#dfe4ea", "#a3adb9", "#f4f6f9", "#c7cfd8", "#8e99a6"],
-    txtEscura: ["#8e99a6", "#4f5965", "#b9c2cc", "#4f5965", "#6f7a87"],
+    contorno: "#242c36",
   },
   Ouro: {
     foil: ["#fff3c4", "#e9c65a", "#b8860b", "#fff1b0", "#d4a629", "#8f6a0c"],
     plano: ["#f6d77a", "#d9a72a"],
     tinta: "#6b4a05",
-    txtClara: ["#fff3c4", "#e9c65a", "#b8860b", "#fff1b0", "#d4a629", "#8f6a0c"],
-    txtEscura: ["#c9961a", "#8f6a0c", "#e6c25a", "#8f6a0c", "#b8860b"],
+    contorno: "#4a3203",
   },
   Platina: {
     foil: ["#f6fbff", "#d3e0ec", "#8499ae", "#eef6fc", "#aec1d4", "#566b80"],
     plano: ["#e3ecf5", "#a2b6ca"],
     tinta: "#2c3e51",
-    txtClara: ["#f6fbff", "#d3e0ec", "#9db0c3", "#eef6fc", "#bccbdb", "#8499ae"],
-    txtEscura: ["#8499ae", "#3f5367", "#aec1d4", "#3f5367", "#566b80"],
+    contorno: "#1d2c3a",
   },
   Diamante: {
     foil: ["#f0fbff", "#b5e3fa", "#4fa6e0", "#e6f6ff", "#8fcaf2", "#2f7cbf"],
     plano: ["#cdeefc", "#84c3ee"],
     tinta: "#15446b",
-    txtClara: ["#f0fbff", "#b5e3fa", "#6ab7e8", "#e6f6ff", "#9fd3f5", "#4fa6e0"],
-    txtEscura: ["#4fa6e0", "#1f5f96", "#8fcaf2", "#1f5f96", "#2f7cbf"],
+    contorno: "#0b3050",
   },
 };
 
@@ -101,27 +97,12 @@ export const SeloNivel = ({ nivel, tamanho, sombra = true }: { nivel: string; ta
   );
 };
 
-/** "NÍVEL / Ouro" em foil — SVG com degradê (o `background-clip: text` não sai na foto do Safari). */
-export const NivelEmFoil = ({
-  nivel, capaClara, rotulo = 9.5, nome = 22, espaco = 1.9,
-}: { nivel: string; capaClara: boolean; rotulo?: number; nome?: number; espaco?: number }) => {
-  const uid = `foil${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+/**
+ * A GRAVAÇÃO do nível (02/10): as cores do "NÍVEL", do nome do nível e do "core" na capa.
+ * Depende SÓ do nível — a capa não entra na conta: Platina é platina no grafite, no kraft e no lilás.
+ * `paradas` = o foil do disco da insígnia (as mesmas 6 cores); `contorno` = o tom escuro do metal.
+ */
+export const gravacaoDoNivel = (nivel: string): { paradas: string[]; contorno: string } => {
   const m = metalDo(nivel);
-  const cores = capaClara ? m.txtEscura : m.txtClara;
-  const alturaRotulo = rotulo * 1.3;
-  return (
-    <svg width={nome * 5.6} height={alturaRotulo + nome * 1.15} style={{ overflow: "visible", display: "block" }} aria-label={`Nível ${nivel}`} role="img">
-      <defs>
-        <linearGradient id={uid} x1="0" y1="0" x2="1" y2="1">
-          {cores.map((c, i) => <stop key={i} offset={i / (cores.length - 1)} stopColor={c} />)}
-        </linearGradient>
-      </defs>
-      <text x="0" y={rotulo} fontFamily="Inter, -apple-system, sans-serif" fontSize={rotulo} fontWeight={800} letterSpacing={espaco} fill={`url(#${uid})`}>
-        NÍVEL
-      </text>
-      <text x="0" y={alturaRotulo + nome * 0.9} fontFamily="Inter, -apple-system, sans-serif" fontSize={nome} fontWeight={800} letterSpacing={-0.01 * nome} fill={`url(#${uid})`}>
-        {nivel}
-      </text>
-    </svg>
-  );
+  return { paradas: m.foil, contorno: m.contorno };
 };

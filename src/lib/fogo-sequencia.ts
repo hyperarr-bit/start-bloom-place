@@ -160,7 +160,12 @@ export const capasLiberadas = (recorde: number): CapaId[] => CAPAS_TRAVAVEIS.fil
 /** Liberadas que a pessoa ainda não viu comemorar. */
 export const capasNovas = (recorde: number, vistas: readonly string[]): CapaId[] => capasLiberadas(recorde).filter((id) => !vistas.includes(id));
 
-/** Guarda as capas cuja festa já passou (lista de ids). */
-export const CHAVE_CAPAS_VISTAS = "conquistas-capas-vistas";
+/**
+ * Guarda as capas cuja festa já passou (lista de ids).
+ * (02/10) chave NOVA: a antiga ("conquistas-capas-vistas") ganhou, por uma tarde, uma linha de base
+ * silenciosa que marcava como vistas as capas de quem já tinha recorde ≥14/30 — essa gente nunca viu o
+ * popup. Com a chave nova todo mundo começa do zero e vê "Capa nova liberada" UMA vez ao abrir Conquistas.
+ */
+export const CHAVE_CAPAS_VISTAS = "conquistas-capas-avisadas";
 
 export const lerCapasVistas = (v: unknown): string[] | null => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null);

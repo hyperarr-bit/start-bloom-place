@@ -188,12 +188,52 @@ describe("o popup 'Capa nova liberada' na orquestra dos momentos", () => {
     await waitFor(() => expect(screen.queryByTestId("momento-capa")).toBeNull());
   });
 
-  it("quem JÁ tinha recorde ≥14 quando as capas chegaram (sem a chave): ganha a capa em silêncio, sem popup (dono 02/10)", async () => {
+  const abrirEm = (rota: string, store: ReturnType<typeof montarStore>) =>
+    render(
+      <MemoryRouter initialEntries={[rota]}>
+        <Provedor store={store}>
+          <MomentosConquistas />
+          <Routes>
+            <Route path="*" element={<p>tela qualquer</p>} />
+          </Routes>
+        </Provedor>
+      </MemoryRouter>,
+    );
+
+  it("FORA de Conquistas (Home, Treino) o popup não aparece, mesmo com a capa liberada e não vista (dono 02/10)", async () => {
     const store = montarStore(cenario(14));
-    abrir(store, <MomentosConquistas />);
-    await waitFor(() => expect(store.dados[CHAVE_CAPAS_VISTAS]).toEqual(["bordo"]));
+    abrirEm("/home", store);
     await new Promise((r) => setTimeout(r, 2200));
     expect(screen.queryByTestId("momento-capa")).toBeNull();
+    expect(store.dados[CHAVE_CAPAS_VISTAS]).toBeUndefined(); // nada de linha de base silenciosa
+    cleanup();
+    abrirEm("/treino", store);
+    await new Promise((r) => setTimeout(r, 2200));
+    expect(screen.queryByTestId("momento-capa")).toBeNull();
+  }, 15000);
+
+  it("quem JÁ tinha recorde ≥14 (sem a chave): ao abrir CONQUISTAS vê o popup UMA vez, com a capa liberada; depois não repete", async () => {
+    const store = montarStore(cenario(14));
+    abrirEm("/conquistas", store);
+    const popup = await screen.findByTestId("momento-capa", {}, { timeout: 4000 });
+    expect(popup).toHaveAttribute("data-capa", "bordo");
+    expect(popup).toHaveTextContent("Capa nova liberada");
+    fireEvent.click(screen.getByTestId("momento-capa-continuar"));
+    await waitFor(() => expect(store.dados[CHAVE_CAPAS_VISTAS]).toEqual(["bordo"]));
+    await waitFor(() => expect(screen.queryByTestId("momento-capa")).toBeNull());
+    cleanup();
+    abrirEm("/conquistas", store); // reabrir Conquistas: não repete
+    await new Promise((r) => setTimeout(r, 2200));
+    expect(screen.queryByTestId("momento-capa")).toBeNull();
+  }, 20000);
+
+  it("recorde 30: as duas capas liberadas e não vistas vêm num popup só (carrossel) ao abrir Conquistas", async () => {
+    const store = montarStore(cenario(30, { "conquistas-vistas": { adesivos: ["first-expense"], marcos: [7, 14, 21, 30] } })); // os marcos já passaram: só a capa fica
+    abrirEm("/conquistas", store);
+    const popup = await screen.findByTestId("momento-capa", {}, { timeout: 4000 });
+    expect(popup).toHaveTextContent("2 capas novas liberadas");
+    expect(screen.getByTestId("momento-capa-item-bordo")).toBeInTheDocument();
+    expect(screen.getByTestId("momento-capa-item-noite")).toBeInTheDocument();
   }, 15000);
 
   it("já comemorada (vista): nada aparece; sem recorde: nada aparece", async () => {

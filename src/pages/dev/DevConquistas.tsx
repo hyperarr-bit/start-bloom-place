@@ -6,7 +6,9 @@ import { somarDias } from "@/lib/sequencia";
 import { TelaConquistas } from "@/components/conquistas/TelaConquistas";
 import { MomentoAdesivo, MomentoCapa, MomentoPopup } from "@/components/conquistas/Momentos";
 import { ehCapa, type CapaId } from "@/components/conquistas/CapaPlanner";
-import { useConquistas } from "@/components/conquistas/use-conquistas";
+import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
+import { LinhaSequencia } from "@/components/conquistas/LinhaSequencia";
+import { DayScoreRing } from "@/components/home/DayScoreRing";
 
 /**
  * /dev/conquistas — SÓ NO SERVIDOR DE DESENVOLVIMENTO (App.tsx monta a rota
@@ -208,10 +210,23 @@ const MomentoCapaDemo = ({ onFechar }: { onFechar: () => void }) => {
       nome="Ana Beatriz"
       membroDesde="julho de 2026"
       dias={14}
-      nivel="Ouro"
+      nivel={new URLSearchParams(window.location.search).get("nivel") || "Ouro"}
       onUsar={(c) => { ctx.set("conquistas-capa", c); onFechar(); }}
       onContinuar={onFechar}
     />
+  );
+};
+
+/** ?home=1 — o cartão do score da Home (anel + linha da sequência), pra fotografar nos temas (?score=N; &hoje=1 = garantido). */
+const CartaoHomeDev = ({ score }: { score: number }) => {
+  const sequencia = useSequencia();
+  return (
+    <div className="min-h-dvh bg-background px-4 pt-8">
+      <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm max-w-lg mx-auto" data-testid="cartao-home-dev">
+        <DayScoreRing score={score} streak={sequencia.dias} mostrarSequencia={false} />
+        <LinhaSequencia seq={sequencia} />
+      </div>
+    </div>
   );
 };
 
@@ -236,6 +251,8 @@ const DevConquistas = () => {
       const antiga = dias(recorde + 122, 123, hoje);
       s["core-dias-anotados"] = [...new Set([...antiga, ...lista])].sort();
     }
+    const nivelDemo = params.get("nivel");
+    if (nivelDemo) s["conquistas-nivel-piso"] = nivelDemo;
     const capa = params.get("capa");
     if (ehCapa(capa)) s["conquistas-capa"] = capa as CapaId;
     const faixaVista = params.get("faixa-vista");
@@ -259,7 +276,7 @@ const DevConquistas = () => {
 
   return (
     <Provedor inicial={inicial}>
-      <TelaConquistas />
+      {params.get("home") === "1" ? <CartaoHomeDev score={Number(params.get("score") || 55)} /> : <TelaConquistas />}
       {momento === "capa" && <MomentoCapaDemo onFechar={() => setParams((p) => { p.delete("momento"); return p; })} />}
       {momento && momento !== "capa" && <MomentoDemo raridade={momento} onFechar={() => setParams((p) => { p.delete("momento"); return p; })} />}
       {params.get("bar") !== "0" && <BarraDev hoje={hoje} />}

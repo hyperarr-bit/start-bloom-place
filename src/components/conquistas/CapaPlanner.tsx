@@ -1,7 +1,7 @@
 import "@fontsource/instrument-serif/latin-400-italic.css";
 import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import "./conquistas.css";
-import { SeloNivel, metalDo } from "./SeloNivel";
+import { SeloNivel, gravacaoDoNivel } from "./SeloNivel";
 import { Fogo } from "./Fogo";
 import { FotoWebKit } from "./foto-contexto";
 
@@ -15,10 +15,12 @@ import { FotoWebKit } from "./foto-contexto";
  *    papel kraft, couro granulado, noite estrelada) — tudo em degradês CSS,
  *    nenhuma imagem;
  *  - borda chanfrada + COSTURA pontilhada no fio da capa;
- *  - gravação em HOT STAMPING (dourado, prata, rosé ou cobre, conforme a
- *    capa) pro "NÍVEL" e pro "core", com o relevo da prensa;
- *  - o nome do nível continua no METAL do nível, mas prensado (contorno +
- *    relevo), e a insígnia assenta num rebaixo circular — legível em todas;
+ *  - gravação em HOT STAMPING pro "NÍVEL", o nome do nível e o "core" — SEMPRE
+ *    no METAL DO NÍVEL (bronze, prata, ouro, platina, diamante), igual em todas
+ *    as capas e igual à insígnia (02/10, dono: a cor da gravação depende só do
+ *    nível, nunca da capa); o contorno escuro do mesmo metal + o relevo da
+ *    prensa garantem a leitura em capa clara e escura; a insígnia assenta num
+ *    rebaixo circular;
  *  - etiqueta de papel com sombra de contato + sombra difusa;
  *  - elástico tecido na cor que combina com a capa, com a etiqueta do fogo
  *    pendurada (o fogo muda de cor com a sequência: lib/fogo-sequencia.ts);
@@ -38,20 +40,18 @@ export const CHAVE_CAPA = "conquistas-capa";
 
 export interface Capa {
   nome: string;
-  /** Uma linha pro seletor/popup ("couro grafite, gravação dourada"). */
+  /** Uma linha pro seletor/popup ("couro grafite"). */
   descricao: string;
   bg: string;
   /** As camadas da textura e da luz (background-image) e os tamanhos delas. */
   camadas: string;
   tamanhos: string;
-  /** Capa clara: o metal do nível escurece pra não sumir. */
+  /** Capa clara (muda só o chanfro e a luz — o metal da gravação é o do nível, em qualquer capa). */
   clara: boolean;
   /** Linha fina do chanfro. */
   chanfro: string;
   /** O fio da costura. */
   costura: string;
-  /** Hot stamping da capa ("NÍVEL", "core"): paradas do foil. */
-  foil: string[];
   /** O relevo da prensa: sombra escura e luz. */
   prensaSombra: string;
   prensaLuz: string;
@@ -95,81 +95,76 @@ const ESTRELAS = [
   ESTRELA(38, 88, 0.6, 0.55), ESTRELA(90, 60, 0.5, 0.5),
 ].join(", ");
 const ESTRELAS_TAM = Array(14).fill("100% 100%").join(", ");
-const OURO = ["#fff3c4", "#e9c65a", "#b8860b", "#fff1b0", "#d4a629", "#8f6a0c"];
-const PRATA = ["#ffffff", "#dfe4ea", "#8e99a6", "#f4f6f9", "#b9c2cc", "#5f6a77"];
-const ROSE = ["#f6d2c4", "#d08a74", "#8a4232", "#f2c7b6", "#b8664f", "#5e2a1e"];
-const PELTRE = ["#f4f6f9", "#b9c2cc", "#5f6a77", "#e8ecf1", "#8e99a6", "#3f4854"];
-const COBRE = ["#f9dcc2", "#d9935c", "#9a4f1f", "#f6d2b2", "#c8763a", "#6e3610"];
 
 export const CAPAS: Record<CapaId, Capa> = {
   grafite: {
-    nome: "Grafite", descricao: "couro grafite · gravação dourada", bg: "#3a3b43", clara: false,
+    nome: "Grafite", descricao: "couro grafite", bg: "#3a3b43", clara: false,
     camadas: `${LUZ_ESCURA}, ${LOMBADA}, ${VINHETA}, ${COURO_GRAO("rgba(255,255,255,.07)", "rgba(0,0,0,.30)")}`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, ${COURO_GRAO_TAM}`,
-    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.55)", foil: OURO,
+    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.55)",
     prensaSombra: "rgba(0,0,0,.6)", prensaLuz: "rgba(255,255,255,.12)", rebaixo: "rgba(0,0,0,.32)",
     elastico: ["#a81f62", "#e0438f", "#6f1340"], papel: "#fbf6ea", papelMoldura: "rgba(43,43,47,.22)",
     amostra: "linear-gradient(135deg,#3a3b42,#26272c)",
   },
   vichy: {
-    nome: "Vichy rosa", descricao: "tecido xadrez · gravação rosé", bg: "#fff4f7", clara: true,
+    nome: "Vichy rosa", descricao: "tecido xadrez", bg: "#fff4f7", clara: true,
     camadas: `${LUZ_CLARA}, ${LOMBADA_CLARA}, ${VINHETA_CLARA}, repeating-linear-gradient(45deg, rgba(255,255,255,.22) 0 1px, transparent 1px 3px), repeating-linear-gradient(-45deg, rgba(120,30,70,.05) 0 1px, transparent 1px 3px), repeating-linear-gradient(0deg, rgba(220,86,140,.46) 0 12px, transparent 12px 24px), repeating-linear-gradient(90deg, rgba(220,86,140,.46) 0 12px, transparent 12px 24px)`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, 6px 6px, 6px 6px, 24px 24px, 24px 24px`,
-    chanfro: "rgba(120,30,70,.14)", costura: "rgba(140,40,80,.45)", foil: ROSE,
+    chanfro: "rgba(120,30,70,.14)", costura: "rgba(140,40,80,.45)",
     prensaSombra: "rgba(120,30,70,.45)", prensaLuz: "rgba(255,255,255,.85)", rebaixo: "rgba(120,30,70,.13)",
     elastico: ["#b4245f", "#e0438f", "#7a1444"], papel: "#fffdf7", papelMoldura: "rgba(120,30,70,.28)",
     amostra: "repeating-conic-gradient(#ea8fb4 0 25%,#fff2f6 0 50%) 0 0/8px 8px",
   },
   salvia: {
-    nome: "Sálvia", descricao: "linho verde-sálvia · gravação dourada", bg: "#a9bea0", clara: true,
+    nome: "Sálvia", descricao: "linho verde-sálvia", bg: "#a9bea0", clara: true,
     camadas: `${LUZ_CLARA}, ${LOMBADA_CLARA}, ${VINHETA_CLARA}, repeating-linear-gradient(0deg, rgba(255,255,255,.26) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(30,60,30,.10) 0 1px, transparent 1px 3px), radial-gradient(ellipse 70% 45% at 50% 50%, rgba(255,255,255,.10), transparent 70%)`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, 3px 3px, 3px 3px, 41px 17px`,
-    chanfro: "rgba(20,50,20,.14)", costura: "rgba(60,80,50,.45)", foil: OURO,
+    chanfro: "rgba(20,50,20,.14)", costura: "rgba(60,80,50,.45)",
     prensaSombra: "rgba(20,50,20,.45)", prensaLuz: "rgba(255,255,255,.75)", rebaixo: "rgba(20,50,20,.14)",
     elastico: ["#3f5f3c", "#6a8a62", "#283f26"], papel: "#fffdf5", papelMoldura: "rgba(43,43,47,.26)",
     amostra: "linear-gradient(135deg,#b9cab0,#9bb292)",
   },
   lavanda: {
-    nome: "Lavanda", descricao: "veludo lilás · gravação prata", bg: "#b5a1dc", clara: true,
+    nome: "Lavanda", descricao: "veludo lilás", bg: "#b5a1dc", clara: true,
     camadas: `linear-gradient(120deg, rgba(255,255,255,.30) 0%, rgba(255,255,255,0) 34%, rgba(60,20,120,.16) 72%, rgba(255,255,255,.14) 100%), ${LOMBADA_CLARA}, ${VINHETA_CLARA}, radial-gradient(circle, rgba(255,255,255,.14) 0 .6px, transparent 1.1px)`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, 3px 3px`,
-    chanfro: "rgba(60,30,110,.16)", costura: "rgba(80,50,130,.45)", foil: PELTRE,
+    chanfro: "rgba(60,30,110,.16)", costura: "rgba(80,50,130,.45)",
     prensaSombra: "rgba(60,30,110,.45)", prensaLuz: "rgba(255,255,255,.8)", rebaixo: "rgba(60,30,110,.14)",
     elastico: ["#4c2f8f", "#7a5bc4", "#2f1a5e"], papel: "#fffcf6", papelMoldura: "rgba(60,30,110,.26)",
     amostra: "linear-gradient(135deg,#c9b8ea,#a38dd0)",
   },
   kraft: {
-    nome: "Kraft", descricao: "papel kraft · gravação cobre", bg: "#c39664", clara: true,
+    nome: "Kraft", descricao: "papel kraft", bg: "#c39664", clara: true,
     camadas: `${LUZ_CLARA}, ${LOMBADA_CLARA}, ${VINHETA_CLARA}, repeating-linear-gradient(97deg, rgba(255,255,255,.08) 0 2px, transparent 2px 9px), repeating-linear-gradient(172deg, rgba(60,30,0,.07) 0 1px, transparent 1px 6px), radial-gradient(circle at 30% 40%, rgba(255,255,255,.10) 0 14px, transparent 40px), radial-gradient(circle at 70% 70%, rgba(60,30,0,.06) 0 10px, transparent 36px)`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, 23px 23px, 17px 17px, 90px 90px, 110px 110px`,
-    chanfro: "rgba(60,30,0,.16)", costura: "rgba(90,50,15,.45)", foil: COBRE,
+    chanfro: "rgba(60,30,0,.16)", costura: "rgba(90,50,15,.45)",
     prensaSombra: "rgba(60,30,0,.45)", prensaLuz: "rgba(255,255,255,.6)", rebaixo: "rgba(60,30,0,.14)",
     elastico: ["#4a2e1b", "#7a5236", "#2d1a0e"], papel: "#fffcf4", papelMoldura: "rgba(60,30,0,.26)",
     amostra: "linear-gradient(135deg,#d2a977,#b4875a)",
   },
   marinho: {
-    nome: "Marinho", descricao: "couro granulado azul-marinho · gravação dourada", bg: "#283a5c", clara: false,
+    nome: "Marinho", descricao: "couro granulado azul-marinho", bg: "#283a5c", clara: false,
     camadas: `${LUZ_ESCURA}, ${LOMBADA}, ${VINHETA}, ${COURO_GRAO("rgba(150,180,230,.10)", "rgba(0,0,0,.34)")}`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, ${COURO_GRAO_TAM}`,
-    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.55)", foil: OURO,
+    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.55)",
     prensaSombra: "rgba(0,0,0,.6)", prensaLuz: "rgba(255,255,255,.12)", rebaixo: "rgba(0,0,0,.32)",
     elastico: ["#9a6b20", "#d4a12f", "#6a4712"], papel: "#fbf6ea", papelMoldura: "rgba(43,43,47,.22)",
     amostra: "linear-gradient(135deg,#2b3d5e,#182338)",
   },
   bordo: {
-    nome: "Bordô", descricao: "couro vinho · gravação dourada · libera com 14 dias seguidos", bg: "#6e2036", clara: false,
+    nome: "Bordô", descricao: "couro vinho · libera com 14 dias seguidos", bg: "#6e2036", clara: false,
     camadas: `${LUZ_ESCURA}, ${LOMBADA}, ${VINHETA}, ${COURO_GRAO("rgba(255,200,210,.09)", "rgba(0,0,0,.34)")}`,
     tamanhos: `${TODO}, ${TODO}, ${TODO}, ${COURO_GRAO_TAM}`,
-    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.6)", foil: OURO,
+    chanfro: "rgba(255,255,255,.10)", costura: "rgba(233,198,90,.6)",
     prensaSombra: "rgba(0,0,0,.6)", prensaLuz: "rgba(255,255,255,.12)", rebaixo: "rgba(0,0,0,.32)",
     elastico: ["#9a6b20", "#e2b64a", "#6a4712"], papel: "#fbf6ea", papelMoldura: "rgba(43,43,47,.22)",
     amostra: "linear-gradient(135deg,#6e2236,#45121f)",
   },
   noite: {
-    nome: "Noite", descricao: "preto estrelado · gravação dourada · libera com 30 dias seguidos", bg: "#1a1a21", clara: false,
+    nome: "Noite", descricao: "preto estrelado · libera com 30 dias seguidos", bg: "#1a1a21", clara: false,
     camadas: `${LUZ_ESCURA}, ${LOMBADA}, ${ESTRELAS}, radial-gradient(120% 90% at 75% 30%, rgba(90,70,140,.32), rgba(0,0,0,0) 60%), ${COURO_GRAO("rgba(255,255,255,.05)", "rgba(0,0,0,.4)", 11)}`,
     tamanhos: `${TODO}, ${TODO}, ${ESTRELAS_TAM}, ${TODO}, ${COURO_GRAO_TAM}`,
-    chanfro: "rgba(255,255,255,.12)", costura: "rgba(233,198,90,.7)", foil: OURO,
+    chanfro: "rgba(255,255,255,.12)", costura: "rgba(233,198,90,.7)",
     prensaSombra: "rgba(0,0,0,.7)", prensaLuz: "rgba(255,255,255,.14)", rebaixo: "rgba(255,241,176,.10)",
     elastico: ["#9a6b20", "#e2b64a", "#6a4712"], papel: "#fbf6ea", papelMoldura: "rgba(43,43,47,.22)",
     amostra: "radial-gradient(circle at 70% 30%, #fff1b0 0 1px, transparent 2px), radial-gradient(circle at 35% 65%, #fff1b0 0 .8px, transparent 1.6px), linear-gradient(135deg,#1c1c22,#0c0c10)",
@@ -245,8 +240,10 @@ export const ARGOLAS_APP = Array.from({ length: G.espiral.n }, (_, i) => G.espir
  * sombra da prensa pra cima/esquerda, luz pra baixo/direita, contorno fino.
  * SVG (o `background-clip: text` não sai na foto do Safari).
  */
-export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, sombra, luz, largura, altura, style }: {
-  texto: string; paradas: string[]; tamanho: number; peso?: number; espaco?: number; sombra: string; luz: string; largura: number; altura: number; style?: CSSProperties;
+export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, sombra, luz, contorno, largura, altura, style }: {
+  texto: string; paradas: string[]; tamanho: number; peso?: number; espaco?: number; sombra: string; luz: string;
+  /** Contorno escuro do metal (tom do próprio metal): a leitura em capa clara e escura. */
+  contorno?: string; largura: number; altura: number; style?: CSSProperties;
 }) => {
   const uid = `hs${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const fotoWebKit = useContext(FotoWebKit);
@@ -257,21 +254,20 @@ export const HotStamp = ({ texto, paradas, tamanho, peso = 900, espaco = 0, somb
           {paradas.map((c, i) => <stop key={i} offset={i / (paradas.length - 1)} stopColor={c} />)}
         </linearGradient>
       </defs>
-      <text x="0" y={tamanho * 0.86} fontFamily={INTER} fontSize={tamanho} fontWeight={peso} letterSpacing={espaco} fill={`url(#${uid})`} stroke={sombra} strokeWidth={0.35} paintOrder="stroke">
+      <text x="0" y={tamanho * 0.86} fontFamily={INTER} fontSize={tamanho} fontWeight={peso} letterSpacing={espaco} fill={`url(#${uid})`} stroke={contorno ?? sombra} strokeWidth={contorno ? Math.max(1.1, tamanho * 0.075) : 0.35} strokeLinejoin="round" paintOrder="stroke">
         {texto}
       </text>
     </svg>
   );
 };
 
-/** "NÍVEL" (foil da capa) + "Platina" (metal do nível, prensado) — legível em qualquer capa. */
+/** "NÍVEL" + nome do nível, os dois no METAL do nível (igual em toda capa) com o contorno escuro do mesmo metal. */
 const NivelPrensado = ({ nivel, c }: { nivel: string; c: Capa }) => {
-  const m = metalDo(nivel);
-  const metal = c.clara ? m.txtEscura : m.txtClara;
+  const g = gravacaoDoNivel(nivel);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }} data-nivel-capa="">
-      <HotStamp texto="NÍVEL" paradas={c.foil} tamanho={G.selo.rotulo} peso={800} espaco={G.selo.espaco} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.selo.nome * 5.2} altura={G.selo.rotulo * 1.15} />
-      <HotStamp texto={nivel} paradas={metal} tamanho={G.selo.nome} peso={800} espaco={-0.01 * G.selo.nome} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.selo.nome * 5.2} altura={G.selo.nome * 1.1} />
+      <HotStamp texto="NÍVEL" paradas={g.paradas} contorno={g.contorno} tamanho={G.selo.rotulo} peso={800} espaco={G.selo.espaco} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.selo.nome * 5.2} altura={G.selo.rotulo * 1.15} />
+      <HotStamp texto={nivel} paradas={g.paradas} contorno={g.contorno} tamanho={G.selo.nome} peso={800} espaco={-0.01 * G.selo.nome} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.selo.nome * 5.2} altura={G.selo.nome * 1.1} />
     </div>
   );
 };
@@ -398,7 +394,7 @@ export const CapaPlanner = ({ capa, nome, membroDesde, dias, nivel, onSelo, semE
       )}
       {/* a marca "core" em hot stamping */}
       <div aria-hidden data-marca-core="" style={{ position: "absolute", right: G.relevo.dir, bottom: G.relevo.base, lineHeight: 0 }}>
-        <HotStamp texto="core" paradas={c.foil} tamanho={G.relevo.tam} peso={900} espaco={-0.03 * G.relevo.tam} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.relevo.tam * 2.4} altura={G.relevo.tam * 1.05} />
+        <HotStamp texto="core" paradas={gravacaoDoNivel(nivel).paradas} contorno={gravacaoDoNivel(nivel).contorno} tamanho={G.relevo.tam} peso={900} espaco={-0.03 * G.relevo.tam} sombra={c.prensaSombra} luz={c.prensaLuz} largura={G.relevo.tam * 2.4} altura={G.relevo.tam * 1.05} />
       </div>
     </div>
   );

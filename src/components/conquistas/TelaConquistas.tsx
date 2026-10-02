@@ -264,11 +264,13 @@ export const TelaConquistas = () => {
 
           {/* o seletor de CAPA (02/10): amostras do MATERIAL de cada capa; as que o tempo libera
               (Bordô · 14 dias, Noite · 30) ficam com cadeado e dizem o requisito ao toque — sem bloco novo.
-              Em 360 o rótulo "CAPA" sai pra caber na mesma fileira. */}
+              (02/10, print do dono: o rótulo "CAPA" ficava por baixo da 1ª amostra — com 8 capas a fileira
+              centralizada estourava pros dois lados) — sem rótulo; a fileira centraliza quando cabe e rola de
+              lado quando não cabe, nunca passando por cima de nada. */}
           <div className="grid gap-2.5 entra-sobe" style={{ "--d": "120ms", gridTemplateColumns: "1fr auto" } as React.CSSProperties}>
             <div role="radiogroup" aria-label="Capa do planner" className="h-11 min-w-0 rounded-xl border border-border flex items-center gap-1.5 px-2" data-testid="seletor-capa">
-              <span className="hidden min-[430px]:inline text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground shrink-0">CAPA</span>
-              <span className="flex items-center justify-center flex-1 min-w-0">
+              <span className="flex-1 min-w-0 overflow-x-auto scrollbar-hide" data-testid="seletor-capa-trilho">
+              <span className="flex items-center w-max mx-auto">
                 {ORDEM_CAPAS.map((id) => {
                   const ativa = id === capa;
                   const travada = !capaLiberada(id, seq.recorde);
@@ -294,6 +296,7 @@ export const TelaConquistas = () => {
                   );
                 })}
               </span>
+              </span>
             </div>
             <button
               type="button"
@@ -302,7 +305,8 @@ export const TelaConquistas = () => {
               data-testid="postar-stories"
             >
               <Instagram className="w-[18px] h-[18px]" aria-hidden />
-              Postar nos Stories
+              {/* em tela estreita só "Stories", pra as 8 capas caberem na fileira ao lado */}
+              <span><span className="hidden min-[421px]:inline">Postar nos </span>Stories</span>
             </button>
           </div>
 

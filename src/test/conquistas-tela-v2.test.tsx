@@ -383,7 +383,7 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     expect(p0).toHaveTextContent("PRÓXIMAS A COLAR");
     expect(p0.querySelector('[data-vaga="sequencia-7"] .vaga-n')).toHaveTextContent("Nº 01");
     expect(within(tela).getByTestId("album-tela-dica")).toHaveTextContent(/A mais perto:/);
-    expect(eventos).toContainEqual(["album_abrir", { adesivos: 2, novas: 0 }]);
+    expect(eventos).toContainEqual(["album_abrir", { adesivos: 2, novas: 0, via: "card", pagina: 0 }]);
     // as abas
     fireEvent.click(within(tela).getByTestId("album-aba-epico"));
     expect(tela).toHaveAttribute("data-atual", "2");
@@ -415,7 +415,7 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     fireEvent.click(screen.getByTestId("album-pacotinho"));
     await screen.findByTestId("album-tela");
     expect((store.dados[CHAVE_ALBUM_VISTO] as string[]).sort()).toEqual(["leitura-1", "sequencia-7"]);
-    expect(eventos).toContainEqual(["album_abrir", { adesivos: 2, novas: 1 }]);
+    expect(eventos).toContainEqual(["album_abrir", { adesivos: 2, novas: 1, via: "pacotinho", pagina: 0 }]);
   });
 
   it("a 1ª vez desta versão entra em silêncio (tudo o que já estava colado vira visto); sem adesivo, 'COMEÇANDO O ÁLBUM'", async () => {

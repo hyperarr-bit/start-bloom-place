@@ -24,10 +24,19 @@ interface Props {
   nome: string;
   ano: number;
   onAbrir: () => void;
+  /**
+   * O PACOTINHO (02/10, vídeo do dono no iPhone: "toque pra abrir o pacotinho"
+   * não respondia). Antes a linha chamava o MESMO `onAbrir` do botão "Abrir o
+   * álbum": o álbum abria na capa e na 1ª página, e a figurinha nova — que é
+   * o motivo do toque — ficava numa página lá na frente, sem nada na tela
+   * dizendo que o pacotinho abriu. Agora o pacotinho tem o próprio caminho:
+   * abre o álbum DIRETO na página da figurinha nova, que cola com o pop.
+   */
+  onAbrirPacotinho?: () => void;
   onCompartilhar: () => void;
 }
 
-export const CardAlbum = ({ maisRaros, abertos, total, porRaridade, proximo, novas, nome, ano, onAbrir, onCompartilhar }: Props) => {
+export const CardAlbum = ({ maisRaros, abertos, total, porRaridade, proximo, novas, nome, ano, onAbrir, onAbrirPacotinho, onCompartilhar }: Props) => {
   const pct = total > 0 ? Math.round((abertos / total) * 100) : 0;
   return (
     <section className="rounded-2xl border border-border bg-card p-3.5" aria-labelledby="titulo-album" data-testid="album-card" data-novas={novas}>
@@ -46,7 +55,7 @@ export const CardAlbum = ({ maisRaros, abertos, total, porRaridade, proximo, nov
           </div>
           <div className="text-[11px] text-muted-foreground mt-1.5">{resumoRaridades(porRaridade)}</div>
           {novas > 0 ? (
-            <button type="button" className="alb-pacote" onClick={onAbrir} data-testid="album-pacotinho">
+            <button type="button" className="alb-pacote" onClick={onAbrirPacotinho ?? onAbrir} data-testid="album-pacotinho" aria-label={`${novas} ${novas === 1 ? "figurinha nova" : "figurinhas novas"} — abrir o pacotinho`}>
               <span className="alb-pacote-fig" aria-hidden />
               <span className="min-w-0">
                 <b className="block text-[11.5px] text-foreground">{novas} {novas === 1 ? "figurinha nova" : "figurinhas novas"}</b>

@@ -76,6 +76,7 @@ export const TelaConquistas = () => {
   const [detalheIns, setDetalheIns] = useState<Insignia | null>(null);
   const [albumAberto, setAlbumAberto] = useState(false);
   const [novasNoAlbum, setNovasNoAlbum] = useState<string[]>([]);
+  const [albumDe, setAlbumDe] = useState<{ pagina: number; via: "card" | "pacotinho" }>({ pagina: 0, via: "card" });
   const [valoresAberto, setValoresAberto] = useState(false);
   const [dica, setDica] = useState(false);
   const desafiosOcultos = get<unknown>(CHAVE_DESAFIOS_OCULTOS, false) === true;
@@ -184,6 +185,20 @@ export const TelaConquistas = () => {
   const consumirDireto = useCallback(() => setArteDireta(null), []);
   const abrirAlbum = () => {
     setNovasNoAlbum(novas);
+    setAlbumDe({ pagina: 0, via: "card" });
+    setAlbumAberto(true);
+    if (visto) set(CHAVE_ALBUM_VISTO, coladas, { system: true });
+  };
+  /**
+   * O PACOTINHO (02/10): abre o álbum direto na página da figurinha nova (a 1ª
+   * das novas, na ordem do álbum), que cola com o pop — e marca tudo como
+   * visto. Antes era o mesmo caminho de "Abrir o álbum" (capa + página 1) e
+   * a figurinha nova ficava numa página lá na frente.
+   */
+  const abrirPacotinho = () => {
+    const alvo = paginas.findIndex((p) => p.vagas.some((b) => novas.includes(b.id)));
+    setNovasNoAlbum(novas);
+    setAlbumDe({ pagina: alvo > 0 ? alvo : 0, via: "pacotinho" });
     setAlbumAberto(true);
     if (visto) set(CHAVE_ALBUM_VISTO, coladas, { system: true });
   };
@@ -300,6 +315,7 @@ export const TelaConquistas = () => {
               nome={perfil.nome}
               ano={insig.ano}
               onAbrir={abrirAlbum}
+              onAbrirPacotinho={abrirPacotinho}
               onCompartilhar={compartilharAlbum}
             />
           </div>
@@ -339,6 +355,8 @@ export const TelaConquistas = () => {
             nivel={conq.nivel.name}
             ano={insig.ano}
             diasDeSequencia={seq.dias}
+            paginaInicial={albumDe.pagina}
+            via={albumDe.via}
             onFechar={() => setAlbumAberto(false)}
             onCompartilhar={compartilharAlbum}
             onCompartilharFigurinha={(b) => setPreviaAdesivo(b)}

@@ -195,36 +195,94 @@ export interface AlbumTelaProps {
   nivel: string;
   ano: number;
   diasDeSequencia: number;
+  /** Abre direto nesta página (o pacotinho abre na página da figurinha nova). */
+  paginaInicial?: number;
+  /** De onde veio a abertura (vai no evento `album_abrir`). */
+  via?: "card" | "pacotinho";
   onFechar: () => void;
   onCompartilhar: () => void;
   onCompartilharFigurinha: (b: Badge) => void;
 }
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+/**
+ * A VIRADA (02/10, vídeo do dono no iPhone: a animação passava por uma PÁGINA
+ * BEGE VAZIA antes da página seguinte). A virada antiga girava a folha de 0°
+ * a 180° com `backface-visibility: hidden` e um fade por keyframes, e a capa
+ * trocava de z-index no instante em que começava a girar — três coisas que
+ * cada motor (WebKit do iPhone, Chromium) resolve de um jeito, e no iPhone
+ * sobrava uma folha em branco. Agora:
+ *   · a folha que SAI gira só de 0° a −90° (até ficar de perfil) e some; a
+ *     página de destino já está montada e inteira por baixo desde o 1º
+ *     quadro — não existe estado em que a mesa mostra uma folha sem conteúdo;
+ *   · voltar é o espelho: a página de destino DESDOBRA da lombada (−90° → 0°)
+ *     por cima da atual;
+ *   · a capa gira só até o perfil (0° → −90°), sempre na frente, e as
+ *     figurinhas da 1ª página começam a colar no instante em que a capa
+ *     revela a página (não 400 ms depois);
+ *   · cada página é um contexto de empilhamento (`isolation`): a pílula do
+ *     progresso de uma página não vaza por cima da folha que está virando.
+ * Nada de backface nem de ordenação 3D entre irmãos: só uma folha girando até
+ * o perfil por cima de uma página pronta.
+ */
+export const DURACAO_VIRADA_MS = 340;
+/** A capa fica parada este tempo antes de virar (a pessoa vê a capa). */
+export const CAPA_PARADA_MS = 500;
+export const CAPA_GIRO_MS = 420;
+/** O instante em que a capa revela a 1ª página = quando as figurinhas começam a colar. */
+export const CAPA_REVELA_MS = CAPA_PARADA_MS + CAPA_GIRO_MS;
+
+interface Virada {
+  /** A folha que gira por cima: pra frente é a página que sai; pra trás, a que entra. */
+  sobre: PaginaAlbum;
+  sobreIndice: number;
+  /** O que fica por baixo enquanto gira: pra frente é a página de destino; pra trás, a que sai. */
+  fundo: PaginaAlbum;
+  fundoIndice: number;
+  dir: 1 | -1;
+  chave: number;
+}
+
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = useReducedMotion();
   const navigate = useNavigate();
-  const [atual, setAtual] = useState(0);
-  const [virando, setVirando] = useState<{ p: PaginaAlbum; indice: number; dir: 1 | -1; chave: number } | null>(null);
+  const n = paginas.length;
+  const inicial = Math.max(0, Math.min(n - 1, paginaInicial));
+  const [atual, setAtual] = useState(inicial);
+  const [virando, setVirando] = useState<Virada | null>(null);
   const [capaVisivel, setCapaVisivel] = useState(false);
   const [capaGirada, setCapaGirada] = useState(false);
   const [detalhe, setDetalhe] = useState<Badge | null>(null);
   const [largura, setLargura] = useState(330);
-  const n = paginas.length;
+  /**
+   * Ainda na página de abertura? As figurinhas dela colam com o pop quando a
+   * capa revela a página — e SÓ ali. (02/10: a lista de "colar" levava as 6
+   * mais raras, que também moram nas páginas das seções: virar pra LENDÁRIOS
+   * ou ÉPICOS logo depois de abrir mostrava a página sem as figurinhas por
+   * 260 ms + a cadência — a "página bege vazia" do vídeo.)
+   */
+  const [abertura, setAbertura] = useState(true);
   const novasSet = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
     if (typeof window !== "undefined") setLargura(Math.min(330, Math.max(240, window.innerWidth - 48)));
   }, [aberto]);
 
-  // abrir: a capa vira na lombada e as figurinhas da 1ª página colam uma a uma
+  // abrir: a capa vira na lombada e as figurinhas da página de abertura colam uma a uma
   useEffect(() => {
     if (!aberto) { setAtual(0); setVirando(null); setDetalhe(null); setCapaVisivel(false); setCapaGirada(false); return; }
-    novasSet.current = new Set([...novas, ...paginas[0].vagas.map((b) => b.id)]);
-    trackEvent("album_abrir", { adesivos: abertos, novas: novas.length });
+    setAtual(inicial);
+    setVirando(null);
+    setAbertura(true);
+    // só as figurinhas NOVAS colam com o pop nas páginas delas; as da página de
+    // abertura colam uma vez, na abertura (ver `colar` abaixo)
+    novasSet.current = new Set(novas);
+    trackEvent("album_abrir", { adesivos: abertos, novas: novas.length, via, pagina: inicial });
     if (reduzir) return;
     setCapaVisivel(true);
-    const t1 = setTimeout(() => setCapaGirada(true), 650);
-    const t2 = setTimeout(() => setCapaVisivel(false), 650 + 800);
+    setCapaGirada(false);
+    const t1 = setTimeout(() => setCapaGirada(true), CAPA_PARADA_MS);
+    // rede de segurança: se o fim da animação não avisar, a capa sai no tempo dela
+    const t2 = setTimeout(() => setCapaVisivel(false), CAPA_REVELA_MS + 120);
     return () => { clearTimeout(t1); clearTimeout(t2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
@@ -243,21 +301,32 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     return () => { document.body.style.overflow = anterior; window.removeEventListener("keydown", tecla); };
   }, [aberto, detalhe, onFechar]);
 
+  const chaveDaVirada = useRef(0);
   const irPara = useCallback((i: number) => {
     const alvo = Math.max(0, Math.min(n - 1, i));
     if (alvo === atual) return;
-    if (!reduzir) setVirando({ p: paginas[atual], indice: atual, dir: alvo > atual ? 1 : -1, chave: Date.now() });
+    if (!reduzir) {
+      const dir: 1 | -1 = alvo > atual ? 1 : -1;
+      // toques rápidos em sequência: cada toque é uma virada nova (chave própria); a anterior sai na hora
+      chaveDaVirada.current += 1;
+      setVirando(dir > 0
+        ? { sobre: paginas[atual], sobreIndice: atual, fundo: paginas[alvo], fundoIndice: alvo, dir, chave: chaveDaVirada.current }
+        : { sobre: paginas[alvo], sobreIndice: alvo, fundo: paginas[atual], fundoIndice: atual, dir, chave: chaveDaVirada.current });
+    }
     setAtual(alvo);
+    setAbertura(false);
     trackEvent("album_pagina", { indice: alvo, secao: paginas[alvo]?.id });
   }, [atual, n, paginas, reduzir]);
 
+  // a folha some quando a animação termina (onAnimationComplete); este relógio é a rede de segurança
   useEffect(() => {
     if (!virando) return;
-    const t = setTimeout(() => setVirando(null), 600);
+    const t = setTimeout(() => setVirando((v) => (v && v.chave === virando.chave ? null : v)), DURACAO_VIRADA_MS + 200);
     return () => clearTimeout(t);
   }, [virando]);
+  const terminarVirada = useCallback((chave: number) => setVirando((v) => (v && v.chave === chave ? null : v)), []);
 
-  // cada figurinha cola UMA vez: depois que a página dela apareceu, sai da lista (voltar à página não cola de novo)
+  // cada figurinha NOVA cola UMA vez: depois que a página dela apareceu, sai da lista (voltar à página não cola de novo)
   useEffect(() => {
     if (!aberto) return;
     const ids = [...paginas[Math.min(atual, n - 1)].vagas, ...paginas[Math.min(atual, n - 1)].proximos].map((b) => b.id);
@@ -267,6 +336,10 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
 
   if (!aberto) return null;
   const pagina = paginas[Math.min(atual, n - 1)];
+  // o que cola com o pop nesta página: as novas (sempre) + as da página de abertura (só na abertura)
+  const colar: Set<string> | null = abertura && !reduzir
+    ? new Set([...novasSet.current, ...paginas[inicial].vagas.map((b) => b.id)])
+    : novasSet.current.size ? novasSet.current : null;
   const abas = [{ id: "mais-raros", rot: "★", rar: "destaque" as const }, ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", rot: TITULO_SECAO[r].slice(0, 3), rar: r })).filter((s) => s.id)];
   const ativaAba = (s: { id: string; rar: string }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar);
   const alturaCapa = Math.round(largura * 1.42);
@@ -296,27 +369,51 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           <div className="alb-lombada" />
           <div className="alb-pilha" />
           <div className="alb-folha" data-folha="" style={{ perspective: 1200 }}>
-            <Pagina p={pagina} indice={atual} total={n} largura={largura} adesivos={adesivos} ativa colar={capaVisivel || novasSet.current.size ? novasSet.current : null} atrasoBase={capaVisivel ? 1350 : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />
-            <AnimatePresence>
-              {virando && (
-                <motion.div key={virando.chave} className="alb-pag-vira" initial={{ rotateY: 0, opacity: 1 }} animate={{ rotateY: virando.dir > 0 ? -180 : 180, opacity: [1, 1, 0, 0] }} exit={{ opacity: 0 }} transition={{ duration: 0.56, ease: [0.45, 0, 0.55, 1] }} aria-hidden>
-                  <Pagina p={virando.p} indice={virando.indice} total={n} largura={largura} adesivos={adesivos} ativa={false} colar={null} atrasoBase={0} diasDeSequencia={diasDeSequencia} onSelecionar={() => undefined} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* a página de baixo: pra frente já é a de destino (inteira, desde o 1º quadro); pra trás é a que sai */}
+            <Pagina p={virando ? virando.fundo : pagina} indice={virando ? virando.fundoIndice : atual} total={n} largura={largura} adesivos={adesivos} ativa={!virando} colar={colar} atrasoBase={capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />
+            {/* a folha que gira: sem animação de saída (a −90° ela está de perfil, invisível) — some na hora, e um
+                toque rápido em sequência troca a folha pela nova (chave) sem sobra */}
+            {virando && (
+              <motion.div
+                key={virando.chave}
+                className="alb-pag-vira"
+                data-testid="album-virando"
+                data-dir={virando.dir > 0 ? "frente" : "tras"}
+                data-pagina={virando.sobre.id}
+                initial={{ rotateY: virando.dir > 0 ? 0 : -90 }}
+                animate={{ rotateY: virando.dir > 0 ? -90 : 0 }}
+                transition={{ duration: DURACAO_VIRADA_MS / 1000, ease: virando.dir > 0 ? [0.5, 0, 0.9, 0.4] : [0.1, 0.6, 0.5, 1] }}
+                onAnimationComplete={() => terminarVirada(virando.chave)}
+                aria-hidden
+              >
+                <Pagina p={virando.sobre} indice={virando.sobreIndice} total={n} largura={largura} adesivos={adesivos} ativa={false} colar={null} atrasoBase={0} diasDeSequencia={diasDeSequencia} onSelecionar={() => undefined} />
+                {/* a sombra da folha dobrando (escurece conforme deita) */}
+                <motion.div aria-hidden className="alb-pag-sombra" initial={{ opacity: virando.dir > 0 ? 0 : 0.35 }} animate={{ opacity: virando.dir > 0 ? 0.35 : 0 }} transition={{ duration: DURACAO_VIRADA_MS / 1000 }} />
+              </motion.div>
+            )}
           </div>
           <div className="alb-abas" role="tablist" aria-label="Seções do álbum">
             {abas.map((s) => (
               <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-ativa={ativaAba(s) ? "" : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.rar}`}>{s.rot}</button>
             ))}
           </div>
-          {/* a capa, por cima, girando na lombada ao abrir */}
+          {/* a capa, por cima, girando na lombada ao abrir — sempre NA FRENTE, só até o perfil (−90°), e sai */}
           {capaVisivel && (
             <>
-              <motion.div aria-hidden className="absolute inset-0" style={{ transformOrigin: "0 50%", transformStyle: "preserve-3d", backfaceVisibility: "hidden", zIndex: capaGirada ? 0 : 6, borderRadius: "6px 14px 14px 6px" }} initial={{ rotateY: 0 }} animate={{ rotateY: capaGirada ? -172 : 0 }} transition={{ duration: 0.76, ease: [0.45, 0, 0.55, 1] }} data-testid="album-capa-3d">
+              <motion.div
+                aria-hidden
+                className="absolute inset-0"
+                style={{ transformOrigin: "0 50%", zIndex: 6, borderRadius: "6px 14px 14px 6px", willChange: "transform" }}
+                initial={{ rotateY: 0 }}
+                animate={{ rotateY: capaGirada ? -90 : 0 }}
+                transition={{ duration: CAPA_GIRO_MS / 1000, ease: [0.5, 0, 0.85, 0.5] }}
+                onAnimationComplete={() => { if (capaGirada) setCapaVisivel(false); }}
+                data-testid="album-capa-3d"
+                data-girada={capaGirada ? "" : undefined}
+              >
                 <CapaAlbum largura={largura} altura={alturaCapa} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />
               </motion.div>
-              <motion.div aria-hidden className="absolute inset-0 pointer-events-none" style={{ zIndex: 5, borderRadius: "6px 14px 14px 6px", background: "linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 70%)" }} initial={{ opacity: 0 }} animate={{ opacity: capaGirada ? [0, 0.45, 0] : 0 }} transition={{ duration: 0.76 }} />
+              <motion.div aria-hidden className="absolute inset-0 pointer-events-none" style={{ zIndex: 5, borderRadius: "6px 14px 14px 6px", background: "linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 70%)" }} initial={{ opacity: 0 }} animate={{ opacity: capaGirada ? 0.4 : 0 }} transition={{ duration: CAPA_GIRO_MS / 1000 }} />
             </>
           )}
         </motion.div>

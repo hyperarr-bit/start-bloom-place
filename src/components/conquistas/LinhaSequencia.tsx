@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import type { CSSProperties } from "react";
 import { Check, ChevronRight, Flame } from "lucide-react";
+import { Fogo } from "./Fogo";
 import type { Sequencia } from "./use-conquistas";
 
 /**
@@ -8,14 +10,17 @@ import type { Sequencia } from "./use-conquistas";
  * no menu, e quase ninguém chegava nela.
  *
  * (02/10) a linha diz O QUÊ falta — a ação da pessoa ("falta 1 coisa: marque o
- * treino de terça"), não um texto fixo. Na HOME ela é de UMA cor só: a do SCORE
- * do tema (amarelo no Original, azul no Índigo…) — o fogo, os dias e o
- * "garantido" (dono 02/10: "cores demais"). O fogo por faixa (laranja,
- * vermelho, roxo, azul, dourado) mora só na tela de Conquistas.
+ * treino de terça"), não um texto fixo. Cores (dono 02/10, 2ª rodada): o FOGO e
+ * os "N dias" na cor da FAIXA da sequência (laranja → vermelho → roxo → azul →
+ * dourado — a recompensa aparece no dia a dia, como no Duolingo); o "garantido
+ * hoje" na cor do SCORE do tema (amarelo no Original, azul no Índigo…), que é a
+ * cor da Home. Nada de verde.
  */
 export const LinhaSequencia = ({ seq }: { seq: Sequencia }) => {
   const navigate = useNavigate();
   const cor = { color: "hsl(var(--score-ring, var(--warning)))" };
+  // os dias na cor da faixa, legível no claro e no escuro (as cores de texto do "hoje" da faixa)
+  const corDosDias = { "--dias-c": seq.faixa.hojeTexto, "--dias-cd": seq.faixa.hojeTextoEscuro } as CSSProperties;
   return (
     <button
       type="button"
@@ -23,19 +28,19 @@ export const LinhaSequencia = ({ seq }: { seq: Sequencia }) => {
       className="mt-4 pt-3 w-full border-t border-border/60 flex items-center gap-1.5 text-[12.5px] text-left whitespace-nowrap overflow-hidden"
       data-testid="linha-sequencia"
     >
-      <Flame
-        className={`w-[17px] h-[17px] shrink-0${seq.dias > 0 ? "" : " text-muted-foreground"}`}
-        style={seq.dias > 0 ? { ...cor, fill: "currentColor", fillOpacity: 0.22 } : undefined}
-        strokeWidth={2.2}
-        aria-hidden
-        data-testid="linha-sequencia-fogo"
-      />
+      {seq.dias > 0 ? (
+        <span className="inline-flex shrink-0" data-testid="linha-sequencia-fogo">
+          <Fogo faixa={seq.faixa} tamanho={17} semBrilho />
+        </span>
+      ) : (
+        <Flame className="w-[17px] h-[17px] shrink-0 text-muted-foreground" strokeWidth={2.2} aria-hidden data-testid="linha-sequencia-fogo" />
+      )}
       {seq.dias > 0 ? (
         <>
-          <b className="font-bold tabular-nums" style={cor} data-testid="linha-sequencia-dias">
+          <b className="font-bold tabular-nums text-[var(--dias-c)] dark:text-[var(--dias-cd)]" style={corDosDias} data-testid="linha-sequencia-dias">
             {seq.dias} {seq.dias === 1 ? "dia" : "dias"}
           </b>
-          <span className="text-muted-foreground" aria-hidden>·</span>
+          <span aria-hidden style={{ ...cor, opacity: 0.55 }} data-testid="linha-sequencia-ponto">·</span>
           {seq.hojeFeito ? (
             <span className="font-semibold inline-flex items-center gap-1" style={cor} data-testid="linha-sequencia-garantido">
               garantido hoje <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden />

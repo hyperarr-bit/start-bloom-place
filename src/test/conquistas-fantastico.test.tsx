@@ -115,12 +115,12 @@ describe("capas que o tempo libera", () => {
 });
 
 describe("o card SEQUÊNCIA com o fogo por faixa e a ação da pessoa", () => {
-  it("12 dias = fogo vermelho (cabeçalho, selo e 'faltam 2 dias pro fogo roxo'); a ação é da pessoa (só Finanças) com o chip 'não gastei'", () => {
+  it("12 dias = fogo vermelho (cabeçalho e etiqueta; sem o selo 'FOGO VERMELHO · faltam…', dono 02/10); a ação é da pessoa (só Finanças) com o chip 'não gastei'", () => {
     abrir(montarStore(cenario(12)));
     const card = screen.getByTestId("card-sequencia");
     expect(card).toHaveAttribute("data-faixa", "vermelho");
-    expect(screen.getByTestId("sequencia-faixa")).toHaveTextContent("FOGO VERMELHO");
-    expect(screen.getByTestId("sequencia-faixa")).toHaveTextContent("faltam 2 dias pro fogo roxo");
+    expect(screen.queryByTestId("sequencia-faixa")).toBeNull();
+    expect(card).not.toHaveTextContent("pro fogo roxo");
     expect(screen.getByTestId("acao-do-dia")).toHaveAttribute("data-acao", "financas");
     expect(screen.getByTestId("acao-principal")).toHaveTextContent("anote o gasto de hoje");
     expect(screen.getByTestId("acao-chips").querySelectorAll(".seq-chip")).toHaveLength(1);

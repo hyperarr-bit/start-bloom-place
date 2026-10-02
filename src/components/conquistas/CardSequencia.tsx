@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { protetorGanhoNaSemana, semanaCompleta, semanaDaSequencia, type DiaDaSemana } from "@/lib/sequencia-semana";
-import { CHAVE_FOGO_VISTO, fraseDaProximaFaixa, lerFaixaVista, mudancaDeFaixa, type Faixa } from "@/lib/fogo-sequencia";
+import { CHAVE_FOGO_VISTO, lerFaixaVista, mudancaDeFaixa, type Faixa } from "@/lib/fogo-sequencia";
 import { CHAVE_SEM_GASTO, diaSemGasto, marcarDiaSemGasto, type Chip } from "@/lib/acao-do-dia";
 import type { Sequencia } from "./use-conquistas";
 import { LembreteDaSequencia } from "./LembreteDaSequencia";
@@ -127,7 +127,6 @@ export const CardSequencia = ({ seq, onAcao }: Props) => {
   const semana = useMemo(() => semanaDaSequencia(lista, usados, hoje), [lista, usados, hoje]);
   const completa = semanaCompleta(semana);
   const ganhouProtetor = useMemo(() => completa && protetorGanhoNaSemana(lista, hoje), [completa, lista, hoje]);
-  const proximaFaixa = fraseDaProximaFaixa(dias);
 
   // "hoje garantido" com o card na tela → a micro-animação (nunca na 1ª pintura)
   const [agora, setAgora] = useState(false);
@@ -232,13 +231,7 @@ export const CardSequencia = ({ seq, onAcao }: Props) => {
         </div>
       )}
 
-      {/* a faixa do fogo e quanto falta pra próxima cor (uma linha, discreta) */}
-      {dias > 0 && (
-        <div className="seq-faixa-linha" data-testid="sequencia-faixa">
-          <span className="seq-faixa-selo">{faixa.rotulo}</span>
-          {proximaFaixa && <span className="seq-faixa-prox">{proximaFaixa}</span>}
-        </div>
-      )}
+      {/* 02/10 (dono): sem o selo "FOGO VERMELHO · faltam N dias pro fogo roxo" — a cor do fogo já diz; a comemoração ao trocar de cor continua */}
 
       <div className="px-4 pt-2 pb-3 text-[12.5px] text-muted-foreground leading-relaxed">
         <div className="relative min-h-[20px]">

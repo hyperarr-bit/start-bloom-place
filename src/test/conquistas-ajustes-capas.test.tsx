@@ -81,33 +81,34 @@ describe("a gravação da capa segue o metal do nível", () => {
   });
 });
 
-describe("linha da sequência na Home: uma cor só, a do score do tema", () => {
+describe("linha da sequência na Home: fogo e dias na cor da faixa, 'garantido' na cor do score", () => {
   const HOJE = "2026-10-07";
   const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: { texto: "marque um hábito" } as Sequencia["acao"], faixa: faixaDoFogo(12), protegidoOntem: false, ...p });
-
   // (renderToStaticMarkup: o jsdom joga fora `color: hsl(var(--x))` — o HTML do servidor guarda o estilo como está)
   const html = (p: Partial<Sequencia>) => renderToStaticMarkup(<StaticRouter location="/home"><LinhaSequencia seq={seq(p)} /></StaticRouter>);
   const SCORE = "color:hsl(var(--score-ring, var(--warning)))";
-  const tag = (marcado: string, id: string) => new RegExp(`<[^>]*style="[^"]*"[^>]*data-testid="${id}"|<[^>]*data-testid="${id}"[^>]*style="[^"]*"`).exec(marcado)?.[0] ?? "";
+  const tag = (marcado: string, id: string) => new RegExp(`<[^>]*data-testid="${id}"[^>]*>[\\s\\S]*?</`).exec(marcado)?.[0] ?? new RegExp(`<[^>]*data-testid="${id}"[^>]*>`).exec(marcado)?.[0] ?? "";
 
-  it("dias, fogo e 'garantido' usam a cor do score (--score-ring) — não a do fogo por faixa nem o verde", () => {
+  it("o 'garantido hoje' usa a cor do score; nada de verde", () => {
     const h = html({ dias: 12, hojeFeito: true });
-    for (const id of ["linha-sequencia-dias", "linha-sequencia-garantido", "linha-sequencia-fogo"]) expect(tag(h, id), id).toContain(SCORE);
+    expect(tag(h, "linha-sequencia-garantido")).toContain(SCORE);
+    expect(tag(h, "linha-sequencia-ponto")).toContain(SCORE); // o "·" entre os dias e o garantido também segue o tema
     expect(h).not.toContain("--success");
-    expect(h).not.toContain("--garantido");
-    expect(h).not.toContain("data-fogo"); // sem o fogo colorido por faixa dentro da linha
   });
 
-  it("em qualquer faixa (3, 8, 20, 45, 120 dias) a cor é a mesma", () => {
+  it("em cada faixa (3, 8, 20, 45, 120 dias) o fogo e os dias seguem a cor da faixa", () => {
     for (const dias of [3, 8, 20, 45, 120]) {
-      const h = html({ dias, faixa: faixaDoFogo(dias), hojeFeito: true });
-      expect(tag(h, "linha-sequencia-dias"), `${dias} dias`).toContain(SCORE);
-      expect(tag(h, "linha-sequencia-fogo"), `${dias} dias`).toContain(SCORE);
-      expect(h).not.toContain(faixaDoFogo(dias).meio);
+      const f = faixaDoFogo(dias);
+      const h = html({ dias, faixa: f, hojeFeito: true });
+      expect(tag(h, "linha-sequencia-fogo"), `${dias} dias`).toContain(`data-fogo="${f.id}"`);
+      expect(tag(h, "linha-sequencia-dias"), `${dias} dias`).toContain(f.hojeTexto);
+      expect(tag(h, "linha-sequencia-dias"), `${dias} dias`).not.toContain("--score-ring");
     }
   });
 
-  it("sem sequência: fogo apagado (cinza), sem cor de score", () => {
-    expect(tag(html({ dias: 0 }), "linha-sequencia-fogo")).not.toContain("--score-ring");
+  it("sem sequência: fogo apagado (cinza), sem cor de faixa nem de score", () => {
+    const h = tag(html({ dias: 0 }), "linha-sequencia-fogo");
+    expect(h).not.toContain("--score-ring");
+    expect(h).not.toContain("data-fogo");
   });
 });

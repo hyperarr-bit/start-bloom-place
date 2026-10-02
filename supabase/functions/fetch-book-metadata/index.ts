@@ -7,6 +7,13 @@ const corsHeaders = {
 
 const ALLOWED_DOMAINS = [
   'amazon.com', 'amazon.com.br', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.it', 'amazon.co.jp',
+  // (02/10) Links CURTOS que o app da Amazon gera no "Compartilhar"
+  // (https://a.co/d/…, amzn.to, amzn.eu). Chamado de cliente (Android, 29/09):
+  // "não consigo puxar nenhum livro… mesmo utilizando o link da Amazon" — o
+  // link que ela colava era um a.co e caía em "URL domain not allowed" antes
+  // de qualquer busca. Só o domínio é liberado: o redirecionamento continua
+  // manual e cada salto passa pelo mesmo `isAllowedUrl` (anti-SSRF).
+  'a.co', 'amzn.to', 'amzn.eu', 'amzn.asia',
   'goodreads.com',
   'books.google.com',
   'saraiva.com.br',
@@ -308,20 +315,17 @@ Deno.serve(async (req) => {
     }
 
     console.log('Fetching metadata from:', url);
-    const hostname = new URL(url).hostname.toLowerCase();
 
-    // Try to extract ASIN from Amazon URLs for direct API approach
-    const asinMatch = url.match(/\/(?:dp|product|gp\/product)\/([A-Z0-9]{10})/i)
-      || url.match(/\/([A-Z0-9]{10})(?:[/?]|$)/);
-
-    // Try to extract ISBN
-    const isbnMatch = url.match(/(?:isbn[=\/:]?\s*)(\d{10,13})/i)
-      || url.match(/\/(\d{13})(?:[/?]|$)/);
+    // (02/10) A URL onde a página de fato está, depois dos redirecionamentos:
+    // um link curto (a.co/d/…) não tem ASIN nem hostname da Amazon — quem tem
+    // é o destino. ASIN, ISBN e hostname são lidos dela, abaixo do fetch.
+    let urlFinal = url;
 
     // SECURITY: redirect manual + timeout para mitigar SSRF
     const fetchWithGuard = async (target: string, depth = 0): Promise<Response> => {
       if (depth > 3) throw new Error('Too many redirects');
       if (!isAllowedUrl(target)) throw new Error('Redirect target not allowed');
+      urlFinal = target;
       const r = await fetch(target, {
         headers: {
           'User-Agent': UA,
@@ -345,6 +349,18 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status}`);
     }
+
+    const hostname = new URL(urlFinal).hostname.toLowerCase();
+
+    // Try to extract ASIN from Amazon URLs for direct API approach (da URL
+    // final — o link curto não o carrega; a original fica de reserva)
+    const asinMatch = urlFinal.match(/\/(?:dp|product|gp\/product)\/([A-Z0-9]{10})/i)
+      || url.match(/\/(?:dp|product|gp\/product)\/([A-Z0-9]{10})/i)
+      || urlFinal.match(/\/([A-Z0-9]{10})(?:[/?]|$)/);
+
+    // Try to extract ISBN
+    const isbnMatch = urlFinal.match(/(?:isbn[=\/:]?\s*)(\d{10,13})/i)
+      || urlFinal.match(/\/(\d{13})(?:[/?]|$)/);
 
     const html = await response.text();
 

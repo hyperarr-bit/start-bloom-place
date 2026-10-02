@@ -108,7 +108,8 @@ describe("Treino: marcar o treino de ontem", () => {
     const { unmount } = await montar(<Treino />);
 
     // o pé discreto no HOJE; a tela de hoje segue sendo a de sexta
-    expect(screen.getByTestId("treino-esqueceu")).toHaveTextContent("ESQUECEU?");
+    // (espera o pé montar: na suíte inteira, com a máquina cheia, o Treino demora mais a carregar)
+    expect(await screen.findByTestId("treino-esqueceu", {}, { timeout: 8000 })).toHaveTextContent("ESQUECEU?");
     expect(screen.getByTestId("treino-hoje")).toHaveTextContent("SEXTA");
     expect(screen.getByTestId("treino-ontem")).not.toHaveTextContent("✓");
 

@@ -188,6 +188,14 @@ describe("o popup 'Capa nova liberada' na orquestra dos momentos", () => {
     await waitFor(() => expect(screen.queryByTestId("momento-capa")).toBeNull());
   });
 
+  it("quem JÁ tinha recorde ≥14 quando as capas chegaram (sem a chave): ganha a capa em silêncio, sem popup (dono 02/10)", async () => {
+    const store = montarStore(cenario(14));
+    abrir(store, <MomentosConquistas />);
+    await waitFor(() => expect(store.dados[CHAVE_CAPAS_VISTAS]).toEqual(["bordo"]));
+    await new Promise((r) => setTimeout(r, 2200));
+    expect(screen.queryByTestId("momento-capa")).toBeNull();
+  }, 15000);
+
   it("já comemorada (vista): nada aparece; sem recorde: nada aparece", async () => {
     abrir(montarStore(cenario(14, { [CHAVE_CAPAS_VISTAS]: ["bordo"] })), <MomentosConquistas />);
     await new Promise((r) => setTimeout(r, 2200));

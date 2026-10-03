@@ -88,14 +88,29 @@ describe("reservarConviteDeValor (iPhone)", () => {
   });
 });
 
-describe("iPhone: nada de pedido no funil nem caixinha automática", () => {
+describe("iPhone: nada de pedido no funil; caixinha nos momentos de uso a partir do 2º dia (03/10)", () => {
   it("plano pronto não pede no iPhone", async () => {
     expect(await pedirAvaliacaoPlanoPronto()).toBe(false);
     expect(m.requestReview).not.toHaveBeenCalled();
   });
-  it("conta paga / sequência / retrospectiva não abrem a caixinha no iPhone", async () => {
+  it("(03/10) conta paga / sequência / retrospectiva: no 1º dia de uso NÃO pedem; voltando num 2º dia, a caixinha da Apple abre (igual ao Android)", async () => {
+    registrarDiaDeUso(new Date(2026, 8, 21, 10));
     expect(await pedirAvaliacaoSePuder("conta_paga", { pagante: true })).toBe(false);
     expect(await pedirAvaliacaoSePuder("retrospectiva", { forte: true })).toBe(false);
+    expect(m.requestReview).not.toHaveBeenCalled();
+    registrarDiaDeUso(new Date(2026, 8, 22, 10));
+    expect(await pedirAvaliacaoSePuder("sequencia_habito", { pagante: true })).toBe(true);
+    expect(m.requestReview).toHaveBeenCalledTimes(1);
+    expect(m.track).toHaveBeenCalledWith("app_avaliacao_pedida", expect.objectContaining({ motivo: "sequencia_habito" }));
+    // a trava de 90 dias vale igual: a próxima não pede
+    expect(await pedirAvaliacaoSePuder("conta_paga", { pagante: true })).toBe(false);
+    expect(m.requestReview).toHaveBeenCalledTimes(1);
+  });
+  it("(03/10) no iPhone o funil e o 1º gasto continuam sem caixinha, mesmo com 2 dias de uso", async () => {
+    doisDias();
+    expect(await pedirAvaliacaoSePuder("plano_pronto", { forte: true })).toBe(false);
+    expect(await pedirAvaliacaoSePuder("primeiro_gasto", { pagante: true })).toBe(false);
+    expect(await pedirAvaliacaoPlanoPronto()).toBe(false);
     expect(m.requestReview).not.toHaveBeenCalled();
   });
   it("convites do 1º gasto e do funil não existem no iPhone", () => {

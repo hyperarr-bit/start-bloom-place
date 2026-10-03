@@ -113,6 +113,9 @@ const CHAVE_RECUSAS_VALOR = "core-avaliacao-valor-recusas";
 const MAX_RECUSAS_VALOR = 2;
 export const DIAS_MINIMOS_PRA_CONVIDAR = 2;
 
+/** Os momentos em que o iPhone pede a caixinha direto (03/10): os de uso do Android — nunca o funil nem o 1º gasto. */
+const MOTIVOS_DIRETOS_NO_IPHONE = new Set<MotivoAvaliacao>(["sequencia_habito", "conta_paga", "retrospectiva", "extrato_importado", "meta_batida", "desafio_concluido"]);
+
 /** Ações que contam como "acabei de conseguir algo" → rótulo da folha. */
 export const ACOES_DE_VALOR: Record<string, string> = {
   first_transaction: "Gasto lançado",
@@ -317,10 +320,15 @@ export async function pedirAvaliacaoSePuder(
   { pagante = false, vezes = 1, forte = false, tocouParaAvaliar = false }: { pagante?: boolean; vezes?: number; forte?: boolean; tocouParaAvaliar?: boolean } = {},
 ): Promise<boolean> {
   if (!pagante && !forte && vezes < 2) return false;
-  /* iPHONE (23/09): nada de caixinha automática (plano pronto, conta paga,
-   * sequência, retrospectiva…). O único caminho é a pessoa tocar em "Deixar
-   * minha nota" na folha de momento de valor — ver reservarConviteDeValor. */
-  if (noIPhone() && !tocouParaAvaliar) return false;
+  /* iPHONE (03/10, dono: "vê como a Play faz e faz igual"): a caixinha da Apple volta nos MESMOS momentos de uso do
+   * Android (sequência, conta paga, retrospectiva, extrato…) — e continua FORA do funil (plano pronto e 1º gasto seguem
+   * desligados: 97% dos pedidos de 17–23/09 iam pra quem nunca usou). A trava a mais do iPhone: 2+ dias de uso — quem
+   * está no teste grátis só é pedido depois de VOLTAR num 2º dia (a Apple mostra no máx 3×/ano; não gastar no 1º dia).
+   * Medido 26/09–02/10: a folha de convite do iPhone teve 4 vistas e 0 aceites; o Android, com pedido direto, ~370. */
+  if (noIPhone() && !tocouParaAvaliar) {
+    if (!MOTIVOS_DIRETOS_NO_IPHONE.has(motivo)) return false;
+    if (diasDeUso() < DIAS_MINIMOS_PRA_CONVIDAR) return false;
+  }
   /* iPHONE, TOQUE EXPLÍCITO (18/09): a caixinha da Apple (SKStoreReviewController)
    * é uma SUGESTÃO — a Apple decide se mostra, no máximo 3× por ano, e não
    * avisa quando não mostra. 454 pedidos em 7 dias no iPhone renderam poucas

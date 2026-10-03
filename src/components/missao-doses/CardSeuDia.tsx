@@ -110,7 +110,8 @@ function CardSeuDiaLigado({ lifeData, sequencia }: { lifeData: LifeHubData; sequ
                   <span className="md-linha-rotulo">{rot} · {cfg.emoji} {cfg.nome}</span>
                   <span className="md-linha-texto" data-feito={feito ? "" : undefined}>{feito ? feito.rotulo : cfg.pedido}</span>
                 </span>
-                <span className="md-pill" data-tom={feito ? "feito" : ehHoje ? "hoje" : "dia"}>{feito ? "Feito" : ehHoje ? "Hoje" : rot === "AMANHÃ" ? "Amanhã" : `Dia ${n}`}</span>
+                {/* (03/10) o próximo pendente pode ser o de AMANHÃ (o de hoje já foi feito): aí a pílula diz "Amanhã", nunca "Hoje" */}
+                <span className="md-pill" data-tom={feito ? "feito" : ehHoje && rot !== "AMANHÃ" ? "hoje" : "dia"}>{feito ? "Feito" : rot === "AMANHÃ" ? "Amanhã" : ehHoje ? "Hoje" : `Dia ${n}`}</span>
               </button>
             );
           })}

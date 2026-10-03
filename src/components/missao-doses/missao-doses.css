@@ -2,9 +2,11 @@
    por cima do cabeçalho do módulo; a página desce a altura dela enquanto o passo está na tela. */
 :root { --missao-doses-faixa-h: 40px; }
 html[data-missao-doses-faixa] body { padding-top: var(--missao-doses-faixa-h); }
-html[data-missao-doses-faixa] header.sticky { top: var(--missao-doses-faixa-h) !important; }
+/* 03/10 (app das lojas): a faixa começa ABAIXO da status bar/notch (--app-safe-top, 0 na web) e o
+   cabeçalho sticky do módulo desce safe-top + faixa — antes ela ficava atrás do horário/bateria. */
+html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px) + var(--missao-doses-faixa-h)) !important; }
 
-.md-faixa { position: fixed; left: 0; right: 0; top: 0; z-index: 210; height: var(--missao-doses-faixa-h); background: #16121c; color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; font-family: Inter, -apple-system, sans-serif; box-shadow: 0 6px 18px -10px rgba(0,0,0,.6); }
+.md-faixa { position: fixed; left: 0; right: 0; top: var(--app-safe-top, 0px); z-index: 210; height: var(--missao-doses-faixa-h); background: #16121c; color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 12px; font-family: Inter, -apple-system, sans-serif; box-shadow: 0 6px 18px -10px rgba(0,0,0,.6); }
 .md-faixa-quadros { display: inline-flex; gap: 3px; }
 .md-faixa-titulo { font-size: 12.5px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .md-faixa-titulo b { color: rgba(255,255,255,.6); font-weight: 700; }
@@ -31,8 +33,11 @@ html[data-missao-doses-faixa] header.sticky { top: var(--missao-doses-faixa-h) !
 .md-tile[data-marcado] { border-color: #16121c; }
 .md-tile-n { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: #16121c; color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
 .md-tile-emoji { font-size: 28px; line-height: 1; }
-.md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
-.md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+/* `button.md-botao` (03/10): o index.css zera o fundo de `[type="button"]` (regra plana, sem :where, pro WebView
+   antigo) com a MESMA especificidade de `.md-botao` — e quando ele vinha depois na folha o botão grafite ficava
+   branco no branco (os prints de 02/10 já saíam sem o "Fazer o toque de hoje"). Um nível a mais e ele sempre ganha. */
+button.md-botao, .md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
+button.md-botao[data-tom="magenta"], .md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
 .md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }
 .md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
 .md-hora[data-marcada] { background: #16121c; color: #fff; }

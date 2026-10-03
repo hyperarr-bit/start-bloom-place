@@ -53,6 +53,11 @@ export interface PrefsNotificacoes {
   /** "sua sequência acaba hoje" das Conquistas, à noite (26/09) — nasce desligado */
   sequencia: boolean;
   horaSequencia: number;
+  /** Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2): 1 por dia nos 7 primeiros dias no
+   *  aparelho, na hora em que a pessoa abriu o app. Nasce LIGADO — é por uma semana, não pra sempre,
+   *  e é o único aviso que não depende de a pessoa ligar nada. A hora dele não mora aqui (vem da
+   *  abertura ou da missão). */
+  primeiraSemana: boolean;
 }
 
 /**
@@ -94,6 +99,8 @@ export const PREFS_PADRAO: PrefsNotificacoes = {
   horaLimite: 8,
   sequencia: false,
   horaSequencia: 20,
+  // 03/10: nasce LIGADO — vale só a 1ª semana e é o que faz voltar no dia 2 (ver lib/lembrete-dia2)
+  primeiraSemana: true,
 };
 
 export const CHAVE_PREFS = "notif-prefs";
@@ -130,6 +137,7 @@ export const lerPrefs = (bruto: unknown): PrefsNotificacoes => {
     horaLimite: horaValida(p.horaLimite, PREFS_PADRAO.horaLimite),
     sequencia: p.sequencia === true,
     horaSequencia: horaValida(p.horaSequencia, PREFS_PADRAO.horaSequencia),
+    primeiraSemana: p.primeiraSemana !== false,
   };
 };
 

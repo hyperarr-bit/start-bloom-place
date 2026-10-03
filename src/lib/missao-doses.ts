@@ -16,10 +16,26 @@
  * tudo" nos primeiros 20 s (toque fora já solta o anel) — o "Pular" da faixa
  * aparece depois; "Pular este passo" no passo de olhar; nunca trava dura.
  *
- * DESLIGADO POR PADRÃO: `MISSAO_DOSES = "off"` = o app de hoje, byte a byte
- * (nenhum card, nenhuma faixa, nenhum evento novo — travado em
- * src/test/missao-doses.test.tsx). Só web: no app das lojas (isNativeShell) a
- * chave é ignorada nesta etapa. QA sem mexer em ninguém, como o Funil B:
+ * DESLIGADO POR PADRÃO NA WEB: `MISSAO_DOSES = "off"` = o site de hoje, byte a
+ * byte (nenhum card, nenhuma faixa, nenhum evento novo — travado em
+ * src/test/missao-doses.test.tsx).
+ *
+ * LIGADA NO APP DAS LOJAS (03/10, versão 1.0.10): `MISSAO_DOSES_APP = "on"` —
+ * rollback = "off" + build. Dado que mandou: dos 364 pagantes de 8–45 dias, quem
+ * fica usou 4 módulos e fez ~22 registros nas 48 h (quem some: 2 e 6); voltar no
+ * dia 2 dobra a chance de ficar (24% × 10%). No app ela vale SÓ PRA QUEM É NOVO
+ * nesta versão (conta < 48 h, `missaoDosesMandaNoApp`) e SUBSTITUI o que a
+ * pessoa nova via antes — nunca duas missões na tela:
+ *   · a Missão dos 3 dias do iPhone (MissaoDoTrial, `core-missao`): quem já está
+ *     com ela em andamento (veio da 1.0.9) termina a antiga; quem é novo não a
+ *     recebe mais;
+ *   · o tutorial de módulos (QuickStartOnboarding + SpotlightOverlay, flag
+ *     `force-new-user-tutorial`): a Home limpa a flag quando a missão manda, como
+ *     já fazia pra Missão do iPhone.
+ * A hora combinada na comemoração vira a hora do Lembrete do dia 2
+ * (lib/lembrete-dia2) — uma notificação só, com o passo de amanhã.
+ *
+ * QA (só na web; no app a chave do app decide), como o Funil B:
  *   · `?missao-doses=on` liga só neste navegador (`off` força desligado,
  *     `auto` desfaz, `recomecar` apaga a missão deste navegador e segue ligado);
  *   · `?missao-doses-dia=1|2|3` simula o dia da missão (`auto` volta ao
@@ -29,14 +45,36 @@
  * chips gravam — esses são dados de verdade da conta, pelo mesmo `set` que o
  * módulo usa.
  */
-import { isNativeShell } from "@/lib/native-shell";
+import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
+import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 
 export type ModoMissaoDoses = "off" | "on";
+/** A web: desligada (02/10). */
 export const MISSAO_DOSES: ModoMissaoDoses = "off";
+/** O app das lojas (iPhone e Android), 1.0.10: ligada pra quem é novo. ROLLBACK = "off". */
+export const MISSAO_DOSES_APP: ModoMissaoDoses = "on";
+
+/** Conta com menos de 48 h — a mesma régua do tutorial e do PortaoBoasVindas. */
+export const contaNova = (criadoEm?: string | null, agora: number = Date.now()): boolean =>
+  !!criadoEm && agora - new Date(criadoEm).getTime() < 48 * 3600e3;
+
+/**
+ * NO APP, A MISSÃO EM DOSES MANDA? (03/10) É a pergunta que a Home (tutorial), a
+ * MissaoDoTrial (Missão antiga) e a própria orquestra fazem — uma resposta só:
+ *   · já nasceu neste aparelho → sim, até o fim (quem começou termina);
+ *   · há Missão antiga (`core-missao`, 1.0.9) → não: a antiga termina;
+ *   · senão, só pra conta nova (< 48 h). Cliente antigo que atualizou não vê nada.
+ */
+export function missaoDosesMandaNoApp(criadoEm?: string | null): boolean {
+  if (!isNativeShell() || MISSAO_DOSES_APP !== "on") return false;
+  if (lerMissao()) return true;
+  if (missaoAtual()) return false;
+  return contaNova(criadoEm);
+}
 
 /**
  * O LINK DE QA (`?missao-doses=on`) — DESLIGADO em 02/10 (dono: "desativa aquele
@@ -92,9 +130,13 @@ export const diaDeQa = (): 1 | 2 | 3 | null => {
   return d === "1" || d === "2" || d === "3" ? (Number(d) as 1 | 2 | 3) : null;
 };
 
-/** A missão em doses está ligada NESTE navegador? Nativo: nunca (nesta etapa). Força de QA > chave. */
-export function missaoDosesLigada(modo: ModoMissaoDoses = MISSAO_DOSES): boolean {
-  if (isNativeShell()) return false;
+/**
+ * A missão em doses está ligada AQUI? No app das lojas: a chave do app (a força de
+ * QA do link não vale no shell — quem decide se ela NASCE é missaoDosesMandaNoApp).
+ * Na web: a força de QA > chave.
+ */
+export function missaoDosesLigada(modo: ModoMissaoDoses = MISSAO_DOSES, modoApp: ModoMissaoDoses = MISSAO_DOSES_APP): boolean {
+  if (isNativeShell()) return modoApp === "on";
   if (!qaHabilitado()) return modo === "on";
   const f = forcaDaMissaoDoses();
   if (f === "on") return true;
@@ -216,8 +258,16 @@ export function iniciarMissao(modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDa
 
 export const apagarMissao = (): void => { ls.del(CHAVE_ESTADO_MISSAO_DOSES); avisar(); };
 
-/** Um evento de medição da missão em doses (todos levam `prototipo: "web"` nesta etapa). */
-export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<string, unknown> => ({ ...dados, prototipo: "web" });
+/**
+ * Um evento de medição da missão em doses. Na web continua `prototipo: "web"` (a
+ * série de 02/10 não muda); no app leva `prototipo: "app"`, a plataforma e a
+ * versão do build — é o que separa a turma da 1.0.10 da da 1.0.9 nas consultas
+ * (voltou no dia 2, dias de uso na 1ª semana).
+ */
+export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<string, unknown> =>
+  isNativeShell()
+    ? { ...dados, prototipo: "app", plataforma: plataformaApp(), versao: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev" }
+    : { ...dados, prototipo: "web" };
 
 /** O dia da missão em que a pessoa está (1 = o dia em que nasceu), pelo relógio dela — ou pelo QA. */
 export function diaDaMissao(m: EstadoMissaoDoses, hoje: string = localDayKey()): number {

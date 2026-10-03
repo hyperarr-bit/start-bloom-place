@@ -6,19 +6,28 @@ import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { areaEscolhidaNoFunil } from "@/components/missao/MissaoDoTrial";
+import { isNativeShell } from "@/lib/native-shell";
+import { EVENTO_DIA2, combinarHora } from "@/lib/lembrete-dia2";
+import { pedirPermissaoDia2 } from "@/lib/notificacoes";
 import {
   EVENTO_MISSAO_DOSES, MODULOS, apagarMissao, diaDaMissao, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  missaoCumprida, missaoDosesLigada, modulosPadrao, passoPendente, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
+  missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoPendente, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { BoasVindasDoses } from "./BoasVindasDoses";
 import { PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 
 /**
- * A ORQUESTRA DA MISSÃO EM DOSES NA WEB (02/10) — montada no App ao lado da
- * MissaoDoTrial. Com a chave desligada (e sem a força de QA) devolve null
- * antes de qualquer hook de dado: o app de hoje, byte a byte. No app das lojas
- * nunca liga nesta etapa (missaoDosesLigada → false no shell nativo).
+ * A ORQUESTRA DA MISSÃO EM DOSES (02/10, web · 03/10, app) — montada no App ao
+ * lado da MissaoDoTrial. Na web, com a chave desligada (e sem a força de QA)
+ * devolve null antes de qualquer hook de dado: o site de hoje, byte a byte.
+ *
+ * NO APP DAS LOJAS (1.0.10): `MISSAO_DOSES_APP = "on"`. A orquestra monta pra
+ * todo mundo, mas a missão só NASCE pra quem é novo (missaoDosesMandaNoApp:
+ * conta < 48 h, sem Missão antiga em andamento) — pro cliente antigo é null,
+ * nenhum evento, nada gravado. A hora combinada na comemoração vira a hora do
+ * Lembrete do dia 2 (combinarHora) e é ali que a permissão de notificação é
+ * pedida, uma vez (pedirPermissaoDia2) — "Te lembro às 20h" É a pré-folha.
  *
  * O que ela decide, pela rota:
  *   · /home sem boas-vindas vistas → D1 (+ D2 pela troca);
@@ -70,6 +79,8 @@ function Ligada() {
   // nasce na 1ª entrada logada: a área da porta primeiro
   useEffect(() => {
     if (!user || !loaded || missao) return;
+    // no app: só pra quem é novo nesta versão (a Missão antiga em andamento termina a dela)
+    if (isNativeShell() && !missaoDosesMandaNoApp(user.created_at)) return;
     const area = areaEscolhidaNoFunil();
     const modulos = modulosPadrao(area);
     const m = iniciarMissao(modulos, hoje);
@@ -164,6 +175,14 @@ function Ligada() {
           const m = lerMissao() ?? missao;
           salvar({ ...m, lembrete });
           trackEvent("missao_doses_lembrete", eventoDaMissao({ dia: n, hora: lembrete }));
+          // 03/10: a hora combinada É a hora do Lembrete do dia 2 (uma notificação só, com o passo de
+          // amanhã). No app, este é o momento de pedir a permissão — ela acabou de dizer "me lembra às 20h".
+          if (isNativeShell()) {
+            combinarHora(lembrete);
+            const reagendar = () => { try { window.dispatchEvent(new Event(EVENTO_DIA2)); } catch { /* noop */ } };
+            if (lembrete !== "sem") Promise.resolve().then(() => pedirPermissaoDia2("missao")).catch(() => "indisponivel").finally(reagendar);
+            else reagendar();
+          }
           fechar();
           navigate("/home");
         }}

@@ -7,6 +7,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { isNativeShell } from "@/lib/native-shell";
 import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
+import { lerDia2 } from "@/lib/lembrete-dia2";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
 import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
@@ -113,6 +114,39 @@ const Notificacoes = () => {
       if (!ok) return; // negou: não finge que ligou
     }
     await aplicar({ [campo]: valor });
+  };
+
+  /** O que está armado da 1ª semana — lido do estado do aparelho (core-dia2), que o agendador grava. */
+  const rodapeDaPrimeiraSemana = (): string => {
+    const u = lerDia2()?.ultimo;
+    if (u?.quando && new Date(u.quando).getTime() > Date.now()) {
+      const d = new Date(u.quando);
+      return `1 aviso agendado · amanhã às ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+    if (u?.motivo === "fim_da_semana") return "A sua primeira semana já passou — este aviso parou sozinho";
+    if (u?.motivo === "sem_aviso") return "Você escolheu \"sem aviso\" na missão";
+    return "Arma na próxima abertura do app";
+  };
+
+  /** Primeira semana (03/10): a pref mora no notif-prefs, mas o agendador é outro
+   *  (sincronizarLembreteDia2 / cancelarLembreteDia2), não o reagendarTudo. */
+  const alternarPrimeiraSemana = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "primeiraSemana", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novas = { ...prefsRef.current, primeiraSemana: valor };
+    prefsRef.current = novas;
+    setPrefs(novas);
+    filaRef.current = filaRef.current.then(async () => {
+      const n = await import("@/lib/notificacoes");
+      if (valor) await n.sincronizarLembreteDia2(get, { ligado: true });
+      else await n.cancelarLembreteDia2();
+      await atualizarEstado();
+    });
+    await filaRef.current;
   };
 
   /** Remédios não passam pelo `aplicar` das prefs: a chave é outra, e o `get`
@@ -320,6 +354,17 @@ const Notificacoes = () => {
           ligado={p.retrospectiva}
           onChange={(v) => void alternar("retrospectiva", v)}
           rodape={rodapeDe("retrospectiva", p.retrospectiva, "Agenda no próximo dia 1º")}
+        />
+
+        {/* 03/10: o Lembrete do dia 2 / 1ª semana (lib/lembrete-dia2). Nasce ligado, vale 7 dias; a hora é a da
+            abertura do app (ou a combinada na missão) — por isso não tem seletor de horário aqui. */}
+        <LinhaAviso
+          icone={<Sparkles className="w-4 h-4" />}
+          titulo="Primeira semana"
+          descricao="Nos 7 primeiros dias, 1 aviso por dia na hora em que você costuma abrir o CORE — com o que te espera hoje. Depois, para sozinho."
+          ligado={p.primeiraSemana}
+          onChange={(v) => void alternarPrimeiraSemana(v)}
+          rodape={p.primeiraSemana && naLoja && permitido ? rodapeDaPrimeiraSemana() : undefined}
         />
 
         <LinhaAviso

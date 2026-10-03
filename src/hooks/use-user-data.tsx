@@ -106,6 +106,10 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "core-presente69-cancelou-visto",
   "core-presente69-bloqueio-visto",
   "core-funnel-area",
+  // 03/10: Lembrete do dia 2 / 1ª semana (1º uso no aparelho, hora, permissão
+  // pedida) e as notificações já contadas como entregues — do DISPOSITIVO.
+  "core-dia2",
+  "core-notif-entregues",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;

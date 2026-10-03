@@ -27,6 +27,7 @@ import { useHomeWidgets, WidgetId, ActiveWidget } from "@/hooks/use-home-widgets
 import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
+import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -156,7 +157,10 @@ const HomePage = () => {
     // arma esta flag pra todo mundo, o quickstart montava por cima do B1 e
     // uma ação DELE creditava o dia 1 da missão (19/08, trial real: dia 1
     // "feito" em 0s e o holofote nunca montou). Missão ativa = missão manda.
-    const missaoManda = trialCartaoAtivo();
+    // 03/10 (1.0.10): a MISSÃO EM DOSES também manda — pra quem é novo no app
+    // ela SUBSTITUI o tutorial de módulos (e a Missão do iPhone), nunca duas na
+    // tela. Quem veio da 1.0.9 com a Missão antiga em andamento segue como antes.
+    const missaoManda = trialCartaoAtivo() || missaoDosesMandaNoApp(user.created_at);
     const forceNewUser = contaNova && (dbFlag || lsFlag) && !missaoManda;
     if ((dbFlag || lsFlag) && (!contaNova || missaoManda)) {
       try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* ignore */ }

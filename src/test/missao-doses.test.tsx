@@ -33,7 +33,7 @@ import { UserDataContext } from "@/hooks/use-user-data";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
 import { PULAR_DEPOIS_DE_MS } from "@/components/missao-doses/PassoDoDia";
-import { CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MISSAO_DOSES, lerMissao, missaoDosesLigada, guardarForcaDaUrl, diaDaMissao, modulosPadrao, rotuloDoPasso, iniciarMissao } from "@/lib/missao-doses";
+import { CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MISSAO_DOSES, MISSAO_DOSES_APP, lerMissao, missaoDosesLigada, guardarForcaDaUrl, diaDaMissao, modulosPadrao, rotuloDoPasso, iniciarMissao } from "@/lib/missao-doses";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { diaDeHoje } from "@/components/demo-guiada/alvos";
@@ -152,13 +152,18 @@ describe("a chave desligada = o app de hoje, byte a byte", () => {
     expect(localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)).toBeNull();
   });
 
-  it("no app das lojas a chave é ignorada nesta etapa, mesmo com a força ligada", () => {
+  it("no app das lojas (03/10) quem decide é a chave do APP, não a força de QA — e pro cliente antigo (conta de setembro) nada muda: nenhum card, nenhuma missão, nada gravado", () => {
     localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");
     nativo.v = true;
-    expect(missaoDosesLigada("on")).toBe(false);
+    expect(missaoDosesLigada("on", "off")).toBe(false);
+    expect(missaoDosesLigada("off", "on")).toBe(true);
+    expect(MISSAO_DOSES_APP).toBe("on");
+    // a conta do mock nasceu em 01/09: não é nova → a missão não nasce (missaoDosesMandaNoApp = false)
     montar(montarStore(conta()), "/home");
     expect(screen.queryByTestId("seu-dia")).toBeNull();
     expect(screen.queryByTestId("missao-doses-boas-vindas")).toBeNull();
+    expect(eventos.filter(([n]) => /missao|seu_dia/.test(n))).toEqual([]);
+    expect(localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)).toBeNull();
   });
 
   it("a força de QA pelo link: on liga, off força desligado (mesmo com a chave 'on'), auto desfaz, recomecar apaga a missão e segue ligado; o dia simulado 1|2|3|auto", () => {

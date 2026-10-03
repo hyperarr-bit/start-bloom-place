@@ -25,7 +25,10 @@ const purgeLocalUserCache = () => {
     // core-theme-mode/palette (20/08, reviews da Monik ★4 e Isabela ★3): o
     // tema escuro e a paleta moram nessas chaves — a vassoura levava os dois
     // no logout e a pessoa reconfigurava a cada volta. Mesmo caso core-pwa.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto", "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto"]);
+    // core-dia2 (03/10): o Lembrete do dia 2 / 1ª semana é do APARELHO (1º uso,
+    // hora da abertura, permissão já pedida) — fora da lista, deslogar e entrar
+    // de novo zeraria "a 1ª semana" e pediria permissão outra vez.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto", "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-dia2", "core-notif-entregues"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

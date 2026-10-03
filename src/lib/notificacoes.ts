@@ -3,6 +3,12 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
+import {
+  BASE_DIA2, ID_DIA2, assinaturaDoPlano, diaDaSemana1a7, gravarDia2, lerDia2, planejarLembreteDia2, registrarAbertura, rotuloDeMinutos,
+  type Leitor as LeitorDia2,
+} from "./lembrete-dia2";
+import { lerMissao } from "./missao-doses";
+import { localDayKey } from "./utils";
 /* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
    este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
    funil da web não precisa carregar a conta de avisos de três módulos. Aqui só os TIPOS. */
@@ -930,7 +936,10 @@ export async function ligarToqueNaNotificacao(navegar: (rota: string) => void): 
       // 02/09: até aqui o toque não deixava rastro — impossível saber se
       // alguma notificação trazia alguém de volta.
       const id = evento.notification?.id ?? null;
-      trackEvent("notif_toque", { id, rota: rota ?? null });
+      // 03/10: o TIPO vai junto (pela faixa do id ou pelo `extra.tipo`) — "qual
+      // notificação traz alguém de volta?" era irrespondível só com o id.
+      const extra = (evento.notification?.extra ?? undefined) as { tipo?: string; em?: string } | undefined;
+      trackEvent("notif_toque", { id, rota: rota ?? null, tipo: id === null ? "outro" : tipoDoAviso(id, extra), em: extra?.em ?? null });
       // 04/09: tocou na de 2h → a da manhã seguinte não precisa mais existir
       if (id === BASE_RESGATE + 1) { void LN.cancel({ notifications: [{ id: BASE_RESGATE + 2 }] }).catch(() => { /* noop */ }); }
       if (rota) navegar(rota);
@@ -1375,5 +1384,172 @@ export async function cancelarReguaDaMissao(): Promise<void> {
 }
 
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
- *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE } as const;
+ *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
+ *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2 } as const;
+
+/** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
+export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {
+  if (extra?.tipo) return extra.tipo;
+  const daCentral = tipoDoId(id);
+  if (daCentral !== "outro") return daCentral;
+  const avulsa = (Object.entries(FAIXAS_AVULSAS) as Array<[string, number]>).find(([, base]) => id >= base && id < base + 10000);
+  return avulsa?.[0] ?? "outro";
+}
+
+/* ─── LEMBRETE DO DIA 2 / 1ª SEMANA (03/10, lib/lembrete-dia2) ─────────────────
+   A conta (quando, texto, dia do uso) é pura e mora em lib/lembrete-dia2; aqui
+   só o que toca o plugin. Chamado a cada ABERTURA do app (use-lembrete-dia2) e
+   quando a missão ou os dados mudam: cancela o pendente da faixa e refaz pra
+   amanhã. Nada aqui PEDE permissão — quem pede é a comemoração da missão ou a
+   pré-folha, uma vez (pedirPermissaoDia2). */
+
+export type ResultadoDia2 =
+  | { ok: true; quando: Date; title: string; body: string; repetido: boolean }
+  | { ok: false; motivo: string };
+
+export async function sincronizarLembreteDia2(
+  get: LeitorDia2,
+  p: { criadoEm?: string | null; area?: string | null; ligado?: boolean; agora?: Date } = {},
+): Promise<ResultadoDia2> {
+  const plug = await plugin();
+  if (!plug) return { ok: false, motivo: "sem_plugin" };
+  const agora = p.agora ?? new Date();
+  const e = registrarAbertura(agora, p.criadoEm);
+  const plano = planejarLembreteDia2(get, e, { ligado: p.ligado !== false, missao: lerMissao(), area: p.area, agora });
+  const estado = await estadoPermissao();
+  if (estado !== "granted") {
+    // sem permissão nada toca (no iPhone nem agenda) — o motivo fica guardado uma vez, sem inundar o banco
+    const assinatura = `motivo:sem_permissao:${estado}`;
+    if (e.ultimo?.assinatura !== assinatura) {
+      gravarDia2({ ...e, ultimo: { assinatura, motivo: `sem_permissao_${estado}` } });
+      trackEvent("lembrete_dia2_agendado", { ok: false, motivo: `sem_permissao_${estado}`, dia_do_uso: plano.ok === true ? plano.diaDoUso : null });
+    }
+    return { ok: false, motivo: `sem_permissao_${estado}` };
+  }
+  const assinatura = assinaturaDoPlano(plano);
+  // o mesmo plano já está no sistema (e ainda no futuro): nada a refazer
+  if (e.ultimo?.assinatura === assinatura && (plano.ok === false || plano.quando.getTime() > agora.getTime())) {
+    return plano.ok === true ? { ok: true, quando: plano.quando, title: plano.conteudo.title, body: plano.conteudo.body, repetido: true } : { ok: false, motivo: plano.motivo };
+  }
+  // a cada abertura o pendente sai: quem abriu antes da hora não precisa do aviso de hoje
+  await limparFaixa(BASE_DIA2);
+  if (plano.ok === false) {
+    gravarDia2({ ...e, ultimo: { assinatura, motivo: plano.motivo } });
+    trackEvent("lembrete_dia2_agendado", { ok: false, motivo: plano.motivo });
+    return { ok: false, motivo: plano.motivo };
+  }
+  // já existe um aviso nosso (de outro tipo) a ≤ 2 min: ela já vai ser lembrada — não empilha
+  const { LN } = plug;
+  try {
+    const pendentes = (await LN.getPending()).notifications ?? [];
+    const colide = pendentes.some((n) => {
+      if (n.id >= BASE_DIA2 && n.id < BASE_DIA2 + 10000) return false;
+      const at = (n.schedule as { at?: Date | string } | undefined)?.at;
+      const t = at ? new Date(at).getTime() : NaN;
+      return Number.isFinite(t) && Math.abs(t - plano.quando.getTime()) <= 2 * 60_000;
+    });
+    if (colide) {
+      const ass = `${assinatura}|ja_tem_aviso`;
+      if (e.ultimo?.assinatura !== ass) {
+        gravarDia2({ ...e, ultimo: { assinatura: ass, motivo: "ja_tem_aviso" } });
+        trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "ja_tem_aviso", hora: rotuloDeMinutos(plano.quando.getHours() * 60 + plano.quando.getMinutes()) });
+      }
+      return { ok: false, motivo: "ja_tem_aviso" };
+    }
+  } catch { /* sem lista de pendentes: segue e agenda */ }
+  await garantirCanal();
+  const { title, body, rota, modulo, temNumero } = plano.conteudo;
+  try {
+    await LN.schedule({
+      notifications: [{
+        id: ID_DIA2, title, body,
+        schedule: { at: plano.quando, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota, tipo: "dia2", em: plano.quando.toISOString() },
+      }],
+    });
+  } catch {
+    trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "erro_agendar" });
+    return { ok: false, motivo: "erro_agendar" };
+  }
+  gravarDia2({ ...e, ultimo: { assinatura, quando: plano.quando.toISOString(), title, body } });
+  trackEvent("lembrete_dia2_agendado", {
+    ok: true,
+    dia_da_semana_1a7: diaDaSemana1a7(plano.quando),
+    modulo,
+    hora: rotuloDeMinutos(plano.quando.getHours() * 60 + plano.quando.getMinutes()),
+    tem_numero: temNumero,
+    dia_do_uso: plano.diaDoUso,
+    missao: modulo === "missao",
+    origem_hora: plano.origemHora,
+  });
+  return { ok: true, quando: plano.quando, title, body, repetido: false };
+}
+
+/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta). */
+export async function cancelarLembreteDia2(): Promise<void> {
+  await limparFaixa(BASE_DIA2);
+}
+
+/**
+ * Pede a permissão UMA vez, num momento de valor (a comemoração da missão com a
+ * hora combinada, ou a pré-folha depois do 1º registro). Negou ou adiou: não
+ * insiste. Concedida → o "acaba amanhã" prometido no paywall do iPhone é armado
+ * aqui também (o pedido ficou guardado na compra).
+ */
+export async function pedirPermissaoDia2(origem: "missao" | "pre_folha"): Promise<"concedeu" | "negou" | "ja_tinha" | "ja_pedida" | "indisponivel"> {
+  const estado = await estadoPermissao();
+  if (estado === "indisponivel") return "indisponivel";
+  if (estado === "granted") return "ja_tinha";
+  const e = lerDia2() ?? registrarAbertura();
+  if (estado === "denied") {
+    if (!e.permissao) gravarDia2({ ...e, permissao: { dia: localDayKey(), resultado: "negada_antes", origem } });
+    return "negou";
+  }
+  if (e.permissao) return "ja_pedida"; // já perguntamos (ou ela adiou): não insiste
+  const ok = await pedirPermissao();
+  gravarDia2({ ...e, permissao: { dia: localDayKey(), resultado: ok ? "concedeu" : "negou", origem } });
+  trackEvent("lembrete_dia2_permissao", { resultado: ok ? "concedeu" : "negou", origem });
+  if (ok) void armarLembreteDoTesteSePuder().catch(() => { /* nunca segura */ });
+  return ok ? "concedeu" : "negou";
+}
+
+/** "Agora não" na pré-folha: conta como a única vez — não voltamos a perguntar. */
+export function adiarPermissaoDia2(origem: "pre_folha" | "missao"): void {
+  const e = lerDia2() ?? registrarAbertura();
+  if (e.permissao) return;
+  gravarDia2({ ...e, permissao: { dia: localDayKey(), resultado: "agora_nao", origem } });
+  trackEvent("lembrete_dia2_permissao", { resultado: "agora_nao", origem });
+}
+
+/* ─── ENTREGA (03/10): hoje não sabemos se as notificações CHEGAM ─────────────
+   Na abertura, o que está na bandeja do sistema vira `notif_entregue` (tipo/id),
+   uma vez cada (a bandeja guarda o aviso até a pessoa limpar). Com o `notif_toque`
+   fecha a conta: quantas chegaram × quantas trouxeram alguém. */
+const CHAVE_ENTREGUES = "core-notif-entregues";
+
+export async function registrarEntregues(): Promise<number> {
+  const plug = await plugin();
+  if (!plug) return 0;
+  const { LN } = plug;
+  try {
+    const entregues = (await LN.getDeliveredNotifications()).notifications ?? [];
+    if (!entregues.length) return 0;
+    let vistas: string[] = [];
+    try { vistas = JSON.parse(localStorage.getItem(CHAVE_ENTREGUES) ?? "[]") as string[]; if (!Array.isArray(vistas)) vistas = []; } catch { vistas = []; }
+    let novas = 0;
+    for (const n of entregues) {
+      const extra = (n.extra ?? undefined) as { tipo?: string; em?: string; rota?: string } | undefined;
+      const chave = `${n.id}|${extra?.em ?? n.title ?? ""}`;
+      if (vistas.includes(chave)) continue;
+      vistas.push(chave);
+      novas += 1;
+      trackEvent("notif_entregue", { id: n.id, tipo: tipoDoAviso(n.id, extra), rota: extra?.rota ?? null, em: extra?.em ?? null });
+    }
+    try { localStorage.setItem(CHAVE_ENTREGUES, JSON.stringify(vistas.slice(-80))); } catch { /* noop */ }
+    return novas;
+  } catch {
+    return 0; // plugin sem o método (web, build antigo): nada a registrar
+  }
+}

@@ -36,6 +36,8 @@ import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
+import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
+import { PreFolhaLembrete } from "@/components/missao-doses/PreFolhaLembrete";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
 
@@ -329,6 +331,8 @@ const DevAssine = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAssine
 const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHomeLanding")) : null;
 // 01/10: o paywall do iPhone sozinho (teste de preço 97,90 × 69,90), pra fotografar com a loja simulada
 const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPaywallIos")) : null;
+// 03/10: os textos do Lembrete do dia 2 em cada cenário + a pré-folha da permissão, pra fotografar — só no dev
+const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -530,6 +534,10 @@ const AnimatedRoutes = () => {
   // Finanças muda. Aqui dentro porque precisa do Router (o toque no aviso
   // navega) e do UserDataProvider.
   useLembretes();
+  // 03/10: o Lembrete do dia 2 / 1ª semana — refeito a cada abertura do app
+  // (hora da 1ª abertura de hoje, passo de amanhã da missão); conta o que
+  // chegou na bandeja (notif_entregue). Só no app da loja, só logado.
+  useLembreteDia2();
   // Arquiva lançamentos de meses passados que ficaram no balde do mês
   // corrente. Aqui em cima porque quem chega na retrospectiva pela
   // notificação não passa por Finanças — e era essa pessoa que via o mês
@@ -619,6 +627,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevPaywallIos && (
           <Route path="/dev/paywall-ios" element={<Suspense fallback={null}><DevPaywallIos /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevDia2 && (
+          <Route path="/dev/dia2" element={<Suspense fallback={null}><DevDia2 /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />
@@ -748,8 +759,12 @@ const App = () => {
                 <TrilhaDoTeste />
                 <RetomadaPosCompra />
                 <MissaoDoTrial />
-                {/* 02/10: a missão em doses + card SEU DIA — protótipo na web, atrás da chave MISSAO_DOSES ("off") e do link ?missao-doses=on */}
+                {/* 02/10: a missão em doses + card SEU DIA — na web atrás da chave MISSAO_DOSES ("off");
+                    03/10: LIGADA no app das lojas pra quem é novo (MISSAO_DOSES_APP, lib/missao-doses) */}
                 <MissaoDosesNaWeb />
+                {/* 03/10: "Quer que eu te lembre amanhã às 19h?" — a permissão de notificação pedida
+                    uma vez, depois do 1º registro do dia 1 (só no app; a comemoração da missão cobre o resto) */}
+                <PreFolhaLembrete />
             <SaveOfferDowngrade />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}

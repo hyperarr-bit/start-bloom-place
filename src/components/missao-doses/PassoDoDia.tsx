@@ -9,6 +9,7 @@ import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { alvoDaMissao, gravacoesDoChip, itemDoChip, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { rotuloCurto } from "@/lib/demo-guiada";
 import { HORAS_DO_LEMBRETE, MODULOS, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
 import "./missao-doses.css";
 
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
@@ -340,7 +341,9 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, aoCombinar, aoAmanhaAgora
   const reduzir = !!useReducedMotion();
   const cfg = MODULOS[modulo];
   const proximo = n === 1 ? MODULOS[missao.modulos[1]] : n === 2 ? MODULOS[missao.modulos[2]] : null;
-  const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? "12h");
+  // 03/10: no app, o chip pré-marcado é o mais perto da hora em que ela abriu o app hoje
+  // (é a hora que o Lembrete do dia 2 usaria sozinho); a escolha dela, se já houve, vence.
+  const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
   const titulo = n === 1 ? "Primeiro registro feito!" : n === 2 ? "Dia 2 feito!" : "Missão cumprida!";
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
@@ -372,8 +375,8 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, aoCombinar, aoAmanhaAgora
                 ))}
               </div>
             </div>
-            <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-combinado" onClick={() => aoCombinar(hora)}>
-              Combinado, até amanhã
+            <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
+              {hora === "sem" ? "Combinado, até amanhã" : `Combinado, me lembra às ${hora}`}
             </button>
             <button type="button" className="md-link" data-testid="missao-doses-amanha-agora" onClick={aoAmanhaAgora}>Quero fazer o toque de amanhã agora</button>
           </>

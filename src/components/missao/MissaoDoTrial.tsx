@@ -36,6 +36,7 @@ import {
   guiaSemente, type Missao,
 } from "@/lib/teste-gratis";
 import { agendarReguaDaMissao, pedirPermissao } from "@/lib/notificacoes";
+import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { CHAVES_FUNIL_W, lerChave } from "@/pages/funis/w/retomada";
 
 const GRAFITE = "#16121c";
@@ -310,7 +311,10 @@ export function MissaoDoTrial() {
     return () => window.removeEventListener("core:trial-cartao", f);
   }, []);
 
-  const elegivel = isNativeShell() && trialCartaoAtivo() && !!user && isSubscribed && !fora(pathname);
+  // 03/10 (1.0.10): pra quem é NOVO no app a Missão em doses SUBSTITUI esta —
+  // ela não nasce mais. Quem já está com esta em andamento (core-missao gravada
+  // na 1.0.9) termina a dela: missaoDosesMandaNoApp devolve false nesse caso.
+  const elegivel = isNativeShell() && trialCartaoAtivo() && !!user && isSubscribed && !fora(pathname) && !missaoDosesMandaNoApp(user?.created_at);
 
   // Nasce a missão na primeira entrada elegível (a área vem do guia/funil).
   useEffect(() => {

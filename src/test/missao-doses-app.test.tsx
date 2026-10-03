@@ -137,8 +137,8 @@ describe("quem é novo no app vê a missão em doses", () => {
     expect(lerMissao()?.modulos).toEqual(["financas", "rotina", "saude"]);
     fireEvent.click(screen.getByTestId("missao-doses-explorar"));
     expect(screen.queryByTestId("missao-doses-boas-vindas")).toBeNull();
-    expect(screen.getByTestId("seu-dia")).toHaveTextContent("Dia 1 de 3 · missão 0/3");
-    expect(screen.queryByTestId("seu-dia-qa")).toBeNull(); // a régua de QA é só da web
+    // (03/10, dono) no app a Home fica como é: nenhum card SEU DIA — a missão anda pelo lembrete e pelo passo no módulo
+    expect(screen.queryByTestId("seu-dia")).toBeNull();
   });
 
   it("cliente antigo (conta de setembro) no app: nada — nenhum card, nenhum evento, nada gravado", () => {

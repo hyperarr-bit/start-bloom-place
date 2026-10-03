@@ -1,32 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, ChevronRight, Flame } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { useUserData } from "@/hooks/use-user-data";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
-import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
-import { abrirAcaoRapida } from "@/components/home/QuickActions";
-import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
-import { useConquistas, type Sequencia } from "@/components/conquistas/use-conquistas";
-import { proximosDoAlbum } from "@/components/conquistas/album-paginas";
-import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { localDayKey } from "@/lib/utils";
+import { isNativeShell } from "@/lib/native-shell";
+import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { trackEvent } from "@/lib/analytics";
 import {
   CHAVE_DIA_QA, EVENTO_MISSAO_DOSES, MODULOS, apagarMissao, diaDaMissao, diaDeQa, eventoDaMissao, forcaDaMissaoDoses, gravarMissao,
-  guardarForcaDaUrl, lerMissao, missaoCumprida, missaoDosesLigada, passoPendente, rotuloDoPasso, type DiaDaMissao,
+  guardarForcaDaUrl, lerMissao, missaoCumprida, missaoDosesLigada, passoPendente, type DiaDaMissao,
 } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /**
- * O CARD "SEU DIA" — fixo no topo da Home enquanto a missão em doses está
- * ligada (D5/D6): a missão (1/3 → 3/3) com o passo de hoje e o botão que leva
- * a ele, as pendências de hoje (a MESMA conta das "Pendências de hoje" lá
- * embaixo), o score do dia, a sequência e o adesivo mais perto. Com a chave
+ * A FAIXA "SEU DIA" da missão em doses — UMA linha no topo da Home, só enquanto a missão anda.
+ * (03/10, dono vendo o print: "quebra totalmente a UI, o score fica lá embaixo") — o card do protótipo trazia de novo as
+ * pendências, o score, a sequência e o adesivo, que a Home já mostra logo abaixo, e ficava lá depois da missão. Agora:
+ * os 3 quadradinhos + "Missão · dia N de 3" + o passo (hoje: botão "Fazer"; já feito hoje: "amanhã: Rotina · fazer
+ * agora"). Missão cumprida: a faixa fica só até a pessoa ver "O que você construiu"; depois some. Com a chave
  * desligada, não existe (null) — a Home de hoje, byte a byte.
  */
 export function CardSeuDia({ lifeData, sequencia }: { lifeData: LifeHubData; sequencia: Sequencia }) {
   guardarForcaDaUrl();
+  // (03/10, dono: "nas turmas boas isso aparecia? melhor deixar só o app, encher de coisa desnecessária") — no APP a
+  // Home fica como é: nenhum card. A missão anda pelo lembrete do dia (o toque abre o módulo) e pelo passo que aparece
+  // ao entrar no módulo do dia. A faixa só vive no protótipo da web (desligado).
+  if (isNativeShell()) return null;
   const ligada = missaoDosesLigada();
   return ligada ? <CardSeuDiaLigado lifeData={lifeData} sequencia={sequencia} /> : null;
 }
@@ -41,14 +40,10 @@ const useMissaoDoses = () => {
   return missao;
 };
 
-function CardSeuDiaLigado({ lifeData, sequencia }: { lifeData: LifeHubData; sequencia: Sequencia }) {
+function CardSeuDiaLigado({ lifeData }: { lifeData: LifeHubData; sequencia: Sequencia }) {
   const navigate = useNavigate();
-  const { get } = useUserData();
   const missao = useMissaoDoses();
-  const conq = useConquistas();
   const hoje = localDayKey();
-  const pend = useMemo(() => pendenciasDeHoje(lifeData, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date()), [lifeData, get]);
-  const proximoAdesivo = useMemo(() => proximosDoAlbum(conq.adesivos, 1)[0] ?? null, [conq.adesivos]);
   const qa = forcaDaMissaoDoses() === "on";
 
   // o score do começo (pra "ontem 20 → hoje 45" no final): grava uma vez
@@ -63,12 +58,14 @@ function CardSeuDiaLigado({ lifeData, sequencia }: { lifeData: LifeHubData; sequ
   const feitos = missao ? ([1, 2, 3] as DiaDaMissao[]).filter((n) => missao.feitos[n]).length : 0;
   useEffect(() => {
     if (!missao) return;
-    trackEvent("seu_dia_view", eventoDaMissao({ dia, missao: `${feitos}/3`, pendencias: pend.pending.length, score: lifeData.dayScore }));
+    trackEvent("seu_dia_view", eventoDaMissao({ dia, missao: `${feitos}/3`, score: lifeData.dayScore }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missao?.inicio]);
 
-  if (!missao) return null;
+  // cumprida e o "O que você construiu" já visto: a faixa sai da Home
+  if (!missao || (cumprida && missao.fimVisto)) return null;
 
+  const amanha = !!pendente && pendente.n > dia;
   const irParaOPasso = (via: "botao" | "linha") => {
     if (!pendente) return;
     trackEvent("seu_dia_click", eventoDaMissao({ alvo: "passo", via, dia, passo: pendente.n, modulo: pendente.modulo }));
@@ -80,94 +77,49 @@ function CardSeuDiaLigado({ lifeData, sequencia }: { lifeData: LifeHubData; sequ
     }
     navigate(MODULOS[pendente.modulo].rota);
   };
-  const tocarPendencia = (i: number) => {
-    const item = pend.pending[i];
-    trackEvent("seu_dia_click", eventoDaMissao({ alvo: "pendencia", rotulo: item.label }));
-    if (item.action) abrirAcaoRapida(item.action);
-    else if (item.route) navigate(item.route);
-  };
-  const totalPend = pend.pending.length + pend.done.length;
-  const proximoNome = pendente ? MODULOS[missao.modulos[Math.min(2, pendente.n)]].nome : null;
+  const cfg = pendente ? MODULOS[pendente.modulo] : null;
+  const pulouHoje = !!pendente && missao.pulados?.[pendente.n] === hoje;
 
   return (
-    <section className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm" aria-labelledby="seu-dia-titulo" data-testid="seu-dia" data-dia={dia} data-feitos={feitos}>
-      <div className="md-secao" data-cor="grafite">
-        <span id="seu-dia-titulo" className="inline-flex items-center gap-2"><Quadradinho marcado={feitos > 0} claro tam={14} /> Seu dia</span>
-        <b data-testid="seu-dia-resumo">{cumprida ? "Missão cumprida · 3 de 3" : `Dia ${Math.min(dia, 3)} de 3 · missão ${feitos}/3`}</b>
-      </div>
-
-      {!cumprida && (
-        <div className="divide-y divide-border" data-testid="seu-dia-missao">
-          {([1, 2, 3] as DiaDaMissao[]).map((n) => {
-            const cfg = MODULOS[missao.modulos[n - 1]];
-            const feito = missao.feitos[n];
-            const ehHoje = pendente?.n === n;
-            const rot = rotuloDoPasso(n, missao, hoje);
-            return (
-              <button key={n} type="button" className="md-linha" data-hoje={ehHoje ? "" : undefined} data-testid={`seu-dia-linha-${n}`} onClick={() => (ehHoje ? irParaOPasso("linha") : feito ? navigate(cfg.rota) : undefined)}>
-                <Quadradinho marcado={!!feito} tam={18} />
-                <span className="min-w-0 flex-1">
-                  <span className="md-linha-rotulo">{rot} · {cfg.emoji} {cfg.nome}</span>
-                  <span className="md-linha-texto" data-feito={feito ? "" : undefined}>{feito ? feito.rotulo : cfg.pedido}</span>
-                </span>
-                {/* (03/10) o próximo pendente pode ser o de AMANHÃ (o de hoje já foi feito): aí a pílula diz "Amanhã", nunca "Hoje" */}
-                <span className="md-pill" data-tom={feito ? "feito" : ehHoje && rot !== "AMANHÃ" ? "hoje" : "dia"}>{feito ? "Feito" : rot === "AMANHÃ" ? "Amanhã" : ehHoje ? "Hoje" : `Dia ${n}`}</span>
-              </button>
-            );
-          })}
-          {pendente && (
-            <div className="p-3">
-              {/* o passo pendente é de HOJE (ou atrasado) → botão cheio; é o de AMANHÃ (ela já fez o de hoje) → "fazer o de amanhã agora", discreto */}
-              <button
-                type="button"
-                className="md-botao"
-                style={pendente.n > dia ? { minHeight: 44, fontSize: 14, background: "transparent", color: "hsl(var(--foreground))", border: "1.5px dashed hsl(var(--border))" } : { minHeight: 48, fontSize: 15 }}
-                data-testid="seu-dia-fazer"
-                data-amanha={pendente.n > dia ? "" : undefined}
-                onClick={() => irParaOPasso("botao")}
-              >
-                {pendente.n > dia ? "Quero fazer o toque de amanhã agora" : "Fazer o toque de hoje"} <ArrowRight className="w-4 h-4" />
-              </button>
-              {missao.pulados?.[pendente.n] === hoje && <p className="text-[11px] text-muted-foreground text-center mt-1.5">Hoje: ainda não. Sem pressa — o toque fica aqui.</p>}
-              {pendente.n < 3 && pendente.n <= dia && proximoNome && <p className="text-[11px] text-muted-foreground text-center mt-1.5">amanhã: {proximoNome}</p>}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="md-secao" data-cor="magenta">
-        <span>Pendências de hoje</span>
-        <b data-testid="seu-dia-pendencias-resumo">{totalPend ? `${pend.done.length} de ${totalPend} feitas` : "nada por hoje"}</b>
-      </div>
-      <div className="divide-y divide-border" data-testid="seu-dia-pendencias">
-        {pend.pending.slice(0, 4).map((item, i) => (
-          <button key={`p-${i}`} type="button" className="md-linha" style={{ padding: "8px 14px" }} onClick={() => tocarPendencia(i)}>
-            <Quadradinho marcado={false} tam={16} />
-            <span className="min-w-0 flex-1 text-[13px] font-medium truncate">{item.emoji} {item.label}</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+    <section className="rounded-2xl border border-border bg-card shadow-sm" aria-labelledby="seu-dia-titulo" data-testid="seu-dia" data-dia={dia} data-feitos={feitos}>
+      <div
+        role={pendente ? "button" : undefined}
+        tabIndex={pendente ? 0 : undefined}
+        className="flex items-center gap-3 px-3.5 py-2.5 min-h-[56px]"
+        data-testid={pendente ? `seu-dia-linha-${pendente.n}` : undefined}
+        onClick={() => irParaOPasso("linha")}
+        onKeyDown={(e) => { if (e.key === "Enter") irParaOPasso("linha"); }}
+      >
+        <span className="inline-flex gap-[3px] shrink-0" aria-hidden>
+          {([1, 2, 3] as DiaDaMissao[]).map((n) => <Quadradinho key={n} marcado={!!missao.feitos[n]} tam={14} />)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span id="seu-dia-titulo" className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground" data-testid="seu-dia-resumo">
+            {cumprida ? "Missão cumprida · 3 de 3" : `Missão · dia ${Math.min(dia, 3)} de 3 · ${feitos}/3`}
+          </span>
+          <span className="block text-[13.5px] font-semibold leading-snug truncate">
+            {cumprida
+              ? "Os 3 toques feitos — o app inteiro é seu."
+              : amanha
+                ? <>Feito hoje ✓ · amanhã: {cfg!.emoji} {cfg!.nome}</>
+                : pulouHoje
+                  ? <>Hoje: ainda não. Sem pressa — {cfg!.emoji} {cfg!.nome} fica aqui.</>
+                  : <>{cfg!.emoji} {cfg!.nome} · {cfg!.pedido}</>}
+          </span>
+        </span>
+        {pendente && (
+          <button
+            type="button"
+            className={amanha ? "shrink-0 text-[12px] font-bold underline underline-offset-2 text-muted-foreground px-1" : "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-extrabold text-white"}
+            style={amanha ? undefined : { background: "hsl(var(--accent))" }}
+            data-testid="seu-dia-fazer"
+            data-amanha={amanha ? "" : undefined}
+            aria-label={amanha ? "Quero fazer o toque de amanhã agora" : "Fazer o toque de hoje"}
+            onClick={(e) => { e.stopPropagation(); irParaOPasso("botao"); }}
+          >
+            {amanha ? "fazer agora" : "Fazer"}
           </button>
-        ))}
-        {pend.pending.length === 0 && pend.done.slice(0, 2).map((item, i) => (
-          <div key={`d-${i}`} className="md-linha" style={{ padding: "8px 14px" }}>
-            <Quadradinho marcado tam={16} />
-            <span className="min-w-0 flex-1 text-[13px] font-medium line-through text-muted-foreground truncate">{item.emoji} {item.label}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 divide-x divide-border border-t border-border text-center">
-        <div className="py-2.5 px-1">
-          <div className="text-[20px] font-black leading-none tabular-nums" data-testid="seu-dia-score">{lifeData.dayScore}</div>
-          <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground mt-1">score</div>
-        </div>
-        <button type="button" className="py-2.5 px-1" onClick={() => navigate("/conquistas", { state: { origem: "home" } })}>
-          <div className="text-[20px] font-black leading-none tabular-nums inline-flex items-center gap-1" data-testid="seu-dia-sequencia"><Flame className="w-4 h-4" style={{ color: "hsl(var(--streak, var(--warning)))" }} /> {sequencia.dias}</div>
-          <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground mt-1">{sequencia.dias === 1 ? "dia seguido" : "dias seguidos"}</div>
-        </button>
-        <button type="button" className="py-2.5 px-2 min-w-0" onClick={() => navigate("/conquistas", { state: { origem: "home" } })} data-testid="seu-dia-adesivo">
-          <div className="text-[12px] font-bold leading-tight truncate">{proximoAdesivo ? `${proximoAdesivo.icon} ${proximoAdesivo.name}` : `${conq.abertos} adesivos`}</div>
-          <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground mt-1 truncate">{proximoAdesivo ? `perto · ${rotuloProgresso(proximoAdesivo) ?? "quase"}` : "colados"}</div>
-        </button>
+        )}
       </div>
 
       {qa && (

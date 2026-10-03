@@ -277,17 +277,14 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(eventos).toContainEqual(["missao_doses_lembrete", { dia: 1, hora: "20h", prototipo: "web" }]);
     expect(rota()).toBe("/home");
     expect(document.documentElement.hasAttribute("data-missao-doses-faixa")).toBe(false);
-    // o card SEU DIA: 1/3, a linha 1 feita e riscada, a 2 é AMANHÃ, o botão vira "amanhã agora"
+    // a faixa SEU DIA (03/10: uma linha só — nada de repetir pendências/score/sequência da Home): 1/3, "Feito hoje ✓ · amanhã: Rotina", "fazer agora"
     const card = screen.getByTestId("seu-dia");
-    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Dia 1 de 3 · missão 1/3");
-    expect(screen.getByTestId("seu-dia-linha-1")).toHaveTextContent("HOJE · 💰 Finanças");
-    expect(screen.getByTestId("seu-dia-linha-1")).toHaveTextContent("Café · R$ 12");
-    expect(screen.getByTestId("seu-dia-linha-1")).toHaveTextContent("Feito");
-    expect(screen.getByTestId("seu-dia-linha-2")).toHaveTextContent("AMANHÃ · 📅 Rotina");
-    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Quero fazer o toque de amanhã agora");
-    expect(card).toHaveTextContent("Pendências de hoje");
-    expect(screen.getByTestId("seu-dia-score")).toHaveTextContent("30");
-    expect(screen.getByTestId("seu-dia-sequencia")).toHaveTextContent("2");
+    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Missão · dia 1 de 3 · 1/3");
+    expect(screen.getByTestId("seu-dia-linha-2")).toHaveTextContent("Feito hoje ✓ · amanhã: 📅 Rotina");
+    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("fazer agora");
+    expect(screen.getByTestId("seu-dia-fazer")).toHaveAttribute("data-amanha");
+    expect(card).not.toHaveTextContent("Pendências de hoje");
+    expect(screen.queryByTestId("seu-dia-score")).toBeNull();
     expect(screen.getByTestId("seu-dia-qa")).toBeInTheDocument(); // só com a força
     expect(eventos).toContainEqual(["seu_dia_view", expect.objectContaining({ dia: 1, missao: "1/3", score: 30 })]);
   });
@@ -298,9 +295,9 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...m, boasVindas: true, feitos: { 1: { dia: "2026-10-02", rotulo: "Café · R$ 12" } } }));
     // dia 2
     montar(store, "/home?missao-doses-dia=2");
-    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Dia 2 de 3 · missão 1/3");
-    expect(screen.getByTestId("seu-dia-linha-2")).toHaveTextContent("HOJE · 📅 Rotina");
-    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer o toque de hoje");
+    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Missão · dia 2 de 3 · 1/3");
+    expect(screen.getByTestId("seu-dia-linha-2")).toHaveTextContent("📅 Rotina");
+    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer");
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/rotina");
     expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3 · Rotina");
@@ -317,7 +314,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     cleanup();
     // dia 3
     montar(store, "/home?missao-doses-dia=3");
-    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Dia 3 de 3 · missão 2/3");
+    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Missão · dia 3 de 3 · 2/3");
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/saude");
     const postIt = esperarPostIt();
@@ -340,8 +337,8 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.queryByTestId("missao-doses-fim")).toBeNull();
     expect(lerMissao()?.fimVisto).toBe(true);
     expect(rota()).toBe("/home");
-    expect(screen.getByTestId("seu-dia-resumo")).toHaveTextContent("Missão cumprida · 3 de 3");
-    expect(screen.queryByTestId("seu-dia-fazer")).toBeNull();
+    // depois de ver "O que você construiu", a faixa sai da Home
+    expect(screen.queryByTestId("seu-dia")).toBeNull();
   });
 
   it("'Quero fazer o toque de amanhã agora' leva direto pro próximo módulo, com o passo do dia 2", () => {
@@ -371,8 +368,8 @@ describe("pular, sem trava dura", () => {
     expect(eventos).toContainEqual(["missao_pular", { dia: 1, passo: "boas_vindas", segundos: 0, via: "link_boas_vindas", prototipo: "web" }]);
     expect(lerMissao()?.explorou).toBe(true);
     const card = screen.getByTestId("seu-dia");
-    expect(card).toHaveTextContent("Dia 1 de 3 · missão 0/3");
-    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer o toque de hoje");
+    expect(card).toHaveTextContent("Missão · dia 1 de 3 · 0/3");
+    expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer");
   });
 
   it("dentro do módulo: sem 'Pular' nos primeiros 20 s; aos 20 s (ou no 2º toque na faixa) ele aparece; pular mede faixa_20s, volta pra Home e o card diz 'Hoje: ainda não' — e o botão do card traz o passo de volta", () => {

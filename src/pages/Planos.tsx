@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
+import { VENDA_NA_WEB } from "@/lib/rotas-web";
 import { CancelFlowDialog, type LojaDaAssinatura } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
@@ -223,6 +224,8 @@ const Planos = () => {
   const [loja, setLoja] = useState<LojaDaAssinatura | null>(null);
   // 01/10: a linha de assinatura já foi lida? (a oferta w97 abaixo espera por isto)
   const [linhaLida, setLinhaLida] = useState(false);
+  // 05/10: o período da assinatura (anual/mensal) pra tela "Meu acesso"
+  const [periodo, setPeriodo] = useState<string | null>(null);
   useEffect(() => {
     if (!isSubscribed || !user) return;
     // .limit(1) + order: contas antigas podem ter MAIS de uma linha (maybeSingle
@@ -233,6 +236,7 @@ const Planos = () => {
         // revenuecat_subscription_id existe na tabela mas não nos tipos gerados
         const s = (data as unknown as Array<{ billing_period?: string | null; plan?: string | null; payment_method?: string | null; revenuecat_subscription_id?: string | null }> | null)?.[0];
         if (s?.billing_period === "lifetime" || s?.plan === "lifetime" || s?.plan === "premium") setIsLifetime(true);
+        setPeriodo(s?.billing_period ?? null);
         if (s?.payment_method === "play_store") setLoja(/Aap/.test(String(s.revenuecat_subscription_id ?? "")) ? "app_store" : "google_play");
         setLinhaLida(true);
       });
@@ -283,6 +287,12 @@ const Planos = () => {
     setPixOpen(true);
   };
 
+  /* "MEU ACESSO" (05/10, chamado de cliente: no teste grátis do iPhone com o cartão recusado ela abriu Planos no site,
+   * viu o card "CORE VITALÍCIO R$ 27,90" com o botão cinza "Acesso já liberado" e entendeu que tinha um vitalício de
+   * 27,90 liberado esperando o Pix). Com a venda na web desligada e sem `?oferta=`, quem JÁ tem acesso não vê preço
+   * nenhum: vê o próprio plano e onde troca o cartão / cancela. As ofertas por link (w97, ds) seguem como estavam. */
+  const soMeuAcesso = !VENDA_NA_WEB && isSubscribed && !ofertaW97 && !ofertaDs;
+
   if (paymentReturn) return <PaymentSuccess />;
 
   if (querW97 && !prontoPraOferta) {
@@ -308,7 +318,7 @@ const Planos = () => {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold">Escolha seu plano</h1>
+          <h1 className="text-lg font-bold">{soMeuAcesso ? "Meu acesso" : "Escolha seu plano"}</h1>
         </div>
       </header>
 
@@ -320,8 +330,17 @@ const Planos = () => {
                 ? "Seu acesso ao CORE é VITALÍCIO 🎉 — nada a pagar, nunca."
                 : ofertaW97
                   ? `A ${loja === "app_store" ? "Apple" : "loja"} não conseguiu cobrar sua assinatura. Tudo o que você organizou continua aqui — e dá pra ficar no CORE pagando uma vez só, no Pix.`
-                  : "Você já é assinante CORE PRO"}
+                  : loja
+                    ? `Seu CORE está liberado pela assinatura ${periodo === "monthly" ? "mensal" : periodo === "annual" ? "anual" : ""} ${loja === "app_store" ? "da App Store" : "do Google Play"}.`.replace("  ", " ")
+                    : "Você já é assinante CORE PRO"}
             </p>
+            {soMeuAcesso && loja && (
+              <p className="text-xs text-muted-foreground leading-relaxed" data-testid="meu-acesso-loja">
+                {loja === "app_store"
+                  ? <>Pra trocar o cartão ou cancelar, é no iPhone: <b>Ajustes → toque no seu nome → Assinaturas → CORE</b>. O cartão fica em <b>Ajustes → seu nome → Pagamento e Envio</b>.</>
+                  : <>Pra trocar o cartão ou cancelar, é no Google Play: <b>Play Store → seu perfil → Pagamentos e assinaturas → Assinaturas → CORE</b>.</>}
+              </p>
+            )}
             {!isLifetime && (
               <Button
                 variant="ghost"
@@ -336,6 +355,7 @@ const Planos = () => {
         )}
         <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} loja={loja} />
 
+        {!soMeuAcesso && (<>
         {/* Hero */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/30">
@@ -428,6 +448,7 @@ const Planos = () => {
             <span>Garantia de 7 dias · Pix libera na hora · sem fidelidade</span>
           </div>
         </motion.div>
+        </>)}
 
         {/* All modules benefits */}
         <section className="space-y-4">

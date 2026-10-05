@@ -77,7 +77,9 @@ describe("/planos?oferta=w97", () => {
     montar("/planos?oferta=w97");
     await waitFor(() => expect(document.body.textContent).toMatch(/VITALÍCIO/));
     expect(screen.queryByTestId("pix-mock")).toBeNull();
-    expect(screen.getByRole("button", { name: /Acesso já liberado/ })).toBeDisabled();
+    // (05/10) quem já tem acesso não vê card de preço nenhum — a página vira "Meu acesso"
+    expect(screen.queryByRole("button", { name: /Acesso já liberado/ })).toBeNull();
+    expect(document.body.textContent).not.toMatch(/R\$ 97,90|27,90/);
     expect(screen.queryByTestId("aviso-cancelar-loja")).toBeNull();
   });
 
@@ -95,5 +97,27 @@ describe("/planos?oferta=w97", () => {
     expect(document.body.textContent).not.toMatch(/97,90/);
     fireEvent.click(screen.getByRole("button", { name: /Gerar meu Pix de R\$ 27,90/ }));
     await waitFor(() => expect(screen.getByTestId("pix-mock").textContent).toBe("oferta:w27"));
+  });
+});
+
+describe("/planos sem oferta, de quem JÁ tem acesso (05/10: 'Meu acesso')", () => {
+  it("assinante da App Store (inclusive na carência): nenhum preço nem 'vitalício R$ 27,90' — o plano dela e onde troca o cartão/cancela", async () => {
+    estado.auth.isSubscribed = true;
+    estado.linha = LOJA_EM_CARENCIA;
+    montar("/planos");
+    await waitFor(() => expect(screen.getByTestId("meu-acesso-loja")).toBeInTheDocument());
+    expect(document.body.textContent).toMatch(/Meu acesso/);
+    expect(document.body.textContent).toMatch(/assinatura anual da App Store/);
+    expect(screen.getByTestId("meu-acesso-loja").textContent).toMatch(/Pagamento e Envio/);
+    expect(document.body.textContent).not.toMatch(/27,90|CORE VITALÍCIO|Acesso já liberado/);
+    expect(screen.queryByTestId("pix-mock")).toBeNull();
+  });
+  it("assinante do Google Play: o caminho da Play", async () => {
+    estado.auth.isSubscribed = true;
+    estado.linha = { billing_period: "monthly", plan: "app", payment_method: "play_store", revenuecat_subscription_id: "GPA.123" };
+    montar("/planos");
+    await waitFor(() => expect(screen.getByTestId("meu-acesso-loja")).toBeInTheDocument());
+    expect(document.body.textContent).toMatch(/assinatura mensal do Google Play/);
+    expect(document.body.textContent).not.toMatch(/27,90/);
   });
 });

@@ -3,7 +3,7 @@
  * no fim do teste. Só avisa quem ainda quer pagar (renovação ligada).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
 import { MemoryRouter, useNavigate } from "react-router-dom";
 
 const estado = vi.hoisted(() => ({
@@ -111,7 +111,8 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     // o texto certo pra quem perdeu o acesso, com o caminho pra loja
     expect(aviso.textContent).toMatch(/Atualize a forma de pagamento na App Store pra voltar a usar o CORE\./);
     expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", "https://apps.apple.com/account/subscriptions");
-    expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false }]]);
+    // o evento sai num efeito depois do aviso montar — com a máquina cheia ele chega um tique depois (05/10: barrou o push)
+    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false }]]));
   });
 
   it("sem acesso, fora do bloqueio (ex.: /planos): volta pra faixa de cima — sem contar outra exibição", async () => {

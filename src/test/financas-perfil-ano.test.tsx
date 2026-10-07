@@ -189,7 +189,13 @@ describe("Balanço anual: ano escolhido, perfil e a linha 'vs ano anterior'", ()
     const tela = renderComStore(<AnnualBudget perfil={PERFIL_PESSOAL} />, store);
     expect(screen.getByTestId("balanco-ano").textContent).toBe("2026");
     expect(screen.getByText(/Nenhum lançamento em 2026/)).toBeInTheDocument();
+    // 07/10: a seta pra frente chega no ano que vem ("minhas contas de 2027") e para lá
+    expect(screen.getByRole("button", { name: "Próximo ano do balanço" })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Próximo ano do balanço" }));
+    expect(screen.getByTestId("balanco-ano").textContent).toBe("2027");
     expect(screen.getByRole("button", { name: "Próximo ano do balanço" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Ano anterior do balanço" }));
+    expect(screen.getByTestId("balanco-ano").textContent).toBe("2026");
 
     fireEvent.click(screen.getByRole("button", { name: "Ano anterior do balanço" }));
     expect(screen.getByTestId("balanco-ano").textContent).toBe("2025");
@@ -258,14 +264,15 @@ describe("Comparação mensal atravessa o ano", () => {
     expect(getMonthTotals("Janeiro", UID, 2026, PERFIL_PESSOAL)).toMatchObject({ receitas: 5000, custosVariaveis: 500 });
   });
 
-  it("a lista de meses carrega o ano e vai do ano mais antigo com dado até o mês de agora", () => {
+  it("a lista de meses carrega o ano e vai do ano mais antigo com dado até 12 meses à frente (07/10: 'comparar out × nov')", () => {
     gravarLocal(chaveArquivada(2024, "marco", "expenses"), [{ id: "x", value: 10 }]);
     gravarLocal(chaveArquivada(2019, "abril", "expenses"), []); // vazio não conta
     expect(anosComLancamentos(UID)).toEqual([2024]);
     const opcoes = opcoesDeMeses(anosComLancamentos(UID), new Date(2026, 0, 15)).map(rotuloMesAno);
     expect(opcoes[0]).toBe("jan/2024");
     expect(opcoes).toContain("dez/2025");
-    expect(opcoes[opcoes.length - 1]).toBe("jan/2026");
+    expect(opcoes).toContain("jan/2026");
+    expect(opcoes[opcoes.length - 1]).toBe("jan/2027");
     // sem nada arquivado: ano passado inteiro + este, nunca menos
     expect(opcoesDeMeses([], new Date(2026, 8, 9)).map(rotuloMesAno)[0]).toBe("jan/2025");
   });

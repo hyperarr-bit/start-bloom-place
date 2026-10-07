@@ -3,7 +3,7 @@ import { Settings2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useFinanceCards } from "@/lib/finance-cards";
-import { rotuloVencimento } from "@/lib/finance-fatura";
+import { contaNoMesDoVencimento, rotuloVencimento } from "@/lib/finance-fatura";
 
 /**
  * Fechamento e vencimento de UM cartão, editados no lugar onde o cartão já
@@ -29,11 +29,17 @@ export const CartaoConfig = ({ card, label }: { card: string; label: string }) =
   const [nome, setNome] = useState(label);
   const [fecha, setFecha] = useState(cfg?.closingDay ? String(cfg.closingDay) : "");
   const [vence, setVence] = useState(cfg?.dueDay ? String(cfg.dueDay) : "");
+  /* 07/10: sem fechamento, "conta no mês do vencimento" (gasto vai pro mês
+     seguinte). Cartão NOVO nasce ligado (é o que a pessoa espera: "prefiro que
+     fique no mês que vai debitar"); cartão que já tinha só o vencimento fica
+     como estava até a pessoa marcar — os números do mês não mudam sozinhos. */
+  const [noVencimento, setNoVencimento] = useState(cfg ? contaNoMesDoVencimento(cfg) : true);
 
   const abrir = () => {
     setNome(label);
     setFecha(cfg?.closingDay ? String(cfg.closingDay) : "");
     setVence(cfg?.dueDay ? String(cfg.dueDay) : "");
+    setNoVencimento(cfg ? contaNoMesDoVencimento(cfg) : true);
     setAberto(true);
   };
 
@@ -50,9 +56,14 @@ export const CartaoConfig = ({ card, label }: { card: string; label: string }) =
       if (r.error) { toast.error(r.error); return; }
     }
     const nomeFinal = renomeou ? nomeNovo : label;
-    setConfig(card, { closingDay: ok(f) ? f : undefined, dueDay: ok(v) ? v : undefined });
+    const soVencimento = !ok(f) && ok(v);
+    setConfig(card, { closingDay: ok(f) ? f : undefined, dueDay: ok(v) ? v : undefined, mesDoVencimento: soVencimento && noVencimento });
     setAberto(false);
-    const fatura = ok(f) ? `compras depois do dia ${f} vão pra fatura do mês seguinte.` : "sem fechamento — gasto conta no mês da compra.";
+    const fatura = ok(f)
+      ? `compras depois do dia ${f} vão pra fatura do mês seguinte.`
+      : soVencimento && noVencimento
+        ? `sem fechamento — gasto conta no mês seguinte, o do vencimento (dia ${v}).`
+        : "sem fechamento — gasto conta no mês da compra.";
     toast.success(renomeou ? `Cartão renomeado para ${nomeFinal}. ${fatura[0].toUpperCase()}${fatura.slice(1)}` : `${nomeFinal}: ${fatura}`);
   };
 
@@ -89,6 +100,12 @@ export const CartaoConfig = ({ card, label }: { card: string; label: string }) =
         <Input type="number" inputMode="numeric" min={1} max={31} value={vence} onChange={(e) => setVence(e.target.value)}
           placeholder="—" className="h-7 w-12 text-xs text-center px-1" />
       </label>
+      {!fecha.trim() && vence.trim() && (
+        <label className="text-[10px] text-muted-foreground flex items-center gap-1 basis-full" data-testid="conta-no-vencimento">
+          <input type="checkbox" checked={noVencimento} onChange={(e) => setNoVencimento(e.target.checked)} aria-label="Gasto conta no mês do vencimento" className="h-3.5 w-3.5 accent-primary" />
+          gasto conta no mês do vencimento (o seguinte)
+        </label>
+      )}
       <button onClick={salvar} aria-label={personalizado ? "Salvar cartão" : "Salvar fechamento e vencimento"} className="h-7 w-7 rounded-md bg-primary text-primary-foreground grid place-items-center">
         <Check className="w-3.5 h-3.5" />
       </button>

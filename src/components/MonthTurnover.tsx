@@ -264,7 +264,8 @@ export const copyToMonth = (
 };
 
 interface MonthTurnoverProps {
-  onOpenMonth?: (month: string) => void;
+  /** Abre a planilha do mês anterior — com o ANO dele (em janeiro/2027, dezembro é de 2026). */
+  onOpenMonth?: (month: string, year?: number) => void;
   /**
    * Aplica um valor no estado do React do mês corrente. Devolve `true` quando
    * a chave tem dono em memória (aí a gravação em disco não é feita aqui — o
@@ -664,7 +665,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                     className="flex-1 text-xs"
                     onClick={() => {
                       handleClose();
-                      onOpenMonth?.(prevMonth);
+                      onOpenMonth?.(prevMonth, anoDoPrev);
                     }}
                   >
                     Ver detalhes

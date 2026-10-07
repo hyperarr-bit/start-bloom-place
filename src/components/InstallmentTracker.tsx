@@ -17,7 +17,7 @@ import {
   type Parcela, carimbar, carimbarLista, marcarParcelaDoMes, parcelaDoMes, parcelaPagaNoMes, parcelaQuitada,
   valorDaParcelaNoMes, somaParcelasDoMes, nomeDoMes, somarMeses,
 } from "@/lib/finance-parcelas";
-import { mesDoGasto, rotuloVencimento } from "@/lib/finance-fatura";
+import { mesDoGasto, rotuloVencimento, contaNoMesDoVencimento } from "@/lib/finance-fatura";
 import { mesCorrenteId } from "@/lib/virada-contas";
 
 /** Formato gravado em `finance-installments` — exportado porque o ExpenseTable
@@ -497,7 +497,7 @@ export const InstallmentTracker = ({
                             <span className={`category-badge ${getCardStyle(card)}`}>
                               {getCardLabel(card)}
                             </span>
-                            {cfg?.closingDay && (
+                            {(cfg?.closingDay || contaNoMesDoVencimento(cfg)) && (
                               <span className="text-[10px] text-muted-foreground">
                                 Fatura de {nomeDoMes(mesDaChave)}{vencimento ? ` · ${vencimento}` : ""}
                               </span>

@@ -67,7 +67,8 @@ export const AnnualBudget = ({ perfil }: Props) => {
   const anoAtual = getCurrentYear();
   const [anoGuardado, setAno] = usePersistedState<number>("finance-balanco-ano", anoAtual);
   // Gravado noutro aparelho fora da faixa (ou lixo)? Cai num ano válido.
-  const ano = Math.min(anoAtual, Math.max(ANO_MINIMO, Number(anoGuardado) || anoAtual));
+  // 07/10: até o ano que vem (o Orçamento Mensal também) — "minhas contas de 2027"
+  const ano = Math.min(anoAtual + 1, Math.max(ANO_MINIMO, Number(anoGuardado) || anoAtual));
   const noAnoCorrente = ano === anoAtual;
   const idxMesAtual = months.indexOf(currentMonth);
   const mesesComparados = noAnoCorrente ? idxMesAtual + 1 : 12;
@@ -107,8 +108,8 @@ export const AnnualBudget = ({ perfil }: Props) => {
           </button>
           <span className="text-xs font-bold tabular-nums min-w-[38px] text-center" data-testid="balanco-ano">{ano}</span>
           <button
-            onClick={() => setAno(Math.min(anoAtual, ano + 1))}
-            disabled={ano >= anoAtual}
+            onClick={() => setAno(Math.min(anoAtual + 1, ano + 1))}
+            disabled={ano >= anoAtual + 1}
             aria-label="Próximo ano do balanço"
             className="h-7 w-7 rounded-md flex items-center justify-center opacity-80 hover:opacity-100 hover:bg-background/15 disabled:opacity-30"
           >

@@ -62,14 +62,21 @@ const abrev = (idx: number) => ALL_MONTHS[idx].substring(0, 3);
 /** "dez/2025" — o que aparece no seletor. */
 export const rotuloMesAno = (m: MesAno) => `${abrev(m.idx).toLowerCase()}/${m.ano}`;
 
+/** Quantos meses à frente entram na lista (07/10, chamado: "não consigo prever meu
+ *  comparativo out × nov" — quem deixa o mês que vem preenchido quer comparar). */
+export const MESES_A_FRENTE = 12;
+
 export const opcoesDeMeses = (anosComDados: number[], agora = new Date()): MesAno[] => {
   const anoAtual = agora.getFullYear();
   const idxAtual = agora.getMonth();
   const anoMin = Math.min(anoAtual - 1, ...anosComDados.filter((a) => a >= 2015 && a <= anoAtual));
+  const ultimo = idxAtual + MESES_A_FRENTE; // em meses desde janeiro de anoAtual
+  const anoMax = anoAtual + Math.floor(ultimo / 12);
+  const idxMax = ultimo % 12;
   const out: MesAno[] = [];
-  for (let ano = anoMin; ano <= anoAtual; ano++) {
+  for (let ano = anoMin; ano <= anoMax; ano++) {
     for (let idx = 0; idx < 12; idx++) {
-      if (ano === anoAtual && idx > idxAtual) break;
+      if (ano === anoMax && idx > idxMax) break;
       out.push({ ano, idx });
     }
   }

@@ -29,11 +29,18 @@ interface MonthlyBudgetProps {
  * os 12 meses do ano corrente e mais nada, então um mês de 2024 existia no
  * banco sem porta de entrada.
  *
- * O limite pra trás é 2015 por bom senso (não há o que digitar antes disso) e
- * pra frente é o ano corrente: planilha de mês que ainda não existe seria
- * convite a lançar despesa no lugar errado e não achar depois.
+ * O limite pra trás é 2015 por bom senso (não há o que digitar antes disso).
+ * Pra frente era o ano corrente — e aí (chamado de 04/10, iPhone 1.0.9) "não
+ * consigo visualizar as minhas contas de 2027": parcela em 12× lançada em
+ * setembro acaba em agosto de 2027 e o mês existe, só não tinha porta. Agora
+ * vai até o ANO SEGUINTE (anoAtual + 1): o mês preenchido antes da hora é
+ * adotado quando chega (lib/virada-do-mes, adotarMesPreenchido), então nada
+ * fica órfão. Dois anos à frente continua fechado — seria convite a lançar no
+ * lugar errado.
  */
 const ANO_MINIMO = 2015;
+/** Até onde a seta vai pra frente (o ano que vem). */
+export const anoMaximo = (anoAtual: number) => anoAtual + 1;
 
 /* O ANO GUARDADO NÃO PRENDE MAIS NO ANO QUE PASSOU (26/09, auditoria da
  * virada). Guardado como número, "2026" escolhido em dezembro (a seta de ida
@@ -62,7 +69,7 @@ const anoValido = (guardado: AnoGuardado | null | undefined, escolhidoEm: number
     ? { ano: guardado, em: typeof escolhidoEm === "number" ? escolhidoEm : ANO_DO_FORMATO_ANTIGO }
     : guardado;
   const bruto = g && typeof g === "object" && Number(g.em) === anoAtual ? Number(g.ano) : anoAtual;
-  return Number.isInteger(bruto) ? Math.min(anoAtual, Math.max(ANO_MINIMO, bruto)) : anoAtual;
+  return Number.isInteger(bruto) ? Math.min(anoMaximo(anoAtual), Math.max(ANO_MINIMO, bruto)) : anoAtual;
 };
 
 const hasMonthData = (userId: string | null, month: string, year: number) => {
@@ -128,8 +135,8 @@ export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudge
           </button>
           <span className="text-xs font-bold tabular-nums min-w-[38px] text-center">{ano}</span>
           <button
-            onClick={() => setAno((a) => Math.min(anoAtual, a + 1))}
-            disabled={ano >= anoAtual}
+            onClick={() => setAno((a) => Math.min(anoMaximo(anoAtual), a + 1))}
+            disabled={ano >= anoMaximo(anoAtual)}
             aria-label="Próximo ano"
             className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-background/60 disabled:opacity-30"
           >

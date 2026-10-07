@@ -68,7 +68,8 @@ export const MAX_CUSTOM_CARDS = 20;
  * muda com isso mora em lib/finance-fatura.ts.
  */
 export const CARD_CONFIG_KEY = "finance-card-config";
-export type CardConfig = { closingDay?: number; dueDay?: number };
+/** `mesDoVencimento` (07/10): sem fechamento, o gasto conta no mês seguinte — ver lib/finance-fatura. */
+export type CardConfig = { closingDay?: number; dueDay?: number; mesDoVencimento?: boolean };
 const SEM_CONFIG: Record<string, CardConfig> = {};
 
 /** `value` é um id estável — o rename NÃO mexe nele, então gasto/parcela já
@@ -121,6 +122,7 @@ export function useFinanceCards() {
     const limpo: CardConfig = {};
     const fecha = dia(cfg.closingDay); if (fecha) limpo.closingDay = fecha;
     const vence = dia(cfg.dueDay); if (vence) limpo.dueDay = vence;
+    if (!fecha && vence && cfg.mesDoVencimento === true) limpo.mesDoVencimento = true;
     const next = { ...config };
     if (fecha || vence) next[value] = limpo; else delete next[value];
     setData(CARD_CONFIG_KEY, next);

@@ -32,7 +32,23 @@ export interface CardConfig {
   closingDay?: number;
   /** Dia em que a fatura vence (1-31). Só informativo. */
   dueDay?: number;
+  /**
+   * 07/10 (chamado do iPhone 1.0.9): "coloco meus gastos do cartão com
+   * vencimento em outubro mas fica em setembro. Não estou colocando data de
+   * fechamento… prefiro que o valor fique no mês que irá debitar." Sem
+   * fechamento o app não sabe em que fatura a compra cai; com esta chave
+   * ligada, toda compra no crédito conta no MÊS SEGUINTE ao da compra (a
+   * fatura que vence no `dueDay` do mês que vem). Só vale sem `closingDay`
+   * (com fechamento a regra dele é mais precisa). É OPT-IN de propósito:
+   * quem já cadastrou só o vencimento não vê os números do mês mudarem
+   * sozinhos — a caixinha fica no mesmo lugar do fechamento (CartaoConfig).
+   */
+  mesDoVencimento?: boolean;
 }
+
+/** Cartão sem fechamento que escolheu "conta no mês do vencimento". */
+export const contaNoMesDoVencimento = (cfg: CardConfig | undefined): boolean =>
+  !!cfg && cfg.mesDoVencimento === true && !diaValido(cfg.closingDay) && diaValido(cfg.dueDay);
 
 /** O mínimo que um gasto precisa ter pra regra da fatura — sem assinatura de
  *  índice, senão a interface `Expense` do ExpenseTable não encaixa. */
@@ -62,7 +78,19 @@ export const mesDaFatura = (date: unknown, closingDay: unknown): string | null =
   return dia > closingDay ? somarMeses(mes, 1) : mes;
 };
 
-/** Em que mês este gasto CONTA. Só crédito em cartão com fechamento muda de mês. */
+/** "YYYY-MM" da data da compra, ou null se ilegível. */
+const mesDaData = (date: unknown): string | null => {
+  if (typeof date !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-\d{2}/.exec(date.trim());
+  return m && Number(m[2]) >= 1 && Number(m[2]) <= 12 ? `${m[1]}-${m[2]}` : null;
+};
+
+/**
+ * Em que mês este gasto CONTA. Só crédito muda de mês: em cartão com
+ * fechamento, pela regra do fechamento; em cartão sem fechamento que marcou
+ * "conta no mês do vencimento", no mês seguinte ao da compra (nunca mais de
+ * 1 mês à frente da chave — é até onde o mês seguinte lê pra trás).
+ */
 export const mesDoGasto = (
   gasto: GastoDeCartao,
   configOf: (card: string) => CardConfig | undefined,
@@ -70,8 +98,13 @@ export const mesDoGasto = (
 ): string => {
   if (gasto?.paymentMethod !== "credito" || !gasto.cardName) return mesDaChave;
   const cfg = configOf(gasto.cardName);
-  if (!cfg || !diaValido(cfg.closingDay)) return mesDaChave;
-  return mesDaFatura(gasto.date, cfg.closingDay) ?? mesDaChave;
+  if (!cfg) return mesDaChave;
+  if (diaValido(cfg.closingDay)) return mesDaFatura(gasto.date, cfg.closingDay) ?? mesDaChave;
+  if (contaNoMesDoVencimento(cfg)) {
+    const mes = mesDaData(gasto.date) ?? mesDaChave;
+    return somarMeses(mesesEntre(mesDaChave, mes) > 0 ? mesDaChave : mes, 1);
+  }
+  return mesDaChave;
 };
 
 export interface VariaveisDoMes<T extends GastoDeCartao> {

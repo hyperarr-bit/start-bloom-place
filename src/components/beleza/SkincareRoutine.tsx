@@ -253,7 +253,7 @@ export const SkincareRoutine = ({
         </button>
       )}
 
-      <FichaDoPasso s={s} aberto={aberto} onFechar={() => setAberto(null)} onVista={(vista) => setAberto((a) => (a ? { ...a, vista } : a))} />
+      <FichaDoPasso s={s} aberto={aberto} onFechar={() => setAberto(null)} onVista={(vista) => setAberto((a) => (a ? { ...a, vista } : a))} onMovido={(i) => setAberto((a) => (a ? { ...a, i } : a))} />
     </div>
   );
 };

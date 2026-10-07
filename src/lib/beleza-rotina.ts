@@ -579,6 +579,12 @@ export function guardarNaBancada(
   if (doCatalogo) {
     const ja = lista.find((x) => x && !x.finished && x.catalogoId === (escolhido as ProdutoDoCatalogo).id);
     if (ja) return { bancada: lista, id: ja.id };
+  } else {
+    // 07/10 (chamado do Android: "os produtos que eu adiciono não ficam guardados
+    // pra usar outra vez"): o digitado à mão também reusa o que já está em Meus
+    // produtos com a mesma marca e nome (sem acento/caixa) — antes entrava de novo.
+    const ja = lista.find((x) => x && !x.finished && mesmoProduto(x, escolhido));
+    if (ja) return { bancada: lista, id: ja.id };
   }
   const c = escolhido as ProdutoDoCatalogo;
   const categoria = (c.categoria ?? "serum") as CategoriaDoCatalogo;
@@ -603,6 +609,55 @@ export function guardarNaBancada(
   };
   return { bancada: [...lista, produto], id: novoId };
 }
+
+/** Mesma marca e nome, ignorando acento, caixa e espaços sobrando. */
+export const mesmoProduto = (a: Pick<Product, "name" | "brand">, b: { marca: string; nome: string }): boolean =>
+  norm(String(a.name ?? "")) === norm(b.nome) && norm(String(a.brand ?? "")) === norm(b.marca);
+
+/**
+ * 07/10 (chamado do iPhone 1.0.9: "produto que já incluí nos 'meus produtos' não
+ * me aparece como sugestão pra colocar naquele passo"): o bloco NOS SEUS PRODUTOS
+ * mostra TUDO o que a pessoa tem de pele (não acabou) — antes só entrava o que
+ * veio da lista curada E encaixava no passo. Ordem: o que encaixa no passo
+ * primeiro, depois por marca/nome. Buscando, filtra por nome ou marca.
+ */
+export function meusProdutosParaOPasso(
+  bancada: ProdutoDaBancada[],
+  catalogo: ProdutoDoCatalogo[] | null,
+  tipo: TipoDoPasso | string | undefined,
+  consulta = "",
+): ProdutoDaBancada[] {
+  const q = norm(consulta);
+  const palavras = q.split(/\s+/).filter((w) => w.length > 0);
+  const porId = new Map((catalogo ?? []).map((c) => [c.id, c] as const));
+  const dePele = (b: ProdutoDaBancada) => {
+    if (b.catalogoId) return true;
+    const c = norm(String(b.category ?? ""));
+    return c === "skincare" || c === "pele" || c === "rosto" || c === "" || c === "outro";
+  };
+  const encaixa = (b: ProdutoDaBancada) => {
+    const c = b.catalogoId ? porId.get(b.catalogoId) : undefined;
+    return c ? encaixaNoPasso(c, tipo) : false;
+  };
+  const alvo = (b: ProdutoDaBancada) => norm(`${b.brand ?? ""} ${b.name ?? ""} ${(b.ativos ?? []).join(" ")}`);
+  return (Array.isArray(bancada) ? bancada : [])
+    .filter((b): b is ProdutoDaBancada => !!b && typeof b.id === "string" && !b.finished && !!String(b.name ?? "").trim() && dePele(b))
+    .filter((b) => palavras.every((w) => alvo(b).includes(w)))
+    .sort((a, b) => Number(encaixa(b)) - Number(encaixa(a)) || String(a.brand ?? "").localeCompare(String(b.brand ?? "")) || String(a.name ?? "").localeCompare(String(b.name ?? "")));
+}
+
+/**
+ * Mover um passo de `de` pra `para` desloca os checks do dia (índices no array
+ * inteiro) junto — o que estava marcado continua marcado no MESMO passo.
+ */
+export const marcadosAposMover = (marcados: number[], de: number, para: number): number[] => {
+  if (de === para) return marcados;
+  return marcados.map((m) => {
+    if (m === de) return para;
+    if (de < para) return m > de && m <= para ? m - 1 : m;
+    return m >= para && m < de ? m + 1 : m;
+  });
+};
 
 /** "CeraVe · Gel de Limpeza Espumante" */
 export const rotuloDoProduto = (p: Pick<Product, "brand" | "name"> | null | undefined): string =>

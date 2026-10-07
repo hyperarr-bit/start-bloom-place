@@ -2,11 +2,12 @@ import { useCallback } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import {
-  CHAVE_DICAS, CHAVE_FEITOS, CHAVE_PASSOS, CHAVE_PERFIL, alternarDia, gerarRotina, guardarNaBancada, passoDigitado, passoValido, ritmoDoPasso,
+  CHAVE_DICAS, CHAVE_FEITOS, CHAVE_PASSOS, CHAVE_PERFIL, alternarDia, gerarRotina, guardarNaBancada, marcadosAposMover, passoDigitado, passoValido, ritmoDoPasso,
   type CategoriaDoCatalogo, type PassoDaRotina, type PerfilDaPele, type Periodo, type ProdutoDaBancada, type ProdutoDoCatalogo,
 } from "@/lib/beleza-rotina";
 import { CHAVE_LEMBRETE_SKINCARE, LEMBRETE_PADRAO, lerLembreteSkincare, type LembreteDoPeriodo, type LembreteSkincare } from "@/lib/beleza-lembrete";
 import { inserirEm, marcadosAposInserir, marcadosAposRemover } from "./utils";
+import { moverNaLista } from "@/lib/treino-plano";
 import { useChaveDaBeleza } from "./estado-compartilhado";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 
@@ -120,6 +121,23 @@ export function useSkincare() {
     });
   };
 
+  /**
+   * 07/10 (chamado do iPhone: "passo novo fica sempre embaixo; teria que ter como
+   * editar a ordem sem excluir tudo"): move o passo de `de` pra `para` no array
+   * inteiro; os checks de hoje/ontem/anteontem andam junto (mesma régua do remover).
+   */
+  const moverPasso = (periodo: Periodo, de: number, para: number): boolean => {
+    const atual = passos[periodo];
+    if (de === para || de < 0 || para < 0 || de >= atual.length || para >= atual.length) return false;
+    setPassos[periodo]((prev) => moverNaLista(lista<PassoDaRotina>(prev), de, para));
+    setFeitos[periodo]((prev) => {
+      const n = { ...prev };
+      for (const d of [hoje, ontem, anteontem]) if (d in (prev ?? {})) n[d] = marcadosAposMover(doDia(prev, d), de, para);
+      return n;
+    });
+    return true;
+  };
+
   const alternarDiaDoPasso = (periodo: Periodo, i: number, dia: number): boolean => {
     const p = passos[periodo][i];
     if (!p) return false;
@@ -146,6 +164,13 @@ export function useSkincare() {
     const { bancada: nova, id } = guardarNaBancada(lista<ProdutoDaBancada>(bancada), escolhido, crypto.randomUUID(), ritmoDoPasso(p) === "todo dia" ? "Diário" : ritmoDoPasso(p));
     if (nova !== bancada) setBancada(nova);
     mudarPasso(periodo, i, (x) => ({ ...x, produtoId: id }));
+  };
+
+  /** Produto que JÁ está em Meus produtos vira o produto do passo (sem criar outro). */
+  const usarProdutoMeu = (periodo: Periodo, i: number, produtoId: string) => {
+    const existe = lista<ProdutoDaBancada>(bancada).some((x) => x?.id === produtoId);
+    if (!existe) return;
+    mudarPasso(periodo, i, (x) => ({ ...x, produtoId }));
   };
 
   const tirarProduto = (periodo: Periodo, i: number) =>
@@ -223,7 +248,7 @@ export function useSkincare() {
   return {
     hoje, ontem, anteontem, passos, feitos, feitosDoDia, checkins, bancada: lista<ProdutoDaBancada>(bancada), evitar: lista<string>(evitar),
     lembrete, perfil, vazia, alternarDispensado: dicasBruto?.alternarDispensado === true,
-    alternar, produtoDe, adicionarPasso, removerPasso, alternarDiaDoPasso, renomear, escolherProduto, tirarProduto, abrirHoje,
+    alternar, produtoDe, adicionarPasso, removerPasso, moverPasso, alternarDiaDoPasso, renomear, escolherProduto, usarProdutoMeu, tirarProduto, abrirHoje,
     gerar, mudarLembrete, ligarLembretes, aplicarDias, dispensarAlternar,
   };
 }

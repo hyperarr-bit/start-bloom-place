@@ -13,7 +13,7 @@
  * marcado. A URL de onde cada produto foi conferido fica no JSON e nunca aparece.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, PackageOpen, Pencil, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, PackageOpen, Pencil, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import {
-  DIAS_CURTOS, ativoEvitado, buscarProdutos, carregarCatalogo, diasDoPasso, diasPorExtenso, ehTodoDia, indicadosPara, nomeCurto,
+  DIAS_CURTOS, ativoEvitado, buscarProdutos, carregarCatalogo, diasDoPasso, diasPorExtenso, ehTodoDia, indicadosPara, meusProdutosParaOPasso, nomeCurto,
   ritmoDoPasso, textoDoPao, tipoPeloNome, type CategoriaDoCatalogo, type PassoDaRotina, type Periodo, type ProdutoDaBancada,
   type ProdutoDoCatalogo, type TipoDoPasso,
 } from "@/lib/beleza-rotina";
@@ -105,10 +105,11 @@ function CartaoDoProduto({ produto, onTrocar, onTirar, onAbrirHoje }: { produto:
   );
 }
 
-function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Skincare; periodo: Periodo; i: number; passo: PassoDaRotina; onEscolher: () => void; onFechar: () => void }) {
+function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar, onMover }: { s: Skincare; periodo: Periodo; i: number; passo: PassoDaRotina; onEscolher: () => void; onFechar: () => void; onMover: (para: number) => void }) {
   const [nome, setNome] = useState(passo.name);
   const dias = diasDoPasso(passo);
   const produto = s.produtoDe(passo);
+  const total = s.passos[periodo].length;
   const salvarNome = () => {
     if (nome.trim() && nome.trim() !== passo.name) s.renomear(periodo, i, nome);
     else setNome(passo.name);
@@ -159,6 +160,34 @@ function ConteudoDaFicha({ s, periodo, i, passo, onEscolher, onFechar }: { s: Sk
           })}
         </div>
       </div>
+
+      {/* 07/10: ordem do passo (setas, como no Treino) — antes só dava pra apagar e recriar */}
+      {total > 1 && (
+        <div className="flex items-center gap-2" data-testid="ordem-do-passo">
+          <span className={ROTULO}>ORDEM</span>
+          <span className="text-[12px] text-bz-suave">{i + 1}º de {total}</span>
+          <div className="ml-auto flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => onMover(i - 1)}
+              disabled={i === 0}
+              aria-label={`Subir ${passo.name}`}
+              className="w-11 h-10 rounded-full border border-bz-linha-forte bg-bz-cartao grid place-items-center disabled:opacity-30 active:bg-bz-blush"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMover(i + 1)}
+              disabled={i >= total - 1}
+              aria-label={`Descer ${passo.name}`}
+              className="w-11 h-10 rounded-full border border-bz-linha-forte bg-bz-cartao grid place-items-center disabled:opacity-30 active:bg-bz-blush"
+            >
+              <ArrowDown className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div>
         <span className={ROTULO}>PRODUTO</span>
@@ -225,7 +254,39 @@ function LinhaDoProduto({ p, evitado, primeira, onEscolher }: { p: ProdutoDoCata
   );
 }
 
-function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; periodo: Periodo; passo: PassoDaRotina; onEscolhido: (p: ProdutoDoCatalogo | { marca: string; nome: string; categoria?: CategoriaDoCatalogo }) => void }) {
+export type Escolhido = ProdutoDoCatalogo | { marca: string; nome: string; categoria?: CategoriaDoCatalogo } | { produtoId: string };
+
+/** Um produto que a pessoa JÁ tem (Meus produtos), na lista do passo. */
+function LinhaDoMeuProduto({ p, evitado, primeira, onEscolher }: { p: ProdutoDaBancada; evitado: string | null; primeira: boolean; onEscolher: () => void }) {
+  const ativos = Array.isArray(p.ativos) ? p.ativos : [];
+  return (
+    <button
+      type="button"
+      onClick={onEscolher}
+      className={cn("w-full text-left px-3.5 py-2.5 flex items-start gap-3 min-h-[60px] bg-transparent active:bg-bz-blush transition-colors", !primeira && "border-t border-bz-linha")}
+      data-testid="produto-da-lista"
+      data-meu="1"
+      aria-label={`${p.brand ? `${p.brand} ` : ""}${p.name}`}
+    >
+      <span className="min-w-0 flex-1">
+        {p.brand ? <span className="block text-[10.5px] font-extrabold tracking-[.12em] text-bz-suave uppercase truncate">{p.brand}</span> : null}
+        <span className="block text-[14px] font-semibold leading-snug text-bz-tinta">{p.name}</span>
+        {ativos.length > 0 && (
+          <span className="mt-1 flex flex-wrap gap-1">
+            {ativos.slice(0, 3).map((a) => <Chip key={a} tom="rose">{a}</Chip>)}
+          </span>
+        )}
+        {evitado && <span className="mt-1 block text-[11.5px] font-semibold text-bz-alerta-tinta">🚫 tem {evitado}, que você evita</span>}
+      </span>
+      <span className="shrink-0 text-right pt-0.5">
+        <span className="block text-[11.5px] font-bold tabular-nums text-bz-tinta">PAO {p.paoMonths || 12}M</span>
+        {p.opened && p.openedDate ? <span className="block text-[10px] text-bz-suave">aberto</span> : null}
+      </span>
+    </button>
+  );
+}
+
+function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; periodo: Periodo; passo: PassoDaRotina; onEscolhido: (p: Escolhido) => void }) {
   const [lista, setLista] = useState<ProdutoDoCatalogo[] | null>(null);
   const [q, setQ] = useState("");
   const [digitando, setDigitando] = useState(false);
@@ -239,9 +300,12 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
   const pele = s.perfil?.pele;
   const tipo = (passo.tipo as TipoDoPasso | undefined) ?? tipoPeloNome(passo.name);
   const buscando = q.trim().length >= 2;
-  // "ter os MEUS produtos": o que a pessoa já tem e serve pra este passo vem antes da lista
+  // "ter os MEUS produtos": TUDO o que a pessoa já tem de pele vem antes da lista
+  // (07/10: antes só entrava o que veio da lista curada e encaixava no passo —
+  // o produto digitado em Meus produtos nunca aparecia como sugestão). Buscando,
+  // os meus também respondem à busca.
   const naBancada = new Set(s.bancada.filter((b) => b && !b.finished && b.catalogoId).map((b) => b.catalogoId as string));
-  const meus = lista && !buscando ? indicadosPara(lista, tipo, pele, s.evitar, 40, periodo).filter((p) => naBancada.has(p.id)) : [];
+  const meus = meusProdutosParaOPasso(s.bancada, lista, tipo, buscando ? q : "");
   const indicados = lista ? indicadosPara(lista, tipo, pele, s.evitar, 40, periodo).filter((p) => !naBancada.has(p.id)) : [];
   const achados = lista && buscando ? buscarProdutos(lista, q, pele, s.evitar, 30, tipo, periodo) : null;
   const mostrar = achados ?? indicados;
@@ -262,7 +326,7 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
           <p className={cn(ROTULO, "px-4 mt-3 mb-1.5")}>NOS SEUS PRODUTOS</p>
           <div className="mx-4 rounded-2xl border-2 border-bz-dica-borda overflow-hidden bg-bz-dica" data-testid="nos-seus-produtos">
             {meus.map((p, k) => (
-              <LinhaDoProduto key={p.id} p={p} evitado={ativoEvitado(p, s.evitar)} primeira={k === 0} onEscolher={() => onEscolhido(p)} />
+              <LinhaDoMeuProduto key={p.id} p={p} evitado={ativoEvitado({ ativos: Array.isArray(p.ativos) ? p.ativos : [] }, s.evitar)} primeira={k === 0} onEscolher={() => onEscolhido({ produtoId: p.id })} />
             ))}
           </div>
         </>
@@ -308,7 +372,7 @@ function EscolherProduto({ s, periodo, passo, onEscolhido }: { s: Skincare; peri
 
 /* ------------------------------------------------------------ a folha */
 
-export function FichaDoPasso({ s, aberto, onFechar, onVista }: { s: Skincare; aberto: PassoAberto | null; onFechar: () => void; onVista: (v: PassoAberto["vista"]) => void }) {
+export function FichaDoPasso({ s, aberto, onFechar, onVista, onMovido }: { s: Skincare; aberto: PassoAberto | null; onFechar: () => void; onVista: (v: PassoAberto["vista"]) => void; onMovido?: (i: number) => void }) {
   // ao fechar a folha ainda desliza: segue mostrando a última ficha em vez de descer vazia
   const ultimo = useRef<PassoAberto | null>(aberto);
   if (aberto) ultimo.current = aberto;
@@ -336,6 +400,13 @@ export function FichaDoPasso({ s, aberto, onFechar, onVista }: { s: Skincare; ab
                   periodo={atual.periodo}
                   passo={passo}
                   onEscolhido={(p) => {
+                    if ("produtoId" in p) {
+                      s.usarProdutoMeu(atual.periodo, atual.i, p.produtoId);
+                      trackEvent("skincare_produto", { da_lista: false, meu: true, passo: String(passo.tipo ?? "") });
+                      toast.success("Produto no passo", { description: "O mesmo item de Meus produtos — nada duplicado." });
+                      onVista("ficha");
+                      return;
+                    }
                     s.escolherProduto(atual.periodo, atual.i, p);
                     trackEvent("skincare_produto", { da_lista: "fonte" in p, passo: String(passo.tipo ?? "") });
                     toast.success("Produto no passo e em Meus produtos", { description: "fonte" in p ? `Validade depois de aberto: ${textoDoPao(p.pao, p.paoPadrao)}` : undefined });
@@ -343,7 +414,16 @@ export function FichaDoPasso({ s, aberto, onFechar, onVista }: { s: Skincare; ab
                   }}
                 />
               ) : (
-                <ConteudoDaFicha key={`${atual.periodo}-${atual.i}`} s={s} periodo={atual.periodo} i={atual.i} passo={passo} onEscolher={() => onVista("escolher")} onFechar={onFechar} />
+                <ConteudoDaFicha
+                  key={`${atual.periodo}-${atual.i}`}
+                  s={s}
+                  periodo={atual.periodo}
+                  i={atual.i}
+                  passo={passo}
+                  onEscolher={() => onVista("escolher")}
+                  onFechar={onFechar}
+                  onMover={(para) => { if (s.moverPasso(atual.periodo, atual.i, para)) onMovido?.(para); }}
+                />
               )}
             </div>
           </>

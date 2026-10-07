@@ -23,3 +23,14 @@ export const rotuloMl = (ml: number): string =>
 
 /** Texto do botão da ação rápida da Home: "+ 200ml Água", "+ 1L Água". */
 export const rotuloAcaoAgua = (copoMl: number): string => `+ ${rotuloMl(copoMl)} Água`;
+
+/** Garrafa (≥ 500 ml) fala em litros; copo fala em copos (07/10, dono: com a
+ *  garrafa de 1 L a Home dizia "Faltam 8 copos de água"). */
+const ehGarrafa = (copoMl: number) => copoMl >= 500;
+
+/** "3 copos de água", "1 copo de água", "2L de água", "1,5L de água". */
+export const aguaQueFalta = (porcoes: number, copoMl: number): string =>
+  ehGarrafa(copoMl) ? `${rotuloMl(porcoes * copoMl)} de água` : `${porcoes} copo${porcoes > 1 ? "s" : ""} de água`;
+
+/** Unidade da contagem na Home: "copos" ou "garrafas". */
+export const unidadeDaAgua = (copoMl: number): string => (ehGarrafa(copoMl) ? "garrafas" : "copos");

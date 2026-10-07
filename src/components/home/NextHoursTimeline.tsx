@@ -6,6 +6,7 @@ import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
 import { CHAVE_COMPROMISSOS, proximosDeHoje, type Compromisso } from "@/lib/compromissos";
+import { CHAVE_COPO_ML, COPO_ML_PADRAO, aguaQueFalta, normalizarCopoMl } from "@/lib/saude-copo";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -33,7 +34,7 @@ export interface PendenciasDeHoje {
  * esta seção sempre fez, agora também lida pelo card "SEU DIA" da missão em
  * doses (missao-doses). Nada mudou na regra — só saiu de dentro do componente.
  */
-export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[], agora: Date = new Date()): PendenciasDeHoje {
+export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[], agora: Date = new Date(), copoMl: number = COPO_ML_PADRAO): PendenciasDeHoje {
   const items: PendingItem[] = [];
 
   /* COMPROMISSOS DE HOJE (22/09, chamado: "tarefas criadas em Rotina não
@@ -116,7 +117,7 @@ export function pendenciasDeHoje(data: LifeHubData, compromissos: Compromisso[],
   const waterRemaining = data.waterGoal - data.waterGlasses;
   if (waterRemaining > 0) {
     items.push({
-      label: `Faltam ${waterRemaining} copo${waterRemaining > 1 ? "s" : ""} de água`,
+      label: `Falta${waterRemaining > 1 && copoMl < 500 ? "m" : ""} ${aguaQueFalta(waterRemaining, copoMl)}`,
       done: false,
       emoji: "💧",
       priority: 4,
@@ -253,7 +254,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const { get } = useUserData();
-  const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date());
+  const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date(), normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
 
   return (
     <div>

@@ -4,6 +4,7 @@ import { Heart, Droplets, Plus, Minus } from "lucide-react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProgressBar } from "@/components/home/ProgressBar";
+import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, unidadeDaAgua } from "@/lib/saude-copo";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 
 export const HealthWidget = ({ size = "small" }: { size?: WidgetSize }) => {
@@ -66,7 +67,7 @@ export const HealthWidget = ({ size = "small" }: { size?: WidgetSize }) => {
 
       <div className="flex items-center gap-2 mb-2">
         <Droplets className="w-4 h-4 text-cyan-500" />
-        <span className="text-sm font-bold">{data.waterGlasses}/{data.waterGoal} copos</span>
+        <span className="text-sm font-bold">{data.waterGlasses}/{data.waterGoal} {unidadeDaAgua(normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)))}</span>
       </div>
       <ProgressBar value={data.waterGlasses} max={data.waterGoal} colorClass="bg-cyan-500" />
 

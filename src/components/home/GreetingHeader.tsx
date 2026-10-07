@@ -9,6 +9,7 @@ import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";
 import { AccountDrawer } from "./AccountDrawer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CHAVE_COPO_ML, COPO_ML_PADRAO, aguaQueFalta, normalizarCopoMl } from "@/lib/saude-copo";
 
 interface GreetingHeaderProps {
   data: LifeHubData;
@@ -24,7 +25,7 @@ const getGreeting = () => {
   return { text: "Boa noite", Icon: Sunset };
 };
 
-const getContextualMessage = (data: LifeHubData): string => {
+const getContextualMessage = (data: LifeHubData, copoMl: number = COPO_ML_PADRAO): string => {
   const h = new Date().getHours();
   const dayOfWeek = new Date().getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -54,7 +55,7 @@ const getContextualMessage = (data: LifeHubData): string => {
   if (h >= 14 && h < 18) {
     if (data.waterGlasses < data.waterGoal) {
       const copos = data.waterGoal - data.waterGlasses;
-      return `Hidrate-se! Falta${copos > 1 ? "m" : ""} ${copos} copo${copos > 1 ? "s" : ""} de água 💧`;
+      return `Hidrate-se! Falta${copos > 1 && copoMl < 500 ? "m" : ""} ${aguaQueFalta(copos, copoMl)} 💧`;
     }
     if (data.todayWorkoutGroup && !data.workoutDone) return `Ainda dá tempo do treino de ${data.todayWorkoutGroup} 🏋️`;
     const remaining = data.tasksTotal - data.tasksCompleted;
@@ -88,7 +89,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
 
-  const contextMessage = getContextualMessage(data);
+  const contextMessage = getContextualMessage(data, normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
   const nomeCompleto = data.userName || user?.email?.split("@")[0] || "";
   /* Só o PRIMEIRO nome na saudação (29/07). "Boa tarde, João Victor 👋" não
      cabe em 360px e virava "Boa tarde, João Vic…" — nome cortado no meio é

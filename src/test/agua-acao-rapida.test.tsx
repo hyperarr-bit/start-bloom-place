@@ -68,3 +68,15 @@ describe("ação rápida de água usa o copo/garrafa configurado em Saúde", () 
     expect(rotuloAcaoAgua(750)).toBe("+ 750ml Água");
   });
 });
+
+describe("água que falta na Home (07/10: garrafa de 1 L dizia 'Faltam 8 copos')", () => {
+  it("copo fala em copos; garrafa fala em litros", async () => {
+    const { aguaQueFalta, unidadeDaAgua } = await import("@/lib/saude-copo");
+    expect(aguaQueFalta(3, 250)).toBe("3 copos de água");
+    expect(aguaQueFalta(1, 250)).toBe("1 copo de água");
+    expect(aguaQueFalta(2, 1000)).toBe("2L de água");
+    expect(aguaQueFalta(3, 500)).toBe("1,5L de água");
+    expect(unidadeDaAgua(250)).toBe("copos");
+    expect(unidadeDaAgua(1000)).toBe("garrafas");
+  });
+});

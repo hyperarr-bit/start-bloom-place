@@ -99,7 +99,7 @@ describe("presente 69 — a offering `anual_69` e o interruptor", () => {
   });
   it("offering ausente ou sem o produto certo: nada (nunca vende outro produto como presente)", () => {
     expect(lerPacoteDoPresente({ current: null, all: {} })).toBeNull();
-    expect(lerPacoteDoPresente(offerings({}, [{ identifier: "$rc_annual", product: { identifier: "core_anual_97", priceString: "R$ 97,90" } }]))).toBeNull();
+    expect(lerPacoteDoPresente(offerings({}, [{ identifier: "$rc_annual", product: { identifier: "core_anual_97", priceString: "R$ 97,90", price: 97.9, currencyCode: "BRL" } }]))).toBeNull();
     expect(lerPacoteDoPresente(null)).toBeNull();
   });
 });

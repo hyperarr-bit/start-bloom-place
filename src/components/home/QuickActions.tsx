@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloAcaoAgua } from "@/lib/saude-copo";
 import { CHAVE_MACROS, type MacrosPlano, entradaDoPlano, formatarMacros, idDoPlano, temMacros } from "@/lib/dieta-macros";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,9 @@ interface QuickAction {
 }
 
 const actions: QuickAction[] = [
-  { id: "water", icon: Droplets, label: "+ 200ml Água", color: "bg-cyan-400/20", iconColor: "text-cyan-600" },
+  // O rótulo da água é trocado na hora de desenhar pelo copo configurado em
+  // Saúde (07/10: "mudei pra 1 litro e não muda aí no início") — ver rotuloDe().
+  { id: "water", icon: Droplets, label: rotuloAcaoAgua(COPO_ML_PADRAO), color: "bg-cyan-400/20", iconColor: "text-cyan-600" },
   { id: "mood", icon: SmilePlus, label: "Check de Humor", color: "bg-pink-400/20", iconColor: "text-pink-600" },
   { id: "expense", icon: DollarSign, label: "Registrar Gasto", color: "bg-amber-400/20", iconColor: "text-amber-600" },
   // Espelho do gasto (09/09, cliente pagante: "registrar ganhos em ações
@@ -79,6 +82,9 @@ const vibrate = () => {
 
 export const QuickActions = () => {
   const { get, set } = useUserData();
+  // Água: o botão diz o tamanho do copo/garrafa que a pessoa escolheu em Saúde.
+  const copoMlAgua = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
+  const rotuloDe = (a: QuickAction) => (a.id === "water" ? rotuloAcaoAgua(copoMlAgua) : a.label);
   const lifeData = useLifeHubData();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
@@ -169,7 +175,7 @@ export const QuickActions = () => {
     const proximo = Math.min(20, current + 1);
     set("core-saude-water", { ...waterLog, [tStr]: proximo });
     set("water-log", { ...waterLogModulo, [tStr]: proximo });
-    const copoMl = Math.min(2000, Math.max(50, Math.round(Number(get<number>("core-saude-copo-ml", 250)) || 250)));
+    const copoMl = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
     vibrate();
     showSuccess("water");
     setWaterSplash(true);
@@ -380,7 +386,7 @@ export const QuickActions = () => {
             <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${successId === a.id ? "bg-green-400/20" : a.color}`}>
               {successId === a.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />}
             </div>
-            <span className="text-[11px] font-medium">{successId === a.id ? "Feito!" : a.label}</span>
+            <span className="text-[11px] font-medium">{successId === a.id ? "Feito!" : rotuloDe(a)}</span>
 
             {/* Water splash effect */}
             {a.id === "water" && waterSplash && (

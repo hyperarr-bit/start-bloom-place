@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { normalizarCopoMl } from "@/lib/saude-copo";
 import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
 import { Droplets, Minus, Pencil, Plus } from "lucide-react";
@@ -27,7 +28,7 @@ export const HydrationTracker = () => {
    * tamanho do próprio copo toda semana.
    */
   const [copoMlRaw, setCopoMl] = usePersistedState<number>("core-saude-copo-ml", 250);
-  const copoMl = Math.min(2000, Math.max(50, Math.round(Number(copoMlRaw) || 250)));
+  const copoMl = normalizarCopoMl(copoMlRaw);
   // FIX 16/07: a ROTINA conta água em water-log — espelha os dois mundos
   // (lê o maior do dia, escreve nos dois) pra nenhuma tela mostrar zero
   const [waterLogRotina, setWaterLogRotina] = usePersistedState<Record<string, number>>("water-log", {});

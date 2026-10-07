@@ -102,6 +102,9 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "core-theme-palette",
   // save-offer do trial cancelado: 1x por pessoa, marca de DISPOSITIVO
   "core-save-offer-visto",
+  // presente de 69,90 do iPhone (07/10): 1x por pessoa POR LUGAR, marca de DISPOSITIVO
+  "core-presente69-cancelou-visto",
+  "core-presente69-bloqueio-visto",
   "core-funnel-area",
 ]);
 

@@ -12,6 +12,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce, temPixEmConfirmacao } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
 import { VagaDoAvisoCobranca } from "@/components/app/AvisoCobrancaRecusada";
+import { PresenteNoBloqueio } from "@/components/app/Presente69";
 import { AssineNoApp } from "@/components/site/AssineNoApp";
 import { VENDA_NA_WEB } from "@/lib/rotas-web";
 
@@ -185,6 +186,10 @@ export const TrialBanner = () => {
                     bloqueio e a pessoa só via "compre de novo"). */}
                 <VagaDoAvisoCobranca />
                 <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
+                {/* 07/10 (iPhone): quem perdeu o acesso depois de já ter testado vê o
+                    presente de 69,90 por cima deste paywall; "Agora não" devolve o
+                    paywall de sempre. Nunca junto com o aviso de cartão recusado. */}
+                <PresenteNoBloqueio />
               </>
             /* 01/10: venda na web desligada (src/lib/rotas-web.ts) — a conta
                logada sem acesso vê "Assine no app e use aqui também" no lugar

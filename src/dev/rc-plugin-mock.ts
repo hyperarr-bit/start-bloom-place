@@ -37,13 +37,22 @@ const modo = (): string => (window as any).__rcModo || "compra";
 // do cadastro pós-compra olha nonSubscriptionTransactions pro vitalício e
 // activeSubscriptions pras assinaturas (compraAssinaturaLocal).
 const ehVitalicio = (id: string) => id.startsWith("core_vitalicio");
-const info = () => ({
-  customerInfo: {
-    entitlements: { active: {} },
-    nonSubscriptionTransactions: compras().filter(ehVitalicio).map((id) => ({ productIdentifier: id })),
-    activeSubscriptions: compras().filter((id) => !ehVitalicio(id)),
-  },
-});
+// 07/10: `localStorage.__rc_mock_customer` (JSON) substitui o customerInfo inteiro — é como se
+// ensaia cartão recusado (billingIssueDetectedAt), teste cancelado (unsubscribeDetectedAt) e
+// acesso perdido (entitlement em `all` sem nada em `active`) sem aparelho nem conta real.
+const info = () => {
+  try {
+    const forcado = JSON.parse(localStorage.getItem("__rc_mock_customer") || "null");
+    if (forcado) return { customerInfo: forcado };
+  } catch { /* noop */ }
+  return {
+    customerInfo: {
+      entitlements: { active: {} },
+      nonSubscriptionTransactions: compras().filter(ehVitalicio).map((id) => ({ productIdentifier: id })),
+      activeSubscriptions: compras().filter((id) => !ehVitalicio(id)),
+    },
+  };
+};
 
 // 20/09: preços do iPhone entram no mock (anual com 3 dias grátis) e podem ser
 // trocados por `localStorage.__rc_mock_precos` (JSON id→priceString) pra
@@ -107,7 +116,21 @@ export const Purchases: any = {
     // de "pronto" se existir pacote). Esvaziar só o getProducts não simulava
     // nada — o app seguia achando que tinha o que vender.
     if (modo() === "catalogo_vazio") return { current: { availablePackages: [] } };
-    if (ehIos()) return { current: offeringIos() };
+    if (ehIos()) {
+      // 07/10: `all` com a offering do presente (anual_69 = core_anual_69), como no painel;
+      // `localStorage.__rc_mock_presente_off` = "1" ensaia o metadata `presente: "off"`.
+      let off = false;
+      try { off = localStorage.getItem("__rc_mock_presente_off") === "1"; } catch { /* noop */ }
+      const atual = offeringIos();
+      const anual69 = {
+        identifier: "anual_69", metadata: off ? { presente: "off" } : {},
+        availablePackages: [
+          { identifier: "$rc_annual", packageType: "ANNUAL", product: produtoMock("core_anual_69") },
+          { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal") },
+        ],
+      };
+      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69 } };
+    }
     // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
     return {
       current: {
@@ -135,7 +158,10 @@ export const Purchases: any = {
   },
   async checkTrialOrIntroductoryPriceEligibility({ productIdentifiers }: { productIdentifiers: string[] }) {
     const r: Record<string, { status: number; description: string }> = {};
-    for (const id of productIdentifiers) r[id] = { status: INTRO[id] ? 2 : 3, description: "mock" };
+    // 07/10: `localStorage.__rc_mock_inelegivel` = "1" ensaia quem JÁ usou o teste no grupo (status 1)
+    let inelegivel = false;
+    try { inelegivel = localStorage.getItem("__rc_mock_inelegivel") === "1"; } catch { /* noop */ }
+    for (const id of productIdentifiers) r[id] = { status: INTRO[id] ? (inelegivel ? 1 : 2) : 3, description: "mock" };
     return r;
   },
   async purchaseStoreProduct({ product }: { product: { identifier: string } }) {

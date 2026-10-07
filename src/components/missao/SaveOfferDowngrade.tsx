@@ -8,8 +8,15 @@
  * "R$ 159,90 de uma vez" por "R$ 24,90/mês" enquanto o acesso ainda vive.
  *
  * Gatilho 100% no cliente (sem push, sem servidor): o RevenueCat sabe que o
- * trial não vai renovar (periodType TRIAL + willRenew false). Na abertura
- * seguinte do app, uma vez só por pessoa.
+ * trial foi cancelado (periodType TRIAL + unsubscribeDetectedAt — 07/10: era
+ * willRenew false, que também é o que o SDK devolve pra CARTÃO RECUSADO, e a
+ * tela disparava pra quem queria pagar). Na abertura seguinte do app, uma
+ * vez só por pessoa.
+ *
+ * iPHONE (07/10): no lugar do mensal, o PRESENTE de 69,90 — o anual
+ * `core_anual_69` (Presente69.tsx). Se o presente estiver desligado no
+ * RevenueCat (ou a loja não responder), cai na save-offer do mensal de
+ * sempre. O Android não muda.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -19,12 +26,14 @@ import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { ehApple } from "@/lib/loja";
+import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 
 const CHAVE_VISTO = "core-save-offer-visto"; // nas 2 allowlists (regra eterna)
 
 export function SaveOfferDowngrade() {
   const { user, isSubscribed, billingPeriod } = useAuth();
   const [mostrar, setMostrar] = useState(false);
+  const [presente, setPresente] = useState<OfertaDoPresente | null>(null);
   const [comprando, setComprando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [precoAno, setPrecoAno] = useState<string | null>(null);
@@ -40,6 +49,12 @@ export function SaveOfferDowngrade() {
     void (async () => {
       const rc = await import("@/lib/revenuecat");
       if (await rc.estadoTrialCancelado()) {
+        if (ehApple()) {
+          try {
+            const oferta = await prepararPresente("cancelou_teste");
+            if (oferta) { setPresente(oferta); return; }
+          } catch { /* cai na save-offer do mensal */ }
+        }
         // 01/10: o preço do ano é o que ela comprou (pedido do lembrete) ou o da loja agora
         try {
           const { pedidoDeLembreteDoTeste } = await import("@/lib/notificacoes");
@@ -52,6 +67,20 @@ export function SaveOfferDowngrade() {
       }
     })();
   }, [elegivel]);
+
+  if (presente) {
+    // o presente é a ÚNICA oferta desta pessoa: no desfecho dele a save-offer
+    // do mensal também fica marcada como vista (nunca duas ofertas em fila)
+    const marcar = () => { try { localStorage.setItem(CHAVE_VISTO, String(Date.now())); } catch { /* noop */ } };
+    return (
+      <Presente69Folha
+        lugar="cancelou_teste"
+        oferta={presente}
+        onFechar={() => { marcar(); setPresente(null); }}
+        onSucesso={() => { marcar(); setPresente(null); window.location.href = "/"; }}
+      />
+    );
+  }
 
   if (!mostrar) return null;
 

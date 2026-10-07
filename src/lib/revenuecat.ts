@@ -202,7 +202,11 @@ export async function conferirTrialCartao(): Promise<void> {
     }
     /* 01/10: o lembrete "acaba amanhã" prometido no paywall segue a verdade da
      * loja — fim real do teste reagenda; cancelou (willRenew false) ou já virou
-     * cobrança (sem TRIAL ativo) desarma. Solto: nunca segura o boot. */
+     * cobrança (sem TRIAL ativo) desarma. Solto: nunca segura o boot.
+     * 07/10 (revisão dos usos de willRenew): aqui ele PODE ficar — willRenew
+     * false por cartão recusado só existe depois da 1ª tentativa de cobrança,
+     * ou seja, com o teste já terminado; desarmar o "acaba amanhã" nesse caso
+     * é o certo (quem avisa é o aviso de cobrança recusada). */
     void import("@/lib/notificacoes")
       .then((n) => n.sincronizarLembreteDoTeste({
         emTeste: !!trial,
@@ -220,20 +224,38 @@ export async function conferirTrialCartao(): Promise<void> {
  * ninguém avisava — sem carência ligada ela só vê o acesso sumir.
  *
  * O RevenueCat marca `billingIssueDetectedAt` no entitlement (em `all`, que
- * inclui os inativos; com carência ele continua em `active`) e mantém
- * `willRenew`. Quem cancelou (`unsubscribeDetectedAt`/`willRenew` false) não
- * entra: aí não é cartão, é decisão.
+ * inclui os inativos; com carência ele continua em `active`). Quem cancelou
+ * (`unsubscribeDetectedAt`) não entra: aí não é cartão, é decisão.
+ *
+ * DEFEITO 20/09→07/10 (aviso_cobranca_view = 0 com 68 pessoas em carência):
+ * o filtro exigia `willRenew !== false`. Só que o SDK CALCULA willRenew —
+ * purchases-ios EntitlementInfo.willRenewWithExpirationDate:
+ *   willRenew = !(promo || vitalício || unsubscribeDetectedAt || billingIssueDetectedAt || prepago)
+ * Ou seja: cartão recusado ⇒ willRenew SEMPRE false ⇒ o filtro descartava
+ * exatamente todo caso que ele existia pra pegar. willRenew não entra mais
+ * na conta: billingIssueDetectedAt presente + unsubscribeDetectedAt ausente.
  */
 export type ProblemaDeCobranca = { temProblema: boolean; comAcesso: boolean; url: string | null };
 const SEM_PROBLEMA: ProblemaDeCobranca = { temProblema: false, comAcesso: false, url: null };
 
+/** O formato do entitlement que estas leituras usam (subconjunto do PurchasesEntitlementInfo). */
+type EntitlementLido = {
+  periodType?: string;
+  isActive?: boolean;
+  willRenew?: boolean;
+  expirationDateMillis?: number | null;
+  billingIssueDetectedAt?: string | null;
+  unsubscribeDetectedAt?: string | null;
+};
+type InfoLida = {
+  managementURL?: string | null;
+  entitlements?: { all?: Record<string, EntitlementLido>; active?: Record<string, EntitlementLido> };
+} | null | undefined;
+
 export function lerProblemaDeCobranca(info: unknown): ProblemaDeCobranca {
-  const i = info as {
-    managementURL?: string | null;
-    entitlements?: { all?: Record<string, { billingIssueDetectedAt?: string | null; willRenew?: boolean; unsubscribeDetectedAt?: string | null; isActive?: boolean }> };
-  } | null;
+  const i = info as InfoLida;
   const todos = Object.values(i?.entitlements?.all ?? {});
-  const e = todos.find((x) => !!x?.billingIssueDetectedAt && x?.willRenew !== false && !x?.unsubscribeDetectedAt);
+  const e = todos.find((x) => !!x?.billingIssueDetectedAt && !x?.unsubscribeDetectedAt);
   if (!e) return SEM_PROBLEMA;
   return { temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null };
 }
@@ -250,23 +272,170 @@ export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
   }
 }
 
-/** Trial que NÃO vai renovar (cancelou, acesso ainda vivo): periodType TRIAL
- *  + willRenew false. É o gatilho da save-offer de downgrade (22/08, caso
- *  raquel: cancelou o anual 4h antes do débito — churn de preço, não de
- *  produto). 100% cliente, sem servidor. */
+/** Trial que a pessoa CANCELOU (acesso ainda vivo): periodType TRIAL +
+ *  unsubscribeDetectedAt. É o gatilho da save-offer (22/08, caso raquel:
+ *  cancelou o anual 4h antes do débito — churn de preço, não de produto).
+ *  07/10: era `willRenew === false`, que o SDK também devolve pra CARTÃO
+ *  RECUSADO (ver lerProblemaDeCobranca) — a save-offer disparava pra quem
+ *  queria pagar e não conseguiu. Aceita willRenew false só sem billingIssue
+ *  (cobre loja que não preencha unsubscribeDetectedAt). 100% cliente. */
+export const lerTrialCancelado = (info: unknown): boolean =>
+  Object.values((info as InfoLida)?.entitlements?.active ?? {}).some((e) =>
+    e?.periodType === "TRIAL" && (!!e?.unsubscribeDetectedAt || (e?.willRenew === false && !e?.billingIssueDetectedAt)));
+
 export async function estadoTrialCancelado(): Promise<boolean> {
   if (!isNativeShell()) return false;
   if (!configurado) await initRevenueCat();
   if (!Purchases || !configurado) return false;
   try {
     const { customerInfo } = await Purchases.getCustomerInfo();
-    const ativos =
-      ((customerInfo as unknown as {
-        entitlements?: { active?: Record<string, { periodType?: string; willRenew?: boolean }> };
-      })?.entitlements?.active) ?? {};
-    return Object.values(ativos).some((e) => e?.periodType === "TRIAL" && e?.willRenew === false);
+    return lerTrialCancelado(customerInfo);
   } catch {
     return false;
+  }
+}
+
+/* ─────────────────────────── PRESENTE DE 69,90 (07/10, só iPhone) ───────────────────────────
+ *
+ * O anual do iPhone é core_anual_97 (R$ 97,90, 3 dias grátis). `core_anual_69`
+ * (R$ 69,90, MESMO grupo CORE Pro 22349268, MESMO nível 1, ONE_YEAR) ficou
+ * aprovado do teste de preço 01→07/10 e vive na offering `anual_69` do
+ * RevenueCat (pacote $rc_annual). Agora ele é o PRESENTE de dois momentos:
+ *   "cancelou_teste" — trial cancelado, acesso vivo (no lugar da save-offer do mensal)
+ *   "bloqueio"       — perdeu o acesso (trial acabou cancelado / expirou), no gate do app
+ * Nunca pra quem está com cartão recusado (esse vê o aviso de cobrança).
+ *
+ * REGRA DA APPLE (lida da ASC em 07/10): os três produtos do grupo têm
+ * groupLevel 1. Trocar core_anual_97 → core_anual_69 é CROSSGRADE de mesma
+ * duração ⇒ ENTRA NA HORA: a App Store cobra R$ 69,90 hoje, o teste termina
+ * e o ano começa. (Fosse nível menor, entraria só na renovação.) Quem já usou
+ * o teste no grupo não ganha outro: a folha cobra na hora — o texto só
+ * promete dias grátis se o StoreKit disser que a conta é elegível.
+ *
+ * DESLIGAR SEM VERSÃO NOVA: no painel do RevenueCat, metadata da offering
+ * `anual_69` com `presente: "off"` (ou apagar/esvaziar a offering). */
+export type LugarDoPresente = "cancelou_teste" | "bloqueio";
+export type SituacaoDoPresente = { lugar: LugarDoPresente; fimMs: number | null } | null;
+const ID_ANUAL_69 = "core_anual_69";
+const OFFERING_PRESENTE = "anual_69";
+
+/** Decisão pura, só do customerInfo: onde (se) o presente cabe. */
+export function lerSituacaoDoPresente(info: unknown): SituacaoDoPresente {
+  if (lerProblemaDeCobranca(info).temProblema) return null;
+  const i = info as InfoLida;
+  const ativos = Object.values(i?.entitlements?.active ?? {});
+  const trial = ativos.find((e) =>
+    e?.periodType === "TRIAL" && (!!e?.unsubscribeDetectedAt || (e?.willRenew === false && !e?.billingIssueDetectedAt)));
+  if (trial) return { lugar: "cancelou_teste", fimMs: typeof trial.expirationDateMillis === "number" ? trial.expirationDateMillis : null };
+  if (ativos.length) return null;
+  const todos = Object.values(i?.entitlements?.all ?? {});
+  if (!todos.length) return null; // nunca assinou neste grupo: paywall normal (com o teste grátis)
+  return { lugar: "bloqueio", fimMs: null };
+}
+
+/** Decisão pura, só das offerings: o pacote do presente, ou null se está desligado/ausente. */
+export function lerPacoteDoPresente(offerings: unknown): PacoteRC | null {
+  const o = (offerings as { all?: Record<string, { metadata?: Record<string, unknown>; availablePackages?: PacoteRC[]; annual?: PacoteRC | null }> } | null)?.all?.[OFFERING_PRESENTE];
+  if (!o) return null;
+  if (String(o.metadata?.presente ?? "").toLowerCase() === "off") return null;
+  const ehO69 = (p?: PacoteRC | null) => !!p?.product?.identifier && (p.product.identifier === ID_ANUAL_69 || p.product.identifier.startsWith(ID_ANUAL_69 + ":"));
+  return (o.availablePackages ?? []).find(ehO69) ?? (ehO69(o.annual) ? o.annual! : null);
+}
+
+export type Presente69 = {
+  preco: string;       // "R$ 69,90"
+  precoMes: string | null; // "R$ 5,82"
+  produto: string;     // core_anual_69
+  comTrial: boolean;   // a folha vai dar dias grátis pra ESTA conta (StoreKit disse "elegível")
+  dias: number;        // dias grátis quando comTrial
+};
+let presente69: { pacote: PacoteRC; dados: Presente69 } | null | undefined;
+
+export async function situacaoDoPresente(): Promise<SituacaoDoPresente> {
+  if (!isNativeShell()) return null;
+  if (!configurado) { try { await initRevenueCat(); } catch { return null; } }
+  if (!Purchases || !configurado) return null;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    return lerSituacaoDoPresente(customerInfo);
+  } catch {
+    return null;
+  }
+}
+
+/** Carrega (e guarda) o presente da offering `anual_69`. null = desligado, ausente ou loja sem resposta. */
+export async function carregarPresente69(): Promise<Presente69 | null> {
+  if (presente69 !== undefined) return presente69?.dados ?? null;
+  if (!configurado) { try { await initRevenueCat(); } catch { return null; } }
+  if (!Purchases || !configurado) return null;
+  try {
+    const pacote = lerPacoteDoPresente(await Purchases.getOfferings());
+    if (!pacote?.product?.priceString) { presente69 = null; return null; }
+    const p = pacote.product as { priceString: string; price?: number; currencyCode?: string; introPrice?: IntroAnual };
+    let comTrial = false;
+    let dias = 0;
+    if (p.introPrice) {
+      try {
+        const r = await Purchases.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: [ID_ANUAL_69] });
+        // só promete dias grátis com um SIM positivo (2 = elegível); quem já usou o teste no grupo paga hoje
+        comTrial = (r as Record<string, { status?: number }> | null)?.[ID_ANUAL_69]?.status === 2;
+      } catch { comTrial = false; }
+      if (comTrial) {
+        const n = Number(p.introPrice.periodNumberOfUnits ?? 0) || 0;
+        const u = String(p.introPrice.periodUnit ?? "DAY").toUpperCase();
+        dias = u === "WEEK" ? n * 7 : u === "MONTH" ? n * 30 : u === "YEAR" ? n * 365 : n;
+      }
+    }
+    presente69 = {
+      pacote,
+      dados: {
+        preco: p.priceString,
+        precoMes: p.price && p.price > 0 ? formatarMoeda(p.price / 12, p.currencyCode || "BRL") : null,
+        produto: ID_ANUAL_69,
+        comTrial,
+        dias,
+      },
+    };
+    return presente69.dados;
+  } catch {
+    return null; // sem cache: a próxima abertura tenta de novo
+  }
+}
+
+/** Compra o presente pelo PACOTE da offering `anual_69` (é o que amarra a
+ *  compra à offering no RevenueCat). true = folha fechou com sucesso e o
+ *  acesso foi sincronizado; false = cancelou/falhou (motivoUltimaCompra diz qual). */
+export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean> {
+  ultimoMotivo = null;
+  if (!(await garantirPronto())) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_ANUAL_69, oferta: "presente69", lugar, retentou: true });
+    return false;
+  }
+  try {
+    if (!presente69) await carregarPresente69();
+    if (!presente69) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_ANUAL_69, oferta: "presente69", lugar });
+      return false;
+    }
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
+      produto: ID_ANUAL_69,
+      escolhida: presente69.pacote.product?.identifier ?? ID_ANUAL_69,
+      preco: presente69.dados.preco,
+      trial: presente69.dados.comTrial,
+      oferta: "presente69",
+      offering: OFFERING_PRESENTE,
+      lugar,
+      pacote: true,
+    });
+    marcarFolhaAberta();
+    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: presente69.pacote });
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    return desfechoDaFalha(e, ID_ANUAL_69);
   }
 }
 

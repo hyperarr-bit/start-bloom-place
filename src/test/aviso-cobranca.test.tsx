@@ -13,6 +13,10 @@ const estado = vi.hoisted(() => ({
 vi.mock("@/lib/revenuecat", async (original) => ({
   ...(await original<typeof import("@/lib/revenuecat")>()),
   problemaDeCobranca: vi.fn(async () => estado.problema),
+  // 07/10: o presente de 69,90 mora no gate; sem este mock ele importaria o plugin
+  // REAL do RevenueCat no jsdom, e o @capacitor/core sobrescreve o window.Capacitor
+  // de mentira (o app vira "web" no meio do teste e o aviso some).
+  situacaoDoPresente: vi.fn(async () => null),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn(), getAttributionParams: () => ({}) }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => estado.auth }));
@@ -38,23 +42,34 @@ const info = (ent: Record<string, unknown>, url: string | null = "https://apps.a
   entitlements: { all: { "CORE APP Pro": ent }, active: {} },
 });
 
+/* O FORMATO REAL (07/10): o SDK calcula willRenew = !(promo || vitalício ||
+ * unsubscribeDetectedAt || billingIssueDetectedAt || prepago) — cartão recusado
+ * chega SEMPRE com willRenew false. Até 07/10 o filtro exigia willRenew true e
+ * o aviso nunca apareceu (aviso_cobranca_view = 0 com 68 pessoas em carência). */
+const CARTAO_RECUSADO = { billingIssueDetectedAt: "2026-09-25T20:24:00Z", unsubscribeDetectedAt: null, willRenew: false, periodType: "NORMAL", store: "APP_STORE" };
+
 describe("Cobrança recusada — leitura do RevenueCat", () => {
-  it("cartão recusado com renovação ligada: avisa, sem acesso", () => {
-    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: "2026-09-25T20:24:00Z", willRenew: true, isActive: false })))
+  it("cartão recusado (formato real: billingIssueDetectedAt + willRenew false): avisa, sem acesso", () => {
+    expect(lerProblemaDeCobranca(info({ ...CARTAO_RECUSADO, isActive: false })))
       .toEqual({ temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" });
   });
 
-  it("dentro da carência (acesso ativo): avisa pra não perder o acesso", () => {
-    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: "2026-09-25T20:24:00Z", willRenew: true, isActive: true })).comAcesso).toBe(true);
+  it("dentro da carência (acesso ativo, willRenew false do mesmo jeito): avisa pra não perder o acesso", () => {
+    expect(lerProblemaDeCobranca(info({ ...CARTAO_RECUSADO, isActive: true, periodType: "TRIAL" })).comAcesso).toBe(true);
   });
 
-  it("quem cancelou não recebe aviso de cartão", () => {
-    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: "2026-09-25T20:24:00Z", willRenew: false, isActive: false })).temProblema).toBe(false);
-    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: "2026-09-25T20:24:00Z", willRenew: true, unsubscribeDetectedAt: "2026-09-25T21:00:00Z" })).temProblema).toBe(false);
+  it("willRenew true com billingIssue (loja que não derrube o flag): avisa também", () => {
+    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: "2026-09-25T20:24:00Z", willRenew: true, isActive: false })).temProblema).toBe(true);
+  });
+
+  it("quem CANCELOU não recebe aviso de cartão — a régua é unsubscribeDetectedAt, não willRenew", () => {
+    expect(lerProblemaDeCobranca(info({ ...CARTAO_RECUSADO, unsubscribeDetectedAt: "2026-09-25T21:00:00Z", isActive: false })).temProblema).toBe(false);
+    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: null, unsubscribeDetectedAt: "2026-09-25T21:00:00Z", willRenew: false, isActive: true })).temProblema).toBe(false);
   });
 
   it("sem problema de cobrança, ou sem dados: nada", () => {
     expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: null, willRenew: true, isActive: true })).temProblema).toBe(false);
+    expect(lerProblemaDeCobranca(info({ billingIssueDetectedAt: null, willRenew: false, isActive: true, periodType: "TRIAL" })).temProblema).toBe(false);
     expect(lerProblemaDeCobranca(null).temProblema).toBe(false);
     expect(lerProblemaDeCobranca({}).temProblema).toBe(false);
   });

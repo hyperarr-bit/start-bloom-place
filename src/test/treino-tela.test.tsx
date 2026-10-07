@@ -241,4 +241,38 @@ describe("Treino — o ciclo inteiro, fechando e reabrindo", () => {
     expect(store.dados["treino-active-days"]).toEqual(expect.arrayContaining(["QUINTA"]));
     expect(vi.mocked(avisarApagado).mock.calls.at(-1)![0]).toBe("Treino de segunda copiado pra 1 dia");
   });
+
+  it("DESMARCAR (07/10): dia marcado pelo atalho da Home (sem sessão) tem como tirar, com Desfazer", async () => {
+    vi.useFakeTimers({ now: new Date(2026, 8, 26, 9, 0), toFake: ["Date"] });
+    const store = criarStore({
+      "saude-workouts-v2": PLANO, "treino-active-days": ["SÁBADO"], "core-tip-seen-treino": "true",
+      "saude-workout-log": ["2026-09-25", "2026-09-26"],
+    });
+    abrir(store);
+    fireEvent.click(within(screen.getByTestId("treino-registrado")).getByRole("button", { name: "Desmarcar" }));
+    expect(store.dados["saude-workout-log"]).toEqual(["2026-09-25"]);
+    expect(screen.queryByTestId("treino-registrado")).toBeNull();
+    const { avisarApagado } = await import("@/lib/desfazer");
+    const chamada = vi.mocked(avisarApagado).mock.calls.at(-1)!;
+    expect(chamada[0]).toBe("Treino de hoje desmarcado");
+    act(() => chamada[1]());
+    expect(store.dados["saude-workout-log"]).toEqual(["2026-09-25", "2026-09-26"]);
+  });
+
+  it("DESMARCAR (07/10): concluiu, desmarcou tudo e 'Salvar de novo' tira o dia (antes: nada saía)", () => {
+    vi.useFakeTimers({ now: new Date(2026, 8, 26, 9, 0), toFake: ["Date"] });
+    const store = criarStore({ "saude-workouts-v2": PLANO, "treino-active-days": ["SÁBADO"], "core-tip-seen-treino": "true" });
+    abrir(store);
+    fireEvent.click(screen.getByRole("button", { name: "Marcar a série 1 de Supino reto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Concluir treino" }));
+    fireEvent.click(within(screen.getByTestId("treino-concluido")).getAllByRole("button", { name: "Fechar" })[0]);
+    expect(store.dados["saude-workout-log"]).toEqual(["2026-09-26"]);
+    fireEvent.click(screen.getByRole("button", { name: "Desmarcar a série 1 de Supino reto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar de novo" }));
+    expect(store.dados["saude-workout-log"]).toEqual([]);
+    expect(store.dados["treino-weekly-volume"]).toEqual({});
+    expect((store.dados["treino-exercise-history"] as { date: string }[]).filter((h) => h.date === "2026-09-26")).toEqual([]);
+    expect(screen.queryByTestId("treino-registrado")).toBeNull();
+    expect(screen.getByRole("button", { name: "Começar treino" })).toBeInTheDocument();
+  });
 });

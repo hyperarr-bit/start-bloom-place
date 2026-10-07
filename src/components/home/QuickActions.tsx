@@ -184,10 +184,19 @@ export const QuickActions = () => {
     // escreve SEMPRE (sem duplicar o dia): o set re-dispara core:activation
     // e a trilha do teste credita o passo mesmo quando o treino de hoje já
     // estava marcado — antes o if engolia o gesto (review 16/08)
-    set("saude-workout-log", log.includes(tStr) ? [...log] : [...log, tStr]);
+    const jaTinha = log.includes(tStr);
+    set("saude-workout-log", jaTinha ? [...log] : [...log, tStr]);
     vibrate();
     showSuccess("workout");
-    toast.success("💪 Treino do dia registrado!", { action: { label: "Ver Treino", onClick: () => navigate("/treino") } });
+    // 07/10 (chamado: "cliquei sem querer e não sai"): um toque marcava o dia sem
+    // volta pelo atalho. Desfazer tira o dia (só se foi este toque que pôs).
+    toast.success("💪 Treino do dia registrado!", {
+      duration: 6000,
+      action: jaTinha
+        ? { label: "Ver Treino", onClick: () => navigate("/treino") }
+        : { label: "Desfazer", onClick: () => set("saude-workout-log", get<string[]>("saude-workout-log", []).filter((d) => d !== tStr)) },
+      cancel: jaTinha ? undefined : { label: "Ver Treino", onClick: () => navigate("/treino") },
+    });
   };
 
   const submitExpense = () => {

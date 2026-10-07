@@ -85,7 +85,7 @@ import { TreinoConcluido, type ResumoDoTreino } from "@/components/treino/Treino
 import { TreinoPlano, type AcoesDoPlano } from "@/components/treino/TreinoPlano";
 import { tomDoDia } from "@/components/treino/planner";
 import { PeDoEsqueceu, TreinoDeOntem, type PedidoDeSalvar } from "@/components/treino/TreinoDeOntem";
-import { gravarTreinoDeOutroDia, treinouNoDia } from "@/lib/treino-outro-dia";
+import { gravarTreinoDeOutroDia, tirarTreinoDoDia, treinouNoDia } from "@/lib/treino-outro-dia";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { aplicarModelo, exercicioNovo, moverNaLista, planoVazio, type DiaDoPlano } from "@/lib/treino-plano";
 
@@ -503,6 +503,11 @@ const Treino = () => {
   };
 
   const concluir = () => {
+    if (feitas === 0 && concluido) {
+      // concluído e depois tudo desmarcado: "Salvar de novo" sem nada = tirar o treino do dia
+      desmarcarHoje();
+      return;
+    }
     if (feitas === 0) {
       toast("Marque pelo menos uma série pra concluir o treino.");
       return;
@@ -564,6 +569,40 @@ const Treino = () => {
       setSessoesMeta(g.sessoes);
     });
     setDiaEsquecido(null);
+  };
+
+  /* ---------------- DESMARCAR o treino de hoje (07/10) ----------------
+   * O dia entra no registro por Concluir ou pelo atalho da Home (sem sessão
+   * nenhuma); antes só o widget da Home tirava. Tira registro, volume, carimbo,
+   * histórico do dia, a sessão e os ✓ do plano de hoje — com Desfazer. */
+  const desmarcarHoje = () => {
+    const data = sessao.data;
+    const antes = {
+      historico: exerciseHistory, log: workoutLog, volume: weeklyVolume, sessoes: sessoesMeta, sessao: sessaoSalva, plano: workoutPlan,
+    };
+    const r = tirarTreinoDoDia({ dia: data, historico: exerciseHistory, log: workoutLog, volume: weeklyVolume, sessoes: sessoesMeta });
+    setExerciseHistory(r.historico);
+    setWorkoutLog(r.log);
+    setWeeklyVolume(r.volume);
+    setSessoesMeta(r.sessoes);
+    setSessaoSalva(null);
+    setDescansoAte(null);
+    if (checksValem) {
+      setWorkoutPlan((prev) => {
+        const d0 = prev[todayDayName];
+        if (!d0?.exercises?.some((e) => e.done)) return prev;
+        return { ...prev, [todayDayName]: { ...d0, exercises: d0.exercises.map((e) => (e.done ? { ...e, done: false } : e)) } };
+      });
+    }
+    trackEvent("treino_desmarcado", { de_sessao: concluido });
+    avisarApagado("Treino de hoje desmarcado", () => {
+      setExerciseHistory(antes.historico);
+      setWorkoutLog(antes.log);
+      setWeeklyVolume(antes.volume);
+      setSessoesMeta(antes.sessoes);
+      setSessaoSalva(antes.sessao);
+      setWorkoutPlan(() => antes.plano);
+    });
   };
 
   /* ---------------- semana, constância, evolução ---------------- */
@@ -762,6 +801,19 @@ const Treino = () => {
         />
 
         {activeTab === "hoje" && !treinoVazio && <PeDoEsqueceu hoje={today} log={log} onAbrir={setDiaEsquecido} />}
+
+        {activeTab === "hoje" && log.includes(today) && (
+          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-3" data-testid="treino-registrado">
+            <p className="text-[13px] text-emerald-900 leading-snug flex-1">✓ Treino de hoje marcado como feito. Foi sem querer?</p>
+            <button
+              type="button"
+              onClick={desmarcarHoje}
+              className="shrink-0 h-10 px-3 rounded-lg border border-emerald-300 bg-white text-emerald-900 text-[13px] font-bold active:scale-95 transition"
+            >
+              Desmarcar
+            </button>
+          </div>
+        )}
 
         {activeTab === "hoje" && (
           <TreinoHoje

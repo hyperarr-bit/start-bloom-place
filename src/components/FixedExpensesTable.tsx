@@ -363,7 +363,9 @@ export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays,
 
       {/* Form sempre visível */}
       <div className="p-3 border-b border-border bg-muted/20 space-y-2">
-        {expenses.length === 0 && (
+        {/* 08/10: com fixos PREVISTOS na planilha do mês futuro, as sugestões genéricas
+            ("+ Aluguel") em cima do Aluguel previsto só confundiam */}
+        {expenses.length === 0 && projetados.length === 0 && (
           <div className="flex flex-wrap gap-1.5">
             <span className="text-[10px] text-muted-foreground self-center mr-0.5">Sugestões:</span>
             {[

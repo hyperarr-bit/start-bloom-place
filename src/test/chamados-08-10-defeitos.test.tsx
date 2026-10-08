@@ -89,7 +89,7 @@ afterEach(() => { vi.useRealTimers(); cleanup(); vi.restoreAllMocks(); esquecerR
 describe("2) Android — lembretes que não chegam", () => {
   it("TODO agendamento de módulo vai com allowWhileIdle (acorda o aparelho em Doze)", async () => {
     const n1 = await agendarRotina({ marcados: new Set(), sequencia: 0 }, { hora: 21, ligado: true });
-    const n2 = await agendarContas([{ day: 15, bills: [{ id: "b1", name: "Luz", paid: false }] }], { hora: 9, ligado: true });
+    const n2 = await agendarContas([{ day: 15, bills: [{ name: "Luz", paid: false }] }], { hora: 9, ligado: true });
     const n3 = await agendarRetrospectiva(true);
     expect(n1).toBeGreaterThan(0);
     expect(n2).toBeGreaterThan(0);

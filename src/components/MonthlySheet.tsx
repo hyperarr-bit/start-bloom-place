@@ -4,7 +4,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, doPerfil, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
-import { FixedExpensesTable } from "@/components/FixedExpensesTable";
+import { FixedExpensesTable, projetarFixos, type FixedExpense } from "@/components/FixedExpensesTable";
 import { BillsDueCards } from "@/components/BillsDueCards";
 import { InstallmentTracker } from "@/components/InstallmentTracker";
 import { Notes } from "@/components/Notes";
@@ -97,9 +97,24 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
      demais. `n()` mantém o número quando ele é válido e trata o resto como
      0 explicitamente, em vez de deixar a coerção decidir calada. */
   const n = (v: unknown) => (Number.isFinite(Number(v)) && v !== null ? Number(v) : 0);
+
+  /* CUSTOS FIXOS NUM MÊS FUTURO (08/10, chamado: "planejar à frente — os custos
+     fixos deviam aparecer já preenchidos"). Mesmo modelo das parcelas: projeção
+     de LEITURA do balde corrente (`finance-fixed-expenses`), nada gravado nesta
+     chave. O que a pessoa digitar/editar aqui vira item de verdade na chave do
+     mês (id novo) e esconde a projeção de mesmo nome; quando o mês chegar, a
+     adoção (virada-do-mes) casa por descrição e os campos daqui vencem — e o
+     que ficou só projetado nem precisa ser adotado: o balde já flui sozinho.
+     Só pra FRENTE: o mês corrente É o balde e o passado já tem o retrato. */
+  const fixosProjetados = useMemo(() => {
+    if (isCurrent || mesId <= agora) return VAZIA as FixedExpense[];
+    return projetarFixos(doPerfil(get<FixedExpense[]>("finance-fixed-expenses", VAZIA) || VAZIA, perfilAtivo || PERFIL_PESSOAL), fixedExpenses as FixedExpense[]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCurrent, mesId, agora, fixedTodos, perfilAtivo, get]);
+
   const totalIncome = incomes.reduce((sum: number, i: any) => sum + n(i.value), 0);
   const totalExpenses = variaveisDoMes(expenses, expensesAnterior, mesId, configOf).total;
-  const totalFixed = fixedExpenses.reduce((sum: number, e: any) => sum + n(e.value), 0);
+  const totalFixed = [...fixedExpenses, ...fixosProjetados].reduce((sum: number, e: any) => sum + n(e.value), 0);
   /* UM TOTAL SÓ (07/09): "DESPESAS" daqui somava só variáveis + fixos,
      enquanto o financeiro geral (Index) usa computeMonthlyOutflow, que inclui
      as parcelas do mês — a mesma pessoa via dois números pro mesmo mês. Agora
@@ -160,7 +175,7 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
         <IncomeTable incomes={incomes} setIncomes={setIncomes} />
       </div>
       <div className="min-w-0">
-        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} />
+        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} mes={mesId} projetados={fixosProjetados} />
       </div>
       <div className="min-w-0">
         <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} />

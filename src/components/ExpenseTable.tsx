@@ -15,6 +15,8 @@ import { NOVO_CUSTO_FIXO_EVENT, type FixedExpense, type NovoCustoFixoDetalhe } f
 import { mesDoGasto } from "@/lib/finance-fatura";
 import { mesesEntre, nomeDoMes } from "@/lib/finance-parcelas";
 import { mesCorrenteId } from "@/lib/virada-contas";
+import { usePersistedState } from "@/hooks/use-persisted-state";
+import { CHAVE_ORDEM_GASTOS, ORDENS_DOS_GASTOS, OrdenarChips, ordenarGastos, type OrdemDosGastos } from "@/components/finance/ordenar";
 
 interface Expense {
   id: string;
@@ -101,8 +103,14 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
      lista deste mês; escolher um mostra só os gastos dele e o subtotal. */
   const [filtroConta, setFiltroConta] = useState("");
   const contasPresentes = Array.from(new Set(expenses.map(contaDoGasto).filter(Boolean)));
-  const visiveis = filtroConta ? expenses.filter((e) => contaDoGasto(e) === filtroConta) : expenses;
-  const subtotalFiltro = visiveis.reduce((s, e) => s + (Number(e.value) || 0), 0);
+  const filtrados = filtroConta ? expenses.filter((e) => contaDoGasto(e) === filtroConta) : expenses;
+  const subtotalFiltro = filtrados.reduce((s, e) => s + (Number(e.value) || 0), 0);
+  /* ORDENAR (08/10, chamado: "ordenar os gastos por data ou por nome"). Só de
+     EXIBIÇÃO — a lista gravada segue na ordem de lançamento (o mesclarPerfil
+     preserva a ordem completa; em "Tudo junto" gravaria a ordem nova). A
+     escolha fica guardada (chave própria, só a preferência). */
+  const [ordem, setOrdem] = usePersistedState<OrdemDosGastos>(CHAVE_ORDEM_GASTOS, "lancamento");
+  const visiveis = ordenarGastos(filtrados, ordem);
 
   /**
    * PARCELAR PELO FLUXO NORMAL (08/08, feedback de assinante: "senti falta da
@@ -511,6 +519,9 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
           )}
         </div>
       )}
+
+      {/* Ordenar (08/10) — só aparece com 2+ gastos */}
+      {expenses.length > 1 && <OrdenarChips<OrdemDosGastos> valor={ordem} opcoes={ORDENS_DOS_GASTOS} onChange={(v) => setOrdem(v)} testid="ordenar-gastos" />}
 
       {/* Lista */}
       <div>

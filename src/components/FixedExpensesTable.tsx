@@ -9,6 +9,8 @@ import { CardSelect } from "@/components/finance/CardSelect";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { mesCorrenteId } from "@/lib/virada-contas";
+import { CHAVE_ORDEM_FIXOS, ORDENS_DOS_FIXOS, OrdenarChips, ordenarFixos, type OrdemDosFixos } from "@/components/finance/ordenar";
 
 /**
  * DIVISÃO DE CONTAS (01/09) — avaliação 5★ de 31/08, cliente pagante:
@@ -37,12 +39,38 @@ export interface FixedExpense {
   /** Ausente = conta sua, e é assim que as ~981 pessoas que nunca ligarem a
    *  divisão continuam vendo exatamente a tela de antes. */
   quem?: QuemPaga;
+  /** 08/10: "YYYY-MM" do mês em que foi marcado como pago — só pro fixo SEM Dia
+   *  (com Dia, o ✓ mora na conta fx-<id> do MEU MÊS). Mês diferente = não pago;
+   *  nenhuma virada precisa limpar. Opcional: o app antigo ignora. */
+  pagoEm?: string;
 }
+
+type Bill = { id: string; name: string; paid: boolean; fixedId?: string };
+type DueDay = { day: number; color: string; bills: Bill[] };
 
 interface FixedExpensesTableProps {
   expenses: FixedExpense[];
   setExpenses: (expenses: FixedExpense[]) => void;
+  /** 08/10: as contas do mês (finance-dueDays) — o ✓ do fixo com Dia é o `paid` da conta dele. Só o mês corrente passa. */
+  dueDays?: DueDay[];
+  setDueDays?: (dueDays: DueDay[]) => void;
+  /** "YYYY-MM" da chave que esta tabela edita (carimbo `pagoEm`). Ausente = mês corrente. */
+  mes?: string;
+  /** 08/10: fixos do mês corrente PREVISTOS num mês futuro (MonthlySheet) — só leitura até a pessoa editar. */
+  projetados?: FixedExpense[];
 }
+
+/**
+ * Quais fixos do balde corrente ainda não têm par (perfil + descrição) na lista
+ * de um mês futuro — os que aparecem como "previsto" lá. A mesma chave de
+ * casamento da adoção (virada-do-mes): o que a pessoa materializar aqui vence
+ * quando o mês chegar, e nada duplica.
+ */
+export const projetarFixos = (correntes: FixedExpense[], reais: FixedExpense[]): FixedExpense[] => {
+  const chave = (f: FixedExpense) => `${String((f as { perfil?: string }).perfil ?? "")}|${String(f.description ?? "").trim().toLowerCase()}`;
+  const temReal = new Set((Array.isArray(reais) ? reais : []).map(chave));
+  return (Array.isArray(correntes) ? correntes : []).filter((f) => f && typeof f === "object" && !temReal.has(chave(f)));
+};
 
 /**
  * PONTE DA CONTA RECORRENTE (07/09) — avaliação 4★ da Play: "as contas
@@ -98,9 +126,42 @@ export const erroDoFixo = (descricao: string, valorDigitado: string): string | n
   return null;
 };
 
-export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTableProps) => {
+export const FixedExpensesTable = ({ expenses, setExpenses, dueDays, setDueDays, mes, projetados = [] }: FixedExpensesTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
+  const mesDaChave = mes ?? mesCorrenteId();
+
+  /* ✓ DE PAGA NA PRÓPRIA LISTA (08/10, chamado: "marcar como pago direto na
+     lista de custos fixos — hoje só em Vencimentos das contas"). Fixo com Dia:
+     é a conta fx-<id> (ou a adotada, fixedId) do MEU MÊS — o mesmo ✓, que a
+     virada zera. Fixo sem Dia (ou planilha de outro mês, onde não há sync):
+     carimbo `pagoEm` com o mês, que expira sozinho quando o mês muda. */
+  const contaDoFixo = (f: FixedExpense): Bill | undefined =>
+    (dueDays ?? []).flatMap((d) => (Array.isArray(d?.bills) ? d.bills : [])).find((b) => b && (b.fixedId === f.id || b.id === `fx-${f.id}`));
+  const estaPago = (f: FixedExpense): boolean => {
+    const conta = contaDoFixo(f);
+    return conta ? !!conta.paid : f.pagoEm === mesDaChave;
+  };
+  const alternarPago = (f: FixedExpense) => {
+    const conta = contaDoFixo(f);
+    if (conta && setDueDays && dueDays) {
+      setDueDays(dueDays.map((d) => ({ ...d, bills: (Array.isArray(d?.bills) ? d.bills : []).map((b) => (b.id === conta.id ? { ...b, paid: !b.paid } : b)) })));
+      return;
+    }
+    setExpenses(expenses.map((e) => {
+      if (e.id !== f.id) return e;
+      if (e.pagoEm === mesDaChave) { const { pagoEm: _p, ...resto } = e; return resto; }
+      return { ...e, pagoEm: mesDaChave };
+    }));
+  };
+
+  /* Ordenar (08/10) — só de exibição; ver components/finance/ordenar. */
+  const [ordem, setOrdem] = usePersistedState<OrdemDosFixos>(CHAVE_ORDEM_FIXOS, "lancamento");
+  const ordenados = ordenarFixos(expenses, ordem);
+  const projetadosOrdenados = ordenarFixos(projetados, ordem);
+
+  /* Editar um PREVISTO (mês futuro) = criar o item de verdade na chave do mês, com id novo. */
+  const [editandoProjetado, setEditandoProjetado] = useState(false);
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
@@ -156,8 +217,9 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
     description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
 
-  const comecarEdicao = (e: FixedExpense) => {
+  const comecarEdicao = (e: FixedExpense, projetado = false) => {
     setConfirmandoApagar(null);
+    setEditandoProjetado(projetado);
     setEditandoId(e.id);
     setRascunho({
       description: e.description,
@@ -175,8 +237,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
     const erro = erroDoFixo(rascunho.description, rascunho.value);
     if (erro) { toast.error(erro); return; }
     const dia = parseInt(rascunho.day, 10);
-    setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
-      ...e,
+    const campos = {
       description: rascunho.description.trim(),
       category: rascunho.category || "outros",
       value: valor,
@@ -184,13 +245,23 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
       cardName: isCardPayment(rascunho.paymentMethod) ? (rascunho.cardName || "outro") : undefined,
       // dia fora de 1–31 vira "sem dia" em vez de sujar o calendário
       day: Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : undefined,
-    }));
+    };
+    if (editandoProjetado) {
+      // o previsto vira item de verdade deste mês (id novo; `quem`/perfil do original ficam)
+      const origem = projetados.find((p) => p.id === editandoId);
+      const { id: _id, pagoEm: _pg, ...resto } = (origem ?? {}) as FixedExpense;
+      setExpenses([...expenses, { ...resto, ...campos, id: Date.now().toString() }]);
+    } else {
+      setExpenses(expenses.map((e) => e.id !== editandoId ? e : { ...e, ...campos }));
+    }
+    setEditandoProjetado(false);
     setEditandoId(null);
   };
 
   const getPaymentLabel = (v: string) => paymentMethods.find((p) => p.value === v)?.label || v;
 
   const total = expenses.reduce((sum, e) => sum + e.value, 0);
+  const totalProjetado = projetados.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
 
   /* Config da divisão. Chave única (sem mês): quem divide a casa com alguém
      divide todo mês, e ter que renomear a pessoa a cada virada seria o tipo
@@ -253,7 +324,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
           recorrentes. Não consegui fazer" — estavam aqui o tempo todo, com
           outro nome. */}
       <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
-        contas recorrentes · repetem todo mês · com o <strong>Dia</strong> preenchido, marque como paga em Contas do mês
+        contas recorrentes · repetem todo mês · o <strong>✓</strong> marca como paga este mês{dueDays ? " (o mesmo do MEU MÊS)" : ""}
       </p>
 
       {/* Nome de quem divide. Fica aqui em cima porque é o que dá sentido a
@@ -374,15 +445,18 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         )}
       </div>
 
+      {/* Ordenar (08/10) — só aparece com 2+ fixos */}
+      {expenses.length + projetados.length > 1 && <OrdenarChips<OrdemDosFixos> valor={ordem} opcoes={ORDENS_DOS_FIXOS} onChange={(v) => setOrdem(v)} testid="ordenar-fixos" />}
+
       {/* Lista */}
       <div>
-        {expenses.length === 0 ? (
+        {expenses.length === 0 && projetados.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-muted-foreground">Nenhum custo fixo cadastrado</p>
             <p className="text-[10px] text-muted-foreground mt-1">Adicione aluguel, contas, assinaturas, academia...</p>
           </div>
         ) : (
-          expenses.map((expense) => editandoId === expense.id ? (
+          [...ordenados, ...projetadosOrdenados].map((expense) => editandoId === expense.id ? (
             <div key={expense.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -431,18 +505,56 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
                 <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
                   <Check className="w-3.5 h-3.5" /> Salvar
                 </button>
-                <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                <button onClick={() => { setEditandoId(null); setEditandoProjetado(false); }} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                   <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          ) : projetados.includes(expense) ? (
+            /* PREVISTO (mês futuro): o fixo de hoje, sem gravar nada aqui. Tocar edita → vira item deste mês. */
+            <div key={`prev-${expense.id}`} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors opacity-80" data-testid="fixo-previsto">
+              <div className="flex items-center gap-2">
+                <button onClick={() => comecarEdicao(expense, true)} className="flex items-center gap-2 flex-1 min-w-0 text-left" aria-label={`Editar ${expense.description} (previsto)`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm truncate">{expense.description}</span>
+                      <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[10px] font-semibold" title="Custo fixo de hoje, previsto pra este mês. Toque pra ajustar só aqui.">
+                        previsto
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                      {expense.day ? <><span>vence dia {expense.day}</span><span>·</span></> : null}
+                      <span>{getPaymentLabel(expense.paymentMethod)}</span>
+                      <span>·</span>
+                      <span>igual ao mês atual</span>
+                    </div>
+                  </div>
+                  <span className="text-sm tabular-nums font-medium whitespace-nowrap text-muted-foreground">
+                    R$ {(Number(expense.value) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </button>
               </div>
             </div>
           ) : (
             <div key={expense.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors">
               <div className="flex items-center gap-2">
+                {/* 08/10: ✓ de paga — fora do botão de editar (botão dentro de botão não é HTML válido) */}
+                <button
+                  type="button"
+                  onClick={() => alternarPago(expense)}
+                  aria-pressed={estaPago(expense)}
+                  aria-label={`${estaPago(expense) ? "Desmarcar" : "Marcar"} ${expense.description} como paga`}
+                  data-testid="fixo-pago"
+                  className={`shrink-0 h-6 w-6 rounded-full border-2 grid place-items-center transition-colors ${
+                    estaPago(expense) ? "bg-success border-success text-white" : "border-border text-transparent hover:border-foreground/40"
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                </button>
                 <button onClick={() => comecarEdicao(expense)} className="flex items-center gap-2 flex-1 min-w-0 text-left" aria-label={`Editar ${expense.description}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm truncate">{expense.description}</span>
+                      <span className={`text-sm truncate ${estaPago(expense) ? "line-through text-muted-foreground" : ""}`}>{expense.description}</span>
                       <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
                         {getCategoryLabel(expense.category)}
                       </span>
@@ -501,8 +613,14 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
       {/* Total */}
       <div className="px-3 py-2 border-t border-border flex items-center justify-between">
         <span className="text-xs text-muted-foreground">TOTAL</span>
-        <span className="text-sm font-bold tabular-nums">R$ {brl(total)}</span>
+        <span className="text-sm font-bold tabular-nums">R$ {brl(total + totalProjetado)}</span>
       </div>
+      {totalProjetado > 0 && (
+        <div className="px-3 pb-2 -mt-1 flex items-center justify-between text-[10px] text-muted-foreground" data-testid="total-previsto">
+          <span>desses, previstos (iguais ao mês atual)</span>
+          <span className="tabular-nums">R$ {brl(totalProjetado)}</span>
+        </div>
+      )}
 
       {/* O relatório que ela pediu: "tudo o que ele tem que pagar", em número.
           Some quando não há custo fixo — duas colunas de R$ 0,00 não informam. */}

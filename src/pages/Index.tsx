@@ -588,7 +588,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 </div>
                 <div className="min-w-0">
                   <TrackedCard cardKey="fixed-expenses" tab="financeiro">
-                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} />
+                    {/* 08/10: ✓ de paga direto na lista (a conta fx-<id> do MEU MÊS; sem Dia, o carimbo pagoEm do mês) */}
+                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesAgora} />
                   </TrackedCard>
                 </div>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">

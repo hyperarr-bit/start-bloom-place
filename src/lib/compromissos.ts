@@ -60,6 +60,36 @@ export interface Compromisso {
   pula?: string[];
   /** Último dia da série ("YYYY-MM-DD", inclusive) — "apagar daqui pra frente". Ausente = sem fim. */
   ate?: string;
+  /** 08/10 (chamado: "poderiam colocar notas nos próprios compromissos?"): texto livre, várias linhas. */
+  notas?: string;
+}
+
+/** Notas legíveis (texto limpo) ou "". */
+export const notasDe = (c: Partial<Compromisso> | null | undefined): string => (typeof c?.notas === "string" ? c.notas.trim() : "");
+
+/**
+ * 08/10: EDITAR um compromisso já criado (antes só dava pra apagar e refazer —
+ * e refazer perdia os "só este dia" da série). Troca só o que veio em
+ * `mudancas`; id, data-âncora, `pula`, `ate`, `origem` e `ref` ficam. Campo
+ * de texto vazio (local, notas) sai do objeto em vez de virar "" — o app
+ * antigo das lojas lê a mesma chave e só conhece os campos de sempre.
+ */
+export function editarCompromisso(
+  lista: Compromisso[],
+  id: string,
+  mudancas: Partial<Pick<Compromisso, "titulo" | "hora" | "repete" | "aviso" | "local" | "notas">>,
+): Compromisso[] {
+  return lista.map((x) => {
+    if (x.id !== id) return x;
+    const novo: Compromisso = { ...x, ...mudancas };
+    if (typeof mudancas.titulo === "string") novo.titulo = mudancas.titulo.trim() || x.titulo;
+    if ("local" in mudancas && !(mudancas.local ?? "").trim()) delete novo.local;
+    else if (typeof mudancas.local === "string") novo.local = mudancas.local.trim();
+    if ("notas" in mudancas && !(mudancas.notas ?? "").trim()) delete novo.notas;
+    else if (typeof mudancas.notas === "string") novo.notas = mudancas.notas.trim();
+    if ("repete" in mudancas && !(mudancas.repete?.length)) { delete novo.repete; delete novo.pula; delete novo.ate; }
+    return novo;
+  });
 }
 
 export interface Ocorrencia {

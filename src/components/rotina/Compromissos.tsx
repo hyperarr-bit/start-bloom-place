@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Bell, BellOff, CalendarPlus, Plus, Repeat, Trash2, X } from "lucide-react";
+import { Bell, BellOff, CalendarPlus, NotebookText, Pencil, Plus, Repeat, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUserData } from "@/hooks/use-user-data";
@@ -12,7 +13,7 @@ import { adicionarAoCalendario } from "@/lib/calendario";
 import { trackEvent } from "@/lib/analytics";
 import { parseLocalDay } from "@/lib/utils";
 import {
-  AVISOS, AVISO_PADRAO, CHAVE_COMPROMISSOS, DIAS_CURTOS, apagarCompromisso, avisoDe, indiceSemana, ocorrencias,
+  AVISOS, AVISO_PADRAO, CHAVE_COMPROMISSOS, DIAS_CURTOS, apagarCompromisso, avisoDe, editarCompromisso, indiceSemana, notasDe, ocorrencias,
   rotuloAviso, rotuloRepeticao, type Compromisso, type ModoDeApagar, type Ocorrencia,
 } from "@/lib/compromissos";
 
@@ -68,33 +69,53 @@ const useApagar = (lista: Compromisso[], onChange: (lista: Compromisso[]) => voi
   };
 };
 
+/* ------------------------------------------------------------ editar */
+
+/**
+ * 08/10: a mesma lista, com um compromisso trocado — e os avisos refeitos
+ * (mudou a hora, muda o aviso). Chamado pelo lápis da linha.
+ */
+const useEditar = (lista: Compromisso[], onChange: (lista: Compromisso[]) => void) => {
+  const { get } = useUserData();
+  return (novo: Compromisso) => {
+    const nova = editarCompromisso(lista, novo.id, { titulo: novo.titulo, hora: novo.hora, repete: novo.repete ?? [], aviso: novo.aviso, local: novo.local ?? "", notas: novo.notas ?? "" });
+    onChange(nova);
+    trackEvent("compromisso_editado", { repete: !!novo.repete?.length, aviso: avisoDe(novo), notas: !!notasDe(novo) });
+    toast.success(`${novo.titulo} atualizado`);
+    void armarAvisosDeCompromissos(get, nova, avisoDe(novo) >= 0);
+  };
+};
+
 /* ------------------------------------------------------------ formulário */
 
-const FormCompromisso = ({ dia, onSalvar, onCancelar }: { dia: string; onSalvar: (c: Compromisso) => void; onCancelar: () => void }) => {
-  const [titulo, setTitulo] = useState("");
-  const [hora, setHora] = useState("09:00");
-  const [repete, setRepete] = useState(false);
-  const [dias, setDias] = useState<number[]>([indiceSemana(parseLocalDay(dia))]);
-  const [aviso, setAviso] = useState<number>(AVISO_PADRAO);
-  const [local, setLocal] = useState("");
+/** Novo compromisso (sem `inicial`) ou edição de um existente (08/10): os mesmos campos, mais as NOTAS. */
+const FormCompromisso = ({ dia, inicial, onSalvar, onCancelar }: { dia: string; inicial?: Compromisso; onSalvar: (c: Compromisso) => void; onCancelar: () => void }) => {
+  const [titulo, setTitulo] = useState(inicial?.titulo ?? "");
+  const [hora, setHora] = useState(inicial?.hora ?? "09:00");
+  const [repete, setRepete] = useState(!!inicial?.repete?.length);
+  const [dias, setDias] = useState<number[]>(inicial?.repete?.length ? [...inicial.repete] : [indiceSemana(parseLocalDay(dia))]);
+  const [aviso, setAviso] = useState<number>(inicial ? avisoDe(inicial) : AVISO_PADRAO);
+  const [local, setLocal] = useState(inicial?.local ?? "");
+  const [notas, setNotas] = useState(notasDe(inicial));
+  const editando = !!inicial;
 
   const salvar = () => {
     if (!titulo.trim()) { toast.error("Dá um nome pro compromisso"); return; }
     if (!/^\d{1,2}:\d{2}$/.test(hora)) { toast.error("Escolhe a hora"); return; }
     if (repete && dias.length === 0) { toast.error("Marca pelo menos um dia da semana"); return; }
     onSalvar({
-      id: novoId(),
+      ...(inicial ?? { id: novoId(), data: dia }),
       titulo: titulo.trim(),
-      data: dia,
       hora,
       ...(repete ? { repete: [...dias].sort((a, b) => a - b) } : {}),
       aviso,
       ...(local.trim() ? { local: local.trim() } : {}),
+      ...(notas.trim() ? { notas: notas.trim() } : {}),
     });
   };
 
   return (
-    <div className="mt-2 p-3 rounded-md border border-sky-200 dark:border-sky-900/60 bg-sky-50/60 dark:bg-sky-950/20 space-y-2" data-testid="form-compromisso">
+    <div className="mt-2 p-3 rounded-md border border-sky-200 dark:border-sky-900/60 bg-sky-50/60 dark:bg-sky-950/20 space-y-2" data-testid={editando ? "form-compromisso-editar" : "form-compromisso"} onClick={(e) => e.stopPropagation()}>
       <Input
         placeholder="O quê? (ex.: Médico, Reunião, Jiu-jitsu)"
         value={titulo}
@@ -144,8 +165,17 @@ const FormCompromisso = ({ dia, onSalvar, onCancelar }: { dia: string; onSalvar:
         </div>
       )}
       <Input placeholder="Onde? (opcional)" value={local} onChange={(e) => setLocal(e.target.value)} className="h-8 text-xs" aria-label="Local" />
+      {/* 08/10: "poderiam colocar notas nos próprios compromissos?" */}
+      <Textarea
+        placeholder="Notas (opcional): o que levar, telefone, pauta…"
+        value={notas}
+        onChange={(e) => setNotas(e.target.value)}
+        rows={2}
+        className="min-h-[56px] text-xs resize-none"
+        aria-label="Notas do compromisso"
+      />
       <div className="flex gap-2">
-        <Button size="sm" onClick={salvar} className="h-8 text-xs flex-1 bg-sky-600 hover:bg-sky-700 text-white">Salvar compromisso</Button>
+        <Button size="sm" onClick={salvar} className="h-8 text-xs flex-1 bg-sky-600 hover:bg-sky-700 text-white">{editando ? "Salvar alterações" : "Salvar compromisso"}</Button>
         <Button size="sm" variant="ghost" onClick={onCancelar} className="h-8 text-xs" aria-label="Cancelar"><X className="w-3.5 h-3.5" /></Button>
       </div>
     </div>
@@ -154,13 +184,18 @@ const FormCompromisso = ({ dia, onSalvar, onCancelar }: { dia: string; onSalvar:
 
 /* -------------------------------------------------------- linha de item */
 
-const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar: Apagar; mostrarDia?: boolean }) => {
+const LinhaOcorrencia = ({ o, onApagar, onEditar, mostrarDia }: { o: Ocorrencia; onApagar: Apagar; onEditar?: (c: Compromisso) => void; mostrarDia?: boolean }) => {
   const [confirmando, setConfirmando] = useState(false);
+  const [editando, setEditando] = useState(false);
   const c = o.compromisso;
   const repeticao = rotuloRepeticao(c);
   const escolher = (modo: ModoDeApagar) => (e: React.MouseEvent) => { e.stopPropagation(); setConfirmando(false); onApagar(c, modo, o.dia); };
   const minutos = avisoDe(c);
   const noCelular = isNativeShell();
+  const notas = notasDe(c);
+  // 08/10: só o que a pessoa criou na Rotina edita aqui; o que veio dos Estudos/Beleza
+  // tem o horário espelhado lá (mexer só aqui deixaria os dois discordando)
+  const editavel = !!onEditar && !c.origem;
 
   const calendario = async () => {
     const r = await adicionarAoCalendario({ titulo: c.titulo, data: o.dia, hora: c.hora, local: c.local });
@@ -185,7 +220,18 @@ const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar:
           </span>
           {c.local && <span>📍 {c.local}</span>}
         </p>
+        {notas && !editando && (
+          <p className="mt-0.5 text-[10.5px] text-muted-foreground inline-flex items-start gap-1 min-w-0 max-w-full" data-testid="notas-do-compromisso">
+            <NotebookText className="w-2.5 h-2.5 shrink-0 mt-[2px]" aria-hidden="true" />
+            <span className="truncate italic">{notas.split(/\n+/).map((l) => l.trim()).filter(Boolean).join(" · ")}</span>
+          </p>
+        )}
       </div>
+      {editavel && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmando(false); setEditando((v) => !v); }} aria-label={`Editar ${c.titulo}`} aria-expanded={editando} className="text-muted-foreground hover:text-foreground p-0.5">
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
       {noCelular && (
         <button type="button" onClick={() => void calendario()} title="Adicionar ao calendário do celular" aria-label="Adicionar ao calendário do celular" className="text-muted-foreground hover:text-foreground p-0.5">
           <CalendarPlus className="w-3.5 h-3.5" />
@@ -219,6 +265,9 @@ const LinhaOcorrencia = ({ o, onApagar, mostrarDia }: { o: Ocorrencia; onApagar:
         </button>
       </div>
     )}
+    {editando && onEditar && (
+      <FormCompromisso dia={o.dia} inicial={c} onSalvar={(novo) => { onEditar(novo); setEditando(false); }} onCancelar={() => setEditando(false)} />
+    )}
     </div>
   );
 };
@@ -246,6 +295,7 @@ export const CompromissosDoDia = ({ dia, lista, onChange }: PropsDia) => {
   };
 
   const apagar = useApagar(lista, onChange);
+  const editar = useEditar(lista, onChange);
 
   return (
     <div className="space-y-2" data-testid="compromissos-do-dia">
@@ -260,7 +310,7 @@ export const CompromissosDoDia = ({ dia, lista, onChange }: PropsDia) => {
       {doDia.length === 0 && !abrindo && (
         <p className="text-[11px] text-muted-foreground">Nada marcado com hora. Toque em + Compromisso — dá pra repetir toda semana e ser avisado antes.</p>
       )}
-      {doDia.map((o) => <LinhaOcorrencia key={`${o.compromisso.id}-${o.dia}`} o={o} onApagar={apagar} />)}
+      {doDia.map((o) => <LinhaOcorrencia key={`${o.compromisso.id}-${o.dia}`} o={o} onApagar={apagar} onEditar={editar} />)}
       {abrindo && <FormCompromisso dia={dia} onSalvar={salvar} onCancelar={() => setAbrindo(false)} />}
     </div>
   );
@@ -275,6 +325,7 @@ export const ProximosCompromissos = ({ lista, onChange, onAbrirDia }: { lista: C
   }, [lista]);
 
   const apagar = useApagar(lista, onChange);
+  const editar = useEditar(lista, onChange);
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden" data-testid="proximos-compromissos">
@@ -289,7 +340,7 @@ export const ProximosCompromissos = ({ lista, onChange, onAbrirDia }: { lista: C
           </p>
         ) : proximos.map((o) => (
           <div key={`${o.compromisso.id}-${o.dia}`} className="cursor-pointer" onClick={() => onAbrirDia(o.dia)}>
-            <LinhaOcorrencia o={o} onApagar={apagar} mostrarDia />
+            <LinhaOcorrencia o={o} onApagar={apagar} onEditar={editar} mostrarDia />
           </div>
         ))}
       </div>

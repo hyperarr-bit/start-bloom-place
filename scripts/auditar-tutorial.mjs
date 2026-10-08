@@ -35,7 +35,8 @@ const arquivos = (dir, acc = []) => {
   return acc;
 };
 
-const todos = arquivos(join(RAIZ, "src"));
+// testes montam passos de mentira (ex.: spotlight-rolagem.test.tsx) — não são o tutorial de verdade
+const todos = arquivos(join(RAIZ, "src")).filter((f) => !/[\\/]test[\\/]|\.test\.tsx?$/.test(f));
 
 // 1. onde cada data-spotlight existe de fato
 const alvosVivos = new Map();

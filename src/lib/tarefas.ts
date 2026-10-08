@@ -39,7 +39,19 @@ export type TarefaDoDia = {
   detalhes?: string;
   /** "YYYY-MM-DD" — o dia em que ela nasceu, quando veio do "Ficou de ontem" (02/10). Só informa. */
   veioDe?: string;
+  /**
+   * 08/10 (chamado: "nas tarefas não tem a data que coloquei no sistema,
+   * importante pra prazos"): quando foi criada, ISO. Tarefa antiga não tem —
+   * `dataDeCriacao` cai em `veioDe ?? dia`.
+   */
+  criadaEm?: string;
+  /** 08/10 ("elencar o que fazer primeiro"): "alta" = marcada como prioridade. Ausente = normal. */
+  prioridade?: "alta";
+  /** 08/10: checklist dentro da tarefa. Ausente/vazio = tarefa simples, como sempre. */
+  subtarefas?: Subtarefa[];
 };
+
+export type Subtarefa = { id: string; texto: string; feito: boolean };
 
 /** As duas listas de "tarefas de hoje" (BlocoDeFases): Rotina e Carreira. */
 export const CHAVE_TAREFAS_ROTINA = "rotina-day-tasks";
@@ -85,6 +97,71 @@ export const avisoDaTarefa = (t: Parcial): number => {
 export const detalhesDaTarefa = (t: Parcial): string => (typeof t?.detalhes === "string" ? t.detalhes.trim() : "");
 
 const ehDia = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+
+/* ---------------------------------------------- 08/10: criação, prioridade, subtarefas, ordem */
+
+/** Só as subtarefas legíveis (id e texto); dado torto fica de fora. */
+export const subtarefasDaTarefa = (t: Parcial): Subtarefa[] =>
+  (Array.isArray(t?.subtarefas) ? t!.subtarefas! : []).filter(
+    (s): s is Subtarefa => !!s && typeof s === "object" && typeof s.id === "string" && typeof s.texto === "string" && s.texto.trim() !== "",
+  ).map((s) => ({ id: s.id, texto: s.texto.trim(), feito: !!s.feito }));
+
+export const progressoDasSubtarefas = (t: Parcial): { feitas: number; total: number } => {
+  const subs = subtarefasDaTarefa(t);
+  return { feitas: subs.filter((s) => s.feito).length, total: subs.length };
+};
+
+export const ehPrioridade = (t: Parcial): boolean => t?.prioridade === "alta";
+
+/**
+ * "YYYY-MM-DD" em que a tarefa foi criada. Tarefa de antes de 08/10 não tem
+ * `criadaEm`: a melhor aproximação é o dia de onde ela veio (Ficou de ontem) ou
+ * o próprio dia — uma tarefa criada hoje pra hoje foi criada hoje.
+ */
+export const dataDeCriacao = (t: Parcial): string => {
+  const c = t?.criadaEm;
+  if (typeof c === "string" && /^\d{4}-\d{2}-\d{2}/.test(c)) return c.slice(0, 10);
+  return (ehDia(t?.veioDe) ? t!.veioDe! : ehDia(t?.dia) ? t!.dia! : "");
+};
+
+/** Texto limpo e id novo pra cada linha digitada no formulário; linha vazia não vira subtarefa. */
+export const montarSubtarefas = (linhas: Array<Partial<Subtarefa> | string>): Subtarefa[] =>
+  linhas
+    .map((l) => (typeof l === "string" ? { texto: l } : l))
+    .filter((l) => typeof l.texto === "string" && l.texto.trim() !== "")
+    .map((l) => ({ id: typeof l.id === "string" && l.id ? l.id : `s${Math.random().toString(36).slice(2, 9)}`, texto: (l.texto as string).trim(), feito: !!l.feito }));
+
+/**
+ * Sobe/desce uma tarefa SEM HORA entre as suas vizinhas de tela: as do mesmo
+ * dia, sem hora e no mesmo estado (pendente/feita) — que é exatamente a ordem
+ * que `ordenarPorHora` mostra (as sem hora saem na ordem da lista). Troca de
+ * lugar com a vizinha na lista completa (que guarda todos os dias); quem tem
+ * hora segue a hora e não se move. Fora dos limites: devolve a mesma lista.
+ */
+export const moverTarefaNoDia = (lista: TarefaDoDia[], id: string, direcao: -1 | 1): TarefaDoDia[] => {
+  const de = lista.findIndex((t) => t.id === id);
+  if (de < 0) return lista;
+  const alvo = lista[de];
+  if (normalizarHora(alvo.hora)) return lista;
+  const vizinhas = lista
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t.dia === alvo.dia && !normalizarHora(t.hora) && !!t.feito === !!alvo.feito);
+  const pos = vizinhas.findIndex(({ i }) => i === de);
+  const outra = vizinhas[pos + direcao];
+  if (!outra) return lista;
+  const nova = [...lista];
+  nova[de] = outra.t;
+  nova[outra.i] = alvo;
+  return nova;
+};
+
+/** Posição (1-based) e total da tarefa entre as vizinhas que ela pode trocar de lugar — null quando tem hora. */
+export const posicaoNoDia = (lista: TarefaDoDia[], id: string): { i: number; total: number } | null => {
+  const alvo = lista.find((t) => t.id === id);
+  if (!alvo || normalizarHora(alvo.hora)) return null;
+  const vizinhas = lista.filter((t) => t.dia === alvo.dia && !normalizarHora(t.hora) && !!t.feito === !!alvo.feito);
+  return { i: vizinhas.findIndex((t) => t.id === id) + 1, total: vizinhas.length };
+};
 
 /** Só o que dá pra mostrar: id, texto e dia legíveis. Dado torto fica de fora, nunca derruba. */
 export const tarefasValidas = (lista: unknown): TarefaDoDia[] =>

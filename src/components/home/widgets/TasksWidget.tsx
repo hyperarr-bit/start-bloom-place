@@ -6,8 +6,8 @@ import { alternarLimpeza, feitoNoPeriodo, periodoDaSecao, type ItemLimpeza } fro
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { cn, localDayKey } from "@/lib/utils";
 import {
-  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, horaDaTarefa, horaDoAviso, ordenarPorHora,
-  type TarefaDoDia,
+  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, ehPrioridade, horaDaTarefa, horaDoAviso, ordenarPorHora,
+  progressoDasSubtarefas, type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
 import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
@@ -115,8 +115,13 @@ export const TasksWidget = () => {
       linhas.push({
         key, origem, texto: t.texto, feito: !!t.feito, detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
         hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
+        // 08/10: bandeirinha de prioridade e "2/3" da checklist, iguais aos do módulo
+        prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t),
         onAlternar: () => fonte.alternar(t.id), onAbrir: () => setAberta(key),
-        ficha: { onde: origem, tarefa: t, onAlternar: () => fonte.alternar(t.id), onSalvar: (c) => fonte.salvar(t.id, c), onApagar: () => fonte.apagar(t.id) },
+        ficha: {
+          onde: origem, tarefa: t, onAlternar: () => fonte.alternar(t.id), onSalvar: (c) => fonte.salvar(t.id, c), onApagar: () => fonte.apagar(t.id),
+          onAlternarSubtarefa: (subId) => fonte.alternarSubtarefa(t.id, subId),
+        },
       });
     });
   doDia(rotina, "rd", "Rotina");

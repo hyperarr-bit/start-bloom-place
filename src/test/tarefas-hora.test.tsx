@@ -312,7 +312,7 @@ describe("tarefas de hoje dentro do módulo (BlocoDeFases: Rotina e Carreira)", 
     fireEvent.change(screen.getByPlaceholderText("Nova tarefa..."), { target: { value: "Follow-up com a Rita" } });
     fireEvent.click(screen.getByRole("button", { name: "Adicionar tarefa" }));
     const [t] = store.dados[CHAVE_TAREFAS_CARREIRA] as TarefaDoDia[];
-    expect(Object.keys(t).sort()).toEqual(["dia", "feito", "id", "texto"]);
+    expect(Object.keys(t).sort()).toEqual(["criadaEm", "dia", "feito", "id", "texto"]); // 08/10: criadaEm entra em toda tarefa nova (chamado: "a data que coloquei no sistema")
     expect(t).toMatchObject({ texto: "Follow-up com a Rita", feito: false, dia: HOJE });
   });
 

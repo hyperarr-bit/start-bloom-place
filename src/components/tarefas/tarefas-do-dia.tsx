@@ -13,7 +13,7 @@
  * marcava a tarefa — com detalhes pra ler, o toque no texto tem que abrir.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlarmClock, Bell, BellOff, Check, ChevronRight, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlarmClock, ArrowDown, ArrowUp, Bell, BellOff, CalendarDays, Check, ChevronRight, Flag, ListChecks, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -30,8 +30,9 @@ import {
   apagarTarefas, concluirNoDiaOriginal, restaurarTarefas, tarefasDosItens, trazerParaHoje, type ItemFicou,
 } from "@/lib/ficou-de-ontem";
 import {
-  AVISO_PADRAO_TAREFA, AVISOS_TAREFA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, horaDaTarefa, horaDoAviso,
-  normalizarHora, ordenarPorHora, resumoDosDetalhes, textoDoAviso, type TarefaDoDia,
+  AVISO_PADRAO_TAREFA, AVISOS_TAREFA, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, ehPrioridade, horaDaTarefa, horaDoAviso,
+  montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, progressoDasSubtarefas, resumoDosDetalhes, subtarefasDaTarefa,
+  textoDoAviso, type Subtarefa, type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/components/treino/planner";
 
@@ -51,18 +52,21 @@ const COLUNAS = "grid grid-cols-[3.4rem_minmax(0,1fr)_3rem]";
 
 /* ------------------------------------------------------- estado da lista */
 
-type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes">;
+type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes" | "prioridade" | "subtarefas">;
 
 /** Monta a tarefa só com o que existe — campo vazio não vira chave (tarefa sem hora fica igual às antigas). */
 const comCampos = <T extends { id: string; feito: boolean; dia: string }>(base: T, c: CamposNovos): TarefaDoDia => {
-  const { hora: _h, aviso: _a, detalhes: _d, texto: _t, ...resto } = base as T & Partial<TarefaDoDia>;
+  const { hora: _h, aviso: _a, detalhes: _d, texto: _t, prioridade: _p, subtarefas: _s, ...resto } = base as T & Partial<TarefaDoDia>;
   const hora = normalizarHora(c.hora);
   const detalhes = (c.detalhes ?? "").trim();
+  const subtarefas = montarSubtarefas(c.subtarefas ?? []);
   return {
     ...(resto as { id: string; feito: boolean; dia: string }),
     texto: c.texto.trim(),
     ...(hora ? { hora, aviso: Number.isInteger(c.aviso) ? (c.aviso as number) : AVISO_PADRAO_TAREFA } : {}),
     ...(detalhes ? { detalhes } : {}),
+    ...(c.prioridade === "alta" ? { prioridade: "alta" as const } : {}),
+    ...(subtarefas.length ? { subtarefas } : {}),
   };
 };
 
@@ -87,7 +91,8 @@ export function useTarefasDoDia(chave: string) {
   // partir do último valor gravado — duas escritas seguidas não se atropelam, e
   // a lista nova já sai pronta pro reagendamento.
   const adicionar = (c: CamposNovos): TarefaDoDia => {
-    const t = comCampos({ id: crypto.randomUUID(), feito: false, dia: localDayKey() }, c);
+    // criadaEm (08/10): a data em que a pessoa pôs a tarefa no sistema — "importante pra prazos"
+    const t = comCampos({ id: crypto.randomUUID(), feito: false, dia: localDayKey(), criadaEm: new Date().toISOString() }, c);
     let nova: TarefaDoDia[] = [];
     setLista((prev) => (nova = [...(Array.isArray(prev) ? prev : []), t]));
     armar(nova, t);
@@ -106,6 +111,17 @@ export function useTarefasDoDia(chave: string) {
 
   const alternar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).map((x) => (x.id === id ? { ...x, feito: !x.feito } : x)));
   const apagar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== id));
+
+  /* 08/10: checklist e ordem. Marcar um passo da checklist só muda o dado (sem reagendar: o
+     aviso é da tarefa). Mover troca de lugar com a vizinha sem hora do mesmo dia. */
+  const alternarSubtarefa = (id: string, subId: string) =>
+    setLista((prev) => (Array.isArray(prev) ? prev : []).map((x) => (x.id !== id ? x : {
+      ...x, subtarefas: subtarefasDaTarefa(x).map((s) => (s.id === subId ? { ...s, feito: !s.feito } : s)),
+    })));
+  const mover = (id: string, direcao: -1 | 1) => {
+    setLista((prev) => moverTarefaNoDia(Array.isArray(prev) ? prev : [], id, direcao));
+    trackEvent("tarefa_movida", { lista: chave, direcao });
+  };
 
   /*
    * "FICOU DE ONTEM" (02/10): as três saídas do bloco e o desfazer. Cada uma devolve
@@ -132,7 +148,7 @@ export function useTarefasDoDia(chave: string) {
     rearmar(nova);
   };
 
-  return { chave, lista: atual, adicionar, salvar, alternar, apagar, trazer, concluirAntigas, apagarAntigas, restaurar };
+  return { chave, lista: atual, adicionar, salvar, alternar, apagar, alternarSubtarefa, mover, trazer, concluirAntigas, apagarAntigas, restaurar };
 }
 
 /* ------------------------------------------------------------ a tabela */
@@ -164,11 +180,16 @@ export interface LinhaVisivel {
   /** sem ele a linha é só leitura (rotação da Casa muda de dono, não "fica feita") */
   onAlternar?: () => void;
   onAbrir: () => void;
+  /** 08/10: marcada como prioridade (bandeirinha antes do texto) */
+  prioridade?: boolean;
+  /** 08/10: progresso da checklist ("2/3"), quando tem subtarefas */
+  checklist?: { feitas: number; total: number };
 }
 
 export function LinhaDeTarefa({ l, tom, primeira }: { l: LinhaVisivel; tom: TomDaTabela; primeira?: boolean }) {
   const aviso = l.hora ? l.aviso ?? -1 : -1;
   const meta = [l.origem, l.detalhe].filter(Boolean).join(" · ");
+  const checklist = l.checklist && l.checklist.total > 0 ? l.checklist : null;
   return (
     <div className={cn(COLUNAS, "min-h-[52px]", !primeira && cn("border-t", tom.linha))} data-testid="linha-tarefa">
       <div
@@ -181,15 +202,24 @@ export function LinhaDeTarefa({ l, tom, primeira }: { l: LinhaVisivel; tom: TomD
         {l.hora ?? ""}
       </div>
       <button type="button" onClick={l.onAbrir} className="min-w-0 text-left px-3 py-2 active:bg-muted/40 transition-colors" aria-label={`Abrir ${l.texto}`}>
-        <span className={cn("block text-[14px] leading-snug truncate", l.feito ? "line-through text-muted-foreground font-medium" : "font-semibold")}>{l.texto}</span>
-        {(meta || (aviso >= 0 && !l.feito)) && (
+        <span className={cn("flex items-center gap-1.5 text-[14px] leading-snug min-w-0", l.feito ? "line-through text-muted-foreground font-medium" : "font-semibold")}>
+          {l.prioridade && !l.feito && <Flag className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400 fill-amber-500/30" aria-label="Prioridade" data-testid="prioridade-da-linha" />}
+          <span className="truncate">{l.texto}</span>
+        </span>
+        {(meta || (aviso >= 0 && !l.feito) || checklist) && (
           <span className="mt-0.5 flex items-center gap-x-1.5 text-[11.5px] text-muted-foreground min-w-0">
             {aviso >= 0 && !l.feito && (
               <span className="inline-flex items-center gap-0.5 shrink-0 text-sky-700 dark:text-sky-300" data-testid="aviso-da-linha">
                 <Bell className="w-3 h-3" aria-hidden="true" /> {rotuloAviso(aviso)}
               </span>
             )}
-            {aviso >= 0 && !l.feito && meta && <span aria-hidden="true">·</span>}
+            {checklist && (
+              <span className="inline-flex items-center gap-0.5 shrink-0 tabular-nums" data-testid="checklist-da-linha">
+                {aviso >= 0 && !l.feito && <span aria-hidden="true" className="mr-1">·</span>}
+                <ListChecks className="w-3 h-3" aria-hidden="true" /> {checklist.feitas}/{checklist.total}
+              </span>
+            )}
+            {((aviso >= 0 && !l.feito) || checklist) && meta && <span aria-hidden="true">·</span>}
             {meta && <span className="truncate">{meta}</span>}
           </span>
         )}
@@ -247,6 +277,16 @@ export function FormTarefa({
   const [hora, setHora] = useState(normalizarHora(inicial?.hora) ?? "");
   const [aviso, setAviso] = useState<number>(Number.isInteger(inicial?.aviso) ? (inicial?.aviso as number) : AVISO_PADRAO_TAREFA);
   const [detalhes, setDetalhes] = useState(inicial?.detalhes ?? "");
+  // 08/10: prioridade e checklist (os passos já existentes mantêm id e ✓; o que a pessoa digita agora entra sem ✓)
+  const [prioridade, setPrioridade] = useState(inicial?.prioridade === "alta");
+  const [subtarefas, setSubtarefas] = useState<Subtarefa[]>(() => subtarefasDaTarefa({ subtarefas: inicial?.subtarefas }));
+  const [novoPasso, setNovoPasso] = useState("");
+  const addPasso = () => {
+    const [s] = montarSubtarefas([novoPasso]);
+    if (!s) return;
+    setSubtarefas((prev) => [...prev, s]);
+    setNovoPasso("");
+  };
 
   const hoje = localDayKey();
   const passou = !!hora && avisoJaPassou(hoje, hora, aviso);
@@ -260,7 +300,9 @@ export function FormTarefa({
 
   const salvar = () => {
     if (!texto.trim()) { toast.error("Escreve o que precisa fazer"); return; }
-    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes });
+    // um passo digitado e não "adicionado" não se perde no Salvar
+    const subs = montarSubtarefas([...subtarefas, novoPasso]);
+    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes, prioridade: prioridade ? "alta" : undefined, subtarefas: subs });
   };
 
   return (
@@ -322,6 +364,57 @@ export function FormTarefa({
         )}
       </div>
 
+      {/* 08/10 — chamados: "elencar o que fazer primeiro" e checklist dentro da tarefa */}
+      <div className="flex items-center justify-between gap-3">
+        <span className={cn(ROTULO, "inline-flex items-center gap-1")}><Flag className="w-3 h-3" aria-hidden="true" /> PRIORIDADE</span>
+        <button
+          type="button"
+          onClick={() => setPrioridade((v) => !v)}
+          aria-pressed={prioridade}
+          data-testid="form-prioridade"
+          className={cn(
+            "h-8 px-3 rounded-full border text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors",
+            prioridade ? "bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300" : "border-border text-muted-foreground",
+          )}
+        >
+          <Flag className={cn("w-3.5 h-3.5", prioridade && "fill-amber-500/40")} aria-hidden="true" /> {prioridade ? "Fazer primeiro" : "Normal"}
+        </button>
+      </div>
+
+      <div data-testid="form-subtarefas">
+        <span className={cn(ROTULO, "inline-flex items-center gap-1")}><ListChecks className="w-3 h-3" aria-hidden="true" /> CHECKLIST</span>
+        <div className="mt-1 rounded-xl border border-border overflow-hidden">
+          {subtarefas.map((s) => (
+            <div key={s.id} className="flex items-center gap-1 pl-1 pr-1 border-b border-border/70 min-h-[40px]">
+              <Quadradinho comoCaixa marcado={s.feito} onClick={() => setSubtarefas((prev) => prev.map((x) => (x.id === s.id ? { ...x, feito: !x.feito } : x)))} rotulo={`Concluir ${s.texto}`} />
+              <input
+                value={s.texto}
+                onChange={(e) => setSubtarefas((prev) => prev.map((x) => (x.id === s.id ? { ...x, texto: e.target.value } : x)))}
+                aria-label={`Passo: ${s.texto}`}
+                className={cn("min-w-0 flex-1 h-9 bg-transparent outline-none text-[14px]", s.feito && "line-through text-muted-foreground")}
+              />
+              <button type="button" onClick={() => setSubtarefas((prev) => prev.filter((x) => x.id !== s.id))} aria-label={`Tirar ${s.texto}`} className="w-8 h-8 grid place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-1 pl-3 pr-1 min-h-[40px]">
+            <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+            <input
+              value={novoPasso}
+              onChange={(e) => setNovoPasso(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPasso(); } }}
+              placeholder={subtarefas.length ? "Mais um passo…" : "Dividir em passos (opcional)"}
+              aria-label="Novo passo da checklist"
+              className="min-w-0 flex-1 h-9 bg-transparent outline-none text-[14px] placeholder:text-muted-foreground/70"
+            />
+            {novoPasso.trim() && (
+              <button type="button" onClick={addPasso} aria-label="Adicionar passo" className="h-8 px-2.5 rounded-full border border-border text-[12px] font-bold">OK</button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div>
         <span className={cn(ROTULO, "inline-flex items-center gap-1")}><NotebookText className="w-3 h-3" aria-hidden="true" /> DETALHES</span>
         <Pautado
@@ -381,6 +474,11 @@ export interface FichaAberta {
   onAlternar?: () => void;
   onSalvar?: (c: CamposNovos) => void;
   onApagar?: () => void;
+  /** 08/10: marca/desmarca um passo da checklist direto na ficha */
+  onAlternarSubtarefa?: (subId: string) => void;
+  /** 08/10: Subir/Descer entre as vizinhas sem hora do dia; `posicao` = onde ela está (1-based) */
+  onMover?: (direcao: -1 | 1) => void;
+  posicao?: { i: number; total: number } | null;
   /** item que não é tarefa do dia (urgência, Foco, limpeza): só marcar e abrir o módulo */
   abrirModulo?: { rotulo: string; ir: () => void };
 }
@@ -403,6 +501,9 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
   const detalhes = detalhesDaTarefa(t);
   const hoje = localDayKey();
   const passou = !!hora && !ficha?.feito && avisoJaPassou(t?.dia ?? hoje, hora, Math.max(0, aviso));
+  const criada = t ? dataDeCriacao(t) : "";
+  const subtarefas = subtarefasDaTarefa(t);
+  const prioridade = ehPrioridade(t);
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
@@ -417,7 +518,7 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
             <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]">
               {editando && ficha.onSalvar ? (
                 <FormTarefa
-                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes }}
+                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas }}
                   rotuloSalvar="Salvar alterações"
                   onSalvar={(c) => { ficha.onSalvar?.(c); setEditando(false); }}
                 />
@@ -430,7 +531,10 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className={cn("text-[18px] font-bold leading-snug break-words", ficha.feito && "line-through text-muted-foreground")}>{ficha.texto}</p>
+                      <p className={cn("text-[18px] font-bold leading-snug break-words", ficha.feito && "line-through text-muted-foreground")}>
+                        {prioridade && !ficha.feito && <Flag className="inline w-4 h-4 mr-1.5 -mt-1 text-amber-600 dark:text-amber-400 fill-amber-500/30" aria-label="Prioridade" />}
+                        {ficha.texto}
+                      </p>
                       {hora && (
                         <p className={cn("mt-1 text-[12.5px] inline-flex items-center gap-1", passou ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")} data-testid="ficha-aviso">
                           {aviso < 0 ? <BellOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Bell className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -438,8 +542,33 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
                         </p>
                       )}
                       {ficha.feito && !hora && <p className="mt-1 text-[12.5px] text-muted-foreground">Feita ✓</p>}
+                      {/* 08/10: "nas tarefas não tem a data que coloquei no sistema, importante pra prazos" */}
+                      {criada && (
+                        <p className="mt-1 text-[12.5px] text-muted-foreground inline-flex items-center gap-1" data-testid="ficha-criada">
+                          <CalendarDays className="w-3.5 h-3.5" aria-hidden="true" />
+                          {criada === hoje ? "Criada hoje" : `Criada em ${diaCurto(criada)}`}
+                          {prioridade && !ficha.feito && <span className="ml-1 text-amber-700 dark:text-amber-300 font-semibold">· prioridade</span>}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* 08/10: checklist — marca o passo direto aqui */}
+                  {t && subtarefas.length > 0 && (
+                    <div data-testid="ficha-checklist">
+                      <span className={cn(ROTULO, "inline-flex items-center gap-1")}>
+                        <ListChecks className="w-3 h-3" aria-hidden="true" /> CHECKLIST · {subtarefas.filter((s) => s.feito).length}/{subtarefas.length}
+                      </span>
+                      <div className="mt-1 rounded-xl border border-border overflow-hidden">
+                        {subtarefas.map((s, i) => (
+                          <div key={s.id} className={cn("flex items-center gap-1 pl-1 pr-3 min-h-[40px]", i > 0 && "border-t border-border/70")}>
+                            <Quadradinho comoCaixa marcado={s.feito} onClick={() => ficha.onAlternarSubtarefa?.(s.id)} rotulo={`Concluir ${s.texto}`} />
+                            <span className={cn("text-[14px] leading-snug min-w-0 break-words", s.feito && "line-through text-muted-foreground")}>{s.texto}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {t && (
                     <div>
@@ -453,6 +582,39 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
                           Toque pra escrever o passo a passo, um telefone, o que levar…
                         </button>
                       )}
+                    </div>
+                  )}
+
+                  {/* 08/10: ORDEM — setas como no Treino/Beleza ("elencar o que fazer primeiro").
+                      Só entre as vizinhas sem hora: quem tem hora segue a hora. */}
+                  {t && ficha.onMover && (
+                    <div className="flex items-center gap-2" data-testid="ficha-ordem">
+                      <span className={ROTULO}>ORDEM</span>
+                      {ficha.posicao ? (
+                        <span className="text-[12px] text-muted-foreground">{ficha.posicao.i}º de {ficha.posicao.total}</span>
+                      ) : (
+                        <span className="text-[12px] text-muted-foreground">com horário, a ordem é a da hora</span>
+                      )}
+                      <div className="ml-auto flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => ficha.onMover?.(-1)}
+                          disabled={!ficha.posicao || ficha.posicao.i <= 1}
+                          aria-label={`Subir ${ficha.texto}`}
+                          className="w-11 h-10 rounded-full border border-border bg-card grid place-items-center disabled:opacity-30 active:bg-muted"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => ficha.onMover?.(1)}
+                          disabled={!ficha.posicao || ficha.posicao.i >= ficha.posicao.total}
+                          aria-label={`Descer ${ficha.texto}`}
+                          className="w-11 h-10 rounded-full border border-border bg-card grid place-items-center disabled:opacity-30 active:bg-muted"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -549,6 +711,9 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
     onAlternar: () => tarefas.alternar(tarefaAberta.id),
     onSalvar: (c) => tarefas.salvar(tarefaAberta.id, c),
     onApagar: () => tarefas.apagar(tarefaAberta.id),
+    onAlternarSubtarefa: (subId) => tarefas.alternarSubtarefa(tarefaAberta.id, subId),
+    onMover: (direcao) => tarefas.mover(tarefaAberta.id, direcao),
+    posicao: posicaoNoDia(tarefas.lista, tarefaAberta.id),
   } : null;
 
   return (
@@ -578,6 +743,7 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
                     l={{
                       key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
                       detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
+                      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t),
                       onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
                     }}
                   />

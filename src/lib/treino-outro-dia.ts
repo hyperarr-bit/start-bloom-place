@@ -111,5 +111,35 @@ export function gravarTreinoDeOutroDia({
   };
 }
 
+/**
+ * DESMARCAR O TREINO DE UM DIA (07/10, chamado: "cliquei no treino sem querer
+ * e ele marcou que eu treinei; tento desmarcar e não sai"). O dia entra em
+ * `saude-workout-log` por 3 portas (Concluir, atalho da Home, "esqueci") e só
+ * o widget da Home sabia tirar. Tira o dia inteiro: registro, volume, carimbo
+ * da sessão e as entradas do histórico daquela data. Mesmas chaves e formato.
+ */
+export function tirarTreinoDoDia({
+  dia, historico, log, volume, sessoes,
+}: {
+  dia: string;
+  historico: unknown;
+  log: unknown;
+  volume: unknown;
+  sessoes: unknown;
+}): Pick<TreinoGravado, "historico" | "log" | "volume" | "sessoes"> {
+  const hist = (Array.isArray(historico) ? historico : []) as EntradaDoHistorico[];
+  const registro = (Array.isArray(log) ? log : []) as string[];
+  const vol = (volume && typeof volume === "object" && !Array.isArray(volume) ? volume : {}) as Record<string, number>;
+  const ses = (sessoes && typeof sessoes === "object" && !Array.isArray(sessoes) ? sessoes : {}) as Record<string, MetaDaSessao>;
+  const { [dia]: _v, ...volSem } = vol;
+  const { [dia]: _s, ...sesSem } = ses;
+  return {
+    historico: hist.filter((h) => h?.date !== dia),
+    log: registro.filter((d) => d !== dia),
+    volume: volSem,
+    sessoes: sesSem,
+  };
+}
+
 /** O dia tem treino registrado? (`saude-workout-log` — o mesmo que a SEMANA lê) */
 export const treinouNoDia = (log: unknown, dia: string): boolean => Array.isArray(log) && log.includes(dia);

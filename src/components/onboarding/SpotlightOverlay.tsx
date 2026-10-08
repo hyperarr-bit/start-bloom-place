@@ -215,23 +215,70 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const step = steps[stepIdx];
     if (!step) return;
 
-    const measure = () => {
+    /*
+     * "QUANDO DESLIZO, O CABEÇALHO TREME" (08/10, iPhone 1.0.10, Finanças — chamado
+     * de uma dev mobile). O que tremia era este anel, em volta de uma aba do
+     * cabeçalho sticky. A versão anterior re-medía o alvo em TODO evento de
+     * scroll (capture: true — inclusive os da faixa de abas que rola pro lado) e
+     * gravava o rect; no WebKit o cabeçalho sticky é posicionado fora da thread
+     * principal, e o getBoundingClientRect() de dentro dele chega atrasado um
+     * ou dois quadros durante a rolagem — o anel ficava pulando em volta de uma
+     * aba que, na tela, não saía do lugar. E pior: se a aba estava na borda, o
+     * scrollIntoView suave era reiniciado a cada evento, puxando a faixa de
+     * abas pra lá e pra cá enquanto a pessoa rolava.
+     *
+     * Agora: (1) alvo dentro de cabeçalho sticky NÃO é re-medido pela rolagem da
+     * página — ele não sai do lugar; mede de novo quando a rolagem assenta;
+     * (2) o resto é medido no máximo 1x por quadro (rAF); (3) o scrollIntoView
+     * só roda ao entrar no passo e no relógio de 250 ms, nunca disparado por
+     * um scroll — ninguém briga com o dedo da pessoa.
+     */
+    let raf = 0;
+    let assentar: ReturnType<typeof setTimeout> | undefined;
+    let ultimaRolagem = 0;
+    let centralizou = false;
+
+    const measure = (origem: "passo" | "relogio" | "rolagem" = "relogio") => {
       const el = document.querySelector(step.selector) as HTMLElement | null;
       if (!el) { setRect(null); return; }
       const r = el.getBoundingClientRect();
       // Auto-scroll horizontally when the target (e.g. a tab) is off-screen
-      // horizontally, so the user doesn't have to swipe to find it.
+      // horizontally, so the user doesn't have to swipe to find it — uma vez
+      // por passo, e nunca a partir de um scroll.
       const vw = window.innerWidth;
-      if (r.right > vw - 8 || r.left < 8) {
-        try { el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch {}
+      if (origem !== "rolagem" && !centralizou && (r.right > vw - 8 || r.left < 8)) {
+        centralizou = true;
+        try { el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch { /* noop */ }
       }
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+      setRect((atual) => (atual && atual.top === r.top && atual.left === r.left && atual.width === r.width && atual.height === r.height
+        ? atual
+        : { top: r.top, left: r.left, width: r.width, height: r.height }));
     };
 
-    measure();
-    const interval = setInterval(measure, 250);
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
+    const emCabecalhoFixo = (el: Element | null) => !!el?.closest?.("header.sticky, [data-sticky-guia]");
+    const aoRolar = () => {
+      ultimaRolagem = Date.now();
+      const el = document.querySelector(step.selector);
+      if (emCabecalhoFixo(el)) {
+        // o cabeçalho não se move com a rolagem: só confere quando ela assenta
+        clearTimeout(assentar);
+        assentar = setTimeout(() => measure("rolagem"), 150);
+        return;
+      }
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; measure("rolagem"); });
+    };
+    const noRelogio = () => {
+      // rolando agora: o rAF (ou o "assentar") já cuida; o relógio esperando
+      // evita o pulo a cada 250 ms com a medida atrasada do WebKit
+      if (Date.now() - ultimaRolagem < 150) return;
+      measure("relogio");
+    };
+
+    measure("passo");
+    const interval = setInterval(noRelogio, 250);
+    window.addEventListener("resize", aoRolar);
+    window.addEventListener("scroll", aoRolar, true);
 
     const onPageClick = (e: MouseEvent) => {
       const target = document.querySelector(step.selector);
@@ -263,8 +310,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
+      clearTimeout(assentar);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("resize", aoRolar);
+      window.removeEventListener("scroll", aoRolar, true);
       document.removeEventListener("click", onPageClick, true);
     };
   }, [active, stepIdx, steps, advance]);

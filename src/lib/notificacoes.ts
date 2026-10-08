@@ -1,4 +1,4 @@
-import { isNativeShell } from "./native-shell";
+import { isAndroid, isNativeShell } from "./native-shell";
 import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
@@ -167,6 +167,62 @@ export async function pedirPermissao(): Promise<boolean> {
   }
 }
 
+/**
+ * ALARME EXATO no Android (08/10 — chamado "não está chegando notificação" /
+ * "o app não me recorda os lembretes", Samsung S23, Android 14).
+ *
+ * Todo lembrete é um alarme do AlarmManager. Sem a permissão SCHEDULE_EXACT_ALARM
+ * (que o app nem declarava) o plugin cai no alarme INEXATO — e, sem
+ * `allowWhileIdle`, num `set(RTC)` que nem acorda o aparelho: em Doze ou com a
+ * Samsung "suspendendo" o app, o aviso das 21h sai quando a pessoa liga a
+ * tela, se sair. Agora: (1) todo agendamento vai com `allowWhileIdle: true`
+ * (acorda o aparelho mesmo inexato); (2) a permissão está declarada no
+ * manifest; (3) no Android 14 ela nasce DESLIGADA e só a pessoa liga, numa
+ * tela do sistema — estas duas funções leem o estado e abrem essa tela.
+ * No iPhone (e na web) o estado é "indisponivel": lá não existe isso.
+ */
+export type EstadoAlarmeExato = "granted" | "denied" | "indisponivel";
+
+export async function estadoAlarmeExato(): Promise<EstadoAlarmeExato> {
+  if (!isAndroid()) return "indisponivel";
+  const p = await plugin();
+  if (!p) return "indisponivel";
+  try {
+    const r = await p.LN.checkExactNotificationSetting();
+    return r.exact_alarm === "granted" ? "granted" : r.exact_alarm === "denied" ? "denied" : "indisponivel";
+  } catch {
+    return "indisponivel"; // Android < 12: alarme exato é sempre permitido, não há o que checar
+  }
+}
+
+/** Abre a tela "Alarmes e lembretes" do Android pro CORE. Devolve o estado ao voltar (ou o atual, se não deu pra abrir). */
+export async function abrirAjusteDeAlarmeExato(): Promise<EstadoAlarmeExato> {
+  if (!isAndroid()) return "indisponivel";
+  const p = await plugin();
+  if (!p) return "indisponivel";
+  try {
+    trackEvent("notif_alarme_exato_abrir");
+    const r = await p.LN.changeExactNotificationSetting();
+    return r.exact_alarm === "granted" ? "granted" : r.exact_alarm === "denied" ? "denied" : "indisponivel";
+  } catch {
+    return estadoAlarmeExato();
+  }
+}
+
+/* O schedule rejeitado (ex.: "Notifications not enabled on this device" quando
+ * a pessoa desligou o canal "Lembretes do CORE" nas configurações) morria num
+ * catch mudo — a central dizia "N avisos agendados" lendo o storage do plugin
+ * e ninguém sabia que nada ia disparar. Um evento por processo, com o motivo. */
+let falhaRegistrada = false;
+const registrarFalhaDeAgendamento = (tipo: string, erro: unknown) => {
+  if (falhaRegistrada) return;
+  falhaRegistrada = true;
+  try {
+    const msg = erro instanceof Error ? erro.message : String((erro as { message?: unknown })?.message ?? erro ?? "?");
+    trackEvent("notif_agendar_falhou", { tipo, motivo: msg.slice(0, 160) });
+  } catch { /* telemetria nunca derruba o agendamento */ }
+};
+
 /** Canal do Android: sem ele a notificação sai sem som e sem controle próprio. */
 async function garantirCanal(): Promise<void> {
   const p = await plugin();
@@ -316,7 +372,7 @@ export async function agendarContas(
         id: a.id,
         title: a.title,
         body: a.body,
-        schedule: { at: a.quando },
+        schedule: { at: a.quando, allowWhileIdle: true },
         channelId: CANAL,
         smallIcon: ICONE, iconColor: COR_MARCA,
         extra: { rota: "/financas" },
@@ -349,7 +405,7 @@ export async function agendarRetrospectiva(ligado = true): Promise<number> {
   if (!ligado) return 0;
 
   const agora = new Date();
-  const avisos: { id: number; title: string; body: string; schedule: { at: Date }; extra: { rota: string } }[] = [];
+  const avisos: { id: number; title: string; body: string; schedule: { at: Date; allowWhileIdle: boolean }; extra: { rota: string } }[] = [];
 
   for (let i = 1; i <= 3; i++) {
     const quando = new Date(agora.getFullYear(), agora.getMonth() + i, 1, HORA_RETRO, 0, 0, 0);
@@ -361,7 +417,7 @@ export async function agendarRetrospectiva(ligado = true): Promise<number> {
       id: BASE_RETRO + Number(`${fechado.getFullYear() % 100}${doisDigitos(fechado.getMonth() + 1)}`),
       title: `Sua retrospectiva de ${nome} tá pronta 🎁`,
       body: "Seu mês em números — dá 30 segundos pra ver.",
-      schedule: { at: quando },
+      schedule: { at: quando, allowWhileIdle: true },
       extra: { rota: `/retrospectiva?mes=${nome}` },
     });
   }
@@ -431,7 +487,10 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
         title: a.title,
         body: a.body,
         ...(a.largeBody ? { largeBody: a.largeBody } : {}),
-        schedule: { at: a.quando },
+        // allowWhileIdle (08/10): acorda o aparelho em Doze. Sem isso o plugin
+        // usava AlarmManager.set(RTC) — inexato E sem despertar: o lembrete
+        // das 21h esperava a pessoa ligar a tela. Ver `estadoAlarmeExato`.
+        schedule: { at: a.quando, allowWhileIdle: true },
         channelId: CANAL,
         smallIcon: ICONE,
         iconColor: COR_MARCA,
@@ -439,7 +498,8 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
       })),
     });
     return avisos.length;
-  } catch {
+  } catch (e) {
+    registrarFalhaDeAgendamento(tipo, e);
     return 0;
   }
 }

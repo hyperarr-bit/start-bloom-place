@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { isNativeShell } from "@/lib/native-shell";
-import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
+import { abrirAjusteDeAlarmeExato, estadoAlarmeExato, estadoPermissao, listarAgendados, pedirPermissao, type EstadoAlarmeExato, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { lerDia2 } from "@/lib/lembrete-dia2";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
@@ -56,6 +56,8 @@ const Notificacoes = () => {
   // remédios (07/09): chave própria, nasce ligado — ver CHAVE_REMEDIOS_LIGADO
   const remediosLigado = get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false;
   const [permissao, setPermissao] = useState<EstadoPermissao | null>(null);
+  // 08/10: alarme exato do Android (ver `estadoAlarmeExato`). "indisponivel" no iPhone e no Android < 12.
+  const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
   const [agendados, setAgendados] = useState<Partial<Record<TipoDeLembrete, number>>>({});
 
   const p = lerPrefs(prefs);
@@ -64,13 +66,28 @@ const Notificacoes = () => {
 
   const atualizarEstado = async () => {
     setPermissao(await estadoPermissao());
+    setAlarmeExato(await estadoAlarmeExato());
     const lista = await listarAgendados();
     const contagem: Partial<Record<TipoDeLembrete, number>> = {};
     lista.forEach((n) => { contagem[n.tipo] = (contagem[n.tipo] ?? 0) + 1; });
     setAgendados(contagem);
   };
 
-  useEffect(() => { void atualizarEstado(); }, []);
+  // 08/10: relê ao VOLTAR das configurações do sistema (liberar notificações ou
+  // o alarme exato) — antes só lia no mount, e a tela seguia dizendo
+  // "bloqueado" depois de a pessoa ter liberado.
+  useEffect(() => {
+    void atualizarEstado();
+    const aoVoltar = () => { if (document.visibilityState === "visible") void atualizarEstado(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+  }, []);
+
+  /** Atalho pra tela "Alarmes e lembretes" do Android; ao voltar, relê tudo (quem liberou ganha o horário exato). */
+  const liberarAlarmeExato = async () => {
+    setAlarmeExato(await abrirAjusteDeAlarmeExato());
+    await atualizarEstado();
+  };
 
   /**
    * A preferência ao vivo, fora do ciclo de render.
@@ -332,6 +349,34 @@ const Notificacoes = () => {
               O Android está bloqueando os avisos do CORE. Para liberar, vá em
               <strong className="text-foreground"> Configurações → Aplicativos → CORE → Notificações</strong> e
               ative. Depois volte aqui.
+            </p>
+          </div>
+        )}
+
+        {/* 08/10 (chamado S23 / Android 14: "o app não me recorda os lembretes"):
+            no Android 14 o alarme EXATO nasce desligado pro app, e sem ele o
+            sistema entrega o lembrete quando quiser — às vezes só quando a
+            pessoa liga a tela. Só aparece com a permissão de avisos já dada e
+            o alarme exato negado; o botão abre a tela do sistema. */}
+        {naLoja && permitido && alarmeExato === "denied" && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4" data-testid="alarme-exato-negado">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <AlarmClock className="w-4 h-4 shrink-0" /> Lembretes podem atrasar
+            </p>
+            <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed">
+              O Android está entregando os avisos do CORE "quando der" — pode ser horas depois,
+              ou só quando você ligar a tela. Pra chegarem na hora certa, libere
+              <strong className="text-foreground"> Alarmes e lembretes</strong> pro CORE.
+            </p>
+            <button
+              type="button"
+              onClick={() => void liberarAlarmeExato()}
+              className="mt-3 h-10 w-full rounded-xl bg-primary text-primary-foreground text-sm font-semibold active:scale-[.99] transition-transform"
+            >
+              Liberar na hora certa
+            </button>
+            <p className="mt-2 text-[11.5px] text-muted-foreground/80 leading-snug">
+              Se mesmo assim nada chegar: Configurações → Bateria → o CORE não pode estar em "Suspenso".
             </p>
           </div>
         )}

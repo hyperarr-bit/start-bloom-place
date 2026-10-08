@@ -111,6 +111,18 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lembretes (08/10, chamado "não está chegando notificação" num S23 /
+         Android 14). POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED e WAKE_LOCK já
+         vêm pelo merge do manifest do @capacitor/local-notifications (que
+         também traz o receiver de boot que reagenda tudo). O que FALTAVA era
+         o alarme exato: sem esta declaração, canScheduleExactAlarms() é
+         sempre falso no Android 12+ e todo lembrete cai no alarme inexato,
+         que o sistema atrasa à vontade. SCHEDULE_EXACT_ALARM é liberada pela
+         pessoa (Android 14: vem desligada; a central de Notificações mostra o
+         atalho "Liberar"). NÃO usar USE_EXACT_ALARM: a Play só aceita em
+         despertador/agenda e pode recusar o envio. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
     <!-- ID de publicidade (12/08, decisão do dono — antes era proibido de
          propósito). É o que permite à Meta atribuir instalação e compra ao
          anúncio. CONSEQUÊNCIA NA PLAY: a declaração de Segurança de Dados

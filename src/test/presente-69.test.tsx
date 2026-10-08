@@ -226,7 +226,7 @@ describe("presente 69 — quem cancelou o teste (no lugar da save-offer do mensa
     const folha = await screen.findByTestId("presente69");
     expect(folha).toHaveAttribute("data-lugar", "cancelou_teste");
     expect(screen.getByText("Antes de ir,", { exact: false })).toBeInTheDocument();
-    expect(screen.getByTestId("presente69-regra").textContent).toMatch(/Entra na hora: a App Store cobra R\$ 69,90 hoje e troca o teste \(que iria até \d+ de \w+\) pelo ano inteiro/);
+    expect(screen.getByTestId("presente69-regra").textContent).toMatch(/Nada é cobrado hoje: você continua no teste e só paga R\$ 69,90 quando ele acabar, em \d+ de \w+/);
     expect(screen.queryByText("Mudar pro mensal", { exact: false })).toBeNull();
     expect(eventos("presente69_view")).toEqual([{ lugar: "cancelou_teste", preco: "R$ 69,90", de: "R$ 97,90", trial: false }]);
     expect(eventos("save_offer_view")).toHaveLength(0);

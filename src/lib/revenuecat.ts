@@ -305,10 +305,12 @@ export async function estadoTrialCancelado(): Promise<boolean> {
  *   "bloqueio"       — perdeu o acesso (trial acabou cancelado / expirou), no gate do app
  * Nunca pra quem está com cartão recusado (esse vê o aviso de cobrança).
  *
- * REGRA DA APPLE (lida da ASC em 07/10): os três produtos do grupo têm
- * groupLevel 1. Trocar core_anual_97 → core_anual_69 é CROSSGRADE de mesma
- * duração ⇒ ENTRA NA HORA: a App Store cobra R$ 69,90 hoje, o teste termina
- * e o ano começa. (Fosse nível menor, entraria só na renovação.) Quem já usou
+ * REGRA DA APPLE: os três produtos do grupo têm groupLevel 1 (crossgrade de
+ * mesma duração, entra na hora). CORREÇÃO 08/10, visto em produção (cliente
+ * trocou 97 → 69 pela tela de assinaturas da Apple durante o teste): a troca
+ * MANTÉM o teste grátis — o RevenueCat registra "renewal R$ 0,00" no produto
+ * novo e a 1ª cobrança de R$ 69,90 cai no fim do teste original. O texto de
+ * 07/10 ("cobra hoje") estava errado. Quem já usou
  * o teste no grupo não ganha outro: a folha cobra na hora — o texto só
  * promete dias grátis se o StoreKit disser que a conta é elegível.
  *

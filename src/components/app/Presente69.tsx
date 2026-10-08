@@ -245,7 +245,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           data-testid="presente69-regra"
         >
           {lugar === "cancelou_teste"
-            ? <>Entra na hora: a App Store cobra <b className="text-[#16121c]">{oferta.preco}</b> hoje e troca o teste{oferta.fimMs ? <> (que iria até {dataCurta(oferta.fimMs)})</> : null} pelo ano inteiro, já liberado.</>
+            ? <>Nada é cobrado hoje: você continua no teste e só paga <b className="text-[#16121c]">{oferta.preco}</b>{oferta.fimMs ? <> quando ele acabar, em {dataCurta(oferta.fimMs)}</> : <> quando ele acabar</>}. Depois, renova uma vez por ano.</>
             : oferta.comTrial
               ? <>{oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store.</>
               : <>Cobrado hoje pela App Store: <b className="text-[#16121c]">{oferta.preco}</b>, sem teste grátis (você já usou o seu).</>}

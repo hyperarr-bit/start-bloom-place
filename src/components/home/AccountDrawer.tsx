@@ -44,14 +44,18 @@ export const AccountDrawer = ({
   // Aquece os chunks lazy dos destinos do menu enquanto o drawer abre — sem
   // isso, clicar em "Conquistas"/"Assinatura" ainda baixa o chunk na hora e
   // trava junto com a animação de fechar.
+  // 08/10: é só aquecimento — se o chunk sumiu (deploy novo) ou a rede caiu, a
+  // falha aqui não pode virar unhandledrejection (era js_error no painel sem
+  // ninguém recarregar); quem decide recarregar é a navegação de verdade.
   useEffect(() => {
     if (!open) return;
-    import("@/pages/Conquistas");
-    import("@/pages/Retrospectiva");
-    import("@/pages/Notificacoes");
-    import("@/pages/Ajuda");
-    if (isNativeShell()) import("@/pages/PlanosApp");
-    else import("@/pages/Planos");
+    const quieto = () => { /* noop */ };
+    import("@/pages/Conquistas").catch(quieto);
+    import("@/pages/Retrospectiva").catch(quieto);
+    import("@/pages/Notificacoes").catch(quieto);
+    import("@/pages/Ajuda").catch(quieto);
+    if (isNativeShell()) import("@/pages/PlanosApp").catch(quieto);
+    else import("@/pages/Planos").catch(quieto);
   }, [open]);
 
   // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame

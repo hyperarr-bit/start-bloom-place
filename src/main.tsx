@@ -7,6 +7,7 @@ import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
 import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
 import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
+import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -36,16 +37,30 @@ const reportJsError = (kind: string, message: string, extra: Record<string, unkn
       message: String(message || "?").slice(0, 300),
       route: window.location.pathname + window.location.search.slice(0, 60),
       ua: navigator.userAgent.slice(0, 160),
+      // 08/10: o painel do admin agrupa js_error sem saber o que é chunk velho
+      // de deploy e o que é crash de verdade — agora vem marcado.
+      chunk: ehErroDeChunk(message),
       ...extra,
     });
   } catch { /* nunca deixar o report derrubar nada */ }
 };
+// 08/10 (12 "Failed to fetch dynamically imported module" no painel depois dos
+// deploys): erro de chunk que NÃO passa pelo vite:preloadError nem por um
+// RouteErrorBoundary (rota sem boundary — o React relança no window.onerror;
+// import() solto que rejeita) só virava evento. Agora recarrega UMA vez por
+// sessão também por aqui (regra única em src/lib/chunk-novo.ts).
+const recarregarSeForChunk = (message: unknown) => {
+  if (ehErroDeChunk(message)) recarregarPorChunkNovo();
+};
 window.addEventListener("error", (e) => {
   reportJsError("error", e.message, { source: `${e.filename?.split("/").pop() ?? "?"}:${e.lineno ?? "?"}` });
+  recarregarSeForChunk(e.message);
 });
 window.addEventListener("unhandledrejection", (e) => {
   const r = (e as PromiseRejectionEvent).reason;
-  reportJsError("unhandledrejection", r?.message ?? String(r ?? "?"));
+  const message = r?.message ?? String(r ?? "?");
+  reportJsError("unhandledrejection", message);
+  recarregarSeForChunk(message);
 });
 
 // Deploy troca os chunks hasheados e APAGA os antigos. Quem estava com o site
@@ -66,35 +81,12 @@ window.addEventListener("unhandledrejection", (e) => {
 // Deixando o erro subir, a rejeição chega com a mensagem verdadeira
 // ("dynamically imported module"), que o RouteErrorBoundary já sabe tratar.
 //
-// A chave é COMPARTILHADA com o RouteErrorBoundary de propósito — ela é o
-// LOCK entre os dois donos de reload, não uma colisão. Sem o preventDefault
-// os dois acordam no mesmo tick: aqui o `replace()` com cache-buster, lá o
-// `reload()` puro. O reload do boundary commitaria PRIMEIRO (o retry do lazy
-// é microtask; navegação precisa de rede) e abortaria a navegação com o
-// cache-buster, recarregando a URL velha — que é exatamente o Safari
-// devolvendo o mesmo index.html do cache, o bug da demo branca de 21/07.
-// Com a chave única: este listener grava e navega; o boundary vê o carimbo
-// fresco e se cala, porque o reload melhor já está a caminho. Erro de chunk
-// que não passa pelo preloadError não escreve a chave, então o auto-reload
-// de lá continua funcionando normalmente.
-window.addEventListener("vite:preloadError", () => {
-  const KEY = "core-chunk-reload-at";
-  try {
-    const last = Number(sessionStorage.getItem(KEY) || 0);
-    if (Date.now() - last < 30_000) return; // já tentou há pouco — não vira loop
-    sessionStorage.setItem(KEY, String(Date.now()));
-  } catch { /* segue e recarrega mesmo assim */ }
-  // reload() puro pode devolver o MESMO index.html velho do cache do Safari
-  // (caso da demo branca de 21/07). O param novo muda a URL → cache miss →
-  // HTML fresco com os chunks novos. O param é inerte pro app.
-  try {
-    const u = new URL(window.location.href);
-    u.searchParams.set("core-cb", String(Date.now() % 1e7));
-    window.location.replace(u.toString());
-  } catch {
-    window.location.reload();
-  }
-});
+// 08/10: a decisão de recarregar (1x por sessão, nunca sem rede, com
+// cache-buster) mora em src/lib/chunk-novo.ts e é a MESMA do RouteErrorBoundary
+// e dos handlers de erro acima — quem chegar primeiro recarrega, os outros
+// veem o carimbo e se calam. Antes eram três réguas diferentes (30 s aqui,
+// 60 s no boundary, nada no import() solto).
+window.addEventListener("vite:preloadError", () => { recarregarPorChunkNovo(); });
 
 // Always unregister any previously-installed service worker and wipe caches.
 // Past versions of this app may have registered a SW that is now serving

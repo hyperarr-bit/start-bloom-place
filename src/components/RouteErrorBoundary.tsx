@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 
 interface Props {
   children: React.ReactNode;
@@ -35,18 +36,14 @@ interface State {
 // Nenhuma delas casava com o regex, então o boundary não recarregava —
 // mostrava "Algo deu errado nesta seção" e a pessoa ficava presa numa tela
 // morta que um F5 resolveria.
-const isChunkError = (error: Error | null) =>
-  !!error && /dynamically imported module|module script failed|ChunkLoadError|Loading chunk .* failed|Loading CSS chunk|Unable to preload CSS|is not a valid JavaScript MIME type|reading 'default'|of undefined \(reading "default"\)/i.test(
-    `${error.name} ${error.message}`,
-  );
-
-const RELOAD_GUARD_KEY = "core-chunk-reload-at";
+const isChunkError = (error: Error | null) => !!error && ehErroDeChunk(`${error.name} ${error.message}`);
 
 /**
  * ErrorBoundary por rota: contém crashes em uma única página
  * para que o app inteiro não fique em tela branca.
  * Erro de chunk (build novo no ar, aba velha) recarrega sozinho — 1x por
- * minuto no máximo, pra nunca virar loop de reload.
+ * sessão no máximo (regra única em src/lib/chunk-novo.ts), pra nunca virar
+ * loop de reload; na 2ª vez (ou sem rede) mostra "Nova versão" com o botão.
  */
 export class RouteErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null, reloading: false };
@@ -82,14 +79,8 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
         chunk: isChunkError(error),
       });
     } catch { /* telemetria nunca pode derrubar a tela de erro */ }
-    if (isChunkError(error)) {
-      let last = 0;
-      try { last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0); } catch { /* noop */ }
-      if (Date.now() - last > 60_000) {
-        try { sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now())); } catch { /* noop */ }
-        this.setState({ reloading: true });
-        window.location.reload();
-      }
+    if (isChunkError(error) && recarregarPorChunkNovo() === "recarregando") {
+      this.setState({ reloading: true });
     }
   }
 

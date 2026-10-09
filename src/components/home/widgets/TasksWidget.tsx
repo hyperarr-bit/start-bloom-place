@@ -6,8 +6,8 @@ import { alternarLimpeza, feitoNoPeriodo, periodoDaSecao, type ItemLimpeza } fro
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { cn, localDayKey } from "@/lib/utils";
 import {
-  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, ehPrioridade, horaDaTarefa, horaDoAviso, ordenarPorHora,
-  progressoDasSubtarefas, type TarefaDoDia,
+  CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, apareceHoje, avisoDaTarefa, avisoJaPassou, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo, horaDaTarefa,
+  horaDoAviso, ordenarPorHora, progressoDasSubtarefas, type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, textoDoDia, tomDoDia } from "@/components/treino/planner";
 import { FicouDeOntem } from "@/components/tarefas/ficou-de-ontem";
@@ -108,15 +108,16 @@ export const TasksWidget = () => {
     });
   });
 
-  // Tarefas de hoje (Rotina e Carreira): as únicas com horário, aviso e detalhes
+  // Tarefas de hoje (Rotina e Carreira): as únicas com horário, aviso e detalhes.
+  // 09/10: a tarefa com PRAZO pendente entra todo dia até ser feita (apareceHoje), com o selo do prazo.
   const doDia = (fonte: ReturnType<typeof useTarefasDoDia>, prefixo: string, origem: string) =>
-    fonte.lista.filter((t): t is TarefaDoDia => !!t && t.dia === hoje && typeof t.texto === "string").forEach((t) => {
+    fonte.lista.filter((t): t is TarefaDoDia => !!t && typeof t.texto === "string" && apareceHoje(t, hoje)).forEach((t) => {
       const key = `${prefixo}-${t.id}`;
       linhas.push({
         key, origem, texto: t.texto, feito: !!t.feito, detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
         hora: horaDaTarefa(t) ?? undefined, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
         // 08/10: bandeirinha de prioridade e "2/3" da checklist, iguais aos do módulo
-        prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t),
+        prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
         onAlternar: () => fonte.alternar(t.id), onAbrir: () => setAberta(key),
         ficha: {
           onde: origem, tarefa: t, onAlternar: () => fonte.alternar(t.id), onSalvar: (c) => fonte.salvar(t.id, c), onApagar: () => fonte.apagar(t.id),
@@ -165,7 +166,7 @@ export const TasksWidget = () => {
     const aviso = avisoDaTarefa(t);
     const hora = horaDaTarefa(t);
     toast.success("Tarefa anotada", {
-      description: hora && aviso >= 0 && !avisoJaPassou(t.dia, hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}` : undefined,
+      description: hora && aviso >= 0 && !avisoJaPassou(diaDoAviso(t), hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}${t.prazo && t.prazo !== t.dia ? ` em ${diaCurto(t.prazo)}` : ""}` : undefined,
     });
   };
 

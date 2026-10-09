@@ -283,7 +283,7 @@ describe("widget Tarefas de hoje (Home)", () => {
     expect(salvas[0]).toMatchObject({ texto: "Enviar a proposta pro Duarte", feito: false, dia: HOJE, hora: "11:00", aviso: 15, detalhes: "Revisar o frete\nAnexar o catálogo" });
     expect(screen.getByTestId("tasks-widget")).toHaveTextContent("11:00");
     // o evento sai (mockado aqui — nunca pro banco de produção) com o que interessa medir
-    expect(trackEvent).toHaveBeenCalledWith("tarefa_criada", { lista: CHAVE_TAREFAS_ROTINA, hora: true, aviso: 15, detalhes: true });
+    expect(trackEvent).toHaveBeenCalledWith("tarefa_criada", { lista: CHAVE_TAREFAS_ROTINA, hora: true, aviso: 15, detalhes: true, prazo: false });
   });
 
   it("horário que já passou: avisa na hora de salvar que não vai tocar", () => {

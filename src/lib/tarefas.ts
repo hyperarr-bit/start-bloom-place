@@ -49,6 +49,17 @@ export type TarefaDoDia = {
   prioridade?: "alta";
   /** 08/10: checklist dentro da tarefa. Ausente/vazio = tarefa simples, como sempre. */
   subtarefas?: Subtarefa[];
+  /**
+   * 09/10 (chamado: "poderia ter um prazo pra terminar a tarefa, um campo com a
+   * data limite"): "YYYY-MM-DD" até quando ela precisa ser feita. Tarefa com prazo
+   * e pendente aparece TODO dia na lista de hoje até ser feita (sem a janela de 7
+   * dias do "Ficou de ontem"), com o selo "vence sexta" / "vence hoje" / "atrasada".
+   * Com horário, o aviso toca no DIA DO PRAZO (o mesmo aviso de tarefa, sem
+   * permissão nova). `dia` continua sendo o dia em que ela nasceu.
+   */
+  prazo?: string;
+  /** 09/10: "YYYY-MM-DD" em que foi marcada como feita — só pra a tarefa com prazo feita hoje ficar riscada no pé da lista até amanhã. */
+  feitoEm?: string;
 };
 
 export type Subtarefa = { id: string; texto: string; feito: boolean };
@@ -122,6 +133,68 @@ export const dataDeCriacao = (t: Parcial): string => {
   const c = t?.criadaEm;
   if (typeof c === "string" && /^\d{4}-\d{2}-\d{2}/.test(c)) return c.slice(0, 10);
   return (ehDia(t?.veioDe) ? t!.veioDe! : ehDia(t?.dia) ? t!.dia! : "");
+};
+
+/* ---------------------------------------------- 09/10: prazo (data limite) */
+
+/** O prazo legível ("YYYY-MM-DD") ou null — dado torto ou ausente é "sem prazo". */
+export const prazoDaTarefa = (t: Parcial): string | null => (ehDia(t?.prazo) ? (t!.prazo as string) : null);
+
+/** O dia a que o aviso se refere: o prazo, quando tem; senão o dia da tarefa. */
+export const diaDoAviso = (t: Parcial): string => prazoDaTarefa(t) ?? (ehDia(t?.dia) ? (t!.dia as string) : "");
+
+const DIA_DA_SEMANA_MIUDO = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const dataLocal = (dia: string) => { const [a, m, d] = dia.split("-").map(Number); return new Date(a, m - 1, d); };
+/** "07/10" */
+const ddmm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+/** Dias de diferença entre duas chaves "YYYY-MM-DD" (b − a), em dias de calendário. */
+const diasEntreDias = (a: string, b: string) => Math.round((dataLocal(b).getTime() - dataLocal(a).getTime()) / 86_400_000);
+
+export interface EstadoDoPrazo {
+  prazo: string;
+  /** o prazo já passou (e a tarefa segue pendente) */
+  atrasada: boolean;
+  /** vence hoje */
+  hoje: boolean;
+  /** negativo = dias de atraso */
+  dias: number;
+  /** o selo da linha: "atrasada", "vence hoje", "vence amanhã", "vence sexta", "vence 17/10" */
+  rotulo: string;
+  /** a frase da ficha: "Atrasada — venceu terça, 07/10", "Vence sexta, 10/10 (em 2 dias)" */
+  texto: string;
+}
+
+/**
+ * O que a linha e a ficha dizem do prazo. Tarefa FEITA não está atrasada (o
+ * selo some: `null`). Sem prazo: `null`.
+ */
+export const estadoDoPrazo = (t: Parcial, hoje: string): EstadoDoPrazo | null => {
+  const prazo = prazoDaTarefa(t);
+  if (!prazo || !ehDia(hoje) || t?.feito) return null;
+  const dias = diasEntreDias(hoje, prazo);
+  const nomeDia = DIA_DA_SEMANA_MIUDO[dataLocal(prazo).getDay()];
+  const quando = `${nomeDia}, ${ddmm(prazo)}`;
+  if (dias < 0) {
+    const n = -dias;
+    return { prazo, atrasada: true, hoje: false, dias, rotulo: "atrasada", texto: `Atrasada — venceu ${quando} (${n === 1 ? "ontem" : `há ${n} dias`})` };
+  }
+  if (dias === 0) return { prazo, atrasada: false, hoje: true, dias, rotulo: "vence hoje", texto: "Vence hoje" };
+  if (dias === 1) return { prazo, atrasada: false, hoje: false, dias, rotulo: "vence amanhã", texto: `Vence amanhã (${quando})` };
+  if (dias < 7) return { prazo, atrasada: false, hoje: false, dias, rotulo: `vence ${nomeDia}`, texto: `Vence ${quando} (em ${dias} dias)` };
+  return { prazo, atrasada: false, hoje: false, dias, rotulo: `vence ${ddmm(prazo)}`, texto: `Vence ${quando} (em ${dias} dias)` };
+};
+
+/**
+ * A tarefa entra na lista de HOJE? A de hoje, sempre (feita ou não — a feita
+ * fica riscada no pé). A de outro dia só se tem PRAZO e está pendente — ou foi
+ * feita hoje (fica riscada até amanhã). A pendente sem prazo de um dia que
+ * passou continua no "Ficou de ontem" (7 dias), como antes.
+ */
+export const apareceHoje = (t: Parcial, hoje: string): boolean => {
+  if (!t || !ehDia(t.dia)) return false;
+  if (t.dia === hoje) return true;
+  if (!prazoDaTarefa(t) || t.dia > hoje) return false;
+  return !t.feito || t.feitoEm === hoje;
 };
 
 /** Texto limpo e id novo pra cada linha digitada no formulário; linha vazia não vira subtarefa. */
@@ -228,13 +301,15 @@ export function tarefasAgendaveis(fontes: { chave: string; lista: unknown }[], h
   const out: TarefaAgendavel[] = [];
   for (const { chave, lista } of fontes) {
     for (const t of tarefasValidas(lista)) {
-      if (t.feito || t.dia < hoje) continue;
+      // 09/10: com prazo, o aviso é do DIA DO PRAZO (a tarefa nasceu antes e segue na lista até lá)
+      const dia = diaDoAviso(t);
+      if (t.feito || dia < hoje) continue;
       const aviso = avisoDaTarefa(t);
       if (aviso < 0) continue;
       out.push({
         id: String(t.id),
         texto: t.texto.trim(),
-        dia: t.dia,
+        dia,
         hora: horaDaTarefa(t) as string,
         aviso,
         detalhes: detalhesDaTarefa(t),

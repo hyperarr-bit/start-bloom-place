@@ -13,7 +13,7 @@
  * marcava a tarefa — com detalhes pra ler, o toque no texto tem que abrir.
  */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlarmClock, ArrowDown, ArrowUp, Bell, BellOff, CalendarDays, Check, ChevronRight, Flag, ListChecks, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { AlarmClock, ArrowDown, ArrowUp, Bell, BellOff, CalendarClock, CalendarDays, Check, ChevronRight, Flag, ListChecks, NotebookText, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -30,9 +30,9 @@ import {
   apagarTarefas, concluirNoDiaOriginal, restaurarTarefas, tarefasDosItens, trazerParaHoje, type ItemFicou,
 } from "@/lib/ficou-de-ontem";
 import {
-  AVISO_PADRAO_TAREFA, AVISOS_TAREFA, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, ehPrioridade, horaDaTarefa, horaDoAviso,
-  montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, progressoDasSubtarefas, resumoDosDetalhes, subtarefasDaTarefa,
-  textoDoAviso, type Subtarefa, type TarefaDoDia,
+  AVISO_PADRAO_TAREFA, AVISOS_TAREFA, apareceHoje, avisoDaTarefa, avisoJaPassou, dataDeCriacao, detalhesDaTarefa, diaDoAviso, ehPrioridade, estadoDoPrazo,
+  horaDaTarefa, horaDoAviso, montarSubtarefas, moverTarefaNoDia, normalizarHora, ordenarPorHora, posicaoNoDia, prazoDaTarefa, progressoDasSubtarefas,
+  resumoDosDetalhes, subtarefasDaTarefa, textoDoAviso, type EstadoDoPrazo, type Subtarefa, type TarefaDoDia,
 } from "@/lib/tarefas";
 import { COR_DO_DIA, DIAS_DA_SEMANA, Pautado, Quadradinho, textoDoDia } from "@/components/treino/planner";
 
@@ -52,14 +52,15 @@ const COLUNAS = "grid grid-cols-[3.4rem_minmax(0,1fr)_3rem]";
 
 /* ------------------------------------------------------- estado da lista */
 
-type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes" | "prioridade" | "subtarefas">;
+type CamposNovos = Pick<TarefaDoDia, "texto" | "hora" | "aviso" | "detalhes" | "prioridade" | "subtarefas" | "prazo">;
 
 /** Monta a tarefa só com o que existe — campo vazio não vira chave (tarefa sem hora fica igual às antigas). */
 const comCampos = <T extends { id: string; feito: boolean; dia: string }>(base: T, c: CamposNovos): TarefaDoDia => {
-  const { hora: _h, aviso: _a, detalhes: _d, texto: _t, prioridade: _p, subtarefas: _s, ...resto } = base as T & Partial<TarefaDoDia>;
+  const { hora: _h, aviso: _a, detalhes: _d, texto: _t, prioridade: _p, subtarefas: _s, prazo: _z, ...resto } = base as T & Partial<TarefaDoDia>;
   const hora = normalizarHora(c.hora);
   const detalhes = (c.detalhes ?? "").trim();
   const subtarefas = montarSubtarefas(c.subtarefas ?? []);
+  const prazo = prazoDaTarefa({ prazo: c.prazo });
   return {
     ...(resto as { id: string; feito: boolean; dia: string }),
     texto: c.texto.trim(),
@@ -67,6 +68,8 @@ const comCampos = <T extends { id: string; feito: boolean; dia: string }>(base: 
     ...(detalhes ? { detalhes } : {}),
     ...(c.prioridade === "alta" ? { prioridade: "alta" as const } : {}),
     ...(subtarefas.length ? { subtarefas } : {}),
+    // 09/10: prazo (data limite) — opcional; sem ele a tarefa é a de sempre
+    ...(prazo ? { prazo } : {}),
   };
 };
 
@@ -96,7 +99,7 @@ export function useTarefasDoDia(chave: string) {
     let nova: TarefaDoDia[] = [];
     setLista((prev) => (nova = [...(Array.isArray(prev) ? prev : []), t]));
     armar(nova, t);
-    trackEvent("tarefa_criada", { lista: chave, hora: !!t.hora, aviso: avisoDaTarefa(t), detalhes: !!t.detalhes });
+    trackEvent("tarefa_criada", { lista: chave, hora: !!t.hora, aviso: avisoDaTarefa(t), detalhes: !!t.detalhes, prazo: !!t.prazo });
     return t;
   };
 
@@ -106,10 +109,15 @@ export function useTarefasDoDia(chave: string) {
     setLista((prev) => (nova = (Array.isArray(prev) ? prev : []).map((x) => (x.id === id ? (t = comCampos(x, c)) : x))));
     if (!t) return;
     armar(nova, t);
-    trackEvent("tarefa_editada", { lista: chave, hora: !!(t as TarefaDoDia).hora, aviso: avisoDaTarefa(t), detalhes: !!(t as TarefaDoDia).detalhes });
+    trackEvent("tarefa_editada", { lista: chave, hora: !!(t as TarefaDoDia).hora, aviso: avisoDaTarefa(t), detalhes: !!(t as TarefaDoDia).detalhes, prazo: !!(t as TarefaDoDia).prazo });
   };
 
-  const alternar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).map((x) => (x.id === id ? { ...x, feito: !x.feito } : x)));
+  // 09/10: marcar grava `feitoEm` (a tarefa com prazo feita hoje fica riscada no pé até amanhã); desmarcar tira o campo
+  const alternar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).map((x) => {
+    if (x.id !== id) return x;
+    if (x.feito) { const { feitoEm: _f, ...semFeitoEm } = x; return { ...semFeitoEm, feito: false }; }
+    return { ...x, feito: true, feitoEm: localDayKey() };
+  }));
   const apagar = (id: string) => setLista((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== id));
 
   /* 08/10: checklist e ordem. Marcar um passo da checklist só muda o dado (sem reagendar: o
@@ -130,7 +138,7 @@ export function useTarefasDoDia(chave: string) {
    * permissão: quem decide isso é quem cria a tarefa com horário).
    */
   const rearmar = (nova: TarefaDoDia[]) => {
-    if (nova.some((t) => t.dia >= localDayKey() && avisoDaTarefa(t) >= 0)) void armarAvisos(get, { [chave]: nova }, false, { nome: "tarefa_permissao", total: nova.length });
+    if (nova.some((t) => diaDoAviso(t) >= localDayKey() && avisoDaTarefa(t) >= 0)) void armarAvisos(get, { [chave]: nova }, false, { nome: "tarefa_permissao", total: nova.length });
   };
   const aplicar = (muda: (prev: unknown) => TarefaDoDia[], itens: ItemFicou[]): TarefaDoDia[] => {
     const antes = tarefasDosItens(atual, itens);
@@ -184,12 +192,32 @@ export interface LinhaVisivel {
   prioridade?: boolean;
   /** 08/10: progresso da checklist ("2/3"), quando tem subtarefas */
   checklist?: { feitas: number; total: number };
+  /** 09/10: o selo do prazo ("vence sexta", "vence hoje", "atrasada") — null/ausente = sem prazo ou feita */
+  prazo?: EstadoDoPrazo | null;
+}
+
+/** O selo do prazo: vermelho atrasada, âmbar vence hoje, discreto nos outros dias. */
+export function SeloDoPrazo({ prazo, className }: { prazo: EstadoDoPrazo; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-0.5 shrink-0 rounded px-1 font-semibold",
+        prazo.atrasada ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" : prazo.hoje ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" : "text-muted-foreground",
+        className,
+      )}
+      data-testid="prazo-da-linha"
+      data-atrasada={prazo.atrasada || undefined}
+    >
+      <CalendarClock className="w-3 h-3" aria-hidden="true" /> {prazo.rotulo}
+    </span>
+  );
 }
 
 export function LinhaDeTarefa({ l, tom, primeira }: { l: LinhaVisivel; tom: TomDaTabela; primeira?: boolean }) {
   const aviso = l.hora ? l.aviso ?? -1 : -1;
   const meta = [l.origem, l.detalhe].filter(Boolean).join(" · ");
   const checklist = l.checklist && l.checklist.total > 0 ? l.checklist : null;
+  const prazo = !l.feito && l.prazo ? l.prazo : null;
   return (
     <div className={cn(COLUNAS, "min-h-[52px]", !primeira && cn("border-t", tom.linha))} data-testid="linha-tarefa">
       <div
@@ -206,20 +234,23 @@ export function LinhaDeTarefa({ l, tom, primeira }: { l: LinhaVisivel; tom: TomD
           {l.prioridade && !l.feito && <Flag className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400 fill-amber-500/30" aria-label="Prioridade" data-testid="prioridade-da-linha" />}
           <span className="truncate">{l.texto}</span>
         </span>
-        {(meta || (aviso >= 0 && !l.feito) || checklist) && (
+        {(meta || (aviso >= 0 && !l.feito) || checklist || prazo) && (
           <span className="mt-0.5 flex items-center gap-x-1.5 text-[11.5px] text-muted-foreground min-w-0">
+            {/* 09/10: o prazo vem primeiro — é o que decide o que fazer antes */}
+            {prazo && <SeloDoPrazo prazo={prazo} />}
             {aviso >= 0 && !l.feito && (
               <span className="inline-flex items-center gap-0.5 shrink-0 text-sky-700 dark:text-sky-300" data-testid="aviso-da-linha">
+                {prazo && <span aria-hidden="true" className="mr-1">·</span>}
                 <Bell className="w-3 h-3" aria-hidden="true" /> {rotuloAviso(aviso)}
               </span>
             )}
             {checklist && (
               <span className="inline-flex items-center gap-0.5 shrink-0 tabular-nums" data-testid="checklist-da-linha">
-                {aviso >= 0 && !l.feito && <span aria-hidden="true" className="mr-1">·</span>}
+                {(prazo || (aviso >= 0 && !l.feito)) && <span aria-hidden="true" className="mr-1">·</span>}
                 <ListChecks className="w-3 h-3" aria-hidden="true" /> {checklist.feitas}/{checklist.total}
               </span>
             )}
-            {((aviso >= 0 && !l.feito) || checklist) && meta && <span aria-hidden="true">·</span>}
+            {(prazo || (aviso >= 0 && !l.feito) || checklist) && meta && <span aria-hidden="true">·</span>}
             {meta && <span className="truncate">{meta}</span>}
           </span>
         )}
@@ -287,22 +318,30 @@ export function FormTarefa({
     setSubtarefas((prev) => [...prev, s]);
     setNovoPasso("");
   };
+  // 09/10: prazo (data limite), opcional
+  const [prazo, setPrazo] = useState(prazoDaTarefa({ prazo: inicial?.prazo }) ?? "");
 
   const hoje = localDayKey();
-  const passou = !!hora && avisoJaPassou(hoje, hora, aviso);
+  const estadoPrazo = prazo ? estadoDoPrazo({ prazo, feito: false }, hoje) : null;
+  // com prazo, o aviso é do dia do prazo (a tarefa segue na lista até lá)
+  const diaDoToque = prazo || hoje;
+  const passou = !!hora && avisoJaPassou(diaDoToque, hora, aviso);
+  const quandoToca = prazo && prazo !== hoje ? `${estadoPrazo?.rotulo.replace(/^vence /, "") ?? diaCurto(prazo)} às ${horaDoAviso(hora, aviso)}` : `às ${horaDoAviso(hora, aviso)}`;
   const dica = !hora
-    ? "Sem horário, ela fica na lista do dia, sem aviso."
+    ? prazo
+      ? "Sem horário, ela fica na lista todo dia até o prazo, sem aviso."
+      : "Sem horário, ela fica na lista do dia, sem aviso."
     : aviso < 0
       ? "Sem aviso: o horário fica só anotado."
       : passou
-        ? "Esse horário já passou hoje. A tarefa fica anotada, sem aviso."
-        : `O aviso toca às ${horaDoAviso(hora, aviso)}.`;
+        ? prazo && prazo !== hoje ? "Esse horário já passou no dia do prazo. A tarefa fica anotada, sem aviso." : "Esse horário já passou hoje. A tarefa fica anotada, sem aviso."
+        : `O aviso toca ${quandoToca}.`;
 
   const salvar = () => {
     if (!texto.trim()) { toast.error("Escreve o que precisa fazer"); return; }
     // um passo digitado e não "adicionado" não se perde no Salvar
     const subs = montarSubtarefas([...subtarefas, novoPasso]);
-    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes, prioridade: prioridade ? "alta" : undefined, subtarefas: subs });
+    onSalvar({ texto, hora: hora || undefined, aviso: hora ? aviso : undefined, detalhes, prioridade: prioridade ? "alta" : undefined, subtarefas: subs, prazo: prazo || undefined });
   };
 
   return (
@@ -362,6 +401,36 @@ export function FormTarefa({
         {hora && aviso >= 0 && !passou && !isNativeShell() && (
           <p className="mt-0.5 text-[11.5px] text-muted-foreground" data-testid="aviso-so-no-app">No site o aviso não toca — ele toca no app do celular.</p>
         )}
+      </div>
+
+      {/* 09/10 — chamado: "poderia ter um prazo pra terminar a tarefa, um campo com a data limite" */}
+      <div>
+        <label className="block rounded-xl border border-border px-3 pt-2 pb-1.5" data-testid="form-prazo">
+          <span className={cn(ROTULO, "inline-flex items-center gap-1")}><CalendarClock className="w-3 h-3" aria-hidden="true" /> PRAZO</span>
+          <span className="flex items-center gap-2">
+            <input
+              type="date"
+              value={prazo}
+              min={hoje}
+              onChange={(e) => setPrazo(prazoDaTarefa({ prazo: e.target.value }) ?? "")}
+              aria-label="Prazo da tarefa"
+              className={cn("h-9 min-w-0 flex-1 bg-transparent outline-none text-[15px] font-bold tabular-nums", prazo ? "text-foreground" : "text-muted-foreground")}
+            />
+            {estadoPrazo ? (
+              <SeloDoPrazo prazo={estadoPrazo} className="text-[11.5px]" />
+            ) : (
+              <span className="text-[12px] text-muted-foreground shrink-0">sem prazo</span>
+            )}
+            {prazo && (
+              <button type="button" onClick={() => setPrazo("")} aria-label="Tirar o prazo" className="w-7 h-7 shrink-0 grid place-items-center rounded-full text-muted-foreground hover:bg-muted">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </span>
+        </label>
+        <p className="mt-1.5 text-[11.5px] text-muted-foreground" data-testid="dica-do-prazo">
+          {prazo ? "Ela aparece todo dia na lista até ser feita; passado o prazo, fica em vermelho." : "Com prazo, a tarefa continua na lista todo dia até ser feita."}
+        </p>
       </div>
 
       {/* 08/10 — chamados: "elencar o que fazer primeiro" e checklist dentro da tarefa */}
@@ -500,10 +569,13 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
   const aviso = avisoDaTarefa(t);
   const detalhes = detalhesDaTarefa(t);
   const hoje = localDayKey();
-  const passou = !!hora && !ficha?.feito && avisoJaPassou(t?.dia ?? hoje, hora, Math.max(0, aviso));
+  const passou = !!hora && !ficha?.feito && avisoJaPassou(t ? diaDoAviso(t) || hoje : hoje, hora, Math.max(0, aviso));
   const criada = t ? dataDeCriacao(t) : "";
   const subtarefas = subtarefasDaTarefa(t);
   const prioridade = ehPrioridade(t);
+  // 09/10: prazo — e a tarefa com prazo que nasceu outro dia é "de hoje" por estar na lista, não pelo `dia`
+  const prazo = t ? estadoDoPrazo({ ...t, feito: !!ficha?.feito }, hoje) : null;
+  const diaDaFaixa = t && t.dia !== hoje && prazoDaTarefa(t) ? hoje : (t?.dia ?? hoje);
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
@@ -511,14 +583,14 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
         {ficha && (
           <>
             <FaixaDaFolha
-              titulo={`${nomeDoDiaDeHoje()} · ${diaCurto(t?.dia ?? hoje)}`}
-              sub={editando ? "Editando a tarefa" : `Tarefa de hoje · ${ficha.onde}`}
+              titulo={`${nomeDoDiaDeHoje()} · ${diaCurto(diaDaFaixa)}`}
+              sub={editando ? "Editando a tarefa" : `${prazoDaTarefa(t) ? "Tarefa com prazo" : "Tarefa de hoje"} · ${ficha.onde}`}
               onFechar={onFechar}
             />
             <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]">
               {editando && ficha.onSalvar ? (
                 <FormTarefa
-                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas }}
+                  inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas, prazo: prazoDaTarefa(t) ?? undefined }}
                   rotuloSalvar="Salvar alterações"
                   onSalvar={(c) => { ficha.onSalvar?.(c); setEditando(false); }}
                 />
@@ -538,10 +610,19 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
                       {hora && (
                         <p className={cn("mt-1 text-[12.5px] inline-flex items-center gap-1", passou ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground")} data-testid="ficha-aviso">
                           {aviso < 0 ? <BellOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Bell className="w-3.5 h-3.5" aria-hidden="true" />}
-                          {ficha.feito ? "Feita — o aviso não vem mais" : passou ? "O horário já passou" : textoDoAviso(hora, aviso)}
+                          {ficha.feito ? "Feita — o aviso não vem mais" : passou ? "O horário já passou" : `${textoDoAviso(hora, aviso)}${prazo && !prazo.hoje && aviso >= 0 ? `, ${prazo.rotulo.replace(/^vence /, "")}` : ""}`}
                         </p>
                       )}
                       {ficha.feito && !hora && <p className="mt-1 text-[12.5px] text-muted-foreground">Feita ✓</p>}
+                      {/* 09/10: o prazo, por extenso — vermelho quando passou */}
+                      {prazo && (
+                        <p
+                          className={cn("mt-1 text-[12.5px] font-semibold inline-flex items-center gap-1", prazo.atrasada ? "text-red-700 dark:text-red-300" : prazo.hoje ? "text-amber-700 dark:text-amber-300" : "text-foreground/80")}
+                          data-testid="ficha-prazo"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" aria-hidden="true" /> {prazo.texto}
+                        </p>
+                      )}
                       {/* 08/10: "nas tarefas não tem a data que coloquei no sistema, importante pra prazos" */}
                       {criada && (
                         <p className="mt-1 text-[12.5px] text-muted-foreground inline-flex items-center gap-1" data-testid="ficha-criada">
@@ -698,7 +779,8 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
   const [criando, setCriando] = useState(false);
   const [aberta, setAberta] = useState<string | null>(null);
   const hoje = localDayKey();
-  const tarefasHoje = tarefas.lista.filter((t) => t.dia === hoje);
+  // 09/10: as de hoje + as com PRAZO ainda pendentes (ficam na lista todo dia até serem feitas)
+  const tarefasHoje = tarefas.lista.filter((t) => apareceHoje(t, hoje));
   const feitasHoje = tarefasHoje.filter((t) => t.feito).length;
   const addTarefa = () => {
     if (!novaTarefa.trim()) return;
@@ -743,7 +825,7 @@ export function ListaTarefasDeHoje({ tarefas, placeholder = "Nova tarefa...", on
                     l={{
                       key: t.id, texto: t.texto, feito: !!t.feito, hora: t.hora, aviso: avisoDaTarefa(t), detalhes: detalhesDaTarefa(t),
                       detalhe: t.veioDe ? `veio de ${diaCurto(t.veioDe)}` : undefined,
-                      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t),
+                      prioridade: ehPrioridade(t), checklist: progressoDasSubtarefas(t), prazo: estadoDoPrazo(t, hoje),
                       onAlternar: () => tarefas.alternar(t.id), onAbrir: () => setAberta(t.id),
                     }}
                   />

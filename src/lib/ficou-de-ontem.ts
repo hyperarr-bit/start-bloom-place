@@ -1,5 +1,5 @@
 import { somarDias } from "@/lib/sequencia";
-import { horaDaTarefa, ordenarPorHora, tarefasValidas, type TarefaDoDia } from "@/lib/tarefas";
+import { horaDaTarefa, ordenarPorHora, prazoDaTarefa, tarefasValidas, type TarefaDoDia } from "@/lib/tarefas";
 
 /**
  * "FICOU DE ONTEM" (02/10) — dois chamados: "quando a tarefa não for concluída,
@@ -74,6 +74,8 @@ export function tarefasQueFicaram(fontes: { chave: string; lista: unknown }[], h
   for (const { chave, lista } of fontes) {
     for (const t of tarefasValidas(lista)) {
       if (t.feito) continue;
+      // 09/10: tarefa com PRAZO já está na lista de hoje todo dia (apareceHoje) — não é "ficou de ontem"
+      if (prazoDaTarefa(t)) continue;
       const atras = diasEntre(t.dia, hoje);
       if (atras === 0) continue; // hoje, futuro ou mais velho que a janela
       const a = assinatura(t);

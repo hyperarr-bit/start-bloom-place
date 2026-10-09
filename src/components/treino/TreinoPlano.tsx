@@ -20,7 +20,7 @@
  * aberto, texto digitado).
  */
 import { Fragment, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Minus, Plus, Target, Timer, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Minus, Plus, RotateCcw, Target, Timer, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,8 @@ export interface AcoesDoPlano {
   meta: (n: number) => void;
   descanso: (segundos: number) => void;
   som: (ligado: boolean) => void;
+  /** 09/10: zera grupos, exercícios e dias de treino dos 7 dias (histórico e recordes ficam) */
+  recomecar: () => void;
 }
 
 export interface PropsDoPlano {
@@ -683,6 +685,63 @@ function ModelosProntos({ vazio, acoes }: { vazio: boolean; acoes: AcoesDoPlano 
   );
 }
 
+/* ---------------- 5. recomeçar (09/10) ---------------- */
+
+/**
+ * "Como posso resetar o plano de treino?" (chamado, 09/10). Antes só dava
+ * apagando exercício por exercício ou trocando por um modelo. Um botão no fim
+ * do PLANO, com a confirmação escrita por extenso (o que sai, o que fica) e
+ * Desfazer no toast. Só aparece quando há plano: zerar o vazio não faz sentido.
+ */
+function RecomecarPlano({ acoes }: { acoes: AcoesDoPlano }) {
+  const [confirmando, setConfirmando] = useState(false);
+  return (
+    <section className="rounded-2xl border border-border overflow-hidden bg-card" data-testid="plano-recomecar">
+      {confirmando ? (
+        <div className="px-4 py-3.5 space-y-3 bg-red-50 dark:bg-red-500/10" role="alertdialog" aria-labelledby="recomecar-titulo">
+          <div>
+            <p id="recomecar-titulo" className="text-[14px] font-bold text-red-900 dark:text-red-200">Recomeçar o plano do zero?</p>
+            <p className="mt-1 text-[12.5px] leading-snug text-red-900/90 dark:text-red-200/90">
+              Apaga os grupos e os exercícios dos 7 dias e desliga os dias de treino — a semana volta vazia, pra montar de novo ou escolher um modelo.
+              <span className="block mt-1 font-semibold">Seu histórico, a evolução e os recordes continuam.</span>
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              className="flex-1 h-11 rounded-lg border border-border bg-card text-[13.5px] font-bold active:scale-95 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => { acoes.recomecar(); setConfirmando(false); }}
+              className="flex-1 h-11 rounded-lg bg-red-600 text-white text-[13.5px] font-bold active:scale-95 transition"
+              data-testid="recomecar-confirmar"
+            >
+              Apagar e recomeçar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          className="w-full px-4 min-h-[56px] flex items-center gap-3 text-left active:bg-muted/40 transition-colors"
+          data-testid="recomecar-plano"
+        >
+          <RotateCcw className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13.5px] font-bold">Recomeçar plano do zero</span>
+            <span className="block text-[11.5px] text-muted-foreground leading-snug">Apaga os exercícios da semana; seu histórico e recordes continuam</span>
+          </span>
+        </button>
+      )}
+    </section>
+  );
+}
+
 export function TreinoPlano(p: PropsDoPlano) {
   const pd = p.plano[p.dia] ?? { muscles: [], exercises: [] };
   return (
@@ -697,6 +756,7 @@ export function TreinoPlano(p: PropsDoPlano) {
       <CartaoDoDia key={p.dia} dia={p.dia} hojeNome={p.hojeNome} pd={pd} ativo={p.diasAtivos.includes(p.dia)} acoes={p.acoes} />
       <DescansoEntreSeries descanso={p.descanso} som={p.som} acoes={p.acoes} />
       {!p.vazio && <ModelosProntos vazio={false} acoes={p.acoes} />}
+      {!p.vazio && <RecomecarPlano acoes={p.acoes} />}
     </div>
   );
 }

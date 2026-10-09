@@ -78,7 +78,7 @@ import {
 import { cargaPorExercicio, recordesDoMes, resumoDaSemana } from "@/lib/treino-evolucao";
 import { TreinoHoje, type AcoesDoHoje } from "@/components/treino/TreinoHoje";
 import { RodapeDoTreino, type EstadoDoRodape } from "@/components/treino/RodapeDoTreino";
-import { TreinoSemana, linhasDaSemana } from "@/components/treino/TreinoSemana";
+import { TreinoSemana, linhasDaSemana, rotuloDoDiaDaSemana } from "@/components/treino/TreinoSemana";
 import { ConstanciaTreino } from "@/components/treino/ConstanciaTreino";
 import { TreinoEvolucao, type RecordeAnotado } from "@/components/treino/TreinoEvolucao";
 import { TreinoConcluido, type ResumoDoTreino } from "@/components/treino/TreinoConcluido";
@@ -571,39 +571,50 @@ const Treino = () => {
     setDiaEsquecido(null);
   };
 
-  /* ---------------- DESMARCAR o treino de hoje (07/10) ----------------
-   * O dia entra no registro por Concluir ou pelo atalho da Home (sem sessão
-   * nenhuma); antes só o widget da Home tirava. Tira registro, volume, carimbo,
-   * histórico do dia, a sessão e os ✓ do plano de hoje — com Desfazer. */
-  const desmarcarHoje = () => {
-    const data = sessao.data;
+  /* ---------------- DESMARCAR o treino de um dia (07/10 hoje; 09/10 qualquer dia) ----------------
+   * O dia entra no registro por Concluir, pelo atalho da Home (sem sessão
+   * nenhuma) ou pelo "esqueci de marcar"; antes só o widget da Home tirava, e
+   * depois só o de HOJE (faixa do HOJE). Chamado de 09/10: "tentei desmarcar o
+   * treino do dia 07/10 e não consegui". Agora a SEMANA desmarca qualquer dia já
+   * passado pela mesma função: registro, volume, carimbo e histórico do dia; se
+   * for hoje, também a sessão e os ✓ do plano — com Desfazer. Dia passado roda
+   * no escopo do dia (marcarOutroDia com `false`): desmarcar não anota hoje na sequência. */
+  const desmarcarDia = (data: string, rotulo?: string) => {
+    const ehHoje = data === today;
     const antes = {
       historico: exerciseHistory, log: workoutLog, volume: weeklyVolume, sessoes: sessoesMeta, sessao: sessaoSalva, plano: workoutPlan,
     };
     const r = tirarTreinoDoDia({ dia: data, historico: exerciseHistory, log: workoutLog, volume: weeklyVolume, sessoes: sessoesMeta });
-    setExerciseHistory(r.historico);
-    setWorkoutLog(r.log);
-    setWeeklyVolume(r.volume);
-    setSessoesMeta(r.sessoes);
-    setSessaoSalva(null);
-    setDescansoAte(null);
-    if (checksValem) {
-      setWorkoutPlan((prev) => {
-        const d0 = prev[todayDayName];
-        if (!d0?.exercises?.some((e) => e.done)) return prev;
-        return { ...prev, [todayDayName]: { ...d0, exercises: d0.exercises.map((e) => (e.done ? { ...e, done: false } : e)) } };
-      });
+    marcarOutroDia("treino", data, false, () => {
+      setExerciseHistory(r.historico);
+      setWorkoutLog(r.log);
+      setWeeklyVolume(r.volume);
+      setSessoesMeta(r.sessoes);
+    });
+    if (ehHoje) {
+      setSessaoSalva(null);
+      setDescansoAte(null);
+      if (checksValem) {
+        setWorkoutPlan((prev) => {
+          const d0 = prev[todayDayName];
+          if (!d0?.exercises?.some((e) => e.done)) return prev;
+          return { ...prev, [todayDayName]: { ...d0, exercises: d0.exercises.map((e) => (e.done ? { ...e, done: false } : e)) } };
+        });
+      }
     }
-    trackEvent("treino_desmarcado", { de_sessao: concluido });
-    avisarApagado("Treino de hoje desmarcado", () => {
+    trackEvent("treino_desmarcado", { de_sessao: ehHoje && concluido, hoje: ehHoje });
+    avisarApagado(ehHoje ? "Treino de hoje desmarcado" : `Treino de ${rotulo ?? data} desmarcado`, () => {
       setExerciseHistory(antes.historico);
       setWorkoutLog(antes.log);
       setWeeklyVolume(antes.volume);
       setSessoesMeta(antes.sessoes);
-      setSessaoSalva(antes.sessao);
-      setWorkoutPlan(() => antes.plano);
+      if (ehHoje) {
+        setSessaoSalva(antes.sessao);
+        setWorkoutPlan(() => antes.plano);
+      }
     });
   };
+  const desmarcarHoje = () => desmarcarDia(sessao.data);
 
   /* ---------------- semana, constância, evolução ---------------- */
   const { semanas, sequencia } = useMemo(() => semanasNaMeta(log, meta, hojeData), [log, meta, hojeData]);
@@ -727,6 +738,26 @@ const Treino = () => {
     meta: (n) => setMetaSalva(n),
     descanso: (s) => setRestTime(s),
     som: (v) => setSoundEnabled(v),
+    // RECOMEÇAR DO ZERO (09/10, chamado: "como posso resetar o plano de treino?").
+    // Zera só o PLANO (`saude-workouts-v2`: grupos e exercícios dos 7 dias) e os
+    // dias de treino; histórico, volume, recordes, registro e sessões ficam. A
+    // sessão de hoje em andamento sai (as séries dela eram dos exercícios que
+    // saíram); um treino já concluído hoje não é mexido. Com Desfazer.
+    recomecar: () => {
+      const planoAntes = workoutPlan;
+      const diasAntes = activeDays;
+      const sessaoAntes = sessaoSalva;
+      setWorkoutPlan(() => Object.fromEntries(DIAS.map((d) => [d, { muscles: [], exercises: [] }])) as WorkoutPlan);
+      setActiveDays([]);
+      if (sessaoOk && !concluido) setSessaoSalva(null);
+      setDiaDoPlano(todayDayName);
+      trackEvent("treino_plano_zerado", { dias: diasAntes.length });
+      avisarApagado("Plano de treino zerado", () => {
+        setWorkoutPlan(() => planoAntes);
+        setActiveDays(diasAntes);
+        if (sessaoOk && !concluido) setSessaoSalva(sessaoAntes);
+      });
+    },
   };
 
   const [alturaRodape, setAlturaRodape] = useState(0);
@@ -855,7 +886,7 @@ const Treino = () => {
         )}
 
         {activeTab === "semana" && (
-          <TreinoSemana linhas={linhas} onAbrirDia={abrirNoPlano}>
+          <TreinoSemana linhas={linhas} onAbrirDia={abrirNoPlano} hoje={today} onDesmarcar={(data, dia) => desmarcarDia(data, rotuloDoDiaDaSemana(dia, data))}>
             <ConstanciaTreino
               meta={meta}
               onMeta={(n) => setMetaSalva(n)}

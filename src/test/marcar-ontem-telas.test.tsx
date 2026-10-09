@@ -179,7 +179,8 @@ describe("Treino: marcar o treino de ontem", () => {
     expect(eventos).toContainEqual(["marcou_ontem", { modulo: "treino", dias_atras: 2 }]);
     fireEvent.click(screen.getByTestId("aba-semana"));
     const quarta = within(screen.getByTestId("treino-semana")).getByText("Costas").closest("tr") as HTMLElement;
-    expect(within(quarta).getByRole("img", { hidden: true })).toBeTruthy();
+    // 09/10: o ✓ de um dia feito virou botão (desmarcar o dia pela SEMANA)
+    expect(within(quarta).getByRole("button", { name: /Desmarcar o treino de quarta/ })).toBeTruthy();
     expect(screen.getByTestId("treino-semana")).toHaveTextContent("1 de 3 feito");
   });
 

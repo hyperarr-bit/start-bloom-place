@@ -133,7 +133,8 @@ describe("Treino — o ciclo inteiro, fechando e reabrindo", () => {
     expect(screen.getByRole("button", { name: "Ver resumo" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /SEMANA/ }));
     const sabado = screen.getByTestId("semana-SÁBADO");
-    expect(within(sabado).getByRole("img", { name: "feito" })).toBeInTheDocument();
+    // 09/10: o ✓ de um dia feito virou botão (desmarcar o dia pela SEMANA)
+    expect(within(sabado).getByRole("button", { name: "Desmarcar o treino de sábado, 26/09" })).toBeInTheDocument();
     expect(sabado).toHaveTextContent("1.575 kg");
     expect(screen.getByTestId("dia-2026-09-26")).toHaveTextContent("💪");
     fireEvent.click(screen.getByRole("button", { name: /EVOLUÇÃO/ }));

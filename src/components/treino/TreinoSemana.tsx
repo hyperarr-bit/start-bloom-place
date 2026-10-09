@@ -3,8 +3,15 @@
  * FEITO, a barrinha na cor do dia, descanso esmaecido, hoje destacado. O FEITO
  * vem do registro de treinos (a data daquele dia nesta semana), não do ✓ do
  * plano. Tocar num dia abre esse dia no 📋 PLANO (27/09: o plano só se edita lá).
+ *
+ * 09/10 (chamado: "tentei desmarcar o treino do dia 07/10 e não consegui; o de
+ * hoje deu certo"): o ✓ da coluna FEITO de um dia já treinado (hoje ou passado)
+ * agora é um botão — toca, a tabela pergunta "Desmarcar o treino de terça,
+ * 07/10?" no pé, e confirmar tira o dia pela MESMA função do Desmarcar de hoje
+ * (registro, volume, carimbo e histórico), com Desfazer. Dia futuro e dia sem
+ * treino continuam só leitura.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn, localDayKey } from "@/lib/utils";
 import { lerNumero } from "@/lib/treino-numeros";
 import { formatarKgInteiro, type ExercicioDoPlano } from "@/lib/treino-series";
@@ -79,9 +86,30 @@ export const linhasDaSemana = ({
   });
 };
 
-export function TreinoSemana({ linhas, onAbrirDia, children }: { linhas: LinhaDaSemana[]; onAbrirDia: (dia: string) => void; children?: ReactNode }) {
+/** "terça, 07/10" — como a pergunta e o Desfazer chamam o dia. */
+export const rotuloDoDiaDaSemana = (dia: string, data: string) => `${dia.toLowerCase()}, ${data.slice(8, 10)}/${data.slice(5, 7)}`;
+
+export function TreinoSemana({ linhas, onAbrirDia, onDesmarcar, hoje, children }: {
+  linhas: LinhaDaSemana[];
+  onAbrirDia: (dia: string) => void;
+  /** 09/10: tira o treino daquela data (hoje ou passado); sem ele o ✓ é só leitura */
+  onDesmarcar?: (data: string, dia: string) => void;
+  /** "YYYY-MM-DD" de hoje — só até ele dá pra desmarcar */
+  hoje?: string;
+  children?: ReactNode;
+}) {
   const planejados = linhas.filter((l) => !l.descanso && !l.extra).length;
   const feitos = linhas.filter((l) => l.treinou).length;
+  const [confirmando, setConfirmando] = useState<LinhaDaSemana | null>(null);
+  const hojeKey = hoje ?? localDayKey();
+  const podeDesmarcar = (l: LinhaDaSemana) => !!onDesmarcar && l.treinou && l.data <= hojeKey;
+  // se o dia deixou de estar treinado por fora (Desfazer, outra aba), a pergunta cai sozinha
+  const pendente = confirmando && linhas.some((l) => l.data === confirmando.data && l.treinou) ? confirmando : null;
+  const confirmar = () => {
+    if (!pendente) return;
+    onDesmarcar?.(pendente.data, pendente.dia);
+    setConfirmando(null);
+  };
   return (
     <div className="space-y-3.5" data-testid="treino-semana">
       <div className="rounded-2xl border border-blue-100 overflow-hidden bg-card">
@@ -136,7 +164,11 @@ export function TreinoSemana({ linhas, onAbrirDia, children }: { linhas: LinhaDa
                       </>
                     )}
                   </td>
-                  <td className={cn(b, "text-center")}>
+                  <td
+                    className={cn(b, "text-center", pendente?.data === l.data && "bg-red-50 dark:bg-red-500/10")}
+                    // o ✓ que desmarca não pode abrir o dia no PLANO (o toque na linha faz isso)
+                    onClick={(e) => { if (podeDesmarcar(l)) e.stopPropagation(); }}
+                  >
                     {l.descanso && !l.treinou ? (
                       <span className="text-muted-foreground" aria-label="descanso">—</span>
                     ) : (
@@ -144,7 +176,9 @@ export function TreinoSemana({ linhas, onAbrirDia, children }: { linhas: LinhaDa
                         marcado={l.treinou}
                         parcial={l.emAndamento}
                         tom={tom}
-                        rotulo={l.treinou ? "feito" : l.emAndamento ? "em andamento" : "não feito"}
+                        rotulo={podeDesmarcar(l) ? `Desmarcar o treino de ${rotuloDoDiaDaSemana(l.dia, l.data)}` : l.treinou ? "feito" : l.emAndamento ? "em andamento" : "não feito"}
+                        onClick={podeDesmarcar(l) ? () => setConfirmando((c) => (c?.data === l.data ? null : l)) : undefined}
+                        testId={podeDesmarcar(l) ? `desmarcar-${l.dia}` : undefined}
                         className="mx-auto"
                       />
                     )}
@@ -154,7 +188,35 @@ export function TreinoSemana({ linhas, onAbrirDia, children }: { linhas: LinhaDa
             })}
           </tbody>
         </table>
-        <p className="px-4 py-2.5 border-t border-blue-100 text-[11.5px] text-muted-foreground">Toque num dia pra montar ou mudar o treino dele no 📋 PLANO.</p>
+        {pendente ? (
+          <div className="px-4 py-3 border-t border-red-200 bg-red-50 dark:bg-red-500/10 space-y-2.5" data-testid="confirmar-desmarcar" role="alertdialog" aria-labelledby="pergunta-desmarcar">
+            <p id="pergunta-desmarcar" className="text-[13.5px] font-bold text-red-900 dark:text-red-200 leading-snug">
+              Desmarcar o treino de {rotuloDoDiaDaSemana(pendente.dia, pendente.data)}?
+              <span className="block mt-0.5 text-[11.5px] font-medium text-red-900/80 dark:text-red-200/80">Sai do registro, do volume e do histórico desse dia. Dá pra desfazer.</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmando(null)}
+                className="flex-1 h-10 rounded-lg border border-border bg-card text-[13px] font-bold active:scale-95 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmar}
+                className="flex-1 h-10 rounded-lg bg-red-600 text-white text-[13px] font-bold active:scale-95 transition"
+                data-testid="desmarcar-confirmar"
+              >
+                Desmarcar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="px-4 py-2.5 border-t border-blue-100 text-[11.5px] text-muted-foreground">
+            Toque num dia pra montar ou mudar o treino dele no 📋 PLANO.{onDesmarcar ? " Marcou sem querer? Toque no ✓ do dia." : ""}
+          </p>
+        )}
       </div>
       {children}
     </div>

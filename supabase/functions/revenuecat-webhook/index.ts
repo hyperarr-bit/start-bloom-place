@@ -20,6 +20,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { aplicarDecisao, classificarEvento, type EventoRC, type Venda } from "../_shared/afiliados.ts";
 
 const log = (step: string, d?: unknown) =>
   console.log(`[RC-WEBHOOK] ${step}${d ? ` - ${JSON.stringify(d)}` : ""}`);
@@ -50,6 +51,16 @@ serve(async (req) => {
     // TEST envia app_user_id fictício — responde 200 pro painel ficar verde.
     if (ev.type === "TEST") return json({ received: true, test: true });
 
+    // PROGRAMA DE AFILIADOS (09/10): ANTES do filtro de anônimo, porque a
+    // compra na App Store acontece antes da conta CORE existir — o evento do
+    // teste chega com $RCAnonymousID e ainda assim é uma venda da afiliada.
+    // Nunca derruba o webhook: falha aqui vira log, e o acesso do cliente
+    // (reconciliação abaixo) não depende disto.
+    const afiliada = await registrarVendaAfiliada(admin, ev as EventoRC).catch((e) => {
+      log("afiliados ERRO", { msg: String(e).slice(0, 160) });
+      return null;
+    });
+
     // Candidatos: o id atual e os aliases (a pessoa pode ter comprado antes
     // do logIn e o RevenueCat mesclou os perfis).
     const candidatos: string[] = [ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? [])]
@@ -60,7 +71,7 @@ serve(async (req) => {
       // a quem dar acesso — o revenuecat-sync resolve quando a pessoa abrir
       // o app logada (o RevenueCat mescla os perfis no logIn).
       log("sem user_id utilizável", { app_user_id: String(ev.app_user_id ?? "").slice(0, 24) });
-      return json({ received: true, ignored: "anonimo" });
+      return json({ received: true, ignored: "anonimo", afiliada });
     }
 
     const resultados: unknown[] = [];
@@ -76,7 +87,7 @@ serve(async (req) => {
       if (ev.type === "BILLING_ISSUE" && ev.store === "APP_STORE") await avisarCobrancaRecusada(uid);
     }
 
-    return json({ received: true, resultados });
+    return json({ received: true, resultados, afiliada });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log("ERROR", { message });
@@ -90,6 +101,52 @@ function json(body: unknown, status = 200) {
     headers: { "Content-Type": "application/json" },
     status,
   });
+}
+
+/**
+ * PROGRAMA DE AFILIADOS — grava/atualiza a venda em `afiliado_vendas`.
+ *
+ * A regra inteira mora em _shared/afiliados.ts (pura, testada no vitest):
+ * aqui só se lê a linha pela chave (original_transaction_id), descobre a
+ * afiliada pelo `offer_code` e grava o que `aplicarDecisao` mandar.
+ * Idempotente: o mesmo evento duas vezes dá "nada" na segunda; a corrida
+ * entre duas entregas simultâneas é resolvida pelo índice único
+ * (upsert com ignoreDuplicates).
+ */
+async function registrarVendaAfiliada(admin: ReturnType<typeof createClient>, ev: EventoRC): Promise<Record<string, unknown> | null> {
+  const d = classificarEvento(ev);
+  if (d.tipo === "ignorar") return null;
+  // Teste novo sem código de oferta não pode ser de afiliada: sai sem tocar o banco.
+  if (d.tipo === "em_teste" && !d.codigo) return null;
+
+  const { data: existente, error: e1 } = await admin
+    .from("afiliado_vendas")
+    .select("id, afiliado_id, user_id, plataforma, transaction_id, transaction_id_cobranca, produto, valor_bruto_cents, valor_liquido_cents, comissao_cents, status, motivo, cobrado_em, pagamento_id")
+    .eq("transaction_id", d.chave)
+    .maybeSingle();
+  if (e1) throw new Error(`afiliado_vendas select: ${e1.message}`);
+  // Sem linha e sem código: evento de assinatura comum (a maioria). Fora.
+  if (!existente && !d.codigo) return null;
+
+  let afiliadoId: string | null = (existente as Venda | null)?.afiliado_id ?? null;
+  if (!existente && d.codigo) {
+    const { data: af } = await admin.from("afiliados").select("id").eq("codigo", d.codigo).maybeSingle();
+    afiliadoId = (af as { id?: string } | null)?.id ?? null;
+    if (!afiliadoId) { log("afiliados: código desconhecido", { codigo: d.codigo }); return { codigo: d.codigo, acao: "codigo_desconhecido" }; }
+  }
+
+  const ap = aplicarDecisao(d, (existente as Venda | null) ?? null, afiliadoId);
+  if (ap.acao === "nada") return { acao: "nada", motivo: ap.motivo, tipo: d.tipo };
+  if (ap.acao === "inserir") {
+    const { error } = await admin.from("afiliado_vendas").upsert(ap.linha, { onConflict: "transaction_id", ignoreDuplicates: true });
+    if (error) throw new Error(`afiliado_vendas insert: ${error.message}`);
+    log("afiliados: venda registrada", { tipo: d.tipo, codigo: d.codigo, status: ap.linha.status, comissao: ap.linha.comissao_cents });
+    return { acao: "inserir", status: ap.linha.status, comissao_cents: ap.linha.comissao_cents };
+  }
+  const { error } = await admin.from("afiliado_vendas").update(ap.campos).eq("id", ap.id);
+  if (error) throw new Error(`afiliado_vendas update: ${error.message}`);
+  log("afiliados: venda atualizada", { tipo: d.tipo, status: ap.campos.status ?? "(igual)", comissao: ap.campos.comissao_cents });
+  return { acao: "atualizar", status: ap.campos.status ?? null, comissao_cents: ap.campos.comissao_cents ?? null };
 }
 
 /** Chama a cobranca-recusada (ela confere o estado no RevenueCat, evita

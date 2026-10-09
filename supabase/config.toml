@@ -36,3 +36,9 @@ verify_jwt = false
 # confere as duas coisas por conta própria.
 [functions.cobranca-recusada]
 verify_jwt = false
+
+# Programa de afiliados (09/10): o painel da afiliada é público por token
+# secreto e o cron do Pix semanal não tem usuário — a função autentica as
+# duas outras portas (admin, cron) por conta própria.
+[functions.afiliados]
+verify_jwt = false

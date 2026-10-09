@@ -333,6 +333,8 @@ const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevH
 const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPaywallIos")) : null;
 // 03/10: os textos do Lembrete do dia 2 em cada cenário + a pré-folha da permissão, pra fotografar — só no dev
 const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) : null;
+// 09/10: painel da afiliada e aba Afiliados do /admin com dados de exemplo, pra fotografar — só no dev
+const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -430,6 +432,9 @@ const AdminCampaigns = lazyPage(() => import("./pages/admin/AdminCampaigns"));
 const AdminUsuarios = lazyPage(() => import("./pages/admin/AdminUsuarios"));
 const AdminPagantes = lazyPage(() => import("./pages/admin/AdminPagantes"));
 const AdminUso = lazyPage(() => import("./pages/admin/AdminUso"));
+const AdminAfiliados = lazyPage(() => import("./pages/admin/AdminAfiliados"));
+// 09/10: o painel público da afiliada (/afiliado/<token>) — chunk próprio, ninguém do app passa por ele
+const Afiliado = lazyPage(() => import("./pages/Afiliado"));
 
 const queryClient = new QueryClient();
 
@@ -588,6 +593,8 @@ const AnimatedRoutes = () => {
             NAVEGADOR, então a exigência dela continua atendida. */}
         <Route path="/suporte" element={<SoNaWeb><PageTransition><Suporte /></PageTransition></SoNaWeb>} />
         <Route path="/como-entrar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="como-entrar"><ComoEntrar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
+        <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<FunilAposentado web={<Navigate to="/comecar" replace />} />} />
@@ -630,6 +637,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevDia2 && (
           <Route path="/dev/dia2" element={<Suspense fallback={null}><DevDia2 /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevAfiliados && (
+          <Route path="/dev/afiliados" element={<Suspense fallback={null}><DevAfiliados /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />
@@ -688,6 +698,7 @@ const AnimatedRoutes = () => {
           <Route path="pagantes" element={<AdminPagantes />} />
           <Route path="uso" element={<AdminUso />} />
           <Route path="suporte" element={<AdminSuporte />} />
+          <Route path="afiliados" element={<AdminAfiliados />} />
           {/* Compat: qualquer rota antiga do admin cai no funil novo. */}
           <Route path="*" element={<Navigate to="/admin/funil" replace />} />
         </Route>

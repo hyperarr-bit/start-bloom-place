@@ -5,6 +5,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
 import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
+import { CHAVE_KCAL, kcalDoPlano } from "@/lib/dieta-consumo";
 import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { enviarParaMercado } from "@/lib/mercado";
 import { avisarApagado } from "@/lib/desfazer";
@@ -70,11 +71,8 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
  * Home, pela lista inteligente e pelo diário — mudar o formato dela era
  * quebrar quatro leitores pra ganhar um campo. Dado antigo segue intacto.
  * As duas somas são exportadas pra teste e pra Home e Dieta fazerem a MESMA conta. */
-export const CHAVE_KCAL = "saude-meals-kcal";
-
-/** Soma das kcal planejadas de um dia do cardápio (valor torto conta 0). */
-export const kcalDoPlano = (dia?: Record<string, unknown> | null) =>
-  Object.values(dia ?? {}).reduce<number>((s, v) => s + (Number(v) > 0 ? Number(v) : 0), 0);
+// 09/10: a chave e a soma moram em lib/dieta-consumo (a Home lê a mesma conta); aqui só re-exporta.
+export { CHAVE_KCAL, kcalDoPlano };
 
 /** Soma do que a Home registrou no dia (`core-dieta-log`) — a mesma conta do
  *  widget de calorias (use-life-hub-data), pra os dois números baterem. */

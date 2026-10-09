@@ -1,21 +1,13 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useUserData } from "@/hooks/use-user-data";
+import { useConsumoDeHoje } from "@/hooks/use-consumo-de-hoje";
 
 export const MacroBalanceWidget = () => {
-  const { get } = useUserData();
   const navigate = useNavigate();
-  const d = new Date();
-  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const todayLog = get<any>("core-dieta-log", {});
-  const meals = todayLog[todayStr] || {};
-
-  let protein = 0, carbs = 0, fat = 0;
-  Object.values(meals).forEach((m: any) => {
-    protein += Number(m?.protein) || 0;
-    carbs += Number(m?.carbs) || 0;
-    fat += Number(m?.fat) || 0;
-  });
+  // 09/10: a mesma conta do widget Calorias e do hub — log do dia + refeições do
+  // diário da Dieta marcadas como seguidas (gramas do cardápio), sem somar em dobro.
+  const consumo = useConsumoDeHoje();
+  const protein = consumo.macros.p, carbs = consumo.macros.c, fat = consumo.macros.g;
 
   const total = protein + carbs + fat;
   const pctP = total > 0 ? (protein / total) * 100 : 33;

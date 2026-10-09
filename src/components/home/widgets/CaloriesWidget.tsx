@@ -5,12 +5,18 @@ import { useUserData } from "@/hooks/use-user-data";
 import { ProgressBar } from "@/components/home/ProgressBar";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 import { useState } from "react";
-import { macrosRegistradas } from "@/lib/dieta-macros";
+import { useConsumoDeHoje } from "@/hooks/use-consumo-de-hoje";
 
 export const CaloriesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const navigate = useNavigate();
   const data = useLifeHubData();
   const { get, set } = useUserData();
+  /* 09/10 (chamado: "0/2000 apesar de inserir as refeições"): kcal e macros vêm
+     da mesma conta do hub (log + diário da Dieta, meta do cardápio). Quando a pessoa
+     marcou refeições mas o cardápio não tem kcal, não há o que somar — o widget diz
+     isso e mostra as refeições, em vez de um 0 que parece defeito. */
+  const consumo = useConsumoDeHoje();
+  const semKcal = data.caloriesConsumed <= 0 && data.mealsLogged > 0;
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [mealName, setMealName] = useState("");
   const [mealCals, setMealCals] = useState("");
@@ -44,11 +50,24 @@ export const CaloriesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Calorias</h3>
-            <div className="flex items-baseline gap-1">
-              <span className="text-sm font-bold">{data.caloriesConsumed}</span>
-              <span className="text-[10px] text-muted-foreground">/ {data.caloriesGoal} kcal</span>
-            </div>
-            <ProgressBar value={data.caloriesConsumed} max={data.caloriesGoal} colorClass="bg-emerald-500" />
+            {semKcal ? (
+              <>
+                <div className="flex items-baseline gap-1" data-testid="calorias-sem-kcal">
+                  <span className="text-sm font-bold">{data.mealsLogged} de {data.mealsTotal}</span>
+                  <span className="text-[10px] text-muted-foreground">refeições</span>
+                </div>
+                <ProgressBar value={data.mealsLogged} max={data.mealsTotal} colorClass="bg-emerald-500" />
+                <p className="mt-1 text-[10px] text-muted-foreground leading-snug">Anote as kcal no cardápio da Dieta pra ver as calorias</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-sm font-bold">{data.caloriesConsumed}</span>
+                  <span className="text-[10px] text-muted-foreground">/ {data.caloriesGoal} kcal</span>
+                </div>
+                <ProgressBar value={data.caloriesConsumed} max={data.caloriesGoal} colorClass="bg-emerald-500" />
+              </>
+            )}
           </div>
         </div>
       </button>
@@ -72,18 +91,33 @@ export const CaloriesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
         </button>
       </div>
 
-      <div className="flex items-baseline gap-1 mb-2">
-        <span className="text-xl font-bold">{data.caloriesConsumed}</span>
-        <span className="text-xs text-muted-foreground">/ {data.caloriesGoal} kcal</span>
-        <span className="text-[10px] text-muted-foreground ml-auto">{pct}%</span>
-      </div>
-      <ProgressBar value={data.caloriesConsumed} max={data.caloriesGoal} colorClass="bg-emerald-500" />
+      {semKcal ? (
+        <div className="mb-2" data-testid="calorias-sem-kcal">
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-bold">{data.mealsLogged} de {data.mealsTotal}</span>
+            <span className="text-xs text-muted-foreground">refeições registradas</span>
+          </div>
+          <ProgressBar value={data.mealsLogged} max={data.mealsTotal} colorClass="bg-emerald-500" />
+          <button type="button" onClick={() => navigate("/dieta")} className="mt-1.5 text-left text-[11px] text-muted-foreground leading-snug">
+            Anote as kcal de cada refeição no cardápio da Dieta — aí as calorias aparecem aqui. <span className="font-medium text-foreground">Abrir Dieta</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1 mb-2">
+            <span className="text-xl font-bold">{data.caloriesConsumed}</span>
+            <span className="text-xs text-muted-foreground">/ {data.caloriesGoal} kcal</span>
+            <span className="text-[10px] text-muted-foreground ml-auto">{pct}%</span>
+          </div>
+          <ProgressBar value={data.caloriesConsumed} max={data.caloriesGoal} colorClass="bg-emerald-500" />
+        </>
+      )}
 
       {/* 18/09: antes "P:" mostrava o NÚMERO DE REFEIÇÕES e C/G eram traço
-          fixo. Agora soma as gramas do log do dia (mesma conta do widget
-          Macros do Dia); sem gramas, some — nada de traço. */}
+          fixo. Agora soma as gramas do dia (mesma conta do widget Macros do
+          Dia — 09/10: log + diário); sem gramas, some — nada de traço. */}
       {(() => {
-        const m = macrosRegistradas(get<Record<string, Record<string, { name: string; protein?: number; carbs?: number; fat?: number }>>>("core-dieta-log", {})[todayStr]);
+        const m = consumo.macros;
         if (m.p + m.c + m.g <= 0) return null;
         return (
           <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground" data-testid="calorias-macros">

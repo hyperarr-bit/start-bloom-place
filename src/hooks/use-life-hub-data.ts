@@ -4,6 +4,8 @@ import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
+import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -212,7 +214,6 @@ export function useLifeHubData(): LifeHubData {
 
     // Diet
     const dietMeals = get<any[]>("core-dieta-meals", []);
-    const caloriesGoal = get<number>("core-dieta-calories-goal", 2000);
     const todayLog = get<any>("core-dieta-log", {});
     const todayMeals = todayLog[tStr] || {};
     // 4 é o fallback de quem NÃO montou plano nenhum na Dieta. Quem montou
@@ -225,7 +226,21 @@ export function useLifeHubData(): LifeHubData {
       ? Object.values(dietaDiary[tStr].meals).filter((m: any) => m?.followed).length
       : 0;
     const mealsLogged = Math.max(Object.keys(todayMeals).length, diaryMealsHoje);
-    const caloriesConsumed: number = Object.values(todayMeals).reduce<number>((s, m: any) => s + (Number(m?.calories) || 0), 0);
+    /* 09/10 (chamado iPhone: "widget de calorias fica em 0/2000 apesar de inserir
+     * as refeições"): as kcal somam o log DO DIA + as refeições do diário da Dieta
+     * marcadas como seguidas que ainda não estão no log (as kcal vêm do cardápio,
+     * `saude-meals-kcal`), sem contar duas vezes; e a meta é o total planejado no
+     * cardápio do dia, não um 2000 cravado. Mesma conta nos widgets (lib/dieta-consumo). */
+    const diaDieta = nomeDoDiaDieta(agoraHub);
+    const consumoHoje = consumoDoDia({
+      log: todayMeals,
+      diario: dietaDiary[tStr],
+      kcalPlano: get<Record<string, Record<string, unknown>>>(CHAVE_KCAL, {})[diaDieta],
+      macrosPlano: get<MacrosPlano>(CHAVE_MACROS, {})[diaDieta],
+      metaAntiga: get<number>(CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO),
+    });
+    const caloriesConsumed = consumoHoje.kcal;
+    const caloriesGoal = consumoHoje.meta;
 
     // Health — FIX 16/07 (pendência de água eterna): os MÓDULOS gravam em
     // water-log/sleep-log; as chaves core-saude-* só recebiam as ações

@@ -22,6 +22,13 @@
  * O que a web tinha e MORREU aqui de propósito: criar-conta pré-paywall (no
  * app a conta nasce depois do pagamento) e a prova social no meio do quiz
  * (a web que dava ROI rodava com ela desligada; a prova mora no mural).
+ *
+ * 10/10 — FUNIL_CALAI (lib/funil-calai, DESLIGADA; VITE_V14_QA=1 liga): a mesma
+ * máquina de passos com a fila enxuta do Cal AI —
+ *   welcome (WelcomeCalai: iPhone com vídeo do app) → porta → quiz (2 perguntas:
+ *   a dor + o número da rota) → grafico_com_sem (GraficoComSem) → notif (passo
+ *   próprio) → prova → progress → result → plano_3_dias (ou compromissos →
+ *   contrato) → offer. Sem promessas, central e demo. Desligada = o de cima.
  */
 import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";

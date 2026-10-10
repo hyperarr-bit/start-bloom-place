@@ -4,7 +4,7 @@
  * As frentes da 1.0.14 nascem TODAS atrás de chave desligada (tour da Home, cartões
  * de boas-vindas, ofertas de saída, onboarding numa tela, dia 1 cheio, cartão
  * recusado, avaliações, módulo oculta pendências, paywall enxuto, recuperação do
- * paywall). Pra o dono testar tudo junto no iPhone sem mexer em constante nenhuma,
+ * paywall, paywall curto, plano com cadeado). Pra o dono testar tudo junto no iPhone sem mexer em constante nenhuma,
  * existe UM modo de build:
  *
  *     VITE_V14_QA=1 npm run loja:ios      → build de QA (tudo ligado)

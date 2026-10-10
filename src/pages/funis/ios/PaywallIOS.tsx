@@ -67,12 +67,45 @@
  * ligada, o 1º Voltar (e o app no fundo) armam os 2 avisos locais da recuperação
  * (lib/notificacoes, faixa 950000) — cancelados ao abrir o paywall de novo e em
  * qualquer compra que dê certo.
+ *
+ * PAYWALL CURTO (10/10, chave PAYWALL_CURTO em lib/ofertas-saida, desligada; dono:
+ * "na tora, testa tudo" — SEM A/B). Hoje: ~12 blocos, planos abaixo da dobra, botão
+ * pulsando sem parar, folha da Apple sem preparação (76% fecham). Ligada, a tela
+ * cabe SEM ROLAR (390×844 e 375×667) em 5 blocos: (1) título com a meta dela,
+ * (2) linha do tempo com DATAS reais (hoje · dia 2 aviso · dia 3 cobrança), (3) anual
+ * pré-selecionado "R$ 8,16/mês" + selo "economize N%" e o mensal numa linha ("sem
+ * teste grátis"), (4) "★★★★★ +1000 pessoas aprovaram", (5) "✓ Sem cobrança hoje" +
+ * "Começar meus 3 dias grátis" (1 pulso só) + legal. No TOQUE, antes da folha, a
+ * pílula de ~1,2 s "A Apple vai mostrar R$ 97,90/ano: é o valor depois dos 3 dias.
+ * Hoje: R$ 0,00." (ela SUBSTITUI a pílula do PAYWALL_TEXTOS — nunca as duas). O que
+ * saiu da dobra vive num "Ver mais" discreto abaixo do legal; Restaurar compras,
+ * Termos e Privacidade continuam no rodapé (3.1.1/3.1.2). Preços SEMPRE da loja
+ * (priceString) — até o "R$ 0,00" é o da oferta introdutória. 2ª chance da folha,
+ * presente 69,90 no Voltar, paywall_saiu, recuperação: iguais. `paywall_oferta_vista`
+ * ganha `paywall_curto: true`. Com a chave off esta tela é a de hoje, byte a byte.
  */
+/** Quanto a pílula "A Apple vai mostrar…" fica na tela antes de a folha abrir. */
+export const PREPARACAO_DA_FOLHA_MS = 1200;
+
+const dataCurta = (d: Date): string => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+/**
+ * A linha do tempo do paywall curto — pura, 3 linhas: "Hoje · R$ 0,00" / "Dia 2 (DD/MM) · a
+ * gente te avisa" / "Dia 3 (DD/MM) · R$ 97,90/ano só se você continuar". Dia 1 = hoje; a
+ * duração e os preços vêm da loja. Sem o preço do teste (loja calada): "sem cobrança".
+ */
+export function linhaDoTempoDoTeste(dias: number, precoAnual: string, precoTeste: string | null, hoje: Date = new Date()): Array<{ t: string; cheio: boolean }> {
+  const em = (n: number) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return dataCurta(d); };
+  const n = Math.max(1, dias);
+  const linhas: Array<{ t: string; cheio: boolean }> = [{ t: `Hoje · ${precoTeste ?? "sem cobrança"}`, cheio: true }];
+  if (n >= 3) linhas.push({ t: `Dia ${n - 1} (${em(n - 2)}) · a gente te avisa`, cheio: false });
+  linhas.push({ t: `Dia ${n} (${em(n - 1)}) · ${precoAnual}/ano só se você continuar`, cheio: false });
+  return linhas;
+}
 /** Um `core:voltar` nos últimos N ms faz a saída contar como "voltar". */
 export const JANELA_DO_VOLTAR_MS = 10_000;
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
@@ -270,6 +303,14 @@ export function PaywallIOS({
   const [textos, setTextos] = useState(false);
   const [economia, setEconomia] = useState<number | null>(null);
   const [precoMensalLoja, setPrecoMensalLoja] = useState<string | null>(null);
+  /* 10/10 — PAYWALL_CURTO: a chave responde na hora (força/QA/constante) e de novo quando a
+   * loja traz a metadata; o preço do teste ("R$ 0,00") é o da oferta introdutória da loja. */
+  const [curto, setCurto] = useState(() => ofertaLigada("curto"));
+  const [precoTeste, setPrecoTeste] = useState<string | null>(null);
+  const [preparando, setPreparando] = useState(false);
+  const [verMais, setVerMais] = useState(false);
+  const preparandoRef = useRef<number | null>(null);
+  useEffect(() => () => { if (preparandoRef.current) window.clearTimeout(preparandoRef.current); }, []);
   const [presenteX, setPresenteX] = useState<OfertaDoPresente | null>(null);
   const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   const presenteXTentadoRef = useRef(false);
@@ -332,12 +373,15 @@ export function PaywallIOS({
           setOferta(d);
           // 10/10: a chave remota chegou junto com as offerings; os preços do selo são os da loja
           const ligou = ofertaLigada("textos");
-          const economiaLida = ligou ? seguro(() => rc.economiaDoAnualIos() ?? null, null) : null;
+          const curtoLigou = ofertaLigada("curto");
+          const economiaLida = ligou || curtoLigou ? seguro(() => rc.economiaDoAnualIos() ?? null, null) : null;
           setTextos(ligou);
+          setCurto(curtoLigou);
           setEconomia(economiaLida);
           setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
+          if (curtoLigou) setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}) });
+          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou ? { paywall_curto: true, economia: economiaLida } : {}) });
         }
       };
       lido();
@@ -494,6 +538,282 @@ export function PaywallIOS({
   // O cartão fala do anual com teste: some com o mensal selecionado e durante
   // a folha aberta; volta com o anual (a mesma exibição — sem novo evento).
   const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
+
+  /* o que aparece POR CIMA do paywall, igual nos dois layouts (de hoje e curto) */
+  const sobreposicoes = (
+    <>
+    {comprando && (
+      <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">
+        <div className="mx-auto max-w-[92%] rounded-2xl bg-[#16121c] text-white text-[12.5px] font-bold px-4 py-2.5 shadow-lg flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> Abrindo o pagamento…
+        </div>
+      </div>
+    )}
+
+    {/* 10/10 — as ofertas de saída, por cima do paywall (z-320). Sucesso = a mesma
+        saída da compra normal: app_sheet_success (com oferta/lugar), lembrete do
+        teste quando a folha deu dias grátis, e o cadastro. "Agora não" devolve o
+        paywall de sempre, intacto. */}
+    {presenteX && (
+      <Presente69Folha
+        lugar="x_paywall"
+        oferta={presenteX}
+        onFechar={() => setPresenteX(null)}
+        onSucesso={async () => {
+          trackEvent("app_sheet_success", { produto: presenteX.produto, funil: "ios", loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
+          try {
+            const rc = await import("@/lib/revenuecat");
+            if (seguro(() => rc.ultimaCompraAnualFoiTrial(), presenteX.comTrial)) {
+              void pedirLembreteDoTeste({ fimMs: seguro(() => rc.fimDaUltimaCompraTrial(), null) ?? Date.now() + (presenteX.dias || dias) * 86400e3, precoAno: presenteX.preco }).catch(() => { /* noop */ });
+            }
+          } catch { /* noop */ }
+          setPresenteX(null);
+          concluir();
+        }}
+      />
+    )}
+    {mensal19 && (
+      <Mensal19Folha
+        lugar="mensal_paywall"
+        oferta={mensal19}
+        onFechar={() => setMensal19(null)}
+        onSucesso={() => {
+          trackEvent("app_sheet_success", { produto: mensal19.produto, funil: "ios", loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
+          setMensal19(null);
+          concluir();
+        }}
+      />
+    )}
+    </>
+  );
+
+  /* o toque no botão principal: o MESMO evento de hoje; no curto (anual com teste) a pílula
+   * de preparação da folha fica ~1,2 s na tela e só então a compra abre */
+  const tocarNoBotao = () => {
+    trackEvent("funnel_click", {
+      cta: "app_paywall_cta", funil: "ios", loja: "ios",
+      produto: mostraMensal ? "core_mensal" : oferta.produto,
+      oferta: mostraMensal ? "mensal" : oferta.oferta,
+      offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
+      ...(curto ? { paywall_curto: true } : {}),
+    });
+    if (curto && comTrial && !mostraMensal && !comprando) {
+      if (preparando) return;
+      setPreparando(true);
+      preparandoRef.current = window.setTimeout(() => {
+        preparandoRef.current = null;
+        if (!vivoRef.current) return;
+        setPreparando(false);
+        void comprar("anual");
+      }, PREPARACAO_DA_FOLHA_MS);
+      return;
+    }
+    void comprar(plano);
+  };
+
+  if (curto) {
+    const precoMensalCurto = precoMensalLoja ?? SEM_PRECO;
+    const linhas = linhaDoTempoDoTeste(dias, precoAnualTxt, precoTeste);
+    const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual, paywall_curto: true }); };
+    return (
+      <div className="relative w-full max-w-sm mx-auto flex-1 flex flex-col pt-1 text-left" data-testid="ios-curto">
+        {/* 1. a meta dela */}
+        <h1 className="text-[22px] font-bold tracking-tight leading-[1.15]">
+          Seu plano pra <span className="text-accent">{vitoria[area]}</span> está pronto
+        </h1>
+
+        {/* 2. linha do tempo com datas reais (só no anual com teste) */}
+        {comTrial && !mostraMensal && (
+          <div className="mt-3 rounded-2xl border border-border bg-card px-3.5 py-2.5" data-testid="ios-linha-do-tempo">
+            {linhas.map((l, i) => (
+              <div key={l.t} className="grid grid-cols-[14px_1fr] gap-2.5 items-center py-[3px]">
+                <span className="relative grid place-items-center" aria-hidden>
+                  <span className={`w-[12px] h-[12px] rounded-full border-2 border-accent ${l.cheio ? "bg-accent" : "bg-accent/15"}`} />
+                  {i < linhas.length - 1 && <span className="absolute top-[14px] w-[2px] h-[12px] bg-accent/25" />}
+                </span>
+                <span className={`text-[13px] leading-tight ${l.cheio ? "font-extrabold" : "font-semibold text-foreground/85"}`}>{l.t}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 3. os planos: anual pré-selecionado em cima, mensal numa linha */}
+        <div className="mt-3 space-y-2" role="radiogroup" aria-label="Plano">
+          <div
+            role="radio" aria-checked={plano === "anual"} tabIndex={0} data-testid="ios-curto-anual"
+            onClick={() => escolher("anual")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("anual"); }}
+            className={`relative rounded-2xl p-[2px] transition-all ${plano === "anual" ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_12px_32px_-16px_hsl(var(--accent)/0.5)]" : "bg-black/10"}`}
+          >
+            <div className="rounded-[calc(1rem-2px)] bg-white px-3.5 py-2.5 flex items-center gap-3 text-[#16121c]">
+              <span className={`w-5 h-5 rounded-full border-2 grid place-items-center shrink-0 ${plano === "anual" ? "border-accent bg-accent text-accent-foreground" : "border-black/20"}`} aria-hidden>
+                {plano === "anual" && <Check className="w-3 h-3" strokeWidth={3.5} />}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="flex items-center gap-1.5">
+                  <b className="text-[15px] font-extrabold">Anual</b>
+                  {comTrial && <span className="rounded-full bg-accent text-accent-foreground text-[9.5px] font-extrabold tracking-[0.06em] px-1.5 py-[2px]">{dias} DIAS GRÁTIS</span>}
+                </span>
+                <span className="block text-[11px] font-semibold text-black/50 leading-tight mt-0.5">{precoAnualTxt}/ano{comTrial ? `, depois dos ${dias} dias` : ""}</span>
+              </span>
+              <span className="text-right shrink-0">
+                <b className="block text-[17px] font-extrabold leading-none">{precoMesTxt}</b>
+                <span className="text-[10.5px] font-semibold text-black/45">por mês</span>
+              </span>
+            </div>
+            {economia !== null && (
+              <span className="absolute -top-2 right-3 rounded-full bg-[#16121c] text-white text-[10px] font-extrabold px-2 py-[2px] shadow-sm" data-testid="ios-economize">
+                economize {economia}%
+              </span>
+            )}
+          </div>
+          <div
+            role="radio" aria-checked={plano === "mensal"} tabIndex={0} data-testid="ios-curto-mensal"
+            onClick={() => escolher("mensal")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("mensal"); }}
+            className={`rounded-xl border px-3.5 py-2 flex items-center gap-3 transition-colors ${plano === "mensal" ? "border-accent bg-white" : "border-border bg-card"}`}
+          >
+            <span className={`w-4 h-4 rounded-full border-2 grid place-items-center shrink-0 ${plano === "mensal" ? "border-accent bg-accent text-accent-foreground" : "border-black/20"}`} aria-hidden>
+              {plano === "mensal" && <Check className="w-2.5 h-2.5" strokeWidth={3.5} />}
+            </span>
+            <span className="flex-1 text-[13px] leading-tight"><b className="font-bold">Mensal</b>{comTrial && <span className="text-muted-foreground"> · sem teste grátis</span>}</span>
+            <span className="text-[13px] font-bold shrink-0">{precoMensalCurto}<span className="text-[10.5px] font-semibold text-muted-foreground">/mês</span></span>
+          </div>
+        </div>
+
+        {/* 4. prova social em UMA linha (o selo que o dono quer) */}
+        <p className="mt-2.5 text-center text-[12px] font-semibold text-muted-foreground" data-testid="ios-prova-social">
+          <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span> <b className="text-foreground">+1000</b> pessoas aprovaram
+        </p>
+
+        {/* 5. sem cobrança hoje + botão (1 pulso só) + legal */}
+        <div className="mt-auto pt-3">
+          {pendente && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] leading-snug p-2.5 mb-2">
+              <b>Compra em processamento.</b> A App Store ainda está confirmando — o acesso libera sozinho aqui.
+              <button className="block w-full text-center font-bold underline underline-offset-2 mt-1 disabled:opacity-50" disabled={conferindo} onClick={() => void confirmarPagamento()}>
+                {conferindo ? "Conferindo…" : "Já comprei — atualizar"}
+              </button>
+            </div>
+          )}
+          {erro && <p className="text-[12px] text-destructive text-center mb-2">{erro}</p>}
+          {mostraSegundaChance && (
+            <div role="status" data-testid="ios-segunda-chance" className="rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 mb-2 flex items-center gap-2.5 text-left">
+              <p className="flex-1 text-[12.5px] font-bold leading-snug text-foreground">Hoje você não paga nada · cancela em 2 toques</p>
+              <button
+                type="button"
+                className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
+                onClick={() => {
+                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
+                  setSegundaChance("usada");
+                  void comprar("anual");
+                }}
+              >
+                Tentar de novo
+              </button>
+            </div>
+          )}
+          {comTrial && !mostraMensal && (
+            <p className="text-[12.5px] text-center font-bold mb-1.5" data-testid="ios-sem-cobranca">
+              <span className="text-accent" aria-hidden>✓</span> Sem cobrança hoje
+            </p>
+          )}
+          <div className="relative">
+            {/* a preparação da folha: aparece no toque, por cima, sem mexer no layout */}
+            {preparando && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}
+                role="status" data-testid="ios-preparando-folha"
+                className="absolute inset-x-0 -top-2 -translate-y-full z-10 rounded-2xl bg-[#16121c] text-white text-[12.5px] font-semibold leading-snug px-3.5 py-2.5 shadow-lg text-center"
+              >
+                A Apple vai mostrar <b>{precoAnualTxt}/ano</b>: é o valor depois dos {dias} dias. Hoje: <b>{precoTeste ?? "nada"}</b>.
+              </motion.div>
+            )}
+            <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 0.9, delay: 0.5, ease: "easeInOut" }}>
+              <Button
+                size="lg"
+                className="w-full h-[52px] rounded-full text-[15.5px] font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+                disabled={comprando || preparando}
+                onClick={tocarNoBotao}
+              >
+                {comprando || preparando
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : mostraMensal
+                    ? <>Começar por {precoMensalCurto}/mês <ArrowRight className="w-4 h-4" /></>
+                    : comTrial
+                      ? <>Começar meus {dias} dias grátis <ArrowRight className="w-4 h-4" /></>
+                      : <>Quero o ano — {precoAnualTxt} <ArrowRight className="w-4 h-4" /></>}
+              </Button>
+            </motion.div>
+          </div>
+          <p className="text-[10.5px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5 leading-snug">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+            <span>
+              {mostraMensal
+                ? <>Assinatura de {precoMensalCurto}/mês pela App Store · renova automaticamente até você cancelar</>
+                : comTrial
+                  ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
+                  : <>Assinatura de {precoAnualTxt}/ano pela App Store · renova automaticamente até você cancelar</>}
+            </span>
+          </p>
+
+        </div>
+
+        {/* o rodapé discreto: a folga da tela se divide entre o bloco do botão e este */}
+        <div className="mt-auto pt-2">
+          {/* o que saiu da dobra, discreto; "Tenho um código" (Offer Code da Apple) ao lado */}
+          <p className="text-center text-[11.5px] font-semibold text-muted-foreground">
+            <button type="button" className="inline-flex items-center gap-0.5 underline underline-offset-2" data-testid="ios-ver-mais" aria-expanded={verMais}
+              onClick={() => { setVerMais((v) => !v); if (!verMais) trackEvent("funnel_click", { cta: "ios_ver_mais", funil: "ios", loja: "ios" }); }}>
+              {verMais ? "Ver menos" : "Ver mais"} <ChevronDown className={`w-3 h-3 transition-transform ${verMais ? "rotate-180" : ""}`} />
+            </button>
+            {" · "}
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              data-testid="ios-tenho-codigo"
+              onClick={async () => {
+                trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: "ios" });
+                const rc = await import("@/lib/revenuecat");
+                const abriu = await rc.abrirResgateApple();
+                if (abriu) setResgatouCodigo(true);
+                else setErro("Não consegui abrir o resgate. Tenta de novo em alguns segundos.");
+              }}
+            >
+              Tenho um código
+            </button>
+          </p>
+          {resgatouCodigo && (
+            <button
+              type="button"
+              className="block w-full text-center text-[12.5px] font-bold underline underline-offset-2 disabled:opacity-50 mt-1"
+              disabled={conferindo}
+              onClick={() => void confirmarPagamento()}
+            >
+              {conferindo ? "Conferindo…" : "Já resgatei — continuar"}
+            </button>
+          )}
+          {verMais && (
+            <div className="mt-4 space-y-4 text-center" data-testid="ios-ver-mais-conteudo">
+              <TransformChart label={chartLabel} />
+              <ValueStack area={area} />
+              {area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}
+              <MuralDepoimentos area={area} semLoja soAssinatura />
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {selosPara(comTrial && !mostraMensal).map((c) => (
+                  <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
+                    {c.emoji && <span>{c.emoji}</span>} {c.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Restaurar compras (3.1.1) + Termos e Privacidade (3.1.2): continuam, discretos */}
+          <AppLegalFooter />
+        </div>
+        {sobreposicoes}
+      </div>
+    );
+  }
 
   return (
     /* pb maior só com o cartão: a barra fixa cresce e cobriria o "Restaurar compras" do rodapé */
@@ -673,15 +993,7 @@ export function PaywallIOS({
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
               disabled={comprando}
-              onClick={() => {
-                trackEvent("funnel_click", {
-                  cta: "app_paywall_cta", funil: "ios", loja: "ios",
-                  produto: mostraMensal ? "core_mensal" : oferta.produto,
-                  oferta: mostraMensal ? "mensal" : oferta.oferta,
-                  offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
-                });
-                void comprar(plano);
-              }}
+              onClick={tocarNoBotao}
             >
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -716,48 +1028,7 @@ export function PaywallIOS({
         </div>
       </div>
 
-      {comprando && (
-        <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">
-          <div className="mx-auto max-w-[92%] rounded-2xl bg-[#16121c] text-white text-[12.5px] font-bold px-4 py-2.5 shadow-lg flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> Abrindo o pagamento…
-          </div>
-        </div>
-      )}
-
-      {/* 10/10 — as ofertas de saída, por cima do paywall (z-320). Sucesso = a mesma
-          saída da compra normal: app_sheet_success (com oferta/lugar), lembrete do
-          teste quando a folha deu dias grátis, e o cadastro. "Agora não" devolve o
-          paywall de sempre, intacto. */}
-      {presenteX && (
-        <Presente69Folha
-          lugar="x_paywall"
-          oferta={presenteX}
-          onFechar={() => setPresenteX(null)}
-          onSucesso={async () => {
-            trackEvent("app_sheet_success", { produto: presenteX.produto, funil: "ios", loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
-            try {
-              const rc = await import("@/lib/revenuecat");
-              if (seguro(() => rc.ultimaCompraAnualFoiTrial(), presenteX.comTrial)) {
-                void pedirLembreteDoTeste({ fimMs: seguro(() => rc.fimDaUltimaCompraTrial(), null) ?? Date.now() + (presenteX.dias || dias) * 86400e3, precoAno: presenteX.preco }).catch(() => { /* noop */ });
-              }
-            } catch { /* noop */ }
-            setPresenteX(null);
-            concluir();
-          }}
-        />
-      )}
-      {mensal19 && (
-        <Mensal19Folha
-          lugar="mensal_paywall"
-          oferta={mensal19}
-          onFechar={() => setMensal19(null)}
-          onSucesso={() => {
-            trackEvent("app_sheet_success", { produto: mensal19.produto, funil: "ios", loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
-            setMensal19(null);
-            concluir();
-          }}
-        />
-      )}
+      {sobreposicoes}
     </div>
   );
 }

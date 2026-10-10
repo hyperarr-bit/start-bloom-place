@@ -20,13 +20,24 @@
  *   RECUPERACAO_PAYWALL (10/10, estilo Enxovaly) quem sai do paywall do funil sem iniciar o
  *                       teste recebe 2 avisos locais (+3 h e 9h da manhã seguinte, faixa 950000),
  *                       só se a permissão já existir; cancelados quando o teste começa
+ *   PAYWALL_CURTO       (10/10, dono: "na tora, testa tudo" — SEM A/B) o PaywallIOS do funil cabe
+ *                       SEM ROLAR (390×844 e 375×667): título com a meta dela, linha do tempo com
+ *                       datas reais, anual pré-selecionado + mensal numa linha, prova social em 1
+ *                       linha, "Sem cobrança hoje" + botão (1 pulso só) + legal; a preparação da
+ *                       folha da Apple no toque (~1,2 s). O resto vai pro "ver mais" discreto.
+ *                       `paywall_oferta_vista` ganha `paywall_curto: true`
+ *   PLANO_CADEADO       (10/10) a tela "Seu plano de 3 dias" (ONBOARDING_1TELA) ganha Dia 1/2/3 na
+ *                       linguagem dela + bloco "Depois do teste" borrado com cadeado e o botão
+ *                       "Desbloquear meu plano" → paywall. `funnel_view step=plano_3_dias` ganha
+ *                       `cadeado: true`; o toque é `funnel_click cta=desbloquear_plano`
  *
  * QUEM DECIDE, nesta ordem (a primeira que responder vale):
  *   1. força de QA deste aparelho, gravada pelo link `?ofertas-saida=…` (ver guardarForcaDasOfertas)
- *   2. a build de QA `VITE_V14_QA=1` (lib/v14-qa): liga as seis
+ *   2. a build de QA `VITE_V14_QA=1` (lib/v14-qa): liga as oito
  *   3. metadata remota do RevenueCat: QUALQUER offering (current, anual_69, mensal_19…) pode
  *      carregar `oferta_x_paywall`, `oferta_mensal_19`, `saida_teste_escada`, `paywall_textos`,
- *      `paywall_enxuto`, `recuperacao_paywall` com "on"/"off" — a `current` vence as outras.
+ *      `paywall_enxuto`, `recuperacao_paywall`, `paywall_curto`, `plano_cadeado` com "on"/"off" —
+ *      a `current` vence as outras.
  *      Ligar/desligar SEM versão nova.
  *   4. a constante local abaixo ("off" hoje).
  * Além disso, uma oferta só EXISTE se a loja tiver o produto: a offering `mensal_19` ausente
@@ -37,7 +48,7 @@
 import { v14Qa } from "@/lib/v14-qa";
 
 export type ModoOferta = "off" | "on";
-export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao";
+export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao" | "curto" | "cadeado";
 
 /** Constantes locais. ROLLBACK/LIGAR sem RevenueCat = trocar aqui + build. */
 export const OFERTA_X_PAYWALL: ModoOferta = "off";
@@ -46,6 +57,8 @@ export const SAIDA_TESTE_ESCADA: ModoOferta = "off";
 export const PAYWALL_TEXTOS: ModoOferta = "off";
 export const PAYWALL_ENXUTO: ModoOferta = "off";
 export const RECUPERACAO_PAYWALL: ModoOferta = "off";
+export const PAYWALL_CURTO: ModoOferta = "off";
+export const PLANO_CADEADO: ModoOferta = "off";
 
 const LOCAL: Record<NomeDaOferta, ModoOferta> = {
   x_paywall: OFERTA_X_PAYWALL,
@@ -54,6 +67,8 @@ const LOCAL: Record<NomeDaOferta, ModoOferta> = {
   textos: PAYWALL_TEXTOS,
   enxuto: PAYWALL_ENXUTO,
   recuperacao: RECUPERACAO_PAYWALL,
+  curto: PAYWALL_CURTO,
+  cadeado: PLANO_CADEADO,
 };
 
 /** O nome da chave no metadata da offering do RevenueCat. */
@@ -64,6 +79,8 @@ export const CHAVE_REMOTA: Record<NomeDaOferta, string> = {
   textos: "paywall_textos",
   enxuto: "paywall_enxuto",
   recuperacao: "recuperacao_paywall",
+  curto: "paywall_curto",
+  cadeado: "plano_cadeado",
 };
 
 export const CHAVE_FORCA_OFERTAS = "ofertas-saida-force"; // nas 2 allowlists (use-auth / use-user-data)
@@ -83,7 +100,7 @@ const modoDe = (v: unknown): ModoOferta | null => {
   return s === "on" ? "on" : s === "off" ? "off" : null;
 };
 
-/** Decisão pura: lê as 4 chaves do metadata de todas as offerings (a `current` vence). */
+/** Decisão pura: lê as chaves do metadata de todas as offerings (a `current` vence). */
 export function lerChavesRemotas(offerings: unknown): Partial<Record<NomeDaOferta, ModoOferta>> {
   type Off = { identifier?: string; metadata?: Record<string, unknown> } | null | undefined;
   const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
@@ -109,8 +126,8 @@ export const _zerarChavesRemotas = (): void => { remota = {}; };
 
 /* ───────────── 1. força de QA pelo link ───────────── */
 /**
- * `?ofertas-saida=on` liga as 6 neste aparelho; `off` força as 6 desligadas; `auto`
- * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos,enxuto,recuperacao`)
+ * `?ofertas-saida=on` liga as 8 neste aparelho; `off` força as 8 desligadas; `auto`
+ * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos,enxuto,recuperacao,curto,cadeado`)
  * liga só essas. Gravado no aparelho porque o funil muda de passo sem levar a query.
  * Também apaga as marcas de "já vi" (`recomecar` junto, ex.: `?ofertas-saida=on,recomecar`).
  */

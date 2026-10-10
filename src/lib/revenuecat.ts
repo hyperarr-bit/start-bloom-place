@@ -1182,6 +1182,16 @@ export const diasTrialIos = (): number => {
   return u === "WEEK" ? n * 7 : u === "MONTH" ? n * 30 : u === "YEAR" ? n * 365 : n;
 };
 
+/** 10/10 (PAYWALL_CURTO): o que a folha da Apple mostra HOJE pelo teste — o priceString da
+ *  oferta introdutória ("R$ 0,00"; "$0.00" na vitrine dos EUA). Sem oferta/sem loja: null. */
+export const precoDoTesteIos = (): string | null => {
+  const intro = introDoAnual();
+  if (!intro || !anualIosTemTrial()) return null;
+  if (intro.priceString) return intro.priceString;
+  const p = produtoAnualIos as { currencyCode?: string } | undefined;
+  return formatarMoeda(Number(intro.price ?? 0) || 0, p?.currencyCode || "BRL");
+};
+
 const formatarMoeda = (valor: number, moeda: string): string => {
   try {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(valor).replace(/\u00A0/g, " ");

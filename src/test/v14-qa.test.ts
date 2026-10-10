@@ -6,13 +6,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { v14Qa } from "@/lib/v14-qa";
 import { CARTOES_MODULO, MODULO_OCULTA_PENDENCIAS, TOUR_HOME, CHAVE_FORCA_TOUR_HOME, cartoesLigados, moduloOcultaPendenciasLigado, tourHomeLigado } from "@/lib/tour-home";
-import { OFERTA_MENSAL_19, OFERTA_X_PAYWALL, PAYWALL_ENXUTO, PAYWALL_TEXTOS, RECUPERACAO_PAYWALL, SAIDA_TESTE_ESCADA, guardarForcaDasOfertas, ofertaLigada, type NomeDaOferta } from "@/lib/ofertas-saida";
+import { OFERTA_MENSAL_19, OFERTA_X_PAYWALL, PAYWALL_CURTO, PAYWALL_ENXUTO, PAYWALL_TEXTOS, PLANO_CADEADO, RECUPERACAO_PAYWALL, SAIDA_TESTE_ESCADA, guardarForcaDasOfertas, ofertaLigada, type NomeDaOferta } from "@/lib/ofertas-saida";
 import { ONBOARDING_1TELA, onboarding1TelaLigado } from "@/lib/onboarding-1tela";
 import { DIA1_CHEIO, bracoDia1, dia1CheioLigado, guardarForcaDia1Cheio, modoDia1Cheio } from "@/lib/dia1-cheio";
 import { COBRANCA_V14, cobrancaV14Ligada } from "@/lib/cobranca-recusada";
 import { AVALIACAO_V14, avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
 
-const OFERTAS: NomeDaOferta[] = ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao"];
+const OFERTAS: NomeDaOferta[] = ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao", "curto", "cadeado"];
 const shell = (ligado: boolean) => {
   if (ligado) (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
   else delete (window as { Capacitor?: unknown }).Capacitor;
@@ -25,7 +25,7 @@ describe("sem a env: a build de LOJA", () => {
   it("todas as constantes nascem desligadas e nenhuma lib responde 'ligado'", () => {
     expect(v14Qa()).toBe(false);
     expect([CARTOES_MODULO, TOUR_HOME, MODULO_OCULTA_PENDENCIAS]).toEqual(["off", "off", "off"]);
-    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL]).toEqual(["off", "off", "off", "off", "off", "off"]);
+    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL, PAYWALL_CURTO, PLANO_CADEADO]).toEqual(["off", "off", "off", "off", "off", "off", "off", "off"]);
     expect(ONBOARDING_1TELA).toBe("off");
     expect(DIA1_CHEIO).toBe("off");
     expect(COBRANCA_V14).toBe("off");

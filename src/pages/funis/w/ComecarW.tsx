@@ -32,7 +32,8 @@ import { isNativeShell } from "@/lib/native-shell";
 import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, recuoDoPaywall } from "@/pages/funis/w/retomada";
 import { COMPROMISSOS_POR_AREA } from "@/pages/funis/w/compromissos";
 import { PlanoDe3Dias } from "@/pages/funis/w/PlanoDe3Dias";
-import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding } from "@/lib/onboarding-1tela";
+import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding, STEP_PLANO_3_DIAS } from "@/lib/onboarding-1tela";
+import { ofertaLigada } from "@/lib/ofertas-saida";
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
@@ -377,7 +378,8 @@ export default function ComecarW() {
     if (naWeb && !voltandoRef.current) { try { window.history.pushState({ w: s }, ""); } catch { /* noop */ } }
     // "offer" é emitido pelo PaywallW no mount (com braço e área) — emitir
     // aqui também contava 2 paywalls por sessão (varredura 02/09).
-    if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
+    // 10/10 (PLANO_CADEADO): a tela do plano diz se nasceu com o cadeado — a série fica comparável
+    if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}), ...(s === STEP_PLANO_3_DIAS && ofertaLigada("cadeado") ? { cadeado: true } : {}) });
     window.scrollTo(0, 0);
   };
 
@@ -401,7 +403,8 @@ export default function ComecarW() {
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       // "offer" já sai do PaywallW no mount — aqui só o registro da retomada
-      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: passoDoOnboarding(s), funil: FUNIL, retomada: true });
+      const passoRetomado = passoDoOnboarding(s);
+      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: passoRetomado, funil: FUNIL, retomada: true, ...(passoRetomado === STEP_PLANO_3_DIAS && ofertaLigada("cadeado") ? { cadeado: true } : {}) });
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
       const visivel = typeof document !== "undefined" ? document.visibilityState : "?";

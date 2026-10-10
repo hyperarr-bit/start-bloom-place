@@ -84,7 +84,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { comprarPresente69, comprarMensal19, lerPacoteDoMensal19, calcularEconomia } from "@/lib/revenuecat";
 import {
   lerChavesRemotas, registrarChavesRemotas, _zerarChavesRemotas, ofertaLigada, guardarForcaDasOfertas,
-  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL,
+  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL, PAYWALL_CURTO, PLANO_CADEADO,
 } from "@/lib/ofertas-saida";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
@@ -122,9 +122,9 @@ afterEach(() => { cleanup(); delete (window as { Capacitor?: unknown }).Capacito
 
 /* ───────────────────────────── as chaves ───────────────────────────── */
 describe("ofertas de saída — as chaves", () => {
-  it("as 6 constantes nascem 'off'", () => {
-    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL]).toEqual(["off", "off", "off", "off", "off", "off"]);
-    for (const n of ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao"] as const) expect(ofertaLigada(n)).toBe(false);
+  it("as 8 constantes nascem 'off'", () => {
+    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL, PAYWALL_CURTO, PLANO_CADEADO]).toEqual(["off", "off", "off", "off", "off", "off", "off", "off"]);
+    for (const n of ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao", "curto", "cadeado"] as const) expect(ofertaLigada(n)).toBe(false);
     // a metadata remota também conhece as duas novas
     registrarChavesRemotas({ current: { identifier: "d", metadata: { paywall_enxuto: "on", recuperacao_paywall: "on" } }, all: {} });
     expect(ofertaLigada("enxuto")).toBe(true);

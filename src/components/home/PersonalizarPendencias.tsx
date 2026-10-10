@@ -64,7 +64,8 @@ export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange }: 
                         <button
                           key={f}
                           type="button"
-                          onClick={() => onChange(comPeso(prefs, f))}
+                          // ao virar semanal, o dia nasce como HOJE ("a partir de hoje, toda semana"); já semanal, só troca a frequência
+                          onClick={() => onChange(comPeso(prefs, f, f === "semanal" && prefs.peso.frequencia !== "semanal" ? new Date().getDay() : undefined))}
                           aria-pressed={prefs.peso.frequencia === f}
                           className={`flex-1 py-1.5 rounded-lg text-[11px] font-medium border transition-colors ${prefs.peso.frequencia === f ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground"}`}
                         >

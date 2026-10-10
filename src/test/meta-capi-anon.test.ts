@@ -15,8 +15,11 @@ import {
   escolherSinal,
   ipDoCabecalho,
   jaEnviado,
+  linhaNovaRevenueCat,
   linhaRevenueCat,
   listarFaltantes,
+  normalizarEvento,
+  patchEventoExistente,
   MARCADOR_COMPRA,
   MARCADOR_TRIAL,
   parIpUa,
@@ -289,9 +292,13 @@ describe("o que este PR não desliga e o que o main ainda não tinha", () => {
     expect(s).toMatch(/9790:\s*\{\s*evento:\s*"compra_anual_97"/);
     expect(s).toMatch(/META_CAPI_ANON_ENVIAR/);
     expect(s).toMatch(/modo === "varredura"|modoPedido === "varredura"|varredura/);
+    expect(s).toMatch(/received_at\.gte/);
+    expect(s).toMatch(/event_at\.gte/);
+    expect(s).not.toMatch(/rc_event_id/);
+    expect(s).not.toMatch(/created_at\.gte\.\"\$\{desdeIso\}\"/);
   });
 
-  it("grava o anônimo (aliases e TRANSFER) antes de desistir da conta", () => {
+  it("grava no schema da Melhorias (id text, type, aliases text[], payload)", () => {
     const linha = linhaRevenueCat({
       id: "ev-1",
       type: "INITIAL_PURCHASE",
@@ -308,13 +315,32 @@ describe("o que este PR não desliga e o que o main ainda não tinha", () => {
       subscriber_attributes: { $idfv: { value: "IDFV-1" } },
     });
     expect(linha).toMatchObject({
-      rc_event_id: "ev-1",
-      event_type: "INITIAL_PURCHASE",
-      anonimo: true,
+      id: "ev-1",
+      type: "INITIAL_PURCHASE",
       user_id: null,
       original_transaction_id: "otx-1",
       app_user_id: "$RCAnonymousID:abc",
+      aliases: ["$RCAnonymousID:abc"],
+      ids_anonimos: ["$RCAnonymousID:abc"],
+      price_in_purchased_currency: 0,
     });
+    expect(linha).not.toHaveProperty("rc_event_id");
+    expect(linha).not.toHaveProperty("event_type");
+    expect(linha).not.toHaveProperty("anonimo");
+    expect(linha).not.toHaveProperty("price_cents");
+    expect(linha).not.toHaveProperty("created_at");
+    expect(linha).not.toHaveProperty("subscriber_attributes");
+    expect((linha?.payload as { subscriber_attributes?: unknown }).subscriber_attributes).toEqual({ $idfv: { value: "IDFV-1" } });
+
+    const nova = linhaNovaRevenueCat(linha as Record<string, unknown>, "2026-10-10T12:00:00.000Z");
+    expect(nova.received_at).toBe("2026-10-10T12:00:00.000Z");
+    expect(nova.origem).toBe("webhook");
+    const patch = patchEventoExistente({ ...linha, user_id: null, received_at: "nao-mexer", ligado_em: "nao-mexer", origem: "app" });
+    expect(patch).not.toHaveProperty("received_at");
+    expect(patch).not.toHaveProperty("ligado_em");
+    expect(patch).not.toHaveProperty("origem");
+    expect(patch).not.toHaveProperty("user_id");
+
     const transfer = linhaRevenueCat({
       id: "ev-2",
       type: "TRANSFER",
@@ -323,18 +349,115 @@ describe("o que este PR não desliga e o que o main ainda não tinha", () => {
       app_user_id: UID,
     });
     expect(transfer).toMatchObject({
-      event_type: "TRANSFER",
-      anonimo: false,
+      id: "ev-2",
+      type: "TRANSFER",
       user_id: UID,
-      transferred_from: ["$RCAnonymousID:abc"],
-      transferred_to: [UID],
+      ids_anonimos: ["$RCAnonymousID:abc"],
     });
+    expect((transfer?.payload as { transferred_from?: string[] }).transferred_from).toEqual(["$RCAnonymousID:abc"]);
     expect(linhaRevenueCat({ type: "TEST" })).toBeNull();
+    expect(linhaRevenueCat({ type: "INITIAL_PURCHASE" })).toBeNull();
 
     const hook = fonte("supabase/functions/revenuecat-webhook/index.ts");
     const grava = hook.indexOf("gravarEventoRevenueCat");
     const desiste = hook.indexOf('ignored: "anonimo"');
     expect(grava).toBeGreaterThan(0);
     expect(desiste).toBeGreaterThan(grava);
+    expect(hook).toMatch(/patchEventoExistente/);
+    expect(hook).not.toMatch(/rc_event_id/);
+    const inicioGrava = hook.indexOf("async function gravarEventoRevenueCat");
+    const gravaFn = hook.slice(inicioGrava, hook.indexOf("\nfunction json", inicioGrava));
+    expect(gravaFn).toMatch(/\.eq\("id", id\)/);
+    expect(gravaFn).not.toMatch(/onConflict/);
+  });
+
+  it("lê a linha que já está em produção (price numeric string, atributos no payload)", () => {
+    const row = {
+      id: "ev-1",
+      type: "INITIAL_PURCHASE",
+      user_id: null,
+      app_user_id: "$RCAnonymousID:abc",
+      original_app_user_id: "$RCAnonymousID:abc",
+      aliases: ["$RCAnonymousID:abc"],
+      ids_anonimos: ["$RCAnonymousID:abc"],
+      environment: "PRODUCTION",
+      store: "APP_STORE",
+      product_id: "core_anual_97",
+      period_type: "TRIAL",
+      event_at: "2026-10-09T15:00:00.000Z",
+      purchased_at: "2026-10-09T15:00:00.000Z",
+      expiration_at: "2026-10-16T15:00:00.000Z",
+      price: "0",
+      price_in_purchased_currency: "0",
+      currency: "BRL",
+      transaction_id: "tx-trial",
+      original_transaction_id: "otx-1",
+      is_trial_conversion: false,
+      payload: {
+        subscriber_attributes: {
+          $fbAnonId: { value: "fb-anon-1" },
+          $idfv: { value: "IDFV-1" },
+          $idfa: { value: "IDFA-1" },
+        },
+      },
+      received_at: "2026-10-09T15:00:01.000Z",
+    };
+    const c = classificarEventoApp(row);
+    expect(c.tipo).toBe("trial");
+    if (c.tipo === "ignorar") throw new Error(c.motivo);
+    expect(c.anonimo).toBe(true);
+    expect(c.eventId).toBe("otx-1");
+    expect(c.cents).toBe(9790);
+    expect(sinaisDeAtributos(c.atributos)).toEqual({ anon_id: "fb-anon-1", madid: "IDFA-1", vendor_id: "IDFV-1" });
+
+    const transfer = {
+      id: "ev-2",
+      type: "TRANSFER",
+      app_user_id: UID,
+      user_id: UID,
+      aliases: [] as string[],
+      ids_anonimos: ["$RCAnonymousID:abc"],
+      store: "APP_STORE",
+      payload: { transferred_from: ["$RCAnonymousID:abc"], transferred_to: [UID] },
+      received_at: "2026-10-09T16:00:00.000Z",
+    };
+    const norm = normalizarEvento(transfer);
+    expect(norm.transferred_from).toEqual(["$RCAnonymousID:abc"]);
+    expect(norm.ids_anonimos).toEqual(["$RCAnonymousID:abc"]);
+    const mapa = chavesPorUsuarioCore([normalizarEvento(row), norm]);
+    expect(mapa.get(UID)).toEqual(expect.arrayContaining(["otx-1", "tx-trial"]));
+
+    const assinatura: AssinaturaLoja = {
+      user_id: UID,
+      revenuecat_subscription_id: "sub_abc",
+      created_at: "2026-10-09T15:00:00.000Z",
+      current_period_start: "2026-10-09T15:00:00.000Z",
+      current_period_end: "2026-10-12T15:00:00.000Z",
+      billing_period: "annual",
+    };
+    const faltantes = listarFaltantes({
+      assinaturas: [assinatura],
+      eventos: [row, transfer],
+      marcadores: [{ event_name: MARCADOR_TRIAL, tx: "sub_abc" }],
+      agora: AGORA,
+    });
+    expect(faltantes.find((f) => f.tx === "otx-1" || f.tx === "sub_abc")).toBeUndefined();
+  });
+
+  it("a migration não abre schema paralelo em cima da tabela viva", () => {
+    const sql = fonte("supabase/migrations/20261010140000_meta_capi_anon_sinais.sql");
+    const eventos = sql.slice(0, sql.indexOf("app_capi_sinais"));
+    expect(sql).not.toMatch(/rc_event_id/);
+    expect(sql).not.toMatch(/event_type/);
+    expect(sql).not.toMatch(/price_cents/);
+    expect(eventos).not.toMatch(/^\s*id uuid/m);
+    expect(eventos).not.toMatch(/ADD COLUMN/);
+    expect(sql).toMatch(/to_regclass\('public\.revenuecat_events'\)/);
+    expect(sql).toMatch(/id text PRIMARY KEY/);
+    expect(sql).toMatch(/aliases text\[\]/);
+    expect(sql).toMatch(/ids_anonimos text\[\]/);
+    expect(sql).toMatch(/app_capi_sinais/);
+    expect(sql).toMatch(/meta-varredura-enviado/);
+    expect(sql).toMatch(/\{"modo":"varredura"\}/);
   });
 });

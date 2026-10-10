@@ -585,7 +585,7 @@ async function carregarEventosRc(
     const { data, error } = await admin
       .from("revenuecat_events")
       .select("*")
-      .or(`purchased_at.gte."${desdeIso}",created_at.gte."${desdeIso}"`)
+      .or(`purchased_at.gte."${desdeIso}",event_at.gte."${desdeIso}",received_at.gte."${desdeIso}"`)
       .range(from, from + 999);
     if (error) {
       log("revenuecat_events indisponivel", { msg: String(error.message ?? error).slice(0, 160) });
@@ -648,7 +648,7 @@ const sinalDe = (linhas: LinhaSinal[], userId: string | null, rc: string | null)
 const atributosDe = (eventos: EventoAppRC[], userId: string | null, rc: string | null) => {
   for (const e of eventos) {
     const casaUser = !!userId && (e.user_id === userId || (e.aliases ?? []).includes(userId) || (e.transferred_to ?? []).includes(userId));
-    const casaRc = !!rc && (e.app_user_id === rc || e.original_app_user_id === rc);
+    const casaRc = !!rc && (e.app_user_id === rc || e.original_app_user_id === rc || (e.aliases ?? []).includes(rc) || (e.ids_anonimos ?? []).includes(rc));
     if ((casaUser || casaRc) && e.subscriber_attributes && Object.keys(e.subscriber_attributes).length) return e.subscriber_attributes;
   }
   return null;

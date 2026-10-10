@@ -190,12 +190,16 @@ export interface EventoAppRC {
   app_user_id?: string | null;
   original_app_user_id?: string | null;
   aliases?: string[] | null;
+  /** text[] na tabela viva. Anônimos do evento, inclusive os do TRANSFER. */
+  ids_anonimos?: string[] | null;
   product_id?: string | null;
   store?: string | null;
   period_type?: string | null;
   transaction_id?: string | null;
   original_transaction_id?: string | null;
   purchased_at?: string | null;
+  event_at?: string | null;
+  received_at?: string | null;
   purchased_at_ms?: number | null;
   expiration_at_ms?: number | null;
   price_cents?: number | null;
@@ -212,39 +216,70 @@ export interface EventoAppRC {
   user_id?: string | null;
 }
 
-/** Aceita a coluna plana desta migration ou um jsonb `payload`/`raw`/`event` no formato do webhook. */
+const num = (v: unknown): number | null => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return null;
+};
+
+const objeto = (v: unknown): Record<string, unknown> | null =>
+  v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null;
+
+/** O payload da Melhorias pode ser o evento cru ou `{ event: {...} }`. */
+const desembrulharPayload = (v: unknown): Record<string, unknown> | null => {
+  const o = objeto(v);
+  if (!o) return null;
+  const interno = objeto(o.event);
+  return interno ? { ...interno, ...o } : o;
+};
+
+const isoMs = (v: unknown): string | null =>
+  typeof v === "number" && Number.isFinite(v) ? new Date(v).toISOString() : null;
+
+/**
+ * Linha viva (09/10): `id` text é o id do evento do RevenueCat, `type` é o
+ * tipo, `aliases` e `ids_anonimos` são text[]. `subscriber_attributes` e
+ * TRANSFER não são colunas — saem do `payload`. `price` numeric volta como
+ * string no PostgREST. Não há `rc_event_id`, `event_type` nem `created_at`.
+ */
 export const normalizarEvento = (row: Record<string, unknown>): EventoAppRC => {
-  const blob = [row.payload, row.raw, row.event].find((x) => x && typeof x === "object" && !Array.isArray(x)) as Record<string, unknown> | undefined;
-  const base: Record<string, unknown> = { ...(blob ?? {}), ...row };
-  const ms = typeof base.purchased_at_ms === "number" ? base.purchased_at_ms : null;
-  const purchased = str(base.purchased_at) ?? (ms ? new Date(ms).toISOString() : null);
+  const payload = desembrulharPayload(row.payload) ?? desembrulharPayload(row.raw) ?? desembrulharPayload(row.event);
+  const base: Record<string, unknown> = { ...(payload ?? {}), ...row };
+  const ms = num(base.purchased_at_ms);
+  const purchased = str(base.purchased_at) ?? (ms !== null ? new Date(ms).toISOString() : null);
+  const attrs = objeto(row.subscriber_attributes) ?? objeto(base.subscriber_attributes);
+  const fromCol = arr(row.transferred_from);
+  const toCol = arr(row.transferred_to);
+  const anonsCol = arr(row.ids_anonimos);
   return {
-    event_type: str(base.event_type) ?? str(base.type),
+    event_type: str(base.type) ?? str(base.event_type),
     type: str(base.type) ?? str(base.event_type),
     app_user_id: str(base.app_user_id),
     original_app_user_id: str(base.original_app_user_id),
     aliases: arr(base.aliases),
+    ids_anonimos: anonsCol.length ? anonsCol : arr(base.ids_anonimos),
     product_id: str(base.product_id),
     store: str(base.store),
     period_type: str(base.period_type),
     transaction_id: str(base.transaction_id),
     original_transaction_id: str(base.original_transaction_id),
     purchased_at: purchased,
+    event_at: str(base.event_at) ?? isoMs(base.event_timestamp_ms),
+    received_at: str(base.received_at),
     purchased_at_ms: ms,
-    price_cents: typeof base.price_cents === "number" ? base.price_cents : null,
-    price_in_purchased_currency: typeof base.price_in_purchased_currency === "number" ? base.price_in_purchased_currency : null,
-    price: typeof base.price === "number" ? base.price : null,
+    price_cents: num(base.price_cents),
+    price_in_purchased_currency: num(base.price_in_purchased_currency),
+    price: num(base.price),
     currency: str(base.currency),
     is_trial_conversion: base.is_trial_conversion === true,
-    subscriber_attributes: (base.subscriber_attributes && typeof base.subscriber_attributes === "object")
-      ? base.subscriber_attributes as Record<string, unknown>
-      : null,
+    subscriber_attributes: attrs,
     environment: str(base.environment),
-    rc_event_id: str(base.rc_event_id) ?? str(base.id),
-    id: str(base.id) ?? str(base.rc_event_id),
-    transferred_from: arr(base.transferred_from),
-    transferred_to: arr(base.transferred_to),
-    user_id: ehUuid(base.user_id) ? base.user_id : null,
+    // `id` da tabela É o id do evento. Não existe coluna rc_event_id.
+    rc_event_id: str(row.id) ?? str(base.id),
+    id: str(row.id) ?? str(base.id),
+    transferred_from: fromCol.length ? fromCol : arr(base.transferred_from),
+    transferred_to: toCol.length ? toCol : arr(base.transferred_to),
+    user_id: ehUuid(base.user_id) ? String(base.user_id) : null,
   };
 };
 
@@ -254,6 +289,9 @@ export const idsDoAssinante = (ev: EventoAppRC): { userId: string | null; anonim
   const appUserId = str(ev.app_user_id) ?? str(ev.original_app_user_id) ?? userId ?? "";
   return { userId, anonimo: !userId, appUserId };
 };
+
+const instanteDoEvento = (ev: EventoAppRC): string | null =>
+  ev.purchased_at ?? ev.event_at ?? ev.received_at ?? null;
 
 /** original_transaction_id primeiro: é o que não muda no TRANSFER. */
 export const chavesDedup = (ev: Pick<EventoAppRC, "original_transaction_id" | "transaction_id" | "rc_event_id" | "id">): string[] =>
@@ -288,7 +326,7 @@ export type ClasseApp =
     };
 
 export const classificarEventoApp = (bruto: EventoAppRC | Record<string, unknown>): ClasseApp => {
-  const ev = "event_type" in bruto || "app_user_id" in bruto ? bruto as EventoAppRC : normalizarEvento(bruto as Record<string, unknown>);
+  const ev = normalizarEvento(bruto as Record<string, unknown>);
   const tipoEv = String(ev.event_type ?? ev.type ?? "").toUpperCase();
   if (!tipoEv || tipoEv === "TEST") return { tipo: "ignorar", motivo: "teste_ou_vazio" };
   if (String(ev.environment ?? "").toUpperCase() === "SANDBOX") return { tipo: "ignorar", motivo: "sandbox" };
@@ -313,7 +351,7 @@ export const classificarEventoApp = (bruto: EventoAppRC | Record<string, unknown
     chaves: chavesDedup(ev),
     cents: cat.cents,
     billing: cat.billing,
-    quando: ev.purchased_at ?? new Date().toISOString(),
+    quando: instanteDoEvento(ev) ?? new Date().toISOString(),
     anonimo: quem.anonimo,
     userId: quem.userId,
     appUserId: quem.appUserId,
@@ -335,45 +373,80 @@ export const classificarEventoApp = (bruto: EventoAppRC | Record<string, unknown
   return { tipo: "ignorar", motivo: `tipo_${tipoEv.toLowerCase()}` };
 };
 
-/** Linha pra `revenuecat_events`. null = não gravar (TEST / vazio). Idempotente pela rc_event_id. */
+/**
+ * Linha no formato da tabela viva (Melhorias, 09/10). PK = `id` text do
+ * evento RC. `type`, não `event_type`. `aliases` / `ids_anonimos` são
+ * text[]. Atributos e TRANSFER vão dentro de `payload` — não há coluna
+ * subscriber_attributes. null = não gravar (TEST, vazio, ou sem id).
+ */
 export const linhaRevenueCat = (bruto: Record<string, unknown> | null | undefined): Record<string, unknown> | null => {
   const ev = (bruto?.event && typeof bruto.event === "object" ? bruto.event : bruto) as Record<string, unknown> | null | undefined;
   if (!ev || typeof ev !== "object") return null;
   const tipo = str(ev.type) ?? str(ev.event_type);
   if (!tipo || tipo.toUpperCase() === "TEST") return null;
+  const id = str(ev.id);
+  if (!id) return null;
   const norm = normalizarEvento(ev);
   const quem = idsDoAssinante(norm);
-  const moeda = String(norm.currency ?? "").toUpperCase();
-  const preco = typeof norm.price_in_purchased_currency === "number"
-    ? norm.price_in_purchased_currency
-    : (typeof norm.price === "number" ? norm.price : null);
-  const priceCents = moeda === "BRL" && preco !== null ? Math.round(preco * 100) : (typeof norm.price_cents === "number" ? norm.price_cents : null);
-  const purchasedMs = typeof ev.purchased_at_ms === "number" ? ev.purchased_at_ms : null;
-  const expirationMs = typeof ev.expiration_at_ms === "number" ? ev.expiration_at_ms : null;
-  const rcEventId = str(ev.id) ?? str(ev.rc_event_id);
+  const aliases = norm.aliases ?? [];
+  const from = norm.transferred_from ?? [];
+  const to = norm.transferred_to ?? [];
+  const idsAnonimos = unico([
+    norm.app_user_id, norm.original_app_user_id, ...aliases, ...from, ...to,
+  ]).filter((x) => x.startsWith("$RCAnonymousID"));
   return {
-    rc_event_id: rcEventId,
-    event_type: tipo,
+    id,
+    type: tipo,
+    user_id: quem.userId,
     app_user_id: norm.app_user_id,
     original_app_user_id: norm.original_app_user_id,
-    aliases: norm.aliases ?? [],
-    product_id: norm.product_id,
+    aliases,
+    ids_anonimos: idsAnonimos,
+    environment: norm.environment,
     store: norm.store,
+    product_id: norm.product_id,
     period_type: norm.period_type,
+    event_at: isoMs(ev.event_timestamp_ms) ?? norm.purchased_at,
+    purchased_at: isoMs(ev.purchased_at_ms) ?? norm.purchased_at,
+    expiration_at: isoMs(ev.expiration_at_ms),
+    grace_period_expiration_at: isoMs(ev.grace_period_expiration_at_ms),
+    motivo: str(ev.cancel_reason) ?? str(ev.expiration_reason),
+    price: num(ev.price),
+    price_in_purchased_currency: num(ev.price_in_purchased_currency),
+    currency: norm.currency,
     transaction_id: norm.transaction_id,
     original_transaction_id: norm.original_transaction_id,
-    purchased_at: purchasedMs ? new Date(purchasedMs).toISOString() : norm.purchased_at,
-    expiration_at: expirationMs ? new Date(expirationMs).toISOString() : null,
-    price_cents: priceCents,
-    currency: norm.currency,
     is_trial_conversion: norm.is_trial_conversion === true,
-    subscriber_attributes: norm.subscriber_attributes ?? {},
-    transferred_from: norm.transferred_from ?? [],
-    transferred_to: norm.transferred_to ?? [],
-    environment: norm.environment,
-    anonimo: quem.anonimo,
-    user_id: quem.userId,
+    country_code: str(ev.country_code),
+    offer_code: str(ev.offer_code),
+    payload: ev,
   };
+};
+
+/**
+ * Insert de linha nova. `received_at` nasce aqui. `origem` marca que foi
+ * este webhook. Não manda `ligado_em` — isso é de quem vinculou a conta.
+ */
+export const linhaNovaRevenueCat = (linha: Record<string, unknown>, agoraIso: string): Record<string, unknown> => ({
+  ...linha,
+  origem: "webhook",
+  received_at: agoraIso,
+});
+
+/**
+ * Update de linha que a Melhorias já gravou. Não reescreve received_at
+ * (senão evento velho entra na janela de 7 dias), nem ligado_em, nem origem.
+ * user_id null não apaga um vínculo que já existe.
+ */
+export const patchEventoExistente = (linha: Record<string, unknown>): Record<string, unknown> => {
+  const out: Record<string, unknown> = { ...linha };
+  delete out.received_at;
+  delete out.ligado_em;
+  delete out.origem;
+  for (const k of ["user_id", "motivo", "country_code", "offer_code", "grace_period_expiration_at", "expiration_at", "price", "price_in_purchased_currency", "currency", "product_id", "store", "period_type"]) {
+    if (out[k] == null) delete out[k];
+  }
+  return out;
 };
 
 export interface MarcadorCapi {
@@ -459,15 +532,21 @@ export const chavesDaAssinatura = (eventos: EventoAppRC[], userId: string, inici
   const inicio = inicioIso ? Date.parse(inicioIso) : NaN;
   const anons = new Set<string>();
   for (const ev of eventos) {
-    const ids = unico([ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? []), ...(ev.transferred_from ?? []), ...(ev.transferred_to ?? [])]);
+    const ids = unico([
+      ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? []), ...(ev.ids_anonimos ?? []),
+      ...(ev.transferred_from ?? []), ...(ev.transferred_to ?? []),
+    ]);
     if (!ids.includes(userId)) continue;
     for (const id of ids) if (id.startsWith("$RCAnonymousID")) anons.add(id);
   }
   const chaves: string[] = [];
   for (const ev of eventos) {
-    const ids = unico([ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? [])]);
+    const ids = unico([
+      ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? []), ...(ev.ids_anonimos ?? []),
+    ]);
     if (!ids.includes(userId) && !ids.some((id) => anons.has(id))) continue;
-    const quando = ev.purchased_at ? Date.parse(ev.purchased_at) : NaN;
+    const quandoIso = instanteDoEvento(ev);
+    const quando = quandoIso ? Date.parse(quandoIso) : NaN;
     if (Number.isFinite(inicio) && Number.isFinite(quando) && Math.abs(quando - inicio) > 24 * 3_600_000) continue;
     if (!Number.isFinite(quando)) continue;
     for (const c of chavesDedup(ev)) if (!chaves.includes(c)) chaves.push(c);
@@ -493,14 +572,17 @@ export const chavesPorUsuarioCore = (eventos: EventoAppRC[]): Map<string, string
     const chaves = chavesDedup(ev);
     const ids = unico([
       ev.app_user_id, ev.original_app_user_id,
-      ...(ev.aliases ?? []), ...(ev.transferred_from ?? []), ...(ev.transferred_to ?? []),
+      ...(ev.aliases ?? []), ...(ev.ids_anonimos ?? []),
+      ...(ev.transferred_from ?? []), ...(ev.transferred_to ?? []),
     ]);
     for (const id of ids) add(id, chaves);
   }
   for (const ev of eventos) {
     const uuids = unico([ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? []), ...(ev.transferred_to ?? [])]).filter(ehUuid);
-    const anons = unico([...(ev.transferred_from ?? []), ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? [])])
-      .filter((id) => id.startsWith("$RCAnonymousID"));
+    const anons = unico([
+      ...(ev.transferred_from ?? []), ...(ev.ids_anonimos ?? []),
+      ev.app_user_id, ev.original_app_user_id, ...(ev.aliases ?? []),
+    ]).filter((id) => id.startsWith("$RCAnonymousID"));
     for (const uid of uuids) {
       for (const anon of anons) add(uid, porId.get(anon) ?? []);
     }
@@ -529,7 +611,7 @@ export const listarFaltantes = (opts: {
 }): FaltanteCapi[] => {
   const agora = opts.agora ?? Date.now();
   const desde = agora - (opts.janelaMs ?? JANELA_VARREDURA_MS);
-  const eventos = opts.eventos.map((e) => ("app_user_id" in e && "event_type" in e ? e as EventoAppRC : normalizarEvento(e as Record<string, unknown>)));
+  const eventos = opts.eventos.map((e) => normalizarEvento(e as Record<string, unknown>));
   const faltantes: FaltanteCapi[] = [];
   const vistos = new Set<string>();
   const push = (f: FaltanteCapi) => {
@@ -563,7 +645,7 @@ export const listarFaltantes = (opts: {
   }
 
   for (const ev of eventos) {
-    const quandoEv = ev.purchased_at;
+    const quandoEv = instanteDoEvento(ev);
     if (!dentro(quandoEv, desde)) continue;
     const classe = classificarEventoApp(ev);
     if (classe.tipo === "ignorar") continue;

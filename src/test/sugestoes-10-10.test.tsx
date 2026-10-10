@@ -369,6 +369,42 @@ describe("3) Meta de calorias editável — lib", () => {
   });
 });
 
+describe("3) Meta de calorias editável — tela da Dieta (aba CARDÁPIO)", () => {
+  const DIA = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"][new Date().getDay()];
+  const seeds = {
+    "spotlight-done-dieta": "true",
+    "saude-meals-kcal": { [DIA]: { "Café da Manhã": 350, Almoço: 700, Janta: 600 } },
+  };
+  it("nasce Automática mostrando a soma do cardápio de hoje; Fixa grava o modo na chave nova e o número na chave ANTIGA; Automática de volta não apaga o número", async () => {
+    const { default: Dieta } = await import("@/pages/Dieta");
+    const store = criarStore(seeds);
+    store.montar(<Dieta />);
+    const campo = await screen.findByTestId("meta-kcal");
+    expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 1.650 kcal · soma do cardápio");
+    expect(within(campo).getByTestId("meta-kcal-auto")).toHaveAttribute("aria-pressed", "true");
+    expect(store.ler(CHAVE_META_KCAL_MODO)).toBeUndefined(); // abrir não grava nada
+
+    fireEvent.click(within(campo).getByTestId("meta-kcal-fixa"));
+    expect(store.ler(CHAVE_META_KCAL_MODO)).toBe("fixa");
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBeUndefined(); // sem número digitado nada vai pra chave antiga: o padrão 2000 vale nas duas pontas (app novo e antigo)
+    expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 2.000 kcal · fixa");
+    const input = within(campo).getByLabelText("Meta diária de calorias") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "1800" } });
+    fireEvent.blur(input);
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1800);
+    expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 1.800 kcal · fixa");
+    // fora da faixa não grava
+    fireEvent.change(input, { target: { value: "50" } });
+    fireEvent.blur(input);
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1800);
+
+    fireEvent.click(within(campo).getByTestId("meta-kcal-auto"));
+    expect(store.ler(CHAVE_META_KCAL_MODO)).toBe("auto");
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1800); // o número fica guardado
+    expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 1.650 kcal · soma do cardápio");
+  });
+});
+
 describe("3) Meta de calorias editável — widget da Home segue a mesma regra", () => {
   const DIA = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"][new Date().getDay()];
   const dieta = {

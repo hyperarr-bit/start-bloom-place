@@ -815,7 +815,7 @@ const Dieta = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setModoMeta("fixa"); if (!(Number(metaFixaBruta) > 0)) setMetaFixa(META_KCAL_PADRAO); }}
+                        onClick={() => setModoMeta("fixa")}
                         aria-pressed={modoMeta === "fixa"}
                         data-testid="meta-kcal-fixa"
                         className={`px-2.5 py-1.5 border-l border-border ${modoMeta === "fixa" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}

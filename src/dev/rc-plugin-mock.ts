@@ -61,6 +61,7 @@ const PRECOS_BASE: Record<string, string> = {
   core_anual_97: "R$ 97,90",
   core_anual_69: "R$ 69,90", // 01/10: braço B do teste de preço do iPhone
   core_mensal: "R$ 24,90",
+  core_mensal_19: "R$ 19,90", // 10/10: mensal de saída (offering mensal_19), produto a criar pelo dono
   core_vitalicio_97: "R$ 97,90",
   core_vitalicio: "R$ 27,90",
   core_vitalicio_19: "R$ 19,90",
@@ -121,7 +122,11 @@ export const Purchases: any = {
       // `localStorage.__rc_mock_presente_off` = "1" ensaia o metadata `presente: "off"`.
       let off = false;
       try { off = localStorage.getItem("__rc_mock_presente_off") === "1"; } catch { /* noop */ }
-      const atual = offeringIos();
+      // 10/10: as chaves remotas das ofertas de saída (ofertas-saida.ts) — `localStorage.__rc_mock_metadata`
+      // (JSON) vira o metadata da offering ATUAL, como se fosse o painel do RevenueCat.
+      let metadata: Record<string, unknown> = {};
+      try { metadata = JSON.parse(localStorage.getItem("__rc_mock_metadata") || "{}"); } catch { /* noop */ }
+      const atual = { ...offeringIos(), metadata };
       const anual69 = {
         identifier: "anual_69", metadata: off ? { presente: "off" } : {},
         availablePackages: [
@@ -129,7 +134,17 @@ export const Purchases: any = {
           { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal") },
         ],
       };
-      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69 } };
+      // 10/10: a offering `mensal_19` (core_mensal_19 em $rc_monthly). `__rc_mock_mensal19_off` = "1"
+      // ensaia a offering AUSENTE no painel (a chave ligada não pode inventar oferta).
+      let semMensal19 = false;
+      try { semMensal19 = localStorage.getItem("__rc_mock_mensal19_off") === "1"; } catch { /* noop */ }
+      const mensal19 = {
+        identifier: "mensal_19", metadata: {},
+        availablePackages: [
+          { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal_19") },
+        ],
+      };
+      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69, ...(semMensal19 ? {} : { mensal_19: mensal19 }) } };
     }
     // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
     return {
@@ -180,4 +195,6 @@ export const Purchases: any = {
   },
   async getCustomerInfo() { return info(); },
   async restorePurchases() { return info(); },
+  // 10/10: o init chama syncPurchases no boot (01/09); sem o método o mock só gerava um aviso no console
+  async syncPurchases() { return info(); },
 };

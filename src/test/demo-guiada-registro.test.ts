@@ -41,8 +41,11 @@ const conta = (inicial: Record<string, unknown> = {}) => {
 
 describe("lista fechada de chaves", () => {
   it("são exatamente as chaves reais dos 5 módulos da missão", () => {
+    // 10/10: + rotina-habits-checked / rotina-habits-week — o chip de hábito da missão em doses
+    // (conta vazia) cria o hábito E marca hoje, com o carimbo da semana
     expect([...CHAVES_DO_ITEM].sort()).toEqual([
-      "core-saude-water", "finance-expenses", "goals-board-v2", "rotina-habits", "saude-workouts-v2", "treino-active-days", "water-log",
+      "core-saude-water", "finance-expenses", "goals-board-v2", "rotina-habits", "rotina-habits-checked", "rotina-habits-week",
+      "saude-workouts-v2", "treino-active-days", "water-log",
     ]);
   });
 

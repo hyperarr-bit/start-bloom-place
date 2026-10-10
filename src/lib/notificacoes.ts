@@ -1305,6 +1305,64 @@ export async function cancelarAvisosDeCobranca(): Promise<void> {
   await limparFaixa(BASE_COBRANCA);
 }
 
+/*
+ * RECUPERAÇÃO DO PAYWALL (1.0.14, atrás de RECUPERACAO_PAYWALL — lib/ofertas-saida;
+ * estilo Enxovaly). Quem SAIU do paywall do funil sem iniciar o teste (o Voltar do
+ * ComecarW, evento `paywall_saiu`) recebe dois avisos locais: +3 h ("Seu plano de
+ * {área} ficou salvo — 3 dias grátis te esperando") e às 9h da manhã seguinte, com
+ * texto diferente. Só se a permissão de notificação JÁ existir — aqui não se pede
+ * nada. Cancelados quando o teste começa (qualquer compra no paywall). Na volta, a
+ * retomada do funil já cai direto no paywall (pages/funis/w/retomada.ts).
+ * `extra.tipo = "recuperacao_paywall"` → notif_toque tipo=recuperacao_paywall.
+ */
+const BASE_RECUPERACAO = 950000;
+export const HORAS_ATE_A_RECUPERACAO = 3;
+export const HORA_DA_MANHA_DA_RECUPERACAO = 9;
+
+/** Os dois horários: +3 h e a próxima 9h da manhã DEPOIS do primeiro aviso. */
+export function quandoRecuperacaoDoPaywall(agora: Date = new Date()): { tresHoras: Date; manha: Date } {
+  const tresHoras = new Date(agora.getTime() + HORAS_ATE_A_RECUPERACAO * 3600e3);
+  const manha = new Date(tresHoras.getFullYear(), tresHoras.getMonth(), tresHoras.getDate(), HORA_DA_MANHA_DA_RECUPERACAO, 0, 0, 0);
+  if (manha.getTime() <= tresHoras.getTime()) manha.setDate(manha.getDate() + 1);
+  return { tresHoras, manha };
+}
+
+export function copyDaRecuperacaoDoPaywall(area: string | null | undefined) {
+  const plano = area ? `Seu plano de ${area}` : "Seu plano";
+  return {
+    tresHoras: { title: `${plano} ficou salvo`, body: "3 dias grátis te esperando — é só abrir e começar. Nada é cobrado hoje." },
+    manha: { title: "Bom dia! Que tal começar hoje?", body: `${plano} está pronto do jeito que você deixou. 3 dias grátis, cancela quando quiser.` },
+  };
+}
+
+export type ResultadoRecuperacao = { ok: true; quando: { tresHoras: Date; manha: Date } } | { ok: false; motivo: string };
+
+/** Arma os dois avisos (substitui os anteriores). Nunca pede permissão. Emite recuperacao_paywall_armada {ok, motivo}. */
+export async function agendarRecuperacaoDoPaywall(area: string | null | undefined, agora: Date = new Date()): Promise<ResultadoRecuperacao> {
+  const falhou = (motivo: string): ResultadoRecuperacao => { trackEvent("recuperacao_paywall_armada", { ok: false, motivo }); return { ok: false, motivo }; };
+  const plug = await plugin();
+  if (!plug) return falhou("sem_plugin");
+  if (!(await temPermissao())) return falhou("sem_permissao");
+  await garantirCanal();
+  await limparFaixa(BASE_RECUPERACAO);
+  const quando = quandoRecuperacaoDoPaywall(agora);
+  const copy = copyDaRecuperacaoDoPaywall(area);
+  try {
+    await plug.LN.schedule({
+      notifications: [
+        { id: BASE_RECUPERACAO + 1, ...copy.tresHoras, schedule: { at: quando.tresHoras, allowWhileIdle: true }, channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA, extra: { tipo: "recuperacao_paywall", rota: "/app", em: quando.tresHoras.toISOString() } },
+        { id: BASE_RECUPERACAO + 2, ...copy.manha, schedule: { at: quando.manha, allowWhileIdle: true }, channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA, extra: { tipo: "recuperacao_paywall", rota: "/app", em: quando.manha.toISOString() } },
+      ],
+    });
+  } catch { return falhou("erro_agendar"); }
+  trackEvent("recuperacao_paywall_armada", { ok: true, em: [quando.tresHoras.toISOString(), quando.manha.toISOString()] });
+  return { ok: true, quando };
+}
+
+export async function cancelarRecuperacaoDoPaywall(): Promise<void> {
+  await limparFaixa(BASE_RECUPERACAO);
+}
+
 /* ------------------------------------------------------- régua do teste 3d */
 
 const BASE_TESTE = 800000;
@@ -1551,8 +1609,8 @@ export async function cancelarProximaDose(): Promise<void> {
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
  *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é
- *  o cartão recusado (10/10, +24 h/+72 h). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA } as const;
+ *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO } as const;
 
 /** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
 export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {

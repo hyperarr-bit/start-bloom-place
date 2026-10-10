@@ -59,17 +59,28 @@
  *    do botão e selo "economize N%" no anual (N dos preços REAIS: 12×mensal × anual).
  * A 2ª chance da folha da Apple (28/09) fica como está; os eventos ganham o campo
  * `segunda_chance` ("imediata" aqui; "saida"/"proxima_abertura" nas ofertas).
+ *
+ * SAÍDA SEM COMPRAR (1.0.14): `paywall_saiu {motivo: voltar|outro, segundos_na_tela,
+ * viu_oferta}` — uma vez por paywall aberto, quando a tela desmonta sem compra ou
+ * quando o app vai pro fundo (o 2º Voltar do iPhone MINIMIZA sem desmontar nada);
+ * "voltar" quando houve `core:voltar` nos últimos 10 s. Com RECUPERACAO_PAYWALL
+ * ligada, o 1º Voltar (e o app no fundo) armam os 2 avisos locais da recuperação
+ * (lib/notificacoes, faixa 950000) — cancelados ao abrir o paywall de novo e em
+ * qualquer compra que dê certo.
  */
+/** Um `core:voltar` nos últimos N ms faz a saída contar como "voltar". */
+export const JANELA_DO_VOLTAR_MS = 10_000;
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
-import { trackEvent } from "@/lib/analytics";
-import { type AreaKey } from "@/lib/funnel";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
+import { AREAS, type AreaKey } from "@/lib/funnel";
+import { isNativeShell } from "@/lib/native-shell";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
-import { pedirLembreteDoTeste } from "@/lib/notificacoes";
+import { agendarRecuperacaoDoPaywall, cancelarRecuperacaoDoPaywall, pedirLembreteDoTeste } from "@/lib/notificacoes";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
@@ -264,6 +275,32 @@ export function PaywallIOS({
   const presenteXTentadoRef = useRef(false);
   const comprandoRef = useRef(false);
   comprandoRef.current = comprando;
+  /* 1.0.14 — a saída sem compra (paywall_saiu) e a recuperação */
+  const abertoEmRef = useRef(Date.now());
+  const ultimoVoltarRef = useRef<number | null>(null);
+  const saiuRegistradoRef = useRef(false);
+  const compraFeitaRef = useRef(false);
+  const viuOfertaRef = useRef(false);
+  const recuperacaoArmadaRef = useRef(false);
+  if (presenteX || mensal19) viuOfertaRef.current = true;
+  const registrarSaida = (motivoForcado?: "voltar" | "outro", beacon = false) => {
+    if (saiuRegistradoRef.current || compraFeitaRef.current) return;
+    saiuRegistradoRef.current = true;
+    const voltou = ultimoVoltarRef.current != null && Date.now() - ultimoVoltarRef.current < JANELA_DO_VOLTAR_MS;
+    const dados = { funil: "ios", loja: "ios", area, motivo: motivoForcado ?? (voltou ? "voltar" : "outro"), segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: viuOfertaRef.current };
+    (beacon ? trackEventBeacon : trackEvent)("paywall_saiu", dados);
+  };
+  const armarRecuperacao = () => {
+    if (recuperacaoArmadaRef.current || compraFeitaRef.current || !isNativeShell() || !ofertaLigada("recuperacao")) return;
+    recuperacaoArmadaRef.current = true;
+    void agendarRecuperacaoDoPaywall(AREAS[area]?.nome ?? null).catch(() => { /* nunca derruba o paywall */ });
+  };
+  /** Toda compra que dá certo passa aqui: cancela a recuperação e segue pro cadastro. */
+  const concluir = () => {
+    compraFeitaRef.current = true;
+    void cancelarRecuperacaoDoPaywall().catch(() => { /* noop */ });
+    onPagoSemConta();
+  };
   // o mensal do paywall: com PAYWALL_TEXTOS, o preço real da loja (reserva: a constante de hoje)
   const precoMensalTxt = textos ? (precoMensalLoja ?? APP_PRECOS.mensal.preco) : APP_PRECOS.mensal.preco;
 
@@ -337,6 +374,27 @@ export function PaywallIOS({
     return () => window.removeEventListener("core:voltar", aoVoltar);
   }, []);
 
+  /* 1.0.14 — paywall_saiu + recuperação: o Voltar marca a hora (e arma a recuperação);
+   * o app no fundo registra a saída por beacon; o desmonte sem compra registra também.
+   * Abrir o paywall de novo cancela a recuperação pendente (ela voltou). */
+  useEffect(() => {
+    void cancelarRecuperacaoDoPaywall().catch(() => { /* noop */ });
+    const aoVoltar = () => { ultimoVoltarRef.current = Date.now(); armarRecuperacao(); };
+    const aoEsconder = () => {
+      if (document.visibilityState !== "hidden" || comprandoRef.current) return;
+      armarRecuperacao();
+      registrarSaida(undefined, true);
+    };
+    window.addEventListener("core:voltar", aoVoltar);
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => {
+      window.removeEventListener("core:voltar", aoVoltar);
+      document.removeEventListener("visibilitychange", aoEsconder);
+      registrarSaida();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [resgatouCodigo, setResgatouCodigo] = useState(false);
   /* SEGUNDA CHANCE (28/09): fechar a folha da Apple não gerava resposta
    * nenhuma — e 32% das compras vêm de quem fechou uma primeira vez. Só na
@@ -353,7 +411,7 @@ export function PaywallIOS({
     try {
       const rc = await import("@/lib/revenuecat");
       const ok = (await rc.restaurar()) || (await rc.compraVitaliciaLocal()) || (await rc.compraAssinaturaLocal());
-      if (ok) { trackEvent("funnel_click", { cta: "ios_ja_paguei_ok", funil: "ios" }); onPagoSemConta(); return; }
+      if (ok) { trackEvent("funnel_click", { cta: "ios_ja_paguei_ok", funil: "ios" }); concluir(); return; }
       setErro("Ainda não achei a compra. Espera uns segundos e toca de novo.");
     } catch { /* conferência nunca derruba o paywall */ }
     setConferindo(false);
@@ -381,7 +439,7 @@ export function PaywallIOS({
           void pedirLembreteDoTeste({ fimMs: rc.fimDaUltimaCompraTrial() ?? Date.now() + dias * 86400e3, precoAno: rc.precoAnualIos() ?? precoAnualTxt }).catch(() => { /* noop */ });
         }
         setSegundaChance("usada");
-        onPagoSemConta();
+        concluir();
         return;
       }
       /* RECUSA NA APPLE — e aqui acaba. Não existe escada: a folha é
@@ -684,7 +742,7 @@ export function PaywallIOS({
               }
             } catch { /* noop */ }
             setPresenteX(null);
-            onPagoSemConta();
+            concluir();
           }}
         />
       )}
@@ -696,7 +754,7 @@ export function PaywallIOS({
           onSucesso={() => {
             trackEvent("app_sheet_success", { produto: mensal19.produto, funil: "ios", loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
             setMensal19(null);
-            onPagoSemConta();
+            concluir();
           }}
         />
       )}

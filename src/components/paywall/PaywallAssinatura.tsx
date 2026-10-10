@@ -55,7 +55,58 @@ import { trackEvent } from "@/lib/analytics";
 import { estadoTeste, limparGuiaSemente } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste, pedirLembreteDoTeste } from "@/lib/notificacoes";
+import { ofertaLigada } from "@/lib/ofertas-saida";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+
+/**
+ * PAYWALL ENXUTO (1.0.14, chave PAYWALL_ENXUTO em lib/ofertas-saida — dono 10/10: "tem
+ * muita informação no paywall: 'O que você construiu', 'você está na conta tal', 'entrar
+ * com outra conta'"). Com a chave ligada, no gate e no /planos: acima da dobra fica só o
+ * título, as 2 colunas de preço, a prova social curta e o botão. "O que você construiu"
+ * só aparece com 2+ itens REAIS, colapsado numa linha ("Você já construiu 3 coisas · ver").
+ * Conta/trocar conta, Restaurar compras, Termos, Privacidade e Excluir conta viram UMA
+ * linha discreta no rodapé (RodapeEnxuto) — nada obrigatório da Apple/Play some: restore,
+ * termos, privacidade e o legal de renovação (sob o botão) continuam. Desligada, o paywall
+ * de hoje, byte a byte.
+ */
+function RodapeEnxuto({ contexto, trocarConta }: { contexto: ContextoPaywall; trocarConta: () => void }) {
+  const { user } = useAuth();
+  const [excluirAberto, setExcluirAberto] = useState(false);
+  const item = "underline underline-offset-2";
+  return (
+    <p className="mt-3 text-center text-[10.5px] leading-relaxed text-muted-foreground/80" data-testid="rodape-enxuto">
+      {contexto === "gate" && user && (
+        <>
+          <span className="whitespace-nowrap">Já tem conta? <button type="button" className={`${item} font-semibold`} onClick={trocarConta} data-testid="gate-trocar-conta">Entrar</button></span>
+          {" · "}
+        </>
+      )}
+      <button
+        type="button"
+        className={item}
+        onClick={async () => {
+          trackEvent("app_restore_paywall", {});
+          const rc = await import("@/lib/revenuecat");
+          if (await rc.restaurar()) window.location.href = "/";
+        }}
+      >
+        Restaurar compras
+      </button>
+      {" · "}
+      <a href="/termos" className={item}>Termos</a>
+      {" · "}
+      <a href="/privacidade" className={item}>Privacidade</a>
+      {user && (
+        <>
+          {" · "}
+          <button type="button" className={item} onClick={() => setExcluirAberto(true)}>Excluir conta</button>
+          <DeleteAccountDialog open={excluirAberto} onOpenChange={setExcluirAberto} />
+        </>
+      )}
+    </p>
+  );
+}
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
 
@@ -486,6 +537,19 @@ export function PaywallAssinatura({
   const folhaPrepaga = temEscadaPix() && (plano === "vitalicio" || loja.mensalVista);
 
   const barraFixa = contexto !== "planos";
+  /* 1.0.14 — PAYWALL_ENXUTO (só gate e /planos; o funil tem o paywall dele). A metadata do
+   * RevenueCat chega com as offerings do efeito acima (setLoja re-renderiza) — por isso é lido no render. */
+  const enxuto = contexto !== "funil" && ofertaLigada("enxuto");
+  const [recapAberto, setRecapAberto] = useState(false);
+  const recapReal = !recap[0]?.startsWith("Seu painel");
+  const trocarConta = async () => {
+    trackEvent("gate_trocar_conta", {});
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.signOut();
+    } catch { /* sem rede: o /entrar resolve */ }
+    navigate("/entrar", { replace: true });
+  };
 
   const caixaPendente = (
     <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12.5px] leading-snug p-3 mb-2.5">
@@ -659,9 +723,25 @@ export function PaywallAssinatura({
           produziu construção real (hábito marcado, conta armada) — é o
           material de deliberação de quem compra (autópsia: 108s lendo). O
           fallback genérico continua só fora do funil. */}
-      {(contexto !== "funil"
+      {enxuto && recapReal && recap.length >= 2 && (
+        <div className="rounded-2xl border border-border bg-white text-[#16121c] px-3.5 py-2.5 mb-3 text-left" data-testid="recap-enxuto">
+          <button type="button" className="w-full flex items-center justify-between gap-2 text-[12.5px] font-semibold" onClick={() => setRecapAberto((v) => !v)} aria-expanded={recapAberto}>
+            <span>Você já construiu {recap.length} coisas</span>
+            <span className="text-[11px] text-black/50 underline underline-offset-2">{recapAberto ? "fechar" : "ver"}</span>
+          </button>
+          {recapAberto && recap.map((r) => (
+            <div key={r} className="flex items-center gap-2.5 text-[12.5px] font-semibold py-0.5 first:mt-2">
+              <span className="min-w-[18px] min-h-[18px] rounded-full bg-emerald-500 text-white grid place-items-center shrink-0">
+                <Check className="w-3 h-3" strokeWidth={3.5} />
+              </span>
+              {r}
+            </div>
+          ))}
+        </div>
+      )}
+      {!enxuto && (contexto !== "funil"
         ? !(contexto === "planos" && teste.fase === "nunca")
-        : !recap[0]?.startsWith("Seu painel")) && (
+        : recapReal) && (
         <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5 mb-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-black/45 mb-2">
             O que você construiu
@@ -679,12 +759,12 @@ export function PaywallAssinatura({
 
       {/* O que entra: eco da grade viva da welcome — os 16 módulos na
           hora do preço, sem gastar altura (uma fileira só). */}
-      <div className="flex justify-center gap-1.5 mb-3">
+      {!enxuto && <div className="flex justify-center gap-1.5 mb-3">
         {([["💰", "#fdeccb"], ["📅", "#cdeeee"], ["💪", "#d9e4fb"], ["🥗", "#d7f0dd"], ["🎯", "#e6def8"], ["❤️", "#fbd8e8"], ["🧠", "#dcf3d2"]] as Array<[string, string]>).map(([e, c]) => (
           <span key={e} className="w-8 h-8 rounded-[10px] grid place-items-center text-[15px]" style={{ background: c }}>{e}</span>
         ))}
         <span className="w-8 h-8 rounded-[10px] grid place-items-center text-[10px] font-black bg-black/[0.06] text-black/50 dark:bg-white/10 dark:text-white/60">+9</span>
-      </div>
+      </div>}
 
       {/* DUAS COLUNAS (v82): mensal = âncora VIVA com frame de aluguel; o
           vitalício é o herói com a conta pronta. bg-white PROPOSITAL nos dois
@@ -759,20 +839,13 @@ export function PaywallAssinatura({
           na conta errada — ou criou uma sem querer no "Crie agora" do login
           antigo (80 contas assim em 17–24/09) — ficava entre pagar de novo e
           apagar o app. Mostra em que conta a pessoa está e deixa trocar. */}
-      {contexto === "gate" && user && (
+      {!enxuto && contexto === "gate" && user && (
         <p className="mt-3 text-center text-[12px] leading-snug text-muted-foreground" data-testid="gate-trocar-conta">
           Você está na conta <b className="text-foreground break-all">{user.email ?? "sem e-mail"}</b>.{" "}
           <button
             type="button"
             className="font-semibold text-foreground underline underline-offset-2"
-            onClick={async () => {
-              trackEvent("gate_trocar_conta", {});
-              try {
-                const { supabase } = await import("@/integrations/supabase/client");
-                await supabase.auth.signOut();
-              } catch { /* sem rede: o /entrar resolve */ }
-              navigate("/entrar", { replace: true });
-            }}
+            onClick={() => void trocarConta()}
           >
             Entrar com outra conta
           </button>
@@ -782,11 +855,12 @@ export function PaywallAssinatura({
       {/* /planos e GATE levam o AppLegalFooter completo (o gate tinha perdido
           o "Excluir conta" — exigência da Play pra conta logada). No funil a
           letra miúda mora na barra fixa. */}
-      {contexto !== "funil" && (
+      {contexto !== "funil" && !enxuto && (
         <div className="mt-2">
           <AppLegalFooter origem={`paywall_${contexto}`} />
         </div>
       )}
+      {contexto !== "funil" && enxuto && <RodapeEnxuto contexto={contexto} trocarConta={() => void trocarConta()} />}
 
       {barraFixa ? (
         <>

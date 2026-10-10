@@ -127,7 +127,7 @@ const esperarPostIt = () => { for (let i = 0; i < 12; i++) avancar(300); return 
 const tocarChipAteAFesta = () => {
   const postIt = esperarPostIt();
   fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-  avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
+  avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
   const entendi = screen.queryByTestId("missao-doses-entendi");
   if (entendi) fireEvent.click(entendi);
   return screen.getByTestId("missao-doses-festa");
@@ -255,6 +255,8 @@ describe("braço A: a missão de hoje + `variante: 'A'`", () => {
     ligarA();
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("A");
+    expect(screen.queryByTestId("missao-doses-vamos-la")).toBeNull(); // o A é a tela de hoje, uma só
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("1 toque por dia");
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "A", prototipo: "app" })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     const festa = tocarChipAteAFesta();
@@ -271,26 +273,45 @@ describe("braço A: a missão de hoje + `variante: 'A'`", () => {
 describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () => {
   const DIAS = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
-  it("boas-vindas B: 4 passos (3 doses + Arrumar sua Home), barra 0 de 4, botão 'Começar a dose 1 · 20 s'; dose 1 → faixa 'Missão · dose 1 de 4' (sem o módulo) → 'Bora a próxima? 20 s' + 'Agora não'", () => {
+  it("boas-vindas B em DUAS telas curtas: 'Tá dentro! 🎉' → 'Vamos lá' → 'Hoje é só 3 toques.' com as 3 doses e 'Começar'; dose 1 → faixa 'Missão · dose 1 de 4' (sem o módulo) → 'Bora a próxima? 20 s' + 'Agora não'", () => {
     ligarB();
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("B");
+    // tela 1: a comemoração por ter entrado — curta, sem lista, sem barra, sem link
+    const tela1 = screen.getByTestId("missao-doses-boas-vindas");
+    expect(tela1).toHaveAttribute("data-tela", "1");
+    expect(tela1).toHaveTextContent("Tá dentro! 🎉");
+    expect(tela1).toHaveTextContent("Seus 3 dias grátis começaram agora. Dá pra usar tudo.");
+    expect(screen.queryByTestId("missao-doses-linhas")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-explorar")).toBeNull();
+    expect(tela1).not.toHaveTextContent("4 passos");
+    expect(eventos).toContainEqual(["missao_doses_boas_vindas", expect.objectContaining({ acao: "view", tela: 1, variante: "B" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    expect(eventos).toContainEqual(["missao_doses_boas_vindas", expect.objectContaining({ acao: "vamos_la", tela: 1 })]);
+    // tela 2: só o essencial das doses
     const boas = screen.getByTestId("missao-doses-boas-vindas");
-    expect(boas).toHaveTextContent("3 toques hoje");
+    expect(boas).toHaveAttribute("data-tela", "2");
+    expect(boas).toHaveTextContent("Hoje é só 3 toques.");
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Um gasto, um hábito, um copo d'água. Uns 20 segundos cada.");
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("💰 Finanças · toca em 1 gasto de hoje");
+    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("📅 Rotina · cria 1 hábito e marca");
+    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("❤️ Saúde · marca 1 copo d'água");
+    expect(screen.getByTestId("missao-doses-depois")).toHaveTextContent("Depois a gente arruma sua Home junto.");
+    expect(screen.queryByTestId("missao-doses-linha-4")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-barra")).toBeNull();
     expect(boas).not.toHaveTextContent("AMANHÃ");
+    expect(boas).not.toHaveTextContent("4 passos");
+    expect(boas).not.toHaveTextContent("13 módulos");
     expect(boas).not.toHaveTextContent("1 toque por dia");
-    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Dose 1 · 💰 Finanças");
-    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("20 s");
-    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Dose 2 · 📅 Rotina");
-    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Dose 3 · ❤️ Saúde");
-    expect(screen.getByTestId("missao-doses-linha-4")).toHaveTextContent("Arrumar sua Home · 5 toques");
-    expect(screen.getByTestId("missao-doses-barra")).toHaveTextContent("0 de 4 hoje");
-    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent("Começar a dose 1 · 20 s");
+    expect(screen.getByTestId("missao-doses-trocar")).toHaveTextContent("Trocar os 3");
+    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent("Começar");
     // o rodapé colado: o link "Explorar" fica ACIMA do botão principal
     const rodape = screen.getByTestId("missao-doses-rodape");
     expect(rodape.querySelector("[data-testid='missao-doses-explorar']")!.compareDocumentPosition(rodape.querySelector("[data-testid='missao-doses-comecar']")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "B" })]);
+    expect(eventos).toContainEqual(["missao_doses_boas_vindas", expect.objectContaining({ acao: "view", tela: 2 })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+    expect(eventos).toContainEqual(["missao_doses_boas_vindas", expect.objectContaining({ acao: "comecar", tela: 2 })]);
     const faixa = screen.getByTestId("missao-doses-faixa");
     expect(faixa).toHaveTextContent("Missão · dose 1 de 4");
     expect(faixa).not.toHaveTextContent("Finanças");
@@ -322,7 +343,7 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     const gastos = store.dados["finance-expenses"] as Array<{ description: string; value: number }>;
     expect(gastos).toHaveLength(1);
     expect(gastos[0]).toMatchObject({ description: "Café", value: 12 });
-    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
+    avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     expect(screen.getByTestId("missao-doses-olhar")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("missao-doses-entendi"));
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Primeira dose feita!");
@@ -385,7 +406,7 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
     expect((store.dados["rotina-habits-checked"] as Record<string, boolean[]>)[DIAS_ROTINA[(new Date().getDay() + 6) % 7]]).toEqual([true]);
-    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
+    avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     const festa = screen.getByTestId("missao-doses-festa");
@@ -608,6 +629,7 @@ describe("1.0.14 — modo 'on' (todo mundo no B) e a avaliação ligada na miss�
     expect(lerMissao()?.braco).toBe("B");
     expect(localStorage.getItem(CHAVE_BRACO_DIA1)).toBeNull();
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "B" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     const festa = tocarChipAteAFesta();
     expect(festa).toHaveTextContent("Primeira dose feita!");
@@ -644,6 +666,7 @@ describe("1.0.14 — modo 'on' (todo mundo no B) e a avaliação ligada na miss�
   it("dose 1 de 3 (missão incompleta): não pede nota", () => {
     ligarB();
     montar(montarStore(dados()), "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     tocarChipAteAFesta();
     avancar(ESPERA_AVALIACAO_MS * 2);

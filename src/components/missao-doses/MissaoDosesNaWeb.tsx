@@ -212,13 +212,13 @@ function Ligada() {
         aoComecar={(modulos) => {
           const m = comModulos(modulos);
           salvar(m);
-          trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "comecar", modulos }));
+          trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "comecar", modulos, ...(B ? { tela: 2 } : {}) }));
           navigate(MODULOS[modulos[0]].rota);
         }}
         aoExplorar={(modulos) => {
           const m = { ...comModulos(modulos), explorou: true };
           salvar(m);
-          trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "explorar", modulos }));
+          trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "explorar", modulos, ...(B ? { tela: 2 } : {}) }));
           trackEvent("missao_pular", eventoDaMissao({ dia: 1, passo: "boas_vindas", segundos: 0, via: "link_boas_vindas" satisfies ViaDoPulo }));
         }}
       />

@@ -1,8 +1,17 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { MODULOS, ORDEM_MODULOS, TOTAL_PASSOS_B, diaDaSemanaDoPasso, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { Confete } from "@/components/demo-guiada/pecas";
+import { trackEvent } from "@/lib/analytics";
+import { MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+
+/** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
+const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
+  financas: "um gasto", rotina: "um hábito", saude: "um copo d'água", treino: "um exercício", dieta: "uma refeição", desenvolvimento: "uma meta",
+  hiperfoco: "um pensamento", estudos: "uma matéria", carreira: "uma tarefa", biblioteca: "um livro", casa: "um item da compra", beleza: "um passo da rotina",
+  viagens: "um destino", relacionamentos: "uma pessoa", pet: "o seu pet", detox: "um hábito de detox",
+};
 import "./missao-doses.css";
 
 type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
@@ -46,6 +55,12 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   braco?: "A" | "B" | null;
 }) {
   const [tela, setTela] = useState<"boas" | "escolha">("boas");
+  /** braço B: 1 = "Tá dentro!", 2 = as doses (a escolha dos 3 volta pra 2) */
+  const [telaB, setTelaB] = useState<1 | 2>(1);
+  useEffect(() => {
+    if (braco === "B") trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: telaB }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telaB]);
   const [modulos, setModulos] = useState<Tres>(missao.modulos);
   const [t0] = useState(() => Date.now());
   const B = braco === "B";
@@ -111,8 +126,72 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
           </div>
         </div>
         <RodapeColado>
-          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" onClick={() => setTela("boas")}>
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" onClick={() => { setTela("boas"); setTelaB(2); }}>
             Pronto, começar <ArrowRight className="w-4 h-4" />
+          </button>
+        </RodapeColado>
+      </div>
+    );
+  }
+
+  /* ── BRAÇO B (10/10, dono: "muita informação, copy muito IA") — DUAS telas curtas ──
+     1) a comemoração por ter entrado; 2) as 3 doses, só o essencial. Nada de barra, "4 passos", "13 módulos". */
+  if (B && telaB === 1) {
+    return (
+      <div className="fixed inset-0 z-[240] flex flex-col text-[#16121c]" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="B" data-tela="1" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)", paddingTop: "var(--app-safe-top)" }}>
+        <Confete />
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[420px] mx-auto flex flex-col items-center px-6 pt-[18vh] text-center">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 17, delay: 0.1 }} className="w-20 h-20 rounded-full bg-emerald-500 grid place-items-center mb-5 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
+              <Check className="w-10 h-10 text-white" strokeWidth={3.5} />
+            </motion.div>
+            <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
+            <p className="text-[16px] text-[#4f5a64] mt-3 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram agora. Dá pra usar tudo.</p>
+          </div>
+        </div>
+        <RodapeColado>
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-vamos-la" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "vamos_la", tela: 1 })); setTelaB(2); }}>
+            Vamos lá <ArrowRight className="w-4 h-4" />
+          </button>
+        </RodapeColado>
+      </div>
+    );
+  }
+  if (B) {
+    const dose = (m: ModuloDaMissao) => {
+      const cfg = MODULOS[m];
+      const pedido = m === "rotina" ? "cria 1 hábito e marca" : cfg.pedido.charAt(0).toLowerCase() + cfg.pedido.slice(1);
+      return `${cfg.emoji} ${cfg.nome} · ${pedido}`;
+    };
+    const resumo = modulos.map((m) => RESUMO_DA_DOSE[m] ?? MODULOS[m].toque).join(", ");
+    return (
+      <div className="fixed inset-0 z-[240] flex flex-col text-[#16121c]" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="B" data-tela="2" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)", paddingTop: "var(--app-safe-top)" }}>
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[10vh]">
+            <h1 className="text-[30px] font-black tracking-[-0.03em] leading-[1.08]">Hoje é só 3 toques.</h1>
+            <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{resumo.charAt(0).toUpperCase() + resumo.slice(1)}. Uns 20 segundos cada.</p>
+            <div className="mt-6 flex items-baseline justify-between">
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64]">Hoje</span>
+              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>Trocar os 3</button>
+            </div>
+            <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
+              {modulos.map((m, i) => (
+                <div key={m} className="md-linha" data-testid={`missao-doses-linha-${i + 1}`}>
+                  <Quadradinho marcado={false} tam={18} />
+                  <span className="md-linha-texto">{dose(m)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[12.5px] text-[#4f5a64] mt-3" data-testid="missao-doses-depois">Depois a gente arruma sua Home junto.</p>
+          </div>
+        </div>
+        {/* dono 10/10: o link fica ABAIXO do botão (como a welcome) — link em cima do botão "não faz sentido" */}
+        <RodapeColado>
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
+            Começar <ArrowRight className="w-4 h-4" />
+          </button>
+          <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
+            Explorar por conta própria
           </button>
         </RodapeColado>
       </div>
@@ -127,67 +206,41 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             <Check className="w-7 h-7 text-white" strokeWidth={3.5} />
           </motion.div>
           <h1 className="text-[26px] font-black tracking-[-0.03em] leading-[1.1] text-center">Seu CORE tá pronto{nome ? `, ${nome}` : ""}.</h1>
-          {B ? (
-            <p className="text-[13.5px] text-[#4f5a64] text-center mt-2 mb-5 leading-snug" data-testid="missao-doses-subtitulo">
-              <b className="text-[#16121c]">3 toques hoje</b>, uns 20 segundos cada, e a Home do seu jeito — o app já é seu.
-            </p>
-          ) : (
-            <p className="text-[13.5px] text-[#4f5a64] text-center mt-2 mb-5 leading-snug">
-              Os <b className="text-[#16121c]">16 módulos</b> já estão liberados. A missão abaixo é só um jeito de começar: <b className="text-[#16121c]">1 toque por dia</b>, 3 dias, uns 40 segundos cada.
-            </p>
-          )}
+          <p className="text-[13.5px] text-[#4f5a64] text-center mt-2 mb-5 leading-snug">
+            Os <b className="text-[#16121c]">16 módulos</b> já estão liberados. A missão abaixo é só um jeito de começar: <b className="text-[#16121c]">1 toque por dia</b>, 3 dias, uns 40 segundos cada.
+          </p>
 
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 24 }} className="rounded-2xl bg-white overflow-hidden shadow-[0_24px_48px_-18px_rgba(20,60,110,.35)] border border-black/[0.06]">
             <div className="md-secao" data-cor="grafite">
-              <span className="inline-flex items-center gap-2"><Quadradinho marcado={false} claro tam={14} /> {B ? "Sua missão de hoje" : "Sua missão dos 3 dias"}</span>
-              <b>{B ? `${TOTAL_PASSOS_B} passos` : "1 toque por dia"}</b>
+              <span className="inline-flex items-center gap-2"><Quadradinho marcado={false} claro tam={14} /> Sua missão dos 3 dias</span>
+              <b>1 toque por dia</b>
             </div>
             <div className="px-4 pt-3.5">
               <div className="h-2 rounded-full bg-black/10 overflow-hidden">
-                <motion.div className="h-full rounded-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: B ? "4%" : "25%" }} transition={{ duration: 0.8, delay: 0.5 }} />
+                <motion.div className="h-full rounded-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: "25%" }} transition={{ duration: 0.8, delay: 0.5 }} />
               </div>
-              <p className="text-[11px] text-[#4f5a64] font-semibold mt-1.5" data-testid="missao-doses-barra">{B ? `0 de ${TOTAL_PASSOS_B} hoje` : "Conta criada ✓ · 3 toques e a missão está cumprida"}</p>
+              <p className="text-[11px] text-[#4f5a64] font-semibold mt-1.5" data-testid="missao-doses-barra">Conta criada ✓ · 3 toques e a missão está cumprida</p>
             </div>
             <div className="mx-4 mt-3 rounded-xl border border-black/10 overflow-hidden divide-y divide-black/10" data-testid="missao-doses-linhas">
               {linhas.map(({ n, cfg, quando }) => (
-                <div key={n} className={`md-linha${B && n !== 1 ? " opacity-60" : ""}`} data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
+                <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
                   <Quadradinho marcado={false} tam={18} />
                   <span className="min-w-0 flex-1">
                     <span className="md-linha-rotulo">{quando} · {cfg.emoji} {cfg.nome}</span>
-                    <span className="md-linha-texto">{B ? `${cfg.pedido} · 20 s` : `${cfg.pedido}${n === 1 ? " · 10 s" : ""}`}</span>
+                    <span className="md-linha-texto">{cfg.pedido}{n === 1 ? " · 10 s" : ""}</span>
                   </span>
                   <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"}>{pill(n)}</span>
                 </div>
               ))}
-              {/* B (10/10, dono): o 4º passo é arrumar a Home (o tour, 5 toques) — a pessoa sabe desde o início que tem mais um */}
-              {B && (
-                <div className="md-linha opacity-60" data-testid="missao-doses-linha-4">
-                  <Quadradinho marcado={false} tam={18} />
-                  <span className="min-w-0 flex-1">
-                    <span className="md-linha-rotulo">Passo 4 · 🏡 Sua Home</span>
-                    <span className="md-linha-texto">Arrumar sua Home · 5 toques</span>
-                  </span>
-                  <span className="md-pill" data-tom="dia">depois</span>
-                </div>
-              )}
             </div>
             <div className="px-4 pt-3 pb-4">
-              {B ? (
-                <p className="text-[12.5px] text-[#4f5a64] leading-snug">
-                  Os outros 13 módulos seguem abertos ·{" "}
-                  <button type="button" className="text-[12.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>Trocar os 3</button>
-                </p>
-              ) : (
-                <>
-                  <p className="text-[12.5px] text-[#4f5a64] leading-snug">
-                    {areaNome ? <>Você escolheu <b className="text-[#16121c]">{areaNome}</b> na porta — ela vem primeiro. </> : null}
-                    Só esses 3 entram na missão; <b className="text-[#16121c]">os outros 13 seguem abertos</b>.
-                  </p>
-                  <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>
-                    Trocar os 3 módulos →
-                  </button>
-                </>
-              )}
+              <p className="text-[12.5px] text-[#4f5a64] leading-snug">
+                {areaNome ? <>Você escolheu <b className="text-[#16121c]">{areaNome}</b> na porta — ela vem primeiro. </> : null}
+                Só esses 3 entram na missão; <b className="text-[#16121c]">os outros 13 seguem abertos</b>.
+              </p>
+              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>
+                Trocar os 3 módulos →
+              </button>
             </div>
           </motion.div>
         </div>

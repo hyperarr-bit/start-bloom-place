@@ -27,6 +27,51 @@ type Fase = "achar" | "anotar" | "registrou" | "olhar" | "festa";
 export type ViaDoPulo = "link_boas_vindas" | "faixa_20s" | "toque_fora" | "passo";
 
 const visivel = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 8 && r.height > 8; };
+
+/* 10/10 (dono: "ficou muito rápido o MEU MÊS; deixa mais embaixo e lento pra o usuário ver") — a rolagem até o
+ * card é ANIMADA à mão (rAF, ease-in-out, ~1 s): o `behavior: smooth` no WKWebView é curto/instantâneo e, quando o
+ * scroller é um container (não o window), nem anima. O card para com o TOPO a ~55 % da altura visível — a metade
+ * de baixo — pra o balão "Olha o seu mês" caber ACIMA dele sem tampar o cabeçalho nem os chips Entrou/Saiu. */
+export const ROLAGEM_DO_OLHAR = { duracaoMs: 1000, fracaoDoTopo: 0.54, pausaMs: 500, numeroS: 1.5 };
+/** O scroller real do elemento: o ancestral com overflow rolável e conteúdo maior que a janela, senão o window. */
+export const scrollerDe = (el: Element): HTMLElement | Window => {
+  let p: HTMLElement | null = el.parentElement;
+  while (p && p !== document.body && p !== document.documentElement) {
+    try {
+      const ov = getComputedStyle(p).overflowY;
+      if ((ov === "auto" || ov === "scroll") && p.scrollHeight > p.clientHeight + 4) return p;
+    } catch { /* noop */ }
+    p = p.parentElement;
+  }
+  return window;
+};
+const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+/** Rola até o topo do `el` ficar em `fracao` da altura visível, animado; chama `aoTerminar` quando parar
+ *  (callback síncrono, não promessa: nos testes com relógio falso a microtask só rodaria depois do teste). */
+export function rolarAte(el: Element, fracao: number, duracaoMs: number, aoTerminar: () => void): void {
+  const resolve = aoTerminar;
+  {
+    const scroller = scrollerDe(el);
+    const janela = scroller === window;
+    const altura = janela ? (window.visualViewport?.height ?? window.innerHeight) : (scroller as HTMLElement).clientHeight;
+    const topoScroller = janela ? 0 : (scroller as HTMLElement).getBoundingClientRect().top;
+    const de = janela ? window.scrollY : (scroller as HTMLElement).scrollTop;
+    const alvoY = de + (el.getBoundingClientRect().top - topoScroller) - altura * fracao;
+    const max = janela ? Math.max(0, document.documentElement.scrollHeight - altura) : Math.max(0, (scroller as HTMLElement).scrollHeight - altura);
+    const para = Math.max(0, Math.min(max, alvoY));
+    const ir = (y: number) => { if (janela) window.scrollTo(0, y); else (scroller as HTMLElement).scrollTop = y; };
+    if (duracaoMs <= 0 || Math.abs(para - de) < 2) { ir(para); resolve(); return; }
+    // quadros por setTimeout de 16 ms com Date.now (não rAF/performance.now): no WKWebView dá os mesmos ~60 fps e,
+    // nos testes com relógio falso, a animação anda junto com o relógio
+    const t0 = Date.now();
+    const passo = () => {
+      const t = Math.min(1, (Date.now() - t0) / duracaoMs);
+      ir(de + (para - de) * easeInOut(t));
+      if (t < 1) window.setTimeout(passo, 16); else resolve();
+    };
+    passo();
+  }
+}
 const significativo = (v: unknown): boolean => {
   if (v == null) return false;
   if (Array.isArray(v)) return v.length > 0;
@@ -244,15 +289,19 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       setAnelVivo(false);
       const el = alvoCfg?.olhar?.achar() ?? null;
       if (el && visivel(el)) {
-        // 10/10 (dono: "tinha que mostrar mais o MEU MÊS"): rola o card até o MEIO da tela antes do anel
-        // (o anel re-mede na rolagem); a festa só vem no "Entendi" ou depois dos 15 s
-        try { el.scrollIntoView({ block: "center", behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
-        timers.push(window.setTimeout(() => {
+        // 10/10: rolagem VISÍVEL até o card (metade de baixo) → pausa → o anel acende e o balão entra → o número
+        // conta por 1,5 s; a festa só no "Entendi" ou 15 s depois do balão (o relógio do Anel nasce com ele)
+        const mostrar = () => {
           if (faseRef.current !== "registrou") return;
           setOlharEm(el);
           setFase("olhar");
           trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view" }));
-        }, reduzir ? 0 : 450));
+        };
+        try {
+          rolarAte(el, ROLAGEM_DO_OLHAR.fracaoDoTopo, reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
+            if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, ROLAGEM_DO_OLHAR.pausaMs));
+          });
+        } catch { mostrar(); }
       } else {
         setFase("festa");
       }
@@ -403,7 +452,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
                     <span className="text-[12px] text-white/50">{numero.titulo}:</span>
                     <span className="text-[13px] text-white/50 line-through tabular-nums">{numero.formatar(numero.antes)}</span>
                     <span className="text-white/50 text-[13px]">→</span>
-                    <span className="text-[22px] font-black tracking-tight leading-none"><ContaSubindo de={numero.antes} para={numero.depois} formatar={numero.formatar} /></span>
+                    <span className="text-[22px] font-black tracking-tight leading-none"><ContaSubindo de={numero.antes} para={numero.depois} formatar={numero.formatar} duracao={ROLAGEM_DO_OLHAR.numeroS} /></span>
                   </span>
                 )}
                 <div className="mt-3 flex items-center gap-3">

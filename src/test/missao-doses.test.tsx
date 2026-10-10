@@ -103,7 +103,7 @@ const rota = () => screen.getByTestId("rota").textContent;
  */
 const esperarPostIt = () => { avancar(400); avancar(3000); return screen.getByTestId("demo-guia-postit"); };
 /** Depois do registro: 550 ms → o olhar (anel assenta em ~700 ms) ou direto a comemoração. */
-const esperarOlharOuFesta = () => { avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */ };
+const esperarOlharOuFesta = () => { avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */ };
 const passarPeloOlhar = () => { esperarOlharOuFesta(); const b = screen.queryByTestId("missao-doses-entendi"); if (b) fireEvent.click(b); };
 
 beforeEach(() => {

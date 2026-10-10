@@ -157,7 +157,7 @@ const esperarPostIt = () => { for (let i = 0; i < 12; i++) avancar(300); return 
 const tocarChipAteAFesta = () => {
   const postIt = esperarPostIt();
   fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-  avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
+  avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
   const entendi = screen.queryByTestId("missao-doses-entendi");
   if (entendi) fireEvent.click(entendi);
   return screen.getByTestId("missao-doses-festa");
@@ -208,12 +208,13 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
   it("conta VAZIA: boas-vindas (4 passos) → dose 1 (chip Café) → dose 2 (hábito pronto, sem hábito na conta) → dose 3 (copo) → 'Arrumar minha Home' → tour com a faixa 'Missão · 4 de 4' (5 passos) → missão completa ('Casa arrumada' destrancado) → plano de amanhã (a última coisa) → a avaliação 1,5 s depois de cada", async () => {
     const store = montarStore(dados());
     montar(store, "/home");
-    // a Home nasce com a missão por cima: nada de tour; a boas-vindas B mostra os 4 passos
-    const boas = screen.getByTestId("missao-doses-boas-vindas");
-    expect(boas).toHaveTextContent("3 toques hoje");
-    expect(screen.getByTestId("missao-doses-linha-4")).toHaveTextContent("Arrumar sua Home · 5 toques");
-    expect(screen.getByTestId("missao-doses-barra")).toHaveTextContent("0 de 4 hoje");
+    // a Home nasce com a missão por cima: nada de tour; a boas-vindas B em 2 telas ("Tá dentro!" → as 3 doses)
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Tá dentro! 🎉");
     expect(screen.queryByTestId("tour-home")).toBeNull();
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    const boas = screen.getByTestId("missao-doses-boas-vindas");
+    expect(boas).toHaveTextContent("Hoje é só 3 toques.");
+    expect(screen.getByTestId("missao-doses-depois")).toHaveTextContent("Depois a gente arruma sua Home junto.");
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(lerMissao()?.braco).toBe("B");
     expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
@@ -237,7 +238,7 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     avancar(400); avancar(3000);
     expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("2 de 2 · marcar");
     fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
-    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
+    avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Segunda dose feita!");
@@ -310,6 +311,7 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
 
   it("quem pulou a missão ('Explorar por conta própria'): o tour entra direto na Home", async () => {
     montar(montarStore(dados()), "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
     fireEvent.click(screen.getByTestId("missao-doses-explorar"));
     expect(lerMissao()?.explorou).toBe(true);
     await respirar(10);

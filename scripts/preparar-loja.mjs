@@ -187,6 +187,21 @@ if (escaparam.length) {
   process.exit(1);
 }
 
+// 3b. (10/10) build de PRODUÇÃO não pode carregar o caminho do "assinante do mock" (lib/rc-mock):
+// com __RC_MOCK__ false o esbuild elimina o código morto; se a marca sobrou, algo mudou — para.
+if (!teste) {
+  const dirJs = join(ASSETS, "assets");
+  const comMarca = existsSync(dirJs)
+    ? readdirSync(dirJs).filter((f) => f.endsWith(".js") && readFileSync(join(dirJs, f), "utf8").includes("__rc_mock_assinante"))
+    : [];
+  if (comMarca.length) {
+    console.error(`\n✗ o JS do binário de produção carrega a marca do assinante do MOCK (${comMarca.join(", ")}).`);
+    console.error("  Veja src/lib/rc-mock.ts: __RC_MOCK__ tem que ser false e o caminho tem que morrer no build.\n");
+    process.exit(1);
+  }
+  console.log("  ✓ sem o assinante do mock no JS");
+}
+
 // 4. tira o peso morto
 const antes = tamanho(ASSETS);
 for (const alvo of MORTO) {

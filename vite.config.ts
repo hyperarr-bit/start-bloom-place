@@ -31,6 +31,9 @@ export default defineConfig(({ mode }) => ({
   // outras (VITE_SUPABASE_URL etc). Foi o que quebrou o smoke agora há pouco.
   define: {
     __APP_VERSION__: JSON.stringify(versaoDoApp),
+    // 10/10: true SÓ no build de TESTE (RC_MOCK=1, do `npm run loja -- --teste`) — é o que deixa
+    // o use-auth tratar a compra do mock como assinatura (lib/rc-mock). Produção: false.
+    __RC_MOCK__: JSON.stringify(process.env.RC_MOCK === "1"),
   },
   server: {
     host: "::",

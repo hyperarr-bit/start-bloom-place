@@ -5,6 +5,7 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { vincularOrigem } from "@/lib/analytics";
 import { vincularCompraAnonima } from "@/lib/sessao-anonima";
+import { assinaturaDoMock, diasDoTesteDoMock } from "@/lib/rc-mock";
 
 // Purge cached user data on sign-out so nothing leaks across accounts on the
 // same browser. Kept inline (no import from use-user-data) to avoid a circular
@@ -201,6 +202,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const checkSubscriptionStatus = async () => {
+    /* 10/10 — BUILD DE TESTE (RC_MOCK=1) só: a compra do mock da loja vale como assinatura
+     * (o servidor nunca recebe webhook do RevenueCat no Simulador — sem isto a pessoa pagava
+     * no mock e caía no gate). Fora do build de mock, assinaturaDoMock() é sempre null. */
+    const mock = assinaturaDoMock();
+    if (mock) {
+      const { trialDay: diaDoTeste, trialHoursLeft: horasDoTeste } = diasDoTesteDoMock(mock);
+      setIsSubscribed(true);
+      setTrialExpired(false);
+      setNoTrial(false);
+      setInGracePeriod(false);
+      setGraceDaysLeft(null);
+      setPaymentMethod(isNativeShell() ? "app_store" : "mock");
+      setBillingPeriod(mock.billingPeriod);
+      setSubscriptionEnd(new Date(mock.fimMs).toISOString());
+      if (mock.emTeste) { setTrialDay(diaDoTeste); setTrialHoursLeft(horasDoTeste); }
+      setSubLoaded(true);
+      return;
+    }
     try {
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) {

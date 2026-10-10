@@ -28,7 +28,33 @@ const compras = (): string[] => {
   try { return JSON.parse(localStorage.getItem(CHAVE) || "[]"); } catch { return []; }
 };
 const gravarCompra = (id: string) => {
-  try { localStorage.setItem(CHAVE, JSON.stringify([...compras(), id])); } catch { /* noop */ }
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify([...compras(), id]));
+    // 10/10 (lib/rc-mock): o use-auth do build de TESTE lê isto como assinatura — o servidor
+    // nunca recebe webhook do RevenueCat no Simulador, e sem a marca a pessoa caía no gate.
+    localStorage.setItem("__rc_mock_assinante", "1");
+    localStorage.setItem("__rc_mock_produto", id);
+    if (!localStorage.getItem("__rc_mock_compra_em")) localStorage.setItem("__rc_mock_compra_em", String(Date.now()));
+  } catch { /* noop */ }
+};
+// 10/10: o entitlement da compra simulada, como o RevenueCat devolveria — TRIAL de 3 dias no
+// anual do iPhone (oferta introdutória), NORMAL no resto. É o que conferirTrialCartao,
+// anotarTrialDaCompra, compraNaLojaSemConta e reconciliarSePreciso leem.
+const entitlementDaCompra = () => {
+  const ids = compras();
+  const id = ids[ids.length - 1];
+  if (!id || ehVitalicio(id)) return {};
+  let compraEm = Date.now();
+  try { compraEm = Number(localStorage.getItem("__rc_mock_compra_em")) || compraEm; } catch { /* noop */ }
+  const trial = /^core_anual(_\d+)?$/.test(id);
+  const fim = compraEm + (trial ? 3 : /^core_anual/.test(id) ? 365 : 30) * 86_400_000;
+  return {
+    pro: {
+      identifier: "pro", isActive: true, willRenew: true, periodType: trial ? "TRIAL" : "NORMAL",
+      productIdentifier: id, store: "APP_STORE", latestPurchaseDateMillis: compraEm, expirationDateMillis: fim,
+      originalPurchaseDateMillis: compraEm, billingIssueDetectedAt: null, unsubscribeDetectedAt: null,
+    },
+  };
 };
 
 const modo = (): string => (window as any).__rcModo || "compra";
@@ -45,9 +71,10 @@ const info = () => {
     const forcado = JSON.parse(localStorage.getItem("__rc_mock_customer") || "null");
     if (forcado) return { customerInfo: forcado };
   } catch { /* noop */ }
+  const ent = entitlementDaCompra();
   return {
     customerInfo: {
-      entitlements: { active: {} },
+      entitlements: { active: ent, all: ent },
       nonSubscriptionTransactions: compras().filter(ehVitalicio).map((id) => ({ productIdentifier: id })),
       activeSubscriptions: compras().filter((id) => !ehVitalicio(id)),
     },

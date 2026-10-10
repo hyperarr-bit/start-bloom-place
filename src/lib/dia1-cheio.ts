@@ -37,7 +37,7 @@
  * (lib/v14-qa) a chave vale "on".
  */
 import { localDayKey } from "@/lib/utils";
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Ligada } from "@/lib/v14-qa";
 
 export type ModoDia1Cheio = "off" | "ab" | "on";
 export const DIA1_CHEIO: ModoDia1Cheio = "off";
@@ -77,7 +77,7 @@ export const forcaDia1Cheio = (): ModoDia1Cheio | null => {
 export function modoDia1Cheio(modo: ModoDia1Cheio = DIA1_CHEIO): ModoDia1Cheio {
   const f = forcaDia1Cheio();
   if (f) return f;
-  if (v14Qa()) return "on";
+  if (v14Ligada()) return "on";
   return modo;
 }
 

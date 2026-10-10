@@ -45,7 +45,7 @@
  *
  * Só iPhone: as telas que leem isto já estão atrás de ehApple(); na web e no Android nada muda.
  */
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Qa, v14Loja } from "@/lib/v14-qa";
 
 export type ModoOferta = "off" | "on";
 export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao" | "curto" | "cadeado";
@@ -170,6 +170,8 @@ export function ofertaLigada(nome: NomeDaOferta): boolean {
   if (f) return f === "on";
   if (v14Qa()) return true;
   const r = remota[nome];
-  if (r) return r === "on";
+  if (r) return r === "on"; // a metadata do RC manda (é o interruptor de emergência no ar, sem versão nova)
+  // loja (VITE_V14_LOJA): tudo ligado MENOS o mensal 19,90 — o produto core_mensal_19 não existe na Apple ainda
+  if (v14Loja() && nome !== "mensal_19") return true;
   return LOCAL[nome] === "on";
 }

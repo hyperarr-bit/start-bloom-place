@@ -97,3 +97,39 @@ describe("VITE_V14_QA=1: a build de QA", () => {
     expect(v14Qa()).toBe(false);
   });
 });
+
+describe("VITE_V14_LOJA=1: a 1.0.14 de loja (dono: 'na tora, liga tudo')", () => {
+  beforeEach(() => vi.stubEnv("VITE_V14_LOJA", "1"));
+
+  it("liga tudo no app, MENOS o mensal 19,90 (core_mensal_19 não existe na Apple); dia 1 cheio = 'on'", () => {
+    shell(true);
+    expect(v14Qa()).toBe(false);
+    expect(cartoesLigados()).toBe(true);
+    expect(tourHomeLigado()).toBe(true);
+    expect(moduloOcultaPendenciasLigado()).toBe(true);
+    for (const n of OFERTAS) expect(ofertaLigada(n), n).toBe(n !== "mensal_19");
+    expect(onboarding1TelaLigado()).toBe(true);
+    expect(modoDia1Cheio()).toBe("on");
+    expect(bracoDia1()).toBe("B");
+    expect(cobrancaV14Ligada()).toBe(true);
+    expect(avaliacaoV14Ligada()).toBe(true);
+    expect(funilCalaiLigado()).toBe(true);
+  });
+
+  it("a metadata do RevenueCat continua sendo o interruptor de emergência das ofertas", async () => {
+    shell(true);
+    const { registrarChavesRemotas, _zerarChavesRemotas } = await import("@/lib/ofertas-saida");
+    registrarChavesRemotas({ current: { identifier: "default", metadata: { paywall_curto: "off" } }, all: {} });
+    expect(ofertaLigada("curto")).toBe(false);
+    expect(ofertaLigada("cadeado")).toBe(true);
+    _zerarChavesRemotas();
+    expect(ofertaLigada("curto")).toBe(true);
+  });
+
+  it("não vira força de QA: o tour continua só pra conta nova (cliente antigo não vê)", async () => {
+    shell(true);
+    const { deveMostrarTourHome } = await import("@/lib/tour-home");
+    const ha10dias = new Date(Date.now() - 10 * 86400e3).toISOString();
+    expect(deveMostrarTourHome(ha10dias)).toBe(false);
+  });
+});

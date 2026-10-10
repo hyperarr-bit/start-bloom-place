@@ -279,6 +279,18 @@ describe("deveMostrarTourHome — a régua", () => {
     expect(deveMostrarTourHome(novo, agora)).toBe(false);
   });
 
+  it("10/10: em teste grátis COM a missão em doses ligada (o caso de quase toda conta nova do iPhone), missão cumprida → sim", () => {
+    trial.ativo = true;
+    (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = true;
+    localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");
+    const m = iniciarMissao(["financas", "rotina", "saude"]);
+    const feitos = { 1: { dia: hoje(), rotulo: "a" }, 2: { dia: hoje(), rotulo: "b" }, 3: { dia: hoje(), rotulo: "c" } };
+    gravarMissao({ ...m, boasVindas: true, feitos, fimVisto: true });
+    expect(deveMostrarTourHome(novo, agora)).toBe(true);
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+    delete (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__;
+  });
+
   it("missão em doses: dose por fazer → espera; pulou ('Explorar por conta própria') → sim; cumprida com 'O que você construiu' por ver → espera; fim visto → sim", () => {
     (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = true;
     localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");

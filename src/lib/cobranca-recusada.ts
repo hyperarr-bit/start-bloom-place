@@ -24,7 +24,7 @@
 import { plataformaApp } from "@/lib/native-shell";
 import { urlGerenciarAssinatura } from "@/lib/loja";
 import type { ProblemaDeCobranca } from "@/lib/revenuecat";
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Ligada } from "@/lib/v14-qa";
 
 export type ModoCobrancaV14 = "off" | "on";
 /** A chave da versão. ROLLBACK = "off". */
@@ -51,7 +51,7 @@ export function guardarForcaDaCobrancaV14(busca?: string | URLSearchParams): voi
 export const cobrancaV14Ligada = (): boolean => {
   const f = ls.get(CHAVE_FORCA_COBRANCA_V14);
   if (f === "on" || f === "off") return f === "on";
-  if (v14Qa()) return true;
+  if (v14Ligada()) return true;
   return (COBRANCA_V14 as ModoCobrancaV14) === "on";
 };
 

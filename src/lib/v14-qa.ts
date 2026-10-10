@@ -19,3 +19,18 @@
 export const v14Qa = (): boolean => {
   try { return import.meta.env.VITE_V14_QA === "1"; } catch { return false; }
 };
+
+/**
+ * BUILD DE LOJA DA 1.0.14 (10/10, dono: "sem A/B, na tora, liga tudo") — `VITE_V14_LOJA=1`.
+ * Liga as MESMAS chaves que o QA, no app das lojas, MENOS o que depende de produto que ainda não
+ * existe (OFERTA_MENSAL_19 — `core_mensal_19` não foi criado na Apple) e sem as forças de QA (o tour
+ * continua só pra conta nova). Só entra no binário quando o build nativo é feito com a env: o site
+ * (Vercel) não tem a env e fica igual. As constantes de cada lib continuam "off".
+ *
+ *     VITE_V14_LOJA=1 npm run loja:ios     → 1.0.14 de loja, novidades ligadas
+ */
+export const v14Loja = (): boolean => {
+  try { return import.meta.env.VITE_V14_LOJA === "1"; } catch { return false; }
+};
+/** QA ou loja: "as novidades da 1.0.14 estão ligadas neste binário". */
+export const v14Ligada = (): boolean => v14Qa() || v14Loja();

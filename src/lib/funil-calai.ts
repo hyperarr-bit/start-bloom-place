@@ -35,7 +35,7 @@
  * QA pelo link (web ou shell de teste): `?funil-calai=on|off|auto` — grava no
  * aparelho. A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Ligada } from "@/lib/v14-qa";
 
 export type ModoFunilCalai = "off" | "on";
 export const FUNIL_CALAI: ModoFunilCalai = "off";
@@ -74,7 +74,7 @@ export function funilCalaiLigado(modo: ModoFunilCalai = FUNIL_CALAI): boolean {
   const f = forcaFunilCalai();
   if (f === "on") return true;
   if (f === "off") return false;
-  if (v14Qa()) return true;
+  if (v14Ligada()) return true;
   return modo === "on";
 }
 

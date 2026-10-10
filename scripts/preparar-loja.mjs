@@ -92,6 +92,9 @@ console.log(`✓ loja: ${LOJA.nome}`);
  * versão só nessa build (tour, cartões, ofertas de saída, onboarding 1 tela, dia 1 cheio, cartão
  * recusado, avaliações, módulo oculta pendências, paywall enxuto, recuperação do paywall). Sem a
  * env, a build é a de LOJA, com as chaves no padrão. O aviso é pra essa build nunca subir por engano. */
+if (process.env.VITE_V14_LOJA === "1") {
+  console.log("\n✓ VITE_V14_LOJA=1 — 1.0.14 de LOJA: novidades da 1.0.14 ligadas no app (menos o mensal 19,90).\n");
+}
 if (process.env.VITE_V14_QA === "1") {
   console.log("\n⚠️  VITE_V14_QA=1 — BUILD DE QA: todas as chaves da 1.0.14 LIGADAS. NÃO é build de loja.\n");
 } else {

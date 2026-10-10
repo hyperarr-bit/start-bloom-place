@@ -27,7 +27,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { contaNova, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Ligada } from "@/lib/v14-qa";
 
 export type ModoChave = "off" | "on";
 /** Cartões de boas-vindas (Finanças e Beleza). ROLLBACK/LIGAR = trocar aqui. */
@@ -90,10 +90,10 @@ export function guardarForcasDaUrl(busca?: string | URLSearchParams): void {
 
 /** Chave + força (só no navegador) + build de QA: a resposta única de "está ligado AQUI?". */
 const ligado = (modo: ModoChave, chaveForca: string): boolean => {
-  if (isNativeShell()) return modo === "on" || v14Qa();
+  if (isNativeShell()) return modo === "on" || v14Ligada();
   const f = lerForca(chaveForca);
   if (f) return f === "on";
-  return modo === "on" || v14Qa();
+  return modo === "on" || v14Ligada();
 };
 
 export const cartoesLigados = (modo: ModoChave = CARTOES_MODULO): boolean => ligado(modo, CHAVE_FORCA_CARTOES);
@@ -135,7 +135,9 @@ export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: 
   if (!tourHomeLigado()) return false;
   if (tourFeitoNesteAparelho()) return false;
   if (!tourForcadoPorQa() && !contaNova(criadoEm, agora)) return false;
-  try { if (trialCartaoAtivo()) return false; } catch { /* sem storage */ }
+  // 10/10: a trava do teste grátis era da Missão de 3 dias do iPhone (1.0.8). Com a missão em doses ligada o
+  // tour É o 4º passo da missão — e quase toda conta nova do iPhone está em teste grátis: sem isto ninguém via o tour.
+  try { if (!missaoDosesLigada() && trialCartaoAtivo()) return false; } catch { /* sem storage */ }
   if (missaoDosesLigada()) {
     const m = lerMissao();
     if (m && !m.explorou && (missaoEmAndamento(m) || !missaoCumprida(m))) return false;

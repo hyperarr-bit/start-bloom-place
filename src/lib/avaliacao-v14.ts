@@ -16,7 +16,7 @@
  * QA: `?avaliacao-v14=on` liga só neste aparelho (`off` força, `auto` desfaz).
  * A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
-import { v14Qa } from "@/lib/v14-qa";
+import { v14Ligada } from "@/lib/v14-qa";
 
 export type ModoAvaliacaoV14 = "off" | "on";
 /** A chave da versão. ROLLBACK = "off". */
@@ -42,6 +42,6 @@ export function guardarForcaDaAvaliacaoV14(busca?: string | URLSearchParams): vo
 export const avaliacaoV14Ligada = (): boolean => {
   const f = ls.get(CHAVE_FORCA_AVALIACAO_V14);
   if (f === "on" || f === "off") return f === "on";
-  if (v14Qa()) return true;
+  if (v14Ligada()) return true;
   return (AVALIACAO_V14 as ModoAvaliacaoV14) === "on";
 };

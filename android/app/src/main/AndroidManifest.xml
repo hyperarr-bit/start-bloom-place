@@ -76,6 +76,17 @@
         <meta-data
             android:name="com.facebook.sdk.AutoInitEnabled"
             android:value="false" />
+        <!--
+            AUTO-LOG DESLIGADO (10/10, CAPI passos 3+4). O mesmo false do
+            setAutoLogAppEventsEnabled na MainActivity, pra um init antecipado
+            não mandar o teste anônimo antes do setter. A abertura segue no
+            activateApp() manual. No dia em que esta build chegar nas pessoas:
+            publicar, META_CAPI_ANON_ENVIAR=1, conferir a varredura. Nunca
+            deixar o auto-log desligado sem o envio anônimo do servidor.
+        -->
+        <meta-data
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

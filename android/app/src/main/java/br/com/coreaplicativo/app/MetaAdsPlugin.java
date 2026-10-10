@@ -59,6 +59,14 @@ public class MetaAdsPlugin extends Plugin {
             } catch (Exception | NoClassDefFoundError e) {
                 // SDK não inicializado (client token ausente): segue sem
             }
+            /*
+             * Android não tem IDFV nem ATT. O GAID fica em `gaid` (madid da
+             * ficha) e o $fbAnonId do RevenueCat sai do anonId acima. Não
+             * copiar o GAID pra $idfa — essa chave é o IDFA do iPhone, e o
+             * plugin de lá só a preenche com o aceite do rastreamento.
+             * `idfv` vazio de propósito, pro contrato ficar igual ao do iOS.
+             */
+            ret.put("idfv", "");
             call.resolve(ret);
         });
     }

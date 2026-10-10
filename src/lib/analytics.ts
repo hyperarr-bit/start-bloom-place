@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { plataformaApp } from "@/lib/native-shell";
+import { isNativeShell, plataformaApp } from "@/lib/native-shell";
+import { corpoDoSinalCapi, type IdsDoPluginMeta } from "@/lib/meta-capi-cliente";
 
 // Persistent session id for the tab
 const SESSION_KEY = "core_session_id";
@@ -263,7 +264,7 @@ export const capturarDispositivoApp = async () => {
     let gaid = "", anonId = "";
     try {
       const { registerPlugin } = await import("@capacitor/core");
-      const MetaAds = registerPlugin<{ idPublicidade(): Promise<{ gaid: string; anonId?: string }> }>("MetaAds");
+      const MetaAds = registerPlugin<{ idPublicidade(): Promise<IdsDoPluginMeta> }>("MetaAds");
       const r = await MetaAds.idPublicidade();
       gaid = r.gaid ?? "";
       anonId = r.anonId ?? "";
@@ -298,9 +299,32 @@ export const capturarDispositivoApp = async () => {
       densidade: window.devicePixelRatio ?? 1,
       nucleos: navigator.hardwareConcurrency ?? 0,
     });
+    // IP do aparelho NÃO entra neste corpo. A função lê o header
+    // (x-forwarded-for / cf-connecting-ip) e guarda IP+UA por ~10 dias, só
+    // pra CAPI. Sem rede, a ficha segue sem o par.
+    if (isNativeShell()) void avisarSinalCapi();
   } catch {
     // telemetria nunca derruba o app
   }
+};
+
+/** POST app-capi-sinal. O id do RevenueCat é opcional: antes do configure
+ *  a sessão sozinha pareia; com ele, o teste anônimo acha o IP pelo
+ *  $RCAnonymousID. Nunca manda IP no JSON. */
+const avisarSinalCapi = async () => {
+  let rcId: string | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
+    const lido = await Promise.race([
+      Purchases.getAppUserID(),
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), 2000); }),
+    ]);
+    rcId = lido && "appUserID" in lido ? lido.appUserID : null;
+  } catch { /* configure ainda não rodou */ }
+  finally { if (timer) clearTimeout(timer); }
+  const body = corpoDoSinalCapi(getSessionId(), rcId);
+  void supabase.functions.invoke("app-capi-sinal", { body }).catch(() => {});
 };
 
 /** Parâmetros de atribuição (fbclid + gclid + utm) pra repassar ao checkout. */

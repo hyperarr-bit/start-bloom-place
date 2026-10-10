@@ -36,6 +36,7 @@
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
+import { atributosDeAnuncio, type IdsDoPluginMeta } from "@/lib/meta-capi-cliente";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
@@ -74,6 +75,91 @@ const chaveDaLoja = (): string | undefined => {
     : env.VITE_REVENUECAT_ANDROID_KEY;
 };
 
+/** Plugin nativo que trava não pode segurar o boot. O timer é limpo quando
+ *  a promise resolve, pra suíte de teste não ficar com handle aberto. */
+const comTeto = async <T>(p: Promise<T>, ms: number): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_, rej) => {
+        timer = setTimeout(() => rej(new Error("teto")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/**
+ * ATRIBUTOS DE ANÚNCIO NO ASSINANTE (10/10, CAPI passos 3+4).
+ *
+ * O servidor (já no ar, PR do anônimo) lê do webhook `$fbAnonId` → anon_id,
+ * `$idfa` → madid e `$idfv` → vendor_id. Sem isto o teste anônimo não tem
+ * com o que casar a instalação quando o auto-log do SDK desliga.
+ *
+ * NÃO liga a integração nativa RevenueCat → Meta: não chama
+ * `setFBAnonymousID` e não mexe no painel. `collectDeviceIdentifiers`, se o
+ * plugin Capacitor tiver o método, grava `$idfv` / `$idfa` / `$gpsAdId`. O
+ * SDK só põe `$idfa` com ATT aceito. `$fbAnonId` ele não conhece — vem do
+ * `anonymousID` do plugin MetaAds. Sem o método, o iPhone manda `$idfv` e
+ * `$idfa` na mão (o plugin só devolve IDFA com ATT).
+ *
+ * Falha aqui nunca derruba o configure nem a abertura do app.
+ */
+type PluginMetaAds = { idPublicidade(): Promise<IdsDoPluginMeta> };
+const lerIdsDoPluginMeta = async (): Promise<IdsDoPluginMeta> => {
+  // No global de propósito: o Capacitor recusa registrar "MetaAds" duas
+  // vezes (login e o aceite do ATT passariam de novo por aqui, e o
+  // reset de módulo nos testes também). A segunda vez reusa o proxy.
+  const g = globalThis as { __coreMetaAdsPlugin?: PluginMetaAds };
+  if (!g.__coreMetaAdsPlugin) {
+    const { registerPlugin } = await import("@capacitor/core");
+    g.__coreMetaAdsPlugin = registerPlugin<PluginMetaAds>("MetaAds");
+  }
+  return await g.__coreMetaAdsPlugin.idPublicidade();
+};
+
+let filaAtributos: Promise<void> = Promise.resolve();
+
+async function gravarIdentificadoresDeAnuncio(): Promise<void> {
+  if (!Purchases || !configurado) return;
+  // Teto ÚNICO: collect + plugin + setAttributes juntos não passam de 2s.
+  // Sucesso no aparelho é imediato; plugin morto não segura o paywall.
+  const limite = Date.now() + 2000;
+  const restante = () => Math.max(1, limite - Date.now());
+  try {
+    let coletou = false;
+    const coletar = (Purchases as { collectDeviceIdentifiers?: () => Promise<void> }).collectDeviceIdentifiers;
+    if (typeof coletar === "function") {
+      try {
+        await comTeto(coletar.call(Purchases), restante());
+        coletou = true;
+      } catch (e) {
+        console.warn("[RC] collectDeviceIdentifiers falhou:", e);
+      }
+    }
+    let ids: IdsDoPluginMeta = {};
+    try { ids = await comTeto(lerIdsDoPluginMeta(), restante()); }
+    catch { /* web / build antiga sem o plugin, ou estourou o teto */ }
+    const attrs = atributosDeAnuncio(ids, { plataforma: plataformaApp(), coletouDispositivo: coletou });
+    if (Object.keys(attrs).length && typeof Purchases.setAttributes === "function") {
+      await comTeto(Purchases.setAttributes(attrs), restante());
+    }
+  } catch (e) {
+    console.warn("[RC] atributos de anúncio falharam:", e);
+  }
+}
+
+/** Depois do configure e de cada logIn/logOut. Nunca rejeita. Chamadas
+ *  seguidas (boot e, em seguida, o aceite do ATT) entram numa fila: a
+ *  segunda enxerga o IDFA que a primeira ainda não tinha. */
+export function enviarIdentificadoresDeAnuncio(): Promise<void> {
+  const passo = filaAtributos.then(() => gravarIdentificadoresDeAnuncio());
+  filaAtributos = passo.catch(() => {});
+  return passo.catch(() => {});
+}
+
 export async function initRevenueCat(): Promise<EstadoRC> {
   if (!isNativeShell()) return "sem_chave";
   const key = chaveDaLoja();
@@ -91,11 +177,17 @@ export async function initRevenueCat(): Promise<EstadoRC> {
       await Purchases.configure({ apiKey: key, appUserID: uid ?? undefined });
       configurado = true;
       appUserIdAtual = uid;
+      // Esperado de propósito: o teste anônimo pode ser comprado logo depois
+      // do init, e o webhook precisa do $fbAnonId já gravado. O teto interno
+      // (2s) impede um plugin morto de segurar a abertura — e a falha não
+      // cai neste catch, porque enviarIdentificadoresDeAnuncio nunca rejeita.
+      await enviarIdentificadoresDeAnuncio();
     } else if (uid !== appUserIdAtual) {
       // trocou de conta dentro do app (ou logou depois do configure)
       if (uid) await Purchases.logIn({ appUserID: uid });
       else await Purchases.logOut();
       appUserIdAtual = uid;
+      await enviarIdentificadoresDeAnuncio();
     }
 
     /* CONFIRMA COMPRA PENDENTE AO ABRIR O APP (01/09 — caso real, com prejuízo).
@@ -148,6 +240,10 @@ export async function identificarRevenueCat(userId: string | null): Promise<void
     if (userId) await Purchases.logIn({ appUserID: userId });
     else await Purchases.logOut();
     appUserIdAtual = userId;
+    // logIn copia atributo do anônimo, mas o $fbAnonId gravado DEPOIS do
+    // configure anônimo precisa estar na conta também — e o logOut nasce
+    // um anônimo novo, que é quem faz o teste sem cadastro.
+    await enviarIdentificadoresDeAnuncio();
   } catch (e) {
     console.warn("[RC] identificar falhou:", e);
   }
@@ -1089,14 +1185,14 @@ export async function comprarAnualIos(): Promise<boolean> {
     ultimaCompraFoiTrial = ativos.length ? ativos.some((e) => e?.periodType === "TRIAL") : anualIosTemTrial();
     const fim = ativos.find((e) => e?.periodType === "TRIAL")?.expirationDateMillis;
     ultimaCompraFimMs = typeof fim === "number" && fim > Date.now() ? fim : null;
-    /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
-     * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
-     * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe
-     * na cobrança. A VENDA (Purchase 97,90) sai do servidor pelo CAPI quando o
-     * trial vira cobrança (meta-backfill-app: período < 10 dias = StartTrial,
-     * depois Purchase no período cheio). Um Purchase de R$ 0 aqui contava
+    /* SEM logPurchase manual (20/09, build 20; auto-log do cliente desligado
+     * em 10/10). Com FacebookAutoLogAppEventsEnabled false, o SDK não registra
+     * mais sozinho o StartTrial dos 3 dias. Quem manda o teste anônimo é o
+     * servidor, e só com META_CAPI_ANON_ENVIAR=1 no mesmo dia em que esta
+     * build chega nas pessoas. A VENDA (Purchase 97,90) continua saindo do
+     * servidor quando o trial vira cobrança. Um Purchase de R$ 0 aqui contava
      * "compra" sem dinheiro e ensinava a campanha a buscar quem só começa o
-     * teste. */
+     * teste. Não religar o auto-log neste binário sem o envio do servidor. */
     await sincronizarAssinatura();
     return true;
   } catch (e) {

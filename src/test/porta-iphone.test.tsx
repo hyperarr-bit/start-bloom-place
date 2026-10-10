@@ -218,7 +218,7 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     conferirCopy();
     expect(screen.getByTestId("porta-salvo-titulo").textContent).toBe("Pronto, seu plano está salvo ✓");
     expect(screen.getByTestId("porta-salvo-email").textContent).toContain("ana@exemplo.com");
-    expect(screen.getByTestId("porta-salvo-texto").textContent).toBe("Baixe o CORE, toque em “Já tenho conta? Entrar” com este e-mail e comece seus 3 dias grátis.");
+    expect(screen.getByTestId("porta-salvo-texto").textContent).toBe("Baixe o CORE, toque em “Entrar” com este e-mail e comece seus 3 dias grátis.");
     expect(screen.getByTestId("porta-passo-2").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/1-tela-inicial-ios.jpg");
     expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/2-entrar-ios.jpg");
     const loja = screen.getByTestId("porta-loja");

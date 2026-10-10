@@ -230,8 +230,10 @@ export const mesCurto = (hoje: Date, mais: number): string => MESES[(hoje.getMon
 
 /* ------------------------------------------------ tela 7 */
 
-/** O texto do botão de entrar no app QUE ESTÁ NA LOJA hoje (AppWelcome: "Já tenho conta? Entrar").
- *  A 1.0.14 (funil Cal AI) diz "Já tem conta? Entrar" — trocar aqui quando ela for a da loja. */
-export const TEXTO_ENTRAR_NO_APP = "Já tenho conta? Entrar";
+/** O botão de entrar na welcome do app. A 1.0.12 da loja diz "Já tenho conta? Entrar" e a 1.0.14 (que vai pro ar
+ *  sozinha quando a Apple aprovar) diz "Já tem conta? Entrar" — nas duas é o "Entrar" logo ABAIXO do Começar.
+ *  Por isso a Porta fala só "Entrar" + onde fica (10/10). */
+export const TEXTO_ENTRAR_NO_APP = "Entrar";
+export const ONDE_FICA_ENTRAR = "logo abaixo do botão Começar";
 /** O botão do código na tela de Entrar do app */
 export const TEXTO_CODIGO_NO_APP = "Entrar sem senha";

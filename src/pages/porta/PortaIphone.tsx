@@ -27,7 +27,7 @@ import { SalvoPorta, type Plataforma } from "./SalvoPorta";
  * anúncio → welcome com vídeo → 3 perguntas de 1 toque → com × sem o CORE →
  * plano de 3 dias com cadeado → CRIA A CONTA no site (Google ou e-mail com
  * código; a campanha fica gravada em user_metadata.porta) → "Pronto, salvo":
- * baixa o app, toca em "Já tenho conta? Entrar" com o mesmo e-mail → o
+ * baixa o app, toca em "Entrar" (abaixo do Começar) com o mesmo e-mail → o
  * paywall do app (3 dias grátis, já no ar) liga o teste à conta.
  *
  * SEM PREÇO em lugar nenhum; "dias grátis" só na tela 7.

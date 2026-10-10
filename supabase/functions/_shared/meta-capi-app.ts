@@ -573,7 +573,7 @@ export const listarFaltantes = (opts: {
       : undefined;
     const chavesDono = unico([
       ...classe.chaves,
-      ...(classe.userId ? (mapa.get(classe.userId) ?? []) : []),
+      ...(classe.userId ? chavesDaAssinatura(eventos, classe.userId, classe.quando) : []),
       ...(dono?.revenuecat_subscription_id ? [dono.revenuecat_subscription_id] : []),
     ]);
     if (jaEnviado(opts.marcadores, nome, chavesDono)) continue;

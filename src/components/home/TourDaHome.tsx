@@ -80,8 +80,11 @@ interface Rect { top: number; left: number; width: number; height: number }
  * termina com a INSTRUÇÃO de ação em negrito, no imperativo (`faca`), o alvo pulsa com um dedinho 👆, o
  * balão sempre tem um botão primário ("Fazer isso" acende o alvo; no último, "Concluir missão") e o
  * resto da Home fica escurecido (55%) com só o alvo e o balão nítidos. */
+/* 10/10, dono: o passo do SCORE é só de LEITURA (tocar no anel abre Conquistas — não é o caminho); o botão
+ * primário de TODOS os passos é "Continuar" e sempre avança (ninguém fica preso); fazer a ação de verdade
+ * também avança, com "✓ Pronto!"; no último, "Concluir missão". */
 const PASSOS = [
-  { alvo: "score", titulo: "Seu score do dia", texto: "O anel soma o que você já fez hoje. Cada registro conta ponto — e 100 é dia fechado.", faca: "Toque em \"O que conta ponto\" e veja a tabela" },
+  { alvo: "score", titulo: "Seu score do dia", texto: "O anel soma o que você já fez hoje. Cada registro conta ponto — e 100 é dia fechado.", faca: "" },
   { alvo: "pendencias", titulo: "Pendências de hoje", texto: "É a lista do que falta — e o score só cobra o que está nela.", faca: "Toque no ⋯ de uma linha e esconda o que não usa" },
   { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Um toque registra água, humor, gasto, sono… sem entrar no módulo.", faca: "Toque em +1 copo d'água" },
   { alvo: "adicionar-widget", titulo: "Widgets", texto: "Mostre na Home o que você olha todo dia (saldo, hábitos, água).", faca: "Toque em + Adicionar widget e escolha um" },
@@ -108,8 +111,6 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
   const [alturaBalao, setAlturaBalao] = useState(0);
   /** "✓ Pronto!" (600 ms) depois de uma ação feita — o passo já avançou por baixo */
   const [pronto, setPronto] = useState(false);
-  /** "Fazer isso": o alvo acende (2 pulsos) */
-  const [acende, setAcende] = useState(0);
   /** uma folha/modal do app aberta (ex.: "Widgets da Home" pelo botão real): o tour se esconde e volta ao fechar */
   const [folhaAberta, setFolhaAberta] = useState(false);
   const widgetsAoEntrar = useRef(widgetsAtivos.length);
@@ -202,19 +203,13 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
   const avancar = useCallback((acao: string) => {
     trackEvent("home_tour_passo", { indice: passo, total: TOTAL_PASSOS, acao });
     setVerPontos(false);
-    // ação feita (não "deixar"): ✓ Pronto! por 600 ms — o passo avança JÁ, o selo só confirma
-    if (acao !== "deixar") { setPronto(true); window.setTimeout(() => setPronto(false), PRONTO_MS); }
+    // ação feita (não "Continuar"/"Concluir"): ✓ Pronto! por 600 ms — o passo avança JÁ, o selo só confirma
+    if (acao !== "continuar" && acao !== "concluir" && acao !== "deixar") { setPronto(true); window.setTimeout(() => setPronto(false), PRONTO_MS); }
     if (passo >= TOTAL_PASSOS - 1) terminar();
     else setPasso((p) => p + 1);
   }, [passo, terminar]);
   const avancarRef = useRef(avancar);
   avancarRef.current = avancar;
-  const fazerIsso = useCallback(() => {
-    trackEvent("home_tour_fazer", { indice: passo });
-    const el = document.querySelector(`[data-tour="${PASSOS[passo].alvo}"]`) as HTMLElement | null;
-    try { el?.scrollIntoView({ block: "center", behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
-    setAcende((x) => x + 1);
-  }, [passo, reduzir]);
 
   if (!ativo) return null;
   const atual = PASSOS[passo];
@@ -333,7 +328,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
               aria-hidden="true"
             />
             <motion.div
-              key={`anel-${passo}-${acende}`}
+              key={`anel-${passo}`}
               className="absolute rounded-xl pointer-events-none"
               initial={reduzir ? false : { opacity: 0, scale: 1.03 }}
               animate={reduzir ? { opacity: 1, scale: 1 } : { opacity: 1, scale: [1.03, 1, 1.02, 1] }}
@@ -341,9 +336,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
               style={{ top: rect.top - PADDING, left: rect.left - PADDING, width: rect.width + PADDING * 2, height: rect.height + PADDING * 2, boxShadow: "0 0 0 2px #fff, 0 0 0 7px hsl(var(--accent) / 0.35)" }}
               data-testid="tour-anel"
             />
-            {/* o dedinho 👆 aponta o alvo (anima; com prefers-reduced-motion fica parado) */}
-            <motion.span
-              key={`dedinho-${passo}-${acende}`}
+            {/* o dedinho 👆 aponta o alvo nos passos COM ação (anima; com prefers-reduced-motion fica parado) */}
+            {atual.faca && <motion.span
+              key={`dedinho-${passo}`}
               className="absolute text-[30px] leading-none pointer-events-none select-none drop-shadow-[0_6px_10px_rgba(0,0,0,.35)]"
               style={{ left: rect.left + rect.width - 34, top: rect.top + rect.height - 12 }}
               initial={reduzir ? false : { y: 6, scale: 1 }}
@@ -351,7 +346,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
               transition={reduzir ? undefined : { duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
               data-testid="tour-dedinho"
               aria-hidden="true"
-            >👆</motion.span>
+            >👆</motion.span>}
           </>
         )}
         {pronto && (
@@ -382,26 +377,21 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
             </div>
             <p className="text-[10.5px] font-extrabold tracking-[.16em] uppercase opacity-85" data-testid="tour-contador">Passo {passo + 1} de {TOTAL_PASSOS}{ultimo ? " · último" : ` · falta ${TOTAL_PASSOS - passo - 1}`}</p>
             <h3 className="mt-0.5 text-[17px] font-bold leading-tight tracking-tight pr-8">{atual.titulo}</h3>
-            <p className="mt-1 text-[12.5px] leading-snug opacity-90">{atual.texto} <b className="font-extrabold" data-testid="tour-faca">{atual.faca}.</b></p>
+            <p className="mt-1 text-[12.5px] leading-snug opacity-90">{atual.texto}{atual.faca ? <> <b className="font-extrabold" data-testid="tour-faca">{atual.faca}.</b></> : null}</p>
             <div className="mt-3">{acao}</div>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5" aria-label={`${passo + 1} de ${TOTAL_PASSOS}`}>
-                {PASSOS.map((p, i) => (
-                  <i key={p.alvo} className="block h-1.5 rounded-full bg-white transition-all" style={{ width: i === passo ? 16 : 6, opacity: i === passo ? 1 : 0.45 }} data-ativo={i === passo ? "" : undefined} />
-                ))}
-              </div>
-              <button type="button" onClick={() => avancar("deixar")} className="text-[12px] font-semibold underline-offset-2 underline opacity-90 active:opacity-70" data-testid="tour-deixar">
-                Deixar como está
-              </button>
+            <div className="mt-3 flex items-center gap-1.5" aria-label={`${passo + 1} de ${TOTAL_PASSOS}`}>
+              {PASSOS.map((p, i) => (
+                <i key={p.alvo} className="block h-1.5 rounded-full bg-white transition-all" style={{ width: i === passo ? 16 : 6, opacity: i === passo ? 1 : 0.45 }} data-ativo={i === passo ? "" : undefined} />
+              ))}
             </div>
-            {/* o botão primário SEMPRE visível: "Fazer isso" acende o alvo; no último passo, "Concluir missão" */}
+            {/* o botão primário SEMPRE visível e SEMPRE avança: "Continuar"; no último passo, "Concluir missão" */}
             <button
               type="button"
-              onClick={() => (ultimo ? avancar("concluir") : fazerIsso())}
+              onClick={() => avancar(ultimo ? "concluir" : "continuar")}
               className="mt-2.5 w-full h-11 rounded-full text-[14px] font-extrabold bg-white text-accent active:scale-[0.98] transition"
-              data-testid={ultimo ? "tour-concluir" : "tour-fazer"}
+              data-testid={ultimo ? "tour-concluir" : "tour-continuar"}
             >
-              {ultimo ? "Concluir missão" : "Fazer isso"}
+              {ultimo ? "Concluir missão" : "Continuar"}
             </button>
           </div>
         </motion.div>

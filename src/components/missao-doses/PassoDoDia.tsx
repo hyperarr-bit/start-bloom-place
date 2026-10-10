@@ -6,7 +6,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
@@ -80,12 +81,17 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const cfg = MODULOS[modulo];
   const alvoCfg: AlvoDaMissao | null = cfg.tipo ? alvoDaMissao(cfg.tipo) : null;
   const { get, set } = useUserData();
-  /* 10/10 — CONTA VAZIA (bug do dono: "a Rotina diz 'toca no quadradinho' sendo que não escolheu nenhum
-   * hábito"): sem hábito, o post-it oferece 3 prontos; tocar cria o hábito E marca hoje. Com hábito, o
-   * quadradinho de sempre. Lido UMA vez no mount (o chip cria o hábito e a pergunta não pode trocar no meio). */
+  /* 10/10 — ROTINA NUMA CONTA VAZIA (dono: "tem que ENSINAR o usuário a criar o hábito, não só clicar
+   * no botão"): sem hábito, a dose tem 2 passos dentro do módulo — (A) "criar": anel + post-it no campo
+   * real "+ Hábito"; os chips só PREENCHEM o campo e a pessoa toca em Adicionar (o hábito nasce pelo
+   * código normal da Rotina); (B) "marcar": o anel vai pro quadradinho de HOJE da linha nova. Com hábito
+   * (conta antiga, dia 2), direto no (B) como sempre. Lido UMA vez no mount. */
   const [semHabito] = useState(() => cfg.tipo === "habito" && !(Array.isArray(get<unknown>("rotina-habits", undefined)) && (get<unknown[]>("rotina-habits", []) ?? []).length > 0));
-  const chips: ChipDaMissao[] = semHabito ? CHIPS_DE_HABITO : (alvoCfg?.chips ?? []);
-  const pergunta = semHabito ? PERGUNTA_HABITO_VAZIO : (alvoCfg?.pergunta ?? cfg.pedido);
+  const [subPasso, setSubPasso] = useState<"criar" | "marcar" | null>(semHabito ? "criar" : null);
+  const subPassoRef = useRef(subPasso);
+  subPassoRef.current = subPasso;
+  const chips: ChipDaMissao[] = subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : (alvoCfg?.chips ?? []);
+  const pergunta = subPasso === "criar" ? PERGUNTA_HABITO_VAZIO : subPasso === "marcar" ? PERGUNTA_HABITO_MARCAR : (alvoCfg?.pergunta ?? cfg.pedido);
   const chipTocado = useRef<ChipDaMissao | null>(null);
   const reduzir = !!useReducedMotion();
   const [fase, setFase] = useState<Fase>("achar");
@@ -128,10 +134,25 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     let tocouAba = false;
     const timers: number[] = [];
     const passos = alvoCfg?.passos ?? (cfg.seletor ? [{ seletor: cfg.seletor }] : []);
+    let abriuCampo = false;
     const procurar = () => {
       if (!vivo || faseRef.current !== "achar") return;
       const [principal, ...reservas] = passos;
       const el = principal ? document.querySelector(principal.seletor) : null;
+      // passo A da Rotina: o alvo é a LINHA DO CAMPO "Nome do hábito..." — abre pelo botão "+ Hábito" (uma vez)
+      if (subPassoRef.current === "criar" && el && visivel(el)) {
+        const linha = linhaDoNovoHabito();
+        if (linha && visivel(linha)) {
+          // o campo da Rotina nasce com autoFocus (teclado aberto = o anel se esconde): solta o foco — o post-it
+          // com os 3 prontos é o que ensina; quem quiser escrever toca no campo
+          try { (document.activeElement as HTMLElement | null)?.blur?.(); } catch { /* noop */ }
+          setAlvo(linha); setAnelVivo(true); setFase("anotar"); return;
+        }
+        if (!abriuCampo) { abriuCampo = true; (el as HTMLElement).click(); }
+        if (++tentativas >= 17) { setAlvo(el); setAnelVivo(true); setFase("anotar"); return; }
+        timers.push(window.setTimeout(procurar, 300));
+        return;
+      }
       if (el && visivel(el)) {
         setAlvo(alvoCfg?.anel ? alvoCfg.anel(el) : el);
         setAnelVivo(true);
@@ -173,9 +194,28 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         try {
           const achado = alvoCfg.achar(k, valor, ant, (kk) => get<unknown>(kk, undefined));
           if (!achado) continue;
-          // o rótulo é o do CHIP que ela tocou (o gasto real da dose — "Café · R$ 12"); digitado = o que achou
+          if (cfg.tipo === "habito" && k === "rotina-habits") {
+            // o hábito NASCEU (pelo Adicionar da Rotina): no passo A isso é a passagem pro passo B —
+            // o anel vai pro quadradinho de HOJE da linha nova (a tabela redesenha num instante)
+            if (subPassoRef.current === "criar") {
+              trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "criar_habito", acao: "feito", nome: achado.item.nome, segundos: segundos() }));
+              setSubPasso("marcar");
+              setTocado(null);
+              setAnelVivo(false);
+              window.setTimeout(() => {
+                if (faseRef.current !== "anotar") return;
+                const btn = document.querySelector('[data-spotlight="add-habit"]');
+                const linha = btn ? linhaDeHoje(btn) : null;
+                setPerdeuAlvo(false); // o anel velho (do campo) pode ter avisado "âncora sumiu" na saída — não é perda
+                if (linha && linha !== btn && visivel(linha)) { setAlvo(linha); setAcende((x) => x + 1); setAnelVivo(true); }
+                else { setAlvo(null); }
+              }, 350);
+            }
+            continue; // criar hábito nunca conta como "marcou"
+          }
+          // o rótulo é o do CHIP que ela tocou (o gasto real da dose — "Café · R$ 12"); hábito = o nome dele (como sempre)
           const c = viaRef.current === "chip" ? chipTocado.current : null;
-          rot = c ? (c.valor != null ? `${c.nome} · R$ ${reais(c.valor)}` : cfg.tipo === "habito" ? `${c.nome} marcado` : c.nome) : rotuloCurto(achado.item);
+          rot = cfg.tipo === "habito" ? rotuloCurto(achado.item) : c ? (c.valor != null ? `${c.nome} · R$ ${reais(c.valor)}` : c.nome) : rotuloCurto(achado.item);
           via = viaRef.current === "chip" ? "chip" : achado.via;
           try { num = alvoCfg.numero(k, valor, ant, achado.item); } catch { num = null; }
         } catch { continue; }
@@ -198,19 +238,26 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   /* REGISTROU → o chip ficou ✓ e a linha apareceu; depois, o OLHAR (ou direto a festa). */
   useEffect(() => {
     if (fase !== "registrou") return;
-    const t = window.setTimeout(() => {
+    const timers: number[] = [];
+    timers.push(window.setTimeout(() => {
       if (faseRef.current !== "registrou") return;
       setAnelVivo(false);
       const el = alvoCfg?.olhar?.achar() ?? null;
       if (el && visivel(el)) {
-        setOlharEm(el);
-        setFase("olhar");
-        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view" }));
+        // 10/10 (dono: "tinha que mostrar mais o MEU MÊS"): rola o card até o MEIO da tela antes do anel
+        // (o anel re-mede na rolagem); a festa só vem no "Entendi" ou depois dos 15 s
+        try { el.scrollIntoView({ block: "center", behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
+        timers.push(window.setTimeout(() => {
+          if (faseRef.current !== "registrou") return;
+          setOlharEm(el);
+          setFase("olhar");
+          trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view" }));
+        }, reduzir ? 0 : 450));
       } else {
         setFase("festa");
       }
-    }, reduzir ? 150 : TEMPOS_DO_PASSO.registrou);
-    return () => window.clearTimeout(t);
+    }, reduzir ? 150 : TEMPOS_DO_PASSO.registrou));
+    return () => timers.forEach((t) => window.clearTimeout(t));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
@@ -226,14 +273,31 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     const item = itemDoChip(cfg.tipo, chip);
     trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, valor: chip.valor, ok: !!item }));
     if (!item) return;
-    viaRef.current = "chip";
     chipTocado.current = chip;
     setTocado(chip.nome);
+    // passo A da Rotina: o chip só PREENCHE o campo real (e dá foco) — quem cria é o Adicionar da Rotina
+    if (subPassoRef.current === "criar") {
+      const campo = (alvo?.querySelector("input") ?? document.querySelector('input[placeholder="Nome do hábito..."]')) as HTMLInputElement | null;
+      if (campo) {
+        try {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+          setter ? setter.call(campo, chip.nome) : (campo.value = chip.nome);
+          campo.dispatchEvent(new Event("input", { bubbles: true }));
+          // sem focar: o teclado esconderia o post-it (o ✓ no chip + "toca em Adicionar" ficam na tela)
+        } catch { /* noop */ }
+      }
+      return;
+    }
+    viaRef.current = "chip";
     try {
       for (const g of gravacoesDoChip(item, chip)) {
         const proximo = g.proximo(get<unknown>(g.chave, undefined));
         if (proximo === undefined) continue;
         set(g.chave, proximo);
+        /* 10/10 — A CAUSA do "apertei e nem criou": o `set` do useUserData grava no store, mas a tela do
+         * módulo guarda a chave num usePersistedState (estado próprio) e NÃO redesenha — a tabela ficava
+         * velha e a próxima gravação dela apagava o registro. O aviso é o que a demo da web já fazia. */
+        avisarEscritaDeFora(g.chave, proximo);
       }
     } catch { /* a missão nunca derruba o módulo */ }
   };
@@ -287,9 +351,12 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
 
   const postIt = (
     <PostItDaMissao
-      rotulo="Agora · 1 toque"
+      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
       pergunta={pergunta}
-      descricao={cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho." : cfg.tipo === "habito" ? (semHabito ? "Toca num pronto: ele entra na sua semana já marcado hoje." : "Toca num quadradinho da linha de HOJE.") : undefined}
+      descricao={cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
+        : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
+        : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
+        : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
       chips={chips}
       tocado={tocado}
       aoChip={tocarChip}

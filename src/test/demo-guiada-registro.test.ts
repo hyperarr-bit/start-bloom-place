@@ -44,7 +44,7 @@ describe("lista fechada de chaves", () => {
     // 10/10: + rotina-habits-checked / rotina-habits-week — o chip de hábito da missão em doses
     // (conta vazia) cria o hábito E marca hoje, com o carimbo da semana
     expect([...CHAVES_DO_ITEM].sort()).toEqual([
-      "core-saude-water", "finance-expenses", "goals-board-v2", "rotina-habits", "rotina-habits-checked", "rotina-habits-week",
+      "core-saude-water", "finance-expenses", "goals-board-v2", "rotina-habits",
       "saude-workouts-v2", "treino-active-days", "water-log",
     ]);
   });

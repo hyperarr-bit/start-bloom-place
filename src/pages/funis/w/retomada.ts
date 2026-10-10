@@ -77,6 +77,9 @@ const RETOMAVEIS: Record<string, string> = {
   // 10/10 (ONBOARDING_1TELA): a tela única retoma nela mesma; se a chave desligou
   // no meio, o ComecarW traduz pra "compromissos" (passoDoOnboarding).
   plano_3_dias: "plano_3_dias",
+  // 10/10 (FUNIL_CALAI): o gráfico retoma nele mesmo (as respostas estão guardadas);
+  // com a chave desligada, o ComecarW traduz pra "quiz" (passoDoFunilCalai).
+  grafico_com_sem: "grafico_com_sem",
 };
 export const passoDeRetomada = (salvo: string | null, noShell: boolean): string | null =>
   noShell && salvo ? (RETOMAVEIS[salvo] ?? null) : null;
@@ -163,7 +166,15 @@ const PASSO_ANTERIOR: Record<string, string> = {
   // 10/10 (ONBOARDING_1TELA): a tela única fica no lugar dos compromissos+contrato — o Voltar cai na central
   plano_3_dias: "central",
 };
-export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;
+/* 10/10 (FUNIL_CALAI, lib/funil-calai): a sequência enxuta não tem promessas, central
+ * nem demo — welcome → porta → quiz → gráfico → notificação → prova → progress →
+ * result → plano (ou compromissos → contrato) → offer. O Voltar anda por ESTA fila. */
+const PASSO_ANTERIOR_CALAI: Record<string, string> = {
+  porta: "welcome", quiz: "porta", grafico_com_sem: "quiz", notif: "grafico_com_sem", prova: "notif",
+  progress: "prova", result: "quiz", plano_3_dias: "result", compromissos: "result", contrato: "compromissos",
+};
+export const passoAnteriorDe = (passo: string, calai = false): string | null =>
+  (calai ? PASSO_ANTERIOR_CALAI[passo] : PASSO_ANTERIOR[passo]) ?? null;
 
 /**
  * Pra onde o 2º Voltar leva quem está NO PAYWALL (03/09).

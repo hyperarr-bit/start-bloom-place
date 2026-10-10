@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
@@ -34,6 +34,8 @@ import { AREAS, type AreaKey } from "@/lib/funnel";
  */
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
+/** O mockup do iPhone (SVG leve, 430×880, tela transparente) que fica por cima do vídeo. */
+export const MOLDURA_WELCOME = "/funil/iphone-mockup.svg";
 
 const PROMESSA_PADRAO = "Sua vida inteira organizada num app só.";
 const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
@@ -48,6 +50,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   /* ATT (20/09): a pessoa vê a tela PRIMEIRO; o pedido chega 3 s depois. Igual à welcome de hoje. */
   useEffect(() => { const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000); return () => window.clearTimeout(t); }, []);
   const navigate = useNavigate();
+  const semMovimento = useReducedMotion() === true;
   const [restaurando, setRestaurando] = useState(false);
   const [msgRestore, setMsgRestore] = useState<string | null>(null);
   const [videoFalhou, setVideoFalhou] = useState(false);
@@ -113,9 +116,21 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
     <div className="wca" data-testid="welcome-calai">
       <style>{CSS_WCA}</style>
       <div className="wca-col">
-        <motion.div className="wca-palco" initial={{ opacity: 0, y: 18, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
-          <div className="wca-fone" aria-hidden>
-            <div className="wca-ilha" />
+        {/* O celular entra deslizando de baixo com leve escala, UMA vez ao montar (Cal AI); depois
+            só um "float" sutil de 3 px a cada 4 s. O loop do vídeo não re-anima nada. Com
+            prefers-reduced-motion, nada se move. */}
+        <motion.div
+          className="wca-palco"
+          initial={semMovimento ? false : { opacity: 0, y: 56, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <motion.div
+            className="wca-fone"
+            aria-hidden
+            animate={semMovimento ? undefined : { y: [0, -3, 0] }}
+            transition={semMovimento ? undefined : { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+          >
             <div className="wca-tela">
             <video
               ref={videoRef}
@@ -134,7 +149,9 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
               data-falhou={videoFalhou ? "" : undefined}
             />
             </div>
-          </div>
+            {/* a moldura de verdade (titânio fino + bezel + Dynamic Island), por CIMA do vídeo; a tela é transparente */}
+            <img className="wca-moldura" src={MOLDURA_WELCOME} alt="" draggable={false} />
+          </motion.div>
         </motion.div>
 
         <div className="wca-corpo">
@@ -206,15 +223,18 @@ const CSS_WCA = `
 /* O palco do telefone ENCOLHE antes do texto e do botão (min-height 0) — num
    iPhone SE o vídeo fica menor, o Começar nunca sai da tela. */
 .wca-palco { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px 0 4px; }
+/* O telefone = o mockup SVG (430×880: moldura de 3 + bezel de 7 → a tela começa em 10/430 = 2.33%
+   de cada lado e 10/880 = 1.14% em cima/embaixo, cantos de 58/430). O vídeo fica POR BAIXO,
+   recortado na tela; a sombra é do telefone inteiro. */
 .wca-fone {
   position: relative; height: 100%; max-height: 100%; width: auto; max-width: 100%;
-  aspect-ratio: 9 / 19.2;
-  border-radius: 40px; background: #16121c; padding: 9px;
-  box-shadow: 0 30px 60px -22px rgba(22,18,28,.55), 0 0 0 1px rgba(22,18,28,.08);
+  aspect-ratio: 430 / 880;
+  border-radius: 15.8% / 7.73%;
+  box-shadow: 0 34px 60px -24px rgba(22,18,28,.5), 0 10px 22px -14px rgba(22,18,28,.25);
 }
-.wca-ilha { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 28%; height: 20px; border-radius: 999px; background: #16121c; z-index: 2; }
-/* a "tela" do telefone: faixa branca em cima (a status bar do iPhone) pra ilha não cobrir o cabeçalho do app */
-.wca-tela { position: absolute; top: 9px; right: 9px; bottom: 9px; left: 9px; border-radius: 32px; overflow: hidden; background: #ffffff; padding-top: 11%; }
+.wca-moldura { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; z-index: 2; }
+/* a "tela": faixa branca em cima (a status bar do iPhone) pra Dynamic Island não cobrir o cabeçalho do app */
+.wca-tela { position: absolute; top: 1.14%; right: 2.33%; bottom: 1.14%; left: 2.33%; border-radius: 13.8% / 6.75%; overflow: hidden; background: #ffffff; padding-top: 9.5%; z-index: 1; }
 .wca-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; background: #ffffff; }
 .wca-corpo { flex: 0 0 auto; text-align: center; padding-top: 14px; }
 .wca h1 {

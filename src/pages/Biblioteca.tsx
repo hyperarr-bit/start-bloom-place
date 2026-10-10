@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { supabase } from "@/integrations/supabase/client";
@@ -583,7 +583,7 @@ const Biblioteca = () => {
         </div>
       </header>
 
-      <ModuleTip moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
+      <BoasVindasDoModulo moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
 
       {/* Stats */}
       <div className="px-4 py-2">

@@ -36,7 +36,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { trackEvent } from "@/lib/analytics";
@@ -822,7 +822,7 @@ const Treino = () => {
         className="max-w-5xl mx-auto px-4 py-4"
         style={{ paddingBottom: mostraRodape ? `calc(${alturaRodape + 20}px + var(--teste-banner-h, 0px))` : "calc(2rem + var(--teste-banner-h, 0px))" }}
       >
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="treino"
           tips={[
             "No 📋 PLANO você monta a semana: modelo pronto, exercícios, séries e carga",

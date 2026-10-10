@@ -3,7 +3,7 @@ import { mesAtualExtenso } from "@/lib/utils";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
@@ -81,7 +81,7 @@ const Casa = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 space-y-5">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="casa"
           tips={[
             "Na Despensa, mude um produto para 'Acabou' e ele vai direto pra lista do Mercado",

@@ -7,7 +7,7 @@ import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/u
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { TarefasDeHoje } from "@/components/tarefas/tarefas-do-dia";
@@ -1375,7 +1375,7 @@ const Rotina = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="rotina"
           tips={[
             "Adicione seus hábitos diários e marque conforme concluir cada um",

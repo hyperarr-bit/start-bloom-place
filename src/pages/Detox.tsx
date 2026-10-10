@@ -10,7 +10,7 @@ import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
@@ -75,7 +75,7 @@ const Detox = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="detox"
           tips={[
             "Adicione hábitos que quer largar",

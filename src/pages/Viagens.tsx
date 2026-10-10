@@ -5,7 +5,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TripCountdown } from "@/components/travel/TripCountdown";
 import { DailyTimeline } from "@/components/travel/DailyTimeline";
@@ -88,7 +88,7 @@ const Viagens = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="viagens"
           tips={[
             "Passeios: registre o rolê simples (cinema, jantar, parque) com data e custo",

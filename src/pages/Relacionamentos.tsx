@@ -5,7 +5,7 @@ import { ArrowLeft, Mail } from "lucide-react";
 import { mesAtualExtenso } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import type { SugestaoDeInicio } from "@/lib/relacoes";
@@ -126,7 +126,7 @@ const Relacionamentos = () => {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-          <ModuleTip
+          <BoasVindasDoModulo
             moduleId="relacionamentos"
             tips={[
               "Guarde suas pessoas com o dia do aniversário — o ano é opcional",

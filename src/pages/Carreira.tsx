@@ -5,7 +5,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, TrendingDown, Link2, Briefcase } from "lucide-react";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
@@ -756,7 +756,7 @@ const Carreira = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="carreira"
           tips={[
             "Registre vagas de emprego e acompanhe o status de cada candidatura",

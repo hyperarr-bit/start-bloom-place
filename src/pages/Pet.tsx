@@ -21,6 +21,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
 import { Pata, FolhaPet } from "@/components/pet/kit";
@@ -126,6 +127,8 @@ const Pet = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-24 space-y-3">
+        {/* 1.0.14 — os cartões de boas-vindas (CARTOES_MODULO); o Pet não tinha "Dicas", então sem chave não há nada */}
+        <BoasVindasDoModulo moduleId="pet" />
         {!loaded && (aba === "hoje" || aba === "saude") && (
           <div className="space-y-3" aria-busy="true" aria-label="Carregando">
             <div className="h-[230px] rounded-2xl bg-muted animate-pulse motion-reduce:animate-none" />

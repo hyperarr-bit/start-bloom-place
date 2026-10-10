@@ -1,6 +1,10 @@
 /* CARTÕES DE BOAS-VINDAS DO MÓDULO (10/10, lib/tour-home) — a paleta de CADA módulo em
  * variáveis --ct-*; o componente só lê as variáveis. Finanças: âmbar (o tile da Home); Beleza:
- * pêssego & malva (os tokens --bz-* do próprio módulo, com o escuro já resolvido lá). */
+ * pêssego & malva (os tokens --bz-* do próprio módulo, com o escuro já resolvido lá).
+ * 1.0.14: os outros 14 módulos, cada um na família de cor do SEU tile da Home (lib/modulos):
+ * Rotina esmeralda, Treino azul, Saúde vermelho, Dieta verde, Metas roxo, Casa ciano, Estudos
+ * índigo, Biblioteca laranja, Mente violeta, Carreira grafite, Relações rosa, Detox lima, Pet
+ * caramelo (o âmbar quente, pra não confundir com Finanças), Viagens verde-água. */
 .ct-financas {
   --ct-papel: #fff8e6;
   --ct-cartao: #ffffff;
@@ -33,9 +37,55 @@
 }
 .ct-beleza [data-ct-pagina="2"] { --ct-faixa: hsl(var(--bz-noite)); }
 
+.ct-rotina { --ct-papel: #ecfdf5; --ct-cartao: #ffffff; --ct-faixa: #a7f3d0; --ct-tinta: #064e3b; --ct-suave: #3f7a62; --ct-linha: #bbf0d8; --ct-acento: #059669; --ct-acento-tinta: #ffffff; }
+.dark .ct-rotina { --ct-papel: #0b241b; --ct-cartao: #0f2e23; --ct-faixa: #14532d; --ct-tinta: #d1fae5; --ct-suave: #86cfb0; --ct-linha: #1f5a44; --ct-acento: #34d399; --ct-acento-tinta: #052e1c; }
+
+.ct-treino { --ct-papel: #eff6ff; --ct-cartao: #ffffff; --ct-faixa: #bfdbfe; --ct-tinta: #1e3a8a; --ct-suave: #4a6a9a; --ct-linha: #c7d9f7; --ct-acento: #2563eb; --ct-acento-tinta: #ffffff; }
+.dark .ct-treino { --ct-papel: #0f1b33; --ct-cartao: #13213d; --ct-faixa: #1e3a8a; --ct-tinta: #dbeafe; --ct-suave: #9db8e8; --ct-linha: #27416e; --ct-acento: #60a5fa; --ct-acento-tinta: #0b1a33; }
+
+.ct-saude { --ct-papel: #fef2f2; --ct-cartao: #ffffff; --ct-faixa: #fecaca; --ct-tinta: #7f1d1d; --ct-suave: #a04a4a; --ct-linha: #f7cccc; --ct-acento: #dc2626; --ct-acento-tinta: #ffffff; }
+.dark .ct-saude { --ct-papel: #2a1212; --ct-cartao: #341717; --ct-faixa: #7f1d1d; --ct-tinta: #fee2e2; --ct-suave: #e8a0a0; --ct-linha: #5a2626; --ct-acento: #f87171; --ct-acento-tinta: #2a0f0f; }
+
+.ct-dieta { --ct-papel: #f0fdf4; --ct-cartao: #ffffff; --ct-faixa: #bbf7d0; --ct-tinta: #14532d; --ct-suave: #4a7c59; --ct-linha: #c6ecd0; --ct-acento: #16a34a; --ct-acento-tinta: #ffffff; }
+.dark .ct-dieta { --ct-papel: #0f2416; --ct-cartao: #142d1c; --ct-faixa: #14532d; --ct-tinta: #dcfce7; --ct-suave: #9bd3ab; --ct-linha: #245a36; --ct-acento: #4ade80; --ct-acento-tinta: #0a2412; }
+
+.ct-desenvolvimento { --ct-papel: #faf5ff; --ct-cartao: #ffffff; --ct-faixa: #e9d5ff; --ct-tinta: #4c1d95; --ct-suave: #7c5aa6; --ct-linha: #e4d4f7; --ct-acento: #7c3aed; --ct-acento-tinta: #ffffff; }
+.dark .ct-desenvolvimento { --ct-papel: #1d1230; --ct-cartao: #241839; --ct-faixa: #4c1d95; --ct-tinta: #ede9fe; --ct-suave: #c0a8ea; --ct-linha: #45306b; --ct-acento: #a78bfa; --ct-acento-tinta: #1d1230; }
+
+.ct-casa { --ct-papel: #ecfeff; --ct-cartao: #ffffff; --ct-faixa: #a5f3fc; --ct-tinta: #164e63; --ct-suave: #3f7a8a; --ct-linha: #b8ecf4; --ct-acento: #0891b2; --ct-acento-tinta: #ffffff; }
+.dark .ct-casa { --ct-papel: #0c2a30; --ct-cartao: #103540; --ct-faixa: #164e63; --ct-tinta: #cffafe; --ct-suave: #8fd3df; --ct-linha: #1f5a6a; --ct-acento: #22d3ee; --ct-acento-tinta: #0a2a30; }
+
+.ct-estudos { --ct-papel: #eef2ff; --ct-cartao: #ffffff; --ct-faixa: #c7d2fe; --ct-tinta: #312e81; --ct-suave: #5a5a9a; --ct-linha: #d3d9f7; --ct-acento: #4f46e5; --ct-acento-tinta: #ffffff; }
+.dark .ct-estudos { --ct-papel: #16163a; --ct-cartao: #1c1c44; --ct-faixa: #312e81; --ct-tinta: #e0e7ff; --ct-suave: #a8b0ea; --ct-linha: #3b3b7a; --ct-acento: #818cf8; --ct-acento-tinta: #14143a; }
+
+.ct-biblioteca { --ct-papel: #fff7ed; --ct-cartao: #ffffff; --ct-faixa: #fed7aa; --ct-tinta: #7c2d12; --ct-suave: #a0613a; --ct-linha: #f9dcc0; --ct-acento: #ea580c; --ct-acento-tinta: #ffffff; }
+.dark .ct-biblioteca { --ct-papel: #2c1a0d; --ct-cartao: #362012; --ct-faixa: #7c2d12; --ct-tinta: #ffedd5; --ct-suave: #f0b990; --ct-linha: #5a3a1f; --ct-acento: #fb923c; --ct-acento-tinta: #2c1a0d; }
+
+.ct-hiperfoco { --ct-papel: #f5f3ff; --ct-cartao: #ffffff; --ct-faixa: #ddd6fe; --ct-tinta: #4c1d95; --ct-suave: #6f5aa6; --ct-linha: #e2dcfa; --ct-acento: #6d28d9; --ct-acento-tinta: #ffffff; }
+.dark .ct-hiperfoco { --ct-papel: #1a1433; --ct-cartao: #221a40; --ct-faixa: #4c1d95; --ct-tinta: #ede9fe; --ct-suave: #bfb0f0; --ct-linha: #3e3270; --ct-acento: #a78bfa; --ct-acento-tinta: #1a1433; }
+
+.ct-carreira { --ct-papel: #f8fafc; --ct-cartao: #ffffff; --ct-faixa: #cbd5e1; --ct-tinta: #0f172a; --ct-suave: #475569; --ct-linha: #dbe3ee; --ct-acento: #334155; --ct-acento-tinta: #ffffff; }
+.dark .ct-carreira { --ct-papel: #121a26; --ct-cartao: #182131; --ct-faixa: #334155; --ct-tinta: #e2e8f0; --ct-suave: #a4b2c6; --ct-linha: #2a3a52; --ct-acento: #94a3b8; --ct-acento-tinta: #0f172a; }
+
+.ct-relacionamentos { --ct-papel: #fff1f2; --ct-cartao: #ffffff; --ct-faixa: #fecdd3; --ct-tinta: #881337; --ct-suave: #a04a62; --ct-linha: #f9cfd8; --ct-acento: #e11d48; --ct-acento-tinta: #ffffff; }
+.dark .ct-relacionamentos { --ct-papel: #2b1018; --ct-cartao: #35151f; --ct-faixa: #881337; --ct-tinta: #ffe4e6; --ct-suave: #eaa0b0; --ct-linha: #5a2434; --ct-acento: #fb7185; --ct-acento-tinta: #2b1018; }
+
+.ct-detox { --ct-papel: #f7fee7; --ct-cartao: #ffffff; --ct-faixa: #d9f99d; --ct-tinta: #365314; --ct-suave: #5f7a2a; --ct-linha: #e2f3bd; --ct-acento: #65a30d; --ct-acento-tinta: #ffffff; }
+.dark .ct-detox { --ct-papel: #18240a; --ct-cartao: #1e2d0e; --ct-faixa: #365314; --ct-tinta: #ecfccb; --ct-suave: #c4e08c; --ct-linha: #3f5a1a; --ct-acento: #a3e635; --ct-acento-tinta: #18240a; }
+
+.ct-pet { --ct-papel: #fff7e6; --ct-cartao: #ffffff; --ct-faixa: #fcd9a0; --ct-tinta: #5a3a0a; --ct-suave: #8a6630; --ct-linha: #f5deb3; --ct-acento: #d9800e; --ct-acento-tinta: #ffffff; }
+.dark .ct-pet { --ct-papel: #2a1d0a; --ct-cartao: #33240f; --ct-faixa: #6b4a12; --ct-tinta: #fde9c8; --ct-suave: #e2bd80; --ct-linha: #4f3a16; --ct-acento: #f5a524; --ct-acento-tinta: #2a1d0a; }
+
+.ct-viagens { --ct-papel: #f0fdfa; --ct-cartao: #ffffff; --ct-faixa: #99f6e4; --ct-tinta: #134e4a; --ct-suave: #3f7a74; --ct-linha: #b6ebe3; --ct-acento: #0d9488; --ct-acento-tinta: #ffffff; }
+.dark .ct-viagens { --ct-papel: #0b2622; --ct-cartao: #10312c; --ct-faixa: #134e4a; --ct-tinta: #ccfbf1; --ct-suave: #8ad3c8; --ct-linha: #1f5a54; --ct-acento: #2dd4bf; --ct-acento-tinta: #0b2622; }
+
+/* a folha (1.0.14): o trilho é a área que rola — de lado entre os cartões, pra baixo dentro de um cartão alto */
+.ct-folha .ct-trilho { height: auto; }
 .ct-trilho { display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .ct-trilho::-webkit-scrollbar { display: none; }
 .ct-pagina { flex: none; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+.ct-folha .ct-pagina { height: 100%; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: none; }
+.ct-folha .ct-pagina::-webkit-scrollbar { display: none; }
 
 .ct-dot { display: block; width: 6px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ct-tinta) 22%, transparent); transition: width .2s, background .2s; }
 .ct-dot[data-ativo] { width: 16px; background: var(--ct-acento); }

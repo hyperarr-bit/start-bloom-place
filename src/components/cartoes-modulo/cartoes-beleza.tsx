@@ -2,6 +2,7 @@ import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { TEMA_BELEZA } from "@/components/beleza/kit";
 import { getSeedsForModule } from "@/lib/preview-seeds";
 import { Miniatura } from "./Miniatura";
+import { abrirAba } from "./registro";
 import type { ConfigCartoes } from "./CartoesDoModulo";
 
 /** Os 3 cartões da BELEZA (pêssego & malva, os tokens do próprio módulo). */
@@ -31,3 +32,6 @@ export const cartoesBeleza = ({ irParaSkincare }: { irParaSkincare: () => void }
     itens: ["Meus produtos", "Fotos da pele", "Cronograma capilar"],
   },
 });
+
+/** Pelo registro (sem a página por perto): a aba abre pelo rótulo. */
+export default (): ConfigCartoes => cartoesBeleza({ irParaSkincare: () => abrirAba("SKINCARE") });

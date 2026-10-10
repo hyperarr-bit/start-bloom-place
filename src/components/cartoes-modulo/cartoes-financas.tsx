@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { getSeedsForModule } from "@/lib/preview-seeds";
 import { Miniatura } from "./Miniatura";
+import { abrirAba } from "./registro";
 import type { ConfigCartoes } from "./CartoesDoModulo";
 
 /** A tabela de gastos REAL, reduzida, com os gastos de exemplo da demo em memória. */
@@ -40,3 +41,6 @@ export const cartoesFinancas = ({ irParaFinanceiro }: { irParaFinanceiro: () => 
     itens: ["Investimentos", "Limites por categoria", "Simuladores"],
   },
 });
+
+/** Pelo registro (sem a página por perto): a aba abre pelo rótulo. */
+export default (): ConfigCartoes => cartoesFinancas({ irParaFinanceiro: () => abrirAba("MEU FINANCEIRO") });

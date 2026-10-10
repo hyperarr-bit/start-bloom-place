@@ -9,7 +9,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   ArrowLeft, Plus, X, Trash2, Star, Target, Heart, Shield, Brain,
@@ -521,7 +521,7 @@ const DesenvolvimentoPessoal = () => {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="desenvolvimento"
           tips={[
             "Defina suas metas de vida, bucket list e quadro de visão na aba Metas",

@@ -29,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
@@ -773,7 +773,7 @@ const Dieta = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="dieta"
           tips={[
             "Configure suas refeições clicando em ⚙️ no cardápio (adicione ou remova refeições)",

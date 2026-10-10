@@ -11,7 +11,7 @@ import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 import { IdeasPanel } from "@/components/hiperfoco/IdeasPanel";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
@@ -76,7 +76,7 @@ const Hiperfoco = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="hiperfoco"
           tips={[
             "Capture pensamentos rápidos na aba Dia",

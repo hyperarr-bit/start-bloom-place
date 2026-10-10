@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
 import { CicloMenstrual } from "@/components/saude/CicloMenstrual";
@@ -69,7 +69,7 @@ const Saude = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="saude"
           tips={[
             "Acompanhe sua hidratação diária e marque seus copos de água",

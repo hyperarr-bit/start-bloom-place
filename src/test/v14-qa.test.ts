@@ -11,6 +11,7 @@ import { ONBOARDING_1TELA, onboarding1TelaLigado } from "@/lib/onboarding-1tela"
 import { DIA1_CHEIO, bracoDia1, dia1CheioLigado, guardarForcaDia1Cheio, modoDia1Cheio } from "@/lib/dia1-cheio";
 import { COBRANCA_V14, cobrancaV14Ligada } from "@/lib/cobranca-recusada";
 import { AVALIACAO_V14, avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
+import { FUNIL_CALAI, funilCalaiLigado, guardarForcaFunilCalai } from "@/lib/funil-calai";
 
 const OFERTAS: NomeDaOferta[] = ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao", "curto", "cadeado"];
 const shell = (ligado: boolean) => {
@@ -30,6 +31,7 @@ describe("sem a env: a build de LOJA", () => {
     expect(DIA1_CHEIO).toBe("off");
     expect(COBRANCA_V14).toBe("off");
     expect(AVALIACAO_V14).toBe("off");
+    expect(FUNIL_CALAI).toBe("off");
     for (const nativo of [false, true]) {
       shell(nativo);
       expect(cartoesLigados()).toBe(false);
@@ -42,6 +44,7 @@ describe("sem a env: a build de LOJA", () => {
       expect(bracoDia1()).toBeNull();
       expect(cobrancaV14Ligada()).toBe(false);
       expect(avaliacaoV14Ligada()).toBe(false);
+      expect(funilCalaiLigado()).toBe(false);
     }
   });
 });
@@ -64,6 +67,7 @@ describe("VITE_V14_QA=1: a build de QA", () => {
       expect(localStorage.getItem("core-dia1-braco")).toBeNull();
       expect(cobrancaV14Ligada()).toBe(true);
       expect(avaliacaoV14Ligada()).toBe(true);
+      expect(funilCalaiLigado()).toBe(true);
     }
   });
 
@@ -79,6 +83,10 @@ describe("VITE_V14_QA=1: a build de QA", () => {
     expect(modoDia1Cheio()).toBe("ab");
     guardarForcaDia1Cheio("?dia1-cheio=off");
     expect(dia1CheioLigado()).toBe(false);
+    guardarForcaFunilCalai("?funil-calai=off");
+    expect(funilCalaiLigado()).toBe(false);
+    guardarForcaFunilCalai("?funil-calai=auto");
+    expect(funilCalaiLigado()).toBe(true);
   });
 
   it("qualquer outro valor da env é desligado", () => {

@@ -383,7 +383,11 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
   ],
 };
 
-export function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
+export function RadarResultScreen({ answers, area, onDone, cta = "Ver minha central", rodape = "Abre o app de verdade, com dados de exemplo" }: {
+  answers: Record<string, string>; area: AreaKey; onDone: () => void;
+  /** 10/10 (FUNIL_CALAI): sem central nem demo depois daqui, o botão leva pro plano — texto e rodapé mudam. Sem os props, a tela de hoje. */
+  cta?: string; rodape?: string | null;
+}) {
   const a = AREAS[area];
   const roi2 = ehFunilRoi2();
   const items = answers.vitoria
@@ -421,9 +425,9 @@ export function RadarResultScreen({ answers, area, onDone }: { answers: Record<s
         ))}
       </Card>
       <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}>
-        Ver minha central <ArrowRight className="w-4 h-4" />
+        {cta} <ArrowRight className="w-4 h-4" />
       </Button>
-      <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
+      {rodape && <p className="text-xs text-muted-foreground mt-3">{rodape}</p>}
     </div>
   );
 }

@@ -14,12 +14,21 @@ import "./cartoes.css";
  *
  * 1.0.14: viraram POPUP (dono: "aparecer por cima do app como popup") — a mesma
  * folha que sobe de baixo das outras (Sheet do PersonalizarPendencias / menu da
- * conta), ~70% da tela, o módulo escurecido atrás. Dentro, os MESMOS 3 cartões que
- * deslizam de lado (swipe + bolinhas), na paleta do módulo:
- *   1. Faz isso agora — 1 ação de 1 toque; "Fazer agora" FECHA a folha, rola e acende o campo real;
- *   2. Onde fica o essencial — as 2–3 abas vivas + a tela do módulo em MINIATURA;
- *   3. O que não precisa hoje — "Relaxa: X, Y e Z ficam pra depois".
- * "Já sei" no topo, sempre visível; arrastar a folha pra baixo (ou tocar fora) = "Já sei".
+ * conta), ~70% da tela, o módulo escurecido atrás.
+ *
+ * v2 (dono, 10/10: "em vez de 3 cards de texto, 4 a 6 cards deslizando pro lado,
+ * cada um com uma imagem viva da parte do app, mostrando uma coisa de cada vez, na
+ * ordem de importância do módulo"): cada cartão = título curto + 1 frase + a
+ * MINIATURA VIVA (o componente real ou a réplica do card, com dados de exemplo em
+ * memória — a conta da pessoa continua vazia) ou uma mini-animação de 2–3 quadros
+ * (digita → aparece, marca um a um, o medidor sobe; CSS/estado, sem vídeo).
+ *   1. Faz isso agora — a 1 ação de 1 toque, animada; "Fazer agora" FECHA a folha,
+ *      rola e acende o campo real;
+ *   2..N-1. uma coisa do módulo por cartão, na ordem do diagnóstico de abas
+ *      (scratchpad/complexidade-10-10): o que mais gente usa primeiro;
+ *   N. Relaxa: X e Y ficam pra depois.
+ * "Já sei" no topo, sempre visível; bolinhas + "2 de 5"; arrastar a folha pra
+ * baixo (ou tocar fora) = "Já sei".
  *
  * Existem pra os 16 módulos (components/cartoes-modulo/cartoes-*.tsx, carregados sob
  * demanda pelo `registro`): o ModuleTip "Dicas para começar" sai de cena com a chave
@@ -32,6 +41,11 @@ import "./cartoes.css";
  * inteira ("Explorar por conta própria"): cartões em qualquer módulo. Conta antiga sem
  * missão e a missão da 1.0.10 (braço A / chave off) seguem a mesma regra.
  *
+ * FUNDO (bug da Beleza, 10/10): a folha é um portal, fora da raiz da página — a classe
+ * da config precisa carregar os tokens do módulo (a Beleza leva "tema-beleza" junto do
+ * "ct-beleza"), e o cartoes.css tem reserva literal pra todo módulo (.ct-folha nunca
+ * fica transparente).
+ *
  * Chave: 1x por APARELHO em `core-cartoes-vistos-{moduleId}` (localStorage); ao fechar
  * também grava `core-tip-seen-{moduleId}` na conta — o "Dicas" antigo não reaparece.
  *
@@ -39,26 +53,42 @@ import "./cartoes.css";
  * modulo_cartoes_fechados {moduleId, indice} · modulo_cartao_fazer_agora {moduleId}.
  */
 
+export interface CartaoVivo {
+  /** Título curto ("Seu cardápio da semana"). */
+  titulo: string;
+  /** Uma frase. */
+  texto: string;
+  /** A imagem viva: <Miniatura> com o componente real ou os blocos (blocos.tsx). */
+  miniatura: ReactNode;
+}
+
 export interface ConfigCartoes {
   moduleId: string;
-  /** Classe com as variáveis --ct-* (cartoes.css): "ct-financas", "ct-rotina"… */
+  /** Classe(s) com as variáveis --ct-* (cartoes.css): "ct-financas"; a Beleza: "tema-beleza ct-beleza". */
   classe: string;
   /** "FINANÇAS" — no selo do cabeçalho. */
   nome: string;
+  /** Cartão 1: a ação de 1 toque, com a miniatura animada e o "Fazer agora". */
   agora: {
-    titulo: string;
+    titulo?: string;
     texto: string;
     botao: string;
     /** O elemento real que acende (querySelector; vale lista com vírgula). */
     seletor: string;
     /** Antes de procurar o alvo: trocar de aba, por exemplo. */
     antes?: () => void;
-    /** A linha de apoio sob o título (padrão: "Um toque e o módulo já está trabalhando pra você."). */
+    /** A linha de apoio sob o título. */
     apoio?: string;
+    miniatura: ReactNode;
   };
-  essencial: { titulo: string; texto: string; abas: string[]; miniatura: ReactNode };
-  depois: { titulo: string; itens: string[] };
+  /** Cartões 2..N-1 (2 a 4): uma coisa do módulo por cartão, na ordem de importância. */
+  cartoes: CartaoVivo[];
+  /** O último: "Relaxa: X e Y ficam pra depois." */
+  depois: { titulo?: string; itens: string[] };
 }
+
+/** Quantos cartões uma config tem (1 + os do meio + o "relaxa"). */
+export const totalDeCartoes = (c: ConfigCartoes): number => 2 + c.cartoes.length;
 
 /** Só a camada de guia de OUTRO componente conta (a própria folha dos cartões também é uma camada). */
 const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="cartoes-modulo"])';
@@ -134,6 +164,10 @@ function useConfigDosCartoes(moduleId: string, pronta: ConfigCartoes | undefined
   return pronta ?? carregada;
 }
 
+const Eyebrow = ({ children }: { children: ReactNode }) => (
+  <p className="text-[10.5px] font-extrabold tracking-[.14em] uppercase" style={{ color: "var(--ct-suave)" }}>{children}</p>
+);
+
 export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config?: ConfigCartoes; moduleId?: string }) => {
   const moduleId = pronta?.moduleId ?? idPedido ?? "";
   const { get, set } = useUserData();
@@ -161,6 +195,8 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visivel, !!config]);
 
+  const total = config ? totalDeCartoes(config) : 0;
+
   const fechar = (como: "ja_sei" | "fazer_agora") => {
     marcarCartoesVistos(moduleId);
     set(`core-tip-seen-${moduleId}`, "true");
@@ -170,7 +206,7 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
 
   const irPara = (n: number) => {
     const t = trilho.current;
-    const alvo = Math.max(0, Math.min(2, n));
+    const alvo = Math.max(0, Math.min(total - 1, n));
     if (t) {
       if (typeof t.scrollTo === "function") t.scrollTo({ left: alvo * t.clientWidth, behavior: "smooth" });
       else t.scrollLeft = alvo * t.clientWidth;
@@ -205,9 +241,13 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
 
   if (!visivel || !config) return alvoAceso ? <AnelFazerAgora alvo={alvoAceso} classe={config?.classe ?? ""} onFim={() => setAlvoAceso(null)} /> : null;
 
-  const paginas = [config.agora.titulo, config.essencial.titulo, config.depois.titulo];
+  const tituloAgora = config.agora.titulo ?? "Faz isso agora";
+  const tituloDepois = config.depois.titulo ?? "O que não precisa hoje";
+  const titulos = [tituloAgora, ...config.cartoes.map((c) => c.titulo), tituloDepois];
   const chip = "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold border";
   const estiloChip = { borderColor: "var(--ct-linha)", background: "var(--ct-papel)", color: "var(--ct-tinta)" };
+  const ultimo = total - 1;
+  const { itens } = config.depois;
 
   return (
     <Sheet open onOpenChange={(aberta) => { if (!aberta) fechar("ja_sei"); }}>
@@ -216,10 +256,10 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
         semFechar
         overlayClassName="z-[290] bg-black/55"
         className={`${config.classe} ct-folha p-0 z-[300] rounded-t-[28px] border-0 h-[72dvh] max-h-[72dvh] flex flex-col overflow-hidden`}
-        style={{ background: "var(--ct-cartao)", color: "var(--ct-tinta)" }}
         data-testid="cartoes-modulo"
         data-modulo={moduleId}
         data-pagina={pagina}
+        data-total={total}
         data-camada-guia="cartoes-modulo"
         aria-label={`Boas-vindas: ${config.nome}`}
         aria-describedby={undefined}
@@ -243,42 +283,41 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
         </div>
 
         <div ref={trilho} className="ct-trilho flex-1 min-h-0" onScroll={aoRolar} data-testid="cartoes-trilho" tabIndex={0} aria-roledescription="carrossel">
-          {/* 1 — Faz isso agora */}
-          <article className="ct-pagina px-5 pt-5 pb-4" data-ct-pagina="0" aria-label={paginas[0]} aria-hidden={pagina !== 0 ? "true" : undefined}>
-            <p className="text-[10.5px] font-extrabold tracking-[.14em] uppercase" style={{ color: "var(--ct-suave)" }}>1 · {config.agora.titulo}</p>
-            <h3 className="mt-1.5 text-[22px] font-bold leading-tight tracking-tight">{config.agora.texto}</h3>
-            <p className="mt-2 text-[13px] leading-snug" style={{ color: "var(--ct-suave)" }}>{config.agora.apoio ?? "Um toque e o módulo já está trabalhando pra você."}</p>
+          {/* 1 — Faz isso agora, com a ação acontecendo na miniatura */}
+          <article className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina="0" aria-label={tituloAgora} aria-hidden={pagina !== 0 ? "true" : undefined}>
+            <Eyebrow>1 · {tituloAgora}</Eyebrow>
+            <h3 className="mt-1 text-[19px] font-bold leading-tight tracking-tight">{config.agora.texto}</h3>
+            {config.agora.apoio && <p className="mt-1 text-[12.5px] leading-snug" style={{ color: "var(--ct-suave)" }}>{config.agora.apoio}</p>}
+            <div className="mt-3">{config.agora.miniatura}</div>
             <button
               type="button"
               onClick={fazerAgora}
               data-testid="cartoes-fazer-agora"
-              className="mt-5 h-12 px-6 rounded-full text-[14px] font-bold active:scale-95 transition shadow-sm"
+              className="mt-3 h-11 px-6 rounded-full text-[14px] font-bold active:scale-95 transition shadow-sm"
               style={{ background: "var(--ct-acento)", color: "var(--ct-acento-tinta)" }}
             >
               {config.agora.botao}
             </button>
-            <p className="mt-6 text-[11.5px]" style={{ color: "var(--ct-suave)" }}>Desliza pro lado pra ver as abas que importam →</p>
           </article>
 
-          {/* 2 — Onde fica o essencial */}
-          <article className="ct-pagina px-5 pt-5 pb-4" data-ct-pagina="1" aria-label={paginas[1]} aria-hidden={pagina !== 1 ? "true" : undefined}>
-            <p className="text-[10.5px] font-extrabold tracking-[.14em] uppercase" style={{ color: "var(--ct-suave)" }}>2 · {config.essencial.titulo}</p>
-            <h3 className="mt-1.5 text-[17px] font-bold leading-tight tracking-tight">{config.essencial.texto}</h3>
-            <div className="mt-2 mb-3 flex flex-wrap gap-1.5">
-              {config.essencial.abas.map((a) => <span key={a} className={chip} style={estiloChip}>{a}</span>)}
-            </div>
-            {config.essencial.miniatura}
-          </article>
+          {/* 2..N-1 — uma coisa do módulo por cartão */}
+          {config.cartoes.map((c, i) => (
+            <article key={c.titulo} className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina={i + 1} aria-label={c.titulo} aria-hidden={pagina !== i + 1 ? "true" : undefined}>
+              <Eyebrow>{i + 2} · {c.titulo}</Eyebrow>
+              <h3 className="mt-1 text-[17px] font-bold leading-tight tracking-tight">{c.texto}</h3>
+              <div className="mt-3">{c.miniatura}</div>
+            </article>
+          ))}
 
-          {/* 3 — O que não precisa hoje */}
-          <article className="ct-pagina px-5 pt-5 pb-4" data-ct-pagina="2" aria-label={paginas[2]} aria-hidden={pagina !== 2 ? "true" : undefined}>
-            <p className="text-[10.5px] font-extrabold tracking-[.14em] uppercase" style={{ color: "var(--ct-suave)" }}>3 · {config.depois.titulo}</p>
-            <h3 className="mt-1.5 text-[22px] font-bold leading-tight tracking-tight">Relaxa: isso fica pra depois.</h3>
+          {/* N — O que não precisa hoje */}
+          <article className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina={ultimo} aria-label={tituloDepois} aria-hidden={pagina !== ultimo ? "true" : undefined}>
+            <Eyebrow>{total} · {tituloDepois}</Eyebrow>
+            <h3 className="mt-1 text-[22px] font-bold leading-tight tracking-tight">Relaxa: isso fica pra depois.</h3>
             <p className="mt-2 text-[13px] leading-snug" style={{ color: "var(--ct-suave)" }}>
-              {config.depois.itens.slice(0, -1).join(", ")} e {config.depois.itens[config.depois.itens.length - 1]} continuam aqui quando você quiser — hoje não precisa.
+              {itens.length > 1 ? `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}` : itens[0]} continuam aqui quando você quiser — hoje não precisa.
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {config.depois.itens.map((i) => <span key={i} className={`${chip} line-through opacity-70`} style={estiloChip}>{i}</span>)}
+              {itens.map((i) => <span key={i} className={`${chip} line-through opacity-70`} style={estiloChip}>{i}</span>)}
             </div>
             <button
               type="button"
@@ -293,13 +332,13 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
         </div>
 
         <div className="flex items-center justify-between px-4 pt-2 shrink-0 pb-[max(0.9rem,var(--app-safe-bottom,0px))]" style={{ borderTop: "1px solid var(--ct-linha)" }}>
-          <div className="flex items-center gap-1.5" role="tablist" aria-label="Cartões">
-            {paginas.map((p, i) => (
-              <button key={p} type="button" role="tab" aria-selected={i === pagina} aria-label={`Cartão ${i + 1}: ${p}`} onClick={() => irPara(i)} className="p-1.5" data-testid={`cartoes-bolinha-${i}`}>
+          <div className="flex items-center gap-1" role="tablist" aria-label="Cartões">
+            {titulos.map((p, i) => (
+              <button key={`${p}-${i}`} type="button" role="tab" aria-selected={i === pagina} aria-label={`Cartão ${i + 1}: ${p}`} onClick={() => irPara(i)} className="p-1.5" data-testid={`cartoes-bolinha-${i}`}>
                 <i className="ct-dot" data-ativo={i === pagina ? "" : undefined} />
               </button>
             ))}
-            <span className="ml-1 text-[11px] tabular-nums" style={{ color: "var(--ct-suave)" }} data-testid="cartoes-contador">{pagina + 1} de 3</span>
+            <span className="ml-1 text-[11px] tabular-nums" style={{ color: "var(--ct-suave)" }} data-testid="cartoes-contador">{pagina + 1} de {total}</span>
           </div>
           <FigurinhaPlaceholder tamanho={40} className="-rotate-6" />
         </div>

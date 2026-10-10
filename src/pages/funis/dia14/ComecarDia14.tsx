@@ -35,6 +35,7 @@ import { bracoGuardadoDoQuiz, guardarBracoDoQuiz, perguntasDoBraco, sortearBraco
 import { portaAntigaNesteAparelho } from "@/lib/porta-aparelho";
 import { buscarProvaSocial } from "@/lib/prova-social";
 import { Faixa, Grade16, LinhaInclusos } from "./pecas-roi2";
+import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -383,10 +384,12 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
   ],
 };
 
-export function RadarResultScreen({ answers, area, onDone, cta = "Ver minha central", rodape = "Abre o app de verdade, com dados de exemplo" }: {
+export function RadarResultScreen({ answers, area, onDone, cta = "Ver minha central", rodape = "Abre o app de verdade, com dados de exemplo", botaoFixo = false }: {
   answers: Record<string, string>; area: AreaKey; onDone: () => void;
   /** 10/10 (FUNIL_CALAI): sem central nem demo depois daqui, o botão leva pro plano — texto e rodapé mudam. Sem os props, a tela de hoje. */
   cta?: string; rodape?: string | null;
+  /** 10/10 (FUNIL_CALAI): o botão no rodapé fixo padrão do funil (BotaoDoFunil). Sem o prop, o botão de hoje. */
+  botaoFixo?: boolean;
 }) {
   const a = AREAS[area];
   const roi2 = ehFunilRoi2();
@@ -424,9 +427,13 @@ export function RadarResultScreen({ answers, area, onDone, cta = "Ver minha cent
           </motion.div>
         ))}
       </Card>
+      {botaoFixo ? (
+        <BotaoDoFunil texto={cta} testid="result-botao" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }} />
+      ) : (
       <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}>
         {cta} <ArrowRight className="w-4 h-4" />
       </Button>
+      )}
       {rodape && <p className="text-xs text-muted-foreground mt-3">{rodape}</p>}
     </div>
   );
@@ -741,7 +748,7 @@ const PROVA_AVATARES: Array<{ foto?: string; ini?: string; cor?: string }> = [
  *  (3.1.1) e dizer "App Store" seria mentira — fica "avaliação de usuário". */
 const rotuloDaLoja = () => (ehApple() ? "avaliação de usuário" : "Google Play");
 
-export function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
+export function ProvaSocialScreen({ onNext, botaoFixo = false }: { onNext: () => void; /** 10/10 (FUNIL_CALAI): o botão no rodapé fixo padrão do funil. Sem o prop, o de hoje. */ botaoFixo?: boolean }) {
   useEffect(() => { trackEvent("funnel_view", { step: "prova_social" }); }, []);
   return (
     <div className="w-full max-w-sm mx-auto text-center pt-4">
@@ -792,9 +799,13 @@ export function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
           <p className="text-[11px] text-muted-foreground font-semibold">Paulo P. — {rotuloDaLoja()} <span className="text-[#f0a500]">★★★★★</span></p>
         </div>
       </motion.div>
+      {botaoFixo ? (
+        <BotaoDoFunil texto="Montar meu plano" testid="prova-social-botao" onClick={onNext} />
+      ) : (
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         Montar meu plano <ArrowRight className="w-4 h-4" />
       </Button>
+      )}
     </div>
   );
 }

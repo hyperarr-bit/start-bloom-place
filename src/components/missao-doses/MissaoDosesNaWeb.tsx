@@ -10,8 +10,9 @@ import { isNativeShell } from "@/lib/native-shell";
 import { EVENTO_DIA2, LEMBRETE_DO_PLANO, combinarHora } from "@/lib/lembrete-dia2";
 import { agendarProximaDose, pedirPermissaoDia2 } from "@/lib/notificacoes";
 import { bracoDia1, guardarForcaDia1Cheio, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import {
-  EVENTO_MISSAO_DOSES, MODULOS, apagarMissao, aprofundarPendente, diaDaMissao, dosesFeitas, ehBracoB, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, apagarMissao, aprofundarPendente, diaDaMissao, dosesFeitas, ehBracoB, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { BoasVindasDoses } from "./BoasVindasDoses";
@@ -47,10 +48,23 @@ import { PlanoDeAmanha } from "./PlanoDeAmanha";
  *     só a partir do dia 3.
  * Eventos novos (só com a chave ligada): missao_dose_concluida {indice, modulo,
  * variante}, missao_completa {variante}, missao_agora_nao {indice},
- * plano_amanha_definido {quando, gatilho}. TOUR DA HOME (outro agente): vem
- * DEPOIS da missão/plano — ver `missaoEmAndamento` em lib/missao-doses e o
- * evento `missao_completa` / o CustomEvent `missao-doses:completa` na janela.
+ * plano_amanha_definido {quando, gatilho}. TOUR DA HOME (1.0.14): vem DEPOIS da
+ * missão/plano — ver `missaoEmAndamento` em lib/missao-doses e o CustomEvent
+ * `missao-doses:completa` (EVENTO_MISSAO_COMPLETA) na janela, que a Home escuta.
+ *
+ * AVALIAÇÃO (1.0.14, chave AVALIACAO_V14 em lib/avaliacao-v14): a missão é quem
+ * pede a nota — `pedirAvaliacaoPorMissao("missao_completa")` 1,5 s depois da
+ * comemoração da 3ª dose e `("plano_amanha_definido")` 1,5 s depois do "Combinado"
+ * da folha do plano. As travas (chave, 2+ dias de uso, momento ruim, cota) moram
+ * em lib/avaliacao; aqui só o momento. Nunca derruba a missão.
  */
+/** 1,5 s depois da comemoração — a festa já está na tela, a caixinha vem por cima. */
+export const ESPERA_AVALIACAO_MS = 1500;
+const pedirNotaDepois = (motivo: MotivoDaMissao): void => {
+  window.setTimeout(() => {
+    try { void pedirAvaliacaoPorMissao(motivo).catch(() => false); } catch { /* a avaliação nunca derruba a missão */ }
+  }, ESPERA_AVALIACAO_MS);
+};
 export function MissaoDosesNaWeb() {
   const { search } = useLocation();
   // a força de QA pelo link, em qualquer rota (o link do dono pode cair em qualquer página)
@@ -60,8 +74,8 @@ export function MissaoDosesNaWeb() {
   return ligada ? <Ligada /> : null;
 }
 
-/** O CustomEvent da janela quando as 3 doses ficam feitas (o tour da Home escuta). */
-export const EVENTO_MISSAO_COMPLETA = "missao-doses:completa";
+/** O CustomEvent da janela quando as 3 doses ficam feitas (o tour da Home escuta). Mora em lib/missao-doses. */
+export { EVENTO_MISSAO_COMPLETA };
 
 function Ligada() {
   const { user } = useAuth();
@@ -165,6 +179,7 @@ function Ligada() {
           const m = lerMissao() ?? missao;
           salvar({ ...m, planoAmanha: plano });
           trackEvent("plano_amanha_definido", eventoDaMissao({ quando: plano.quando, gatilho: plano.gatilho ?? null, doses: dosesFeitas(m), titulo: previa.title }));
+          pedirNotaDepois("plano_amanha_definido");
           // a hora do plano É a hora do Lembrete do dia 2 (a semana inteira); a permissão é pedida AQUI, ligada ao plano
           if (isNativeShell()) {
             combinarHora(LEMBRETE_DO_PLANO[plano.quando]);
@@ -238,15 +253,7 @@ function Ligada() {
             if (completa) {
               trackEvent("missao_completa", eventoDaMissao({ dia_relogio: dia, modulos: m.modulos }));
               try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_COMPLETA, { detail: { variante: m.braco } })); } catch { /* noop */ }
-              /* TODO(avaliacao, 10/10): `pedirAvaliacaoPorMissao(motivo)` ainda não existe em lib/avaliacao
-               * (não é desta frente). Quando existir, este bloco a chama 1,5 s depois da comemoração;
-               * até lá só os eventos acima saem. */
-              window.setTimeout(() => {
-                void import("@/lib/avaliacao").then((mod) => {
-                  const pedir = (mod as { pedirAvaliacaoPorMissao?: (motivo: string) => unknown }).pedirAvaliacaoPorMissao;
-                  if (typeof pedir === "function") void pedir("missao_completa");
-                }).catch(() => { /* a avaliação nunca derruba a missão */ });
-              }, 1500);
+              pedirNotaDepois("missao_completa");
             }
           }
         }}

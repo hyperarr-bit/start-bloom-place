@@ -6,9 +6,38 @@ import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { WIDGET_CATALOG, type WidgetId } from "@/hooks/use-home-widgets";
 import { MODULOS } from "@/lib/modulos";
 import { CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, ocultar, type TipoPendencia } from "@/lib/home-pendencias";
+import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES } from "@/lib/missao-doses";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { abrirAcaoRapida } from "@/components/home/QuickActions";
-import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, avisar, marcarTourFeito } from "@/lib/tour-home";
+import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, avisar, deveMostrarTourHome, marcarTourFeito } from "@/lib/tour-home";
+
+/**
+ * O ENCAIXE DO TOUR (1.0.14): a Home pergunta "mostro o tour agora?" e a resposta
+ * muda quando a missão em doses anda — a 3ª dose feita, a folha "Plano de amanhã"
+ * combinada, "O que você construiu" fechado. Este hook relê `deveMostrarTourHome`
+ * nesses eventos (`missao-doses:mudou`, `missao-doses:completa`) e quando outra
+ * guia sai da tela, e só diz "sim" quando NÃO há outra camada de guia montada
+ * (`[data-camada-guia]`: a folha do plano, a festa da dose, o holofote) — a folha
+ * "Plano de amanhã" tem prioridade sobre o tour. Fluxo esperado na conta nova:
+ * funil → paywall → teste → missão (3 doses) → plano de amanhã → tour (5 passos) →
+ * festa "Casa arrumada". Quem pulou a missão: tour direto.
+ */
+export function useTourDaHome(criadoEm: string | null | undefined, ligado = true): boolean {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const reler = () => setTick((t) => t + 1);
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    window.addEventListener(EVENTO_MISSAO_COMPLETA, reler);
+    // a folha do plano / a festa desmontam sem evento próprio: um relógio curto confere a camada
+    const relogio = window.setInterval(() => { if (!document.querySelector('[data-camada-guia]:not([data-camada-guia="tour-home"])')) reler(); }, 700);
+    return () => { window.removeEventListener(EVENTO_MISSAO_DOSES, reler); window.removeEventListener(EVENTO_MISSAO_COMPLETA, reler); window.clearInterval(relogio); };
+  }, []);
+  if (!ligado) return false;
+  void tick;
+  if (!deveMostrarTourHome(criadoEm)) return false;
+  try { if (document.querySelector('[data-camada-guia]:not([data-camada-guia="tour-home"])')) return false; } catch { /* sem DOM */ }
+  return true;
+}
 import { FigurinhaPlaceholder } from "@/components/cartoes-modulo/CartoesDoModulo";
 
 /**

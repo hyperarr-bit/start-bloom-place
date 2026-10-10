@@ -28,8 +28,8 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
-import { deveMostrarTourHome, guardarForcasDaUrl } from "@/lib/tour-home";
-import { TourDaHome } from "@/components/home/TourDaHome";
+import { guardarForcasDaUrl } from "@/lib/tour-home";
+import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -121,6 +121,8 @@ const HomePage = () => {
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
+  // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã
+  const mostrarTour = useTourDaHome(user?.created_at, !!user);
 
   const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino", "saude", "metas", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
 
@@ -428,7 +430,7 @@ const HomePage = () => {
 
       {/* 10/10 — "Sua Home em 5 passos" (TOUR_HOME, lib/tour-home): só pra conta nova sem missão
           ativa/pendente, 1x por aparelho — ver deveMostrarTourHome. Desligada, não existe o nó. */}
-      {!!user && deveMostrarTourHome(user.created_at) && (
+      {mostrarTour && (
         <TourDaHome lifeData={lifeData} widgetsAtivos={activeWidgets.map((w) => w.id)} adicionarWidget={addWidget} onFim={() => setDataTrigger((d) => d + 1)} />
       )}
 

@@ -45,7 +45,8 @@ import ComecarW from "@/pages/funis/w/ComecarW";
 import { CHAVES_FUNIL_W, passoAnteriorDe, passoDeRetomada, guardarChave } from "@/pages/funis/w/retomada";
 import { CHAVE_FORCA_FUNIL_CALAI, FUNIL_CALAI, STEP_GRAFICO_COM_SEM, funilCalaiLigado, guardarForcaFunilCalai, passoDoFunilCalai } from "@/lib/funil-calai";
 import { CHAVE_FORCA_ONBOARDING_1TELA, passoDoOnboarding } from "@/lib/onboarding-1tela";
-import { MEDIANA_DIAS, MEDIANA_REAIS, copyDoGrafico, mesAlvo, numeroDaRota, numeroDaRotaDe, projecao } from "@/lib/funil-numeros";
+import { ABERTURA_TUDO, COPY_SEM_COM, MEDIANA_REAIS, MEDIANA_TREINOS, copyDoGrafico, mesAlvo, numeroDaRota, numeroDaRotaDe, portaTudo, projecao } from "@/lib/funil-numeros";
+import { PORTA_TUDO } from "@/lib/funnel";
 
 const montar = (url: string) => {
   window.history.replaceState({}, "", url);
@@ -113,27 +114,36 @@ describe("a chave", () => {
 });
 
 describe("lib/funil-numeros: o número dela", () => {
-  it("dinheiro: a faixa vira R$/mês; 'não faço ideia' usa a mediana (estimado); outras rotas viram dias/mês", () => {
-    expect(numeroDaRotaDe("dinheiro", { gasto: "R$ 300 a R$ 500" })).toMatchObject({ rota: "dinheiro", tipo: "reais", valor: 500, rotulo: "R$ 500", estimado: false });
+  it("dinheiro: a faixa vira R$/mês (gráfico); 'não faço ideia' usa a mediana (estimado); corpo vira treinos/semana (gráfico); rotina e metas viram copy; a porta 'Tudo' é dinheiro", () => {
+    expect(numeroDaRotaDe("dinheiro", { gasto: "R$ 300 a R$ 500" })).toMatchObject({ rota: "dinheiro", tipo: "reais", formato: "grafico", valor: 500, rotulo: "R$ 500", estimado: false });
     expect(numeroDaRotaDe("dinheiro", { gasto: "Mais de R$ 500" })).toMatchObject({ valor: 800, rotulo: "R$ 500+", estimado: false });
     expect(numeroDaRotaDe("dinheiro", { gasto: "Não faço ideia" })).toMatchObject({ valor: MEDIANA_REAIS, estimado: true });
     expect(numeroDaRotaDe("dinheiro", {})).toMatchObject({ valor: MEDIANA_REAIS, estimado: true });
     expect(numeroDaRotaDe(null, null)).toMatchObject({ rota: "dinheiro", valor: MEDIANA_REAIS, estimado: true });
-    expect(numeroDaRotaDe("rotina", { consistencia: "Uns 3 dias" })).toMatchObject({ rota: "rotina", tipo: "dias", valor: 3, rotulo: "3 dias", estimado: false });
-    expect(numeroDaRotaDe("corpo", { consistencia: "Perdi a conta" })).toMatchObject({ tipo: "dias", valor: 4 });
-    expect(numeroDaRotaDe("metas", {})).toMatchObject({ tipo: "dias", valor: MEDIANA_DIAS, estimado: true });
+    expect(numeroDaRotaDe("corpo", { consistencia: "Perdi a conta" })).toMatchObject({ rota: "corpo", tipo: "treinos", formato: "grafico", valor: 1, rotulo: "1 treino", estimado: false });
+    expect(numeroDaRotaDe("corpo", { consistencia: "Tô na ativa, mas sem controle" })).toMatchObject({ valor: 3, rotulo: "3 treinos" });
+    expect(numeroDaRotaDe("corpo", {})).toMatchObject({ valor: MEDIANA_TREINOS, estimado: true });
+    expect(numeroDaRotaDe("rotina", { consistencia: "Uns 3 dias" })).toMatchObject({ rota: "rotina", tipo: "copy", formato: "copy", valor: 0, copy: COPY_SEM_COM.rotina });
+    expect(numeroDaRotaDe("metas", {})).toMatchObject({ rota: "metas", tipo: "copy", copy: COPY_SEM_COM.metas });
+    expect(COPY_SEM_COM.rotina.sem).toEqual(["Dias que passam e nada muda", "Hábitos que você começa e abandona", "Rotina sempre pra depois"]);
+    expect(COPY_SEM_COM.metas.com).toEqual(["Metas com passo a passo", "Progresso que você vê", "Sonhos com data"]);
+    // a porta "Tudo, sinceramente" mora em dinheiro: o número é o de Finanças; só `portaTudo` sabe de onde veio
+    const tudo = { area: "dinheiro", area_label: PORTA_TUDO.label, gasto: "R$ 100 a R$ 300" };
+    expect(numeroDaRotaDe("dinheiro", tudo)).toMatchObject({ rota: "dinheiro", tipo: "reais", valor: 300 });
+    expect(portaTudo(tudo)).toBe(true);
+    expect(portaTudo({ area: "dinheiro", area_label: "Meu dinheiro" })).toBe(false);
   });
 
   it("lê das chaves do funil já gravadas (retrocompatível: as mesmas de hoje)", () => {
     guardarChave(CHAVES_FUNIL_W.area, "dinheiro");
     guardarChave(CHAVES_FUNIL_W.respostas, { area: "dinheiro", atrapalha: "Gasto sem perceber", gasto: "R$ 100 a R$ 300" });
     expect(numeroDaRota()).toMatchObject({ rota: "dinheiro", valor: 300, rotulo: "R$ 300", estimado: false });
-    guardarChave(CHAVES_FUNIL_W.area, "rotina");
-    guardarChave(CHAVES_FUNIL_W.respostas, { consistencia: "Uma semana" });
-    expect(numeroDaRota()).toMatchObject({ rota: "rotina", valor: 7 });
+    guardarChave(CHAVES_FUNIL_W.area, "corpo");
+    guardarChave(CHAVES_FUNIL_W.respostas, { consistencia: "Umas 2 ou 3" });
+    expect(numeroDaRota()).toMatchObject({ rota: "corpo", tipo: "treinos", valor: 2 });
   });
 
-  it("a projeção e a copy: 3 meses, mês alvo, R$ 500 → R$ 1.500 sem rastro; 7 dias → 69 dias perdidos", () => {
+  it("a projeção e a copy: R$ 500 → R$ 1.500 sem rastro em 3 meses; treinos: 2/sem caem pra 1 e sobem pra 3; rotina/metas sem número", () => {
     const hoje = new Date(2026, 9, 10);
     expect(mesAlvo(hoje)).toBe("janeiro");
     expect(mesAlvo(new Date(2026, 2, 1))).toBe("junho");
@@ -144,11 +154,19 @@ describe("lib/funil-numeros: o número dela", () => {
     expect(cd.subtitulo).toBe("Até janeiro, R$ 1.500 sem rastro.");
     expect(cd.cta).toBe("Quero ver pra onde vai");
     expect(copyDoGrafico(numeroDaRotaDe("dinheiro", {}), hoje).titulo).toBe("Em média, R$ 500 somem por mês.");
-    const r = numeroDaRotaDe("rotina", { consistencia: "Uma semana" });
-    expect(projecao(r)).toEqual({ sem: [0, 23, 46, 69], com: [0, 10, 15, 18] });
-    const cr = copyDoGrafico(r, hoje);
-    expect(cr.titulo).toBe("Hoje são 7 dias organizados por mês.");
-    expect(cr.subtitulo).toBe("Até janeiro, 69 dias perdidos.");
+    const t = numeroDaRotaDe("corpo", {});
+    const pt = projecao(t);
+    expect(pt.sem.length).toBe(13);
+    expect(pt.sem[0]).toBe(2); expect(pt.sem[12]).toBe(1);
+    expect(pt.com[0]).toBe(2); expect(pt.com[4]).toBe(3); expect(pt.com[12]).toBe(3);
+    const ct = copyDoGrafico(t, hoje);
+    expect(ct.titulo).toBe("Sem o CORE: 2 treinos por semana viram 1 em 3 meses.");
+    expect(ct.subtitulo).toBe("Com o CORE: 3 por semana, sem falhar.");
+    expect(ct.cta).toBe("Quero manter o ritmo");
+    const r = numeroDaRotaDe("rotina", {});
+    expect(projecao(r)).toEqual({ sem: [], com: [] });
+    expect(copyDoGrafico(r, hoje)).toMatchObject({ titulo: "Sua vida sem o CORE", subtitulo: "× com o CORE", cta: "Quero uma rotina que fica" });
+    expect(copyDoGrafico(numeroDaRotaDe("metas", {}), hoje).cta).toBe("Quero tirar do papel");
   });
 });
 
@@ -237,7 +255,9 @@ describe("LIGADA: a sequência enxuta", () => {
       expect(screen.getByTestId("grafico-sem-valor")).toHaveTextContent("R$ 1.500");
       expect(screen.getByTestId("grafico-com-valor")).toHaveTextContent("R$ 325");
       expect(screen.getByText("Com o CORE você vê pra onde vai cada real.")).toBeInTheDocument();
-      expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", funil: "w", area: "dinheiro", rota: "dinheiro", numero: 500, estimado: false })]);
+      expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", funil: "w", area: "dinheiro", rota: "dinheiro", formato: "grafico", numero: 500, estimado: false })]);
+      expect(grafico).toHaveAttribute("data-formato", "grafico");
+      expect(screen.queryByTestId("abertura-tudo")).toBeNull();
       expect(nomes()).not.toContain("funnel_view:quiz_proof");
       expect(JSON.parse(localStorage.getItem(CHAVES_FUNIL_W.passo) ?? "{}").v).toBe("grafico_com_sem");
       expect(numeroDaRota()).toMatchObject({ rota: "dinheiro", valor: 500 }); // a lib pura lê o que o funil gravou
@@ -272,7 +292,78 @@ describe("LIGADA: a sequência enxuta", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("rota rotina: quiz_1 + quiz_2 (consistência) e o gráfico de dias; sem ONBOARDING_1TELA o resultado cai nos compromissos de hoje", async () => {
+  it("porta 'Tudo, sinceramente': o caminho de Finanças (quiz_1 + quiz_3, linha de abertura, gráfico em R$ com area=tudo no evento, plano de Finanças)", async () => {
+    montar("/funil-w");
+    await tick();
+    fireEvent.click(screen.getByTestId("welcome-comecar"));
+    await tick(); await tick();
+    fireEvent.click(screen.getByText(PORTA_TUDO.label));
+    expect(screen.getByTestId("abertura-tudo")).toHaveTextContent(ABERTURA_TUDO);
+    expect(screen.getByText("O que mais te atrapalha hoje?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Gasto sem perceber"));
+    expect(screen.getByText("Quanto você acha que gasta sem perceber, por mês?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("R$ 100 a R$ 300"));
+    const grafico = screen.getByTestId("grafico-com-sem");
+    expect(grafico).toHaveAttribute("data-rota", "dinheiro");
+    expect(grafico).toHaveAttribute("data-formato", "grafico");
+    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent("R$ 300 somem por mês.");
+    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", area: "tudo", rota: "dinheiro", formato: "grafico", numero: 300 })]);
+    expect(eventos).toContainEqual(["funnel_quiz_answer", expect.objectContaining({ step: "porta", answer: PORTA_TUDO.label })]);
+    fireEvent.click(screen.getByTestId("grafico-quero-ver"));
+    expect(screen.getByText("O CORE te avisa antes da conta vencer")).toBeInTheDocument(); // a notificação de Finanças
+    fireEvent.click(screen.getByText("Agora não"));
+    await tick();
+    // o loading encadeia setTimeouts: os timers falsos têm que estar ligados ANTES de ele montar
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByText("Montar meu plano"));
+      for (let i = 0; i < 8; i++) await act(async () => { vi.advanceTimersByTime(900); });
+    } finally { vi.useRealTimers(); }
+    expect(screen.getByText(/Seu mapa da vida/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Montar meu plano"));
+    // o plano de FINANÇAS (os compromissos da rota dinheiro)
+    expect(screen.getByTestId("plano-3-dias-chip-1")).toHaveTextContent("Saber pra onde meu dinheiro vai");
+  });
+
+  it("rota treino: quiz_1 + quiz_2 e o gráfico de treinos por semana", async () => {
+    montar("/funil-w");
+    await tick();
+    fireEvent.click(screen.getByTestId("welcome-comecar"));
+    await tick(); await tick();
+    fireEvent.click(screen.getByText("Treino e alimentação"));
+    fireEvent.click(screen.getByText("Começo a treinar e desisto"));
+    expect(screen.getByText("Quantas vezes você já recomeçou treino ou dieta?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Perdi a conta"));
+    const grafico = screen.getByTestId("grafico-com-sem");
+    expect(grafico).toHaveAttribute("data-rota", "corpo");
+    expect(grafico).toHaveAttribute("data-formato", "grafico");
+    expect(grafico).toHaveAttribute("data-numero", "1");
+    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent("Sem o CORE: 1 treino por semana somem em 3 meses.");
+    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent("Com o CORE: 3 por semana, sem falhar.");
+    expect(screen.getByTestId("grafico-com-valor")).toHaveTextContent("3/sem");
+    expect(screen.getByText("Quero manter o ritmo")).toBeInTheDocument();
+    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", rota: "corpo", formato: "grafico", numero: 1 })]);
+  });
+
+  it("rota metas: a tela de copy 'sem × com' (sem número)", async () => {
+    montar("/funil-w");
+    await tick();
+    fireEvent.click(screen.getByTestId("welcome-comecar"));
+    await tick(); await tick();
+    fireEvent.click(screen.getByText("Minhas metas paradas"));
+    fireEvent.click(screen.getByText("Ficam na cabeça, nunca no papel"));
+    fireEvent.click(screen.getByText("Uns meses"));
+    const grafico = screen.getByTestId("grafico-com-sem");
+    expect(grafico).toHaveAttribute("data-rota", "metas");
+    expect(grafico).toHaveAttribute("data-formato", "copy");
+    expect(screen.getByTestId("grafico-card-sem")).toHaveTextContent("Objetivos que ficam só na cabeça");
+    expect(screen.getByTestId("grafico-card-com")).toHaveTextContent("Sonhos com data");
+    expect(screen.queryByTestId("grafico-sem-valor")).toBeNull();
+    expect(screen.getByText("Quero tirar do papel")).toBeInTheDocument();
+    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", rota: "metas", formato: "copy" })]);
+  });
+
+  it("rota rotina: quiz_1 + quiz_2 (consistência) e a tela de copy 'sem × com'; sem ONBOARDING_1TELA o resultado cai nos compromissos de hoje", async () => {
     localStorage.removeItem(CHAVE_FORCA_ONBOARDING_1TELA);
     guardarChave(CHAVES_FUNIL_W.area, "rotina");
     guardarChave(CHAVES_FUNIL_W.respostas, { area: "rotina", atrapalha: "Acordo sem plano nenhum", consistencia: "Uns 3 dias" });
@@ -303,12 +394,14 @@ describe("LIGADA: a sequência enxuta", () => {
     fireEvent.click(screen.getByText("Uns 3 dias"));
     const grafico = screen.getByTestId("grafico-com-sem");
     expect(grafico).toHaveAttribute("data-rota", "rotina");
-    expect(grafico).toHaveAttribute("data-numero", "3");
-    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent("Hoje são 3 dias organizados por mês.");
-    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent(`Até ${mesAlvo()}, 81 dias perdidos.`);
-    expect(screen.getByTestId("grafico-sem-valor")).toHaveTextContent("81 dias");
-    expect(screen.getByText("Quero meus dias de volta")).toBeInTheDocument();
-    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", rota: "rotina", numero: 3 })]);
+    expect(grafico).toHaveAttribute("data-formato", "copy");
+    expect(screen.getByTestId("grafico-titulo")).toHaveTextContent("Sua vida sem o CORE");
+    expect(screen.getByTestId("grafico-card-sem")).toHaveTextContent("Hábitos que você começa e abandona");
+    expect(screen.getByTestId("grafico-card-com")).toHaveTextContent("Sequência que você não quer perder");
+    expect(screen.queryByTestId("grafico-linha-sem")).toBeNull();
+    expect(screen.getByText("Quero uma rotina que fica")).toBeInTheDocument();
+    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", rota: "rotina", formato: "copy" })]);
+    expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "grafico_com_sem", area: "rotina" })]);
     fireEvent.click(screen.getByTestId("grafico-quero-ver"));
     expect(screen.getByText("O CORE te lembra do hábito na hora certa")).toBeInTheDocument();
   });

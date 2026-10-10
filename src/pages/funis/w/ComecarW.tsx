@@ -43,7 +43,7 @@ import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding }
 /* 10/10 (FUNIL_CALAI, lib/funil-calai, DESLIGADA): o funil enxuto — welcome com vídeo,
    2 perguntas, gráfico "sem × com", notificação como passo, sem central nem demo. */
 import { STEP_GRAFICO_COM_SEM, funilCalaiLigado, guardarForcaFunilCalai, passoDoFunilCalai } from "@/lib/funil-calai";
-import { numeroDaRotaDe } from "@/lib/funil-numeros";
+import { ABERTURA_TUDO, numeroDaRotaDe, portaTudo } from "@/lib/funil-numeros";
 import { WelcomeCalai } from "@/pages/funis/w/WelcomeCalai";
 import { GraficoComSem } from "@/pages/funis/w/GraficoComSem";
 import { useAuth } from "@/hooks/use-auth";
@@ -656,6 +656,16 @@ export default function ComecarW() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naWeb, step, posCompra, usuarioLogado, jaAssina]);
 
+  /** O recuo de um passo a partir do paywall (botão Voltar do paywall curto): o mesmo destino do Voltar do Android. */
+  const recuarDoPaywall = () => {
+    const recuo = recuoDoPaywall(onboarding1TelaLigado());
+    trackEvent("funnel_click", { cta: "paywall_voltar_recuou", funil: FUNIL, step: "offer", para: recuo });
+    setStepCru(recuo as Step);
+    guardarChave(CHAVES.passo, recuo);
+    window.scrollTo(0, 0);
+  };
+  const propsDoPaywallIOS = { area: areaOuPadrao, answers, onPagoSemConta: () => pagoSemConta(), onVoltar: recuarDoPaywall };
+
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
     if (a) guardarChave(CHAVES.area, a);
     guardarChave(CHAVES.respostas, r);
@@ -778,6 +788,10 @@ export default function ComecarW() {
                   }}
                 />
               )}
+              {/* 10/10 (FUNIL_CALAI): quem entrou por "Tudo, sinceramente" começa pelo dinheiro — a linha diz isso em cima do quiz */}
+              {step === "quiz" && calai && portaTudo(answers) && (
+                <p className="text-[13px] text-muted-foreground leading-snug mb-4 -mt-1 rounded-xl px-3 py-2" style={{ background: "#FFF8D6" }} data-testid="abertura-tudo">{ABERTURA_TUDO}</p>
+              )}
               {step === "quiz" && (
                 <QuizScreen
                   questions={perguntas}
@@ -796,7 +810,8 @@ export default function ComecarW() {
                      * dela — `funnel_view step=grafico_com_sem {rota, numero}`. */
                     if (calai) {
                       const n = numeroDaRotaDe(area, todas);
-                      setStep(STEP_GRAFICO_COM_SEM as Step, { rota: n.rota, numero: n.valor, estimado: n.estimado });
+                      // a porta "Tudo" segue o caminho de Finanças (rota dinheiro), mas o evento diz de onde veio (area: "tudo")
+                      setStep(STEP_GRAFICO_COM_SEM as Step, { rota: n.rota, formato: n.formato, numero: n.valor, estimado: n.estimado, ...(portaTudo(todas) ? { area: "tudo" } : {}) });
                       return;
                     }
                     /* 03/09: tela de prova entre o quiz e o plano (BitePal/Cal
@@ -864,11 +879,12 @@ export default function ComecarW() {
                   depende de ninguém lembrar de uma condicional. */}
               {step === "offer" && (
                 ehApple() ? (
-                  <PaywallIOS
-                    area={areaOuPadrao}
-                    answers={answers}
-                    onPagoSemConta={pagoSemConta}
-                  />
+                  /* 10/10 (PAYWALL_CURTO, ramo v14-paywall-curto): o paywall curto tem um botão Voltar
+                     redondo e chama `onVoltar` quando nenhuma oferta de saída abre — aqui ele recua um
+                     passo, o MESMO recuo do Voltar do Android (recuoDoPaywall: plano_3_dias ou contrato).
+                     Passado por spread pra compilar nos dois lados da junção (antes dela o PaywallIOS
+                     ainda não conhece a prop e só a ignora). */
+                  <PaywallIOS {...propsDoPaywallIOS} />
                 ) : (
                   /* 07/09 10h20–10h40: a web rodou o PaywallDia14 (27,90, Cakto)
                    * por vinte minutos e voltou pro PaywallW a 24,90/97,90 na

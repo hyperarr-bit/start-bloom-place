@@ -21,6 +21,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { aplicarDecisao, classificarEvento, type EventoRC, type Venda } from "../_shared/afiliados.ts";
+import { linhaRevenueCat } from "../_shared/meta-capi-app.ts";
 
 const log = (step: string, d?: unknown) =>
   console.log(`[RC-WEBHOOK] ${step}${d ? ` - ${JSON.stringify(d)}` : ""}`);
@@ -51,6 +52,14 @@ serve(async (req) => {
     // TEST envia app_user_id fictício — responde 200 pro painel ficar verde.
     if (ev.type === "TEST") return json({ received: true, test: true });
 
+    // Grava TODO evento (anônimo, aliases, TRANSFER) antes de desistir de
+    // quem não tem conta. O acesso continua saindo só pra UUID — esta linha
+    // é a fonte do meta-backfill-app. Falha aqui não derruba o webhook:
+    // o RevenueCat reenvia, e o upsert por rc_event_id é idempotente.
+    // Se a tabela viva (deploy de 09/10, fora do main) tiver outras colunas,
+    // o insert erra, a gente loga a mensagem sem o corpo, e segue.
+    await gravarEventoRevenueCat(admin, ev as Record<string, unknown>);
+
     // PROGRAMA DE AFILIADOS (09/10): ANTES do filtro de anônimo, porque a
     // compra na App Store acontece antes da conta CORE existir — o evento do
     // teste chega com $RCAnonymousID e ainda assim é uma venda da afiliada.
@@ -70,6 +79,8 @@ serve(async (req) => {
       // $RCAnonymousID: compra sem conta CORE identificada. Não dá pra saber
       // a quem dar acesso — o revenuecat-sync resolve quando a pessoa abrir
       // o app logada (o RevenueCat mescla os perfis no logIn).
+      // Acesso segue sem conta. O evento já está em revenuecat_events (acima),
+      // pro meta-backfill mandar o StartTrial quando META_CAPI_ANON_ENVIAR=1.
       log("sem user_id utilizável", { app_user_id: String(ev.app_user_id ?? "").slice(0, 24) });
       return json({ received: true, ignored: "anonimo", afiliada });
     }
@@ -95,6 +106,20 @@ serve(async (req) => {
     return json({ error: message }, 500);
   }
 });
+
+async function gravarEventoRevenueCat(admin: ReturnType<typeof createClient>, ev: Record<string, unknown>) {
+  try {
+    const linha = linhaRevenueCat(ev);
+    if (!linha) return;
+    const q = linha.rc_event_id
+      ? admin.from("revenuecat_events").upsert(linha, { onConflict: "rc_event_id" })
+      : admin.from("revenuecat_events").insert(linha);
+    const { error } = await q;
+    if (error) log("revenuecat_events", { msg: String(error.message ?? "").slice(0, 160) });
+  } catch (e) {
+    log("revenuecat_events ERRO", { msg: String(e).slice(0, 160) });
+  }
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -42,3 +42,8 @@ verify_jwt = false
 # duas outras portas (admin, cron) por conta própria.
 [functions.afiliados]
 verify_jwt = false
+
+# IP + UA do aparelho pra CAPI. O app manda a chave anon ou o JWT; sem JWT
+# do projeto a função nem abre. O IP não volta na resposta.
+[functions.app-capi-sinal]
+verify_jwt = true

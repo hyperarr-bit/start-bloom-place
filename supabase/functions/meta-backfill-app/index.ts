@@ -1,5 +1,24 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  escolherSinal,
+  classificarEventoApp,
+  cronEnviaAnonimos,
+  deveEnviarComoAnonimo,
+  chavesDaAssinatura,
+  listarFaltantes,
+  normalizarEvento,
+  parIpUa,
+  sinaisDeAtributos,
+  varreduraPodeEnviar,
+  ehUuid,
+  JANELA_VARREDURA_MS,
+  MARCADOR_COMPRA,
+  MARCADOR_TRIAL,
+  type EventoAppRC,
+  type LinhaSinal,
+  type MarcadorCapi,
+} from "../_shared/meta-capi-app.ts";
 
 /**
  * meta-backfill-app — reenvia pra Meta compras do app que ficaram pra trás.
@@ -15,6 +34,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  * duas vezes não duplica evento (e evento duplicado estraga o CPA no painel).
  *
  * POST { "de": "2026-08-11", "ate": "2026-08-11" }   (datas em BRT)
+ *
+ * VARREDURA "enviado × venda" (10/10) — últimos 7 dias, SÓ LISTA por padrão.
+ * Não manda nada pra Meta. O cron diário chama exatamente isto.
+ *
+ *   POST /functions/v1/meta-backfill-app?varredura=1
+ *   Authorization: Bearer <anon ou admin>
+ *   {"modo":"varredura"}
+ *
+ * Envio (só depois de ler a lista, e sabendo que o auto-log do SDK AINDA
+ * cobre o teste anônimo — ligar os dois conta duas vezes):
+ *   admin logado: {"modo":"varredura","enviar":true}
+ *   ou env META_VARREDURA_ENVIAR=1 (também vale pro cron).
+ * O cron de 15 min continua mandando quem JÁ TEM conta, como hoje.
+ * Teste ainda anônimo só sai nesse cron com env META_CAPI_ANON_ENVIAR=1.
+ *
+ * TODO (passo 4, OUTRO PR, só depois deste envio anônimo estar no ar e a
+ * varredura zerada): FacebookAutoLogAppEventsEnabled no Info.plist. Não
+ * desligar neste PR — hoje é o SDK que cobre o teste sem conta.
  */
 
 const cors = {
@@ -69,7 +106,7 @@ const sha256 = async (txt: string): Promise<string> => {
 
 async function mandarCompraProMeta(
   admin: ReturnType<typeof createClient>,
-  userId: string,
+  userId: string | null,
   email: string | null,
   cents: number,
   txId: string,
@@ -86,37 +123,60 @@ async function mandarCompraProMeta(
   // evento novo em venda que já saiu (o dedup da Meta é por (nome, event_id),
   // então Purchase e compra_avista são descartados e só o nome inédito entra).
   forcar = false,
+  // Pareamento extra (10/10): IP+UA em par, $fbAnonId/$idfa/$idfv, e as
+  // chaves irmãs do mesmo teste (original_transaction_id × sub id). Sem isto
+  // o TRANSFER anônimo→conta mandava o StartTrial de novo.
+  sinal: {
+    externalId?: string | null;
+    chaves?: string[];
+    atributos?: Record<string, unknown> | null;
+    ip?: string | null;
+    ua?: string | null;
+    plataforma?: "ios" | "android" | null;
+    reservar?: boolean;
+  } | null = null,
 ) {
   const dataset = Deno.env.get("META_APP_DATASET_ID");
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
-  if (!dataset || !token) return;
+  if (!dataset || !token) return "sem_config" as const;
   const nomeEvento = tipo === "trial" ? "StartTrial" : "Purchase";
   const marcador = tipo === "trial" ? "meta_capi_trial_enviado" : "meta_capi_app_enviado";
+  const externo = String(sinal?.externalId ?? userId ?? "");
+  if (!externo) return "pulado" as const;
 
-  // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
-  // o webhook (ele reenvia em qualquer 500 nosso).
-  const { data: jaFoi, error: erroJaFoi } = await admin
-    .from("analytics_events")
-    .select("id")
-    .eq("event_name", marcador)
-    .eq("user_id", userId)
-    .contains("event_data", { tx: txId })
-    .limit(2);
+  const chavesChecar = [...new Set([txId, ...(sinal?.chaves ?? [])].map((x) => String(x ?? "").trim()).filter(Boolean))].slice(0, 8);
+
+  // Idempotência SEM filtrar user_id: o marcador do anônimo não tem UUID, e
+  // o da conta tem. Filtrar por user_id reenviava o mesmo teste no TRANSFER.
   // maybeSingle() com marcador DUPLICADO devolvia erro (PGRST116) que era
   // ignorado -> data null -> reenvio ETERNO a cada cron (caso real 17-19/08:
   // meta_capi_app_enviado x96/dia). Na duvida (erro OU 1+ marcador), NAO reenvia.
-  if (!forcar && (erroJaFoi || (jaFoi?.length ?? 0) > 0)) return;
+  if (!forcar) {
+    let bloqueia = false;
+    for (const chave of chavesChecar) {
+      const porTx = await admin.from("analytics_events").select("id").eq("event_name", marcador).contains("event_data", { tx: chave }).limit(1);
+      if (porTx.error || (porTx.data?.length ?? 0) > 0) { bloqueia = true; break; }
+      const porLista = await admin.from("analytics_events").select("id").eq("event_name", marcador).contains("event_data", { chaves: [chave] }).limit(1);
+      if (porLista.error || (porLista.data?.length ?? 0) > 0) { bloqueia = true; break; }
+    }
+    if (bloqueia) return "pulado" as const;
+  }
 
   // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
-  const { data: dev } = await admin
-    .from("analytics_events")
-    .select("event_data")
-    .eq("event_name", "app_device_info")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  let d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  // Sem UUID (teste anônimo) não há linha de conta pra buscar — a plataforma
+  // vem da loja do evento, mais abaixo.
+  let d: Record<string, unknown> = {};
+  if (ehUuid(userId)) {
+    const { data: dev } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "app_device_info")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  }
 
   /*
    * PELA SESSÃO QUANDO O user_id NÃO ACHA (14/08) — este era o buraco.
@@ -133,7 +193,7 @@ async function mandarCompraProMeta(
    * gravada o tempo todo (Android 16, Samsung, build 49) — só estava
    * pendurada na sessão anônima.
    */
-  if (!Object.keys(d).length) {
+  if (ehUuid(userId) && !Object.keys(d).length) {
     const { data: sess } = await admin
       .from("analytics_events").select("session_id").eq("user_id", userId).limit(50);
     const ids = [...new Set(((sess ?? []) as { session_id: string }[]).map((x) => x.session_id).filter(Boolean))];
@@ -150,7 +210,7 @@ async function mandarCompraProMeta(
     }
   }
 
-  if (!Object.keys(d).length) {
+  if (ehUuid(userId) && !Object.keys(d).length) {
     // Quem está em build anterior à v48 não emite app_device_info. O
     // webview_info (que existe desde a v37) carrega o UA — dá SO e modelo,
     // que é o que mais pesa no pareamento.
@@ -178,7 +238,7 @@ async function mandarCompraProMeta(
    *
    * O RESTO DO ARRAY é igual nos dois — mesma ordem, mesmos 16 campos. Só os
    * palpites de reserva mudam: num iPhone o padrão honesto não é "13"/"Android". */
-  const ehIOS = s("plataforma") === "ios";
+  const ehIOS = s("plataforma") === "ios" || (!s("plataforma") && sinal?.plataforma === "ios");
   const extinfo = [
     ehIOS ? "i2" : "a2",                     // versão do extinfo (i2 = iOS)
     s("pacote") || "br.com.coreaplicativo.app",
@@ -201,7 +261,7 @@ async function mandarCompraProMeta(
     s("fuso") || "America/Sao_Paulo",
   ];
 
-  const user_data: Record<string, unknown> = { external_id: await sha256(userId) };
+  const user_data: Record<string, unknown> = { external_id: await sha256(externo) };
   if (email) user_data.em = await sha256(email.trim().toLowerCase());
   // GAID (12/08): a v49 grava o ID de publicidade na ficha app_device_info.
   // Como madid, é o que casa a compra com o CLIQUE no anúncio — e-mail só
@@ -214,6 +274,14 @@ async function mandarCompraProMeta(
   // quem desligou o ID de publicidade (aí o madid vem vazio).
   const anonId = s("anon_id");
   if (anonId) user_data.anon_id = anonId;
+  // $fbAnonId / $idfa do RevenueCat ganham da ficha quando existem. $idfv vai
+  // em app_data.vendor_id (doc: parameters/app-data). IP e UA só em par.
+  const doRc = sinaisDeAtributos(sinal?.atributos, null);
+  if (doRc.madid) user_data.madid = doRc.madid;
+  if (doRc.anon_id) user_data.anon_id = doRc.anon_id;
+  const par = parIpUa(sinal?.ip, sinal?.ua);
+  if (par) Object.assign(user_data, par);
+  const vendorId = doRc.vendor_id;
 
   const payload: Record<string, unknown> = {
     data: [{
@@ -235,9 +303,10 @@ async function mandarCompraProMeta(
         // Safety). 12/08, decisão do dono: v49 embarca o SDK da Meta e coleta
         // o GAID — quem está em build antigo (ou fez opt-out) segue sem, e o
         // pareamento cai pra e-mail/external_id.
-        advertiser_tracking_enabled: !!gaid,
+        advertiser_tracking_enabled: !!user_data.madid,
         application_tracking_enabled: true,
         extinfo,
+        ...(vendorId ? { vendor_id: vendorId } : {}),
       },
       // StartTrial LEVA O VALOR DO PLANO (20/08, decisão do dono): receita e
       // ROAS no painel vêm SÓ do Purchase — valor aqui não vira caixa, vira
@@ -309,6 +378,37 @@ async function mandarCompraProMeta(
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
   if (teste) payload.test_event_code = teste;
 
+  const userIdMarcador = ehUuid(userId) ? userId : null;
+  const eventData: Record<string, unknown> = {
+    tx: txId,
+    valor: cents / 100,
+    ...(chavesChecar.length > 1 ? { chaves: chavesChecar } : {}),
+  };
+  // Reserva antes de mandar SÓ no caminho anônimo (dois crons no mesmo tx).
+  // Quem já tem conta segue o desenho antigo: o webhook já reserva do lado dele.
+  let reservaId: string | null = null;
+  if (sinal?.reservar) {
+    const ins = await admin.from("analytics_events").insert({
+      user_id: userIdMarcador,
+      event_name: marcador,
+      event_data: { ...eventData, estado: "enviando" },
+    }).select("id").single();
+    reservaId = (ins.data as { id?: string } | null)?.id ?? null;
+    if (ins.error || !reservaId) return "pulado" as const;
+    const primeira = await admin
+      .from("analytics_events").select("id")
+      .eq("event_name", marcador)
+      .contains("event_data", { tx: txId })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(1);
+    const eleito = (primeira.data?.[0] as { id?: string } | undefined)?.id;
+    if (primeira.error || eleito !== reservaId) {
+      await admin.from("analytics_events").delete().eq("id", reservaId);
+      return "pulado" as const;
+    }
+  }
+
   try {
     const r = await fetch(`https://graph.facebook.com/v21.0/${dataset}/events?access_token=${token}`, {
       method: "POST",
@@ -325,14 +425,25 @@ async function mandarCompraProMeta(
     // meio dia de hipótese errada sobre duplicação de evento.
     if (!r.ok) ultimoErroMeta = corpo.slice(0, 400);
     if (r.ok) {
-      await admin.from("analytics_events").insert({
-        user_id: userId,
-        event_name: marcador,
-        event_data: { tx: txId, valor: cents / 100 },
-      });
+      if (reservaId) {
+        await admin.from("analytics_events").update({ event_data: { ...eventData, estado: "enviado" } }).eq("id", reservaId);
+      } else {
+        await admin.from("analytics_events").insert({
+          user_id: userIdMarcador,
+          event_name: marcador,
+          event_data: eventData,
+        });
+      }
+      return "enviado" as const;
     }
+    if (reservaId) await admin.from("analytics_events").delete().eq("id", reservaId);
+    return "falhou" as const;
   } catch (e) {
     log("meta capi app ERRO", { msg: String(e).slice(0, 150) });
+    if (reservaId) {
+      try { await admin.from("analytics_events").delete().eq("id", reservaId); } catch { /* reserva fica e trava o reenvio — melhor que duplicar */ }
+    }
+    return "falhou" as const;
   }
 }
 
@@ -464,6 +575,85 @@ async function mandarCompraProTikTok(
   }
 }
 
+async function carregarEventosRc(
+  admin: ReturnType<typeof createClient>,
+  desdeIso: string,
+): Promise<{ eventos: EventoAppRC[]; disponivel: boolean }> {
+  const eventos: EventoAppRC[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await admin
+      .from("revenuecat_events")
+      .select("*")
+      .or(`purchased_at.gte."${desdeIso}",created_at.gte."${desdeIso}"`)
+      .range(from, from + 999);
+    if (error) {
+      log("revenuecat_events indisponivel", { msg: String(error.message ?? error).slice(0, 160) });
+      return { eventos: [], disponivel: false };
+    }
+    const page = (data ?? []) as Record<string, unknown>[];
+    for (const row of page) eventos.push(normalizarEvento(row));
+    if (page.length < 1000) break;
+    from += 1000;
+    if (from >= 20_000) break;
+  }
+  return { eventos, disponivel: true };
+}
+
+async function carregarMarcadores(
+  admin: ReturnType<typeof createClient>,
+  desdeIso: string,
+): Promise<{ marcadores: MarcadorCapi[]; erro: boolean }> {
+  const marcadores: MarcadorCapi[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await admin
+      .from("analytics_events")
+      .select("event_name,event_data")
+      .in("event_name", [MARCADOR_TRIAL, MARCADOR_COMPRA])
+      .gte("created_at", desdeIso)
+      .range(from, from + 999);
+    if (error) return { marcadores: [], erro: true };
+    const page = (data ?? []) as { event_name?: string; event_data?: { tx?: string; chaves?: unknown } }[];
+    for (const row of page) {
+      const tx = String(row.event_data?.tx ?? "").trim();
+      if (!tx || !row.event_name) continue;
+      const chaves = Array.isArray(row.event_data?.chaves) ? row.event_data.chaves.filter((x): x is string => typeof x === "string") : [];
+      marcadores.push({ event_name: row.event_name, tx, chaves });
+    }
+    if (page.length < 1000) break;
+    from += 1000;
+    if (from >= 20_000) break;
+  }
+  return { marcadores, erro: false };
+}
+
+async function carregarSinais(admin: ReturnType<typeof createClient>): Promise<LinhaSinal[]> {
+  const { data, error } = await admin
+    .from("app_capi_sinais")
+    .select("user_id,rc_app_user_id,session_id,client_ip,user_agent,created_at,expira_em")
+    .gt("expira_em", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (error) {
+    log("app_capi_sinais indisponivel", { msg: String(error.message ?? "").slice(0, 120) });
+    return [];
+  }
+  return (data ?? []) as LinhaSinal[];
+}
+
+const sinalDe = (linhas: LinhaSinal[], userId: string | null, rc: string | null) =>
+  escolherSinal(linhas.filter((l) => (userId && l.user_id === userId) || (rc && l.rc_app_user_id === rc)));
+
+const atributosDe = (eventos: EventoAppRC[], userId: string | null, rc: string | null) => {
+  for (const e of eventos) {
+    const casaUser = !!userId && (e.user_id === userId || (e.aliases ?? []).includes(userId) || (e.transferred_to ?? []).includes(userId));
+    const casaRc = !!rc && (e.app_user_id === rc || e.original_app_user_id === rc);
+    if ((casaUser || casaRc) && e.subscriber_attributes && Object.keys(e.subscriber_attributes).length) return e.subscriber_attributes;
+  }
+  return null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -503,8 +693,18 @@ serve(async (req) => {
      * duplica evento) e NÃO devolve e-mail de ninguém. O pior que um terceiro
      * consegue é fazer a Meta receber vendas que realmente aconteceram.
      */
+    const reqUrl = new URL(req.url);
+    const modoPedido = String(body?.modo ?? "");
+    const varredura = modoPedido === "varredura"
+      || reqUrl.searchParams.get("varredura") === "1"
+      || reqUrl.searchParams.get("modo") === "varredura";
     const cron = !ehAdmin;
-    if (cron && String(body?.modo ?? "") !== "cron") return json({ error: "forbidden" }, 403);
+    if (cron && modoPedido !== "cron" && !varredura) return json({ error: "forbidden" }, 403);
+    const enviarVarredura = varredura && varreduraPodeEnviar({
+      cron,
+      bodyEnviar: body?.enviar === true || reqUrl.searchParams.get("enviar") === "1",
+      envEnviar: ["1", "true"].includes(Deno.env.get("META_VARREDURA_ENVIAR") ?? ""),
+    });
 
     /* DIAGNÓSTICO (24/09, só admin): o que o RevenueCat diz de uma assinatura
      * — status e receita — sem mandar nada pra Meta. Existe pra conferir o
@@ -527,6 +727,38 @@ serve(async (req) => {
       });
     }
 
+    /* VARREDURA só listar (10/10). O cron diário cai aqui. Não manda pra Meta. */
+    if (varredura && !enviarVarredura) {
+      const desde12 = new Date(Date.now() - 12 * 86_400_000).toISOString();
+      const { data: vendasV, error: erroV } = await admin
+        .from("subscriptions")
+        .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,current_period_end,created_at,billing_period")
+        .eq("payment_method", "play_store")
+        .not("revenuecat_subscription_id", "is", null)
+        .gte("created_at", desde12)
+        .limit(2000);
+      if (erroV) return json({ modo: "varredura", enviar: false, erro: "subscriptions" }, 500);
+      const ctx = await carregarEventosRc(admin, desde12);
+      const marks = await carregarMarcadores(admin, desde12);
+      if (marks.erro) return json({ modo: "varredura", enviar: false, erro: "marcadores", fonte_anonima: ctx.disponivel ? "ok" : "indisponivel" }, 500);
+      const faltantes = listarFaltantes({
+        assinaturas: (vendasV ?? []) as Parameters<typeof listarFaltantes>[0]["assinaturas"],
+        eventos: ctx.eventos,
+        marcadores: marks.marcadores,
+        janelaMs: JANELA_VARREDURA_MS,
+      });
+      return json({
+        modo: "varredura",
+        enviar: false,
+        janela_dias: 7,
+        fonte_anonima: ctx.disponivel ? "ok" : "indisponivel",
+        total: faltantes.length,
+        anonimos: faltantes.filter((f) => f.anonimo).length,
+        faltantes,
+        como_enviar: "Admin POST {\"modo\":\"varredura\",\"enviar\":true} ou env META_VARREDURA_ENVIAR=1. O cron diário não envia. META_CAPI_ANON_ENVIAR=1 liga o teste anônimo no cron de 15 min — só depois de ler esta lista, e o auto-log do SDK só sai num PR seguinte.",
+      });
+    }
+
     /* REENVIO FORÇADO — lista EXPLÍCITA de tx, só pra admin logado. Nunca uma
      * flag "força tudo": o estrago de reenviar a base inteira seria o mesmo
      * bug de 17-22/08 (1.292 Purchase fantasma), e ninguém quer repetir. */
@@ -542,8 +774,9 @@ serve(async (req) => {
     // 22/08): 7+3+margem = 12. O filtro é por created_at da LINHA; o
     // event_time que vai pra Meta é o da conversão (recente), então o teto
     // de 7 dias da Meta continua respeitado. Idempotente pelos marcadores.
-    const de = cron ? iso(new Date(hoje.getTime() - 12 * 86400_000)) : String(body?.de ?? "").slice(0, 10);
-    const ate = cron ? iso(hoje) : String(body?.ate ?? de).slice(0, 10);
+    const janelaDias = varredura ? 7 : 12;
+    const de = (cron || varredura) ? iso(new Date(hoje.getTime() - janelaDias * 86400_000)) : String(body?.de ?? "").slice(0, 10);
+    const ate = (cron || varredura) ? iso(hoje) : String(body?.ate ?? de).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(de)) return json({ error: "informe de/ate em YYYY-MM-DD" }, 400);
     // Janela BRT: o dia vai de 03:00Z a 03:00Z do dia seguinte.
     const inicio = `${de}T03:00:00Z`;
@@ -563,6 +796,19 @@ serve(async (req) => {
      * excluída à mão num backfill anterior; aqui vira regra. */
     const EH_TESTE = (email?: string | null) =>
       !!email && /(^|[+.])teste|testeghg|jv20101958/i.test(email);
+
+    const desdeContexto = new Date(hoje.getTime() - 12 * 86400_000).toISOString();
+    const ctxEventos = await carregarEventosRc(admin, desdeContexto);
+    const sinais = await carregarSinais(admin);
+    const sinalDaConta = (userId: string, tx: string, inicio: string | null) => {
+      const par = sinalDe(sinais, userId, null);
+      return {
+        chaves: [tx, ...chavesDaAssinatura(ctxEventos.eventos, userId, inicio)],
+        atributos: atributosDe(ctxEventos.eventos, userId, null),
+        ip: par?.client_ip_address ?? null,
+        ua: par?.client_user_agent ?? null,
+      };
+    };
 
     const feitos: unknown[] = [];
     for (const v of vendas ?? []) {
@@ -593,7 +839,8 @@ serve(async (req) => {
         await mandarCompraProMeta(
           admin, v.user_id, v.customer_email, v.amount_cents ?? 15990,
           v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
-          "trial",
+          "trial", null, false,
+          sinalDaConta(v.user_id, String(v.revenuecat_subscription_id), v.current_period_start ?? v.created_at),
         );
         // TikTok recebe o MESMO sinal (StartTrial, com o VALOR do plano) — marcador
         // próprio (tiktok_trial_enviado), dormente sem os secrets.
@@ -632,10 +879,13 @@ serve(async (req) => {
         const antes = await admin
           .from("analytics_events").select("id")
           .eq("event_name", "meta_capi_app_enviado")
-          .eq("user_id", v.user_id)
           .contains("event_data", { tx: v.revenuecat_subscription_id })
-          .maybeSingle();
-        if (antes.data) { feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" }); continue; }
+          .limit(1);
+        // Erro de leitura NÃO vira "não enviado" (o ×36–96).
+        if (antes.error || (antes.data?.length ?? 0) > 0) {
+          feitos.push({ tx: v.revenuecat_subscription_id, resultado: antes.error ? "pulado_erro_marcador" : "ja_enviado" });
+          continue;
+        }
       }
       // Assinatura (sub…): só com cobrança confirmada na loja. Compra única
       // (otp…, vitalício) é dinheiro na hora — segue como sempre.
@@ -646,11 +896,16 @@ serve(async (req) => {
           continue;
         }
       }
-      await mandarCompraProMeta(
+      const rMeta = await mandarCompraProMeta(
         admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
         v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
         "purchase", v.billing_period, forcarEsta,
+        sinalDaConta(v.user_id, String(v.revenuecat_subscription_id), v.current_period_start ?? v.created_at),
       );
+      if (rMeta === "pulado") {
+        feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" });
+        continue;
+      }
       // .limit(1), NÃO .maybeSingle(): no reenvio forçado existem 2+ marcadores
       // pro mesmo tx, e maybeSingle() devolve erro PGRST116 nessa situação —
       // o envio dava certo e o relatório dizia "falhou". Mesma armadilha que já
@@ -669,19 +924,75 @@ serve(async (req) => {
         ...(forcarEsta && ultimoPacote ? { pacote: ultimoPacote } : {}),
       });
     }
-    log("fim", { de, ate, total: feitos.length, cron });
+    // Teste anônimo: desligado até META_CAPI_ANON_ENVIAR=1, ou até a varredura
+    // com enviar explícito. Com o auto-log do SDK ainda ligado, mandar agora
+    // contaria o teste duas vezes.
+    const enviarAnon = (cron && cronEnviaAnonimos(Deno.env.get("META_CAPI_ANON_ENVIAR"))) || enviarVarredura;
+    let anonimosEnviados = 0;
+    let anonimosPulados = 0;
+    if (enviarAnon && ctxEventos.disponivel) {
+      // A janela de envio da varredura é 7 dias; a assinatura dona pode ter
+      // nascido antes. Sem estas linhas o TRANSFER usaria outro event_id.
+      const { data: donasQ } = await admin
+        .from("subscriptions")
+        .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,current_period_end,created_at,billing_period")
+        .eq("payment_method", "play_store")
+        .not("revenuecat_subscription_id", "is", null)
+        .gte("created_at", desdeContexto)
+        .limit(2000);
+      const donas = ((donasQ ?? vendas ?? []) as Parameters<typeof deveEnviarComoAnonimo>[2]);
+      const desdeAnon = Date.now() - JANELA_VARREDURA_MS;
+      for (const ev of ctxEventos.eventos) {
+        const t = ev.purchased_at ? Date.parse(ev.purchased_at) : NaN;
+        if (!Number.isFinite(t) || t < desdeAnon) continue;
+        const classe = classificarEventoApp(ev);
+        if (classe.tipo === "ignorar" || !deveEnviarComoAnonimo(classe, [], donas, ctxEventos.eventos)) {
+          continue;
+        }
+        const chaves = [...classe.chaves];
+        for (const a of donas) {
+          if (!a.user_id || !a.revenuecat_subscription_id) continue;
+          const rel = chavesDaAssinatura(ctxEventos.eventos, a.user_id, a.current_period_start ?? a.created_at);
+          if (classe.chaves.some((c) => rel.includes(c))) chaves.push(String(a.revenuecat_subscription_id));
+        }
+        const par = sinalDe(sinais, null, classe.appUserId);
+        const rAnon = await mandarCompraProMeta(
+          admin, null, classe.email, classe.cents, classe.eventId, classe.quando,
+          classe.tipo, classe.billing, forcarTx.includes(classe.eventId),
+          {
+            externalId: classe.appUserId,
+            chaves,
+            atributos: classe.atributos,
+            ip: par?.client_ip_address ?? null,
+            ua: par?.client_user_agent ?? null,
+            plataforma: classe.plataforma,
+            reservar: true,
+          },
+        );
+        if (rAnon === "enviado") anonimosEnviados += 1;
+        else anonimosPulados += 1;
+      }
+    }
+    log("fim", { de, ate, total: feitos.length, cron, anonimosEnviados, envio_anonimo: enviarAnon });
+    const resumoAnon = {
+      envio_anonimo: enviarAnon,
+      fonte_anonima: ctxEventos.disponivel ? "ok" : "indisponivel",
+      anonimos_enviados: anonimosEnviados,
+      anonimos_pulados: anonimosPulados,
+    };
     if (cron) {
       // Resposta sem e-mail: este caminho é alcançável com chave anônima.
       const conta = (r: string) => feitos.filter((f) => (f as { resultado: string }).resultado === r).length;
       return json({
-        modo: "cron", de, ate,
+        modo: enviarVarredura ? "varredura" : "cron", de, ate,
         vendas: (vendas ?? []).length,
         enviados: conta("enviado"),
         ja_enviados: conta("ja_enviado"),
         falhas: conta("falhou"),
+        ...resumoAnon,
       });
     }
-    return json({ de, ate, vendas: (vendas ?? []).length, tiktok_ultimo_erro: ultimoErroTikTok, resultados: feitos });
+    return json({ de, ate, vendas: (vendas ?? []).length, tiktok_ultimo_erro: ultimoErroTikTok, ...resumoAnon, resultados: feitos });
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);
     log("ERRO", { m });

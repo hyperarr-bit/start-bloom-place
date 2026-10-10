@@ -298,6 +298,9 @@ export const capturarDispositivoApp = async () => {
       densidade: window.devicePixelRatio ?? 1,
       nucleos: navigator.hardwareConcurrency ?? 0,
     });
+    // IP do aparelho NÃO entra neste evento. A função lê o header e guarda
+    // IP+UA por ~10 dias, só pra CAPI. Sem rede, a ficha segue sem o par.
+    void supabase.functions.invoke("app-capi-sinal", { body: { session_id: getSessionId() } }).catch(() => {});
   } catch {
     // telemetria nunca derruba o app
   }

@@ -79,6 +79,11 @@
 	<string></string>
 	<key>FacebookDisplayName</key>
 	<string>CORE</string>
+	<!-- TODO (PR seguinte, passo 4 — NÃO neste): deixar true enquanto o SDK
+	     cobre o teste anônimo. Só virar false DEPOIS que o meta-backfill-app
+	     estiver enviando StartTrial anônimo em produção (META_CAPI_ANON_ENVIAR=1)
+	     e a varredura "enviado × venda" estiver zerada. Desligar antes some
+	     teste de verdade da Meta. -->
 	<key>FacebookAutoLogAppEventsEnabled</key>
 	<true/>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>

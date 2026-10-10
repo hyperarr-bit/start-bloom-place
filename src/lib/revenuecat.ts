@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
+import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -134,6 +135,8 @@ export async function initRevenueCat(): Promise<EstadoRC> {
     })();
 
     const offerings = await Purchases.getOfferings();
+    // 10/10: as chaves das ofertas de saída viajam no metadata das offerings (ofertas-saida.ts)
+    registrarChavesRemotas(offerings);
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];
@@ -337,8 +340,14 @@ export async function estadoTrialCancelado(): Promise<boolean> {
  * promete dias grátis se o StoreKit disser que a conta é elegível.
  *
  * DESLIGAR SEM VERSÃO NOVA: no painel do RevenueCat, metadata da offering
- * `anual_69` com `presente: "off"` (ou apagar/esvaziar a offering). */
-export type LugarDoPresente = "cancelou_teste" | "bloqueio";
+ * `anual_69` com `presente: "off"` (ou apagar/esvaziar a offering).
+ *
+ * 10/10 (1.0.14, chave OFERTA_X_PAYWALL em ofertas-saida.ts): 3º lugar,
+ *   "x_paywall" — fechou o paywall do FUNIL sem iniciar o teste (Voltar). Essa
+ *   pessoa nunca assinou: o pacote da `anual_69` traz a oferta introdutória e a
+ *   folha dá os 3 dias grátis (StoreKit decide a elegibilidade; o texto segue
+ *   `comTrial`). Não depende do customerInfo (lerSituacaoDoPresente), só da chave. */
+export type LugarDoPresente = "cancelou_teste" | "bloqueio" | "x_paywall";
 export type SituacaoDoPresente = { lugar: LugarDoPresente; fimMs: number | null } | null;
 const ID_ANUAL_69 = "core_anual_69";
 const OFFERING_PRESENTE = "anual_69";
@@ -393,7 +402,9 @@ export async function carregarPresente69(): Promise<Presente69 | null> {
   if (!configurado) { try { await initRevenueCat(); } catch { return null; } }
   if (!Purchases || !configurado) return null;
   try {
-    const pacote = lerPacoteDoPresente(await Purchases.getOfferings());
+    const offerings = await Purchases.getOfferings();
+    registrarChavesRemotas(offerings);
+    const pacote = lerPacoteDoPresente(offerings);
     if (!pacote?.product?.priceString) { presente69 = null; return null; }
     const p = pacote.product as { priceString: string; price?: number; currencyCode?: string; introPrice?: IntroAnual };
     let comTrial = false;
@@ -455,14 +466,102 @@ export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean
       pacote: true,
     });
     marcarFolhaAberta();
-    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: presente69.pacote });
+    const resultado = await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: presente69.pacote });
     registrarResultadoDaFolha("sucesso", ID_ANUAL_69);
+    // 10/10: no "x_paywall" a compra pode ENTRAR EM TESTE (3 dias) — o paywall do
+    // funil lê isto pra armar o lembrete "acaba amanhã", como no comprarAnualIos.
+    anotarTrialDaCompra(resultado, presente69.dados.comTrial);
     await sincronizarAssinatura();
     return true;
   } catch (e) {
     return desfechoDaFalha(e, ID_ANUAL_69);
   }
 }
+
+/* ─────────────────────────── MENSAL DE 19,90 (10/10, só iPhone, 1.0.14) ───────────────────────────
+ *
+ * Produto NOVO `core_mensal_19` (R$ 19,90/mês, MESMO grupo CORE Pro 22349268, criado
+ * pelo dono com scripts/asc-mensal-19.mjs), na offering `mensal_19` do RevenueCat,
+ * pacote $rc_monthly. É o degrau de "prefere ir devagar?" em três lugares:
+ *   "mensal_paywall" — escolheu o mensal no paywall do funil e cancelou a folha da Apple
+ *                      (chave OFERTA_MENSAL_19): compra na hora, sem teste
+ *   "cancelou_teste" — recusou o presente de 69,90 durante o teste (chave SAIDA_TESTE_ESCADA):
+ *                      a troca anual→mensal_19 é DOWNGRADE no grupo (groupLevel maior) e a Apple
+ *                      aplica no FIM do período atual = fim do teste; nada é cobrado hoje
+ *   "bloqueio"       — perdeu o acesso e recusou o 69,90 (mesma chave): compra na hora
+ * Preço SEMPRE do priceString da loja. Se a offering não existir (ou vier sem o produto
+ * certo, ou com metadata `presente: "off"`), nenhuma dessas telas aparece — chave ou não. */
+export type LugarDoMensal19 = "mensal_paywall" | "cancelou_teste" | "bloqueio";
+const ID_MENSAL_19 = "core_mensal_19";
+const OFFERING_MENSAL_19 = "mensal_19";
+
+/** Decisão pura, só das offerings: o pacote do mensal 19, ou null (ausente/desligado). */
+export function lerPacoteDoMensal19(offerings: unknown): PacoteRC | null {
+  const o = (offerings as { all?: Record<string, { metadata?: Record<string, unknown>; availablePackages?: PacoteRC[]; monthly?: PacoteRC | null }> } | null)?.all?.[OFFERING_MENSAL_19];
+  if (!o) return null;
+  if (String(o.metadata?.presente ?? "").toLowerCase() === "off") return null;
+  const ehO19 = (p?: PacoteRC | null) => !!p?.product?.identifier && (p.product.identifier === ID_MENSAL_19 || p.product.identifier.startsWith(ID_MENSAL_19 + ":"));
+  return (o.availablePackages ?? []).find(ehO19) ?? (ehO19(o.monthly) ? o.monthly! : null);
+}
+
+export type Mensal19 = { preco: string; produto: string };
+let mensal19: { pacote: PacoteRC; dados: Mensal19 } | null | undefined;
+
+/** Carrega (e guarda) o mensal 19 da offering `mensal_19`. null = ausente, desligado ou loja sem resposta. */
+export async function carregarMensal19(): Promise<Mensal19 | null> {
+  if (mensal19 !== undefined) return mensal19?.dados ?? null;
+  if (!configurado) { try { await initRevenueCat(); } catch { return null; } }
+  if (!Purchases || !configurado) return null;
+  try {
+    const offerings = await Purchases.getOfferings();
+    registrarChavesRemotas(offerings);
+    const pacote = lerPacoteDoMensal19(offerings);
+    if (!pacote?.product?.priceString) { mensal19 = null; return null; }
+    mensal19 = { pacote, dados: { preco: pacote.product.priceString, produto: ID_MENSAL_19 } };
+    return mensal19.dados;
+  } catch {
+    return null; // sem cache: a próxima tentativa lê de novo
+  }
+}
+
+/** Compra o mensal 19 pelo PACOTE da offering `mensal_19`. true = folha fechou e sincronizou. */
+export async function comprarMensal19(lugar: LugarDoMensal19): Promise<boolean> {
+  ultimoMotivo = null;
+  if (!(await garantirPronto())) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_MENSAL_19, oferta: "mensal19", lugar, retentou: true });
+    return false;
+  }
+  try {
+    if (!mensal19) await carregarMensal19();
+    if (!mensal19) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_MENSAL_19, oferta: "mensal19", lugar });
+      return false;
+    }
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
+      produto: ID_MENSAL_19,
+      escolhida: mensal19.pacote.product?.identifier ?? ID_MENSAL_19,
+      preco: mensal19.dados.preco,
+      trial: false,
+      oferta: "mensal19",
+      offering: OFFERING_MENSAL_19,
+      lugar,
+      pacote: true,
+    });
+    marcarFolhaAberta();
+    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: mensal19.pacote });
+    registrarResultadoDaFolha("sucesso", ID_MENSAL_19);
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    return desfechoDaFalha(e, ID_MENSAL_19);
+  }
+}
+
+/** Só testes: esquece o que foi carregado da loja (presente 69 e mensal 19). */
+export const _zerarCacheDasOfertas = (): void => { presente69 = undefined; mensal19 = undefined; };
 
 /** Se o RevenueCat diz que tem assinatura ativa mas o nosso banco não sabe,
  *  conserta sozinho. Roda no boot e a cada checagem de assinatura — é a rede
@@ -990,6 +1089,7 @@ type PacoteRC = import("@revenuecat/purchases-capacitor").PurchasesPackage;
 let produtoAnualIos: ProdutoRC | undefined;
 let pacoteAnualIos: PacoteRC | undefined;
 let offeringAnualIos: string | null = null;
+let produtoMensalIos: ProdutoRC | undefined;
 let prefetchAnualDesfecho = "nao_rodou";
 
 /** Oferta da App Store = o anual da família core_anual_* (97, 69…), nunca o pré-pago do Play. */
@@ -1001,6 +1101,7 @@ export async function prefetchAnualIos(): Promise<void> {
   // 1) o pacote anual da offering ATUAL (o experimento decide qual é)
   try {
     const offerings = await Purchases.getOfferings();
+    registrarChavesRemotas(offerings);
     const atual = offerings?.current;
     const pacote = (atual?.availablePackages ?? []).find((p) => ehAnualDaAppStore(p?.product?.identifier))
       ?? (ehAnualDaAppStore((atual as { annual?: PacoteRC } | undefined)?.annual?.product?.identifier) ? (atual as { annual?: PacoteRC }).annual : undefined);
@@ -1010,6 +1111,9 @@ export async function prefetchAnualIos(): Promise<void> {
       offeringAnualIos = atual?.identifier ?? null;
       prefetchAnualDesfecho = `offering_${offeringAnualIos ?? "?"}`;
     }
+    // 10/10: o MENSAL da mesma offering (core_mensal) — preço real pro selo "economize N%"
+    const mensal = (atual?.availablePackages ?? []).find((p) => /^core_mensal(:|$)/.test(String(p?.product?.identifier ?? "")));
+    if (mensal?.product) produtoMensalIos = mensal.product;
   } catch (e) {
     prefetchAnualDesfecho = "offerings_lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 60);
   }
@@ -1105,8 +1209,37 @@ export const precoMensalDoAnualIos = (): string | null => {
   return formatarMoeda(p.price / 12, p.currencyCode || "BRL");
 };
 
+/* 10/10 (chave PAYWALL_TEXTOS): o MENSAL também vem da loja, nunca chumbado. */
+/** Preço real do mensal (core_mensal) na offering atual, ex. "R$ 24,90"; null até a loja responder. */
+export const precoMensalIos = (): string | null => produtoMensalIos?.priceString ?? null;
+/** Valor numérico do mensal (24.9), ou null. */
+export const valorMensalIos = (): number | null => {
+  const p = produtoMensalIos as { price?: number } | undefined;
+  return p?.price && p.price > 0 ? p.price : null;
+};
+/** "economize 67%": quanto o ano economiza contra 12 meses de mensal, arredondado.
+ *  Pura: 97,90 × 24,90 → 67; 69,90 × 24,90 → 77. null se algum preço faltar ou a conta não fizer sentido. */
+export const calcularEconomia = (anual: number | null, mensal: number | null): number | null => {
+  if (!anual || !mensal || anual <= 0 || mensal <= 0) return null;
+  const pct = Math.round((1 - anual / (12 * mensal)) * 100);
+  return pct >= 1 && pct <= 99 ? pct : null;
+};
+/** A economia do anual servido pela loja contra o mensal servido pela loja. */
+export const economiaDoAnualIos = (): number | null => calcularEconomia(valorAnualIos(), valorMensalIos());
+
 let ultimaCompraFoiTrial = false;
 let ultimaCompraFimMs: number | null = null;
+/** Lê do resultado da folha se a compra entrou em TESTE (e até quando) — comum ao anual do
+ *  paywall e ao presente de 69,90 (10/10). `seNaoDisser` vale quando a loja não devolveu entitlement. */
+const anotarTrialDaCompra = (resultado: unknown, seNaoDisser: boolean): void => {
+  const ativos = Object.values(
+    (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> } } } | undefined)
+      ?.customerInfo?.entitlements?.active ?? {},
+  );
+  ultimaCompraFoiTrial = ativos.length ? ativos.some((e) => e?.periodType === "TRIAL") : seNaoDisser;
+  const fim = ativos.find((e) => e?.periodType === "TRIAL")?.expirationDateMillis;
+  ultimaCompraFimMs = typeof fim === "number" && fim > Date.now() ? fim : null;
+};
 /** A última compra do anual entrou em período de TESTE (a Apple aplicou a
  *  oferta)? É o que decide se o app arma o lembrete "acaba amanhã". */
 export const ultimaCompraAnualFoiTrial = (): boolean => ultimaCompraFoiTrial;
@@ -1144,13 +1277,7 @@ export async function comprarAnualIos(): Promise<boolean> {
       ? await Purchases.purchasePackage({ aPackage: pacoteAnualIos })
       : await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
     registrarResultadoDaFolha("sucesso", idProdutoAnualIos());
-    const ativos = Object.values(
-      (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> } } } | undefined)
-        ?.customerInfo?.entitlements?.active ?? {},
-    );
-    ultimaCompraFoiTrial = ativos.length ? ativos.some((e) => e?.periodType === "TRIAL") : anualIosTemTrial();
-    const fim = ativos.find((e) => e?.periodType === "TRIAL")?.expirationDateMillis;
-    ultimaCompraFimMs = typeof fim === "number" && fim > Date.now() ? fim : null;
+    anotarTrialDaCompra(resultado, anualIosTemTrial());
     /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
      * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
      * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe

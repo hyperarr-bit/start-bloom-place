@@ -1,0 +1,139 @@
+/**
+ * OFERTAS DE SAÍDA DO PAYWALL DO iPHONE (10/10, pra 1.0.14) — as CHAVES.
+ *
+ * Quatro coisas novas, cada uma atrás da própria chave, TODAS DESLIGADAS por
+ * padrão (= o paywall de hoje, byte a byte; travado em src/test/ofertas-saida.test.tsx):
+ *
+ *   OFERTA_X_PAYWALL    fechou o paywall do funil sem iniciar o teste (Voltar) →
+ *                       caixa de presente: anual 69,90 COM os 3 dias grátis (lugar "x_paywall")
+ *   OFERTA_MENSAL_19    escolheu o mensal e cancelou a folha da Apple → mensal 19,90
+ *                       (produto core_mensal_19, offering `mensal_19`, pacote $rc_monthly)
+ *   SAIDA_TESTE_ESCADA  quem sai durante o teste recusou o 69,90 ("Agora não") → 2º degrau:
+ *                       mensal 19,90 (também no bloqueio de quem perdeu o acesso)
+ *   PAYWALL_TEXTOS      "A Apple vai pedir confirmação. Nada é cobrado hoje." acima do botão
+ *                       + selo "economize N%" no anual (N calculado dos preços reais)
+ *
+ * QUEM DECIDE, nesta ordem (a primeira que responder vale):
+ *   1. força de QA deste aparelho, gravada pelo link `?ofertas-saida=…` (ver guardarForcaDasOfertas)
+ *   2. metadata remota do RevenueCat: QUALQUER offering (current, anual_69, mensal_19…) pode
+ *      carregar `oferta_x_paywall`, `oferta_mensal_19`, `saida_teste_escada`, `paywall_textos`
+ *      com "on"/"off" — a `current` vence as outras. Ligar/desligar SEM versão nova.
+ *   3. a constante local abaixo ("off" hoje).
+ * Além disso, uma oferta só EXISTE se a loja tiver o produto: a offering `mensal_19` ausente
+ * no RevenueCat faz OFERTA_MENSAL_19 e o 2º degrau da escada não fazerem nada, chave ligada ou não.
+ *
+ * Só iPhone: as telas que leem isto já estão atrás de ehApple(); na web e no Android nada muda.
+ */
+export type ModoOferta = "off" | "on";
+export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos";
+
+/** Constantes locais. ROLLBACK/LIGAR sem RevenueCat = trocar aqui + build. */
+export const OFERTA_X_PAYWALL: ModoOferta = "off";
+export const OFERTA_MENSAL_19: ModoOferta = "off";
+export const SAIDA_TESTE_ESCADA: ModoOferta = "off";
+export const PAYWALL_TEXTOS: ModoOferta = "off";
+
+const LOCAL: Record<NomeDaOferta, ModoOferta> = {
+  x_paywall: OFERTA_X_PAYWALL,
+  mensal_19: OFERTA_MENSAL_19,
+  escada: SAIDA_TESTE_ESCADA,
+  textos: PAYWALL_TEXTOS,
+};
+
+/** O nome da chave no metadata da offering do RevenueCat. */
+export const CHAVE_REMOTA: Record<NomeDaOferta, string> = {
+  x_paywall: "oferta_x_paywall",
+  mensal_19: "oferta_mensal_19",
+  escada: "saida_teste_escada",
+  textos: "paywall_textos",
+};
+
+export const CHAVE_FORCA_OFERTAS = "ofertas-saida-force"; // nas 2 allowlists (use-auth / use-user-data)
+export const PARAM_QA_OFERTAS = "ofertas-saida";
+
+const ls = {
+  get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* noop */ } },
+  del: (k: string) => { try { localStorage.removeItem(k); } catch { /* noop */ } },
+};
+
+/* ───────────── 2. metadata remota (preenchida pelo revenuecat.ts a cada getOfferings) ───────────── */
+let remota: Partial<Record<NomeDaOferta, ModoOferta>> = {};
+
+const modoDe = (v: unknown): ModoOferta | null => {
+  const s = String(v ?? "").toLowerCase();
+  return s === "on" ? "on" : s === "off" ? "off" : null;
+};
+
+/** Decisão pura: lê as 4 chaves do metadata de todas as offerings (a `current` vence). */
+export function lerChavesRemotas(offerings: unknown): Partial<Record<NomeDaOferta, ModoOferta>> {
+  type Off = { identifier?: string; metadata?: Record<string, unknown> } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  const lidas: Partial<Record<NomeDaOferta, ModoOferta>> = {};
+  const aplicar = (off: Off) => {
+    for (const nome of Object.keys(CHAVE_REMOTA) as NomeDaOferta[]) {
+      const m = modoDe(off?.metadata?.[CHAVE_REMOTA[nome]]);
+      if (m) lidas[nome] = m;
+    }
+  };
+  for (const off of Object.values(o?.all ?? {})) if (off !== o?.current) aplicar(off);
+  aplicar(o?.current);
+  return lidas;
+}
+
+/** O revenuecat.ts chama isto com o resultado de cada getOfferings(). */
+export function registrarChavesRemotas(offerings: unknown): void {
+  try { remota = lerChavesRemotas(offerings); } catch { /* metadata estranha: fica como estava */ }
+}
+export const chavesRemotas = (): Readonly<Partial<Record<NomeDaOferta, ModoOferta>>> => remota;
+/** Só testes. */
+export const _zerarChavesRemotas = (): void => { remota = {}; };
+
+/* ───────────── 1. força de QA pelo link ───────────── */
+/**
+ * `?ofertas-saida=on` liga as 4 neste aparelho; `off` força as 4 desligadas; `auto`
+ * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos`) liga
+ * só essas. Gravado no aparelho porque o funil muda de passo sem levar a query.
+ * Também apaga as marcas de "já vi" (`recomecar` junto, ex.: `?ofertas-saida=on,recomecar`).
+ */
+export function guardarForcaDasOfertas(busca?: string | URLSearchParams): void {
+  let v: string | null;
+  try {
+    const p = busca instanceof URLSearchParams ? busca : new URLSearchParams(busca ?? window.location.search);
+    v = p.get(PARAM_QA_OFERTAS);
+  } catch { return; }
+  if (v === null) return;
+  const partes = v.split(",").map((s) => s.trim()).filter(Boolean);
+  if (partes.includes("recomecar")) apagarMarcasDeVisto();
+  const semRecomecar = partes.filter((p) => p !== "recomecar");
+  if (semRecomecar.includes("auto")) { ls.del(CHAVE_FORCA_OFERTAS); return; }
+  if (semRecomecar.includes("off")) { ls.set(CHAVE_FORCA_OFERTAS, "off"); return; }
+  if (semRecomecar.includes("on")) { ls.set(CHAVE_FORCA_OFERTAS, "on"); return; }
+  const nomes = semRecomecar.filter((p): p is NomeDaOferta => p in LOCAL);
+  if (nomes.length) ls.set(CHAVE_FORCA_OFERTAS, nomes.join(","));
+}
+
+export const forcaDasOfertas = (nome: NomeDaOferta): ModoOferta | null => {
+  const f = ls.get(CHAVE_FORCA_OFERTAS);
+  if (!f) return null;
+  if (f === "on" || f === "off") return f;
+  return f.split(",").includes(nome) ? "on" : "off";
+};
+
+/** As marcas de "1x por aparelho" de todas as ofertas (presente e mensal 19) — pra QA recomeçar. */
+export const CHAVES_DE_VISTO = [
+  "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-presente69-x-paywall-visto",
+  "core-mensal19-mensal-paywall-visto", "core-mensal19-cancelou-visto", "core-mensal19-bloqueio-visto",
+  "core-save-offer-visto",
+];
+export const apagarMarcasDeVisto = (): void => { for (const k of CHAVES_DE_VISTO) ls.del(k); };
+
+/* ───────────── a resposta ───────────── */
+/** A oferta está ligada AQUI, agora? força de QA > metadata do RevenueCat > constante local. */
+export function ofertaLigada(nome: NomeDaOferta): boolean {
+  const f = forcaDasOfertas(nome);
+  if (f) return f === "on";
+  const r = remota[nome];
+  if (r) return r === "on";
+  return LOCAL[nome] === "on";
+}

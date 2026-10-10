@@ -105,6 +105,13 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   // presente de 69,90 do iPhone (07/10): 1x por pessoa POR LUGAR, marca de DISPOSITIVO
   "core-presente69-cancelou-visto",
   "core-presente69-bloqueio-visto",
+  // 10/10 (1.0.14, ofertas de saída): o 3º lugar do presente, o mensal de 19,90 (1x por
+  // lugar) e a força de QA das chaves — tudo marca de DISPOSITIVO
+  "core-presente69-x-paywall-visto",
+  "core-mensal19-mensal-paywall-visto",
+  "core-mensal19-cancelou-visto",
+  "core-mensal19-bloqueio-visto",
+  "ofertas-saida-force",
   "core-funnel-area",
   // 03/10: Lembrete do dia 2 / 1ª semana (1º uso no aparelho, hora, permissão
   // pedida) e as notificações já contadas como entregues — do DISPOSITIVO.

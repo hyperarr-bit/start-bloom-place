@@ -12,6 +12,12 @@
  * continua aqui, com o erro quando é defeito, e "Agora não" sempre à mão.
  * Desligar sem versão nova: metadata `presente: "off"` na offering `anual_69`
  * (ver revenuecat.ts). A regra da Apple pra cada texto também está lá.
+ *
+ * 10/10 (1.0.14): 3º lugar, "x_paywall" — fechou o paywall do funil sem iniciar o
+ * teste (chave OFERTA_X_PAYWALL, lib/ofertas-saida). Essa pessoa nunca assinou, então
+ * a folha dá os 3 dias grátis do pacote e o texto é "Antes de ir: 3 dias grátis e
+ * depois R$ 69,90/ano". E no "bloqueio", depois do "Agora não", o 2º degrau da
+ * escada (chave SAIDA_TESTE_ESCADA): o mensal de 19,90 (OfertaMensal19.tsx).
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -19,10 +25,13 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { ehApple, erroFolhaNaoConcluiu, erroJaAtivo, erroNaoPermitido } from "@/lib/loja";
 import type { LugarDoPresente, Presente69 } from "@/lib/revenuecat";
+import { ofertaLigada } from "@/lib/ofertas-saida";
+import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 
 const CHAVES: Record<LugarDoPresente, string> = {
   cancelou_teste: "core-presente69-cancelou-visto", // nas 2 allowlists (use-auth / use-user-data)
   bloqueio: "core-presente69-bloqueio-visto",
+  x_paywall: "core-presente69-x-paywall-visto",
 };
 export const presenteJaVisto = (lugar: LugarDoPresente): boolean => {
   try { return !!localStorage.getItem(CHAVES[lugar]); } catch { return false; }
@@ -31,20 +40,33 @@ const marcarVisto = (lugar: LugarDoPresente) => {
   try { localStorage.setItem(CHAVES[lugar], String(Date.now())); } catch { /* noop */ }
 };
 
+/** Como a oferta chegou até a pessoa — vai em todo evento das ofertas de saída (10/10):
+ *  "imediata" = na mesma tela, logo depois da folha fechar; "saida" = quando ela ia embora
+ *  (Voltar); "proxima_abertura" = numa abertura seguinte do app (teste cancelado, bloqueio). */
+export const segundaChanceDe = (lugar: LugarDoPresente): "saida" | "proxima_abertura" =>
+  lugar === "x_paywall" ? "saida" : "proxima_abertura";
+
 export type OfertaDoPresente = Presente69 & { precoDe: string | null; fimMs: number | null };
 
 /** Carrega tudo que a folha precisa; null = não mostrar (desligado, sem loja, já visto, lugar errado). */
 export async function prepararPresente(lugar: LugarDoPresente): Promise<OfertaDoPresente | null> {
   if (!ehApple() || presenteJaVisto(lugar)) return null;
   const rc = await import("@/lib/revenuecat");
-  const situacao = await rc.situacaoDoPresente();
-  if (situacao?.lugar !== lugar) return null;
+  let fimMs: number | null = null;
+  if (lugar === "x_paywall") {
+    // quem fecha o paywall do funil não tem assinatura pra ler: a chave decide
+    if (!ofertaLigada("x_paywall")) return null;
+  } else {
+    const situacao = await rc.situacaoDoPresente();
+    if (situacao?.lugar !== lugar) return null;
+    fimMs = situacao.fimMs;
+  }
   const dados = await rc.carregarPresente69();
   if (!dados) return null;
   let precoDe: string | null = null;
   try { await rc.prefetchAnualIos(); precoDe = rc.precoAnualIos(); } catch { /* sem o "de" */ }
   if (precoDe === dados.preco) precoDe = null; // a loja já serviu o 69 como anual: não riscar o próprio preço
-  return { ...dados, precoDe, fimMs: situacao.fimMs };
+  return { ...dados, precoDe, fimMs };
 }
 
 const dataCurta = (ms: number) => {
@@ -143,9 +165,12 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
   const [erro, setErro] = useState<string | null>(null);
   const vivo = useRef(true);
 
+  // 10/10: lugares novos levam `segunda_chance`; os dois de 07/10 seguem com os eventos de sempre
+  const extra = lugar === "x_paywall" ? { segunda_chance: segundaChanceDe(lugar) } : {};
+
   useEffect(() => {
     vivo.current = true;
-    trackEvent("presente69_view", { lugar, preco: oferta.preco, de: oferta.precoDe, trial: oferta.comTrial });
+    trackEvent("presente69_view", { lugar, preco: oferta.preco, de: oferta.precoDe, trial: oferta.comTrial, ...extra });
     const t = window.setTimeout(() => { if (vivo.current) setAberta(true); }, reduzir ? 0 : 420);
     return () => { vivo.current = false; window.clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,7 +178,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
 
   const fechar = () => {
     marcarVisto(lugar);
-    trackEvent("presente69_fechou", { lugar });
+    trackEvent("presente69_fechou", { lugar, ...extra });
     onFechar();
   };
 
@@ -161,7 +186,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
     if (comprando) return;
     setComprando(true);
     setErro(null);
-    trackEvent("presente69_toque", { lugar });
+    trackEvent("presente69_toque", { lugar, ...extra });
     const rc = await import("@/lib/revenuecat");
     rc.marcarToqueDeCompra();
     const ok = await rc.comprarPresente69(lugar);
@@ -169,7 +194,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
     setComprando(false);
     if (ok) {
       marcarVisto(lugar);
-      trackEvent("presente69_sucesso", { lugar, preco: oferta.preco });
+      trackEvent("presente69_sucesso", { lugar, preco: oferta.preco, ...extra });
       if (lugar === "cancelou_teste") {
         // o teste virou ano pago: o "acaba amanhã" não tem mais por quê
         try { (await import("@/lib/notificacoes")).cancelarLembreteDoTeste().catch(() => { /* noop */ }); } catch { /* noop */ }
@@ -178,7 +203,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
       return;
     }
     const motivo = rc.motivoUltimaCompra();
-    trackEvent("presente69_falhou", { lugar, motivo });
+    trackEvent("presente69_falhou", { lugar, motivo, ...extra });
     // fechou a folha = normal, sem alarde; o resto precisa de uma frase
     if (motivo === "cancelou" || motivo === null) return;
     if (motivo === "ja_ativo") setErro(erroJaAtivo());
@@ -203,15 +228,23 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
       <div className="min-h-full max-w-[400px] mx-auto flex flex-col px-6 pb-8 pt-[calc(var(--app-safe-top)+28px)]">
         <motion.div initial={reduzir ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entra} className="text-center">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider">
-            {lugar === "bloqueio" ? "Pra você voltar" : "Pra você ficar"}
+            {lugar === "bloqueio" ? "Pra você voltar" : lugar === "x_paywall" ? "Antes de ir" : "Pra você ficar"}
           </span>
           <h1 className="text-[26px] font-black tracking-[-0.03em] leading-[1.12] text-[#16121c] mt-3">
-            {lugar === "bloqueio" ? <>Seu teste acabou.<br />Um presente pra voltar.</> : <>Antes de ir,<br />um presente.</>}
+            {lugar === "bloqueio"
+              ? <>Seu teste acabou.<br />Um presente pra voltar.</>
+              : lugar === "x_paywall"
+                ? (oferta.comTrial ? <>Antes de ir:<br />{oferta.dias} dias grátis.</> : <>Antes de ir,<br />um presente.</>)
+                : <>Antes de ir,<br />um presente.</>}
           </h1>
           <p className="text-[13.5px] text-[#4f5a64] mt-2.5 leading-snug">
             {lugar === "bloqueio"
               ? <>Tudo o que você construiu continua aqui. O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>
-              : <>Você cancelou a renovação — tudo bem. Se quiser ficar, o ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>}
+              : lugar === "x_paywall"
+                ? (oferta.comTrial
+                    ? <>{oferta.dias} dias grátis e depois <b className="text-[#16121c]">{oferta.preco}/ano</b>{oferta.precoDe ? <> (em vez de {oferta.precoDe})</> : null}{mes ? <> — {mes} por mês</> : null}.</>
+                    : <>O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>)
+                : <>Você cancelou a renovação — tudo bem. Se quiser ficar, o ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>}
           </p>
         </motion.div>
 
@@ -247,7 +280,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           {lugar === "cancelou_teste"
             ? <>Nada é cobrado hoje: você continua no teste e só paga <b className="text-[#16121c]">{oferta.preco}</b>{oferta.fimMs ? <> quando ele acabar, em {dataCurta(oferta.fimMs)}</> : <> quando ele acabar</>}. Depois, renova uma vez por ano.</>
             : oferta.comTrial
-              ? <>{oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store.</>
+              ? <>{oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store.{lugar === "x_paywall" ? <> Cancelou antes do fim do teste, não paga nada.</> : null}</>
               : <>Cobrado hoje pela App Store: <b className="text-[#16121c]">{oferta.preco}</b>, sem teste grátis (você já usou o seu).</>}
         </motion.p>
 
@@ -263,7 +296,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           >
             {comprando
               ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <span className="flex items-center gap-1.5">{lugar === "bloqueio" ? "Voltar com o presente" : "Quero o presente"} — {oferta.preco}/ano <ArrowRight className="w-4 h-4" /></span>}
+              : lugar === "x_paywall" && oferta.comTrial
+                ? <span className="flex items-center gap-1.5">Começar {oferta.dias} dias grátis <ArrowRight className="w-4 h-4" /></span>
+                : <span className="flex items-center gap-1.5">{lugar === "bloqueio" ? "Voltar com o presente" : "Quero o presente"} — {oferta.preco}/ano <ArrowRight className="w-4 h-4" /></span>}
           </motion.button>
           <p className="text-[10.5px] text-[#8a93a0] text-center mt-2 leading-snug">
             Assinatura pela App Store · renova automaticamente por {oferta.preco}/ano até você cancelar
@@ -290,17 +325,35 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
  */
 export const PresenteNoBloqueio = () => {
   const [oferta, setOferta] = useState<OfertaDoPresente | null>(null);
+  // 10/10 (chave SAIDA_TESTE_ESCADA): recusou o 69,90 → o mensal de 19,90, compra na hora.
+  // Nunca os dois ao mesmo tempo; cada um 1x por aparelho.
+  const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   useEffect(() => {
     let vivo = true;
     void prepararPresente("bloqueio").then((o) => { if (vivo && o) setOferta(o); }).catch(() => { /* paywall de sempre */ });
     return () => { vivo = false; };
   }, []);
+  const segundoDegrau = () => {
+    setOferta(null);
+    if (!ofertaLigada("escada")) return;
+    void prepararMensal19("bloqueio").then((m) => { if (m) setMensal19(m); }).catch(() => { /* paywall de sempre */ });
+  };
+  if (mensal19) {
+    return (
+      <Mensal19Folha
+        lugar="bloqueio"
+        oferta={mensal19}
+        onFechar={() => setMensal19(null)}
+        onSucesso={() => { window.location.href = "/"; }}
+      />
+    );
+  }
   if (!oferta) return null;
   return (
     <Presente69Folha
       lugar="bloqueio"
       oferta={oferta}
-      onFechar={() => setOferta(null)}
+      onFechar={segundoDegrau}
       onSucesso={() => { window.location.href = "/"; }}
     />
   );

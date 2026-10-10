@@ -45,6 +45,20 @@
  * dia a identidade visual das duas lojas divergir, esses também se separam.
  *
  * Coberto por `paywall-ios.test.tsx`.
+ *
+ * OFERTAS DE SAÍDA (10/10, pra 1.0.14) — TODAS atrás de chave DESLIGADA
+ * (lib/ofertas-saida: constante local, metadata da offering no RevenueCat ou
+ * `?ofertas-saida=on` neste aparelho). Com tudo off esta tela é a de hoje,
+ * byte a byte (src/test/ofertas-saida.test.tsx prova):
+ *  · OFERTA_X_PAYWALL — o Voltar do funil (evento `core:voltar`, do ComecarW) sem
+ *    ter iniciado o teste abre a caixa de presente (Presente69, lugar "x_paywall"):
+ *    anual 69,90 COM os 3 dias grátis. 1x por aparelho; "Agora não" fecha de vez.
+ *  · OFERTA_MENSAL_19 — escolheu o mensal e cancelou a folha da Apple → mensal
+ *    19,90 (OfertaMensal19, lugar "mensal_paywall"), se a offering `mensal_19` existir.
+ *  · PAYWALL_TEXTOS — "A Apple vai pedir confirmação. Nada é cobrado hoje." acima
+ *    do botão e selo "economize N%" no anual (N dos preços REAIS: 12×mensal × anual).
+ * A 2ª chance da folha da Apple (28/09) fica como está; os eventos ganham o campo
+ * `segunda_chance` ("imediata" aqui; "saida"/"proxima_abertura" nas ofertas).
  */
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
 import { useEffect, useRef, useState } from "react";
@@ -56,6 +70,9 @@ import { trackEvent } from "@/lib/analytics";
 import { type AreaKey } from "@/lib/funnel";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { pedirLembreteDoTeste } from "@/lib/notificacoes";
+import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
+import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
+import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -118,6 +135,10 @@ const selosPara = (teste: boolean) => teste
  * troca na frente dela pareceria desconto de mentira. */
 const SEM_PRECO = "R$ —";
 
+/* 10/10: leituras NOVAS do revenuecat (economia, preço do mensal) protegidas — testes
+ * antigos mockam o módulo inteiro sem elas, e o mock do vitest LANÇA no acesso. */
+const seguro = <T,>(f: () => T, reserva: T): T => { try { return f(); } catch { return reserva; } };
+
 /* (B) CRONOGRAMA DO TESTE — o bloco que deu +23% no Blinkist e que a Apple
  * recomenda na sessão sobre testes: a pessoa sabe exatamente quando (e se)
  * vai pagar. O dia do aviso e o da cobrança vêm da duração lida da loja
@@ -155,8 +176,8 @@ function ComoFuncionaOTeste({ dias, precoAnual }: { dias: number; precoAnual: st
  * que faz a comparação sem precisar de tabela.
  */
 function DuasColunas({
-  plano, onSelect, precoAnual, precoMes, comTrial, dias, mesesDeMensal,
-}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; precoMes: string; comTrial: boolean; dias: number; mesesDeMensal: number | null }) {
+  plano, onSelect, precoAnual, precoMes, comTrial, dias, mesesDeMensal, precoMensal = APP_PRECOS.mensal.preco, economia = null,
+}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; precoMes: string; comTrial: boolean; dias: number; mesesDeMensal: number | null; precoMensal?: string; economia?: number | null }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -169,7 +190,7 @@ function DuasColunas({
           <span className="h-[19px]" aria-hidden />
           <span className="text-[30px] font-black leading-none mt-1.5">1</span>
           <span className="text-[12.5px] font-bold text-black/45">mês</span>
-          <span className="text-[17px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[17px] font-extrabold mt-2">{precoMensal}</span>
           <span className="text-[10px] font-semibold text-black/40">por mês</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           {/* "renova sozinho" e não "cancele quando quiser": na Apple a
@@ -193,6 +214,12 @@ function DuasColunas({
           <span className="text-[10px] font-semibold text-black/40 leading-tight px-1">
             por mês · {precoAnual}/ano{comTrial ? `, depois dos ${dias} dias` : ""}
           </span>
+          {/* 10/10 (chave PAYWALL_TEXTOS): a economia contra 12 meses de mensal, dos preços REAIS */}
+          {economia !== null && (
+            <span className="mx-auto mt-1.5 rounded-full bg-accent/10 text-accent text-[10px] font-extrabold px-2 py-[2px]" data-testid="ios-economize">
+              economize {economia}%
+            </span>
+          )}
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           {/* 01/10: a conta vem do preço REAL (97,90 → 4 meses; 69,90 → 3) — nunca chumbada */}
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
@@ -226,9 +253,23 @@ export function PaywallIOS({
   });
   const precoAnualTxt = precoAnual ?? SEM_PRECO;
   const precoMesTxt = precoMes ?? SEM_PRECO;
+  /* 10/10 — ofertas de saída (lib/ofertas-saida). `textos` e `economia` só entram
+   * com a chave PAYWALL_TEXTOS lida DEPOIS de a loja responder (a metadata vem
+   * nas offerings); as folhas de presente/mensal 19 nascem de eventos. */
+  const [textos, setTextos] = useState(false);
+  const [economia, setEconomia] = useState<number | null>(null);
+  const [precoMensalLoja, setPrecoMensalLoja] = useState<string | null>(null);
+  const [presenteX, setPresenteX] = useState<OfertaDoPresente | null>(null);
+  const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
+  const presenteXTentadoRef = useRef(false);
+  const comprandoRef = useRef(false);
+  comprandoRef.current = comprando;
+  // o mensal do paywall: com PAYWALL_TEXTOS, o preço real da loja (reserva: a constante de hoje)
+  const precoMensalTxt = textos ? (precoMensalLoja ?? APP_PRECOS.mensal.preco) : APP_PRECOS.mensal.preco;
 
   useEffect(() => {
     vivoRef.current = true;
+    guardarForcaDasOfertas(); // `?ofertas-saida=on|off|auto|lista` — QA neste aparelho
     // `loja: "ios"` em todo evento: sem isso o iPhone entraria somando nos
     // números do funil do Android e as duas leituras virariam uma média de
     // dois públicos, duas lojas e duas mecânicas de pagamento.
@@ -252,8 +293,14 @@ export function PaywallIOS({
           setMesesDeMensal(rc.mesesDeMensalQuePagamOAno());
           const d = rc.dadosDaOfertaIos();
           setOferta(d);
+          // 10/10: a chave remota chegou junto com as offerings; os preços do selo são os da loja
+          const ligou = ofertaLigada("textos");
+          const economiaLida = ligou ? seguro(() => rc.economiaDoAnualIos() ?? null, null) : null;
+          setTextos(ligou);
+          setEconomia(economiaLida);
+          setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial() });
+          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}) });
         }
       };
       lido();
@@ -271,6 +318,25 @@ export function PaywallIOS({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* OFERTA NO "X" (10/10, chave OFERTA_X_PAYWALL). O paywall do funil não tem X: a
+   * saída é o Voltar (físico no app, do navegador na web), que o ComecarW traduz
+   * no evento `core:voltar` ANTES de recuar (o 1º Voltar fica na tela; o 2º em 3 s
+   * recua um passo). Aqui o 1º Voltar abre a caixa de presente — 1x por sessão
+   * do paywall e 1x por aparelho (marca no desfecho, dentro do Presente69). Com a
+   * folha da Apple aberta não faz nada; com a chave off, nada muda. */
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (presenteXTentadoRef.current || comprandoRef.current) return;
+      if (!ofertaLigada("x_paywall")) return;
+      presenteXTentadoRef.current = true;
+      void prepararPresente("x_paywall")
+        .then((o) => { if (vivoRef.current && o) setPresenteX(o); })
+        .catch(() => { /* paywall de sempre */ });
+    };
+    window.addEventListener("core:voltar", aoVoltar);
+    return () => window.removeEventListener("core:voltar", aoVoltar);
+  }, []);
+
   const [resgatouCodigo, setResgatouCodigo] = useState(false);
   /* SEGUNDA CHANCE (28/09): fechar a folha da Apple não gerava resposta
    * nenhuma — e 32% das compras vêm de quem fechou uma primeira vez. Só na
@@ -278,7 +344,7 @@ export function PaywallIOS({
    * grátis, 1 vez por sessão do paywall; some quando a compra dá certo. */
   const [segundaChance, setSegundaChance] = useState<"nunca" | "visivel" | "usada">("nunca");
   useEffect(() => {
-    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias });
+    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segundaChance]);
 
@@ -344,6 +410,13 @@ export function PaywallIOS({
       if (motivo === "cancelou" && produto === "anual" && comTrial && rc.anualIosTemTrial()) {
         setSegundaChance((s) => (s === "nunca" ? "visivel" : s));
       }
+      /* 10/10 (chave OFERTA_MENSAL_19): fechou a folha do MENSAL → o mensal de 19,90,
+       * se a offering `mensal_19` existir na loja. 1x por aparelho (marca no desfecho). */
+      if (motivo === "cancelou" && produto === "mensal" && ofertaLigada("mensal_19")) {
+        void prepararMensal19("mensal_paywall")
+          .then((m) => { if (vivoRef.current && m) setMensal19(m); })
+          .catch(() => { /* paywall de sempre */ });
+      }
     } catch {
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
     }
@@ -366,7 +439,7 @@ export function PaywallIOS({
 
   return (
     /* pb maior só com o cartão: a barra fixa cresce e cobriria o "Restaurar compras" do rodapé */
-    <div className={`relative w-full max-w-sm mx-auto text-center ${mostraSegundaChance ? "pb-60" : "pb-40"} pt-8`}>
+    <div className={`relative w-full max-w-sm mx-auto text-center ${mostraSegundaChance ? "pb-60" : textos && comTrial && !mostraMensal ? "pb-48" : "pb-40"} pt-8`}>
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -395,7 +468,7 @@ export function PaywallIOS({
             /* (A) 20/09: no anual a âncora mostra o POR MÊS (R$ 8,16) — é o
              * número comparável com o mensal e com o que some por mês; o
              * valor cheio do ano vai na linha de baixo. */
-            const valor = mostraMensal ? APP_PRECOS.mensal.preco : precoMesTxt;
+            const valor = mostraMensal ? precoMensalTxt : precoMesTxt;
             const emReais = /^R\$/.test(valor);
             const preco = emReais ? valor.replace(/^R\$\s?/, "") : valor;
             const prefixo = emReais ? "R$ " : "";
@@ -426,6 +499,8 @@ export function PaywallIOS({
             dias={dias}
             comTrial={comTrial}
             mesesDeMensal={mesesDeMensal}
+            precoMensal={precoMensalTxt}
+            economia={textos ? economia : null}
             onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual }); }}
           />
         </motion.div>
@@ -515,7 +590,7 @@ export function PaywallIOS({
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
                 onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias });
+                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
                   setSegundaChance("usada");
                   void comprar("anual");
                 }}
@@ -523,6 +598,16 @@ export function PaywallIOS({
                 Tentar de novo
               </button>
             </div>
+          )}
+
+          {/* 10/10 (chave PAYWALL_TEXTOS): o que a folha vai fazer, dito ANTES do toque */}
+          {textos && comTrial && !mostraMensal && (
+            <p className="text-center mb-2" data-testid="ios-apple-confirma">
+              {/* fundo opaco: a linha fica na zona do degradê da barra e sobreporia o conteúdo */}
+              <span className="inline-block rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-foreground shadow-[0_2px_10px_-4px_rgba(0,0,0,0.25)]">
+                A Apple vai pedir confirmação. Nada é cobrado hoje.
+              </span>
+            </p>
           )}
 
           <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
@@ -535,7 +620,7 @@ export function PaywallIOS({
                   cta: "app_paywall_cta", funil: "ios", loja: "ios",
                   produto: mostraMensal ? "core_mensal" : oferta.produto,
                   oferta: mostraMensal ? "mensal" : oferta.oferta,
-                  offering: oferta.offering, preco: mostraMensal ? APP_PRECOS.mensal.preco : precoAnual,
+                  offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
                 });
                 void comprar(plano);
               }}
@@ -543,7 +628,7 @@ export function PaywallIOS({
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : mostraMensal
-                  ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
+                  ? <>Começar por {precoMensalTxt}/mês <ArrowRight className="w-4 h-4" /></>
                   : comTrial
                     ? <>Começar {dias} dias grátis <ArrowRight className="w-4 h-4" /></>
                     : <>Quero o ano — {precoAnualTxt} <ArrowRight className="w-4 h-4" /></>}
@@ -564,7 +649,7 @@ export function PaywallIOS({
               {/* Nenhuma forma de pagamento citada (3.1.1) e, no mensal, o
                   aviso de renovação automática que a 3.1.2 exige. */}
               {mostraMensal
-                ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar</>
+                ? <>Assinatura de {precoMensalTxt}/mês pela App Store · renova automaticamente até você cancelar</>
                 : comTrial
                   ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
                   : <>Assinatura de {precoAnualTxt}/ano pela App Store · renova automaticamente até você cancelar</>}
@@ -579,6 +664,41 @@ export function PaywallIOS({
             <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> Abrindo o pagamento…
           </div>
         </div>
+      )}
+
+      {/* 10/10 — as ofertas de saída, por cima do paywall (z-320). Sucesso = a mesma
+          saída da compra normal: app_sheet_success (com oferta/lugar), lembrete do
+          teste quando a folha deu dias grátis, e o cadastro. "Agora não" devolve o
+          paywall de sempre, intacto. */}
+      {presenteX && (
+        <Presente69Folha
+          lugar="x_paywall"
+          oferta={presenteX}
+          onFechar={() => setPresenteX(null)}
+          onSucesso={async () => {
+            trackEvent("app_sheet_success", { produto: presenteX.produto, funil: "ios", loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
+            try {
+              const rc = await import("@/lib/revenuecat");
+              if (seguro(() => rc.ultimaCompraAnualFoiTrial(), presenteX.comTrial)) {
+                void pedirLembreteDoTeste({ fimMs: seguro(() => rc.fimDaUltimaCompraTrial(), null) ?? Date.now() + (presenteX.dias || dias) * 86400e3, precoAno: presenteX.preco }).catch(() => { /* noop */ });
+              }
+            } catch { /* noop */ }
+            setPresenteX(null);
+            onPagoSemConta();
+          }}
+        />
+      )}
+      {mensal19 && (
+        <Mensal19Folha
+          lugar="mensal_paywall"
+          oferta={mensal19}
+          onFechar={() => setMensal19(null)}
+          onSucesso={() => {
+            trackEvent("app_sheet_success", { produto: mensal19.produto, funil: "ios", loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
+            setMensal19(null);
+            onPagoSemConta();
+          }}
+        />
       )}
     </div>
   );

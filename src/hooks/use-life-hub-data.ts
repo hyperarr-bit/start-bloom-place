@@ -6,6 +6,10 @@ import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
+import {
+  CHAVE_PENDENCIAS_PREFS, normalizarPrefs, pesoCobradoHoje, scoreDosBlocos, tiposCobradosHoje,
+  type BlocoDoScore, type PendenciasPrefs, type TipoPendencia,
+} from "@/lib/home-pendencias";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -59,6 +63,11 @@ export interface LifeHubData {
   /** Opcional só porque fixtures montam LifeHubData na mão (score-do-dia.test);
    *  o hook preenche SEMPRE. Sem isso a timeline não cria as linhas novas. */
   registrosHoje?: RegistrosHoje;
+  /** 10/10 — Pendências personalizáveis (lib/home-pendencias): as prefs da
+   *  pessoa e os TIPOS que a lista e o score cobram hoje (os não ocultos; peso
+   *  só quando a frequência manda). Ausente (fixtures antigas) = cobra tudo. */
+  pendenciasPrefs?: PendenciasPrefs;
+  pendenciasCobradas?: TipoPendencia[];
 }
 
 const NADA_REGISTRADO: RegistrosHoje = { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
@@ -330,39 +339,38 @@ export function useLifeHubData(): LifeHubData {
      * "Fez tudo o que a tela mostra" tem que dar 100 — o teste
      * src/test/score-do-dia.test.tsx prova nos dois extremos.
      */
-    let scorePoints = 0;
-    const scoreMax = 100;
+    /* 10/10 — PENDÊNCIAS PERSONALIZÁVEIS (lib/home-pendencias): cada bloco
+     * vira {tipo, pontos, max}; o que a pessoa escondeu em "Não mostrar isso"
+     * sai da conta e os blocos que sobram são reescalados pra 100. Com nada
+     * escondido, max = 100 e o score é a soma de sempre, ponto por ponto. */
+    const pendenciasPrefs = normalizarPrefs(get<unknown>(CHAVE_PENDENCIAS_PREFS, null));
+    const blocos: BlocoDoScore[] = [];
+    const bloco = (tipo: TipoPendencia, pontos: number, max: number) => blocos.push({ tipo, pontos: Math.min(max, pontos), max });
 
     // Treino (15pts) — feito, ou não há treino programado hoje (descanso /
     // sem plano): não existe o que cobrar. Já era assim.
-    if (workoutDone) scorePoints += 15;
-    else if (!todayGroup) scorePoints += 15; // rest day = free
+    bloco("treino", workoutDone || !todayGroup ? 15 : 0, 15);
 
     // Hábitos (20pts) — cobrável sempre: sem hábito a Home pede pra cadastrar
     // ("Adicionar hábitos diários" fica pendente na timeline), então é a única
     // ausência de cadastro que NÃO vira ponto cheio. É o coração da Rotina.
-    if (tasksTotal > 0) {
-      scorePoints += Math.round((tasksCompleted / tasksTotal) * 20);
-    }
+    bloco("habitos", tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 20) : 0, 20);
 
     // Água (15pts) — meta sempre existe (8 copos por padrão), sempre cobrável.
-    scorePoints += Math.min(15, Math.round((waterGlasses / waterGoal) * 15));
+    bloco("agua", Math.min(15, Math.round((waterGlasses / waterGoal) * 15)), 15);
 
     // Refeições (10pts) — dividido pelo número REAL do plano: plano de 3
     // refeições, 3 registradas = 10 (antes dava round(3/4*10) = 8, a cliente
     // nunca fechava). Sem plano nenhum continua cobrando 4. O teto de 10
     // evita que 5 registros num plano de 3 valham 17 e mascarem outro bloco.
-    if (mealsTotal > 0) {
-      scorePoints += Math.min(10, Math.round((mealsLogged / mealsTotal) * 10));
-    }
+    bloco("refeicoes", mealsTotal > 0 ? Math.min(10, Math.round((mealsLogged / mealsTotal) * 10)) : 0, 10);
 
     // Leitura (5pts) — sem livro em leitura não existe o que cobrar: 5.
     // Com livro "lendo", vale pelo `lib-read-log` de hoje (11/09): a linha
     // "Continuar «livro»" das pendências nunca ficava feita e o score dava o
     // ponto de graça — a lista e o número discordavam. Agora os dois leem a
     // mesma coisa: mexeu na página hoje (Biblioteca ou widget) = 5.
-    // Voltar ao "vale 5 sempre" é trocar esta linha por `scorePoints += 5`.
-    if (!currentBook || leuHoje) scorePoints += 5;
+    bloco("leitura", !currentBook || leuHoje ? 5 : 0, 5);
 
     // Humor registrado (5pts) — registro diário, sem cadastro prévio: sempre
     // cobrável. FIX 16/07: Rotina grava em mood-log e o Dev. Pessoal em
@@ -373,50 +381,49 @@ export function useLifeHubData(): LifeHubData {
     // As flags `*Hoje` abaixo são as MESMAS que a timeline recebe em
     // `registrosHoje`: o score soma por elas e a pendência aparece por elas.
     const humorHoje = !!(moodLog[tStr] || moodRotina[tStr] || moodDp[tStr]);
-    if (humorHoje) scorePoints += 5;
+    bloco("humor", humorHoje ? 5 : 0, 5);
 
     // Gratidão registrada (5pts) — registro diário, sempre cobrável.
     // FIX 16/07: dp-gratitude (módulo) também
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
     const gratDp = get<Record<string, string[]>>("dp-gratitude", {});
     const gratidaoHoje = (gratLog[tStr] || []).length > 0 || (gratDp[tStr] || []).length > 0;
-    if (gratidaoHoje) scorePoints += 5;
+    bloco("gratidao", gratidaoHoje ? 5 : 0, 5);
 
     // Ideia capturada hoje (5pts) — registro diário no Hiperfoco, sempre cobrável.
     const thoughtsAll = get<Record<string, any>>("hiperfoco-thoughts", {});
     const todayThoughts = thoughtsAll[tStr] || {};
     const hasThoughtToday = Object.values(todayThoughts).some((arr: any) => Array.isArray(arr) && arr.length > 0);
-    if (hasThoughtToday) scorePoints += 5;
+    bloco("ideia", hasThoughtToday ? 5 : 0, 5);
 
     // Peso registrado (5pts) — registro diário na Saúde (medidas), não exige
     // cadastro: qualquer um pesa hoje. Sempre cobrável — a cliente dos 95
-    // tinha feito este.
+    // tinha feito este. (10/10: ou 1x por semana, no dia escolhido — aí só é
+    // cobrado nesse dia, e só se ainda não pesou na semana.)
     const measures = get<any[]>("core-saude-measures", []);
     const pesoHoje = measures.some((m: any) => m.date === tStr);
-    if (pesoHoje) scorePoints += 5;
+    bloco("peso", pesoHoje ? 5 : 0, 5);
+    const pesoCobrado = pesoCobradoHoje(pendenciasPrefs, measures.map((m: any) => m?.date), agoraHub);
 
     // Suplementos (5pts) — sem suplemento cadastrado na Saúde vale 5. Não é
     // "de graça": é que não existe o que cobrar — a Home nem lista pendência
     // de suplemento pra quem não tem nenhum. Era o `if` que travava a
     // cliente em 95 (10/09). Com cadastro, proporção dos tomados hoje.
-    if (supplements.length > 0) {
-      scorePoints += Math.min(5, Math.round((supplementsTaken / supplements.length) * 5));
-    } else {
-      scorePoints += 5;
-    }
+    bloco("suplementos", supplements.length > 0 ? Math.min(5, Math.round((supplementsTaken / supplements.length) * 5)) : 5, 5);
 
     // Sono registrado (5pts) — registro diário (Saúde ou ação rápida), sem
     // cadastro prévio: sempre cobrável.
     const sonoHoje = !!sleepHours;
-    if (sonoHoje) scorePoints += 5;
+    bloco("sono", sonoHoje ? 5 : 0, 5);
 
     // Gasto registrado hoje (5pts) — registro diário em Finanças, sem cadastro
     // prévio: sempre cobrável. (Segue o perfil ativo, como o saldo acima.)
     const todayExpenses = variableExpenses.filter((e: any) => e.date === tStr);
     const gastoHoje = todayExpenses.length > 0;
-    if (gastoHoje) scorePoints += 5;
+    bloco("gasto", gastoHoje ? 5 : 0, 5);
 
-    const dayScore = Math.min(100, scorePoints);
+    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado);
+    const dayScore = scoreDosBlocos(blocos, cobrados);
     const userName = get<string>("core-user-name", "");
 
     return {
@@ -431,6 +438,7 @@ export function useLifeHubData(): LifeHubData {
       booksReadThisYear: booksRead,
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
       registrosHoje: { humor: humorHoje, gasto: gastoHoje, peso: pesoHoje, sono: sonoHoje, gratidao: gratidaoHoje, ideia: hasThoughtToday },
+      pendenciasPrefs, pendenciasCobradas: Array.from(cobrados),
     };
   }, [get, loaded]);
 }

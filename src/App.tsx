@@ -16,6 +16,7 @@ import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { PortaoBoasVindas } from "@/components/onboarding/PortaoBoasVindas";
 import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { AvisoCobrancaRecusada } from "@/components/app/AvisoCobrancaRecusada";
+import { PonteDaFolhaDeCobranca } from "@/components/app/PonteDaFolhaDeCobranca";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
@@ -739,6 +740,8 @@ const App = () => {
                 <GracePeriodBanner />
                 {/* 26/09: cartão recusado na App Store/Google Play (só no app). */}
                 <AvisoCobrancaRecusada />
+                {/* 10/10 (1.0.14): a folha nativa de cobrança do StoreKit só na Home — ver lib/cobranca-nativa. Só iPhone. */}
+                <PonteDaFolhaDeCobranca />
                 <TrilhoLateral />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />

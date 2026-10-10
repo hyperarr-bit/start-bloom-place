@@ -7,7 +7,7 @@ import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-libra
 import { MemoryRouter, useNavigate } from "react-router-dom";
 
 const estado = vi.hoisted(() => ({
-  problema: { temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" as string | null },
+  problema: { temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" } as { temProblema: boolean; comAcesso: boolean; url: string | null; detectadoEm?: string | null },
   auth: {} as Record<string, unknown>,
 }));
 vi.mock("@/lib/revenuecat", async (original) => ({
@@ -36,6 +36,10 @@ import { lerProblemaDeCobranca } from "@/lib/revenuecat";
 import { trackEvent } from "@/lib/analytics";
 import { AvisoCobrancaRecusada } from "@/components/app/AvisoCobrancaRecusada";
 import { TrialBanner } from "@/components/TrialBanner";
+import {
+  CARENCIA_DIAS, CHAVE_FORCA_COBRANCA_V14, URL_PAGAMENTO_APPLE, avisoFechadoNestaAbertura, diasRestantesDaCarencia,
+  fecharAvisoNestaAbertura, registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento, zerarAvisoDaAbertura,
+} from "@/lib/cobranca-recusada";
 
 const info = (ent: Record<string, unknown>, url: string | null = "https://apps.apple.com/account/subscriptions") => ({
   managementURL: url,
@@ -51,7 +55,7 @@ const CARTAO_RECUSADO = { billingIssueDetectedAt: "2026-09-25T20:24:00Z", unsubs
 describe("Cobrança recusada — leitura do RevenueCat", () => {
   it("cartão recusado (formato real: billingIssueDetectedAt + willRenew false): avisa, sem acesso", () => {
     expect(lerProblemaDeCobranca(info({ ...CARTAO_RECUSADO, isActive: false })))
-      .toEqual({ temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" });
+      .toEqual({ temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions", detectadoEm: "2026-09-25T20:24:00Z" });
   });
 
   it("dentro da carência (acesso ativo, willRenew false do mesmo jeito): avisa pra não perder o acesso", () => {
@@ -125,9 +129,10 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     expect(aviso.parentElement).toHaveClass("pt-[var(--app-safe-top)]");
     // o texto certo pra quem perdeu o acesso, com o caminho pra loja
     expect(aviso.textContent).toMatch(/Atualize a forma de pagamento na App Store pra voltar a usar o CORE\./);
-    expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", "https://apps.apple.com/account/subscriptions");
+    // 10/10: no iPhone o botão leva pra FORMA DE PAGAMENTO da Apple (a tela de assinaturas não tem cartão)
+    expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", URL_PAGAMENTO_APPLE);
     // o evento sai num efeito depois do aviso montar — com a máquina cheia ele chega um tique depois (05/10: barrou o push)
-    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false }]]));
+    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false, dias_restantes: null }]]));
   });
 
   it("sem acesso, fora do bloqueio (ex.: /planos): volta pra faixa de cima — sem contar outra exibição", async () => {
@@ -151,7 +156,9 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     expect(gate()).toBeNull();
     expect(screen.getByTestId("topo-do-app").firstElementChild).toBe(aviso);
     expect(aviso.textContent).toMatch(/pra não perder o acesso\./);
-    expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true }]]);
+    expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: null }]]);
+    // chave desligada: sem contador
+    expect(screen.queryByTestId("carencia-dias")).toBeNull();
   });
 
   it("'Agora não' dentro do bloqueio esconde o aviso e o bloqueio segue igual", async () => {
@@ -175,5 +182,120 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
     expect(views()).toHaveLength(0);
+  });
+});
+
+/* 10/10 (1.0.14): a conta da carência (pura) e o que muda com a chave COBRANCA_V14. */
+describe("Cobrança recusada — carência de 28 dias e o botão (1.0.14)", () => {
+  it("dias restantes: 28 a partir da detecção, arredondando pra cima, nunca negativo, null sem data", () => {
+    const detectado = "2026-10-01T12:00:00Z";
+    const t = (s: string) => new Date(s).getTime();
+    expect(CARENCIA_DIAS).toBe(28);
+    expect(diasRestantesDaCarencia(detectado, t("2026-10-01T12:00:00Z"))).toBe(28);
+    expect(diasRestantesDaCarencia(detectado, t("2026-10-10T12:00:00Z"))).toBe(19);
+    expect(diasRestantesDaCarencia(detectado, t("2026-10-28T09:00:00Z"))).toBe(2); // faltando 27 h: 2 dias
+    expect(diasRestantesDaCarencia(detectado, t("2026-10-29T09:00:00Z"))).toBe(1); // faltando 3 h ainda é 1 dia
+    expect(diasRestantesDaCarencia(detectado, t("2026-11-05T12:00:00Z"))).toBe(0);
+    expect(diasRestantesDaCarencia(null)).toBeNull();
+    expect(diasRestantesDaCarencia("lixo")).toBeNull();
+  });
+  it("texto do contador: singular, plural, e nada quando venceu ou sem data", () => {
+    expect(textoDaCarencia(1)).toBe("Você tem 1 dia pra atualizar.");
+    expect(textoDaCarencia(12)).toBe("Você tem 12 dias pra atualizar.");
+    expect(textoDaCarencia(0)).toBeNull();
+    expect(textoDaCarencia(null)).toBeNull();
+  });
+  it("o botão: iPhone → forma de pagamento da Apple; Android → a Play (managementURL ou a tela de assinaturas)", () => {
+    expect(urlAtualizarPagamento({ url: "https://apps.apple.com/account/subscriptions" }, "ios")).toBe("https://apps.apple.com/account/billing");
+    expect(urlAtualizarPagamento({ url: null }, "ios")).toBe("https://apps.apple.com/account/billing");
+    expect(urlAtualizarPagamento({ url: "https://play.google.com/store/account/subscriptions?sku=x" }, "android")).toBe("https://play.google.com/store/account/subscriptions?sku=x");
+    expect(urlAtualizarPagamento({ url: null }, "android")).toMatch(/^https:\/\/play\.google\.com\/store\/account\/subscriptions\?package=br\.com\.coreaplicativo\.app$/);
+  });
+});
+
+describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-v14=on)", () => {
+  const montar = () =>
+    render(
+      <MemoryRouter initialEntries={["/home"]}>
+        <div data-testid="topo-do-app"><AvisoCobrancaRecusada /></div>
+        <TrialBanner />
+      </MemoryRouter>
+    );
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const views = () => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === "aviso_cobranca_view");
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "on");
+    zerarAvisoDaAbertura();
+    vi.mocked(trackEvent).mockClear();
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T15:00:00Z"));
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    zerarAvisoDaAbertura();
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+
+  it("com acesso: mostra o contador da carência e o view leva dias_restantes", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-01T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    montar();
+    await screen.findByText("Seu pagamento não passou");
+    expect(screen.getByTestId("carencia-dias").textContent).toBe("Você tem 19 dias pra atualizar.");
+    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: 19 }]]));
+  });
+
+  it("no bloqueio (sem acesso): o contador aparece lá também; carência vencida não mostra contador", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null, detectadoEm: "2026-10-08T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: false, noTrial: true, trialExpired: false };
+    montar();
+    const aviso = (await screen.findByText("Seu pagamento não passou")).closest('[role="alert"]') as HTMLElement;
+    expect(document.querySelector(".fixed.inset-0")!.contains(aviso)).toBe(true);
+    expect(screen.getByTestId("carencia-dias").textContent).toBe("Você tem 26 dias pra atualizar.");
+    cleanup();
+    zerarAvisoDaAbertura();
+    estado.problema = { temProblema: true, comAcesso: false, url: null, detectadoEm: "2026-08-01T12:00:00Z" };
+    montar();
+    await screen.findByText("Seu pagamento não passou");
+    expect(screen.queryByTestId("carencia-dias")).toBeNull();
+  });
+
+  it("'Agora não' esconde só até a próxima abertura: nada em disco, remontar na mesma abertura segue escondido, abertura nova volta", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-01T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    montar();
+    await screen.findByText("Seu pagamento não passou");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Agora não" })); });
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(localStorage.getItem("core-aviso-cobranca-fechado-ate")).toBeNull(); // o modo antigo (24 h) não é gravado
+    expect(vi.mocked(trackEvent).mock.calls.find((c) => c[0] === "aviso_cobranca_fechar")?.[1]).toEqual({ dias_restantes: 19 });
+    cleanup();
+    montar(); // mesma abertura do app (ex.: trocou de tela e voltou)
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    cleanup();
+    zerarAvisoDaAbertura(); // o app foi fechado e aberto de novo
+    montar();
+    expect(await screen.findByText("Seu pagamento não passou")).toBeInTheDocument();
+  });
+
+  it("voltar do fundo depois de 30 min conta como abertura nova; antes disso, não", () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-01T12:00:00Z" };
+    const t0 = Date.now();
+    zerarAvisoDaAbertura();
+    // fecha, vai pro fundo 10 min, volta: segue escondido
+    registrarVisibilidadeDoAviso(true, t0);
+    fecharAvisoNestaAbertura();
+    registrarVisibilidadeDoAviso(false, t0 + 60e3);
+    registrarVisibilidadeDoAviso(true, t0 + 11 * 60e3);
+    expect(avisoFechadoNestaAbertura()).toBe(true);
+    // fundo por 31 min: abertura nova
+    registrarVisibilidadeDoAviso(false, t0 + 12 * 60e3);
+    registrarVisibilidadeDoAviso(true, t0 + 44 * 60e3);
+    expect(avisoFechadoNestaAbertura()).toBe(false);
   });
 });

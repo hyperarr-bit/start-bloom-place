@@ -2,18 +2,28 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import "./styles/escuro.css"; // modo escuro como sistema (gerado por scripts/gerar-escuro.mjs) — depois do index.css de propósito
-import { trackEvent, captureLandingMeta } from "@/lib/analytics";
+import { trackEvent, captureLandingMeta, iniciarMedicaoDoAparelho } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
 import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
 import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
+import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
+import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
 // mudança de ordem, aqui garante antes do React montar. O CSS do shell
 // (ex.: matar outline de foco preso) depende só desta classe.
 if (isNativeShell()) document.documentElement.classList.add("core-shell");
+
+// 10/10 (1.0.14): device_id, turma e versão em TODO evento + app_primeira_abertura
+// (1× por aparelho, só no app das lojas). Antes do React: os primeiros eventos
+// do boot já saem com a ficha. Ver lib/aparelho.
+void iniciarMedicaoDoAparelho();
+// As chaves de QA da 1.0.14 pelo link (`?cobranca-v14=on`, `?avaliacao-v14=on`): gravadas no aparelho, como a MISSAO_DOSES.
+guardarForcaDaCobrancaV14();
+guardarForcaDaAvaliacaoV14();
 
 // Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO
 // (o Recharts exige, e o throw sobe até o RouteErrorBoundary). Instala antes

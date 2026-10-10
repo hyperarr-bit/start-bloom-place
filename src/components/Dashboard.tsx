@@ -1,7 +1,9 @@
 import { LembreteDoLimite } from "@/components/finance/LembreteDoLimite";
 import { reais } from "@/lib/dinheiro";
 import { usePaletaGrafico } from "@/lib/paleta-grafico";
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { Info, Landmark } from "lucide-react";
+import type { SaldoEmConta } from "@/lib/finance-saldo-conta";
 import { localDayKey } from "@/lib/utils";
 // Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
 const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
@@ -65,6 +67,10 @@ interface DashboardProps {
   onNavigate?: (tab: string) => void;
   /** Perfil ativo (PF/PJ): sem ele o gráfico anual não recalculava ao trocar o chip (13/09). */
   perfil?: string;
+  /** 10/10 — "Saldo em conta" (lib/finance-saldo-conta): quanto sobra na conta,
+   *  sem a compra no crédito deste mês e com as faturas que vencem. Opcional:
+   *  sem ele, o Dashboard é o de sempre. */
+  saldoEmConta?: SaldoEmConta;
 }
 
 // 17/09: a paleta agora depende do tema — ver src/lib/paleta-grafico.ts (usePaletaGrafico dentro do componente)
@@ -145,7 +151,9 @@ export const Dashboard = ({
   monthlyInstallments = 0,
   onNavigate,
   perfil,
+  saldoEmConta,
 }: DashboardProps) => {
+  const [explicarSaldoConta, setExplicarSaldoConta] = useState(false);
   const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
   const { user } = useAuth();
   // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
@@ -483,6 +491,61 @@ export const Dashboard = ({
           </div>
         </div>
       </div>
+
+      {/* SALDO EM CONTA (10/10, chamado: "receitas menos o que é pago via
+          pix/débito, aí bate certinho com o saldo que tenho em conta"). Linha
+          inteira logo abaixo do Saldo do Mês; o ⓘ abre a conta por extenso. */}
+      {saldoEmConta && (
+        <div className="bg-card rounded-lg border border-border p-4" data-testid="saldo-em-conta">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs text-muted-foreground">Saldo em conta</p>
+                <button
+                  type="button"
+                  onClick={() => setExplicarSaldoConta((v) => !v)}
+                  aria-label="O que é o saldo em conta"
+                  aria-expanded={explicarSaldoConta}
+                  data-testid="saldo-em-conta-info"
+                  className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${explicarSaldoConta ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className={`text-[clamp(0.95rem,4.4vw,1.25rem)] font-bold whitespace-nowrap ${saldoEmConta.saldo >= 0 ? "text-green-400" : "text-red-400"}`} data-testid="saldo-em-conta-valor">
+                {saldoEmConta.saldo >= 0 ? "+" : "-"}R$ {reais(Math.abs(saldoEmConta.saldo))}
+              </p>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Pix, débito e boleto do mês{saldoEmConta.faturas > 0 ? " + faturas que vencem" : ""} — sem as compras no crédito que só vão pra próxima fatura
+              </p>
+            </div>
+            <Landmark className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-sky-400/30" />
+          </div>
+          {explicarSaldoConta && (
+            <div className="mt-3 pt-3 border-t border-border/60 space-y-2 text-[11px] leading-snug" data-testid="saldo-em-conta-explicacao">
+              <p><span className="font-semibold">Saldo do Mês</span> = quanto do mês já está comprometido: receitas − todas as despesas (fixas, variáveis, parcelas), com a compra no crédito contando no mês da fatura.</p>
+              <p><span className="font-semibold">Saldo em conta</span> = quanto sobra na conta neste mês: receitas − o que sai da conta agora (Pix, débito, dinheiro, boleto, transferência, débito automático) − as faturas de cartão que vencem neste mês. A compra no crédito deste mês <span className="font-semibold">não</span> entra: ela só sai da conta quando a fatura vencer.</p>
+              <div className="rounded-md bg-muted/40 px-2.5 py-2 space-y-0.5 tabular-nums">
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Receitas</span><span className="text-green-500">+ R$ {reais(saldoEmConta.receitas)}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Sai da conta (Pix, débito, boleto…)</span><span>− R$ {reais(saldoEmConta.debitoDireto)}</span></div>
+                {saldoEmConta.faturas > 0 && (
+                  <div className="flex justify-between gap-2"><span className="text-muted-foreground">Faturas que vencem no mês</span><span>− R$ {reais(saldoEmConta.faturas)}</span></div>
+                )}
+                {saldoEmConta.creditoSemFatura > 0 && (
+                  <div className="flex justify-between gap-2"><span className="text-muted-foreground">Crédito em cartão sem vencimento cadastrado</span><span>− R$ {reais(saldoEmConta.creditoSemFatura)}</span></div>
+                )}
+                <div className="flex justify-between gap-2 pt-1 border-t border-border/50 font-semibold"><span>Saldo em conta</span><span>{saldoEmConta.saldo >= 0 ? "" : "− "}R$ {reais(Math.abs(saldoEmConta.saldo))}</span></div>
+              </div>
+              {saldoEmConta.semForma > 0 && (
+                <p className="text-muted-foreground">{saldoEmConta.semForma === 1 ? "1 lançamento sem forma de pagamento entrou" : `${saldoEmConta.semForma} lançamentos sem forma de pagamento entraram`} como "sai da conta". Marque Pix, débito ou crédito em cada um pra conta ficar exata.</p>
+              )}
+              {saldoEmConta.cartoesSemVencimento.length > 0 && (
+                <p className="text-muted-foreground">Cartão sem dia de vencimento cadastrado: as compras no crédito contam no mês, como no Saldo do Mês. Cadastre o vencimento na ⚙️ do cartão (em Gastos) pra fatura entrar no mês certo.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Alerts */}
       {alerts.length > 0 && (

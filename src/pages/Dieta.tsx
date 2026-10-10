@@ -5,7 +5,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
 import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
-import { CHAVE_KCAL, kcalDoPlano } from "@/lib/dieta-consumo";
+import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, kcalDoPlano, metaDoDia, normalizarModoMeta, type ModoMetaKcal } from "@/lib/dieta-consumo";
 import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { enviarParaMercado } from "@/lib/mercado";
 import { avisarApagado } from "@/lib/desfazer";
@@ -371,6 +371,22 @@ const Dieta = () => {
   // kcal por refeição — ver CALORIAS (07/09) no topo do arquivo
   const [mealKcal, setMealKcal] = usePersistedState<Record<string, Record<string, number>>>(CHAVE_KCAL, {});
   const [editMealKcal, setEditMealKcal] = useState("");
+  /* META DIÁRIA DE CALORIAS (10/10, chamado: "como faço para alterar a meta de
+     calorias diárias?") — ver lib/dieta-consumo. Automática = soma do cardápio
+     do dia; fixa = o número digitado, gravado na chave ANTIGA (que o app antigo
+     lê) + a flag de modo numa chave nova. */
+  const [modoMetaBruto, setModoMeta] = usePersistedState<string>(CHAVE_META_KCAL_MODO, "auto");
+  const modoMeta: ModoMetaKcal = normalizarModoMeta(modoMetaBruto);
+  const [metaFixaBruta, setMetaFixa] = usePersistedState<number>(CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO);
+  const metaFixa = Number(metaFixaBruta) > 0 ? Math.round(Number(metaFixaBruta)) : META_KCAL_PADRAO;
+  const [metaDigitada, setMetaDigitada] = useState<string | null>(null);
+  const gravarMetaFixa = () => {
+    if (metaDigitada === null) return;
+    const n = Math.round(Number(String(metaDigitada).replace(",", ".")));
+    if (n >= 500 && n <= 10000) setMetaFixa(n);
+    else if (metaDigitada.trim() !== "") toast("A meta precisa ficar entre 500 e 10.000 kcal.");
+    setMetaDigitada(null);
+  };
   // macros por refeição (18/09) — ver src/lib/dieta-macros.ts
   const [mealMacros, setMealMacros] = usePersistedState<MacrosPlano>(CHAVE_MACROS, {});
   const [editMacros, setEditMacros] = useState<{ p: string; c: string; g: string }>({ p: "", c: "", g: "" });
@@ -772,6 +788,65 @@ const Dieta = () => {
                 <Settings className="w-3 h-3 mr-1" /> Refeições ({meals.length})
               </Button>
             </div>
+
+            {/* META DIÁRIA DE CALORIAS (10/10) — discreta, no topo do cardápio */}
+            {(() => {
+              const planejadoHoje = kcalDoPlano(mealKcal[getDiaryDayName(today)]);
+              const metaHoje = metaDoDia({ kcalPlanejadas: planejadoHoje, metaAntiga: metaFixa, modo: modoMeta });
+              return (
+                <div className="rounded-xl border border-border bg-card px-3 py-2.5 space-y-2" data-testid="meta-kcal">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-muted-foreground">META DIÁRIA DE CALORIAS</p>
+                      <p className="text-xs" data-testid="meta-kcal-hoje">
+                        Hoje: <span className="font-bold">{metaHoje.toLocaleString("pt-BR")} kcal</span>
+                        <span className="text-muted-foreground"> · {modoMeta === "fixa" ? "fixa" : planejadoHoje > 0 ? "soma do cardápio" : "padrão (cardápio sem kcal)"}</span>
+                      </p>
+                    </div>
+                    <div className="flex rounded-lg border border-border overflow-hidden text-[11px] font-medium shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setModoMeta("auto")}
+                        aria-pressed={modoMeta === "auto"}
+                        data-testid="meta-kcal-auto"
+                        className={`px-2.5 py-1.5 ${modoMeta === "auto" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+                      >
+                        Automática
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setModoMeta("fixa"); if (!(Number(metaFixaBruta) > 0)) setMetaFixa(META_KCAL_PADRAO); }}
+                        aria-pressed={modoMeta === "fixa"}
+                        data-testid="meta-kcal-fixa"
+                        className={`px-2.5 py-1.5 border-l border-border ${modoMeta === "fixa" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+                      >
+                        Fixa
+                      </button>
+                    </div>
+                  </div>
+                  {modoMeta === "fixa" ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={500}
+                        max={10000}
+                        step={50}
+                        aria-label="Meta diária de calorias"
+                        value={metaDigitada ?? String(metaFixa)}
+                        onChange={(e) => setMetaDigitada(e.target.value)}
+                        onBlur={gravarMetaFixa}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                        className="h-8 w-28 text-sm"
+                      />
+                      <span className="text-xs text-muted-foreground">kcal por dia — vale pro widget da Home e pros macros</span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground leading-snug">A meta é a soma das kcal das refeições do dia no cardápio. Sem kcal anotadas, vale {META_KCAL_PADRAO.toLocaleString("pt-BR")} kcal.</p>
+                  )}
+                </div>
+              );
+            })()}
 
             {showMealConfig && (
               <div className="bg-muted/30 rounded-xl border border-border p-3 space-y-3">

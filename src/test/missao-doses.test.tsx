@@ -240,7 +240,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     const m = lerMissao()!; m.boasVindas = true; localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify(m));
     montar(store, "/financas");
     const faixa = screen.getByTestId("missao-doses-faixa");
-    expect(faixa).toHaveTextContent("Missão · dia 1 de 3 · Finanças");
+    expect(faixa).toHaveTextContent("Missão · dia 1 de 3");
     expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("1");
     expect(screen.queryByTestId("missao-doses-pular")).toBeNull(); // sem "pular tudo" nos primeiros 20 s
     const postIt = esperarPostIt();
@@ -300,7 +300,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer");
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/rotina");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3 · Rotina");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
     esperarPostIt();
     // ela marca o quadradinho de hoje (o módulo grava a chave de sempre)
     act(() => { store.valor().set("rotina-habits-checked", { [diaDeHoje()]: [true, false] }); });
@@ -351,7 +351,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     passarPeloOlhar();
     fireEvent.click(screen.getByTestId("missao-doses-amanha-agora"));
     expect(rota()).toBe("/rotina");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3 · Rotina");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
     expect(eventos).toContainEqual(["missao_doses_amanha_agora", { dia: 1, prototipo: "web" }]);
   });
 });

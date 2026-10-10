@@ -19,7 +19,7 @@
  */
 import { normalizarItem, reais, type ItemDaDemo, type TipoDoItem } from "@/lib/demo-guiada";
 import { gravacoesDoItem, idDoItem, type Gravacao } from "@/lib/demo-guiada-registro";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, semanaAtualId } from "@/lib/utils";
 
 /**
  * Os tempos da missão. A 1ª comemoração dura o que dura no app (MissaoDoTrial:
@@ -177,6 +177,19 @@ const quadradinhoMarcado = (valor: unknown, anterior: unknown): [string, number]
 };
 
 /* ------------------------------------------------------------ a tabela */
+
+/**
+ * 10/10 — HÁBITOS SUGERIDOS pra conta VAZIA (bug do dono: "a missão da Rotina diz 'toca no
+ * quadradinho' sendo que o usuário não escolheu nenhum hábito"). Quando não há hábito, o post-it
+ * oferece 3 prontos: tocar CRIA o hábito e MARCA como feito hoje (gravacoesDoChip). Com hábito,
+ * continua "toca no quadradinho". (A demo da web tem hábitos nos seeds e não usa isto.)
+ */
+export const CHIPS_DE_HABITO: ChipDaMissao[] = [
+  { emoji: "💧", nome: "Beber água ao acordar" },
+  { emoji: "🧘", nome: "Alongar 5 min" },
+  { emoji: "🛏️", nome: "Arrumar a cama" },
+];
+export const PERGUNTA_HABITO_VAZIO = "Qual hábito você quer começar hoje?";
 
 const CHIPS_DE_GASTO: ChipDaMissao[] = [
   { emoji: "☕", nome: "Café", valor: 12, categoria: "alimentacao" },
@@ -362,6 +375,38 @@ export const itemDoChip = (tipo: TipoDoItem, chip: ChipDaMissao): ItemDaDemo | n
  * O id é o `idDoItem` (estável): é assim que `achar` sabe que veio do chip.
  */
 export function gravacoesDoChip(item: ItemDaDemo, chip: ChipDaMissao, hoje: Date = new Date()): Gravacao[] {
+  if (item.tipo === "habito") {
+    // o hábito nasce (rotina-habits) E já vem marcado HOJE na grade da semana (rotina-habits-checked),
+    // com o carimbo da semana (rotina-habits-week) — sem o carimbo a Rotina mostra a grade zerada.
+    // As gravações são aplicadas em ordem (PassoDoDia): a 1ª descobre o índice do hábito, a 2ª usa.
+    const [criar] = gravacoesDoItem(item, hoje, "demo");
+    const diaDaSemana = diaDeHoje(hoje);
+    const nome = item.nome.trim().toLowerCase();
+    let indice = -1;
+    const criarComIndice: Gravacao = {
+      chave: "rotina-habits",
+      proximo: (atual) => {
+        const depois = criar.proximo(atual);
+        const listaFinal = lista(depois ?? atual);
+        indice = listaFinal.findIndex((h) => String(typeof h === "string" ? h : mapa(h).name ?? "").trim().toLowerCase() === nome);
+        return depois;
+      },
+    };
+    const marcarHoje: Gravacao = {
+      chave: "rotina-habits-checked",
+      proximo: (atual) => {
+        if (indice < 0) return undefined;
+        const grade = (atual && typeof atual === "object" && !Array.isArray(atual) ? atual : {}) as Record<string, unknown>;
+        const nova = lista(grade[diaDaSemana]).map((x) => x === true);
+        while (nova.length <= indice) nova.push(false);
+        if (nova[indice]) return undefined;
+        nova[indice] = true;
+        return { ...grade, [diaDaSemana]: nova };
+      },
+    };
+    const semana: Gravacao = { chave: "rotina-habits-week", proximo: (atual) => (atual === semanaAtualId() ? undefined : semanaAtualId()) };
+    return [criarComIndice, marcarHoje, semana];
+  }
   if (item.tipo !== "gasto") return gravacoesDoItem(item, hoje, "demo");
   const id = idDoItem(item);
   const gasto = { id, description: item.nome, category: chip.categoria || "outros", value: item.valor ?? 0, date: localDayKey(hoje), paymentMethod: "pix" };

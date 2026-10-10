@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Crosshair } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { alvoDaMissao, gravacoesDoChip, itemDoChip, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
-import { rotuloCurto } from "@/lib/demo-guiada";
-import { HORAS_DO_LEMBRETE, MODULOS, diaDaMissao, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { CHIPS_DE_HABITO, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { reais, rotuloCurto } from "@/lib/demo-guiada";
+import { HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
 import "./missao-doses.css";
 
@@ -80,6 +80,13 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const cfg = MODULOS[modulo];
   const alvoCfg: AlvoDaMissao | null = cfg.tipo ? alvoDaMissao(cfg.tipo) : null;
   const { get, set } = useUserData();
+  /* 10/10 — CONTA VAZIA (bug do dono: "a Rotina diz 'toca no quadradinho' sendo que não escolheu nenhum
+   * hábito"): sem hábito, o post-it oferece 3 prontos; tocar cria o hábito E marca hoje. Com hábito, o
+   * quadradinho de sempre. Lido UMA vez no mount (o chip cria o hábito e a pergunta não pode trocar no meio). */
+  const [semHabito] = useState(() => cfg.tipo === "habito" && !(Array.isArray(get<unknown>("rotina-habits", undefined)) && (get<unknown[]>("rotina-habits", []) ?? []).length > 0));
+  const chips: ChipDaMissao[] = semHabito ? CHIPS_DE_HABITO : (alvoCfg?.chips ?? []);
+  const pergunta = semHabito ? PERGUNTA_HABITO_VAZIO : (alvoCfg?.pergunta ?? cfg.pedido);
+  const chipTocado = useRef<ChipDaMissao | null>(null);
   const reduzir = !!useReducedMotion();
   const [fase, setFase] = useState<Fase>("achar");
   const faseRef = useRef<Fase>("achar");
@@ -166,7 +173,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         try {
           const achado = alvoCfg.achar(k, valor, ant, (kk) => get<unknown>(kk, undefined));
           if (!achado) continue;
-          rot = rotuloCurto(achado.item);
+          // o rótulo é o do CHIP que ela tocou (o gasto real da dose — "Café · R$ 12"); digitado = o que achou
+          const c = viaRef.current === "chip" ? chipTocado.current : null;
+          rot = c ? (c.valor != null ? `${c.nome} · R$ ${reais(c.valor)}` : cfg.tipo === "habito" ? `${c.nome} marcado` : c.nome) : rotuloCurto(achado.item);
           via = viaRef.current === "chip" ? "chip" : achado.via;
           try { num = alvoCfg.numero(k, valor, ant, achado.item); } catch { num = null; }
         } catch { continue; }
@@ -218,6 +227,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, valor: chip.valor, ok: !!item }));
     if (!item) return;
     viaRef.current = "chip";
+    chipTocado.current = chip;
     setTocado(chip.nome);
     try {
       for (const g of gravacoesDoChip(item, chip)) {
@@ -250,19 +260,24 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     setFase("festa");
   };
 
-  const feitos = ([1, 2, 3] as DiaDaMissao[]).filter((k) => missao.feitos[k] || (k === n && fase === "festa")).length;
+  const B = braco === "B";
+  const total = B ? TOTAL_PASSOS_B : 3;
+  const feitos = ([1, 2, 3] as DiaDaMissao[]).filter((k) => missao.feitos[k] || (k === n && fase === "festa")).length + (B && missao.homeTour ? 1 : 0);
+  /* A FAIXA (10/10, print do dono: título truncado, "mostrar onde" quebrado em 2 linhas cobrindo o
+   * cabeçalho): UMA linha de altura fixa, "Missão · dose 1 de 4" sem o nome do módulo (ele já está no
+   * cabeçalho logo abaixo), à direita só "Pular" e um alvo ⌖ pra "mostrar onde" (ícone, nunca texto). */
   const faixa = (
     <div className="md-faixa" data-testid="missao-doses-faixa" data-fase={fase} onClick={toqueNaFaixa} role="presentation">
-      <span className="md-faixa-quadros" aria-label={`${feitos} de 3 feitos`} role="img">
-        {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitos} claro tam={14} />)}
+      <span className="md-faixa-quadros" aria-label={`${feitos} de ${total} feitos`} role="img">
+        {Array.from({ length: total }, (_, i) => <Quadradinho key={i} marcado={i < feitos} claro tam={14} />)}
       </span>
       <span className="md-faixa-titulo">
-        {modo === "aprofundar" ? <>Aprofundar · dia {diaDaMissao(missao, hoje)} · <b>{cfg.nome}</b></>
-          : braco === "B" ? <>Missão · dose {n} de 3 · <b>{cfg.nome}</b></>
-          : <>Missão · dia {n} de 3 · <b>{cfg.nome}</b></>}
+        {modo === "aprofundar" ? <>Aprofundar · dia {diaDaMissao(missao, hoje)}</>
+          : B ? <>Missão · dose {n} de {total}</>
+          : <>Missão · dia {n} de 3</>}
       </span>
       {perdeuAlvo && fase === "anotar" && (
-        <button type="button" className="md-faixa-onde" data-testid="missao-doses-onde" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}>mostrar onde</button>
+        <button type="button" className="md-faixa-onde" data-testid="missao-doses-onde" aria-label="Mostrar onde tocar" title="Mostrar onde" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
       )}
       {pularVisivel && fase !== "festa" && (
         <button type="button" className="md-faixa-pular" data-testid="missao-doses-pular" onClick={(e) => { e.stopPropagation(); pularPelaFaixa(); }}>Pular</button>
@@ -273,13 +288,13 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const postIt = (
     <PostItDaMissao
       rotulo="Agora · 1 toque"
-      pergunta={alvoCfg?.pergunta ?? cfg.pedido}
-      descricao={cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho." : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
-      chips={alvoCfg?.chips ?? []}
+      pergunta={pergunta}
+      descricao={cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho." : cfg.tipo === "habito" ? (semHabito ? "Toca num pronto: ele entra na sua semana já marcado hoje." : "Toca num quadradinho da linha de HOJE.") : undefined}
+      chips={chips}
       tocado={tocado}
       aoChip={tocarChip}
       aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
-      dica={alvoCfg?.chips.length && alvoCfg.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+      dica={chips.length && alvoCfg?.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
     />
   );
 
@@ -289,13 +304,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       <AnimatePresence>
         {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
           <Anel
-            key={`anotar-${acende}`} interativo duracao={60_000} alvo={alvo} testid="missao-doses-anel" abaixo={!!alvoCfg?.postItAbaixo}
+            /* 10/10 (dono): toque FORA e rolagem NÃO fecham o post-it (`fixo`: o anel segue o alvo e o toque só
+               clareia o escuro); só "Pular"/o tempo (60 s)/a âncora sumir soltam — e aí a faixa mostra ⌖ pra reabrir. */
+            key={`anotar-${acende}`} fixo interativo duracao={60_000} alvo={alvo} testid="missao-doses-anel" abaixo={!!alvoCfg?.postItAbaixo}
             aoSair={(motivo) => {
               setAnelVivo(false);
               if (faseRef.current !== "anotar") return;
               setPerdeuAlvo(true);
-              if (motivo === "toque_fora") aoPular("toque_fora", "toque", segundos());
-              else trackEvent("missao_doses_anel_saiu", eventoDaMissao({ dia: n, modulo, motivo }));
+              trackEvent("missao_doses_anel_saiu", eventoDaMissao({ dia: n, modulo, motivo }));
             }}
             balao={postIt}
           />
@@ -374,7 +390,7 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanh
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
   const B = braco === "B";
   const titulo = modo === "aprofundar" ? `Dia ${diaDaMissao(missao, hoje)} aprofundado!`
-    : B ? (n === 1 ? "Primeira dose feita!" : n === 2 ? "Segunda dose feita!" : "Missão cumprida!")
+    : B ? (n === 1 ? "Primeira dose feita!" : n === 2 ? "Segunda dose feita!" : "Terceira dose feita!")
     : n === 1 ? "Primeiro registro feito!" : n === 2 ? "Dia 2 feito!" : "Missão cumprida!";
 
   /* APROFUNDAR (B, dias 2–3): festa curta — o que ela fez já está no módulo; "Fechar". */
@@ -402,15 +418,15 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanh
         transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }}
         className="relative w-full max-w-[340px] rounded-3xl bg-white p-5 text-center text-[#16121c] shadow-2xl"
       >
-        <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">🔥 Dia {n} da missão ✓</span>
+        <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${TOTAL_PASSOS_B} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
         <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
           {cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}
         </p>
         <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
-          <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / 3) * 100)}%` }} animate={{ width: `${Math.round((n / 3) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
+          <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
         </div>
-        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{B ? `Missão do dia 1 · ${n} de 3 doses` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
+        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{B ? `Missão de hoje · ${n} de ${TOTAL_PASSOS_B}` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
 
         {/* BRAÇO B (DIA1_CHEIO): as 3 doses são de HOJE — a festa puxa a próxima (20 s), ou "Agora não" */}
         {B && proximo ? (
@@ -418,7 +434,7 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanh
             <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-proxima-dose">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Próxima dose · {proximo.emoji} {proximo.nome}</span>
               <span className="block text-[15px] font-extrabold leading-snug mt-0.5">{proximo.pedido}</span>
-              <span className="block text-[12px] text-[#4f5a64] mt-1">Uns 20 segundos. Depois a missão de hoje {n === 1 ? "fica em 2 de 3" : "está completa"}.</span>
+              <span className="block text-[12px] text-[#4f5a64] mt-1">Uns 20 segundos. Depois a missão de hoje fica em {n + 1} de {TOTAL_PASSOS_B}.</span>
             </div>
             <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-bora-proxima" onClick={aoBoraProxima}>
               Bora a próxima? 20 s <ArrowRight className="w-4 h-4" />
@@ -426,9 +442,17 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanh
             <button type="button" className="md-link" data-testid="missao-doses-agora-nao" onClick={aoAgoraNao}>Agora não</button>
           </>
         ) : B ? (
-          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>
-            Fechar por hoje <ArrowRight className="w-4 h-4" />
-          </button>
+          <>
+            {/* a 3ª dose feita: falta o 4º passo — arrumar a Home (o tour, 5 toques) */}
+            <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-falta-home">
+              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Falta 1 · 🏡 Sua Home</span>
+              <span className="block text-[15px] font-extrabold leading-snug mt-0.5">Falta 1: arrumar sua Home</span>
+              <span className="block text-[12px] text-[#4f5a64] mt-1">5 toques e ela fica do seu jeito — e a missão de hoje fecha.</span>
+            </div>
+            <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>
+              Arrumar minha Home <ArrowRight className="w-4 h-4" />
+            </button>
+          </>
         ) : proximo ? (
           <>
             <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-amanha">

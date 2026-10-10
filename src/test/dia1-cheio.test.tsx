@@ -47,8 +47,9 @@ vi.mock("@/components/missao-doses/ConstruiuEm3Dias", () => ({ ConstruiuEm3Dias:
 import { UserDataContext } from "@/hooks/use-user-data";
 import { MissaoDosesNaWeb, EVENTO_MISSAO_COMPLETA } from "@/components/missao-doses/MissaoDosesNaWeb";
 import {
-  CHAVE_ESTADO_MISSAO_DOSES, aprofundarPendente, ehBracoB, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, precisaPlanoAmanha, varianteDia1,
+  CHAVE_ESTADO_MISSAO_DOSES, aprofundarPendente, ehBracoB, eventoDaMissao, iniciarMissao, lerMissao, missaoDoDiaEmCena, missaoEmAndamento, precisaPlanoAmanha, varianteDia1,
 } from "@/lib/missao-doses";
+import { EVENTO_TOUR_HOME_FIM } from "@/lib/tour-home";
 import {
   CHAVE_BRACO_DIA1, CHAVE_FORCA_DIA1_CHEIO, CHAVE_ID_LOCAL, DIA1_CHEIO, bracoDia1, dia1CheioLigado, fraseDoPlano, guardarForcaDia1Cheio, idDoAparelho, minutosDoPlano, modoDia1Cheio, quandoSugerido, sortearBraco,
 } from "@/lib/dia1-cheio";
@@ -95,7 +96,8 @@ const montar = (store: Store, rota: string) =>
       </Provedor>
     </MemoryRouter>,
   );
-const dados = () => ({ "core-user-name": "Ana", "rotina-habits": ["Água", "Andar"], "finance-expenses": [] as unknown[] });
+/** A CONTA NOVA DE VERDADE é VAZIA (10/10, dono): nenhum seed — cada dose tem que funcionar assim. */
+const dados = (): Record<string, unknown> => ({});
 const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 const esperarPostIt = () => { avancar(400); avancar(3000); return screen.getByTestId("demo-guia-postit"); };
 /** toca no 1º chip e chega na festa */
@@ -125,7 +127,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   vi.setSystemTime(new Date(2026, 9, 3, 15, 10)); // sábado 03/10/2026, 15:10
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); delete (window as { Capacitor?: unknown }).Capacitor; });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); delete (window as { Capacitor?: unknown }).Capacitor; });
 
 /* ------------------------------------------------------------ a chave e o sorteio */
 
@@ -243,16 +245,35 @@ describe("braço A: a missão de hoje + `variante: 'A'`", () => {
 
 /* ------------------------------------------------------------ braço B */
 
-describe("braço B: as 3 doses no dia 1", () => {
-  it("dose 1 feita → 'Bora a próxima? 20 s' (Rotina) + 'Agora não'; missao_dose_concluida com variante B; 'Bora' leva ao próximo módulo", () => {
+describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () => {
+  const DIAS = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
+
+  it("boas-vindas B: 4 passos (3 doses + Arrumar sua Home), barra 0 de 4, botão 'Começar a dose 1 · 20 s'; dose 1 → faixa 'Missão · dose 1 de 4' (sem o módulo) → 'Bora a próxima? 20 s' + 'Agora não'", () => {
     ligarB();
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("B");
+    const boas = screen.getByTestId("missao-doses-boas-vindas");
+    expect(boas).toHaveTextContent("3 toques hoje");
+    expect(boas).not.toHaveTextContent("AMANHÃ");
+    expect(boas).not.toHaveTextContent("1 toque por dia");
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Dose 1 · 💰 Finanças");
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("20 s");
+    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Dose 2 · 📅 Rotina");
+    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Dose 3 · ❤️ Saúde");
+    expect(screen.getByTestId("missao-doses-linha-4")).toHaveTextContent("Arrumar sua Home · 5 toques");
+    expect(screen.getByTestId("missao-doses-barra")).toHaveTextContent("0 de 4 hoje");
+    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent("Começar a dose 1 · 20 s");
+    // o rodapé colado: o link "Explorar" fica ACIMA do botão principal
+    const rodape = screen.getByTestId("missao-doses-rodape");
+    expect(rodape.querySelector("[data-testid='missao-doses-explorar']")!.compareDocumentPosition(rodape.querySelector("[data-testid='missao-doses-comecar']")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "B" })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 3 · Finanças");
+    const faixa = screen.getByTestId("missao-doses-faixa");
+    expect(faixa).toHaveTextContent("Missão · dose 1 de 4");
+    expect(faixa).not.toHaveTextContent("Finanças");
     const festa = tocarChipAteAFesta();
     expect(festa).toHaveTextContent("Primeira dose feita!");
+    expect(festa).toHaveTextContent("Café · R$ 12");
     expect(screen.getByTestId("missao-doses-proxima-dose")).toHaveTextContent("Próxima dose · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-bora-proxima")).toHaveTextContent("Bora a próxima? 20 s");
     expect(screen.getByTestId("missao-doses-agora-nao")).toHaveTextContent("Agora não");
@@ -264,7 +285,77 @@ describe("braço B: as 3 doses no dia 1", () => {
     expect(screen.queryByTestId("plano-amanha")).toBeNull(); // ainda no meio das doses
   });
 
-  it("'Agora não' no meio: missao_agora_nao, a notificação de +3 h é armada pra próxima dose, e a Home mostra a folha do plano de amanhã", async () => {
+  it("o chip 'Café · R$ 12' com TOQUE de verdade (pointerdown → click): lança o gasto na conta, abre o olhar e a festa — o post-it NÃO some no pointerdown (o bug do Simulador)", () => {
+    ligarB();
+    const store = montarStore(dados());
+    missaoGravada({ braco: "B" });
+    montar(store, "/financas");
+    const postIt = esperarPostIt();
+    const chip = within(postIt).getAllByTestId("demo-guia-chip")[0];
+    expect(chip).toHaveTextContent("Café");
+    fireEvent.pointerDown(chip);            // o que o WKWebView manda primeiro
+    expect(screen.getByTestId("demo-guia-postit")).toBeInTheDocument(); // continua na tela
+    fireEvent.click(chip);
+    const gastos = store.dados["finance-expenses"] as Array<{ description: string; value: number }>;
+    expect(gastos).toHaveLength(1);
+    expect(gastos[0]).toMatchObject({ description: "Café", value: 12 });
+    avancar(700); avancar(1000);
+    expect(screen.getByTestId("missao-doses-olhar")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("missao-doses-entendi"));
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Primeira dose feita!");
+    expect(screen.getByTestId("missao-doses-bora-proxima")).toBeInTheDocument();
+    expect(eventos.map(([n]) => n)).not.toContain("missao_pular");
+  });
+
+  it("tocar FORA do post-it (no fundo) ou rolar a página NÃO fecha o post-it; o tempo (60 s) solta o anel e o ⌖ da faixa reabre", () => {
+    ligarB();
+    missaoGravada({ braco: "B" });
+    montar(montarStore(dados()), "/financas");
+    esperarPostIt();
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerDown(screen.getByText("MEU MÊS"));
+    expect(screen.getByTestId("demo-guia-postit")).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new Event("scroll")); });
+    avancar(500);
+    expect(screen.getByTestId("demo-guia-postit")).toBeInTheDocument();
+    expect(eventos.map(([n]) => n)).not.toContain("missao_pular");
+    expect(screen.queryByTestId("missao-doses-onde")).toBeNull();
+    avancar(60_000); // o tempo do anel: ele sai (o jsdom não termina a animação de saída — vale o evento e o ⌖)
+    expect(eventos).toContainEqual(["missao_doses_anel_saiu", expect.objectContaining({ motivo: "timeout", variante: "B" })]);
+    const onde = screen.getByTestId("missao-doses-onde");
+    expect(onde).toHaveAttribute("aria-label", "Mostrar onde tocar");
+    expect(onde.textContent).toBe(""); // ícone, nunca texto quebrando a faixa
+    fireEvent.click(onde);
+    avancar(400); avancar(3000);
+    expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThanOrEqual(1); // reabriu (o antigo ainda sai animado no jsdom)
+    expect(lerMissao()).not.toBeNull(); // fechar NUNCA apaga a missão
+  });
+
+  it("dose 2 na Rotina de uma conta VAZIA: sem hábito, o post-it oferece 3 hábitos prontos; tocar cria o hábito E marca hoje (com o carimbo da semana) → olhar → 'Segunda dose feita!'", () => {
+    ligarB();
+    const store = montarStore(dados());
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
+    montar(store, "/rotina");
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Qual hábito você quer começar hoje?");
+    expect(postIt).not.toHaveTextContent("quadradinho");
+    const chips = within(postIt).getAllByTestId("demo-guia-chip");
+    expect(chips.map((c) => c.textContent)).toEqual(["💧Beber água ao acordar", "🧘Alongar 5 min", "🛏️Arrumar a cama"]);
+    fireEvent.pointerDown(chips[0]);
+    fireEvent.click(chips[0]);
+    expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
+    expect((store.dados["rotina-habits-checked"] as Record<string, boolean[]>)[DIAS[new Date().getDay()]]).toEqual([true]);
+    expect(store.dados["rotina-habits-week"]).toBeTruthy();
+    avancar(700); avancar(1000);
+    const entendi = screen.queryByTestId("missao-doses-entendi");
+    if (entendi) fireEvent.click(entendi);
+    const festa = screen.getByTestId("missao-doses-festa");
+    expect(festa).toHaveTextContent("Segunda dose feita!");
+    expect(festa).toHaveTextContent("Beber água ao acordar marcado");
+    expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 2, modulo: "rotina", variante: "B" })]);
+  });
+
+  it("'Agora não' no meio: missao_agora_nao, a notificação de +3 h é armada pra próxima dose, e a folha do plano de amanhã entra ALI (no módulo), sem jargão; 'Combinado' vira a hora do lembrete, pede a permissão UMA vez e leva pra Home", async () => {
     ligarB();
     registrarAbertura(new Date(2026, 9, 3, 15, 10), conta.created_at);
     const store = montarStore(dados());
@@ -277,15 +368,19 @@ describe("braço B: as 3 doses no dia 1", () => {
     expect(notif.proximaDose).toHaveBeenCalledWith(expect.objectContaining({ indice: 2, nome: "Rotina", rota: "/rotina" }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(eventos).toContainEqual(["missao_proxima_dose_armada", expect.objectContaining({ ok: true, indice: 2 })]);
-    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
-    // a folha do plano de amanhã
+    expect(screen.getByTestId("rota")).toHaveTextContent("/financas"); // ainda no contexto da missão
+    // a folha do plano de amanhã: pelo VALOR dos avisos, sem "dia 2"
     const folha = screen.getByTestId("plano-amanha");
-    expect(folha).toHaveTextContent("Quando você abre o CORE amanhã?");
+    expect(folha).toHaveTextContent("O CORE te avisa do que importa");
+    expect(folha).toHaveTextContent("Conta vencendo — antes do juros");
+    expect(folha).toHaveTextContent("Sua próxima dose da missão — 20 s");
+    expect(folha).toHaveTextContent("Que horas te lembro amanhã?");
+    expect(folha).not.toHaveTextContent("dia 2");
     expect(screen.getByTestId("plano-amanha-quando-almoco")).toHaveAttribute("aria-checked", "true"); // 15:10 → o mais perto é o almoço
     expect(eventos).toContainEqual(["plano_amanha_folha", expect.objectContaining({ acao: "view", doses: 1, variante: "B" })]);
-    // a prévia é concreta: parou no meio → a próxima dose, com o que ela fez
     expect(screen.getByTestId("plano-amanha-previa")).toHaveTextContent("Ontem você anotou 1 gasto — bora a próxima dose?");
-    // noite + antes de dormir → Combinado
+    // o link "Sem lembrete" fica ACIMA do botão fixo
+    expect(screen.getByTestId("plano-amanha-pular").compareDocumentPosition(screen.getByTestId("plano-amanha-combinado")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByTestId("plano-amanha-quando-noite"));
     fireEvent.click(screen.getByTestId("plano-amanha-gatilho-dormir"));
     expect(screen.getByTestId("plano-amanha-previa")).toHaveTextContent("Amanhã à noite, antes de dormir · 20:00");
@@ -298,12 +393,13 @@ describe("braço B: as 3 doses no dia 1", () => {
     expect(notif.pedirDia2).toHaveBeenCalledWith("missao");
     expect(notif.pedirDia2).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("plano-amanha")).toBeNull();
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
     expect(screen.getByText("home de sempre")).toBeInTheDocument();
   });
 
   it("'Sem lembrete' na folha: grava o pulo do dia, não pede permissão, e a folha não volta hoje", async () => {
     ligarB();
-    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
+    missaoGravada({ braco: "B", agoraNao: { dia: "2026-10-03", indice: 1 }, feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
     montar(montarStore(dados()), "/home");
     fireEvent.click(screen.getByTestId("plano-amanha-pular"));
     expect(eventos).toContainEqual(["plano_amanha_pulou", expect.objectContaining({ doses: 1, variante: "B" })]);
@@ -314,34 +410,59 @@ describe("braço B: as 3 doses no dia 1", () => {
     expect(precisaPlanoAmanha(lerMissao()!)).toBe(false);
   });
 
-  it("3ª dose no dia 1: 'Missão cumprida!' + 'Fechar por hoje', missao_completa {variante} + CustomEvent pro tour; 'O que você construiu' NÃO aparece no dia 1 (só no dia 3)", () => {
+  it("3ª dose: 'Terceira dose feita!' + 'Falta 1: arrumar sua Home' → 'Arrumar minha Home' leva pra Home com a faixa 'Missão · 4 de 4'; SEM missao_completa ainda; o fim do tour (evento) fecha a missão: indice 4 modulo home + missao_completa + CustomEvent; SÓ ENTÃO a folha do plano", () => {
+    vi.stubEnv("VITE_V14_QA", "1"); // o tour da Home existe nesta build
     ligarB();
-    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Água marcado" } }, planoAmanha: { quando: "noite", dia: "2026-10-03" } });
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Beber água ao acordar marcado" } } });
     const completou = vi.fn();
     window.addEventListener(EVENTO_MISSAO_COMPLETA, completou);
-    montar(montarStore(dados()), "/saude");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 3 de 3 · Saúde");
+    const store = montarStore(dados());
+    montar(store, "/saude");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 3 de 4");
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Missão cumprida!");
-    expect(screen.getByTestId("missao-doses-fechar-dia")).toHaveTextContent("Fechar por hoje");
+    expect(festa).toHaveTextContent("Terceira dose feita!");
+    expect(screen.getByTestId("missao-doses-falta-home")).toHaveTextContent("Falta 1: arrumar sua Home");
+    expect(screen.getByTestId("missao-doses-fechar-dia")).toHaveTextContent("Arrumar minha Home");
     expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 3, modulo: "saude", variante: "B" })]);
-    expect(eventos).toContainEqual(["missao_completa", expect.objectContaining({ variante: "B", modulos: ["financas", "rotina", "saude"] })]);
-    expect(completou).toHaveBeenCalledTimes(1);
-    expect(lerMissao()?.completaEm).toBe("2026-10-03");
+    expect(eventos.map(([n]) => n)).not.toContain("missao_completa");
+    expect(completou).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · 4 de 4");
+    expect(screen.queryByTestId("plano-amanha")).toBeNull(); // o plano é a ÚLTIMA coisa: depois do tour
     expect(screen.queryByTestId("construiu")).toBeNull(); // dia 1: nada; o final é do dia 3
-    expect(screen.queryByTestId("plano-amanha")).toBeNull(); // o plano já estava combinado
+    // o tour da Home terminou (TourDaHome dispara o evento)
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_TOUR_HOME_FIM)); });
+    expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 4, modulo: "home", variante: "B" })]);
+    expect(eventos).toContainEqual(["missao_completa", expect.objectContaining({ variante: "B", modulos: ["financas", "rotina", "saude"], home: "tour" })]);
+    expect(completou).toHaveBeenCalledTimes(1);
+    expect(lerMissao()?.homeTour).toEqual({ dia: "2026-10-03", via: "tour" });
+    expect(lerMissao()?.completaEm).toBe("2026-10-03");
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    // a folha do plano espera a festa "Casa arrumada" ser vista (ela é a comemoração do fim da missão)
+    expect(screen.queryByTestId("plano-amanha")).toBeNull();
+    act(() => { store.valor().set("conquistas-vistas", { adesivos: ["casa-arrumada"], marcos: [] }); });
+    expect(screen.getByTestId("plano-amanha")).toBeInTheDocument();
     window.removeEventListener(EVENTO_MISSAO_COMPLETA, completou);
   });
 
-  it("dia 2 = 'aprofundar': no módulo já visto, a faixa 'Aprofundar · dia 2 · Finanças', 1 registro → festa curta → Fechar; o módulo não pede de novo hoje", () => {
+  it("sem o tour nesta build (chave off): o 4º passo é dado como feito em silêncio (home: sem_tour) e o plano vem na Home", () => {
     ligarB();
-    missaoGravada({ braco: "B", completaEm: "2026-10-02", planoAmanha: { quando: "noite", dia: "2026-10-02" }, feitos: { 1: { dia: "2026-10-02", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-02", rotulo: "Água marcado" }, 3: { dia: "2026-10-02", rotulo: "1 copo" } } }, "2026-10-02");
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "a" }, 2: { dia: "2026-10-03", rotulo: "b" }, 3: { dia: "2026-10-03", rotulo: "c" } } });
+    montar(montarStore(dados()), "/home");
+    expect(lerMissao()?.homeTour).toEqual({ dia: "2026-10-03", via: "sem_tour" });
+    expect(eventos).toContainEqual(["missao_completa", expect.objectContaining({ variante: "B", home: "sem_tour" })]);
+    expect(eventos.filter(([n, d]) => n === "missao_dose_concluida" && d.indice === 4)).toEqual([]);
+    expect(screen.getByTestId("plano-amanha")).toBeInTheDocument();
+  });
+
+  it("dia 2 = 'aprofundar': no módulo já visto, a faixa 'Aprofundar · dia 2', 1 registro → festa curta → Fechar; o módulo não pede de novo hoje", () => {
+    ligarB();
+    missaoGravada({ braco: "B", completaEm: "2026-10-02", homeTour: { dia: "2026-10-02", via: "tour" }, planoAmanha: { quando: "noite", dia: "2026-10-02" }, feitos: { 1: { dia: "2026-10-02", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-02", rotulo: "Água marcado" }, 3: { dia: "2026-10-02", rotulo: "1 copo" } } }, "2026-10-02");
     expect(aprofundarPendente(lerMissao()!, "/financas")).toEqual({ n: 1, modulo: "financas" });
     expect(aprofundarPendente(lerMissao()!, "/home")).toBeNull();
     montar(montarStore(dados()), "/financas");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Aprofundar · dia 2 · Finanças");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Aprofundar · dia 2");
     const festa = tocarChipAteAFesta();
     expect(festa).toHaveAttribute("data-modo", "aprofundar");
     expect(festa).toHaveTextContent("Dia 2 aprofundado!");
@@ -357,7 +478,7 @@ describe("braço B: as 3 doses no dia 1", () => {
 
   it("dia 3: 'O que você construiu' aparece na Home (e missaoEmAndamento acompanha o tour)", () => {
     ligarB();
-    missaoGravada({ braco: "B", completaEm: "2026-10-01", planoAmanha: { quando: "noite", dia: "2026-10-01" }, feitos: { 1: { dia: "2026-10-01", rotulo: "a" }, 2: { dia: "2026-10-01", rotulo: "b" }, 3: { dia: "2026-10-01", rotulo: "c" } } }, "2026-10-01");
+    missaoGravada({ braco: "B", completaEm: "2026-10-01", homeTour: { dia: "2026-10-01", via: "tour" }, planoAmanha: { quando: "noite", dia: "2026-10-01" }, feitos: { 1: { dia: "2026-10-01", rotulo: "a" }, 2: { dia: "2026-10-01", rotulo: "b" }, 3: { dia: "2026-10-01", rotulo: "c" } } }, "2026-10-01");
     expect(missaoEmAndamento(lerMissao())).toBe(true);
     montar(montarStore(dados()), "/home");
     expect(screen.getByTestId("construiu")).toBeInTheDocument();
@@ -365,16 +486,29 @@ describe("braço B: as 3 doses no dia 1", () => {
     expect(missaoEmAndamento(lerMissao())).toBe(false);
   });
 
-  it("missaoEmAndamento (encaixe do tour): boas-vindas, dose do dia 1 e a folha do plano contam; A sem a chave: o de hoje", () => {
+  it("missaoEmAndamento (encaixe do tour) e missaoDoDiaEmCena (os adesivos esperam): boas-vindas, dose do dia 1, o tour como 4º passo e a folha do plano", () => {
     ligarB();
     missaoGravada({ braco: "B", boasVindas: false });
     expect(missaoEmAndamento(lerMissao())).toBe(true);
+    expect(missaoDoDiaEmCena(lerMissao())).toBe(true);
     missaoGravada({ braco: "B" });
     expect(missaoEmAndamento(lerMissao())).toBe(true); // dose 1 do dia 1 por fazer
-    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "x" } } });
-    expect(missaoEmAndamento(lerMissao())).toBe(true); // a folha do plano está devendo
-    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "x" } }, planoAmanha: { quando: "noite", dia: "2026-10-03" }, pulados: { 2: "2026-10-03" } });
-    expect(missaoEmAndamento(lerMissao())).toBe(false); // plano feito, dose 2 pulada hoje: a Home é da pessoa (e do tour)
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "x" } }, agoraNao: { dia: "2026-10-03", indice: 1 } });
+    expect(missaoEmAndamento(lerMissao())).toBe(true); // "Agora não": a folha do plano está devendo
+    expect(precisaPlanoAmanha(lerMissao()!)).toBe(true);
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "x" } }, agoraNao: { dia: "2026-10-03", indice: 1 }, planoAmanha: { quando: "noite", dia: "2026-10-03" } });
+    expect(missaoEmAndamento(lerMissao())).toBe(false); // plano feito depois do "Agora não": a Home é da pessoa
+    expect(missaoDoDiaEmCena(lerMissao())).toBe(false); // os adesivos podem aparecer
+    const tres = { 1: { dia: "2026-10-03", rotulo: "a" }, 2: { dia: "2026-10-03", rotulo: "b" }, 3: { dia: "2026-10-03", rotulo: "c" } };
+    missaoGravada({ braco: "B", feitos: tres });
+    expect(missaoEmAndamento(lerMissao())).toBe(false); // 3 doses feitas: o tour É o 4º passo — pode entrar
+    expect(precisaPlanoAmanha(lerMissao()!)).toBe(false); // o plano só depois do tour
+    expect(missaoDoDiaEmCena(lerMissao())).toBe(true); // mas os adesivos ainda esperam
+    missaoGravada({ braco: "B", feitos: tres, homeTour: { dia: "2026-10-03", via: "tour" } });
+    expect(precisaPlanoAmanha(lerMissao()!)).toBe(true); // tour feito: a folha do plano
+    expect(missaoEmAndamento(lerMissao())).toBe(true);
+    missaoGravada({ braco: "B", explorou: true });
+    expect(missaoDoDiaEmCena(lerMissao())).toBe(false); // pulou a missão: nada segura os adesivos
     expect(missaoEmAndamento(null)).toBe(false);
   });
 });
@@ -389,7 +523,7 @@ describe("o Lembrete do dia 2 no braço B é concreto", () => {
     missaoGravada({ braco: "B", completaEm: "2026-10-03", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Água marcado" }, 3: { dia: "2026-10-03", rotulo: "1 copo" } } });
     const c = conteudoDoLembrete(get, { missao: lerMissao(), amanha, hoje: "2026-10-03" });
     expect(c.title).toBe("Ontem você anotou 1 gasto — 20 s pra anotar o de hoje");
-    expect(c.body).toBe("Café · R$ 12 já está nas suas Finanças. Toca em 1 gasto de hoje de novo e o dia 2 da missão fica feito.");
+    expect(c.body).toBe("Café · R$ 12 já está nas suas Finanças. Toca em 1 gasto de hoje de novo e a missão continua.");
     expect(c.modulo).toBe("missao"); expect(c.rota).toBe("/financas"); expect(c.temNumero).toBe(true);
     const c3 = conteudoDoLembrete(get, { missao: lerMissao(), amanha: new Date(2026, 9, 5, 20, 0), hoje: "2026-10-04" });
     expect(c3.title).toBe("Esses dias você anotou 1 hábito — 20 s pra anotar mais um de hoje");
@@ -429,20 +563,24 @@ describe("1.0.14 — modo 'on' (todo mundo no B) e a avaliação ligada na miss�
     expect(screen.getByTestId("missao-doses-bora-proxima")).toBeInTheDocument();
   });
 
-  it("3ª dose: pedirAvaliacaoPorMissao('missao_completa') 1,5 s depois da comemoração; o plano combinado pede 'plano_amanha_definido' 1,5 s depois", () => {
+  it("o fim do tour (4º passo): pedirAvaliacaoPorMissao('missao_completa') 1,5 s depois; o plano combinado pede 'plano_amanha_definido' 1,5 s depois", () => {
+    vi.stubEnv("VITE_V14_QA", "1");
     ligarB();
     missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Água marcado" } } });
     montar(montarStore(dados()), "/saude");
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Missão cumprida!");
-    expect(nota.pedir).not.toHaveBeenCalled();
+    expect(festa).toHaveTextContent("Terceira dose feita!");
+    avancar(ESPERA_AVALIACAO_MS * 2);
+    expect(nota.pedir).not.toHaveBeenCalled(); // a 3ª dose ainda não é a missão completa
+    fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_TOUR_HOME_FIM)); });
     avancar(ESPERA_AVALIACAO_MS - 1);
     expect(nota.pedir).not.toHaveBeenCalled();
     avancar(1);
     expect(nota.pedir).toHaveBeenCalledTimes(1);
     expect(nota.pedir).toHaveBeenCalledWith("missao_completa");
-    // fecha o dia → a Home mostra o plano de amanhã → "Combinado" → 1,5 s → plano_amanha_definido
-    fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
+    avancar(8000); // sem os Momentos montados aqui, a folha espera a festa "Casa arrumada" até 8 s
+    // a missão fechou → a folha do plano → "Combinado" → 1,5 s → plano_amanha_definido
     expect(screen.getByTestId("plano-amanha")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("plano-amanha-combinado"));
     expect(eventos.map(([n]) => n)).toContain("plano_amanha_definido");

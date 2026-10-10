@@ -11,14 +11,17 @@ import { EVENTO_DIA2, LEMBRETE_DO_PLANO, combinarHora } from "@/lib/lembrete-dia
 import { agendarProximaDose, pedirPermissaoDia2 } from "@/lib/notificacoes";
 import { bracoDia1, guardarForcaDia1Cheio, type PlanoAmanha } from "@/lib/dia1-cheio";
 import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
+import { EVENTO_TOUR_HOME_FIM, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 import {
-  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, apagarMissao, aprofundarPendente, diaDaMissao, dosesFeitas, ehBracoB, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
+  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, diaDaMissao, dosesFeitas, ehBracoB, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
+import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { BoasVindasDoses } from "./BoasVindasDoses";
 import { PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
+import "./missao-doses.css";
 
 /**
  * A ORQUESTRA DA MISSÃO EM DOSES (02/10, web · 03/10, app) — montada no App ao
@@ -36,27 +39,17 @@ import { PlanoDeAmanha } from "./PlanoDeAmanha";
  *   · /home sem boas-vindas vistas → D1 (+ D2 pela troca);
  *   · no módulo do passo pendente (e não pulado hoje) → o passo do dia;
  *   · missão cumprida e final não visto → "O que você construiu".
- * O card "SEU DIA" mora na Home (CardSeuDia) e lê o mesmo estado.
  *
- * 10/10 — DIA 1 CHEIO (chave DIA1_CHEIO, lib/dia1-cheio, DESLIGADA). Com ela
- * ligada a missão nasce com um braço (A|B, sorteio local 50/50 por aparelho):
- *   · A = tudo acima, sem mudar nada (só `variante: "A"` nos eventos);
- *   · B = as 3 doses no dia 1 em sequência ("Bora a próxima? 20 s" / "Agora não"
- *     → notificação de +3 h); a folha "Quando você abre o CORE amanhã?" no fim da
- *     1ª sessão (vira a hora do Lembrete do dia 2 + pede a permissão); dias 2 e
- *     3 = "aprofundar" (1 uso real por módulo já visto); "O que você construiu"
- *     só a partir do dia 3.
- * Eventos novos (só com a chave ligada): missao_dose_concluida {indice, modulo,
- * variante}, missao_completa {variante}, missao_agora_nao {indice},
- * plano_amanha_definido {quando, gatilho}. TOUR DA HOME (1.0.14): vem DEPOIS da
- * missão/plano — ver `missaoEmAndamento` em lib/missao-doses e o CustomEvent
- * `missao-doses:completa` (EVENTO_MISSAO_COMPLETA) na janela, que a Home escuta.
- *
- * AVALIAÇÃO (1.0.14, chave AVALIACAO_V14 em lib/avaliacao-v14): a missão é quem
- * pede a nota — `pedirAvaliacaoPorMissao("missao_completa")` 1,5 s depois da
- * comemoração da 3ª dose e `("plano_amanha_definido")` 1,5 s depois do "Combinado"
- * da folha do plano. As travas (chave, 2+ dias de uso, momento ruim, cota) moram
- * em lib/avaliacao; aqui só o momento. Nunca derruba a missão.
+ * 10/10 — DIA 1 CHEIO (chave DIA1_CHEIO, lib/dia1-cheio). Braço B, a missão do dia 1
+ * tem 4 PASSOS: dose 1 → dose 2 → dose 3 (cada uma "Bora a próxima? 20 s" / "Agora
+ * não" → notificação de +3 h) → "Arrumar sua Home" (o tour da Home, 5 toques, com
+ * a faixa "Missão · 4 de 4" por cima) → a festa "Casa arrumada" fecha a missão
+ * (`missao_completa`) → e SÓ ENTÃO a folha do plano de amanhã ("O CORE te avisa do
+ * que importa… que horas te lembro amanhã?"), a última coisa do dia 1 — também
+ * depois de um "Agora não" no meio das doses, ainda no contexto da missão. Dias 2
+ * e 3 = "aprofundar"; "O que você construiu" só a partir do dia 3. Braço A = a
+ * missão da 1.0.10 (só `variante: "A"` nos eventos). Quem pulou ("Explorar por
+ * conta própria") vê só o tour, direto.
  */
 /** 1,5 s depois da comemoração — a festa já está na tela, a caixinha vem por cima. */
 export const ESPERA_AVALIACAO_MS = 1500;
@@ -74,8 +67,28 @@ export function MissaoDosesNaWeb() {
   return ligada ? <Ligada /> : null;
 }
 
-/** O CustomEvent da janela quando as 3 doses ficam feitas (o tour da Home escuta). Mora em lib/missao-doses. */
+/** O CustomEvent da janela quando a missão fica completa (o tour da Home escuta). Mora em lib/missao-doses. */
 export { EVENTO_MISSAO_COMPLETA };
+
+/** Outra festa/folha na tela (adesivo dos Momentos, diálogo)? A folha do plano espera ela sair. */
+const FESTA_NA_TELA = '[data-momento], [role="dialog"]:not([data-testid="plano-amanha"]), [role="alertdialog"], [data-camada-guia="tour-home"]';
+const festaNaTela = (): boolean => { try { return !!document.querySelector(FESTA_NA_TELA); } catch { return false; } };
+
+/** A faixa do 4º passo (B): "Missão · 4 de 4 · arrumar sua Home", por cima do tour da Home. */
+function FaixaDoPasso4() {
+  useEffect(() => {
+    document.documentElement.setAttribute("data-missao-doses-faixa", "1");
+    return () => { document.documentElement.removeAttribute("data-missao-doses-faixa"); };
+  }, []);
+  return (
+    <div className="md-faixa" data-testid="missao-doses-faixa" data-fase="home" role="presentation">
+      <span className="md-faixa-quadros" aria-label={`3 de ${TOTAL_PASSOS_B} feitos`} role="img">
+        {Array.from({ length: TOTAL_PASSOS_B }, (_, i) => <Quadradinho key={i} marcado={i < 3} claro tam={14} />)}
+      </span>
+      <span className="md-faixa-titulo">Missão · {TOTAL_PASSOS_B} de {TOTAL_PASSOS_B} · <b>arrumar sua Home</b></span>
+    </div>
+  );
+}
 
 function Ligada() {
   const { user } = useAuth();
@@ -127,6 +140,49 @@ function Ligada() {
     trackEvent("missao_doses_inicio", eventoDaMissao({ modulos, area: area ?? null }));
   }, [user, loaded, missao, hoje]);
 
+  /* ── O 4º PASSO (B): o tour da Home. Quando ele termina (EVENTO_TOUR_HOME_FIM) a missão fecha:
+     `missao_dose_concluida indice=4 modulo=home` + `missao_completa`. Se o tour não existe pra esta
+     pessoa (chave desligada, ou já feito neste aparelho), o passo é dado como feito em silêncio. ── */
+  const B = ehBracoB(missao);
+  const homePendente = passoHomePendente(missao);
+  useEffect(() => {
+    if (!homePendente) return;
+    const concluir = (via: "tour" | "sem_tour") => {
+      const m = lerMissao();
+      if (!m || m.homeTour) return;
+      const novo = { ...m, homeTour: { dia: hoje, via }, completaEm: hoje };
+      gravarMissao(novo); setMissao(novo);
+      if (via === "tour") trackEvent("missao_dose_concluida", eventoDaMissao({ indice: 4, modulo: "home", dia_relogio: diaDaMissao(m, hoje) }));
+      trackEvent("missao_completa", eventoDaMissao({ dia_relogio: diaDaMissao(m, hoje), modulos: m.modulos, home: via }));
+      try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_COMPLETA, { detail: { variante: m.braco } })); } catch { /* noop */ }
+      if (via === "tour") pedirNotaDepois("missao_completa");
+    };
+    if (!tourHomeLigado() || tourFeitoNesteAparelho()) { concluir("sem_tour"); return; }
+    const aoFim = () => concluir("tour");
+    window.addEventListener(EVENTO_TOUR_HOME_FIM, aoFim);
+    return () => window.removeEventListener(EVENTO_TOUR_HOME_FIM, aoFim);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homePendente, hoje]);
+
+  /* ── A folha do plano espera a festa "Casa arrumada" (ou qualquer outra festa) sair da tela.
+     Depois do tour, a festa leva ~2 s pra entrar (os Momentos esperam a tela assentar): a folha segura
+     até o "Casa arrumada" ter sido VISTO (conquistas-vistas) — ou 8 s, se a festa não vier. ── */
+  const { get } = useUserData();
+  const [festaAberta, setFestaAberta] = useState(() => festaNaTela());
+  const [esperouFesta, setEsperouFesta] = useState(false);
+  const planoDevendo = !!missao && B && precisaPlanoAmanha(missao, hoje);
+  const casaVista = (() => {
+    try { return ((get<{ adesivos?: string[] } | undefined>("conquistas-vistas", undefined)?.adesivos) ?? []).includes("casa-arrumada"); } catch { return false; }
+  })();
+  const segurarPeloCasa = planoDevendo && missao?.homeTour?.via === "tour" && !casaVista && !esperouFesta;
+  useEffect(() => {
+    if (!planoDevendo) { setEsperouFesta(false); return; }
+    setFestaAberta(festaNaTela());
+    const t = window.setInterval(() => setFestaAberta(festaNaTela()), 500);
+    const limite = window.setTimeout(() => setEsperouFesta(true), 8000);
+    return () => { window.clearInterval(t); window.clearTimeout(limite); };
+  }, [planoDevendo]);
+
   if (!user || !missao) return null;
 
   const salvar = (m: EstadoMissaoDoses) => { gravarMissao(m); setMissao(m); };
@@ -137,7 +193,6 @@ function Ligada() {
   const pendente = passoPendente(missao);
   const dia = diaDaMissao(missao, hoje);
   const noHome = pathname === "/home";
-  const B = ehBracoB(missao);
 
   /* D1/D2 */
   if (!missao.boasVindas) {
@@ -153,6 +208,7 @@ function Ligada() {
         nome=""
         areaNome={areaNome}
         hoje={hoje}
+        braco={B ? "B" : null} /* 10/10: no braço B a copy é "3 toques hoje + arrumar sua Home"; A = a tela de hoje */
         aoComecar={(modulos) => {
           const m = comModulos(modulos);
           salvar(m);
@@ -169,8 +225,9 @@ function Ligada() {
     );
   }
 
-  /* BRAÇO B — a folha do plano de amanhã, no fim da 1ª sessão (na Home, sem passo aberto) */
-  if (B && noHome && !emCurso && precisaPlanoAmanha(missao, hoje)) {
+  /* BRAÇO B — a folha do plano de amanhã: a ÚLTIMA coisa do dia 1 (depois da festa "Casa arrumada", ou
+     logo depois de um "Agora não" no meio das doses — ainda no contexto da missão, sem passo aberto). */
+  if (planoDevendo && !emCurso && !festaAberta && !segurarPeloCasa) {
     return (
       <PlanoDeAmanha
         missao={missao}
@@ -186,11 +243,13 @@ function Ligada() {
             const reagendar = () => { try { window.dispatchEvent(new Event(EVENTO_DIA2)); } catch { /* noop */ } };
             Promise.resolve().then(() => pedirPermissaoDia2("missao")).catch(() => "indisponivel").finally(reagendar);
           }
+          if (!noHome) navigate("/home");
         }}
         aoPular={() => {
           const m = lerMissao() ?? missao;
           salvar({ ...m, planoAmanhaPulado: hoje });
           trackEvent("plano_amanha_pulou", eventoDaMissao({ doses: dosesFeitas(m) }));
+          if (!noHome) navigate("/home");
         }}
       />
     );
@@ -210,6 +269,9 @@ function Ligada() {
       />
     );
   }
+
+  /* B, 4º passo: a faixa "Missão · 4 de 4" por cima do tour da Home */
+  if (homePendente && noHome && !emCurso) return <FaixaDoPasso4 />;
 
   /* D3/D4/D7: o passo do dia, dentro do módulo dele */
   const passo: Passo | null = emCurso ?? candidato;
@@ -244,13 +306,14 @@ function Ligada() {
           }
           if (m.feitos[n]) return;
           const feitos = { ...m.feitos, [n]: { dia: hoje, rotulo } };
-          const completa = !!(feitos[1] && feitos[2] && feitos[3]);
-          salvar({ ...m, feitos, ...(completa && m.braco ? { completaEm: hoje } : {}) });
+          const tresDoses = !!(feitos[1] && feitos[2] && feitos[3]);
+          // A: 3 doses = missão completa. B: falta o 4º passo (a Home) — `completaEm` só depois dele.
+          salvar({ ...m, feitos, ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
           trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: n, dia_relogio: dia, modulo: passo.modulo, segundos, rotulo }));
           // 10/10 (DIA1_CHEIO): os eventos do teste, só com a chave ligada (eventoDaMissao põe `variante`)
           if (m.braco && eventoDaMissao().variante) {
             trackEvent("missao_dose_concluida", eventoDaMissao({ indice: n, modulo: passo.modulo, dia_relogio: dia, segundos }));
-            if (completa) {
+            if (tresDoses && !ehBracoB(m)) {
               trackEvent("missao_completa", eventoDaMissao({ dia_relogio: dia, modulos: m.modulos }));
               try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_COMPLETA, { detail: { variante: m.braco } })); } catch { /* noop */ }
               pedirNotaDepois("missao_completa");
@@ -308,12 +371,11 @@ function Ligada() {
               .then((r) => trackEvent("missao_proxima_dose_armada", eventoDaMissao(r.ok === true ? { ok: true, indice: prox.n, em: r.quando.toISOString() } : { ok: false, indice: prox.n, motivo: r.motivo })))
               .catch(() => { /* nunca derruba a missão */ });
           }
-          fechar();
-          navigate("/home"); // a Home mostra a folha do plano de amanhã (precisaPlanoAmanha)
+          fechar(); // a folha do plano de amanhã entra AQUI, ainda no módulo (precisaPlanoAmanha) — e leva pra Home
         }}
         aoFecharDia={() => {
           fechar();
-          navigate("/home");
+          navigate("/home"); // B: "Arrumar minha Home" → o tour é o 4º passo
         }}
       />
     );

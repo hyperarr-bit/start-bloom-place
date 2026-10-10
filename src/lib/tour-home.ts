@@ -103,6 +103,8 @@ export const moduloOcultaPendenciasLigado = (modo: ModoChave = MODULO_OCULTA_PEN
 /** A força de QA do tour está ligada neste navegador (ignora a régua de conta nova — o dono testa com a conta dele). */
 export const tourForcadoPorQa = (): boolean => !isNativeShell() && lerForca(CHAVE_FORCA_TOUR_HOME) === "on";
 
+/** 10/10: o tour acabou (TourDaHome dispara) — a missão em doses (braço B) fecha o 4º passo com isto. */
+export const EVENTO_TOUR_HOME_FIM = "tour-home:concluido";
 export const tourFeitoNesteAparelho = (): boolean => !!ls.get(CHAVE_TOUR_FEITO);
 export const marcarTourFeito = (): void => ls.set(CHAVE_TOUR_FEITO, new Date().toISOString());
 

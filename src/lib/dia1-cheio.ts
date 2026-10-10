@@ -24,17 +24,22 @@
  * missao_completa, missao_agora_nao, plano_amanha_definido e os
  * `missao_doses_*` de sempre, que também ganham `variante` com a chave ligada).
  *
- * DESLIGADA POR PADRÃO: `DIA1_CHEIO = "off"` = a missão de hoje, byte a byte
- * (nenhum braço sorteado, nenhum campo `variante`, nenhum evento novo — travado
- * em src/test/dia1-cheio.test.tsx). O braço fica em `core-dia1-braco` ("A"|"B")
- * no aparelho; a missão guarda uma cópia (`braco`) pra sobreviver ao logout.
+ * A CHAVE TEM 3 VALORES (dono 10/10: "dia 1 cheio pra TODO MUNDO, sem 50/50"):
+ *   · "off" — a missão de hoje, byte a byte (nenhum braço sorteado, nenhum campo
+ *     `variante`, nenhum evento novo — travado em src/test/dia1-cheio.test.tsx);
+ *   · "ab"  — o teste 50/50 acima (braço em `core-dia1-braco`, sorteio pelo id);
+ *   · "on"  — TODO MUNDO no braço B, sem sorteio. `variante: "B"` continua nos
+ *     eventos — é por ela que a turma da 1.0.14 se lê contra as turmas da 1.0.10.
+ * Padrão "off". A missão guarda uma cópia do braço (`braco`) pra sobreviver ao logout.
  *
- * QA pelo link: `?dia1-cheio=on|off|auto` liga/desliga aqui; `?dia1-cheio=a|b`
- * liga E força o braço (apaga o sorteio deste aparelho).
+ * QA pelo link: `?dia1-cheio=on|ab|off|auto`; `?dia1-cheio=a|b` liga o 50/50 E
+ * força o braço (apaga o sorteio deste aparelho). Na build `VITE_V14_QA=1`
+ * (lib/v14-qa) a chave vale "on".
  */
 import { localDayKey } from "@/lib/utils";
+import { v14Qa } from "@/lib/v14-qa";
 
-export type ModoDia1Cheio = "off" | "on";
+export type ModoDia1Cheio = "off" | "ab" | "on";
 export const DIA1_CHEIO: ModoDia1Cheio = "off";
 
 export type BracoDia1 = "A" | "B";
@@ -58,23 +63,31 @@ export function guardarForcaDia1Cheio(busca?: string | URLSearchParams): void {
     p = busca instanceof URLSearchParams ? busca : new URLSearchParams(busca ?? window.location.search);
   } catch { return; }
   const v = (p.get(PARAM_DIA1_CHEIO) ?? "").toLowerCase();
-  if (v === "on" || v === "off") ls.set(CHAVE_FORCA_DIA1_CHEIO, v);
+  if (v === "on" || v === "off" || v === "ab") ls.set(CHAVE_FORCA_DIA1_CHEIO, v);
   else if (v === "auto") { ls.del(CHAVE_FORCA_DIA1_CHEIO); }
-  else if (v === "a" || v === "b") { ls.set(CHAVE_FORCA_DIA1_CHEIO, "on"); ls.set(CHAVE_BRACO_DIA1, v.toUpperCase()); }
+  else if (v === "a" || v === "b") { ls.set(CHAVE_FORCA_DIA1_CHEIO, "ab"); ls.set(CHAVE_BRACO_DIA1, v.toUpperCase()); }
 }
 
-export const forcaDia1Cheio = (): "on" | "off" | null => {
+export const forcaDia1Cheio = (): ModoDia1Cheio | null => {
   const f = ls.get(CHAVE_FORCA_DIA1_CHEIO);
-  return f === "on" || f === "off" ? f : null;
+  return f === "on" || f === "off" || f === "ab" ? f : null;
 };
 
-/** O teste está ligado AQUI? força de QA > chave. */
-export function dia1CheioLigado(modo: ModoDia1Cheio = DIA1_CHEIO): boolean {
+/** O modo que vale AQUI: força de QA > build de QA (VITE_V14_QA → "on") > constante. */
+export function modoDia1Cheio(modo: ModoDia1Cheio = DIA1_CHEIO): ModoDia1Cheio {
   const f = forcaDia1Cheio();
-  if (f === "on") return true;
-  if (f === "off") return false;
-  return modo === "on";
+  if (f) return f;
+  if (v14Qa()) return "on";
+  return modo;
 }
+
+/** O teste está ligado AQUI ("ab" ou "on")? */
+export function dia1CheioLigado(modo: ModoDia1Cheio = DIA1_CHEIO): boolean {
+  return modoDia1Cheio(modo) !== "off";
+}
+
+/** Modo "on": o braço de todo mundo é B, sem sorteio (null nos outros modos). */
+export const bracoFixo = (modo: ModoDia1Cheio = DIA1_CHEIO): BracoDia1 | null => (modoDia1Cheio(modo) === "on" ? "B" : null);
 
 /** O braço já sorteado neste aparelho (sem sortear). */
 export const bracoGravado = (): BracoDia1 | null => {
@@ -106,11 +119,14 @@ export function sortearBraco(id: string): BracoDia1 {
 }
 
 /**
- * O braço desta pessoa: null com a chave desligada (nada muda); senão o gravado,
- * ou o sorteio pelo id do aparelho — gravado em `core-dia1-braco` na 1ª vez.
+ * O braço desta pessoa: null com a chave desligada (nada muda); "B" pra todo mundo
+ * no modo "on"; no "ab", o gravado ou o sorteio pelo id do aparelho — gravado em
+ * `core-dia1-braco` na 1ª vez.
  */
 export function bracoDia1(): BracoDia1 | null {
   if (!dia1CheioLigado()) return null;
+  const fixo = bracoFixo();
+  if (fixo) return fixo;
   const b = bracoGravado();
   if (b) return b;
   const sorteado = sortearBraco(idDoAparelho());

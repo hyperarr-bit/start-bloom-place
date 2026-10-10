@@ -21,11 +21,13 @@
  * `?tour-home=on|off|auto|recomecar` (recomecar apaga o "já vi" deste aparelho),
  * `?modulo-oculta-pendencias=on|off|auto`. A força fica no localStorage deste
  * navegador (a Home → módulo → Home passa por várias páginas). No app das lojas a
- * força é ignorada: só a chave do código decide.
+ * força é ignorada: só a chave do código decide — ou a build de QA (`VITE_V14_QA=1`,
+ * lib/v14-qa), que liga as três.
  */
 import { isNativeShell } from "@/lib/native-shell";
-import { contaNova, lerMissao, missaoCumprida, missaoDosesLigada } from "@/lib/missao-doses";
+import { contaNova, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
+import { v14Qa } from "@/lib/v14-qa";
 
 export type ModoChave = "off" | "on";
 /** Cartões de boas-vindas (Finanças e Beleza). ROLLBACK/LIGAR = trocar aqui. */
@@ -86,12 +88,12 @@ export function guardarForcasDaUrl(busca?: string | URLSearchParams): void {
   if (t === "recomecar") { ls.set(CHAVE_FORCA_TOUR_HOME, "on"); ls.del(CHAVE_TOUR_FEITO); }
 }
 
-/** Chave + força (só no navegador): a resposta única de "está ligado AQUI?". */
+/** Chave + força (só no navegador) + build de QA: a resposta única de "está ligado AQUI?". */
 const ligado = (modo: ModoChave, chaveForca: string): boolean => {
-  if (isNativeShell()) return modo === "on";
+  if (isNativeShell()) return modo === "on" || v14Qa();
   const f = lerForca(chaveForca);
   if (f) return f === "on";
-  return modo === "on";
+  return modo === "on" || v14Qa();
 };
 
 export const cartoesLigados = (modo: ModoChave = CARTOES_MODULO): boolean => ligado(modo, CHAVE_FORCA_CARTOES);
@@ -118,8 +120,14 @@ export const marcarCartoesVistos = (moduleId: string): void => ls.set(chaveCarto
  *   · já passou neste aparelho               → não
  *   · conta ≥ 48 h (e sem força de QA)       → não (cliente antigo não vê nada)
  *   · Missão do iPhone em andamento          → não (ela é o tutorial)
- *   · missão em doses ligada, com passo por fazer e NÃO pulada → não (espera ela acabar)
+ *   · missão em doses com tela por mostrar   → não (espera): dose por fazer, a folha
+ *     "Plano de amanhã" (braço B) ou "O que você construiu" ainda não visto — é
+ *     `missaoEmAndamento` (lib/missao-doses) + "ainda falta dose". Quem pulou a
+ *     missão inteira ("Explorar por conta própria") vê o tour direto.
  *   · senão                                  → sim
+ * A Home relê isto nos eventos `missao-doses:mudou` e `missao-doses:completa`
+ * (hook useTourDaHome em components/home/TourDaHome): o fluxo esperado é missão
+ * (3 doses) → plano de amanhã → tour da Home → festa "Casa arrumada".
  */
 export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: number = Date.now()): boolean {
   if (!tourHomeLigado()) return false;
@@ -128,7 +136,7 @@ export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: 
   try { if (trialCartaoAtivo()) return false; } catch { /* sem storage */ }
   if (missaoDosesLigada()) {
     const m = lerMissao();
-    if (m && !missaoCumprida(m) && !m.explorou) return false;
+    if (m && !m.explorou && (missaoEmAndamento(m) || !missaoCumprida(m))) return false;
   }
   return true;
 }

@@ -23,7 +23,10 @@
  *
  * QA pelo link (web ou shell de teste): `?onboarding-1tela=on|off|auto` — grava
  * no aparelho (a volta da demo é navegação completa, o link não vai junto).
+ * A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
+import { v14Qa } from "@/lib/v14-qa";
+
 export type ModoOnboarding1Tela = "off" | "on";
 export const ONBOARDING_1TELA: ModoOnboarding1Tela = "off";
 
@@ -58,6 +61,7 @@ export function onboarding1TelaLigado(modo: ModoOnboarding1Tela = ONBOARDING_1TE
   const f = forcaOnboarding1Tela();
   if (f === "on") return true;
   if (f === "off") return false;
+  if (v14Qa()) return true;
   return modo === "on";
 }
 

@@ -10,6 +10,7 @@ import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
+import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -24,6 +25,7 @@ void iniciarMedicaoDoAparelho();
 // As chaves de QA da 1.0.14 pelo link (`?cobranca-v14=on`, `?avaliacao-v14=on`): gravadas no aparelho, como a MISSAO_DOSES.
 guardarForcaDaCobrancaV14();
 guardarForcaDaAvaliacaoV14();
+guardarForcaDasOfertas(); // `?ofertas-saida=…` em qualquer rota: o paywall enxuto mora no gate e no /planos, não só no funil
 
 // Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO
 // (o Recharts exige, e o throw sobe até o RouteErrorBoundary). Instala antes

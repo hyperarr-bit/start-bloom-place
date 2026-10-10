@@ -12,32 +12,48 @@
  *                       mensal 19,90 (também no bloqueio de quem perdeu o acesso)
  *   PAYWALL_TEXTOS      "A Apple vai pedir confirmação. Nada é cobrado hoje." acima do botão
  *                       + selo "economize N%" no anual (N calculado dos preços reais)
+ *   PAYWALL_ENXUTO      (10/10, dono: "tem muita informação no paywall") o paywall de
+ *                       assinatura do app (PaywallAssinatura: gate e /planos) acima da dobra
+ *                       só com título, as 2 colunas, prova social curta e o botão; "O que você
+ *                       construiu" só com 2+ itens e colapsado numa linha; conta/trocar conta,
+ *                       restaurar, termos, privacidade e excluir conta numa linha só no rodapé
+ *   RECUPERACAO_PAYWALL (10/10, estilo Enxovaly) quem sai do paywall do funil sem iniciar o
+ *                       teste recebe 2 avisos locais (+3 h e 9h da manhã seguinte, faixa 950000),
+ *                       só se a permissão já existir; cancelados quando o teste começa
  *
  * QUEM DECIDE, nesta ordem (a primeira que responder vale):
  *   1. força de QA deste aparelho, gravada pelo link `?ofertas-saida=…` (ver guardarForcaDasOfertas)
- *   2. metadata remota do RevenueCat: QUALQUER offering (current, anual_69, mensal_19…) pode
- *      carregar `oferta_x_paywall`, `oferta_mensal_19`, `saida_teste_escada`, `paywall_textos`
- *      com "on"/"off" — a `current` vence as outras. Ligar/desligar SEM versão nova.
- *   3. a constante local abaixo ("off" hoje).
+ *   2. a build de QA `VITE_V14_QA=1` (lib/v14-qa): liga as seis
+ *   3. metadata remota do RevenueCat: QUALQUER offering (current, anual_69, mensal_19…) pode
+ *      carregar `oferta_x_paywall`, `oferta_mensal_19`, `saida_teste_escada`, `paywall_textos`,
+ *      `paywall_enxuto`, `recuperacao_paywall` com "on"/"off" — a `current` vence as outras.
+ *      Ligar/desligar SEM versão nova.
+ *   4. a constante local abaixo ("off" hoje).
  * Além disso, uma oferta só EXISTE se a loja tiver o produto: a offering `mensal_19` ausente
  * no RevenueCat faz OFERTA_MENSAL_19 e o 2º degrau da escada não fazerem nada, chave ligada ou não.
  *
  * Só iPhone: as telas que leem isto já estão atrás de ehApple(); na web e no Android nada muda.
  */
+import { v14Qa } from "@/lib/v14-qa";
+
 export type ModoOferta = "off" | "on";
-export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos";
+export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao";
 
 /** Constantes locais. ROLLBACK/LIGAR sem RevenueCat = trocar aqui + build. */
 export const OFERTA_X_PAYWALL: ModoOferta = "off";
 export const OFERTA_MENSAL_19: ModoOferta = "off";
 export const SAIDA_TESTE_ESCADA: ModoOferta = "off";
 export const PAYWALL_TEXTOS: ModoOferta = "off";
+export const PAYWALL_ENXUTO: ModoOferta = "off";
+export const RECUPERACAO_PAYWALL: ModoOferta = "off";
 
 const LOCAL: Record<NomeDaOferta, ModoOferta> = {
   x_paywall: OFERTA_X_PAYWALL,
   mensal_19: OFERTA_MENSAL_19,
   escada: SAIDA_TESTE_ESCADA,
   textos: PAYWALL_TEXTOS,
+  enxuto: PAYWALL_ENXUTO,
+  recuperacao: RECUPERACAO_PAYWALL,
 };
 
 /** O nome da chave no metadata da offering do RevenueCat. */
@@ -46,6 +62,8 @@ export const CHAVE_REMOTA: Record<NomeDaOferta, string> = {
   mensal_19: "oferta_mensal_19",
   escada: "saida_teste_escada",
   textos: "paywall_textos",
+  enxuto: "paywall_enxuto",
+  recuperacao: "recuperacao_paywall",
 };
 
 export const CHAVE_FORCA_OFERTAS = "ofertas-saida-force"; // nas 2 allowlists (use-auth / use-user-data)
@@ -91,9 +109,9 @@ export const _zerarChavesRemotas = (): void => { remota = {}; };
 
 /* ───────────── 1. força de QA pelo link ───────────── */
 /**
- * `?ofertas-saida=on` liga as 4 neste aparelho; `off` força as 4 desligadas; `auto`
- * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos`) liga
- * só essas. Gravado no aparelho porque o funil muda de passo sem levar a query.
+ * `?ofertas-saida=on` liga as 6 neste aparelho; `off` força as 6 desligadas; `auto`
+ * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos,enxuto,recuperacao`)
+ * liga só essas. Gravado no aparelho porque o funil muda de passo sem levar a query.
  * Também apaga as marcas de "já vi" (`recomecar` junto, ex.: `?ofertas-saida=on,recomecar`).
  */
 export function guardarForcaDasOfertas(busca?: string | URLSearchParams): void {
@@ -129,10 +147,11 @@ export const CHAVES_DE_VISTO = [
 export const apagarMarcasDeVisto = (): void => { for (const k of CHAVES_DE_VISTO) ls.del(k); };
 
 /* ───────────── a resposta ───────────── */
-/** A oferta está ligada AQUI, agora? força de QA > metadata do RevenueCat > constante local. */
+/** A oferta está ligada AQUI, agora? força de QA > build de QA > metadata do RevenueCat > constante local. */
 export function ofertaLigada(nome: NomeDaOferta): boolean {
   const f = forcaDasOfertas(nome);
   if (f) return f === "on";
+  if (v14Qa()) return true;
   const r = remota[nome];
   if (r) return r === "on";
   return LOCAL[nome] === "on";

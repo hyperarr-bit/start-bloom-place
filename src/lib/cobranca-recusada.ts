@@ -19,11 +19,12 @@
  *   · a folha nativa "Problema de cobrança" do StoreKit (iOS 16.4+) só na Home
  *     (ios/App/App/AppDelegate.swift + lib/cobranca-nativa).
  * QA: `?cobranca-v14=on` liga só neste aparelho/navegador (`off` força, `auto`
- * desfaz) — padrão da MISSAO_DOSES.
+ * desfaz) — padrão da MISSAO_DOSES. A build `VITE_V14_QA=1` (lib/v14-qa) liga.
  */
 import { plataformaApp } from "@/lib/native-shell";
 import { urlGerenciarAssinatura } from "@/lib/loja";
 import type { ProblemaDeCobranca } from "@/lib/revenuecat";
+import { v14Qa } from "@/lib/v14-qa";
 
 export type ModoCobrancaV14 = "off" | "on";
 /** A chave da versão. ROLLBACK = "off". */
@@ -50,6 +51,7 @@ export function guardarForcaDaCobrancaV14(busca?: string | URLSearchParams): voi
 export const cobrancaV14Ligada = (): boolean => {
   const f = ls.get(CHAVE_FORCA_COBRANCA_V14);
   if (f === "on" || f === "off") return f === "on";
+  if (v14Qa()) return true;
   return (COBRANCA_V14 as ModoCobrancaV14) === "on";
 };
 

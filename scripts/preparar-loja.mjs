@@ -88,6 +88,15 @@ if (!teste && !chave.startsWith(LOJA.prefixo)) {
   process.exit(1);
 }
 console.log(`✓ loja: ${LOJA.nome}`);
+/* 1.0.14 — BUILD DE QA (lib/v14-qa): `VITE_V14_QA=1 npm run loja:ios` liga TODAS as chaves da
+ * versão só nessa build (tour, cartões, ofertas de saída, onboarding 1 tela, dia 1 cheio, cartão
+ * recusado, avaliações, módulo oculta pendências, paywall enxuto, recuperação do paywall). Sem a
+ * env, a build é a de LOJA, com as chaves no padrão. O aviso é pra essa build nunca subir por engano. */
+if (process.env.VITE_V14_QA === "1") {
+  console.log("\n⚠️  VITE_V14_QA=1 — BUILD DE QA: todas as chaves da 1.0.14 LIGADAS. NÃO é build de loja.\n");
+} else {
+  console.log("✓ chaves da 1.0.14 no padrão (build de loja)");
+}
 console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build de TESTE)" : "(produção)"}`);
 
 // SDK da Meta (12/08): a MainActivity só liga o SDK se o client token estiver

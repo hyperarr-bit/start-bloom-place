@@ -51,7 +51,7 @@ import { somarDias } from "@/lib/sequencia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
-import { bracoGravado, dia1CheioLigado, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { bracoFixo, bracoGravado, dia1CheioLigado, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -259,6 +259,8 @@ export function lerMissao(): EstadoMissaoDoses | null {
 
 /** O card da Home e a orquestra escutam este evento pra reler o estado (as duas moram em árvores diferentes). */
 export const EVENTO_MISSAO_DOSES = "missao-doses:mudou";
+/** O CustomEvent da janela quando as 3 doses ficam feitas (o tour da Home escuta). */
+export const EVENTO_MISSAO_COMPLETA = "missao-doses:completa";
 const avisar = () => { try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_DOSES)); } catch { /* sem window */ } };
 
 export function gravarMissao(m: EstadoMissaoDoses): EstadoMissaoDoses {
@@ -293,7 +295,7 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
 /** O braço desta pessoa pros eventos (só com a chave DIA1_CHEIO ligada), ou null. */
 export function varianteDia1(): BracoDia1 | null {
   if (!dia1CheioLigado()) return null;
-  return lerMissao()?.braco ?? bracoGravado();
+  return lerMissao()?.braco ?? bracoFixo() ?? bracoGravado();
 }
 
 /** A missão está no braço B ("dia 1 cheio")? Com a chave desligada, nunca — mesmo que o braço tenha ficado gravado. */

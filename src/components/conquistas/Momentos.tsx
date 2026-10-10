@@ -15,6 +15,7 @@ import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
 import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
+import { EVENTO_MISSAO_DOSES, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
 import "./conquistas.css";
 
 /**
@@ -91,7 +92,18 @@ const pesoDaRaridade = (b: Badge) => RARIDADES.indexOf(raridadeDe(b));
  */
 export const outraTelaAberta = () =>
   typeof document !== "undefined" &&
-  !!document.querySelector('[data-testid="celebracao-100"], [role="dialog"]:not([data-momento]), [role="alertdialog"], [data-camada-guia]');
+  (!!document.querySelector('[data-testid="celebracao-100"], [role="dialog"]:not([data-momento]), [role="alertdialog"], [data-camada-guia]')
+    // 10/10: a faixa da missão em doses no topo = passo em andamento (entre o anel e a festa há frestas sem camada)
+    || document.documentElement.hasAttribute("data-missao-doses-faixa"));
+
+/**
+ * 10/10 (print do dono: o adesivo "Primeira Despesa" POR CIMA do post-it da dose 2 — "cliquei e saiu da
+ * missão"): enquanto a MISSÃO DO DIA 1 em doses (braço B) está em cena — das boas-vindas até a folha do
+ * plano de amanhã decidida — os adesivos NÃO abrem popup: ficam na fila (não viram "vistos") e aparecem
+ * depois, agrupados. A exceção é o "Casa arrumada": ele é o fim do 4º passo e FECHA a missão.
+ */
+export const ADESIVO_QUE_FECHA_A_MISSAO = "casa-arrumada";
+export const missaoEmCena = (): boolean => { try { return missaoDoDiaEmCena(lerMissao()); } catch { return false; } };
 
 /**
  * A pessoa está NO MEIO de um registro? (01/10) Teclado aberto num campo, ou
@@ -626,6 +638,14 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   // quando as capas chegaram também vê o popup UMA vez, na 1ª abertura de Conquistas (as capas já
   // estão liberadas no seletor desde antes — o popup só avisa).
   const emConquistas = pathname.startsWith("/conquistas");
+  // a missão do dia (braço B) em cena? relê quando a missão muda (EVENTO_MISSAO_DOSES)
+  const [tiqueMissao, setTiqueMissao] = useState(0);
+  useEffect(() => {
+    const reler = () => setTiqueMissao((t) => t + 1);
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, []);
+  const esperaMissao = useMemo(() => missaoEmCena(), [tiqueMissao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // linha de base (1ª abertura): o que já está conquistado não vira festa atrasada
   useEffect(() => {
@@ -652,22 +672,26 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     // capa nova pelo RECORDE (nunca é tirada): uma festa só, com todas as liberadas desde a última vez
     const capas = emConquistas ? capasNovas(seq.recorde, capasVistas) : []; // só com a tela de Conquistas aberta
     if (capas.length && !emTesteComMissao()) itens.push({ tipo: "capa", capas });
-    const novos = conq.folha
+    let novos = conq.folha
       .filter((b) => b.unlocked && !/^sequencia-/.test(b.id) && !vistas.adesivos.includes(b.id))
       .sort((a, b) => pesoDaRaridade(b) - pesoDaRaridade(a));
     if (emTesteComMissao()) return { fila: itens, semFesta: novos.map((b) => b.id) };
+    // missão do dia em cena (B): só o "Casa arrumada" passa; o resto espera na fila SEM virar visto
+    if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO);
+    // os adesivos ganhos DURANTE a missão chegam juntos, num popup só ("Você ganhou N adesivos")
+    const agrupar = !esperaMissao && !!lerMissao();
     const raros = novos.filter((b) => formatoDaFesta(b) === "tela_cheia");
     const comuns = novos.filter((b) => formatoDaFesta(b) === "popup");
     const maxRaros = contaNova ? MAX_FESTAS_CONTA_NOVA : MAX_FESTAS_DE_UMA_VEZ;
     const comFesta = raros.slice(0, maxRaros);
     for (const b of comFesta) itens.push({ tipo: "adesivo", badge: b });
     // conta nova já com um raro: os comuns colam quietos; senão, 1 no popup
-    const maxComuns = contaNova ? (comFesta.length ? 0 : 1) : MAX_NO_POPUP;
+    const maxComuns = contaNova && !agrupar ? (comFesta.length ? 0 : 1) : MAX_NO_POPUP;
     const noPopup = comuns.slice(0, maxComuns);
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas, emConquistas]);
+  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas, emConquistas, esperaMissao]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");

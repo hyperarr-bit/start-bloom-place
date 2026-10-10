@@ -38,6 +38,9 @@ export const CHAVES_DO_ITEM = [
   "core-saude-water",
   "water-log",
   "goals-board-v2",
+  // 10/10: o chip de hábito da missão em doses (conta vazia) cria o hábito E marca hoje, com o carimbo da semana
+  "rotina-habits-checked",
+  "rotina-habits-week",
 ] as const;
 export type ChaveDoItem = (typeof CHAVES_DO_ITEM)[number];
 

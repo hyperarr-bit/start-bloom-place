@@ -87,12 +87,21 @@ export const WidgetPicker = ({ open, onOpenChange, activeWidgets, onToggle, onTo
                           }`}
                           aria-hidden="true"
                         >
+                          {/* 10/10 (dono: "cards cinza vazios/esqueleto"): a miniatura mostra o widget — emoji + nome —
+                              no formato que ele terá (largo = grande; dois quadros = pequeno), nunca um bloco vazio */}
                           {grande ? (
-                            <div className="h-6 flex-1 rounded bg-foreground/15" />
+                            <div className="h-7 flex-1 rounded bg-background/90 border border-border/50 flex items-center gap-1.5 px-2 overflow-hidden">
+                              <span className="text-[13px] leading-none">{widget.emoji}</span>
+                              <span className="text-[9.5px] font-bold text-foreground/70 truncate">{widget.label}</span>
+                              <span className="ml-auto h-1.5 w-8 rounded-full bg-primary/40" />
+                            </div>
                           ) : (
                             <>
-                              <div className="h-6 flex-1 rounded bg-foreground/15" />
-                              <div className="h-6 flex-1 rounded bg-foreground/[0.07]" />
+                              <div className="h-7 flex-1 rounded bg-background/90 border border-border/50 flex items-center gap-1 px-1.5 overflow-hidden">
+                                <span className="text-[13px] leading-none">{widget.emoji}</span>
+                                <span className="text-[9px] font-bold text-foreground/70 truncate">{widget.label}</span>
+                              </div>
+                              <div className="h-7 flex-1 rounded bg-foreground/[0.06] border border-dashed border-border/50" />
                             </>
                           )}
                         </div>

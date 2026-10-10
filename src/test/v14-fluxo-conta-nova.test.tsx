@@ -6,8 +6,10 @@
  * boas-vindas (BoasVindasDoModulo) dentro dos módulos. O casco da Home e das páginas dos
  * módulos é de mentira (como em dia1-cheio.test.tsx e tour-home-e-cartoes.test.tsx).
  *
- * Fluxo esperado (dono 10/10): missão (3 doses, braço B pra todo mundo) → plano de amanhã →
- * tour da Home (5 passos) → festa "Casa arrumada". Quem pulou a missão: tour direto.
+ * Fluxo esperado (dono 10/10, 2ª rodada): missão de 4 passos (3 doses, braço B pra todo mundo,
+ * + "Arrumar sua Home" = o tour da Home com a faixa "Missão · 4 de 4") → o fim do tour fecha a
+ * missão (missao_completa; a festa "Casa arrumada" é a comemoração) → SÓ ENTÃO a folha do plano
+ * de amanhã, a última coisa do dia 1. Quem pulou a missão: tour direto. Tudo com a conta VAZIA.
  *
  * Cartões × missão (regra obrigatória, dono 10/10):
  *   · módulo QUE FAZ PARTE da missão: NUNCA cartões — nem no dia 1 (a dose é a boas-vindas), nem
@@ -124,23 +126,14 @@ const montar = (store: Store, rota: string) =>
       </Provedor>
     </MemoryRouter>,
   );
-const dados = () => ({ "core-user-name": "Ana", "rotina-habits": ["Água", "Andar"], "finance-expenses": [] as unknown[], "conquistas-vistas": { adesivos: [], marcos: [] }, "conquistas-desbloqueadas": {} });
+/** A CONTA NOVA DE VERDADE é VAZIA (10/10, dono): nenhum seed — o fluxo inteiro tem que fazer sentido assim. */
+const dados = (): Record<string, unknown> => ({});
 const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 const esperarPostIt = () => { avancar(400); avancar(3000); return screen.getByTestId("demo-guia-postit"); };
 /** toca no 1º chip e chega na festa */
 const tocarChipAteAFesta = () => {
   const postIt = esperarPostIt();
   fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-  avancar(700); avancar(1000);
-  const entendi = screen.queryByTestId("missao-doses-entendi");
-  if (entendi) fireEvent.click(entendi);
-  return screen.getByTestId("missao-doses-festa");
-};
-/** A dose da Rotina: o post-it pede o quadradinho de HOJE (sem chip) — aqui o módulo de mentira grava o que o quadradinho gravaria. */
-const marcarQuadradinhoAteAFesta = (store: Store) => {
-  esperarPostIt();
-  const DIAS = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
-  act(() => { store.valor().set("rotina-habits-checked", { [DIAS[new Date().getDay()]]: [true, false] }); });
   avancar(700); avancar(1000);
   const entendi = screen.queryByTestId("missao-doses-entendi");
   if (entendi) fireEvent.click(entendi);
@@ -189,70 +182,100 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     expect(cartoesLigados()).toBe(true);
   });
 
-  it("missão (3 doses no dia 1, sem cartões nos módulos dela) → plano de amanhã (prioridade sobre o tour) → tour da Home (5 passos) → 'Casa arrumada'; a avaliação é pedida 1,5 s depois de cada comemoração", async () => {
+  it("conta VAZIA: boas-vindas (4 passos) → dose 1 (chip Café) → dose 2 (hábito pronto, sem hábito na conta) → dose 3 (copo) → 'Arrumar minha Home' → tour com a faixa 'Missão · 4 de 4' (5 passos) → missão completa ('Casa arrumada' destrancado) → plano de amanhã (a última coisa) → a avaliação 1,5 s depois de cada", async () => {
     const store = montarStore(dados());
     montar(store, "/home");
-    // a Home nasce com a missão por cima: nada de tour
-    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
+    // a Home nasce com a missão por cima: nada de tour; a boas-vindas B mostra os 4 passos
+    const boas = screen.getByTestId("missao-doses-boas-vindas");
+    expect(boas).toHaveTextContent("3 toques hoje");
+    expect(screen.getByTestId("missao-doses-linha-4")).toHaveTextContent("Arrumar sua Home · 5 toques");
+    expect(screen.getByTestId("missao-doses-barra")).toHaveTextContent("0 de 4 hoje");
     expect(screen.queryByTestId("tour-home")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(lerMissao()?.braco).toBe("B");
     expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
 
-    // dose 1 — Finanças: a dose É a boas-vindas; cartões nunca
+    // dose 1 — Finanças: a dose É a boas-vindas; cartões nunca; o chip lança o gasto na conta vazia
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 4");
     tocarChipAteAFesta();
+    expect((store.dados["finance-expenses"] as unknown[]).length).toBe(1);
     await respirar(3);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-bora-proxima"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
-    // dose 2 — Rotina: a dose do hábito não tem chip, é o quadradinho de hoje no próprio módulo
-    marcarQuadradinhoAteAFesta(store);
+    // dose 2 — Rotina numa conta SEM hábito: o post-it oferece 3 prontos; o chip cria e marca hoje
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Qual hábito você quer começar hoje?");
+    fireEvent.pointerDown(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
+    avancar(700); avancar(1000);
+    const entendi = screen.queryByTestId("missao-doses-entendi");
+    if (entendi) fireEvent.click(entendi);
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Segunda dose feita!");
     await respirar(3);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-bora-proxima"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/saude");
-    // dose 3 — Saúde: missão cumprida → a nota 1,5 s depois da comemoração
+    // dose 3 — Saúde: "Terceira dose feita!" + "Falta 1: arrumar sua Home"; a missão NÃO fecha aqui
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Missão cumprida!");
+    expect(festa).toHaveTextContent("Terceira dose feita!");
+    expect(screen.getByTestId("missao-doses-falta-home")).toBeInTheDocument();
     await respirar(3);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(nomes()).not.toContain("missao_completa");
+    avancar(1500);
+    expect(nota.pedir).not.toHaveBeenCalled();
+
+    // "Arrumar minha Home" → Home: a faixa "Missão · 4 de 4" e o tour (o 4º passo); SEM a folha do plano ainda
+    fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · 4 de 4");
+    expect(screen.queryByTestId("plano-amanha")).toBeNull();
+    expect(missaoEmAndamento(lerMissao())).toBe(false); // o tour É o passo 4: pode entrar
+    await respirar(10);
+    const tour = screen.getByTestId("tour-home");
+    expect(tour.getAttribute("data-passo")).toBe("1");
+    expect(screen.getByTestId("tour-contador").textContent).toBe(`Passo 1 de ${TOTAL_PASSOS} · falta ${TOTAL_PASSOS - 1}`);
+    expect(screen.getByTestId("tour-fazer")).toHaveTextContent("Fazer isso");
+    expect(nomes()).toContain("home_tour_visto");
+
+    // os 5 passos ("Deixar como está" nos 4 primeiros, "Concluir missão" no último) → o fim do tour FECHA a missão
+    for (let i = 0; i < TOTAL_PASSOS - 1; i++) fireEvent.click(screen.getByTestId("tour-deixar"));
+    expect(screen.getByTestId("tour-concluir")).toHaveTextContent("Concluir missão");
+    fireEvent.click(screen.getByTestId("tour-concluir"));
+    expect(screen.queryByTestId("tour-home")).toBeNull();
+    expect(nomes()).toContain("home_tour_concluido");
+    expect(localStorage.getItem(CHAVE_TOUR_FEITO)).toBeTruthy();
+    expect(store.dados[CHAVE_TOUR_FEITO]).toBeTruthy();
+    expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 4, modulo: "home" })]);
     expect(nomes()).toContain("missao_completa");
+    expect(lerMissao()?.homeTour).toEqual(expect.objectContaining({ via: "tour" }));
+    const casa = buildBadgesVida(store.get).find((b) => b.id === "casa-arrumada")!;
+    expect(casa.unlocked).toBe(true);
     expect(nota.pedir).not.toHaveBeenCalled();
     avancar(1500);
     expect(nota.pedir).toHaveBeenCalledWith("missao_completa");
 
-    // fecha o dia → Home: a folha "Plano de amanhã" tem prioridade; o tour espera
-    fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
-    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
-    expect(screen.getByTestId("plano-amanha")).toBeInTheDocument();
+    // a festa "Casa arrumada" (Momentos) é a comemoração do fim — a folha do plano espera ela ser vista
+    await respirar(3);
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(screen.queryByTestId("plano-amanha")).toBeNull();
+    act(() => { store.valor().set("conquistas-vistas", { adesivos: ["casa-arrumada"], marcos: [] }); });
+    await respirar(2);
+    // a ÚLTIMA coisa do dia 1: a folha do plano de amanhã (sem jargão) → "Combinado" → a nota 1,5 s depois
+    const folha = screen.getByTestId("plano-amanha");
+    expect(folha).toHaveTextContent("O CORE te avisa do que importa");
+    expect(folha).not.toHaveTextContent("dia 2");
     expect(missaoEmAndamento(lerMissao())).toBe(true);
-    await respirar(10);
-    expect(screen.queryByTestId("tour-home")).toBeNull();
-
-    // "Combinado" → a nota do plano 1,5 s depois → o tour entra
     fireEvent.click(screen.getByTestId("plano-amanha-combinado"));
     expect(nomes()).toContain("plano_amanha_definido");
     expect(missaoEmAndamento(lerMissao())).toBe(false);
     avancar(1500);
     expect(nota.pedir).toHaveBeenLastCalledWith("plano_amanha_definido");
-    await respirar(10);
-    expect(screen.queryByTestId("plano-amanha")).toBeNull();
-    const tour = screen.getByTestId("tour-home");
-    expect(tour.getAttribute("data-passo")).toBe("1");
-    expect(screen.getByTestId("tour-contador").textContent).toBe(`1 de ${TOTAL_PASSOS}`);
-    expect(nomes()).toContain("home_tour_visto");
-
-    // os 5 passos ("Deixar como está" em todos) → fim → "Casa arrumada" destrancado
-    for (let i = 0; i < TOTAL_PASSOS; i++) fireEvent.click(screen.getByTestId("tour-deixar"));
-    expect(screen.queryByTestId("tour-home")).toBeNull();
-    expect(nomes()).toContain("home_tour_concluido");
-    expect(localStorage.getItem(CHAVE_TOUR_FEITO)).toBeTruthy();
-    expect(store.dados[CHAVE_TOUR_FEITO]).toBeTruthy();
-    const casa = buildBadgesVida(store.get).find((b) => b.id === "casa-arrumada")!;
-    expect(casa.unlocked).toBe(true);
-    // e não volta
     await respirar(5);
-    expect(screen.queryByTestId("tour-home")).toBeNull();
+    expect(screen.queryByTestId("plano-amanha")).toBeNull();
+    expect(screen.queryByTestId("tour-home")).toBeNull(); // e não volta
   });
 
   it("quem pulou a missão ('Explorar por conta própria'): o tour entra direto na Home", async () => {

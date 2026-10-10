@@ -179,18 +179,18 @@ export const MODULOS: Record<ModuloDaMissao, PassoDoModulo> = {
   rotina: { modulo: "rotina", nome: "Rotina", emoji: "📅", rota: "/rotina", onde: "na sua Rotina", cor: "#FFE4EC", tipo: "habito", pedido: "Marca 1 hábito no quadradinho", toque: "1 hábito", chaves: ["rotina-habits-checked", "rotina-habits"], seletor: '[data-spotlight="add-habit"]', olhar: { titulo: "A linha da semana", texto: "Cada quadradinho marcado vira um dia na sua sequência — a semana inteira cabe num olhar." } },
   saude: { modulo: "saude", nome: "Saúde", emoji: "❤️", rota: "/saude", onde: "na sua Saúde", cor: "#FFE1E1", tipo: "agua", pedido: "Marca 1 copo d'água", toque: "1 copo", chaves: ["core-saude-water"], seletor: '[data-spotlight="add-water"]', olhar: { titulo: "O copo que contou", texto: "Cada copo entra na meta do dia — e o CORE te lembra de bater ela." } },
   treino: { modulo: "treino", nome: "Treino", emoji: "🏋️", rota: "/treino", onde: "no seu Treino", cor: "#E3ECFF", tipo: "exercicio", pedido: "Anota 1 exercício", toque: "1 exercício", chaves: ["saude-workouts-v2"], seletor: '[data-spotlight="add-exercise"]', olhar: { titulo: "O seu treino da semana", texto: "O exercício entra no dia de hoje; anota a carga de cada série e vê a evolução." } },
-  dieta: { modulo: "dieta", nome: "Dieta", emoji: "🥗", rota: "/dieta", onde: "na sua Dieta", cor: "#E2F7E6", pedido: "Marca 1 refeição de hoje", toque: "1 refeição", chaves: ["saude-meals", "dieta-diary"], olhar: { titulo: "O seu dia na dieta", texto: "Cada refeição marcada fecha o dia — o CORE mostra o que falta." } },
+  dieta: { modulo: "dieta", nome: "Dieta", emoji: "🥗", rota: "/dieta", onde: "na sua Dieta", cor: "#E2F7E6", pedido: "Anota 1 refeição de hoje", toque: "1 refeição", chaves: ["saude-meals", "core-dieta-log", "dieta-diary-v2"], olhar: { titulo: "O seu dia na dieta", texto: "Cada refeição anotada fecha o dia — o CORE mostra o que falta." } },
   desenvolvimento: { modulo: "desenvolvimento", nome: "Metas", emoji: "🎯", rota: "/desenvolvimento", onde: "nas suas Metas", cor: "#EEE6FF", tipo: "meta", pedido: "Escolhe 1 meta sua", toque: "1 meta", chaves: ["goals-board-v2"], seletor: '[data-spotlight="add-goal"]', olhar: { titulo: "A meta com plano", texto: "A meta ganha passos; cada passo feito aparece aqui." } },
   hiperfoco: { modulo: "hiperfoco", nome: "Hiperfoco", emoji: "🧠", rota: "/hiperfoco", onde: "no seu Hiperfoco", cor: "#DFF1FF", pedido: "Anota 1 pensamento", toque: "1 pensamento", chaves: ["hiperfoco-thoughts", "mente-dreams"], olhar: { titulo: "A mente no papel", texto: "O que está na cabeça vai pro papel — e sai da cabeça." } },
   estudos: { modulo: "estudos", nome: "Estudos", emoji: "📚", rota: "/estudos", onde: "nos seus Estudos", cor: "#FFF4C2", pedido: "Anota 1 matéria", toque: "1 matéria", chaves: ["estudos-subjects", "estudos-aprendizados", "estudos-pomodoro-count"], olhar: { titulo: "A sua grade", texto: "A matéria entra na grade; revisões e provas ficam no lugar." } },
   carreira: { modulo: "carreira", nome: "Carreira", emoji: "💼", rota: "/carreira", onde: "na sua Carreira", cor: "#EDEFF3", pedido: "Anota 1 tarefa do dia", toque: "1 tarefa", chaves: ["career-day-tasks", "career-skills"], olhar: { titulo: "O seu dia de trabalho", texto: "As fases do dia e as tarefas ficam no mesmo lugar." } },
-  biblioteca: { modulo: "biblioteca", nome: "Biblioteca", emoji: "📖", rota: "/biblioteca", onde: "na sua Biblioteca", cor: "#FFE9D6", pedido: "Marca 1 página lida", toque: "1 página", chaves: ["lib-books", "lib-read-log"], olhar: { titulo: "A sua estante", texto: "Cada página marcada avança a barra do livro." } },
+  biblioteca: { modulo: "biblioteca", nome: "Biblioteca", emoji: "📖", rota: "/biblioteca", onde: "na sua Biblioteca", cor: "#FFE9D6", pedido: "Anota 1 livro que você está lendo", toque: "1 livro", chaves: ["lib-books", "lib-read-log"], olhar: { titulo: "A sua estante", texto: "O livro entra na estante; cada página marcada avança a barra dele." } },
   casa: { modulo: "casa", nome: "Casa", emoji: "🏠", rota: "/casa", onde: "na sua Casa", cor: "#E6F8D9", pedido: "Anota 1 item da compra", toque: "1 item", chaves: ["casa-shopping-list", "casa-maint-tasks"], olhar: { titulo: "A lista da casa", texto: "O item entra na lista; no mercado, é só marcar." } },
-  beleza: { modulo: "beleza", nome: "Beleza", emoji: "💄", rota: "/beleza", onde: "na sua Beleza", cor: "#FFE4F1", pedido: "Marca 1 passo do skincare", toque: "1 passo", chaves: ["skincare-morning-checked", "skincare-night-checked", "skincare-daily-checkin"], olhar: { titulo: "A rotina de hoje", texto: "Cada passo marcado fecha a rotina da manhã ou da noite." } },
+  beleza: { modulo: "beleza", nome: "Beleza", emoji: "💄", rota: "/beleza", onde: "na sua Beleza", cor: "#FFE4F1", pedido: "Marca 1 passo da rotina de hoje", toque: "1 passo", chaves: ["skincare-morning-checked", "skincare-night-checked", "skincare-daily-checkin", "skincare-de-hoje", "skincare-do-dia", "skincare-diary"], olhar: { titulo: "A rotina de hoje", texto: "Cada passo marcado fecha a rotina da manhã ou da noite." } },
   viagens: { modulo: "viagens", nome: "Viagens", emoji: "✈️", rota: "/viagens", onde: "nas suas Viagens", cor: "#E3E8FF", pedido: "Anota 1 destino", toque: "1 destino", chaves: ["travel-bucket"], olhar: { titulo: "A sua lista de destinos", texto: "O destino entra na lista; depois vem o roteiro e a mala." } },
-  relacionamentos: { modulo: "relacionamentos", nome: "Relações", emoji: "💞", rota: "/relacionamentos", onde: "nas suas Relações", cor: "#FFE1E7", pedido: "Anota 1 pessoa", toque: "1 pessoa", chaves: ["rel-people", "rel-dates", "rel-moments"], olhar: { titulo: "As pessoas que importam", texto: "Datas e momentos ficam ligados à pessoa." } },
-  pet: { modulo: "pet", nome: "Pet", emoji: "🐾", rota: "/pet", onde: "no seu Pet", cor: "#FFF4C2", pedido: "Marca 1 cuidado do pet", toque: "1 cuidado", chaves: ["pet-cuidados", "pet-list", "pet-diary"], olhar: { titulo: "A agenda do pet", texto: "Vacina, banho, remédio: cada cuidado marcado entra na agenda." } },
-  detox: { modulo: "detox", nome: "Detox", emoji: "📵", rota: "/detox", onde: "no seu Detox", cor: "#EDEFF3", pedido: "Marca 1 hábito de detox", toque: "1 hábito", chaves: ["detox-habits", "detox-diary"], olhar: { titulo: "Menos tela, mais presença", texto: "Cada hábito marcado é um pedaço do dia de volta." } },
+  relacionamentos: { modulo: "relacionamentos", nome: "Relações", emoji: "💞", rota: "/relacionamentos", onde: "nas suas Relações", cor: "#FFE1E7", pedido: "Anota 1 pessoa que importa", toque: "1 pessoa", chaves: ["rel-people", "rel-dates", "rel-moments", "relacoes-pessoas", "relacoes-datas", "relacoes-momentos"], olhar: { titulo: "As pessoas que importam", texto: "Datas e momentos ficam ligados à pessoa." } },
+  pet: { modulo: "pet", nome: "Pet", emoji: "🐾", rota: "/pet", onde: "no seu Pet", cor: "#FFF4C2", pedido: "Cadastra o seu pet", toque: "1 pet", chaves: ["pet-list", "pet-diary", "pet-cuidados", "pet-expenses"], olhar: { titulo: "A agenda do pet", texto: "Com o pet cadastrado, vacina, banho e remédio entram na agenda dele." } },
+  detox: { modulo: "detox", nome: "Detox", emoji: "📵", rota: "/detox", onde: "no seu Detox", cor: "#EDEFF3", pedido: "Cria 1 hábito de detox", toque: "1 hábito", chaves: ["detox-habits", "detox-diary"], olhar: { titulo: "Menos tela, mais presença", texto: "Cada hábito marcado é um pedaço do dia de volta." } },
 };
 
 /** A ordem da grade de escolha (a mesma do mockup). */
@@ -245,6 +245,8 @@ export interface EstadoMissaoDoses {
   completaEm?: string;
   /** braço B, dias 2 e 3 ("aprofundar"): por dia, os módulos em que já houve 1 uso real */
   aprofundados?: Record<string, ModuloDaMissao[]>;
+  /** braço B (10/10): o 4º passo da missão = o tour da Home ("Arrumar sua Home"); `via` = "tour" | "sem_tour" (tour indisponível/já feito) */
+  homeTour?: { dia: string; via: "tour" | "sem_tour" };
 }
 
 export function lerMissao(): EstadoMissaoDoses | null {
@@ -304,15 +306,36 @@ export const ehBracoB = (m: EstadoMissaoDoses | null): boolean => !!m && dia1Che
 /** Quantas doses já foram feitas (1..3). */
 export const dosesFeitas = (m: EstadoMissaoDoses): number => ([1, 2, 3] as DiaDaMissao[]).filter((n) => m.feitos[n]).length;
 
+/** Braço B: a missão do dia 1 tem 4 passos (3 doses + "Arrumar sua Home"); A tem 3. */
+export const TOTAL_PASSOS_B = 4;
+export const totalDePassos = (m: EstadoMissaoDoses | null): number => (ehBracoB(m) ? TOTAL_PASSOS_B : 3);
+/** Passos feitos contando o 4º (B). */
+export const passosFeitos = (m: EstadoMissaoDoses): number => dosesFeitas(m) + (ehBracoB(m) && m.homeTour ? 1 : 0);
+/** Braço B: as 3 doses feitas e o tour da Home ainda por fazer (o 4º passo). */
+export const passoHomePendente = (m: EstadoMissaoDoses | null): boolean => !!m && ehBracoB(m) && missaoCumprida(m) && !m.homeTour;
+/** A missão inteira feita: A = 3 doses; B = 3 doses + o tour da Home. */
+export const missaoCompleta = (m: EstadoMissaoDoses): boolean => missaoCumprida(m) && (!ehBracoB(m) || !!m.homeTour);
+
 /**
- * Braço B — a folha "Quando você abre o CORE amanhã?" está devendo? No fim da 1ª
- * sessão: dia 1 da missão, ≥1 dose feita ou "Agora não", e sem plano (nem pulo) ainda.
+ * Braço B — a folha do plano de amanhã ("O CORE te avisa do que importa… que horas te
+ * lembro amanhã?") está devendo? É a ÚLTIMA coisa do dia 1: depois do 4º passo (tour da
+ * Home → festa "Casa arrumada") ou depois de um "Agora não" no meio das doses.
  */
 export function precisaPlanoAmanha(m: EstadoMissaoDoses, hoje: string = localDayKey()): boolean {
   if (!ehBracoB(m) || !m.boasVindas) return false;
   if (m.planoAmanha || m.planoAmanhaPulado === hoje) return false;
   if (diaDaMissao(m, hoje) !== 1) return false;
-  return dosesFeitas(m) >= 1 || m.agoraNao?.dia === hoje;
+  return missaoCompleta(m) || m.agoraNao?.dia === hoje;
+}
+
+/**
+ * A MISSÃO DO DIA 1 ESTÁ EM CENA? (braço B) — os adesivos dos Momentos esperam: do começo até a
+ * folha do plano de amanhã decidida (ela é o fim do dia 1). Quem pulou ("Explorar") libera na hora.
+ */
+export function missaoDoDiaEmCena(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!m || !ehBracoB(m) || m.explorou) return false;
+  if (diaDaMissao(m, hoje) !== 1) return false;
+  return !(m.planoAmanha || m.planoAmanhaPulado === hoje);
 }
 
 /**
@@ -341,7 +364,10 @@ export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = lo
   if (!m.boasVindas) return true;
   if (precisaPlanoAmanha(m, hoje)) return true;
   const dia = diaDaMissao(m, hoje);
-  if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje;
+  // dose por fazer no dia 1 (não pulada hoje; no B, "Agora não" encerra a sessão — a Home é da pessoa)
+  if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje && !(ehBracoB(m) && m.agoraNao?.dia === hoje);
+  // B: as 3 doses feitas e o tour por fazer = o tour É o passo 4 (deveMostrarTourHome deixa passar: não é "em andamento")
+  if (passoHomePendente(m)) return false;
   return !m.fimVisto && (!ehBracoB(m) || dia >= 3);
 }
 

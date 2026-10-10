@@ -11,7 +11,10 @@ html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px)
 .md-faixa-titulo { font-size: 12.5px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .md-faixa-titulo b { color: rgba(255,255,255,.6); font-weight: 700; }
 .md-faixa-pular { margin-left: auto; min-height: 36px; padding: 0 10px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.7); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; }
-.md-faixa-onde { font-size: 12px; font-weight: 700; color: #ffd36e; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0 4px; }
+/* 10/10: o "mostrar onde" virou um alvo ⌖ (ícone, 36 px de toque) — texto quebrava em 2 linhas e cobria o cabeçalho */
+.md-faixa-onde { margin-left: auto; width: 36px; height: 36px; display: inline-grid; place-items: center; color: #ffd36e; background: rgba(255,255,255,.08); border: 0; border-radius: 999px; padding: 0; flex-shrink: 0; }
+.md-faixa-onde + .md-faixa-pular { margin-left: 0; }
+.md-faixa-pular { flex-shrink: 0; white-space: nowrap; }
 
 /* a faixa colorida com título em caixa alta — a gramática das seções do planner */
 .md-secao { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #fff; }
@@ -38,6 +41,8 @@ html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px)
    branco no branco (os prints de 02/10 já saíam sem o "Fazer o toque de hoje"). Um nível a mais e ele sempre ganha. */
 button.md-botao, .md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
 button.md-botao[data-tom="magenta"], .md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+/* 10/10 (regra do dono pro funil): o botão principal colado embaixo tem 56 px, como nas outras telas do funil */
+button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 56px; }
 .md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }
 .md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
 .md-hora[data-marcada] { background: #16121c; color: #fff; }

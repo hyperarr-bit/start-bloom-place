@@ -312,6 +312,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+/** O contexto sem exigir o provider (undefined fora dele) — pra peças que também montam soltas. */
+export const useAuthOpcional = () => useContext(AuthContext);
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");

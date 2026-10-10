@@ -341,7 +341,7 @@ export function conteudoDoAprofundar(missao: EstadoMissaoDoses | null, hoje: str
   const quando = missao.completaEm === hoje || !missao.completaEm ? "Ontem" : "Esses dias";
   return {
     title: `${quando} você anotou ${cfg.toque} — 20 s pra anotar ${cfg.toque === "1 gasto" ? "o" : "mais um"} de hoje`,
-    body: `${feito?.rotulo ? `${feito.rotulo} já está ${cfg.onde}. ` : ""}${cfg.pedido} de novo e o dia ${diaAmanha} da missão fica feito.`,
+    body: `${feito?.rotulo ? `${feito.rotulo} já está ${cfg.onde}. ` : ""}${cfg.pedido} de novo e a missão continua.`,
     modulo: "missao",
     temNumero: !!feito?.rotulo,
     rota: cfg.rota,

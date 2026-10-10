@@ -281,6 +281,11 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
 
     // Saídas passivas — NUNCA preventDefault: a demo continua 100% tocável.
     const aoTocar = (e: Event) => {
+      /* 10/10 (bug do dono no Simulador: "clico no Café e não vai, só sai da missão"): o toque NO
+       * BALÃO (post-it, chips, "Entendi") é parte do guia — nunca é "toque fora". Antes, o pointerdown
+       * no chip derrubava o anel ANTES do click; no Chromium o chip ainda recebia o click durante a
+       * animação de saída, no WKWebView não — o post-it sumia sem registrar nada. */
+      if (e.target instanceof Node && balaoRef.current?.contains(e.target)) return;
       if (fixo) { setLeve(true); return; } // fixo: o passo continua na tela, só o escuro clareia
       if (e.target instanceof Node && alvo.contains(e.target)) {
         // tocou o alvo: a ação segue e o anel se despede sozinho

@@ -325,8 +325,13 @@ describe("Sua Home em 5 passos (força on)", () => {
     const tour = screen.getByTestId("tour-home");
     expect(tour.getAttribute("data-camada-guia")).toBe("tour-home"); // a festa do adesivo espera o tour sair
     expect(tour.getAttribute("data-passo")).toBe("1");
-    expect(screen.getByTestId("tour-contador").textContent).toBe(`1 de ${TOTAL_PASSOS}`);
+    expect(screen.getByTestId("tour-contador").textContent).toBe(`Passo 1 de ${TOTAL_PASSOS} · falta ${TOTAL_PASSOS - 1}`);
     expect(screen.queryByText(/pular/i)).toBeNull(); // sem "pular tudo"
+    // 10/10: instrução de ação em negrito, o escuro com o alvo recortado, o dedinho e o botão "Fazer isso"
+    expect(screen.getByTestId("tour-faca").textContent).toMatch(/^Toque em/);
+    expect(screen.getByTestId("tour-escuro")).toBeInTheDocument();
+    expect(screen.getByTestId("tour-dedinho")).toBeInTheDocument();
+    expect(screen.getByTestId("tour-fazer").textContent).toBe("Fazer isso");
     expect(screen.getByTestId("tour-balao").querySelector("[data-figurinha-placeholder]")).not.toBeNull();
     expect(nomes()).toEqual(["home_tour_visto"]);
 

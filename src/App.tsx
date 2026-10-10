@@ -375,6 +375,10 @@ import Landing from "./pages/site/Landing";
 const Suporte = lazyPage(() => import("./pages/site/Suporte"));
 // 24/09: passo a passo de como entrar no app com a conta da compra da web
 const ComoEntrar = lazyPage(() => import("./pages/ComoEntrar"));
+// 10/10: a PORTA iPHONE (/comece) — funil de anúncio só da WEB: perguntas →
+// plano → conta criada no site (campanha gravada nela) → App Store → Entrar.
+// SoNaWeb: o app nativo nunca monta (regra rota_inicio_acopla_app_web).
+const PortaIphone = lazyPage(() => import("./pages/porta/PortaIphone"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
 // /suporte do site: aquela é SoNaWeb e nunca abriu no shell — que era
 // exatamente o buraco. Esta funciona nos dois.
@@ -593,6 +597,7 @@ const AnimatedRoutes = () => {
             NAVEGADOR, então a exigência dela continua atendida. */}
         <Route path="/suporte" element={<SoNaWeb><PageTransition><Suporte /></PageTransition></SoNaWeb>} />
         <Route path="/como-entrar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="como-entrar"><ComoEntrar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/comece" element={<SoNaWeb><RouteErrorBoundary routeName="porta-iphone"><PortaIphone /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

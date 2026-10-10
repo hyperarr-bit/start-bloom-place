@@ -9,9 +9,10 @@
  *
  * Regras: começa com "/" (caminho interno), não começa com "//" (seria outro
  * host), sem esquema/":" ou "\" no caminho, sem espaço/controle, e o caminho
- * tem que ser uma das rotas permitidas (hoje só /planos…).
+ * tem que ser uma das rotas permitidas (/planos… e /comece).
  */
-export const DESTINOS_PERMITIDOS = ["/planos"];
+// 10/10: + /comece — a Porta iPhone volta pra tela "Pronto, salvo" depois do Google e do link do e-mail
+export const DESTINOS_PERMITIDOS = ["/planos", "/comece"];
 const CHAVE = "core-auth-next";
 
 export function destinoSeguro(raw: string | null | undefined): string | null {

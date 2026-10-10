@@ -79,6 +79,9 @@ export const TrialBanner = () => {
     // animações ("o paywall renasce, dá reset" — dono, 04/08) e, pior,
     // ENTERRANDO o AppPurchaseSheet (z-[90]) de quem já tinha tocado o CTA.
     location.pathname.startsWith("/app") ||
+    // /comece é a Porta iPhone (10/10): a conta nasce lá, SEM assinatura, e a
+    // tela seguinte é "baixe o app". O "Assine no app" por cima apagaria isso.
+    location.pathname.startsWith("/comece") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

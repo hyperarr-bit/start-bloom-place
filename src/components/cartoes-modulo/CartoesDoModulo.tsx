@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { lerMissao, missaoCumprida, missaoDosesLigada, passoPendente } from "@/lib/missao-doses";
@@ -29,6 +30,16 @@ import "./cartoes.css";
  *   N. Relaxa: X e Y ficam pra depois.
  * "Já sei" no topo, sempre visível; bolinhas + "2 de 5"; arrastar a folha pra
  * baixo (ou tocar fora) = "Já sei".
+ *
+ * v3 (dono no Simulador, 10/10: "tem que ficar mais óbvio que tem que rolar pro
+ * lado — talvez botar uma seta"): (1) ESPIADA — o cartão ocupa 88% da largura e
+ * ~12% do próximo aparece à direita (scroll-snap por cartão; o último não tem
+ * espiada); (2) SETAS redondas na borda, na altura do meio, na cor do módulo: "→"
+ * avança e "←" volta (a partir do 2º) pelo mesmo snap do swipe; no último a da
+ * direita vira o "✓" do "Já sei"; (3) a DICA "Deslize →" com a seta pulsando (3
+ * ciclos e para; reduced-motion = parada) só no 1º cartão e 1x por aparelho
+ * (`core-cartoes-dica-deslizar`), some ao 1º swipe/seta. Evento novo:
+ * cartoes_modulo_seta {modulo, de, para}.
  *
  * Existem pra os 16 módulos (components/cartoes-modulo/cartoes-*.tsx, carregados sob
  * demanda pelo `registro`): o ModuleTip "Dicas para começar" sai de cena com a chave
@@ -89,6 +100,11 @@ export interface ConfigCartoes {
 
 /** Quantos cartões uma config tem (1 + os do meio + o "relaxa"). */
 export const totalDeCartoes = (c: ConfigCartoes): number => 2 + c.cartoes.length;
+
+/** 1x por aparelho: a dica "Deslize →" já foi vista (some ao 1º swipe/seta, ou quando a folha fecha). */
+export const CHAVE_DICA_DESLIZAR = "core-cartoes-dica-deslizar";
+const dicaJaVista = (): boolean => { try { return !!localStorage.getItem(CHAVE_DICA_DESLIZAR); } catch { return false; } };
+const marcarDicaVista = (): void => { try { localStorage.setItem(CHAVE_DICA_DESLIZAR, new Date().toISOString()); } catch { /* storage bloqueado */ } };
 
 /** Só a camada de guia de OUTRO componente conta (a própria folha dos cartões também é uma camada). */
 const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="cartoes-modulo"])';
@@ -196,32 +212,52 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
   }, [visivel, !!config]);
 
   const total = config ? totalDeCartoes(config) : 0;
+  // a dica "Deslize →": só no 1º cartão, 1x por aparelho; some ao 1º swipe/seta
+  const [dica, setDica] = useState(() => !dicaJaVista());
+  const esconderDica = () => { if (dica) { setDica(false); marcarDicaVista(); } };
 
   const fechar = (como: "ja_sei" | "fazer_agora") => {
     marcarCartoesVistos(moduleId);
     set(`core-tip-seen-${moduleId}`, "true");
+    if (dica) marcarDicaVista(); // mostrou uma vez: não repete no próximo módulo
     if (como === "ja_sei") trackEvent("modulo_cartoes_fechados", { moduleId, indice: pagina });
     setVisivel(false);
   };
 
+  /** A posição de rolagem do cartão n (cada cartão tem a própria largura: 88% ou 100% no último). */
+  const posicaoDe = (t: HTMLDivElement, n: number): number => (t.children[n] as HTMLElement | undefined)?.offsetLeft ?? 0;
   const irPara = (n: number) => {
     const t = trilho.current;
     const alvo = Math.max(0, Math.min(total - 1, n));
     if (t) {
-      if (typeof t.scrollTo === "function") t.scrollTo({ left: alvo * t.clientWidth, behavior: "smooth" });
-      else t.scrollLeft = alvo * t.clientWidth;
+      const left = posicaoDe(t, alvo);
+      if (typeof t.scrollTo === "function") t.scrollTo({ left, behavior: "smooth" });
+      else t.scrollLeft = left;
     }
     mudarPagina(alvo);
   };
   const mudarPagina = (n: number) => {
     if (n === pagina) return;
     setPagina(n);
+    esconderDica();
     trackEvent("modulo_cartao", { moduleId, indice: n });
   };
   const aoRolar = () => {
     const t = trilho.current;
     if (!t || !t.clientWidth) return;
-    mudarPagina(Math.round(t.scrollLeft / t.clientWidth));
+    // o cartão mais perto da borda esquerda
+    let perto = 0;
+    for (let i = 0; i < t.children.length; i++) if (Math.abs(posicaoDe(t, i) - t.scrollLeft) < Math.abs(posicaoDe(t, perto) - t.scrollLeft)) perto = i;
+    mudarPagina(perto);
+  };
+  /** As setas: o mesmo snap do swipe + o evento cartoes_modulo_seta. No último, a da direita fecha. */
+  const seta = (direcao: -1 | 1) => {
+    const para = pagina + direcao;
+    if (direcao === 1 && pagina >= total - 1) { trackEvent("cartoes_modulo_seta", { modulo: moduleId, de: pagina, para: "fechar" }); fechar("ja_sei"); return; }
+    if (para < 0 || para >= total) return;
+    trackEvent("cartoes_modulo_seta", { modulo: moduleId, de: pagina, para });
+    esconderDica();
+    irPara(para);
   };
 
   const fazerAgora = () => {
@@ -282,6 +318,22 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
           </button>
         </div>
 
+        <div className="relative flex-1 min-h-0 flex flex-col">
+        {/* as setas: na borda, na altura do meio, na cor do módulo — "←" a partir do 2º; "→" vira "✓" no último */}
+        {pagina > 0 && (
+          <button type="button" onClick={() => seta(-1)} aria-label="Cartão anterior" data-testid="cartoes-seta-anterior" className="absolute ct-seta ct-seta-esq">
+            <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => seta(1)}
+          aria-label={pagina >= total - 1 ? "Já sei" : "Próximo cartão"}
+          data-testid={pagina >= total - 1 ? "cartoes-seta-fechar" : "cartoes-seta-proximo"}
+          className="absolute ct-seta ct-seta-dir"
+        >
+          {pagina >= total - 1 ? <Check className="w-5 h-5" strokeWidth={2.5} /> : <ChevronRight className="w-5 h-5" strokeWidth={2.5} />}
+        </button>
         <div ref={trilho} className="ct-trilho flex-1 min-h-0" onScroll={aoRolar} data-testid="cartoes-trilho" tabIndex={0} aria-roledescription="carrossel">
           {/* 1 — Faz isso agora, com a ação acontecendo na miniatura */}
           <article className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina="0" aria-label={tituloAgora} aria-hidden={pagina !== 0 ? "true" : undefined}>
@@ -310,7 +362,7 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
           ))}
 
           {/* N — O que não precisa hoje */}
-          <article className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina={ultimo} aria-label={tituloDepois} aria-hidden={pagina !== ultimo ? "true" : undefined}>
+          <article className="ct-pagina px-5 pt-4 pb-4" data-ct-pagina={ultimo} data-ultimo="" aria-label={tituloDepois} aria-hidden={pagina !== ultimo ? "true" : undefined}>
             <Eyebrow>{total} · {tituloDepois}</Eyebrow>
             <h3 className="mt-1 text-[22px] font-bold leading-tight tracking-tight">Relaxa: isso fica pra depois.</h3>
             <p className="mt-2 text-[13px] leading-snug" style={{ color: "var(--ct-suave)" }}>
@@ -330,15 +382,23 @@ export const CartoesDoModulo = ({ config: pronta, moduleId: idPedido }: { config
             </button>
           </article>
         </div>
+        </div>
 
         <div className="flex items-center justify-between px-4 pt-2 shrink-0 pb-[max(0.9rem,var(--app-safe-bottom,0px))]" style={{ borderTop: "1px solid var(--ct-linha)" }}>
-          <div className="flex items-center gap-1" role="tablist" aria-label="Cartões">
-            {titulos.map((p, i) => (
-              <button key={`${p}-${i}`} type="button" role="tab" aria-selected={i === pagina} aria-label={`Cartão ${i + 1}: ${p}`} onClick={() => irPara(i)} className="p-1.5" data-testid={`cartoes-bolinha-${i}`}>
-                <i className="ct-dot" data-ativo={i === pagina ? "" : undefined} />
-              </button>
-            ))}
-            <span className="ml-1 text-[11px] tabular-nums" style={{ color: "var(--ct-suave)" }} data-testid="cartoes-contador">{pagina + 1} de {total}</span>
+          <div>
+            <div className="flex items-center gap-1" role="tablist" aria-label="Cartões">
+              {titulos.map((p, i) => (
+                <button key={`${p}-${i}`} type="button" role="tab" aria-selected={i === pagina} aria-label={`Cartão ${i + 1}: ${p}`} onClick={() => irPara(i)} className="p-1.5" data-testid={`cartoes-bolinha-${i}`}>
+                  <i className="ct-dot" data-ativo={i === pagina ? "" : undefined} />
+                </button>
+              ))}
+              <span className="ml-1 text-[11px] tabular-nums" style={{ color: "var(--ct-suave)" }} data-testid="cartoes-contador">{pagina + 1} de {total}</span>
+            </div>
+            {dica && pagina === 0 && (
+              <p className="ct-dica mt-0.5 pl-1.5 text-[11.5px] font-semibold" style={{ color: "var(--ct-acento)" }} data-testid="cartoes-dica-deslizar" aria-hidden="true">
+                Deslize <span className="ct-dica-seta">→</span>
+              </p>
+            )}
           </div>
           <FigurinhaPlaceholder tamanho={40} className="-rotate-6" />
         </div>

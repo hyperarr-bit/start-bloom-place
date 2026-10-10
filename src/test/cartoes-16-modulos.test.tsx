@@ -248,6 +248,80 @@ describe("a porta única: chave off = ModuleTip de sempre; on = a folha dos cart
   });
 });
 
+describe("v3: espiada do próximo, setas e a dica 'Deslize →' (dono no Simulador: 'tem que ficar mais óbvio que rola pro lado')", () => {
+  beforeEach(() => localStorage.setItem(CHAVE_FORCA_CARTOES, "on"));
+
+  it("a seta → avança pelo mesmo snap (evento cartoes_modulo_seta {modulo, de, para}); ← aparece a partir do 2º e volta; no último a → vira o ✓ do Já sei", async () => {
+    const n = criarNuvem({});
+    n.montar(<CartoesDoModulo moduleId="rotina" />, "/rotina");
+    const folha = await esperarFolha();
+    const total = Number(folha.getAttribute("data-total"));
+    expect(screen.queryByTestId("cartoes-seta-anterior")).toBeNull(); // no 1º não há "←"
+    fireEvent.click(screen.getByTestId("cartoes-seta-proximo"));
+    expect(screen.getByTestId("cartoes-contador").textContent).toBe(`2 de ${total}`);
+    expect(eventos).toContainEqual(["cartoes_modulo_seta", { modulo: "rotina", de: 0, para: 1 }]);
+    expect(eventos).toContainEqual(["modulo_cartao", { moduleId: "rotina", indice: 1 }]);
+    expect(screen.getByTestId("cartoes-seta-anterior")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("cartoes-seta-anterior"));
+    expect(screen.getByTestId("cartoes-contador").textContent).toBe(`1 de ${total}`);
+    expect(eventos).toContainEqual(["cartoes_modulo_seta", { modulo: "rotina", de: 1, para: 0 }]);
+    // até o último: a "→" some e no lugar fica o "✓" (Já sei), que fecha
+    for (let i = 0; i < total - 1; i++) fireEvent.click(screen.getByTestId("cartoes-seta-proximo"));
+    expect(screen.getByTestId("cartoes-contador").textContent).toBe(`${total} de ${total}`);
+    expect(screen.queryByTestId("cartoes-seta-proximo")).toBeNull();
+    expect(folha.querySelector("article[data-ultimo]")).not.toBeNull(); // o último não tem espiada (CSS: 100%)
+    fireEvent.click(screen.getByTestId("cartoes-seta-fechar"));
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(eventos).toContainEqual(["cartoes_modulo_seta", { modulo: "rotina", de: total - 1, para: "fechar" }]);
+    expect(eventos.at(-1)).toEqual(["modulo_cartoes_fechados", { moduleId: "rotina", indice: total - 1 }]);
+  });
+
+  it("a dica 'Deslize →' só no 1º cartão, some ao 1º toque na seta e não volta neste aparelho (nem em outro módulo)", async () => {
+    const n = criarNuvem({});
+    n.montar(<CartoesDoModulo moduleId="casa" />, "/casa");
+    await esperarFolha();
+    expect(screen.getByTestId("cartoes-dica-deslizar")).toBeInTheDocument();
+    expect(localStorage.getItem("core-cartoes-dica-deslizar")).toBeNull();
+    fireEvent.click(screen.getByTestId("cartoes-seta-proximo"));
+    expect(screen.queryByTestId("cartoes-dica-deslizar")).toBeNull();
+    expect(localStorage.getItem("core-cartoes-dica-deslizar")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("cartoes-seta-anterior"));
+    expect(screen.queryByTestId("cartoes-dica-deslizar")).toBeNull(); // voltar pro 1º não traz a dica de volta
+    cleanup();
+    const n2 = criarNuvem({});
+    n2.montar(<CartoesDoModulo moduleId="pet" />, "/pet");
+    await esperarFolha();
+    expect(screen.queryByTestId("cartoes-dica-deslizar")).toBeNull();
+  });
+
+  it("a dica some pelo swipe (bolinha) também; fechar a folha com a dica na tela já conta como vista", async () => {
+    const n = criarNuvem({});
+    n.montar(<CartoesDoModulo moduleId="detox" />, "/detox");
+    await esperarFolha();
+    fireEvent.click(screen.getByTestId("cartoes-bolinha-2"));
+    expect(screen.queryByTestId("cartoes-dica-deslizar")).toBeNull();
+    expect(localStorage.getItem("core-cartoes-dica-deslizar")).toBeTruthy();
+    localStorage.removeItem("core-cartoes-dica-deslizar");
+    cleanup();
+    const n2 = criarNuvem({});
+    n2.montar(<CartoesDoModulo moduleId="viagens" />, "/viagens");
+    await esperarFolha();
+    expect(screen.getByTestId("cartoes-dica-deslizar")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("cartoes-ja-sei"));
+    expect(localStorage.getItem("core-cartoes-dica-deslizar")).toBeTruthy();
+  });
+
+  it("CSS: espiada (cartão 88%, o último 100%), setas de 38 px na cor do módulo, dica com 3 ciclos e parada no reduced-motion", () => {
+    const css = ler("src/components/cartoes-modulo/cartoes.css");
+    expect(css).toContain(".ct-folha .ct-pagina { width: 88%; }");
+    expect(css).toContain(".ct-folha .ct-pagina[data-ultimo] { width: 100%; }");
+    expect(css).toMatch(/\.ct-seta \{[^}]*width: 38px; height: 38px;[^}]*background: var\(--ct-acento\)/);
+    expect(css).toMatch(/\.ct-dica-seta \{[^}]*animation: ct-deslize \.7s ease-in-out 3/);
+    const reduzido = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduzido).toMatch(/\.ct-dica-seta \{ animation: none; \}|, \.ct-dica-seta \{ animation: none; \}/);
+  });
+});
+
 describe("numa página real (Saúde)", () => {
   it("off: o 'Dicas para começar' de sempre; on: a folha na paleta da Saúde com o HydrationTracker de verdade na miniatura", async () => {
     const n = criarNuvem({ "spotlight-done-saude": "true" });

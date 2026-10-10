@@ -116,6 +116,22 @@
 .ct-folha .ct-pagina { height: 100%; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: none; }
 .ct-folha .ct-pagina::-webkit-scrollbar { display: none; }
 
+/* ESPIADA (v3): o cartão ocupa 88% da largura e ~12% do próximo aparece à direita, com um fio
+ * separando — o último ocupa 100% (não há o que espiar). O snap continua por cartão. */
+.ct-folha .ct-pagina { width: 88%; }
+.ct-folha .ct-pagina[data-ultimo] { width: 100%; }
+.ct-folha .ct-pagina + .ct-pagina { border-left: 1px solid var(--ct-linha); }
+
+/* SETAS (v3): redondas, na borda, na altura do meio, na cor do módulo */
+.ct-seta { position: absolute; top: 50%; transform: translateY(-50%); z-index: 10; width: 38px; height: 38px; border-radius: 999px; display: grid; place-items: center; background: var(--ct-acento); color: var(--ct-acento-tinta); box-shadow: 0 6px 18px -8px rgba(0,0,0,.45), 0 0 0 2px var(--ct-cartao); transition: transform .12s; }
+.ct-seta:active { transform: translateY(-50%) scale(.94); }
+.ct-seta-dir { right: 8px; }
+.ct-seta-esq { left: 8px; }
+
+/* DICA (v3): "Deslize →" com a seta indo e voltando 4 px, 3 ciclos, e para */
+.ct-dica-seta { display: inline-block; animation: ct-deslize .7s ease-in-out 3; }
+@keyframes ct-deslize { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+
 .ct-dot { display: block; width: 6px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ct-tinta) 22%, transparent); transition: width .2s, background .2s; }
 .ct-dot[data-ativo] { width: 16px; background: var(--ct-acento); }
 
@@ -137,6 +153,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ct-trilho { scroll-behavior: auto; transition: none !important; }
-  .ct-dedinho, .ct-anel, .ct-linha-nova, .ct-cursor { animation: none; }
-  .ct-barra { transition: none; }
+  .ct-dedinho, .ct-anel, .ct-linha-nova, .ct-cursor, .ct-dica-seta { animation: none; }
+  .ct-barra, .ct-seta { transition: none; }
 }

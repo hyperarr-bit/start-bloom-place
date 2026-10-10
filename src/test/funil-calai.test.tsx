@@ -218,8 +218,14 @@ describe("LIGADA: a sequência enxuta", () => {
       expect(screen.getByTestId("welcome-video")).toHaveAttribute("playsinline");
       expect(eventos).toContainEqual(["funnel_view", { step: "welcome", funil: "w", video: true }]);
       expect(eventos).toContainEqual(["app_welcome_view", { calai: true }]);
-      expect(screen.getByText(/Já tem conta\?/)).toBeInTheDocument();
-      expect(screen.getByText(/Termos e Aviso de Privacidade/)).toBeInTheDocument();
+      // 10/10 (dono): "Já tem conta? Entrar" ABAIXO do Começar, como o Cal AI; sem termos, sem
+      // "Restaurar compras" (foi pra tela de Entrar), sem "Já é cliente?"
+      const entrar = screen.getByText(/Já tem conta\?/).closest("button")!;
+      const comecar = screen.getByTestId("welcome-comecar");
+      expect(comecar.compareDocumentPosition(entrar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.queryByText(/Termos e Aviso de Privacidade/)).toBeNull();
+      expect(screen.queryByText(/Restaurar compras/)).toBeNull();
+      expect(screen.queryByText(/Já é cliente/)).toBeNull();
       // o vídeo rodou / falhou
       fireEvent.playing(screen.getByTestId("welcome-video"));
       expect(eventos).toContainEqual(["welcome_video_play", {}]);

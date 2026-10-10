@@ -15,11 +15,13 @@ import {
  * mesma folha de baixo do menu da conta (AccountDrawer) — nada novo no visual.
  * Compromissos, tarefas e contas a vencer não estão aqui: são da pessoa.
  */
-export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange }: {
+export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange, porModulo = [] }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   prefs: PendenciasPrefs;
   onChange: (p: PendenciasPrefs) => void;
+  /** 10/10 — tipos escondidos porque o MÓDULO deles está oculto na Home (regra derivada): a linha explica e o interruptor trava. */
+  porModulo?: TipoPendencia[];
 }) {
   const alternar = (tipo: TipoPendencia, mostrar: boolean) => onChange(mostrar ? religar(prefs, tipo) : ocultar(prefs, tipo));
   const ocultos = prefs.ocultos.length;
@@ -44,18 +46,19 @@ export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange }: 
 
         <div className="px-5 space-y-1">
           {CATALOGO_PENDENCIAS.map((c) => {
-            const ligado = !estaOculto(prefs, c.tipo);
+            const peloModulo = porModulo.includes(c.tipo);
+            const ligado = !estaOculto(prefs, c.tipo) && !peloModulo;
             return (
-              <div key={c.tipo} className="rounded-xl border border-border/50 bg-card" data-testid={`pref-${c.tipo}`}>
+              <div key={c.tipo} className="rounded-xl border border-border/50 bg-card" data-testid={`pref-${c.tipo}`} data-pelo-modulo={peloModulo ? "" : undefined}>
                 <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
                   <span className="text-sm">{c.emoji}</span>
                   <span className="flex-1 min-w-0">
                     <span className={`block text-xs font-medium ${ligado ? "" : "text-muted-foreground line-through"}`}>{c.nome}</span>
                     <span className="block text-[10px] text-muted-foreground leading-snug">
-                      {c.tipo === "peso" && ligado ? rotuloDoPeso(prefs) : c.descricao}
+                      {peloModulo ? "Escondido junto com o módulo (religue o módulo em Módulos › ⚙)" : c.tipo === "peso" && ligado ? rotuloDoPeso(prefs) : c.descricao}
                     </span>
                   </span>
-                  <Switch checked={ligado} onCheckedChange={(v) => alternar(c.tipo, v)} aria-label={`Mostrar ${c.nome}`} className="scale-90" />
+                  <Switch checked={ligado} disabled={peloModulo} onCheckedChange={(v) => alternar(c.tipo, v)} aria-label={`Mostrar ${c.nome}`} className="scale-90" />
                 </label>
                 {c.tipo === "peso" && ligado && (
                   <div className="px-3 pb-2.5 space-y-2" data-testid="peso-frequencia">

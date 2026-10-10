@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Star, Settings, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR } from "@/lib/tour-home";
 
 const modules = MODULOS;
 
@@ -11,6 +12,19 @@ export const ModuleDrawer = () => {
   const navigate = useNavigate();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
+
+  /* 10/10 — o tour da Home (passo 5) abre a engrenagem e esconde um módulo POR
+     EVENTO: a preferência tem uma fonte só (este hook). Sem os eventos, nada muda. */
+  useEffect(() => {
+    const editar = (e: Event) => setEditMode((e as CustomEvent<{ editar?: boolean }>).detail?.editar !== false);
+    const ocultar = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id && modules.some((m) => m.id === id) && !isHidden(id)) toggleHidden(id);
+    };
+    window.addEventListener(EVENTO_MODULOS_EDITAR, editar);
+    window.addEventListener(EVENTO_MODULOS_OCULTAR, ocultar);
+    return () => { window.removeEventListener(EVENTO_MODULOS_EDITAR, editar); window.removeEventListener(EVENTO_MODULOS_OCULTAR, ocultar); };
+  });
 
   // Ordem da pessoa (avaliação: "poder mover a ordem das coisas... deixar a
   // tela inicial do seu jeito, mover, editar, ocultar"). Sem ordem salva, é
@@ -28,6 +42,8 @@ export const ModuleDrawer = () => {
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Módulos</h3>
         <button
           onClick={() => setEditMode(!editMode)}
+          aria-label={editMode ? "Fechar edição dos módulos" : "Editar módulos"}
+          data-tour="modulos-engrenagem"
           className={`p-1.5 rounded-lg transition-colors ${editMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
           <Settings className="w-3.5 h-3.5" />
@@ -55,6 +71,7 @@ export const ModuleDrawer = () => {
                 </button>
                 <button
                   onClick={() => toggleHidden(m.id)}
+                  aria-label={isHidden(m.id) ? `Mostrar ${m.label}` : `Esconder ${m.label}`}
                   className={`w-5 h-5 rounded-full flex items-center justify-center ${
                     isHidden(m.id) ? "bg-destructive text-white" : "bg-card border border-border text-muted-foreground"
                   }`}

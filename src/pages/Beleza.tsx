@@ -18,6 +18,10 @@ import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useLocation } from "react-router-dom";
+import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
+import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
+import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -62,6 +66,10 @@ const Beleza = () => {
   const [recemGerada, setRecemGerada] = useState<PerfilDaPele | null>(null);
   const rotinaNoTopo = activeTab === "routine" && vazia;
   const rotina = <SkincareRoutine recemGerada={recemGerada} onGerada={setRecemGerada} />;
+  // 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home) no lugar do "Dicas pra começar"; nunca na demo
+  const { pathname } = useLocation();
+  guardarForcasDaUrl(); // a força do link (`?cartoes=on`) tem que estar guardada ANTES de perguntar se está ligado
+  const comCartoes = !pathname.startsWith("/preview") && cartoesLigados();
 
   // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
   useEffect(() => {
@@ -117,17 +125,18 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {comCartoes && <CartoesDoModulo config={cartoesBeleza({ irParaSkincare: () => handleTabChange("routine") })} />}
         {activeTab === "routine" && (
           <>
             {rotinaNoTopo && rotina}
-            <DicasDaBeleza
+            {!comCartoes && <DicasDaBeleza
               dicas={[
                 "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
                 "Toque num passo pra escolher o produto e os dias da semana",
                 "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
                 "Cadastre seus produtos para rastrear validade e custo por dose",
               ]}
-            />
+            />}
             <DailyMirror />
             {!rotinaNoTopo && rotina}
             <SkinDiary />

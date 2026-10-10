@@ -857,6 +857,19 @@ const ARTES: Record<string, ReactNode> = {
     </>
   ),
 
+  // casa arrumada (10/10, tour da Home) — PLACEHOLDER: casinha com estrela; a ilustração final o dono gera
+  "casa-arrumada": (
+    <>
+      <path d="M50,20 L18,48 H28 V80 H72 V48 H82 Z" fill="#fbcfe8" />
+      <path d="M50,20 L18,48 H82 Z" fill="#d22d80" />
+      <rect x="42" y="58" width="16" height="22" rx="3" fill="#7c3aed" />
+      <rect x="31" y="54" width="9" height="9" rx="2" fill="#fde68a" />
+      <rect x="60" y="54" width="9" height="9" rx="2" fill="#fde68a" />
+      <Brilho x={80} y={24} r={7} />
+      <Brilho x={22} y={30} r={4.5} cor="#f9a8d4" />
+    </>
+  ),
+
   /* ---------------- Geral ---------------- */
   // coroa
   "master": (

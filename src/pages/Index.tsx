@@ -8,6 +8,9 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ModuleTip } from "@/components/ModuleTip";
+import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
+import { cartoesFinancas } from "@/components/cartoes-modulo/cartoes-financas";
+import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { ArrowLeft, DollarSign, Sparkles } from "lucide-react";
 import { AskCore } from "@/components/ask/AskCore";
 
@@ -459,6 +462,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
+        {/* 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home): 1ª visita, fora da missão e do
+            holofote; nunca na demo. Desligada, não existe o nó. */}
+        {!isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que

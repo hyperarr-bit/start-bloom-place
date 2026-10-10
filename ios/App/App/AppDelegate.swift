@@ -94,6 +94,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
      * próxima ativação; o JS (welcome/Home) continua como segunda chance. */
     static var attEmAndamento = false
     static func pedirATTSePrecisar() {
+        #if targetEnvironment(simulator)
+        return // no simulador o diálogo de ATT só atrapalha os prints
+        #endif
         guard #available(iOS 14, *), !attEmAndamento else { return }
         guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
         attEmAndamento = true
@@ -309,6 +312,9 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
      * nada) e espelha o resultado no SDK. Sempre na thread principal — a
      * Apple exige e, fora dela, o diálogo simplesmente não aparece. */
     @objc func pedirRastreamento(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        call.resolve(["status": "denied"]); return // simulador: sem diálogo
+        #endif
         guard #available(iOS 14, *) else { call.resolve(["status": "restricted"]); return }
         DispatchQueue.main.async {
             ATTrackingManager.requestTrackingAuthorization { status in

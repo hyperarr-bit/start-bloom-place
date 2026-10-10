@@ -19,7 +19,7 @@ const cartoesRelacionamentos = (): ConfigCartoes => ({
     seletor: '[data-testid="comeco-pronto"], [data-testid="lista-pessoas"]',
     apoio: "O ano é opcional. O app lembra na véspera e no dia.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Mãe", "Lu"], "Rafa", { x: "24%", y: "24%" }, { x: "10%", y: "76%" }, { x: "84%", y: "24%" })}>
         <MiniAcao titulo="MINHAS PESSOAS" emoji="💌" cor={COR} corBotao={BOTAO} placeholder="Nome da pessoa…" botao="Guardar" itens={["Mãe", "Lu"]} subtitulos={{ Mãe: "família · 🎂 12/03", Lu: "melhor amiga · 🎂 28/07", Rafa: "irmão · 🎂 05/11" }} />
       </Miniatura>
@@ -39,7 +39,7 @@ const cartoesRelacionamentos = (): ConfigCartoes => ({
       titulo: "Datas que importam",
       texto: "Aniversários e datas especiais no mês — com aviso antes.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={210}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniCalendario titulo="DATAS" emoji="📅" cor={COR} corMarca={BOTAO} marcados={[5, 12, 28]} legendas={{ 5: "🎂 Rafa", 12: "💍 Aniversário de casamento", 28: "🎂 Lu" }} />
         </Miniatura>
       ),
@@ -48,7 +48,7 @@ const cartoesRelacionamentos = (): ConfigCartoes => ({
       titulo: "Momentos",
       texto: "O jantar, a ligação, o passeio — guardados com quem foi.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={150}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniLinhas titulo="MOMENTOS" emoji="✨" cor={COR} corBotao={BOTAO} caixa={false} itens={["Jantar com a Lu", "Ligação pra mãe"]} subtitulos={{ "Jantar com a Lu": "sábado · 📸 2 fotos", "Ligação pra mãe": "domingo · 40 min" }} />
         </Miniatura>
       ),

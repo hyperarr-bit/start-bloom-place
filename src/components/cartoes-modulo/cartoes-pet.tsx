@@ -31,7 +31,7 @@ const cartoesPet = (): ConfigCartoes => ({
     seletor: '[data-spotlight="pet-especie"], [data-testid="selos"]',
     apoio: "Em 3 toques ele ganha RG, a rotina do dia e a carteirinha de vacinas.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={150} intervalo={1300} quadros={quadrosValor([0, 1, 0], { x: "12%", y: "48%" })}>
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1300} quadros={quadrosValor([0, 1, 0], { x: "12%", y: "48%" })}>
         <MiniChips titulo="QUEM É O SEU PET?" emoji="🐾" cor={COR} corAcesa={BOTAO} chips={["🐶 Cachorro", "🐱 Gato", "🐾 Outro"]} abaixo={<p className="text-[11px] text-muted-foreground">Depois: o nome e o aniversário. Pronto.</p>} />
       </Miniatura>
     ),
@@ -50,7 +50,7 @@ const cartoesPet = (): ConfigCartoes => ({
       titulo: "Saúde: vacinas e remédios",
       texto: "A carteirinha com as datas — o app avisa quando vence.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniLinhas titulo="CARTEIRINHA" emoji="💉" cor={COR} corBotao={BOTAO} caixa={false} itens={["V10 · 12/03", "Antirrábica · vence 20/11", "Vermífugo · a cada 3 meses"]} subtitulos={{ "V10 · 12/03": "em dia ✓", "Antirrábica · vence 20/11": "aviso 7 dias antes", "Vermífugo · a cada 3 meses": "próximo: 02/12" }} />
         </Miniatura>
       ),
@@ -59,7 +59,7 @@ const cartoesPet = (): ConfigCartoes => ({
       titulo: "Gastos do pet",
       texto: "Ração, veterinário, banho — quanto ele custa por mês.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={150}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniBarras titulo="GASTOS DO MÊS" emoji="💸" cor={COR} corBarra={BOTAO} unidade="R$ " barras={[{ rotulo: "Ração", valor: 180 }, { rotulo: "Veterinário", valor: 120 }, { rotulo: "Banho", valor: 60 }]} rodape="Total: R$ 360" />
         </Miniatura>
       ),

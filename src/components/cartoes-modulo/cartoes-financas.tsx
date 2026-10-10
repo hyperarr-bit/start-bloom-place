@@ -34,7 +34,7 @@ export const cartoesFinancas = ({ irParaFinanceiro }: { irParaFinanceiro: () => 
     antes: irParaFinanceiro,
     apoio: "Escreve o gasto, o valor, e toca no +. O mês soma sozinho.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Mercado · R$ 235,00", "Uber · R$ 38,00"], "Café · R$ 12,00", { x: "24%", y: "24%" }, { x: "24%", y: "76%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="CUSTOS VARIÁVEIS" emoji="💸" cor={COR} corBotao={BOTAO} placeholder="+ Novo gasto" itens={["Mercado · R$ 235,00", "Uber · R$ 38,00"]} subtitulos={{ "Mercado · R$ 235,00": "Alimentação · Pix", "Uber · R$ 38,00": "Transporte · Pix", "Café · R$ 12,00": "Alimentação · Pix" }} />
       </Miniatura>
@@ -54,7 +54,7 @@ export const cartoesFinancas = ({ irParaFinanceiro }: { irParaFinanceiro: () => 
       titulo: "Seu mês num olhar",
       texto: "O Dashboard soma receitas, fixos e variáveis — e diz quanto sobra.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniBarras titulo="DASHBOARD" emoji="📊" cor={COR} corBarra={BOTAO} unidade="R$ " barras={[{ rotulo: "Receitas", valor: 3500 }, { rotulo: "Fixos", valor: 1850 }, { rotulo: "Variáveis", valor: 643 }, { rotulo: "Sobra", valor: 1007 }]} rodape="Saldo do mês: R$ 1.007" />
         </Miniatura>
       ),
@@ -63,7 +63,7 @@ export const cartoesFinancas = ({ irParaFinanceiro }: { irParaFinanceiro: () => 
       titulo: "Contas que vencem",
       texto: "No Meu mês cada conta cai no dia — e o app te lembra antes.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={210}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniCalendario titulo="MEU MÊS" emoji="📅" cor={COR} corMarca={BOTAO} marcados={[5, 10, 20]} legendas={{ 5: "Aluguel · R$ 1.200", 10: "Energia · R$ 178", 20: "Internet · R$ 99" }} />
         </Miniatura>
       ),

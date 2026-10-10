@@ -16,7 +16,7 @@ const cartoesRotina = (): ConfigCartoes => ({
     seletor: '[data-spotlight="add-habit"]',
     apoio: "Ele já aparece na sua semana e você marca com um toque por dia.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Meditar", "Alongar"], "Beber água", { x: "24%", y: "24%" }, { x: "10%", y: "76%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="HÁBITOS DIÁRIOS" emoji="✅" cor={COR} corBotao={BOTAO} placeholder="Novo hábito…" itens={["Meditar", "Alongar"]} caixa />
       </Miniatura>
@@ -27,7 +27,7 @@ const cartoesRotina = (): ConfigCartoes => ({
       titulo: "Marca a semana",
       texto: "Cada quadradinho é um hábito num dia — a linha da semana cresce sozinha.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170} intervalo={1200}
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1200}
           quadros={quadrosMarcar([[0, 1, 7, 8], [0, 1, 7, 8, 14], [0, 1, 7, 8, 14, 15]], [{ x: "36%", y: "58%" }, { x: "36%", y: "58%" }, { x: "44%", y: "58%" }])}>
           <MiniSemana titulo="MINHA SEMANA" emoji="📅" cor={COR} corMarca={BOTAO} linhas={["Meditar", "Alongar", "Beber água"]} />
         </Miniatura>
@@ -37,7 +37,7 @@ const cartoesRotina = (): ConfigCartoes => ({
       titulo: "Meu mês: compromissos",
       texto: "Dentista, aniversário, prova — com hora, e o aviso antes.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={210}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniCalendario titulo="MEU MÊS" emoji="📆" cor={COR} corMarca={BOTAO} marcados={[3, 12, 18]} legendas={{ 3: "Academia · 7h", 12: "Dentista · 15h", 18: "Aniversário da Lu" }} />
         </Miniatura>
       ),
@@ -46,7 +46,7 @@ const cartoesRotina = (): ConfigCartoes => ({
       titulo: "Foco: 25 minutos",
       texto: "O pomodoro conta o tempo e guarda quantos blocos você fez.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={150} intervalo={1200} quadros={quadrosValor([10, 18, 25])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1200} quadros={quadrosValor([10, 18, 25])}>
           <MiniMeta titulo="FOCO" emoji="🧠" cor={COR} corBarra={BOTAO} valor={18} alvo={25} unidade="min" legenda="25 de foco, 5 de pausa — 3 blocos hoje" />
         </Miniatura>
       ),

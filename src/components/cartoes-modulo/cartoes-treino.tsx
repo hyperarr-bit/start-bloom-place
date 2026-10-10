@@ -45,7 +45,7 @@ const cartoesTreino = (): ConfigCartoes => ({
     antes: () => abrirAba("PLANO"),
     apoio: "Dois toques e a semana inteira fica montada — você só ajusta.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={190} intervalo={1500} quadros={quadrosValor([0, 1, 2], { x: "44%", y: "28%" })}>
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1500} quadros={quadrosValor([0, 1, 2], { x: "44%", y: "28%" })}>
         <MiniPlano />
       </Miniatura>
     ),
@@ -55,7 +55,7 @@ const cartoesTreino = (): ConfigCartoes => ({
       titulo: "Hoje: marca cada série",
       texto: "O treino do dia já vem do plano — toca em cada exercício feito.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={190} intervalo={1200} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1200} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
           <MiniLinhas titulo="HOJE · PERNAS" emoji="🏋️" cor={COR} corBotao={BOTAO} itens={["Agachamento · 3×12", "Leg press · 3×12", "Cadeira extensora · 3×15"]} subtitulos={{ "Agachamento · 3×12": "40 kg", "Leg press · 3×12": "120 kg", "Cadeira extensora · 3×15": "35 kg" }} />
         </Miniatura>
       ),
@@ -64,7 +64,7 @@ const cartoesTreino = (): ConfigCartoes => ({
       titulo: "Semana: os dias feitos",
       texto: "Cada treino marcado vira um dia na semana — e na sua sequência.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={130} intervalo={1200} quadros={quadrosMarcar([[0, 2], [0, 2, 4]], [{ x: "48%", y: "48%" }, { x: "62%", y: "48%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1200} quadros={quadrosMarcar([[0, 2], [0, 2, 4]], [{ x: "48%", y: "48%" }, { x: "62%", y: "48%" }])}>
           <MiniSemana titulo="SEMANA" emoji="📅" cor={COR} corMarca={BOTAO} linhas={["Treinos"]} rodape="3 de 3 esta semana · meta batida" />
         </Miniatura>
       ),

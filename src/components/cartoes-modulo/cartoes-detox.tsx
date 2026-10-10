@@ -18,7 +18,7 @@ const cartoesDetox = (): ConfigCartoes => ({
     seletor: 'input[placeholder^="O que quer parar"]',
     apoio: "Redes sociais, açúcar, cigarro — o check-in de cada dia vira sua sequência.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={170} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Açúcar"], "Redes sociais à noite", { x: "24%", y: "24%" }, { x: "10%", y: "62%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="RASTREADOR" emoji="🌿" cor={COR} corBotao={BOTAO} placeholder="O que quer parar?" itens={["Açúcar"]} caixa subtitulos={{ Açúcar: "4 dias seguidos", "Redes sociais à noite": "começa hoje" }} />
       </Miniatura>
@@ -38,7 +38,7 @@ const cartoesDetox = (): ConfigCartoes => ({
       titulo: "O check-in vira sequência",
       texto: "Um toque por dia — a semana mostra o que você segurou.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={150} intervalo={1200} quadros={quadrosMarcar([[0, 1, 2, 7, 8], [0, 1, 2, 3, 7, 8], [0, 1, 2, 3, 7, 8, 9]], [{ x: "52%", y: "42%" }, { x: "52%", y: "42%" }, { x: "44%", y: "58%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1200} quadros={quadrosMarcar([[0, 1, 2, 7, 8], [0, 1, 2, 3, 7, 8], [0, 1, 2, 3, 7, 8, 9]], [{ x: "52%", y: "42%" }, { x: "52%", y: "42%" }, { x: "44%", y: "58%" }])}>
           <MiniSemana titulo="SEQUÊNCIA" emoji="🔥" cor={COR} corMarca={BOTAO} linhas={["Açúcar", "Redes"]} />
         </Miniatura>
       ),
@@ -47,7 +47,7 @@ const cartoesDetox = (): ConfigCartoes => ({
       titulo: "Stats",
       texto: "Dias limpos, melhor sequência, recaídas — sem julgamento.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={150}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniBarras titulo="DIAS LIMPOS" emoji="📈" cor={COR} corBarra={BOTAO} barras={[{ rotulo: "Açúcar", valor: 12 }, { rotulo: "Redes", valor: 5 }]} rodape="melhor sequência: 12 dias" />
         </Miniatura>
       ),

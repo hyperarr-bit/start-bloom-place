@@ -18,7 +18,7 @@ const cartoesViagens = (): ConfigCartoes => ({
     seletor: 'input[placeholder="Destino..."], input[placeholder="Destino"]',
     apoio: "Só o lugar. Roteiro, mala e orçamento vêm quando a viagem ficar de pé.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Lisboa", "Chapada dos Veadeiros"], "Japão", { x: "24%", y: "24%" }, { x: "10%", y: "76%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="DESTINOS" emoji="🧭" cor={COR} corBotao={BOTAO} placeholder="Destino…" itens={["Lisboa", "Chapada dos Veadeiros"]} subtitulos={{ Lisboa: "Portugal · abril", "Chapada dos Veadeiros": "Goiás · feriado", Japão: "sonho" }} />
       </Miniatura>
@@ -38,7 +38,7 @@ const cartoesViagens = (): ConfigCartoes => ({
       titulo: "Roteiro dia a dia",
       texto: "O que fazer em cada dia — e o app ordena pela hora.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniLinhas titulo="ROTEIRO · LISBOA" emoji="🗺️" cor={COR} corBotao={BOTAO} caixa={false} itens={["Dia 1 · Alfama e Castelo", "Dia 2 · Belém", "Dia 3 · Sintra"]} subtitulos={{ "Dia 1 · Alfama e Castelo": "elétrico 28 · pastel de nata", "Dia 2 · Belém": "Mosteiro · Torre", "Dia 3 · Sintra": "Pena · Quinta da Regaleira" }} />
         </Miniatura>
       ),
@@ -47,7 +47,7 @@ const cartoesViagens = (): ConfigCartoes => ({
       titulo: "Mala",
       texto: "A lista do que levar — marca enquanto arruma.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={190} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
           <MiniLinhas titulo="MALA" emoji="🎒" cor={COR} corBotao={BOTAO} itens={["Passaporte", "Carregador", "Tênis confortável", "Protetor solar"]} />
         </Miniatura>
       ),

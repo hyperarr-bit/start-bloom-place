@@ -18,7 +18,7 @@ const cartoesCasa = (): ConfigCartoes => ({
     seletor: 'input[placeholder^="Adicionar item"], input[placeholder^="Nome do cômodo"], [data-spotlight="tab-mercado"]',
     apoio: "A cozinha, a sala e o quarto já estão aqui — é só dizer o que falta fazer.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Lavar a louça", "Limpar o fogão"], "Trocar o pano de prato", { x: "24%", y: "24%" }, { x: "10%", y: "76%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="COZINHA" emoji="🍳" cor={COR} corBotao={BOTAO} placeholder="Adicionar item…" itens={["Lavar a louça", "Limpar o fogão"]} caixa />
       </Miniatura>
@@ -38,7 +38,7 @@ const cartoesCasa = (): ConfigCartoes => ({
       titulo: "Despensa → mercado",
       texto: "Marca o que acabou e ele vai pra lista do mercado sozinho.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
           <MiniLinhas titulo="DESPENSA" emoji="🛒" cor={COR} corBotao={BOTAO} itens={["Arroz", "Café", "Azeite"]} subtitulos={{ Arroz: "acabou", Café: "pouco", Azeite: "ok" }} rodape="O que acabou vai pro MERCADO" />
         </Miniatura>
       ),
@@ -47,7 +47,7 @@ const cartoesCasa = (): ConfigCartoes => ({
       titulo: "Lista do mercado",
       texto: "No mercado é só marcar — o que falta fica em cima.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={190} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1300} quadros={quadrosMarcar([[], [0], [0, 1]], [{ x: "8%", y: "32%" }, { x: "8%", y: "32%" }, { x: "8%", y: "52%" }])}>
           <MiniLinhas titulo="MERCADO" emoji="🍎" cor={COR} corBotao={BOTAO} itens={["Arroz · 5 kg", "Café · 500 g", "Detergente", "Frutas da semana"]} />
         </Miniatura>
       ),

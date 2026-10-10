@@ -20,7 +20,7 @@ const cartoesDesenvolvimento = (): ConfigCartoes => ({
     antes: () => abrirAba("METAS"),
     apoio: "Só o nome. Etapas e prazo você põe quando quiser.",
     miniatura: (
-      <Miniatura sementes={{}} largura={430} altura={200} intervalo={1400}
+      <Miniatura sementes={{}} largura={430} altura={260} intervalo={1400}
         quadros={quadrosDigitar(["Ler 2 livros", "Guardar R$ 500"], "Correr 5 km", { x: "24%", y: "24%" }, { x: "10%", y: "76%" }, { x: "86%", y: "24%" })}>
         <MiniAcao titulo="METAS" emoji="🎯" cor={COR} corBotao={BOTAO} placeholder="Nova meta…" itens={["Ler 2 livros", "Guardar R$ 500"]} caixa subtitulos={{ "Ler 2 livros": "1 de 2 · até 31/10", "Guardar R$ 500": "R$ 320 · até 31/10" }} />
       </Miniatura>
@@ -40,7 +40,7 @@ const cartoesDesenvolvimento = (): ConfigCartoes => ({
       titulo: "Humor & score",
       texto: "Como você está hoje, num toque — e o score do dia junta tudo.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={190} intervalo={1300} quadros={quadrosMarcar([[], [3], [3]], [{ x: "8%", y: "70%" }, { x: "8%", y: "70%" }, { x: "8%", y: "70%" }])}>
+        <Miniatura sementes={{}} largura={430} altura={260} intervalo={1300} quadros={quadrosMarcar([[], [3], [3]], [{ x: "8%", y: "70%" }, { x: "8%", y: "70%" }, { x: "8%", y: "70%" }])}>
           <MiniLinhas titulo="COMO VOCÊ ESTÁ HOJE" emoji="😊" cor={COR} corBotao={BOTAO} itens={["😡 Péssimo", "😔 Ruim", "😐 Neutro", "🙂 Bom", "🤩 Ótimo"]} rodape="Score do dia: 72 · humor registrado ✓" />
         </Miniatura>
       ),
@@ -49,7 +49,7 @@ const cartoesDesenvolvimento = (): ConfigCartoes => ({
       titulo: "Sobre mim",
       texto: "O que te move, seus pontos fortes e seus valores — pra reler quando precisar.",
       miniatura: (
-        <Miniatura sementes={{}} largura={430} altura={170}>
+        <Miniatura sementes={{}} largura={430} altura={260}>
           <MiniLinhas titulo="SOBRE MIM" emoji="🧠" cor={COR} corBotao={BOTAO} caixa={false} itens={["O que me motiva", "Pontos fortes", "Meus valores"]} subtitulos={{ "O que me motiva": "família, liberdade, aprender", "Pontos fortes": "disciplina, foco, empatia", "Meus valores": "honestidade, constância" }} />
         </Miniatura>
       ),

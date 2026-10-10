@@ -18,10 +18,11 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
- *   · UMA linha secundária, "Já tem conta? Entrar" (dono 10/10: o rodapé tinha 4 linhas,
- *     duas dizendo a mesma coisa) + o rodapé legal. "Restaurar compras" e o "Já pagou pelo
- *     site?" moraram aqui até 10/10; agora ficam na tela de Entrar (que é pra onde a
- *     pessoa vai de qualquer jeito — ver RestaurarCompras em pages/Entrar).
+ *   · UMA linha secundária, "Já tem conta? Entrar", ABAIXO do botão como no Cal AI (dono
+ *     10/10: o rodapé tinha 4 linhas, duas dizendo a mesma coisa, e o link em cima do
+ *     botão "não faz sentido nenhum"; a linha de termos saiu — o Cal AI não tem). "Restaurar
+ *     compras" e o "Já pagou pelo site?" moraram aqui até 10/10; agora ficam na tela de
+ *     Entrar (que é pra onde a pessoa vai de qualquer jeito — ver RestaurarCompras).
  *
  * Eventos: os MESMOS da welcome de hoje (`app_welcome_view`, `app_welcome_start`,
  * `app_welcome_login`, `app_welcome_restore`; o `funnel_view step=welcome` sai do
@@ -148,10 +149,9 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
           </motion.p>
         </div>
 
-        {/* 10/10 (dono): o botão principal no MESMO lugar de todas as telas do funil — o BotaoDoFunil
-            (56 px, 12 px de margem, colado embaixo + safe-area); o link secundário logo acima; os
-            termos acima do link. Aqui ele rende no fluxo (a welcome já é
-            uma camada fixa), com a mesma geometria do rodapé fixo das outras telas. */}
+        {/* 10/10 (dono): o BotaoDoFunil (56 px, 12 px de margem, colado embaixo + safe-area), rendendo no
+            fluxo (a welcome já é uma camada fixa). Só aqui o link secundário fica ABAIXO do botão —
+            "não tem problema mudar o botão só na 1ª página". */}
         <motion.div className="wca-rodape" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.4 }}>
           {veioDoSite && (
             <div className="wca-aviso" data-testid="welcome-veio-do-site">
@@ -166,14 +166,10 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
             onClick={veioDoSite
               ? () => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }
               : async () => { trackEvent("app_welcome_start", { calai: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}
+            secundarioAbaixo
             secundario={veioDoSite
               ? { texto: <>Ainda não tenho conta? <b>Começar</b></>, onClick: async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); } }
               : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
-            extra={(
-              <div className="bdf-extra">
-                <span className="bdf-extra-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
-              </div>
-            )}
           />
         </motion.div>
       </div>

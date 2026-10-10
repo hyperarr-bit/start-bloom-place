@@ -9,7 +9,9 @@ import { ArrowRight } from "lucide-react";
  *   · pílula preta, largura total menos 24 px (12 de cada lado), 56 px de altura, mesma
  *     fonte, colada embaixo respeitando a safe-area (env(safe-area-inset-bottom));
  *   · a ação secundária ("Agora não", "Já tem conta? Entrar") é SEMPRE um link de texto
- *     logo ACIMA do botão, na mesma posição em todas as telas; nunca dois botões lado a lado;
+ *     logo ACIMA do botão, na mesma posição em todas as telas; nunca dois botões lado a lado.
+ *     Exceção (dono 10/10): a WELCOME põe o link ABAIXO do botão, como o Cal AI
+ *     ("Get started" → "Already have an account? Sign in") — `secundarioAbaixo`;
  *   · o rodapé é fixo (portal no body) e deixa um ESPAÇADOR do mesmo tamanho no lugar onde
  *     foi montado — o conteúdo da tela rola por cima dele quando não cabe.
  *
@@ -22,7 +24,7 @@ export const ALTURA_SECUNDARIO = 40;
 /** o degradê branco em cima do rodapé (faz parte do espaçador) */
 export const RESPIRO_TOPO = 14;
 
-export function BotaoDoFunil({ texto, onClick, disabled, testid, seta = true, secundario, extra, fixo = true }: {
+export function BotaoDoFunil({ texto, onClick, disabled, testid, seta = true, secundario, secundarioAbaixo = false, extra, fixo = true }: {
   texto: ReactNode;
   onClick: () => void;
   disabled?: boolean;
@@ -31,6 +33,8 @@ export function BotaoDoFunil({ texto, onClick, disabled, testid, seta = true, se
   seta?: boolean;
   /** o link de texto logo acima do botão */
   secundario?: { texto: ReactNode; onClick: () => void; disabled?: boolean; testid?: string };
+  /** `true` = o link secundário fica ABAIXO do botão (só a welcome, estilo Cal AI) */
+  secundarioAbaixo?: boolean;
   /** linhas miúdas (termos, restaurar) que ficam ACIMA do link secundário — só a welcome usa */
   extra?: ReactNode;
   /** `false` = rende no fluxo (sem portal nem espaçador): a welcome, que já é uma camada fixa */
@@ -46,7 +50,7 @@ export function BotaoDoFunil({ texto, onClick, disabled, testid, seta = true, se
       <style>{CSS_BDF}</style>
       <div className="bdf-col">
         {extra}
-        {secundario && (
+        {secundario && !secundarioAbaixo && (
           <button type="button" className="bdf-link" onClick={secundario.onClick} disabled={secundario.disabled} data-testid={secundario.testid ?? "botao-do-funil-secundario"}>
             {secundario.texto}
           </button>
@@ -54,6 +58,11 @@ export function BotaoDoFunil({ texto, onClick, disabled, testid, seta = true, se
         <button type="button" className="bdf-botao btn-shine" onClick={onClick} disabled={disabled} data-testid={testid ?? "botao-do-funil"}>
           {texto}{seta && <ArrowRight className="w-4 h-4" aria-hidden />}
         </button>
+        {secundario && secundarioAbaixo && (
+          <button type="button" className="bdf-link bdf-link-abaixo" onClick={secundario.onClick} disabled={secundario.disabled} data-testid={secundario.testid ?? "botao-do-funil-secundario"}>
+            {secundario.texto}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -72,6 +81,7 @@ const CSS_BDF = `
 .bdf-col { width: 100%; max-width: 430px; margin: 0 auto; padding: 0 ${MARGEM_LATERAL}px; display: flex; flex-direction: column; align-items: center; }
 .bdf-link { display: block; box-sizing: border-box; width: 100%; height: ${ALTURA_SECUNDARIO}px; margin: 0; border: 0; background: none; padding: 0 16px; font-family: inherit; font-size: 14px; line-height: 1.2; color: #4f5a64; cursor: pointer; }
 .bdf-link b { color: #16121c; }
+.bdf-link-abaixo { margin-top: 2px; }
 .bdf-link:disabled { opacity: .6; }
 .bdf-botao { display: inline-flex; box-sizing: border-box; align-items: center; justify-content: center; gap: 8px; width: 100%; height: ${ALTURA_BOTAO}px; margin: 0; padding: 0 16px; border: 0; border-radius: 999px; background: #16121c; color: #fff; font-family: inherit; font-size: 16px; line-height: 1.2; font-weight: 800; cursor: pointer; box-shadow: 0 18px 38px -12px rgba(22,18,28,.5); }
 /* o portal cai no body, fora do app: regras globais de "botão com ícone" (button:has(svg)) davam padding 8px

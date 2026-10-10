@@ -25,7 +25,32 @@
   --ct-acento: #f5b301;
   --ct-acento-tinta: #221a0c;
 }
+/* A BELEZA lê os tokens --bz-* do próprio módulo (beleza.css, escopo .tema-beleza). A folha dos cartões
+ * é um PORTAL (fora da raiz .tema-beleza da página): a classe da config leva "tema-beleza" junto
+ * (cartoes-beleza.tsx) — sem ela os --bz-* não existem, var() vira inválido e o fundo fica transparente
+ * (o bug do dono, 10/10). Os valores abaixo são a reserva literal pra qualquer caso em que o escopo não
+ * esteja presente: a folha nunca mais fica sem fundo. */
 .ct-beleza {
+  --ct-papel: #fff8f5;
+  --ct-cartao: #ffffff;
+  --ct-faixa: #ffe4d9;
+  --ct-tinta: #3a1d2c;
+  --ct-suave: #6f5560;
+  --ct-linha: #efc6cc;
+  --ct-acento: #d22d80;
+  --ct-acento-tinta: #ffffff;
+}
+.dark .ct-beleza {
+  --ct-papel: #1a1014;
+  --ct-cartao: #22151c;
+  --ct-faixa: #3a2420;
+  --ct-tinta: #f6e4ec;
+  --ct-suave: #c9aab8;
+  --ct-linha: #4a2b3a;
+  --ct-acento: #e45aa0;
+  --ct-acento-tinta: #ffffff;
+}
+.tema-beleza.ct-beleza, .tema-beleza .ct-beleza {
   --ct-papel: hsl(var(--bz-papel));
   --ct-cartao: hsl(var(--bz-cartao));
   --ct-faixa: hsl(var(--bz-manha));
@@ -35,7 +60,11 @@
   --ct-acento: hsl(var(--bz-acento));
   --ct-acento-tinta: hsl(var(--bz-acento-tinta));
 }
-.ct-beleza [data-ct-pagina="2"] { --ct-faixa: hsl(var(--bz-noite)); }
+.tema-beleza.ct-beleza [data-ct-pagina="2"], .tema-beleza .ct-beleza [data-ct-pagina="2"] { --ct-faixa: hsl(var(--bz-noite)); }
+
+/* a reserva de TODO módulo: se uma classe de paleta faltar (ou não resolver), a folha e o anel ainda
+ * têm fundo e tinta — os tokens do app */
+.ct-folha { background: var(--ct-cartao, hsl(var(--card))); color: var(--ct-tinta, hsl(var(--foreground))); }
 
 .ct-rotina { --ct-papel: #ecfdf5; --ct-cartao: #ffffff; --ct-faixa: #a7f3d0; --ct-tinta: #064e3b; --ct-suave: #3f7a62; --ct-linha: #bbf0d8; --ct-acento: #059669; --ct-acento-tinta: #ffffff; }
 .dark .ct-rotina { --ct-papel: #0b241b; --ct-cartao: #0f2e23; --ct-faixa: #14532d; --ct-tinta: #d1fae5; --ct-suave: #86cfb0; --ct-linha: #1f5a44; --ct-acento: #34d399; --ct-acento-tinta: #052e1c; }
@@ -90,6 +119,14 @@
 .ct-dot { display: block; width: 6px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ct-tinta) 22%, transparent); transition: width .2s, background .2s; }
 .ct-dot[data-ativo] { width: 16px; background: var(--ct-acento); }
 
+/* a mini-animação em quadros (v2): a linha nova acende, a barra cresce, o cursor pisca — nada além de
+ * opacity/transform/width */
+.ct-linha-nova { animation: ct-acende .5s ease-out 1; }
+@keyframes ct-acende { 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: none; } }
+.ct-barra { transition: width .6s ease; }
+.ct-cursor { display: inline-block; width: 1px; margin-left: 1px; animation: ct-pisca 1s steps(2, start) infinite; }
+@keyframes ct-pisca { to { visibility: hidden; } }
+
 /* o dedinho apontando na miniatura: só transform, um quique curto */
 .ct-dedinho { position: absolute; font-size: 26px; line-height: 1; transform: translate(-30%, -10%); filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); animation: ct-aponta 1.1s ease-in-out infinite; pointer-events: none; }
 @keyframes ct-aponta { 0%, 100% { transform: translate(-30%, -10%); } 50% { transform: translate(-30%, -30%); } }
@@ -100,5 +137,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ct-trilho { scroll-behavior: auto; transition: none !important; }
-  .ct-dedinho, .ct-anel { animation: none; }
+  .ct-dedinho, .ct-anel, .ct-linha-nova, .ct-cursor { animation: none; }
+  .ct-barra { transition: none; }
 }

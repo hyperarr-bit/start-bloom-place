@@ -161,30 +161,32 @@ describe("força de QA pelo link — só no navegador", () => {
 describe("cartões de boas-vindas — Finanças (força on)", () => {
   beforeEach(() => ligar(CHAVE_FORCA_CARTOES));
 
-  it("3 cartões, bolinhas, 'Já sei' sempre visível, a miniatura VIVA com a tabela real e o dedinho; eventos", async () => {
+  it("5 cartões, bolinhas, 'Já sei' sempre visível, a miniatura VIVA com a tabela real e o dedinho; eventos", async () => {
     const s = criarStore(CONTA());
     s.montar(<CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => {} })} />, "/financas");
     const raiz = screen.getByTestId("cartoes-modulo");
     expect(raiz.getAttribute("data-modulo")).toBe("financas");
     expect(raiz.className).toContain("ct-financas");
-    expect(raiz.querySelectorAll("article")).toHaveLength(3); // os 2 fora da tela ficam aria-hidden
+    expect(raiz.querySelectorAll("article")).toHaveLength(5); // os fora da tela ficam aria-hidden
     expect(screen.getByText("Faz isso agora", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Onde fica o essencial", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Seus gastos, mês a mês", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("O que não precisa hoje", { exact: false })).toBeInTheDocument();
     expect(screen.getByTestId("cartoes-ja-sei")).toBeVisible();
-    expect(screen.getByTestId("cartoes-contador").textContent).toBe("1 de 3");
-    // a miniatura: o componente REAL (a tabela de gastos, com o "+ Novo gasto") em memória, com dedinho
-    const mini = screen.getByTestId("miniatura");
+    expect(screen.getByTestId("cartoes-contador").textContent).toBe("1 de 5");
+    // o cartão 2: o componente REAL (a tabela de gastos, com o "+ Novo gasto") em memória, com dedinho
+    const minis = screen.getAllByTestId("miniatura");
+    expect(minis).toHaveLength(4);
+    const mini = minis[1];
     expect(mini.textContent).toContain("CUSTOS VARIÁVEIS");
     expect(mini.querySelector('input[placeholder*="Novo gasto"]')).not.toBeNull();
     expect(mini.querySelector("[inert]")).not.toBeNull();
-    expect(screen.getByTestId("dedinho")).toBeInTheDocument();
+    expect(screen.getAllByTestId("dedinho").length).toBeGreaterThan(0);
     expect(raiz.querySelector("[data-figurinha-placeholder]")).not.toBeNull();
     expect(nomes()).toEqual(["modulo_cartoes_vistos", "modulo_cartao"]);
     expect(dos("modulo_cartao")[0]).toEqual({ moduleId: "financas", indice: 0 });
-    // bolinha 2 → "2 de 3" + evento do cartão 1
+    // bolinha 2 → "2 de 5" + evento do cartão 1
     fireEvent.click(screen.getByTestId("cartoes-bolinha-1"));
-    expect(screen.getByTestId("cartoes-contador").textContent).toBe("2 de 3");
+    expect(screen.getByTestId("cartoes-contador").textContent).toBe("2 de 5");
     expect(dos("modulo_cartao").at(-1)).toEqual({ moduleId: "financas", indice: 1 });
     // "Já sei": some, marca o aparelho E a conta (o Dicas antigo não volta), evento com o índice
     fireEvent.click(screen.getByTestId("cartoes-ja-sei"));
@@ -244,7 +246,7 @@ describe("cartões de boas-vindas — Beleza (força on)", () => {
     expect(raiz.getAttribute("data-modulo")).toBe("beleza");
     expect(raiz.className).toContain("ct-beleza");
     expect(screen.queryByTestId("dicas-beleza")).toBeNull();
-    expect(screen.getByTestId("miniatura").querySelector(".tema-beleza")).not.toBeNull();
+    expect(screen.getAllByTestId("miniatura").some((m) => m.querySelector(".tema-beleza"))).toBe(true);
     expect(screen.getAllByText(/Monta sua rotina de skincare em 3 toques/)).not.toHaveLength(0);
     // "Já sei" devolve a Beleza de sempre — e o Dicas também fica como visto
     fireEvent.click(screen.getByTestId("cartoes-ja-sei"));

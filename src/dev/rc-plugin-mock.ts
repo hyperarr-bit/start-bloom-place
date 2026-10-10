@@ -180,4 +180,9 @@ export const Purchases: any = {
   },
   async getCustomerInfo() { return info(); },
   async restorePurchases() { return info(); },
+  // CAPI passos 3+4: o app chama isto depois do configure. No APK de teste
+  // não há loja real pra receber atributo; resolver evita o catch de boot.
+  async collectDeviceIdentifiers() {},
+  async setAttributes(_: Record<string, string | null>) {},
+  async getAppUserID() { return { appUserID: "$RCAnonymousID:mock" }; },
 };

@@ -8,10 +8,14 @@ import AdSupport
  * SDK DA META NO iPHONE (06/09, refeito 07/09 SEM ATT) — espelho da v49 do
  * Android, que é o que vende hoje.
  *
- * DIVISÃO DE TRABALHO, igual à do Android: o SDK manda INSTALAÇÃO e ABERTURA
- * (é o que alimenta o SKAdNetwork e a medição agregada da Meta); a COMPRA sai
- * do SERVIDOR por CAPI, com e-mail/id em hash — fecha com o app em segundo
- * plano, e um evento do cliente ali seria perdido ou duplicado.
+ * DIVISÃO DE TRABALHO (10/10, auto-log desligado): a ABERTURA sai daqui, no
+ * activateApp() manual. Instalação automática e o teste anônimo NÃO saem
+ * mais do SDK. O teste de quem ainda não tem conta sai do servidor, e só
+ * com META_CAPI_ANON_ENVIAR=1 no mesmo dia em que esta build chega nas
+ * pessoas — sem esse envio, desligar o auto-log some trial de verdade.
+ * A COMPRA (dinheiro) continua saindo do servidor por CAPI, com e-mail/id
+ * em hash: fecha com o app em segundo plano, e um evento do cliente ali
+ * seria perdido ou duplicado.
  *
  * ATT (19/09, build 15): a build 13 nasceu sem o pedido (decisão de 07/09,
  * depois de duas recusas 2.1 "unable to locate the ATT permission request" —
@@ -48,6 +52,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             // lido do sistema a cada abertura, porque a pessoa pode mudar nos Ajustes.
             AppDelegate.aplicarStatusATT()
             ApplicationDelegate.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
+            // DEPOIS do init: o SDK 9+ recusa setter antes de inicializar
+            // (fatalError em DEBUG). O Info.plist já nasce false, então a
+            // subida não loga sozinha; este setter marca explícito pra uma
+            // config remota do painel não religar o auto-log por baixo.
+            // A abertura continua no activateApp() manual.
+            // Não publicar esta build sem META_CAPI_ANON_ENVIAR=1 no mesmo dia.
+            Settings.shared.isAutoLogAppEventsEnabled = false
         }
         return true
     }
@@ -206,12 +217,20 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         var anonId = ""
         if AppDelegate.metaConfigurada { anonId = AppEvents.shared.anonymousID }
         // IDFA só com o aceite do ATT; sem ele o sistema devolve zeros e aqui
-        // vai vazio, como sempre foi. Com ele, o servidor manda como `madid`.
+        // vai vazio, como sempre foi. Com ele, o servidor manda como `madid`
+        // e o app grava `$idfa` no RevenueCat. Nunca mandar o UUID zerado.
         var idfa = ""
         if #available(iOS 14, *), ATTrackingManager.trackingAuthorizationStatus == .authorized {
             let id = ASIdentifierManager.shared().advertisingIdentifier.uuidString
             if id != "00000000-0000-0000-0000-000000000000" { idfa = id }
         }
-        call.resolve(["gaid": idfa, "anonId": anonId])
+        // IDFV não depende de ATT. O servidor manda como vendor_id (`$idfv`)
+        // quando o collectDeviceIdentifiers do RevenueCat não rodou.
+        var idfv = ""
+        if let v = UIDevice.current.identifierForVendor?.uuidString,
+           v != "00000000-0000-0000-0000-000000000000" {
+            idfv = v
+        }
+        call.resolve(["gaid": idfa, "anonId": anonId, "idfv": idfv])
     }
 }

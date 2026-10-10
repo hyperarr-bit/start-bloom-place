@@ -106,11 +106,21 @@ public class MainActivity extends BridgeActivity {
             // coleta do ID ainda estiver indefinida o SDK loga aviso (visto
             // no emulador com a ordem invertida).
             FacebookSdk.setAdvertiserIDCollectionEnabled(true);
-            FacebookSdk.setAutoLogAppEventsEnabled(true);
+            // AUTO-LOG DESLIGADO (10/10, CAPI passos 3+4). Instalação automática
+            // e o teste anônimo deixam de sair do SDK. A abertura continua no
+            // activateApp() logo abaixo.
+            // NO DIA EM QUE ESTA BUILD CHEGAR NAS PESSOAS: (1) publicar a build
+            // (2) META_CAPI_ANON_ENVIAR=1 (3) conferir a varredura.
+            // Nunca deixar o auto-log desligado sem o envio anônimo do servidor.
+            // O teste de hoje ainda depende do auto-log; desligar sozinho some
+            // trial de verdade da Meta. O interruptor do painel não desfaz este
+            // setter: ele está no binário.
+            FacebookSdk.setAutoLogAppEventsEnabled(false);
             FacebookSdk.setAutoInitEnabled(true);
             FacebookSdk.fullyInitialize();
-            // Instalação (fb_mobile_first_app_launch) + abertura
-            // (fb_mobile_activate_app) automáticos a partir daqui.
+            // Abertura (fb_mobile_activate_app). O first launch automático
+            // parou junto com o auto-log; o teste anônimo passa a sair do
+            // servidor quando META_CAPI_ANON_ENVIAR=1.
             AppEventsLogger.activateApp(getApplication());
         }
 

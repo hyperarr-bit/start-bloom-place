@@ -9,7 +9,7 @@ import { CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, ocultar, typ
 import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES } from "@/lib/missao-doses";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { abrirAcaoRapida } from "@/components/home/QuickActions";
-import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, avisar, deveMostrarTourHome, marcarTourFeito } from "@/lib/tour-home";
+import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, avisar, deveMostrarTourHome, marcarTourFeito, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 
 /**
  * O ENCAIXE DO TOUR (1.0.14): a Home pergunta "mostro o tour agora?" e a resposta
@@ -22,20 +22,29 @@ import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO
  * funil → paywall → teste → missão (3 doses) → plano de amanhã → tour (5 passos) →
  * festa "Casa arrumada". Quem pulou a missão: tour direto.
  */
+const OUTRA_CAMADA = '[data-camada-guia]:not([data-camada-guia="tour-home"])';
 export function useTourDaHome(criadoEm: string | null | undefined, ligado = true): boolean {
   const [tick, setTick] = useState(0);
+  // com a chave desligada (ou o tour já feito aqui) o hook não escuta nada: custo zero pra quem não vai ver o tour
+  const pertinente = ligado && tourHomeLigado() && !tourFeitoNesteAparelho();
   useEffect(() => {
+    if (!pertinente) return;
     const reler = () => setTick((t) => t + 1);
     window.addEventListener(EVENTO_MISSAO_DOSES, reler);
     window.addEventListener(EVENTO_MISSAO_COMPLETA, reler);
-    // a folha do plano / a festa desmontam sem evento próprio: um relógio curto confere a camada
-    const relogio = window.setInterval(() => { if (!document.querySelector('[data-camada-guia]:not([data-camada-guia="tour-home"])')) reler(); }, 700);
+    // a folha do plano / a festa desmontam sem evento próprio: um relógio curto confere a camada —
+    // e só re-renderiza a Home quando a camada APARECE ou SOME (nunca a cada tique)
+    let bloqueado = !!document.querySelector(OUTRA_CAMADA);
+    const relogio = window.setInterval(() => {
+      const agora = !!document.querySelector(OUTRA_CAMADA);
+      if (agora !== bloqueado) { bloqueado = agora; reler(); }
+    }, 700);
     return () => { window.removeEventListener(EVENTO_MISSAO_DOSES, reler); window.removeEventListener(EVENTO_MISSAO_COMPLETA, reler); window.clearInterval(relogio); };
-  }, []);
-  if (!ligado) return false;
+  }, [pertinente]);
+  if (!pertinente) return false;
   void tick;
   if (!deveMostrarTourHome(criadoEm)) return false;
-  try { if (document.querySelector('[data-camada-guia]:not([data-camada-guia="tour-home"])')) return false; } catch { /* sem DOM */ }
+  try { if (document.querySelector(OUTRA_CAMADA)) return false; } catch { /* sem DOM */ }
   return true;
 }
 import { FigurinhaPlaceholder } from "@/components/cartoes-modulo/CartoesDoModulo";

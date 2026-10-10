@@ -1,0 +1,54 @@
+/* CARTÕES DE BOAS-VINDAS DO MÓDULO (10/10, lib/tour-home) — a paleta de CADA módulo em
+ * variáveis --ct-*; o componente só lê as variáveis. Finanças: âmbar (o tile da Home); Beleza:
+ * pêssego & malva (os tokens --bz-* do próprio módulo, com o escuro já resolvido lá). */
+.ct-financas {
+  --ct-papel: #fff8e6;
+  --ct-cartao: #ffffff;
+  --ct-faixa: #fde68a;
+  --ct-tinta: #4a3005;
+  --ct-suave: #8a6a2a;
+  --ct-linha: #f3dfa3;
+  --ct-acento: #d97706;
+  --ct-acento-tinta: #ffffff;
+}
+.dark .ct-financas {
+  --ct-papel: #221a0c;
+  --ct-cartao: #2b2211;
+  --ct-faixa: #5a4312;
+  --ct-tinta: #fdf1d3;
+  --ct-suave: #d8bb7a;
+  --ct-linha: #4a3a18;
+  --ct-acento: #f5b301;
+  --ct-acento-tinta: #221a0c;
+}
+.ct-beleza {
+  --ct-papel: hsl(var(--bz-papel));
+  --ct-cartao: hsl(var(--bz-cartao));
+  --ct-faixa: hsl(var(--bz-manha));
+  --ct-tinta: hsl(var(--bz-tinta));
+  --ct-suave: hsl(var(--bz-suave));
+  --ct-linha: hsl(var(--bz-linha-forte));
+  --ct-acento: hsl(var(--bz-acento));
+  --ct-acento-tinta: hsl(var(--bz-acento-tinta));
+}
+.ct-beleza [data-ct-pagina="2"] { --ct-faixa: hsl(var(--bz-noite)); }
+
+.ct-trilho { display: flex; align-items: flex-start; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.ct-trilho::-webkit-scrollbar { display: none; }
+.ct-pagina { flex: none; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+
+.ct-dot { display: block; width: 6px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--ct-tinta) 22%, transparent); transition: width .2s, background .2s; }
+.ct-dot[data-ativo] { width: 16px; background: var(--ct-acento); }
+
+/* o dedinho apontando na miniatura: só transform, um quique curto */
+.ct-dedinho { position: absolute; font-size: 26px; line-height: 1; transform: translate(-30%, -10%); filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); animation: ct-aponta 1.1s ease-in-out infinite; pointer-events: none; }
+@keyframes ct-aponta { 0%, 100% { transform: translate(-30%, -10%); } 50% { transform: translate(-30%, -30%); } }
+
+/* o anel do "Fazer agora": o mesmo anel fino do holofote, um pulso só */
+.ct-anel { position: fixed; border-radius: 12px; pointer-events: none; z-index: 190; box-shadow: 0 0 0 1.5px hsl(var(--primary) / .9), 0 0 0 7px hsl(var(--primary) / .12); animation: ct-pulso .9s ease-out 1; }
+@keyframes ct-pulso { 0% { box-shadow: 0 0 0 1.5px hsl(var(--primary) / .9), 0 0 0 2px hsl(var(--primary) / .35); } 100% { box-shadow: 0 0 0 1.5px hsl(var(--primary) / .9), 0 0 0 7px hsl(var(--primary) / .12); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-trilho { scroll-behavior: auto; transition: none !important; }
+  .ct-dedinho, .ct-anel { animation: none; }
+}

@@ -28,6 +28,8 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
+import { deveMostrarTourHome, guardarForcasDaUrl } from "@/lib/tour-home";
+import { TourDaHome } from "@/components/home/TourDaHome";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -84,6 +86,8 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
 
 const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
+  // 10/10 — as forças de QA do tour/cartões/módulo-oculta (`?tour-home=on`…): só no navegador, antes do hub ler
+  guardarForcasDaUrl();
 
   // Virada de dia com o app VIVO (celular mantém a aba em memória): sem isso,
   // hub/widgets seguem mostrando "hoje" de ontem — mesmo bug do diário da
@@ -341,7 +345,7 @@ const HomePage = () => {
             {/* "SEU DIA" (missão em doses, 02/10): só com a chave ligada — desligada, não existe nem o nó */}
             <CardSeuDia lifeData={lifeData} sequencia={sequencia} />
 
-            <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
+            <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm" data-tour="score">
               <DayScoreRing score={lifeData.dayScore} streak={sequencia.dias} mostrarSequencia={false} />
               <LinhaSequencia seq={sequencia} />
               <CelebracaoDia100 score={lifeData.dayScore} streak={sequencia.dias} />
@@ -356,7 +360,7 @@ const HomePage = () => {
                 reembolso. Agora aponta pras lojas de verdade. */}
             <LojasCard variant="home" />
 
-            <div>
+            <div data-tour="acoes-rapidas">
               <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ações rápidas</h3>
               <QuickActions />
             </div>
@@ -403,6 +407,7 @@ const HomePage = () => {
             {!editingWidgets && (
               <motion.button
                 onClick={() => setShowWidgetPicker(true)}
+                data-tour="adicionar-widget"
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
                 whileTap={{ scale: 0.98 }}
               >
@@ -411,8 +416,8 @@ const HomePage = () => {
               </motion.button>
             )}
 
-            <NextHoursTimeline data={lifeData} />
-            <ModuleDrawer />
+            <div data-tour="pendencias"><NextHoursTimeline data={lifeData} /></div>
+            <div data-tour="modulos"><ModuleDrawer /></div>
 
             <p className="text-center text-[10px] text-muted-foreground py-2">
               Core © {new Date().getFullYear()} — Organize sua vida
@@ -420,6 +425,12 @@ const HomePage = () => {
           </div>
         </main>
       </div>
+
+      {/* 10/10 — "Sua Home em 5 passos" (TOUR_HOME, lib/tour-home): só pra conta nova sem missão
+          ativa/pendente, 1x por aparelho — ver deveMostrarTourHome. Desligada, não existe o nó. */}
+      {!!user && deveMostrarTourHome(user.created_at) && (
+        <TourDaHome lifeData={lifeData} widgetsAtivos={activeWidgets.map((w) => w.id)} adicionarWidget={addWidget} onFim={() => setDataTrigger((d) => d + 1)} />
+      )}
 
       <WidgetPicker
         open={showWidgetPicker}

@@ -329,7 +329,8 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
 
       {/* Form sempre visível */}
       <div className="p-3 border-b border-border bg-muted/20 space-y-2">
-        <div className="flex items-center gap-2">
+        {/* data-cartao-alvo (10/10): o "Fazer agora" dos cartões de boas-vindas acende a LINHA do formulário, não só o "+" */}
+        <div className="flex items-center gap-2" data-cartao-alvo="novo-gasto">
           <Input
             placeholder="+ Novo gasto"
             value={newExpense.description}

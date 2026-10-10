@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronRight, ChevronDown, MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +11,7 @@ import {
   CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, comPeso, ocultar, type PendenciasPrefs, type TipoPendencia,
 } from "@/lib/home-pendencias";
 import { PersonalizarPendencias } from "@/components/home/PersonalizarPendencias";
+import { EVENTO_PENDENCIAS_ABRIR } from "@/lib/tour-home";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -291,6 +292,12 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date(), normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
   const prefs: PendenciasPrefs = data.pendenciasPrefs ?? PREFS_PADRAO;
   const gravar = (p: PendenciasPrefs) => { set(CHAVE_PENDENCIAS_PREFS, p); setMenuAberto(null); };
+  // 10/10 — o tour da Home pede pra lista abrir (acende o "⋯"); sem o evento, nada muda
+  useEffect(() => {
+    const abrir = () => setIsOpen(true);
+    window.addEventListener(EVENTO_PENDENCIAS_ABRIR, abrir);
+    return () => window.removeEventListener(EVENTO_PENDENCIAS_ABRIR, abrir);
+  }, []);
   const nomeDoTipo = (t: TipoPendencia) => CATALOGO_PENDENCIAS.find((c) => c.tipo === t)?.nome ?? t;
 
   return (
@@ -480,7 +487,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
         )}
       </AnimatePresence>
 
-      <PersonalizarPendencias open={personalizar} onOpenChange={setPersonalizar} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} />
+      <PersonalizarPendencias open={personalizar} onOpenChange={setPersonalizar} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={data.pendenciasPorModulo} />
     </div>
   );
 };

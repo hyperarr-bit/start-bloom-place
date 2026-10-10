@@ -1,6 +1,7 @@
 import { Badge, Raridade, XP_RARIDADE } from "./types";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { DIAS, metaPadrao, segundaDe, somarDias as somarDiasData } from "@/lib/treino-constancia";
+import { CHAVE_TOUR_FEITO, tourHomeLigado } from "@/lib/tour-home";
 
 /**
  * Conquistas dos módulos de VIDA (27/07; coleção ampliada em 27/09).
@@ -162,6 +163,8 @@ export function medirVida(get: Leitor, hoje: string = localDayKey()) {
   const momentos = lista(get<unknown>("rel-moments", [])).length;
   const diasDeDetox = diasDaLista(get<unknown>("detox-diary", []));
   const revisoes = Object.values(objeto(get<unknown>("estudos-revisoes", {}))).filter((e) => (Number((e as { vezes?: unknown })?.vezes) || 0) >= 1).length;
+  // 10/10 — o tour da Home terminou nesta conta (a chave vai pra conta no fim do tour; lib/tour-home)
+  const tourDaHome = !!get<unknown>(CHAVE_TOUR_FEITO, "");
 
   return {
     diasAtivos, recordeRotina, diasDeDiario, diasDeHumor, minutosDeFoco,
@@ -169,7 +172,7 @@ export function medirVida(get: Leitor, hoje: string = localDayKey()) {
     treinos, recordesPessoais, metaSemanal, semanasNaMeta,
     diasImpecaveis, recordeDieta, receitas,
     metaAgua, diasDeAgua, noitesNaMeta, diasDeRemedio, medicoes,
-    metasConcluidas, cartaEscrita, registrosDoPet, momentos, diasDeDetox, revisoes,
+    metasConcluidas, cartaEscrita, registrosDoPet, momentos, diasDeDetox, revisoes, tourDaHome,
   };
 }
 
@@ -224,5 +227,10 @@ export function buildBadgesVida(get: Leitor, hoje: string = localDayKey()): Badg
     fazer("momentos-5", "Álbum de Momentos", "5 momentos guardados", "📸", "vida", "comum", m.momentos, 5, ["momento", "momentos"], rota("/relacionamentos", "Relacionamentos")),
     fazer("detox-7", "Semana Detox", "7 dias no diário do detox", "🌿", "vida", "raro", m.diasDeDetox, 7, ["dia de diário", "dias de diário"], rota("/detox", "Detox")),
     fazer("estudos-revisao-1", "Revisão Feita", "Responda 1 revisão dos estudos", "🧠", "vida", "comum", m.revisoes, 1, ["revisão", "revisões"], rota("/estudos", "Estudos")),
+    // 10/10 — "Casa arrumada": o tour da Home em 5 passos (lib/tour-home). Só existe no álbum com a
+    // chave TOUR_HOME ligada: desligada, a coleção continua a de 65, byte a byte.
+    ...(tourHomeLigado()
+      ? [fazer("casa-arrumada", "Casa arrumada", "Fez o tour da Home e deixou tudo do seu jeito", "🏡", "vida", "comum", m.tourDaHome ? 1 : 0, 1, undefined, rota("/home", "Home"))]
+      : []),
   ];
 }

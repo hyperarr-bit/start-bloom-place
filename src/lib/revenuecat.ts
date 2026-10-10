@@ -37,6 +37,7 @@ import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
+import { deviceId, turma } from "@/lib/aparelho";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -91,6 +92,14 @@ export async function initRevenueCat(): Promise<EstadoRC> {
       await Purchases.configure({ apiKey: key, appUserID: uid ?? undefined });
       configurado = true;
       appUserIdAtual = uid;
+      /* 10/10 (1.0.14): turma e device_id como ATRIBUTOS do assinante no RevenueCat —
+       * é o que deixa cruzar "a turma de 12/10 renovou?" no painel deles e no
+       * webhook sem passar pelo nosso banco. Solto e engolido: nunca segura o init.
+       * `$fbAnonId` NÃO entra aqui (é do agente da Meta). */
+      void (async () => {
+        try { await Purchases!.setAttributes({ core_turma: turma(), core_device_id: deviceId() }); }
+        catch { /* SDK velho sem o método, ou rede: segue sem */ }
+      })();
     } else if (uid !== appUserIdAtual) {
       // trocou de conta dentro do app (ou logou depois do configure)
       if (uid) await Purchases.logIn({ appUserID: uid });
@@ -235,7 +244,13 @@ export async function conferirTrialCartao(): Promise<void> {
  * exatamente todo caso que ele existia pra pegar. willRenew não entra mais
  * na conta: billingIssueDetectedAt presente + unsubscribeDetectedAt ausente.
  */
-export type ProblemaDeCobranca = { temProblema: boolean; comAcesso: boolean; url: string | null };
+export type ProblemaDeCobranca = {
+  temProblema: boolean;
+  comAcesso: boolean;
+  url: string | null;
+  /** 10/10: quando a loja detectou o cartão recusado (ISO) — base do contador da carência. */
+  detectadoEm?: string | null;
+};
 const SEM_PROBLEMA: ProblemaDeCobranca = { temProblema: false, comAcesso: false, url: null };
 
 /** O formato do entitlement que estas leituras usam (subconjunto do PurchasesEntitlementInfo). */
@@ -257,7 +272,7 @@ export function lerProblemaDeCobranca(info: unknown): ProblemaDeCobranca {
   const todos = Object.values(i?.entitlements?.all ?? {});
   const e = todos.find((x) => !!x?.billingIssueDetectedAt && !x?.unsubscribeDetectedAt);
   if (!e) return SEM_PROBLEMA;
-  return { temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null };
+  return { temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null, detectadoEm: e.billingIssueDetectedAt ?? null };
 }
 
 export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
@@ -266,7 +281,14 @@ export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
   if (!Purchases || !configurado) return SEM_PROBLEMA;
   try {
     const { customerInfo } = await Purchases.getCustomerInfo();
-    return lerProblemaDeCobranca(customerInfo);
+    const p = lerProblemaDeCobranca(customerInfo);
+    /* 10/10 (1.0.14, atrás de COBRANCA_V14): os avisos locais de +24 h/+72 h
+     * acompanham a verdade da loja a cada leitura — arma quando detecta,
+     * cancela quando a cobrança entra. Solto: nunca segura o aviso. */
+    void import("@/lib/cobranca-recusada")
+      .then((m) => m.sincronizarAvisosDeCobranca(p))
+      .catch(() => { /* noop */ });
+    return p;
   } catch {
     return SEM_PROBLEMA; // rede de segurança: aviso nunca quebra o app
   }
@@ -434,6 +456,7 @@ export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean
     });
     marcarFolhaAberta();
     await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: presente69.pacote });
+    registrarResultadoDaFolha("sucesso", ID_ANUAL_69);
     await sincronizarAssinatura();
     return true;
   } catch (e) {
@@ -544,6 +567,7 @@ export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 export async function desfechoDaFalha(e: unknown, produto: string): Promise<boolean> {
   const msg = String((e as { message?: string })?.message ?? e);
   const codigo = String((e as { code?: string })?.code ?? "");
+  registrarResultadoDaFolha(/cancel/i.test(msg) || codigo === "1" ? "cancelou" : "erro", produto);
   // Pix/boleto escolhido NA FOLHA: compra fica pendente, o webhook libera.
   if (codigo === "20" || /pending/i.test(msg)) {
     ultimoMotivo = "pendente";
@@ -582,13 +606,48 @@ let toqueEm: number | null = null;
 export const marcarToqueDeCompra = (t: number = Date.now()): void => { toqueEm = t; };
 /** Lê e ZERA: um carimbo vale pra uma folha só — sem isso, um paywall que não
  *  marca (revisão 02/09) herdava o toque de outro e media tempo de dias. */
-const consumirToque = (): number | null => { const v = toqueEm ? Date.now() - toqueEm : null; toqueEm = null; return v; };
+const consumirToque = (): number | null => { toqueDaFolhaEm = toqueEm; const v = toqueEm ? Date.now() - toqueEm : null; toqueEm = null; return v; };
 /** Carimbo da folha em memória E no disco: o `saida-do-app.ts` lê o de disco
  *  no boot seguinte pra saber se a morte do processo veio logo depois. */
 const marcarFolhaAberta = () => {
   folhaAbertaEm = Date.now();
+  folhaEmAndamento = true;
   try { localStorage.setItem("core-folha-aberta-em", String(folhaAbertaEm)); } catch { /* modo privado */ }
 };
+
+/*
+ * `folha_apple_resultado` (10/10, 1.0.14) — UM evento por folha da Apple, com o
+ * desfecho e o tempo desde o TOQUE em comprar. Hoje o sucesso é app_sheet_success
+ * (cada paywall com um payload) e a falha é app_compra_falhou (6 motivos): juntar
+ * "quantas folhas abriram × quantas fecharam com dinheiro" exigia casar os dois.
+ * Nasce AQUI, onde a compra acontece, pra não mexer em paywall nenhum.
+ *   · resultado      sucesso | cancelou | erro
+ *   · ms_desde_toque toque no CTA → desfecho (o toque que o paywall marcou; sem
+ *                    ele, desde a abertura da folha)
+ *   · segunda_chance a folha anterior desta sessão falhou há < 15 min (é a
+ *                    pessoa tentando de novo — a "segunda chance" do PaywallIOS)
+ * Só no iPhone; a folha do Google segue medida pelos eventos de sempre.
+ */
+let toqueDaFolhaEm: number | null = null;
+let folhaEmAndamento = false;
+let ultimaFolhaFalhouEm: number | null = null;
+export type ResultadoDaFolha = "sucesso" | "cancelou" | "erro";
+export const SEGUNDA_CHANCE_JANELA_MS = 15 * 60e3;
+function registrarResultadoDaFolha(resultado: ResultadoDaFolha, produto: string): void {
+  if (!folhaEmAndamento) return; // falhou antes de abrir a folha (catálogo, rede): não é folha
+  folhaEmAndamento = false;
+  if (plataformaApp() !== "ios") return;
+  const agora = Date.now();
+  const base = toqueDaFolhaEm ?? folhaAbertaEm;
+  trackEvent("folha_apple_resultado", {
+    resultado,
+    produto,
+    ms_desde_toque: base ? agora - base : null,
+    segunda_chance: ultimaFolhaFalhouEm != null && agora - ultimaFolhaFalhouEm < SEGUNDA_CHANCE_JANELA_MS,
+  });
+  ultimaFolhaFalhouEm = resultado === "sucesso" ? null : agora;
+  toqueDaFolhaEm = null;
+}
 
 /** Corrida do boot (raio-x de 26/08): toques em comprar morriam com
  *  "rc_sem_chave" porque o init ainda não tinha terminado (ou falhou por rede)
@@ -706,6 +765,7 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
     } else {
       await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
     }
+    registrarResultadoDaFolha("sucesso", productId);
     // Folha fechou com sucesso = dinheiro saiu. Como no vitalício, o acesso
     // NÃO depende do entitlement do RC (quem manda é a linha em
     // `subscriptions` via sync/webhook) — o check de entitlement aqui já
@@ -858,6 +918,7 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
     });
     marcarFolhaAberta();
     await Purchases.purchaseStoreProduct({ product: produto });
+    registrarResultadoDaFolha("sucesso", id);
     await sincronizarAssinatura();
     return true;
   } catch (e) {
@@ -1082,6 +1143,7 @@ export async function comprarAnualIos(): Promise<boolean> {
     const resultado = pacoteAnualIos
       ? await Purchases.purchasePackage({ aPackage: pacoteAnualIos })
       : await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    registrarResultadoDaFolha("sucesso", idProdutoAnualIos());
     const ativos = Object.values(
       (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> } } } | undefined)
         ?.customerInfo?.entitlements?.active ?? {},
@@ -1184,6 +1246,7 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
     });
     marcarFolhaAberta();
     await Purchases.purchaseStoreProduct({ product: produto });
+    registrarResultadoDaFolha("sucesso", produtoId);
     // Dinheiro saiu. Sincroniza já pra pessoa entrar na hora; se o sync
     // atrasar, webhook e reconciliarSePreciso completam.
     await sincronizarAssinatura();

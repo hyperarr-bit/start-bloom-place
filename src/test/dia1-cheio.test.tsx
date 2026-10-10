@@ -305,7 +305,6 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     expect(boas).not.toHaveTextContent("1 toque por dia");
     expect(screen.getByTestId("missao-doses-trocar")).toHaveTextContent("Trocar os 3");
     expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent("Começar");
-    // o rodapé colado: o link "Explorar" fica ACIMA do botão principal
     const rodape = screen.getByTestId("missao-doses-rodape");
     // dono 10/10: o "Explorar por conta própria" fica ABAIXO do "Começar" (como a welcome)
     expect(rodape.querySelector("[data-testid='missao-doses-comecar']")!.compareDocumentPosition(rodape.querySelector("[data-testid='missao-doses-explorar']")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

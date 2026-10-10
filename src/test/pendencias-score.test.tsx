@@ -90,7 +90,8 @@ const score = () => Number(screen.getByTestId("score").textContent);
 /** Linhas pendentes são <button>; as feitas são <div> riscado. O cabeçalho
  *  também é <button>, por isso o filtro. */
 const pendentes = () =>
-  screen.getAllByRole("button").filter(b => !/Pendências de hoje/.test(b.textContent || "")).map(b => b.textContent || "");
+  // 10/10: cada linha pendente leva data-testid="pendencia" (a engrenagem e o "⋯" de cada linha também são botões)
+  screen.queryAllByTestId("pendencia").map(b => b.textContent || "");
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* jsdom */ }

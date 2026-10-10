@@ -4,7 +4,7 @@ import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
-import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
+import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
 import {
   CHAVE_PENDENCIAS_PREFS, normalizarPrefs, pesoCobradoHoje, scoreDosBlocos, tiposCobradosHoje,
@@ -247,6 +247,7 @@ export function useLifeHubData(): LifeHubData {
       kcalPlano: get<Record<string, Record<string, unknown>>>(CHAVE_KCAL, {})[diaDieta],
       macrosPlano: get<MacrosPlano>(CHAVE_MACROS, {})[diaDieta],
       metaAntiga: get<number>(CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO),
+      modoMeta: get<string>(CHAVE_META_KCAL_MODO, "auto"),
     });
     const caloriesConsumed = consumoHoje.kcal;
     const caloriesGoal = consumoHoje.meta;

@@ -1,6 +1,6 @@
 import { useUserData } from "@/hooks/use-user-data";
 import { localDayKey } from "@/lib/utils";
-import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta, type ConsumoDoDia } from "@/lib/dieta-consumo";
+import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta, type ConsumoDoDia } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type EntradaLog, type MacrosPlano } from "@/lib/dieta-macros";
 
 /**
@@ -19,5 +19,6 @@ export function useConsumoDeHoje(): ConsumoDoDia {
     kcalPlano: get<Record<string, Record<string, unknown>>>(CHAVE_KCAL, {})[dia],
     macrosPlano: get<MacrosPlano>(CHAVE_MACROS, {})[dia],
     metaAntiga: get<number>(CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO),
+    modoMeta: get<string>(CHAVE_META_KCAL_MODO, "auto"),
   });
 }

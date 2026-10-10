@@ -1501,6 +1501,53 @@ export async function cancelarReguaDaMissao(): Promise<void> {
   await limparFaixa(BASE_MISSAO);
 }
 
+/* ─── PRÓXIMA DOSE EM 3 H (10/10, chave DIA1_CHEIO, braço B — lib/dia1-cheio) ─────
+   "Agora não" no meio das 3 doses do dia 1: UMA notificação local, 3 h depois,
+   na faixa da missão (id próprio, 900002 — a régua antiga usa 900001). Não sai
+   se cair depois das 21:30 (o Lembrete do dia 2 cobre a manhã seguinte) e não
+   PEDE permissão (quem pede é a folha do plano de amanhã). */
+export const ID_PROXIMA_DOSE = BASE_MISSAO + 2;
+export const PROXIMA_DOSE_EM_MS = 3 * 3600_000;
+const PROXIMA_DOSE_ATE_MIN = 21 * 60 + 30;
+
+/** Quando a próxima dose toca (ou null = tarde demais pra hoje). Pura, pra teste. */
+export function quandoProximaDose(agora: Date = new Date(), emMs: number = PROXIMA_DOSE_EM_MS): Date | null {
+  const alvo = new Date(agora.getTime() + emMs);
+  if (alvo.getDate() !== agora.getDate() || alvo.getHours() * 60 + alvo.getMinutes() > PROXIMA_DOSE_ATE_MIN) return null;
+  return alvo;
+}
+
+export type ResultadoProximaDose = { ok: true; quando: Date } | { ok: false; motivo: "sem_plugin" | "sem_permissao" | "tarde" | "erro_agendar" };
+
+export async function agendarProximaDose(dose: { indice: number; nome: string; emoji: string; pedido: string; rota: string }, agora: Date = new Date()): Promise<ResultadoProximaDose> {
+  const p = await plugin();
+  if (!p) return { ok: false, motivo: "sem_plugin" };
+  await cancelarProximaDose();
+  if (!(await temPermissao())) return { ok: false, motivo: "sem_permissao" };
+  const alvo = quandoProximaDose(agora);
+  if (!alvo) return { ok: false, motivo: "tarde" };
+  await garantirCanal();
+  try {
+    await p.LN.schedule({
+      notifications: [{
+        id: ID_PROXIMA_DOSE,
+        title: "Sua próxima dose de 20 s está pronta",
+        body: `${dose.emoji} ${dose.nome}: ${dose.pedido.toLowerCase()} — e a dose ${dose.indice} de 3 fica feita.`,
+        schedule: { at: alvo, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: dose.rota, tipo: "proxima_dose", em: alvo.toISOString() },
+      }],
+    });
+  } catch { return { ok: false, motivo: "erro_agendar" }; }
+  return { ok: true, quando: alvo };
+}
+
+export async function cancelarProximaDose(): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  try { await p.LN.cancel({ notifications: [{ id: ID_PROXIMA_DOSE }] }); } catch { /* nada pendente */ }
+}
+
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
  *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é

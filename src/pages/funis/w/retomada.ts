@@ -74,6 +74,9 @@ const RETOMAVEIS: Record<string, string> = {
   quiz: "quiz", prova: "central", progress: "central", result: "central", central: "central",
   compromissos: "compromissos", contrato: "contrato", notif: "notif", offer: "offer",
   signup: "signup", confirm: "signup", liberando: "signup",
+  // 10/10 (ONBOARDING_1TELA): a tela única retoma nela mesma; se a chave desligou
+  // no meio, o ComecarW traduz pra "compromissos" (passoDoOnboarding).
+  plano_3_dias: "plano_3_dias",
 };
 export const passoDeRetomada = (salvo: string | null, noShell: boolean): string | null =>
   noShell && salvo ? (RETOMAVEIS[salvo] ?? null) : null;
@@ -157,6 +160,8 @@ export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => 
 const PASSO_ANTERIOR: Record<string, string> = {
   promessas: "welcome", porta: "welcome", quiz: "porta", prova: "quiz", progress: "prova", result: "quiz",
   central: "result", compromissos: "central", contrato: "compromissos", notif: "contrato",
+  // 10/10 (ONBOARDING_1TELA): a tela única fica no lugar dos compromissos+contrato — o Voltar cai na central
+  plano_3_dias: "central",
 };
 export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;
 
@@ -176,6 +181,8 @@ export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[
  * quer sair vira cárcere e nota 1 na loja.
  */
 export const RECUO_DO_PAYWALL = "contrato";
+/** 10/10 (ONBOARDING_1TELA): com a tela única ligada, o contrato É "Seu plano de 3 dias" — o recuo cai nela. */
+export const recuoDoPaywall = (telaUnica: boolean): string => (telaUnica ? "plano_3_dias" : RECUO_DO_PAYWALL);
 
 /** Quem pediu "Topo, se for bem simples" no quiz (24% de quem vê o paywall)
  *  toca 23,5% contra 39,7% de quem pediu "Sim, topo" — e some em <10s. O

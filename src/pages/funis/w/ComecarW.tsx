@@ -12,6 +12,9 @@
  *   central     → 16 módulos → abre a DEMO REAL (/preview do módulo da rota)
  *   compromissos→ volta da demo: Claro!×3 POR ROTA (app/Me+, perguntas novas)
  *   contrato    → assinatura no dedo (app/Me+)
+ *   plano_3_dias→ (10/10, chave ONBOARDING_1TELA, DESLIGADA) os dois acima numa
+ *                 tela só: "Seu plano de 3 dias" — chips marcados + 1 linha de
+ *                 contrato + "Fechado" (lib/onboarding-1tela, ./PlanoDe3Dias)
  *   notif       → UMA tela só, copy premissa-dia14, pós-contrato
  *   offer       → PaywallW (layout web @ 97,90 vitalício, motor RC do app)
  *   signup      → cadastro DEPOIS de pagar (v48) → liberando
@@ -26,7 +29,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, RECUO_DO_PAYWALL } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, recuoDoPaywall } from "@/pages/funis/w/retomada";
+import { COMPROMISSOS_POR_AREA } from "@/pages/funis/w/compromissos";
+import { PlanoDe3Dias } from "@/pages/funis/w/PlanoDe3Dias";
+import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding } from "@/lib/onboarding-1tela";
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
@@ -53,7 +59,10 @@ const FUNIL = "w";
 type Step =
   | "welcome" | "promessas" | "porta" | "quiz" | "prova" | "progress" | "result"
   | "central" | "compromissos" | "contrato" | "notif" | "offer"
-  | "signup" | "confirm" | "liberando";
+  | "signup" | "confirm" | "liberando"
+  /* 10/10 (chave ONBOARDING_1TELA, desligada): "Seu plano de 3 dias" — os 3
+     Claro! + o contrato numa tela só. Só existe com a chave ligada. */
+  | "plano_3_dias";
 
 // Tema claro fixo (o funil da web roda claro, doa o que doer o tema do sistema).
 const LIGHT_VARS = {
@@ -81,35 +90,8 @@ const fade = {
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-/** Claro!×3 POR ROTA (pedido do dono: "elas têm que mudar de acordo com a
- *  escolha da rota"). A pergunta 1 é a dor da área; 2 e 3 sobem o degrau. */
-const COMPROMISSOS_POR_AREA: Record<AreaKey, Array<{ emoji: string; p: string }>> = {
-  dinheiro: [
-    { emoji: "💸", p: "Você quer saber pra onde seu dinheiro vai?" },
-    { emoji: "📅", p: "Quer parar de esquecer conta e pagar juros?" },
-    { emoji: "🚀", p: "Topa fechar o mês no azul?" },
-  ],
-  rotina: [
-    { emoji: "🗓️", p: "Você quer um dia que se organiza sozinho?" },
-    { emoji: "🔁", p: "Quer construir hábitos que ficam?" },
-    { emoji: "🚀", p: "Topa manter a constância por 30 dias?" },
-  ],
-  corpo: [
-    { emoji: "💪", p: "Você quer treinar com progresso de verdade?" },
-    { emoji: "🥗", p: "Quer dieta e treino no mesmo lugar?" },
-    { emoji: "🚀", p: "Topa cuidar do corpo sem depender de motivação?" },
-  ],
-  saude: [
-    { emoji: "❤️", p: "Você quer cuidar da sua saúde todo dia?" },
-    { emoji: "😴", p: "Quer dormir e beber água como gente grande?" },
-    { emoji: "🚀", p: "Topa virar sua versão mais saudável?" },
-  ],
-  metas: [
-    { emoji: "🎯", p: "Você quer tirar suas metas do papel?" },
-    { emoji: "🧭", p: "Quer ver seu progresso toda semana?" },
-    { emoji: "🚀", p: "Topa virar sua melhor versão?" },
-  ],
-};
+// Claro!×3 POR ROTA: mora em ./compromissos.ts (10/10) — a tela única "Seu
+// plano de 3 dias" (ONBOARDING_1TELA) usa as mesmas perguntas como chips.
 
 /** Porta como PERGUNTA de quiz (30/08, dono): na web esta tela era a ENTRADA
  *  do funil (headline hero, grade de 16 ícones, "5 perguntas rápidas · sem
@@ -347,9 +329,12 @@ export default function ComecarW() {
   // 1 frame da welcome azul antes do efeito trocar o passo — o estado já
   // nasce no passo certo e o azul nunca pinta).
   const [step, setStepCru] = useState<Step>(() => {
+    // 10/10: a força de QA da tela única (`?onboarding-1tela=on|off|auto`) é lida
+    // ANTES do passo — a volta da demo (`?step=compromissos`) cai na tela certa.
+    try { guardarForcaOnboarding1Tela(window.location.search); } catch { /* noop */ }
     try {
       const s = new URLSearchParams(window.location.search).get("step");
-      if (s === "compromissos" || s === "offer" || s === "signup") return s as Step;
+      if (s === "compromissos" || s === "offer" || s === "signup") return passoDoOnboarding(s) as Step;
     } catch { /* noop */ }
     // ANÚNCIO NA WEB → PORTA (02/09): o clique pago cai na primeira pergunta,
     // sem welcome nem promessas (ver retomada.ts — 69% morriam no splash).
@@ -357,7 +342,7 @@ export default function ComecarW() {
     // RETOMADA (02/09): o app morreu com a folha do Google aberta e voltou?
     // Cai onde parou (paywall, cadastro…), não na welcome. Só no shell.
     const retomar = passoDeRetomada(lerChave<string>(CHAVES.passo), isNativeShell());
-    if (retomar) return retomar as Step;
+    if (retomar) return passoDoOnboarding(retomar) as Step;
     return "welcome";
   });
   const [area, setArea] = useState<AreaKey | null>(() => {
@@ -416,7 +401,7 @@ export default function ComecarW() {
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       // "offer" já sai do PaywallW no mount — aqui só o registro da retomada
-      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: s, funil: FUNIL, retomada: true });
+      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: passoDoOnboarding(s), funil: FUNIL, retomada: true });
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
       const visivel = typeof document !== "undefined" ? document.visibilityState : "?";
@@ -472,9 +457,10 @@ export default function ComecarW() {
           if (agora - ultimoVoltarRef.current < 3000) {
             if (s === "offer" && !recuouRef.current) {
               recuouRef.current = true;
-              trackEvent("funnel_click", { cta: "w_back_recuou", funil: FUNIL, step: s, para: RECUO_DO_PAYWALL });
-              setStepCru(RECUO_DO_PAYWALL as Step);
-              guardarChave(CHAVES.passo, RECUO_DO_PAYWALL);
+              const recuo = recuoDoPaywall(onboarding1TelaLigado());
+              trackEvent("funnel_click", { cta: "w_back_recuou", funil: FUNIL, step: s, para: recuo });
+              setStepCru(recuo as Step);
+              guardarChave(CHAVES.passo, recuo);
               window.scrollTo(0, 0);
               return;
             }
@@ -582,8 +568,10 @@ export default function ComecarW() {
     try {
       if (localStorage.getItem(POS_COMPRA_OAUTH_KEY) === "1") { localStorage.removeItem(POS_COMPRA_OAUTH_KEY); oauthPosCompra = true; }
     } catch { /* noop */ }
-    const alvo = alvoDoDeepLink(params.get("step"), stepRef.current, oauthPosCompra);
-    if (!alvo) return;
+    const alvoCru = alvoDoDeepLink(params.get("step"), stepRef.current, oauthPosCompra);
+    if (!alvoCru) return;
+    const alvo = passoDoOnboarding(alvoCru);
+    if (alvo === stepRef.current) return;
     if (alvo === "liberando") { setPosCompra(true); setStepCru("liberando"); limparProgresso(); return; }
     trackEvent(alvo === "offer" ? "funnel_retomada" : "funnel_view", { step: alvo, funil: FUNIL, retomada: true, motivo: "deeplink" });
     setStepCru(alvo as Step);
@@ -667,6 +655,8 @@ export default function ComecarW() {
   })();
   const prepSteps = ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[areaOuPadrao].nome}`, "Finalizando seu plano personalizado"];
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
+  // 10/10: a tela única é um pouco mais alta que um passo curto — ela ROLA em celular pequeno (como a central)
+  const telaComprida = step === "result" || step === "central" || step === "plano_3_dias";
 
   // Faixa da status bar veste o funil (regra v83.4).
   useEffect(() => {
@@ -728,7 +718,7 @@ export default function ComecarW() {
            topo; só resultado/central/paywall — compridos de verdade — rolam. */
         <div
           style={{ ["--util" as string]: "calc(100dvh - var(--app-safe-top, 0px))" }}
-          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : step === "result" || step === "central" ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
+          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : telaComprida ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
@@ -776,6 +766,15 @@ export default function ComecarW() {
               )}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
+              {/* 10/10 (ONBOARDING_1TELA, desligada): os 3 Claro! + o contrato numa tela só.
+                  A demo termina AQUI; depois vem o paywall exatamente como no contrato de hoje. */}
+              {step === "plano_3_dias" && (
+                <PlanoDe3Dias
+                  area={areaOuPadrao}
+                  nome={(usuarioLogado?.user_metadata as { name?: string; full_name?: string } | undefined)?.name ?? (usuarioLogado?.user_metadata as { full_name?: string } | undefined)?.full_name ?? null}
+                  onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")}
+                />
+              )}
               {/* MESMA ORDEM NAS DUAS PONTAS (01/09): vende primeiro, cadastra
                   depois. Até ontem a web era obrigada a cadastrar ANTES do
                   paywall porque a função do Pix exige usuário autenticado pra

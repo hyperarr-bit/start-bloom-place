@@ -8,7 +8,7 @@ import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao } from "@/comp
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { alvoDaMissao, gravacoesDoChip, itemDoChip, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { rotuloCurto } from "@/lib/demo-guiada";
-import { HORAS_DO_LEMBRETE, MODULOS, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { HORAS_DO_LEMBRETE, MODULOS, diaDaMissao, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
 import "./missao-doses.css";
 
@@ -48,7 +48,17 @@ const tamanho = (v: unknown): number => (Array.isArray(v) ? v.length : v && type
  * "Pular" da faixa só aparece aos 20 s ou no 2º toque nela, e a missão escuta
  * o registro por qualquer caminho (chip, campo, quadradinho).
  */
-export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombinar, aoAmanhaAgora, aoVerFim }: {
+/**
+ * 10/10 (chave DIA1_CHEIO, lib/dia1-cheio) — o braço B muda SÓ a comemoração e a faixa:
+ *   · `braco: "B"` (modo "dose"): as 3 doses são do dia 1 → a festa pergunta "Bora a próxima? 20 s"
+ *     (+ "Agora não") em vez de combinar a hora de amanhã; na 3ª, "Fechar por hoje";
+ *   · `modo: "aprofundar"` (dias 2 e 3 do B): a faixa diz "Aprofundar · dia N" e a festa é curta.
+ * Sem `braco` (chave desligada, ou braço A) tudo aqui é o de hoje, byte a byte.
+ */
+export type BracoDoPasso = "A" | "B" | null | undefined;
+export type ModoDoPasso = "dose" | "aprofundar";
+
+export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
   missao: EstadoMissaoDoses;
   n: DiaDaMissao;
   modulo: ModuloDaMissao;
@@ -58,6 +68,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   aoCombinar: (lembrete: Lembrete) => void;
   aoAmanhaAgora: () => void;
   aoVerFim: () => void;
+  braco?: BracoDoPasso;
+  modo?: ModoDoPasso;
+  /** braço B: "Bora a próxima? 20 s" */
+  aoBoraProxima?: () => void;
+  /** braço B: "Agora não" no meio das doses */
+  aoAgoraNao?: () => void;
+  /** braço B: a 3ª dose feita (ou um "aprofundar" feito) — fecha a festa */
+  aoFecharDia?: () => void;
 }) {
   const cfg = MODULOS[modulo];
   const alvoCfg: AlvoDaMissao | null = cfg.tipo ? alvoDaMissao(cfg.tipo) : null;
@@ -238,7 +256,11 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       <span className="md-faixa-quadros" aria-label={`${feitos} de 3 feitos`} role="img">
         {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitos} claro tam={14} />)}
       </span>
-      <span className="md-faixa-titulo">Missão · dia {n} de 3 · <b>{cfg.nome}</b></span>
+      <span className="md-faixa-titulo">
+        {modo === "aprofundar" ? <>Aprofundar · dia {diaDaMissao(missao, hoje)} · <b>{cfg.nome}</b></>
+          : braco === "B" ? <>Missão · dose {n} de 3 · <b>{cfg.nome}</b></>
+          : <>Missão · dia {n} de 3 · <b>{cfg.nome}</b></>}
+      </span>
       {perdeuAlvo && fase === "anotar" && (
         <button type="button" className="md-faixa-onde" data-testid="missao-doses-onde" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}>mostrar onde</button>
       )}
@@ -320,6 +342,11 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             aoCombinar={aoCombinar}
             aoAmanhaAgora={aoAmanhaAgora}
             aoVerFim={aoVerFim}
+            braco={braco}
+            modo={modo}
+            aoBoraProxima={aoBoraProxima}
+            aoAgoraNao={aoAgoraNao}
+            aoFecharDia={aoFecharDia}
           />
         )}
       </AnimatePresence>
@@ -334,9 +361,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
  * fazer o toque de amanhã agora" leva pro próximo módulo. No dia 3: "Ver o que
  * você construiu".
  */
-function ComemoracaoDoDia({ n, missao, modulo, rotulo, aoCombinar, aoAmanhaAgora, aoVerFim }: {
+function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoAmanhaAgora: () => void; aoVerFim: () => void;
+  braco?: BracoDoPasso; modo?: ModoDoPasso; aoBoraProxima?: () => void; aoAgoraNao?: () => void; aoFecharDia?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const cfg = MODULOS[modulo];
@@ -344,7 +372,28 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, aoCombinar, aoAmanhaAgora
   // 03/10: no app, o chip pré-marcado é o mais perto da hora em que ela abriu o app hoje
   // (é a hora que o Lembrete do dia 2 usaria sozinho); a escolha dela, se já houve, vence.
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
-  const titulo = n === 1 ? "Primeiro registro feito!" : n === 2 ? "Dia 2 feito!" : "Missão cumprida!";
+  const B = braco === "B";
+  const titulo = modo === "aprofundar" ? `Dia ${diaDaMissao(missao, hoje)} aprofundado!`
+    : B ? (n === 1 ? "Primeira dose feita!" : n === 2 ? "Segunda dose feita!" : "Missão cumprida!")
+    : n === 1 ? "Primeiro registro feito!" : n === 2 ? "Dia 2 feito!" : "Missão cumprida!";
+
+  /* APROFUNDAR (B, dias 2–3): festa curta — o que ela fez já está no módulo; "Fechar". */
+  if (modo === "aprofundar") {
+    return createPortal(
+      <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-modo="aprofundar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }} className="relative w-full max-w-[340px] rounded-3xl bg-white p-5 text-center text-[#16121c] shadow-2xl">
+          <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">🔥 Dia {diaDaMissao(missao, hoje)} · {cfg.emoji} {cfg.nome} ✓</span>
+          <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
+          <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
+            {cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. Um uso de verdade por dia é o que faz o hábito pegar.
+          </p>
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>Fechar</button>
+        </motion.div>
+      </motion.div>,
+      document.body,
+    );
+  }
+
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
       <Confete />
@@ -361,9 +410,26 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, aoCombinar, aoAmanhaAgora
         <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
           <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / 3) * 100)}%` }} animate={{ width: `${Math.round((n / 3) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
         </div>
-        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">Missão dos 3 dias · {n} de 3 toques</p>
+        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{B ? `Missão do dia 1 · ${n} de 3 doses` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
 
-        {proximo ? (
+        {/* BRAÇO B (DIA1_CHEIO): as 3 doses são de HOJE — a festa puxa a próxima (20 s), ou "Agora não" */}
+        {B && proximo ? (
+          <>
+            <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-proxima-dose">
+              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Próxima dose · {proximo.emoji} {proximo.nome}</span>
+              <span className="block text-[15px] font-extrabold leading-snug mt-0.5">{proximo.pedido}</span>
+              <span className="block text-[12px] text-[#4f5a64] mt-1">Uns 20 segundos. Depois a missão de hoje {n === 1 ? "fica em 2 de 3" : "está completa"}.</span>
+            </div>
+            <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-bora-proxima" onClick={aoBoraProxima}>
+              Bora a próxima? 20 s <ArrowRight className="w-4 h-4" />
+            </button>
+            <button type="button" className="md-link" data-testid="missao-doses-agora-nao" onClick={aoAgoraNao}>Agora não</button>
+          </>
+        ) : B ? (
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>
+            Fechar por hoje <ArrowRight className="w-4 h-4" />
+          </button>
+        ) : proximo ? (
           <>
             <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-amanha">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Amanhã · {proximo.emoji} {proximo.nome}</span>

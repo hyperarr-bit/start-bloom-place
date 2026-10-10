@@ -35,9 +35,10 @@ import { computeDailyBudget, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import {
-  MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, missaoCumprida, passoPendente,
+  MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, missaoCumprida, passoPendente,
   type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
+import type { QuandoAmanha } from "./dia1-cheio";
 import type { AreaKey } from "./funnel";
 
 export const CHAVE_DIA2 = "core-dia2";
@@ -116,6 +117,9 @@ export function registrarAbertura(agora: Date = new Date(), criadoEm?: string | 
 export const diaDoUso = (e: EstadoDia2, dia: string): number => diasEntre(e.primeiroUso, dia) + 1;
 
 export const HORA_DA_MISSAO: Record<Lembrete, number | "sem"> = { "8h": 8 * 60, "12h": 12 * 60, "20h": 20 * 60, sem: "sem" };
+
+/** 10/10 (DIA1_CHEIO, braço B): o chip do plano de amanhã ("manhã/almoço/noite") na hora do lembrete. */
+export const LEMBRETE_DO_PLANO: Record<QuandoAmanha, Lembrete> = { manha: "8h", almoco: "12h", noite: "20h" };
 
 /** A comemoração da missão combinou a hora: vale a semana toda (escolha explícita > inferência). */
 export function combinarHora(l: Lembrete, agora: Date = new Date()): EstadoDia2 {
@@ -300,6 +304,18 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
   if (diaDaMissao(missao, somarDias(hoje, 1)) > 5) return null;
   const cfg = MODULOS[pendente.modulo];
   const feitos = ([1, 2, 3] as const).filter((n) => missao.feitos[n]).length;
+  // 10/10 (DIA1_CHEIO, braço B): parou no meio das doses ("Agora não") — a de amanhã é a PRÓXIMA DOSE, com o que já fez
+  if (ehBracoB(missao)) {
+    const ultimo = feitos ? missao.feitos[feitos as 1 | 2 | 3] : undefined;
+    const ultimoCfg = feitos ? MODULOS[missao.modulos[feitos - 1]] : null;
+    return {
+      title: ultimo && ultimoCfg ? `Ontem você anotou ${ultimoCfg.toque} — bora a próxima dose?` : `Sua próxima dose de 20 s: ${cfg.emoji} ${cfg.nome}`,
+      body: `${cfg.pedido} — 20 segundos e a dose ${pendente.n} de 3 fica feita${feitos ? ` (${feitos} de 3 já ${feitos === 1 ? "foi" : "foram"})` : ""}.`,
+      modulo: "missao",
+      temNumero: false,
+      rota: cfg.rota,
+    };
+  }
   return {
     title: `🔥 Dia ${pendente.n} da missão: ${cfg.emoji} ${cfg.nome}`,
     body: `${cfg.pedido} — 40 segundos e o passo ${pendente.n} de 3 fica feito${feitos ? ` (${feitos} de 3 já foram)` : ""}.`,
@@ -310,12 +326,35 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
 }
 
 /**
+ * 10/10 (DIA1_CHEIO, braço B) — "APROFUNDAR": as 3 doses foram feitas no dia 1; amanhã (dia 2) e
+ * depois (dia 3) o lembrete pede 1 uso REAL num módulo já visto, com o que a pessoa fez de concreto:
+ * "Ontem você anotou 1 gasto — 20 s pra anotar o de hoje". Dia 2 → o 1º módulo da missão; dia 3 → o 2º.
+ * Fora dos dias 2–3 (ou missão incompleta), null.
+ */
+export function conteudoDoAprofundar(missao: EstadoMissaoDoses | null, hoje: string = localDayKey()): ConteudoDia2 | null {
+  if (!missao || !ehBracoB(missao) || !missao.boasVindas || !missaoCumprida(missao)) return null;
+  const diaAmanha = diaDaMissao(missao, somarDias(hoje, 1));
+  if (diaAmanha < 2 || diaAmanha > 3) return null;
+  const n = (diaAmanha - 1) as 1 | 2;
+  const cfg = MODULOS[missao.modulos[n - 1]];
+  const feito = missao.feitos[n];
+  const quando = missao.completaEm === hoje || !missao.completaEm ? "Ontem" : "Esses dias";
+  return {
+    title: `${quando} você anotou ${cfg.toque} — 20 s pra anotar ${cfg.toque === "1 gasto" ? "o" : "mais um"} de hoje`,
+    body: `${feito?.rotulo ? `${feito.rotulo} já está ${cfg.onde}. ` : ""}${cfg.pedido} de novo e o dia ${diaAmanha} da missão fica feito.`,
+    modulo: "missao",
+    temNumero: !!feito?.rotulo,
+    rota: cfg.rota,
+  };
+}
+
+/**
  * O conteúdo do lembrete que toca em `amanha`: o passo da missão, senão o módulo
  * mais usado com o número da pessoa, senão o módulo da área da porta, senão Finanças.
  */
 export function conteudoDoLembrete(get: Leitor, p: { missao: EstadoMissaoDoses | null; amanha: Date; area?: string | null; hoje?: string }): ConteudoDia2 {
   const hoje = p.hoje ?? localDayKey();
-  const daMissao = conteudoDaMissao(p.missao, hoje);
+  const daMissao = conteudoDaMissao(p.missao, hoje) ?? conteudoDoAprofundar(p.missao, hoje);
   if (daMissao) return daMissao;
   const modulo = moduloMaisUsado(get) ?? (p.area && p.area in MODULO_DA_AREA ? MODULO_DA_AREA[p.area as AreaKey] : "financas");
   return conteudoDoModulo(get, modulo, p.amanha, hoje);

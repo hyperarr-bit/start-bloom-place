@@ -51,6 +51,7 @@ import { somarDias } from "@/lib/sequencia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
+import { bracoGravado, dia1CheioLigado, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -230,6 +231,20 @@ export interface EstadoMissaoDoses {
   fimVisto?: boolean;
   /** o score do dia na abertura (pra "ontem 20 → hoje 45" no final) */
   scoreNoInicio?: number;
+  /* ── 10/10 (chave DIA1_CHEIO, desligada; lib/dia1-cheio) — todos opcionais: a missão de
+     hoje lê e grava sem eles, e um estado antigo continua válido (lerMissao não os exige). ── */
+  /** o braço do teste "dia 1 cheio" (cópia de core-dia1-braco; sobrevive ao logout junto com a missão) */
+  braco?: BracoDia1;
+  /** braço B: "Agora não" no meio das doses — o dia e a dose em que parou */
+  agoraNao?: { dia: string; indice: DiaDaMissao };
+  /** braço B: o plano de amanhã combinado na folha (vira a hora do Lembrete do dia 2) */
+  planoAmanha?: PlanoAmanha;
+  /** braço B: pulou a folha do plano neste dia (não insiste) */
+  planoAmanhaPulado?: string;
+  /** braço B: o dia em que as 3 doses ficaram feitas */
+  completaEm?: string;
+  /** braço B, dias 2 e 3 ("aprofundar"): por dia, os módulos em que já houve 1 uso real */
+  aprofundados?: Record<string, ModuloDaMissao[]>;
 }
 
 export function lerMissao(): EstadoMissaoDoses | null {
@@ -252,8 +267,9 @@ export function gravarMissao(m: EstadoMissaoDoses): EstadoMissaoDoses {
   return m;
 }
 
-export function iniciarMissao(modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao], hoje: string = localDayKey(), scoreNoInicio?: number): EstadoMissaoDoses {
-  return gravarMissao({ v: 1, inicio: hoje, modulos, feitos: {}, boasVindas: false, scoreNoInicio });
+export function iniciarMissao(modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao], hoje: string = localDayKey(), scoreNoInicio?: number, braco?: BracoDia1 | null): EstadoMissaoDoses {
+  // o braço só entra no estado quando existe (chave DIA1_CHEIO ligada): desligada, o JSON gravado é o de hoje
+  return gravarMissao({ v: 1, inicio: hoje, modulos, feitos: {}, boasVindas: false, scoreNoInicio, ...(braco ? { braco } : {}) });
 }
 
 export const apagarMissao = (): void => { ls.del(CHAVE_ESTADO_MISSAO_DOSES); avisar(); };
@@ -264,10 +280,68 @@ export const apagarMissao = (): void => { ls.del(CHAVE_ESTADO_MISSAO_DOSES); avi
  * versão do build — é o que separa a turma da 1.0.10 da da 1.0.9 nas consultas
  * (voltou no dia 2, dias de uso na 1ª semana).
  */
-export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<string, unknown> =>
-  isNativeShell()
+export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<string, unknown> => {
+  const base = isNativeShell()
     ? { ...dados, prototipo: "app", plataforma: plataformaApp(), versao: typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev" }
     : { ...dados, prototipo: "web" };
+  // 10/10 (DIA1_CHEIO): com a chave ligada TODO evento da missão leva o braço — é por `variante`
+  // que o teste se lê. Desligada, o payload é o de hoje, campo a campo.
+  const variante = varianteDia1();
+  return variante ? { ...base, variante } : base;
+};
+
+/** O braço desta pessoa pros eventos (só com a chave DIA1_CHEIO ligada), ou null. */
+export function varianteDia1(): BracoDia1 | null {
+  if (!dia1CheioLigado()) return null;
+  return lerMissao()?.braco ?? bracoGravado();
+}
+
+/** A missão está no braço B ("dia 1 cheio")? Com a chave desligada, nunca — mesmo que o braço tenha ficado gravado. */
+export const ehBracoB = (m: EstadoMissaoDoses | null): boolean => !!m && dia1CheioLigado() && m.braco === "B";
+
+/** Quantas doses já foram feitas (1..3). */
+export const dosesFeitas = (m: EstadoMissaoDoses): number => ([1, 2, 3] as DiaDaMissao[]).filter((n) => m.feitos[n]).length;
+
+/**
+ * Braço B — a folha "Quando você abre o CORE amanhã?" está devendo? No fim da 1ª
+ * sessão: dia 1 da missão, ≥1 dose feita ou "Agora não", e sem plano (nem pulo) ainda.
+ */
+export function precisaPlanoAmanha(m: EstadoMissaoDoses, hoje: string = localDayKey()): boolean {
+  if (!ehBracoB(m) || !m.boasVindas) return false;
+  if (m.planoAmanha || m.planoAmanhaPulado === hoje) return false;
+  if (diaDaMissao(m, hoje) !== 1) return false;
+  return dosesFeitas(m) >= 1 || m.agoraNao?.dia === hoje;
+}
+
+/**
+ * Braço B, dias 2 e 3 ("aprofundar"): o módulo da missão em que ainda não houve 1 uso real
+ * HOJE, ao entrar nele — ou null (fora dos dias 2–3, missão incompleta, módulo já aprofundado hoje).
+ */
+export function aprofundarPendente(m: EstadoMissaoDoses, rota: string, hoje: string = localDayKey()): { n: DiaDaMissao; modulo: ModuloDaMissao } | null {
+  if (!ehBracoB(m) || !missaoCumprida(m)) return null;
+  const dia = diaDaMissao(m, hoje);
+  if (dia < 2 || dia > 3) return null;
+  const feitosHoje = m.aprofundados?.[hoje] ?? [];
+  for (const n of [1, 2, 3] as DiaDaMissao[]) {
+    const modulo = m.modulos[n - 1];
+    if (rota.startsWith(MODULOS[modulo].rota) && !feitosHoje.includes(modulo)) return { n, modulo };
+  }
+  return null;
+}
+
+/**
+ * PONTO DE ENCAIXE DO TOUR DA HOME (10/10, pra quem fizer o tour): enquanto isto é true a
+ * missão (ou a folha do plano de amanhã, ou "O que você construiu") ainda tem tela pra
+ * mostrar — o tour deve ESPERAR. Reler ao evento EVENTO_MISSAO_DOSES (e ao `missao_completa`).
+ */
+export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!m) return false;
+  if (!m.boasVindas) return true;
+  if (precisaPlanoAmanha(m, hoje)) return true;
+  const dia = diaDaMissao(m, hoje);
+  if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje;
+  return !m.fimVisto && (!ehBracoB(m) || dia >= 3);
+}
 
 /** O dia da missão em que a pessoa está (1 = o dia em que nasceu), pelo relógio dela — ou pelo QA. */
 export function diaDaMissao(m: EstadoMissaoDoses, hoje: string = localDayKey()): number {

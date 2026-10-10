@@ -117,12 +117,16 @@ describe("quandoLembrarDoTeste — hora do aviso", () => {
     expect(quandoLembrarDoTeste(fim, madrugada)!.getHours()).toBe(9);
   });
 
-  it("copy diz o preço do ano, que o que montou fica, onde cancelar — e nada de vitalício", () => {
+  it("copy diz o preço do ano, que o que montou fica, pede pra conferir o cartão — sem 'cancele hoje em Ajustes' e nada de vitalício", () => {
     const c = copyDoLembreteDoTeste("R$ 97,90");
     expect(c.title).toBe("Seu teste grátis do CORE acaba amanhã");
     expect(c.body).toMatch(/R\$ 97,90 pelo ano inteiro/);
     expect(c.body).toMatch(/tudo que você montou fica/);
-    expect(c.body).toMatch(/Ajustes › Assinaturas/);
+    // 10/10: 59% das cobranças do fim do teste falham no cartão — o aviso pede pra conferir
+    expect(c.body).toMatch(/confira se o cartão da App Store está ok/);
+    expect(c.body).not.toMatch(/cancele hoje|Ajustes › Assinaturas/);
+    // a promessa do paywall continua honesta: ainda dá pra cancelar
+    expect(c.body).toMatch(/cancelar/);
     expect(c.body).not.toMatch(/vitalíc|pra sempre/i);
     // o preço vem da loja: 69,90 no braço B do experimento
     expect(copyDoLembreteDoTeste("R$ 69,90").body).toMatch(/R\$ 69,90 pelo ano inteiro/);

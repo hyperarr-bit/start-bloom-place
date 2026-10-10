@@ -1156,7 +1156,11 @@ export function quandoLembrarDoTeste(fimMs: number, agora = Date.now()): Date | 
 export function copyDoLembreteDoTeste(precoAno: string) {
   return {
     title: "Seu teste grátis do CORE acaba amanhã",
-    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica. Se não, cancele hoje em Ajustes › Assinaturas e não paga nada.`,
+    /* 10/10 (1.0.14): sai o "cancele hoje em Ajustes › Assinaturas" (ensinava o
+     * caminho de sair a quem só queria ser avisado) e entra o cartão — 59% das
+     * cobranças do fim do teste FALHAM no cartão, e a pessoa só descobre quando
+     * o acesso cai. A promessa do paywall ("a gente te avisa") continua a mesma. */
+    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica — só confira se o cartão da App Store está ok. Se não quiser, dá pra cancelar até amanhã.`,
   };
 }
 
@@ -1245,6 +1249,60 @@ export async function sincronizarLembreteDoTeste(estado: { emTeste: boolean; vai
 export async function cancelarLembreteDoTeste(): Promise<void> {
   guardarPedidoDeLembrete(null);
   await limparFaixa(BASE_LEMBRETE_TESTE);
+}
+
+/* ------------------------------------- cartão recusado: +24 h e +72 h (10/10) */
+
+/*
+ * CARTÃO RECUSADO NA LOJA (1.0.14, atrás de COBRANCA_V14 — ver lib/cobranca-
+ * recusada). Quem tem o cartão recusado só fica sabendo se ABRIR o app e ver a
+ * faixa; 59% das cobranças falham e ~5% recuperam. Dois avisos locais, armados
+ * quando o app detecta o problema (ids 940001 e 940002): 24 h e 72 h depois.
+ * Cancelados quando a loja diz que a cobrança entrou (ou a pessoa cancelou).
+ * `extra.tipo = "cobranca"` pros eventos notif_entregue/notif_toque, como os outros.
+ */
+const BASE_COBRANCA = 940000;
+export const HORAS_DOS_AVISOS_DE_COBRANCA = [24, 72] as const;
+
+export function copyDoAvisoDeCobranca(loja: string = isAndroid() ? "Google Play" : "App Store") {
+  return {
+    title: "Seu pagamento do CORE não passou",
+    body: `Atualize o cartão na ${loja} pra não perder o acesso.`,
+  };
+}
+
+/** Arma os dois avisos (substitui os anteriores). `marca` = billingIssueDetectedAt, pro evento. */
+export async function agendarAvisosDeCobranca(marca: string, agora: number = Date.now()): Promise<boolean> {
+  const plug = await plugin();
+  if (!plug) return false;
+  if (!(await temPermissao())) { trackEvent("notif_cobranca_armada", { ok: false, motivo: "sem_permissao" }); return false; }
+  await garantirCanal();
+  await limparFaixa(BASE_COBRANCA);
+  const { LN } = plug;
+  const copy = copyDoAvisoDeCobranca();
+  try {
+    await LN.schedule({
+      notifications: HORAS_DOS_AVISOS_DE_COBRANCA.map((h, i) => ({
+        id: BASE_COBRANCA + 1 + i,
+        title: copy.title,
+        body: copy.body,
+        schedule: { at: new Date(agora + h * 3600e3), allowWhileIdle: true },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { tipo: "cobranca", rota: "/home", em: marca },
+      })),
+    });
+    trackEvent("notif_cobranca_armada", { ok: true, em_h: [...HORAS_DOS_AVISOS_DE_COBRANCA] });
+    return true;
+  } catch {
+    trackEvent("notif_cobranca_armada", { ok: false, motivo: "erro_agendar" });
+    return false;
+  }
+}
+
+export async function cancelarAvisosDeCobranca(): Promise<void> {
+  await limparFaixa(BASE_COBRANCA);
 }
 
 /* ------------------------------------------------------- régua do teste 3d */
@@ -1445,8 +1503,9 @@ export async function cancelarReguaDaMissao(): Promise<void> {
 
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
- *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2 } as const;
+ *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é
+ *  o cartão recusado (10/10, +24 h/+72 h). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA } as const;
 
 /** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
 export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {

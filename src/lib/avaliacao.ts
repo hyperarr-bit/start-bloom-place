@@ -1,6 +1,8 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { userKeyOf } from "@/components/finance/storage-keys";
+import { erroNaSessao, momentoRuimRecente } from "@/lib/momento-ruim";
+import { avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
 
 /**
  * PEDIDO DE AVALIAÇÃO NA PLAY (14/08).
@@ -67,7 +69,14 @@ export type MotivoAvaliacao =
   | "plano_pronto"
   // iPhone (23/09): convite depois de uma ação de valor de quem PAGA e VOLTOU
   // (2+ dias de uso). Ver `reservarConviteDeValor`.
-  | "momento_valor";
+  | "momento_valor"
+  // 10/10 (1.0.14, atrás de AVALIACAO_V14): os momentos da MISSÃO EM DOSES —
+  // quem dispara é a missão (agente dela), por `pedirAvaliacaoPorMissao`.
+  | MotivoDaMissao;
+
+/** Os momentos da missão em doses que podem pedir nota (10/10). */
+export type MotivoDaMissao = "missao_dose_concluida" | "missao_completa" | "plano_amanha_definido";
+export const MOTIVOS_DA_MISSAO: ReadonlySet<string> = new Set<MotivoDaMissao>(["missao_dose_concluida", "missao_completa", "plano_amanha_definido"]);
 
 const lerNumero = (chave: string): number => {
   try {
@@ -113,8 +122,12 @@ const CHAVE_RECUSAS_VALOR = "core-avaliacao-valor-recusas";
 const MAX_RECUSAS_VALOR = 2;
 export const DIAS_MINIMOS_PRA_CONVIDAR = 2;
 
-/** Os momentos em que o iPhone pede a caixinha direto (03/10): os de uso do Android — nunca o funil nem o 1º gasto. */
-const MOTIVOS_DIRETOS_NO_IPHONE = new Set<MotivoAvaliacao>(["sequencia_habito", "conta_paga", "retrospectiva", "extrato_importado", "meta_batida", "desafio_concluido"]);
+/** Os momentos em que o iPhone pede a caixinha direto (03/10): os de uso do Android — nunca o funil nem o 1º gasto.
+ *  10/10: + os da missão em doses (só chegam aqui por `pedirAvaliacaoPorMissao`, atrás da chave AVALIACAO_V14). */
+export const MOTIVOS_DIRETOS_NO_IPHONE = new Set<MotivoAvaliacao>([
+  "sequencia_habito", "conta_paga", "retrospectiva", "extrato_importado", "meta_batida", "desafio_concluido",
+  "missao_dose_concluida", "missao_completa", "plano_amanha_definido",
+]);
 
 /** Ações que contam como "acabei de conseguir algo" → rótulo da folha. */
 export const ACOES_DE_VALOR: Record<string, string> = {
@@ -201,6 +214,10 @@ export function podePedirAvaliacao(): boolean {
   // turista de 30s marcando a conta de exemplo seria convidado a avaliar: o
   // exato erro do pedido-no-funil que morreu em 28/08.
   try { if (window.location.pathname.startsWith("/preview")) return false; } catch { /* noop */ }
+  // 10/10: quem acabou de ver "seu pagamento não passou", abriu o cancelamento ou
+  // recebeu o presente de 69,90 (24 h), ou teve erro nesta sessão, não é pedido —
+  // a nota vem baixa e a cota é de 3/ano. Ver lib/momento-ruim.
+  if (momentoRuimRecente() || erroNaSessao()) return false;
   if (lerNumero(CHAVE_TOTAL) >= MAXIMO_NA_VIDA) return false;
   const ultima = lerNumero(CHAVE_ULTIMA);
   const dias = ultima ? (Date.now() - ultima) / 86_400_000 : Infinity;
@@ -338,9 +355,12 @@ export async function pedirAvaliacaoSePuder(
     try {
       const { Capacitor } = await import("@capacitor/core");
       if (Capacitor.getPlatform() === "ios") {
-        trackEvent("app_avaliacao_pedida", { motivo, pagante, vezes, ordem: lerNumero(CHAVE_TOTAL) + 1, loja_direto: true });
-        try { localStorage.setItem(CHAVE_ULTIMA, String(Date.now())); } catch { /* noop */ }
-        window.location.href = "itms-apps://itunes.apple.com/app/id6806913181?action=write-review";
+        const total = lerNumero(CHAVE_TOTAL);
+        trackEvent("app_avaliacao_pedida", { motivo, pagante, vezes, ordem: total + 1, loja_direto: true });
+        // 10/10: conta no total da vida também (antes só a caixinha contava — a
+        // régua de 3 pedidos valia só pra metade dos caminhos).
+        try { localStorage.setItem(CHAVE_ULTIMA, String(Date.now())); localStorage.setItem(CHAVE_TOTAL, String(total + 1)); } catch { /* noop */ }
+        window.location.href = URL_AVALIAR_IOS;
         return true;
       }
     } catch { /* cai na caixinha */ }
@@ -398,4 +418,57 @@ export async function pedirAvaliacaoPlanoPronto(): Promise<boolean> {
   if (lerNumero(CHAVE_PLANO_PRONTO)) return false;
   try { localStorage.setItem(CHAVE_PLANO_PRONTO, "1"); } catch { /* modo privado */ }
   return pedirAvaliacaoSePuder("plano_pronto", { forte: true });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * 1.0.14 (10/10): MISSÃO EM DOSES + "AVALIAR O CORE" NO MENU — ver lib/avaliacao-v14.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export const URL_AVALIAR_IOS = "itms-apps://itunes.apple.com/app/id6806913181?action=write-review";
+export const URL_AVALIAR_ANDROID = "https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app";
+/** A comemoração da missão (anel, confete) leva ~1 s; a caixinha só depois dela. */
+export const ATRASO_DEPOIS_DA_COMEMORACAO_MS = 1500;
+
+/**
+ * O pedido que a MISSÃO EM DOSES faz (quem chama é o agente da missão, no fim
+ * da comemoração de cada passo / do plano de amanhã / da missão completa).
+ *
+ * Travas, além das de sempre (`pedirAvaliacaoSePuder`: shell, /preview, 3 na
+ * vida, 90 dias, momento ruim): a chave AVALIACAO_V14 e 2+ dias de uso NAS
+ * DUAS lojas — o passo do dia 1 é cedo demais pra qualquer um; voltar no dia 2
+ * é o momento (44% de quem volta no dia 2 paga). Espera 1,5 s depois da
+ * comemoração. Devolve se a caixinha foi pedida.
+ */
+export function pedirAvaliacaoPorMissao(motivo: MotivoDaMissao, { pagante = false }: { pagante?: boolean } = {}): Promise<boolean> {
+  if (!avaliacaoV14Ligada()) return Promise.resolve(false);
+  if (!MOTIVOS_DA_MISSAO.has(motivo)) return Promise.resolve(false);
+  if (registrarDiaDeUso() < DIAS_MINIMOS_PRA_CONVIDAR) return Promise.resolve(false);
+  if (!podePedirAvaliacao()) return Promise.resolve(false);
+  return new Promise<boolean>((resolver) => {
+    setTimeout(() => {
+      pedirAvaliacaoSePuder(motivo, { pagante, forte: true }).then(resolver, () => resolver(false));
+    }, ATRASO_DEPOIS_DA_COMEMORACAO_MS);
+  });
+}
+
+/**
+ * "Avaliar o CORE" em Ajustes (menu da conta) — ação da PESSOA, nunca a caixinha
+ * (a diretriz do Google proíbe botão que às vezes não faz nada; a da Apple só
+ * mostra quando quer). iPhone: a tela de escrever a avaliação na App Store;
+ * Android: a ficha na Play. Conta no total/última como um pedido (quem acabou
+ * de avaliar pelo menu não precisa ser pedido de novo por 90 dias).
+ */
+export function abrirPaginaDeAvaliacao(origem = "menu"): boolean {
+  if (!isNativeShell()) return false;
+  const iphone = noIPhone();
+  const total = lerNumero(CHAVE_TOTAL);
+  trackEvent("app_avaliacao_pedida", { motivo: "menu", origem, loja_direto: true, ordem: total + 1, loja: iphone ? "ios" : "android" });
+  try { localStorage.setItem(CHAVE_ULTIMA, String(Date.now())); localStorage.setItem(CHAVE_TOTAL, String(total + 1)); } catch { /* noop */ }
+  try {
+    if (iphone) window.location.href = URL_AVALIAR_IOS;
+    else window.open(URL_AVALIAR_ANDROID, "_blank", "noopener");
+    return true;
+  } catch {
+    return false;
+  }
 }

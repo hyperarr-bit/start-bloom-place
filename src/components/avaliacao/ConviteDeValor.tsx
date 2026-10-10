@@ -20,9 +20,9 @@ export const ConviteDeValor = () => {
   const { user, isSubscribed, subLoaded } = useAuth();
   const [momento, setMomento] = useState<MomentoDoConvite | null>(null);
 
-  // conta o dia de uso: ao abrir e ao voltar pro app (quem deixa aberto de um dia pro outro)
+  // conta o dia de uso: ao abrir e ao voltar pro app (quem deixa aberto de um dia pro outro).
+  // 10/10: nas DUAS lojas — a trava de 2+ dias da missão (pedirAvaliacaoPorMissao) vale no Android também.
   useEffect(() => {
-    if (!noIPhone()) return;
     registrarDiaDeUso();
     const aoVoltar = () => { if (document.visibilityState === "visible") registrarDiaDeUso(); };
     document.addEventListener("visibilitychange", aoVoltar);

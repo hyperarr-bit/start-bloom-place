@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { abrirPaginaDeAvaliacao } from "@/lib/avaliacao";
+import { avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
 import { NameEditDialog } from "./NameEditDialog";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { ApagarDadosDialog } from "@/components/account/ApagarDadosDialog";
@@ -107,6 +109,11 @@ export const AccountDrawer = ({
     onOpenChange(false);
     onReplayTutorial?.();
   };
+  // 10/10 (1.0.14, atrás de AVALIACAO_V14): "Avaliar o CORE" — a página da loja,
+  // nunca a caixinha (botão que às vezes não faz nada é experiência quebrada).
+  const itemAvaliar = isNativeShell() && avaliacaoV14Ligada()
+    ? [{ icon: Star, label: "Avaliar o CORE", onClick: () => { onOpenChange(false); abrirPaginaDeAvaliacao("menu"); } }]
+    : [];
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
@@ -125,6 +132,7 @@ export const AccountDrawer = ({
         // nas telas de funil. Quem quer pagar precisa de caminho.
         { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
         { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
+        ...itemAvaliar,
       ]
     : [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
@@ -149,6 +157,7 @@ export const AccountDrawer = ({
         // página de termos — a /suporte do site é bloqueada no shell. Este
         // item é a porta que faltava, e vale na web também.
         { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
+        ...itemAvaliar,
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 

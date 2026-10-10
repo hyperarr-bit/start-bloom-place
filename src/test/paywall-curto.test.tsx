@@ -3,12 +3,13 @@
  *
  *  · OFF (o padrão) = o paywall de hoje: cronograma, duas colunas, botão "Começar 3 dias grátis",
  *    nenhum testid/texto do curto, nenhum campo novo nos eventos.
- *  · ON: 5 blocos — título com a meta, linha do tempo com DATAS reais, anual pré-selecionado
- *    "R$ 8,16/mês" + "economize 67%", mensal numa linha "sem teste grátis", "★★★★★ +1000 pessoas
- *    aprovaram", "✓ Sem cobrança hoje" + "Começar meus 3 dias grátis" + legal de renovação;
- *    o toque mostra a pílula de preparação ~1,2 s e SÓ ENTÃO abre a folha; "Ver mais" guarda o
- *    resto; Restaurar compras/Termos/Privacidade continuam; 2ª chance, presente no Voltar e
- *    paywall_saiu seguem funcionando; `paywall_oferta_vista` ganha `paywall_curto: true`.
+ *  · ON (estrutura do Cal AI, dono 10/10): imagem grande sangrando + Voltar redondo; título "Comece
+ *    seus 3 dias grátis pra continuar"; card do anual com cabeçalho "3 DIAS GRÁTIS", "Comece grátis e
+ *    economize 67%", "R$ 97,90 cobrado por ano", "R$ 8,16/mês"; card do mensal "Mensal · R$ 24,90/mês";
+ *    "✓ Sem cobrança hoje · a gente te avisa dia DD/MM"; botão "Continuar"; legal em 2 linhas;
+ *    "Termos · Privacidade · Restaurar compras". O toque mostra a pílula de preparação ~1,2 s e SÓ
+ *    ENTÃO abre a folha; 2ª chance, presente no Voltar (botão redondo = core:voltar) e paywall_saiu
+ *    seguem funcionando; `paywall_oferta_vista` ganha `paywall_curto: true`.
  *  · preços SEMPRE da loja: 69,90 troca tudo; sem o mensal da loja = sem selo e "R$ —".
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -73,7 +74,7 @@ vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ get: (_k: string
 import { trackEvent } from "@/lib/analytics";
 import { comprarAnualIos, comprar as comprarAssinatura } from "@/lib/revenuecat";
 import { CHAVE_FORCA_OFERTAS, PAYWALL_CURTO, PLANO_CADEADO, ofertaLigada, registrarChavesRemotas, _zerarChavesRemotas, lerChavesRemotas } from "@/lib/ofertas-saida";
-import { PaywallIOS, PREPARACAO_DA_FOLHA_MS, linhaDoTempoDoTeste } from "@/pages/funis/ios/PaywallIOS";
+import { PaywallIOS, PREPARACAO_DA_FOLHA_MS, diaDoAviso, linhaDoTempoDoTeste } from "@/pages/funis/ios/PaywallIOS";
 
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
 const ios = () => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; };
@@ -128,6 +129,11 @@ describe("a chave PAYWALL_CURTO (e a PLANO_CADEADO)", () => {
     expect(linhaDoTempoDoTeste(1, "R$ 97,90", "R$ 0,00", hoje).map((l) => l.t)).toEqual(["Hoje · R$ 0,00", "Dia 1 (10/10) · R$ 97,90/ano só se você continuar"]);
     // a virada do mês
     expect(linhaDoTempoDoTeste(3, "R$ 97,90", "R$ 0,00", new Date(2026, 9, 31))[2].t).toMatch(/Dia 3 \(02\/11\)/);
+    // a linha única do Cal AI: o dia do aviso (N−1)
+    expect(diaDoAviso(3, hoje)).toBe("11/10");
+    expect(diaDoAviso(7, hoje)).toBe("15/10");
+    expect(diaDoAviso(3, new Date(2026, 9, 31))).toBe("01/11");
+    expect(diaDoAviso(1, hoje)).toBeNull();
   });
 });
 
@@ -142,7 +148,9 @@ describe("OFF: o paywall do iPhone é o de hoje", () => {
     expect(screen.getByTestId("ios-cronograma")).toBeInTheDocument();
     expect(screen.getByTestId("ios-coluna-anual")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/Começar meus|A Apple vai mostrar|pessoas aprovaram|economize|sem teste grátis/);
+    expect(document.body.textContent).not.toMatch(/pra continuar|A Apple vai mostrar|economize|cobrado por ano|a gente te avisa dia/);
+    expect(screen.queryByTestId("ios-curto-hero")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Continuar" })).toBeNull();
     expect(eventos("paywall_oferta_vista")[0]).not.toHaveProperty("paywall_curto");
     fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
     expect(eventos("funnel_click").find((e) => e.cta === "app_paywall_cta")).not.toHaveProperty("paywall_curto");
@@ -152,41 +160,42 @@ describe("OFF: o paywall do iPhone é o de hoje", () => {
   });
 });
 
-describe("ON: 5 blocos, sem rolar", () => {
+describe("ON: a estrutura do Cal AI, cheia de cima a baixo", () => {
   beforeEach(() => ligar("curto"));
+  const esperarCurto = () => screen.findByTestId("ios-curto-legal");
 
-  it("título com a meta, linha do tempo com datas reais, anual pré-selecionado R$ 8,16/mês + economize 67%, mensal 'sem teste grátis', prova social em 1 linha, Sem cobrança hoje + botão + legal", async () => {
+  it("imagem + Voltar redondo, título, card do anual com '3 DIAS GRÁTIS' / 'Comece grátis e economize 67%' / 'R$ 97,90 cobrado por ano' / 'R$ 8,16/mês', mensal 'R$ 24,90/mês', linha única, 'Continuar', legal em 2 linhas, Termos · Privacidade · Restaurar", async () => {
     montar();
-    const tela = await screen.findByTestId("ios-curto");
-    expect(tela.querySelector("h1")).toHaveTextContent("Seu plano pra ver pra onde seu dinheiro vai está pronto");
-    const linha = await screen.findByTestId("ios-linha-do-tempo");
-    expect(linha).toHaveTextContent("Hoje · R$ 0,00");
-    expect(linha).toHaveTextContent(`Dia 2 (${dd(1)}) · a gente te avisa`);
-    expect(linha).toHaveTextContent(`Dia 3 (${dd(2)}) · R$ 97,90/ano só se você continuar`);
+    await esperarCurto();
+    const tela = screen.getByTestId("ios-curto");
+    const hero = screen.getByTestId("ios-curto-hero");
+    expect(hero.querySelector("img")).toHaveAttribute("src", "/paywall-hero.jpg");
+    expect(screen.getByTestId("ios-curto-voltar")).toHaveAttribute("aria-label", "Voltar");
+    expect(tela.querySelector("h1")).toHaveTextContent("Comece seus 3 dias grátis pra continuar");
     const anual = screen.getByTestId("ios-curto-anual");
     expect(anual).toHaveAttribute("aria-checked", "true");
-    expect(anual).toHaveTextContent("Anual");
     expect(anual).toHaveTextContent("3 DIAS GRÁTIS");
-    expect(anual).toHaveTextContent("R$ 8,16");
-    expect(anual).toHaveTextContent("R$ 97,90/ano, depois dos 3 dias");
+    expect(anual).toHaveTextContent("Comece grátis e economize 67%");
+    expect(anual).toHaveTextContent("R$ 97,90 cobrado por ano");
+    expect(anual).toHaveTextContent("R$ 8,16/mês");
     expect(screen.getByTestId("ios-economize")).toHaveTextContent("economize 67%");
     const mensal = screen.getByTestId("ios-curto-mensal");
     expect(mensal).toHaveAttribute("aria-checked", "false");
-    expect(mensal).toHaveTextContent("Mensal · sem teste grátis");
+    expect(mensal).toHaveTextContent("Mensal");
     expect(mensal).toHaveTextContent("R$ 24,90/mês");
-    expect(screen.getByTestId("ios-prova-social")).toHaveTextContent("★★★★★ +1000 pessoas aprovaram");
-    expect(screen.getByTestId("ios-sem-cobranca")).toHaveTextContent("Sem cobrança hoje");
-    expect(screen.getByRole("button", { name: /Começar meus 3 dias grátis/ })).toBeInTheDocument();
-    expect(document.body.textContent).toMatch(/3 dias grátis, depois R\$ 97,90\/ano pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada/);
-    // o que saiu da dobra NÃO está na tela; o obrigatório da Apple está
+    expect(screen.getByTestId("ios-sem-cobranca")).toHaveTextContent(`Sem cobrança hoje · a gente te avisa dia ${dd(1)}`);
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeInTheDocument();
+    expect(screen.getByTestId("ios-curto-legal")).toHaveTextContent("3 dias grátis, depois R$ 97,90 por ano. Renova automaticamente, a menos que cancele na App Store.");
+    expect(screen.getByText("Restaurar compras")).toBeInTheDocument();
+    expect(screen.getByText("Termos")).toHaveAttribute("href", "/termos");
+    expect(screen.getByText("Privacidade")).toHaveAttribute("href", "/privacidade");
+    expect(screen.getByTestId("ios-tenho-codigo")).toBeInTheDocument();
+    // o que saiu: cronograma, colunas, depoimentos, selos, estrelas, "ver mais"
     expect(screen.queryByTestId("ios-cronograma")).toBeNull();
+    expect(screen.queryByTestId("ios-coluna-anual")).toBeNull();
     expect(screen.queryByText("Como funciona o teste")).toBeNull();
     expect(screen.queryByText("Compra pela App Store")).toBeNull();
-    expect(screen.getByText("Restaurar compras")).toBeInTheDocument();
-    expect(screen.getByText("Termos")).toBeInTheDocument();
-    expect(screen.getByText("Privacidade")).toBeInTheDocument();
-    expect(screen.getByTestId("ios-tenho-codigo")).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/Pix|Google|Play|vitalício|garantia/i);
+    expect(document.body.textContent).not.toMatch(/Ver mais|aprovaram|Pix|Google|Play|vitalício|garantia/i);
     // eventos: os de hoje + paywall_curto
     expect(eventos("funnel_view")[0]).toMatchObject({ step: "offer", funil: "ios", loja: "ios" });
     expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ paywall_curto: true, economia: 67, oferta: "anual_97", trial: true });
@@ -197,18 +206,18 @@ describe("ON: 5 blocos, sem rolar", () => {
   it("com PAYWALL_TEXTOS também ligado, a pílula de sempre NÃO duplica — só a do toque", async () => {
     ligar("curto,textos");
     montar();
-    await screen.findByTestId("ios-linha-do-tempo");
+    await esperarCurto();
     expect(screen.queryByTestId("ios-apple-confirma")).toBeNull();
     expect(document.body.textContent).not.toMatch(/A Apple vai pedir confirmação/);
     expect(screen.getByTestId("ios-economize")).toHaveTextContent("economize 67%");
   });
 
-  it("o toque: pílula 'A Apple vai mostrar R$ 97,90/ano: é o valor depois dos 3 dias. Hoje: R$ 0,00.' por ~1,2 s, botão travado, e SÓ ENTÃO a folha abre; 2º toque não abre duas", async () => {
+  it("o toque em Continuar: pílula 'A Apple vai mostrar R$ 97,90/ano: é o valor depois dos 3 dias. Hoje: R$ 0,00.' por ~1,2 s, botão travado, e SÓ ENTÃO a folha abre; 2º toque não abre duas", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       montar();
-      await screen.findByTestId("ios-linha-do-tempo");
-      const botao = screen.getByRole("button", { name: /Começar meus 3 dias grátis/ });
+      await esperarCurto();
+      const botao = screen.getByRole("button", { name: "Continuar" });
       fireEvent.click(botao);
       const pilula = screen.getByTestId("ios-preparando-folha");
       expect(pilula).toHaveTextContent("A Apple vai mostrar R$ 97,90/ano: é o valor depois dos 3 dias. Hoje: R$ 0,00.");
@@ -224,86 +233,77 @@ describe("ON: 5 blocos, sem rolar", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("mensal: a linha do tempo e o 'Sem cobrança hoje' somem, botão 'Começar por R$ 24,90/mês', legal diz que renova, SEM pílula (cobra hoje)", async () => {
+  it("mensal: título vira 'Escolha seu plano', 'Sem cobrança hoje' some, legal do mensal, SEM pílula (cobra hoje); o selo fica no anual", async () => {
     montar();
-    await screen.findByTestId("ios-linha-do-tempo");
+    await esperarCurto();
     fireEvent.click(screen.getByTestId("ios-curto-mensal"));
     expect(screen.getByTestId("ios-curto-mensal")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("ios-curto-anual")).toHaveAttribute("aria-checked", "false");
-    expect(screen.queryByTestId("ios-linha-do-tempo")).toBeNull();
+    expect(screen.getByTestId("ios-curto").querySelector("h1")).toHaveTextContent("Escolha seu plano pra continuar");
     expect(screen.queryByTestId("ios-sem-cobranca")).toBeNull();
     expect(eventos("funnel_click").find((e) => e.cta === "ios_plano")).toMatchObject({ plano: "mensal", paywall_curto: true });
-    expect(document.body.textContent).toMatch(/Assinatura de R\$ 24,90\/mês pela App Store · renova automaticamente até você cancelar/);
-    fireEvent.click(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ }));
+    expect(screen.getByTestId("ios-curto-legal")).toHaveTextContent("R$ 24,90 por mês pela App Store. Renova automaticamente, a menos que cancele na App Store.");
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.queryByTestId("ios-preparando-folha")).toBeNull();
     await waitFor(() => expect(vi.mocked(comprarAssinatura)).toHaveBeenCalledWith("core_mensal", { semTrial: true }));
-    // o selo fica no anual
     expect(screen.getByTestId("ios-economize")).toBeInTheDocument();
   });
 
-  it("preços da loja: 69,90 troca título do preço, linha do tempo, selo (77%) e legal; mensal de 26,90 troca a linha do mensal; sem o mensal da loja: sem selo e 'R$ —'", async () => {
+  it("preços da loja: 69,90 troca card, selo (77%) e legal; mensal de 26,90 troca o card do mensal; sem o mensal da loja: sem selo e 'R$ —'", async () => {
     loja.preco = "R$ 69,90"; loja.valorAnual = 69.9; loja.mes = "R$ 5,83";
     montar();
-    const linha = await screen.findByTestId("ios-linha-do-tempo");
-    expect(linha).toHaveTextContent("R$ 69,90/ano só se você continuar");
-    expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("R$ 5,83");
+    await esperarCurto();
+    expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("R$ 69,90 cobrado por ano");
+    expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("R$ 5,83/mês");
     expect(screen.getByTestId("ios-economize")).toHaveTextContent("economize 77%");
+    expect(screen.getByTestId("ios-curto-legal")).toHaveTextContent("depois R$ 69,90 por ano");
     expect(document.body.textContent).not.toMatch(/97,90/);
     expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ oferta: "anual_69", paywall_curto: true, economia: 77 });
     cleanup();
     loja.preco = "R$ 97,90"; loja.valorAnual = 97.9; loja.mes = "R$ 8,16"; loja.precoMensal = "R$ 26,90"; loja.valorMensal = 26.9;
     montar();
-    expect(await screen.findByTestId("ios-curto-mensal")).toHaveTextContent("R$ 26,90/mês");
+    await esperarCurto();
+    expect(screen.getByTestId("ios-curto-mensal")).toHaveTextContent("R$ 26,90/mês");
     expect(document.body.textContent).not.toMatch(/24,90/);
     cleanup();
     loja.precoMensal = null; loja.valorMensal = null;
     montar();
-    expect(await screen.findByTestId("ios-curto-mensal")).toHaveTextContent("R$ —");
+    await esperarCurto();
+    expect(screen.getByTestId("ios-curto-mensal")).toHaveTextContent("R$ —");
     expect(screen.queryByTestId("ios-economize")).toBeNull();
+    expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("Comece grátis");
   });
 
-  it("a duração vem da loja: 7 dias muda linha do tempo, selo e botão; sem direito ao teste: sem linha do tempo, sem 'Sem cobrança hoje', botão 'Quero o ano'", async () => {
+  it("a duração vem da loja: 7 dias muda título, cabeçalho, aviso e legal; sem direito ao teste: 'Escolha seu plano', card 'Anual' sem cabeçalho, sem 'Sem cobrança hoje', folha abre no toque", async () => {
     loja.dias = 7;
     montar();
-    const linha = await screen.findByTestId("ios-linha-do-tempo");
-    expect(linha).toHaveTextContent(`Dia 6 (${dd(5)}) · a gente te avisa`);
-    expect(linha).toHaveTextContent(`Dia 7 (${dd(6)}) · R$ 97,90/ano só se você continuar`);
+    await esperarCurto();
+    expect(screen.getByTestId("ios-curto").querySelector("h1")).toHaveTextContent("Comece seus 7 dias grátis pra continuar");
     expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("7 DIAS GRÁTIS");
-    expect(screen.getByRole("button", { name: /Começar meus 7 dias grátis/ })).toBeInTheDocument();
+    expect(screen.getByTestId("ios-sem-cobranca")).toHaveTextContent(`a gente te avisa dia ${dd(5)}`);
+    expect(screen.getByTestId("ios-curto-legal")).toHaveTextContent("7 dias grátis, depois R$ 97,90 por ano.");
     cleanup();
     loja.trial = false; loja.precoTeste = null;
     montar();
-    expect(await screen.findByRole("button", { name: /Quero o ano — R\$ 97,90/ })).toBeInTheDocument();
-    expect(screen.queryByTestId("ios-linha-do-tempo")).toBeNull();
+    await esperarCurto();
+    expect(screen.getByTestId("ios-curto").querySelector("h1")).toHaveTextContent("Escolha seu plano pra continuar");
+    expect(screen.getByTestId("ios-curto-anual")).toHaveTextContent("Anual e economize 67%");
+    expect(screen.getByTestId("ios-curto-anual")).not.toHaveTextContent("DIAS GRÁTIS");
     expect(screen.queryByTestId("ios-sem-cobranca")).toBeNull();
     expect(document.body.textContent).not.toMatch(/grátis|Sem cobrança/);
-    expect(document.body.textContent).toMatch(/Assinatura de R\$ 97,90\/ano pela App Store · renova automaticamente/);
-    // sem teste a pílula não existe: a folha abre no toque
-    fireEvent.click(screen.getByRole("button", { name: /Quero o ano/ }));
+    expect(screen.getByTestId("ios-curto-legal")).toHaveTextContent("R$ 97,90 por ano pela App Store. Renova automaticamente");
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    expect(screen.queryByTestId("ios-preparando-folha")).toBeNull();
     await waitFor(() => expect(vi.mocked(comprarAnualIos)).toHaveBeenCalledTimes(1));
-  });
-
-  it("'Ver mais' abre o que saiu da dobra (gráfico, módulos, depoimentos, selos) e fecha de novo", async () => {
-    montar();
-    await screen.findByTestId("ios-linha-do-tempo");
-    expect(screen.queryByTestId("ios-ver-mais-conteudo")).toBeNull();
-    fireEvent.click(screen.getByTestId("ios-ver-mais"));
-    expect(screen.getByTestId("ios-ver-mais-conteudo")).toBeInTheDocument();
-    expect(screen.getByText("Compra pela App Store")).toBeInTheDocument();
-    expect(screen.getByText("Aviso 1 dia antes de cobrar")).toBeInTheDocument();
-    expect(eventos("funnel_click").find((e) => e.cta === "ios_ver_mais")).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/Pix|Google|Play|vitalício|garantia/i);
-    fireEvent.click(screen.getByTestId("ios-ver-mais"));
-    expect(screen.queryByTestId("ios-ver-mais-conteudo")).toBeNull();
   });
 
   it("2ª chance da folha continua: fechou a folha → cartão 'Hoje você não paga nada' → 'Tentar de novo' reabre a compra", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       montar();
-      await screen.findByTestId("ios-linha-do-tempo");
+      await esperarCurto();
       loja.compraOk = false; loja.motivo = "cancelou";
-      fireEvent.click(screen.getByRole("button", { name: /Começar meus 3 dias grátis/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
       await act(async () => { vi.advanceTimersByTime(PREPARACAO_DA_FOLHA_MS + 50); });
       await screen.findByTestId("ios-segunda-chance");
       expect(eventos("folha_segunda_chance_view")[0]).toMatchObject({ segunda_chance: "imediata" });
@@ -314,22 +314,38 @@ describe("ON: 5 blocos, sem rolar", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("o presente 69,90 no Voltar (OFERTA_X_PAYWALL) e a recuperação seguem por cima do curto; paywall_saiu sai no desmonte", async () => {
+  it("o Voltar redondo emite core:voltar: com OFERTA_X_PAYWALL abre o presente 69,90 por cima (e a recuperação arma); sem presente aberto, chama onVoltar do funil; paywall_saiu sai no desmonte", async () => {
     ligar("curto,x_paywall,recuperacao");
-    montar();
-    await screen.findByTestId("ios-linha-do-tempo");
-    voltar();
+    const onVoltar = vi.fn();
+    render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} onVoltar={onVoltar} /></MemoryRouter>);
+    await esperarCurto();
+    fireEvent.click(screen.getByTestId("ios-curto-voltar"));
+    expect(eventos("funnel_click").find((e) => e.cta === "ios_paywall_voltar")).toMatchObject({ paywall_curto: true });
     const folha = await screen.findByTestId("presente69");
     expect(folha).toHaveAttribute("data-lugar", "x_paywall");
     expect(screen.getByTestId("ios-curto")).toBeInTheDocument(); // o paywall continua embaixo
     expect(notif.recuperar).toHaveBeenCalledWith("Dinheiro");
-    await espera();
+    await espera(500);
+    expect(onVoltar).not.toHaveBeenCalled(); // o presente abriu: o recuo não acontece por cima dele
     cleanup();
     expect(eventos("paywall_saiu")[0]).toMatchObject({ funil: "ios", motivo: "voltar", viu_oferta: true });
+    // sem presente (já visto neste aparelho): o funil recua
+    localStorage.setItem("core-presente69-x-paywall-visto", "1");
+    vi.mocked(trackEvent).mockClear();
+    render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} onVoltar={onVoltar} /></MemoryRouter>);
+    await esperarCurto();
+    fireEvent.click(screen.getByTestId("ios-curto-voltar"));
+    await espera(500);
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(onVoltar).toHaveBeenCalledTimes(1);
   });
 
-  it("as outras áreas levam a própria meta no título", async () => {
-    montar("rotina");
-    expect((await screen.findByTestId("ios-curto")).querySelector("h1")).toHaveTextContent("Seu plano pra organizar sua rotina está pronto");
+  it("sem onVoltar (o funil de hoje não passa): o Voltar só emite core:voltar e nada quebra", async () => {
+    montar();
+    await esperarCurto();
+    fireEvent.click(screen.getByTestId("ios-curto-voltar"));
+    await espera(500);
+    expect(screen.getByTestId("ios-curto")).toBeInTheDocument();
+    expect(screen.queryByTestId("presente69")).toBeNull();
   });
 });

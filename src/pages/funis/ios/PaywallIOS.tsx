@@ -70,19 +70,28 @@
  *
  * PAYWALL CURTO (10/10, chave PAYWALL_CURTO em lib/ofertas-saida, desligada; dono:
  * "na tora, testa tudo" — SEM A/B). Hoje: ~12 blocos, planos abaixo da dobra, botão
- * pulsando sem parar, folha da Apple sem preparação (76% fecham). Ligada, a tela
- * cabe SEM ROLAR (390×844 e 375×667) em 5 blocos: (1) título com a meta dela,
- * (2) linha do tempo com DATAS reais (hoje · dia 2 aviso · dia 3 cobrança), (3) anual
- * pré-selecionado "R$ 8,16/mês" + selo "economize N%" e o mensal numa linha ("sem
- * teste grátis"), (4) "★★★★★ +1000 pessoas aprovaram", (5) "✓ Sem cobrança hoje" +
- * "Começar meus 3 dias grátis" (1 pulso só) + legal. No TOQUE, antes da folha, a
- * pílula de ~1,2 s "A Apple vai mostrar R$ 97,90/ano: é o valor depois dos 3 dias.
- * Hoje: R$ 0,00." (ela SUBSTITUI a pílula do PAYWALL_TEXTOS — nunca as duas). O que
- * saiu da dobra vive num "Ver mais" discreto abaixo do legal; Restaurar compras,
- * Termos e Privacidade continuam no rodapé (3.1.1/3.1.2). Preços SEMPRE da loja
- * (priceString) — até o "R$ 0,00" é o da oferta introdutória. 2ª chance da folha,
- * presente 69,90 no Voltar, paywall_saiu, recuperação: iguais. `paywall_oferta_vista`
- * ganha `paywall_curto: true`. Com a chave off esta tela é a de hoje, byte a byte.
+ * pulsando sem parar, folha da Apple sem preparação (76% fecham). Ligada, a tela é a
+ * ESTRUTURA do paywall do Cal AI (dono 10/10, depois de ver a 1ª versão no Simulador:
+ * "muito espaço não preenchido; segue o estilo do Cal AI"), cheia de cima a baixo, SEM
+ * ROLAR (390×844 e 375×667 — na pequena a imagem encolhe, ela é o flex-1):
+ *   1. imagem grande sangrando até as bordas (public/paywall-hero.jpg: o Finanças
+ *      real com o mês somado), fade pra branco embaixo, botão Voltar redondo branco
+ *      por cima (emite `core:voltar` — é o "X" do paywall: abre o presente 69,90 com
+ *      OFERTA_X_PAYWALL — e chama `onVoltar`, se o funil passar um);
+ *   2. título grande centralizado "Comece seus 3 dias grátis pra continuar";
+ *   3. card do anual com cabeçalho preto "3 DIAS GRÁTIS": ✓ "Comece grátis e
+ *      economize 67%" (calcularEconomia dos preços reais) + "R$ 97,90 cobrado por ano"
+ *      e "R$ 8,16/mês" à direita; borda preta grossa quando selecionado;
+ *   4. card do mensal embaixo, cinza claro, "Mensal" + "R$ 24,90/mês";
+ *   5. UMA linha pequena "✓ Sem cobrança hoje · a gente te avisa dia DD/MM" + botão
+ *      preto "Continuar" (1 pulso só) + legal em 2 linhas + "Termos · Privacidade ·
+ *      Restaurar" (3.1.1/3.1.2) e "Tenho um código · Já paguei pelo site" discretos.
+ * No TOQUE, antes da folha, a pílula de ~1,2 s "A Apple vai mostrar R$ 97,90/ano: é o
+ * valor depois dos 3 dias. Hoje: R$ 0,00." (ela SUBSTITUI a pílula do PAYWALL_TEXTOS —
+ * nunca as duas). Preços SEMPRE da loja (priceString) — até o "R$ 0,00" é o da oferta
+ * introdutória. 2ª chance da folha, presente 69,90 no Voltar, paywall_saiu, recuperação:
+ * iguais. `paywall_oferta_vista` ganha `paywall_curto: true`. Com a chave off esta tela
+ * é a de hoje, byte a byte.
  */
 /** Quanto a pílula "A Apple vai mostrar…" fica na tela antes de a folha abrir. */
 export const PREPARACAO_DA_FOLHA_MS = 1200;
@@ -93,6 +102,13 @@ const dataCurta = (d: Date): string => `${String(d.getDate()).padStart(2, "0")}/
  * gente te avisa" / "Dia 3 (DD/MM) · R$ 97,90/ano só se você continuar". Dia 1 = hoje; a
  * duração e os preços vêm da loja. Sem o preço do teste (loja calada): "sem cobrança".
  */
+/** "a gente te avisa dia DD/MM": o dia N−1 do teste (Dia 1 = hoje). null se o teste tem menos de 3 dias. */
+export function diaDoAviso(dias: number, hoje: Date = new Date()): string | null {
+  const n = Math.max(1, dias);
+  if (n < 3) return null;
+  const d = new Date(hoje); d.setDate(d.getDate() + n - 2);
+  return dataCurta(d);
+}
 export function linhaDoTempoDoTeste(dias: number, precoAnual: string, precoTeste: string | null, hoje: Date = new Date()): Array<{ t: string; cheio: boolean }> {
   const em = (n: number) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return dataCurta(d); };
   const n = Math.max(1, dias);
@@ -105,7 +121,7 @@ export function linhaDoTempoDoTeste(dias: number, precoAnual: string, precoTeste
 export const JANELA_DO_VOLTAR_MS = 10_000;
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
@@ -113,6 +129,8 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
+import { useAuth } from "@/hooks/use-auth";
 import { agendarRecuperacaoDoPaywall, cancelarRecuperacaoDoPaywall, pedirLembreteDoTeste } from "@/lib/notificacoes";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
@@ -276,8 +294,9 @@ function DuasColunas({
 }
 
 export function PaywallIOS({
-  area, answers, onPagoSemConta,
-}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void }) {
+  area, answers, onPagoSemConta, onVoltar,
+}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void; onVoltar?: () => void }) {
+  const { user: usuarioLogado } = useAuth();
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
   const [conferindo, setConferindo] = useState(false);
@@ -308,7 +327,6 @@ export function PaywallIOS({
   const [curto, setCurto] = useState(() => ofertaLigada("curto"));
   const [precoTeste, setPrecoTeste] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
-  const [verMais, setVerMais] = useState(false);
   const preparandoRef = useRef<number | null>(null);
   useEffect(() => () => { if (preparandoRef.current) window.clearTimeout(preparandoRef.current); }, []);
   const [presenteX, setPresenteX] = useState<OfertaDoPresente | null>(null);
@@ -613,90 +631,89 @@ export function PaywallIOS({
 
   if (curto) {
     const precoMensalCurto = precoMensalLoja ?? SEM_PRECO;
-    const linhas = linhaDoTempoDoTeste(dias, precoAnualTxt, precoTeste);
+    const aviso = comTrial ? diaDoAviso(dias) : null;
     const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual, paywall_curto: true }); };
+    /* o Voltar redondo = o "X" do paywall: o MESMO `core:voltar` do funil (presente 69,90 com
+     * OFERTA_X_PAYWALL, recuperação); o recuo de passo é do funil (`onVoltar`), se ele passar —
+     * e só quando nenhuma folha de oferta abriu por cima. */
+    const voltar = () => {
+      trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: "ios", loja: "ios", paywall_curto: true });
+      window.dispatchEvent(new CustomEvent("core:voltar"));
+      if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !viuOfertaRef.current) onVoltar(); }, 400);
+    };
+    const radio = (ativo: boolean) => (
+      <span className={`w-6 h-6 rounded-full grid place-items-center shrink-0 ${ativo ? "bg-[#16121c] text-white" : "border-2 border-black/15 bg-white"}`} aria-hidden>
+        {ativo && <Check className="w-3.5 h-3.5" strokeWidth={3.5} />}
+      </span>
+    );
     return (
-      <div className="relative w-full max-w-sm mx-auto flex-1 flex flex-col pt-1 text-left" data-testid="ios-curto">
-        {/* 1. a meta dela */}
-        <h1 className="text-[22px] font-bold tracking-tight leading-[1.15]">
-          Seu plano pra <span className="text-accent">{vitoria[area]}</span> está pronto
-        </h1>
-
-        {/* 2. linha do tempo com datas reais (só no anual com teste) */}
-        {comTrial && !mostraMensal && (
-          <div className="mt-3 rounded-2xl border border-border bg-card px-3.5 py-2.5" data-testid="ios-linha-do-tempo">
-            {linhas.map((l, i) => (
-              <div key={l.t} className="grid grid-cols-[14px_1fr] gap-2.5 items-center py-[3px]">
-                <span className="relative grid place-items-center" aria-hidden>
-                  <span className={`w-[12px] h-[12px] rounded-full border-2 border-accent ${l.cheio ? "bg-accent" : "bg-accent/15"}`} />
-                  {i < linhas.length - 1 && <span className="absolute top-[14px] w-[2px] h-[12px] bg-accent/25" />}
-                </span>
-                <span className={`text-[13px] leading-tight ${l.cheio ? "font-extrabold" : "font-semibold text-foreground/85"}`}>{l.t}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 3. os planos: anual pré-selecionado em cima, mensal numa linha */}
-        <div className="mt-3 space-y-2" role="radiogroup" aria-label="Plano">
-          <div
-            role="radio" aria-checked={plano === "anual"} tabIndex={0} data-testid="ios-curto-anual"
-            onClick={() => escolher("anual")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("anual"); }}
-            className={`relative rounded-2xl p-[2px] transition-all ${plano === "anual" ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_12px_32px_-16px_hsl(var(--accent)/0.5)]" : "bg-black/10"}`}
+      <div className="relative w-full flex-1 flex flex-col" data-testid="ios-curto">
+        {/* 1. a imagem sangrando até as bordas (o px-5/pt-4 do funil é desfeito aqui); é ela que encolhe */}
+        <div className="relative flex-1 min-h-[150px] max-h-[440px] -mx-5 -mt-4 overflow-hidden bg-[#f6f6f7]" data-testid="ios-curto-hero">
+          <img src="/paywall-hero.jpg" alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover object-top select-none scale-[1.07] origin-top" />
+          <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-white via-white/85 to-transparent" aria-hidden />
+          <button
+            type="button" aria-label="Voltar" data-testid="ios-curto-voltar" onClick={voltar}
+            className="absolute top-3 left-4 w-11 h-11 rounded-full bg-white text-[#16121c] shadow-[0_2px_12px_rgba(0,0,0,0.18)] grid place-items-center active:scale-95 transition-transform"
           >
-            <div className="rounded-[calc(1rem-2px)] bg-white px-3.5 py-2.5 flex items-center gap-3 text-[#16121c]">
-              <span className={`w-5 h-5 rounded-full border-2 grid place-items-center shrink-0 ${plano === "anual" ? "border-accent bg-accent text-accent-foreground" : "border-black/20"}`} aria-hidden>
-                {plano === "anual" && <Check className="w-3 h-3" strokeWidth={3.5} />}
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="flex items-center gap-1.5">
-                  <b className="text-[15px] font-extrabold">Anual</b>
-                  {comTrial && <span className="rounded-full bg-accent text-accent-foreground text-[9.5px] font-extrabold tracking-[0.06em] px-1.5 py-[2px]">{dias} DIAS GRÁTIS</span>}
-                </span>
-                <span className="block text-[11px] font-semibold text-black/50 leading-tight mt-0.5">{precoAnualTxt}/ano{comTrial ? `, depois dos ${dias} dias` : ""}</span>
-              </span>
-              <span className="text-right shrink-0">
-                <b className="block text-[17px] font-extrabold leading-none">{precoMesTxt}</b>
-                <span className="text-[10.5px] font-semibold text-black/45">por mês</span>
-              </span>
-            </div>
-            {economia !== null && (
-              <span className="absolute -top-2 right-3 rounded-full bg-[#16121c] text-white text-[10px] font-extrabold px-2 py-[2px] shadow-sm" data-testid="ios-economize">
-                economize {economia}%
-              </span>
-            )}
-          </div>
-          <div
-            role="radio" aria-checked={plano === "mensal"} tabIndex={0} data-testid="ios-curto-mensal"
-            onClick={() => escolher("mensal")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("mensal"); }}
-            className={`rounded-xl border px-3.5 py-2 flex items-center gap-3 transition-colors ${plano === "mensal" ? "border-accent bg-white" : "border-border bg-card"}`}
-          >
-            <span className={`w-4 h-4 rounded-full border-2 grid place-items-center shrink-0 ${plano === "mensal" ? "border-accent bg-accent text-accent-foreground" : "border-black/20"}`} aria-hidden>
-              {plano === "mensal" && <Check className="w-2.5 h-2.5" strokeWidth={3.5} />}
-            </span>
-            <span className="flex-1 text-[13px] leading-tight"><b className="font-bold">Mensal</b>{comTrial && <span className="text-muted-foreground"> · sem teste grátis</span>}</span>
-            <span className="text-[13px] font-bold shrink-0">{precoMensalCurto}<span className="text-[10.5px] font-semibold text-muted-foreground">/mês</span></span>
-          </div>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+          </button>
         </div>
 
-        {/* 4. prova social em UMA linha (o selo que o dono quer) */}
-        <p className="mt-2.5 text-center text-[12px] font-semibold text-muted-foreground" data-testid="ios-prova-social">
-          <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span> <b className="text-foreground">+1000</b> pessoas aprovaram
-        </p>
+        <div className="shrink-0 max-w-sm w-full mx-auto flex flex-col">
+          {/* 2. o título */}
+          <h1 className="text-center text-[26px] font-black tracking-[-0.02em] leading-[1.12] text-[#16121c] -mt-1">
+            {comTrial && !mostraMensal
+              ? <>Comece seus {dias} dias grátis{" "}<br />pra continuar</>
+              : <>Escolha seu plano{" "}<br />pra continuar</>}
+          </h1>
 
-        {/* 5. sem cobrança hoje + botão (1 pulso só) + legal */}
-        <div className="mt-auto pt-3">
+          {/* 3. anual com o cabeçalho preto · 4. mensal cinza */}
+          <div className="mt-4 space-y-2.5" role="radiogroup" aria-label="Plano">
+            <div
+              role="radio" aria-checked={plano === "anual"} tabIndex={0} data-testid="ios-curto-anual"
+              onClick={() => escolher("anual")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("anual"); }}
+              className={`rounded-2xl overflow-hidden border-[2.5px] bg-white transition-colors ${plano === "anual" ? "border-[#16121c]" : "border-black/10"}`}
+            >
+              {comTrial && (
+                <div className={`text-center text-[12px] font-extrabold tracking-[0.1em] py-[6px] ${plano === "anual" ? "bg-[#16121c] text-white" : "bg-black/10 text-[#16121c]"}`}>
+                  {dias} DIAS GRÁTIS
+                </div>
+              )}
+              <div className="flex items-center gap-3 px-3.5 py-3 text-[#16121c]">
+                {radio(plano === "anual")}
+                <span className="flex-1 min-w-0">
+                  <b className="block text-[15.5px] font-bold leading-tight">
+                    {comTrial ? "Comece grátis" : "Anual"}
+                    {economia !== null && <span data-testid="ios-economize"> e economize {economia}%</span>}
+                  </b>
+                  <span className="block text-[12.5px] text-black/55 mt-0.5">{precoAnualTxt} cobrado por ano</span>
+                </span>
+                <span className="text-[14.5px] font-bold shrink-0">{precoMesTxt}<span className="font-semibold text-black/55">/mês</span></span>
+              </div>
+            </div>
+            <div
+              role="radio" aria-checked={plano === "mensal"} tabIndex={0} data-testid="ios-curto-mensal"
+              onClick={() => escolher("mensal")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("mensal"); }}
+              className={`rounded-2xl border-[2.5px] flex items-center gap-3 px-3.5 py-3.5 text-[#16121c] transition-colors ${plano === "mensal" ? "border-[#16121c] bg-white" : "border-black/10 bg-[#f6f6f7]"}`}
+            >
+              {radio(plano === "mensal")}
+              <b className="flex-1 text-[15.5px] font-bold">Mensal</b>
+              <span className="text-[14.5px] font-bold shrink-0">{precoMensalCurto}<span className="font-semibold text-black/55">/mês</span></span>
+            </div>
+          </div>
+
           {pendente && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] leading-snug p-2.5 mb-2">
+            <div className="mt-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] leading-snug p-2.5">
               <b>Compra em processamento.</b> A App Store ainda está confirmando — o acesso libera sozinho aqui.
               <button className="block w-full text-center font-bold underline underline-offset-2 mt-1 disabled:opacity-50" disabled={conferindo} onClick={() => void confirmarPagamento()}>
                 {conferindo ? "Conferindo…" : "Já comprei — atualizar"}
               </button>
             </div>
           )}
-          {erro && <p className="text-[12px] text-destructive text-center mb-2">{erro}</p>}
+          {erro && <p className="mt-2 text-[12px] text-destructive text-center">{erro}</p>}
           {mostraSegundaChance && (
-            <div role="status" data-testid="ios-segunda-chance" className="rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 mb-2 flex items-center gap-2.5 text-left">
+            <div role="status" data-testid="ios-segunda-chance" className="mt-2.5 rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 flex items-center gap-2.5 text-left">
               <p className="flex-1 text-[12.5px] font-bold leading-snug text-foreground">Hoje você não paga nada · cancela em 2 toques</p>
               <button
                 type="button"
@@ -711,13 +728,14 @@ export function PaywallIOS({
               </button>
             </div>
           )}
+
+          {/* 5. a linha única + o botão (1 pulso) + o legal */}
           {comTrial && !mostraMensal && (
-            <p className="text-[12.5px] text-center font-bold mb-1.5" data-testid="ios-sem-cobranca">
-              <span className="text-accent" aria-hidden>✓</span> Sem cobrança hoje
+            <p className="mt-3 text-center text-[12.5px] font-semibold text-[#16121c]" data-testid="ios-sem-cobranca">
+              <span className="text-accent" aria-hidden>✓</span> Sem cobrança hoje{aviso ? <span className="text-muted-foreground"> · a gente te avisa dia {aviso}</span> : null}
             </p>
           )}
-          <div className="relative">
-            {/* a preparação da folha: aparece no toque, por cima, sem mexer no layout */}
+          <div className={`relative ${comTrial && !mostraMensal ? "mt-2" : "mt-4"}`}>
             {preparando && (
               <motion.div
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}
@@ -730,46 +748,42 @@ export function PaywallIOS({
             <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 0.9, delay: 0.5, ease: "easeInOut" }}>
               <Button
                 size="lg"
-                className="w-full h-[52px] rounded-full text-[15.5px] font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+                className="w-full h-14 rounded-full bg-[#16121c] hover:bg-[#16121c]/90 text-white text-[17px] font-bold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.45)]"
                 disabled={comprando || preparando}
                 onClick={tocarNoBotao}
               >
-                {comprando || preparando
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : mostraMensal
-                    ? <>Começar por {precoMensalCurto}/mês <ArrowRight className="w-4 h-4" /></>
-                    : comTrial
-                      ? <>Começar meus {dias} dias grátis <ArrowRight className="w-4 h-4" /></>
-                      : <>Quero o ano — {precoAnualTxt} <ArrowRight className="w-4 h-4" /></>}
+                {comprando || preparando ? <Loader2 className="w-5 h-5 animate-spin" /> : "Continuar"}
               </Button>
             </motion.div>
           </div>
-          <p className="text-[10.5px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5 leading-snug">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
-            <span>
-              {mostraMensal
-                ? <>Assinatura de {precoMensalCurto}/mês pela App Store · renova automaticamente até você cancelar</>
-                : comTrial
-                  ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
-                  : <>Assinatura de {precoAnualTxt}/ano pela App Store · renova automaticamente até você cancelar</>}
-            </span>
+          <p className="mt-2.5 text-[11px] text-muted-foreground text-center leading-snug" data-testid="ios-curto-legal">
+            {mostraMensal
+              ? <>{precoMensalCurto} por mês pela App Store.{" "}<br />Renova automaticamente, a menos que cancele na App Store.</>
+              : comTrial
+                ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt} por ano</strong>.{" "}<br />Renova automaticamente, a menos que cancele na App Store.</>
+                : <>{precoAnualTxt} por ano pela App Store.{" "}<br />Renova automaticamente, a menos que cancele na App Store.</>}
           </p>
-
-        </div>
-
-        {/* o rodapé discreto: a folga da tela se divide entre o bloco do botão e este */}
-        <div className="mt-auto pt-2">
-          {/* o que saiu da dobra, discreto; "Tenho um código" (Offer Code da Apple) ao lado */}
-          <p className="text-center text-[11.5px] font-semibold text-muted-foreground">
-            <button type="button" className="inline-flex items-center gap-0.5 underline underline-offset-2" data-testid="ios-ver-mais" aria-expanded={verMais}
-              onClick={() => { setVerMais((v) => !v); if (!verMais) trackEvent("funnel_click", { cta: "ios_ver_mais", funil: "ios", loja: "ios" }); }}>
-              {verMais ? "Ver menos" : "Ver mais"} <ChevronDown className={`w-3 h-3 transition-transform ${verMais ? "rotate-180" : ""}`} />
-            </button>
+          {/* 3.1.1 / 3.1.2 numa linha discreta, como no Cal AI; o Offer Code e o "já paguei pelo site" na de baixo */}
+          <p className="mt-1.5 text-center text-[11.5px] text-muted-foreground">
+            <a href="/termos" className="underline underline-offset-2">Termos</a>
+            {" · "}
+            <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>
             {" · "}
             <button
-              type="button"
-              className="underline underline-offset-2"
-              data-testid="ios-tenho-codigo"
+              type="button" className="underline underline-offset-2"
+              onClick={async () => {
+                trackEvent("app_restore_paywall", {});
+                const rc = await import("@/lib/revenuecat");
+                const ok = await rc.restaurar();
+                if (ok) window.location.href = "/";
+              }}
+            >
+              Restaurar compras
+            </button>
+          </p>
+          <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
+            <button
+              type="button" className="underline underline-offset-2" data-testid="ios-tenho-codigo"
               onClick={async () => {
                 trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: "ios" });
                 const rc = await import("@/lib/revenuecat");
@@ -780,6 +794,8 @@ export function PaywallIOS({
             >
               Tenho um código
             </button>
+            {" · "}
+            <JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" />
           </p>
           {resgatouCodigo && (
             <button
@@ -791,24 +807,6 @@ export function PaywallIOS({
               {conferindo ? "Conferindo…" : "Já resgatei — continuar"}
             </button>
           )}
-          {verMais && (
-            <div className="mt-4 space-y-4 text-center" data-testid="ios-ver-mais-conteudo">
-              <TransformChart label={chartLabel} />
-              <ValueStack area={area} />
-              {area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}
-              <MuralDepoimentos area={area} semLoja soAssinatura />
-              <div className="flex items-center justify-center gap-2 flex-wrap">
-                {selosPara(comTrial && !mostraMensal).map((c) => (
-                  <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
-                    {c.emoji && <span>{c.emoji}</span>} {c.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Restaurar compras (3.1.1) + Termos e Privacidade (3.1.2): continuam, discretos */}
-          <AppLegalFooter />
         </div>
         {sobreposicoes}
       </div>

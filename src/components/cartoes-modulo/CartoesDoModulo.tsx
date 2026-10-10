@@ -75,7 +75,7 @@ export function guiaDoModuloAtiva(moduleId: string, get: <T>(k: string, f: T) =>
     if (missaoDosesLigada()) {
       const m = lerMissao();
       if (m && moduloDaMissao(moduleId, m)) return true;
-      if (m && !missaoCumprida(m) && passoPendente(m)?.modulo === moduleId) return true;
+      if (m && !m.explorou && !missaoCumprida(m) && passoPendente(m)?.modulo === moduleId) return true;
     }
   } catch { /* sem storage: segue */ }
   return false;
@@ -128,7 +128,7 @@ function useConfigDosCartoes(moduleId: string, pronta: ConfigCartoes | undefined
     let viva = true;
     carregarCartoes(moduleId)
       .then((fabrica: FabricaDeCartoes | null) => { if (viva && fabrica) setCarregada(fabrica()); })
-      .catch(() => { /* sem cartões pra este módulo: nada aparece */ });
+      .catch((e) => { console.warn(`cartões: a config de ${moduleId} não carregou`, e); /* nada aparece */ });
     return () => { viva = false; };
   }, [moduleId, pronta, precisa]);
   return pronta ?? carregada;

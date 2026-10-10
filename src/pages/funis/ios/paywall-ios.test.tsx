@@ -41,6 +41,8 @@ vi.mock("@/lib/notificacoes", () => ({
   pedirPermissao: () => notif.pedir(),
   agendarLembreteDoTeste: () => notif.agendar(),
   pedirLembreteDoTeste: (p: { fimMs: number; precoAno: string }) => notif.pedirLembrete(p),
+  agendarRecuperacaoDoPaywall: vi.fn(async () => ({ ok: false, motivo: "teste" })),
+  cancelarRecuperacaoDoPaywall: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/lib/revenuecat", () => ({

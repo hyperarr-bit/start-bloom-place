@@ -277,14 +277,19 @@ describe("deveMostrarTourHome — a régua", () => {
     expect(deveMostrarTourHome(novo, agora)).toBe(false);
   });
 
-  it("missão em doses: com passo por fazer → espera; pulou ('Explorar por conta própria') → sim; cumprida → sim", () => {
+  it("missão em doses: dose por fazer → espera; pulou ('Explorar por conta própria') → sim; cumprida com 'O que você construiu' por ver → espera; fim visto → sim", () => {
     (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = true;
     localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");
     const m = iniciarMissao(["financas", "rotina", "saude"]);
     expect(deveMostrarTourHome(novo, agora)).toBe(false);
-    gravarMissao({ ...m, explorou: true });
+    gravarMissao({ ...m, boasVindas: true, explorou: true });
     expect(deveMostrarTourHome(novo, agora)).toBe(true);
-    gravarMissao({ ...m, feitos: { 1: { dia: hoje(), rotulo: "a" }, 2: { dia: hoje(), rotulo: "b" }, 3: { dia: hoje(), rotulo: "c" } } });
+    const feitos = { 1: { dia: hoje(), rotulo: "a" }, 2: { dia: hoje(), rotulo: "b" }, 3: { dia: hoje(), rotulo: "c" } };
+    gravarMissao({ ...m, boasVindas: true, feitos: { 1: feitos[1] } });
+    expect(deveMostrarTourHome(novo, agora)).toBe(false); // ainda falta dose
+    gravarMissao({ ...m, boasVindas: true, feitos });
+    expect(deveMostrarTourHome(novo, agora)).toBe(false); // a missão da 1.0.10 ainda tem "O que você construiu" pra mostrar (missaoEmAndamento)
+    gravarMissao({ ...m, boasVindas: true, feitos, fimVisto: true });
     expect(deveMostrarTourHome(novo, agora)).toBe(true);
     localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
     delete (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__;

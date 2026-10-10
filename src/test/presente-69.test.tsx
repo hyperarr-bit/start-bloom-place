@@ -33,7 +33,7 @@ vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => estado.auth }));
 vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ get: (_k: string, d: unknown) => d, loaded: true }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ firePixPurchaseOnce: vi.fn(), temPixEmConfirmacao: () => false }));
-vi.mock("@/lib/notificacoes", () => ({ cancelarLembreteDoTeste: vi.fn(async () => undefined), pedidoDeLembreteDoTeste: () => null }));
+vi.mock("@/lib/notificacoes", () => ({ cancelarLembreteDoTeste: vi.fn(async () => undefined), pedidoDeLembreteDoTeste: () => null, agendarRecuperacaoDoPaywall: vi.fn(async () => ({ ok: false, motivo: "teste" })), cancelarRecuperacaoDoPaywall: vi.fn(async () => undefined) }));
 vi.mock("@/components/paywall/PaywallAssinatura", () => ({
   PaywallAssinatura: () => <div data-testid="paywall-gate"><button>Começar 3 dias grátis</button></div>,
 }));

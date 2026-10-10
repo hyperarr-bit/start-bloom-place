@@ -28,6 +28,8 @@ vi.mock("@/lib/analytics", async (orig) => ({
   trackEvent: (n: string, d: Record<string, unknown> = {}) => { eventos.push([n, d]); },
 }));
 const conta = vi.hoisted(() => ({ created_at: new Date(2026, 9, 3, 9, 0).toISOString() }));
+const nota = vi.hoisted(() => ({ pedir: vi.fn(async (_m: string) => true) }));
+vi.mock("@/lib/avaliacao", async (orig) => ({ ...(await orig<typeof import("@/lib/avaliacao")>()), pedirAvaliacaoPorMissao: (m: string) => nota.pedir(m) }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1", created_at: conta.created_at, email: "ana@x.com" }, isSubscribed: true }) }));
 const notif = vi.hoisted(() => ({
   pedirDia2: vi.fn(async (_o: string) => "concedeu" as const),
@@ -48,8 +50,9 @@ import {
   CHAVE_ESTADO_MISSAO_DOSES, aprofundarPendente, ehBracoB, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, precisaPlanoAmanha, varianteDia1,
 } from "@/lib/missao-doses";
 import {
-  CHAVE_BRACO_DIA1, CHAVE_FORCA_DIA1_CHEIO, CHAVE_ID_LOCAL, DIA1_CHEIO, bracoDia1, dia1CheioLigado, fraseDoPlano, guardarForcaDia1Cheio, idDoAparelho, minutosDoPlano, quandoSugerido, sortearBraco,
+  CHAVE_BRACO_DIA1, CHAVE_FORCA_DIA1_CHEIO, CHAVE_ID_LOCAL, DIA1_CHEIO, bracoDia1, dia1CheioLigado, fraseDoPlano, guardarForcaDia1Cheio, idDoAparelho, minutosDoPlano, modoDia1Cheio, quandoSugerido, sortearBraco,
 } from "@/lib/dia1-cheio";
+import { ESPERA_AVALIACAO_MS } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { conteudoDoLembrete, lerDia2, registrarAbertura, type Leitor } from "@/lib/lembrete-dia2";
 
 /* ------------------------------------------------------------ o aparelho de mentira */
@@ -114,7 +117,7 @@ const ligarA = () => guardarForcaDia1Cheio("?dia1-cheio=a");
 beforeEach(() => {
   localStorage.clear();
   eventos.length = 0;
-  notif.pedirDia2.mockClear(); notif.proximaDose.mockClear();
+  notif.pedirDia2.mockClear(); notif.proximaDose.mockClear(); nota.pedir.mockClear();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();
   (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
   localStorage.setItem("core-funnel-area", "dinheiro");
@@ -137,8 +140,9 @@ describe("a chave DIA1_CHEIO", () => {
     expect(eventoDaMissao({ dia: 1 })).toEqual({ dia: 1, prototipo: "app", plataforma: "ios", versao: expect.any(String) });
   });
 
-  it("ligada: sorteio 50/50 determinístico pelo id do aparelho (uuid local se não há device_id), gravado uma vez; a/b forçam", () => {
-    guardarForcaDia1Cheio("?dia1-cheio=on");
+  it("'ab': sorteio 50/50 determinístico pelo id do aparelho (uuid local se não há device_id), gravado uma vez; a/b forçam; 'on': TODO MUNDO no B, sem sorteio", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=ab");
+    expect(modoDia1Cheio()).toBe("ab");
     expect(dia1CheioLigado()).toBe(true);
     const id = idDoAparelho();
     expect(localStorage.getItem(CHAVE_ID_LOCAL)).toBe(id);
@@ -161,6 +165,16 @@ describe("a chave DIA1_CHEIO", () => {
     expect(bracoDia1()).toBe("B");
     guardarForcaDia1Cheio("?dia1-cheio=A");
     expect(bracoDia1()).toBe("A");
+    expect(localStorage.getItem(CHAVE_FORCA_DIA1_CHEIO)).toBe("ab"); // a/b ligam o 50/50 e forçam o braço
+    // "on" (dono 10/10: dia 1 cheio pra todo mundo): B sem sorteio — o A gravado de um QA não vale, e nada é gravado
+    guardarForcaDia1Cheio("?dia1-cheio=on");
+    expect(modoDia1Cheio()).toBe("on");
+    expect(dia1CheioLigado()).toBe(true);
+    expect(bracoDia1()).toBe("B");
+    expect(varianteDia1()).toBe("B");
+    localStorage.removeItem(CHAVE_BRACO_DIA1);
+    expect(bracoDia1()).toBe("B");
+    expect(localStorage.getItem(CHAVE_BRACO_DIA1)).toBeNull();
     guardarForcaDia1Cheio("?dia1-cheio=off");
     expect(bracoDia1()).toBeNull();
     expect(varianteDia1()).toBeNull();
@@ -394,5 +408,56 @@ describe("o Lembrete do dia 2 no braço B é concreto", () => {
     guardarForcaDia1Cheio("?dia1-cheio=off");
     const hoje = conteudoDoLembrete(get, { missao: lerMissao(), amanha, hoje: "2026-10-03" });
     expect(hoje.title).toBe("🔥 Dia 2 da missão: 📅 Rotina");
+  });
+});
+
+/* ------------------------------------------------------------ 1.0.14: "on" pra todo mundo + a avaliação na missão */
+
+describe("1.0.14 — modo 'on' (todo mundo no B) e a avaliação ligada na missão", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("a build de QA (VITE_V14_QA=1) vale 'on': a missão nasce no braço B pra todo mundo, com variante B nos eventos, sem sorteio gravado", () => {
+    vi.stubEnv("VITE_V14_QA", "1");
+    expect(modoDia1Cheio()).toBe("on");
+    montar(montarStore(dados()), "/home");
+    expect(lerMissao()?.braco).toBe("B");
+    expect(localStorage.getItem(CHAVE_BRACO_DIA1)).toBeNull();
+    expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "B" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+    const festa = tocarChipAteAFesta();
+    expect(festa).toHaveTextContent("Primeira dose feita!");
+    expect(screen.getByTestId("missao-doses-bora-proxima")).toBeInTheDocument();
+  });
+
+  it("3ª dose: pedirAvaliacaoPorMissao('missao_completa') 1,5 s depois da comemoração; o plano combinado pede 'plano_amanha_definido' 1,5 s depois", () => {
+    ligarB();
+    missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Água marcado" } } });
+    montar(montarStore(dados()), "/saude");
+    const festa = tocarChipAteAFesta();
+    expect(festa).toHaveTextContent("Missão cumprida!");
+    expect(nota.pedir).not.toHaveBeenCalled();
+    avancar(ESPERA_AVALIACAO_MS - 1);
+    expect(nota.pedir).not.toHaveBeenCalled();
+    avancar(1);
+    expect(nota.pedir).toHaveBeenCalledTimes(1);
+    expect(nota.pedir).toHaveBeenCalledWith("missao_completa");
+    // fecha o dia → a Home mostra o plano de amanhã → "Combinado" → 1,5 s → plano_amanha_definido
+    fireEvent.click(screen.getByTestId("missao-doses-fechar-dia"));
+    expect(screen.getByTestId("plano-amanha")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("plano-amanha-combinado"));
+    expect(eventos.map(([n]) => n)).toContain("plano_amanha_definido");
+    expect(nota.pedir).toHaveBeenCalledTimes(1);
+    avancar(ESPERA_AVALIACAO_MS);
+    expect(nota.pedir).toHaveBeenCalledTimes(2);
+    expect(nota.pedir).toHaveBeenLastCalledWith("plano_amanha_definido");
+  });
+
+  it("dose 1 de 3 (missão incompleta): não pede nota", () => {
+    ligarB();
+    montar(montarStore(dados()), "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+    tocarChipAteAFesta();
+    avancar(ESPERA_AVALIACAO_MS * 2);
+    expect(nota.pedir).not.toHaveBeenCalled();
   });
 });

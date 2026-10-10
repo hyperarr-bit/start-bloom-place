@@ -24,11 +24,17 @@ const loja = vi.hoisted(() => ({
   ultimaFoiTrial: true,
   auth: {} as Record<string, unknown>,
 }));
-const notif = vi.hoisted(() => ({ pedirLembrete: vi.fn(async (_p: { fimMs: number; precoAno: string }) => "pendente" as const), cancelar: vi.fn(async () => undefined) }));
+const notif = vi.hoisted(() => ({
+  pedirLembrete: vi.fn(async (_p: { fimMs: number; precoAno: string }) => "pendente" as const), cancelar: vi.fn(async () => undefined),
+  recuperar: vi.fn(async (_area: string | null) => ({ ok: true as const, quando: { tresHoras: new Date(), manha: new Date() } })),
+  cancelarRecuperacao: vi.fn(async () => undefined),
+}));
 vi.mock("@/lib/notificacoes", () => ({
   pedirLembreteDoTeste: (p: { fimMs: number; precoAno: string }) => notif.pedirLembrete(p),
   cancelarLembreteDoTeste: () => notif.cancelar(),
   pedidoDeLembreteDoTeste: () => null,
+  agendarRecuperacaoDoPaywall: (area: string | null) => notif.recuperar(area),
+  cancelarRecuperacaoDoPaywall: () => notif.cancelarRecuperacao(),
 }));
 vi.mock("@/lib/revenuecat", async (original) => ({
   ...(await original<typeof import("@/lib/revenuecat")>()),
@@ -74,11 +80,11 @@ vi.mock("@/lib/teste-gratis", async (original) => ({ ...(await original<typeof i
 vi.mock("@/components/paywall/PaywallAssinatura", () => ({ PaywallAssinatura: () => <div data-testid="paywall-gate" /> }));
 vi.mock("@/components/paywall/PaywallFlow", async (original) => ({ ...(await original<typeof import("@/components/paywall/PaywallFlow")>()), PaywallFlow: () => <div data-testid="paywall-web" /> }));
 
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { comprarPresente69, comprarMensal19, lerPacoteDoMensal19, calcularEconomia } from "@/lib/revenuecat";
 import {
   lerChavesRemotas, registrarChavesRemotas, _zerarChavesRemotas, ofertaLigada, guardarForcaDasOfertas,
-  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS,
+  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL,
 } from "@/lib/ofertas-saida";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
@@ -102,7 +108,8 @@ beforeEach(() => {
   vi.mocked(trackEvent).mockClear();
   vi.mocked(comprarPresente69).mockClear();
   vi.mocked(comprarMensal19).mockClear();
-  notif.pedirLembrete.mockClear(); notif.cancelar.mockClear();
+  notif.pedirLembrete.mockClear(); notif.cancelar.mockClear(); notif.recuperar.mockClear(); notif.cancelarRecuperacao.mockClear();
+  vi.mocked(trackEventBeacon).mockClear();
   ios();
   loja.preco = "R$ 97,90"; loja.valorAnual = 97.9; loja.valorMensal = 24.9; loja.precoMensal = "R$ 24,90";
   loja.compraOk = true; loja.motivo = null; loja.compraPresenteOk = true; loja.compraMensal19Ok = true; loja.ultimaFoiTrial = true;
@@ -115,9 +122,13 @@ afterEach(() => { cleanup(); delete (window as { Capacitor?: unknown }).Capacito
 
 /* ───────────────────────────── as chaves ───────────────────────────── */
 describe("ofertas de saída — as chaves", () => {
-  it("as 4 constantes nascem 'off'", () => {
-    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS]).toEqual(["off", "off", "off", "off"]);
-    for (const n of ["x_paywall", "mensal_19", "escada", "textos"] as const) expect(ofertaLigada(n)).toBe(false);
+  it("as 6 constantes nascem 'off'", () => {
+    expect([OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL]).toEqual(["off", "off", "off", "off", "off", "off"]);
+    for (const n of ["x_paywall", "mensal_19", "escada", "textos", "enxuto", "recuperacao"] as const) expect(ofertaLigada(n)).toBe(false);
+    // a metadata remota também conhece as duas novas
+    registrarChavesRemotas({ current: { identifier: "d", metadata: { paywall_enxuto: "on", recuperacao_paywall: "on" } }, all: {} });
+    expect(ofertaLigada("enxuto")).toBe(true);
+    expect(ofertaLigada("recuperacao")).toBe(true);
   });
 
   it("metadata do RevenueCat: qualquer offering liga/desliga; a current vence", () => {
@@ -472,5 +483,78 @@ describe("SAIDA_TESTE_ESCADA — 69,90 → 'Agora não' → 19,90", () => {
     expect(screen.queryByTestId("mensal19")).toBeNull();
     expect(screen.getByTestId("paywall-gate")).toBeInTheDocument();
     expect(localStorage.getItem("core-mensal19-bloqueio-visto")).toBeTruthy();
+  });
+});
+
+/* ───────────────────────────── paywall_saiu + RECUPERACAO_PAYWALL (1.0.14) ───────────────────────────── */
+const esconderApp = () => {
+  Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+};
+const mostrarApp = () => { Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true }); };
+const saidas = () => [...eventos("paywall_saiu"), ...vi.mocked(trackEventBeacon).mock.calls.filter((c) => c[0] === "paywall_saiu").map((c) => c[1] as Record<string, unknown>)];
+
+describe("paywall_saiu — sair do paywall do iPhone sem comprar (sempre ligado, não depende de chave)", () => {
+  afterEach(mostrarApp);
+
+  it("desmontou sem comprar: 1 evento {motivo: outro, segundos_na_tela, viu_oferta: false}; nenhuma recuperação com a chave off", async () => {
+    const { unmount } = render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} /></MemoryRouter>);
+    await esperarLoja();
+    unmount();
+    expect(saidas()).toEqual([expect.objectContaining({ motivo: "outro", viu_oferta: false, segundos_na_tela: expect.any(Number), funil: "ios", loja: "ios", area: "dinheiro" })]);
+    expect(notif.recuperar).not.toHaveBeenCalled();
+  });
+
+  it("Voltar e depois saiu: motivo 'voltar'; com o presente do x_paywall aberto, viu_oferta true; o evento sai UMA vez", async () => {
+    ligar("x_paywall");
+    const { unmount } = render(<MemoryRouter><PaywallIOS area="rotina" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} /></MemoryRouter>);
+    await esperarLoja();
+    voltar();
+    await screen.findByTestId("presente69");
+    esconderApp(); // o 2º Voltar do iPhone minimiza o app: a saída vai por beacon
+    unmount();
+    expect(saidas()).toEqual([expect.objectContaining({ motivo: "voltar", viu_oferta: true, area: "rotina" })]);
+  });
+
+  it("comprou: nenhum paywall_saiu, e a recuperação pendente é cancelada", async () => {
+    const onPago = vi.fn();
+    const { unmount } = render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={onPago} /></MemoryRouter>);
+    await esperarLoja();
+    notif.cancelarRecuperacao.mockClear(); // o mount já cancela (ela voltou pro paywall)
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+    expect(notif.cancelarRecuperacao).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(saidas()).toEqual([]);
+  });
+});
+
+describe("RECUPERACAO_PAYWALL — quem sai sem iniciar o teste ganha 2 avisos (lib/notificacoes, faixa 950000)", () => {
+  afterEach(mostrarApp);
+
+  it("ligada: o 1º Voltar arma a recuperação com o nome da área, uma vez por paywall; o app no fundo também arma", async () => {
+    ligar("recuperacao");
+    const { unmount } = render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} /></MemoryRouter>);
+    await esperarLoja();
+    expect(notif.cancelarRecuperacao).toHaveBeenCalled(); // abriu o paywall de novo: a pendente sai
+    voltar();
+    voltar();
+    expect(notif.recuperar).toHaveBeenCalledTimes(1);
+    expect(notif.recuperar).toHaveBeenCalledWith("Dinheiro");
+    unmount();
+    // sem Voltar, o app no fundo arma
+    notif.recuperar.mockClear();
+    render(<MemoryRouter><PaywallIOS area="corpo" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} /></MemoryRouter>);
+    await esperarLoja();
+    esconderApp();
+    expect(notif.recuperar).toHaveBeenCalledWith("Corpo");
+  });
+
+  it("desligada (padrão): nem o Voltar nem o fundo armam nada — o paywall de hoje", async () => {
+    render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={vi.fn()} /></MemoryRouter>);
+    await esperarLoja();
+    voltar();
+    esconderApp();
+    expect(notif.recuperar).not.toHaveBeenCalled();
   });
 });

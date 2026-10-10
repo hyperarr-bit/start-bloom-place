@@ -47,6 +47,7 @@ import { STEP_GRAFICO_COM_SEM, funilCalaiLigado, guardarForcaFunilCalai, passoDo
 import { ABERTURA_TUDO, numeroDaRotaDe, portaTudo } from "@/lib/funil-numeros";
 import { WelcomeCalai } from "@/pages/funis/w/WelcomeCalai";
 import { GraficoComSem } from "@/pages/funis/w/GraficoComSem";
+import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
@@ -228,7 +229,7 @@ const LEMBRETES_W: Record<AreaKey, { titulo: string; itens: Array<{ emoji: strin
   },
 };
 
-function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
+function NotifW({ area, onDone, rodapeFixo = false }: { area: AreaKey; onDone: () => void; /** 10/10 (FUNIL_CALAI): o botão no rodapé fixo padrão do funil (BotaoDoFunil) */ rodapeFixo?: boolean }) {
   const [indo, setIndo] = useState(false);
   const conf = LEMBRETES_W[area] ?? LEMBRETES_W.dinheiro;
   const seguir = async (pedir: boolean) => {
@@ -272,6 +273,10 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
           </div>
         ))}
       </div>
+      {rodapeFixo ? (
+        <BotaoDoFunil texto="Quero ser lembrado" seta={false} onClick={() => void seguir(true)} disabled={indo} testid="notif-ativar"
+          secundario={{ texto: "Agora não", onClick: () => void seguir(false), disabled: indo, testid: "notif-pular" }} />
+      ) : (
       <div className="space-y-2.5 pb-2">
         <button
           onClick={() => void seguir(true)}
@@ -285,6 +290,7 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
           Agora não
         </button>
       </div>
+      )}
     </div>
   );
 }
@@ -831,14 +837,14 @@ export default function ComecarW() {
               {step === "grafico_com_sem" && (
                 <GraficoComSem numero={numeroDaRotaDe(area, answers)} onNext={() => setStep("notif")} />
               )}
-              {step === "notif" && <NotifW area={areaOuPadrao} onDone={() => setStep("prova")} />}
-              {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} />}
+              {step === "notif" && <NotifW area={areaOuPadrao} onDone={() => setStep("prova")} rodapeFixo />}
+              {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} botaoFixo={calai} />}
               {step === "progress" && <div className="flex-1 grid place-items-center"><ProgressScreen steps={prepSteps} onDone={() => setStep("result")} /></div>}
               {step === "result" && (
                 calai ? (
                   /* 10/10 (FUNIL_CALAI): sem central nem demo — do radar direto pro plano
                      (a tela única com ONBOARDING_1TELA; senão os compromissos de hoje). */
-                  <RadarResultScreen answers={answers} area={areaOuPadrao} cta="Montar meu plano" rodape={null} onDone={() => setStep(passoDoOnboarding("compromissos") as Step)} />
+                  <RadarResultScreen answers={answers} area={areaOuPadrao} cta="Montar meu plano" rodape={null} botaoFixo onDone={() => setStep(passoDoOnboarding("compromissos") as Step)} />
                 ) : (
                   <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
                 )
@@ -848,11 +854,21 @@ export default function ComecarW() {
               {/* 10/10 (ONBOARDING_1TELA, desligada): os 3 Claro! + o contrato numa tela só.
                   A demo termina AQUI; depois vem o paywall exatamente como no contrato de hoje. */}
               {step === "plano_3_dias" && (
-                <PlanoDe3Dias
-                  area={areaOuPadrao}
-                  nome={(usuarioLogado?.user_metadata as { name?: string; full_name?: string } | undefined)?.name ?? (usuarioLogado?.user_metadata as { full_name?: string } | undefined)?.full_name ?? null}
-                  onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")}
-                />
+                /* 10/10 (FUNIL_CALAI): o "Fechado" vai pro rodapé fixo padrão (BotaoDoFunil) SEM mexer no
+                   PlanoDe3Dias (arquivo do outro ramo): o botão da tela some pelo CSS e o do rodapé toca nele —
+                   a lógica e os eventos continuam os da tela. Com a chave desligada, a tela de hoje. */
+                <div className={calai ? "flex-1 flex flex-col" : "contents"} data-plano-rodape-fixo={calai ? "" : undefined}>
+                  {calai && <style>{`[data-plano-rodape-fixo] [data-testid="plano-3-dias-fechado"] { display: none; }`}</style>}
+                  <PlanoDe3Dias
+                    area={areaOuPadrao}
+                    nome={(usuarioLogado?.user_metadata as { name?: string; full_name?: string } | undefined)?.name ?? (usuarioLogado?.user_metadata as { full_name?: string } | undefined)?.full_name ?? null}
+                    onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")}
+                  />
+                  {calai && (
+                    <BotaoDoFunil texto="Fechado" seta={false} testid="plano-3-dias-fechado-rodape"
+                      onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="plano-3-dias-fechado"]')?.click()} />
+                  )}
+                </div>
               )}
               {/* MESMA ORDEM NAS DUAS PONTAS (01/09): vende primeiro, cadastra
                   depois. Até ontem a web era obrigada a cadastrar ANTES do

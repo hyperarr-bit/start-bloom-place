@@ -8,6 +8,7 @@ import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { ehApple } from "@/lib/loja";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { AREAS, type AreaKey } from "@/lib/funnel";
+import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 
 /**
  * WELCOME ESTILO CAL AI (10/10, chave FUNIL_CALAI em lib/funil-calai) — a tela 1 do
@@ -163,44 +164,42 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
           </motion.p>
         </div>
 
+        {/* 10/10 (dono): o botão principal no MESMO lugar de todas as telas do funil — o BotaoDoFunil
+            (56 px, 12 px de margem, colado embaixo + safe-area); o link secundário logo acima; as linhas
+            miúdas (restaurar, já pagou, termos) acima do link. Aqui ele rende no fluxo (a welcome já é
+            uma camada fixa), com a mesma geometria do rodapé fixo das outras telas. */}
         <motion.div className="wca-rodape" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.4 }}>
           {veioDoSite && (
             <div className="wca-aviso" data-testid="welcome-veio-do-site">
               Você já comprou pelo site? <b>Entra com o mesmo e-mail</b> — não precisa pagar de novo.
             </div>
           )}
-          {veioDoSite ? (
-            <button className="wca-cta btn-shine" onClick={() => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
-              Entrar na minha conta
-            </button>
-          ) : (
-            <button
-              className="wca-cta btn-shine"
-              data-testid="welcome-comecar"
-              onClick={async () => { trackEvent("app_welcome_start", { calai: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}
-            >
-              Começar
-            </button>
-          )}
-          {veioDoSite ? (
-            <button className="wca-link" onClick={async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}>
-              Ainda não tenho conta? <b>Começar</b>
-            </button>
-          ) : (
-            <button className="wca-link" onClick={() => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
-              Já tem conta? <b>Entrar</b>
-            </button>
-          )}
-          {isNativeShell() && (
-            <button className="wca-restore" onClick={tentarRestaurar} disabled={restaurando}>
-              {restaurando ? "Verificando…" : "Restaurar compras"}
-            </button>
-          )}
-          {!veioDoSite && (
-            <JaPagouPeloSite origem="welcome" onEntrar={onEntrar} className="wca-ja-pagou" classeAcao="wca-ja-pagou-acao" />
-          )}
-          {msgRestore && <span className="wca-msg">{msgRestore}</span>}
-          <span className="wca-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
+          <BotaoDoFunil
+            fixo={false}
+            seta={false}
+            texto={veioDoSite ? "Entrar na minha conta" : "Começar"}
+            testid={veioDoSite ? "welcome-entrar-conta" : "welcome-comecar"}
+            onClick={veioDoSite
+              ? () => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }
+              : async () => { trackEvent("app_welcome_start", { calai: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}
+            secundario={veioDoSite
+              ? { texto: <>Ainda não tenho conta? <b>Começar</b></>, onClick: async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); } }
+              : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
+            extra={(
+              <div className="bdf-extra">
+                {isNativeShell() && (
+                  <button type="button" className="bdf-extra-linha" onClick={tentarRestaurar} disabled={restaurando}>
+                    <u>{restaurando ? "Verificando…" : "Restaurar compras"}</u>
+                  </button>
+                )}
+                {!veioDoSite && (
+                  <JaPagouPeloSite origem="welcome" onEntrar={onEntrar} className="bdf-extra-linha" classeAcao="wca-ja-pagou-acao" />
+                )}
+                {msgRestore && <span className="wca-msg">{msgRestore}</span>}
+                <span className="bdf-extra-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
+              </div>
+            )}
+          />
         </motion.div>
       </div>
     </div>
@@ -218,11 +217,11 @@ const CSS_WCA = `
 .wca-col {
   position: relative; width: 100%; max-width: 430px;
   display: flex; flex-direction: column;
-  padding: calc(14px + env(safe-area-inset-top)) 22px calc(18px + env(safe-area-inset-bottom));
+  padding: calc(14px + env(safe-area-inset-top)) 0 0;
 }
 /* O palco do telefone ENCOLHE antes do texto e do botão (min-height 0) — num
    iPhone SE o vídeo fica menor, o Começar nunca sai da tela. */
-.wca-palco { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px 0 4px; }
+.wca-palco { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px 10px 4px; }
 /* O telefone = o mockup SVG (430×880: moldura de 3 + bezel de 7 → a tela começa em 10/430 = 2.33%
    de cada lado e 10/880 = 1.14% em cima/embaixo, cantos de 58/430). O vídeo fica POR BAIXO,
    recortado na tela; a sombra é do telefone inteiro. */
@@ -236,7 +235,7 @@ const CSS_WCA = `
 /* a "tela": faixa branca em cima (a status bar do iPhone) pra Dynamic Island não cobrir o cabeçalho do app */
 .wca-tela { position: absolute; top: 1.14%; right: 2.33%; bottom: 1.14%; left: 2.33%; border-radius: 13.8% / 6.75%; overflow: hidden; background: #ffffff; padding-top: 9.5%; z-index: 1; }
 .wca-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; background: #ffffff; }
-.wca-corpo { flex: 0 0 auto; text-align: center; padding-top: 14px; }
+.wca-corpo { flex: 0 0 auto; text-align: center; padding: 14px 22px 0; }
 .wca h1 {
   margin: 0; font-weight: 900; letter-spacing: -.03em; line-height: 1.08;
   font-size: 28px; font-size: clamp(25px, 7.4vw, 32px);
@@ -244,8 +243,7 @@ const CSS_WCA = `
 .wca-prova { margin: 9px 0 0; font-size: 13.5px; color: #7d8691; }
 .wca-prova b { color: #16121c; }
 .wca-st { color: #f0a500; letter-spacing: .06em; }
-.wca-rodape { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding-top: 14px; }
-.wca-rodape > * + * { margin-top: 9px; }
+.wca-rodape { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; padding-top: 6px; }
 .wca-cta {
   width: 100%; height: 56px; border: 0; border-radius: 999px;
   background: #16121c; color: #fff; font-size: 17px; font-weight: 800;

@@ -1,7 +1,8 @@
 import { useId, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 import { MESES_DO_GRAFICO, SEMANAS_DO_GRAFICO, copyDoGrafico, formatarReais, mesAlvo, projecao, type NumeroDaRota } from "@/lib/funil-numeros";
 
 const FUNIL = "w";
@@ -35,19 +36,8 @@ export function GraficoComSem({ numero, hoje = new Date(), onNext }: { numero: N
     trackEvent("funnel_click", { cta: "grafico_quero_ver", funil: FUNIL, rota: numero.rota, formato: numero.formato, numero: numero.valor, estimado: numero.estimado });
     onNext();
   };
-  const botao = (
-    <div className="mt-auto pt-4 pb-1">
-      <button
-        type="button"
-        data-testid="grafico-quero-ver"
-        onClick={seguir}
-        className="w-full rounded-full py-4 text-[16px] font-extrabold text-white active:scale-[0.99] transition-transform inline-flex items-center justify-center gap-2"
-        style={{ background: "#16121c" }}
-      >
-        {copy.cta} <ArrowRight className="w-4 h-4" />
-      </button>
-    </div>
-  );
+  // o botão principal no MESMO lugar de todas as telas do funil (BotaoDoFunil: rodapé fixo)
+  const botao = <BotaoDoFunil texto={copy.cta} onClick={seguir} testid="grafico-quero-ver" />;
 
   if (numero.tipo === "copy") {
     const linhas = numero.copy ?? { sem: [], com: [] };

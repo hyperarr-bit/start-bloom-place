@@ -318,9 +318,11 @@ describe("Dieta", () => {
     expect(cabecalho("SEGUNDA").className).toMatch(/text-white/);
   });
 
-  it("no celular abre só HOJE; os outros dias mostram um resumo que abre com um toque", () => {
+  it("todos os dias nascem ABERTOS (dono 10/10); tocar no cabeçalho recolhe e mostra o resumo, tocar no resumo abre de novo", () => {
     montarDieta();
     expect(within(screen.getByTestId(`dia-${hojeNome}`)).queryByTestId(`resumo-${hojeNome}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`resumo-${outroDia}`)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Recolher ${outroDia}` }));
     const resumo = screen.getByTestId(`resumo-${outroDia}`);
     expect(resumo).toHaveTextContent("2 de 2 refeições");
     fireEvent.click(resumo);

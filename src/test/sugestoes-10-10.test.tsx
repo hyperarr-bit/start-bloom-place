@@ -39,7 +39,6 @@ import {
   CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, inicioDaSemana, normalizarPrefs, pesoCobradoHoje, scoreDosBlocos, tiposCobradosHoje,
   type PendenciasPrefs,
 } from "@/lib/home-pendencias";
-import { calcularSaldoEmConta } from "@/lib/finance-saldo-conta";
 import { faturasAVencer } from "@/lib/finance-faturas";
 import { variaveisDoMes, type CardConfig } from "@/lib/finance-fatura";
 import { Dashboard } from "@/components/Dashboard";
@@ -264,92 +263,6 @@ describe("1) Pendências de hoje editáveis — tela", () => {
 });
 
 /* ------------------------------------------------------------------ 2) SALDO EM CONTA */
-describe("2) Saldo em conta — lib", () => {
-  const cfg: Record<string, CardConfig> = {
-    nubank: { closingDay: 25, dueDay: 5 }, // fecha 25, vence dia 5 do mês seguinte
-    inter: { dueDay: 15 },                 // sem fechamento, com vencimento (conta no mês da compra, fatura vence dia 15)
-    outro: {},                             // nada cadastrado
-  };
-  const configOf = (c: string) => cfg[c];
-  const temVencimento = (c: string) => Number.isInteger(cfg[c]?.dueDay);
-
-  it("só Pix/débito: saldo em conta = saldo do mês; gasto sem forma de pagamento conta como 'sai da conta' e é avisado", () => {
-    const r = calcularSaldoEmConta({
-      receitas: 3000,
-      variaveis: [{ value: 200, paymentMethod: "pix" }, { value: 100, paymentMethod: "debito" }, { value: 50 }],
-      fixos: [{ value: 1000, paymentMethod: "boleto" }, { value: 80, paymentMethod: "dinheiro" }],
-      parcelas: [], faturas: [], temVencimento,
-    });
-    expect(r).toMatchObject({ saldo: 1570, debitoDireto: 1430, faturas: 0, creditoSemFatura: 0, semForma: 1, cartoesSemVencimento: [] });
-  });
-
-  it("cartão COM fechamento: a compra no crédito deste mês não sai da conta; o que sai é a fatura que VENCE neste mês (a que fechou no mês passado)", () => {
-    const setembro = [{ id: "s1", value: 400, date: "2026-09-10", paymentMethod: "credito", cardName: "nubank" }, { id: "s2", value: 90, date: "2026-09-28", paymentMethod: "credito", cardName: "nubank" }];
-    const outubro = [{ id: "o1", value: 250, date: "2026-10-03", paymentMethod: "credito", cardName: "nubank" }, { id: "o2", value: 120, date: "2026-10-04", paymentMethod: "pix" }];
-    const gastosDoMes = (mes: string) => (mes === "2026-10" ? outubro : mes === "2026-09" ? setembro : []);
-    const faturas = faturasAVencer({ mes: "2026-10", gastosDoMes, parcelasDoMes: () => [], fixos: [], cards: ["nubank"], configOf, labelOf: (c) => c, pagas: {} });
-    expect(faturas.map((f) => [f.card, f.total])).toEqual([["nubank", 400]]); // a de 28/09 já é da fatura que fecha 25/10 (vence em nov)
-    const vars = variaveisDoMes(outubro, setembro, "2026-10", configOf);
-    const r = calcularSaldoEmConta({ receitas: 3000, variaveis: vars.noMes, fixos: [], parcelas: [], faturas, temVencimento });
-    // 3000 − pix 120 − fatura 400; o crédito de 03/10 (250) e o de 28/09 (90) não saem da conta em outubro
-    expect(r).toMatchObject({ saldo: 2480, debitoDireto: 120, faturas: 400, creditoSemFatura: 0, cartoesSemVencimento: [] });
-  });
-
-  it("cartão SEM fechamento mas com vencimento: fatura do mês = compras do mês; sem vencimento nenhum: o crédito conta no mês e a ⚙️ é apontada", () => {
-    const outubro = [
-      { id: "a", value: 300, date: "2026-10-02", paymentMethod: "credito", cardName: "inter" },
-      { id: "b", value: 70, date: "2026-10-06", paymentMethod: "credito", cardName: "outro" },
-      { id: "c", value: 40, date: "2026-10-06", paymentMethod: "pix" },
-    ];
-    const faturas = faturasAVencer({ mes: "2026-10", gastosDoMes: (m) => (m === "2026-10" ? outubro : []), parcelasDoMes: () => [], fixos: [], cards: ["inter", "outro"], configOf, labelOf: (c) => c, pagas: {} });
-    expect(faturas.map((f) => [f.card, f.total])).toEqual([["inter", 300]]);
-    const r = calcularSaldoEmConta({ receitas: 1000, variaveis: variaveisDoMes(outubro, [], "2026-10", configOf).noMes, fixos: [], parcelas: [], faturas, temVencimento });
-    expect(r).toMatchObject({ saldo: 1000 - 40 - 300 - 70, debitoDireto: 40, faturas: 300, creditoSemFatura: 70, cartoesSemVencimento: ["outro"] });
-  });
-
-  it("parcelas: em cartão com vencimento já estão dentro da fatura; em cartão sem vencimento saem da conta no mês; fixo no crédito idem", () => {
-    const parcelas = [
-      { id: "p1", description: "Celular", totalValue: 1200, installmentValue: 100, paidInstallments: 2, totalInstallments: 12, cardName: "nubank", category: "eletronicos", date: "2026-08-01", startMonth: "2026-10", parcelaDoMes: 3 },
-      { id: "p2", description: "Sofá", totalValue: 600, installmentValue: 60, paidInstallments: 0, totalInstallments: 10, cardName: "outro", category: "casa", date: "2026-10-01", startMonth: "2026-10", parcelaDoMes: 1 },
-    ];
-    const faturas = faturasAVencer({ mes: "2026-10", gastosDoMes: () => [], parcelasDoMes: (m) => (m === "2026-09" || m === "2026-10" ? parcelas : []), fixos: [{ value: 55, paymentMethod: "credito", cardName: "nubank" }], cards: ["nubank"], configOf, labelOf: (c) => c, pagas: {} });
-    // nubank vence dia 5 do mês seguinte: a fatura que vence em out. fechou em set. (parcela 100 + fixo 55)
-    expect(faturas.map((f) => [f.card, f.total])).toEqual([["nubank", 155]]);
-    const r = calcularSaldoEmConta({ receitas: 2000, variaveis: [], fixos: [{ value: 55, paymentMethod: "credito", cardName: "nubank" }, { value: 30, paymentMethod: "credito", cardName: "outro" }], parcelas, faturas, temVencimento });
-    expect(r).toMatchObject({ saldo: 2000 - 155 - 60 - 30, faturas: 155, creditoSemFatura: 90, cartoesSemVencimento: ["outro"] });
-  });
-});
-
-describe("2) Saldo em conta — tela", () => {
-  const props = {
-    totalIncome: 3000, totalExpenses: 1770, totalDebts: 0, totalInvestments: 0, expenses: [], fixedExpenses: [], dueDays: [], savingsRate: 41, incomes: [],
-  };
-  it("sem a prop o Dashboard é o de sempre (nada de Saldo em conta)", () => {
-    criarStore({}).montar(<Dashboard {...props} />);
-    expect(screen.getByText("Saldo do Mês")).toBeInTheDocument();
-    expect(screen.queryByTestId("saldo-em-conta")).toBeNull();
-  });
-
-  it("com a prop: Saldo do Mês +R$ 1.230 e Saldo em conta +R$ 2.480; o ⓘ abre a explicação com a diferença, as parcelas da conta e o aviso do dado que falta", () => {
-    const saldo = calcularSaldoEmConta({
-      receitas: 3000, variaveis: [{ value: 120, paymentMethod: "pix" }, { value: 250, paymentMethod: "credito", cardName: "nubank" }, { value: 15 }],
-      fixos: [], parcelas: [], faturas: [{ card: "nubank", total: 400 }], temVencimento: () => true,
-    });
-    criarStore({}).montar(<Dashboard {...props} saldoEmConta={saldo} />);
-    expect(screen.getByText("Saldo do Mês").parentElement).toHaveTextContent(/\+R\$ 1\.230(,00)?$/);
-    expect(screen.getByTestId("saldo-em-conta-valor")).toHaveTextContent(/\+R\$ 2\.465(,00)?$/);
-    expect(screen.queryByTestId("saldo-em-conta-explicacao")).toBeNull();
-    fireEvent.click(screen.getByTestId("saldo-em-conta-info"));
-    const exp = screen.getByTestId("saldo-em-conta-explicacao");
-    expect(exp).toHaveTextContent(/Saldo do Mês.*quanto do mês já está comprometido/);
-    expect(exp).toHaveTextContent(/Saldo em conta.*quanto sobra na conta/);
-    expect(exp).toHaveTextContent(/Faturas que vencem no mês− R\$ 400(,00)?/);
-    expect(exp).toHaveTextContent(/Sai da conta \(Pix, débito, boleto…\)− R\$ 135(,00)?/);
-    expect(exp).toHaveTextContent(/1 lançamento sem forma de pagamento entrou como "sai da conta"/);
-  });
-});
-
-/* ------------------------------------------------------------------ 3) META DE CALORIAS */
 describe("3) Meta de calorias editável — lib", () => {
   it("modo auto (padrão, chave ausente ou lixo): soma do cardápio, senão a antiga, senão 2000 — a regra de sempre", () => {
     expect(normalizarModoMeta(undefined)).toBe("auto");

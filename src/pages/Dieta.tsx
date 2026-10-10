@@ -343,10 +343,10 @@ const Dieta = () => {
   const [newMealNameConfig, setNewMealNameConfig] = useState("");
   const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
   const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
-  /* Cardápio recolhido no celular (26/09, varredura): a 360 px os 7 dias
-     abertos davam ~4.400 px de rolagem. Abre só HOJE; o resto mostra um resumo
-     e abre com um toque. No desktop (md+) tudo continua aberto. */
-  const [diasAbertos, setDiasAbertos] = useState<string[]>(() => [nomeDoDia(new Date())]);
+  /* Dias do cardápio (26/09 recolhia todos menos HOJE no celular, pela
+     rolagem). 10/10, dono: "deixa os cards abertos por padrão — segunda,
+     terça etc." → todos nascem abertos; o toque no cabeçalho ainda recolhe. */
+  const [diasAbertos, setDiasAbertos] = useState<string[]>(() => [...weekDays]);
 
   const mealEmojis = defaultMealEmojis;
   const mealColors = defaultMealColors;

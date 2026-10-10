@@ -51,7 +51,6 @@ import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
-import { calcularSaldoEmConta } from "@/lib/finance-saldo-conta";
 import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
@@ -332,12 +331,6 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // Dashboard, Relatórios, Saúde e a barra de resumo mostram. Fonte única em
   // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
   const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments);
-  /* SALDO EM CONTA (10/10, lib/finance-saldo-conta): o que sobra NA CONTA —
-     sem a compra no crédito deste mês, com as faturas que vencem agora. */
-  const temVencimento = (card: string) => { const d = configOf(card)?.dueDay; return Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 31; };
-  const saldoEmConta = calcularSaldoEmConta({
-    receitas: totalIncome, variaveis: variaveisMes.noMes, fixos: fixedExpenses, parcelas: installments as Parcela[], faturas, temVencimento,
-  });
 
   /* Reserva de emergência DECLARADA pela pessoa (08/08). Enquanto ela não
      registrar, o app segue estimando como antes — ver FinancialHealth. */
@@ -519,7 +512,6 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 incomes={incomes}
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
-                saldoEmConta={saldoEmConta}
             />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">

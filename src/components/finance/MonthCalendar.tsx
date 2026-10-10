@@ -268,6 +268,7 @@ export const MonthCalendar = ({
   return (
     <div
       data-spotlight="add-bill"
+      data-missao="meu-mes" /* 10/10: o "olhar" da missão em doses mira ESTE card (há outro add-bill: VENCIMENTOS DAS CONTAS) */
       className="rounded-2xl border border-sky-100 dark:border-sky-900/40 overflow-hidden animate-fade-in bg-gradient-to-b from-sky-50 via-white to-white dark:from-sky-950/60 dark:via-slate-950 dark:to-slate-950"
     >
       {/* céu do header: azul bebê + nuvens (chá revelação ☁️) */}

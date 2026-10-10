@@ -185,7 +185,7 @@ describe("a comemoração combina a hora — e essa hora é a do Lembrete do dia
     montar(store, "/financas");
     const postIt = esperarPostIt();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-    avancar(700); avancar(1000);
+    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     const festa = screen.getByTestId("missao-doses-festa");
@@ -214,7 +214,7 @@ describe("a comemoração combina a hora — e essa hora é a do Lembrete do dia
     montar(store, "/financas");
     const postIt = esperarPostIt();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-    avancar(700); avancar(1000);
+    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     fireEvent.click(screen.getByTestId("missao-doses-hora-sem"));

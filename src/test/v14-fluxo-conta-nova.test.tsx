@@ -53,7 +53,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: vi.fn() }, auth: { getUser: async () => ({ data: { user: null } }) }, storage: { from: () => ({ upload: vi.fn(), createSignedUrl: vi.fn(async () => ({ data: null })) }) } },
 }));
 
-import { UserDataContext } from "@/hooks/use-user-data";
+import { UserDataContext, useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -107,7 +107,29 @@ const HomeFalsa = () => {
 const FinancasFalsa = () => (
   <div><Rota /><header className="sticky">FINANÇAS</header><BoasVindasDoModulo moduleId="financas" tips={["dica"]} /><div><input placeholder="Novo gasto" /><button type="button" data-spotlight="add-expense">+</button></div><section data-spotlight="add-bill"><h3>MEU MÊS</h3></section></div>
 );
-const RotinaFalsa = () => <div><Rota /><header className="sticky">ROTINA</header><BoasVindasDoModulo moduleId="rotina" tips={["dica"]} /><button type="button" data-spotlight="add-habit">+</button></div>;
+/** A Rotina de mentira com o caminho REAL de criar um hábito: "+ Hábito" abre o campo, "Adicionar" grava
+ *  `rotina-habits` (como a página), e a tabela tem a linha de HOJE com um quadradinho por hábito que grava
+ *  `rotina-habits-checked`. É o que a dose 2 ensina em 2 passos. */
+const DIAS_ROTINA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+const RotinaFalsa = () => {
+  const { get, set } = useUserData();
+  const [aberto, setAberto] = useState(false);
+  const [nome, setNome] = useState("");
+  const habitos = (get<string[]>("rotina-habits", []) ?? []);
+  const grade = get<Record<string, boolean[]>>("rotina-habits-checked", {}) ?? {};
+  const adicionar = () => { if (!nome.trim()) return; set("rotina-habits", [...habitos, nome.trim()]); setNome(""); setAberto(false); };
+  const marcar = (dia: string, i: number) => { const linha = [...(grade[dia] ?? habitos.map(() => false))]; linha[i] = !linha[i]; set("rotina-habits-checked", { ...grade, [dia]: linha }); };
+  return (
+    <div>
+      <Rota /><header className="sticky">ROTINA</header><BoasVindasDoModulo moduleId="rotina" tips={["dica"]} />
+      <button type="button" data-spotlight="add-habit" onClick={() => setAberto((a) => !a)}>+ Hábito</button>
+      {aberto && <div><input placeholder="Nome do hábito..." value={nome} onChange={(e) => setNome(e.target.value)} /><button type="button" onClick={adicionar}>Adicionar</button></div>}
+      <table><tbody>{DIAS_ROTINA.map((d) => (
+        <tr key={d}><td>{d}</td>{habitos.map((h, i) => <td key={h}><input type="checkbox" aria-label={`${h} ${d}`} checked={!!grade[d]?.[i]} onChange={() => marcar(d, i)} /></td>)}</tr>
+      ))}</tbody></table>
+    </div>
+  );
+};
 const SaudeFalsa = () => <div><Rota /><header className="sticky">SAÚDE</header><BoasVindasDoModulo moduleId="saude" tips={["dica"]} /><button type="button" data-spotlight="add-water">+</button></div>;
 const CasaFalsa = () => <div><Rota /><header className="sticky">CASA</header><BoasVindasDoModulo moduleId="casa" tips={["dica"]} /></div>;
 const montar = (store: Store, rota: string) =>
@@ -129,12 +151,13 @@ const montar = (store: Store, rota: string) =>
 /** A CONTA NOVA DE VERDADE é VAZIA (10/10, dono): nenhum seed — o fluxo inteiro tem que fazer sentido assim. */
 const dados = (): Record<string, unknown> => ({});
 const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
-const esperarPostIt = () => { avancar(400); avancar(3000); return screen.getByTestId("demo-guia-postit"); };
+/** em passos curtos: a missão abre o campo da Rotina por um click que o React só confirma entre os `act` */
+const esperarPostIt = () => { for (let i = 0; i < 12; i++) avancar(300); return screen.getAllByTestId("demo-guia-postit").at(-1)!; };
 /** toca no 1º chip e chega na festa */
 const tocarChipAteAFesta = () => {
   const postIt = esperarPostIt();
   fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-  avancar(700); avancar(1000);
+  avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
   const entendi = screen.queryByTestId("missao-doses-entendi");
   if (entendi) fireEvent.click(entendi);
   return screen.getByTestId("missao-doses-festa");
@@ -203,13 +226,18 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-bora-proxima"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
-    // dose 2 — Rotina numa conta SEM hábito: o post-it oferece 3 prontos; o chip cria e marca hoje
+    // dose 2 — Rotina numa conta SEM hábito, em 2 passos: o chip preenche o campo real, "Adicionar" cria, o quadradinho de hoje marca
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("Qual hábito você quer começar hoje?");
+    expect(postIt).toHaveTextContent("1 de 2 · criar");
     fireEvent.pointerDown(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    expect((screen.getByPlaceholderText("Nome do hábito...") as HTMLInputElement).value).toBe("Beber água ao acordar");
+    fireEvent.click(screen.getByText("Adicionar"));
     expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
-    avancar(700); avancar(1000);
+    avancar(400); avancar(3000);
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("2 de 2 · marcar");
+    fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
+    avancar(700); avancar(1000); avancar(800); /* 10/10: o olhar rola o card até o meio antes do anel (+450 ms) */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Segunda dose feita!");
@@ -237,11 +265,13 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     const tour = screen.getByTestId("tour-home");
     expect(tour.getAttribute("data-passo")).toBe("1");
     expect(screen.getByTestId("tour-contador").textContent).toBe(`Passo 1 de ${TOTAL_PASSOS} · falta ${TOTAL_PASSOS - 1}`);
-    expect(screen.getByTestId("tour-fazer")).toHaveTextContent("Fazer isso");
+    expect(screen.getByTestId("tour-continuar")).toHaveTextContent("Continuar");
+    expect(screen.queryByTestId("tour-faca")).toBeNull(); // o passo do score é só de leitura
+    expect(screen.queryByTestId("tour-dedinho")).toBeNull();
     expect(nomes()).toContain("home_tour_visto");
 
-    // os 5 passos ("Deixar como está" nos 4 primeiros, "Concluir missão" no último) → o fim do tour FECHA a missão
-    for (let i = 0; i < TOTAL_PASSOS - 1; i++) fireEvent.click(screen.getByTestId("tour-deixar"));
+    // os 5 passos ("Continuar" nos 4 primeiros, "Concluir missão" no último) → o fim do tour FECHA a missão
+    for (let i = 0; i < TOTAL_PASSOS - 1; i++) fireEvent.click(screen.getByTestId("tour-continuar"));
     expect(screen.getByTestId("tour-concluir")).toHaveTextContent("Concluir missão");
     fireEvent.click(screen.getByTestId("tour-concluir"));
     expect(screen.queryByTestId("tour-home")).toBeNull();

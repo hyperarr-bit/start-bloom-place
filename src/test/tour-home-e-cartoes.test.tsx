@@ -329,11 +329,12 @@ describe("Sua Home em 5 passos (força on)", () => {
     expect(tour.getAttribute("data-passo")).toBe("1");
     expect(screen.getByTestId("tour-contador").textContent).toBe(`Passo 1 de ${TOTAL_PASSOS} · falta ${TOTAL_PASSOS - 1}`);
     expect(screen.queryByText(/pular/i)).toBeNull(); // sem "pular tudo"
-    // 10/10: instrução de ação em negrito, o escuro com o alvo recortado, o dedinho e o botão "Fazer isso"
-    expect(screen.getByTestId("tour-faca").textContent).toMatch(/^Toque em/);
+    // 10/10: o escuro com o alvo recortado; o passo do score é só LEITURA (sem instrução, sem dedinho) e o botão é "Continuar"
+    expect(screen.queryByTestId("tour-faca")).toBeNull();
     expect(screen.getByTestId("tour-escuro")).toBeInTheDocument();
-    expect(screen.getByTestId("tour-dedinho")).toBeInTheDocument();
-    expect(screen.getByTestId("tour-fazer").textContent).toBe("Fazer isso");
+    expect(screen.queryByTestId("tour-dedinho")).toBeNull();
+    expect(screen.getByTestId("tour-continuar").textContent).toBe("Continuar");
+    expect(screen.queryByText("Fazer isso")).toBeNull();
     expect(screen.getByTestId("tour-balao").querySelector("[data-figurinha-placeholder]")).not.toBeNull();
     expect(nomes()).toEqual(["home_tour_visto"]);
 
@@ -344,8 +345,10 @@ describe("Sua Home em 5 passos (força on)", () => {
     fireEvent.click(screen.getByTestId("tour-entendi"));
     expect(screen.getByTestId("tour-home").getAttribute("data-passo")).toBe("2");
 
-    // 2 — pendências: a lista abriu (o "⋯" está na tela) e "Esconder Refeições" grava na chave de sempre
+    // 2 — pendências: a lista abriu (o "⋯" está na tela) e "Esconder Refeições" grava na chave de sempre; instrução + dedinho
     expect(screen.getByTestId("opcoes-refeicoes")).toBeInTheDocument();
+    expect(screen.getByTestId("tour-faca").textContent).toMatch(/^Toque no ⋯/);
+    expect(screen.getByTestId("tour-dedinho")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("tour-ocultar-refeicoes"));
     expect(s.ler<PendenciasPrefs>(CHAVE_PENDENCIAS_PREFS).ocultos).toEqual(["refeicoes"]);
     expect(screen.getByTestId("tour-home").getAttribute("data-passo")).toBe("3");
@@ -384,12 +387,14 @@ describe("Sua Home em 5 passos (força on)", () => {
     expect(temArte("casa-arrumada")).toBe(true);
   });
 
-  it("'Deixar como está' em todos: termina em 5 toques sem gravar nada além da chave do tour", () => {
+  it("'Continuar' em todos (e 'Concluir missão' no último): termina em 5 toques sem gravar nada além da chave do tour — ninguém fica preso", () => {
     const s = criarStore(CONTA());
     s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
-    for (let i = 0; i < TOTAL_PASSOS; i++) fireEvent.click(screen.getByTestId("tour-deixar"));
+    for (let i = 0; i < TOTAL_PASSOS - 1; i++) fireEvent.click(screen.getByTestId("tour-continuar"));
+    expect(screen.getByTestId("tour-concluir").textContent).toBe("Concluir missão");
+    fireEvent.click(screen.getByTestId("tour-concluir"));
     expect(screen.queryByTestId("tour-home")).toBeNull();
-    expect(dos("home_tour_passo").map((d) => d.acao)).toEqual(["deixar", "deixar", "deixar", "deixar", "deixar"]);
+    expect(dos("home_tour_passo").map((d) => d.acao)).toEqual(["continuar", "continuar", "continuar", "continuar", "concluir"]);
     expect(s.estado.escritas.filter((k) => k !== CHAVE_TOUR_FEITO && k !== "core-module-prefs")).toEqual([]);
     expect(s.ler<string>(CHAVE_TOUR_FEITO)).toBeTruthy();
   });

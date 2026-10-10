@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
-import { isNativeShell } from "@/lib/native-shell";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
-import { initRevenueCat, restaurar } from "@/lib/revenuecat";
-import { ehApple } from "@/lib/loja";
-import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 
@@ -22,8 +18,10 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
- *   · "Já tem conta? Entrar", "Restaurar compras" (shell), "Já pagou pelo site?" e
- *     o rodapé legal de hoje.
+ *   · UMA linha secundária, "Já tem conta? Entrar" (dono 10/10: o rodapé tinha 4 linhas,
+ *     duas dizendo a mesma coisa) + o rodapé legal. "Restaurar compras" e o "Já pagou pelo
+ *     site?" moraram aqui até 10/10; agora ficam na tela de Entrar (que é pra onde a
+ *     pessoa vai de qualquer jeito — ver RestaurarCompras em pages/Entrar).
  *
  * Eventos: os MESMOS da welcome de hoje (`app_welcome_view`, `app_welcome_start`,
  * `app_welcome_login`, `app_welcome_restore`; o `funnel_view step=welcome` sai do
@@ -52,8 +50,6 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   useEffect(() => { const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000); return () => window.clearTimeout(t); }, []);
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
-  const [restaurando, setRestaurando] = useState(false);
-  const [msgRestore, setMsgRestore] = useState<string | null>(null);
   const [videoFalhou, setVideoFalhou] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
@@ -97,18 +93,6 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
     setVideoFalhou(true);
     const code = videoRef.current?.error?.code ?? null;
     trackEvent("welcome_video_erro", { motivo: "carregar", code });
-  };
-
-  const tentarRestaurar = async () => {
-    if (restaurando) return;
-    setRestaurando(true);
-    setMsgRestore(null);
-    trackEvent("app_welcome_restore", {});
-    await initRevenueCat();
-    const ok = await restaurar();
-    setRestaurando(false);
-    if (ok) { window.location.href = "/"; return; }
-    setMsgRestore(`Nenhuma assinatura encontrada nesta conta ${ehApple() ? "da App Store" : "Google"}.`);
   };
 
   const promessa = area && area in AREAS ? PROMESSA_DA_ROTA[area] : PROMESSA_PADRAO;
@@ -165,8 +149,8 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
         </div>
 
         {/* 10/10 (dono): o botão principal no MESMO lugar de todas as telas do funil — o BotaoDoFunil
-            (56 px, 12 px de margem, colado embaixo + safe-area); o link secundário logo acima; as linhas
-            miúdas (restaurar, já pagou, termos) acima do link. Aqui ele rende no fluxo (a welcome já é
+            (56 px, 12 px de margem, colado embaixo + safe-area); o link secundário logo acima; os
+            termos acima do link. Aqui ele rende no fluxo (a welcome já é
             uma camada fixa), com a mesma geometria do rodapé fixo das outras telas. */}
         <motion.div className="wca-rodape" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.4 }}>
           {veioDoSite && (
@@ -187,15 +171,6 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
               : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
             extra={(
               <div className="bdf-extra">
-                {isNativeShell() && (
-                  <button type="button" className="bdf-extra-linha" onClick={tentarRestaurar} disabled={restaurando}>
-                    <u>{restaurando ? "Verificando…" : "Restaurar compras"}</u>
-                  </button>
-                )}
-                {!veioDoSite && (
-                  <JaPagouPeloSite origem="welcome" onEntrar={onEntrar} className="bdf-extra-linha" classeAcao="wca-ja-pagou-acao" />
-                )}
-                {msgRestore && <span className="wca-msg">{msgRestore}</span>}
                 <span className="bdf-extra-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
               </div>
             )}
@@ -257,9 +232,5 @@ const CSS_WCA = `
 .wca-restore { border: 0; background: none; padding: 8px 16px; font-size: 12.5px; color: #4f5a64; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .wca-restore:disabled { opacity: .6; }
-.wca-rodape > .wca-ja-pagou { margin-top: -4px; }
-.wca-ja-pagou { border: 0; background: none; padding: 4px 16px 8px; font-size: 12px; color: #4f5a64; font-family: inherit; cursor: pointer; line-height: 1.25; }
-.wca-ja-pagou-acao { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-.wca-msg { font-size: 11.5px; color: #4f5a64; }
 .wca-termos { font-size: 10.5px; color: #9aa6b1; text-align: center; line-height: 1.5; }
 `;

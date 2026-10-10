@@ -24,6 +24,7 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import { isInAppBrowser } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
+import { RestaurarCompras } from "@/components/app/RestaurarCompras";
 
 /** /entrar — duas plateias, a mesma tela.
  *
@@ -394,6 +395,11 @@ const Entrar = () => {
             Redefinir senha em 1 minuto
           </Link>
         </div>
+
+        {/* 10/10: "Restaurar compras" saiu da welcome do funil enxuto (FUNIL_CALAI)
+            e mora aqui — quem reinstalou e procura a assinatura da loja acaba
+            nesta tela de qualquer jeito. Só no app das lojas. */}
+        {app && <RestaurarCompras origem="entrar" />}
 
         {/* No app NÃO pode prometer vitalício: lá o modelo é assinatura, e a
             contradição reprova na revisão do Play. */}

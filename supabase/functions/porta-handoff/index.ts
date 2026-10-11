@@ -5,10 +5,15 @@
  * na welcome e a pessoa tinha que achar o "Entrar" e digitar tudo de novo.
  * Esta função faz a ponte com um CÓDIGO de uso único:
  *
- *   POST { acao: "criar" }               COM o JWT da conta (o site, logo depois
- *        → { codigo, expira_em }         da conta criada/entrada). 10 caracteres,
- *                                        24 h, 1 uso; os anteriores NÃO usados da
- *                                        mesma conta são invalidados.
+ *   POST { acao: "criar", metodo? }      COM o JWT da conta (o site, logo depois
+ *        → { codigo, expira_em,          da conta criada/entrada). 10 caracteres,
+ *            email_enviado }             24 h, 1 uso; os anteriores NÃO usados da
+ *                                        mesma conta são invalidados. Na 1ª vez de
+ *                                        cada conta manda o e-mail "Seu plano está
+ *                                        salvo — entre no CORE" com ESTE código no
+ *                                        botão (core://entrar?h=…) — ver
+ *                                        ../_shared/email-porta.ts. Falhou o e-mail,
+ *                                        o código volta igual.
  *   POST { acao: "resgatar", codigo }    SEM login (o app, que ainda não tem
  *        → { token_hash, email }         sessão). Confere o hash, não usado, não
  *                                        vencido; marca usado; gera um magic link
@@ -30,6 +35,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { ASSUNTO_PORTA, ehEmailDeTeste, htmlPorta } from "../_shared/email-porta.ts";
 import {
   VALIDADE_MS, codigoValido, dentroDoLimite, gerarCodigo, hashCodigo, ipDoPedido, normalizarCodigo,
 } from "../_shared/porta-handoff.ts";
@@ -46,7 +52,33 @@ const json = (body: Record<string, unknown>, status = 200) =>
 
 const log = (passo: string, d?: unknown) => console.log(`[PORTA-HANDOFF] ${passo}${d ? " - " + JSON.stringify(d) : ""}`);
 
-const VIAS = new Set(["link", "clipboard"]);
+const VIAS = new Set(["link"]);
+
+/** O e-mail da Porta, 1x por conta (analytics_events porta_email_enviado). Nunca lança. */
+async function mandarEmailDaPorta(
+  admin: ReturnType<typeof createClient>, user: { id: string; email?: string | null }, codigo: string, metodo: string,
+): Promise<boolean> {
+  try {
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    const email = user.email ?? null;
+    if (!resendKey || !email || ehEmailDeTeste(email)) return false;
+    const { data: ja } = await admin.from("analytics_events").select("id").eq("event_name", "porta_email_enviado").eq("user_id", user.id).limit(1);
+    if (ja?.length) return false;
+    const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
+    const from = fromBase.includes("<") ? `CORE <${fromBase.split("<")[1]}` : fromBase;
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [email], subject: ASSUNTO_PORTA, html: htmlPorta({ email, metodo, codigo }) }),
+    });
+    if (!r.ok) { log("resend recusou", { status: r.status, corpo: (await r.text()).slice(0, 160) }); return false; }
+    await admin.from("analytics_events").insert({ user_id: user.id, event_name: "porta_email_enviado", event_data: { metodo, com_codigo: true }, session_id: null });
+    return true;
+  } catch (e) {
+    log("falha no e-mail", { erro: String(e).slice(0, 160) });
+    return false;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -93,7 +125,9 @@ serve(async (req) => {
         });
         if (!error) {
           log("criado", { user_id: user.id });
-          return json({ codigo, expira_em: expira });
+          const metodo = ["senha", "apple", "google", "sessao"].includes(String(body?.metodo)) ? String(body.metodo) : "senha";
+          const emailEnviado = await mandarEmailDaPorta(admin, user, codigo, metodo);
+          return json({ codigo, expira_em: expira, email_enviado: emailEnviado });
         }
         if (error.code !== "23505") {
           log("falha ao gravar", { erro: error.message });

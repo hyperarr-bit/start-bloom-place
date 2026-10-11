@@ -379,7 +379,7 @@ const ComoEntrar = lazyPage(() => import("./pages/ComoEntrar"));
 // plano → conta criada no site (campanha gravada nela) → App Store → Entrar.
 // SoNaWeb: o app nativo nunca monta (regra rota_inicio_acopla_app_web).
 const PortaIphone = lazyPage(() => import("./pages/porta/PortaIphone"));
-// 10/10: /p/<código> — o link do "abrir o app já logado" que a Porta copia; pra quem colar no navegador.
+// 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
 // /suporte do site: aquela é SoNaWeb e nunca abriu no shell — que era
@@ -600,7 +600,7 @@ const AnimatedRoutes = () => {
         <Route path="/suporte" element={<SoNaWeb><PageTransition><Suporte /></PageTransition></SoNaWeb>} />
         <Route path="/como-entrar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="como-entrar"><ComoEntrar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comece" element={<SoNaWeb><RouteErrorBoundary routeName="porta-iphone"><PortaIphone /></RouteErrorBoundary></SoNaWeb>} />
-        <Route path="/p/:codigo" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

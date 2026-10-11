@@ -2,11 +2,10 @@
  * PORTA → APP SEM DIGITAR NADA (10/10) — as partes PURAS do `porta-handoff`.
  *
  * A pessoa cria a conta no site (/comece) e baixa o app. Pra o app abrir JÁ
- * LOGADO, o site pede um CÓDIGO de uso único (24 h, 1 uso, ligado ao user_id)
- * e o entrega ao app por dois caminhos: `core://porta?c=<código>` (botão
- * "Abrir o CORE" na volta da loja) e a área de transferência
- * (`https://coreaplicativo.com.br/p/<código>`, copiado no toque em "Baixar").
- * O app troca o código por um token_hash de magic link e faz `verifyOtp`.
+ * LOGADO, o site pede um CÓDIGO de uso único (24 h, 1 uso, ligado ao user_id),
+ * que chega ao app pelo link `core://entrar?h=<código>` ("Abrir o CORE" na tela 7,
+ * a página /abrir?h=… e o e-mail da Porta). Área de transferência é PROIBIDA
+ * (dono 10/10). O app troca o código por um token_hash de magic link e faz `verifyOtp`.
  *
  * O CÓDIGO: 10 caracteres de um alfabeto de 32 SEM os ambíguos (sem I, O, 0, 1)
  * = 32^10 ≈ 1,1 × 10^15 combinações. Com o limite de 20 erros por IP por hora
@@ -65,7 +64,3 @@ export function ipDoPedido(h: { get(n: string): string | null }): string {
 export function dentroDoLimite(errosNaUltimaHora: number): boolean {
   return errosNaUltimaHora < LIMITE_ERROS_POR_HORA;
 }
-
-/** O link que o site copia e o app reconhece na área de transferência. */
-export const BASE_LINK = "https://coreaplicativo.com.br/p/";
-export const linkDoCodigo = (codigo: string): string => `${BASE_LINK}${codigo}`;

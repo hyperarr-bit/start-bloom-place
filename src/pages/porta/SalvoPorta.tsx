@@ -15,7 +15,7 @@ import { ONDE_FICA_ENTRAR, TEXTO_ENTRAR_NO_APP } from "./conteudo";
  * Quando a aba volta a ficar visível depois do clique na loja, o título vira
  * "Já instalou? Abra o CORE e toque em Entrar".
  *
- * 10/10 — COM o código do porta-handoff (`abrirApp` = core://porta?c=…, só iPhone): "Abrir o CORE" logo
+ * 10/10 — COM o código do porta-handoff (`abrirApp` = core://entrar?h=…, só iPhone): "Abrir o CORE" logo
  * abaixo do título (o app troca o código por sessão e abre JÁ LOGADO, no paywall); na volta da loja ele
  * vira o botão PRINCIPAL e a loja fica secundária. Os passos "toque em Entrar" continuam: são a rede pra
  * a versão do app que ainda não conhece o link (1.0.14) e pro código que falhar.
@@ -53,7 +53,7 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null,
   hrefLoja: (loja: "ios" | "android" | null) => string;
   qrUrl: string;
   onLoja: (loja: "ios" | "android") => void;
-  /** core://porta?c=<código> — null sem código (ou fora do iPhone) */
+  /** core://entrar?h=<código> — null sem código (ou fora do iPhone) */
   abrirApp?: string | null;
   onAbrirApp?: (onde: "topo" | "principal") => void;
 }) {

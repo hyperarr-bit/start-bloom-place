@@ -668,13 +668,11 @@ describe("conteúdo", () => {
 /* ---------------------------------------------------------------- abrir o app já logado */
 describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
   const CODIGO = "ABCDEFGH23";
-  const LINK = `https://coreaplicativo.com.br/p/${CODIGO}`;
+  const LINK_APP = `core://entrar?h=${CODIGO}`;
   const beacons = (nome: string) => vi.mocked(trackEventBeacon).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
+  /* PROIBIDO clipboard (dono 10/10): um writeText espião prova que ninguém copia nada */
   let writeText: ReturnType<typeof vi.fn>;
-  const clipboard = (impl: () => Promise<void>) => {
-    writeText = vi.fn(impl);
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-  };
+  beforeEach(() => { writeText = vi.fn(async () => {}); Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true }); });
   afterEach(() => { try { delete (navigator as { clipboard?: unknown }).clipboard; } catch { /* noop */ } });
 
   /** conta nova por e-mail e senha, até o "Último passo" */
@@ -687,25 +685,21 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     await waitFor(() => expect(screen.getByTestId("porta-instrucao")).toBeInTheDocument());
   };
 
-  it("iPhone: pede o código depois da conta; o toque em Baixar copia o link ANTES de sair; tela 7 com 'Abrir o CORE'", async () => {
+  it("iPhone: pede o código depois da conta (com o método, pro e-mail); Baixar NÃO copia nada; tela 7 com 'Abrir o CORE' (core://entrar?h=)", async () => {
     ua(UA.safari);
-    invoke.mockResolvedValue({ data: { codigo: CODIGO, expira_em: "x" }, error: null });
-    clipboard(async () => {});
+    invoke.mockResolvedValue({ data: { codigo: CODIGO, expira_em: "x", email_enviado: true }, error: null });
     await contaCriada();
-    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
-    expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "criar" } });
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true, email: true }));
+    expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "criar", metodo: "senha" } });
     expect(invoke).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
-    expect(writeText).toHaveBeenCalledWith(LINK);
-    // a cópia acontece no toque, antes de a página registrar a saída pra loja
-    const ordemLoja = vi.mocked(trackEventBeacon).mock.invocationCallOrder[vi.mocked(trackEventBeacon).mock.calls.findIndex((c) => c[0] === "porta_loja_click")];
-    expect(writeText.mock.invocationCallOrder[0]).toBeLessThan(ordemLoja);
-    await waitFor(() => expect(beacons("porta_clipboard")[0]).toMatchObject({ ok: true, metodo: "clipboard_api" }));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(beacons("porta_clipboard")).toHaveLength(0);
 
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
     const topo = screen.getByTestId("porta-abrir-app-topo");
-    expect(topo.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+    expect(topo.getAttribute("href")).toBe(LINK_APP);
     fireEvent.click(topo);
     expect(beacons("porta_abrir_app_click")[0]).toMatchObject({ onde: "topo" });
 
@@ -715,7 +709,7 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     expect(screen.queryByTestId("porta-abrir-app-topo")).toBeNull();
     const principal = screen.getByTestId("porta-abrir-app");
     expect(principal.textContent).toBe("Abrir o CORE");
-    expect(principal.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+    expect(principal.getAttribute("href")).toBe(LINK_APP);
     expect(screen.getByTestId("porta-loja").getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei");
     expect(screen.getByTestId("porta-loja").className).toContain("bpt-link");
     fireEvent.click(principal);
@@ -724,22 +718,8 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     expect(screen.getByTestId("porta-passo-2").textContent).toContain("Entrar");
   });
 
-  it("Instagram recusa a cópia: registra porta_clipboard ok:false e a loja abre igual", async () => {
-    ua(UA.instagram);
-    invoke.mockResolvedValue({ data: { codigo: CODIGO }, error: null });
-    clipboard(async () => { throw Object.assign(new Error("negado"), { name: "NotAllowedError" }); });
-    await contaCriada();
-    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
-    fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
-    expect(writeText).toHaveBeenCalledWith(LINK);
-    await waitFor(() => expect(beacons("porta_clipboard")[0]).toMatchObject({ ok: false, erro: "NotAllowedError", in_app: true }));
-    expect(beacons("porta_loja_click")[0]).toMatchObject({ loja: "ios" });
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
-  });
-
-  it("função fora (ou código inválido): nada copiado, sem 'Abrir o CORE', o fluxo segue com o 'toque em Entrar'", async () => {
+  it("função fora (ou código inválido): sem 'Abrir o CORE', o fluxo segue com o 'toque em Entrar'", async () => {
     ua(UA.safari);
-    clipboard(async () => {});
     await contaCriada();
     await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: false, erro: "funcao_fora" }));
     fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
@@ -780,22 +760,22 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     expect(JSON.parse(localStorage.getItem("porta-estado-v1")!).codigo).toBe(CODIGO);
   });
 
-  describe("/p/:codigo (quem cola o link no navegador)", () => {
+  describe("/abrir?h=<código> (a reserva https do link do e-mail)", () => {
     const abrirLink = (codigo: string) => render(
-      <MemoryRouter initialEntries={[`/p/${codigo}`]}>
+      <MemoryRouter initialEntries={[`/abrir?h=${codigo}`]}>
         <Routes>
-          <Route path="/p/:codigo" element={<AbrirPortaRota />} />
+          <Route path="/abrir" element={<AbrirPortaRota />} />
           <Route path="*" element={<Onde />} />
         </Routes>
       </MemoryRouter>,
     );
 
-    it("'Abrir o CORE' → core://porta?c=…, 'Baixar' secundário, noindex, evento", () => {
+    it("'Abrir o CORE' → core://entrar?h=…, 'Baixar' secundário, noindex, evento", () => {
       ua(UA.safari);
       const { unmount } = abrirLink("abcdefgh23");
       expect(screen.getByTestId("porta-abrir-titulo").textContent).toBe("Abrir o CORE");
       const abrir = screen.getByTestId("porta-abrir-app");
-      expect(abrir.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+      expect(abrir.getAttribute("href")).toBe(LINK_APP);
       expect(screen.getByTestId("porta-abrir-baixar").getAttribute("href")).toBe("/baixar?origem=porta_link");
       expect(screen.getByTestId("porta-abrir-baixar").textContent).toBe("Ainda não tem o app? Baixar");
       expect(document.head.querySelector('meta[name="robots"][data-porta]')?.getAttribute("content")).toMatch(/noindex/);
@@ -813,14 +793,18 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
       expect(screen.getByTestId("porta-abrir-baixar").getAttribute("href")).toBe("/baixar?origem=porta_link");
     });
 
-    it("o app nativo nunca monta /p/ (SoNaWeb + cinto); TrialBanner não cobre", () => {
+    it("o app nativo nunca monta /abrir (SoNaWeb + cinto); TrialBanner não cobre; nada de clipboard na Porta", () => {
       nativo(true);
       abrirLink(CODIGO);
       expect(screen.getByTestId("onde").textContent).toBe("/app");
       const app = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
-      expect(app).toContain('<Route path="/p/:codigo" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />');
+      expect(app).toContain('<Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />');
       const banner = readFileSync(join(process.cwd(), "src/components/TrialBanner.tsx"), "utf8");
-      expect(banner).toContain('location.pathname.startsWith("/p/")');
+      expect(banner).toContain('location.pathname.startsWith("/abrir")');
+      for (const f of ["PortaIphone.tsx", "SalvoPorta.tsx", "InstrucaoPorta.tsx", "AbrirPorta.tsx", "handoff.ts"]) {
+        const fonte = readFileSync(join(process.cwd(), "src/pages/porta", f), "utf8");
+        expect(fonte).not.toMatch(/navigator\.clipboard|writeText|execCommand|porta_clipboard/);
+      }
     });
   });
 });

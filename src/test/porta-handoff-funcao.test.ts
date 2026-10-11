@@ -3,12 +3,13 @@
  * (supabase/functions/_shared/porta-handoff.ts) — o código e o limite.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ALFABETO, LIMITE_ERROS_POR_HORA, TAMANHO_CODIGO, codigoValido, dentroDoLimite, gerarCodigo, hashCodigo,
-  ipDoPedido, linkDoCodigo, normalizarCodigo,
+  ipDoPedido, normalizarCodigo,
 } from "../../supabase/functions/_shared/porta-handoff";
+import { ASSUNTO_PORTA, ehEmailDeTeste, htmlPorta, linkDeReserva, linkDoApp } from "../../supabase/functions/_shared/email-porta";
 
 const cab = (o: Record<string, string>) => ({ get: (n: string) => o[n.toLowerCase()] ?? null });
 
@@ -55,8 +56,9 @@ describe("código do handoff", () => {
     expect(await hashCodigo("ABCDEFGH24")).not.toBe(h);
   });
 
-  it("o link que o site copia e o app reconhece", () => {
-    expect(linkDoCodigo("ABCDEFGH23")).toBe("https://coreaplicativo.com.br/p/ABCDEFGH23");
+  it("os links do código: core://entrar?h= (app) e a reserva https /abrir?h=", () => {
+    expect(linkDoApp("ABCDEFGH23")).toBe("core://entrar?h=ABCDEFGH23");
+    expect(linkDeReserva("ABCDEFGH23")).toBe("https://coreaplicativo.com.br/abrir?h=ABCDEFGH23");
   });
 });
 
@@ -96,8 +98,41 @@ describe("a função e a migração", () => {
     expect(sql).toMatch(/porta_handoff_user_id_idx/);
   });
 
+  it("o 'criar' manda o e-mail da Porta com o MESMO código, 1x por conta, e nunca segura o código", () => {
+    expect(fn).toContain("const emailEnviado = await mandarEmailDaPorta(admin, user, codigo, metodo);");
+    expect(fn).toContain('eq("event_name", "porta_email_enviado")');
+    expect(fn).toMatch(/return json\(\{ codigo, expira_em: expira, email_enviado: emailEnviado \}\)/);
+    // área de transferência é proibida (dono 10/10)
+    expect(fn).not.toMatch(/clipboard/i);
+  });
+
   it("verify_jwt desligado (o app resgata sem sessão; o criar confere o JWT dentro)", () => {
     expect(cfg).toMatch(/\[functions\.porta-handoff\]\s*\nverify_jwt = false/);
     expect(fn).toContain("anon.auth.getUser(token)");
+  });
+});
+
+describe("e-mail 'Seu plano está salvo — entre no CORE'", () => {
+  it("botão 'Entrar no CORE' com core://entrar?h=<código>, reserva https, 3 passos pelo método; sem preço", () => {
+    const html = htmlPorta({ email: "ana@exemplo.com", metodo: "senha", codigo: "ABCDEFGH23" });
+    expect(ASSUNTO_PORTA).toBe("Seu plano está salvo — entre no CORE");
+    expect(html).toContain('href="core://entrar?h=ABCDEFGH23"');
+    expect(html).toContain(">Entrar no CORE</a>");
+    expect(html).toContain('href="https://coreaplicativo.com.br/abrir?h=ABCDEFGH23"');
+    expect(html).toContain("https://coreaplicativo.com.br/baixar?origem=porta_email");
+    expect(html).toContain("toque em <b>“Entrar”</b>");
+    expect(html).toContain("Digite <b>ana@exemplo.com</b> e a sua senha");
+    expect(html).not.toMatch(/R\$|\d+,90|grátis/i);
+    expect(htmlPorta({ email: "a@b.com", metodo: "apple", codigo: "X" })).toContain("Continuar com a Apple");
+    expect(htmlPorta({ email: "a@b.com", metodo: "google", codigo: "X" })).toContain("Continuar com Google");
+    // sem código (função falhou): só os passos
+    expect(htmlPorta({ email: "a@b.com", metodo: "senha", codigo: null })).not.toContain("core://");
+    // escapa o e-mail
+    expect(htmlPorta({ email: "<x>@b.com", metodo: "senha", codigo: "X" })).not.toContain("<x>");
+    expect(ehEmailDeTeste("fulano+portaqa1@gmail.com")).toBe(true);
+    expect(ehEmailDeTeste("ana@exemplo.com")).toBe(false);
+    // o print do e-mail (scratchpad, pra mostrar ao dono)
+    const saida = process.env.PORTA_EMAIL_HTML;
+    if (saida) writeFileSync(saida, html);
   });
 });

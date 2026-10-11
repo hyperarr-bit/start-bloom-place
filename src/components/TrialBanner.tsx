@@ -82,8 +82,8 @@ export const TrialBanner = () => {
     // /comece é a Porta iPhone (10/10): a conta nasce lá, SEM assinatura, e a
     // tela seguinte é "baixe o app". O "Assine no app" por cima apagaria isso.
     location.pathname.startsWith("/comece") ||
-    // /p/<código> (10/10): o link do "abrir o app já logado" da Porta — mesma conta recém-criada.
-    location.pathname.startsWith("/p/") ||
+    // /abrir?h=<código> (10/10): a reserva do "Abrir o CORE" da Porta — mesma conta recém-criada.
+    location.pathname.startsWith("/abrir") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

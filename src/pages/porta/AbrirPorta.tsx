@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP } from "@/lib/rotas-web";
@@ -7,11 +7,12 @@ import { BotaoPorta } from "./BotaoPorta";
 import { abrirAppComCodigo, codigoDaPortaOk } from "./handoff";
 
 /**
- * coreaplicativo.com.br/p/<código> (10/10) — o link que a Porta copia no toque em "Baixar".
+ * coreaplicativo.com.br/abrir?h=<código> (10/10) — a reserva do link da Porta.
  *
- * O caminho normal é o APP ler esse link na área de transferência. Esta página só existe pra quem
- * COLAR o link no navegador (ou tocar nele numa conversa): "Abrir o CORE" → core://porta?c=<código>
- * (o app troca o código por sessão e abre já logado) + "Ainda não tem o app? Baixar".
+ * O botão do e-mail "entre no CORE" é `core://entrar?h=<código>`; alguns apps de e-mail não abrem
+ * link core://, então embaixo vai este endereço https: "Abrir o CORE" → core://entrar?h=<código> (o
+ * app troca o código por sessão e abre já logado) + "Ainda não tem o app? Baixar". É também o
+ * endereço que um universal link usaria no futuro (sem Associated Domains hoje).
  * Só na web (SoNaWeb no App.tsx), noindex. O código é de uso único e vence em 24 h; a página não
  * consulta nada no servidor (quem resgata é o app).
  */
@@ -21,8 +22,8 @@ export default function AbrirPortaRota() {
 }
 
 export function AbrirPorta() {
-  const { codigo: cru } = useParams();
-  const codigo = String(cru ?? "").trim().toUpperCase();
+  const [busca] = useSearchParams();
+  const codigo = String(busca.get("h") ?? "").trim().toUpperCase();
   const valido = codigoDaPortaOk(codigo);
   const viu = useRef(false);
 

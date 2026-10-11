@@ -21,7 +21,7 @@ import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
 import { irPraLoja } from "./navegar";
 import { InstrucaoPorta } from "./InstrucaoPorta";
-import { abrirAppComCodigo, codigoDaPortaOk, copiarNoToque, linkDoCodigo } from "./handoff";
+import { abrirAppComCodigo, codigoDaPortaOk } from "./handoff";
 
 /** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
 export const SEGUNDOS_ATE_A_LOJA = 4;
@@ -48,9 +48,10 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
  *   porta_voltou_aba {}
  *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
- *   porta_codigo {ok, erro}              10/10: pediu o código do "abrir o app já logado" (porta-handoff)
- *   porta_clipboard {ok, metodo, erro}   copiou o link /p/<código> no toque em "Baixar" (keepalive)
- *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://porta?c=…) na tela 7
+ *   porta_codigo {ok, erro, email}       10/10: pediu o código do "abrir o app já logado" (porta-handoff; a
+ *                                        mesma chamada manda o e-mail "entre no CORE" com o código)
+ *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://entrar?h=…) na tela 7
+ * (Área de transferência é PROIBIDA — dono 10/10. Nada aqui copia nem lê o clipboard.)
  * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
  */
 export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
@@ -208,19 +209,19 @@ export function PortaIphone() {
 
   /* ---------------------------------------------------------- o código do app já logado */
   /* 10/10: depois da conta, um código de uso único (porta-handoff "criar", 24 h, 1 uso) pra o app abrir
-   * JÁ LOGADO — pelo clipboard (copiado no "Baixar") ou pelo "Abrir o CORE" (core://porta?c=…). Só no
-   * iPhone (o app Android não sabe resgatar). NUNCA bloqueia: falhou, fica só o "toque em Entrar". */
+   * JÁ LOGADO pelo "Abrir o CORE" (core://entrar?h=…); a mesma chamada manda o e-mail com o código. Só
+   * no iPhone (o app Android não sabe resgatar). NUNCA bloqueia: falhou, fica só o "toque em Entrar". */
   const pedirCodigo = async (): Promise<void> => {
     if (plataformaDaWeb() !== "ios") return;
     try {
-      const { data, error } = await supabase.functions.invoke("porta-handoff", { body: { acao: "criar" } });
+      const { data, error } = await supabase.functions.invoke("porta-handoff", { body: { acao: "criar", metodo: estadoRef.current.metodo ?? "senha" } });
       const codigo = (data as { codigo?: unknown } | null)?.codigo;
       if (error || !codigoDaPortaOk(codigo)) {
         trackEvent("porta_codigo", { ok: false, erro: (error?.message || "sem_codigo").slice(0, 120), ...ids() });
         return;
       }
       setEstado((x) => ({ ...x, codigo }));
-      trackEvent("porta_codigo", { ok: true, ...ids() });
+      trackEvent("porta_codigo", { ok: true, email: !!(data as { email_enviado?: boolean } | null)?.email_enviado, ...ids() });
     } catch (e) {
       trackEvent("porta_codigo", { ok: false, erro: String(e).slice(0, 120), ...ids() });
     }
@@ -460,12 +461,6 @@ export function PortaIphone() {
         email={estado.email ?? user?.email ?? ""}
         hrefLoja={hrefLoja(loja)}
         onBaixar={() => {
-          // 10/10: o link do app já logado vai pra área de transferência AGORA, dentro do toque (antes de a
-          // página sair pra loja) — o app lê na 1ª abertura. No Instagram a cópia pode ser recusada: registra.
-          const codigo = estadoRef.current.codigo;
-          if (codigoDaPortaOk(codigo)) {
-            copiarNoToque(linkDoCodigo(codigo), (r) => trackEventBeacon("porta_clipboard", { ok: r.ok, metodo: r.metodo, erro: r.erro ?? null, in_app: emInApp, ...ids() }));
-          }
           passoFeito("instrucao", "baixar");
           onLoja(loja, "botao");
           try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }

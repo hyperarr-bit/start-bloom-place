@@ -91,7 +91,13 @@ function FaixaDoPasso4() {
 }
 
 function Ligada() {
-  const { user } = useAuth();
+  const { user, isSubscribed } = useAuth();
+  /* 10/10 (build 38, achado na prova da Porta no Simulador): no APP, conta nova SEM assinatura (entrou pelo
+   * "Entrar" ou pelo link da Porta, antes de pagar) caía no gate do paywall com o "Tá dentro! Seus 3 dias
+   * grátis começaram agora" piscando por cima — e a missão nascia antes do teste existir. A missão é do
+   * teste/assinatura: no app ela só nasce e só aparece com acesso (isSubscribed; antes da 1ª resposta do
+   * check-subscription é false, então nada pisca). A web segue como estava. */
+  const semAcessoNoApp = isNativeShell() && !isSubscribed;
   const { loaded } = useUserData();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -128,7 +134,7 @@ function Ligada() {
 
   // nasce na 1ª entrada logada: a área da porta primeiro
   useEffect(() => {
-    if (!user || !loaded || missao) return;
+    if (!user || !loaded || missao || semAcessoNoApp) return;
     // no app: só pra quem é novo nesta versão (a Missão antiga em andamento termina a dela)
     if (isNativeShell() && !missaoDosesMandaNoApp(user.created_at)) return;
     const area = areaEscolhidaNoFunil();
@@ -138,7 +144,7 @@ function Ligada() {
     const m = iniciarMissao(modulos, hoje, undefined, braco);
     setMissao(m);
     trackEvent("missao_doses_inicio", eventoDaMissao({ modulos, area: area ?? null }));
-  }, [user, loaded, missao, hoje]);
+  }, [user, loaded, missao, hoje, semAcessoNoApp]);
 
   /* ── O 4º PASSO (B): o tour da Home. Quando ele termina (EVENTO_TOUR_HOME_FIM) a missão fecha:
      `missao_dose_concluida indice=4 modulo=home` + `missao_completa`. Se o tour não existe pra esta
@@ -183,7 +189,7 @@ function Ligada() {
     return () => { window.clearInterval(t); window.clearTimeout(limite); };
   }, [planoDevendo]);
 
-  if (!user || !missao) return null;
+  if (!user || !missao || semAcessoNoApp) return null;
 
   const salvar = (m: EstadoMissaoDoses) => { gravarMissao(m); setMissao(m); };
   const areaNome = (() => {

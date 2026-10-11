@@ -251,6 +251,9 @@ export function PortaIphone() {
       }
       if (!existente) {
         fireMetaEvent("CompleteRegistration", { content_name: "porta_iphone", status: true }, eventId);
+        // 11/10: o mesmo CompleteRegistration pela CAPI do site (servidor), com o MESMO eventID — a Meta deduplica.
+        // Não bloqueia nada: se falhar, fica o do navegador.
+        try { void supabase.functions.invoke("porta-handoff", { body: { acao: "registro", event_id: eventId } }).catch(() => {}); } catch { /* noop */ }
         void persistLeadSource(supabase, u.id);
       }
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });

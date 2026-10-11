@@ -14,6 +14,8 @@
  *                                        botão (core://entrar?h=…) — ver
  *                                        ../_shared/email-porta.ts. Falhou o e-mail,
  *                                        o código volta igual.
+ *   POST { acao: "registro", event_id } COM o JWT: CompleteRegistration na CAPI do pixel do site (1x, conta nova
+ *                                        da Porta, mesmo event_id do fbq → a Meta deduplica).
  *   POST { acao: "resgatar", codigo }    SEM login (o app, que ainda não tem
  *        → { token_hash, email }         sessão). Confere o hash, não usado, não
  *                                        vencido; marca usado; gera um magic link
@@ -80,6 +82,57 @@ async function mandarEmailDaPorta(
   }
 }
 
+/* CAPI DO CADASTRO (11/10, dono: "quando a conta é criada, CompleteRegistration no pixel 998037194527241; se já
+ * existir CAPI no site, manda também"). Mesmo dataset/token da CAPI de compras do Cakto/Asaas (META_PIXEL_ID +
+ * META_CAPI_TOKEN). event_id = porta.event_id — o MESMO eventID do fbq do navegador → a Meta deduplica.
+ * Só conta NOVA da Porta (porta.event_id bate e a conta tem < 30 min), 1x por conta (analytics_events
+ * porta_capi_cr). user_data: e-mail e id em SHA-256 + fbc/fbp do clique; SEM IP/user agent (brief: só com ok
+ * do dono). Nunca lança; sem os secrets, não faz nada. */
+const sha256 = async (v: string) => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v.trim().toLowerCase()));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+async function capiCadastro(
+  admin: ReturnType<typeof createClient>,
+  user: { id: string; email?: string | null; created_at?: string; user_metadata?: Record<string, unknown> },
+  eventId: string,
+): Promise<{ ok: boolean; motivo: string }> {
+  try {
+    const pixelId = Deno.env.get("META_PIXEL_ID");
+    const token = Deno.env.get("META_CAPI_TOKEN");
+    if (!pixelId || !token) return { ok: false, motivo: "sem_secrets" };
+    const porta = (user.user_metadata?.porta ?? null) as { event_id?: string; attr?: Record<string, string | undefined> } | null;
+    if (!porta || !eventId || porta.event_id !== eventId) return { ok: false, motivo: "sem_porta" };
+    if (!user.created_at || Date.now() - Date.parse(user.created_at) > 30 * 60e3) return { ok: false, motivo: "conta_antiga" };
+    const { data: ja } = await admin.from("analytics_events").select("id").eq("event_name", "porta_capi_cr").eq("user_id", user.id).limit(1);
+    if (ja?.length) return { ok: false, motivo: "ja_enviado" };
+    const a = porta.attr ?? {};
+    const userData: Record<string, unknown> = { external_id: [await sha256(user.id)] };
+    if (user.email) userData.em = [await sha256(user.email)];
+    if (a.fbc) userData.fbc = a.fbc;
+    if (a.fbp) userData.fbp = a.fbp;
+    const evento = {
+      event_name: "CompleteRegistration",
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: eventId,
+      action_source: "website",
+      event_source_url: a.landing || "https://www.coreaplicativo.com.br/comece",
+      user_data: userData,
+      custom_data: { content_name: "porta_iphone", status: true },
+    };
+    const r = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: [evento] }),
+    });
+    const ok = r.ok;
+    if (!ok) log("capi recusou", { status: r.status, corpo: (await r.text()).slice(0, 160) });
+    await admin.from("analytics_events").insert({ user_id: user.id, event_name: "porta_capi_cr", event_data: { ok, event_id: eventId, status: r.status, fbc: !!a.fbc, fbp: !!a.fbp }, session_id: null });
+    return { ok, motivo: ok ? "ok" : "meta" };
+  } catch (e) {
+    log("falha na capi", { erro: String(e).slice(0, 160) });
+    return { ok: false, motivo: "erro" };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ erro: "metodo" }, 405);
@@ -135,6 +188,19 @@ serve(async (req) => {
         }
       }
       return json({ erro: "gravar" }, 500);
+    }
+
+    /* ------------------------------------------------------------ registro (CAPI do cadastro) */
+    if (acao === "registro") {
+      const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const anon = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: authData } = await anon.auth.getUser(token);
+      const user = authData?.user;
+      if (!user) return json({ erro: "sem_login" }, 401);
+      const r = await capiCadastro(admin, user, String(body?.event_id ?? ""));
+      return json(r);
     }
 
     /* ------------------------------------------------------------ resgatar */

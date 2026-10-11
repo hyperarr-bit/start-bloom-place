@@ -723,7 +723,11 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     await contaCriada();
     await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true, email: true }));
     expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "criar", metodo: "senha" } });
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke.mock.calls.filter((c) => (c[1] as { body: { acao: string } }).body.acao === "criar")).toHaveLength(1);
+    // 11/10: o CompleteRegistration também pela CAPI do site, com o MESMO eventID do fbq (dedup na Meta)
+    const reg = invoke.mock.calls.find((c) => (c[1] as { body: { acao: string } }).body.acao === "registro");
+    expect(reg).toBeTruthy();
+    expect((reg![1] as { body: { event_id: string } }).body.event_id).toBe(vi.mocked(fireMetaEvent).mock.calls.find((c) => c[0] === "CompleteRegistration")![2]);
 
     fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
     expect(writeText).not.toHaveBeenCalled();
@@ -777,7 +781,8 @@ describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
     preencherSenha("ana@exemplo.com", "segredo1");
     fireEvent.click(screen.getByTestId("porta-criar-conta"));
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
-    expect(invoke).not.toHaveBeenCalled();
+    // sem código no Android/computador (a CAPI do cadastro vale pra todo aparelho)
+    expect(invoke.mock.calls.filter((c) => (c[1] as { body: { acao: string } }).body.acao === "criar")).toHaveLength(0);
     expect(screen.queryByTestId("porta-abrir-app-topo")).toBeNull();
   });
 

@@ -1,16 +1,21 @@
 /**
- * PORTA iPHONE (/comece, 10/10) — anúncio → perguntas → plano → CONTA NO SITE
- * (campanha gravada nela) → App Store → "Entrar" no app.
+ * PORTA iPHONE (/comece) — v3 (11/10): TELA 1 abertura + área + dor (a pergunta aparece na mesma
+ * tela) → TELA 2 o número → TELA 3 com × sem → TELA 4 CONTA com o plano no topo (a tela do plano
+ * saiu) → "Último passo" → tela 7 (App Store → "Entrar" no app).
  *
  * O que não pode quebrar:
- *   · as perguntas 2 e 3 são as MESMAS do funil novo do app, área por área (v2, dono);
+ *   · a dor e o número são as MESMAS perguntas do funil novo do app, área por área (v2, dono);
+ *   · a dor aparece na tela 1 ao escolher a área, e troca quando a área troca;
+ *   · sem tela de plano, sem cadeado, sem "Desbloquear": o plano está no topo da conta;
+ *   · "3 dias grátis no app · sem cobrança hoje" só no iPhone; NUNCA "sem cartão";
+ *   · o estado salvo da v2 (welcome/area/p2/plano) cai no equivalente novo;
  *   · o com × sem usa o número da resposta (R$ do gasto dela, treinos), como o app;
  *   · o fluxo inteiro, com o app nativo NUNCA montando /comece;
  *   · conta: Apple, Google (no Instagram: aviso, sem OAuth) e e-mail + senha, sem código;
  *     e-mail que já existe entra com a senha, NUNCA vira 2ª conta;
  *   · a atribuição é capturada na 1ª carga e sobrevive ao Instagram zerar o storage;
  *   · user_metadata.porta só é gravado se AUSENTE;
- *   · nenhum PREÇO do produto em tela nenhuma; "dias grátis" só na tela 7;
+ *   · nenhum PREÇO do produto em tela nenhuma; "dias grátis" só na conta (iPhone) e na tela 7;
  *   · os eventos saem com os campos certos.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -91,34 +96,47 @@ const texto = () => document.body.textContent ?? "";
 const PRECO_DO_PRODUTO = /\d+,90|\banual\b|\bmensal\b|mensalidade|assinatura|por ano|\/ano|\/mês/i;
 const conferirCopy = () => {
   expect(texto()).not.toMatch(PRECO_DO_PRODUTO);
-  if (!screen.queryByTestId("porta-salvo")) expect(texto()).not.toMatch(/dias? grátis/i);
+  expect(texto()).not.toMatch(/sem cart[aã]o/i); // a Apple pede forma de pagamento pro teste
+  expect(texto()).not.toMatch(/desbloque/i);
+  const iphone = /iPhone/.test(navigator.userAgent);
+  const podeTeste = screen.queryByTestId("porta-salvo") || (iphone && screen.queryByTestId("porta-conta"));
+  if (!podeTeste) expect(texto()).not.toMatch(/dias? grátis/i);
 };
 const escolher = async (id: string, proxima: string) => {
   fireEvent.click(screen.getByTestId(`porta-opcao-${id}`));
   await waitFor(() => expect(screen.getByTestId(proxima)).toBeInTheDocument());
   conferirCopy();
 };
-const rotulos = (testid: string) => Array.from(screen.getByTestId(testid).querySelectorAll("[data-testid^='porta-opcao-'] span.block:first-child")).map((n) => n.textContent);
+const rotulos = (testid: string) => Array.from(screen.getByTestId(testid).querySelectorAll("[data-testid^='porta-opcao-'] span.block:first-child, [data-testid^='porta-area-'] span.block:first-child")).map((n) => n.textContent);
 /** 10/10: no celular, depois da conta vem o "Último passo: no app, toque em Entrar"; o botão abre a loja e leva pra tela 7. */
 const passarInstrucao = async () => {
   await waitFor(() => expect(screen.getByTestId("porta-instrucao")).toBeInTheDocument());
   expect(screen.getByTestId("porta-instrucao-titulo").textContent).toBe("No app, toque em Entrar");
+  expect(screen.getByTestId("porta-instrucao-passo-1").textContent).toBe("Toque em “Entrar”, abaixo do Começar");
+  if (!/Android/.test(navigator.userAgent)) expect(screen.getByTestId("porta-instrucao-print").getAttribute("src")).toBe("/porta/tela-inicial-1014-ios.jpg");
   fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
   await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
 };
 const usuario = (over: Partial<U> = {}): U => ({ id: "u-1", email: "ana@exemplo.com", created_at: new Date().toISOString(), user_metadata: {}, ...over });
 
-/** até a tela da conta, numa área, com as respostas dadas */
-const ateConta = async (area: string, dor: string, numero: string) => {
+/** tela 1: toca na área; a pergunta da dor aparece logo abaixo, na MESMA tela */
+const tocarArea = async (area: string) => {
+  fireEvent.click(screen.getByTestId(`porta-area-${area}`));
+  await waitFor(() => expect(screen.getByTestId("porta-dor")).toBeInTheDocument());
+  expect(screen.getByTestId("porta-abertura")).toBeInTheDocument();
+  conferirCopy();
+};
+/** até a tela 3 (com × sem), numa área, com as respostas dadas */
+const ateComSem = async (area: string, dor: string, numero: string) => {
   montar();
-  fireEvent.click(screen.getByTestId("porta-comecar"));
-  await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-  await escolher(area, "porta-p2");
+  await tocarArea(area);
   await escolher(dor, "porta-p3");
   await escolher(numero, "porta-comsem");
+};
+/** até a tela da conta, numa área, com as respostas dadas */
+const ateConta = async (area: string, dor: string, numero: string) => {
+  await ateComSem(area, dor, numero);
   fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-  await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
-  fireEvent.click(screen.getByTestId("porta-desbloquear"));
   await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
   conferirCopy();
 };
@@ -200,16 +218,14 @@ const DO_APP: Record<AreaPorta, { dor: [string, string[]]; numero: [string, stri
   },
 };
 
-describe("perguntas 2 e 3 são as MESMAS do funil do app, área por área", () => {
+describe("a dor (tela 1) e o número (tela 2) são as MESMAS perguntas do funil do app, área por área", () => {
   for (const area of Object.keys(DO_APP) as AreaPorta[]) {
     it(area, async () => {
       montar();
-      fireEvent.click(screen.getByTestId("porta-comecar"));
-      await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-      await escolher(area, "porta-p2");
+      await tocarArea(area);
       expect(screen.getByTestId("porta-pergunta").textContent).toBe(DO_APP[area].dor[0]);
-      expect(rotulos("porta-p2")).toEqual(DO_APP[area].dor[1]);
-      fireEvent.click(screen.getAllByRole("listitem")[0]);
+      expect(rotulos("porta-dor")).toEqual(DO_APP[area].dor[1]);
+      fireEvent.click(screen.getByTestId("porta-dor").querySelectorAll("[data-testid^='porta-opcao-']")[0]);
       await waitFor(() => expect(screen.getByTestId("porta-p3")).toBeInTheDocument());
       expect(screen.getByTestId("porta-pergunta").textContent).toBe(DO_APP[area].numero[0]);
       expect(rotulos("porta-p3")).toEqual(DO_APP[area].numero[1]);
@@ -219,46 +235,124 @@ describe("perguntas 2 e 3 são as MESMAS do funil do app, área por área", () =
 
   it("'Tudo' segue pelo dinheiro, com a linha de abertura do app em cima", async () => {
     montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("tudo", "porta-p2");
+    await tocarArea("tudo");
     expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha hoje?");
     expect(screen.getByTestId("porta-abertura-tudo").textContent).toBe("Vamos começar pelo mais importante: o dinheiro. Rotina e saúde entram nos dias 2 e 3.");
     expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "area", area: "tudo", resposta: "tudo" });
   });
 });
 
-describe("com × sem usa o número da resposta (como o GraficoComSem do app)", () => {
-  it("'R$ 100 a R$ 300' → R$ 300 por mês, R$ 900 em 3 meses", async () => {
+describe("tela 1 — abertura + área + dor numa tela só (v3)", () => {
+  it("vazia: título, prova social, as 6 áreas, sem pergunta, sem botão, 'Já tem conta? Entrar'", () => {
     montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("dinheiro", "porta-p2");
-    await escolher("gasto_sem_perceber", "porta-p3");
-    await escolher("100_300", "porta-comsem");
+    expect(screen.getByTestId("porta-abertura-titulo").textContent).toBe("Organize sua vida em 3 dias.");
+    expect(screen.getByTestId("porta-prova").textContent).toBe("★★★★★ +1000 pessoas organizando a vida");
+    expect(rotulos("porta-area")).toEqual(["Dinheiro", "Rotina", "Corpo", "Saúde", "Metas", "Tudo"]);
+    expect(screen.queryByTestId("porta-dor")).toBeNull();
+    expect(screen.queryByTestId("porta-cta")).toBeNull();
+    expect(screen.queryByTestId("porta-topo")).toBeNull(); // sem barra/voltar na abertura
+    expect(screen.queryByTestId("porta-welcome")).toBeNull();
+    expect(screen.queryByTestId("porta-video")).toBeNull();
+    expect(screen.getByTestId("porta-entrar").textContent).toBe("Já tem conta? Entrar");
+    conferirCopy();
+  });
+
+  it("a pergunta aparece ao escolher a área (com rolagem suave até ela) e muda ao trocar; a resposta avança", async () => {
+    const rolar = vi.fn();
+    Element.prototype.scrollIntoView = rolar as unknown as Element["scrollIntoView"];
+    montar();
+    await tocarArea("dinheiro");
+    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha hoje?");
+    expect(screen.getByTestId("porta-area-dinheiro").getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(rolar).toHaveBeenCalledWith({ behavior: "smooth", block: "nearest" }));
+    // trocar a área troca a pergunta, na mesma tela
+    fireEvent.click(screen.getByTestId("porta-area-rotina"));
+    await waitFor(() => expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais bagunça sua rotina hoje?"));
+    expect(screen.getByTestId("porta-area-dinheiro").getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("porta-abertura").getAttribute("data-area")).toBe("rotina");
+    await escolher("celular", "porta-p3");
+    expect(screen.getByTestId("porta-pergunta").textContent).toBe("Quanto tempo você costuma manter um hábito novo?");
+    expect(eventos("porta_passo").map((e) => [e.passo, e.area, e.resposta])).toEqual([
+      ["abertura", null, "area"],
+      ["area", "dinheiro", "dinheiro"],
+      ["area", "rotina", "rotina"],
+      ["p2", "rotina", "Perco horas no celular"],
+    ]);
+    // voltar da tela 2: a tela 1 com a área marcada e a pergunta dela
+    fireEvent.click(screen.getByTestId("porta-voltar"));
+    await waitFor(() => expect(screen.getByTestId("porta-abertura")).toBeInTheDocument());
+    expect(screen.getByTestId("porta-area-rotina").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais bagunça sua rotina hoje?");
+  });
+
+  it("'Já tem conta? Entrar' vai pro /entrar", () => {
+    montar();
+    fireEvent.click(screen.getByTestId("porta-entrar"));
+    expect(screen.getByTestId("onde").textContent).toBe("/entrar");
+    expect(eventos("porta_entrar_click")).toHaveLength(1);
+  });
+});
+
+describe("estado salvo da v2 (porta-estado-v1) cai no equivalente novo", () => {
+  const salvo = (passo: string, extra: Record<string, unknown> = {}) =>
+    localStorage.setItem("porta-estado-v1", JSON.stringify({ passo, escolha: "rotina", p2: "celular", p3: "semana", eventId: "porta_cr_antigo1", metodo: null, email: null, ...extra }));
+
+  for (const passo of ["welcome", "area", "p2"]) {
+    it(`'${passo}' → tela 1 (com a área marcada e a pergunta dela)`, () => {
+      salvo(passo);
+      montar();
+      expect(screen.getByTestId("porta").getAttribute("data-passo")).toBe("abertura");
+      expect(screen.getByTestId("porta-area-rotina").getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais bagunça sua rotina hoje?");
+      expect(eventos("porta_view")[0]).toMatchObject({ retomou: null });
+    });
+  }
+
+  it("'welcome' sem área → tela 1 vazia", () => {
+    salvo("welcome", { escolha: null, p2: null, p3: null });
+    montar();
+    expect(screen.getByTestId("porta-abertura")).toBeInTheDocument();
+    expect(screen.queryByTestId("porta-dor")).toBeNull();
+  });
+
+  it("'plano' → a conta, com o plano no topo", () => {
+    salvo("plano");
+    montar();
+    expect(screen.getByTestId("porta-conta")).toBeInTheDocument();
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Troca 15 minutos de celular por 1 hábito e marca");
+    expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "conta", resposta: "view" });
+  });
+
+  it("'comsem' continua onde estava; passo desconhecido cai na tela 1 do zero", () => {
+    salvo("comsem");
+    montar();
+    expect(screen.getByTestId("porta-comsem")).toBeInTheDocument();
+    cleanup(); _zerarEstadoPorta(); localStorage.clear();
+    salvo("passo_que_nao_existe");
+    montar();
+    expect(screen.getByTestId("porta-abertura")).toBeInTheDocument();
+    expect(screen.queryByTestId("porta-dor")).toBeNull();
+  });
+});
+
+describe("com × sem usa o número da resposta (como o GraficoComSem do app)", () => {
+  it("'R$ 100 a R$ 300' → R$ 300 por mês, R$ 900 em 3 meses; botão 'Criar minha conta', sem 'estimativa'", async () => {
+    await ateComSem("dinheiro", "gasto_sem_perceber", "100_300");
+    expect(screen.getByTestId("porta-comsem-cta").textContent).toBe("Criar minha conta");
+    expect(texto()).not.toMatch(/estimativa/i);
     expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("reais");
     expect(screen.getByTestId("porta-comsem-titulo").textContent).toBe(`R$ 300 somem por mês.Até ${mesAlvo(new Date())}, R$ 900 sem rastro.`);
     expect(screen.getByTestId("porta-grafico-sem").textContent).toBe("R$ 900");
   });
 
   it("'Não faço ideia' → a mediana estimada do app (R$ 500, 'Em média')", async () => {
-    montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("dinheiro", "porta-p2");
-    await escolher("esqueco_contas", "porta-p3");
-    await escolher("nao_sei", "porta-comsem");
+    await ateComSem("dinheiro", "esqueco_contas", "nao_sei");
     expect(screen.getByTestId("porta-comsem-titulo").textContent).toContain("Em média, R$ 500 somem por mês.");
     expect(screen.getByTestId("porta-grafico-sem").textContent).toBe("R$ 1.500");
   });
 
   it("Corpo: gráfico de treinos por semana da resposta ('Perdi a conta' = 1 treino)", async () => {
-    montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("corpo", "porta-p2");
-    await escolher("desisto", "porta-p3");
-    await escolher("perdi_a_conta", "porta-comsem");
+    await ateComSem("corpo", "desisto", "perdi_a_conta");
     expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("treinos");
     expect(screen.getByTestId("porta-comsem-titulo").textContent).toBe("Sem o CORE: 1 treino por semana somem em 3 meses.Com o CORE: 3 por semana, sem falhar.");
     expect(screen.getByTestId("porta-grafico-com").textContent).toBe("3/sem");
@@ -267,34 +361,40 @@ describe("com × sem usa o número da resposta (como o GraficoComSem do app)", (
 
 /* ---------------------------------------------------------------- fluxo inteiro */
 describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-mail e senha", () => {
-  it("8 telas, Google bloqueado com aviso, conta criada com a campanha, CompleteRegistration, loja e volta da aba", async () => {
+  it("4 telas até a conta, plano no topo dela, Google bloqueado com aviso, conta com a campanha, CompleteRegistration, loja e volta da aba", async () => {
     montar();
-    // 0. welcome
-    expect(screen.getByTestId("porta-welcome-titulo").textContent).toBe("Sua vida inteira organizada num app só.");
+    // 1. abertura + área + dor
+    expect(screen.getByTestId("porta-abertura-titulo").textContent).toBe("Organize sua vida em 3 dias.");
     expect(texto()).toContain("+1000 pessoas");
-    expect(screen.getByTestId("porta-welcome-entrar").textContent).toBe("Já tem conta? Entrar");
+    expect(screen.getByTestId("porta-entrar").textContent).toBe("Já tem conta? Entrar");
     conferirCopy();
     const view = eventos("porta_view")[0];
     expect(view).toMatchObject({ utm_source: "meta", utm_campaign: "porta_teste", utm_content: "video_organizei", c_id: "111", as_id: "222", ad_id: "333", pl: "Instagram_Reels", fbclid: "IwAR_abc", atribuicao: "url", in_app: true, plataforma: "ios" });
     expect(String(view.fbc)).toMatch(/^fb\.1\.\d{13}\.IwAR_abc$/);
     expect(fireMetaEvent).toHaveBeenCalledWith("ViewContent", expect.objectContaining({ content_name: "porta_iphone" }));
 
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("dinheiro", "porta-p2");
+    await tocarArea("dinheiro");
     await escolher("gasto_sem_perceber", "porta-p3");
     await escolher("300_500", "porta-comsem");
     fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-    // 5. plano: Dia 1 da DOR, dias 2 e 3 = os degraus do app que ela não cobre
-    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
+
+    // 4. conta, com o PLANO no topo: Dia 1 da DOR, dias 2 e 3 = os degraus do app que ela não cobre, inteiros
+    await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+    expect(screen.queryByTestId("porta-desbloquear")).toBeNull();
+    expect(screen.getByTestId("porta-plano-eyebrow").textContent).toBe("Seu plano de 3 dias está pronto");
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Dia 1 · hoje");
     expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Anota os gastos de hoje e vê quanto somam");
     expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Porque você disse: “Gasto sem perceber”");
-    expect(screen.getByTestId("porta-plano-dia2").textContent).toContain(DIAS_POR_AREA.dinheiro[1]);
-    expect(screen.getByTestId("porta-plano-dia3").textContent).toContain(DIAS_POR_AREA.dinheiro[2]);
-    fireEvent.click(screen.getByTestId("porta-desbloquear"));
-
-    // 6. conta: Apple e Google visíveis; Google no Instagram = aviso, sem OAuth
-    await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+    expect(screen.getByTestId("porta-plano-dia2").textContent).toBe(`Dia 2${DIAS_POR_AREA.dinheiro[1]}`);
+    expect(screen.getByTestId("porta-plano-dia3").textContent).toBe(`Dia 3${DIAS_POR_AREA.dinheiro[2]}`);
+    for (const d of ["porta-plano-dia2", "porta-plano-dia3"]) {
+      const el = screen.getByTestId(d);
+      expect(el.hasAttribute("data-trancado")).toBe(false);
+      expect(el.outerHTML).not.toMatch(/blur/);
+    }
+    expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Crie sua conta pra abrir o plano no app.");
+    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("3 dias grátis no app · sem cobrança hoje");
+    // Apple e Google visíveis; Google no Instagram = aviso, sem OAuth
     expect(screen.getByTestId("porta-apple").textContent).toContain("Continuar com a Apple");
     expect(screen.getByTestId("porta-google").textContent).toContain("Continuar com o Google");
     expect(screen.queryByTestId("porta-codigo")).toBeNull();
@@ -353,12 +453,12 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     expect(eventos("porta_voltou_aba")).toHaveLength(1);
 
     expect(eventos("porta_passo").map((e) => [e.passo, e.area, e.resposta])).toEqual([
-      ["welcome", null, "comecar"],
+      ["abertura", null, "area"],
       ["area", "dinheiro", "dinheiro"],
       ["p2", "dinheiro", "Gasto sem perceber"],
       ["p3", "dinheiro", "R$ 300 a R$ 500"],
-      ["comsem", "dinheiro", "seguir"],
-      ["plano", "dinheiro", "desbloquear"],
+      ["comsem", "dinheiro", "criar_conta"],
+      ["conta", "dinheiro", "view"],
       ["instrucao", "dinheiro", "baixar"],
     ]);
   });
@@ -430,6 +530,24 @@ describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
     await ateConta("metas", "na_cabeca", "ano");
     expect(screen.queryByTestId("porta-apple")).toBeNull();
     expect(screen.getByTestId("porta-google")).toBeInTheDocument();
+  });
+
+  it("Android e computador: o plano no topo da conta, SEM a linha do teste grátis (só existe no iPhone)", async () => {
+    for (const v of [UA.android, UA.mac]) {
+      cleanup(); _zerarEstadoPorta(); _zerarMemoriaPorta(); localStorage.clear(); sessionStorage.clear();
+      ua(v);
+      await ateConta("dinheiro", "esqueco_contas", "nao_sei");
+      expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Coloca as contas do mês e recebe aviso antes de vencer");
+      expect(screen.getByTestId("porta-conta-titulo")).toBeInTheDocument();
+      expect(screen.queryByTestId("porta-conta-confianca")).toBeNull();
+      expect(texto()).not.toMatch(/grátis|cobrança/i);
+    }
+  });
+
+  it("Safari do iPhone: a linha do teste também aparece (é iPhone)", async () => {
+    ua(UA.safari);
+    await ateConta("corpo", "como_mal", "primeira");
+    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("3 dias grátis no app · sem cobrança hoje");
   });
 });
 
@@ -508,16 +626,9 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     const u = usuario({ email: "logada@exemplo.com", created_at: "2025-05-05T00:00:00Z" });
     authState.user = u;
     getUser.mockResolvedValue({ data: { user: u } });
-    montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("saude", "porta-p2");
-    await escolher("sono", "porta-p3");
-    await escolher("cansaco", "porta-comsem");
-    fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("porta-desbloquear"));
+    await ateConta("saude", "sono", "cansaco");
     await waitFor(() => expect(screen.getByTestId("porta-conta-email-logado").textContent).toBe("logada@exemplo.com"));
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Registra o sono de hoje e começa a ver o padrão");
     fireEvent.click(screen.getByTestId("porta-salvar-nesta-conta"));
     await passarInstrucao();
     expect(updateUser).toHaveBeenCalledTimes(1);
@@ -621,16 +732,6 @@ describe("tela 7 por aparelho", () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it("10/10: iPhone nega o autoplay (Pouca Energia) → o celular da welcome passa as 6 telas em sequência, sem botão de play", async () => {
-    HTMLMediaElement.prototype.play = vi.fn(() => Promise.reject(new Error("NotAllowedError"))) as unknown as HTMLMediaElement["play"];
-    montar();
-    await waitFor(() => expect(screen.getByTestId("porta-poster")).toBeInTheDocument());
-    const imgs = Array.from(screen.getByTestId("porta-poster").querySelectorAll("img")).map((i) => i.getAttribute("src"));
-    expect(imgs).toEqual(["/porta/tour/1.jpg", "/porta/tour/2.jpg", "/porta/tour/3.jpg", "/porta/tour/4.jpg", "/porta/tour/5.jpg", "/porta/tour/6.jpg"]);
-    expect(screen.getByTestId("porta-video").style.display).toBe("none");
-    expect(eventos("porta_video")[0]).toMatchObject({ ok: false, motivo: "autoplay" });
-  });
-
   it("10/10: o 'Último passo' conta 10 s e abre a loja sozinho (o botão adianta); vai pra tela 7", async () => {
     const { irPraLoja } = await import("@/pages/porta/navegar");
     vi.mocked(irPraLoja).mockClear();
@@ -658,6 +759,7 @@ describe("tela 7 por aparelho", () => {
     naSete("google");
     expect(screen.getByTestId("porta-loja").textContent).toContain("Google Play");
     expect(texto()).not.toMatch(/grátis/);
+    expect(screen.getByTestId("porta-passo-2").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/1-tela-inicial-android.jpg");
     expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-google-android.jpg");
   });
 
@@ -673,6 +775,7 @@ describe("tela 7 por aparelho", () => {
 
   it("o passo 3 é o método da conta: senha, Apple, Google", () => {
     naSete("senha");
+    expect(screen.getByTestId("porta-passo-2").querySelector("img")?.getAttribute("src")).toBe("/porta/tela-inicial-1014-ios.jpg");
     expect(screen.getByTestId("porta-passo-3").textContent).toBe("3Digite este e-mail e a sua senha e toque em “Entrar no meu CORE”.");
     cleanup(); _zerarEstadoPorta(); localStorage.clear();
     naSete("apple");

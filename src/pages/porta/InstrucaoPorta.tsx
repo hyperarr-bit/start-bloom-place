@@ -1,4 +1,5 @@
 import { BotaoPorta } from "./BotaoPorta";
+import { PRINT_TELA_INICIAL } from "./conteudo";
 import type { Plataforma } from "./SalvoPorta";
 
 /**
@@ -7,7 +8,8 @@ import type { Plataforma } from "./SalvoPorta";
  * "Entrar" marcado. O botão já abre a loja (toque da pessoa = o jeito mais garantido no Instagram); quem volta
  * da loja cai na tela 7 ("Já instalou? Abra o CORE e toque em Entrar").
  * Computador não passa por aqui (lá é o QR da tela 7).
- * Quando a 1.0.14 for a versão da loja, trocar o print pela welcome nova ("Já tem conta? Entrar" abaixo do Começar).
+ * 11/10: a 1.0.14 está na loja — o print 1 do iPhone é a welcome NOVA (vídeo, "Começar" e "Já tem conta? Entrar"
+ * logo abaixo), tirada do Simulador: public/porta/tela-inicial-1014-ios.jpg. Android segue no print antigo.
  */
 const MAGENTA = "#d22d80";
 
@@ -44,7 +46,7 @@ export function InstrucaoPorta({ plataforma, metodo, email, hrefLoja, onBaixar, 
 
       <div className="flex-1 min-h-0 grid grid-cols-2 gap-3 py-4 items-start">
         {[
-          { n: 1, txt: <>Toque em <b>“Entrar”</b>, abaixo do Começar</>, src: `/como-entrar/1-tela-inicial-${so}.jpg`, alt: "Tela inicial do CORE com o Entrar marcado", id: "porta-instrucao-print" },
+          { n: 1, txt: <>Toque em <b>“Entrar”</b>, abaixo do Começar</>, src: PRINT_TELA_INICIAL[so], alt: "Tela inicial do CORE com o Entrar marcado", id: "porta-instrucao-print" },
           { n: 2, txt: segundo, src: `/porta/entrar-${m}-${so}.jpg`, alt: "Tela de entrar do CORE com o botão marcado", id: "porta-instrucao-print-2" },
         ].map((p) => (
           <div key={p.n} className="flex flex-col items-center text-center">

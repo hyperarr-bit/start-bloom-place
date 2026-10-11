@@ -14,9 +14,9 @@ import { persistLeadSource } from "@/lib/lead-source";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { capturarAtribuicao, decidirGravacao, idsDoAnuncio, lerAtribuicao, montarPorta, sessaoDaPorta, type AtribuicaoPorta, type PortaNaConta } from "./atribuicao";
-import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
-import { WelcomePorta } from "./WelcomePorta";
-import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
+import { PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
+import { AberturaPorta } from "./AberturaPorta";
+import { ComSemPorta, PerguntaPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
 import { irPraLoja } from "./navegar";
@@ -33,18 +33,23 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  * A PORTA iPHONE — coreaplicativo.com.br/comece (10/10). Só na WEB (o app
  * nativo nunca monta: a rota fica atrás do SoNaWeb no App.tsx). noindex.
  *
- * anúncio → welcome com vídeo → área + as 2 perguntas do funil do app (a dor e
- * o número) → com × sem o CORE → plano de 3 dias com cadeado → CRIA A CONTA no
- * site (Apple, Google ou e-mail + senha; a campanha fica gravada em
- * user_metadata.porta) → "Pronto, salvo":
+ * v3 (11/10, dono: "quero algo mais rápido"; no iPhone só 28% passavam da welcome com vídeo):
+ * anúncio → TELA 1 "Organize sua vida em 3 dias." com as áreas e a pergunta da DOR aparecendo
+ * logo abaixo (1 toque avança) → TELA 2 o número → TELA 3 com × sem o CORE ("Criar minha conta")
+ * → TELA 4 a CONTA com o plano de 3 dias no topo (sem cadeado; a tela do plano saiu) → CRIA A
+ * CONTA no site (Apple, Google ou e-mail + senha; a campanha fica gravada em user_metadata.porta)
+ * → "Último passo" (celular) → "Pronto, salvo":
  * baixa o app, toca em "Entrar" (abaixo do Começar) com o mesmo e-mail → o
  * paywall do app (3 dias grátis, já no ar) liga o teste à conta.
  *
- * SEM o preço do produto em lugar nenhum; "dias grátis" só na tela 7.
+ * SEM o preço do produto em lugar nenhum. "3 dias grátis" só no iPhone (conta e tela 7); nunca "sem cartão".
  *
  * Eventos (analytics_events, todos com porta_session_id + ids do anúncio):
  *   porta_view {attr…}           1ª carga da sessão
- *   porta_passo {passo, area, resposta}
+ *   porta_passo {passo, area, resposta}  passo (v3): "abertura" (1º toque na tela 1 = o antigo "welcome"),
+ *                                        "area" (cada área tocada), "p2" (a dor, avança), "p3" (o número),
+ *                                        "comsem" (tocou "Criar minha conta"), "conta" (abriu a tela da conta
+ *                                        = o antigo "plano"), "instrucao"
  *   porta_conta_iniciada {metodo}
  *   porta_conta_criada {metodo, existente, event_id, gravou}
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
@@ -54,10 +59,16 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *                                        mesma chamada manda o e-mail "entre no CORE" com o código)
  *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://entrar?h=…) na tela 7
  * (Área de transferência é PROIBIDA — dono 10/10. Nada aqui copia nem lê o clipboard.)
- * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
+ * Pixel: ViewContent na 1ª carga; CompleteRegistration (eventID = porta.event_id) na conta nova (+ a CAPI "registro").
  */
-export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
-export const ORDEM: Passo[] = ["welcome", "area", "p2", "p3", "comsem", "plano", "conta", "instrucao", "salvo"];
+export type Passo = "abertura" | "p3" | "comsem" | "conta" | "instrucao" | "salvo";
+export const ORDEM: Passo[] = ["abertura", "p3", "comsem", "conta", "instrucao", "salvo"];
+/** Telas com a barra de progresso (a tela 1 é a abertura: sem barra, sem voltar). */
+const COM_BARRA: Passo[] = ["p3", "comsem", "conta"];
+/** v3: o estado salvo da v2 (localStorage "porta-estado-v1") cai no equivalente novo, sem quebrar. */
+const PASSO_ANTIGO: Record<string, Passo> = { welcome: "abertura", area: "abertura", p2: "abertura", plano: "conta" };
+export const migrarPasso = (p: unknown): Passo | null =>
+  typeof p !== "string" ? null : (ORDEM as string[]).includes(p) ? (p as Passo) : PASSO_ANTIGO[p] ?? null;
 
 export type EstadoPorta = {
   passo: Passo;
@@ -86,7 +97,13 @@ function lerEstado(): EstadoPorta | null {
     const raw = localStorage.getItem(CHAVE_ESTADO);
     if (!raw) return null;
     const e = JSON.parse(raw) as EstadoPorta;
-    if (e && ORDEM.includes(e.passo) && typeof e.eventId === "string") { memoriaEstado = e; return e; }
+    const passo = e ? migrarPasso(e.passo) : null;
+    if (e && passo && typeof e.eventId === "string") {
+      // quem estava na área/na dor da v2 volta pra tela 1 com a área marcada (a dor é respondida de novo)
+      const n: EstadoPorta = passo === "abertura" ? { ...e, passo, p2: null, p3: null } : { ...e, passo };
+      memoriaEstado = n;
+      return n;
+    }
   } catch { /* noop */ }
   return null;
 }
@@ -161,7 +178,7 @@ export function PortaIphone() {
   const attrAgora = () => lerAtribuicao() ?? inicio.current!.attr;
   const ids = () => idsDoAnuncio(attrAgora(), sessao);
 
-  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? estadoDaUrl() ?? { passo: "welcome", escolha: null, p2: null, p3: null, eventId: novoId(), metodo: null, email: null });
+  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? estadoDaUrl() ?? { passo: "abertura", escolha: null, p2: null, p3: null, eventId: novoId(), metodo: null, email: null });
   const setEstado = useCallback((f: (e: EstadoPorta) => EstadoPorta) => {
     setEstadoCru((e) => { const n = f(e); gravarEstado(n); return n; });
   }, []);
@@ -188,7 +205,7 @@ export function PortaIphone() {
   useEffect(() => {
     if (!inicio.current?.nova) return;
     const { origem, ...a } = inicio.current.attr;
-    trackEvent("porta_view", { ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "welcome" ? estado.passo : null });
+    trackEvent("porta_view", { ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "abertura" ? estado.passo : null });
     fireMetaEvent("ViewContent", { content_name: "porta_iphone", content_category: "porta" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -198,6 +215,13 @@ export function PortaIphone() {
   const ir = (passo: Passo, extra: Partial<EstadoPorta> = {}) => setEstado((e) => ({ ...e, ...extra, passo }));
   const passoFeito = (passo: string, resposta: string | null, area: string | null = estadoRef.current.escolha) =>
     trackEvent("porta_passo", { passo, area, resposta, ...ids() });
+  /** o 1º toque na tela 1 (porta_passo "abertura" = o antigo "welcome/começar"), 1x por carga */
+  const comecou = useRef(false);
+  /* porta_passo "conta": abriu a tela da conta (o plano está no topo dela; = o antigo "plano") */
+  useEffect(() => {
+    if (estado.passo === "conta") passoFeito("conta", "view");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.passo]);
 
   /* as respostas como o APP guarda (chave → texto da opção): atrapalha + gasto|consistencia */
   const respostas = (e: EstadoPorta = estadoRef.current): PortaNaConta["respostas"] => {
@@ -435,43 +459,40 @@ export function PortaIphone() {
   }, [estado.passo, plataforma]);
 
   /* ---------------------------------------------------------- render */
-  if (estado.passo === "welcome") {
-    return (
-      <WelcomePorta
-        onComecar={() => { passoFeito("welcome", "comecar", null); ir("area"); }}
-        onEntrar={() => { trackEvent("porta_entrar_click", { ...ids() }); navigate("/entrar"); }}
-        onVideo={(ok, motivo) => trackEvent("porta_video", { ok, motivo: motivo ?? null, ...ids() })}
-      />
-    );
-  }
-
   const indice = ORDEM.indexOf(estado.passo);
-  const comBarra = indice >= 1 && indice <= 6;
+  const comBarra = COM_BARRA.includes(estado.passo);
+  const posBarra = COM_BARRA.indexOf(estado.passo) + 1;
   const voltar = () => { if (indice > 0 && estado.passo !== "salvo" && estado.passo !== "instrucao") ir(ORDEM[indice - 1]); };
 
   let tela: React.ReactNode = null;
-  if (estado.passo === "area") {
+  if (estado.passo === "abertura") {
+    // TELA 1: abertura + área + a DOR (quiz_1 do app) aparecendo logo abaixo; a resposta avança
     tela = (
-      <PerguntaPorta
-        testid="porta-area" titulo={PERGUNTA_AREA} opcoes={OPCOES_AREA}
-        onEscolher={(o) => { passoFeito("area", o.id, o.id); ir("p2", { escolha: o.id as EscolhaPorta, p2: null, p3: null }); }}
+      <AberturaPorta
+        escolha={estado.escolha}
+        onArea={(area) => {
+          if (!comecou.current) { comecou.current = true; passoFeito("abertura", "area", null); }
+          passoFeito("area", area, area);
+          setEstado((e) => ({ ...e, escolha: area, p2: e.escolha === area ? e.p2 : null, p3: e.escolha === area ? e.p3 : null }));
+        }}
+        onDor={(o) => { passoFeito("p2", o.label); ir("p3", { p2: o.id }); }}
+        onEntrar={() => { trackEvent("porta_entrar_click", { ...ids() }); navigate("/entrar"); }}
       />
     );
-  } else if (estado.passo === "p2") {
-    // a DOR (quiz_1 do app); quem entrou por "Tudo" vê a linha de abertura do app em cima
-    const q = PERGUNTA_DOR[rota];
-    tela = <PerguntaPorta testid="porta-p2" abertura={estado.escolha === "tudo" ? ABERTURA_TUDO : undefined} titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p2", o.label); ir("p3", { p2: o.id }); }} />;
   } else if (estado.passo === "p3") {
-    // o NÚMERO da rota (dinheiro: quiz_3 "gasto"; as outras: quiz_2 "consistencia")
+    // TELA 2: o NÚMERO da rota (dinheiro: quiz_3 "gasto"; as outras: quiz_2 "consistencia")
     const q = PERGUNTA_NUMERO[rota];
     tela = <PerguntaPorta testid="porta-p3" titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p3", o.label); ir("comsem", { p3: o.id }); }} />;
   } else if (estado.passo === "comsem") {
-    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "seguir"); ir("plano"); }} />;
-  } else if (estado.passo === "plano") {
-    tela = <PlanoPorta rota={rota} dor={estado.p2} onDesbloquear={() => { passoFeito("plano", "desbloquear"); ir("conta"); }} />;
+    // TELA 3: com × sem o CORE → "Criar minha conta"
+    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "criar_conta"); ir("conta"); }} />;
   } else if (estado.passo === "conta") {
+    // TELA 4: a conta, com o plano de 3 dias no topo
     tela = (
       <ContaPorta
+        rota={rota}
+        dor={estado.p2}
+        mostrarTeste={plataforma === "ios"}
         emInApp={emInApp}
         appDoWebview={appDoWebview()}
         mostrarApple={plataforma !== "android"}
@@ -522,13 +543,13 @@ export function PortaIphone() {
             <button type="button" onClick={voltar} aria-label="Voltar" className="grid place-items-center w-9 h-9 -ml-2 rounded-full text-[#16121c] active:bg-[#f2eff5]" data-testid="porta-voltar">
               <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
             </button>
-            <div className="flex-1 h-1.5 rounded-full bg-[#efedf2] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={6} aria-valuenow={indice}>
-              <motion.div className="h-full rounded-full bg-[#16121c]" initial={false} animate={{ width: `${(indice / 6) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+            <div className="flex-1 h-1.5 rounded-full bg-[#efedf2] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={COM_BARRA.length} aria-valuenow={posBarra}>
+              <motion.div className="h-full rounded-full bg-[#16121c]" initial={false} animate={{ width: `${(posBarra / COM_BARRA.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
             </div>
             <span className="w-7" aria-hidden />
           </div>
         )}
-        <motion.div key={estado.passo} className={`flex-1 flex flex-col ${comBarra ? "pt-4" : "pt-8"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+        <motion.div key={estado.passo} className={`flex-1 flex flex-col ${comBarra ? "pt-4" : estado.passo === "abertura" ? "pt-7" : "pt-8"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
           {tela}
         </motion.div>
       </div>

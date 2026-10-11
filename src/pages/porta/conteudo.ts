@@ -13,7 +13,9 @@ export type EscolhaPorta = AreaPorta | "tudo";
 
 export type Opcao = { id: string; emoji: string; label: string; sub?: string };
 
-/** Tela 1. "Tudo" segue pela rota do dinheiro (Finanças), como no app. */
+/** Tela 1 (v3, 11/10): a abertura, a área e a dor numa tela só. Sem vídeo, sem mockup. */
+export const TITULO_ABERTURA = "Organize sua vida em 3 dias.";
+/** "Tudo" segue pela rota do dinheiro (Finanças), como no app. */
 export const PERGUNTA_AREA = "O que você quer arrumar primeiro?";
 export const OPCOES_AREA: Array<Opcao & { id: EscolhaPorta }> = [
   { id: "dinheiro", emoji: "💰", label: "Dinheiro", sub: "gastos, contas, cartão" },
@@ -34,13 +36,13 @@ export const NOME_DA_AREA: Record<AreaPorta, { emoji: string; nome: string }> = 
   metas: { emoji: "🎯", nome: "Metas" },
 };
 
-/* ------------------------------------------------ telas 2 e 3: AS MESMAS DO APP
+/* ------------------------------------------------ a dor e o número: AS MESMAS DO APP
  *
  * 10/10 (dono, depois dos prints da v1: "achei a escolha das perguntas estranha"):
- * as perguntas 2 e 3 são as MESMAS do funil novo do app (FUNIL_CALAI, ramo v14:
+ * as perguntas são as MESMAS do funil novo do app (FUNIL_CALAI, ramo v14:
  * lib/funnel QUIZ/AREA_TRACKS + a sequência do ComecarW com a chave ligada):
- *   · tela 2 = quiz_1, a DOR ("atrapalha") da área;
- *   · tela 3 = o NÚMERO da rota: dinheiro (e "Tudo") = quiz_3 "gasto"; as outras = quiz_2 "consistencia".
+ *   · a DOR (quiz_1, "atrapalha") da área — v3: aparece na TELA 1, logo abaixo da área escolhida;
+ *   · o NÚMERO da rota (tela 2): dinheiro (e "Tudo") = quiz_3 "gasto"; as outras = quiz_2 "consistencia".
  * Mesmos textos, mesmas opções, mesma ordem. Nada de pergunta nova.
  */
 export type PerguntaPorta = { key: string; q: string; opts: Opcao[] };
@@ -183,7 +185,7 @@ export function planoDe3Dias(rota: AreaPorta, dor: string | null | undefined): {
   return { dia1, dia2: resto[0], dia3: resto[1], motivo: op?.label ?? null };
 }
 
-/* ------------------------------------------------ tela 4: com × sem o CORE (porte de v14 lib/funil-numeros) */
+/* ------------------------------------------------ tela 3: com × sem o CORE (porte de v14 lib/funil-numeros) */
 
 export const MEDIANA_REAIS = 500;
 export const MEDIANA_TREINOS = 2;
@@ -204,13 +206,8 @@ export type ComSem =
   | (Base & { tipo: "reais" | "treinos"; sem: number[]; com: number[]; valor: number; estimado: boolean })
   | (Base & { tipo: "copy"; linhasSem: string[]; linhasCom: string[] });
 
-export const CTA_COM_SEM: Record<AreaPorta, string> = {
-  dinheiro: "Quero ver pra onde vai",
-  corpo: "Quero manter o ritmo",
-  rotina: "Quero uma rotina que fica",
-  metas: "Quero tirar do papel",
-  saude: "Quero me cuidar de verdade",
-};
+/** v3: a tela do plano saiu; o com × sem leva direto pra conta (o plano mora no topo dela). */
+export const CTA_COM_SEM = "Criar minha conta";
 
 export const COPY_SEM_COM: Record<"rotina" | "metas" | "saude", { sem: string[]; com: string[] }> = {
   rotina: {
@@ -248,9 +245,9 @@ export function projecaoTreinos(valor: number): { sem: number[]; com: number[] }
   return { sem, com };
 }
 
-/** A tela 4 a partir da rota e da resposta da tela 3 (o número). A copy do app, sem travessão. */
+/** A tela 3 a partir da rota e da resposta da tela 2 (o número). A copy do app, sem travessão. */
 export function comSemDa(rota: AreaPorta, numero: string | null | undefined, hoje: Date = new Date()): ComSem {
-  const cta = CTA_COM_SEM[rota];
+  const cta = CTA_COM_SEM;
   if (rota === "dinheiro") {
     const v = numero ? REAIS_POR_RESPOSTA[numero] : undefined;
     const valor = v ?? MEDIANA_REAIS;
@@ -286,10 +283,15 @@ export function comSemDa(rota: AreaPorta, numero: string | null | undefined, hoj
   };
 }
 
-/* ------------------------------------------------ tela 7 */
+/* ------------------------------------------------ último passo e tela 7 */
 
-/** O botão de entrar na welcome do app. A 1.0.12 da loja diz "Já tenho conta? Entrar" e a 1.0.14 (que vai pro ar
- *  sozinha quando a Apple aprovar) diz "Já tem conta? Entrar" — nas duas é o "Entrar" logo ABAIXO do Começar.
- *  Por isso a Porta fala só "Entrar" + onde fica (10/10). */
+/** A welcome do app 1.0.14 com o "Já tem conta? Entrar" marcado (print do Simulador, 11/10). Android segue no print antigo. */
+export const PRINT_TELA_INICIAL: Record<"ios" | "android", string> = {
+  ios: "/porta/tela-inicial-1014-ios.jpg",
+  android: "/como-entrar/1-tela-inicial-android.jpg",
+};
+
+/** O botão de entrar na welcome do app. A 1.0.14 (na loja desde 11/10) diz "Já tem conta? Entrar", logo ABAIXO
+ *  do Começar (a 1.0.12 dizia "Já tenho conta? Entrar", no mesmo lugar). A Porta fala só "Entrar" + onde fica. */
 export const TEXTO_ENTRAR_NO_APP = "Entrar";
 export const ONDE_FICA_ENTRAR = "logo abaixo do botão Começar";

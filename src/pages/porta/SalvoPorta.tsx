@@ -1,14 +1,14 @@
 import { QRCodeSVG } from "qrcode.react";
 import { BotaoPorta } from "./BotaoPorta";
-import { ONDE_FICA_ENTRAR, TEXTO_ENTRAR_NO_APP } from "./conteudo";
+import { ONDE_FICA_ENTRAR, PRINT_TELA_INICIAL, TEXTO_ENTRAR_NO_APP } from "./conteudo";
 
 /**
  * TELA 7 DA PORTA — "Pronto, seu plano está salvo ✓".
  *
- * A ÚNICA tela que fala de "3 dias grátis" (e só onde é verdade: o teste de
+ * Fala de "3 dias grátis" (junto com a conta, v3) só onde é verdade: o teste de
  * 3 dias existe no iPhone; no Android não há teste, então lá a frase não diz).
  * Ensina o toque certo no app com os prints REAIS do /como-entrar: abrir o
- * CORE e tocar em "Entrar", logo abaixo do Começar (vale pra 1.0.12 e pra 1.0.14)
+ * CORE e tocar em "Entrar", logo abaixo do Começar (no iPhone, o print da welcome da 1.0.14)
  * com o MESMO e-mail. O botão vai pro /baixar (302 pra loja do aparelho; o
  * /baixar já trata o navegador do Instagram).
  *
@@ -108,7 +108,7 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null,
             </div>
           )}
         </Passo>
-        <Passo n={2} print={`/como-entrar/1-tela-inicial-${prints}.jpg`} alt={`Tela inicial do app com “${TEXTO_ENTRAR_NO_APP}” destacado`}>
+        <Passo n={2} print={PRINT_TELA_INICIAL[prints]} alt={`Tela inicial do app com “${TEXTO_ENTRAR_NO_APP}” destacado`}>
           Abra o app e toque em <b>“{TEXTO_ENTRAR_NO_APP}”</b>, {ONDE_FICA_ENTRAR}. Não toque em “Começar”.
         </Passo>
         {/* o passo 3 é o jeito que ELA criou a conta (prints do /entrar do app com o anel no botão certo: public/porta/) */}

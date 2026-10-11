@@ -1,12 +1,12 @@
 import { useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Lock, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { BotaoPorta } from "./BotaoPorta";
 import { NOME_DA_AREA, formatarReais, mesCurto, planoDe3Dias, type AreaPorta, type ComSem, type Opcao } from "./conteudo";
 
 /**
- * As telas do meio da Porta (/comece): perguntas de 1 toque (1, 2 e 3), o
- * "com × sem o CORE" (4) e o plano de 3 dias com cadeado (5). Visual planner:
+ * As peças da Porta (/comece, v3): as opções de 1 toque (tela 1 e tela 2), o
+ * "com × sem o CORE" (tela 3) e o plano de 3 dias que mora no topo da conta. Visual planner:
  * branco, grafite #16121c, magenta só no detalhe, Inter herdada.
  */
 const GRAFITE = "#16121c";
@@ -17,18 +17,56 @@ export function Eyebrow({ children }: { children: React.ReactNode }) {
   return <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7d8691]">{children}</p>;
 }
 
-/* ------------------------------------------------ telas 1, 2 e 3 */
+/* ------------------------------------------------ as opções de 1 toque (tela 1 e tela 2) */
 
-export function PerguntaPorta({ eyebrow, abertura, titulo, opcoes, onEscolher, testid, compacta = false }: {
+/** A lista de opções (controlada: quem usa decide o que fica marcado e o que o toque faz). */
+export function OpcoesPorta({ opcoes, sel, onToque, prefixo = "porta-opcao-", compacta = false, atraso = 0.04 }: {
+  opcoes: Opcao[];
+  sel: string | null;
+  onToque: (o: Opcao) => void;
+  /** data-testid = prefixo + id */
+  prefixo?: string;
+  compacta?: boolean;
+  atraso?: number;
+}) {
+  return (
+    <div className={`flex flex-col ${compacta ? "gap-2" : "gap-3"}`} role="list">
+      {opcoes.map((o, i) => {
+        const on = sel === o.id;
+        return (
+          <motion.button
+            key={o.id}
+            type="button"
+            role="listitem"
+            aria-pressed={on}
+            onClick={() => onToque(o)}
+            data-testid={`${prefixo}${o.id}`}
+            data-on={on ? "" : undefined}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: atraso * i, duration: 0.22 }}
+            className={`w-full flex items-center gap-3.5 rounded-2xl border-2 text-left transition-colors ${compacta ? "px-3.5 py-2.5" : "px-4 py-4"} ${on ? "border-[#16121c] bg-[#16121c] text-white" : "border-[#ebe7ef] bg-white text-[#16121c] active:bg-[#f7f5fa]"}`}
+          >
+            <span className={`grid place-items-center rounded-xl shrink-0 leading-none ${compacta ? "w-10 h-10 text-[20px]" : "w-11 h-11 text-[22px]"} ${on ? "bg-white/15" : "bg-[#f6f3f8]"}`} aria-hidden>{o.emoji}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[16px] font-bold leading-tight">{o.label}</span>
+              {o.sub && <span className={`block text-[13px] leading-snug mt-0.5 ${on ? "text-white/75" : "text-[#7d8691]"}`}>{o.sub}</span>}
+            </span>
+            {on && <Check className="w-5 h-5 shrink-0" strokeWidth={3} aria-hidden />}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Uma pergunta de 1 toque numa tela só (a tela 2, o número). O toque marca e avança. */
+export function PerguntaPorta({ eyebrow, titulo, opcoes, onEscolher, testid }: {
   eyebrow?: string;
-  /** a linha amarela em cima da pergunta (quem entrou por "Tudo", como no app) */
-  abertura?: string;
   titulo: string;
   opcoes: Opcao[];
   onEscolher: (o: Opcao) => void;
   testid: string;
-  /** chips mais baixos (tela 3) */
-  compacta?: boolean;
 }) {
   const [sel, setSel] = useState<string | null>(null);
   const indo = useRef(false);
@@ -41,33 +79,10 @@ export function PerguntaPorta({ eyebrow, abertura, titulo, opcoes, onEscolher, t
   };
   return (
     <div className="flex-1 flex flex-col" data-testid={testid}>
-      {abertura && <p className="text-[13px] text-[#5b6570] leading-snug mb-3 rounded-xl px-3 py-2" style={{ background: "#FFF8D6" }} data-testid="porta-abertura-tudo">{abertura}</p>}
       {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
       <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.12] mt-1.5 text-balance" data-testid="porta-pergunta">{titulo}</h1>
-      <div className={`mt-6 flex flex-col ${compacta ? "gap-2.5" : "gap-3"}`} role="list">
-        {opcoes.map((o, i) => {
-          const on = sel === o.id;
-          return (
-            <motion.button
-              key={o.id}
-              type="button"
-              role="listitem"
-              onClick={() => escolher(o)}
-              data-testid={`porta-opcao-${o.id}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.04 * i, duration: 0.22 }}
-              className={`w-full flex items-center gap-3.5 rounded-2xl border-2 text-left transition-colors ${compacta ? "px-3.5 py-3" : "px-4 py-4"} ${on ? "border-[#16121c] bg-[#16121c] text-white" : "border-[#ebe7ef] bg-white text-[#16121c] active:bg-[#f7f5fa]"}`}
-            >
-              <span className={`grid place-items-center rounded-xl shrink-0 text-[22px] leading-none ${compacta ? "w-10 h-10" : "w-11 h-11"} ${on ? "bg-white/15" : "bg-[#f6f3f8]"}`} aria-hidden>{o.emoji}</span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[16px] font-bold leading-tight">{o.label}</span>
-                {o.sub && <span className={`block text-[13px] leading-snug mt-0.5 ${on ? "text-white/75" : "text-[#7d8691]"}`}>{o.sub}</span>}
-              </span>
-              {on && <Check className="w-5 h-5 shrink-0" strokeWidth={3} aria-hidden />}
-            </motion.button>
-          );
-        })}
+      <div className="mt-6">
+        <OpcoesPorta opcoes={opcoes} sel={sel} onToque={escolher} />
       </div>
     </div>
   );
@@ -175,48 +190,37 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "reais" | "tr
   );
 }
 
-/* ------------------------------------------------ tela 5: plano com cadeado */
+/* ------------------------------------------------ o plano, no topo da tela da conta (v3) */
 
-export function PlanoPorta({ rota, dor, onDesbloquear }: { rota: AreaPorta; dor: string | null; onDesbloquear: () => void }) {
+/**
+ * v3 (dono 11/10: o cadeado e o "Desbloquear meu plano" tinham cara de pagamento): a tela do plano saiu e o
+ * plano virou o TOPO da conta. Os 3 dias aparecem inteiros, legíveis — sem borrão, sem cadeado.
+ * O Dia 1 sai da DOR ("Porque você disse: …"); os Dias 2 e 3 são os degraus da área.
+ */
+export function PlanoNaConta({ rota, dor }: { rota: AreaPorta; dor: string | null }) {
   const plano = planoDe3Dias(rota, dor);
   const info = NOME_DA_AREA[rota];
   return (
-    <div className="flex-1 flex flex-col" data-testid="porta-plano">
-      <Eyebrow>Feito com as suas respostas</Eyebrow>
-      <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5">Seu plano de 3 dias</h1>
-
-      <div className="mt-5 rounded-2xl border-2 border-[#16121c] bg-white p-4" data-testid="porta-plano-card">
-        <div className="flex items-center gap-2">
-          <span className="text-[18px] leading-none" aria-hidden>{info.emoji}</span>
-          <span className="text-[12px] font-extrabold uppercase tracking-[0.1em] text-[#16121c]">{info.nome}</span>
-        </div>
-
-        <motion.div className="mt-3.5" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25 }} data-testid="porta-plano-dia1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-md bg-[#16121c] text-white text-[10.5px] font-extrabold tracking-wide px-2 py-[3px]">DIA 1</span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: COR_COM }}>Hoje</span>
+    <div data-testid="porta-plano">
+      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: COR_COM }} data-testid="porta-plano-eyebrow">Seu plano de 3 dias está pronto</p>
+      <div className="mt-2.5 rounded-2xl border border-[#ebe7ef] bg-[#faf9fb] px-4 py-3.5" data-testid="porta-plano-card">
+        <div data-testid="porta-plano-dia1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="rounded-md bg-[#16121c] text-white text-[10.5px] font-extrabold tracking-[0.06em] uppercase px-2 py-[3px]">Dia 1 · hoje</span>
+            <span className="text-[12px] font-semibold text-[#7d8691]"><span aria-hidden>{info.emoji}</span> {info.nome}</span>
           </div>
-          <p className="text-[17px] font-extrabold leading-snug text-[#16121c] mt-2">{plano.dia1}</p>
-          {plano.motivo && <p className="text-[13px] text-[#7d8691] mt-1">Porque você disse: “{plano.motivo}”</p>}
-        </motion.div>
-
-        <div className="mt-4 pt-3.5 border-t border-[#ebe7ef] space-y-3">
+          <p className="text-[16.5px] font-extrabold leading-snug text-[#16121c] mt-2 text-pretty">{plano.dia1}</p>
+          {plano.motivo && <p className="text-[12.5px] text-[#7d8691] mt-0.5">Porque você disse: “{plano.motivo}”</p>}
+        </div>
+        <div className="mt-3 pt-3 border-t border-[#ebe7ef] space-y-1.5">
           {[plano.dia2, plano.dia3].map((t, i) => (
-            <div key={t} className="grid grid-cols-[52px_1fr_auto] gap-2 items-center" data-testid={`porta-plano-dia${i + 2}`} data-trancado="">
-              <span className="rounded-md bg-[#efedf2] text-[#7d8691] text-[10.5px] font-extrabold tracking-wide text-center py-[3px]">DIA {i + 2}</span>
-              <span className="text-[14px] font-semibold leading-snug text-[#16121c] select-none" style={{ filter: "blur(5px)" }} aria-hidden>{t}</span>
-              <Lock className="w-4 h-4 text-[#7d8691]" strokeWidth={2.5} aria-label="Trancado" />
-            </div>
+            <p key={t} className="flex items-baseline gap-2.5 text-[13.5px] leading-snug text-[#4f5a64]" data-testid={`porta-plano-dia${i + 2}`}>
+              <span className="shrink-0 w-[38px] text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa3ad]">Dia {i + 2}</span>
+              <span className="text-pretty">{t}</span>
+            </p>
           ))}
         </div>
       </div>
-
-      <p className="mt-4 flex items-start gap-2 text-[14px] leading-snug text-[#5b6570]" data-testid="porta-plano-nota">
-        <Lock className="w-4 h-4 shrink-0 mt-[2px] text-[#16121c]" strokeWidth={2.5} aria-hidden />
-        <span>Os dias 2 e 3 abrem quando você salva o plano na sua conta.</span>
-      </p>
-
-      <BotaoPorta texto="Desbloquear meu plano" seta={false} icone={<Lock className="w-4 h-4" strokeWidth={2.5} aria-hidden />} onClick={onDesbloquear} testid="porta-desbloquear" />
     </div>
   );
 }

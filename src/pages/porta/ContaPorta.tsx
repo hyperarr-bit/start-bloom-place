@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, Lock, Mail, MoreHorizontal } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Lock, Mail, MoreHorizontal } from "lucide-react";
 import { BotaoPorta } from "./BotaoPorta";
-import { Eyebrow } from "./telas";
+import { Eyebrow, PlanoNaConta } from "./telas";
+import type { AreaPorta } from "./conteudo";
 
 /**
- * TELA 6 DA PORTA — "Salve seu plano na sua conta" (v2, dono 10/10: "não é
- * necessário botar a confirmação de números no Gmail; deixar a opção de criar
- * conta com Google e Apple").
+ * TELA 4 DA PORTA — a CONTA, com o PLANO no topo (v3, 11/10: a tela do plano com cadeado saiu; o plano
+ * aparece inteiro aqui, e logo abaixo "Crie sua conta pra abrir o plano no app.").
+ *
+ *   · linha de confiança "3 dias grátis no app · sem cobrança hoje" SÓ no iPhone (o teste de 3 dias só
+ *     existe lá). NUNCA "sem cartão": a Apple pede forma de pagamento pro teste;
+ *
+ * Conta (v2, dono 10/10: "não é necessário botar a confirmação de números no Gmail; deixar a opção de
+ * criar conta com Google e Apple"):
  *
  *   · [Continuar com a Apple] — signInWithOAuth apple na web (provider ligado, o
  *     /authorize vai pra Apple com o Services ID do app). Não aparece no Android:
@@ -64,7 +70,30 @@ function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de
   );
 }
 
-export function ContaPorta({ emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta }: {
+/** Só no iPhone (o teste de 3 dias só existe lá). Nunca "sem cartão". */
+export const LINHA_CONFIANCA = "3 dias grátis no app · sem cobrança hoje";
+
+function TopoComPlano({ rota, dor, mostrarTeste }: { rota: AreaPorta; dor: string | null; mostrarTeste: boolean }) {
+  return (
+    <>
+      <PlanoNaConta rota={rota} dor={dor} />
+      <h1 className="mt-5 text-[21px] font-black tracking-[-0.02em] leading-[1.15] text-balance" data-testid="porta-conta-titulo">Crie sua conta pra abrir o plano no app.</h1>
+      {mostrarTeste && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[13.5px] font-semibold text-[#3f7d4e]" data-testid="porta-conta-confianca">
+          <Check className="w-4 h-4 shrink-0" strokeWidth={3} aria-hidden />
+          {LINHA_CONFIANCA}
+        </p>
+      )}
+    </>
+  );
+}
+
+export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta }: {
+  /** o plano do topo: a rota da área e a resposta da dor */
+  rota: AreaPorta;
+  dor: string | null;
+  /** iPhone: mostra "3 dias grátis no app · sem cobrança hoje" */
+  mostrarTeste: boolean;
   emInApp: boolean;
   /** "Instagram" | "Facebook" — o nome no aviso do Google */
   appDoWebview: string;
@@ -99,10 +128,9 @@ export function ContaPorta({ emInApp, appDoWebview, mostrarApple, emailLogado, o
   if (emailLogado) {
     return (
       <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="logado">
-        <Eyebrow>Falta só isso</Eyebrow>
-        <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5">Salve seu plano na sua conta</h1>
-        <p className="text-[15px] text-[#5b6570] leading-snug mt-2">Você já entrou neste aparelho.</p>
-        <div className="mt-5 rounded-2xl border-2 border-[#16121c] bg-white p-4">
+        <TopoComPlano rota={rota} dor={dor} mostrarTeste={mostrarTeste} />
+        <p className="text-[14.5px] text-[#5b6570] leading-snug mt-3">Você já entrou neste aparelho.</p>
+        <div className="mt-3 rounded-2xl border-2 border-[#16121c] bg-white p-4">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">Sua conta</p>
           <p className="text-[17px] font-extrabold text-[#16121c] mt-1 break-all" data-testid="porta-conta-email-logado">{emailLogado}</p>
         </div>
@@ -152,11 +180,9 @@ export function ContaPorta({ emInApp, appDoWebview, mostrarApple, emailLogado, o
   };
   return (
     <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="form">
-      <Eyebrow>Falta só isso</Eyebrow>
-      <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5">Salve seu plano na sua conta</h1>
-      <p className="text-[15px] text-[#5b6570] leading-snug mt-1.5">Ele fica te esperando no app.</p>
+      <TopoComPlano rota={rota} dor={dor} mostrarTeste={mostrarTeste} />
 
-      <div className="mt-5 space-y-2.5">
+      <div className="mt-4 space-y-2.5">
         {mostrarApple && (
           <button
             type="button"
@@ -190,7 +216,7 @@ export function ContaPorta({ emInApp, appDoWebview, mostrarApple, emailLogado, o
         )}
       </div>
 
-      <div className="flex items-center gap-3 my-4" aria-hidden>
+      <div className="flex items-center gap-3 my-3.5" aria-hidden>
         <span className="flex-1 h-px bg-[#ebe7ef]" />
         <span className="text-[12px] font-semibold text-[#7d8691]">ou com e-mail</span>
         <span className="flex-1 h-px bg-[#ebe7ef]" />

@@ -96,6 +96,13 @@ const escolher = async (id: string, proxima: string) => {
   conferirCopy();
 };
 const rotulos = (testid: string) => Array.from(screen.getByTestId(testid).querySelectorAll("[data-testid^='porta-opcao-'] span.block:first-child")).map((n) => n.textContent);
+/** 10/10: no celular, depois da conta vem o "Último passo: no app, toque em Entrar"; o botão abre a loja e leva pra tela 7. */
+const passarInstrucao = async () => {
+  await waitFor(() => expect(screen.getByTestId("porta-instrucao")).toBeInTheDocument());
+  expect(screen.getByTestId("porta-instrucao-titulo").textContent).toBe("No app, toque em Entrar");
+  fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
+  await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+};
 const usuario = (over: Partial<U> = {}): U => ({ id: "u-1", email: "ana@exemplo.com", created_at: new Date().toISOString(), user_metadata: {}, ...over });
 
 /** até a tela da conta, numa área, com as respostas dadas */
@@ -312,7 +319,7 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     fireEvent.click(screen.getByTestId("porta-criar-conta"));
 
     // 7. pronto
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(signUp).toHaveBeenCalledTimes(1);
     const cad = signUp.mock.calls[0][0] as { email: string; password: string; options: { data: { porta: Record<string, any> } } };
     expect(cad.email).toBe("ana@exemplo.com");
@@ -348,6 +355,7 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
       ["p3", "dinheiro", "R$ 300 a R$ 500"],
       ["comsem", "dinheiro", "seguir"],
       ["plano", "dinheiro", "desbloquear"],
+      ["instrucao", "dinheiro", "baixar"],
     ]);
   });
 
@@ -382,7 +390,7 @@ describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
     authState.user = u;
     getUser.mockResolvedValue({ data: { user: u } });
     montar();
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(updateUser).toHaveBeenCalledTimes(1);
     const gravada = (updateUser.mock.calls[0][0] as { data: { porta: Record<string, any> } }).data.porta;
     expect(gravada.attr).toMatchObject({ utm_campaign: "porta_teste", ad_id: "333", fbclid: "IwAR_abc" });
@@ -408,7 +416,7 @@ describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
     authState.user = u;
     getUser.mockResolvedValue({ data: { user: u } });
     montar();
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "apple", existente: false });
     expect(screen.getByTestId("porta-passo-3").textContent).toContain("Continuar com a Apple");
   });
@@ -429,7 +437,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     getUser.mockResolvedValue({ data: { user: usuario({ email: "velha@exemplo.com", created_at: "2025-01-01T00:00:00Z", user_metadata: { full_name: "Bia" } }) } });
     preencherSenha("velha@exemplo.com", "minhasenha");
     fireEvent.click(screen.getByTestId("porta-criar-conta"));
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(signUp).toHaveBeenCalledTimes(1);
     expect(signInWithPassword).toHaveBeenCalledWith({ email: "velha@exemplo.com", password: "minhasenha" });
     expect(updateUser).toHaveBeenCalledTimes(1);
@@ -457,7 +465,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     getUser.mockResolvedValue({ data: { user: usuario({ email: "velha@exemplo.com", created_at: "2025-01-01T00:00:00Z" }) } });
     fireEvent.change(screen.getByTestId("porta-senha-existente"), { target: { value: "acertei1" } });
     fireEvent.click(screen.getByTestId("porta-entrar-existente"));
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(signUp).toHaveBeenCalledTimes(1); // nunca uma 2ª tentativa de criar
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: true });
   });
@@ -470,7 +478,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     getUser.mockResolvedValue({ data: { user: usuario({ created_at: "2026-09-01T00:00:00Z", user_metadata: { porta: antiga } }) } });
     preencherSenha("velha@exemplo.com", "minhasenha");
     fireEvent.click(screen.getByTestId("porta-criar-conta"));
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(updateUser).not.toHaveBeenCalled();
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ existente: true, gravou: false, event_id: "porta_cr_antigo" });
   });
@@ -507,7 +515,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     fireEvent.click(screen.getByTestId("porta-desbloquear"));
     await waitFor(() => expect(screen.getByTestId("porta-conta-email-logado").textContent).toBe("logada@exemplo.com"));
     fireEvent.click(screen.getByTestId("porta-salvar-nesta-conta"));
-    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    await passarInstrucao();
     expect(updateUser).toHaveBeenCalledTimes(1);
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "sessao", existente: true });
   });

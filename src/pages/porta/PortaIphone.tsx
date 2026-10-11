@@ -20,6 +20,7 @@ import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
 import { irPraLoja } from "./navegar";
+import { InstrucaoPorta } from "./InstrucaoPorta";
 
 /** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
 export const SEGUNDOS_ATE_A_LOJA = 4;
@@ -48,8 +49,8 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
  * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
  */
-export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "salvo";
-export const ORDEM: Passo[] = ["welcome", "area", "p2", "p3", "comsem", "plano", "conta", "salvo"];
+export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
+export const ORDEM: Passo[] = ["welcome", "area", "p2", "p3", "comsem", "plano", "conta", "instrucao", "salvo"];
 
 export type EstadoPorta = {
   passo: Passo;
@@ -224,7 +225,8 @@ export function PortaIphone() {
         void persistLeadSource(supabase, u.id);
       }
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });
-      setEstado((x) => ({ ...x, passo: "salvo", metodo, email: u.email ?? x.email, eventId }));
+      // 10/10: no celular, antes da tela 7, o "Último passo: no app, toque em Entrar" (computador vai direto pro QR)
+      setEstado((x) => ({ ...x, passo: plataformaDaWeb() === "web" ? "salvo" : "instrucao", metodo, email: u.email ?? x.email, eventId }));
       return { ok: true };
     } catch {
       concluindo.current = false;
@@ -237,7 +239,7 @@ export function PortaIphone() {
     if (authLoading || !user) return;
     const e = estadoRef.current;
     const social = e.metodo === "google" || e.metodo === "apple";
-    if ((e.passo === "conta" && social) || (paramPasso === "voltou" && e.passo !== "salvo")) void concluir(social ? (e.metodo as string) : "google");
+    if ((e.passo === "conta" && social) || (paramPasso === "voltou" && e.passo !== "salvo" && e.passo !== "instrucao")) void concluir(social ? (e.metodo as string) : "google");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
 
@@ -374,7 +376,7 @@ export function PortaIphone() {
 
   const indice = ORDEM.indexOf(estado.passo);
   const comBarra = indice >= 1 && indice <= 6;
-  const voltar = () => { if (indice > 0 && estado.passo !== "salvo") ir(ORDEM[indice - 1]); };
+  const voltar = () => { if (indice > 0 && estado.passo !== "salvo" && estado.passo !== "instrucao") ir(ORDEM[indice - 1]); };
 
   let tela: React.ReactNode = null;
   if (estado.passo === "area") {
@@ -410,6 +412,22 @@ export function PortaIphone() {
         onEntrarComSenha={onEntrarComSenha}
         onSalvarNestaConta={onSalvarNestaConta}
         onTrocarConta={async () => { await supabase.auth.signOut(); }}
+      />
+    );
+  } else if (estado.passo === "instrucao") {
+    const loja = plataforma === "android" ? "android" : "ios";
+    tela = (
+      <InstrucaoPorta
+        plataforma={plataforma}
+        metodo={estado.metodo ?? "senha"}
+        email={estado.email ?? user?.email ?? ""}
+        hrefLoja={hrefLoja(loja)}
+        onBaixar={() => {
+          passoFeito("instrucao", "baixar");
+          onLoja(loja, "botao");
+          try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
+          setEstado((x) => ({ ...x, passo: "salvo" }));
+        }}
       />
     );
   } else if (estado.passo === "salvo") {

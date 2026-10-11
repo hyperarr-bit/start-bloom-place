@@ -93,6 +93,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
      * mesmo assim não mostrar (app foi pro fundo no meio), fica armado pra
      * próxima ativação; o JS (welcome/Home) continua como segunda chance. */
     static var attEmAndamento = false
+    /// 10/10 (build 38): quem veio da Porta não vê o ATT. Ligado pelo link core://entrar (open url)
+    /// ou pelo JS (CoreNativo.pularATT, conta com user_metadata.porta). Vale pro processo.
+    static var pularATT = false
     static func pedirATTSePrecisar() {
         #if targetEnvironment(simulator)
         return // no simulador o diálogo de ATT só atrapalha os prints
@@ -106,6 +109,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
          * passe pela welcome; se o JS já pediu, encontra o status decidido e
          * não faz nada. */
         DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            guard !AppDelegate.pularATT else { AppDelegate.attEmAndamento = false; return }
             guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { AppDelegate.attEmAndamento = false; return }
             ATTrackingManager.requestTrackingAuthorization { status in
                 AppDelegate.aplicarStatusATT()
@@ -122,6 +126,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Login do Facebook, e este caminho é o do `core://auth` (Sign in with
         // Apple / Supabase). Enfiar outro handler aqui é arriscar o deep link
         // que já custou um bug no Android em 28/07.
+        // 10/10 (build 38): o "Abrir o CORE" da Porta (core://entrar?h=…) — a conta veio do site,
+        // sem o diálogo de ATT. Marcado aqui, antes de o JS existir, pra a reserva de 10 s respeitar.
+        if url.scheme == "core", url.host == "entrar" { AppDelegate.pularATT = true }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
@@ -254,7 +261,8 @@ final class FolhaDeCobranca {
  * Plugin `CoreNativo` — o que o JS (src/lib/cobranca-nativa.ts) chama:
  *   telaAtual({ rota })        a rota do React a cada navegação;
  *   ativarFolhaDeCobranca()    começa a observar a fila (só com a chave ligada);
- *   evento billingSheetExibida { motivo, esperou_ms, forcada }.
+ *   evento billingSheetExibida { motivo, esperou_ms, forcada };
+ *   pularATT()                 (10/10, build 38) conta da Porta: segura a reserva de ATT de 10 s.
  * Registrado à mão no CoreViewController, como o MetaAds (plugin de dentro do
  * app não entra no packageClassList).
  */
@@ -264,8 +272,16 @@ public class CoreNativoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "CoreNativo"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "telaAtual", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pularATT", returnType: CAPPluginReturnPromise)
     ]
+
+    @objc func pularATT(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            AppDelegate.pularATT = true
+            call.resolve()
+        }
+    }
 
     @objc func telaAtual(_ call: CAPPluginCall) {
         let rota = call.getString("rota") ?? ""

@@ -107,6 +107,8 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
          `core://entrar` sem código só abre o /entrar. */
       if (ehLinkDeEntrar(url)) {
         const codigoPorta = codigoDoLinkDaPorta(url);
+        // veio da Porta: nada de ATT (antes do resgate, antes de qualquer timer da welcome)
+        if (codigoPorta) { try { (await import("./att-ios")).marcarPortaSemATT(); } catch { /* noop */ } }
         if (!codigoPorta) { navegar("/entrar"); return true; }
         const r = await resgatarCodigo(codigoPorta, "link");
         if (r.ok) navegar("/home");

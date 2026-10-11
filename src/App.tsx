@@ -503,6 +503,17 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
  */
 const jaReportouWebView = { atual: false };
 const TelemetriaWebView = () => {
+  // 10/10 (build 38): conta da Porta (user_metadata.porta) não vê o ATT — o aviso pro nativo
+  // (que segura a reserva de 10 s) sai já na abertura e de novo quando a sessão da Porta aparece.
+  const { user: usuarioDaSessao } = useAuth();
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    void import("@/lib/att-ios").then((m) => {
+      const porta = (usuarioDaSessao?.user_metadata as { porta?: unknown } | undefined)?.porta;
+      if (porta && typeof porta === "object") m.marcarPortaSemATT();
+      else m.reavisarPortaSemATT();
+    }).catch(() => { /* noop */ });
+  }, [usuarioDaSessao?.id]);
   useEffect(() => {
     if (!isNativeShell() || jaReportouWebView.atual) return;
     jaReportouWebView.atual = true;

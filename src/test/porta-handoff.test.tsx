@@ -132,6 +132,7 @@ describe("deep link core://porta (deep-link.ts)", () => {
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"));
     expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "resgatar", codigo: CODIGO, via: "link" } });
     expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "hash-1", type: "magiclink" });
+    expect(localStorage.getItem("porta-sem-att")).toBe("1"); // veio da Porta: sem o diálogo de ATT
   });
 
   it("app aberto (appUrlOpen, na welcome): mesma coisa; os atalhos de módulo seguem funcionando", async () => {
@@ -265,6 +266,7 @@ describe("PortaPrimeiraAbertura (no lugar do Navigate pra welcome)", () => {
     montar();
     await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/app"));
     expect(invoke).not.toHaveBeenCalled();
+    expect(localStorage.getItem("porta-sem-att")).toBeNull(); // app normal: o ATT segue como hoje
   });
 
   it("abriu frio pelo 'Abrir o CORE' (core://entrar?h=…): entra e vai pro /home, nunca a welcome", async () => {
@@ -273,6 +275,7 @@ describe("PortaPrimeiraAbertura (no lugar do Navigate pra welcome)", () => {
     await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/home"));
     expect(verifyOtp).toHaveBeenCalledTimes(1);
     expect(eventos("porta_handoff")[0]).toMatchObject({ via: "link", ok: true });
+    expect(localStorage.getItem("porta-sem-att")).toBe("1");
   });
 
   it("o link era da Porta mas o código não vale (usado/vencido): /entrar", async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { codigoDoLinkDeAbertura, olharLinkDeAbertura, resgatarCodigo } from "@/lib/porta-handoff";
+import { marcarPortaSemATT } from "@/lib/att-ios";
 
 /**
  * A ABERTURA SEM CONTA NO iPHONE, ANTES DA WELCOME (10/10, build 38) — o "abrir já logado" da Porta.
@@ -24,6 +25,7 @@ export function PortaPrimeiraAbertura({ semPorta }: { semPorta: string }) {
       const codigo = await codigoDoLinkDeAbertura();
       if (!vivo) return;
       if (!codigo) { setDestino(semPorta); return; }
+      marcarPortaSemATT(); // veio da Porta: sem o diálogo de ATT (a welcome nem monta)
       setEntrando(true);
       const r = await resgatarCodigo(codigo, "link");
       if (!vivo) return;

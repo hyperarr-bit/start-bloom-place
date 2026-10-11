@@ -621,6 +621,38 @@ describe("tela 7 por aparelho", () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it("10/10: iPhone nega o autoplay (Pouca Energia) → o celular da welcome passa as 6 telas em sequência, sem botão de play", async () => {
+    HTMLMediaElement.prototype.play = vi.fn(() => Promise.reject(new Error("NotAllowedError"))) as unknown as HTMLMediaElement["play"];
+    montar();
+    await waitFor(() => expect(screen.getByTestId("porta-poster")).toBeInTheDocument());
+    const imgs = Array.from(screen.getByTestId("porta-poster").querySelectorAll("img")).map((i) => i.getAttribute("src"));
+    expect(imgs).toEqual(["/porta/tour/1.jpg", "/porta/tour/2.jpg", "/porta/tour/3.jpg", "/porta/tour/4.jpg", "/porta/tour/5.jpg", "/porta/tour/6.jpg"]);
+    expect(screen.getByTestId("porta-video").style.display).toBe("none");
+    expect(eventos("porta_video")[0]).toMatchObject({ ok: false, motivo: "autoplay" });
+  });
+
+  it("10/10: o 'Último passo' conta 10 s e abre a loja sozinho (o botão adianta); vai pra tela 7", async () => {
+    const { irPraLoja } = await import("@/pages/porta/navegar");
+    vi.mocked(irPraLoja).mockClear();
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    try {
+      ua(UA.instagram);
+      localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "instrucao", escolha: "dinheiro", p2: "gasto_sem_perceber", p3: "300_500", eventId: "porta_cr_x", metodo: "apple", email: "ana@exemplo.com" }));
+      montar();
+      expect(screen.getByTestId("porta-instrucao-contagem").textContent).toBe("Abrindo a App Store em 10…");
+      act(() => { vi.advanceTimersByTime(9000); });
+      expect(irPraLoja).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(irPraLoja).toHaveBeenCalledTimes(1);
+      expect(trackEventBeacon).toHaveBeenCalledWith("porta_loja_click", expect.objectContaining({ loja: "ios", via: "auto" }));
+      expect(screen.getByTestId("porta-salvo")).toBeInTheDocument();
+      // na tela 7 a contagem dela NÃO roda de novo (já foi pra loja)
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(irPraLoja).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("Android: Google Play pelo /baixar, sem prometer teste grátis (no Android não há)", () => {
     ua(UA.android);
     naSete("google");

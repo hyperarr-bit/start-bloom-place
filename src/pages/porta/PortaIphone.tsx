@@ -25,6 +25,8 @@ import { abrirAppComCodigo, codigoDaPortaOk } from "./handoff";
 
 /** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
 export const SEGUNDOS_ATE_A_LOJA = 4;
+/** "Último passo": segundos até abrir a loja sozinho (dá tempo de ver os 2 prints). */
+export const SEGUNDOS_NA_INSTRUCAO = 10;
 const CHAVE_LOJA_AUTO = "porta-loja-auto";
 
 /**
@@ -401,6 +403,34 @@ export function PortaIphone() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado.passo, plataforma]);
 
+  /* 10/10 (dono: "não tá indo automático pro app depois de uns 10 segundos naquela tela"): o "Último passo"
+   * também conta (SEGUNDOS_NA_INSTRUCAO) e abre a loja sozinho — dá tempo de ver os 2 prints; o botão adianta. */
+  const baixarDaInstrucao = (via: "botao" | "auto") => {
+    const loja = plataforma === "android" ? "android" : "ios";
+    passoFeito("instrucao", via === "auto" ? "baixar_auto" : "baixar");
+    onLoja(loja, via);
+    try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
+    setEstado((x) => ({ ...x, passo: "salvo" }));
+  };
+  const [contagemInstrucao, setContagemInstrucao] = useState<number | null>(null);
+  useEffect(() => {
+    if (estado.passo !== "instrucao" || plataforma === "web") { setContagemInstrucao(null); return; }
+    let n = SEGUNDOS_NA_INSTRUCAO;
+    setContagemInstrucao(n);
+    const t = window.setInterval(() => {
+      n -= 1;
+      if (estadoRef.current.passo !== "instrucao" || clicouLoja.current) { window.clearInterval(t); setContagemInstrucao(null); return; }
+      if (n > 0) { setContagemInstrucao(n); return; }
+      window.clearInterval(t);
+      setContagemInstrucao(null);
+      const loja = plataforma === "android" ? "android" : "ios";
+      baixarDaInstrucao("auto");
+      irPraLoja(hrefLoja(loja));
+    }, 1000);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.passo, plataforma]);
+
   /* ---------------------------------------------------------- render */
   if (estado.passo === "welcome") {
     return (
@@ -460,12 +490,8 @@ export function PortaIphone() {
         metodo={estado.metodo ?? "senha"}
         email={estado.email ?? user?.email ?? ""}
         hrefLoja={hrefLoja(loja)}
-        onBaixar={() => {
-          passoFeito("instrucao", "baixar");
-          onLoja(loja, "botao");
-          try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
-          setEstado((x) => ({ ...x, passo: "salvo" }));
-        }}
+        contagem={contagemInstrucao}
+        onBaixar={() => baixarDaInstrucao("botao")}
       />
     );
   } else if (estado.passo === "salvo") {

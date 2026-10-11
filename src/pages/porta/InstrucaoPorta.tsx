@@ -17,12 +17,14 @@ const Apple = () => (
   </svg>
 );
 
-export function InstrucaoPorta({ plataforma, metodo, email, hrefLoja, onBaixar }: {
+export function InstrucaoPorta({ plataforma, metodo, email, hrefLoja, onBaixar, contagem = null }: {
   plataforma: Plataforma;
   metodo: string;
   email: string;
   hrefLoja: string;
   onBaixar: () => void;
+  /** segundos até a loja abrir sozinha (null = sem contagem) */
+  contagem?: number | null;
 }) {
   const android = plataforma === "android";
   const so = android ? "android" : "ios";
@@ -57,6 +59,11 @@ export function InstrucaoPorta({ plataforma, metodo, email, hrefLoja, onBaixar }
         ))}
       </div>
 
+      {contagem != null && (
+        <p className="text-center text-[13.5px] font-bold pb-2" style={{ color: MAGENTA }} data-testid="porta-instrucao-contagem" aria-live="polite">
+          Abrindo a {android ? "Google Play" : "App Store"} em {contagem}…
+        </p>
+      )}
       <BotaoPorta
         texto="Entendi, baixar o CORE" seta={false} icone={android ? undefined : <Apple />}
         href={hrefLoja} onClick={() => onBaixar()} testid="porta-instrucao-baixar"

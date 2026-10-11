@@ -19,6 +19,11 @@ import { WelcomePorta } from "./WelcomePorta";
 import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
+import { irPraLoja } from "./navegar";
+
+/** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
+export const SEGUNDOS_ATE_A_LOJA = 4;
+const CHAVE_LOJA_AUTO = "porta-loja-auto";
 
 /**
  * A PORTA iPHONE — coreaplicativo.com.br/comece (10/10). Só na WEB (o app
@@ -324,10 +329,37 @@ export function PortaIphone() {
     if (loja) q.set("loja", loja);
     return `/baixar?${q.toString()}`;
   };
-  const onLoja = (loja: "ios" | "android") => {
+  const onLoja = (loja: "ios" | "android", via: "botao" | "auto" = "botao") => {
     clicouLoja.current = true;
-    trackEventBeacon("porta_loja_click", { plataforma, loja, metodo: estadoRef.current.metodo, ...ids() });
+    trackEventBeacon("porta_loja_click", { plataforma, loja, via, metodo: estadoRef.current.metodo, ...ids() });
   };
+
+  /* 10/10 (dono: "no Dinzo, depois de alguns segundos ele redireciona automático pra loja"): na tela 7, no
+   * celular, conta SEGUNDOS_ATE_A_LOJA e abre a loja sozinha — 1x por sessão (recarregar não repete; quem volta
+   * da loja não é jogado de novo). No Instagram a App Store abre POR CIMA da página: fechando a loja, a pessoa
+   * volta e ainda vê o "toque em Entrar". Computador: nunca (lá é o QR). */
+  const [contagem, setContagem] = useState<number | null>(null);
+  useEffect(() => {
+    if (estado.passo !== "salvo" || plataforma === "web") return;
+    let ja = false;
+    try { ja = sessionStorage.getItem(CHAVE_LOJA_AUTO) === "1"; } catch { /* sem storage: segue */ }
+    if (ja || clicouLoja.current) return;
+    setContagem(SEGUNDOS_ATE_A_LOJA);
+    let n = SEGUNDOS_ATE_A_LOJA;
+    const t = window.setInterval(() => {
+      n -= 1;
+      if (clicouLoja.current) { window.clearInterval(t); setContagem(null); return; }
+      if (n > 0) { setContagem(n); return; }
+      window.clearInterval(t);
+      setContagem(null);
+      try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
+      const loja = plataforma === "android" ? "android" : "ios";
+      onLoja(loja, "auto");
+      irPraLoja(hrefLoja(loja));
+    }, 1000);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado.passo, plataforma]);
 
   /* ---------------------------------------------------------- render */
   if (estado.passo === "welcome") {
@@ -387,6 +419,7 @@ export function PortaIphone() {
         metodo={estado.metodo ?? "senha"}
         plataforma={plataforma}
         voltou={voltou}
+        contagem={contagem}
         hrefLoja={hrefLoja}
         qrUrl={URL_QR}
         onLoja={onLoja}

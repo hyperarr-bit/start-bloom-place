@@ -38,11 +38,13 @@ const Apple = () => (
   </svg>
 );
 
-export function SalvoPorta({ email, metodo, plataforma, voltou, hrefLoja, qrUrl, onLoja }: {
+export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null, hrefLoja, qrUrl, onLoja }: {
   email: string;
   metodo: string;
   plataforma: Plataforma;
   voltou: boolean;
+  /** segundos até a loja abrir sozinha (null = sem contagem) */
+  contagem?: number | null;
   hrefLoja: (loja: "ios" | "android" | null) => string;
   qrUrl: string;
   onLoja: (loja: "ios" | "android") => void;
@@ -64,6 +66,12 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, hrefLoja, qrUrl,
         {/* e-mail comprido (o "esconder meu e-mail" da Apple tem ~35 letras) desce a fonte em vez de quebrar no meio */}
         <p className={`${email.length > 26 ? "text-[14.5px]" : "text-[18px]"} font-extrabold text-[#16121c] mt-0.5 break-all`}>{email}</p>
       </div>
+
+      {contagem != null && (
+        <p className="mt-3 text-[13.5px] font-bold" style={{ color: MAGENTA }} data-testid="porta-salvo-contagem" aria-live="polite">
+          Abrindo a {loja} em {contagem}…
+        </p>
+      )}
 
       <p className="text-[15px] text-[#5b6570] leading-snug mt-4" data-testid="porta-salvo-texto">
         {android

@@ -42,6 +42,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn() }));
+vi.mock("@/pages/porta/navegar", () => ({ irPraLoja: vi.fn() }));
 vi.mock("@/lib/meta-pixel", () => ({ fireMetaEvent: vi.fn() }));
 vi.mock("@/lib/auth-nativo", () => ({ entrarComGoogle: vi.fn(async () => ({ error: null })), entrarComApple: vi.fn(async () => ({ error: null })) }));
 
@@ -560,6 +561,53 @@ describe("tela 7 por aparelho", () => {
     localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "salvo", escolha: "dinheiro", p2: "esqueco_contas", p3: "nao_sei", eventId: "porta_cr_x", metodo, email }));
     montar();
   };
+
+  it("10/10 (como a Dinzo): no iPhone a loja abre SOZINHA em 4 s, com a contagem na tela; 1x por sessão", async () => {
+    const { irPraLoja } = await import("@/pages/porta/navegar");
+    vi.mocked(irPraLoja).mockClear();
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    try {
+      ua(UA.instagram);
+      naSete();
+      expect(screen.getByTestId("porta-salvo-contagem").textContent).toBe("Abrindo a App Store em 4…");
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(screen.getByTestId("porta-salvo-contagem").textContent).toBe("Abrindo a App Store em 1…");
+      expect(irPraLoja).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(irPraLoja).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(irPraLoja).mock.calls[0][0]).toBe("/baixar?origem=porta&utm_content=video_organizei&loja=ios");
+      expect(trackEventBeacon).toHaveBeenCalledWith("porta_loja_click", expect.objectContaining({ loja: "ios", via: "auto" }));
+      expect(screen.queryByTestId("porta-salvo-contagem")).toBeNull();
+      // recarregar a página na mesma sessão NÃO joga pra loja de novo
+      cleanup();
+      naSete();
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(irPraLoja).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("porta-salvo-contagem")).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("tocar no botão antes da contagem acabar cancela o automático (não abre 2x); computador nunca conta", async () => {
+    const { irPraLoja } = await import("@/pages/porta/navegar");
+    vi.mocked(irPraLoja).mockClear();
+    sessionStorage.clear();
+    vi.useFakeTimers();
+    try {
+      ua(UA.instagram);
+      naSete();
+      fireEvent.click(screen.getByTestId("porta-loja"));
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(irPraLoja).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("porta-salvo-contagem")).toBeNull();
+      cleanup(); sessionStorage.clear();
+      ua(UA.mac);
+      naSete();
+      expect(screen.queryByTestId("porta-salvo-contagem")).toBeNull();
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(irPraLoja).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
 
   it("Android: Google Play pelo /baixar, sem prometer teste grátis (no Android não há)", () => {
     ua(UA.android);

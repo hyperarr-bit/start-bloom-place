@@ -131,7 +131,8 @@ import { isNativeShell } from "@/lib/native-shell";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { useAuth } from "@/hooks/use-auth";
-import { agendarRecuperacaoDoPaywall, cancelarRecuperacaoDoPaywall, pedirLembreteDoTeste } from "@/lib/notificacoes";
+import { agendarRecuperacaoDoPaywall, agendarResgateDoPlano, cancelarRecuperacaoDoPaywall, cancelarResgateDoPlano, cancelarReguaDoTeste, pedirLembreteDoTeste } from "@/lib/notificacoes";
+import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
@@ -293,10 +294,31 @@ function DuasColunas({
   );
 }
 
+/**
+ * MODO GATE (10/10, build 38 — dono: "quem entra logado sem assinatura no iPhone tem que ver o MESMO
+ * paywall novo do funil"). O TrialBanner monta este paywall, no layout CURTO, como a tela cheia do gate
+ * pra conta logada sem acesso (a Porta: conta criada no site; ou qualquer conta sem assinatura), no lugar
+ * do PaywallAssinatura contexto="gate". Diferenças do funil, todas por ter conta e não ter funil atrás:
+ *   · sempre o layout curto (o TrialBanner só escolhe este modo com a chave "curto" ligada; se a
+ *     metadata do RevenueCat desligar a chave depois, `onChaveDesligada` devolve o gate antigo);
+ *   · SEM o Voltar redondo (não há passo anterior) — logo, sem o presente 69,90 do "X"; o presente do
+ *     BLOQUEIO (quem já testou) continua no TrialBanner, por cima, como sempre;
+ *   · RevenueCat identificado com o uid da conta ANTES da folha (a compra fica na conta);
+ *   · rodapé com "Entrar com outra conta" (signOut → /entrar) e "Excluir conta" (5.1.1), além de
+ *     Termos · Privacidade · Restaurar compras;
+ *   · a régua do gate de hoje: arma o "resgate do plano" (2 h / 24 h) ao abrir e cancela na compra; a
+ *     recuperação do paywall do funil NÃO arma aqui (seriam dois avisos pro mesmo paywall);
+ *   · eventos com `funil: "gate_ios"` (não somam no funil do iPhone);
+ *   · compra/restaurar que dá certo → `onPagoSemConta` (o TrialBanner recarrega pra "/" = Home/missão,
+ *     o mesmo pós-compra do gate de hoje).
+ */
 export function PaywallIOS({
-  area, answers, onPagoSemConta, onVoltar,
-}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void; onVoltar?: () => void }) {
+  area, answers, onPagoSemConta, onVoltar, modo = "funil", onChaveDesligada,
+}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void; onVoltar?: () => void; modo?: "funil" | "gate"; onChaveDesligada?: () => void }) {
+  const gate = modo === "gate";
+  const FUNIL = gate ? "gate_ios" : "ios";
   const { user: usuarioLogado } = useAuth();
+  const [excluirAberto, setExcluirAberto] = useState(false);
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
   const [conferindo, setConferindo] = useState(false);
@@ -324,7 +346,7 @@ export function PaywallIOS({
   const [precoMensalLoja, setPrecoMensalLoja] = useState<string | null>(null);
   /* 10/10 — PAYWALL_CURTO: a chave responde na hora (força/QA/constante) e de novo quando a
    * loja traz a metadata; o preço do teste ("R$ 0,00") é o da oferta introdutória da loja. */
-  const [curto, setCurto] = useState(() => ofertaLigada("curto"));
+  const [curto, setCurto] = useState(() => gate || ofertaLigada("curto"));
   const [precoTeste, setPrecoTeste] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const preparandoRef = useRef<number | null>(null);
@@ -346,11 +368,11 @@ export function PaywallIOS({
     if (saiuRegistradoRef.current || compraFeitaRef.current) return;
     saiuRegistradoRef.current = true;
     const voltou = ultimoVoltarRef.current != null && Date.now() - ultimoVoltarRef.current < JANELA_DO_VOLTAR_MS;
-    const dados = { funil: "ios", loja: "ios", area, motivo: motivoForcado ?? (voltou ? "voltar" : "outro"), segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: viuOfertaRef.current };
+    const dados = { funil: FUNIL, loja: "ios", area, motivo: motivoForcado ?? (voltou ? "voltar" : "outro"), segundos_na_tela: Math.round((Date.now() - abertoEmRef.current) / 1000), viu_oferta: viuOfertaRef.current };
     (beacon ? trackEventBeacon : trackEvent)("paywall_saiu", dados);
   };
   const armarRecuperacao = () => {
-    if (recuperacaoArmadaRef.current || compraFeitaRef.current || !isNativeShell() || !ofertaLigada("recuperacao")) return;
+    if (gate || recuperacaoArmadaRef.current || compraFeitaRef.current || !isNativeShell() || !ofertaLigada("recuperacao")) return;
     recuperacaoArmadaRef.current = true;
     void agendarRecuperacaoDoPaywall(AREAS[area]?.nome ?? null).catch(() => { /* nunca derruba o paywall */ });
   };
@@ -358,7 +380,20 @@ export function PaywallIOS({
   const concluir = () => {
     compraFeitaRef.current = true;
     void cancelarRecuperacaoDoPaywall().catch(() => { /* noop */ });
+    if (gate) {
+      void cancelarResgateDoPlano().catch(() => { /* noop */ });
+      void cancelarReguaDoTeste().catch(() => { /* noop */ });
+    }
     onPagoSemConta();
+  };
+  /** gate: a saída que o gate antigo já tinha — sai desta conta e vai pro login. */
+  const trocarConta = async () => {
+    trackEvent("gate_trocar_conta", { funil: FUNIL });
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.signOut();
+    } catch { /* sem rede: o /entrar resolve */ }
+    window.location.href = "/entrar";
   };
   // o mensal do paywall: com PAYWALL_TEXTOS, o preço real da loja (reserva: a constante de hoje)
   const precoMensalTxt = textos ? (precoMensalLoja ?? APP_PRECOS.mensal.preco) : APP_PRECOS.mensal.preco;
@@ -369,7 +404,9 @@ export function PaywallIOS({
     // `loja: "ios"` em todo evento: sem isso o iPhone entraria somando nos
     // números do funil do Android e as duas leituras virariam uma média de
     // dois públicos, duas lojas e duas mecânicas de pagamento.
-    trackEvent("funnel_view", { step: "offer", funil: "ios", area, loja: "ios" });
+    trackEvent("funnel_view", { step: "offer", funil: FUNIL, area, loja: "ios" });
+    // gate: a mesma régua do gate antigo ("seu plano ficou salvo", 2 h / 24 h), cancelada na compra
+    if (gate) { try { void agendarResgateDoPlano(null)?.catch?.(() => { /* noop */ }); } catch { /* noop */ } }
     /* Aquecimento do RevenueCat no mount (lição da v91 do Android): sem
      * init aqui, o primeiro toque paga init + catálogo inteiro e a folha
      * demora em aparelho popular. Só cache — o caminho do toque não muda. */
@@ -392,14 +429,16 @@ export function PaywallIOS({
           // 10/10: a chave remota chegou junto com as offerings; os preços do selo são os da loja
           const ligou = ofertaLigada("textos");
           const curtoLigou = ofertaLigada("curto");
-          const economiaLida = ligou || curtoLigou ? seguro(() => rc.economiaDoAnualIos() ?? null, null) : null;
+          const economiaLida = ligou || curtoLigou || gate ? seguro(() => rc.economiaDoAnualIos() ?? null, null) : null;
           setTextos(ligou);
-          setCurto(curtoLigou);
+          // gate: a metadata desligou o curto (interruptor de emergência) → o TrialBanner volta pro gate antigo
+          if (gate && !curtoLigou) onChaveDesligada?.();
+          setCurto(gate || curtoLigou);
           setEconomia(economiaLida);
           setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
-          if (curtoLigou) setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
+          if (curtoLigou || gate) setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: "ios", loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou ? { paywall_curto: true, economia: economiaLida } : {}) });
+          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}) });
         }
       };
       lido();
@@ -464,7 +503,7 @@ export function PaywallIOS({
    * grátis, 1 vez por sessão do paywall; some quando a compra dá certo. */
   const [segundaChance, setSegundaChance] = useState<"nunca" | "visivel" | "usada">("nunca");
   useEffect(() => {
-    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
+    if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segundaChance]);
 
@@ -473,7 +512,7 @@ export function PaywallIOS({
     try {
       const rc = await import("@/lib/revenuecat");
       const ok = (await rc.restaurar()) || (await rc.compraVitaliciaLocal()) || (await rc.compraAssinaturaLocal());
-      if (ok) { trackEvent("funnel_click", { cta: "ios_ja_paguei_ok", funil: "ios" }); concluir(); return; }
+      if (ok) { trackEvent("funnel_click", { cta: "ios_ja_paguei_ok", funil: FUNIL }); concluir(); return; }
       setErro("Ainda não achei a compra. Espera uns segundos e toca de novo.");
     } catch { /* conferência nunca derruba o paywall */ }
     setConferindo(false);
@@ -485,12 +524,14 @@ export function PaywallIOS({
     setComprando(true);
     try {
       const rc = await import("@/lib/revenuecat");
+      // gate: a compra fica na CONTA logada — RevenueCat com o uid antes da folha (no-op se já está)
+      if (gate && usuarioLogado?.id) { try { await rc.identificarRevenueCat(usuarioLogado.id); } catch { /* segue: o init já usa a sessão */ } }
       const idProduto = produto === "mensal" ? "core_mensal" : rc.idProdutoAnualIos();
       const ok = produto === "mensal"
         ? await rc.comprar("core_mensal", { semTrial: true })
         : await rc.comprarAnualIos();
       if (ok) {
-        trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
+        trackEvent("app_sheet_success", { produto: idProduto, funil: FUNIL, loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
         /* (D) LEMBRETE DO TESTE (01/10, de volta): a Apple não avisa antes de
          * cobrar. Compra que entrou em teste guarda o pedido do aviso "acaba
          * amanhã" e arma na hora se a permissão já existe. SEM diálogo aqui —
@@ -578,7 +619,7 @@ export function PaywallIOS({
         oferta={presenteX}
         onFechar={() => setPresenteX(null)}
         onSucesso={async () => {
-          trackEvent("app_sheet_success", { produto: presenteX.produto, funil: "ios", loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
+          trackEvent("app_sheet_success", { produto: presenteX.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
           try {
             const rc = await import("@/lib/revenuecat");
             if (seguro(() => rc.ultimaCompraAnualFoiTrial(), presenteX.comTrial)) {
@@ -596,7 +637,7 @@ export function PaywallIOS({
         oferta={mensal19}
         onFechar={() => setMensal19(null)}
         onSucesso={() => {
-          trackEvent("app_sheet_success", { produto: mensal19.produto, funil: "ios", loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
+          trackEvent("app_sheet_success", { produto: mensal19.produto, funil: FUNIL, loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
           setMensal19(null);
           concluir();
         }}
@@ -609,7 +650,7 @@ export function PaywallIOS({
    * de preparação da folha fica ~1,2 s na tela e só então a compra abre */
   const tocarNoBotao = () => {
     trackEvent("funnel_click", {
-      cta: "app_paywall_cta", funil: "ios", loja: "ios",
+      cta: "app_paywall_cta", funil: FUNIL, loja: "ios",
       produto: mostraMensal ? "core_mensal" : oferta.produto,
       oferta: mostraMensal ? "mensal" : oferta.oferta,
       offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
@@ -632,12 +673,12 @@ export function PaywallIOS({
   if (curto) {
     const precoMensalCurto = precoMensalLoja ?? SEM_PRECO;
     const aviso = comTrial ? diaDoAviso(dias) : null;
-    const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual, paywall_curto: true }); };
+    const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: FUNIL, oferta: oferta.oferta, preco: precoAnual, paywall_curto: true }); };
     /* o Voltar redondo = o "X" do paywall: o MESMO `core:voltar` do funil (presente 69,90 com
      * OFERTA_X_PAYWALL, recuperação); o recuo de passo é do funil (`onVoltar`), se ele passar —
      * e só quando nenhuma folha de oferta abriu por cima. */
     const voltar = () => {
-      trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: "ios", loja: "ios", paywall_curto: true });
+      trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: FUNIL, loja: "ios", paywall_curto: true });
       window.dispatchEvent(new CustomEvent("core:voltar"));
       if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !viuOfertaRef.current) onVoltar(); }, 400);
     };
@@ -652,12 +693,12 @@ export function PaywallIOS({
         <div className="relative flex-1 min-h-[150px] max-h-[440px] -mx-5 -mt-4 overflow-hidden bg-[#f6f6f7]" data-testid="ios-curto-hero">
           <img src="/paywall-hero.jpg" alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover object-top select-none scale-[1.07] origin-top" />
           <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-white via-white/85 to-transparent" aria-hidden />
-          <button
+          {!gate && <button
             type="button" aria-label="Voltar" data-testid="ios-curto-voltar" onClick={voltar}
             className="absolute top-3 left-4 w-11 h-11 rounded-full bg-white text-[#16121c] shadow-[0_2px_12px_rgba(0,0,0,0.18)] grid place-items-center active:scale-95 transition-transform"
           >
             <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
-          </button>
+          </button>}
         </div>
 
         <div className="shrink-0 max-w-sm w-full mx-auto flex flex-col">
@@ -719,7 +760,7 @@ export function PaywallIOS({
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
                 onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
+                  trackEvent("folha_segunda_chance_click", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
                   setSegundaChance("usada");
                   void comprar("anual");
                 }}
@@ -775,17 +816,29 @@ export function PaywallIOS({
                 trackEvent("app_restore_paywall", {});
                 const rc = await import("@/lib/revenuecat");
                 const ok = await rc.restaurar();
-                if (ok) window.location.href = "/";
+                if (ok) { if (gate) concluir(); else window.location.href = "/"; }
               }}
             >
               Restaurar compras
             </button>
           </p>
+          {gate && (
+            <p className="mt-0.5 text-center text-[11px] text-muted-foreground" data-testid="gate-ios-conta">
+              <button type="button" className="underline underline-offset-2" onClick={() => void trocarConta()} data-testid="gate-trocar-conta">Entrar com outra conta</button>
+              {usuarioLogado && (
+                <>
+                  {" · "}
+                  <button type="button" className="underline underline-offset-2" onClick={() => setExcluirAberto(true)} data-testid="gate-excluir-conta">Excluir conta</button>
+                  <DeleteAccountDialog open={excluirAberto} onOpenChange={setExcluirAberto} />
+                </>
+              )}
+            </p>
+          )}
           <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
             <button
               type="button" className="underline underline-offset-2" data-testid="ios-tenho-codigo"
               onClick={async () => {
-                trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: "ios" });
+                trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: FUNIL });
                 const rc = await import("@/lib/revenuecat");
                 const abriu = await rc.abrirResgateApple();
                 if (abriu) setResgatouCodigo(true);
@@ -877,7 +930,7 @@ export function PaywallIOS({
             mesesDeMensal={mesesDeMensal}
             precoMensal={precoMensalTxt}
             economia={textos ? economia : null}
-            onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios", oferta: oferta.oferta, preco: precoAnual }); }}
+            onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: FUNIL, oferta: oferta.oferta, preco: precoAnual }); }}
           />
         </motion.div>
         <MuralDepoimentos area={area} semLoja soAssinatura />
@@ -914,7 +967,7 @@ export function PaywallIOS({
             className="text-[12px] font-semibold text-muted-foreground underline underline-offset-2"
             data-testid="ios-tenho-codigo"
             onClick={async () => {
-              trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: "ios" });
+              trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: FUNIL });
               const rc = await import("@/lib/revenuecat");
               const abriu = await rc.abrirResgateApple();
               if (abriu) setResgatouCodigo(true);
@@ -966,7 +1019,7 @@ export function PaywallIOS({
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
                 onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: "ios", loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
+                  trackEvent("folha_segunda_chance_click", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
                   setSegundaChance("usada");
                   void comprar("anual");
                 }}

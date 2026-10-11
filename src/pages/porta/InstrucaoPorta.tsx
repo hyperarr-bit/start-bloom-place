@@ -25,24 +25,37 @@ export function InstrucaoPorta({ plataforma, metodo, email, hrefLoja, onBaixar }
   onBaixar: () => void;
 }) {
   const android = plataforma === "android";
-  const depois = metodo === "apple"
-    ? <>Depois toque em <b>“Continuar com a Apple”</b>.</>
-    : metodo === "google"
-      ? <>Depois toque em <b>“Continuar com Google”</b>.</>
-      : <>Depois entre com <b className="break-all">{email}</b> e a sua senha.</>;
+  const so = android ? "android" : "ios";
+  /* 10/10 (dono: "tem que ter a parte de continuar com a Apple também explicar"): os DOIS toques com print —
+   * 1) Entrar na tela inicial; 2) o botão do jeito que a conta foi criada, na tela de entrar do app. */
+  const m = metodo === "apple" || metodo === "google" ? metodo : "senha";
+  const segundo = m === "apple"
+    ? <>Toque em <b>“Continuar com a Apple”</b></>
+    : m === "google"
+      ? <>Toque em <b>“Continuar com Google”</b></>
+      : <>Entre com <b className="break-all">{email}</b> e a sua senha</>;
   return (
     <div className="flex-1 flex flex-col" data-testid="porta-instrucao">
       <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: MAGENTA }}>Último passo</p>
       <h1 className="mt-1 text-[30px] font-black tracking-[-0.03em] leading-[1.05]" data-testid="porta-instrucao-titulo">No app, toque em Entrar</h1>
       <p className="mt-2 text-[15.5px] text-[#5b6570] leading-snug">Sua conta já está pronta. <b className="text-[#16121c]">Não toque em Começar.</b></p>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center py-4">
-        <div className="relative h-full max-h-[440px] aspect-[390/844] rounded-[28px] border-[6px] border-[#16121c] bg-[#16121c] overflow-hidden shadow-[0_24px_48px_-20px_rgba(22,18,28,.55)]">
-          <img src={`/como-entrar/1-tela-inicial-${android ? "android" : "ios"}.jpg`} alt="Tela inicial do CORE com o Entrar marcado, logo abaixo do Começar" className="block w-full h-full object-cover rounded-[22px]" data-testid="porta-instrucao-print" />
-        </div>
+      <div className="flex-1 min-h-0 grid grid-cols-2 gap-3 py-4 items-start">
+        {[
+          { n: 1, txt: <>Toque em <b>“Entrar”</b>, abaixo do Começar</>, src: `/como-entrar/1-tela-inicial-${so}.jpg`, alt: "Tela inicial do CORE com o Entrar marcado", id: "porta-instrucao-print" },
+          { n: 2, txt: segundo, src: `/porta/entrar-${m}-${so}.jpg`, alt: "Tela de entrar do CORE com o botão marcado", id: "porta-instrucao-print-2" },
+        ].map((p) => (
+          <div key={p.n} className="flex flex-col items-center text-center">
+            <div className="w-full max-w-[170px] aspect-[390/844] rounded-[22px] border-[5px] border-[#16121c] bg-[#16121c] overflow-hidden shadow-[0_18px_36px_-18px_rgba(22,18,28,.55)]">
+              <img src={p.src} alt={p.alt} className="block w-full h-full object-cover rounded-[17px]" data-testid={p.id} />
+            </div>
+            <div className="mt-3 flex items-start gap-2 text-left">
+              <span className="grid place-items-center w-6 h-6 rounded-full text-white text-[12px] font-black shrink-0" style={{ background: MAGENTA }} aria-hidden>{p.n}</span>
+              <p className="text-[13.5px] leading-snug text-[#16121c]" data-testid={`porta-instrucao-passo-${p.n}`}>{p.txt}</p>
+            </div>
+          </div>
+        ))}
       </div>
-
-      <p className="text-[14px] text-[#16121c] text-center leading-snug pb-2" data-testid="porta-instrucao-depois">{depois}</p>
 
       <BotaoPorta
         texto="Entendi, baixar o CORE" seta={false} icone={android ? undefined : <Apple />}

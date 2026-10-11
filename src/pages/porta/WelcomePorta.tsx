@@ -14,6 +14,9 @@ import { BotaoPorta } from "./BotaoPorta";
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
 export const MOLDURA_WELCOME = "/funil/iphone-mockup.svg";
+/** 10/10: quando o iPhone NEGA o autoplay (Modo Pouca Energia — o dono testou assim), o celular da tela passa
+ *  estas telas do mesmo passeio em sequência (imagem anima sempre; vídeo não). Tiradas dos quadros do vídeo. */
+export const QUADROS_RESERVA = ["/porta/tour/1.jpg", "/porta/tour/2.jpg", "/porta/tour/3.jpg", "/porta/tour/4.jpg", "/porta/tour/5.jpg", "/porta/tour/6.jpg"];
 
 export function WelcomePorta({ onComecar, onEntrar, onVideo }: {
   onComecar: () => void;
@@ -42,6 +45,10 @@ export function WelcomePorta({ onComecar, onEntrar, onVideo }: {
         onVideo?.(false, "autoplay");
       });
     }
+    /* o 1º toque na tela é gesto do usuário: aí o iOS deixa o vídeo rodar mesmo em Pouca Energia */
+    const tentarDeNovo = () => { if (!rodouRef.current) { try { void v.play()?.catch(() => {}); } catch { /* noop */ } } };
+    window.addEventListener("touchstart", tentarDeNovo, { once: true, passive: true });
+    return () => window.removeEventListener("touchstart", tentarDeNovo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -64,7 +71,13 @@ export function WelcomePorta({ onComecar, onEntrar, onVideo }: {
             <div className="wpt-tela">
               {/* autoplay negado (modo economia de bateria, webview): no lugar do vídeo com o botão de
                   play nativo por cima, a tela parada do app (o poster), limpa */}
-              {falhou && <img className="wpt-video" src={POSTER_WELCOME} alt="" draggable={false} data-testid="porta-poster" />}
+              {falhou && (
+                <div className={`wpt-slides${semMovimento ? " wpt-slides-parado" : ""}`} data-testid="porta-poster">
+                  {QUADROS_RESERVA.map((src, i) => (
+                    <img key={src} className="wpt-video wpt-slide" src={src} alt="" draggable={false} style={{ animationDelay: `${i * 2}s` }} />
+                  ))}
+                </div>
+              )}
               <video
                 style={falhou ? { display: "none" } : undefined}
                 ref={videoRef}
@@ -122,6 +135,12 @@ const CSS_WPT = `
 /* sem o botão de play nativo por cima (modo economia de bateria nega o autoplay): fica o poster limpo */
 .wpt-video::-webkit-media-controls, .wpt-video::-webkit-media-controls-start-playback-button, .wpt-video::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; opacity: 0; }
 .wpt-video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; background: #ffffff; }
+/* reserva sem vídeo: 6 telas, 2 s cada, troca com fade de ~0,4 s, em loop (12 s) */
+.wpt-slides { position: relative; width: 100%; height: 100%; }
+.wpt-slide { position: absolute; top: 0; left: 0; opacity: 0; animation: wpt-slide 12s infinite; }
+.wpt-slides-parado .wpt-slide { animation: none; }
+.wpt-slides-parado .wpt-slide:first-child { opacity: 1; }
+@keyframes wpt-slide { 0% { opacity: 0; } 3% { opacity: 1; } 16.67% { opacity: 1; } 20% { opacity: 0; } 100% { opacity: 0; } }
 .wpt-corpo { flex: 0 0 auto; text-align: center; padding: 14px 22px 0; }
 .wpt h1 { margin: 0; font-weight: 900; letter-spacing: -.03em; line-height: 1.08; font-size: 28px; font-size: clamp(25px, 7.4vw, 32px); }
 .wpt-prova { margin: 9px 0 0; font-size: 13.5px; color: #7d8691; }

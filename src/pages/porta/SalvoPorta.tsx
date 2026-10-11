@@ -14,6 +14,11 @@ import { ONDE_FICA_ENTRAR, TEXTO_ENTRAR_NO_APP } from "./conteudo";
  *
  * Quando a aba volta a ficar visível depois do clique na loja, o título vira
  * "Já instalou? Abra o CORE e toque em Entrar".
+ *
+ * 10/10 — COM o código do porta-handoff (`abrirApp` = core://porta?c=…, só iPhone): "Abrir o CORE" logo
+ * abaixo do título (o app troca o código por sessão e abre JÁ LOGADO, no paywall); na volta da loja ele
+ * vira o botão PRINCIPAL e a loja fica secundária. Os passos "toque em Entrar" continuam: são a rede pra
+ * a versão do app que ainda não conhece o link (1.0.14) e pro código que falhar.
  */
 export type Plataforma = "ios" | "android" | "web";
 const MAGENTA = "#d22d80";
@@ -38,7 +43,7 @@ const Apple = () => (
   </svg>
 );
 
-export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null, hrefLoja, qrUrl, onLoja }: {
+export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null, hrefLoja, qrUrl, onLoja, abrirApp = null, onAbrirApp }: {
   email: string;
   metodo: string;
   plataforma: Plataforma;
@@ -48,6 +53,9 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null,
   hrefLoja: (loja: "ios" | "android" | null) => string;
   qrUrl: string;
   onLoja: (loja: "ios" | "android") => void;
+  /** core://porta?c=<código> — null sem código (ou fora do iPhone) */
+  abrirApp?: string | null;
+  onAbrirApp?: (onde: "topo" | "principal") => void;
 }) {
   const android = plataforma === "android";
   const web = plataforma === "web";
@@ -58,8 +66,18 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null,
   return (
     <div className="flex-1 flex flex-col" data-testid="porta-salvo" data-plataforma={plataforma} data-voltou={voltou ? "" : undefined}>
       <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] text-balance" data-testid="porta-salvo-titulo">
-        {voltou ? "Já instalou? Abra o CORE e toque em Entrar" : "Pronto, seu plano está salvo ✓"}
+        {voltou ? (abrirApp ? "Já instalou? Toque em Abrir o CORE" : "Já instalou? Abra o CORE e toque em Entrar") : "Pronto, seu plano está salvo ✓"}
       </h1>
+
+      {abrirApp && !voltou && (
+        <a
+          href={abrirApp} onClick={() => onAbrirApp?.("topo")} data-testid="porta-abrir-app-topo"
+          className="mt-4 flex items-center justify-center gap-2 h-12 rounded-full border-2 text-[15.5px] font-extrabold no-underline active:scale-[.985]"
+          style={{ borderColor: MAGENTA, color: MAGENTA }}
+        >
+          Já instalei: abrir o CORE
+        </a>
+      )}
 
       <div className="mt-4 rounded-2xl border-2 bg-white px-4 py-3" style={{ borderColor: MAGENTA }} data-testid="porta-salvo-email">
         <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">{google ? "Sua conta Google" : metodo === "apple" ? "Sua conta Apple" : "Sua conta"}</p>
@@ -123,6 +141,11 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, contagem = null,
         <BotaoPorta
           texto="Baixar na App Store" seta={false} icone={<Apple />} href={hrefLoja("ios")} onClick={() => onLoja("ios")} testid="porta-loja"
           secundario={{ texto: <>Tenho <b>Android</b></>, href: hrefLoja("android"), onClick: () => onLoja("android"), testid: "porta-loja-android" }}
+        />
+      ) : abrirApp && voltou ? (
+        <BotaoPorta
+          texto="Abrir o CORE" seta={false} href={abrirApp} onClick={() => onAbrirApp?.("principal")} testid="porta-abrir-app"
+          secundario={{ texto: <>Ainda não baixou? <b>App Store</b></>, href: hrefLoja(null), onClick: () => onLoja("ios"), testid: "porta-loja" }}
         />
       ) : (
         <BotaoPorta texto={voltou ? "Abrir a App Store de novo" : "Baixar na App Store"} seta={false} icone={<Apple />} href={hrefLoja(null)} onClick={() => onLoja("ios")} testid="porta-loja" />

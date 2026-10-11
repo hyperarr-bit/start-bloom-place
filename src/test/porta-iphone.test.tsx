@@ -29,6 +29,7 @@ const signUp = vi.fn();
 const signInWithPassword = vi.fn();
 const updateUser = vi.fn();
 const signOut = vi.fn();
+const invoke = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
@@ -38,6 +39,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       updateUser: (...a: unknown[]) => updateUser(...a),
       signOut: (...a: unknown[]) => signOut(...a),
     },
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
     from: () => ({ update: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
   },
 }));
@@ -50,6 +52,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { entrarComApple, entrarComGoogle } from "@/lib/auth-nativo";
 import PortaIphoneRota, { _zerarEstadoPorta } from "@/pages/porta/PortaIphone";
+import AbrirPortaRota from "@/pages/porta/AbrirPorta";
 import { _zerarMemoriaPorta, capturarAtribuicao, decidirGravacao, lerAtribuicao, sessaoDaPorta, CHAVE_ATTR, COOKIE_ATTR } from "@/pages/porta/atribuicao";
 import { DIAS_POR_AREA, PERGUNTA_DOR, mesAlvo, planoDe3Dias, type AreaPorta } from "@/pages/porta/conteudo";
 
@@ -132,7 +135,8 @@ beforeEach(() => {
   nativo(false);
   authState.user = null;
   authState.loading = false;
-  [getUser, signUp, signInWithPassword, updateUser, signOut].forEach((f) => f.mockReset());
+  [getUser, signUp, signInWithPassword, updateUser, signOut, invoke].forEach((f) => f.mockReset());
+  invoke.mockResolvedValue({ data: null, error: { message: "funcao_fora" } });
   vi.mocked(trackEvent).mockClear();
   vi.mocked(trackEventBeacon).mockClear();
   vi.mocked(fireMetaEvent).mockClear();
@@ -658,5 +662,165 @@ describe("conteúdo", () => {
         expect(new Set([p.dia1, p.dia2, p.dia3]).size).toBe(3);
       }
     }
+  });
+});
+
+/* ---------------------------------------------------------------- abrir o app já logado */
+describe("abrir o app JÁ LOGADO (porta-handoff, 10/10)", () => {
+  const CODIGO = "ABCDEFGH23";
+  const LINK = `https://coreaplicativo.com.br/p/${CODIGO}`;
+  const beacons = (nome: string) => vi.mocked(trackEventBeacon).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
+  let writeText: ReturnType<typeof vi.fn>;
+  const clipboard = (impl: () => Promise<void>) => {
+    writeText = vi.fn(impl);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  };
+  afterEach(() => { try { delete (navigator as { clipboard?: unknown }).clipboard; } catch { /* noop */ } });
+
+  /** conta nova por e-mail e senha, até o "Último passo" */
+  const contaCriada = async () => {
+    await ateConta("dinheiro", "gasto_sem_perceber", "300_500");
+    preencherSenha("ana@exemplo.com", "segredo1");
+    signUp.mockResolvedValue({ data: { user: { id: "u-1" }, session: { access_token: "x" } }, error: null });
+    getUser.mockResolvedValue({ data: { user: usuario() } });
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    await waitFor(() => expect(screen.getByTestId("porta-instrucao")).toBeInTheDocument());
+  };
+
+  it("iPhone: pede o código depois da conta; o toque em Baixar copia o link ANTES de sair; tela 7 com 'Abrir o CORE'", async () => {
+    ua(UA.safari);
+    invoke.mockResolvedValue({ data: { codigo: CODIGO, expira_em: "x" }, error: null });
+    clipboard(async () => {});
+    await contaCriada();
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
+    expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "criar" } });
+    expect(invoke).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
+    expect(writeText).toHaveBeenCalledWith(LINK);
+    // a cópia acontece no toque, antes de a página registrar a saída pra loja
+    const ordemLoja = vi.mocked(trackEventBeacon).mock.invocationCallOrder[vi.mocked(trackEventBeacon).mock.calls.findIndex((c) => c[0] === "porta_loja_click")];
+    expect(writeText.mock.invocationCallOrder[0]).toBeLessThan(ordemLoja);
+    await waitFor(() => expect(beacons("porta_clipboard")[0]).toMatchObject({ ok: true, metodo: "clipboard_api" }));
+
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    const topo = screen.getByTestId("porta-abrir-app-topo");
+    expect(topo.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+    fireEvent.click(topo);
+    expect(beacons("porta_abrir_app_click")[0]).toMatchObject({ onde: "topo" });
+
+    // volta da loja: "Abrir o CORE" vira o botão principal; a loja fica secundária
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(screen.getByTestId("porta-salvo-titulo").textContent).toBe("Já instalou? Toque em Abrir o CORE");
+    expect(screen.queryByTestId("porta-abrir-app-topo")).toBeNull();
+    const principal = screen.getByTestId("porta-abrir-app");
+    expect(principal.textContent).toBe("Abrir o CORE");
+    expect(principal.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+    expect(screen.getByTestId("porta-loja").getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei");
+    expect(screen.getByTestId("porta-loja").className).toContain("bpt-link");
+    fireEvent.click(principal);
+    expect(beacons("porta_abrir_app_click")[1]).toMatchObject({ onde: "principal", voltou: true });
+    // os passos do "toque em Entrar" continuam (rede pra app sem o link)
+    expect(screen.getByTestId("porta-passo-2").textContent).toContain("Entrar");
+  });
+
+  it("Instagram recusa a cópia: registra porta_clipboard ok:false e a loja abre igual", async () => {
+    ua(UA.instagram);
+    invoke.mockResolvedValue({ data: { codigo: CODIGO }, error: null });
+    clipboard(async () => { throw Object.assign(new Error("negado"), { name: "NotAllowedError" }); });
+    await contaCriada();
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
+    fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
+    expect(writeText).toHaveBeenCalledWith(LINK);
+    await waitFor(() => expect(beacons("porta_clipboard")[0]).toMatchObject({ ok: false, erro: "NotAllowedError", in_app: true }));
+    expect(beacons("porta_loja_click")[0]).toMatchObject({ loja: "ios" });
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+  });
+
+  it("função fora (ou código inválido): nada copiado, sem 'Abrir o CORE', o fluxo segue com o 'toque em Entrar'", async () => {
+    ua(UA.safari);
+    clipboard(async () => {});
+    await contaCriada();
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: false, erro: "funcao_fora" }));
+    fireEvent.click(screen.getByTestId("porta-instrucao-baixar"));
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("porta-abrir-app-topo")).toBeNull();
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(screen.getByTestId("porta-salvo-titulo").textContent).toBe("Já instalou? Abra o CORE e toque em Entrar");
+    expect(screen.queryByTestId("porta-abrir-app")).toBeNull();
+
+    cleanup(); _zerarEstadoPorta(); localStorage.clear(); invoke.mockReset();
+    invoke.mockResolvedValue({ data: { codigo: "TESTE" }, error: null }); // formato errado = ignorado
+    await contaCriada();
+    await waitFor(() => expect(eventos("porta_codigo").at(-1)).toMatchObject({ ok: false }));
+  });
+
+  it("Android e computador não pedem código (o app Android não resgata; no computador é o QR)", async () => {
+    ua(UA.android);
+    await contaCriada();
+    cleanup(); _zerarEstadoPorta(); localStorage.clear();
+    ua(UA.mac);
+    await ateConta("dinheiro", "gasto_sem_perceber", "300_500");
+    preencherSenha("ana@exemplo.com", "segredo1");
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    expect(invoke).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("porta-abrir-app-topo")).toBeNull();
+  });
+
+  it("recarregou o 'Último passo' logado e sem código: pede 1x", async () => {
+    ua(UA.safari);
+    invoke.mockResolvedValue({ data: { codigo: CODIGO }, error: null });
+    authState.user = usuario();
+    localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "instrucao", escolha: "dinheiro", p2: "esqueco_contas", p3: "nao_sei", eventId: "porta_cr_x", metodo: "senha", email: "ana@exemplo.com" }));
+    montar();
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem("porta-estado-v1")!).codigo).toBe(CODIGO);
+  });
+
+  describe("/p/:codigo (quem cola o link no navegador)", () => {
+    const abrirLink = (codigo: string) => render(
+      <MemoryRouter initialEntries={[`/p/${codigo}`]}>
+        <Routes>
+          <Route path="/p/:codigo" element={<AbrirPortaRota />} />
+          <Route path="*" element={<Onde />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    it("'Abrir o CORE' → core://porta?c=…, 'Baixar' secundário, noindex, evento", () => {
+      ua(UA.safari);
+      const { unmount } = abrirLink("abcdefgh23");
+      expect(screen.getByTestId("porta-abrir-titulo").textContent).toBe("Abrir o CORE");
+      const abrir = screen.getByTestId("porta-abrir-app");
+      expect(abrir.getAttribute("href")).toBe(`core://porta?c=${CODIGO}`);
+      expect(screen.getByTestId("porta-abrir-baixar").getAttribute("href")).toBe("/baixar?origem=porta_link");
+      expect(screen.getByTestId("porta-abrir-baixar").textContent).toBe("Ainda não tem o app? Baixar");
+      expect(document.head.querySelector('meta[name="robots"][data-porta]')?.getAttribute("content")).toMatch(/noindex/);
+      expect(eventos("porta_link_view")[0]).toEqual({ valido: true });
+      fireEvent.click(abrir);
+      expect(beacons("porta_abrir_app_click")[0]).toMatchObject({ onde: "link" });
+      unmount();
+      expect(document.head.querySelector('meta[name="robots"][data-porta]')).toBeNull();
+    });
+
+    it("código torto: sem botão de abrir, ensina o Entrar e oferece baixar", () => {
+      abrirLink("xx");
+      expect(screen.queryByTestId("porta-abrir-app")).toBeNull();
+      expect(screen.getByTestId("porta-abrir-titulo").textContent).toBe("Abra o CORE e toque em Entrar");
+      expect(screen.getByTestId("porta-abrir-baixar").getAttribute("href")).toBe("/baixar?origem=porta_link");
+    });
+
+    it("o app nativo nunca monta /p/ (SoNaWeb + cinto); TrialBanner não cobre", () => {
+      nativo(true);
+      abrirLink(CODIGO);
+      expect(screen.getByTestId("onde").textContent).toBe("/app");
+      const app = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
+      expect(app).toContain('<Route path="/p/:codigo" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />');
+      const banner = readFileSync(join(process.cwd(), "src/components/TrialBanner.tsx"), "utf8");
+      expect(banner).toContain('location.pathname.startsWith("/p/")');
+    });
   });
 });

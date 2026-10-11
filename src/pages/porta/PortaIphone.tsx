@@ -21,6 +21,7 @@ import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
 import { irPraLoja } from "./navegar";
 import { InstrucaoPorta } from "./InstrucaoPorta";
+import { abrirAppComCodigo, codigoDaPortaOk, copiarNoToque, linkDoCodigo } from "./handoff";
 
 /** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
 export const SEGUNDOS_ATE_A_LOJA = 4;
@@ -47,6 +48,9 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
  *   porta_voltou_aba {}
  *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
+ *   porta_codigo {ok, erro}              10/10: pediu o código do "abrir o app já logado" (porta-handoff)
+ *   porta_clipboard {ok, metodo, erro}   copiou o link /p/<código> no toque em "Baixar" (keepalive)
+ *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://porta?c=…) na tela 7
  * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
  */
 export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
@@ -60,6 +64,8 @@ export type EstadoPorta = {
   eventId: string;
   metodo: string | null;
   email: string | null;
+  /** 10/10: código de uso único do porta-handoff (abre o app já logado). Ausente = só o "toque em Entrar". */
+  codigo?: string | null;
 };
 
 export const CHAVE_ESTADO = "porta-estado-v1";
@@ -200,6 +206,26 @@ export function PortaIphone() {
     };
   };
 
+  /* ---------------------------------------------------------- o código do app já logado */
+  /* 10/10: depois da conta, um código de uso único (porta-handoff "criar", 24 h, 1 uso) pra o app abrir
+   * JÁ LOGADO — pelo clipboard (copiado no "Baixar") ou pelo "Abrir o CORE" (core://porta?c=…). Só no
+   * iPhone (o app Android não sabe resgatar). NUNCA bloqueia: falhou, fica só o "toque em Entrar". */
+  const pedirCodigo = async (): Promise<void> => {
+    if (plataformaDaWeb() !== "ios") return;
+    try {
+      const { data, error } = await supabase.functions.invoke("porta-handoff", { body: { acao: "criar" } });
+      const codigo = (data as { codigo?: unknown } | null)?.codigo;
+      if (error || !codigoDaPortaOk(codigo)) {
+        trackEvent("porta_codigo", { ok: false, erro: (error?.message || "sem_codigo").slice(0, 120), ...ids() });
+        return;
+      }
+      setEstado((x) => ({ ...x, codigo }));
+      trackEvent("porta_codigo", { ok: true, ...ids() });
+    } catch (e) {
+      trackEvent("porta_codigo", { ok: false, erro: String(e).slice(0, 120), ...ids() });
+    }
+  };
+
   /* ---------------------------------------------------------- a conta */
   const concluindo = useRef(false);
   const concluir = useCallback(async (metodo: string): Promise<Resultado> => {
@@ -227,6 +253,7 @@ export function PortaIphone() {
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });
       // 10/10: no celular, antes da tela 7, o "Último passo: no app, toque em Entrar" (computador vai direto pro QR)
       setEstado((x) => ({ ...x, passo: plataformaDaWeb() === "web" ? "salvo" : "instrucao", metodo, email: u.email ?? x.email, eventId }));
+      void pedirCodigo();
       return { ok: true };
     } catch {
       concluindo.current = false;
@@ -308,6 +335,16 @@ export function PortaIphone() {
     trackEvent("porta_conta_iniciada", { metodo: "sessao", ...ids() });
     return concluir("sessao");
   };
+
+  /* recarregou no "Último passo"/tela 7 sem código (o pedido falhou ou a conta veio de outra aba): tenta 1x */
+  const pediuNaVolta = useRef(false);
+  useEffect(() => {
+    if (pediuNaVolta.current || authLoading || !user) return;
+    if ((estado.passo !== "instrucao" && estado.passo !== "salvo") || codigoDaPortaOk(estado.codigo)) return;
+    pediuNaVolta.current = true;
+    void pedirCodigo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, estado.passo]);
 
   /* ---------------------------------------------------------- tela 7: loja */
   const clicouLoja = useRef(false);
@@ -423,6 +460,12 @@ export function PortaIphone() {
         email={estado.email ?? user?.email ?? ""}
         hrefLoja={hrefLoja(loja)}
         onBaixar={() => {
+          // 10/10: o link do app já logado vai pra área de transferência AGORA, dentro do toque (antes de a
+          // página sair pra loja) — o app lê na 1ª abertura. No Instagram a cópia pode ser recusada: registra.
+          const codigo = estadoRef.current.codigo;
+          if (codigoDaPortaOk(codigo)) {
+            copiarNoToque(linkDoCodigo(codigo), (r) => trackEventBeacon("porta_clipboard", { ok: r.ok, metodo: r.metodo, erro: r.erro ?? null, in_app: emInApp, ...ids() }));
+          }
           passoFeito("instrucao", "baixar");
           onLoja(loja, "botao");
           try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
@@ -441,6 +484,8 @@ export function PortaIphone() {
         hrefLoja={hrefLoja}
         qrUrl={URL_QR}
         onLoja={onLoja}
+        abrirApp={plataforma === "ios" && codigoDaPortaOk(estado.codigo) ? abrirAppComCodigo(estado.codigo) : null}
+        onAbrirApp={(onde) => trackEventBeacon("porta_abrir_app_click", { onde, voltou, metodo: estado.metodo, ...ids() })}
       />
     );
   }

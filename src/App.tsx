@@ -189,8 +189,8 @@ const RootGate = () => {
     // recomeçar a venda pra quem está no meio do teste. Expirado, o
     // ProtectedRoute manda pro paywall do dia 3.
     if (testeLiberado()) return <Navigate to="/home" replace />;
-    // 10/10 (build 38): na 1ª abertura do iPhone, antes da welcome, o "abrir já logado" da Porta
-    // (link core://porta ou o link copiado no clipboard). Fora disso é o mesmo Navigate de sempre.
+    // 10/10 (build 38): no iPhone, antes da welcome, o "abrir já logado" da Porta (o app abriu por
+    // core://entrar?h=<código>). Sem link é o mesmo Navigate de sempre. Nunca lê o clipboard.
     return <PortaPrimeiraAbertura semPorta={ENTRADA_APP} />;
   }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve

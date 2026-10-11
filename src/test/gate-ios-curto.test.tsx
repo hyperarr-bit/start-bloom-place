@@ -14,7 +14,7 @@ import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-libra
 import { MemoryRouter } from "react-router-dom";
 
 const estado = vi.hoisted(() => ({
-  auth: { user: { id: "uid-porta", email: "ana@exemplo.com", created_at: new Date().toISOString() }, loading: false, trialExpired: false, noTrial: true, isSubscribed: false, subLoaded: true, trialDay: 1, trialHoursLeft: 0 },
+  auth: { user: { id: "uid-porta", email: "ana@exemplo.com", created_at: new Date().toISOString(), user_metadata: {} as Record<string, unknown> }, loading: false, trialExpired: false, noTrial: true, isSubscribed: false, subLoaded: true, trialDay: 1, trialHoursLeft: 0 },
   metadataCurto: null as null | "on" | "off",
 }));
 const rcMock = vi.hoisted(() => ({
@@ -90,6 +90,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { signOut: 
 import { trackEvent } from "@/lib/analytics";
 import { CHAVE_FORCA_OFERTAS, _zerarChavesRemotas } from "@/lib/ofertas-saida";
 import { TrialBanner } from "@/components/TrialBanner";
+import { _zerarParabens, linhaDoPlano } from "@/components/porta/ParabensPorta";
 
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
 const plataforma = (p: "ios" | "android") => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => p }; };
@@ -99,6 +100,8 @@ let href = "";
 beforeEach(() => {
   localStorage.clear();
   _zerarChavesRemotas();
+  _zerarParabens();
+  estado.auth.user.user_metadata = {};
   estado.metadataCurto = null;
   vi.mocked(trackEvent).mockClear();
   [rcMock.identificar, rcMock.comprarAnual, rcMock.restaurar, notif.resgate, notif.cancelarResgate, notif.cancelarRegua, notif.recuperar, signOut].forEach((f) => f.mockClear());
@@ -188,5 +191,55 @@ describe("fora do iPhone com a chave: o gate de sempre", () => {
     montar();
     expect(screen.getByTestId("paywall-assinatura").textContent).toBe("gate");
     expect(screen.queryByTestId("gate-ios-curto")).toBeNull();
+  });
+});
+
+describe("'Você ganhou 3 dias grátis' — conta da Porta (user_metadata.porta), antes do paywall", () => {
+  const daPorta = (area: string | null = "rotina") => { estado.auth.user.user_metadata = { porta: { respostas: { area, rota: area } } }; };
+
+  it("mostra a tela (título, o plano da área do site, 'Continuar'); sem preço; Continuar → o paywall curto, sem comprar nada", async () => {
+    daPorta("rotina");
+    montar();
+    expect(screen.getByTestId("porta-parabens-titulo").textContent).toBe("Você ganhou 3 dias grátis");
+    expect(screen.getByTestId("porta-parabens-plano").textContent).toBe("Seu plano de Rotina já está salvo.");
+    expect(document.body.textContent).not.toMatch(/R\$|\d+,90|por ano|\/mês/);
+    expect(screen.queryByTestId("ios-curto")).toBeNull();
+    expect(eventos("porta_parabens_visto")[0]).toEqual({ area: "rotina" });
+    expect(rcMock.comprarAnual).not.toHaveBeenCalled();
+    expect(rcMock.restaurar).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("porta-parabens-continuar"));
+    expect(eventos("porta_parabens_continuar")[0]).toEqual({ area: "rotina" });
+    expect(await screen.findByTestId("ios-curto")).toBeInTheDocument();
+    expect(rcMock.comprarAnual).not.toHaveBeenCalled();
+    // a área do site vira a área do app (a Missão do dia 1 abre nela)
+    expect(localStorage.getItem("core-funnel-area")).toBe("rotina");
+  });
+
+  it("1x por sessão do app: remontar o gate na mesma sessão vai direto pro paywall", async () => {
+    daPorta();
+    montar();
+    fireEvent.click(screen.getByTestId("porta-parabens-continuar"));
+    cleanup();
+    montar();
+    expect(screen.queryByTestId("porta-parabens")).toBeNull();
+    expect(await screen.findByTestId("ios-curto")).toBeInTheDocument();
+  });
+
+  it("conta SEM porta: direto no paywall curto; Android com porta: o gate de sempre, sem a tela", async () => {
+    montar();
+    expect(screen.queryByTestId("porta-parabens")).toBeNull();
+    expect(await screen.findByTestId("ios-curto")).toBeInTheDocument();
+    cleanup();
+    daPorta();
+    plataforma("android");
+    montar();
+    expect(screen.queryByTestId("porta-parabens")).toBeNull();
+    expect(screen.getByTestId("paywall-assinatura").textContent).toBe("gate");
+  });
+
+  it("a linha do plano: área conhecida pelo nome; 'tudo'/sem área = 'Seu plano de 3 dias'", () => {
+    expect(linhaDoPlano({ respostas: { area: "dinheiro" } })).toBe("Seu plano de Dinheiro já está salvo.");
+    expect(linhaDoPlano({ respostas: { area: "tudo" } })).toBe("Seu plano de 3 dias já está salvo.");
+    expect(linhaDoPlano(null)).toBe("Seu plano de 3 dias já está salvo.");
   });
 });

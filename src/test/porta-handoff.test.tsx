@@ -2,12 +2,12 @@
  * PORTA → APP JÁ LOGADO (10/10, build 38): o app troca o código da Porta (site) por sessão.
  *
  * O que não pode quebrar:
- *   · `core://porta?c=…` vira SESSÃO (não rota), no arranque frio e com o app aberto; entrou → /home;
+ *   · `core://entrar?h=…` vira SESSÃO (não rota), no arranque frio e com o app aberto; entrou → /home;
+ *     `core://entrar` sem código abre o /entrar;
  *   · o resgate chama a função, faz verifyOtp com o token_hash e registra porta_handoff {via, ok, motivo};
  *   · assinante logado NUNCA é deslogado; conta sem assinatura troca (limpando o cache da anterior);
- *   · o clipboard só é LIDO (aviso do iOS) quando o detectPatterns disse que há URL; 1x por instalação;
- *     sem URL a welcome não espera mais que 400 ms; Android não faz nada;
- *   · a 1ª abertura sem conta: Porta deu certo → /home; código da Porta falhou → /entrar; nada → welcome.
+ *   · a abertura sem conta: link da Porta deu certo → /home; código falhou → /entrar; sem link → welcome;
+ *   · área de transferência é PROIBIDA: nada no app a lê (o código-fonte é conferido abaixo).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
@@ -41,14 +41,12 @@ vi.mock("@capacitor/app", () => ({
 vi.mock("@/lib/auth-nativo", () => ({ ehRetornoDeLogin: (u?: string) => !!u && u.startsWith("core://auth"), sessaoDoLink: vi.fn(), fecharNavegador: vi.fn() }));
 
 import { trackEvent } from "@/lib/analytics";
-import {
-  CHAVE_CLIPBOARD_TENTADO, LIMITE_DETECCAO_MS, _trocarPlugin, _zerarHandoff, codigoDoLinkDaPorta, resgatarCodigo,
-  tentarClipboardDaPorta,
-} from "@/lib/porta-handoff";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { _zerarHandoff, codigoDoLinkDaPorta, ehLinkDeEntrar, resgatarCodigo } from "@/lib/porta-handoff";
 import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
 
 const CODIGO = "ABCDEFGH23";
-const LINK = `https://coreaplicativo.com.br/p/${CODIGO}`;
 const sessao = (email: string) => ({ data: { session: { user: { id: `id-${email}`, email } } } });
 const semSessao = () => ({ data: { session: null } });
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
@@ -75,20 +73,8 @@ const nativo = (plataforma: "ios" | "android" | null) => {
   else delete (window as { Capacitor?: unknown }).Capacitor;
 };
 
-type Nativo = { clipboardTemLink: ReturnType<typeof vi.fn>; clipboardLer: ReturnType<typeof vi.fn>; clipboardLimpar: ReturnType<typeof vi.fn> };
-const pluginFalso = (o: { temUrl?: boolean | "nunca"; texto?: string | null } = {}): Nativo => {
-  const n: Nativo = {
-    clipboardTemLink: vi.fn(() => (o.temUrl === "nunca" ? new Promise(() => {}) : Promise.resolve({ temUrl: !!o.temUrl }))),
-    clipboardLer: vi.fn(async () => ({ texto: o.texto ?? null, versao: 7 })),
-    clipboardLimpar: vi.fn(async () => ({ limpou: true })),
-  };
-  _trocarPlugin(Promise.resolve({ nativo: n as never }));
-  return n;
-};
-
 beforeEach(() => {
   _zerarHandoff();
-  _trocarPlugin(null);
   [getSession, verifyOtp, signInWithPassword, invoke, purgeLocalUserCache].forEach((f) => f.mockReset());
   vi.mocked(trackEvent).mockClear();
   getSession.mockResolvedValue(semSessao());
@@ -103,19 +89,29 @@ afterEach(() => { cleanup(); nativo(null); vi.useRealTimers(); });
 
 /* ---------------------------------------------------------------- o link */
 describe("links da Porta", () => {
-  it("core://porta?c=… e https://coreaplicativo.com.br/p/… dão o código; o resto não", () => {
-    expect(codigoDoLinkDaPorta(`core://porta?c=${CODIGO.toLowerCase()}`)).toBe(CODIGO);
-    expect(codigoDoLinkDaPorta(LINK)).toBe(CODIGO);
-    expect(codigoDoLinkDaPorta(`https://www.coreaplicativo.com.br/p/${CODIGO}/`)).toBe(CODIGO);
-    expect(codigoDoLinkDaPorta(` ${LINK} `)).toBe(CODIGO);
-    expect(codigoDoLinkDaPorta("core://porta?c=TESTE")).toBe("TESTE"); // formato torto: o resgate recusa e registra
+  it("core://entrar?h=… (e o futuro https://coreaplicativo.com.br/abrir?h=…) dão o código; o resto não", () => {
+    expect(codigoDoLinkDaPorta(`core://entrar?h=${CODIGO.toLowerCase()}`)).toBe(CODIGO);
+    expect(codigoDoLinkDaPorta(`https://coreaplicativo.com.br/abrir?h=${CODIGO}`)).toBe(CODIGO);
+    expect(codigoDoLinkDaPorta(`https://www.coreaplicativo.com.br/abrir/?h=${CODIGO}`)).toBe(CODIGO);
+    expect(codigoDoLinkDaPorta("core://entrar?h=TESTE")).toBe("TESTE"); // formato torto: o resgate recusa e registra
+    expect(codigoDoLinkDaPorta("core://entrar")).toBeNull();
+    expect(codigoDoLinkDaPorta(`core://porta?c=${CODIGO}`)).toBeNull(); // o esquema antigo morreu antes de sair
     expect(codigoDoLinkDaPorta("core://financas")).toBeNull();
-    expect(codigoDoLinkDaPorta("core://porta")).toBeNull();
-    expect(codigoDoLinkDaPorta(`http://coreaplicativo.com.br/p/${CODIGO}`)).toBeNull();
-    expect(codigoDoLinkDaPorta(`https://outro.com/p/${CODIGO}`)).toBeNull();
-    expect(codigoDoLinkDaPorta("https://coreaplicativo.com.br/comece")).toBeNull();
-    expect(codigoDoLinkDaPorta("https://www.instagram.com/p/abc")).toBeNull();
+    expect(codigoDoLinkDaPorta(`http://coreaplicativo.com.br/abrir?h=${CODIGO}`)).toBeNull();
+    expect(codigoDoLinkDaPorta(`https://outro.com/abrir?h=${CODIGO}`)).toBeNull();
+    expect(codigoDoLinkDaPorta(`https://coreaplicativo.com.br/p/${CODIGO}`)).toBeNull();
     expect(codigoDoLinkDaPorta(null)).toBeNull();
+    expect(ehLinkDeEntrar("core://entrar")).toBe(true);
+    expect(ehLinkDeEntrar("core://financas")).toBe(false);
+  });
+
+  it("PROIBIDO clipboard: nada do app lê a área de transferência", () => {
+    const raiz = process.cwd();
+    const fontes = ["src/lib/porta-handoff.ts", "src/components/PortaPrimeiraAbertura.tsx", "src/lib/deep-link.ts", "ios/App/App/AppDelegate.swift"]
+      .map((f) => readFileSync(join(raiz, f), "utf8"));
+    for (const f of fontes) {
+      expect(f).not.toMatch(/UIPasteboard|navigator\.clipboard|clipboardLer|clipboardTemLink|detectPatterns/);
+    }
   });
 });
 
@@ -131,7 +127,7 @@ describe("deep link core://porta (deep-link.ts)", () => {
   };
 
   it("arranque frio (getLaunchUrl): resgata, verifyOtp com o token_hash, vai pro /home (nunca a welcome)", async () => {
-    app.launch = `core://porta?c=${CODIGO}`;
+    app.launch = `core://entrar?h=${CODIGO}`;
     const navegar = await ligar();
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"));
     expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "resgatar", codigo: CODIGO, via: "link" } });
@@ -141,15 +137,17 @@ describe("deep link core://porta (deep-link.ts)", () => {
   it("app aberto (appUrlOpen, na welcome): mesma coisa; os atalhos de módulo seguem funcionando", async () => {
     const navegar = await ligar();
     expect(navegar).not.toHaveBeenCalled();
-    app.ouvintes[0]({ url: `core://porta?c=${CODIGO}` });
+    app.ouvintes[0]({ url: `core://entrar?h=${CODIGO}` });
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"));
     app.ouvintes[0]({ url: "core://financas" });
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/financas"));
+    app.ouvintes[0]({ url: "core://entrar" }); // sem código: só a tela de entrar
+    await waitFor(() => expect(navegar).toHaveBeenCalledWith("/entrar"));
   });
 
   it("código recusado e sem conta no aparelho → /entrar (ela tem conta: veio da Porta)", async () => {
     servidor({ resgate: erroHttp({ erro: "codigo" }) });
-    app.launch = `core://porta?c=${CODIGO}`;
+    app.launch = `core://entrar?h=${CODIGO}`;
     const navegar = await ligar();
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/entrar"));
     expect(verifyOtp).not.toHaveBeenCalled();
@@ -158,7 +156,7 @@ describe("deep link core://porta (deep-link.ts)", () => {
   it("assinante logado: o link não faz nada (nem desloga, nem navega)", async () => {
     getSession.mockResolvedValue(sessao("assina@exemplo.com"));
     servidor({ assinante: true });
-    app.launch = `core://porta?c=${CODIGO}`;
+    app.launch = `core://entrar?h=${CODIGO}`;
     const navegar = await ligar();
     await waitFor(() => expect(eventos("porta_handoff")).toHaveLength(1));
     expect(navegar).not.toHaveBeenCalled();
@@ -176,9 +174,9 @@ describe("resgatarCodigo", () => {
 
   it("código recusado pela função (400 { erro: 'codigo' }) → motivo codigo, sem verifyOtp", async () => {
     servidor({ resgate: erroHttp({ erro: "codigo" }) });
-    expect(await resgatarCodigo(CODIGO, "clipboard")).toEqual({ ok: false, motivo: "codigo" });
+    expect(await resgatarCodigo(CODIGO, "link")).toEqual({ ok: false, motivo: "codigo" });
     expect(verifyOtp).not.toHaveBeenCalled();
-    expect(eventos("porta_handoff")[0]).toMatchObject({ via: "clipboard", ok: false, motivo: "codigo" });
+    expect(eventos("porta_handoff")[0]).toMatchObject({ via: "link", ok: false, motivo: "codigo" });
   });
 
   it("limite (429), rede fora e formato torto", async () => {
@@ -203,8 +201,8 @@ describe("resgatarCodigo", () => {
     expect(await resgatarCodigo(CODIGO, "link")).toEqual({ ok: false, motivo: "sessao" });
   });
 
-  it("o mesmo código por dois caminhos na mesma abertura: UM resgate", async () => {
-    const [a, b] = await Promise.all([resgatarCodigo(CODIGO, "link"), resgatarCodigo(CODIGO, "clipboard")]);
+  it("o mesmo código por dois caminhos no arranque frio (deep-link + abertura): UM resgate", async () => {
+    const [a, b] = await Promise.all([resgatarCodigo(CODIGO, "link"), resgatarCodigo(CODIGO, "link")]);
     expect(a).toBe(b);
     expect(invoke.mock.calls.filter((c) => c[0] === "porta-handoff")).toHaveLength(1);
   });
@@ -245,66 +243,6 @@ describe("resgatarCodigo", () => {
   });
 });
 
-/* ---------------------------------------------------------------- clipboard */
-describe("área de transferência (1ª abertura do iPhone)", () => {
-  it("detectPatterns diz que NÃO há URL: nunca lê (sem aviso do iOS) e segue", async () => {
-    const n = pluginFalso({ temUrl: false });
-    expect(await tentarClipboardDaPorta()).toBeNull();
-    expect(n.clipboardTemLink).toHaveBeenCalledTimes(1);
-    expect(n.clipboardLer).not.toHaveBeenCalled();
-    expect(eventos("porta_clip_check")[0]).toEqual({ tem_url: false, nosso: false });
-  });
-
-  it("há URL e é o nosso link: lê, resgata e limpa o clipboard (pela versão lida)", async () => {
-    const n = pluginFalso({ temUrl: true, texto: LINK });
-    const r = await tentarClipboardDaPorta();
-    expect(r).toEqual({ ok: true, motivo: "ok", trocouConta: false });
-    expect(n.clipboardLer).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenCalledWith("porta-handoff", { body: { acao: "resgatar", codigo: CODIGO, via: "clipboard" } });
-    expect(n.clipboardLimpar).toHaveBeenCalledWith({ versao: 7 });
-    expect(eventos("porta_handoff")[0]).toMatchObject({ via: "clipboard", ok: true });
-  });
-
-  it("há URL mas não é nosso (link do Instagram): não resgata, não limpa", async () => {
-    const n = pluginFalso({ temUrl: true, texto: "https://www.instagram.com/p/abc" });
-    expect(await tentarClipboardDaPorta()).toBeNull();
-    expect(invoke).not.toHaveBeenCalled();
-    expect(n.clipboardLimpar).not.toHaveBeenCalled();
-    expect(eventos("porta_clip_check")[0]).toMatchObject({ tem_url: true, nosso: false });
-  });
-
-  it("no máximo 1x por instalação (a flag fica mesmo sem link)", async () => {
-    const n = pluginFalso({ temUrl: false });
-    await tentarClipboardDaPorta();
-    expect(localStorage.getItem(CHAVE_CLIPBOARD_TENTADO)).toBe("1");
-    await tentarClipboardDaPorta();
-    pluginFalso({ temUrl: true, texto: LINK });
-    await tentarClipboardDaPorta();
-    expect(n.clipboardTemLink).toHaveBeenCalledTimes(1);
-    expect(invoke).not.toHaveBeenCalled();
-  });
-
-  it(`o nativo não responde: em ${LIMITE_DETECCAO_MS} ms segue pra welcome`, async () => {
-    vi.useFakeTimers();
-    const n = pluginFalso({ temUrl: "nunca" });
-    let fim: unknown = "pendente";
-    void tentarClipboardDaPorta().then((r) => { fim = r; });
-    await vi.advanceTimersByTimeAsync(LIMITE_DETECCAO_MS - 50);
-    expect(fim).toBe("pendente");
-    await vi.advanceTimersByTimeAsync(60);
-    expect(fim).toBeNull();
-    expect(n.clipboardLer).not.toHaveBeenCalled();
-  });
-
-  it("Android (e web): não olha o clipboard", async () => {
-    nativo("android");
-    const n = pluginFalso({ temUrl: true, texto: LINK });
-    expect(await tentarClipboardDaPorta()).toBeNull();
-    expect(n.clipboardTemLink).not.toHaveBeenCalled();
-    expect(localStorage.getItem(CHAVE_CLIPBOARD_TENTADO)).toBeNull();
-  });
-});
-
 /* ---------------------------------------------------------------- a 1ª abertura (RootGate) */
 describe("PortaPrimeiraAbertura (no lugar do Navigate pra welcome)", () => {
   const Onde = () => { const l = useLocation(); return <p data-testid="onde">{l.pathname}</p>; };
@@ -317,45 +255,39 @@ describe("PortaPrimeiraAbertura (no lugar do Navigate pra welcome)", () => {
     </MemoryRouter>,
   );
 
-  it("já olhou nesta instalação (ou Android): welcome NA HORA, sem tocar no nativo", () => {
-    localStorage.setItem(CHAVE_CLIPBOARD_TENTADO, "1");
-    const n = pluginFalso({ temUrl: true, texto: LINK });
-    montar();
-    expect(screen.getByTestId("onde").textContent).toBe("/app");
-    cleanup();
-    localStorage.clear();
+  it("Android (e web): welcome NA HORA", () => {
     nativo("android");
     montar();
     expect(screen.getByTestId("onde").textContent).toBe("/app");
-    expect(n.clipboardTemLink).not.toHaveBeenCalled();
   });
 
-  it("sem link no clipboard: welcome", async () => {
-    pluginFalso({ temUrl: false });
+  it("iPhone sem link: welcome (sem resgate, sem aviso nenhum)", async () => {
     montar();
     await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/app"));
+    expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("link da Porta no clipboard: entra e vai pro /home (o gate do paywall), nunca a welcome", async () => {
-    pluginFalso({ temUrl: true, texto: LINK });
+  it("abriu frio pelo 'Abrir o CORE' (core://entrar?h=…): entra e vai pro /home, nunca a welcome", async () => {
+    app.launch = `core://entrar?h=${CODIGO}`;
     montar();
     await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/home"));
     expect(verifyOtp).toHaveBeenCalledTimes(1);
-  });
-
-  it("abriu frio pelo 'Abrir o CORE' (core://porta): resgata ESSE e não lê o clipboard", async () => {
-    app.launch = `core://porta?c=${CODIGO}`;
-    const n = pluginFalso({ temUrl: true, texto: LINK });
-    montar();
-    await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/home"));
-    expect(n.clipboardLer).not.toHaveBeenCalled();
     expect(eventos("porta_handoff")[0]).toMatchObject({ via: "link", ok: true });
   });
 
   it("o link era da Porta mas o código não vale (usado/vencido): /entrar", async () => {
     servidor({ resgate: erroHttp({ erro: "codigo" }) });
-    pluginFalso({ temUrl: true, texto: LINK });
+    app.launch = `core://entrar?h=${CODIGO}`;
     montar();
     await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/entrar"));
+  });
+
+  it("o link de abertura vale UMA vez por processo (sair da conta e voltar pra '/' não resgata de novo)", async () => {
+    app.launch = `core://entrar?h=${CODIGO}`;
+    montar();
+    await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/home"));
+    cleanup();
+    montar();
+    await waitFor(() => expect(screen.getByTestId("onde").textContent).toBe("/app"));
   });
 });

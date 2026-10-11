@@ -2,26 +2,19 @@
  * PORTA → APP JÁ LOGADO (10/10, build 38).
  *
  * A Porta iPhone (coreaplicativo.com.br/comece) cria a conta NO SITE e manda a
- * pessoa pra App Store. Até aqui o app abria na welcome e ela tinha que achar o
- * "Entrar" e digitar o e-mail de novo. Agora o site entrega ao app um CÓDIGO de
- * uso único (função `porta-handoff`, 24 h, 1 uso) por dois caminhos:
+ * pessoa pra App Store. Pra o app abrir JÁ LOGADO, o site pede um CÓDIGO de uso
+ * único (função `porta-handoff`, 24 h, 1 uso) e mostra, na volta da loja, o
+ * botão "Abrir o CORE" → `core://entrar?h=<código>` (o mesmo link da página
+ * /abrir?h=<código> do site). App fechado (getLaunchUrl) ou aberto (appUrlOpen),
+ * ver deep-link.ts e PortaPrimeiraAbertura. `core://entrar` sem `h` só abre o /entrar.
  *
- *   1. ÁREA DE TRANSFERÊNCIA (o principal: a pessoa toca "Abrir" na própria App
- *      Store). No toque em "Baixar" o site copiou
- *      `https://coreaplicativo.com.br/p/<código>`. Na 1ª abertura do app (sem
- *      sessão, nunca tentado nesta instalação) o nativo pergunta ao iOS SE há um
- *      link no clipboard (`detectPatterns` — não mostra aviso nenhum); só se
- *      houver, lê o texto (aí o iOS mostra "Permitir colar?"), confere se é o
- *      nosso link e resgata. Sem link: segue pra welcome, sem atraso (≤ 400 ms).
- *   2. LINK `core://porta?c=<código>` — o botão "Abrir o CORE" da tela 7 da
- *      Porta e da página /p/<código>. App fechado (getLaunchUrl) ou aberto
- *      (appUrlOpen), ver deep-link.ts.
+ * ÁREA DE TRANSFERÊNCIA É PROIBIDA (dono 10/10): o "CORE quer colar…" do iOS é
+ * feio e, com "Não Permitir", quebra o atalho. Nada aqui lê o clipboard.
  *
  * O resgate: a função devolve o token_hash de um magic link e o app faz
- * `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })`. Com a sessão,
- * o caminho normal do app (RootGate → /home → gate PaywallAssinatura) mostra o
- * paywall do teste de 3 dias; o RevenueCat faz logIn com o uid no
- * onAuthStateChange (use-auth).
+ * `supabase.auth.verifyOtp({ token_hash, type: "magiclink" })`. Com a sessão, o
+ * RootGate leva pra /home e o gate (TrialBanner) mostra "Você ganhou 3 dias
+ * grátis" (conta da Porta) e o paywall curto; o RevenueCat faz logIn com o uid.
  *
  * REGRA DA CONTA QUE JÁ ESTÁ NO APARELHO: se já houver sessão, o app só troca
  * de conta se a atual NÃO tem assinatura. Assinante logado nunca é deslogado
@@ -30,14 +23,13 @@
  * da MESMA conta, nada muda. Ao trocar, limpa o cache local da conta anterior
  * (a mesma vassoura do signOut), pra nada vazar de uma conta pra outra.
  *
- * Eventos: porta_handoff {via: "link"|"clipboard", ok, motivo, trocou_conta};
- *          porta_clip_check {tem_url, nosso} (1x por instalação, só iPhone).
+ * Evento: porta_handoff {via: "link", ok, motivo, trocou_conta}.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { plataformaApp } from "@/lib/native-shell";
 
-export type ViaHandoff = "link" | "clipboard";
+export type ViaHandoff = "link";
 export type MotivoHandoff =
   | "ok" | "mesma_conta" | "formato" | "codigo" | "limite" | "rede" | "servidor" | "sessao" | "assinante_logado";
 export type ResultadoHandoff = { ok: boolean; motivo: MotivoHandoff; trocouConta?: boolean };
@@ -47,25 +39,34 @@ export const RE_CODIGO_PORTA = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{10}$/;
 export const normalizarCodigo = (v: unknown): string =>
   String(v ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
 
+/** O link é da Porta? (`core://entrar`, com ou sem código) */
+export function ehLinkDeEntrar(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(String(url).trim());
+    return u.protocol === "core:" && (u.hostname || u.pathname.replace(/^\/+/, "")).toLowerCase() === "entrar";
+  } catch {
+    return false;
+  }
+}
+
 /**
- * O código de um link da Porta, ou null. Aceita `core://porta?c=<código>` e
- * `https://coreaplicativo.com.br/p/<código>` (o que o site copia). Formato
- * torto devolve o texto normalizado mesmo assim (o resgate recusa com "formato"
- * e registra) — só não aceita link que não seja da Porta.
+ * O código de um link da Porta, ou null. Aceita `core://entrar?h=<código>` e (pro
+ * dia em que existir universal link) `https://coreaplicativo.com.br/abrir?h=<código>`.
+ * Formato torto devolve o texto normalizado mesmo assim (o resgate recusa com
+ * "formato" e registra) — só não aceita link que não seja da Porta.
  */
 export function codigoDoLinkDaPorta(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
     const u = new URL(String(url).trim());
     if (u.protocol === "core:") {
-      const alvo = (u.hostname || u.pathname.replace(/^\/+/, "")).toLowerCase();
-      if (alvo !== "porta") return null;
-      const c = normalizarCodigo(u.searchParams.get("c"));
+      if (!ehLinkDeEntrar(url)) return null;
+      const c = normalizarCodigo(u.searchParams.get("h"));
       return c || null;
     }
-    if (u.protocol === "https:" && /^(www\.)?coreaplicativo\.com\.br$/i.test(u.hostname)) {
-      const m = /^\/p\/([^/]+)\/?$/.exec(u.pathname);
-      const c = m ? normalizarCodigo(decodeURIComponent(m[1])) : "";
+    if (u.protocol === "https:" && /^(www\.)?coreaplicativo\.com\.br$/i.test(u.hostname) && /^\/abrir\/?$/.test(u.pathname)) {
+      const c = normalizarCodigo(u.searchParams.get("h"));
       return c || null;
     }
     return null;
@@ -134,11 +135,11 @@ async function limparContaAnterior(): Promise<void> {
   } catch { /* noop */ }
 }
 
-/* O mesmo código pode chegar por dois caminhos na mesma abertura (o "Abrir o CORE" abre o app recém-
- * instalado com o link E o clipboard tem o mesmo código): um resgate só, os dois esperam a mesma promessa. */
+/* O mesmo link chega por dois caminhos no arranque frio (o deep-link.ts lê o getLaunchUrl E a
+ * PortaPrimeiraAbertura também): um resgate só, os dois esperam a mesma promessa. */
 const emCurso = new Map<string, Promise<ResultadoHandoff>>();
 /** só pros testes */
-export function _zerarHandoff(): void { emCurso.clear(); }
+export function _zerarHandoff(): void { emCurso.clear(); aberturaLida = false; }
 
 /** Troca o código por sessão. Nunca lança. */
 export function resgatarCodigo(codigoCru: string, via: ViaHandoff): Promise<ResultadoHandoff> {
@@ -185,32 +186,10 @@ async function resgatar(codigo: string, via: ViaHandoff): Promise<ResultadoHando
   }
 }
 
-/* ------------------------------------------------------------------ área de transferência */
+/* ------------------------------------------------------------------ link de abertura */
 
-/** Flag do APARELHO (fora das chaves que a vassoura do logout leva: não começa com "core-"). */
-export const CHAVE_CLIPBOARD_TENTADO = "porta-clip-tentado";
-/** Teto pra perguntar ao iOS se há link no clipboard: sem link, a welcome não espera mais que isso. */
+/** Teto pra ler o link de abertura: sem link, a welcome não espera mais que isso. */
 export const LIMITE_DETECCAO_MS = 400;
-
-type PluginClipboard = {
-  clipboardTemLink(): Promise<{ temUrl: boolean }>;
-  clipboardLer(): Promise<{ texto?: string | null; versao?: number }>;
-  clipboardLimpar(o: { versao: number }): Promise<{ limpou: boolean }>;
-};
-type Carregado = { nativo: PluginClipboard };
-let plugin: Promise<Carregado | null> | null = null;
-/* Embrulhado num objeto, de propósito: o plugin do Capacitor é um Proxy e resolver uma promise
- * com ele faz o JS procurar `.then()` nele (ver cobranca-nativa.ts / notificacoes.ts). */
-const carregarPlugin = (): Promise<Carregado | null> => {
-  if (!plugin) {
-    plugin = import("@capacitor/core")
-      .then(({ registerPlugin }) => ({ nativo: registerPlugin<PluginClipboard>("CoreNativo") }))
-      .catch(() => null);
-  }
-  return plugin;
-};
-/** só pros testes */
-export function _trocarPlugin(p: Promise<Carregado | null> | null): void { plugin = p; }
 
 const comTeto = <T,>(p: Promise<T>, ms: number, padrao: T): Promise<T> =>
   new Promise<T>((resolve) => {
@@ -218,64 +197,18 @@ const comTeto = <T,>(p: Promise<T>, ms: number, padrao: T): Promise<T> =>
     p.then((v) => { clearTimeout(t); resolve(v); }, () => { clearTimeout(t); resolve(padrao); });
   });
 
-const jaTentou = (): boolean => {
-  try { return localStorage.getItem(CHAVE_CLIPBOARD_TENTADO) === "1"; } catch { return true; }
-};
-const marcarTentado = (): void => {
-  try { localStorage.setItem(CHAVE_CLIPBOARD_TENTADO, "1"); } catch { /* noop */ }
-};
+/** Vale olhar o link de abertura antes da welcome? (só o app do iPhone: é onde a Porta manda) */
+export const olharLinkDeAbertura = (): boolean => plataformaApp() === "ios";
 
-/** Precisa olhar o clipboard nesta abertura? (iPhone, nunca tentado nesta instalação.) Síncrono: sem isso, zero espera. */
-export const precisaOlharClipboard = (): boolean => plataformaApp() === "ios" && !jaTentou();
-/** Marca "já olhou" (o link de abertura da Porta também conta: o clipboard teria o MESMO código). */
-export const marcarClipboardTentado = (): void => marcarTentado();
-
-/**
- * Passo 1 (sem aviso do iOS): há algo com cara de URL no clipboard? `detectPatterns` não lê o conteúdo.
- * Marca a flag ANTES de olhar (1x por instalação, mesmo se o app morrer no meio). Teto de 400 ms no total.
- */
-export async function detectarLinkNoClipboard(): Promise<boolean> {
-  if (!precisaOlharClipboard()) return false;
-  marcarTentado();
-  const tem = await comTeto((async () => {
-    const p = await carregarPlugin();
-    if (!p) return false;
-    const r = await p.nativo.clipboardTemLink();
-    return !!r?.temUrl;
-  })(), LIMITE_DETECCAO_MS, false);
-  if (!tem) trackEvent("porta_clip_check", { tem_url: false, nosso: false });
-  return tem;
-}
-
-/**
- * Passo 2 (só depois do passo 1 dizer que há URL): lê o texto — aqui o iOS pergunta "Permitir colar?",
- * sem teto, é a pessoa respondendo —, confere se é o nosso link e resgata. null = não era nosso.
- */
-export async function resgatarDoClipboard(): Promise<ResultadoHandoff | null> {
-  const p = await carregarPlugin();
-  if (!p) return null;
-  let lido: { texto?: string | null; versao?: number } | null = null;
-  try { lido = await p.nativo.clipboardLer(); } catch { lido = null; }
-  const codigo = codigoDoLinkDaPorta(lido?.texto ?? null);
-  trackEvent("porta_clip_check", { tem_url: true, nosso: !!codigo, leu: lido?.texto != null });
-  if (!codigo) return null;
-  const r = await resgatarCodigo(codigo, "clipboard");
-  // o código é de uso único: usado (ou recusado), o link no clipboard não serve pra mais nada.
-  // Só limpa se o clipboard ainda é o que lemos (changeCount igual) — nunca apaga o que a pessoa copiou depois.
-  if (r.ok || r.motivo === "codigo" || r.motivo === "formato") {
-    try { if (typeof lido?.versao === "number") await p.nativo.clipboardLimpar({ versao: lido.versao }); } catch { /* noop */ }
-  }
-  return r;
-}
-
-/** Os dois passos juntos: null quando não havia o que resgatar (segue pra welcome). */
-export async function tentarClipboardDaPorta(): Promise<ResultadoHandoff | null> {
-  if (!(await detectarLinkNoClipboard())) return null;
-  return resgatarDoClipboard();
-}
-
-/** Se o app abriu (frio) por um link da Porta, o código dele — pra a 1ª abertura esperar esse resgate em vez do clipboard. */
+/** Se o app abriu (frio) por um link da Porta, o código dele — pra a abertura esperar esse resgate em vez de piscar a welcome. */
+let aberturaLida = false;
+/** só pros testes */
+export function _zerarAbertura(): void { aberturaLida = false; }
+/* UMA vez por processo: o getLaunchUrl continua devolvendo o link da abertura enquanto o app vive — sem
+ * isto, quem saísse da conta e voltasse pra "/" teria o mesmo código "resgatado" de novo. */
 export async function codigoDoLinkDeAbertura(): Promise<string | null> {
+  if (aberturaLida) return null;
+  aberturaLida = true;
   try {
     const { App } = await import("@capacitor/app");
     const inicial = await comTeto(App.getLaunchUrl(), LIMITE_DETECCAO_MS, undefined as { url?: string } | undefined);

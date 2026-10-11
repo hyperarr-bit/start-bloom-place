@@ -200,7 +200,7 @@ describe("'Você ganhou 3 dias grátis' — conta da Porta (user_metadata.porta)
   it("mostra a tela (título, o plano da área do site, 'Continuar'); sem preço; Continuar → o paywall curto, sem comprar nada", async () => {
     daPorta("rotina");
     montar();
-    expect(screen.getByTestId("porta-parabens-titulo").textContent).toBe("Você ganhou 3 dias grátis");
+    expect(screen.getByTestId("porta-parabens-titulo").textContent).toBe("Você ganhou3 dias grátis"); // <br /> entre as duas linhas
     expect(screen.getByTestId("porta-parabens-plano").textContent).toBe("Seu plano de Rotina já está salvo.");
     expect(document.body.textContent).not.toMatch(/R\$|\d+,90|por ano|\/mês/);
     expect(screen.queryByTestId("ios-curto")).toBeNull();

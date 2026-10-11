@@ -847,8 +847,8 @@ export function PaywallIOS({
             >
               Tenho um código
             </button>
-            {" · "}
-            <JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" />
+            {/* gate: a conta já está logada e não há venda no site — sem o "Já paguei pelo site" (e sem o "·" sobrando) */}
+            {!gate && <>{" · "}<JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" /></>}
           </p>
           {resgatouCodigo && (
             <button

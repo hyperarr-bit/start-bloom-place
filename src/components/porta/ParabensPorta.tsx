@@ -63,7 +63,7 @@ export function ParabensPorta({ porta, onContinuar }: { porta: PortaNaConta; onC
         <div className="w-20 h-20 rounded-full bg-[#16121c] text-white grid place-items-center mb-6 shadow-[0_16px_32px_-12px_rgba(22,18,28,.55)]" aria-hidden>
           <Check className="w-10 h-10" strokeWidth={3.5} />
         </div>
-        <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]" data-testid="porta-parabens-titulo">Você ganhou 3 dias grátis</h1>
+        <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]" data-testid="porta-parabens-titulo">Você ganhou<br />3 dias grátis</h1>
         <p className="mt-3 text-[16px] text-[#4f5a64] leading-snug" data-testid="porta-parabens-plano">{linhaDoPlano(porta)}</p>
       </div>
       <BotaoDoFunil

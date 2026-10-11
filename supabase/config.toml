@@ -42,3 +42,9 @@ verify_jwt = false
 # duas outras portas (admin, cron) por conta própria.
 [functions.afiliados]
 verify_jwt = false
+
+# CompleteRegistration da Porta (/comece). Quem chama é a conta recém-criada,
+# com o JWT dela; a função recusa conta antiga. O pixel da página é o do
+# index.html (998037194527241), não o META_PIXEL_ID se ele for outro.
+[functions.porta-capi]
+verify_jwt = true

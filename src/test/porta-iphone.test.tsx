@@ -29,6 +29,7 @@ const signUp = vi.fn();
 const signInWithPassword = vi.fn();
 const updateUser = vi.fn();
 const signOut = vi.fn();
+const invoke = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
@@ -39,6 +40,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signOut: (...a: unknown[]) => signOut(...a),
     },
     from: () => ({ update: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
   },
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn() }));
@@ -50,6 +52,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { entrarComApple, entrarComGoogle } from "@/lib/auth-nativo";
 import PortaIphoneRota, { _zerarEstadoPorta } from "@/pages/porta/PortaIphone";
+import { _zerarRegistroMeta } from "@/pages/porta/registro-meta";
 import { _zerarMemoriaPorta, capturarAtribuicao, decidirGravacao, lerAtribuicao, sessaoDaPorta, CHAVE_ATTR, COOKIE_ATTR } from "@/pages/porta/atribuicao";
 import { DIAS_POR_AREA, PERGUNTA_DOR, mesAlvo, planoDe3Dias, type AreaPorta } from "@/pages/porta/conteudo";
 
@@ -127,12 +130,14 @@ const preencherSenha = (email: string, senha: string) => {
 beforeEach(() => {
   _zerarMemoriaPorta();
   _zerarEstadoPorta();
+  _zerarRegistroMeta();
   try { localStorage.clear(); sessionStorage.clear(); } catch { /* noop */ }
   limparCookies();
   nativo(false);
   authState.user = null;
   authState.loading = false;
-  [getUser, signUp, signInWithPassword, updateUser, signOut].forEach((f) => f.mockReset());
+  [getUser, signUp, signInWithPassword, updateUser, signOut, invoke].forEach((f) => f.mockReset());
+  invoke.mockResolvedValue({ data: { ok: true }, error: null });
   vi.mocked(trackEvent).mockClear();
   vi.mocked(trackEventBeacon).mockClear();
   vi.mocked(fireMetaEvent).mockClear();
@@ -332,6 +337,10 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     expect(updateUser).not.toHaveBeenCalled(); // a porta nasceu junto com a conta
     expect(signInWithPassword).not.toHaveBeenCalled();
     expect(fireMetaEvent).toHaveBeenCalledWith("CompleteRegistration", expect.objectContaining({ content_name: "porta_iphone" }), porta.event_id);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("porta-capi", expect.objectContaining({
+      body: expect.objectContaining({ event_id: porta.event_id }),
+    }));
     expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "senha", ad_id: "333" });
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: false, event_id: porta.event_id, gravou: false, ad_id: "333" });
     conferirCopy();
@@ -398,6 +407,9 @@ describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
     expect(gravada.metodo).toBe("google");
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "google", existente: false, gravou: true });
     expect(fireMetaEvent).toHaveBeenCalledWith("CompleteRegistration", expect.anything(), gravada.event_id);
+    expect(invoke).toHaveBeenCalledWith("porta-capi", expect.objectContaining({
+      body: expect.objectContaining({ event_id: gravada.event_id }),
+    }));
     expect(screen.getByTestId("porta-passo-3").textContent).toContain("Continuar com Google");
     expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-google-ios.jpg");
   });
@@ -443,6 +455,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     expect(updateUser).toHaveBeenCalledTimes(1);
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: true, gravou: true });
     expect(fireMetaEvent).not.toHaveBeenCalledWith("CompleteRegistration", expect.anything(), expect.anything());
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("senha diferente: pede a senha dela (com 'Esqueci a senha'), entra e não cria outra conta", async () => {

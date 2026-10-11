@@ -14,6 +14,7 @@ import { persistLeadSource } from "@/lib/lead-source";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { capturarAtribuicao, decidirGravacao, idsDoAnuncio, lerAtribuicao, montarPorta, sessaoDaPorta, type AtribuicaoPorta, type PortaNaConta } from "./atribuicao";
+import { codigoTesteDaPagina, dispararCompleteRegistration } from "./registro-meta";
 import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
 import { WelcomePorta } from "./WelcomePorta";
 import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
@@ -47,7 +48,8 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
  *   porta_voltou_aba {}
  *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
- * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
+ * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova,
+ *   uma vez, e a CAPI (porta-capi) com o mesmo event_id — a Meta deduplica.
  */
 export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
 export const ORDEM: Passo[] = ["welcome", "area", "p2", "p3", "comsem", "plano", "conta", "instrucao", "salvo"];
@@ -215,14 +217,22 @@ export function PortaIphone() {
       const dec = decidirGravacao(u, sessao, agora);
       const existente = dec.existente;
       const eventId = atual?.event_id ?? e.eventId;
+      // Antes do updateUser: se ele falhar, a conta já nasceu e o evento tem que ter saído.
+      // Conta que já existia (login) não dispara — nem pixel, nem CAPI.
+      if (!existente) {
+        const attr = capturarAtribuicao({ search: "" });
+        dispararCompleteRegistration({
+          eventId,
+          fbp: attr.fbp,
+          fbc: attr.fbc,
+          sourceUrl: typeof location !== "undefined" ? location.href : null,
+        });
+        void persistLeadSource(supabase, u.id);
+      }
       if (dec.gravar) {
         const porta = montarPorta({ attr: capturarAtribuicao({ search: "" }), respostas: respostas(e), eventId, sessao, metodo, agora });
         const { error } = await supabase.auth.updateUser({ data: { porta } });
         if (error) trackEvent("porta_erro", { onde: "gravar_porta", msg: (error.message || "").slice(0, 160), ...ids() });
-      }
-      if (!existente) {
-        fireMetaEvent("CompleteRegistration", { content_name: "porta_iphone", status: true }, eventId);
-        void persistLeadSource(supabase, u.id);
       }
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });
       // 10/10: no celular, antes da tela 7, o "Último passo: no app, toque em Entrar" (computador vai direto pro QR)
@@ -246,7 +256,8 @@ export function PortaIphone() {
   const social = async (metodo: "google" | "apple"): Promise<Resultado> => {
     trackEvent("porta_conta_iniciada", { metodo, ...ids() });
     setEstado((e) => ({ ...e, passo: "conta", metodo }));
-    guardarDestino("/comece?passo=voltou");
+    const teste = codigoTesteDaPagina();
+    guardarDestino(teste ? `/comece?passo=voltou&meta_teste=${teste}` : "/comece?passo=voltou");
     const { error } = await (metodo === "apple" ? entrarComApple() : entrarComGoogle());
     if (error) {
       setEstado((e) => ({ ...e, metodo: null }));

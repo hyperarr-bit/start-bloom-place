@@ -240,7 +240,7 @@ export type PortaNaConta = {
   /** p2/p3 = ids das opções; atrapalha/gasto/consistencia = o TEXTO da opção, como o app guarda */
   respostas: { area: string; rota: string; p2: string | null; p3: string | null; [chave: string]: string | null };
   criado_em: string;
-  /** o eventID do CompleteRegistration do pixel (pra deduplicar com a CAPI depois) */
+  /** o eventID do CompleteRegistration: o pixel e a CAPI (porta-capi) usam o mesmo */
   event_id: string;
   porta_session_id: string;
   metodo: string;

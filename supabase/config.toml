@@ -42,3 +42,8 @@ verify_jwt = false
 # duas outras portas (admin, cron) por conta própria.
 [functions.afiliados]
 verify_jwt = false
+
+# Porta → app já logado (10/10): o "resgatar" é chamado pelo app SEM sessão; o
+# "criar" confere o JWT da conta dentro da função.
+[functions.porta-handoff]
+verify_jwt = false

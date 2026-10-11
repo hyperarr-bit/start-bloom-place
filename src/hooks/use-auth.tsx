@@ -10,7 +10,8 @@ import { assinaturaDoMock, diasDoTesteDoMock } from "@/lib/rc-mock";
 // Purge cached user data on sign-out so nothing leaks across accounts on the
 // same browser. Kept inline (no import from use-user-data) to avoid a circular
 // hook dependency.
-const purgeLocalUserCache = () => {
+// 10/10: exportada pro porta-handoff (troca de conta sem assinatura por um link da Porta).
+export const purgeLocalUserCache = () => {
   try {
     // core-pwa é marca do APARELHO (app instalado), não da conta: deslogar do
     // PWA não pode mandar a pessoa de volta pro funil de vendas.

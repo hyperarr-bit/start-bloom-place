@@ -255,6 +255,13 @@ final class FolhaDeCobranca {
  *   telaAtual({ rota })        a rota do React a cada navegação;
  *   ativarFolhaDeCobranca()    começa a observar a fila (só com a chave ligada);
  *   evento billingSheetExibida { motivo, esperou_ms, forcada }.
+ * 10/10 (build 38) — a área de transferência do "abrir já logado" da Porta (src/lib/porta-handoff.ts):
+ *   clipboardTemLink()         { temUrl } — detectPatterns(.probableWebURL): NÃO lê o conteúdo e o iOS
+ *                              não mostra aviso nenhum;
+ *   clipboardLer()             { texto, versao } — lê o texto (AQUI o iOS mostra "Permitir colar?");
+ *                              versao = changeCount no momento da leitura;
+ *   clipboardLimpar({versao})  { limpou } — esvazia só se o clipboard ainda é o que foi lido
+ *                              (changeCount igual): nunca apaga o que a pessoa copiou depois.
  * Registrado à mão no CoreViewController, como o MetaAds (plugin de dentro do
  * app não entra no packageClassList).
  */
@@ -264,8 +271,45 @@ public class CoreNativoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "CoreNativo"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "telaAtual", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clipboardTemLink", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clipboardLer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clipboardLimpar", returnType: CAPPluginReturnPromise)
     ]
+
+    @objc func clipboardTemLink(_ call: CAPPluginCall) {
+        let pb = UIPasteboard.general
+        // hasStrings/hasURLs também não disparam o aviso; clipboard vazio responde na hora
+        guard pb.hasStrings || pb.hasURLs else { call.resolve(["temUrl": false]); return }
+        pb.detectPatterns(for: [UIPasteboard.DetectionPattern.probableWebURL]) { resultado in
+            switch resultado {
+            case .success(let achados): call.resolve(["temUrl": achados.contains(UIPasteboard.DetectionPattern.probableWebURL)])
+            case .failure: call.resolve(["temUrl": false])
+            }
+        }
+    }
+
+    @objc func clipboardLer(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let pb = UIPasteboard.general
+            let versao = pb.changeCount
+            if let texto = pb.string {
+                call.resolve(["texto": texto, "versao": versao])
+            } else {
+                call.resolve(["versao": versao])
+            }
+        }
+    }
+
+    @objc func clipboardLimpar(_ call: CAPPluginCall) {
+        let versao = call.getInt("versao") ?? -1
+        DispatchQueue.main.async {
+            let pb = UIPasteboard.general
+            guard pb.changeCount == versao else { call.resolve(["limpou": false]); return }
+            pb.items = []
+            call.resolve(["limpou": true])
+        }
+    }
 
     @objc func telaAtual(_ call: CAPPluginCall) {
         let rota = call.getString("rota") ?? ""

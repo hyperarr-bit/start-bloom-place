@@ -1,5 +1,6 @@
 import { isNativeShell } from "./native-shell";
 import { ehRetornoDeLogin, fecharNavegador, sessaoDoLink } from "./auth-nativo";
+import { codigoDoLinkDaPorta, resgatarCodigo } from "./porta-handoff";
 
 /**
  * Deep links `core://` (27/07).
@@ -96,6 +97,23 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
             }
           } catch { /* noop */ }
           navegar(voltaPro);
+        }
+        return true;
+      }
+      /* 10/10 (build 38): `core://porta?c=<código>` — o "Abrir o CORE" da Porta iPhone (site). Não vira
+         rota: vira SESSÃO (porta-handoff.ts). Entrou → /home, onde o gate mostra o paywall do teste
+         (nunca a welcome/funil). Não deu e não há conta no aparelho → /entrar (ela TEM conta: veio da
+         Porta). Assinante logado: fica onde está (o link nunca desloga quem assina). */
+      const codigoPorta = codigoDoLinkDaPorta(url);
+      if (codigoPorta) {
+        const r = await resgatarCodigo(codigoPorta, "link");
+        if (r.ok) navegar("/home");
+        else if (r.motivo !== "assinante_logado") {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data } = await supabase.auth.getSession();
+            if (!data?.session) navegar("/entrar");
+          } catch { /* noop */ }
         }
         return true;
       }

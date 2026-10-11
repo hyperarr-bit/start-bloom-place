@@ -148,6 +148,14 @@ if (!teste && process.env.RC_MOCK === "1") {
   process.exit(1);
 }
 
+// 10/10 (build 38): o falso do "abrir já logado" da Porta (lib/porta-handoff, VITE_PORTA_QA=1) entra SÓ
+// no build de teste do Simulador — num binário de loja ele trocaria o resgate do código por um login fixo.
+if (!teste && (process.env.VITE_PORTA_QA === "1" || process.env.VITE_PORTA_QA_EMAIL || process.env.VITE_PORTA_QA_SENHA)) {
+  console.error("\n✗ VITE_PORTA_QA* no ambiente de um build de PRODUÇÃO — o resgate da Porta sairia falso.");
+  console.error("  Rode sem essas variáveis, ou use `npm run loja -- --teste` se é build de teste.\n");
+  process.exit(1);
+}
+
 // 2. build + sync
 sh(teste ? "RC_MOCK=1 npm run build" : "npm run build");
 sh(`npx cap sync ${LOJA.plataforma}`);
@@ -203,6 +211,16 @@ if (!teste) {
     process.exit(1);
   }
   console.log("  ✓ sem o assinante do mock no JS");
+  // 10/10: idem pro falso do resgate da Porta (some junto com __RC_MOCK__ false)
+  const comPortaQa = existsSync(dirJs)
+    ? readdirSync(dirJs).filter((f) => f.endsWith(".js") && readFileSync(join(dirJs, f), "utf8").includes("__porta_qa_mock"))
+    : [];
+  if (comPortaQa.length) {
+    console.error(`\n✗ o JS do binário de produção carrega o resgate FALSO da Porta (${comPortaQa.join(", ")}).`);
+    console.error("  Veja src/lib/porta-handoff.ts: o ramo de QA tem que morrer com __RC_MOCK__ false.\n");
+    process.exit(1);
+  }
+  console.log("  ✓ sem o resgate falso da Porta no JS");
 }
 
 // 4. tira o peso morto

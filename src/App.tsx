@@ -30,6 +30,7 @@ import { ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
+import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
@@ -188,7 +189,9 @@ const RootGate = () => {
     // recomeçar a venda pra quem está no meio do teste. Expirado, o
     // ProtectedRoute manda pro paywall do dia 3.
     if (testeLiberado()) return <Navigate to="/home" replace />;
-    return <Navigate to={ENTRADA_APP} replace />;
+    // 10/10 (build 38): na 1ª abertura do iPhone, antes da welcome, o "abrir já logado" da Porta
+    // (link core://porta ou o link copiado no clipboard). Fora disso é o mesmo Navigate de sempre.
+    return <PortaPrimeiraAbertura semPorta={ENTRADA_APP} />;
   }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).

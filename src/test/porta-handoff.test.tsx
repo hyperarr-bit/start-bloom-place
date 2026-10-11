@@ -167,6 +167,19 @@ describe("deep link core://porta (deep-link.ts)", () => {
 
 /* ---------------------------------------------------------------- o resgate */
 describe("resgatarCodigo", () => {
+  it("10/10: entrou pelo link = da Porta nesta sessão (a tela '3 dias grátis' aparece mesmo sem user_metadata.porta); falha não marca", async () => {
+    const { entrouPeloLinkDaPorta, _zerarEntrouPeloLink } = await import("@/lib/porta-sessao");
+    _zerarEntrouPeloLink();
+    servidor({ resgate: erroHttp({ erro: "codigo" }) });
+    await resgatarCodigo(CODIGO, "link");
+    expect(entrouPeloLinkDaPorta()).toBe(false);
+    _zerarHandoff();
+    servidor({});
+    await resgatarCodigo(CODIGO, "link");
+    expect(entrouPeloLinkDaPorta()).toBe(true);
+    _zerarEntrouPeloLink();
+  });
+
   it("sucesso: porta_handoff {via, ok:true, motivo:'ok'}", async () => {
     const r = await resgatarCodigo(CODIGO.toLowerCase(), "link");
     expect(r).toEqual({ ok: true, motivo: "ok", trocouConta: false });

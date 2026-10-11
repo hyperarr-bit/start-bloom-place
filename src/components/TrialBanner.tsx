@@ -19,6 +19,7 @@ import { ehApple } from "@/lib/loja";
 import { ofertaLigada } from "@/lib/ofertas-saida";
 import { getFunnelArea } from "@/lib/funnel";
 import { ParabensPorta, contaDaPorta, parabensJaVisto, type PortaNaConta } from "@/components/porta/ParabensPorta";
+import { entrouPeloLinkDaPorta } from "@/lib/porta-sessao";
 // lazy: o paywall do iPhone (e o que ele puxa do PaywallDia14) não entra no bundle principal do site
 const PaywallIOS = lazy(() => import("@/pages/funis/ios/PaywallIOS").then((m) => ({ default: m.PaywallIOS })));
 
@@ -198,7 +199,7 @@ export const TrialBanner = () => {
                     não passou" é desenhado nesta vaga (antes ficava atrás do
                     bloqueio e a pessoa só via "compre de novo"). */}
                 <VagaDoAvisoCobranca />
-                {ehApple() && !parabensFeito && contaDaPorta(user.user_metadata)
+                {ehApple() && !parabensFeito && (contaDaPorta(user.user_metadata) || entrouPeloLinkDaPorta())
                   ? <ParabensPorta porta={(user.user_metadata as { porta?: PortaNaConta }).porta} onContinuar={() => setParabensFeito(true)} />
                   : gateCurto
                   ? (

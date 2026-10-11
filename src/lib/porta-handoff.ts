@@ -26,6 +26,7 @@
  * Evento: porta_handoff {via: "link", ok, motivo, trocou_conta}.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { marcarEntrouPeloLink } from "@/lib/porta-sessao";
 import { trackEvent } from "@/lib/analytics";
 import { plataformaApp } from "@/lib/native-shell";
 
@@ -154,6 +155,7 @@ export function resgatarCodigo(codigoCru: string, via: ViaHandoff): Promise<Resu
 async function resgatar(codigo: string, via: ViaHandoff): Promise<ResultadoHandoff> {
   const fim = (r: ResultadoHandoff): ResultadoHandoff => {
     trackEvent("porta_handoff", { via, ok: r.ok, motivo: r.motivo, trocou_conta: !!r.trocouConta });
+    if (r.ok) marcarEntrouPeloLink();
     return r;
   };
   try {

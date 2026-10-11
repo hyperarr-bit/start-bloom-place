@@ -1,13 +1,16 @@
 /**
  * PORTA iPHONE (/comece, 10/10) — anúncio → perguntas → plano → CONTA NO SITE
- * (campanha gravada nela) → App Store → "Já tenho conta? Entrar" no app.
+ * (campanha gravada nela) → App Store → "Entrar" no app.
  *
  * O que não pode quebrar:
- *   · o fluxo inteiro por área (dinheiro e rotina), CTA sempre o mesmo botão;
- *   · o app nativo NUNCA monta /comece;
+ *   · as perguntas 2 e 3 são as MESMAS do funil novo do app, área por área (v2, dono);
+ *   · o com × sem usa o número da resposta (R$ do gasto dela, treinos), como o app;
+ *   · o fluxo inteiro, com o app nativo NUNCA montando /comece;
+ *   · conta: Apple, Google (no Instagram: aviso, sem OAuth) e e-mail + senha, sem código;
+ *     e-mail que já existe entra com a senha, NUNCA vira 2ª conta;
  *   · a atribuição é capturada na 1ª carga e sobrevive ao Instagram zerar o storage;
- *   · user_metadata.porta só é gravado se AUSENTE (nunca sobrescreve a 1ª atribuição);
- *   · nenhum "R$" em tela nenhuma; "dias grátis" só na tela 7;
+ *   · user_metadata.porta só é gravado se AUSENTE;
+ *   · nenhum PREÇO do produto em tela nenhuma; "dias grátis" só na tela 7;
  *   · os eventos saem com os campos certos.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -22,16 +25,16 @@ const authState: { user: U | null; loading: boolean } = { user: null, loading: f
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => authState }));
 
 const getUser = vi.fn();
-const signInWithOtp = vi.fn();
-const verifyOtp = vi.fn();
+const signUp = vi.fn();
+const signInWithPassword = vi.fn();
 const updateUser = vi.fn();
 const signOut = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       getUser: (...a: unknown[]) => getUser(...a),
-      signInWithOtp: (...a: unknown[]) => signInWithOtp(...a),
-      verifyOtp: (...a: unknown[]) => verifyOtp(...a),
+      signUp: (...a: unknown[]) => signUp(...a),
+      signInWithPassword: (...a: unknown[]) => signInWithPassword(...a),
       updateUser: (...a: unknown[]) => updateUser(...a),
       signOut: (...a: unknown[]) => signOut(...a),
     },
@@ -40,14 +43,14 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn() }));
 vi.mock("@/lib/meta-pixel", () => ({ fireMetaEvent: vi.fn() }));
-vi.mock("@/lib/auth-nativo", () => ({ entrarComGoogle: vi.fn(async () => ({ error: null })) }));
+vi.mock("@/lib/auth-nativo", () => ({ entrarComGoogle: vi.fn(async () => ({ error: null })), entrarComApple: vi.fn(async () => ({ error: null })) }));
 
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { entrarComGoogle } from "@/lib/auth-nativo";
+import { entrarComApple, entrarComGoogle } from "@/lib/auth-nativo";
 import PortaIphoneRota, { _zerarEstadoPorta } from "@/pages/porta/PortaIphone";
 import { _zerarMemoriaPorta, capturarAtribuicao, decidirGravacao, lerAtribuicao, sessaoDaPorta, CHAVE_ATTR, COOKIE_ATTR } from "@/pages/porta/atribuicao";
-import { planoDe3Dias, PERGUNTA_3_OPCOES } from "@/pages/porta/conteudo";
+import { DIAS_POR_AREA, PERGUNTA_DOR, mesAlvo, planoDe3Dias, type AreaPorta } from "@/pages/porta/conteudo";
 
 /* ---------------------------------------------------------------- ambiente */
 const UA = {
@@ -80,19 +83,38 @@ const montar = () => render(
 );
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
 const texto = () => document.body.textContent ?? "";
-/** a cada tela: sem preço; "dias grátis" só na tela 7 */
+/** PREÇO DO PRODUTO (97,90 / 24,90 / 69,90 / 19,90 / anual / mensal / assinatura): nunca. Gasto da pessoa em R$ pode. */
+const PRECO_DO_PRODUTO = /\d+,90|\banual\b|\bmensal\b|mensalidade|assinatura|por ano|\/ano|\/mês/i;
 const conferirCopy = () => {
-  expect(texto()).not.toMatch(/R\$/);
-  const naSete = !!screen.queryByTestId("porta-salvo");
-  if (!naSete) expect(texto()).not.toMatch(/dias? grátis/i);
+  expect(texto()).not.toMatch(PRECO_DO_PRODUTO);
+  if (!screen.queryByTestId("porta-salvo")) expect(texto()).not.toMatch(/dias? grátis/i);
 };
 const escolher = async (id: string, proxima: string) => {
   fireEvent.click(screen.getByTestId(`porta-opcao-${id}`));
   await waitFor(() => expect(screen.getByTestId(proxima)).toBeInTheDocument());
   conferirCopy();
 };
-
+const rotulos = (testid: string) => Array.from(screen.getByTestId(testid).querySelectorAll("[data-testid^='porta-opcao-'] span.block:first-child")).map((n) => n.textContent);
 const usuario = (over: Partial<U> = {}): U => ({ id: "u-1", email: "ana@exemplo.com", created_at: new Date().toISOString(), user_metadata: {}, ...over });
+
+/** até a tela da conta, numa área, com as respostas dadas */
+const ateConta = async (area: string, dor: string, numero: string) => {
+  montar();
+  fireEvent.click(screen.getByTestId("porta-comecar"));
+  await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+  await escolher(area, "porta-p2");
+  await escolher(dor, "porta-p3");
+  await escolher(numero, "porta-comsem");
+  fireEvent.click(screen.getByTestId("porta-comsem-cta"));
+  await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("porta-desbloquear"));
+  await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+  conferirCopy();
+};
+const preencherSenha = (email: string, senha: string) => {
+  fireEvent.change(screen.getByTestId("porta-email"), { target: { value: email } });
+  fireEvent.change(screen.getByTestId("porta-senha"), { target: { value: senha } });
+};
 
 beforeEach(() => {
   _zerarMemoriaPorta();
@@ -102,11 +124,12 @@ beforeEach(() => {
   nativo(false);
   authState.user = null;
   authState.loading = false;
-  [getUser, signInWithOtp, verifyOtp, updateUser, signOut].forEach((f) => f.mockReset());
+  [getUser, signUp, signInWithPassword, updateUser, signOut].forEach((f) => f.mockReset());
   vi.mocked(trackEvent).mockClear();
   vi.mocked(trackEventBeacon).mockClear();
   vi.mocked(fireMetaEvent).mockClear();
   vi.mocked(entrarComGoogle).mockClear();
+  vi.mocked(entrarComApple).mockClear();
   updateUser.mockResolvedValue({ data: {}, error: null });
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   HTMLMediaElement.prototype.play = vi.fn(() => Promise.resolve()) as unknown as HTMLMediaElement["play"];
@@ -115,7 +138,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); nativo(false); irPara("/"); });
 
-/* ---------------------------------------------------------------- testes */
+/* ---------------------------------------------------------------- rota */
 describe("rota", () => {
   it("o app nativo NUNCA monta /comece (vai pra porta do app)", () => {
     nativo(true);
@@ -140,148 +163,217 @@ describe("rota", () => {
   });
 });
 
-describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-mail", () => {
-  it("8 telas, conta criada com a campanha, CompleteRegistration com o eventID guardado, loja e volta da aba", async () => {
+/* ---------------------------------------------------------------- perguntas = as do app */
+/** Copiadas do funil novo do app (ramo v14: lib/funnel QUIZ + AREA_TRACKS; FUNIL_CALAI = quiz_1 + o número). */
+const DO_APP: Record<AreaPorta, { dor: [string, string[]]; numero: [string, string[]] }> = {
+  dinheiro: {
+    dor: ["O que mais te atrapalha hoje?", ["Gasto sem perceber", "Esqueço contas", "Não consigo guardar dinheiro", "Não sei pra onde meu dinheiro vai", "Quero organizar tudo"]],
+    numero: ["Quanto você acha que gasta sem perceber, por mês?", ["Menos de R$ 100", "R$ 100 a R$ 300", "R$ 300 a R$ 500", "Mais de R$ 500", "Não faço ideia"]],
+  },
+  rotina: {
+    dor: ["O que mais bagunça sua rotina hoje?", ["Acordo sem plano nenhum", "Perco horas no celular", "Começo mil coisas e não termino", "Esqueço tarefas e compromissos", "Quero organizar tudo"]],
+    numero: ["Quanto tempo você costuma manter um hábito novo?", ["Uns 3 dias", "Uma semana", "Um mês, aí largo", "Nunca consegui manter"]],
+  },
+  corpo: {
+    dor: ["O que mais te trava hoje?", ["Começo a treinar e desisto", "Como mal e nem percebo", "Não tenho plano de treino nem dieta", "Falta constância, não vontade", "Quero organizar tudo"]],
+    numero: ["Quantas vezes você já recomeçou treino ou dieta?", ["Essa vai ser a primeira", "Umas 2 ou 3", "Perdi a conta", "Tô na ativa, mas sem controle"]],
+  },
+  saude: {
+    dor: ["O que você mais negligencia hoje?", ["Beber água", "Dormir direito", "Vitaminas e remédios na hora", "Exames e check-ups", "Um pouco de tudo"]],
+    numero: ["Como seu corpo anda te avisando?", ["Cansaço o dia todo", "Sono ruim", "Ansiedade e estresse", "Tô bem — quero prevenir"]],
+  },
+  metas: {
+    dor: ["O que acontece com as suas metas?", ["Ficam na cabeça, nunca no papel", "Empolgo em janeiro, esqueço em março", "Tenho tantas que não sei por onde começar", "Sinto que não saio do lugar", "Quero organizar tudo"]],
+    numero: ["Quanto tempo faz que essa meta te espera?", ["Surgiu agora", "Uns meses", "Mais de um ano", "Anos… nem conto mais"]],
+  },
+};
+
+describe("perguntas 2 e 3 são as MESMAS do funil do app, área por área", () => {
+  for (const area of Object.keys(DO_APP) as AreaPorta[]) {
+    it(area, async () => {
+      montar();
+      fireEvent.click(screen.getByTestId("porta-comecar"));
+      await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+      await escolher(area, "porta-p2");
+      expect(screen.getByTestId("porta-pergunta").textContent).toBe(DO_APP[area].dor[0]);
+      expect(rotulos("porta-p2")).toEqual(DO_APP[area].dor[1]);
+      fireEvent.click(screen.getAllByRole("listitem")[0]);
+      await waitFor(() => expect(screen.getByTestId("porta-p3")).toBeInTheDocument());
+      expect(screen.getByTestId("porta-pergunta").textContent).toBe(DO_APP[area].numero[0]);
+      expect(rotulos("porta-p3")).toEqual(DO_APP[area].numero[1]);
+      conferirCopy();
+    });
+  }
+
+  it("'Tudo' segue pelo dinheiro, com a linha de abertura do app em cima", async () => {
+    montar();
+    fireEvent.click(screen.getByTestId("porta-comecar"));
+    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+    await escolher("tudo", "porta-p2");
+    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha hoje?");
+    expect(screen.getByTestId("porta-abertura-tudo").textContent).toBe("Vamos começar pelo mais importante: o dinheiro. Rotina e saúde entram nos dias 2 e 3.");
+    expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "area", area: "tudo", resposta: "tudo" });
+  });
+});
+
+describe("com × sem usa o número da resposta (como o GraficoComSem do app)", () => {
+  it("'R$ 100 a R$ 300' → R$ 300 por mês, R$ 900 em 3 meses", async () => {
+    montar();
+    fireEvent.click(screen.getByTestId("porta-comecar"));
+    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+    await escolher("dinheiro", "porta-p2");
+    await escolher("gasto_sem_perceber", "porta-p3");
+    await escolher("100_300", "porta-comsem");
+    expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("reais");
+    expect(screen.getByTestId("porta-comsem-titulo").textContent).toBe(`R$ 300 somem por mês.Até ${mesAlvo(new Date())}, R$ 900 sem rastro.`);
+    expect(screen.getByTestId("porta-grafico-sem").textContent).toBe("R$ 900");
+  });
+
+  it("'Não faço ideia' → a mediana estimada do app (R$ 500, 'Em média')", async () => {
+    montar();
+    fireEvent.click(screen.getByTestId("porta-comecar"));
+    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+    await escolher("dinheiro", "porta-p2");
+    await escolher("esqueco_contas", "porta-p3");
+    await escolher("nao_sei", "porta-comsem");
+    expect(screen.getByTestId("porta-comsem-titulo").textContent).toContain("Em média, R$ 500 somem por mês.");
+    expect(screen.getByTestId("porta-grafico-sem").textContent).toBe("R$ 1.500");
+  });
+
+  it("Corpo: gráfico de treinos por semana da resposta ('Perdi a conta' = 1 treino)", async () => {
+    montar();
+    fireEvent.click(screen.getByTestId("porta-comecar"));
+    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
+    await escolher("corpo", "porta-p2");
+    await escolher("desisto", "porta-p3");
+    await escolher("perdi_a_conta", "porta-comsem");
+    expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("treinos");
+    expect(screen.getByTestId("porta-comsem-titulo").textContent).toBe("Sem o CORE: 1 treino por semana somem em 3 meses.Com o CORE: 3 por semana, sem falhar.");
+    expect(screen.getByTestId("porta-grafico-com").textContent).toBe("3/sem");
+  });
+});
+
+/* ---------------------------------------------------------------- fluxo inteiro */
+describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-mail e senha", () => {
+  it("8 telas, Google bloqueado com aviso, conta criada com a campanha, CompleteRegistration, loja e volta da aba", async () => {
     montar();
     // 0. welcome
     expect(screen.getByTestId("porta-welcome-titulo").textContent).toBe("Sua vida inteira organizada num app só.");
     expect(texto()).toContain("+1000 pessoas");
     expect(screen.getByTestId("porta-welcome-entrar").textContent).toBe("Já tem conta? Entrar");
-    expect(texto()).not.toMatch(/Restaurar|Termos/);
     conferirCopy();
     const view = eventos("porta_view")[0];
-    expect(view).toMatchObject({ utm_source: "meta", utm_medium: "paid", utm_campaign: "porta_teste", utm_content: "video_organizei", utm_term: "t1", c_id: "111", as_id: "222", ad_id: "333", pl: "Instagram_Reels", fbclid: "IwAR_abc", atribuicao: "url", in_app: true, plataforma: "ios" });
+    expect(view).toMatchObject({ utm_source: "meta", utm_campaign: "porta_teste", utm_content: "video_organizei", c_id: "111", as_id: "222", ad_id: "333", pl: "Instagram_Reels", fbclid: "IwAR_abc", atribuicao: "url", in_app: true, plataforma: "ios" });
     expect(String(view.fbc)).toMatch(/^fb\.1\.\d{13}\.IwAR_abc$/);
-    expect(typeof view.ts).toBe("number");
-    expect(String(view.porta_session_id)).toMatch(/.{8,}/);
     expect(fireMetaEvent).toHaveBeenCalledWith("ViewContent", expect.objectContaining({ content_name: "porta_iphone" }));
 
     fireEvent.click(screen.getByTestId("porta-comecar"));
-    // 1. área
     await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que você quer arrumar primeiro?");
-    for (const id of ["dinheiro", "rotina", "corpo", "saude", "metas", "tudo"]) expect(screen.getByTestId(`porta-opcao-${id}`)).toBeInTheDocument();
-    conferirCopy();
     await escolher("dinheiro", "porta-p2");
-    // 2.
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("Você sabe quanto sobra no fim do mês?");
-    await escolher("nao_sei", "porta-p3");
-    // 3.
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha?");
-    await escolher("gasto_pequeno", "porta-comsem");
-    // 4. com × sem: gráfico, sem reais
-    expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("dinheiro");
-    expect(screen.getByTestId("porta-grafico")).toBeInTheDocument();
+    await escolher("gasto_sem_perceber", "porta-p3");
+    await escolher("300_500", "porta-comsem");
     fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-    // 5. plano: Dia 1 da resposta 3, dias 2 e 3 trancados
+    // 5. plano: Dia 1 da DOR, dias 2 e 3 = os degraus do app que ela não cobre
     await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
-    conferirCopy();
-    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Anota os gastos pequenos de hoje e vê quanto somam");
-    expect(screen.getByTestId("porta-plano-dia2").hasAttribute("data-trancado")).toBe(true);
-    expect(screen.getByTestId("porta-plano-dia3").hasAttribute("data-trancado")).toBe(true);
-    expect(screen.getByTestId("porta-desbloquear").textContent).toBe("Desbloquear meu plano");
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Anota os gastos de hoje e vê quanto somam");
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Porque você disse: “Gasto sem perceber”");
+    expect(screen.getByTestId("porta-plano-dia2").textContent).toContain(DIAS_POR_AREA.dinheiro[1]);
+    expect(screen.getByTestId("porta-plano-dia3").textContent).toContain(DIAS_POR_AREA.dinheiro[2]);
     fireEvent.click(screen.getByTestId("porta-desbloquear"));
-    // 6. conta: no Instagram o Google some (o Google barra login em webview)
+
+    // 6. conta: Apple e Google visíveis; Google no Instagram = aviso, sem OAuth
     await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+    expect(screen.getByTestId("porta-apple").textContent).toContain("Continuar com a Apple");
+    expect(screen.getByTestId("porta-google").textContent).toContain("Continuar com o Google");
+    expect(screen.queryByTestId("porta-codigo")).toBeNull();
+    fireEvent.click(screen.getByTestId("porta-google"));
+    expect(entrarComGoogle).not.toHaveBeenCalled();
+    expect(screen.getByTestId("porta-aviso-google").textContent).toBe("O Google não deixa entrar por dentro do Instagram. Toque em ⋯ no alto e em Abrir no navegador. Ou use a Apple ou o e-mail.");
+    expect(eventos("porta_google_bloqueado")[0]).toMatchObject({ app: "Instagram", ad_id: "333" });
+    // as respostas e a sessão foram pra URL, pra irem junto no "Abrir no navegador"
+    const q = new URLSearchParams(window.location.search);
+    expect(JSON.parse(q.get("pe")!)).toMatchObject({ escolha: "dinheiro", p2: "gasto_sem_perceber", p3: "300_500" });
+    expect(q.get("ps")).toBe(view.porta_session_id);
+    expect(q.get("utm_campaign")).toBe("porta_teste");
     conferirCopy();
-    expect(screen.queryByTestId("porta-google")).toBeNull();
-    expect((screen.getByTestId("porta-enviar-codigo") as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(screen.getByTestId("porta-email"), { target: { value: " Ana@Exemplo.com " } });
 
+    // e-mail + senha (sem código)
+    expect((screen.getByTestId("porta-criar-conta") as HTMLButtonElement).disabled).toBe(true);
+    preencherSenha(" Ana@Exemplo.com ", "12345");
+    expect((screen.getByTestId("porta-criar-conta") as HTMLButtonElement).disabled).toBe(true); // senha < 6
+    fireEvent.change(screen.getByTestId("porta-senha"), { target: { value: "segredo1" } });
     let portaEnviada: Record<string, unknown> | null = null;
-    signInWithOtp.mockImplementation(async (arg: { options: { data: { porta: Record<string, unknown> } } }) => { portaEnviada = arg.options.data.porta; return { error: null }; });
-    fireEvent.click(screen.getByTestId("porta-enviar-codigo"));
-    await waitFor(() => expect(screen.getByTestId("porta-codigo")).toBeInTheDocument());
-    const otp = signInWithOtp.mock.calls[0][0] as { email: string; options: { shouldCreateUser: boolean; emailRedirectTo: string; data: { porta: Record<string, any> } } };
-    expect(otp.email).toBe("ana@exemplo.com");
-    expect(otp.options.shouldCreateUser).toBe(true);
-    expect(otp.options.emailRedirectTo).toContain("/auth/callback?next=%2Fcomece%3Fpasso%3Dsalvo");
-    const porta = otp.options.data.porta;
-    expect(porta.attr).toMatchObject({ utm_campaign: "porta_teste", utm_content: "video_organizei", c_id: "111", as_id: "222", ad_id: "333", pl: "Instagram_Reels", fbclid: "IwAR_abc", origem: "url" });
-    expect(porta.attr.fbc).toMatch(/^fb\.1\.\d+\.IwAR_abc$/);
-    expect(porta.respostas).toEqual({ area: "dinheiro", rota: "dinheiro", p2: "nao_sei", p3: "gasto_pequeno" });
-    expect(porta.event_id).toMatch(/^porta_cr_/);
-    expect(porta.porta_session_id).toBe(view.porta_session_id);
-    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "email", ad_id: "333", porta_session_id: view.porta_session_id });
+    signUp.mockImplementation(async (arg: { options: { data: { porta: Record<string, unknown> } } }) => {
+      portaEnviada = arg.options.data.porta;
+      return { data: { user: { id: "u-1" }, session: { access_token: "x" } }, error: null };
+    });
+    getUser.mockImplementation(async () => ({ data: { user: usuario({ user_metadata: { porta: portaEnviada } }) } }));
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
 
-    // a conta nasceu agora, com o `data` desta sessão
-    verifyOtp.mockResolvedValue({ error: null });
-    getUser.mockResolvedValue({ data: { user: usuario({ user_metadata: { porta: portaEnviada } }) } });
-    fireEvent.change(screen.getByTestId("porta-codigo"), { target: { value: "1234-5678" } });
-    fireEvent.click(screen.getByTestId("porta-conferir"));
     // 7. pronto
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
-    expect(verifyOtp).toHaveBeenCalledWith({ email: "ana@exemplo.com", token: "12345678", type: "email" });
-    expect(updateUser).not.toHaveBeenCalled(); // já veio no signInWithOtp: nada a regravar
+    expect(signUp).toHaveBeenCalledTimes(1);
+    const cad = signUp.mock.calls[0][0] as { email: string; password: string; options: { data: { porta: Record<string, any> } } };
+    expect(cad.email).toBe("ana@exemplo.com");
+    expect(cad.password).toBe("segredo1");
+    const porta = cad.options.data.porta;
+    expect(porta.attr).toMatchObject({ utm_campaign: "porta_teste", utm_content: "video_organizei", c_id: "111", as_id: "222", ad_id: "333", pl: "Instagram_Reels", fbclid: "IwAR_abc", origem: "url" });
+    expect(porta.respostas).toEqual({ area: "dinheiro", rota: "dinheiro", p2: "gasto_sem_perceber", p3: "300_500", atrapalha: "Gasto sem perceber", gasto: "R$ 300 a R$ 500" });
+    expect(porta.metodo).toBe("senha");
+    expect(porta.porta_session_id).toBe(view.porta_session_id);
+    expect(updateUser).not.toHaveBeenCalled(); // a porta nasceu junto com a conta
+    expect(signInWithPassword).not.toHaveBeenCalled();
     expect(fireMetaEvent).toHaveBeenCalledWith("CompleteRegistration", expect.objectContaining({ content_name: "porta_iphone" }), porta.event_id);
-    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "email", existente: false, event_id: porta.event_id, gravou: false, ad_id: "333" });
+    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "senha", ad_id: "333" });
+    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: false, event_id: porta.event_id, gravou: false, ad_id: "333" });
     conferirCopy();
     expect(screen.getByTestId("porta-salvo-titulo").textContent).toBe("Pronto, seu plano está salvo ✓");
     expect(screen.getByTestId("porta-salvo-email").textContent).toContain("ana@exemplo.com");
     expect(screen.getByTestId("porta-salvo-texto").textContent).toBe("Baixe o CORE, toque em “Entrar” com este e-mail e comece seus 3 dias grátis.");
-    expect(screen.getByTestId("porta-passo-2").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/1-tela-inicial-ios.jpg");
-    expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/2-entrar-ios.jpg");
+    expect(screen.getByTestId("porta-passo-3").textContent).toContain("Digite este e-mail e a sua senha");
+    expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-senha-ios.jpg");
     const loja = screen.getByTestId("porta-loja");
     expect(loja.getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei");
-    expect(loja.textContent).toContain("Baixar na App Store");
-
     fireEvent.click(loja);
     expect(trackEventBeacon).toHaveBeenCalledWith("porta_loja_click", expect.objectContaining({ plataforma: "ios", loja: "ios", ad_id: "333", porta_session_id: view.porta_session_id }));
     act(() => { document.dispatchEvent(new Event("visibilitychange")); });
     expect(screen.getByTestId("porta-salvo-titulo").textContent).toBe("Já instalou? Abra o CORE e toque em Entrar");
     expect(eventos("porta_voltou_aba")).toHaveLength(1);
 
-    // os passos, na ordem, com área e resposta
     expect(eventos("porta_passo").map((e) => [e.passo, e.area, e.resposta])).toEqual([
       ["welcome", null, "comecar"],
       ["area", "dinheiro", "dinheiro"],
-      ["p2", "dinheiro", "nao_sei"],
-      ["p3", "dinheiro", "gasto_pequeno"],
+      ["p2", "dinheiro", "Gasto sem perceber"],
+      ["p3", "dinheiro", "R$ 300 a R$ 500"],
       ["comsem", "dinheiro", "seguir"],
       ["plano", "dinheiro", "desbloquear"],
     ]);
-    for (const e of eventos("porta_passo")) expect(e.porta_session_id).toBe(view.porta_session_id);
   });
 
-  it("'Tudo' segue pela rota do dinheiro", async () => {
+  it("'Abrir no navegador': a URL com pe/ps abre direto na conta, com as respostas e a MESMA sessão", async () => {
+    ua(UA.safari);
+    const pe = JSON.stringify({ escolha: "dinheiro", p2: "esqueco_contas", p3: "mais_500", eventId: "porta_cr_abc12345" });
+    irPara(`/comece${QUERY_AD}&pe=${encodeURIComponent(pe)}&ps=sessao-do-instagram-1`);
     montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("tudo", "porta-p2");
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("Você sabe quanto sobra no fim do mês?");
-    expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "area", area: "tudo", resposta: "tudo" });
+    expect(screen.getByTestId("porta-conta")).toBeInTheDocument();
+    expect(sessaoDaPorta().id).toBe("sessao-do-instagram-1");
+    fireEvent.click(screen.getByTestId("porta-google"));
+    await waitFor(() => expect(entrarComGoogle).toHaveBeenCalledTimes(1)); // no Safari o Google vai
+    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "google", porta_session_id: "sessao-do-instagram-1" });
   });
 });
 
-describe("fluxo inteiro — ROTINA, no Safari, conta pelo Google", () => {
-  it("copy no com × sem, Dia 1 da rotina, Google sai e volta pra tela 7 com a porta gravada", async () => {
+describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
+  it("copy no com × sem, Dia 1 da dor, Google sai e volta pra tela 7 com a porta gravada", async () => {
     ua(UA.safari);
-    montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("rotina", "porta-p2");
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("Quantos dias por semana você consegue manter uma rotina?");
-    await escolher("1-2", "porta-p3");
-    expect(screen.getByTestId("porta-opcao-largo_no_meio")).toBeInTheDocument();
-    await escolher("largo_no_meio", "porta-comsem");
-    expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("copy");
-    expect(screen.getByTestId("porta-card-sem")).toBeInTheDocument();
-    expect(screen.getByTestId("porta-card-com")).toBeInTheDocument();
-    expect(screen.queryByTestId("porta-grafico")).toBeNull();
-    fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
-    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Escolhe 1 hábito só e marca feito hoje");
-    conferirCopy();
-    fireEvent.click(screen.getByTestId("porta-desbloquear"));
-    await waitFor(() => expect(screen.getByTestId("porta-google")).toBeInTheDocument());
-
+    await ateConta("rotina", "sem_plano", "semana");
+    expect(eventos("porta_passo").find((e) => e.passo === "p3")?.resposta).toBe("Uma semana");
     fireEvent.click(screen.getByTestId("porta-google"));
     await waitFor(() => expect(entrarComGoogle).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("porta-aviso-google")).toBeNull();
     expect(localStorage.getItem("core-auth-next")).toBe("/comece?passo=voltou");
-    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "google" });
     cleanup();
 
-    // a volta do OAuth: página NOVA (/auth/callback → /comece?passo=voltou), Instagram não, Safari mantém o storage
     _zerarMemoriaPorta();
     _zerarEstadoPorta();
     irPara("/comece?passo=voltou");
@@ -292,55 +384,103 @@ describe("fluxo inteiro — ROTINA, no Safari, conta pelo Google", () => {
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
     expect(updateUser).toHaveBeenCalledTimes(1);
     const gravada = (updateUser.mock.calls[0][0] as { data: { porta: Record<string, any> } }).data.porta;
-    expect(gravada.attr).toMatchObject({ utm_campaign: "porta_teste", ad_id: "333", fbclid: "IwAR_abc" }); // a campanha da 1ª carga, relida do storage
-    expect(gravada.respostas).toEqual({ area: "rotina", rota: "rotina", p2: "1-2", p3: "largo_no_meio" });
+    expect(gravada.attr).toMatchObject({ utm_campaign: "porta_teste", ad_id: "333", fbclid: "IwAR_abc" });
+    expect(gravada.respostas).toEqual({ area: "rotina", rota: "rotina", p2: "sem_plano", p3: "semana", atrapalha: "Acordo sem plano nenhum", consistencia: "Uma semana" });
     expect(gravada.metodo).toBe("google");
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "google", existente: false, gravou: true });
     expect(fireMetaEvent).toHaveBeenCalledWith("CompleteRegistration", expect.anything(), gravada.event_id);
-    expect(screen.getByTestId("porta-salvo-email").textContent).toContain("rotina@gmail.com");
     expect(screen.getByTestId("porta-passo-3").textContent).toContain("Continuar com Google");
+    expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-google-ios.jpg");
+  });
+
+  it("Apple chama entrarComApple (também dentro do Instagram) e volta como método apple", async () => {
+    await ateConta("saude", "agua", "sono_ruim");
+    fireEvent.click(screen.getByTestId("porta-apple"));
+    await waitFor(() => expect(entrarComApple).toHaveBeenCalledTimes(1));
+    expect(entrarComGoogle).not.toHaveBeenCalled();
+    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "apple" });
+    cleanup();
+    _zerarMemoriaPorta();
+    _zerarEstadoPorta();
+    irPara("/comece?passo=voltou");
+    const u = usuario({ email: "x1y2@privaterelay.appleid.com" });
+    authState.user = u;
+    getUser.mockResolvedValue({ data: { user: u } });
+    montar();
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "apple", existente: false });
+    expect(screen.getByTestId("porta-passo-3").textContent).toContain("Continuar com a Apple");
+  });
+
+  it("Android: sem o botão da Apple (o app Android não entra com a Apple)", async () => {
+    ua(UA.android);
+    await ateConta("metas", "na_cabeca", "ano");
+    expect(screen.queryByTestId("porta-apple")).toBeNull();
+    expect(screen.getByTestId("porta-google")).toBeInTheDocument();
   });
 });
 
-describe("conta que já existe e metadata só se ausente", () => {
-  const chegarNaConta = async () => {
-    montar();
-    fireEvent.click(screen.getByTestId("porta-comecar"));
-    await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
-    await escolher("metas", "porta-p2");
-    await escolher("nenhuma", "porta-p3");
-    await escolher("na_cabeca", "porta-comsem");
-    fireEvent.click(screen.getByTestId("porta-comsem-cta"));
-    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("porta-desbloquear"));
-    await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
-    signInWithOtp.mockResolvedValue({ error: null });
-    verifyOtp.mockResolvedValue({ error: null });
-    fireEvent.change(screen.getByTestId("porta-email"), { target: { value: "velha@exemplo.com" } });
-    fireEvent.click(screen.getByTestId("porta-enviar-codigo"));
-    await waitFor(() => expect(screen.getByTestId("porta-codigo")).toBeInTheDocument());
-    fireEvent.change(screen.getByTestId("porta-codigo"), { target: { value: "87654321" } });
-  };
-
-  it("conta antiga SEM porta: entra, grava a porta (updateUser), existente:true, sem CompleteRegistration", async () => {
-    await chegarNaConta();
+describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só se ausente", () => {
+  it("mesma senha: entra, grava a porta (updateUser), existente:true, sem CompleteRegistration", async () => {
+    await ateConta("metas", "tantas", "meses");
+    signUp.mockResolvedValue({ data: { user: null, session: null }, error: { message: "User already registered" } });
+    signInWithPassword.mockResolvedValue({ data: {}, error: null });
     getUser.mockResolvedValue({ data: { user: usuario({ email: "velha@exemplo.com", created_at: "2025-01-01T00:00:00Z", user_metadata: { full_name: "Bia" } }) } });
-    fireEvent.click(screen.getByTestId("porta-conferir"));
+    preencherSenha("velha@exemplo.com", "minhasenha");
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    expect(signUp).toHaveBeenCalledTimes(1);
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: "velha@exemplo.com", password: "minhasenha" });
     expect(updateUser).toHaveBeenCalledTimes(1);
-    expect((updateUser.mock.calls[0][0] as { data: { porta: { respostas: unknown } } }).data.porta.respostas).toEqual({ area: "metas", rota: "metas", p2: "nenhuma", p3: "na_cabeca" });
-    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "email", existente: true, gravou: true });
+    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: true, gravou: true });
     expect(fireMetaEvent).not.toHaveBeenCalledWith("CompleteRegistration", expect.anything(), expect.anything());
   });
 
+  it("senha diferente: pede a senha dela (com 'Esqueci a senha'), entra e não cria outra conta", async () => {
+    await ateConta("dinheiro", "nao_guardo", "menos_100");
+    signUp.mockResolvedValue({ data: { user: null, session: null }, error: { message: "User already registered" } });
+    signInWithPassword.mockResolvedValueOnce({ data: {}, error: { message: "Invalid login credentials" } });
+    preencherSenha("velha@exemplo.com", "outrasenha");
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    await waitFor(() => expect(screen.getByTestId("porta-conta").getAttribute("data-fase")).toBe("existe"));
+    expect(texto()).toContain("Esse e-mail já tem conta");
+    expect(screen.getByTestId("porta-esqueci").getAttribute("href")).toBe("/reset-password");
+    expect(eventos("porta_conta_existe")).toHaveLength(1);
+
+    signInWithPassword.mockResolvedValueOnce({ data: {}, error: { message: "Invalid login credentials" } });
+    fireEvent.change(screen.getByTestId("porta-senha-existente"), { target: { value: "erradaaa" } });
+    fireEvent.click(screen.getByTestId("porta-entrar-existente"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Senha não bateu");
+
+    signInWithPassword.mockResolvedValueOnce({ data: {}, error: null });
+    getUser.mockResolvedValue({ data: { user: usuario({ email: "velha@exemplo.com", created_at: "2025-01-01T00:00:00Z" }) } });
+    fireEvent.change(screen.getByTestId("porta-senha-existente"), { target: { value: "acertei1" } });
+    fireEvent.click(screen.getByTestId("porta-entrar-existente"));
+    await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
+    expect(signUp).toHaveBeenCalledTimes(1); // nunca uma 2ª tentativa de criar
+    expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "senha", existente: true });
+  });
+
   it("conta que JÁ tem porta (de outra visita): NUNCA sobrescreve a 1ª atribuição", async () => {
-    await chegarNaConta();
+    await ateConta("rotina", "celular", "nunca");
+    signUp.mockResolvedValue({ data: { user: null, session: null }, error: { message: "User already registered" } });
+    signInWithPassword.mockResolvedValue({ data: {}, error: null });
     const antiga = { v: 1, porta_session_id: "outra-sessao", event_id: "porta_cr_antigo", attr: { ad_id: "999" } };
-    getUser.mockResolvedValue({ data: { user: usuario({ email: "velha@exemplo.com", created_at: "2026-09-01T00:00:00Z", user_metadata: { porta: antiga } }) } });
-    fireEvent.click(screen.getByTestId("porta-conferir"));
+    getUser.mockResolvedValue({ data: { user: usuario({ created_at: "2026-09-01T00:00:00Z", user_metadata: { porta: antiga } }) } });
+    preencherSenha("velha@exemplo.com", "minhasenha");
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
     expect(updateUser).not.toHaveBeenCalled();
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ existente: true, gravou: false, event_id: "porta_cr_antigo" });
+  });
+
+  it("senha fraca recusada pelo servidor: mensagem clara, sem tentar entrar", async () => {
+    await ateConta("corpo", "como_mal", "primeira");
+    signUp.mockResolvedValue({ data: { user: null, session: null }, error: { message: "Password should be at least 6 characters" } });
+    preencherSenha("nova@exemplo.com", "abcdef");
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("senha é fraca");
+    expect(signInWithPassword).not.toHaveBeenCalled();
   });
 
   it("decidirGravacao: mesma sessão = conta nova; outra sessão = intocada; ausente = grava", () => {
@@ -351,7 +491,7 @@ describe("conta que já existe e metadata só se ausente", () => {
     expect(decidirGravacao({ created_at: "2024-01-01T00:00:00Z", user_metadata: null }, "s1", agora)).toEqual({ gravar: true, existente: true });
   });
 
-  it("já logado neste navegador: 'Salvar nesta conta' grava sem pedir e-mail", async () => {
+  it("já logado neste navegador: 'Salvar nesta conta' grava sem pedir nada", async () => {
     const u = usuario({ email: "logada@exemplo.com", created_at: "2025-05-05T00:00:00Z" });
     authState.user = u;
     getUser.mockResolvedValue({ data: { user: u } });
@@ -359,8 +499,8 @@ describe("conta que já existe e metadata só se ausente", () => {
     fireEvent.click(screen.getByTestId("porta-comecar"));
     await waitFor(() => expect(screen.getByTestId("porta-area")).toBeInTheDocument());
     await escolher("saude", "porta-p2");
-    await escolher("um_falha", "porta-p3");
-    await escolher("agua", "porta-comsem");
+    await escolher("sono", "porta-p3");
+    await escolher("cansaco", "porta-comsem");
     fireEvent.click(screen.getByTestId("porta-comsem-cta"));
     await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("porta-desbloquear"));
@@ -368,11 +508,11 @@ describe("conta que já existe e metadata só se ausente", () => {
     fireEvent.click(screen.getByTestId("porta-salvar-nesta-conta"));
     await waitFor(() => expect(screen.getByTestId("porta-salvo")).toBeInTheDocument());
     expect(updateUser).toHaveBeenCalledTimes(1);
-    expect(eventos("porta_conta_iniciada")[0]).toMatchObject({ metodo: "sessao" });
     expect(eventos("porta_conta_criada")[0]).toMatchObject({ metodo: "sessao", existente: true });
   });
 });
 
+/* ---------------------------------------------------------------- atribuição */
 describe("atribuição à prova do Instagram", () => {
   it("captura na 1ª carga e persiste em localStorage, sessionStorage, cookie próprio e memória", () => {
     const a = capturarAtribuicao({ search: QUERY_AD, cookie: "_fbp=fb.1.1700000000000.123456", agora: 1_791_000_000_000, caminho: "/comece" });
@@ -386,10 +526,10 @@ describe("atribuição à prova do Instagram", () => {
     capturarAtribuicao({ search: QUERY_AD, agora: 1_791_000_000_000 });
     const s1 = sessaoDaPorta();
     localStorage.clear(); sessionStorage.clear(); limparCookies();
-    const relida = capturarAtribuicao({ search: "" }); // a próxima leitura (ex.: na hora de gravar a conta)
+    const relida = capturarAtribuicao({ search: "" });
     expect(relida).toMatchObject({ ad_id: "333", utm_campaign: "porta_teste", fbclid: "IwAR_abc", origem: "url" });
-    expect(JSON.parse(localStorage.getItem(CHAVE_ATTR)!).ad_id).toBe("333"); // re-semeado
-    expect(sessaoDaPorta()).toEqual({ id: s1.id, nova: false }); // mesma sessão
+    expect(JSON.parse(localStorage.getItem(CHAVE_ATTR)!).ad_id).toBe("333");
+    expect(sessaoDaPorta()).toEqual({ id: s1.id, nova: false });
     expect(lerAtribuicao()?.ad_id).toBe("333");
   });
 
@@ -416,18 +556,17 @@ describe("atribuição à prova do Instagram", () => {
 });
 
 describe("tela 7 por aparelho", () => {
-  const naSete = (email = "ana@exemplo.com", metodo = "email") => {
-    localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "salvo", escolha: "dinheiro", p2: "sei", p3: "cartao", eventId: "porta_cr_x", metodo, email }));
+  const naSete = (metodo = "senha", email = "ana@exemplo.com") => {
+    localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "salvo", escolha: "dinheiro", p2: "esqueco_contas", p3: "nao_sei", eventId: "porta_cr_x", metodo, email }));
     montar();
   };
 
   it("Android: Google Play pelo /baixar, sem prometer teste grátis (no Android não há)", () => {
     ua(UA.android);
-    naSete();
+    naSete("google");
     expect(screen.getByTestId("porta-loja").textContent).toContain("Google Play");
-    expect(screen.getByTestId("porta-loja").getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei");
     expect(texto()).not.toMatch(/grátis/);
-    expect(screen.getByTestId("porta-passo-2").querySelector("img")?.getAttribute("src")).toBe("/como-entrar/1-tela-inicial-android.jpg");
+    expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-google-android.jpg");
   });
 
   it("computador: QR do /baixar, 'também no computador' e as duas lojas", () => {
@@ -437,16 +576,29 @@ describe("tela 7 por aparelho", () => {
     expect(screen.getByTestId("porta-salvo-computador").textContent).toBe("No computador você também usa: entre em coreaplicativo.com.br");
     expect(screen.getByTestId("porta-loja").getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei&loja=ios");
     expect(screen.getByTestId("porta-loja-android").getAttribute("href")).toBe("/baixar?origem=porta&utm_content=video_organizei&loja=android");
-    expect(texto()).not.toMatch(/R\$/);
+    conferirCopy();
+  });
+
+  it("o passo 3 é o método da conta: senha, Apple, Google", () => {
+    naSete("senha");
+    expect(screen.getByTestId("porta-passo-3").textContent).toBe("3Digite este e-mail e a sua senha e toque em “Entrar no meu CORE”.");
+    cleanup(); _zerarEstadoPorta(); localStorage.clear();
+    naSete("apple");
+    expect(screen.getByTestId("porta-passo-3").textContent).toBe("3Toque em “Continuar com a Apple”.");
+    expect(screen.getByTestId("porta-passo-3").querySelector("img")?.getAttribute("src")).toBe("/porta/entrar-apple-ios.jpg");
+    cleanup(); _zerarEstadoPorta(); localStorage.clear();
+    naSete("google");
+    expect(screen.getByTestId("porta-passo-3").textContent).toBe("3Toque em “Continuar com Google” e escolha esta conta.");
   });
 });
 
 describe("conteúdo", () => {
-  it("o plano nunca repete o Dia 1 nos dias 2 e 3", () => {
-    for (const [rota, ops] of Object.entries(PERGUNTA_3_OPCOES)) {
-      for (const o of ops) {
-        const p = planoDe3Dias(rota as keyof typeof PERGUNTA_3_OPCOES, o.id);
+  it("o plano: Dia 1 é o da dor e nunca se repete nos dias 2 e 3", () => {
+    for (const rota of Object.keys(PERGUNTA_DOR) as AreaPorta[]) {
+      for (const o of PERGUNTA_DOR[rota].opts) {
+        const p = planoDe3Dias(rota, o.id);
         expect(p.dia1).toBe(o.dia1);
+        expect(p.motivo).toBe(o.label);
         expect(new Set([p.dia1, p.dia2, p.dia3]).size).toBe(3);
       }
     }

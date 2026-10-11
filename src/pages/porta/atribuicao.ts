@@ -205,14 +205,16 @@ export function lerAtribuicao(): AtribuicaoPorta | null {
   return a;
 }
 
-/** O id da sessão da Porta: heap → sessionStorage → novo. `nova` = acabou de nascer (dispara o porta_view). */
-export function sessaoDaPorta(): { id: string; nova: boolean } {
+/** O id da sessão da Porta: heap → sessionStorage → o da URL (`ps`, quem veio do Instagram pro navegador) → novo.
+ *  `nova` = acabou de nascer (dispara o porta_view). */
+export function sessaoDaPorta(daUrl?: string | null): { id: string; nova: boolean } {
   if (memoriaSessao) {
     if (!ss.get(CHAVE_SESSAO)) ss.set(CHAVE_SESSAO, memoriaSessao);
     return { id: memoriaSessao, nova: false };
   }
   const salvo = ss.get(CHAVE_SESSAO);
   if (salvo) { memoriaSessao = salvo; return { id: salvo, nova: false }; }
+  if (daUrl && /^[a-z0-9-]{8,64}$/i.test(daUrl)) { memoriaSessao = daUrl; ss.set(CHAVE_SESSAO, daUrl); return { id: daUrl, nova: false }; }
   let id: string;
   try { id = crypto.randomUUID(); } catch { id = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`; }
   memoriaSessao = id;
@@ -235,7 +237,8 @@ export function idsDoAnuncio(a: AtribuicaoPorta | null, sessao: string): Record<
 export type PortaNaConta = {
   v: 1;
   attr: Omit<AtribuicaoPorta, "origem"> & { origem: AtribuicaoPorta["origem"] };
-  respostas: { area: string; rota: string; p2: string | null; p3: string | null };
+  /** p2/p3 = ids das opções; atrapalha/gasto/consistencia = o TEXTO da opção, como o app guarda */
+  respostas: { area: string; rota: string; p2: string | null; p3: string | null; [chave: string]: string | null };
   criado_em: string;
   /** o eventID do CompleteRegistration do pixel (pra deduplicar com a CAPI depois) */
   event_id: string;
@@ -264,10 +267,10 @@ export function montarPorta(args: {
 
 /**
  * Decide o que fazer com a conta depois da sessão:
- *   · a conta já tem `porta` desta MESMA sessão → foi o signInWithOtp desta
+ *   · a conta já tem `porta` desta MESMA sessão → foi o signUp desta
  *     página que a criou (o `data` só vale na criação): conta nova, nada a gravar;
  *   · tem `porta` de outra sessão → conta que já passou pela Porta: NUNCA sobrescreve;
- *   · não tem `porta` → grava (Google, conta existente pelo código).
+ *   · não tem `porta` → grava (Google, Apple, conta que já existia e entrou com a senha).
  * `existente`: conta que já existia antes desta visita (criada há mais de 10 min).
  */
 export function decidirGravacao(

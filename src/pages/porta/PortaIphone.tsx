@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { entrarComGoogle } from "@/lib/auth-nativo";
+import { entrarComApple, entrarComGoogle } from "@/lib/auth-nativo";
 import { guardarDestino } from "@/lib/destino-seguro";
 import { isInAppBrowser } from "@/lib/funnel";
 import { getAuthRedirectUrl } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { persistLeadSource } from "@/lib/lead-source";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { capturarAtribuicao, decidirGravacao, idsDoAnuncio, lerAtribuicao, montarPorta, sessaoDaPorta, type AtribuicaoPorta, type PortaNaConta } from "./atribuicao";
-import { OPCOES_AREA, PERGUNTA_2, PERGUNTA_3, PERGUNTA_3_OPCOES, PERGUNTA_AREA, comSemDa, rotaDe, type EscolhaPorta } from "./conteudo";
+import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
 import { WelcomePorta } from "./WelcomePorta";
 import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
@@ -24,13 +24,14 @@ import { SalvoPorta, type Plataforma } from "./SalvoPorta";
  * A PORTA iPHONE — coreaplicativo.com.br/comece (10/10). Só na WEB (o app
  * nativo nunca monta: a rota fica atrás do SoNaWeb no App.tsx). noindex.
  *
- * anúncio → welcome com vídeo → 3 perguntas de 1 toque → com × sem o CORE →
- * plano de 3 dias com cadeado → CRIA A CONTA no site (Google ou e-mail com
- * código; a campanha fica gravada em user_metadata.porta) → "Pronto, salvo":
+ * anúncio → welcome com vídeo → área + as 2 perguntas do funil do app (a dor e
+ * o número) → com × sem o CORE → plano de 3 dias com cadeado → CRIA A CONTA no
+ * site (Apple, Google ou e-mail + senha; a campanha fica gravada em
+ * user_metadata.porta) → "Pronto, salvo":
  * baixa o app, toca em "Entrar" (abaixo do Começar) com o mesmo e-mail → o
  * paywall do app (3 dias grátis, já no ar) liga o teste à conta.
  *
- * SEM PREÇO em lugar nenhum; "dias grátis" só na tela 7.
+ * SEM o preço do produto em lugar nenhum; "dias grátis" só na tela 7.
  *
  * Eventos (analytics_events, todos com porta_session_id + ids do anúncio):
  *   porta_view {attr…}           1ª carga da sessão
@@ -39,6 +40,7 @@ import { SalvoPorta, type Plataforma } from "./SalvoPorta";
  *   porta_conta_criada {metodo, existente, event_id, gravou}
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
  *   porta_voltou_aba {}
+ *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
  * Pixel: ViewContent na welcome; CompleteRegistration (eventID = porta.event_id) na conta nova.
  */
 export type Passo = "welcome" | "area" | "p2" | "p3" | "comsem" | "plano" | "conta" | "salvo";
@@ -85,12 +87,38 @@ const plataformaDaWeb = (): Plataforma => {
   return "web";
 };
 
-const msgErroOtp = (m: string): string =>
-  /rate|limit|security purposes|seconds/i.test(m)
-    ? "Já mandei um código há pouco. Confira a caixa de entrada e o spam."
-    : /invalid.*email|email.*invalid|valid email/i.test(m)
+const JA_EXISTE = /already registered|already been registered|user already|already exists/i;
+const msgErroCadastro = (m: string): string =>
+  /password|senha/i.test(m) && /weak|short|least|characters|fraca/i.test(m)
+    ? "Essa senha é fraca. Use pelo menos 6 caracteres, com letras e números."
+    : /invalid.*email|email.*invalid|valid email|unable to validate email/i.test(m)
       ? "Esse e-mail parece errado. Confere e tenta de novo."
-      : "Não consegui mandar o código. Tenta de novo em alguns segundos.";
+      : /rate|limit|security purposes|seconds/i.test(m)
+        ? "Muitas tentativas seguidas. Espera um minutinho e tenta de novo."
+        : "Não consegui criar a conta agora. Tenta de novo em alguns segundos.";
+
+/* HANDOFF PRO NAVEGADOR (v2): no Instagram o Google não funciona; a pessoa toca em
+ * ⋯ → "Abrir no navegador" e a MESMA URL abre no Safari, que não tem o storage do
+ * Instagram. Por isso, ao mostrar o aviso, as respostas (`pe`) e a sessão da
+ * Porta (`ps`) vão pra URL: no Safari ela cai direto na tela da conta. */
+export const PARAM_ESTADO = "pe";
+export const PARAM_SESSAO = "ps";
+function estadoDaUrl(): EstadoPorta | null {
+  try {
+    const raw = new URLSearchParams(window.location.search).get(PARAM_ESTADO);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Partial<EstadoPorta>;
+    const okId = (v: unknown) => v === null || v === undefined || (typeof v === "string" && /^[a-z0-9_-]{1,40}$/i.test(v));
+    if (!okId(o.escolha) || !okId(o.p2) || !okId(o.p3) || typeof o.eventId !== "string" || !/^porta_cr_[a-z0-9-]{6,60}$/i.test(o.eventId)) return null;
+    return { passo: "conta", escolha: (o.escolha ?? null) as EscolhaPorta | null, p2: o.p2 ?? null, p3: o.p3 ?? null, eventId: o.eventId, metodo: null, email: null };
+  } catch {
+    return null;
+  }
+}
+const appDoWebview = (): string => {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  return /Instagram/i.test(ua) ? "Instagram" : /FBAN|FBAV|FB_IAB|FBIOS/i.test(ua) ? "Facebook" : "navegador deste app";
+};
 
 export const URL_QR = "https://coreaplicativo.com.br/baixar?origem=porta_qr";
 
@@ -109,14 +137,16 @@ export function PortaIphone() {
   const inicio = useRef<{ attr: AtribuicaoPorta; sessao: string; nova: boolean } | null>(null);
   if (!inicio.current) {
     const attr = capturarAtribuicao();
-    const s = sessaoDaPorta();
+    let psUrl: string | null = null;
+    try { psUrl = new URLSearchParams(window.location.search).get(PARAM_SESSAO); } catch { /* noop */ }
+    const s = sessaoDaPorta(psUrl);
     inicio.current = { attr, sessao: s.id, nova: s.nova };
   }
   const sessao = inicio.current.sessao;
   const attrAgora = () => lerAtribuicao() ?? inicio.current!.attr;
   const ids = () => idsDoAnuncio(attrAgora(), sessao);
 
-  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? { passo: "welcome", escolha: null, p2: null, p3: null, eventId: novoId(), metodo: null, email: null });
+  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? estadoDaUrl() ?? { passo: "welcome", escolha: null, p2: null, p3: null, eventId: novoId(), metodo: null, email: null });
   const setEstado = useCallback((f: (e: EstadoPorta) => EstadoPorta) => {
     setEstadoCru((e) => { const n = f(e); gravarEstado(n); return n; });
   }, []);
@@ -154,7 +184,15 @@ export function PortaIphone() {
   const passoFeito = (passo: string, resposta: string | null, area: string | null = estadoRef.current.escolha) =>
     trackEvent("porta_passo", { passo, area, resposta, ...ids() });
 
-  const respostas = (e: EstadoPorta = estadoRef.current): PortaNaConta["respostas"] => ({ area: e.escolha ?? "dinheiro", rota: rotaDe(e.escolha), p2: e.p2, p3: e.p3 });
+  /* as respostas como o APP guarda (chave → texto da opção): atrapalha + gasto|consistencia */
+  const respostas = (e: EstadoPorta = estadoRef.current): PortaNaConta["respostas"] => {
+    const r = rotaDe(e.escolha);
+    const num = PERGUNTA_NUMERO[r];
+    return {
+      area: e.escolha ?? "dinheiro", rota: r, p2: e.p2, p3: e.p3,
+      atrapalha: labelDe(PERGUNTA_DOR[r].opts, e.p2), [num.key]: labelDe(num.opts, e.p3),
+    };
+  };
 
   /* ---------------------------------------------------------- a conta */
   const concluindo = useRef(false);
@@ -169,12 +207,7 @@ export function PortaIphone() {
       const atual = (u.user_metadata as { porta?: PortaNaConta } | undefined)?.porta;
       const agora = Date.now();
       const dec = decidirGravacao(u, sessao, agora);
-      let existente = dec.existente;
-      if (metodo === "link_email" && atual) {
-        // voltou pelo link do e-mail (outro navegador, outra sessão): a conta é nova se nasceu há menos de 1 h
-        const criada = u.created_at ? Date.parse(u.created_at) : NaN;
-        existente = !(Number.isFinite(criada) && agora - criada < 60 * 60 * 1000);
-      }
+      const existente = dec.existente;
       const eventId = atual?.event_id ?? e.eventId;
       if (dec.gravar) {
         const porta = montarPorta({ attr: capturarAtribuicao({ search: "" }), respostas: respostas(e), eventId, sessao, metodo, agora });
@@ -194,56 +227,74 @@ export function PortaIphone() {
     }
   }, [sessao, setEstado]);
 
-  /* volta do Google (/auth/callback → /comece?passo=voltou) e do link do e-mail (?passo=salvo) */
+  /* volta do Google/Apple (/auth/callback → /comece?passo=voltou) */
   useEffect(() => {
     if (authLoading || !user) return;
     const e = estadoRef.current;
-    if ((e.passo === "conta" && e.metodo === "google") || (paramPasso === "voltou" && e.passo !== "salvo")) { void concluir("google"); return; }
-    if (paramPasso === "salvo" && e.passo !== "salvo") void concluir("link_email");
+    const social = e.metodo === "google" || e.metodo === "apple";
+    if ((e.passo === "conta" && social) || (paramPasso === "voltou" && e.passo !== "salvo")) void concluir(social ? (e.metodo as string) : "google");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
 
-  const onGoogle = async (): Promise<Resultado> => {
-    trackEvent("porta_conta_iniciada", { metodo: "google", ...ids() });
-    setEstado((e) => ({ ...e, passo: "conta", metodo: "google" }));
+  const social = async (metodo: "google" | "apple"): Promise<Resultado> => {
+    trackEvent("porta_conta_iniciada", { metodo, ...ids() });
+    setEstado((e) => ({ ...e, passo: "conta", metodo }));
     guardarDestino("/comece?passo=voltou");
-    const { error } = await entrarComGoogle();
+    const { error } = await (metodo === "apple" ? entrarComApple() : entrarComGoogle());
     if (error) {
       setEstado((e) => ({ ...e, metodo: null }));
-      return { ok: false, erro: "Não consegui abrir o Google. Use seu e-mail aqui embaixo." };
+      trackEvent("porta_erro", { onde: `oauth_${metodo}`, msg: (error.message || "").slice(0, 160), ...ids() });
+      return { ok: false, erro: `Não consegui abrir ${metodo === "apple" ? "a Apple" : "o Google"}. Use seu e-mail aqui embaixo.` };
     }
     return { ok: true };
   };
+  const onGoogle = () => social("google");
+  const onApple = () => social("apple");
 
-  const onEnviarCodigo = async (email: string): Promise<Resultado> => {
-    trackEvent("porta_conta_iniciada", { metodo: "email", ...ids() });
+  /* Google dentro do Instagram/Facebook: NADA de OAuth (403 disallowed_useragent). Mostra o
+   * aviso e põe as respostas na URL, pra elas irem junto no "Abrir no navegador". */
+  const onGoogleBloqueado = () => {
+    trackEvent("porta_google_bloqueado", { app: appDoWebview(), ...ids() });
+    try {
+      const e = estadoRef.current;
+      const q = new URLSearchParams(window.location.search);
+      q.set(PARAM_ESTADO, JSON.stringify({ escolha: e.escolha, p2: e.p2, p3: e.p3, eventId: e.eventId }));
+      q.set(PARAM_SESSAO, sessao);
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}?${q.toString()}`);
+    } catch { /* noop */ }
+  };
+
+  /* E-MAIL + SENHA (v2, sem código). Conta nova: signUp com a porta no `data` (a confirmação de
+   * e-mail está desligada no projeto: mailer_autoconfirm = true, a sessão volta na hora, como nos
+   * funis antigos da web). E-mail que já existe: entra com a MESMA senha; se não der, pede a senha
+   * dela. Nunca cria 2ª conta. */
+  const entrarComSenha = async (email: string, senha: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    return !error;
+  };
+  const onCriarConta = async (email: string, senha: string): Promise<Resultado> => {
+    trackEvent("porta_conta_iniciada", { metodo: "senha", ...ids() });
     const e = estadoRef.current;
-    const porta = montarPorta({ attr: capturarAtribuicao({ search: "" }), respostas: respostas(e), eventId: e.eventId, sessao, metodo: "email" });
-    setEstado((x) => ({ ...x, metodo: "email", email }));
-    const { error } = await supabase.auth.signInWithOtp({
+    const porta = montarPorta({ attr: capturarAtribuicao({ search: "" }), respostas: respostas(e), eventId: e.eventId, sessao, metodo: "senha" });
+    setEstado((x) => ({ ...x, metodo: "senha", email }));
+    const { data, error } = await supabase.auth.signUp({
       email,
-      options: {
-        shouldCreateUser: true,
-        // vale só na CRIAÇÃO da conta (conta que já existe ignora): a 1ª atribuição nasce junto com a conta
-        data: { porta },
-        // se a pessoa tocar no link do e-mail em vez de digitar o código, volta pra tela 7
-        emailRedirectTo: getAuthRedirectUrl(`/auth/callback?next=${encodeURIComponent("/comece?passo=salvo")}`),
-      },
+      password: senha,
+      options: { data: { porta }, emailRedirectTo: getAuthRedirectUrl("/auth/callback") },
     });
-    if (error) {
-      trackEvent("porta_erro", { onde: "enviar_codigo", msg: (error.message || "").slice(0, 160), ...ids() });
-      return { ok: false, erro: msgErroOtp(error.message || "") };
+    if (error && !JA_EXISTE.test(error.message || "")) {
+      trackEvent("porta_erro", { onde: "criar_conta", msg: (error.message || "").slice(0, 160), ...ids() });
+      return { ok: false, erro: msgErroCadastro(error.message || "") };
     }
-    return { ok: true };
+    if (!error && data?.session) return concluir("senha");
+    // já existe (ou o projeto pediu confirmação): tenta a mesma senha, nunca uma 2ª conta
+    if (await entrarComSenha(email, senha)) return concluir("senha");
+    trackEvent("porta_conta_existe", { ...ids() });
+    return { ok: false, existe: true };
   };
-
-  const onConferir = async (email: string, codigo: string): Promise<Resultado> => {
-    const { error } = await supabase.auth.verifyOtp({ email, token: codigo, type: "email" });
-    if (error) {
-      trackEvent("porta_erro", { onde: "conferir_codigo", msg: (error.message || "").slice(0, 160), ...ids() });
-      return { ok: false, erro: /expired/i.test(error.message || "") ? "Esse código venceu. Peça outro." : "Código não bateu. Confere os números do e-mail." };
-    }
-    return concluir("email");
+  const onEntrarComSenha = async (email: string, senha: string): Promise<Resultado> => {
+    if (await entrarComSenha(email, senha)) return concluir("senha");
+    return { ok: false, erro: "Senha não bateu. Confere ou toque em Esqueci a senha." };
   };
 
   const onSalvarNestaConta = async (): Promise<Resultado> => {
@@ -302,22 +353,29 @@ export function PortaIphone() {
       />
     );
   } else if (estado.passo === "p2") {
-    const q = PERGUNTA_2[rota];
-    tela = <PerguntaPorta testid="porta-p2" titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p2", o.id); ir("p3", { p2: o.id }); }} />;
+    // a DOR (quiz_1 do app); quem entrou por "Tudo" vê a linha de abertura do app em cima
+    const q = PERGUNTA_DOR[rota];
+    tela = <PerguntaPorta testid="porta-p2" abertura={estado.escolha === "tudo" ? ABERTURA_TUDO : undefined} titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p2", o.label); ir("p3", { p2: o.id }); }} />;
   } else if (estado.passo === "p3") {
-    tela = <PerguntaPorta testid="porta-p3" titulo={PERGUNTA_3} opcoes={PERGUNTA_3_OPCOES[rota]} onEscolher={(o) => { passoFeito("p3", o.id); ir("comsem", { p3: o.id }); }} />;
+    // o NÚMERO da rota (dinheiro: quiz_3 "gasto"; as outras: quiz_2 "consistencia")
+    const q = PERGUNTA_NUMERO[rota];
+    tela = <PerguntaPorta testid="porta-p3" titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p3", o.label); ir("comsem", { p3: o.id }); }} />;
   } else if (estado.passo === "comsem") {
-    tela = <ComSemPorta dados={comSemDa(rota, estado.p2)} onNext={() => { passoFeito("comsem", "seguir"); ir("plano"); }} />;
+    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "seguir"); ir("plano"); }} />;
   } else if (estado.passo === "plano") {
-    tela = <PlanoPorta rota={rota} p3={estado.p3} onDesbloquear={() => { passoFeito("plano", "desbloquear"); ir("conta"); }} />;
+    tela = <PlanoPorta rota={rota} dor={estado.p2} onDesbloquear={() => { passoFeito("plano", "desbloquear"); ir("conta"); }} />;
   } else if (estado.passo === "conta") {
     tela = (
       <ContaPorta
         emInApp={emInApp}
+        appDoWebview={appDoWebview()}
+        mostrarApple={plataforma !== "android"}
         emailLogado={!authLoading && user ? user.email ?? null : null}
+        onApple={onApple}
         onGoogle={onGoogle}
-        onEnviarCodigo={onEnviarCodigo}
-        onConferir={onConferir}
+        onGoogleBloqueado={onGoogleBloqueado}
+        onCriarConta={onCriarConta}
+        onEntrarComSenha={onEntrarComSenha}
         onSalvarNestaConta={onSalvarNestaConta}
         onTrocarConta={async () => { await supabase.auth.signOut(); }}
       />
@@ -326,7 +384,7 @@ export function PortaIphone() {
     tela = (
       <SalvoPorta
         email={estado.email ?? user?.email ?? ""}
-        metodo={estado.metodo ?? "email"}
+        metodo={estado.metodo ?? "senha"}
         plataforma={plataforma}
         voltou={voltou}
         hrefLoja={hrefLoja}

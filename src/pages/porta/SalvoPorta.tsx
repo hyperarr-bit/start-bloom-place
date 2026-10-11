@@ -1,6 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import { BotaoPorta } from "./BotaoPorta";
-import { ONDE_FICA_ENTRAR, TEXTO_CODIGO_NO_APP, TEXTO_ENTRAR_NO_APP } from "./conteudo";
+import { ONDE_FICA_ENTRAR, TEXTO_ENTRAR_NO_APP } from "./conteudo";
 
 /**
  * TELA 7 DA PORTA — "Pronto, seu plano está salvo ✓".
@@ -60,8 +60,9 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, hrefLoja, qrUrl,
       </h1>
 
       <div className="mt-4 rounded-2xl border-2 bg-white px-4 py-3" style={{ borderColor: MAGENTA }} data-testid="porta-salvo-email">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">{google ? "Sua conta Google" : "Sua conta"}</p>
-        <p className="text-[18px] font-extrabold text-[#16121c] mt-0.5 break-all">{email}</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">{google ? "Sua conta Google" : metodo === "apple" ? "Sua conta Apple" : "Sua conta"}</p>
+        {/* e-mail comprido (o "esconder meu e-mail" da Apple tem ~35 letras) desce a fonte em vez de quebrar no meio */}
+        <p className={`${email.length > 26 ? "text-[14.5px]" : "text-[18px]"} font-extrabold text-[#16121c] mt-0.5 break-all`}>{email}</p>
       </div>
 
       <p className="text-[15px] text-[#5b6570] leading-snug mt-4" data-testid="porta-salvo-texto">
@@ -84,12 +85,21 @@ export function SalvoPorta({ email, metodo, plataforma, voltou, hrefLoja, qrUrl,
         <Passo n={2} print={`/como-entrar/1-tela-inicial-${prints}.jpg`} alt={`Tela inicial do app com “${TEXTO_ENTRAR_NO_APP}” destacado`}>
           Abra o app e toque em <b>“{TEXTO_ENTRAR_NO_APP}”</b>, {ONDE_FICA_ENTRAR}. Não toque em “Começar”.
         </Passo>
-        {google ? (
-          <Passo n={3}>Toque em <b>“Continuar com Google”</b> e escolha esta conta.</Passo>
-        ) : (
-          <Passo n={3} print={`/como-entrar/2-entrar-${prints}.jpg`} alt={`Tela de entrar do app com “${TEXTO_CODIGO_NO_APP}” destacado`}>
-            Digite este e-mail e toque em <b>“{TEXTO_CODIGO_NO_APP}”</b>. O código chega no seu e-mail.
+        {/* o passo 3 é o jeito que ELA criou a conta (prints do /entrar do app com o anel no botão certo: public/porta/) */}
+        {metodo === "google" ? (
+          <Passo n={3} print={`/porta/entrar-google-${prints}.jpg`} alt="Tela de entrar do app com “Continuar com Google” destacado">
+            Toque em <b>“Continuar com Google”</b> e escolha esta conta.
           </Passo>
+        ) : metodo === "apple" ? (
+          <Passo n={3} print="/porta/entrar-apple-ios.jpg" alt="Tela de entrar do app com “Continuar com a Apple” destacado">
+            Toque em <b>“Continuar com a Apple”</b>.
+          </Passo>
+        ) : metodo === "senha" ? (
+          <Passo n={3} print={`/porta/entrar-senha-${prints}.jpg`} alt="Tela de entrar do app com o e-mail e a senha destacados">
+            Digite este e-mail e a sua senha e toque em <b>“Entrar no meu CORE”</b>.
+          </Passo>
+        ) : (
+          <Passo n={3}>Entre com este e-mail, do jeito que você já entra na sua conta.</Passo>
         )}
       </ol>
 

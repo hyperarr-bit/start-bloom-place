@@ -2,8 +2,8 @@
  * E-MAIL "ENTRAR NO CORE" DA PORTA iPHONE (10/10) — NÃO DEPLOYADO.
  *
  * Quem cria a conta na /comece (Porta iPhone) e não aparece no app em 10 min
- * recebe UM e-mail com os 3 passos: baixar, tocar em "Já tenho conta? Entrar",
- * usar o mesmo e-mail (código sem senha / Google). É o caminho que funciona
+ * recebe UM e-mail com os 3 passos: baixar, tocar em "Entrar" (abaixo do Começar),
+ * entrar do mesmo jeito que criou a conta (senha, Apple ou Google). É o caminho que funciona
  * quando o navegador do Instagram não abre a loja, ou quando a pessoa fecha a
  * aba antes de baixar.
  *
@@ -25,11 +25,14 @@ const EH_TESTE = (email?: string | null) => !!email && /(^|[+.])teste|testeghg|j
 const SITE = "https://coreaplicativo.com.br";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function htmlPorta(email: string, google: boolean) {
+export function htmlPorta(email: string, metodo: string) {
   const e = esc(email);
-  const passo3 = google
+  // o passo 3 é o jeito que a conta foi criada na Porta (v2: senha, Apple ou Google; sem código)
+  const passo3 = metodo === "google"
     ? `Toque em <b>“Continuar com Google”</b> e escolha <b>${e}</b>.`
-    : `Digite <b>${e}</b> e toque em <b>“Entrar sem senha”</b>. O código chega neste e-mail.`;
+    : metodo === "apple"
+      ? `Toque em <b>“Continuar com a Apple”</b>.`
+      : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
   const passo = (n: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 14px 0;"><div style="width:26px;height:26px;border-radius:13px;background:#d22d80;color:#fff;font-weight:900;font-size:13px;line-height:26px;text-align:center;">${n}</div></td><td style="vertical-align:top;padding:3px 0 14px;font-size:15px;line-height:1.45;color:#16121c;">${t}</td></tr>`;
   return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f6f3f5;font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#16121c;">
 <div style="max-width:520px;margin:0 auto;padding:28px 20px;">
@@ -39,7 +42,7 @@ export function htmlPorta(email: string, google: boolean) {
     <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">Sua conta: <b style="color:#16121c;">${e}</b></p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
       ${passo(1, "Baixe o <b>CORE</b> no celular.")}
-      ${passo(2, "Abra o app e toque em <b>“Já tenho conta? Entrar”</b>. Não toque em “Começar”.")}
+      ${passo(2, "Abra o app e toque em <b>“Entrar”</b>, logo abaixo do botão Começar. Não toque em “Começar”.")}
       ${passo(3, passo3)}
     </table>
     <a href="${SITE}/baixar?origem=porta_email" style="display:block;text-align:center;background:#16121c;color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:15px 18px;border-radius:999px;margin:8px 0 12px;">Baixar o CORE</a>
@@ -59,14 +62,14 @@ serve(async (req) => {
     if (!resendKey) return Response.json({ skipped: "no RESEND_API_KEY" });
     const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
     const from = fromBase.includes("<") ? `CORE <${fromBase.split("<")[1]}` : fromBase;
-    const enviar = async (to: string, google: boolean) => {
+    const enviar = async (to: string, metodo: string) => {
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [to], subject: "Entrar no CORE: seu plano está te esperando", html: htmlPorta(to, google) }),
+        body: JSON.stringify({ from, to: [to], subject: "Entrar no CORE: seu plano está te esperando", html: htmlPorta(to, metodo) }),
       });
       if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
     };
-    if (body?.preview) { await enviar(String(body.preview), false); return Response.json({ preview: true }); }
+    if (body?.preview) { await enviar(String(body.preview), "senha"); return Response.json({ preview: true }); }
 
     const agora = Date.now();
     const de = new Date(agora - 120 * 60_000).toISOString(), ate = new Date(agora - 10 * 60_000).toISOString();
@@ -76,7 +79,7 @@ serve(async (req) => {
       .not("user_id", "is", null).limit(300);
     if (error) throw error;
     const porUser = new Map<string, { metodo: string; t: string }>();
-    for (const c of criadas ?? []) if (!porUser.has(String(c.user_id))) porUser.set(String(c.user_id), { metodo: String(c.event_data?.metodo ?? "email"), t: c.created_at });
+    for (const c of criadas ?? []) if (!porUser.has(String(c.user_id))) porUser.set(String(c.user_id), { metodo: String(c.event_data?.metodo ?? "senha"), t: c.created_at });
 
     let enviados = 0, jaAvisados = 0, noApp = 0, semEmail = 0, testes = 0, falhas = 0;
     for (const [uid, c] of porUser) {
@@ -94,7 +97,7 @@ serve(async (req) => {
         const email = u?.user?.email ?? null;
         if (!email) { semEmail++; continue; }
         if (EH_TESTE(email)) { testes++; continue; }
-        await enviar(email, c.metodo === "google");
+        await enviar(email, c.metodo);
         await supabase.from("analytics_events").insert({ user_id: uid, event_name: "porta_email_enviado", event_data: { metodo: c.metodo }, session_id: null });
         enviados++;
       } catch (e) {

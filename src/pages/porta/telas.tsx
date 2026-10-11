@@ -1,8 +1,8 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Lock, X } from "lucide-react";
 import { BotaoPorta } from "./BotaoPorta";
-import { NOME_DA_AREA, mesCurto, planoDe3Dias, type AreaPorta, type ComSem, type Opcao } from "./conteudo";
+import { NOME_DA_AREA, formatarReais, mesCurto, planoDe3Dias, type AreaPorta, type ComSem, type Opcao } from "./conteudo";
 
 /**
  * As telas do meio da Porta (/comece): perguntas de 1 toque (1, 2 e 3), o
@@ -19,8 +19,10 @@ export function Eyebrow({ children }: { children: React.ReactNode }) {
 
 /* ------------------------------------------------ telas 1, 2 e 3 */
 
-export function PerguntaPorta({ eyebrow, titulo, opcoes, onEscolher, testid, compacta = false }: {
+export function PerguntaPorta({ eyebrow, abertura, titulo, opcoes, onEscolher, testid, compacta = false }: {
   eyebrow?: string;
+  /** a linha amarela em cima da pergunta (quem entrou por "Tudo", como no app) */
+  abertura?: string;
   titulo: string;
   opcoes: Opcao[];
   onEscolher: (o: Opcao) => void;
@@ -39,6 +41,7 @@ export function PerguntaPorta({ eyebrow, titulo, opcoes, onEscolher, testid, com
   };
   return (
     <div className="flex-1 flex flex-col" data-testid={testid}>
+      {abertura && <p className="text-[13px] text-[#5b6570] leading-snug mb-3 rounded-xl px-3 py-2" style={{ background: "#FFF8D6" }} data-testid="porta-abertura-tudo">{abertura}</p>}
       {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
       <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.12] mt-1.5 text-balance" data-testid="porta-pergunta">{titulo}</h1>
       <div className={`mt-6 flex flex-col ${compacta ? "gap-2.5" : "gap-3"}`} role="list">
@@ -79,9 +82,10 @@ export function ComSemPorta({ dados, hoje = new Date(), onNext }: { dados: ComSe
       <h1 className="text-[25px] font-black tracking-[-0.02em] leading-[1.12] mt-1.5" data-testid="porta-comsem-titulo">
         <span style={{ color: COR_SEM }}>{dados.titulo}</span><br />{dados.subtitulo}
       </h1>
-      {dados.tipo === "copy" ? <CardsComSem sem={dados.sem} com={dados.com} /> : <Grafico dados={dados} hoje={hoje} />}
-      <motion.p className="text-[14px] text-[#5b6570] leading-snug mt-4" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.4 }}>
-        <strong className="text-[#16121c]">{dados.legenda}</strong>
+      {dados.tipo === "copy" ? <CardsComSem sem={dados.linhasSem} com={dados.linhasCom} /> : <Grafico dados={dados} hoje={hoje} />}
+      <motion.p className="text-[14px] text-[#5b6570] leading-snug mt-4" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.4 }} data-testid="porta-comsem-legenda">
+        <strong className="text-[#16121c]">{dados.legenda}</strong>{" "}
+        {dados.tipo === "reais" ? "Registrar leva segundos. O que você vê, você controla." : dados.tipo === "treinos" ? "Treino marcado é treino que acontece." : "Dez minutos por dia, no lugar certo."}
       </motion.p>
       <BotaoPorta texto={dados.cta} onClick={onNext} testid="porta-comsem-cta" />
     </div>
@@ -119,12 +123,12 @@ function CardsComSem({ sem, com }: { sem: string[]; com: string[] }) {
 
 const W = 320, H = 196, PAD_X = 14, PAD_TOP = 26, PAD_BOTTOM = 26;
 
-/** O gráfico: dinheiro SEM eixo em reais (a forma da curva, rótulos em palavras); corpo em treinos por semana. */
-function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "dinheiro" | "treinos" }>; hoje: Date }) {
+/** O gráfico (o GraficoComSem do app): dinheiro em R$ da resposta dela (3 meses); corpo em treinos por semana (12 semanas). */
+function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "reais" | "treinos" }>; hoje: Date }) {
   const idClip = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const { sem, com } = useMemo(() => (dados.tipo === "treinos" ? { sem: dados.sem, com: dados.com } : { sem: [0, 1, 2, 3], com: [0, 0.42, 0.56, 0.66] }), [dados]);
+  const { sem, com } = dados;
   const treinos = dados.tipo === "treinos";
-  const padDireita = treinos ? 50 : 14;
+  const padDireita = treinos ? 50 : 66;
   const n = sem.length;
   const max = Math.max(...sem, ...com, 1) * (treinos ? 1.2 : 1.08);
   const x = (i: number) => PAD_X + (i / (n - 1)) * (W - PAD_X - padDireita);
@@ -135,7 +139,7 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "dinheiro" | 
     ? [0, 4, 8, 12].map((i) => ({ i, r: i === 0 ? "hoje" : `${i / 4} ${i === 4 ? "mês" : "meses"}` }))
     : [0, 1, 2, 3].map((i) => ({ i, r: i === 0 ? "hoje" : mesCurto(hoje, i) }));
   const semFim = sem[n - 1], comFim = com[n - 1];
-  const fmt = (v: number) => `${String(v).replace(".", ",")}/sem`;
+  const fmt = (v: number) => (treinos ? `${String(v).replace(".", ",")}/sem` : formatarReais(v));
   const ySem = y(semFim), yCom = y(comFim);
   const [ySemR, yComR] = Math.abs(ySem - yCom) < 16 ? (ySem < yCom ? [ySem, ySem + 16] : [yCom + 16, yCom]) : [ySem, yCom];
 
@@ -145,7 +149,7 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "dinheiro" | 
         <span className="inline-flex items-center gap-1.5"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke={COR_SEM} strokeWidth="2" strokeDasharray="4 3" /></svg>Sem o CORE</span>
         <span className="inline-flex items-center gap-1.5"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke={COR_COM} strokeWidth="2.5" /></svg>Com o CORE</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-1" role="img" aria-label={treinos ? `Sem o CORE: ${fmt(semFim)}. Com o CORE: ${fmt(comFim)}.` : "Sem o CORE o dinheiro some sem rastro. Com o CORE fica sob controle."}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-1" role="img" aria-label={`Sem o CORE: ${fmt(semFim)}. Com o CORE: ${fmt(comFim)}.`}>
         <line x1={PAD_X} x2={W - padDireita} y1={y(0)} y2={y(0)} stroke="#ebe7ef" strokeWidth="1" />
         <line x1={PAD_X} x2={W - padDireita} y1={y(max / 2)} y2={y(max / 2)} stroke="#ebe7ef" strokeWidth="1" strokeDasharray="2 4" />
         {marcas.map((m) => (
@@ -160,15 +164,11 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "dinheiro" | 
         <path d={caminho(com)} fill="none" stroke={COR_COM} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" clipPath={`url(#${idClip}-com)`} />
         <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.45, duration: 0.3 }}>
           <circle cx={x(n - 1)} cy={ySem} r="5.5" fill={COR_SEM} stroke="#fff" strokeWidth="2" />
-          {treinos
-            ? <text x={x(n - 1) + 9} y={ySemR + 4} fontSize="12" fontWeight="800" fill={GRAFITE}>{fmt(semFim)}</text>
-            : <text x={x(n - 1) - 10} y={ySem + 4} textAnchor="end" fontSize="12" fontWeight="800" fill={GRAFITE}>Some sem rastro</text>}
+          <text x={x(n - 1) + 9} y={ySemR + 4} fontSize="12" fontWeight="800" fill={GRAFITE} data-testid="porta-grafico-sem">{fmt(semFim)}</text>
         </motion.g>
         <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.7, duration: 0.3 }}>
           <circle cx={x(n - 1)} cy={yCom} r="5.5" fill={COR_COM} stroke="#fff" strokeWidth="2" />
-          {treinos
-            ? <text x={x(n - 1) + 9} y={yComR + 4} fontSize="12" fontWeight="800" fill={GRAFITE}>{fmt(comFim)}</text>
-            : <text x={x(n - 1) - 4} y={yCom - 12} textAnchor="end" fontSize="12" fontWeight="800" fill={GRAFITE}>Sob controle</text>}
+          <text x={x(n - 1) + 9} y={yComR + 4} fontSize="12" fontWeight="800" fill={GRAFITE} data-testid="porta-grafico-com">{fmt(comFim)}</text>
         </motion.g>
       </svg>
     </div>
@@ -177,8 +177,8 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "dinheiro" | 
 
 /* ------------------------------------------------ tela 5: plano com cadeado */
 
-export function PlanoPorta({ rota, p3, onDesbloquear }: { rota: AreaPorta; p3: string | null; onDesbloquear: () => void }) {
-  const plano = planoDe3Dias(rota, p3);
+export function PlanoPorta({ rota, dor, onDesbloquear }: { rota: AreaPorta; dor: string | null; onDesbloquear: () => void }) {
+  const plano = planoDe3Dias(rota, dor);
   const info = NOME_DA_AREA[rota];
   return (
     <div className="flex-1 flex flex-col" data-testid="porta-plano">

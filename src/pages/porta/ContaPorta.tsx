@@ -1,32 +1,21 @@
 import { useRef, useState } from "react";
-import { Eye, EyeOff, Loader2, Lock, Mail, MoreHorizontal } from "lucide-react";
-import { BotaoPorta } from "./BotaoPorta";
-import { Eyebrow, LinhaDoPlano } from "./telas";
-import type { AreaPorta } from "./conteudo";
+import { Eye, EyeOff, Loader2, MoreHorizontal } from "lucide-react";
+import { BotaoCard, TituloCard } from "./telas";
 
 /**
- * TELA 5 DA PORTA — a CONTA (v4, 12/10). O plano inteiro está na tela anterior; aqui fica só 1 linha
- * ("Seu plano de 3 dias está pronto · 💰 Dinheiro") e o pedido, dito com o que a pessoa GANHA:
+ * PASSO 5 DA PORTA — a CONTA, dentro do card (v5, 12/10, desenho da Dinzo: "Pronto! Agora crie sua conta").
  *
- *   · iPhone: "Salve seu plano e ganhe 3 dias grátis no app" + "Nada cobrado hoje · cancele quando quiser"
- *     (o teste de 3 dias só existe no iPhone). NUNCA "sem cartão": a Apple pede forma de pagamento pro teste;
- *   · Android/computador: "Salve seu plano na sua conta", sem promessa de teste;
- *   · o botão "Criar conta e salvar" fica SEMPRE ativo (preto): tocou com dado faltando, não envia, diz embaixo
- *     do campo o que falta e foca o campo (o cinza desabilitado da v3 não dizia nada). Evento porta_conta_erro.
- *
- * Conta (v2, dono 10/10: "não é necessário botar a confirmação de números no Gmail; deixar a opção de
- * criar conta com Google e Apple"):
- *
- *   · [Continuar com a Apple] — signInWithOAuth apple na web (provider ligado, o
- *     /authorize vai pra Apple com o Services ID do app). Não aparece no Android:
- *     o app Android não tem "Entrar com a Apple", a conta ficaria sem porta de entrada;
- *   · [Continuar com o Google] — SEMPRE visível. No navegador do Instagram/Facebook
- *     o toque NÃO tenta o OAuth (o Google devolve 403 disallowed_useragent): abre o
- *     aviso "abra no navegador" (o pai guarda as respostas na URL pra elas irem junto);
- *   · "ou com e-mail": e-mail + senha (mín. 6) → [Criar conta e salvar]. SEM código.
- *     E-mail que já tem conta: tenta entrar com a mesma senha; se não der, pede a
- *     senha dela ("Esqueci a senha" → /reset-password). Nunca cria 2ª conta;
- *   · já logado neste navegador: "Salvar nesta conta" ou "Usar outro e-mail".
+ *   · "Pronto! Seu plano de 3 dias está montado." + "Agora crie sua conta pra abrir no app.";
+ *   · iPhone: "3 dias grátis no app · nada cobrado hoje" (o teste de 3 dias só existe no iPhone). NUNCA
+ *     "sem cartão": a Apple pede forma de pagamento pro teste. Android/computador: sem promessa de teste;
+ *   · [Continuar com a Apple] 1º, preto, com "1 toque, sem senha" — não aparece no Android (o app Android não
+ *     entra com a Apple, a conta ficaria sem porta de entrada);
+ *   · [Continuar com o Google] — no navegador do Instagram/Facebook o toque NÃO tenta o OAuth (403
+ *     disallowed_useragent): abre o aviso "⋯ → Abrir no navegador" (o pai põe as respostas na URL);
+ *   · "ou com e-mail": e-mail + senha (mín. 6) → [Criar conta], SEMPRE ativo: tocou com dado faltando, não
+ *     envia, diz embaixo do campo o que falta e foca o campo (evento porta_conta_erro). E-mail que já tem conta:
+ *     tenta a mesma senha; se não der, pede a senha dela. Nunca cria 2ª conta;
+ *   · já logado neste navegador: "Continuar com esta conta" ou "Usar outro e-mail".
  */
 export const SENHA_MIN = 6;
 const emailValido = (e: string) => /^\S+@\S+\.\S{2,}$/.test(e.trim());
@@ -40,27 +29,30 @@ const GoogleIcon = () => (
   </svg>
 );
 /* Glifo oficial da Apple (diretriz de marca: botão preto, logo à esquerda) */
-const AppleIcon = () => (
+export const AppleIcon = () => (
   <svg width="17" height="17" viewBox="0 0 384 512" aria-hidden="true" fill="currentColor">
     <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
   </svg>
 );
 
+
 export type Resultado = { ok: boolean; erro?: string; existe?: boolean };
 
-function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de 6 caracteres", autoComplete = "new-password", inputRef, erroId }: {
-  valor: string; onMudar: (v: string) => void; onEnter: () => void; testid: string; placeholder?: string; autoComplete?: string;
+const CAMPO = "w-full h-[52px] rounded-[12px] border bg-white px-4 text-[16px] text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#a9a3af]";
+
+function CampoSenha({ valor, onMudar, onEnter, testid, placeholder, autoComplete = "new-password", inputRef, erroId }: {
+  valor: string; onMudar: (v: string) => void; onEnter: () => void; testid: string; placeholder: string; autoComplete?: string;
   inputRef?: React.Ref<HTMLInputElement>; erroId?: string;
 }) {
   const [ver, setVer] = useState(false);
   return (
-    <div className="relative mt-1.5">
-      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9aa3ad]" aria-hidden />
+    <div className="relative">
       <input
         id={testid}
         ref={inputRef}
         aria-invalid={erroId ? true : undefined}
         aria-describedby={erroId}
+        aria-label={placeholder}
         type={ver ? "text" : "password"}
         autoComplete={autoComplete}
         value={valor}
@@ -68,21 +60,22 @@ function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de
         onKeyDown={(e) => { if (e.key === "Enter") onEnter(); }}
         placeholder={placeholder}
         data-testid={testid}
-        className={`w-full h-[52px] rounded-2xl border-2 ${erroId ? "border-[#e5484d]" : "border-[#ebe7ef]"} bg-white pl-12 pr-12 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal`}
+        className={`${CAMPO} pr-12 ${erroId ? "border-[#e5484d]" : "border-[#e3e0e6]"}`}
       />
-      <button type="button" onClick={() => setVer((v) => !v)} aria-label={ver ? "Esconder senha" : "Mostrar senha"} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-[#7d8691]">
+      <button type="button" onClick={() => setVer((v) => !v)} aria-label={ver ? "Esconder senha" : "Mostrar senha"} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-[#8a8490]">
         {ver ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
       </button>
     </div>
   );
 }
 
-/** v4: o título e a linha de baixo da conta. A promessa do teste SÓ no iPhone (o teste de 3 dias só existe lá). Nunca "sem cartão". */
-export const TITULO_CONTA_IPHONE = "Salve seu plano e ganhe 3 dias grátis no app";
-export const LINHA_CONFIANCA = "Nada cobrado hoje · cancele quando quiser";
-export const TITULO_CONTA_OUTROS = "Salve seu plano na sua conta";
+/** v5: o título, o texto e a linha do teste da conta. A promessa do teste SÓ no iPhone. Nunca "sem cartão". */
+export const TITULO_CONTA = "Pronto! Seu plano de 3 dias está montado.";
+export const TEXTO_CONTA = "Agora crie sua conta pra abrir no app.";
+export const LINHA_TESTE = "3 dias grátis no app · nada cobrado hoje";
+export const LEGENDA_APPLE = "1 toque, sem senha";
 
-/** As mensagens de campo do "Criar conta e salvar" (o botão nunca fica cinza). */
+/** As mensagens de campo do "Criar conta" (o botão nunca fica cinza). */
 export const ERRO_CAMPO = {
   email_vazio: "Digite seu e-mail",
   email_invalido: "E-mail inválido",
@@ -102,27 +95,29 @@ export function validarConta(email: string, senha: string): Falta[] {
   return out;
 }
 
-function TopoDaConta({ rota, mostrarTeste }: { rota: AreaPorta; mostrarTeste: boolean }) {
+function TopoDaConta({ mostrarTeste }: { mostrarTeste: boolean }) {
   return (
     <>
-      <LinhaDoPlano rota={rota} />
-      <h1 className="mt-2 text-[24px] font-black tracking-[-0.025em] leading-[1.12] text-balance" data-testid="porta-conta-titulo">
-        {mostrarTeste ? TITULO_CONTA_IPHONE : TITULO_CONTA_OUTROS}
-      </h1>
+      <TituloCard testid="porta-conta-titulo">{TITULO_CONTA}</TituloCard>
+      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-conta-texto">{TEXTO_CONTA}</p>
       {mostrarTeste && (
-        <p className="mt-1.5 text-[14px] font-semibold text-[#5b6570]" data-testid="porta-conta-confianca">{LINHA_CONFIANCA}</p>
+        <p className="mt-2 text-[14px] font-semibold text-[#16121c]" data-testid="porta-conta-teste">{LINHA_TESTE}</p>
       )}
     </>
   );
 }
 
 const ErroDoCampo = ({ id, msg }: { id: string; msg?: string }) =>
-  msg ? <p id={id} className="text-[13px] font-semibold text-[#b42318] mt-1.5 ml-1" role="alert" data-testid={id}>{msg}</p> : null;
+  msg ? <p id={id} className="text-[13px] font-semibold text-[#b42318] mt-1 ml-1" role="alert" data-testid={id}>{msg}</p> : null;
 
-export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta, onErroCampo }: {
-  /** a área do plano (a linha "Seu plano de 3 dias está pronto · …") */
-  rota: AreaPorta;
-  /** iPhone: título "Salve seu plano e ganhe 3 dias grátis no app" + "Nada cobrado hoje · cancele quando quiser" */
+const Termos = () => (
+  <p className="text-[12px] text-[#8a8490] mt-3.5 leading-snug text-center" data-testid="porta-termos">
+    Ao continuar, você aceita os <a href="/termos" className="underline underline-offset-2">Termos de Uso</a> e a <a href="/privacidade" className="underline underline-offset-2">Política de Privacidade</a>.
+  </p>
+);
+
+export function ContaPorta({ mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta, onErroCampo }: {
+  /** iPhone: "3 dias grátis no app · nada cobrado hoje" */
   mostrarTeste: boolean;
   emInApp: boolean;
   /** "Instagram" | "Facebook" — o nome no aviso do Google */
@@ -136,7 +131,7 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
   onEntrarComSenha: (email: string, senha: string) => Promise<Resultado>;
   onSalvarNestaConta: () => Promise<Resultado>;
   onTrocarConta: () => Promise<void>;
-  /** tocou em "Criar conta e salvar" com campo faltando (o pai manda o porta_conta_erro) */
+  /** tocou em "Criar conta" com campo faltando (o pai manda o porta_conta_erro) */
   onErroCampo?: (campo: CampoConta, motivo: string) => void;
 }) {
   const [email, setEmail] = useState("");
@@ -149,6 +144,7 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
   const [ocupado, setOcupado] = useState<null | "apple" | "google" | "criar" | "entrar" | "salvar">(null);
   const [erro, setErro] = useState<string | null>(null);
   const alvo = email.trim().toLowerCase();
+  const girando = <Loader2 className="w-5 h-5 animate-spin" />;
 
   const rodar = async (qual: NonNullable<typeof ocupado>, f: () => Promise<Resultado>) => {
     if (ocupado) return;
@@ -162,21 +158,23 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
 
   if (emailLogado) {
     return (
-      <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="logado">
-        <TopoDaConta rota={rota} mostrarTeste={mostrarTeste} />
-        <p className="text-[14.5px] text-[#5b6570] leading-snug mt-3">Você já entrou neste aparelho.</p>
-        <div className="mt-3 rounded-2xl border-2 border-[#16121c] bg-white p-4">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">Sua conta</p>
-          <p className="text-[17px] font-extrabold text-[#16121c] mt-1 break-all" data-testid="porta-conta-email-logado">{emailLogado}</p>
+      <div className="mt-6" data-testid="porta-conta" data-fase="logado">
+        <TopoDaConta mostrarTeste={mostrarTeste} />
+        <div className="mt-4 rounded-[12px] border border-[#e3e0e6] bg-[#faf9fb] px-4 py-3">
+          <p className="text-[12.5px] text-[#6b6670]">Você já entrou neste aparelho</p>
+          <p className="text-[16px] font-semibold text-[#16121c] mt-0.5 break-all" data-testid="porta-conta-email-logado">{emailLogado}</p>
         </div>
         {erro && <p className="text-[13px] text-[#b42318] mt-3" role="alert">{erro}</p>}
-        <BotaoPorta
-          texto={ocupado === "salvar" ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar nesta conta"}
+        <BotaoCard
+          texto={ocupado === "salvar" ? girando : "Continuar com esta conta"}
           disabled={!!ocupado}
           onClick={() => void rodar("salvar", onSalvarNestaConta)}
           testid="porta-salvar-nesta-conta"
-          secundario={{ texto: <>Usar <b>outro e-mail</b></>, onClick: () => { void onTrocarConta(); }, testid: "porta-trocar-conta" }}
+          className="mt-4"
         />
+        <button type="button" onClick={() => { void onTrocarConta(); }} className="mt-2 w-full h-10 text-[14px] text-[#6b6670]" data-testid="porta-trocar-conta">
+          Usar <b className="text-[#16121c]">outro e-mail</b>
+        </button>
       </div>
     );
   }
@@ -185,24 +183,19 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
     const ok = senha.length >= SENHA_MIN;
     const entrar = () => { if (ok) void rodar("entrar", () => onEntrarComSenha(alvo, senha)); };
     return (
-      <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="existe">
-        <Eyebrow>Você já tem conta</Eyebrow>
-        <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5">Esse e-mail já tem conta</h1>
-        <p className="text-[15px] text-[#5b6570] leading-snug mt-2">
+      <div className="mt-6" data-testid="porta-conta" data-fase="existe">
+        <TituloCard testid="porta-conta-titulo">Esse e-mail já tem conta</TituloCard>
+        <p className="text-[15px] text-[#6b6670] leading-snug mt-1.5">
           Entre com a senha de <b className="text-[#16121c] break-all">{alvo}</b> pra salvar o plano nela.{" "}
           <button type="button" className="underline underline-offset-2 font-semibold text-[#16121c]" onClick={() => { setFase("form"); setSenha(""); setErro(null); }} data-testid="porta-trocar-email">Trocar</button>
         </p>
-        <label htmlFor="porta-senha-existente" className="mt-6 text-[12px] font-bold uppercase tracking-[0.1em] text-[#7d8691]">Sua senha</label>
-        <CampoSenha valor={senha} onMudar={(v) => { setSenha(v); setErro(null); }} onEnter={entrar} testid="porta-senha-existente" placeholder="A senha da sua conta" autoComplete="current-password" />
-        <p className="text-[13px] text-[#7d8691] mt-2.5 leading-snug">Criou com o Google ou a Apple? Volte e use o mesmo botão.</p>
+        <div className="mt-4">
+          <CampoSenha valor={senha} onMudar={(v) => { setSenha(v); setErro(null); }} onEnter={entrar} testid="porta-senha-existente" placeholder="A senha da sua conta" autoComplete="current-password" />
+        </div>
+        <p className="text-[13px] text-[#8a8490] mt-2 leading-snug">Criou com o Google ou a Apple? Volte e use o mesmo botão.</p>
         {erro && <p className="text-[13px] text-[#b42318] mt-2" role="alert">{erro}</p>}
-        <BotaoPorta
-          texto={ocupado === "entrar" ? <Loader2 className="w-5 h-5 animate-spin" /> : "Entrar e salvar"}
-          disabled={!ok || !!ocupado}
-          onClick={entrar}
-          testid="porta-entrar-existente"
-          secundario={{ texto: <>Esqueci <b>a senha</b></>, href: "/reset-password", testid: "porta-esqueci" }}
-        />
+        <BotaoCard texto={ocupado === "entrar" ? girando : "Entrar e salvar"} disabled={!ok || !!ocupado} onClick={entrar} testid="porta-entrar-existente" className="mt-4" />
+        <a href="/reset-password" className="mt-2 flex items-center justify-center h-10 text-[14px] text-[#6b6670] no-underline" data-testid="porta-esqueci"><span>Esqueci <b className="text-[#16121c]">a senha</b></span></a>
       </div>
     );
   }
@@ -227,35 +220,38 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
     void rodar("google", onGoogle);
   };
   return (
-    <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="form">
-      <TopoDaConta rota={rota} mostrarTeste={mostrarTeste} />
+    <div className="mt-6" data-testid="porta-conta" data-fase="form">
+      <TopoDaConta mostrarTeste={mostrarTeste} />
 
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-4">
         {mostrarApple && (
-          <button
-            type="button"
-            onClick={() => void rodar("apple", onApple)}
-            disabled={!!ocupado}
-            data-testid="porta-apple"
-            className="w-full h-[52px] rounded-2xl bg-black text-white text-[16px] font-bold flex items-center justify-center gap-2.5 disabled:opacity-60"
-          >
-            {ocupado === "apple" ? <Loader2 className="w-5 h-5 animate-spin" /> : <><AppleIcon /> Continuar com a Apple</>}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void rodar("apple", onApple)}
+              disabled={!!ocupado}
+              data-testid="porta-apple"
+              className="w-full h-[52px] rounded-[12px] bg-black text-white text-[16px] font-semibold flex items-center justify-center gap-2.5 disabled:opacity-60 active:scale-[.985] transition-transform"
+            >
+              {ocupado === "apple" ? girando : <><AppleIcon /> Continuar com a Apple</>}
+            </button>
+            <p className="mt-1.5 mb-2.5 text-center text-[12.5px] text-[#8a8490]" data-testid="porta-apple-legenda">{LEGENDA_APPLE}</p>
+          </>
         )}
         <button
           type="button"
           onClick={tocarGoogle}
           disabled={!!ocupado}
           data-testid="porta-google"
-          className="w-full h-[52px] rounded-2xl border-2 border-[#ebe7ef] bg-white text-[16px] font-bold text-[#16121c] flex items-center justify-center gap-2.5 disabled:opacity-60 active:bg-[#f7f5fa]"
+          className="w-full h-[52px] rounded-[12px] border border-[#e3e0e6] bg-white text-[16px] font-semibold text-[#16121c] flex items-center justify-center gap-2.5 disabled:opacity-60 active:bg-[#f5f3f7]"
         >
-          {ocupado === "google" ? <Loader2 className="w-5 h-5 animate-spin" /> : <><GoogleIcon /> Continuar com o Google</>}
+          {ocupado === "google" ? girando : <><GoogleIcon /> Continuar com o Google</>}
         </button>
         {avisoGoogle && (
-          <div className="rounded-2xl border border-[#f1d38a] bg-[#fff8e1] px-3.5 py-3 flex items-start gap-3" role="alert" data-testid="porta-aviso-google">
+          <div className="mt-2.5 rounded-[12px] border border-[#f1d38a] bg-[#fff8e1] px-3.5 py-3 flex items-start gap-3" role="alert" data-testid="porta-aviso-google">
             {/* o canto do navegador do Instagram: os ⋯ no alto, à direita */}
-            <span className="shrink-0 grid place-items-center w-10 h-10 rounded-xl bg-white border border-[#ebe7ef] text-[#16121c]" aria-hidden>
-              <MoreHorizontal className="w-6 h-6" strokeWidth={2.6} />
+            <span className="shrink-0 grid place-items-center w-9 h-9 rounded-[10px] bg-white border border-[#ebe7ef] text-[#16121c]" aria-hidden>
+              <MoreHorizontal className="w-5 h-5" strokeWidth={2.6} />
             </span>
             <p className="text-[13.5px] leading-snug text-[#5c4300]">
               O Google não deixa entrar por dentro do {appDoWebview}. Toque em <b className="text-[#16121c]">⋯</b> no alto e em <b className="text-[#16121c]">Abrir no navegador</b>. Ou use {mostrarApple ? "a Apple ou o e-mail" : "o e-mail"}.
@@ -264,54 +260,45 @@ export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarA
         )}
       </div>
 
-      <div className="flex items-center gap-3 my-3.5" aria-hidden>
-        <span className="flex-1 h-px bg-[#ebe7ef]" />
-        <span className="text-[12px] font-semibold text-[#7d8691]">ou com e-mail</span>
-        <span className="flex-1 h-px bg-[#ebe7ef]" />
+      <div className="flex items-center gap-3 my-4" aria-hidden>
+        <span className="flex-1 h-px bg-[#ebe8ee]" />
+        <span className="text-[13px] text-[#8a8490]">ou com e-mail</span>
+        <span className="flex-1 h-px bg-[#ebe8ee]" />
       </div>
 
-      <div className="relative">
-        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9aa3ad]" aria-hidden />
-        <input
-          id="porta-email"
-          ref={emailRef}
-          aria-invalid={errosCampo.email ? true : undefined}
-          aria-describedby={errosCampo.email ? "porta-erro-email" : undefined}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          autoCapitalize="none"
-          spellCheck={false}
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); setErro(null); if (errosCampo.email) setErrosCampo((x) => ({ ...x, email: undefined })); }}
-          placeholder="Seu e-mail"
-          aria-label="Seu e-mail"
-          data-testid="porta-email"
-          className={`w-full h-[52px] rounded-2xl border-2 ${errosCampo.email ? "border-[#e5484d]" : "border-[#ebe7ef]"} bg-white pl-12 pr-4 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal`}
+      <input
+        id="porta-email"
+        ref={emailRef}
+        aria-invalid={errosCampo.email ? true : undefined}
+        aria-describedby={errosCampo.email ? "porta-erro-email" : undefined}
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        value={email}
+        onChange={(e) => { setEmail(e.target.value); setErro(null); if (errosCampo.email) setErrosCampo((x) => ({ ...x, email: undefined })); }}
+        placeholder="Seu e-mail"
+        aria-label="Seu e-mail"
+        data-testid="porta-email"
+        className={`${CAMPO} ${errosCampo.email ? "border-[#e5484d]" : "border-[#e3e0e6]"}`}
+      />
+      <ErroDoCampo id="porta-erro-email" msg={errosCampo.email} />
+      <div className="mt-2.5">
+        <CampoSenha
+          valor={senha}
+          onMudar={(v) => { setSenha(v); setErro(null); if (errosCampo.senha) setErrosCampo((x) => ({ ...x, senha: undefined })); }}
+          onEnter={criar}
+          testid="porta-senha"
+          placeholder="Crie uma senha (mín. 6)"
+          inputRef={senhaRef}
+          erroId={errosCampo.senha ? "porta-erro-senha" : undefined}
         />
       </div>
-      <ErroDoCampo id="porta-erro-email" msg={errosCampo.email} />
-      <CampoSenha
-        valor={senha}
-        onMudar={(v) => { setSenha(v); setErro(null); if (errosCampo.senha) setErrosCampo((x) => ({ ...x, senha: undefined })); }}
-        onEnter={criar}
-        testid="porta-senha"
-        placeholder="Crie uma senha (mín. 6)"
-        inputRef={senhaRef}
-        erroId={errosCampo.senha ? "porta-erro-senha" : undefined}
-      />
       <ErroDoCampo id="porta-erro-senha" msg={errosCampo.senha} />
-      <p className="text-[12.5px] text-[#7d8691] mt-2 leading-snug">É com esse e-mail e essa senha que você entra no app.</p>
       {erro && <p className="text-[13px] text-[#b42318] mt-2" role="alert">{erro}</p>}
-      <p className="text-[11.5px] text-[#9aa3ad] mt-auto pt-4 leading-snug text-center">
-        Ao continuar, você aceita os <a href="/termos" className="underline underline-offset-2">Termos</a> e a <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>.
-      </p>
-      <BotaoPorta
-        texto={ocupado === "criar" ? <Loader2 className="w-5 h-5 animate-spin" /> : "Criar conta e salvar"}
-        disabled={!!ocupado}
-        onClick={criar}
-        testid="porta-criar-conta"
-      />
+      <BotaoCard texto={ocupado === "criar" ? girando : "Criar conta"} disabled={!!ocupado} onClick={criar} testid="porta-criar-conta" className="mt-3.5" />
+      <Termos />
     </div>
   );
 }

@@ -1,262 +1,176 @@
-import { useId, useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Check, X } from "lucide-react";
-import { BotaoPorta } from "./BotaoPorta";
-import { NOME_DA_AREA, formatarReais, mesCurto, planoDe3Dias, type AreaPorta, type ComSem, type Opcao } from "./conteudo";
+import { Check, ChevronLeft } from "lucide-react";
+import { SELO_TOPO, SUB_TOPO, TITULO_TOPO, type Opcao } from "./conteudo";
 
 /**
- * As peças da Porta (/comece, v4): as opções de 1 toque (tela 1 e tela 2), o
- * "com × sem o CORE" (tela 3) e o plano de 3 dias (tela 4, antes da conta). Visual planner:
- * branco, grafite #16121c, magenta só no detalhe, Inter herdada.
+ * As peças da Porta v5 (/comece, 12/10 — o desenho da Dinzo, adaptado ao CORE):
+ *   · TopoPorta: logo do CORE (o ícone do app + "CORE" como no site), PLANO GRATUITO, o título e a linha de
+ *     baixo. IGUAL em todos os passos (o topo não se mexe; só o card troca);
+ *   · CardPorta: o card branco onde tudo acontece (barra de progresso fina magenta + voltar quadradinho);
+ *   · PerguntaPorta (1 toque avança) e PerguntaMulti (círculo à direita + "Continuar");
+ *   · BotaoCard: o botão principal DENTRO do card (sem rodapé fixo, como na Dinzo).
+ * Cores do CORE: grafite #16121c no texto/botões, magenta #d22d80 no selo/progresso/✓, Inter herdada.
  */
-const GRAFITE = "#16121c";
-const COR_SEM = "#a16207";
-const COR_COM = "#d22d80";
+export const GRAFITE = "#16121c";
+export const MAGENTA = "#d22d80";
+/** O ícone do app (o mesmo do manifest/PWA e da App Store: public/icon-192.png, 5 KB). Não é desenho novo. */
+export const LOGO_PORTA = "/icon-192.png";
 
-export function Eyebrow({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7d8691]">{children}</p>;
-}
-
-/* ------------------------------------------------ as opções de 1 toque (tela 1 e tela 2) */
-
-/** A lista de opções (controlada: quem usa decide o que fica marcado e o que o toque faz). */
-export function OpcoesPorta({ opcoes, sel, onToque, prefixo = "porta-opcao-", compacta = false, atraso = 0.04 }: {
-  opcoes: Opcao[];
-  sel: string | null;
-  onToque: (o: Opcao) => void;
-  /** data-testid = prefixo + id */
-  prefixo?: string;
-  compacta?: boolean;
-  atraso?: number;
-}) {
+export function TopoPorta() {
   return (
-    <div className={`flex flex-col ${compacta ? "gap-2" : "gap-3"}`} role="list">
-      {opcoes.map((o, i) => {
-        const on = sel === o.id;
-        return (
-          <motion.button
-            key={o.id}
-            type="button"
-            role="listitem"
-            aria-pressed={on}
-            onClick={() => onToque(o)}
-            data-testid={`${prefixo}${o.id}`}
-            data-on={on ? "" : undefined}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: atraso * i, duration: 0.22 }}
-            className={`w-full flex items-center gap-3.5 rounded-2xl border-2 text-left transition-colors ${compacta ? "px-3.5 py-2.5" : "px-4 py-4"} ${on ? "border-[#16121c] bg-[#16121c] text-white" : "border-[#ebe7ef] bg-white text-[#16121c] active:bg-[#f7f5fa]"}`}
-          >
-            <span className={`grid place-items-center rounded-xl shrink-0 leading-none ${compacta ? "w-10 h-10 text-[20px]" : "w-11 h-11 text-[22px]"} ${on ? "bg-white/15" : "bg-[#f6f3f8]"}`} aria-hidden>{o.emoji}</span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-[16px] font-bold leading-tight">{o.label}</span>
-              {o.sub && <span className={`block text-[13px] leading-snug mt-0.5 ${on ? "text-white/75" : "text-[#7d8691]"}`}>{o.sub}</span>}
-            </span>
-            {on && <Check className="w-5 h-5 shrink-0" strokeWidth={3} aria-hidden />}
-          </motion.button>
-        );
-      })}
-    </div>
+    <header className="flex flex-col items-center text-center" data-testid="porta-topo">
+      <div className="flex items-center gap-2" data-testid="porta-logo-linha">
+        <img
+          src={LOGO_PORTA} alt="" width={30} height={30} decoding="async"
+          className="w-[30px] h-[30px] rounded-[8px] border border-[#e6e3e9] bg-white"
+          data-testid="porta-logo"
+        />
+        <span className="text-[22px] font-black tracking-[-0.03em] leading-none text-[#16121c]">CORE</span>
+      </div>
+      <p className="mt-[18px] text-[12.5px] font-bold uppercase tracking-[0.14em]" style={{ color: MAGENTA }} data-testid="porta-selo">{SELO_TOPO}</p>
+      <h1 className="mt-2 text-[30px] font-extrabold tracking-[-0.035em] leading-[1.08] text-balance max-w-[320px]" data-testid="porta-titulo">{TITULO_TOPO}</h1>
+      <p className="mt-2.5 text-[15.5px] leading-[1.45] text-[#6b6670] max-w-[330px] text-pretty" data-testid="porta-sub">{SUB_TOPO}</p>
+    </header>
   );
 }
 
-/** Uma pergunta de 1 toque numa tela só (a tela 2, o número). O toque marca e avança. */
-export function PerguntaPorta({ eyebrow, titulo, opcoes, onEscolher, testid }: {
-  eyebrow?: string;
+/** O card: barra de progresso (fração 0–1, null = sem barra) e o voltar (só quando há pra onde voltar). */
+export function CardPorta({ progresso, onVoltar, children, passo }: {
+  progresso: number | null;
+  onVoltar?: () => void;
+  children: ReactNode;
+  passo: string;
+}) {
+  return (
+    <section
+      className="mt-[22px] rounded-[20px] border border-[#ebe8ee] bg-white px-5 pt-5 pb-6 shadow-[0_1px_2px_rgba(22,18,28,.04),0_10px_28px_-14px_rgba(22,18,28,.14)]"
+      data-testid="porta-card"
+    >
+      {progresso != null && (
+        <div className={`flex items-center gap-3 ${onVoltar ? "h-8" : "h-1.5"}`} data-testid="porta-barra">
+          {onVoltar && (
+            <button
+              type="button" onClick={onVoltar} aria-label="Voltar" data-testid="porta-voltar"
+              className="grid place-items-center w-8 h-8 shrink-0 rounded-[9px] border border-[#e3e0e6] bg-white text-[#16121c] active:bg-[#f3f1f5]"
+            >
+              <ChevronLeft className="w-[18px] h-[18px]" strokeWidth={2.2} />
+            </button>
+          )}
+          <div className="flex-1 h-[5px] rounded-full bg-[#efedf1] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progresso * 100)}>
+            <motion.div className="h-full rounded-full" style={{ background: MAGENTA }} initial={false} animate={{ width: `${Math.round(progresso * 100)}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+          </div>
+        </div>
+      )}
+      {/* a transição é só DENTRO do card: o topo da página não se mexe */}
+      <motion.div key={passo} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+        {children}
+      </motion.div>
+    </section>
+  );
+}
+
+export function TituloCard({ children, testid = "porta-pergunta", className = "" }: { children: ReactNode; testid?: string; className?: string }) {
+  return <h2 className={`text-[22px] font-extrabold tracking-[-0.025em] leading-[1.2] text-[#16121c] text-balance ${className}`} data-testid={testid}>{children}</h2>;
+}
+
+const OPCAO = "w-full min-h-[52px] flex items-center gap-3 rounded-[12px] border px-4 py-3 text-left text-[16px] font-medium leading-snug text-[#16121c] transition-colors";
+const OPCAO_ON = "border-[#16121c] bg-[#f5f3f7]";
+const OPCAO_OFF = "border-[#e3e0e6] bg-white active:bg-[#f5f3f7] active:border-[#c9c4ce]";
+
+/** Uma pergunta de 1 toque: o toque marca (dá pra ver) e avança. */
+export function PerguntaPorta({ titulo, sub, opcoes, onEscolher, testid, inicial = null }: {
   titulo: string;
+  sub?: ReactNode;
   opcoes: Opcao[];
   onEscolher: (o: Opcao) => void;
   testid: string;
+  /** a resposta já dada (voltou pra cá) */
+  inicial?: string | null;
 }) {
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(inicial);
   const indo = useRef(false);
   const escolher = (o: Opcao) => {
     if (indo.current) return;
     indo.current = true;
     setSel(o.id);
-    // o toque aparece (preenchido) antes de avançar, como no Cal AI
     window.setTimeout(() => onEscolher(o), 170);
   };
   return (
-    <div className="flex-1 flex flex-col" data-testid={testid}>
-      {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-      <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.12] mt-1.5 text-balance" data-testid="porta-pergunta">{titulo}</h1>
-      <div className="mt-6">
-        <OpcoesPorta opcoes={opcoes} sel={sel} onToque={escolher} />
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------ tela 3: com × sem */
-
-export function ComSemPorta({ dados, hoje = new Date(), onNext }: { dados: ComSem; hoje?: Date; onNext: () => void }) {
-  return (
-    <div className="flex-1 flex flex-col" data-testid="porta-comsem" data-tipo={dados.tipo}>
-      <Eyebrow>{dados.eyebrow}</Eyebrow>
-      <h1 className="text-[25px] font-black tracking-[-0.02em] leading-[1.12] mt-1.5" data-testid="porta-comsem-titulo">
-        <span style={{ color: COR_SEM }}>{dados.titulo}</span><br />{dados.subtitulo}
-      </h1>
-      {dados.tipo === "copy" ? <CardsComSem sem={dados.linhasSem} com={dados.linhasCom} /> : <Grafico dados={dados} hoje={hoje} />}
-      <motion.p className="text-[14px] text-[#5b6570] leading-snug mt-4" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 0.4 }} data-testid="porta-comsem-legenda">
-        <strong className="text-[#16121c]">{dados.legenda}</strong>{" "}
-        {dados.tipo === "reais" ? "Registrar leva segundos. O que você vê, você controla." : dados.tipo === "treinos" ? "Treino marcado é treino que acontece." : "Dez minutos por dia, no lugar certo."}
-      </motion.p>
-      <BotaoPorta texto={dados.cta} onClick={onNext} testid="porta-comsem-cta" />
-    </div>
-  );
-}
-
-function CardsComSem({ sem, com }: { sem: string[]; com: string[] }) {
-  return (
-    <div className="mt-5 space-y-3">
-      <motion.div className="rounded-2xl border-2 p-4" style={{ borderColor: "#e7e5e4", background: "#faf8f5" }} data-testid="porta-card-sem" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.35 }}>
-        <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.14em]" style={{ color: COR_SEM }}>Sem o CORE</span>
-        <ul className="mt-2 space-y-2">
-          {sem.map((l) => (
-            <li key={l} className="flex items-start gap-2.5 text-[15px] font-semibold leading-snug text-[#57534e]">
-              <span className="grid place-items-center w-5 h-5 rounded-full shrink-0 mt-0.5" style={{ background: "#e7e5e4", color: COR_SEM }} aria-hidden><X className="w-3 h-3" strokeWidth={3} /></span>
-              {l}
-            </li>
-          ))}
-        </ul>
-      </motion.div>
-      <motion.div className="rounded-2xl border-2 p-4" style={{ borderColor: COR_COM, background: "#fff5fa" }} data-testid="porta-card-com" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.35 }}>
-        <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.14em]" style={{ color: COR_COM }}>Com o CORE</span>
-        <ul className="mt-2 space-y-2">
-          {com.map((l) => (
-            <li key={l} className="flex items-start gap-2.5 text-[15px] font-extrabold leading-snug text-[#16121c]">
-              <span className="grid place-items-center w-5 h-5 rounded-full shrink-0 mt-0.5 text-white" style={{ background: COR_COM }} aria-hidden><Check className="w-3 h-3" strokeWidth={3.5} /></span>
-              {l}
-            </li>
-          ))}
-        </ul>
-      </motion.div>
-    </div>
-  );
-}
-
-const W = 320, H = 196, PAD_X = 14, PAD_TOP = 26, PAD_BOTTOM = 26;
-
-/** O gráfico (o GraficoComSem do app): dinheiro em R$ da resposta dela (3 meses); corpo em treinos por semana (12 semanas). */
-function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "reais" | "treinos" }>; hoje: Date }) {
-  const idClip = `pg${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const { sem, com } = dados;
-  const treinos = dados.tipo === "treinos";
-  const padDireita = treinos ? 50 : 66;
-  const n = sem.length;
-  const max = Math.max(...sem, ...com, 1) * (treinos ? 1.2 : 1.08);
-  const x = (i: number) => PAD_X + (i / (n - 1)) * (W - PAD_X - padDireita);
-  const y = (v: number) => PAD_TOP + (1 - v / max) * (H - PAD_TOP - PAD_BOTTOM);
-  const caminho = (s: number[]) => s.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const area = `${caminho(sem)} L${x(n - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
-  const marcas: Array<{ i: number; r: string }> = treinos
-    ? [0, 4, 8, 12].map((i) => ({ i, r: i === 0 ? "hoje" : `${i / 4} ${i === 4 ? "mês" : "meses"}` }))
-    : [0, 1, 2, 3].map((i) => ({ i, r: i === 0 ? "hoje" : mesCurto(hoje, i) }));
-  const semFim = sem[n - 1], comFim = com[n - 1];
-  const fmt = (v: number) => (treinos ? `${String(v).replace(".", ",")}/sem` : formatarReais(v));
-  const ySem = y(semFim), yCom = y(comFim);
-  const [ySemR, yComR] = Math.abs(ySem - yCom) < 16 ? (ySem < yCom ? [ySem, ySem + 16] : [yCom + 16, yCom]) : [ySem, yCom];
-
-  return (
-    <div className="mt-5 rounded-2xl border border-[#ebe7ef] bg-white px-2 pt-3 pb-1" data-testid="porta-grafico">
-      <div className="flex items-center gap-4 px-2 text-[11.5px] font-semibold text-[#7d8691]" aria-hidden>
-        <span className="inline-flex items-center gap-1.5"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke={COR_SEM} strokeWidth="2" strokeDasharray="4 3" /></svg>Sem o CORE</span>
-        <span className="inline-flex items-center gap-1.5"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke={COR_COM} strokeWidth="2.5" /></svg>Com o CORE</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-1" role="img" aria-label={`Sem o CORE: ${fmt(semFim)}. Com o CORE: ${fmt(comFim)}.`}>
-        <line x1={PAD_X} x2={W - padDireita} y1={y(0)} y2={y(0)} stroke="#ebe7ef" strokeWidth="1" />
-        <line x1={PAD_X} x2={W - padDireita} y1={y(max / 2)} y2={y(max / 2)} stroke="#ebe7ef" strokeWidth="1" strokeDasharray="2 4" />
-        {marcas.map((m) => (
-          <text key={m.i} x={x(m.i)} y={H - 8} textAnchor={m.i === 0 ? "start" : m.i === n - 1 ? "end" : "middle"} fontSize="10.5" fontWeight="600" fill="#7d8691">{m.r}</text>
-        ))}
-        <defs>
-          <clipPath id={`${idClip}-sem`}><motion.rect x="0" y="0" height={H} initial={{ width: 0 }} animate={{ width: W }} transition={{ duration: 1.3, ease: "easeOut", delay: 0.2 }} /></clipPath>
-          <clipPath id={`${idClip}-com`}><motion.rect x="0" y="0" height={H} initial={{ width: 0 }} animate={{ width: W }} transition={{ duration: 1.3, ease: "easeOut", delay: 0.45 }} /></clipPath>
-        </defs>
-        {!treinos && <motion.path d={area} fill={COR_SEM} initial={{ opacity: 0 }} animate={{ opacity: 0.08 }} transition={{ delay: 1.0, duration: 0.6 }} />}
-        <path d={caminho(sem)} fill="none" stroke={COR_SEM} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" clipPath={`url(#${idClip}-sem)`} />
-        <path d={caminho(com)} fill="none" stroke={COR_COM} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" clipPath={`url(#${idClip}-com)`} />
-        <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.45, duration: 0.3 }}>
-          <circle cx={x(n - 1)} cy={ySem} r="5.5" fill={COR_SEM} stroke="#fff" strokeWidth="2" />
-          <text x={x(n - 1) + 9} y={ySemR + 4} fontSize="12" fontWeight="800" fill={GRAFITE} data-testid="porta-grafico-sem">{fmt(semFim)}</text>
-        </motion.g>
-        <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.7, duration: 0.3 }}>
-          <circle cx={x(n - 1)} cy={yCom} r="5.5" fill={COR_COM} stroke="#fff" strokeWidth="2" />
-          <text x={x(n - 1) + 9} y={yComR + 4} fontSize="12" fontWeight="800" fill={GRAFITE} data-testid="porta-grafico-com">{fmt(comFim)}</text>
-        </motion.g>
-      </svg>
-    </div>
-  );
-}
-
-/* ------------------------------------------------ tela 4: o plano de 3 dias (v4) */
-
-/**
- * v4 (12/10, dono "faz as 6"): a tela do plano VOLTA entre o com × sem e a conta. Na v2 (com ela) 33% das
- * pessoas que viam a conta criavam; na v3 (plano + formulário juntos) 23% — o "momento de ganho" antes do
- * pedido fazia falta.
- *
- * Igual à v2, MENOS o cadeado (dono 11/10: cadeado e "Desbloquear" tinham cara de pagamento):
- *   · "Seu plano de 3 dias"; Dia 1 aberto, com a ação da DOR e "Porque você disse: …";
- *   · Dias 2 e 3 à vista, mas esmaecidos e borrados (dá pra ver que tem coisa ali; dá vontade);
- *   · "Os dias 2 e 3 ficam salvos na sua conta." e o botão "Salvar meu plano grátis" (sem ícone).
- */
-export function PlanoPorta({ rota, dor, onSalvar }: { rota: AreaPorta; dor: string | null; onSalvar: () => void }) {
-  const plano = planoDe3Dias(rota, dor);
-  const info = NOME_DA_AREA[rota];
-  return (
-    <div className="flex-1 flex flex-col" data-testid="porta-plano">
-      <Eyebrow>Feito com as suas respostas</Eyebrow>
-      <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5" data-testid="porta-plano-titulo">Seu plano de 3 dias</h1>
-
-      <div className="mt-5 rounded-2xl border-2 border-[#16121c] bg-white p-4" data-testid="porta-plano-card">
-        <div className="flex items-center gap-2">
-          <span className="text-[18px] leading-none" aria-hidden>{info.emoji}</span>
-          <span className="text-[12px] font-extrabold uppercase tracking-[0.1em] text-[#16121c]">{info.nome}</span>
-        </div>
-
-        <motion.div className="mt-3.5" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25 }} data-testid="porta-plano-dia1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-md bg-[#16121c] text-white text-[10.5px] font-extrabold tracking-wide px-2 py-[3px]">DIA 1</span>
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: COR_COM }}>Hoje</span>
-          </div>
-          <p className="text-[17px] font-extrabold leading-snug text-[#16121c] mt-2 text-pretty">{plano.dia1}</p>
-          {plano.motivo && <p className="text-[13px] text-[#7d8691] mt-1">Porque você disse: “{plano.motivo}”</p>}
-        </motion.div>
-
-        <div className="mt-4 pt-3.5 border-t border-[#ebe7ef] space-y-3">
-          {[plano.dia2, plano.dia3].map((t, i) => (
-            <motion.div
-              key={t}
-              className="grid grid-cols-[52px_1fr] gap-2 items-center"
-              data-testid={`porta-plano-dia${i + 2}`}
-              data-esmaecido=""
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.12, duration: 0.3 }}
+    <div className="mt-6" data-testid={testid}>
+      <TituloCard>{titulo}</TituloCard>
+      {sub && <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-pergunta-sub">{sub}</p>}
+      <div className="mt-[18px] flex flex-col gap-2.5" role="list">
+        {opcoes.map((o) => {
+          const on = sel === o.id;
+          return (
+            <button
+              key={o.id} type="button" role="listitem" aria-pressed={on} onClick={() => escolher(o)}
+              data-testid={`porta-opcao-${o.id}`} data-on={on ? "" : undefined}
+              className={`${OPCAO} ${on ? OPCAO_ON : OPCAO_OFF}`}
             >
-              <span className="rounded-md bg-[#efedf2] text-[#7d8691] text-[10.5px] font-extrabold tracking-wide text-center py-[3px]">DIA {i + 2}</span>
-              {/* esmaecido + borrado: a forma do texto aparece, a frase não (sem cadeado, sem "trancado") */}
-              <span className="text-[14px] font-semibold leading-snug text-[#16121c] select-none" style={{ filter: "blur(3.5px)", opacity: 0.55 }} aria-hidden>{t}</span>
-            </motion.div>
-          ))}
-        </div>
+              <span className="flex-1 min-w-0">{o.label}</span>
+            </button>
+          );
+        })}
       </div>
-
-      <p className="mt-4 text-[14px] leading-snug text-[#5b6570]" data-testid="porta-plano-nota">Os dias 2 e 3 ficam salvos na sua conta.</p>
-
-      <BotaoPorta texto="Salvar meu plano grátis" seta={false} onClick={onSalvar} testid="porta-salvar-plano" />
     </div>
   );
 }
 
-/** v4: a conta mostra só 1 linha do plano (o plano inteiro está na tela anterior). "Seu plano de saúde" seria
- *  o convênio médico — por isso a área vai depois, com o emoji, e não "plano de <área>". */
-export function LinhaDoPlano({ rota }: { rota: AreaPorta }) {
-  const info = NOME_DA_AREA[rota];
+/** Multi-seleção: círculo à direita, "Continuar" no card (ativo com pelo menos 1 marcada). */
+export function PerguntaMulti({ titulo, sub, opcoes, inicial, alternar, onContinuar, testid }: {
+  titulo: string;
+  sub?: ReactNode;
+  opcoes: Opcao[];
+  inicial: string[];
+  /** a regra de marcar/desmarcar (ex.: "Não organizo" é exclusiva) */
+  alternar: (sel: string[], id: string) => string[];
+  onContinuar: (ids: string[]) => void;
+  testid: string;
+}) {
+  const [sel, setSel] = useState<string[]>(inicial);
   return (
-    <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#3f7d4e]" data-testid="porta-conta-plano">
-      <Check className="w-4 h-4 shrink-0" strokeWidth={3} aria-hidden />
-      <span>Seu plano de 3 dias está pronto · <span aria-hidden>{info.emoji}</span> {info.nome}</span>
-    </p>
+    <div className="mt-6" data-testid={testid}>
+      <TituloCard>{titulo}</TituloCard>
+      {sub && <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-pergunta-sub">{sub}</p>}
+      <div className="mt-[18px] flex flex-col gap-2.5" role="list">
+        {opcoes.map((o) => {
+          const on = sel.includes(o.id);
+          return (
+            <button
+              key={o.id} type="button" role="listitem" aria-pressed={on} onClick={() => setSel((s) => alternar(s, o.id))}
+              data-testid={`porta-opcao-${o.id}`} data-on={on ? "" : undefined}
+              className={`${OPCAO} ${on ? OPCAO_ON : OPCAO_OFF}`}
+            >
+              <span className="flex-1 min-w-0">{o.label}</span>
+              <span
+                className={`grid place-items-center w-[22px] h-[22px] shrink-0 rounded-full border-[1.5px] transition-colors ${on ? "text-white" : "border-[#cfcad4] bg-white"}`}
+                style={on ? { background: MAGENTA, borderColor: MAGENTA } : undefined}
+                aria-hidden data-testid={`porta-circulo-${o.id}`}
+              >
+                {on && <Check className="w-3.5 h-3.5" strokeWidth={3.2} />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <BotaoCard texto="Continuar" disabled={sel.length === 0} onClick={() => onContinuar(sel)} testid="porta-continuar" className="mt-4" />
+    </div>
   );
+}
+
+/** O botão principal dentro do card (grafite, 52 px). `href` vira <a> (link pra loja tem que ser link de verdade). */
+export function BotaoCard({ texto, onClick, href, disabled, testid, className = "", icone }: {
+  texto: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  testid: string;
+  className?: string;
+  icone?: ReactNode;
+}) {
+  const cls = `w-full h-[52px] rounded-[12px] flex items-center justify-center gap-2 text-[16px] font-semibold text-white no-underline transition-[transform,opacity] active:scale-[.985] disabled:opacity-40 disabled:active:scale-100 ${className}`;
+  if (href && !disabled) return <a href={href} onClick={onClick} className={cls} style={{ background: GRAFITE }} data-testid={testid}>{icone}{texto}</a>;
+  return <button type="button" onClick={onClick} disabled={disabled} className={cls} style={{ background: GRAFITE }} data-testid={testid}>{icone}{texto}</button>;
 }

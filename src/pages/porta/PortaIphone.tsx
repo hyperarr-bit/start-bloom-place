@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
@@ -14,68 +12,62 @@ import { persistLeadSource } from "@/lib/lead-source";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP } from "@/lib/rotas-web";
 import { capturarAtribuicao, decidirGravacao, idsDoAnuncio, lerAtribuicao, montarPorta, sessaoDaPorta, type AtribuicaoPorta, type PortaNaConta } from "./atribuicao";
-import { PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
-import { AberturaPorta } from "./AberturaPorta";
-import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
+import {
+  ABERTURA_TUDO, DICA_ORGANIZA, OPCOES_AREA, OPCOES_ORGANIZA, PERGUNTA_AREA, PERGUNTA_DOR, PERGUNTA_NUMERO, PERGUNTA_ORGANIZA,
+  alternarOrganiza, labelDe, rotaDe, type EscolhaPorta,
+} from "./conteudo";
+import { CardPorta, PerguntaMulti, PerguntaPorta, TopoPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
-import { SalvoPorta, type Plataforma } from "./SalvoPorta";
+import { SucessoPorta, type Plataforma } from "./SucessoPorta";
 import { irPraLoja } from "./navegar";
-import { InstrucaoPorta } from "./InstrucaoPorta";
 import { abrirAppComCodigo, codigoDaPortaOk } from "./handoff";
 import { lerHtmlDaPorta, msDesdeANavegacao } from "./medicao";
 
-/** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
-export const SEGUNDOS_ATE_A_LOJA = 4;
-/** "Último passo": segundos até abrir a loja sozinho (dá tempo de ver os 2 prints). */
-export const SEGUNDOS_NA_INSTRUCAO = 10;
+/** Sucesso: segundos até a loja abrir sozinha (como a Dinzo: "Abrindo a App Store…"). */
+export const SEGUNDOS_ATE_A_LOJA = 3;
 const CHAVE_LOJA_AUTO = "porta-loja-auto";
 
 /**
  * A PORTA iPHONE — coreaplicativo.com.br/comece (10/10). Só na WEB (o app
  * nativo nunca monta: a rota fica atrás do SoNaWeb no App.tsx). noindex.
  *
- * v3 (11/10, dono: "quero algo mais rápido"; no iPhone só 28% passavam da welcome com vídeo):
- * anúncio → TELA 1 "Organize sua vida em 3 dias." com as áreas e a pergunta da DOR aparecendo
- * logo abaixo (1 toque avança) → TELA 2 o número → TELA 3 com × sem o CORE.
- * v4 (12/10, dono "faz as 6"): tela 1 com o ícone do CORE e "Grátis · 3 perguntas · 30 segundos";
- * TELA 3 → "Ver meu plano de 3 dias" → TELA 4 o PLANO de volta (Dia 1 aberto, dias 2 e 3 esmaecidos, sem
- * cadeado, "Salvar meu plano grátis") → TELA 5 a CONTA ("Salve seu plano e ganhe 3 dias grátis no app" no
- * iPhone; botão sempre ativo com o que falta embaixo do campo) → CRIA A
- * CONTA no site (Apple, Google ou e-mail + senha; a campanha fica gravada em user_metadata.porta)
- * → "Último passo" (celular) → "Pronto, salvo":
- * baixa o app, toca em "Entrar" (abaixo do Começar) com o mesmo e-mail → o
- * paywall do app (3 dias grátis, já no ar) liga o teste à conta.
+ * v5 (12/10, dono: "quero o funil igual o do Dinzo, mesmo design, só adaptando o quiz"): TOPO FIXO igual em
+ * todos os passos (logo · PLANO GRATUITO · "Monte seu plano de 3 dias" · "4 perguntas rápidas…") + UM card
+ * branco onde tudo acontece:
+ *   1 área → 2 a dor da área → 3 o número da área → 4 "Como você organiza isso hoje?" (multi) → 5 CONTA (Apple,
+ *   Google, e-mail + senha; a campanha fica em user_metadata.porta) → 6 SUCESSO ("Agora é só entrar", loja
+ *   abre sozinha em ~3 s, 1x por sessão; na volta da aba, "Abrir o CORE" com o código do porta-handoff).
+ * Saíram (v5): o com × sem, a tela do plano, o "Último passo" e a tela 7 antiga.
  *
- * SEM o preço do produto em lugar nenhum. "3 dias grátis" só no iPhone (conta e tela 7); nunca "sem cartão".
- * ("Grátis" do selo da tela 1 e do "Salvar meu plano grátis" é o PLANO, que é grátis em qualquer aparelho.)
+ * SEM o preço do produto em lugar nenhum. "3 dias grátis" só na conta do iPhone; nunca "sem cartão".
  *
  * Eventos (analytics_events, todos com porta_session_id + ids do anúncio):
  *   porta_html {t_ms, html_id}   v4: do index.html, ANTES do React (ver ./medicao.ts); porta_erro_js {msg} também
  *   porta_view {attr…, tempo_ms, tela1_visivel, html_id, html_ms}   1ª carga da sessão
- *   porta_passo {passo, area, resposta}  passo (v3): "abertura" (1º toque na tela 1 = o antigo "welcome"),
- *                                        "area" (cada área tocada), "p2" (a dor, avança), "p3" (o número),
- *                                        "comsem" (v4: tocou "Ver meu plano de 3 dias"), "plano" (v4: tocou
- *                                        "Salvar meu plano grátis" = o "desbloquear" da v2), "conta" (abriu a
- *                                        tela da conta), "instrucao"
- *   porta_conta_erro {campo, motivo}     v4: tocou "Criar conta e salvar" com e-mail/senha faltando (1 por campo)
+ *   porta_passo {passo, area, resposta}  v5: "area" (tocou a área), "p2" (a dor), "p3" (o número), "organiza"
+ *                                        (resposta = rótulos marcados, separados por vírgula), "conta" (abriu a
+ *                                        conta, resposta "view"), "sucesso" (viu o sucesso, resposta "view")
+ *                                        [v3/v4 também tinham "abertura", "comsem", "plano", "instrucao"]
+ *   porta_conta_erro {campo, motivo}     tocou "Criar conta" com e-mail/senha faltando (1 por campo)
  *   porta_conta_iniciada {metodo}
  *   porta_conta_criada {metodo, existente, event_id, gravou}
- *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
+ *   porta_loja_click {plataforma, loja, via: "botao"|"auto"}   (keepalive: a página sai pra loja)
  *   porta_voltou_aba {}
  *   porta_google_bloqueado {}            tocou no Google dentro do Instagram/Facebook (aviso, sem OAuth)
- *   porta_codigo {ok, erro, email}       10/10: pediu o código do "abrir o app já logado" (porta-handoff; a
- *                                        mesma chamada manda o e-mail "entre no CORE" com o código)
- *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://entrar?h=…) na tela 7
+ *   porta_codigo {ok, erro, email}       pediu o código do "abrir o app já logado" (porta-handoff; a mesma
+ *                                        chamada manda o e-mail "entre no CORE" com o código)
+ *   porta_abrir_app_click {onde}         tocou em "Abrir o CORE" (core://entrar?h=…) no sucesso
  * (Área de transferência é PROIBIDA — dono 10/10. Nada aqui copia nem lê o clipboard.)
  * Pixel: ViewContent na 1ª carga; CompleteRegistration (eventID = porta.event_id) na conta nova (+ a CAPI "registro").
  */
-export type Passo = "abertura" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
-export const ORDEM: Passo[] = ["abertura", "p3", "comsem", "plano", "conta", "instrucao", "salvo"];
-/** Telas com a barra de progresso (a tela 1 é a abertura: sem barra, sem voltar). */
-const COM_BARRA: Passo[] = ["p3", "comsem", "plano", "conta"];
+export type Passo = "area" | "p2" | "p3" | "organiza" | "conta" | "sucesso";
+export const ORDEM: Passo[] = ["area", "p2", "p3", "organiza", "conta", "sucesso"];
+/** A barra de progresso do card (o sucesso não tem barra, como na Dinzo). */
+const PROGRESSO: Partial<Record<Passo, number>> = { area: 0.1, p2: 0.3, p3: 0.5, organiza: 0.7, conta: 0.88 };
 /** O estado salvo das versões antigas (localStorage "porta-estado-v1") cai no equivalente novo, sem quebrar:
- *  v2 welcome/area/p2 → tela 1; "plano" (v2) e "conta" (v3) existem de novo na v4 e ficam onde estavam. */
-const PASSO_ANTIGO: Record<string, Passo> = { welcome: "abertura", area: "abertura", p2: "abertura" };
+ *  v1/v2 welcome/area e v3/v4 abertura (área + dor numa tela) → a dor se a área já estava marcada, senão a área;
+ *  comsem/plano (v4: já respondeu o número) → organiza; instrucao/salvo → sucesso. */
+const PASSO_ANTIGO: Record<string, Passo> = { welcome: "area", abertura: "area", comsem: "organiza", plano: "organiza", instrucao: "sucesso", salvo: "sucesso" };
 export const migrarPasso = (p: unknown): Passo | null =>
   typeof p !== "string" ? null : (ORDEM as string[]).includes(p) ? (p as Passo) : PASSO_ANTIGO[p] ?? null;
 
@@ -84,11 +76,15 @@ export type EstadoPorta = {
   escolha: EscolhaPorta | null;
   p2: string | null;
   p3: string | null;
+  /** v5: o passo 4 (multi-seleção) — ids de OPCOES_ORGANIZA */
+  p4?: string[] | null;
   eventId: string;
   metodo: string | null;
   email: string | null;
   /** 10/10: código de uso único do porta-handoff (abre o app já logado). Ausente = só o "toque em Entrar". */
   codigo?: string | null;
+  /** o porta-handoff disse que o e-mail com o código saiu (a faixa verde do sucesso) */
+  emailEnviado?: boolean;
 };
 
 export const CHAVE_ESTADO = "porta-estado-v1";
@@ -108,8 +104,11 @@ function lerEstado(): EstadoPorta | null {
     const e = JSON.parse(raw) as EstadoPorta;
     const passo = e ? migrarPasso(e.passo) : null;
     if (e && passo && typeof e.eventId === "string") {
-      // quem estava na área/na dor da v2 volta pra tela 1 com a área marcada (a dor é respondida de novo)
-      const n: EstadoPorta = passo === "abertura" ? { ...e, passo, p2: null, p3: null } : { ...e, passo };
+      // v1–v4 na área/abertura com a área marcada: segue pra dor (a dor e o número são respondidos de novo)
+      const n: EstadoPorta = passo === "area"
+        ? { ...e, passo: e.escolha ? "p2" : "area", p2: null, p3: null }
+        : { ...e, passo };
+      if (!Array.isArray(n.p4)) n.p4 = null;
       memoriaEstado = n;
       return n;
     }
@@ -151,7 +150,8 @@ function estadoDaUrl(): EstadoPorta | null {
     const o = JSON.parse(raw) as Partial<EstadoPorta>;
     const okId = (v: unknown) => v === null || v === undefined || (typeof v === "string" && /^[a-z0-9_-]{1,40}$/i.test(v));
     if (!okId(o.escolha) || !okId(o.p2) || !okId(o.p3) || typeof o.eventId !== "string" || !/^porta_cr_[a-z0-9-]{6,60}$/i.test(o.eventId)) return null;
-    return { passo: "conta", escolha: (o.escolha ?? null) as EscolhaPorta | null, p2: o.p2 ?? null, p3: o.p3 ?? null, eventId: o.eventId, metodo: null, email: null };
+    const p4 = Array.isArray(o.p4) && o.p4.length <= 8 && o.p4.every((x) => typeof x === "string" && okId(x)) ? (o.p4 as string[]) : null;
+    return { passo: "conta", escolha: (o.escolha ?? null) as EscolhaPorta | null, p2: o.p2 ?? null, p3: o.p3 ?? null, p4, eventId: o.eventId, metodo: null, email: null };
   } catch {
     return null;
   }
@@ -187,7 +187,7 @@ export function PortaIphone() {
   const attrAgora = () => lerAtribuicao() ?? inicio.current!.attr;
   const ids = () => idsDoAnuncio(attrAgora(), sessao);
 
-  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? estadoDaUrl() ?? { passo: "abertura", escolha: null, p2: null, p3: null, eventId: novoId(), metodo: null, email: null });
+  const [estado, setEstadoCru] = useState<EstadoPorta>(() => lerEstado() ?? estadoDaUrl() ?? { passo: "area", escolha: null, p2: null, p3: null, p4: null, eventId: novoId(), metodo: null, email: null });
   const setEstado = useCallback((f: (e: EstadoPorta) => EstadoPorta) => {
     setEstadoCru((e) => { const n = f(e); gravarEstado(n); return n; });
   }, []);
@@ -220,9 +220,9 @@ export function PortaIphone() {
     const html = lerHtmlDaPorta();
     let visivel: boolean | null = null;
     try { visivel = document.visibilityState === "visible"; } catch { /* noop */ }
-    const tela1 = estado.passo === "abertura" && !!document.querySelector("[data-testid='porta-abertura']");
+    const tela1 = estado.passo === "area" && !!document.querySelector("[data-testid='porta-q-area']");
     trackEvent("porta_view", {
-      ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "abertura" ? estado.passo : null,
+      ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "area" ? estado.passo : null,
       tempo_ms: msDesdeANavegacao(), visivel, tela1_visivel: tela1 && visivel !== false,
       html_id: html?.id ?? null, html_ms: html?.t ?? null,
     });
@@ -235,21 +235,21 @@ export function PortaIphone() {
   const ir = (passo: Passo, extra: Partial<EstadoPorta> = {}) => setEstado((e) => ({ ...e, ...extra, passo }));
   const passoFeito = (passo: string, resposta: string | null, area: string | null = estadoRef.current.escolha) =>
     trackEvent("porta_passo", { passo, area, resposta, ...ids() });
-  /** o 1º toque na tela 1 (porta_passo "abertura" = o antigo "welcome/começar"), 1x por carga */
-  const comecou = useRef(false);
-  /* porta_passo "conta": abriu a tela da conta (v4: o plano é a tela anterior) */
+  /* porta_passo "conta"/"sucesso": abriu a conta / viu o sucesso */
   useEffect(() => {
-    if (estado.passo === "conta") passoFeito("conta", "view");
+    if (estado.passo === "conta" || estado.passo === "sucesso") passoFeito(estado.passo, "view");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado.passo]);
 
-  /* as respostas como o APP guarda (chave → texto da opção): atrapalha + gasto|consistencia */
+  /* as respostas como o APP guarda (chave → texto da opção): atrapalha + gasto|consistencia (+ v5: organiza) */
   const respostas = (e: EstadoPorta = estadoRef.current): PortaNaConta["respostas"] => {
     const r = rotaDe(e.escolha);
     const num = PERGUNTA_NUMERO[r];
+    const p4 = e.p4 && e.p4.length ? e.p4 : null;
     return {
       area: e.escolha ?? "dinheiro", rota: r, p2: e.p2, p3: e.p3,
       atrapalha: labelDe(PERGUNTA_DOR[r].opts, e.p2), [num.key]: labelDe(num.opts, e.p3),
+      p4: p4 ? p4.join(",") : null, organiza: p4 ? rotulosOrganiza(p4) : null,
     };
   };
 
@@ -266,8 +266,9 @@ export function PortaIphone() {
         trackEvent("porta_codigo", { ok: false, erro: (error?.message || "sem_codigo").slice(0, 120), ...ids() });
         return;
       }
-      setEstado((x) => ({ ...x, codigo }));
-      trackEvent("porta_codigo", { ok: true, email: !!(data as { email_enviado?: boolean } | null)?.email_enviado, ...ids() });
+      const emailEnviado = !!(data as { email_enviado?: boolean } | null)?.email_enviado;
+      setEstado((x) => ({ ...x, codigo, emailEnviado }));
+      trackEvent("porta_codigo", { ok: true, email: emailEnviado, ...ids() });
     } catch (e) {
       trackEvent("porta_codigo", { ok: false, erro: String(e).slice(0, 120), ...ids() });
     }
@@ -301,8 +302,7 @@ export function PortaIphone() {
         void persistLeadSource(supabase, u.id);
       }
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });
-      // 10/10: no celular, antes da tela 7, o "Último passo: no app, toque em Entrar" (computador vai direto pro QR)
-      setEstado((x) => ({ ...x, passo: plataformaDaWeb() === "web" ? "salvo" : "instrucao", metodo, email: u.email ?? x.email, eventId }));
+      setEstado((x) => ({ ...x, passo: "sucesso", metodo, email: u.email ?? x.email, eventId }));
       void pedirCodigo();
       return { ok: true };
     } catch {
@@ -316,7 +316,7 @@ export function PortaIphone() {
     if (authLoading || !user) return;
     const e = estadoRef.current;
     const social = e.metodo === "google" || e.metodo === "apple";
-    if ((e.passo === "conta" && social) || (paramPasso === "voltou" && e.passo !== "salvo" && e.passo !== "instrucao")) void concluir(social ? (e.metodo as string) : "google");
+    if ((e.passo === "conta" && social) || (paramPasso === "voltou" && e.passo !== "sucesso")) void concluir(social ? (e.metodo as string) : "google");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
 
@@ -342,7 +342,7 @@ export function PortaIphone() {
     try {
       const e = estadoRef.current;
       const q = new URLSearchParams(window.location.search);
-      q.set(PARAM_ESTADO, JSON.stringify({ escolha: e.escolha, p2: e.p2, p3: e.p3, eventId: e.eventId }));
+      q.set(PARAM_ESTADO, JSON.stringify({ escolha: e.escolha, p2: e.p2, p3: e.p3, p4: e.p4 ?? null, eventId: e.eventId }));
       q.set(PARAM_SESSAO, sessao);
       window.history.replaceState(window.history.state, "", `${window.location.pathname}?${q.toString()}`);
     } catch { /* noop */ }
@@ -386,17 +386,17 @@ export function PortaIphone() {
     return concluir("sessao");
   };
 
-  /* recarregou no "Último passo"/tela 7 sem código (o pedido falhou ou a conta veio de outra aba): tenta 1x */
+  /* recarregou no sucesso sem código (o pedido falhou ou a conta veio de outra aba): tenta 1x */
   const pediuNaVolta = useRef(false);
   useEffect(() => {
     if (pediuNaVolta.current || authLoading || !user) return;
-    if ((estado.passo !== "instrucao" && estado.passo !== "salvo") || codigoDaPortaOk(estado.codigo)) return;
+    if (estado.passo !== "sucesso" || codigoDaPortaOk(estado.codigo)) return;
     pediuNaVolta.current = true;
     void pedirCodigo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, estado.passo]);
 
-  /* ---------------------------------------------------------- tela 7: loja */
+  /* ---------------------------------------------------------- sucesso: loja */
   const clicouLoja = useRef(false);
   const avisouVolta = useRef(false);
   const [voltou, setVoltou] = useState(false);
@@ -423,97 +423,77 @@ export function PortaIphone() {
     trackEventBeacon("porta_loja_click", { plataforma, loja, via, metodo: estadoRef.current.metodo, ...ids() });
   };
 
-  /* 10/10 (dono: "no Dinzo, depois de alguns segundos ele redireciona automático pra loja"): na tela 7, no
-   * celular, conta SEGUNDOS_ATE_A_LOJA e abre a loja sozinha — 1x por sessão (recarregar não repete; quem volta
-   * da loja não é jogado de novo). No Instagram a App Store abre POR CIMA da página: fechando a loja, a pessoa
-   * volta e ainda vê o "toque em Entrar". Computador: nunca (lá é o QR). */
-  const [contagem, setContagem] = useState<number | null>(null);
+  /* Sucesso, no celular (como a Dinzo: "Abrindo a App Store…"): conta SEGUNDOS_ATE_A_LOJA e abre a loja sozinha
+   * — 1x por sessão (recarregar não repete; quem volta da loja não é jogado de novo). Qualquer toque na página
+   * cancela o automático (a pessoa está lendo/agindo). No Instagram a App Store abre POR CIMA da página: fechando
+   * a loja, a pessoa volta e ainda vê o "toque em Entrar". Computador: nunca (lá é o QR). */
+  const [abrindo, setAbrindo] = useState(false);
+  const cancelouAuto = useRef(false);
   useEffect(() => {
-    if (estado.passo !== "salvo" || plataforma === "web") return;
+    if (estado.passo !== "sucesso" || plataforma === "web") return;
     let ja = false;
     try { ja = sessionStorage.getItem(CHAVE_LOJA_AUTO) === "1"; } catch { /* sem storage: segue */ }
-    if (ja || clicouLoja.current) return;
-    setContagem(SEGUNDOS_ATE_A_LOJA);
-    let n = SEGUNDOS_ATE_A_LOJA;
-    const t = window.setInterval(() => {
-      n -= 1;
-      if (clicouLoja.current) { window.clearInterval(t); setContagem(null); return; }
-      if (n > 0) { setContagem(n); return; }
-      window.clearInterval(t);
-      setContagem(null);
+    if (ja || clicouLoja.current || cancelouAuto.current) return;
+    setAbrindo(true);
+    const t = window.setTimeout(() => {
+      setAbrindo(false);
+      if (clicouLoja.current || cancelouAuto.current) return;
       try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
       const loja = plataforma === "android" ? "android" : "ios";
       onLoja(loja, "auto");
       irPraLoja(hrefLoja(loja));
-    }, 1000);
-    return () => window.clearInterval(t);
+    }, SEGUNDOS_ATE_A_LOJA * 1000);
+    return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado.passo, plataforma]);
-
-  /* 10/10 (dono: "não tá indo automático pro app depois de uns 10 segundos naquela tela"): o "Último passo"
-   * também conta (SEGUNDOS_NA_INSTRUCAO) e abre a loja sozinho — dá tempo de ver os 2 prints; o botão adianta. */
-  const baixarDaInstrucao = (via: "botao" | "auto") => {
-    const loja = plataforma === "android" ? "android" : "ios";
-    passoFeito("instrucao", via === "auto" ? "baixar_auto" : "baixar");
-    onLoja(loja, via);
-    try { sessionStorage.setItem(CHAVE_LOJA_AUTO, "1"); } catch { /* noop */ }
-    setEstado((x) => ({ ...x, passo: "salvo" }));
+  const cancelarAuto = () => {
+    if (!abrindo) return;
+    cancelouAuto.current = true;
+    setAbrindo(false);
   };
-  const [contagemInstrucao, setContagemInstrucao] = useState<number | null>(null);
-  useEffect(() => {
-    if (estado.passo !== "instrucao" || plataforma === "web") { setContagemInstrucao(null); return; }
-    let n = SEGUNDOS_NA_INSTRUCAO;
-    setContagemInstrucao(n);
-    const t = window.setInterval(() => {
-      n -= 1;
-      if (estadoRef.current.passo !== "instrucao" || clicouLoja.current) { window.clearInterval(t); setContagemInstrucao(null); return; }
-      if (n > 0) { setContagemInstrucao(n); return; }
-      window.clearInterval(t);
-      setContagemInstrucao(null);
-      const loja = plataforma === "android" ? "android" : "ios";
-      baixarDaInstrucao("auto");
-      irPraLoja(hrefLoja(loja));
-    }, 1000);
-    return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado.passo, plataforma]);
 
   /* ---------------------------------------------------------- render */
   const indice = ORDEM.indexOf(estado.passo);
-  const comBarra = COM_BARRA.includes(estado.passo);
-  const posBarra = COM_BARRA.indexOf(estado.passo) + 1;
-  const voltar = () => { if (indice > 0 && estado.passo !== "salvo" && estado.passo !== "instrucao") ir(ORDEM[indice - 1]); };
+  const progresso = PROGRESSO[estado.passo] ?? null;
+  const podeVoltar = indice > 0 && estado.passo !== "sucesso";
+  const voltar = () => { if (podeVoltar) ir(ORDEM[indice - 1]); };
 
   let tela: React.ReactNode = null;
-  if (estado.passo === "abertura") {
-    // TELA 1: abertura + área + a DOR (quiz_1 do app) aparecendo logo abaixo; a resposta avança
+  if (estado.passo === "area") {
     tela = (
-      <AberturaPorta
-        escolha={estado.escolha}
-        onArea={(area) => {
-          if (!comecou.current) { comecou.current = true; passoFeito("abertura", "area", null); }
+      <PerguntaPorta
+        key="area" testid="porta-q-area" titulo={PERGUNTA_AREA} opcoes={OPCOES_AREA} inicial={estado.escolha}
+        onEscolher={(o) => {
+          const area = o.id as EscolhaPorta;
           passoFeito("area", area, area);
-          setEstado((e) => ({ ...e, escolha: area, p2: e.escolha === area ? e.p2 : null, p3: e.escolha === area ? e.p3 : null }));
+          // trocou de área: a dor e o número da área antiga não valem mais
+          ir("p2", estadoRef.current.escolha === area ? { escolha: area } : { escolha: area, p2: null, p3: null });
         }}
-        onDor={(o) => { passoFeito("p2", o.label); ir("p3", { p2: o.id }); }}
-        onEntrar={() => { trackEvent("porta_entrar_click", { ...ids() }); navigate("/entrar"); }}
+      />
+    );
+  } else if (estado.passo === "p2") {
+    const q = PERGUNTA_DOR[rota];
+    tela = (
+      <PerguntaPorta
+        key={`p2-${rota}`} testid="porta-q-p2" titulo={q.q} opcoes={q.opts} inicial={estado.p2}
+        sub={estado.escolha === "tudo" ? <span data-testid="porta-tudo">{ABERTURA_TUDO}</span> : undefined}
+        onEscolher={(o) => { passoFeito("p2", o.label); ir("p3", { p2: o.id }); }}
       />
     );
   } else if (estado.passo === "p3") {
-    // TELA 2: o NÚMERO da rota (dinheiro: quiz_3 "gasto"; as outras: quiz_2 "consistencia")
     const q = PERGUNTA_NUMERO[rota];
-    tela = <PerguntaPorta testid="porta-p3" titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p3", o.label); ir("comsem", { p3: o.id }); }} />;
-  } else if (estado.passo === "comsem") {
-    // TELA 3: com × sem o CORE → "Ver meu plano de 3 dias"
-    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "ver_plano"); ir("plano"); }} />;
-  } else if (estado.passo === "plano") {
-    // TELA 4 (v4): o plano de 3 dias → "Salvar meu plano grátis"
-    tela = <PlanoPorta rota={rota} dor={estado.p2} onSalvar={() => { passoFeito("plano", "salvar"); ir("conta"); }} />;
+    tela = <PerguntaPorta key={`p3-${rota}`} testid="porta-q-p3" titulo={q.q} opcoes={q.opts} inicial={estado.p3} onEscolher={(o) => { passoFeito("p3", o.label); ir("organiza", { p3: o.id }); }} />;
+  } else if (estado.passo === "organiza") {
+    tela = (
+      <PerguntaMulti
+        testid="porta-q-organiza" titulo={PERGUNTA_ORGANIZA} sub={DICA_ORGANIZA} opcoes={OPCOES_ORGANIZA}
+        inicial={estado.p4 ?? []} alternar={alternarOrganiza}
+        onContinuar={(ids) => { passoFeito("organiza", rotulosOrganiza(ids)); ir("conta", { p4: ids }); }}
+      />
+    );
   } else if (estado.passo === "conta") {
-    // TELA 5: a conta (1 linha do plano no topo)
     tela = (
       <ContaPorta
-        rota={rota}
         mostrarTeste={plataforma === "ios"}
         emInApp={emInApp}
         appDoWebview={appDoWebview()}
@@ -529,53 +509,43 @@ export function PortaIphone() {
         onErroCampo={(campo, motivo) => trackEvent("porta_conta_erro", { campo, motivo, ...ids() })}
       />
     );
-  } else if (estado.passo === "instrucao") {
-    const loja = plataforma === "android" ? "android" : "ios";
+  } else if (estado.passo === "sucesso") {
+    const comCodigo = plataforma === "ios" && codigoDaPortaOk(estado.codigo);
     tela = (
-      <InstrucaoPorta
+      <SucessoPorta
         plataforma={plataforma}
         metodo={estado.metodo ?? "senha"}
-        email={estado.email ?? user?.email ?? ""}
-        hrefLoja={hrefLoja(loja)}
-        contagem={contagemInstrucao}
-        onBaixar={() => baixarDaInstrucao("botao")}
-      />
-    );
-  } else if (estado.passo === "salvo") {
-    tela = (
-      <SalvoPorta
-        email={estado.email ?? user?.email ?? ""}
-        metodo={estado.metodo ?? "senha"}
-        plataforma={plataforma}
         voltou={voltou}
-        contagem={contagem}
+        abrindo={abrindo}
+        emailEnviado={comCodigo && !!estado.emailEnviado}
+        abrirApp={comCodigo ? abrirAppComCodigo(estado.codigo as string) : null}
         hrefLoja={hrefLoja}
         qrUrl={URL_QR}
         onLoja={onLoja}
-        abrirApp={plataforma === "ios" && codigoDaPortaOk(estado.codigo) ? abrirAppComCodigo(estado.codigo) : null}
         onAbrirApp={(onde) => trackEventBeacon("porta_abrir_app_click", { onde, voltou, metodo: estado.metodo, ...ids() })}
       />
     );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white text-[#16121c] antialiased" data-testid="porta" data-passo={estado.passo}>
-      <div className="mx-auto w-full max-w-[430px] min-h-[100dvh] flex flex-col px-5" style={{ paddingTop: "calc(10px + env(safe-area-inset-top))" }}>
-        {comBarra && (
-          <div className="flex items-center gap-3 h-11" data-testid="porta-topo">
-            <button type="button" onClick={voltar} aria-label="Voltar" className="grid place-items-center w-9 h-9 -ml-2 rounded-full text-[#16121c] active:bg-[#f2eff5]" data-testid="porta-voltar">
-              <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
+    <div className="min-h-[100dvh] bg-[#f6f5f7] text-[#16121c] antialiased" data-testid="porta" data-passo={estado.passo} onPointerDownCapture={cancelarAuto}>
+      <div className="mx-auto w-full max-w-[440px] px-5 pb-10" style={{ paddingTop: "calc(20px + env(safe-area-inset-top))" }}>
+        <TopoPorta />
+        <CardPorta progresso={progresso} onVoltar={podeVoltar ? voltar : undefined} passo={estado.passo}>
+          {tela}
+        </CardPorta>
+        {estado.passo === "area" && (
+          <div className="mt-4 flex justify-center">
+            <button type="button" onClick={() => { trackEvent("porta_entrar_click", { ...ids() }); navigate("/entrar"); }} className="h-10 px-4 text-[14px] text-[#6b6670]" data-testid="porta-entrar">
+              Já tem conta? <b className="text-[#16121c]">Entrar</b>
             </button>
-            <div className="flex-1 h-1.5 rounded-full bg-[#efedf2] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={COM_BARRA.length} aria-valuenow={posBarra}>
-              <motion.div className="h-full rounded-full bg-[#16121c]" initial={false} animate={{ width: `${(posBarra / COM_BARRA.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
-            </div>
-            <span className="w-7" aria-hidden />
           </div>
         )}
-        <motion.div key={estado.passo} className={`flex-1 flex flex-col ${comBarra ? "pt-4" : estado.passo === "abertura" ? "pt-4" : "pt-8"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
-          {tela}
-        </motion.div>
       </div>
     </div>
   );
 }
+
+/** os rótulos do passo 4, na ordem da tela, separados por vírgula */
+const rotulosOrganiza = (ids: string[]): string =>
+  OPCOES_ORGANIZA.filter((o) => ids.includes(o.id)).map((o) => o.label).join(", ");

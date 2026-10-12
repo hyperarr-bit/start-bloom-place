@@ -195,7 +195,7 @@ describe("rota", () => {
 
 /* ---------------------------------------------------------------- o desenho */
 describe("topo fixo + card (o desenho da Dinzo)", () => {
-  it("passo 1: logo (ícone do app + CORE), PLANO GRATUITO, título, sub; card com a barra, SEM voltar, 6 áreas só texto", () => {
+  it("passo 1: logo (ícone do app + CORE), PLANO GRATUITO, título, sub; card com a barra, SEM voltar, 5 áreas só texto (sem Tudo)", () => {
     montar();
     expect(screen.getByTestId("porta-logo").getAttribute("src")).toBe("/icon-192.png");
     expect(readFileSync(join(process.cwd(), "public/icon-192.png")).length).toBeLessThan(20_000);
@@ -204,7 +204,7 @@ describe("topo fixo + card (o desenho da Dinzo)", () => {
     expect(screen.getByTestId("porta-titulo").textContent).toBe("Monte seu plano de 3 dias");
     expect(screen.getByTestId("porta-sub").textContent).toBe("4 perguntas rápidas, e sua conta fica pronta em menos de um minuto.");
     expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que você quer organizar primeiro?");
-    expect(rotulos("porta-q-area")).toEqual(["Dinheiro", "Rotina", "Treino e dieta", "Saúde", "Metas", "Tudo"]);
+    expect(rotulos("porta-q-area")).toEqual(["Dinheiro", "Rotina", "Treino e dieta", "Saúde", "Metas"]);
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("10");
     expect(screen.queryByTestId("porta-voltar")).toBeNull();
     expect(screen.queryByTestId("porta-continuar")).toBeNull();
@@ -301,12 +301,10 @@ describe("a dor (passo 2) e o número (passo 3) são as MESMAS perguntas do funi
     });
   }
 
-  it("'Tudo' segue pelo dinheiro, com a linha do app embaixo da pergunta", async () => {
+  it("12/10: sem a opção 'Tudo'; estado antigo salvo com 'tudo' segue pelo dinheiro", async () => {
+    localStorage.setItem("porta-estado-v1", JSON.stringify({ passo: "p2", escolha: "tudo", eventId: "porta_cr_x" }));
     montar();
-    await escolher("tudo", "p2");
-    expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha hoje?");
-    expect(screen.getByTestId("porta-tudo").textContent).toBe("Vamos começar pelo dinheiro. Rotina e saúde entram nos dias 2 e 3.");
-    expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "area", area: "tudo", resposta: "tudo" });
+    await waitFor(() => expect(screen.getByTestId("porta-pergunta").textContent).toBe("O que mais te atrapalha hoje?"));
   });
 });
 
@@ -399,7 +397,7 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
     expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Pronto! Seu plano de 3 dias está montado.");
     expect(screen.getByTestId("porta-conta-texto").textContent).toBe("Agora crie sua conta pra abrir no app.");
-    expect(screen.getByTestId("porta-conta-teste").textContent).toBe("3 dias grátis no app · nada cobrado hoje");
+    expect(screen.queryByTestId("porta-conta-teste")).toBeNull(); // 12/10: a linha do teste saiu da conta
     const apple = screen.getByTestId("porta-apple"), google = screen.getByTestId("porta-google");
     expect(apple.textContent?.trim()).toBe("Continuar com a Apple");
     expect(apple.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // Apple vem antes

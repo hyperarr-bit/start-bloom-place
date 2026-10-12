@@ -27,7 +27,8 @@ export const OPCOES_AREA: Array<Opcao & { id: EscolhaPorta }> = [
   { id: "corpo", label: "Treino e dieta" },
   { id: "saude", label: "Saúde" },
   { id: "metas", label: "Metas" },
-  { id: "tudo", label: "Tudo" },
+  // 12/10 (dono: "deixa só 5, tem demais"): sai o "Tudo" — o tipo e o rotaDe seguem aceitando "tudo" pra quem
+  // tem o estado antigo salvo (cai no dinheiro, como sempre)
 ];
 
 export const rotaDe = (e: EscolhaPorta | null | undefined): AreaPorta => (e && e !== "tudo" ? e : "dinheiro");

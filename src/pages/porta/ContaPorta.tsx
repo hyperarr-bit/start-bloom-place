@@ -95,14 +95,13 @@ export function validarConta(email: string, senha: string): Falta[] {
   return out;
 }
 
-function TopoDaConta({ mostrarTeste }: { mostrarTeste: boolean }) {
+/* 12/10 (dono): sai a linha "3 dias grátis no app · nada cobrado hoje" desta tela — o teste é apresentado no app
+ * ("Você ganhou 3 dias grátis") e no sucesso. `mostrarTeste` fica na assinatura pra não mexer em quem chama. */
+function TopoDaConta(_props: { mostrarTeste: boolean }) {
   return (
     <>
       <TituloCard testid="porta-conta-titulo">{TITULO_CONTA}</TituloCard>
       <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-conta-texto">{TEXTO_CONTA}</p>
-      {mostrarTeste && (
-        <p className="mt-2 text-[14px] font-semibold text-[#16121c]" data-testid="porta-conta-teste">{LINHA_TESTE}</p>
-      )}
     </>
   );
 }

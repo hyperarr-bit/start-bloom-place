@@ -191,6 +191,101 @@
     </script>
 
     <script>
+      // ─── PORTA (/comece): medir ANTES do React (12/10) — SÓ ES5, SÓ em /comece ───
+      //
+      // O porta_view sai quando o React monta; quem desiste enquanto o bundle
+      // baixa (4G ruim, navegador do Instagram) sumia da conta. Este bloco
+      // manda "porta_html" na hora em que o HTML chega (tempo desde o início
+      // da navegação) e "porta_erro_js" pra erro de JS/recurso enquanto a
+      // página está em /comece. Mesmo endpoint e chave anon do
+      // trackEventBeacon (src/lib/analytics.ts) e o MESMO session_id
+      // (sessionStorage "core_session_id": se não existe, nasce aqui e o
+      // analytics lê o mesmo). html_id fica em window.__portaHtml e em
+      // sessionStorage "porta-html-v1" pro porta_view levar junto
+      // (src/pages/porta/medicao.ts). fetch keepalive assíncrono: não segura
+      // nada; qualquer falha é engolida. Fora de /comece não faz NADA.
+      (function () {
+        try {
+          if (String(location.pathname).indexOf("/comece") !== 0) return;
+          var URL_EV = "https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events";
+          var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
+          var ss = null;
+          try { ss = window.sessionStorage; } catch (e0) {}
+          var novoId = function () {
+            try { return window.crypto.randomUUID(); } catch (e1) { return "h" + new Date().getTime().toString(36) + Math.random().toString(36).slice(2, 10); }
+          };
+          var agora = function () { try { return Math.round(performance.now()); } catch (e2) { return null; } };
+          var sid = null;
+          try { sid = ss && ss.getItem("core_session_id"); } catch (e3) {}
+          if (!sid) { sid = novoId(); try { if (ss) ss.setItem("core_session_id", sid); } catch (e4) {} }
+          var h = { id: novoId(), t: agora() };
+          window.__portaHtml = h;
+          try { if (ss) ss.setItem("porta-html-v1", JSON.stringify(h)); } catch (e5) {}
+          var ttfb = null;
+          try {
+            var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+            if (nav && nav.responseStart) ttfb = Math.round(nav.responseStart);
+          } catch (e6) {}
+          var ua = navigator.userAgent || "";
+          var plat = /iPhone|iPad|iPod/i.test(ua) ? "ios" : /Android/i.test(ua) ? "android" : "web";
+          var inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|MicroMessenger|TikTok|musical_ly/i.test(ua);
+          var q = {};
+          try {
+            var sp = new URLSearchParams(location.search);
+            var ks = ["utm_source", "utm_campaign", "utm_content", "ad_id", "as_id", "c_id"];
+            for (var i = 0; i < ks.length; i++) { var v = sp.get(ks[i]); if (v) q[ks[i]] = v.slice(0, 200); }
+            if (sp.get("fbclid")) q.tem_fbclid = true;
+          } catch (e7) {}
+          var manda = function (nome, dados) {
+            try {
+              if (typeof fetch !== "function") return;
+              var d = { html_id: h.id, plataforma: plat, in_app: inApp }, k;
+              for (k in q) d[k] = q[k];
+              for (k in dados) d[k] = dados[k];
+              var ps = null;
+              try { ps = ss && ss.getItem("porta-sessao-v1"); } catch (e8) {}
+              if (ps) d.porta_session_id = ps;
+              fetch(URL_EV, {
+                method: "POST",
+                keepalive: true,
+                headers: { "Content-Type": "application/json", apikey: KEY, Authorization: "Bearer " + KEY, Prefer: "return=minimal" },
+                body: JSON.stringify({ user_id: null, event_name: nome, event_data: d, trial_day: null, session_id: sid })
+              })["catch"](function () {});
+            } catch (e9) {}
+          };
+          var visivel = null;
+          try { visivel = document.visibilityState === "visible"; } catch (e10) {}
+          manda("porta_html", { t_ms: h.t, ttfb_ms: ttfb, visivel: visivel });
+
+          var erros = 0;
+          var erro = function (msg) {
+            try {
+              if (erros >= 5 || String(location.pathname).indexOf("/comece") !== 0) return;
+              erros++;
+              var raiz = document.getElementById("root");
+              manda("porta_erro_js", { msg: String(msg || "erro").slice(0, 160), t_ms: agora(), montou: !!(raiz && raiz.children && raiz.children.length) });
+            } catch (e11) {}
+          };
+          // captura: pega também script/CSS NOSSO que não carregou (não borbulha até a window). Pixel de
+          // terceiro bloqueado (bloqueador de anúncio) não conta: não deixa a tela branca e gastaria a cota de 5.
+          window.addEventListener("error", function (e) {
+            var alvo = e && e.target;
+            if (alvo && alvo !== window && alvo.tagName) {
+              var src = String(alvo.src || alvo.href || "");
+              if ((alvo.tagName === "SCRIPT" || alvo.tagName === "LINK") && src.indexOf(location.origin + "/") === 0) erro("recurso: " + src.slice(location.origin.length, location.origin.length + 120));
+              return;
+            }
+            erro((e && e.message) || "erro");
+          }, true);
+          window.addEventListener("unhandledrejection", function (e) {
+            var r = e && e.reason;
+            erro("promise: " + ((r && (r.message || String(r))) || "rejeitada"));
+          });
+        } catch (e12) {}
+      })();
+    </script>
+
+    <script>
       // Apply theme BEFORE React mounts to prevent FOUC (flash of light theme).
       // Keep palette table in sync with src/hooks/use-theme.tsx (paletteVars).
       (function () {

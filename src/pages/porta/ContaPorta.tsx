@@ -1,15 +1,18 @@
-import { useState } from "react";
-import { Check, Eye, EyeOff, Loader2, Lock, Mail, MoreHorizontal } from "lucide-react";
+import { useRef, useState } from "react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MoreHorizontal } from "lucide-react";
 import { BotaoPorta } from "./BotaoPorta";
-import { Eyebrow, PlanoNaConta } from "./telas";
+import { Eyebrow, LinhaDoPlano } from "./telas";
 import type { AreaPorta } from "./conteudo";
 
 /**
- * TELA 4 DA PORTA — a CONTA, com o PLANO no topo (v3, 11/10: a tela do plano com cadeado saiu; o plano
- * aparece inteiro aqui, e logo abaixo "Crie sua conta pra abrir o plano no app.").
+ * TELA 5 DA PORTA — a CONTA (v4, 12/10). O plano inteiro está na tela anterior; aqui fica só 1 linha
+ * ("Seu plano de 3 dias está pronto · 💰 Dinheiro") e o pedido, dito com o que a pessoa GANHA:
  *
- *   · linha de confiança "3 dias grátis no app · sem cobrança hoje" SÓ no iPhone (o teste de 3 dias só
- *     existe lá). NUNCA "sem cartão": a Apple pede forma de pagamento pro teste;
+ *   · iPhone: "Salve seu plano e ganhe 3 dias grátis no app" + "Nada cobrado hoje · cancele quando quiser"
+ *     (o teste de 3 dias só existe no iPhone). NUNCA "sem cartão": a Apple pede forma de pagamento pro teste;
+ *   · Android/computador: "Salve seu plano na sua conta", sem promessa de teste;
+ *   · o botão "Criar conta e salvar" fica SEMPRE ativo (preto): tocou com dado faltando, não envia, diz embaixo
+ *     do campo o que falta e foca o campo (o cinza desabilitado da v3 não dizia nada). Evento porta_conta_erro.
  *
  * Conta (v2, dono 10/10: "não é necessário botar a confirmação de números no Gmail; deixar a opção de
  * criar conta com Google e Apple"):
@@ -45,8 +48,9 @@ const AppleIcon = () => (
 
 export type Resultado = { ok: boolean; erro?: string; existe?: boolean };
 
-function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de 6 caracteres", autoComplete = "new-password" }: {
+function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de 6 caracteres", autoComplete = "new-password", inputRef, erroId }: {
   valor: string; onMudar: (v: string) => void; onEnter: () => void; testid: string; placeholder?: string; autoComplete?: string;
+  inputRef?: React.Ref<HTMLInputElement>; erroId?: string;
 }) {
   const [ver, setVer] = useState(false);
   return (
@@ -54,6 +58,9 @@ function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de
       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9aa3ad]" aria-hidden />
       <input
         id={testid}
+        ref={inputRef}
+        aria-invalid={erroId ? true : undefined}
+        aria-describedby={erroId}
         type={ver ? "text" : "password"}
         autoComplete={autoComplete}
         value={valor}
@@ -61,7 +68,7 @@ function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de
         onKeyDown={(e) => { if (e.key === "Enter") onEnter(); }}
         placeholder={placeholder}
         data-testid={testid}
-        className="w-full h-[52px] rounded-2xl border-2 border-[#ebe7ef] bg-white pl-12 pr-12 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal"
+        className={`w-full h-[52px] rounded-2xl border-2 ${erroId ? "border-[#e5484d]" : "border-[#ebe7ef]"} bg-white pl-12 pr-12 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal`}
       />
       <button type="button" onClick={() => setVer((v) => !v)} aria-label={ver ? "Esconder senha" : "Mostrar senha"} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-[#7d8691]">
         {ver ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -70,29 +77,52 @@ function CampoSenha({ valor, onMudar, onEnter, testid, placeholder = "Mínimo de
   );
 }
 
-/** Só no iPhone (o teste de 3 dias só existe lá). Nunca "sem cartão". */
-export const LINHA_CONFIANCA = "3 dias grátis no app · sem cobrança hoje";
+/** v4: o título e a linha de baixo da conta. A promessa do teste SÓ no iPhone (o teste de 3 dias só existe lá). Nunca "sem cartão". */
+export const TITULO_CONTA_IPHONE = "Salve seu plano e ganhe 3 dias grátis no app";
+export const LINHA_CONFIANCA = "Nada cobrado hoje · cancele quando quiser";
+export const TITULO_CONTA_OUTROS = "Salve seu plano na sua conta";
 
-function TopoComPlano({ rota, dor, mostrarTeste }: { rota: AreaPorta; dor: string | null; mostrarTeste: boolean }) {
+/** As mensagens de campo do "Criar conta e salvar" (o botão nunca fica cinza). */
+export const ERRO_CAMPO = {
+  email_vazio: "Digite seu e-mail",
+  email_invalido: "E-mail inválido",
+  senha: "A senha precisa de 6 letras ou números",
+} as const;
+export type CampoConta = "email" | "senha";
+type ErrosCampo = Partial<Record<CampoConta, string>>;
+type Falta = { campo: CampoConta; motivo: "vazio" | "invalido" | "curta"; msg: string };
+
+/** Puro: o que falta pra criar a conta (vazio = pode enviar). Ordem = ordem dos campos na tela. */
+export function validarConta(email: string, senha: string): Falta[] {
+  const out: Falta[] = [];
+  const e = email.trim();
+  if (!e) out.push({ campo: "email", motivo: "vazio", msg: ERRO_CAMPO.email_vazio });
+  else if (!emailValido(e)) out.push({ campo: "email", motivo: "invalido", msg: ERRO_CAMPO.email_invalido });
+  if (senha.length < SENHA_MIN) out.push({ campo: "senha", motivo: senha.length ? "curta" : "vazio", msg: ERRO_CAMPO.senha });
+  return out;
+}
+
+function TopoDaConta({ rota, mostrarTeste }: { rota: AreaPorta; mostrarTeste: boolean }) {
   return (
     <>
-      <PlanoNaConta rota={rota} dor={dor} />
-      <h1 className="mt-5 text-[21px] font-black tracking-[-0.02em] leading-[1.15] text-balance" data-testid="porta-conta-titulo">Crie sua conta pra abrir o plano no app.</h1>
+      <LinhaDoPlano rota={rota} />
+      <h1 className="mt-2 text-[24px] font-black tracking-[-0.025em] leading-[1.12] text-balance" data-testid="porta-conta-titulo">
+        {mostrarTeste ? TITULO_CONTA_IPHONE : TITULO_CONTA_OUTROS}
+      </h1>
       {mostrarTeste && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[13.5px] font-semibold text-[#3f7d4e]" data-testid="porta-conta-confianca">
-          <Check className="w-4 h-4 shrink-0" strokeWidth={3} aria-hidden />
-          {LINHA_CONFIANCA}
-        </p>
+        <p className="mt-1.5 text-[14px] font-semibold text-[#5b6570]" data-testid="porta-conta-confianca">{LINHA_CONFIANCA}</p>
       )}
     </>
   );
 }
 
-export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta }: {
-  /** o plano do topo: a rota da área e a resposta da dor */
+const ErroDoCampo = ({ id, msg }: { id: string; msg?: string }) =>
+  msg ? <p id={id} className="text-[13px] font-semibold text-[#b42318] mt-1.5 ml-1" role="alert" data-testid={id}>{msg}</p> : null;
+
+export function ContaPorta({ rota, mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta, onErroCampo }: {
+  /** a área do plano (a linha "Seu plano de 3 dias está pronto · …") */
   rota: AreaPorta;
-  dor: string | null;
-  /** iPhone: mostra "3 dias grátis no app · sem cobrança hoje" */
+  /** iPhone: título "Salve seu plano e ganhe 3 dias grátis no app" + "Nada cobrado hoje · cancele quando quiser" */
   mostrarTeste: boolean;
   emInApp: boolean;
   /** "Instagram" | "Facebook" — o nome no aviso do Google */
@@ -106,8 +136,13 @@ export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mos
   onEntrarComSenha: (email: string, senha: string) => Promise<Resultado>;
   onSalvarNestaConta: () => Promise<Resultado>;
   onTrocarConta: () => Promise<void>;
+  /** tocou em "Criar conta e salvar" com campo faltando (o pai manda o porta_conta_erro) */
+  onErroCampo?: (campo: CampoConta, motivo: string) => void;
 }) {
   const [email, setEmail] = useState("");
+  const [errosCampo, setErrosCampo] = useState<ErrosCampo>({});
+  const emailRef = useRef<HTMLInputElement | null>(null);
+  const senhaRef = useRef<HTMLInputElement | null>(null);
   const [senha, setSenha] = useState("");
   const [fase, setFase] = useState<"form" | "existe">("form");
   const [avisoGoogle, setAvisoGoogle] = useState(false);
@@ -128,7 +163,7 @@ export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mos
   if (emailLogado) {
     return (
       <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="logado">
-        <TopoComPlano rota={rota} dor={dor} mostrarTeste={mostrarTeste} />
+        <TopoDaConta rota={rota} mostrarTeste={mostrarTeste} />
         <p className="text-[14.5px] text-[#5b6570] leading-snug mt-3">Você já entrou neste aparelho.</p>
         <div className="mt-3 rounded-2xl border-2 border-[#16121c] bg-white p-4">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[#7d8691]">Sua conta</p>
@@ -172,15 +207,28 @@ export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mos
     );
   }
 
-  const valido = emailValido(alvo) && senha.length >= SENHA_MIN;
-  const criar = () => { if (valido) void rodar("criar", () => onCriarConta(alvo, senha)); };
+  const criar = () => {
+    if (ocupado) return;
+    const falta = validarConta(email, senha);
+    if (falta.length) {
+      // não envia: diz embaixo de cada campo o que falta e leva o cursor pro 1º
+      setErro(null);
+      setErrosCampo(Object.fromEntries(falta.map((f) => [f.campo, f.msg])) as ErrosCampo);
+      for (const f of falta) onErroCampo?.(f.campo, f.motivo);
+      const alvoFoco = falta[0].campo === "email" ? emailRef.current : senhaRef.current;
+      try { alvoFoco?.focus(); } catch { /* noop */ }
+      return;
+    }
+    setErrosCampo({});
+    void rodar("criar", () => onCriarConta(alvo, senha));
+  };
   const tocarGoogle = () => {
     if (emInApp) { setAvisoGoogle(true); onGoogleBloqueado(); return; }
     void rodar("google", onGoogle);
   };
   return (
     <div className="flex-1 flex flex-col" data-testid="porta-conta" data-fase="form">
-      <TopoComPlano rota={rota} dor={dor} mostrarTeste={mostrarTeste} />
+      <TopoDaConta rota={rota} mostrarTeste={mostrarTeste} />
 
       <div className="mt-4 space-y-2.5">
         {mostrarApple && (
@@ -226,20 +274,33 @@ export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mos
         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9aa3ad]" aria-hidden />
         <input
           id="porta-email"
+          ref={emailRef}
+          aria-invalid={errosCampo.email ? true : undefined}
+          aria-describedby={errosCampo.email ? "porta-erro-email" : undefined}
           type="email"
           inputMode="email"
           autoComplete="email"
           autoCapitalize="none"
           spellCheck={false}
           value={email}
-          onChange={(e) => { setEmail(e.target.value); setErro(null); }}
+          onChange={(e) => { setEmail(e.target.value); setErro(null); if (errosCampo.email) setErrosCampo((x) => ({ ...x, email: undefined })); }}
           placeholder="Seu e-mail"
           aria-label="Seu e-mail"
           data-testid="porta-email"
-          className="w-full h-[52px] rounded-2xl border-2 border-[#ebe7ef] bg-white pl-12 pr-4 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal"
+          className={`w-full h-[52px] rounded-2xl border-2 ${errosCampo.email ? "border-[#e5484d]" : "border-[#ebe7ef]"} bg-white pl-12 pr-4 text-[17px] font-semibold text-[#16121c] outline-none focus:border-[#16121c] placeholder:text-[#b8b1c0] placeholder:font-normal`}
         />
       </div>
-      <CampoSenha valor={senha} onMudar={(v) => { setSenha(v); setErro(null); }} onEnter={criar} testid="porta-senha" placeholder="Crie uma senha (mín. 6)" />
+      <ErroDoCampo id="porta-erro-email" msg={errosCampo.email} />
+      <CampoSenha
+        valor={senha}
+        onMudar={(v) => { setSenha(v); setErro(null); if (errosCampo.senha) setErrosCampo((x) => ({ ...x, senha: undefined })); }}
+        onEnter={criar}
+        testid="porta-senha"
+        placeholder="Crie uma senha (mín. 6)"
+        inputRef={senhaRef}
+        erroId={errosCampo.senha ? "porta-erro-senha" : undefined}
+      />
+      <ErroDoCampo id="porta-erro-senha" msg={errosCampo.senha} />
       <p className="text-[12.5px] text-[#7d8691] mt-2 leading-snug">É com esse e-mail e essa senha que você entra no app.</p>
       {erro && <p className="text-[13px] text-[#b42318] mt-2" role="alert">{erro}</p>}
       <p className="text-[11.5px] text-[#9aa3ad] mt-auto pt-4 leading-snug text-center">
@@ -247,7 +308,7 @@ export function ContaPorta({ rota, dor, mostrarTeste, emInApp, appDoWebview, mos
       </p>
       <BotaoPorta
         texto={ocupado === "criar" ? <Loader2 className="w-5 h-5 animate-spin" /> : "Criar conta e salvar"}
-        disabled={!valido || !!ocupado}
+        disabled={!!ocupado}
         onClick={criar}
         testid="porta-criar-conta"
       />

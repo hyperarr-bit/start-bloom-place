@@ -21,6 +21,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { aplicarDecisao, classificarEvento, type EventoRC, type Venda } from "../_shared/afiliados.ts";
+import { MARCADOR, decidirCapiPorta, montarEventoCapiPorta, tipoDoEvento, type EventoRCPorta, type PortaDaConta } from "../_shared/porta-capi.ts";
 
 const log = (step: string, d?: unknown) =>
   console.log(`[RC-WEBHOOK] ${step}${d ? ` - ${JSON.stringify(d)}` : ""}`);
@@ -85,6 +86,9 @@ serve(async (req) => {
       // pagamento — quem teve o cartão recusado quase nunca abre o app de
       // novo. Nunca derruba o webhook: o estado já foi reconciliado acima.
       if (ev.type === "BILLING_ISSUE" && ev.store === "APP_STORE") await avisarCobrancaRecusada(uid);
+      // PORTA (12/10): teste/1ª cobrança de conta da /comece como evento de SITE na CAPI do pixel do site.
+      // Desligado sem PORTA_CAPI_TRIAL="on" (aí não faz nem consulta). Nunca derruba o webhook.
+      if (Deno.env.get("PORTA_CAPI_TRIAL") === "on") await capiPortaDoSite(admin, ev as EventoRCPorta, u.user).catch((e) => log("porta capi ERRO", { msg: String(e).slice(0, 160) }));
     }
 
     return json({ received: true, resultados, afiliada });
@@ -147,6 +151,47 @@ async function registrarVendaAfiliada(admin: ReturnType<typeof createClient>, ev
   if (error) throw new Error(`afiliado_vendas update: ${error.message}`);
   log("afiliados: venda atualizada", { tipo: d.tipo, status: ap.campos.status ?? "(igual)", comissao: ap.campos.comissao_cents });
   return { acao: "atualizar", status: ap.campos.status ?? null, comissao_cents: ap.campos.comissao_cents ?? null };
+}
+
+/**
+ * PORTA → CAPI DO SITE (12/10, atrás de PORTA_CAPI_TRIAL="on").
+ *
+ * Conta com user_metadata.porta: INITIAL_PURCHASE de teste → StartTrial; a 1ª cobrança do anual → Purchase
+ * (valor em BRL). Vai pro pixel do SITE (META_PIXEL_ID/META_CAPI_TOKEN — os mesmos da CAPI de compras do
+ * Cakto e do CompleteRegistration da porta-handoff), action_source "website", com fbc/fbp do clique e
+ * em/external_id em SHA-256, SEM IP/UA. event_id determinístico (porta_trial_<id do evento>) e 1x por conta
+ * (analytics_events porta_capi_trial / porta_capi_pago). Regras e montagem: ../_shared/porta-capi.ts.
+ * Não toca em nada do resto do webhook (subscriptions, CAPI de app, TikTok, afiliados).
+ */
+async function capiPortaDoSite(
+  admin: ReturnType<typeof createClient>,
+  ev: EventoRCPorta,
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
+): Promise<void> {
+  const porta = ((user.user_metadata ?? {}) as { porta?: PortaDaConta }).porta ?? null;
+  const tipo = tipoDoEvento(ev);
+  if (!porta || !tipo) return; // conta fora da Porta, ou evento que não interessa: sai sem consultar nada
+  const pixelId = Deno.env.get("META_PIXEL_ID");
+  const token = Deno.env.get("META_CAPI_TOKEN");
+  if (!pixelId || !token) { log("porta capi: sem secrets"); return; }
+  const { data: ja } = await admin.from("analytics_events").select("id").eq("event_name", MARCADOR[tipo]).eq("user_id", user.id).limit(1);
+  const d = decidirCapiPorta({ ligado: true, ev, porta, jaEnviado: !!ja?.length });
+  if (!d.manda) { log("porta capi: não manda", { motivo: d.motivo }); return; }
+  const evento = await montarEventoCapiPorta({ tipo: d.tipo, ev, uid: user.id, email: user.email ?? null, porta });
+  const r = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: [evento] }),
+  });
+  const corpo = (await r.text()).slice(0, 200);
+  log("porta capi", { tipo: d.tipo, ok: r.ok, status: r.status, corpo });
+  // só marca quando a Meta aceitou: recusa = o próximo evento (ou reenvio) tenta de novo
+  if (r.ok) {
+    await admin.from("analytics_events").insert({
+      user_id: user.id,
+      event_name: MARCADOR[d.tipo],
+      event_data: { ok: true, event_id: evento.event_id, evento: evento.event_name, valor: (evento.custom_data as { value?: number }).value ?? null, rc_tipo: ev.type ?? null },
+      session_id: null,
+    });
+  }
 }
 
 /** Chama a cobranca-recusada (ela confere o estado no RevenueCat, evita

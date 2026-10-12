@@ -15,6 +15,8 @@ export type Opcao = { id: string; emoji: string; label: string; sub?: string };
 
 /** Tela 1 (v3, 11/10): a abertura, a área e a dor numa tela só. Sem vídeo, sem mockup. */
 export const TITULO_ABERTURA = "Organize sua vida em 3 dias.";
+/** v4 (12/10): o esforço e o custo ditos na 1ª dobra, junto do título (como a Dinzo: "Diagnóstico gratuito · 5 perguntas"). */
+export const SELO_ABERTURA = "Grátis · 3 perguntas · 30 segundos";
 /** "Tudo" segue pela rota do dinheiro (Finanças), como no app. */
 export const PERGUNTA_AREA = "O que você quer arrumar primeiro?";
 export const OPCOES_AREA: Array<Opcao & { id: EscolhaPorta }> = [
@@ -206,8 +208,8 @@ export type ComSem =
   | (Base & { tipo: "reais" | "treinos"; sem: number[]; com: number[]; valor: number; estimado: boolean })
   | (Base & { tipo: "copy"; linhasSem: string[]; linhasCom: string[] });
 
-/** v3: a tela do plano saiu; o com × sem leva direto pra conta (o plano mora no topo dela). */
-export const CTA_COM_SEM = "Criar minha conta";
+/** v4 (12/10): a tela do plano VOLTOU entre o com × sem e a conta (na v2, plano→conta era 33%; a v3 sem ela, 23%). */
+export const CTA_COM_SEM = "Ver meu plano de 3 dias";
 
 export const COPY_SEM_COM: Record<"rotina" | "metas" | "saude", { sem: string[]; com: string[] }> = {
   rotina: {

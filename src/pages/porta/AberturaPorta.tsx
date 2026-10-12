@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { OpcoesPorta } from "./telas";
-import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, TITULO_ABERTURA, rotaDe, type EscolhaPorta, type Opcao } from "./conteudo";
+import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, SELO_ABERTURA, TITULO_ABERTURA, rotaDe, type EscolhaPorta, type Opcao } from "./conteudo";
+
+/** O ícone do app (o mesmo do manifest/PWA e da App Store: public/icon-192.png, 5 KB). Não é desenho novo. */
+export const LOGO_PORTA = "/icon-192.png";
 
 /**
  * TELA 1 DA PORTA (v3, dono 11/10: "quero algo mais rápido; tirar a tela do mockup e unir").
@@ -14,6 +17,10 @@ import { ABERTURA_TUDO, OPCOES_AREA, PERGUNTA_AREA, PERGUNTA_DOR, TITULO_ABERTUR
  *     trocar a área troca a pergunta;
  *   · tocou numa resposta → avança. Sem botão "Continuar".
  *   · "Já tem conta? Entrar" discreto no fim.
+ *
+ * v4 (12/10): no iPhone só 31% passavam desta tela. Em cima do título, o ícone do CORE (o da App Store, pra a
+ * pessoa saber que é um app e reconhecer depois na loja) e o selo "Grátis · 3 perguntas · 30 segundos" (o
+ * esforço e o custo ditos antes de pedir o 1º toque). O resto igual.
  */
 export function AberturaPorta({ escolha, onArea, onDor, onEntrar }: {
   /** a área já escolhida (voltou da tela 2, ou o estado salvo) */
@@ -58,6 +65,16 @@ export function AberturaPorta({ escolha, onArea, onDor, onEntrar }: {
 
   return (
     <div className="flex-1 flex flex-col pb-4" data-testid="porta-abertura" data-area={area ?? undefined}>
+      <div className="flex items-center gap-2.5 mb-4" data-testid="porta-abertura-topo">
+        <img
+          src={LOGO_PORTA} alt="CORE" width={34} height={34} decoding="async"
+          className="w-[34px] h-[34px] rounded-[9px] border border-[#ebe7ef] shadow-[0_1px_2px_rgba(22,18,28,.06)]"
+          data-testid="porta-logo"
+        />
+        <span className="inline-flex items-center h-7 px-2.5 rounded-full bg-[#f4f1f6] text-[12.5px] font-bold text-[#4f5a64]" data-testid="porta-selo">
+          {SELO_ABERTURA}
+        </span>
+      </div>
       <motion.h1
         className="text-[34px] font-black tracking-[-0.035em] leading-[1.04] text-balance"
         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}

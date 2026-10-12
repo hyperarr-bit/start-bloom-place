@@ -53,3 +53,45 @@ export function htmlPorta({ email, metodo, codigo }: { email: string; metodo: st
   <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;">Você recebeu este e-mail porque salvou um plano no CORE agora há pouco.</p>
 </div></body></html>`;
 }
+
+/* ------------------------------------------------------------------ v4 (12/10): o LEMBRETE
+ *
+ * Pra quem criou a conta na /comece e não entrou no app (ação "lembretes" do porta-handoff, cron a cada
+ * 15 min — ver ./porta-lembretes.ts). Mesma cara do e-mail acima, com um código NOVO no botão (o de 24 h pode
+ * ter vencido ou sido usado), a reserva https e os 3 passos. Lembra a resposta dela ("Você disse: …") e que
+ * os 3 dias grátis começam quando ela entra — só vai pra iPhone, onde o teste existe. Sem preço.
+ */
+export const ASSUNTO_LEMBRETE: Record<1 | 2, string> = {
+  1: "Seu plano de 3 dias está te esperando",
+  2: "Seu Dia 1 ainda está te esperando",
+};
+
+export function htmlLembrete({ email, metodo, codigo, n, dor }: { email: string; metodo: string; codigo: string; n: 1 | 2; dor?: string | null }): string {
+  const e = esc(email);
+  const passo3 = metodo === "google"
+    ? `Toque em <b>“Continuar com Google”</b> e escolha <b>${e}</b>.`
+    : metodo === "apple"
+      ? `Toque em <b>“Continuar com a Apple”</b>.`
+      : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
+  const passo = (k: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 14px 0;"><div style="width:26px;height:26px;border-radius:13px;background:#d22d80;color:#fff;font-weight:900;font-size:13px;line-height:26px;text-align:center;">${k}</div></td><td style="vertical-align:top;padding:3px 0 14px;font-size:15px;line-height:1.45;color:#16121c;">${t}</td></tr>`;
+  const titulo = n === 1 ? "Seu plano de 3 dias está te esperando no app." : "Seu Dia 1 continua pronto no app.";
+  const dorTxt = dor ? `<p style="font-size:15px;line-height:1.5;margin:0 0 6px;color:#16121c;">Você disse: <b>“${esc(dor)}”</b>. O Dia 1 já está montado pra isso.</p>` : "";
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(ASSUNTO_LEMBRETE[n])}</title></head><body style="margin:0;background:#f6f3f5;font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#16121c;">
+<div style="max-width:520px;margin:0 auto;padding:28px 20px;">
+  <div style="background:#fff;border-radius:16px;padding:26px 22px;border:1px solid #e9e2e6;">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#8a838f;text-transform:uppercase;">${n === 1 ? "Seu plano está salvo" : "Ainda dá tempo"}</div>
+    <h1 style="font-size:22px;line-height:1.25;margin:10px 0 10px;">${titulo}</h1>
+    ${dorTxt}
+    <p style="font-size:15px;line-height:1.5;margin:0 0 18px;color:#5b5560;">Seus 3 dias grátis começam quando você entrar. Sua conta: <b style="color:#16121c;">${e}</b></p>
+    <a href="${esc(linkDoApp(codigo))}" style="display:block;text-align:center;background:#16121c;color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:15px 18px;border-radius:999px;margin:6px 0 10px;">Entrar no CORE</a>
+    <p style="font-size:12.5px;color:#5b5560;line-height:1.5;margin:0 0 20px;text-align:center;">Com o app instalado, o botão abre o CORE já na sua conta.<br>Não abriu? <a href="${esc(linkDeReserva(codigo))}" style="color:#d22d80;font-weight:700;">Toque aqui</a></p>
+    <p style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#8a838f;text-transform:uppercase;margin:0 0 10px;">Ainda não tem o app?</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      ${passo(1, `Baixe o <b>CORE</b> no celular: <a href="${SITE}/baixar?origem=porta_lembrete${n}" style="color:#d22d80;font-weight:700;">App Store</a>.`)}
+      ${passo(2, "Abra o app e toque em <b>“Entrar”</b>, logo abaixo do botão Começar. Não toque em “Começar”.")}
+      ${passo(3, passo3)}
+    </table>
+  </div>
+  <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;">Você recebeu este e-mail porque salvou um plano no CORE${n === 1 ? " há pouco" : " ontem"}.</p>
+</div></body></html>`;
+}

@@ -5,8 +5,8 @@ import { BotaoPorta } from "./BotaoPorta";
 import { NOME_DA_AREA, formatarReais, mesCurto, planoDe3Dias, type AreaPorta, type ComSem, type Opcao } from "./conteudo";
 
 /**
- * As peças da Porta (/comece, v3): as opções de 1 toque (tela 1 e tela 2), o
- * "com × sem o CORE" (tela 3) e o plano de 3 dias que mora no topo da conta. Visual planner:
+ * As peças da Porta (/comece, v4): as opções de 1 toque (tela 1 e tela 2), o
+ * "com × sem o CORE" (tela 3) e o plano de 3 dias (tela 4, antes da conta). Visual planner:
  * branco, grafite #16121c, magenta só no detalhe, Inter herdada.
  */
 const GRAFITE = "#16121c";
@@ -88,7 +88,7 @@ export function PerguntaPorta({ eyebrow, titulo, opcoes, onEscolher, testid }: {
   );
 }
 
-/* ------------------------------------------------ tela 4: com × sem */
+/* ------------------------------------------------ tela 3: com × sem */
 
 export function ComSemPorta({ dados, hoje = new Date(), onNext }: { dados: ComSem; hoje?: Date; onNext: () => void }) {
   return (
@@ -190,37 +190,73 @@ function Grafico({ dados, hoje }: { dados: Extract<ComSem, { tipo: "reais" | "tr
   );
 }
 
-/* ------------------------------------------------ o plano, no topo da tela da conta (v3) */
+/* ------------------------------------------------ tela 4: o plano de 3 dias (v4) */
 
 /**
- * v3 (dono 11/10: o cadeado e o "Desbloquear meu plano" tinham cara de pagamento): a tela do plano saiu e o
- * plano virou o TOPO da conta. Os 3 dias aparecem inteiros, legíveis — sem borrão, sem cadeado.
- * O Dia 1 sai da DOR ("Porque você disse: …"); os Dias 2 e 3 são os degraus da área.
+ * v4 (12/10, dono "faz as 6"): a tela do plano VOLTA entre o com × sem e a conta. Na v2 (com ela) 33% das
+ * pessoas que viam a conta criavam; na v3 (plano + formulário juntos) 23% — o "momento de ganho" antes do
+ * pedido fazia falta.
+ *
+ * Igual à v2, MENOS o cadeado (dono 11/10: cadeado e "Desbloquear" tinham cara de pagamento):
+ *   · "Seu plano de 3 dias"; Dia 1 aberto, com a ação da DOR e "Porque você disse: …";
+ *   · Dias 2 e 3 à vista, mas esmaecidos e borrados (dá pra ver que tem coisa ali; dá vontade);
+ *   · "Os dias 2 e 3 ficam salvos na sua conta." e o botão "Salvar meu plano grátis" (sem ícone).
  */
-export function PlanoNaConta({ rota, dor }: { rota: AreaPorta; dor: string | null }) {
+export function PlanoPorta({ rota, dor, onSalvar }: { rota: AreaPorta; dor: string | null; onSalvar: () => void }) {
   const plano = planoDe3Dias(rota, dor);
   const info = NOME_DA_AREA[rota];
   return (
-    <div data-testid="porta-plano">
-      <p className="text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: COR_COM }} data-testid="porta-plano-eyebrow">Seu plano de 3 dias está pronto</p>
-      <div className="mt-2.5 rounded-2xl border border-[#ebe7ef] bg-[#faf9fb] px-4 py-3.5" data-testid="porta-plano-card">
-        <div data-testid="porta-plano-dia1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="rounded-md bg-[#16121c] text-white text-[10.5px] font-extrabold tracking-[0.06em] uppercase px-2 py-[3px]">Dia 1 · hoje</span>
-            <span className="text-[12px] font-semibold text-[#7d8691]"><span aria-hidden>{info.emoji}</span> {info.nome}</span>
-          </div>
-          <p className="text-[16.5px] font-extrabold leading-snug text-[#16121c] mt-2 text-pretty">{plano.dia1}</p>
-          {plano.motivo && <p className="text-[12.5px] text-[#7d8691] mt-0.5">Porque você disse: “{plano.motivo}”</p>}
+    <div className="flex-1 flex flex-col" data-testid="porta-plano">
+      <Eyebrow>Feito com as suas respostas</Eyebrow>
+      <h1 className="text-[26px] font-black tracking-[-0.025em] leading-[1.1] mt-1.5" data-testid="porta-plano-titulo">Seu plano de 3 dias</h1>
+
+      <div className="mt-5 rounded-2xl border-2 border-[#16121c] bg-white p-4" data-testid="porta-plano-card">
+        <div className="flex items-center gap-2">
+          <span className="text-[18px] leading-none" aria-hidden>{info.emoji}</span>
+          <span className="text-[12px] font-extrabold uppercase tracking-[0.1em] text-[#16121c]">{info.nome}</span>
         </div>
-        <div className="mt-3 pt-3 border-t border-[#ebe7ef] space-y-1.5">
+
+        <motion.div className="mt-3.5" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25 }} data-testid="porta-plano-dia1">
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-[#16121c] text-white text-[10.5px] font-extrabold tracking-wide px-2 py-[3px]">DIA 1</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: COR_COM }}>Hoje</span>
+          </div>
+          <p className="text-[17px] font-extrabold leading-snug text-[#16121c] mt-2 text-pretty">{plano.dia1}</p>
+          {plano.motivo && <p className="text-[13px] text-[#7d8691] mt-1">Porque você disse: “{plano.motivo}”</p>}
+        </motion.div>
+
+        <div className="mt-4 pt-3.5 border-t border-[#ebe7ef] space-y-3">
           {[plano.dia2, plano.dia3].map((t, i) => (
-            <p key={t} className="flex items-baseline gap-2.5 text-[13.5px] leading-snug text-[#4f5a64]" data-testid={`porta-plano-dia${i + 2}`}>
-              <span className="shrink-0 w-[38px] text-[11px] font-extrabold uppercase tracking-[0.06em] text-[#9aa3ad]">Dia {i + 2}</span>
-              <span className="text-pretty">{t}</span>
-            </p>
+            <motion.div
+              key={t}
+              className="grid grid-cols-[52px_1fr] gap-2 items-center"
+              data-testid={`porta-plano-dia${i + 2}`}
+              data-esmaecido=""
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.12, duration: 0.3 }}
+            >
+              <span className="rounded-md bg-[#efedf2] text-[#7d8691] text-[10.5px] font-extrabold tracking-wide text-center py-[3px]">DIA {i + 2}</span>
+              {/* esmaecido + borrado: a forma do texto aparece, a frase não (sem cadeado, sem "trancado") */}
+              <span className="text-[14px] font-semibold leading-snug text-[#16121c] select-none" style={{ filter: "blur(3.5px)", opacity: 0.55 }} aria-hidden>{t}</span>
+            </motion.div>
           ))}
         </div>
       </div>
+
+      <p className="mt-4 text-[14px] leading-snug text-[#5b6570]" data-testid="porta-plano-nota">Os dias 2 e 3 ficam salvos na sua conta.</p>
+
+      <BotaoPorta texto="Salvar meu plano grátis" seta={false} onClick={onSalvar} testid="porta-salvar-plano" />
     </div>
+  );
+}
+
+/** v4: a conta mostra só 1 linha do plano (o plano inteiro está na tela anterior). "Seu plano de saúde" seria
+ *  o convênio médico — por isso a área vai depois, com o emoji, e não "plano de <área>". */
+export function LinhaDoPlano({ rota }: { rota: AreaPorta }) {
+  const info = NOME_DA_AREA[rota];
+  return (
+    <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-[#3f7d4e]" data-testid="porta-conta-plano">
+      <Check className="w-4 h-4 shrink-0" strokeWidth={3} aria-hidden />
+      <span>Seu plano de 3 dias está pronto · <span aria-hidden>{info.emoji}</span> {info.nome}</span>
+    </p>
   );
 }

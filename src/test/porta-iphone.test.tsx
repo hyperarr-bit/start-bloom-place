@@ -1,14 +1,18 @@
 /**
- * PORTA iPHONE (/comece) — v3 (11/10): TELA 1 abertura + área + dor (a pergunta aparece na mesma
- * tela) → TELA 2 o número → TELA 3 com × sem → TELA 4 CONTA com o plano no topo (a tela do plano
- * saiu) → "Último passo" → tela 7 (App Store → "Entrar" no app).
+ * PORTA iPHONE (/comece) — v4 (12/10): TELA 1 (ícone + "Grátis · 3 perguntas · 30 segundos") abertura
+ * + área + dor (a pergunta aparece na mesma tela) → TELA 2 o número → TELA 3 com × sem ("Ver meu plano
+ * de 3 dias") → TELA 4 o PLANO (voltou; sem cadeado; "Salvar meu plano grátis") → TELA 5 CONTA (1 linha
+ * do plano; título por aparelho; botão sempre ativo) → "Último passo" → tela 7 (App Store → "Entrar").
  *
  * O que não pode quebrar:
  *   · a dor e o número são as MESMAS perguntas do funil novo do app, área por área (v2, dono);
  *   · a dor aparece na tela 1 ao escolher a área, e troca quando a área troca;
- *   · sem tela de plano, sem cadeado, sem "Desbloquear": o plano está no topo da conta;
- *   · "3 dias grátis no app · sem cobrança hoje" só no iPhone; NUNCA "sem cartão";
- *   · o estado salvo da v2 (welcome/area/p2/plano) cai no equivalente novo;
+ *   · a tela do plano entre o com × sem e a conta, SEM cadeado (nem no botão) e sem "Desbloquear";
+ *   · conta: "Salve seu plano e ganhe 3 dias grátis no app" + "Nada cobrado hoje · cancele quando quiser"
+ *     só no iPhone; Android/computador "Salve seu plano na sua conta"; NUNCA "sem cartão";
+ *   · "Criar conta e salvar" nunca desabilita: diz o que falta embaixo do campo e foca;
+ *   · o estado salvo das versões antigas (welcome/area/p2 → tela 1; plano e conta ficam) cai no equivalente;
+ *   · porta_view com tempo_ms e o html_id do index.html;
  *   · o com × sem usa o número da resposta (R$ do gasto dela, treinos), como o app;
  *   · o fluxo inteiro, com o app nativo NUNCA montando /comece;
  *   · conta: Apple, Google (no Instagram: aviso, sem OAuth) e e-mail + senha, sem código;
@@ -133,10 +137,17 @@ const ateComSem = async (area: string, dor: string, numero: string) => {
   await escolher(dor, "porta-p3");
   await escolher(numero, "porta-comsem");
 };
-/** até a tela da conta, numa área, com as respostas dadas */
-const ateConta = async (area: string, dor: string, numero: string) => {
+/** até a tela do plano (v4), numa área, com as respostas dadas */
+const atePlano = async (area: string, dor: string, numero: string) => {
   await ateComSem(area, dor, numero);
   fireEvent.click(screen.getByTestId("porta-comsem-cta"));
+  await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
+  conferirCopy();
+};
+/** até a tela da conta, numa área, com as respostas dadas */
+const ateConta = async (area: string, dor: string, numero: string) => {
+  await atePlano(area, dor, numero);
+  fireEvent.click(screen.getByTestId("porta-salvar-plano"));
   await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
   conferirCopy();
 };
@@ -243,8 +254,15 @@ describe("a dor (tela 1) e o número (tela 2) são as MESMAS perguntas do funil 
 });
 
 describe("tela 1 — abertura + área + dor numa tela só (v3)", () => {
-  it("vazia: título, prova social, as 6 áreas, sem pergunta, sem botão, 'Já tem conta? Entrar'", () => {
+  it("vazia: ícone do CORE + selo, título, prova social, as 6 áreas, sem pergunta, sem botão, 'Já tem conta? Entrar'", () => {
     montar();
+    // v4: o ícone do app (o asset que já existe: manifest/PWA) e o selo do esforço, junto do título
+    expect(screen.getByTestId("porta-logo").getAttribute("src")).toBe("/icon-192.png");
+    expect(screen.getByTestId("porta-logo").getAttribute("alt")).toBe("CORE");
+    expect(readFileSync(join(process.cwd(), "public/icon-192.png")).length).toBeLessThan(20_000);
+    expect(screen.getByTestId("porta-selo").textContent).toBe("Grátis · 3 perguntas · 30 segundos");
+    const topo = screen.getByTestId("porta-abertura-topo");
+    expect(topo.compareDocumentPosition(screen.getByTestId("porta-abertura-titulo")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId("porta-abertura-titulo").textContent).toBe("Organize sua vida em 3 dias.");
     expect(screen.getByTestId("porta-prova").textContent).toBe("★★★★★ +1000 pessoas organizando a vida");
     expect(rotulos("porta-area")).toEqual(["Dinheiro", "Rotina", "Corpo", "Saúde", "Metas", "Tudo"]);
@@ -293,7 +311,7 @@ describe("tela 1 — abertura + área + dor numa tela só (v3)", () => {
   });
 });
 
-describe("estado salvo da v2 (porta-estado-v1) cai no equivalente novo", () => {
+describe("estado salvo das versões antigas (porta-estado-v1) cai no equivalente novo", () => {
   const salvo = (passo: string, extra: Record<string, unknown> = {}) =>
     localStorage.setItem("porta-estado-v1", JSON.stringify({ passo, escolha: "rotina", p2: "celular", p3: "semana", eventId: "porta_cr_antigo1", metodo: null, email: null, ...extra }));
 
@@ -315,12 +333,24 @@ describe("estado salvo da v2 (porta-estado-v1) cai no equivalente novo", () => {
     expect(screen.queryByTestId("porta-dor")).toBeNull();
   });
 
-  it("'plano' → a conta, com o plano no topo", () => {
+  it("'plano' (v2) → a tela do plano de novo (v4), com o Dia 1 da dor", () => {
     salvo("plano");
     montar();
-    expect(screen.getByTestId("porta-conta")).toBeInTheDocument();
+    expect(screen.getByTestId("porta").getAttribute("data-passo")).toBe("plano");
     expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Troca 15 minutos de celular por 1 hábito e marca");
+    expect(screen.queryByTestId("porta-conta")).toBeNull();
+    expect(eventos("porta_passo")).toHaveLength(0);
+  });
+
+  it("'conta' (v3) → continua na conta (sem o plano inteiro; 1 linha dele); voltar leva ao plano", async () => {
+    salvo("conta");
+    montar();
+    expect(screen.getByTestId("porta-conta")).toBeInTheDocument();
+    expect(screen.queryByTestId("porta-plano")).toBeNull();
+    expect(screen.getByTestId("porta-conta-plano").textContent).toBe("Seu plano de 3 dias está pronto · 📅 Rotina");
     expect(eventos("porta_passo").at(-1)).toMatchObject({ passo: "conta", resposta: "view" });
+    fireEvent.click(screen.getByTestId("porta-voltar"));
+    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
   });
 
   it("'comsem' continua onde estava; passo desconhecido cai na tela 1 do zero", () => {
@@ -336,9 +366,10 @@ describe("estado salvo da v2 (porta-estado-v1) cai no equivalente novo", () => {
 });
 
 describe("com × sem usa o número da resposta (como o GraficoComSem do app)", () => {
-  it("'R$ 100 a R$ 300' → R$ 300 por mês, R$ 900 em 3 meses; botão 'Criar minha conta', sem 'estimativa'", async () => {
+  it("'R$ 100 a R$ 300' → R$ 300 por mês, R$ 900 em 3 meses; botão 'Ver meu plano de 3 dias', sem 'estimativa'", async () => {
     await ateComSem("dinheiro", "gasto_sem_perceber", "100_300");
-    expect(screen.getByTestId("porta-comsem-cta").textContent).toBe("Criar minha conta");
+    expect(screen.getByTestId("porta-comsem-cta").textContent).toBe("Ver meu plano de 3 dias");
+    expect(screen.getByTestId("porta-comsem-cta").querySelector("svg")).not.toBeNull(); // a seta →
     expect(texto()).not.toMatch(/estimativa/i);
     expect(screen.getByTestId("porta-comsem").getAttribute("data-tipo")).toBe("reais");
     expect(screen.getByTestId("porta-comsem-titulo").textContent).toBe(`R$ 300 somem por mês.Até ${mesAlvo(new Date())}, R$ 900 sem rastro.`);
@@ -361,7 +392,7 @@ describe("com × sem usa o número da resposta (como o GraficoComSem do app)", (
 
 /* ---------------------------------------------------------------- fluxo inteiro */
 describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-mail e senha", () => {
-  it("4 telas até a conta, plano no topo dela, Google bloqueado com aviso, conta com a campanha, CompleteRegistration, loja e volta da aba", async () => {
+  it("5 telas até a conta (com o plano antes dela), Google bloqueado com aviso, botão sempre ativo, conta com a campanha, CompleteRegistration, loja e volta da aba", async () => {
     montar();
     // 1. abertura + área + dor
     expect(screen.getByTestId("porta-abertura-titulo").textContent).toBe("Organize sua vida em 3 dias.");
@@ -378,22 +409,38 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     await escolher("300_500", "porta-comsem");
     fireEvent.click(screen.getByTestId("porta-comsem-cta"));
 
-    // 4. conta, com o PLANO no topo: Dia 1 da DOR, dias 2 e 3 = os degraus do app que ela não cobre, inteiros
-    await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
-    expect(screen.queryByTestId("porta-desbloquear")).toBeNull();
-    expect(screen.getByTestId("porta-plano-eyebrow").textContent).toBe("Seu plano de 3 dias está pronto");
-    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Dia 1 · hoje");
+    // 4. o PLANO (v4, voltou): Dia 1 da DOR aberto; dias 2 e 3 = os degraus que ela não cobre, esmaecidos
+    await waitFor(() => expect(screen.getByTestId("porta-plano")).toBeInTheDocument());
+    expect(screen.getByTestId("porta-plano-titulo").textContent).toBe("Seu plano de 3 dias");
+    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("DIA 1");
     expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Anota os gastos de hoje e vê quanto somam");
     expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Porque você disse: “Gasto sem perceber”");
-    expect(screen.getByTestId("porta-plano-dia2").textContent).toBe(`Dia 2${DIAS_POR_AREA.dinheiro[1]}`);
-    expect(screen.getByTestId("porta-plano-dia3").textContent).toBe(`Dia 3${DIAS_POR_AREA.dinheiro[2]}`);
+    expect(screen.getByTestId("porta-plano-dia2").textContent).toBe(`DIA 2${DIAS_POR_AREA.dinheiro[1]}`);
+    expect(screen.getByTestId("porta-plano-dia3").textContent).toBe(`DIA 3${DIAS_POR_AREA.dinheiro[2]}`);
     for (const d of ["porta-plano-dia2", "porta-plano-dia3"]) {
       const el = screen.getByTestId(d);
+      expect(el.hasAttribute("data-esmaecido")).toBe(true);
+      expect(el.outerHTML).toMatch(/blur/);
       expect(el.hasAttribute("data-trancado")).toBe(false);
-      expect(el.outerHTML).not.toMatch(/blur/);
     }
-    expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Crie sua conta pra abrir o plano no app.");
-    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("3 dias grátis no app · sem cobrança hoje");
+    expect(screen.getByTestId("porta-plano-nota").textContent).toBe("Os dias 2 e 3 ficam salvos na sua conta.");
+    // botão SEM cadeado (dono: cadeado = cara de pagamento); nada de "Desbloquear"
+    const salvar = screen.getByTestId("porta-salvar-plano");
+    expect(salvar.textContent).toBe("Salvar meu plano grátis");
+    expect(salvar.querySelector("svg")).toBeNull();
+    expect(screen.getByTestId("porta-plano").querySelector(".lucide-lock")).toBeNull();
+    expect(screen.queryByTestId("porta-desbloquear")).toBeNull();
+    expect(screen.queryByTestId("porta-conta")).toBeNull();
+    conferirCopy();
+    fireEvent.click(salvar);
+
+    // 5. conta: 1 linha do plano (não o plano inteiro) + o que ela ganha (iPhone)
+    await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+    expect(screen.queryByTestId("porta-plano")).toBeNull();
+    expect(screen.queryByTestId("porta-plano-dia1")).toBeNull();
+    expect(screen.getByTestId("porta-conta-plano").textContent).toBe("Seu plano de 3 dias está pronto · 💰 Dinheiro");
+    expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Salve seu plano e ganhe 3 dias grátis no app");
+    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("Nada cobrado hoje · cancele quando quiser");
     // Apple e Google visíveis; Google no Instagram = aviso, sem OAuth
     expect(screen.getByTestId("porta-apple").textContent).toContain("Continuar com a Apple");
     expect(screen.getByTestId("porta-google").textContent).toContain("Continuar com o Google");
@@ -409,11 +456,15 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
     expect(q.get("utm_campaign")).toBe("porta_teste");
     conferirCopy();
 
-    // e-mail + senha (sem código)
-    expect((screen.getByTestId("porta-criar-conta") as HTMLButtonElement).disabled).toBe(true);
+    // e-mail + senha (sem código). v4: o botão nunca fica cinza; tocar sem dado diz o que falta
+    expect((screen.getByTestId("porta-criar-conta") as HTMLButtonElement).disabled).toBe(false);
     preencherSenha(" Ana@Exemplo.com ", "12345");
-    expect((screen.getByTestId("porta-criar-conta") as HTMLButtonElement).disabled).toBe(true); // senha < 6
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    expect(screen.getByTestId("porta-erro-senha").textContent).toBe("A senha precisa de 6 letras ou números");
+    expect(screen.queryByTestId("porta-erro-email")).toBeNull();
+    expect(signUp).not.toHaveBeenCalled();
     fireEvent.change(screen.getByTestId("porta-senha"), { target: { value: "segredo1" } });
+    expect(screen.queryByTestId("porta-erro-senha")).toBeNull(); // digitar no campo apaga o aviso dele
     let portaEnviada: Record<string, unknown> | null = null;
     signUp.mockImplementation(async (arg: { options: { data: { porta: Record<string, unknown> } } }) => {
       portaEnviada = arg.options.data.porta;
@@ -457,10 +508,12 @@ describe("fluxo inteiro — DINHEIRO, no Instagram do iPhone, conta nova por e-m
       ["area", "dinheiro", "dinheiro"],
       ["p2", "dinheiro", "Gasto sem perceber"],
       ["p3", "dinheiro", "R$ 300 a R$ 500"],
-      ["comsem", "dinheiro", "criar_conta"],
+      ["comsem", "dinheiro", "ver_plano"],
+      ["plano", "dinheiro", "salvar"],
       ["conta", "dinheiro", "view"],
       ["instrucao", "dinheiro", "baixar"],
     ]);
+    expect(eventos("porta_conta_erro")).toEqual([expect.objectContaining({ campo: "senha", motivo: "curta", ad_id: "333" })]);
   });
 
   it("'Abrir no navegador': a URL com pe/ps abre direto na conta, com as respostas e a MESMA sessão", async () => {
@@ -532,22 +585,51 @@ describe("ROTINA no Safari, conta pelo Google; Apple; Android", () => {
     expect(screen.getByTestId("porta-google")).toBeInTheDocument();
   });
 
-  it("Android e computador: o plano no topo da conta, SEM a linha do teste grátis (só existe no iPhone)", async () => {
+  it("Android e computador: plano igual; conta 'Salve seu plano na sua conta', SEM promessa de teste (só existe no iPhone)", async () => {
     for (const v of [UA.android, UA.mac]) {
       cleanup(); _zerarEstadoPorta(); _zerarMemoriaPorta(); localStorage.clear(); sessionStorage.clear();
       ua(v);
-      await ateConta("dinheiro", "esqueco_contas", "nao_sei");
+      await atePlano("dinheiro", "esqueco_contas", "nao_sei");
       expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Coloca as contas do mês e recebe aviso antes de vencer");
-      expect(screen.getByTestId("porta-conta-titulo")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("porta-salvar-plano"));
+      await waitFor(() => expect(screen.getByTestId("porta-conta")).toBeInTheDocument());
+      expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Salve seu plano na sua conta");
       expect(screen.queryByTestId("porta-conta-confianca")).toBeNull();
-      expect(texto()).not.toMatch(/grátis|cobrança/i);
+      expect(texto()).not.toMatch(/grátis|cobrança|cobrado|cancele/i);
     }
   });
 
-  it("Safari do iPhone: a linha do teste também aparece (é iPhone)", async () => {
+  it("Safari do iPhone: o título com o teste e 'Nada cobrado hoje' também aparecem (é iPhone)", async () => {
     ua(UA.safari);
     await ateConta("corpo", "como_mal", "primeira");
-    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("3 dias grátis no app · sem cobrança hoje");
+    expect(screen.getByTestId("porta-conta-titulo").textContent).toBe("Salve seu plano e ganhe 3 dias grátis no app");
+    expect(screen.getByTestId("porta-conta-confianca").textContent).toBe("Nada cobrado hoje · cancele quando quiser");
+  });
+
+  it("botão sempre ativo: vazio → 'Digite seu e-mail' + senha, foca o e-mail; e-mail torto → 'E-mail inválido'; evento por campo", async () => {
+    await ateConta("rotina", "celular", "semana");
+    const botao = screen.getByTestId("porta-criar-conta") as HTMLButtonElement;
+    expect(botao.disabled).toBe(false);
+    fireEvent.click(botao);
+    expect(screen.getByTestId("porta-erro-email").textContent).toBe("Digite seu e-mail");
+    expect(screen.getByTestId("porta-erro-senha").textContent).toBe("A senha precisa de 6 letras ou números");
+    expect(document.activeElement).toBe(screen.getByTestId("porta-email"));
+    expect(screen.getByTestId("porta-email").getAttribute("aria-invalid")).toBe("true");
+    expect(eventos("porta_conta_erro").map((e) => [e.campo, e.motivo])).toEqual([["email", "vazio"], ["senha", "vazio"]]);
+    expect(signUp).not.toHaveBeenCalled();
+    // e-mail torto, senha boa: só o e-mail reclama
+    preencherSenha("ana@", "segredo1");
+    fireEvent.click(botao);
+    expect(screen.getByTestId("porta-erro-email").textContent).toBe("E-mail inválido");
+    expect(screen.queryByTestId("porta-erro-senha")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTestId("porta-email"));
+    // e-mail bom, senha curta: foca a senha
+    preencherSenha("ana@exemplo.com", "abc");
+    fireEvent.click(botao);
+    expect(screen.queryByTestId("porta-erro-email")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTestId("porta-senha"));
+    expect(eventos("porta_conta_erro").at(-1)).toMatchObject({ campo: "senha", motivo: "curta" });
+    expect(signUp).not.toHaveBeenCalled();
   });
 });
 
@@ -628,7 +710,7 @@ describe("e-mail que já existe: entra com a senha, NUNCA 2ª conta; porta só s
     getUser.mockResolvedValue({ data: { user: u } });
     await ateConta("saude", "sono", "cansaco");
     await waitFor(() => expect(screen.getByTestId("porta-conta-email-logado").textContent).toBe("logada@exemplo.com"));
-    expect(screen.getByTestId("porta-plano-dia1").textContent).toContain("Registra o sono de hoje e começa a ver o padrão");
+    expect(screen.getByTestId("porta-conta-plano").textContent).toBe("Seu plano de 3 dias está pronto · ❤️ Saúde");
     fireEvent.click(screen.getByTestId("porta-salvar-nesta-conta"));
     await passarInstrucao();
     expect(updateUser).toHaveBeenCalledTimes(1);
@@ -676,6 +758,21 @@ describe("atribuição à prova do Instagram", () => {
     cleanup();
     montar();
     expect(eventos("porta_view")).toHaveLength(1);
+  });
+
+  it("v4: porta_view com tempo_ms, tela 1 visível e o html_id/html_ms do index.html", () => {
+    (window as { __portaHtml?: unknown }).__portaHtml = { id: "html-abc-123", t: 812 };
+    try {
+      montar();
+      const v = eventos("porta_view")[0];
+      expect(typeof v.tempo_ms).toBe("number");
+      expect(v.tempo_ms as number).toBeGreaterThanOrEqual(0);
+      expect(v).toMatchObject({ tela1_visivel: true, visivel: true, html_id: "html-abc-123", html_ms: 812 });
+    } finally { delete (window as { __portaHtml?: unknown }).__portaHtml; }
+    // sem o script do index.html (navegação interna): html_id nulo, o resto igual
+    cleanup(); _zerarMemoriaPorta(); _zerarEstadoPorta(); sessionStorage.clear(); vi.mocked(trackEvent).mockClear();
+    montar();
+    expect(eventos("porta_view")[0]).toMatchObject({ html_id: null, html_ms: null, tela1_visivel: true });
   });
 });
 

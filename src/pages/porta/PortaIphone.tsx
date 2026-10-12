@@ -16,12 +16,13 @@ import { ENTRADA_APP } from "@/lib/rotas-web";
 import { capturarAtribuicao, decidirGravacao, idsDoAnuncio, lerAtribuicao, montarPorta, sessaoDaPorta, type AtribuicaoPorta, type PortaNaConta } from "./atribuicao";
 import { PERGUNTA_DOR, PERGUNTA_NUMERO, comSemDa, labelDe, rotaDe, type EscolhaPorta } from "./conteudo";
 import { AberturaPorta } from "./AberturaPorta";
-import { ComSemPorta, PerguntaPorta } from "./telas";
+import { ComSemPorta, PerguntaPorta, PlanoPorta } from "./telas";
 import { ContaPorta, type Resultado } from "./ContaPorta";
 import { SalvoPorta, type Plataforma } from "./SalvoPorta";
 import { irPraLoja } from "./navegar";
 import { InstrucaoPorta } from "./InstrucaoPorta";
 import { abrirAppComCodigo, codigoDaPortaOk } from "./handoff";
+import { lerHtmlDaPorta, msDesdeANavegacao } from "./medicao";
 
 /** Tela 7: segundos até abrir a loja sozinha (como a Dinzo). Dá pra ler "toque em Entrar" antes. */
 export const SEGUNDOS_ATE_A_LOJA = 4;
@@ -35,21 +36,28 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  *
  * v3 (11/10, dono: "quero algo mais rápido"; no iPhone só 28% passavam da welcome com vídeo):
  * anúncio → TELA 1 "Organize sua vida em 3 dias." com as áreas e a pergunta da DOR aparecendo
- * logo abaixo (1 toque avança) → TELA 2 o número → TELA 3 com × sem o CORE ("Criar minha conta")
- * → TELA 4 a CONTA com o plano de 3 dias no topo (sem cadeado; a tela do plano saiu) → CRIA A
+ * logo abaixo (1 toque avança) → TELA 2 o número → TELA 3 com × sem o CORE.
+ * v4 (12/10, dono "faz as 6"): tela 1 com o ícone do CORE e "Grátis · 3 perguntas · 30 segundos";
+ * TELA 3 → "Ver meu plano de 3 dias" → TELA 4 o PLANO de volta (Dia 1 aberto, dias 2 e 3 esmaecidos, sem
+ * cadeado, "Salvar meu plano grátis") → TELA 5 a CONTA ("Salve seu plano e ganhe 3 dias grátis no app" no
+ * iPhone; botão sempre ativo com o que falta embaixo do campo) → CRIA A
  * CONTA no site (Apple, Google ou e-mail + senha; a campanha fica gravada em user_metadata.porta)
  * → "Último passo" (celular) → "Pronto, salvo":
  * baixa o app, toca em "Entrar" (abaixo do Começar) com o mesmo e-mail → o
  * paywall do app (3 dias grátis, já no ar) liga o teste à conta.
  *
  * SEM o preço do produto em lugar nenhum. "3 dias grátis" só no iPhone (conta e tela 7); nunca "sem cartão".
+ * ("Grátis" do selo da tela 1 e do "Salvar meu plano grátis" é o PLANO, que é grátis em qualquer aparelho.)
  *
  * Eventos (analytics_events, todos com porta_session_id + ids do anúncio):
- *   porta_view {attr…}           1ª carga da sessão
+ *   porta_html {t_ms, html_id}   v4: do index.html, ANTES do React (ver ./medicao.ts); porta_erro_js {msg} também
+ *   porta_view {attr…, tempo_ms, tela1_visivel, html_id, html_ms}   1ª carga da sessão
  *   porta_passo {passo, area, resposta}  passo (v3): "abertura" (1º toque na tela 1 = o antigo "welcome"),
  *                                        "area" (cada área tocada), "p2" (a dor, avança), "p3" (o número),
- *                                        "comsem" (tocou "Criar minha conta"), "conta" (abriu a tela da conta
- *                                        = o antigo "plano"), "instrucao"
+ *                                        "comsem" (v4: tocou "Ver meu plano de 3 dias"), "plano" (v4: tocou
+ *                                        "Salvar meu plano grátis" = o "desbloquear" da v2), "conta" (abriu a
+ *                                        tela da conta), "instrucao"
+ *   porta_conta_erro {campo, motivo}     v4: tocou "Criar conta e salvar" com e-mail/senha faltando (1 por campo)
  *   porta_conta_iniciada {metodo}
  *   porta_conta_criada {metodo, existente, event_id, gravou}
  *   porta_loja_click {plataforma, loja}   (keepalive: a página sai pra loja)
@@ -61,12 +69,13 @@ const CHAVE_LOJA_AUTO = "porta-loja-auto";
  * (Área de transferência é PROIBIDA — dono 10/10. Nada aqui copia nem lê o clipboard.)
  * Pixel: ViewContent na 1ª carga; CompleteRegistration (eventID = porta.event_id) na conta nova (+ a CAPI "registro").
  */
-export type Passo = "abertura" | "p3" | "comsem" | "conta" | "instrucao" | "salvo";
-export const ORDEM: Passo[] = ["abertura", "p3", "comsem", "conta", "instrucao", "salvo"];
+export type Passo = "abertura" | "p3" | "comsem" | "plano" | "conta" | "instrucao" | "salvo";
+export const ORDEM: Passo[] = ["abertura", "p3", "comsem", "plano", "conta", "instrucao", "salvo"];
 /** Telas com a barra de progresso (a tela 1 é a abertura: sem barra, sem voltar). */
-const COM_BARRA: Passo[] = ["p3", "comsem", "conta"];
-/** v3: o estado salvo da v2 (localStorage "porta-estado-v1") cai no equivalente novo, sem quebrar. */
-const PASSO_ANTIGO: Record<string, Passo> = { welcome: "abertura", area: "abertura", p2: "abertura", plano: "conta" };
+const COM_BARRA: Passo[] = ["p3", "comsem", "plano", "conta"];
+/** O estado salvo das versões antigas (localStorage "porta-estado-v1") cai no equivalente novo, sem quebrar:
+ *  v2 welcome/area/p2 → tela 1; "plano" (v2) e "conta" (v3) existem de novo na v4 e ficam onde estavam. */
+const PASSO_ANTIGO: Record<string, Passo> = { welcome: "abertura", area: "abertura", p2: "abertura" };
 export const migrarPasso = (p: unknown): Passo | null =>
   typeof p !== "string" ? null : (ORDEM as string[]).includes(p) ? (p as Passo) : PASSO_ANTIGO[p] ?? null;
 
@@ -201,11 +210,22 @@ export function PortaIphone() {
     return () => { meta.remove(); document.title = tituloAntes; };
   }, []);
 
-  /* porta_view: uma vez por sessão da Porta, com a atribuição inteira */
+  /* porta_view: uma vez por sessão da Porta, com a atribuição inteira.
+   * v4: + tempo_ms (performance.now() na montagem = do início da navegação até a tela existir), se a tela 1
+   * ficou visível, e o html_id/html_ms do porta_html do index.html (quem tem porta_html e não tem porta_view
+   * desistiu ANTES da tela aparecer). */
   useEffect(() => {
     if (!inicio.current?.nova) return;
     const { origem, ...a } = inicio.current.attr;
-    trackEvent("porta_view", { ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "abertura" ? estado.passo : null });
+    const html = lerHtmlDaPorta();
+    let visivel: boolean | null = null;
+    try { visivel = document.visibilityState === "visible"; } catch { /* noop */ }
+    const tela1 = estado.passo === "abertura" && !!document.querySelector("[data-testid='porta-abertura']");
+    trackEvent("porta_view", {
+      ...a, atribuicao: origem, porta_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.passo !== "abertura" ? estado.passo : null,
+      tempo_ms: msDesdeANavegacao(), visivel, tela1_visivel: tela1 && visivel !== false,
+      html_id: html?.id ?? null, html_ms: html?.t ?? null,
+    });
     fireMetaEvent("ViewContent", { content_name: "porta_iphone", content_category: "porta" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -217,7 +237,7 @@ export function PortaIphone() {
     trackEvent("porta_passo", { passo, area, resposta, ...ids() });
   /** o 1º toque na tela 1 (porta_passo "abertura" = o antigo "welcome/começar"), 1x por carga */
   const comecou = useRef(false);
-  /* porta_passo "conta": abriu a tela da conta (o plano está no topo dela; = o antigo "plano") */
+  /* porta_passo "conta": abriu a tela da conta (v4: o plano é a tela anterior) */
   useEffect(() => {
     if (estado.passo === "conta") passoFeito("conta", "view");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -484,14 +504,16 @@ export function PortaIphone() {
     const q = PERGUNTA_NUMERO[rota];
     tela = <PerguntaPorta testid="porta-p3" titulo={q.q} opcoes={q.opts} onEscolher={(o) => { passoFeito("p3", o.label); ir("comsem", { p3: o.id }); }} />;
   } else if (estado.passo === "comsem") {
-    // TELA 3: com × sem o CORE → "Criar minha conta"
-    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "criar_conta"); ir("conta"); }} />;
+    // TELA 3: com × sem o CORE → "Ver meu plano de 3 dias"
+    tela = <ComSemPorta dados={comSemDa(rota, estado.p3)} onNext={() => { passoFeito("comsem", "ver_plano"); ir("plano"); }} />;
+  } else if (estado.passo === "plano") {
+    // TELA 4 (v4): o plano de 3 dias → "Salvar meu plano grátis"
+    tela = <PlanoPorta rota={rota} dor={estado.p2} onSalvar={() => { passoFeito("plano", "salvar"); ir("conta"); }} />;
   } else if (estado.passo === "conta") {
-    // TELA 4: a conta, com o plano de 3 dias no topo
+    // TELA 5: a conta (1 linha do plano no topo)
     tela = (
       <ContaPorta
         rota={rota}
-        dor={estado.p2}
         mostrarTeste={plataforma === "ios"}
         emInApp={emInApp}
         appDoWebview={appDoWebview()}
@@ -504,6 +526,7 @@ export function PortaIphone() {
         onEntrarComSenha={onEntrarComSenha}
         onSalvarNestaConta={onSalvarNestaConta}
         onTrocarConta={async () => { await supabase.auth.signOut(); }}
+        onErroCampo={(campo, motivo) => trackEvent("porta_conta_erro", { campo, motivo, ...ids() })}
       />
     );
   } else if (estado.passo === "instrucao") {
@@ -549,7 +572,7 @@ export function PortaIphone() {
             <span className="w-7" aria-hidden />
           </div>
         )}
-        <motion.div key={estado.passo} className={`flex-1 flex flex-col ${comBarra ? "pt-4" : estado.passo === "abertura" ? "pt-7" : "pt-8"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+        <motion.div key={estado.passo} className={`flex-1 flex flex-col ${comBarra ? "pt-4" : estado.passo === "abertura" ? "pt-4" : "pt-8"}`} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22, ease: "easeOut" }}>
           {tela}
         </motion.div>
       </div>

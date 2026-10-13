@@ -28,7 +28,13 @@ const tabs = [
 const Saude = () => {
   // seta ←: no app, o hub; na demo, o destino do botão de baixo dela (P5, 30/09 — antes, /auth)
   const voltarDoModulo = useVoltarDoModulo();
-  const [activeTab, setActiveTab] = useState("hoje");
+  // 13/10: o aviso da consulta abre /saude?aba=log direto no LOG MÉDICO
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const pedida = new URLSearchParams(window.location.search).get("aba");
+      return tabs.some((t) => t.id === pedida) ? (pedida as string) : "hoje";
+    } catch { return "hoje"; }
+  });
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const currentMonth = mesAtualExtenso();

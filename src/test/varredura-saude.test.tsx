@@ -141,7 +141,7 @@ describe("Foto na demo", () => {
     window.history.pushState({}, "", "/preview/saude");
     montar(<MedicalLog />, criarStore({ "core-saude-exams-v2": [{ id: "e1", name: "Hemograma", date: "2026-09-01", time: "", location: "", notes: "", done: true }] }));
     fireEvent.click(screen.getByRole("button", { name: "Fotos e observações de Hemograma" }));
-    fireEvent.click(screen.getByRole("button", { name: /^Foto$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Anexar foto ou PDF" }));
     expect(toastMock).toHaveBeenLastCalledWith("Fotos funcionam depois de criar a conta", expect.anything());
     expect(clique).not.toHaveBeenCalled();
     clique.mockRestore();

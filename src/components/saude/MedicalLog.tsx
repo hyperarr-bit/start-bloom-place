@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip } from "lucide-react";
+import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip, Stethoscope } from "lucide-react";
 import { AnexosDeSaude } from "./AnexosDeSaude";
+import { caminhoEhPdf } from "@/lib/image-upload";
 import { toast } from "sonner";
 import { avisarApagado } from "@/lib/desfazer";
 import { isNativeShell } from "@/lib/native-shell";
@@ -12,6 +13,16 @@ import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
+import { useUserData } from "@/hooks/use-user-data";
+import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
+import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
+import { reagendarTudo, type Leitor } from "@/lib/reagendar";
+import { trackEvent } from "@/lib/analytics";
+import { CHAVE_AVISO_CONSULTAS, CHAVE_CONSULTAS, momentosDoAviso, rotuloDoAviso } from "@/lib/consulta-avisos";
+import {
+  ESPECIALIDADES_COMUNS, TODOS, aoEscolherMedico, chaveMedico, medicosConhecidos, naPasta, pastasDosExames, rotuloMedico,
+  type MedicoConhecido,
+} from "@/lib/saude-medicos";
 
 interface Appointment {
   id: string;
@@ -35,8 +46,15 @@ interface Exam {
   location: string;
   notes: string;
   done: boolean;
-  /** caminhos no bucket privado (11/09) — ver AnexosDeSaude */
+  /** caminhos no bucket privado (11/09) — ver AnexosDeSaude. Foto (.webp) ou PDF (.pdf, 13/10). */
   fotos?: string[];
+  /** "Pedido por" (13/10): o médico que pediu o exame — a "pasta do médico".
+   *  Opcionais: exame antigo não tem, e a chave sincronizada não muda de tipo. */
+  medico?: string;
+  especialidade?: string;
+  /** Resumo do resultado (13/10): o que o laudo diz, em 2–3 linhas, pra não
+   *  precisar abrir cada arquivo. O arquivo inteiro continua no anexo. */
+  resumo?: string;
 }
 
 /** Receita, laudo, atestado, carteirinha: o que a pessoa precisa achar na
@@ -126,6 +144,103 @@ const numeroBr = (n: number) =>
 /** Data da tabela numa linha só (26/09, varredura: "5 de out. de 2026"
  *  quebrava em 4 linhas no celular e empurrava as ações pra fora da tela). */
 const DATA_CURTA: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "2-digit" };
+/** Exame com o ANO inteiro (13/10, chamado: quem lança exame antigo — 13/04/2022 —
+ *  não distinguia "22" de "26" de relance). */
+const DATA_COMPLETA: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+
+type RascunhoExame = Omit<Exam, "id" | "done">;
+const EXAME_VAZIO: RascunhoExame = { name: "", date: "", time: "", location: "", notes: "", medico: "", especialidade: "", resumo: "" };
+
+/** Grava só o que foi preenchido: campo opcional vazio não entra no dado (exame
+ *  antigo e exame novo sem médico ficam com o mesmo formato). */
+const limparOpcionais = (r: RascunhoExame): RascunhoExame => {
+  const { medico, especialidade, resumo, ...resto } = r;
+  return {
+    ...resto,
+    medico: medico?.trim() || undefined,
+    especialidade: especialidade?.trim() || undefined,
+    resumo: resumo?.trim() || undefined,
+  };
+};
+
+/**
+ * "Pedido por" no formulário do exame (novo e edição): médico com sugestão dos
+ * que já apareceram em consultas e exames, e especialidade com as mais comuns.
+ * Escolher um médico conhecido preenche a especialidade (aoEscolherMedico).
+ */
+const CamposPedidoPor = ({ valor, onChange, conhecidos, idBase }: {
+  valor: { medico?: string; especialidade?: string };
+  onChange: (v: { medico: string; especialidade: string }) => void;
+  conhecidos: MedicoConhecido[];
+  idBase: string;
+}) => {
+  const especialidades = useMemo(() => {
+    const extras = conhecidos.map(m => m.especialidade).filter(Boolean);
+    return [...new Set([...ESPECIALIDADES_COMUNS, ...extras])];
+  }, [conhecidos]);
+  return (
+    <div className="grid gap-1.5" data-testid="pedido-por">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+        <Stethoscope className="w-3 h-3" /> Pedido por <span className="font-normal normal-case tracking-normal">(opcional)</span>
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          value={valor.medico ?? ""}
+          onChange={ev => onChange(aoEscolherMedico(valor, ev.target.value, conhecidos))}
+          placeholder="Médico (ex: Dr. Hélio)"
+          aria-label="Médico que pediu o exame"
+          list={`${idBase}-medicos`}
+          className="text-xs h-9"
+        />
+        <Input
+          value={valor.especialidade ?? ""}
+          onChange={ev => onChange({ medico: valor.medico ?? "", especialidade: ev.target.value })}
+          placeholder="Especialidade"
+          aria-label="Especialidade do médico"
+          list={`${idBase}-especialidades`}
+          className="text-xs h-9"
+        />
+      </div>
+      <datalist id={`${idBase}-medicos`}>
+        {conhecidos.map(m => <option key={m.nome} value={m.nome}>{m.especialidade}</option>)}
+      </datalist>
+      <datalist id={`${idBase}-especialidades`}>
+        {especialidades.map(e => <option key={e} value={e} />)}
+      </datalist>
+    </div>
+  );
+};
+
+/** Campo do resumo no formulário, com rótulo: preenchido, o placeholder some e
+ *  a pessoa não saberia mais que aquilo é o que aparece na lista. */
+const CampoResumo = ({ valor, onChange }: { valor: string; onChange: (v: string) => void }) => (
+  <div className="grid gap-1.5">
+    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+      📄 Resumo do resultado <span className="font-normal normal-case tracking-normal">(aparece na lista)</span>
+    </p>
+    <Textarea value={valor} onChange={ev => onChange(ev.target.value)} placeholder="Ex: Ressonância normal, sem alterações. Vitamina D 24 (baixa)." aria-label="Resumo do resultado" className="text-xs min-h-[60px]" />
+  </div>
+);
+
+/** Resumo do resultado embaixo do exame: 3 linhas, toque abre o texto inteiro. */
+const ResumoDoExame = ({ texto, nome }: { texto: string; nome: string }) => {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => setAberto(!aberto)}
+      aria-expanded={aberto}
+      aria-label={`${aberto ? "Recolher" : "Ler"} resumo de ${nome}`}
+      className="w-full text-left rounded-lg bg-muted/60 px-2.5 py-1.5"
+      data-testid="exame-resumo"
+    >
+      {/* `block` e `line-clamp-3` brigam pelo display (o clamp precisa de -webkit-box) */}
+      <span className={`text-[11px] leading-snug text-foreground/80 whitespace-pre-wrap ${aberto ? "block" : "line-clamp-3"}`}>
+        {texto}
+      </span>
+    </button>
+  );
+};
 
 export const MedicalLog = () => {
   const [appointments, setAppointments] = usePersistedState<Appointment[]>("core-saude-appointments", []);
@@ -154,13 +269,46 @@ export const MedicalLog = () => {
     const q = (quem ?? "").trim();
     if (q && !dependentes.includes(q)) setDependentes([...dependentes, q]);
   };
-  const [newExam, setNewExam] = useState<Omit<Exam, "id" | "done">>({ name: "", date: "", time: "", location: "", notes: "" });
+  const [newExam, setNewExam] = useState<RascunhoExame>(EXAME_VAZIO);
   const [newBio, setNewBio] = useState({ name: "", unit: "ng/dL", refMin: "", refMax: "" });
+
+  /* AVISO DA CONSULTA (13/10): véspera às 19h e 2 h antes, notificação local do
+     app da loja (lib/consulta-avisos). A permissão é pedida AQUI, quando a
+     pessoa acabou de marcar uma consulta com data no futuro — no Android 13+ e
+     no iPhone a recusa é definitiva, então a chance é gasta quando faz sentido
+     (mesma regra dos remédios, PharmacyChecklist). O useLembretes reagenda a
+     cada mudança de dado (editar, apagar), mas roda no render seguinte e antes
+     da permissão chegar — por isso o reagendamento explícito, com um leitor
+     que já enxerga a lista nova. */
+  const { get } = useUserData();
+  const consultasLigado = get<boolean>(CHAVE_AVISO_CONSULTAS, true) !== false;
+  const [avisoPermitido, setAvisoPermitido] = useState(false);
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    let vivo = true;
+    void temPermissao().then(ok => { if (vivo) setAvisoPermitido(ok); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+  const rearmarAvisosConsulta = async (lista: Appointment[], consulta?: Pick<Appointment, "date" | "time">) => {
+    if (!isNativeShell() || !consultasLigado) return;
+    const temAviso = !!consulta && (() => { const m = momentosDoAviso(consulta); return !!(m.vespera || m.antes); })();
+    let ok = avisoPermitido;
+    if (temAviso && !ok) {
+      ok = await pedirPermissao();
+      setAvisoPermitido(ok);
+      trackEvent("lembrete_consulta_permissao", { concedida: ok });
+    }
+    if (!ok) return;
+    const leitor: Leitor = (k, fb) => (k === CHAVE_CONSULTAS ? (lista as unknown as typeof fb) : get(k, fb));
+    try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
+  };
 
   const addAppointment = () => {
     if (!newAppt.doctor.trim()) return;
     const quem = (newAppt.quem ?? "").trim();
-    setAppointments(prev => [...prev, { ...newAppt, ...(quem ? { quem } : { quem: undefined }), id: Date.now().toString() }]);
+    const nova = { ...newAppt, ...(quem ? { quem } : { quem: undefined }), id: Date.now().toString() };
+    setAppointments(prev => [...prev, nova]);
+    void rearmarAvisosConsulta([...appointments, nova], nova);
     lembrarDependente(quem);
     setNewAppt({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "", quem: "" });
     setShowApptForm(false);
@@ -168,8 +316,8 @@ export const MedicalLog = () => {
 
   const addExam = () => {
     if (!newExam.name.trim()) return;
-    setExams(prev => [...prev, { ...newExam, id: Date.now().toString(), done: false }]);
-    setNewExam({ name: "", date: "", time: "", location: "", notes: "" });
+    setExams(prev => [...prev, { ...limparOpcionais(newExam), name: newExam.name.trim(), id: Date.now().toString(), done: false }]);
+    setNewExam(EXAME_VAZIO);
     setShowExamForm(false);
   };
 
@@ -194,23 +342,26 @@ export const MedicalLog = () => {
   const salvarEdicaoAppt = () => {
     // médico vazio não salva: é o único campo obrigatório no cadastro
     if (!rascunhoAppt.doctor.trim()) return;
-    setAppointments(prev => prev.map(a => a.id !== editandoApptId ? a : { ...a, ...rascunhoAppt, doctor: rascunhoAppt.doctor.trim() }));
+    const editar = (a: Appointment) => a.id !== editandoApptId ? a : { ...a, ...rascunhoAppt, doctor: rascunhoAppt.doctor.trim() };
+    setAppointments(prev => prev.map(editar));
+    // remarcou: a série de avisos é refeita com a data nova (e pede a permissão se for a 1ª consulta futura)
+    void rearmarAvisosConsulta(appointments.map(editar), rascunhoAppt);
     setEditandoApptId(null);
   };
 
   const [editandoExamId, setEditandoExamId] = useState<string | null>(null);
-  const [rascunhoExam, setRascunhoExam] = useState<Omit<Exam, "id" | "done">>({ name: "", date: "", time: "", location: "", notes: "" });
+  const [rascunhoExam, setRascunhoExam] = useState<RascunhoExame>(EXAME_VAZIO);
 
   const comecarEdicaoExam = (e: Exam) => {
     setEditandoExamId(e.id);
-    setRascunhoExam({ name: e.name, date: e.date, time: e.time, location: e.location, notes: e.notes });
+    setRascunhoExam({ name: e.name, date: e.date, time: e.time, location: e.location, notes: e.notes, medico: e.medico ?? "", especialidade: e.especialidade ?? "", resumo: e.resumo ?? "" });
   };
 
   const salvarEdicaoExam = () => {
     if (!rascunhoExam.name.trim()) return;
     // `done` fica de fora do rascunho de propósito: marcar como feito é um
     // toque na lista, não uma decisão da tela de edição.
-    setExams(prev => prev.map(e => e.id !== editandoExamId ? e : { ...e, ...rascunhoExam, name: rascunhoExam.name.trim() }));
+    setExams(prev => prev.map(e => e.id !== editandoExamId ? e : { ...e, ...limparOpcionais(rascunhoExam), name: rascunhoExam.name.trim() }));
     setEditandoExamId(null);
   };
 
@@ -390,6 +541,15 @@ export const MedicalLog = () => {
 
   const allAppts = [...appointments].sort((a, b) => b.date.localeCompare(a.date));
 
+  /* PASTA DO MÉDICO (13/10): chips no topo da lista filtram os exames por quem
+     pediu. É só filtro de tela — o dado continua uma lista só. */
+  const conhecidos = useMemo(() => medicosConhecidos(appointments, exams), [appointments, exams]);
+  const pastas = useMemo(() => pastasDosExames(exams), [exams]);
+  const [pasta, setPasta] = useState<string>(TODOS);
+  // a pasta escolhida sumiu (apagou o último exame do médico): volta pra Todos
+  const pastaValida = pasta === TODOS || pastas.some(p => p.chave === pasta) ? pasta : TODOS;
+  const examesVisiveis = [...exams].filter(e => naPasta(e, pastaValida)).sort((a, b) => b.date.localeCompare(a.date));
+
   return (
     <div className="space-y-5">
       {/* ── MARCAR CONSULTA ── */}
@@ -508,6 +668,12 @@ export const MedicalLog = () => {
                           👤 {a.quem.trim()}
                         </span>
                       )}
+                      {/* só quando o aviso vai MESMO sair: app da loja, permissão
+                          dada, interruptor ligado e a consulta ainda por vir */}
+                      {naLoja && avisoPermitido && consultasLigado && (() => {
+                        const rotulo = rotuloDoAviso(a);
+                        return rotulo ? <p className="mt-1 text-[10px] leading-tight text-muted-foreground" data-testid="consulta-aviso">{rotulo}</p> : null;
+                      })()}
                     </td>
                     <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {mostrarDia(a.date, DATA_CURTA)}
@@ -616,7 +782,9 @@ export const MedicalLog = () => {
                     <Input type="time" value={newExam.time} onChange={e => setNewExam({ ...newExam, time: e.target.value })} className="text-xs h-9" />
                   </div>
                   <Input value={newExam.location} onChange={e => setNewExam({ ...newExam, location: e.target.value })} placeholder="Local / Laboratório" className="text-xs h-9" />
+                  <CamposPedidoPor idBase="exame-novo" valor={newExam} conhecidos={conhecidos} onChange={v => setNewExam({ ...newExam, ...v })} />
                   <Textarea value={newExam.notes} onChange={e => setNewExam({ ...newExam, notes: e.target.value })} placeholder="Observações (jejum, preparo...)" className="text-xs min-h-[60px]" />
+                  <CampoResumo valor={newExam.resumo ?? ""} onChange={resumo => setNewExam({ ...newExam, resumo })} />
                   <button onClick={addExam} className="py-2.5 rounded-xl bg-[hsl(var(--saude-green)/0.12)] text-[hsl(var(--saude-green))] text-xs font-bold hover:bg-[hsl(var(--saude-green)/0.2)] transition-colors">
                     Salvar Exame
                   </button>
@@ -626,6 +794,19 @@ export const MedicalLog = () => {
           </AnimatePresence>
         </div>
 
+        {pastas.length > 0 && (
+          <div className="px-4 pb-3 -mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Exames por médico" data-testid="pastas-medico">
+            {[{ chave: TODOS, rotulo: "Todos", total: exams.length }, ...pastas].map(p => {
+              const ativo = pastaValida === p.chave;
+              return (
+                <button key={p.chave} type="button" onClick={() => setPasta(p.chave)} aria-pressed={ativo}
+                  className={`shrink-0 h-8 px-3 rounded-full border text-[11px] font-semibold whitespace-nowrap transition-colors ${ativo ? "bg-foreground text-background border-foreground" : "bg-card border-border text-muted-foreground hover:bg-muted/60"}`}>
+                  {p.chave !== TODOS && p.rotulo !== "Sem médico" && "🩺 "}{p.rotulo} <span className={ativo ? "opacity-70" : "opacity-60"}>{p.total}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {exams.length > 0 ? (
           <div className="overflow-x-auto">
             {/* ações sempre à vista, igual às consultas (26/09, varredura) */}
@@ -634,14 +815,13 @@ export const MedicalLog = () => {
                 <tr className="bg-muted/50">
                   <th className="text-left pl-3 pr-2 py-3 text-xs font-semibold text-muted-foreground">Exame</th>
                   <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Data</th>
-                  <th className="text-left px-1.5 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
                   <th className="sticky right-0 bg-card pl-1 pr-2 py-3"><span aria-hidden className="absolute inset-0 bg-muted/50" /></th>
                 </tr>
               </thead>
               <tbody>
-                {[...exams].sort((a, b) => b.date.localeCompare(a.date)).map(e => editandoExamId === e.id ? (
+                {examesVisiveis.map(e => editandoExamId === e.id ? (
                   <tr key={e.id} className="border-t border-border/50 bg-primary/[0.04]">
-                    <td colSpan={4} className="px-4 py-3">
+                    <td colSpan={3} className="px-4 py-3">
                       <div className="grid gap-2">
                         <Input autoFocus value={rascunhoExam.name} onChange={ev => setRascunhoExam({ ...rascunhoExam, name: ev.target.value })} placeholder="Nome do exame (ex: Hemograma)" className="text-xs h-9" />
                         <div className="grid grid-cols-2 gap-2">
@@ -649,7 +829,9 @@ export const MedicalLog = () => {
                           <Input type="time" value={rascunhoExam.time} onChange={ev => setRascunhoExam({ ...rascunhoExam, time: ev.target.value })} className="text-xs h-9" />
                         </div>
                         <Input value={rascunhoExam.location} onChange={ev => setRascunhoExam({ ...rascunhoExam, location: ev.target.value })} placeholder="Local / Laboratório" className="text-xs h-9" />
+                        <CamposPedidoPor idBase={`exame-${e.id}`} valor={rascunhoExam} conhecidos={conhecidos} onChange={v => setRascunhoExam({ ...rascunhoExam, ...v })} />
                         <Textarea value={rascunhoExam.notes} onChange={ev => setRascunhoExam({ ...rascunhoExam, notes: ev.target.value })} placeholder="Observações (jejum, preparo...)" className="text-xs min-h-[60px]" />
+                        <CampoResumo valor={rascunhoExam.resumo ?? ""} onChange={resumo => setRascunhoExam({ ...rascunhoExam, resumo })} />
                         <div className="flex items-center gap-2">
                           <button onClick={salvarEdicaoExam} className="h-9 flex-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
                             <Check className="w-3.5 h-3.5" /> Salvar
@@ -662,7 +844,8 @@ export const MedicalLog = () => {
                     </td>
                   </tr>
                 ) : (
-                  <tr key={e.id} className={`border-t border-border/50 hover:bg-muted/30 transition-colors ${e.done ? "opacity-50" : ""}`}>
+                  <Fragment key={e.id}>
+                  <tr className={`border-t border-border/50 hover:bg-muted/30 transition-colors ${e.done ? "opacity-50" : ""}`}>
                     <td className="pl-3 pr-2 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getExamColor(e.name)}`}>
                         {e.done ? "✓ " : ""}{e.name}
@@ -673,11 +856,20 @@ export const MedicalLog = () => {
                       {e.location && (
                         <p className="mt-1 text-[10px] text-muted-foreground max-w-[160px] truncate" title={e.location}>{e.location}</p>
                       )}
+                      {/* quem pediu (13/10): a mesma etiqueta do chip da pasta */}
+                      {chaveMedico(e.medico) && (
+                        <span className="mt-1 inline-block max-w-[190px] px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" data-testid="exame-medico">
+                          🩺 {rotuloMedico(e.medico!, e.especialidade)}
+                        </span>
+                      )}
                     </td>
+                    {/* data com ano + horário embaixo (13/10): a coluna Horário saiu
+                        pra a data de 4 dígitos caber no celular sem empurrar as
+                        ações e o resumo pra fora da tela */}
                     <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                      {mostrarDia(e.date, DATA_CURTA)}
+                      <span className="block" data-testid="exame-data">{mostrarDia(e.date, DATA_COMPLETA)}</span>
+                      {e.time && <span className="block text-[10px] mt-0.5">{e.time}</span>}
                     </td>
-                    <td className="px-1.5 py-3 text-xs text-muted-foreground whitespace-nowrap">{e.time || "—"}</td>
                     <td className="sticky right-0 bg-card pl-1 pr-2 py-2">
                       <div className="flex flex-wrap justify-end gap-1 min-w-[84px]">
                         <button onClick={() => toggleExamDone(e.id)}
@@ -728,11 +920,38 @@ export const MedicalLog = () => {
                       </div>
                     </td>
                   </tr>
+                  {/* EMBAIXO DO EXAME (13/10): o resumo do resultado e — quando
+                      aberto pelo clipe — observações e anexos. Antes o painel
+                      abria no pé da tabela, longe da linha tocada: com 15
+                      exames, tocar no de cima parecia não fazer nada. */}
+                  {(e.resumo?.trim() || expandedExam === e.id) && (
+                    <tr data-testid="exame-detalhe">
+                      <td colSpan={3} className="pl-3 pr-3 pb-3 pt-0">
+                        <div className="space-y-2">
+                          {e.resumo?.trim() && <ResumoDoExame texto={e.resumo.trim()} nome={e.name} />}
+                          {expandedExam === e.id && (
+                            <>
+                              {e.notes && (
+                                <div className="p-3 rounded-xl bg-muted text-xs text-muted-foreground">
+                                  <p className="font-bold text-foreground mb-1">📝 Observações:</p>
+                                  {e.notes}
+                                </div>
+                              )}
+                              <div className="p-3 rounded-xl bg-muted">
+                                <p className="text-xs font-bold mb-2">📎 Resultado (foto ou PDF)</p>
+                                <AnexosDeSaude caminhos={e.fotos ?? []} onChange={fotos => fotosDoExame(e.id, fotos)} rotulo={`exame ${e.name}`} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
-                {exams.length < 4 && Array.from({ length: 4 - exams.length }).map((_, i) => (
+                {examesVisiveis.length < 4 && Array.from({ length: 4 - examesVisiveis.length }).map((_, i) => (
                   <tr key={`empty-${i}`} className="border-t border-border/50">
                     <td className="px-4 py-3"><span className="inline-block px-2.5 py-1 rounded-md text-xs bg-transparent">&nbsp;</span></td>
-                    <td className="px-4 py-3" />
                     <td className="px-4 py-3" />
                     <td className="px-2 py-3" />
                   </tr>
@@ -746,24 +965,6 @@ export const MedicalLog = () => {
             <p className="text-xs text-muted-foreground/70 mt-1">Use o botão acima para agendar</p>
           </div>
         )}
-        {expandedExam && (() => {
-          const e = exams.find(x => x.id === expandedExam);
-          if (!e) return null;
-          return (
-            <div className="px-4 pb-4 space-y-2">
-              {e.notes && (
-                <div className="p-3 rounded-xl bg-muted text-xs text-muted-foreground">
-                  <p className="font-bold text-foreground mb-1">📝 Observações:</p>
-                  {e.notes}
-                </div>
-              )}
-              <div className="p-3 rounded-xl bg-muted">
-                <p className="text-xs font-bold mb-2">📷 Fotos do resultado</p>
-                <AnexosDeSaude caminhos={e.fotos ?? []} onChange={fotos => fotosDoExame(e.id, fotos)} rotulo={`exame ${e.name}`} />
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* ── DOCUMENTOS (11/09): receita, laudo, atestado — foto + data + nota ── */}
@@ -809,7 +1010,7 @@ export const MedicalLog = () => {
                   <span className="text-lg">{tipo.emoji}</span>
                   <button type="button" onClick={() => setDocAberto(aberto ? null : d.id)} className="flex-1 min-w-0 text-left">
                     <p className="text-xs font-bold truncate">{d.titulo}</p>
-                    <p className="text-[10px] text-muted-foreground">{tipo.rotulo}{d.date ? ` · ${mostrarDia(d.date)}` : ""}{d.fotos.length ? ` · ${d.fotos.length} foto${d.fotos.length > 1 ? "s" : ""}` : ""}</p>
+                    <p className="text-[10px] text-muted-foreground">{tipo.rotulo}{d.date ? ` · ${mostrarDia(d.date)}` : ""}{d.fotos.length ? ` · ${d.fotos.length} ${d.fotos.some(caminhoEhPdf) ? "anexo" : "foto"}${d.fotos.length > 1 ? "s" : ""}` : ""}</p>
                   </button>
                   <button onClick={() => setDocAberto(aberto ? null : d.id)} aria-label={`Abrir ${d.titulo}`}
                     className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">

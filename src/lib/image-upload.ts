@@ -123,11 +123,33 @@ export async function migrateBase64ToStorage(
  * O bucket é privado e a política só deixa cada pessoa ler a própria
  * pasta, então nem o caminho vazado abre a foto.
  */
+/** PDF de laudo/resultado (13/10): vem pelo "Escolher arquivo" do iPhone ou
+ *  pelos arquivos do Android. Alguns seletores mandam o tipo vazio — o nome
+ *  ".pdf" também vale. */
+export const ehPdf = (file: Blob): boolean =>
+  file.type === "application/pdf" || (!file.type && /\.pdf$/i.test((file as File).name ?? ""));
+
+/** Caminho gravado que aponta pra um PDF (a miniatura vira ícone de documento). */
+export const caminhoEhPdf = (caminho: string): boolean => /\.pdf$/i.test(caminho);
+
 export async function uploadImagePath(bucket: string, file: Blob, subfolder = "general"): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+  const base = `${user.id}/${subfolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  /* PDF sobe INTACTO (13/10): o compressImage desenha num canvas — num PDF a
+     "imagem" nunca carrega e o upload morria (ou, pior, gravaria um .webp
+     quebrado). Laudo tem que chegar byte a byte, com o tipo e a extensão certos
+     pro navegador abrir na URL assinada. */
+  if (ehPdf(file)) {
+    const fileName = `${base}.pdf`;
+    const { error } = await supabase.storage.from(bucket).upload(fileName, file, { contentType: "application/pdf", upsert: false });
+    if (error) { console.error("[image-upload] failed:", error); return null; }
+    return fileName;
+  }
+  // nem imagem nem PDF: não sobe (o bucket é de fotos e laudos)
+  if (file.type && !file.type.startsWith("image/")) return null;
   const compressed = await compressImage(file);
-  const fileName = `${user.id}/${subfolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+  const fileName = `${base}.webp`;
   const { error } = await supabase.storage.from(bucket).upload(fileName, compressed, { contentType: "image/webp", upsert: false });
   if (error) { console.error("[image-upload] failed:", error); return null; }
   return fileName;

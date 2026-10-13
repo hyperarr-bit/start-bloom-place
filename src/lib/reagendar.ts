@@ -4,6 +4,8 @@ import {
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import { agendarPet } from "@/lib/notificacoes";
+import { agendarConsultas } from "@/lib/notificacoes";
+import { CHAVE_AVISO_CONSULTAS, CHAVE_CONSULTAS, consultasValidas, type ConsultaAgendavel } from "@/lib/consulta-avisos";
 import { algumLigadoPet, lerDadosDosAvisosPet, type DadosDosAvisosPet } from "@/lib/pet-avisos";
 import { agendarRelacoes } from "@/lib/notificacoes";
 import { assinaturaDasRelacoes, lerDadosDasRelacoes, type DadosDasRelacoes } from "@/lib/relacoes-lembrete";
@@ -85,6 +87,9 @@ export interface DadosDosLembretes {
   /** remédios/suplementos do Saúde com horário, e se já foram tomados hoje */
   remedios: RemedioAgendavel[];
   remediosLigado: boolean;
+  /** consultas médicas de Saúde com data (13/10): véspera 19h e 2 h antes */
+  consultas?: ConsultaAgendavel[];
+  consultasLigado?: boolean;
   /** pessoas de Relações com aniversário (11/09) */
   pessoas: PessoaAgendavel[];
   /** tarefas de manutenção de Casa já feitas alguma vez (11/09) */
@@ -219,6 +224,9 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     jaPreencheuHoje: Object.keys(diarioDieta[hoje]?.meals ?? {}).length > 0,
     remedios,
     remediosLigado: get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false,
+    // consultas (13/10): só as que ainda não passaram — consulta antiga não muda o plano
+    consultas: consultasValidas(get<unknown>(CHAVE_CONSULTAS, [])).filter((c) => c.date >= hoje),
+    consultasLigado: get<boolean>(CHAVE_AVISO_CONSULTAS, true) !== false,
     pessoas: (get<{ name?: string; birthday?: string }[]>("rel-people", []) ?? [])
       .filter((p) => p?.name && p?.birthday)
       .map((p) => ({ nome: String(p.name), aniversario: String(p.birthday) })),
@@ -278,6 +286,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.leitura && dados.leitura,
     prefs.dieta && dados.jaPreencheuHoje,
     dados.remediosLigado && dados.remedios,
+    // (13/10) consultas: remarcar/apagar muda o plano (endereço e médico vão no texto)
+    dados.consultasLigado !== false && (dados.consultas ?? []),
     prefs.aniversario && dados.pessoas,
     prefs.casa && dados.manutencao,
     prefs.compromissos && dados.compromissos,
@@ -319,6 +329,7 @@ export async function reagendarTudo(
     leitura: await agendarLeitura(d.leitura, { hora: prefs.horaLeitura, ligado: prefs.leitura }),
     dieta: await agendarDieta({ jaPreencheuHoje: d.jaPreencheuHoje }, { hora: prefs.horaDieta, ligado: prefs.dieta }),
     saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
+    consulta: await agendarConsultas(d.consultas ?? [], { ligado: d.consultasLigado !== false }),
     aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
     casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
     compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),

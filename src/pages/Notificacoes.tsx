@@ -9,6 +9,7 @@ import { abrirAjusteDeAlarmeExato, estadoAlarmeExato, estadoPermissao, listarAge
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { lerDia2 } from "@/lib/lembrete-dia2";
 import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
+import { CHAVE_AVISO_CONSULTAS } from "@/lib/consulta-avisos";
 import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib/beleza-lembrete";
 import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
 import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos } from "@/lib/beleza-cuidados";
@@ -55,6 +56,8 @@ const Notificacoes = () => {
   const [prefs, setPrefs] = usePersistedState<PrefsNotificacoes>(CHAVE_PREFS, lerPrefs(undefined));
   // remédios (07/09): chave própria, nasce ligado — ver CHAVE_REMEDIOS_LIGADO
   const remediosLigado = get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false;
+  // consultas (13/10): mesma regra dos remédios — chave própria, nasce ligado
+  const consultasLigado = get<boolean>(CHAVE_AVISO_CONSULTAS, true) !== false;
   const [permissao, setPermissao] = useState<EstadoPermissao | null>(null);
   // 08/10: alarme exato do Android (ver `estadoAlarmeExato`). "indisponivel" no iPhone e no Android < 12.
   const [alarmeExato, setAlarmeExato] = useState<EstadoAlarmeExato>("indisponivel");
@@ -178,6 +181,24 @@ const Notificacoes = () => {
     }
     set(CHAVE_REMEDIOS_LIGADO, valor);
     const leitor: Leitor = (k, fb) => (k === CHAVE_REMEDIOS_LIGADO ? (valor as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Consultas (13/10): igual aos remédios — chave própria, leitor sobreposto. */
+  const alternarConsultas = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "consultas", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    set(CHAVE_AVISO_CONSULTAS, valor);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_AVISO_CONSULTAS ? (valor as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -419,6 +440,15 @@ const Notificacoes = () => {
           ligado={remediosLigado}
           onChange={(v) => void alternarRemedios(v)}
           rodape={rodapeDe("saude", remediosLigado, "Cadastre um remédio com horário em Saúde")}
+        />
+
+        <LinhaAviso
+          icone={<CalendarClock className="w-4 h-4" />}
+          titulo="Consultas médicas"
+          descricao="Na véspera, às 19h, e 2 horas antes de cada consulta marcada em Saúde (sem horário, só na véspera)."
+          ligado={consultasLigado}
+          onChange={(v) => void alternarConsultas(v)}
+          rodape={rodapeDe("consulta", consultasLigado, "Marque uma consulta com data em Saúde")}
         />
 
         <LinhaAviso

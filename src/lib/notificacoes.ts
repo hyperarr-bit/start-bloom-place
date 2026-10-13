@@ -13,6 +13,7 @@ import { localDayKey } from "./utils";
    este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
    funil da web não precisa carregar a conta de avisos de três módulos. Aqui só os TIPOS. */
 import type { DadosDosAvisosPet } from "./pet-avisos";
+import type { ConsultaAgendavel } from "./consulta-avisos";
 import type { DadosDasRelacoes } from "./relacoes-lembrete";
 import type { DadosDoSkincare } from "./beleza-lembrete";
 import type { DadosDoCabelo } from "./beleza-cabelo";
@@ -47,7 +48,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "consulta" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -75,6 +76,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   sequencia: 1500000, // 26/09: sequência de dias anotados (Conquistas), à noite
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
+  consulta: 1810000, // 13/10: consulta médica de Saúde — véspera 19h e 2 h antes (lib/consulta-avisos)
   relacoes: 1900000, // 29/09: aniversário NO DIA + "faz tempo que não fala com…" (Relações, lib/relacoes-lembrete)
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
   cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
@@ -890,6 +892,17 @@ export async function agendarPet(dados: DadosDosAvisosPet): Promise<number> {
   const { algumLigadoPet, planejarAvisosPet } = await import("./pet-avisos");
   if (!algumLigadoPet(dados.prefs)) { await limparFaixa(BASES.pet); return 0; }
   return agendarSerie("pet", "/pet", planejarAvisosPet(dados, BASES.pet));
+}
+
+/* ─── Consulta médica (13/10, chamado: "o app não me avisa da consulta") ───────
+   A conta mora em lib/consulta-avisos (pura): véspera às 19h e 2 h antes (só
+   com horário). Nasce LIGADO como os remédios; editar a data ou apagar a
+   consulta muda o dado → o useLembretes reagenda → a série é refeita. O toque
+   abre o LOG MÉDICO de Saúde. */
+export async function agendarConsultas(lista: ConsultaAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.consulta); return 0; }
+  const { planejarAvisosConsulta } = await import("./consulta-avisos");
+  return agendarSerie("consulta", "/saude?aba=log", planejarAvisosConsulta(lista, BASES.consulta));
 }
 
 /* ─── Relações: parabéns no dia e manter contato (29/09, Onda 1) ─────────────

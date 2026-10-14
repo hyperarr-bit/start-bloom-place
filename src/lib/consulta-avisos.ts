@@ -119,8 +119,10 @@ const comQuem = (c: ConsultaAgendavel) => {
 
 export function planejarAvisosConsulta(consultas: ConsultaAgendavel[], base: number, agora: Date = new Date()): AvisoConsulta[] {
   const futuras = consultas
-    .map((c) => ({ c, m: momentosDoAviso(c, agora), inicio: instanteLocal(c.date, c.time, 0)!.getTime() }))
-    .filter(({ m }) => m.vespera || m.antes)
+    // 14/10 (revisor): data/hora impossível ("25:00", 31/02) dava null aqui e o .getTime() derrubava o reagendarTudo
+    // inteiro (todos os lembretes depois da consulta deixavam de ser agendados) — agora a consulta inválida só fica de fora
+    .map((c) => ({ c, m: momentosDoAviso(c, agora), inicio: instanteLocal(c.date, c.time, 0)?.getTime() ?? NaN }))
+    .filter(({ m, inicio }) => Number.isFinite(inicio) && (m.vespera || m.antes))
     .sort((a, b) => a.inicio - b.inicio || a.c.id.localeCompare(b.c.id));
 
   const avisos: AvisoConsulta[] = [];

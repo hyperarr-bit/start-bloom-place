@@ -72,7 +72,9 @@ const sh = (cmd) => execSync(cmd, { stdio: "inherit" });
 if (!process.argv.includes("--sem-trava")) {
   console.log("\n▶ trava de reabrir o app (chaves do aparelho, tour, cartões, festa)…");
   try {
-    execSync("npx vitest run src/test/chaves-do-aparelho-guarda.test.ts src/test/reabrir-app-telas-unicas.test.tsx src/test/vassoura-chaves-aparelho.test.ts src/test/momentos-popup.test.tsx", { stdio: "inherit" });
+    // 14/10 (revisor, build 39): a trava rodava só 4 arquivos e um teste quebrado escapou → roda a SUÍTE INTEIRA
+    // (só as 4 instáveis conhecidas de fora). Os testes de reabrir continuam dentro dela.
+    execSync("npx vitest run --exclude '**/aviso-cobranca*' --exclude '**/cancelar-assinatura-da-loja*' --exclude '**/resize-observer-fallback*' --exclude '**/demo-guiada-missao*' --exclude '**/node_modules/**' --exclude '**/.claude/**'", { stdio: "inherit" });
   } catch {
     console.error("\n✗ TRAVA: algum teste de reabrir o app falhou — o binário NÃO foi gerado. Conserta antes de subir pra loja.");
     process.exit(1);

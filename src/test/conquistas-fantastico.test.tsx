@@ -77,6 +77,7 @@ const cenario = (dias: number, extra: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   eventos.length = 0;
   toasts.length = 0;
+  try { localStorage.removeItem("core-festas-mostradas"); } catch { /* noop */ } // 14/10: festa já mostrada é do aparelho — não vaza entre testes
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 9, 7, 10, 0));
 });

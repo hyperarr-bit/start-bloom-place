@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { markActivation, trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
+import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, registrarDiaRetroativo, temConteudo } from "@/lib/sequencia";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
@@ -74,57 +75,9 @@ const checkActivation = (key: string, value: any) => {
   }
 };
 
-const GLOBAL_KEY_ALLOWLIST = new Set<string>([
-  "core-welcome-done",
-  "theme",
-  "vite-ui-theme",
-  "finance-keys-migrated-v2",
-  // Marca "este aparelho é o app instalado" — é do DISPOSITIVO, não do
-  // usuário: sem ela aqui, trocar de conta/logar mandava o PWA pro funil.
-  "core-pwa",
-  // Braço sorteado do A/B de gateway (abacate × pagarme): também é do
-  // dispositivo. Varrer isso faria a pessoa trocar de gateway entre sessões.
-  "core-gw-arm",
-  // "já vi a comemoração pós-compra" — de dispositivo de propósito, porque a
-  // tela aparece logo antes de um location.href e não dá tempo de sincronizar
-  // com o servidor. Fora daqui, a varredura apagaria e a tela voltaria.
-  "core-boas-vindas-visto",
-  // v61: trial do cartão + Missão dos 3 dias — nascem ANÔNIMOS (compra antes
-  // do cadastro) e o login vem logo depois; fora da lista, a vassoura levava
-  // exatamente quando passam a importar (pego no emulador 19/08).
-  "core-trial-cartao-fim",
-  "core-missao",
-  "core-lembrete-hora",
-  // Tema escuro + paleta de cores (20/08, reviews ★4/★3 independentes): são
-  // preferência do DISPOSITIVO — fora daqui, a vassoura resetava o visual a
-  // cada logout e a pessoa configurava tudo de novo.
-  "core-theme-mode",
-  "core-theme-palette",
-  // save-offer do trial cancelado: 1x por pessoa, marca de DISPOSITIVO
-  "core-save-offer-visto",
-  // presente de 69,90 do iPhone (07/10): 1x por pessoa POR LUGAR, marca de DISPOSITIVO
-  "core-presente69-cancelou-visto",
-  "core-presente69-bloqueio-visto",
-  // 10/10 (1.0.14, ofertas de saída): o 3º lugar do presente, o mensal de 19,90 (1x por
-  // lugar) e a força de QA das chaves — tudo marca de DISPOSITIVO
-  "core-presente69-x-paywall-visto",
-  "core-mensal19-mensal-paywall-visto",
-  "core-mensal19-cancelou-visto",
-  "core-mensal19-bloqueio-visto",
-  "ofertas-saida-force",
-  "core-funnel-area",
-  // 03/10: Lembrete do dia 2 / 1ª semana (1º uso no aparelho, hora, permissão
-  // pedida) e as notificações já contadas como entregues — do DISPOSITIVO.
-  "core-dia2",
-  "core-notif-entregues",
-  // 14/10 (chamado: "toda vez que eu entro ou mudo de tela aparece o tutorial"): a vassoura roda em TODA abertura
-  // (lastUserIdRef nasce null) e levava o "já vi" do tour da Home e dos cartões dos módulos — 1x por APARELHO.
-  // Mesmo caso: o braço do Dia 1, o id local do aparelho e os avisos de cobrança já armados.
-  "core-home-tour-done",
-  "core-dia1-braco",
-  "core-device-id",
-  "core-aviso-cobranca-notif",
-]);
+// As chaves do APARELHO (o que nenhuma vassoura apaga) moram em src/lib/chaves-do-aparelho.ts,
+// a fonte única desta vassoura e da do logout (use-auth). Chave nova gravada direto no
+// localStorage com prefixo varrido entra lá — o teste chaves-do-aparelho-guarda cobra.
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;
 // Guest (pre-signup) keys — survive across reloads, migrated on signup/login.
@@ -195,23 +148,10 @@ export const purgeUserLocalCache = () => {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!k) continue;
-      if (GLOBAL_KEY_ALLOWLIST.has(k)) continue;
-      if (k.startsWith("core-cartoes-vistos-")) continue; // 14/10: "já vi os cartões" de cada módulo, por aparelho
       // Never purge guest data here — it belongs to a separate, pre-signup session.
       if (k.startsWith(GUEST_PREFIX)) continue;
-      if (
-        k.startsWith("u:") ||
-        k.startsWith("finance-") ||
-        k.startsWith("home-") ||
-        k.startsWith("core-") ||
-        k.startsWith("life-") ||
-        k.startsWith("module-") ||
-        k.startsWith("daily-") ||
-        k.startsWith("offline-") ||
-        k.startsWith("nudge-")
-      ) {
-        toRemove.push(k);
-      }
+      // 14/10: roda em TODA abertura (lastUserIdRef nasce null) — o que é do aparelho fica.
+      if (vassouraLeva(k)) toRemove.push(k);
     }
     toRemove.forEach(safeRemoveItem);
   } catch {}

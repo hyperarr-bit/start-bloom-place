@@ -66,6 +66,18 @@ const ASSINATURAS = [
 ];
 
 const sh = (cmd) => execSync(cmd, { stdio: "inherit" });
+
+// TRAVA (14/10, bug do tutorial que voltava a cada abertura na 1.0.14): nenhum binário de loja sai sem os testes
+// de "usar → fechar → reabrir" e a guarda das chaves do aparelho. Falhou = não builda. (pular só com --sem-trava)
+if (!process.argv.includes("--sem-trava")) {
+  console.log("\n▶ trava de reabrir o app (chaves do aparelho, tour, cartões, festa)…");
+  try {
+    execSync("npx vitest run src/test/chaves-do-aparelho-guarda.test.ts src/test/reabrir-app-telas-unicas.test.tsx src/test/vassoura-chaves-aparelho.test.ts src/test/momentos-popup.test.tsx", { stdio: "inherit" });
+  } catch {
+    console.error("\n✗ TRAVA: algum teste de reabrir o app falhou — o binário NÃO foi gerado. Conserta antes de subir pra loja.");
+    process.exit(1);
+  }
+}
 const tamanho = (p) => {
   if (!existsSync(p)) return 0;
   const s = statSync(p);

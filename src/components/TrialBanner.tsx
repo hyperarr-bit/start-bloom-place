@@ -84,6 +84,8 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/comece") ||
     // /abrir?h=<código> (10/10): a reserva do "Abrir o CORE" da Porta — mesma conta recém-criada.
     location.pathname.startsWith("/abrir") ||
+    // /experimente (14/10): o funil-demo da campanha nova — demo + conta + "baixe o app", como a Porta.
+    location.pathname.startsWith("/experimente") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

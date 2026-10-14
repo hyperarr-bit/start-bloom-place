@@ -3,6 +3,7 @@ import { Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import { useUserData } from "@/hooks/use-user-data";
 import { uploadImage } from "@/lib/image-upload";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * FOTO QUE VAI PRO STORAGE, NÃO PRA DENTRO DA CHAVE (30/09, integração do Pet).
@@ -22,7 +23,7 @@ import { uploadImage } from "@/lib/image-upload";
 const BUCKET = "dream-board";
 
 const emDemonstracao = () => {
-  try { return window.location.pathname.startsWith("/preview"); } catch { return false; }
+  try { return ehCaminhoDeDemo(window.location.pathname); } catch { return false; }
 };
 
 /** Na demo: miniatura em memória (nunca vai pro servidor — a demo não grava nada). */

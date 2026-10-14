@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { FileText, Loader2, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 import { caminhoEhPdf, ehPdf, removeImage, signedUrlFor, uploadImagePath } from "@/lib/image-upload";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 export const BUCKET_SAUDE = "dream-board";
 export const PASTA_SAUDE = "saude";
@@ -29,7 +30,7 @@ export const MAX_PDF_MB = 20;
  * a galeria abria e nada acontecia (progresso) ou dizia "Tenta de novo"
  * (exame, documento). Na demo o toque só explica; o app logado não muda. */
 export const estaNaDemo = () => {
-  try { return window.location.pathname.startsWith("/preview"); } catch { return false; }
+  try { return ehCaminhoDeDemo(window.location.pathname); } catch { return false; }
 };
 export const avisarFotoNaDemo = () =>
   toast("Fotos funcionam depois de criar a conta", { description: "Aqui na demonstração nada é salvo." });

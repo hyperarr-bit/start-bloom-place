@@ -16,6 +16,7 @@ import { CHAVE_LEMBRETE } from "@/lib/pet";
 import { ANTECEDENCIAS, algumLigadoPet, type PrefsLembretePet } from "@/lib/pet-avisos";
 import { BotaoPet, CartaoPet, Pata } from "./kit";
 import type { UsePet } from "./use-pet";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 const HORAS = [7, 8, 9, 10, 12, 18, 20];
 export const CHAVE_WIDGETS_HOME = "core-home-widgets-v2";
@@ -106,7 +107,7 @@ export const DicaDoPet = ({ dados, onAvisos }: { dados: UsePet; onAvisos: () => 
     return <p className="text-[12.5px] font-semibold text-[hsl(var(--pet-ok))] px-1" role="status">{feito}</p>;
   }
   // na demonstração (/preview) não existe Home de verdade nem aviso: a dica só confundiria
-  try { if (window.location.pathname.startsWith("/preview")) return null; } catch { /* noop */ }
+  try { if (ehCaminhoDeDemo(window.location.pathname)) return null; } catch { /* noop */ }
 
   // o convite dos avisos só no app (na web o aviso não toca: seria botão morto)
   const oferta: "home" | "avisos" | null = !naHome && dicas.home !== "nao" ? "home" : avisosNoApp() && !algumLigadoPet(prefsLembrete) && dicas.avisos !== "nao" ? "avisos" : null;

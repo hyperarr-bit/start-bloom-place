@@ -1,4 +1,5 @@
 import { isNativeShell } from "@/lib/native-shell";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * LEMBRETE SÓ EXISTE NO APP DA LOJA (30/09, integração de Pet, Relações e Beleza).
@@ -17,7 +18,7 @@ import { isNativeShell } from "@/lib/native-shell";
 export const avisosNoApp = (): boolean => {
   if (!isNativeShell()) return false;
   try {
-    return !window.location.pathname.startsWith("/preview");
+    return !ehCaminhoDeDemo(window.location.pathname);
   } catch {
     return true;
   }

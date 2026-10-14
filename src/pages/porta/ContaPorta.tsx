@@ -97,11 +97,12 @@ export function validarConta(email: string, senha: string): Falta[] {
 
 /* 12/10 (dono): sai a linha "3 dias grátis no app · nada cobrado hoje" desta tela — o teste é apresentado no app
  * ("Você ganhou 3 dias grátis") e no sucesso. `mostrarTeste` fica na assinatura pra não mexer em quem chama. */
-function TopoDaConta(_props: { mostrarTeste: boolean }) {
+/* 14/10: o funil-demo (/experimente) usa a MESMA conta com outro título/texto (`titulo`/`texto`); sem eles, os da Porta. */
+function TopoDaConta({ titulo = TITULO_CONTA, texto = TEXTO_CONTA }: { mostrarTeste: boolean; titulo?: string; texto?: string }) {
   return (
     <>
-      <TituloCard testid="porta-conta-titulo">{TITULO_CONTA}</TituloCard>
-      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-conta-texto">{TEXTO_CONTA}</p>
+      <TituloCard testid="porta-conta-titulo">{titulo}</TituloCard>
+      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="porta-conta-texto">{texto}</p>
     </>
   );
 }
@@ -115,9 +116,12 @@ const Termos = () => (
   </p>
 );
 
-export function ContaPorta({ mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta, onErroCampo }: {
+export function ContaPorta({ mostrarTeste, emInApp, appDoWebview, mostrarApple, emailLogado, onApple, onGoogle, onGoogleBloqueado, onCriarConta, onEntrarComSenha, onSalvarNestaConta, onTrocarConta, onErroCampo, titulo, texto }: {
   /** iPhone: "3 dias grátis no app · nada cobrado hoje" */
   mostrarTeste: boolean;
+  /** 14/10 (funil-demo): título e texto do topo da conta. Sem eles, os da Porta (TITULO_CONTA / TEXTO_CONTA). */
+  titulo?: string;
+  texto?: string;
   emInApp: boolean;
   /** "Instagram" | "Facebook" — o nome no aviso do Google */
   appDoWebview: string;
@@ -158,7 +162,7 @@ export function ContaPorta({ mostrarTeste, emInApp, appDoWebview, mostrarApple, 
   if (emailLogado) {
     return (
       <div className="mt-6" data-testid="porta-conta" data-fase="logado">
-        <TopoDaConta mostrarTeste={mostrarTeste} />
+        <TopoDaConta mostrarTeste={mostrarTeste} titulo={titulo} texto={texto} />
         <div className="mt-4 rounded-[12px] border border-[#e3e0e6] bg-[#faf9fb] px-4 py-3">
           <p className="text-[12.5px] text-[#6b6670]">Você já entrou neste aparelho</p>
           <p className="text-[16px] font-semibold text-[#16121c] mt-0.5 break-all" data-testid="porta-conta-email-logado">{emailLogado}</p>
@@ -220,7 +224,7 @@ export function ContaPorta({ mostrarTeste, emInApp, appDoWebview, mostrarApple, 
   };
   return (
     <div className="mt-6" data-testid="porta-conta" data-fase="form">
-      <TopoDaConta mostrarTeste={mostrarTeste} />
+      <TopoDaConta mostrarTeste={mostrarTeste} titulo={titulo} texto={texto} />
 
       <div className="mt-4">
         {mostrarApple && (

@@ -6,6 +6,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora } from "@/lib/prefs-notificacoes";
 import { trackEvent } from "@/lib/analytics";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * "Me avisar todo dia" no próprio card do QUANTO POSSO GASTAR HOJE (26/09).
@@ -20,7 +21,7 @@ export const LembreteDoLimite = () => {
   const [ligadoAgora, setLigadoAgora] = useState(false);
 
   if (!isNativeShell() || !loaded) return null;
-  try { if (window.location.pathname.startsWith("/preview")) return null; } catch { /* noop */ }
+  try { if (ehCaminhoDeDemo(window.location.pathname)) return null; } catch { /* noop */ }
   const prefs = lerPrefs(get(CHAVE_PREFS, {}));
   if (prefs.limite && !ligadoAgora) return null;
 

@@ -12,7 +12,8 @@
  * tem que ser uma das rotas permitidas (/planos… e /comece).
  */
 // 10/10: + /comece — a Porta iPhone volta pra tela "Pronto, salvo" depois do Google e do link do e-mail
-export const DESTINOS_PERMITIDOS = ["/planos", "/comece"];
+// 14/10: + /experimente — o funil-demo volta pra conta depois do Google/Apple (/experimente?passo=voltou)
+export const DESTINOS_PERMITIDOS = ["/planos", "/comece", "/experimente"];
 const CHAVE = "core-auth-next";
 
 export function destinoSeguro(raw: string | null | undefined): string | null {

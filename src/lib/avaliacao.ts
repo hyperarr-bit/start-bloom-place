@@ -1,6 +1,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { userKeyOf } from "@/components/finance/storage-keys";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * PEDIDO DE AVALIAÇÃO NA PLAY (14/08).
@@ -200,7 +201,7 @@ export function podePedirAvaliacao(): boolean {
   // Na DEMO do funil os módulos são os REAIS (/preview) — sem este guard, o
   // turista de 30s marcando a conta de exemplo seria convidado a avaliar: o
   // exato erro do pedido-no-funil que morreu em 28/08.
-  try { if (window.location.pathname.startsWith("/preview")) return false; } catch { /* noop */ }
+  try { if (ehCaminhoDeDemo(window.location.pathname)) return false; } catch { /* noop */ }
   if (lerNumero(CHAVE_TOTAL) >= MAXIMO_NA_VIDA) return false;
   const ultima = lerNumero(CHAVE_ULTIMA);
   const dias = ultima ? (Date.now() - ultima) / 86_400_000 : Infinity;

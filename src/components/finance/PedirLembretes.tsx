@@ -7,6 +7,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { trackEvent } from "@/lib/analytics";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 const CHAVE_JA_PERGUNTOU = "lembretes-contas-perguntado";
 
@@ -37,7 +38,7 @@ export const PedirLembretes = ({ dueDays }: { dueDays: { day?: number; bills?: {
     if (!isNativeShell() || !loaded) return;
     // v83.1 (dono): na DEMO do funil não se pede notificação — o funil já tem
     // a tela própria de sininho antes; aqui viraria pedido duplicado.
-    try { if (window.location.pathname.startsWith("/preview")) return; } catch { /* noop */ }
+    try { if (ehCaminhoDeDemo(window.location.pathname)) return; } catch { /* noop */ }
     if (contasAbertas === 0) return;                          // nada a lembrar ainda
     if (get<string>(CHAVE_JA_PERGUNTOU, "") === "true") return;
     let vivo = true;

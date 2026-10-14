@@ -62,6 +62,7 @@ import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelc
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -76,7 +77,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // A seta ←: no app, o hub; na demo, o mesmo destino do botão de baixo (P5, 30/09).
   const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  const isPreview = ehCaminhoDeDemo(location.pathname);
   const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
   /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma

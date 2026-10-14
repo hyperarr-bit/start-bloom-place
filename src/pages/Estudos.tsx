@@ -24,6 +24,7 @@ import { RevisaoDoDia } from "@/components/estudos/RevisaoDoDia";
 import { Metodo } from "@/components/estudos/Metodo";
 import { comoRevisoes, responder, type Resposta, type Revisoes } from "@/components/estudos/revisao";
 import { comoAprendizados, type Aprendizado, type AprendizadosPorCurso } from "@/components/estudos/aprendizados";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 
 // ── Types ──
@@ -147,7 +148,7 @@ const Estudos = () => {
   // botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
   const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  const isPreview = ehCaminhoDeDemo(location.pathname);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
 

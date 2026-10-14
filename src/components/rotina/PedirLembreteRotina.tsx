@@ -8,6 +8,7 @@ import { estadoPermissao, pedirPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 const CHAVE_JA_PERGUNTOU = "lembrete-rotina-perguntado";
 /** Abaixo disto não há o que proteger — e o convite vira propaganda. */
@@ -43,7 +44,7 @@ export const PedirLembreteRotina = ({ sequencia }: { sequencia: number }) => {
     // v83.4 (print do dono): na DEMO do funil (/preview) a sequência de 41
     // dias é DADO DE EXEMPLO — pedir notificação ali é queimar a única
     // chance do Android 13+ com um turista. Mesma regra do PedirLembretes.
-    try { if (window.location.pathname.startsWith("/preview")) return; } catch { /* noop */ }
+    try { if (ehCaminhoDeDemo(window.location.pathname)) return; } catch { /* noop */ }
     if (sequencia < SEQUENCIA_MINIMA) return;
     if (get<string>(CHAVE_JA_PERGUNTOU, "") === "true") return;
     // já ligou o lembrete de rotina por conta própria? não tem o que oferecer

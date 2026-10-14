@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * Chave da Beleza lida e gravada DIRETO no useUserData, sem cópia local
@@ -40,5 +41,5 @@ export const useChaveDaBeleza = <T,>(chave: string, padrao: T): [T, (v: T | ((an
 
 /** Estamos na demonstração pública (/preview)? Lá não há conta: foto não sobe. */
 export const emDemonstracao = (): boolean => {
-  try { return window.location.pathname.startsWith("/preview"); } catch { return false; }
+  try { return ehCaminhoDeDemo(window.location.pathname); } catch { return false; }
 };

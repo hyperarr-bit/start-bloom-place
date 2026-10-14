@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 const genId = () => crypto.randomUUID();
 
@@ -696,7 +697,7 @@ const Carreira = () => {
   // botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
   const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  const isPreview = ehCaminhoDeDemo(location.pathname);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
 

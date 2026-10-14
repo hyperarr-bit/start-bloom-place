@@ -25,6 +25,7 @@ import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useUserData } from "@/hooks/use-user-data";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 
 const defaultAffirmations: string[] = [];
@@ -297,7 +298,7 @@ const DesenvolvimentoPessoal = () => {
   // destino do botão de baixo dela (P5, 30/09). Antes: /lp → /comecar.
   const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
-  const isPreview = location.pathname.startsWith("/preview");
+  const isPreview = ehCaminhoDeDemo(location.pathname);
   // ?tab= permite deep-link (a demo do funil de metas abre direto na aba Metas)
   // ids das metas que passam no filtro de etiqueta/ano (null = sem filtro) — ver EtiquetasDasMetas
   const [metasFiltradas, setMetasFiltradas] = useState<Set<string> | null>(null);

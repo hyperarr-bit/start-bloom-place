@@ -9,6 +9,7 @@ import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance
 import { parcelaDoMes, parcelaAtiva } from "@/lib/finance-parcelas";
 import { useAuth } from "@/hooks/use-auth";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 
 /**
  * MEU MÊS — calendário financeiro que se preenche sozinho.
@@ -203,7 +204,7 @@ export const MonthCalendar = ({
      * de 1,2s sobrevivia à navegação SPA e a folha de avaliação abria já
      * DENTRO do funil (o guard central só roda na hora do disparo), e o
      * contador persistente somava conta de EXEMPLO como se fosse uso real. */
-    const emDemo = (() => { try { return window.location.pathname.startsWith("/preview"); } catch { return false; } })();
+    const emDemo = (() => { try { return ehCaminhoDeDemo(window.location.pathname); } catch { return false; } })();
     if (estavaPaga === false && !emDemo) {
       const total = Number(localStorage.getItem("core-contas-pagas") ?? 0) + 1;
       try { localStorage.setItem("core-contas-pagas", String(total)); } catch { /* modo privado */ }

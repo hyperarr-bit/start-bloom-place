@@ -619,6 +619,27 @@ export const MomentoCapa = ({ capas, nome, membroDesde, dias, nivel, onUsar, onC
 /* ------------------------------------------------------------ orquestra */
 
 /** Orquestra a fila de momentos + as escritas da sequência (uma vez por tela). */
+/*
+ * 14/10 (alarme telas-repetidas: a festa do MESMO adesivo voltou pra 23 pessoas na 1.0.14): o "visto" da conta
+ * só era gravado no Continuar / Ver adesivos — quem fechava o app com a festa aberta via de novo na próxima
+ * abertura. Agora, assim que a festa APARECE, ela entra em `core-festas-mostradas` (chave do aparelho, a vassoura
+ * não leva) e, na abertura seguinte, vira "visto" na conta antes de a fila montar. Na abertura em que aparece
+ * ela continua na tela até a pessoa fechar (a lista é lida uma vez, na montagem).
+ */
+export const CHAVE_FESTAS_MOSTRADAS = "core-festas-mostradas";
+export const lerFestasMostradas = (): string[] => {
+  try { const v = JSON.parse(localStorage.getItem(CHAVE_FESTAS_MOSTRADAS) || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+};
+export const gravarFestaMostrada = (ids: string[]): void => {
+  try { localStorage.setItem(CHAVE_FESTAS_MOSTRADAS, JSON.stringify([...new Set([...lerFestasMostradas(), ...ids])].slice(-300))); } catch { /* storage bloqueado */ }
+};
+/** O que um item da fila grava como "já mostrado": adesivo → id; marco → marco:N; capa → capa:id. */
+export const idsMostradosDoItem = (item: { tipo: string; dias?: number; badges?: { id: string }[]; badge?: { id: string }; capas?: string[] }): string[] =>
+  item.tipo === "marco" ? [`marco:${item.dias}`]
+    : item.tipo === "popup" ? (item.badges ?? []).map((b) => b.id)
+    : item.tipo === "capa" ? (item.capas ?? []).map((c) => `capa:${c}`)
+    : item.badge ? [item.badge.id] : [];
+
 export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean } = {}) => {
   const { get, set, loaded } = useUserData();
   const navigate = useNavigate();
@@ -646,6 +667,28 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
   }, []);
   const esperaMissao = useMemo(() => missaoEmCena(), [tiqueMissao]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 14/10: festas que já apareceram em aberturas ANTERIORES viram "visto" na conta (uma escrita), antes da fila
+  const mostradasAntes = useMemo(() => lerFestasMostradas(), []);
+  useEffect(() => {
+    if (!loaded || vistasCru === undefined || !mostradasAntes.length) return;
+    const v = lerVistas(get<unknown>(CHAVE_VISTAS, undefined)) ?? { adesivos: [], marcos: [] };
+    const marcos = mostradasAntes.filter((x) => x.startsWith("marco:")).map((x) => Number(x.slice(6))).filter((n) => Number.isFinite(n));
+    const capas = mostradasAntes.filter((x) => x.startsWith("capa:")).map((x) => x.slice(5));
+    const adesivos = mostradasAntes.filter((x) => !x.startsWith("marco:") && !x.startsWith("capa:"));
+    const marcosAte = MARCOS_SEQUENCIA.filter((m) => marcos.some((d) => m <= d));
+    const novosAdesivos = [...adesivos, ...marcosAte.map((m) => `sequencia-${m}`)].filter((id) => !v.adesivos.includes(id));
+    const novosMarcos = marcosAte.filter((m) => !v.marcos.includes(m));
+    if (novosAdesivos.length || novosMarcos.length) {
+      set(CHAVE_VISTAS, { adesivos: [...v.adesivos, ...novosAdesivos], marcos: [...v.marcos, ...novosMarcos] }, { system: true });
+    }
+    if (capas.length) {
+      const ja = lerCapasVistas(get<unknown>(CHAVE_CAPAS_VISTAS, undefined)) ?? [];
+      const faltam = capas.filter((c) => !ja.includes(c));
+      if (faltam.length) set(CHAVE_CAPAS_VISTAS, [...ja, ...faltam], { system: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, vistasCru === undefined]);
 
   // linha de base (1ª abertura): o que já está conquistado não vira festa atrasada
   useEffect(() => {
@@ -726,6 +769,12 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   // "Ver em tela cheia" do popup: a festa de hoje do adesivo escolhido, por cima; "Voltar" devolve ao cartão
   const [telaCheia, setTelaCheia] = useState<Badge | null>(null);
   useEffect(() => { setTelaCheia(null); }, [chaveAtual]);
+
+  // 14/10: apareceu → fica gravado NESTE aparelho (fechar o app com a festa aberta não a repete na próxima abertura)
+  useEffect(() => {
+    if (atual) gravarFestaMostrada(idsMostradosDoItem(atual as Parameters<typeof idsMostradosDoItem>[0]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveAtual]);
 
   useEffect(() => {
     if (atual?.tipo === "marco") trackEvent("sequencia_marco", { dias: atual.dias });

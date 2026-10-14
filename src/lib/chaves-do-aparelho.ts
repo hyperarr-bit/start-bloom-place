@@ -53,6 +53,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-notif-entregues",
   // 14/10 (af0e444f): o tutorial voltava a cada abertura
   "core-home-tour-done",
+  // 14/10: festas (adesivo/marco/capa) que JÁ apareceram neste aparelho — fechar o app com a festa aberta não a repete
+  "core-festas-mostradas",
   "core-dia1-braco",
   "core-device-id",
   "core-aviso-cobranca-notif",

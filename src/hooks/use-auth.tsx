@@ -30,11 +30,14 @@ export const purgeLocalUserCache = () => {
     // core-dia2 (03/10): o Lembrete do dia 2 / 1ª semana é do APARELHO (1º uso,
     // hora da abertura, permissão já pedida) — fora da lista, deslogar e entrar
     // de novo zeraria "a 1ª semana" e pediria permissão outra vez.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto", "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-presente69-x-paywall-visto", "core-mensal19-mensal-paywall-visto", "core-mensal19-cancelou-visto", "core-mensal19-bloqueio-visto", "ofertas-saida-force", "core-dia2", "core-notif-entregues"]);
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto", "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-presente69-x-paywall-visto", "core-mensal19-mensal-paywall-visto", "core-mensal19-cancelou-visto", "core-mensal19-bloqueio-visto", "ofertas-saida-force", "core-dia2", "core-notif-entregues",
+      // 14/10: chaves do APARELHO que a vassoura levava (o tutorial voltava a cada abertura) — ver use-user-data
+      "core-home-tour-done", "core-dia1-braco", "core-device-id", "core-aviso-cobranca-notif"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!k || KEEP.has(k)) continue;
+      if (k.startsWith("core-cartoes-vistos-")) continue;
       if (
         k.startsWith("u:") ||
         k.startsWith("finance-") ||

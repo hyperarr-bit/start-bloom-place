@@ -117,6 +117,13 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   // pedida) e as notificações já contadas como entregues — do DISPOSITIVO.
   "core-dia2",
   "core-notif-entregues",
+  // 14/10 (chamado: "toda vez que eu entro ou mudo de tela aparece o tutorial"): a vassoura roda em TODA abertura
+  // (lastUserIdRef nasce null) e levava o "já vi" do tour da Home e dos cartões dos módulos — 1x por APARELHO.
+  // Mesmo caso: o braço do Dia 1, o id local do aparelho e os avisos de cobrança já armados.
+  "core-home-tour-done",
+  "core-dia1-braco",
+  "core-device-id",
+  "core-aviso-cobranca-notif",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;
@@ -189,6 +196,7 @@ export const purgeUserLocalCache = () => {
       const k = localStorage.key(i);
       if (!k) continue;
       if (GLOBAL_KEY_ALLOWLIST.has(k)) continue;
+      if (k.startsWith("core-cartoes-vistos-")) continue; // 14/10: "já vi os cartões" de cada módulo, por aparelho
       // Never purge guest data here — it belongs to a separate, pre-signup session.
       if (k.startsWith(GUEST_PREFIX)) continue;
       if (

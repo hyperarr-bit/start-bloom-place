@@ -74,7 +74,12 @@ if (!process.argv.includes("--sem-trava")) {
   try {
     // 14/10 (revisor, build 39): a trava rodava só 4 arquivos e um teste quebrado escapou → roda a SUÍTE INTEIRA
     // (só as 4 instáveis conhecidas de fora). Os testes de reabrir continuam dentro dela.
-    execSync("npx vitest run --exclude '**/aviso-cobranca*' --exclude '**/cancelar-assinatura-da-loja*' --exclude '**/resize-observer-fallback*' --exclude '**/demo-guiada-missao*' --exclude '**/node_modules/**' --exclude '**/.claude/**'", { stdio: "inherit" });
+    execSync("npx vitest run --exclude '**/aviso-cobranca*' --exclude '**/cancelar-assinatura-da-loja*' --exclude '**/resize-observer-fallback*' --exclude '**/demo-guiada-missao*' --exclude '**/node_modules/**' --exclude '**/.claude/**'", {
+      stdio: "inherit",
+      // os testes rodam SEM as variáveis do build de loja (VITE_V14_LOJA=1 etc. ligariam tudo e quebrariam testes
+      // que esperam as chaves no padrão) — é o mesmo ambiente do pre-push
+      env: Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(VITE_|RC_MOCK$)/.test(k))),
+    });
   } catch {
     console.error("\n✗ TRAVA: algum teste de reabrir o app falhou — o binário NÃO foi gerado. Conserta antes de subir pra loja.");
     process.exit(1);

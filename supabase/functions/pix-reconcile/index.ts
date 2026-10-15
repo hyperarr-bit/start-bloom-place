@@ -37,12 +37,18 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790 };
+// 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790 };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
 const DIAS_DA_OFERTA: Record<string, number | null> = {
-  lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null,
+  lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null, a97: 365,
+};
+/** O plano/período gravado na assinatura de cada oferta com prazo (o resto, `dias: null`, é vitalício). */
+const PERIODO_DA_OFERTA: Record<string, { plano: string; periodo: string }> = {
+  w25: { plano: "web", periodo: "monthly_prepaid" },
+  a97: { plano: "core-pro", periodo: "annual" },
 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -302,8 +308,8 @@ serve(async (req) => {
         const payload = {
           user_id: uid,
           status: "active",
-          plan: dias === null ? "lifetime" : "web",
-          billing_period: dias === null ? "lifetime" : "monthly_prepaid",
+          plan: dias === null ? "lifetime" : (PERIODO_DA_OFERTA[o.offer]?.plano ?? "web"),
+          billing_period: dias === null ? "lifetime" : (PERIODO_DA_OFERTA[o.offer]?.periodo ?? "monthly_prepaid"),
           payment_method: "pix",
           abacatepay_billing_id: o.orderId,
           customer_email: email,
@@ -358,7 +364,7 @@ serve(async (req) => {
                 },
                 custom_data: {
                   value: cents / 100, currency: "BRL",
-                  content_name: o.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício",
+                  content_name: o.offer === "a97" ? "CORE Anual" : o.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício",
                 },
               }],
             };

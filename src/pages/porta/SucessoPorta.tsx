@@ -42,7 +42,7 @@ const CONFETE = [
   { x: 22, y: -76, c: MAGENTA, r: 25 }, { x: -70, y: 34, c: "#7c5cff", r: -20 }, { x: 72, y: 36, c: "#f0a500", r: 50 },
 ];
 
-function SeloConta() {
+export function SeloConta() {
   return (
     <div className="relative mx-auto w-[150px] h-[104px] grid place-items-center" aria-hidden data-testid="porta-sucesso-check">
       {CONFETE.map((p, i) => (
@@ -75,7 +75,7 @@ const PlayIcon = () => (
 );
 
 /** o botão preto da loja, no formato do selo da Apple/Google ("Baixar na" pequeno em cima) */
-function BotaoLoja({ android, href, onClick, testid = "porta-loja" }: { android: boolean; href: string; onClick: () => void; testid?: string }) {
+export function BotaoLoja({ android, href, onClick, testid = "porta-loja" }: { android: boolean; href: string; onClick: () => void; testid?: string }) {
   return (
     <a
       href={href} onClick={onClick} data-testid={testid}

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { OFERTA_PIX_ANUAL, assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
 import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
@@ -32,7 +33,8 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * linha abaixo a rebaixa pra "lifetime" e a venda entra pelo preço errado —
  * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
  * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790 };
+// 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790 };
 /* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
  * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
  * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
@@ -44,6 +46,7 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
   w47: { plano: "lifetime", periodo: "lifetime", dias: null },
   w27: { plano: "lifetime", periodo: "lifetime", dias: null }, // 07/09: vitalício web 27,90
+  a97: { plano: "core-pro", periodo: "annual", dias: 365 }, // 15/10: anual da venda da web (/assinar)
 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
@@ -88,7 +91,7 @@ async function sendToUtmify(admin: Admin, args: { userId: string; email: string 
       orderId: args.orderId, platform: "Asaas", paymentMethod: "pix", status: "paid",
       createdAt: nowStamp, approvedDate: nowStamp, refundedAt: null,
       customer: { name: args.name || args.email?.split("@")[0] || "Cliente", email: args.email || "", phone: null, document: null, country: "BR" },
-      products: [{ id: args.offer, name: isDownsell ? "CORE Vitalício (oferta)" : "CORE Vitalício", planId: null, planName: "lifetime", quantity: 1, priceInCents: args.amountCents }],
+      products: [{ id: args.offer, name: nomeDoProduto({ offer: args.offer, downsell: isDownsell }), planId: null, planName: args.offer === OFERTA_PIX_ANUAL ? "annual" : "lifetime", quantity: 1, priceInCents: args.amountCents }],
       trackingParameters: { src: null, sck: null, ...utm },
       commission: { totalPriceInCents: args.amountCents, gatewayFeeInCents: 0, userCommissionInCents: args.amountCents },
       isTest: false,
@@ -129,7 +132,7 @@ async function sendMetaCapi(admin: Admin, args: { userId: string; email: string 
           ...(fbc ? { fbc } : {}),
           ...(args.fbp ? { fbp: args.fbp } : {}),
         },
-        custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: args.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
+        custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: nomeDoProduto({ offer: args.offer, downsell: args.offer === "downsell" }) },
       }],
     };
     const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
@@ -271,12 +274,15 @@ serve(async (req) => {
           const firstName = (displayName ?? "").split(" ")[0] || null;
           await fetch("https://api.resend.com/emails", {
             method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from, to: [email],
-              // o assunto tem que dizer a verdade: mês pré-pago não é vitalício
-              subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅",
-              html: welcomeHtml(firstName, email),
-            }),
+            // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; o resto segue igual
+            body: JSON.stringify(offer === OFERTA_PIX_ANUAL
+              ? { from, to: [email], subject: assuntoVenda("annual"), html: htmlVenda({ email, nome: displayName, periodo: "annual", fim: decisao.fim }) }
+              : {
+                from, to: [email],
+                // o assunto tem que dizer a verdade: mês pré-pago não é vitalício
+                subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅",
+                html: welcomeHtml(firstName, email),
+              }),
           });
           logStep("Welcome email sent", { to: email.slice(0, 3) + "***" });
         }

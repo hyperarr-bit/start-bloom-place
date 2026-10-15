@@ -17,9 +17,13 @@ export const MAGENTA = "#d22d80";
 /** O ícone do app (o mesmo do manifest/PWA e da App Store: public/icon-192.png, 5 KB). Não é desenho novo. */
 export const LOGO_PORTA = "/icon-192.png";
 
-export function TopoPorta() {
+/** Sem props = o topo da /comece (byte a byte). A venda (/assinar, 15/10) passa os textos dela e, depois do quiz,
+ *  `compacto` (só a linha do logo: o paywall e o Pix precisam do espaço). */
+export function TopoPorta({ selo = SELO_TOPO, titulo = TITULO_TOPO, sub = SUB_TOPO, compacto = false }: {
+  selo?: string; titulo?: string; sub?: string; compacto?: boolean;
+} = {}) {
   return (
-    <header className="flex flex-col items-center text-center" data-testid="porta-topo">
+    <header className="flex flex-col items-center text-center" data-testid="porta-topo" data-compacto={compacto ? "" : undefined}>
       <div className="flex items-center gap-2" data-testid="porta-logo-linha">
         <img
           src={LOGO_PORTA} alt="" width={30} height={30} decoding="async"
@@ -28,9 +32,13 @@ export function TopoPorta() {
         />
         <span className="text-[22px] font-black tracking-[-0.03em] leading-none text-[#16121c]">CORE</span>
       </div>
-      <p className="mt-[18px] text-[12.5px] font-bold uppercase tracking-[0.14em]" style={{ color: MAGENTA }} data-testid="porta-selo">{SELO_TOPO}</p>
-      <h1 className="mt-2 text-[30px] font-extrabold tracking-[-0.035em] leading-[1.08] text-balance max-w-[320px]" data-testid="porta-titulo">{TITULO_TOPO}</h1>
-      <p className="mt-2.5 text-[15.5px] leading-[1.45] text-[#6b6670] max-w-[330px] text-pretty" data-testid="porta-sub">{SUB_TOPO}</p>
+      {!compacto && (
+        <>
+          <p className="mt-[18px] text-[12.5px] font-bold uppercase tracking-[0.14em]" style={{ color: MAGENTA }} data-testid="porta-selo">{selo}</p>
+          <h1 className="mt-2 text-[30px] font-extrabold tracking-[-0.035em] leading-[1.08] text-balance max-w-[320px]" data-testid="porta-titulo">{titulo}</h1>
+          <p className="mt-2.5 text-[15.5px] leading-[1.45] text-[#6b6670] max-w-[330px] text-pretty" data-testid="porta-sub">{sub}</p>
+        </>
+      )}
     </header>
   );
 }

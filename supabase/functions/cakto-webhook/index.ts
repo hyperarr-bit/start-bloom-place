@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
 import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 // ============================================================================
@@ -41,6 +42,15 @@ const W47_OFFER = Deno.env.get("CAKTO_OFFER_W47") ?? "";
 if (W97_OFFER) CAKTO_OFFERS[W97_OFFER.toLowerCase()] = { billing: "lifetime" };
 if (W25_OFFER) CAKTO_OFFERS[W25_OFFER.toLowerCase()] = { billing: "monthly" };
 if (W47_OFFER) CAKTO_OFFERS[W47_OFFER.toLowerCase()] = { billing: "lifetime" };
+// 15/10: a VENDA DA WEB (/assinar) no cartão — checkout hospedado da Cakto (ela parcela). O código da oferta (o
+// mesmo do link pay.cakto.com.br/<código>, que o site lê de VITE_VENDA_CAKTO_ANUAL / _MENSAL) entra como secret.
+// Explícito de propósito: o anual de pagamento ÚNICO cairia na inferência "sem recorrência = vitalício" e daria
+// acesso pra sempre por 97,90. Anual = 1 ano; mensal = 1 mês (as renovações chegam como subscription_renewed).
+const WEB_ANUAL_OFFER = Deno.env.get("CAKTO_OFFER_WEB_ANUAL") ?? "";
+const WEB_MENSAL_OFFER = Deno.env.get("CAKTO_OFFER_WEB_MENSAL") ?? "";
+const OFERTAS_VENDA_WEB = new Set<string>();
+if (WEB_ANUAL_OFFER) { CAKTO_OFFERS[WEB_ANUAL_OFFER.toLowerCase()] = { billing: "annual" }; OFERTAS_VENDA_WEB.add(WEB_ANUAL_OFFER.toLowerCase()); }
+if (WEB_MENSAL_OFFER) { CAKTO_OFFERS[WEB_MENSAL_OFFER.toLowerCase()] = { billing: "monthly" }; OFERTAS_VENDA_WEB.add(WEB_MENSAL_OFFER.toLowerCase()); }
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -198,6 +208,7 @@ serve(async (req) => {
       logStep("Unknown offer id — inferred billing period", { offerId, months, price, billingPeriod });
     }
     const isWinback = Boolean(offerCfg?.winback);
+    const ehVendaWeb = OFERTAS_VENDA_WEB.has(offerId) || OFERTAS_VENDA_WEB.has(offerId.split("_")[0]);
 
     // ---- Método de pagamento ----------------------------------------------
     const rawMethod = String(
@@ -327,6 +338,8 @@ serve(async (req) => {
       }
     }
 
+    // o fim do período gravado (vai no e-mail da venda da web: "acesso até dd/mm/aaaa")
+    let periodoFim: string | null = null;
     async function saveActiveSubscription(userId: string, emitConversion: boolean) {
       // Fim do período: usa next_payment_date da Cakto quando vier; senão calcula.
       // VITALÍCIO: pagamento único, nada renova — period_end vai pra +100 anos
@@ -342,6 +355,8 @@ serve(async (req) => {
       } else {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
+
+      periodoFim = periodEnd.toISOString();
 
       // NOTA: as colunas abacatepay_* são legadas — reutilizadas para os IDs da
       // Cakto para não exigir migration (são apenas texto de referência/match).
@@ -525,7 +540,7 @@ serve(async (req) => {
         const nowStamp = utcStamp(new Date());
         const productName = billingPeriod === "lifetime"
           ? (isDownsell || priceInCents < 2790 ? "CORE Vitalício (oferta)" : "CORE Vitalício")
-          : "CORE Pro";
+          : ehVendaWeb ? nomeDoProduto({ periodo: billingPeriod }) : "CORE Pro";
 
         const payload = {
           orderId: String(purchaseId ?? subscriptionId ?? `${userId}-${Date.now()}`),
@@ -602,8 +617,11 @@ serve(async (req) => {
           body: JSON.stringify({
             from,
             to: [email],
-            subject: "Pagamento confirmado ✅ Seu acesso ao CORE tá liberado",
-            html: welcomeHtml(firstName, email, acessarUrl, resetUrl),
+            // 15/10: venda da web (/assinar): 1 ano / 1 mês e conta SEM senha → e-mail próprio (entrar com código)
+            subject: ehVendaWeb && billingPeriod !== "lifetime" ? assuntoVenda(billingPeriod === "annual" ? "annual" : "monthly") : "Pagamento confirmado ✅ Seu acesso ao CORE tá liberado",
+            html: ehVendaWeb && billingPeriod !== "lifetime"
+              ? htmlVenda({ email, nome: customer.name ?? null, periodo: billingPeriod === "annual" ? "annual" : "monthly", fim: periodoFim })
+              : welcomeHtml(firstName, email, acessarUrl, resetUrl),
           }),
         });
         if (!res.ok) {
@@ -686,13 +704,16 @@ serve(async (req) => {
          * a hora em que o webhook rodou — a Meta usa isso pra casar com a
          * janela do clique, e o atraso do webhook empurrava o evento pra fora. */
         const fbHit = rows.find((r) => r.event_data?.fbclid) ?? null;
-        const fbcCookie = ordem?.event_data?.fbc ?? null;
+        // 15/10: o cartão da venda da web (/assinar) não tem pix_order_created — os cookies do clique vão no
+        // venda_cakto_redirect (gravado com a conta, na saída pro checkout)
+        const saidaCartao = ordem ? null : rows.find((r) => r.event_name === "venda_cakto_redirect") ?? null;
+        const fbcCookie = ordem?.event_data?.fbc ?? saidaCartao?.event_data?.fbc ?? null;
         // fbc reconstruído é montado DEPOIS do eventTime (precisa do clamp) —
         // ver bloco abaixo do quandoPagou.
-        const fbp = ordem?.event_data?.fbp ?? null;
+        const fbp = ordem?.event_data?.fbp ?? saidaCartao?.event_data?.fbp ?? null;
         const ip = ordem?.event_data?.client_ip ?? null;
         const ua = ordem?.event_data?.user_agent ?? null;
-        const sourceUrl = ordem?.event_data?.source_url ?? APP_URL;
+        const sourceUrl = ordem?.event_data?.source_url ?? saidaCartao?.event_data?.source_url ?? APP_URL;
 
         // Telefone do perfil (ph): mais um identificador quando existe. O
         // coringa do checkout (DUMMY_PHONE) é lixo pra match — descartado.
@@ -744,7 +765,7 @@ serve(async (req) => {
               // par obrigatório: um sem o outro a Meta ignora
               ...(ip && ua ? { client_ip_address: ip, client_user_agent: ua } : {}),
             },
-            custom_data: { value: amountCents / 100, currency: "BRL", content_name: offerKind === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
+            custom_data: { value: amountCents / 100, currency: "BRL", content_name: ehVendaWeb ? nomeDoProduto({ periodo: billingPeriod }) : offerKind === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
           }],
         };
         logStep("Meta CAPI match signals", {

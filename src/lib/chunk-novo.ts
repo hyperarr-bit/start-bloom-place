@@ -24,6 +24,11 @@
 
 const CHAVE = "core-chunk-reload-at";
 
+/* 15/10: memória da página (zera na próxima carga) — ver marcarSaidaDaPagina. */
+let saindoDeProposito = false;
+/** Chamar logo antes de sair do site por JS (window.location.href = checkout externo). */
+export const marcarSaidaDaPagina = (): void => { saindoDeProposito = true; };
+
 /** Cara de erro de chunk em qualquer navegador (a mesma lista do RouteErrorBoundary). */
 export const ehErroDeChunk = (texto: unknown): boolean =>
   /dynamically imported module|module script failed|ChunkLoadError|Loading chunk .* failed|Loading CSS chunk|Unable to preload CSS|is not a valid JavaScript MIME type|reading 'default'|of undefined \(reading "default"\)/i.test(
@@ -45,6 +50,9 @@ const semRede = () => {
  */
 export function recarregarPorChunkNovo(): "recarregando" | "ja-recarregou" | "sem-rede" {
   if (semRede()) return "sem-rede";
+  // a página está saindo de propósito (ex.: a venda indo pro checkout da Cakto): o import cancelado pela saída
+  // não é chunk velho, e um replace() aqui ganharia da navegação e devolveria a pessoa pro site
+  if (saindoDeProposito) return "ja-recarregou";
   if (ultimaRecargaPorChunk() > 0) return "ja-recarregou";
   try { sessionStorage.setItem(CHAVE, String(Date.now())); } catch { /* segue e recarrega mesmo assim */ }
   try {
@@ -58,4 +66,4 @@ export function recarregarPorChunkNovo(): "recarregando" | "ja-recarregou" | "se
 }
 
 /** Só pros testes: esquece a recarga desta sessão. */
-export const esquecerRecargaPorChunk = () => { try { sessionStorage.removeItem(CHAVE); } catch { /* noop */ } };
+export const esquecerRecargaPorChunk = () => { saindoDeProposito = false; try { sessionStorage.removeItem(CHAVE); } catch { /* noop */ } };

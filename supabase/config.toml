@@ -47,3 +47,8 @@ verify_jwt = false
 # "criar" confere o JWT da conta dentro da função.
 [functions.porta-handoff]
 verify_jwt = false
+
+# Venda da web (/assinar, 15/10): ViewContent/InitiateCheckout pela CAPI saem
+# ANTES de existir conta (a página ainda não tem login).
+[functions.venda-capi]
+verify_jwt = false

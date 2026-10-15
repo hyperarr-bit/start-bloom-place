@@ -86,6 +86,8 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/abrir") ||
     // /experimente (14/10): o funil-demo da campanha nova — demo + conta + "baixe o app", como a Porta.
     location.pathname.startsWith("/experimente") ||
+    // /assinar (15/10): a venda da web — o paywall é DELA, e a conta (sem assinatura até o Pix/cartão cair) nasce lá.
+    location.pathname.startsWith("/assinar") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

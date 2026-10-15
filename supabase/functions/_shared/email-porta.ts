@@ -29,7 +29,9 @@ export function htmlPorta({ email, metodo, codigo }: { email: string; metodo: st
     ? `Toque em <b>“Continuar com Google”</b> e escolha <b>${e}</b>.`
     : metodo === "apple"
       ? `Toque em <b>“Continuar com a Apple”</b>.`
-      : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
+      : metodo === "codigo"
+        ? `Digite <b>${e}</b> e toque em <b>“Entrar sem senha — receber código por e-mail”</b>.`
+        : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
   const passo = (n: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 14px 0;"><div style="width:26px;height:26px;border-radius:13px;background:#d22d80;color:#fff;font-weight:900;font-size:13px;line-height:26px;text-align:center;">${n}</div></td><td style="vertical-align:top;padding:3px 0 14px;font-size:15px;line-height:1.45;color:#16121c;">${t}</td></tr>`;
   const botao = codigo
     ? `<a href="${esc(linkDoApp(codigo))}" style="display:block;text-align:center;background:#16121c;color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:15px 18px;border-radius:999px;margin:6px 0 10px;">Entrar no CORE</a>
@@ -72,7 +74,9 @@ export function htmlLembrete({ email, metodo, codigo, n, dor }: { email: string;
     ? `Toque em <b>“Continuar com Google”</b> e escolha <b>${e}</b>.`
     : metodo === "apple"
       ? `Toque em <b>“Continuar com a Apple”</b>.`
-      : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
+      : metodo === "codigo"
+        ? `Digite <b>${e}</b> e toque em <b>“Entrar sem senha — receber código por e-mail”</b>.`
+        : `Digite <b>${e}</b> e a sua senha e toque em <b>“Entrar no meu CORE”</b>.`;
   const passo = (k: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 14px 0;"><div style="width:26px;height:26px;border-radius:13px;background:#d22d80;color:#fff;font-weight:900;font-size:13px;line-height:26px;text-align:center;">${k}</div></td><td style="vertical-align:top;padding:3px 0 14px;font-size:15px;line-height:1.45;color:#16121c;">${t}</td></tr>`;
   const titulo = n === 1 ? "Seu plano de 3 dias está te esperando no app." : "Seu Dia 1 continua pronto no app.";
   const dorTxt = dor ? `<p style="font-size:15px;line-height:1.5;margin:0 0 6px;color:#16121c;">Você disse: <b>“${esc(dor)}”</b>. O Dia 1 já está montado pra isso.</p>` : "";

@@ -307,7 +307,8 @@ serve(async (req) => {
         });
         if (!error) {
           log("criado", { user_id: user.id });
-          const metodo = ["senha", "apple", "google", "sessao"].includes(String(body?.metodo)) ? String(body.metodo) : "senha";
+          // 15/10: "codigo" = a conta da venda da web (/assinar), sem senha → o passo 3 do e-mail é o "Entrar sem senha"
+          const metodo = ["senha", "apple", "google", "sessao", "codigo"].includes(String(body?.metodo)) ? String(body.metodo) : "senha";
           const emailEnviado = await mandarEmailDaPorta(admin, user, codigo, metodo);
           return json({ codigo, expira_em: expira, email_enviado: emailEnviado });
         }

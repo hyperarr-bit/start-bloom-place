@@ -2,6 +2,7 @@
  * Módulos FALSOS pro teste do funil-demo (src/test/experimente.test.tsx): gravam pelo MESMO useUserData que os
  * módulos de verdade usam (o contexto do PreviewUserDataProvider), nas MESMAS chaves — sem baixar o módulo inteiro.
  */
+import { Link, useNavigate } from "react-router-dom";
 import { useUserData } from "@/hooks/use-user-data";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { DIAS_DA_ROTINA, diaDeHoje } from "@/components/demo-guiada/alvos";
@@ -16,6 +17,7 @@ const Botao = ({ id, onClick }: { id: string; onClick: () => void }) => (
 export function FinancasFalsa() {
   const { get, set } = useUserData();
   const voltar = useVoltarDoModulo();
+  const navigate = useNavigate();
   const gastos = get<Gasto[]>("finance-expenses", []);
   return (
     <div>
@@ -25,6 +27,12 @@ export function FinancasFalsa() {
       <Botao id="falso-editar-exemplo" onClick={() => set("finance-expenses", gastos.map((g, i) => (i === 0 ? { ...g, description: "Mercado grande", value: 999 } : g)))} />
       <Botao id="falso-apagar-gasto" onClick={() => set("finance-expenses", gastos.filter((g) => g.id !== "x-1"))} />
       <Botao id="falso-seta" onClick={voltar} />
+      {/* o que os módulos de verdade fazem: navegar pra rotas do app */}
+      <Botao id="falso-ir-auth" onClick={() => navigate("/auth")} />
+      <Botao id="falso-ir-rotina" onClick={() => navigate("/rotina?aba=meu-mes")} />
+      <Link to="/home" data-testid="falso-link-home">home</Link>
+      <a href="/conquistas" data-testid="falso-a-conquistas">conquistas</a>
+      <a href="https://exemplo.com/fora" data-testid="falso-a-fora" onClick={(e) => e.preventDefault()}>fora</a>
     </div>
   );
 }

@@ -23,7 +23,9 @@ import { ContaPorta, type Resultado } from "@/pages/porta/ContaPorta";
 import { SucessoPorta, type Plataforma } from "@/pages/porta/SucessoPorta";
 import { irPraLoja } from "@/pages/porta/navegar";
 import { abrirAppComCodigo, codigoDaPortaOk } from "@/pages/porta/handoff";
-import { msDesdeANavegacao } from "@/pages/porta/medicao";
+import { lerHtmlDaPorta, msDesdeANavegacao } from "@/pages/porta/medicao";
+import { DemoDoFunilProvider, type DemoDoFunil } from "@/lib/demo-do-funil";
+import { NavegacaoDaDemo, type Desvio } from "./navegacao";
 import {
   AREA_DO_MODULO, BOTAO_CRIAR, CONTA_TITULO, FAIXA_TEXTO, FIM_TEXTO, FIM_TITULO, MODULOS_DEMO, SEGUNDOS_ATE_A_FOLHA,
   TOPO_SELO, VARIANTE, VOLTAR_DEMO, contaTexto, moduloDaUrl, type ModuloDemo,
@@ -56,7 +58,9 @@ import { aindaEsta, codificarItens, decodificarItens, itemDaGravacao, juntarItem
  *   demo_edicao {modulo, chave}                 1ª mexida da pessoa em cada módulo
  *   demo_item {tipo, n}                         achou um item criado por ela (o que pode seguir pra conta)
  *   demo_folha_view {gatilho: "30s"|"pilula"} · demo_folha_criar {gatilho} · demo_folha_fechar {gatilho, via}
- *   demo_criar_conta_click {origem: "topo"|"faixa"|"folha"|"fim"|"seta", modulo, ms_na_demo, itens}
+ *   demo_criar_conta_click {origem: "topo"|"faixa"|"folha"|"fim"|"seta"|"modulo", modulo, ms_na_demo, itens}
+ *                                               ("modulo" = algo do módulo que levaria pra fora: login, outro módulo…)
+ *   demo_navegacao {para, acao: "modulo"|"conta"}  o módulo tentou navegar (ver ./navegacao.tsx)
  *   demo_entrar_click {}
  *   demo_itens_conta {ok, n, chaves, erro}      os itens dela gravados na conta
  *   + os da Porta: porta_passo {passo: "conta"|"sucesso", resposta: "view"}, porta_conta_erro, porta_conta_iniciada,
@@ -99,7 +103,7 @@ export const URL_QR = "https://coreaplicativo.com.br/baixar?origem=porta_demo_qr
 /** a gravação dos itens dela não segura a tela do sucesso mais que isso */
 const MS_ITENS = 5000;
 
-export type OrigemCriar = "topo" | "faixa" | "folha" | "fim" | "seta";
+export type OrigemCriar = "topo" | "faixa" | "folha" | "fim" | "seta" | "modulo";
 type Passo = "demo" | "conta" | "sucesso";
 
 export type EstadoDemo = {
@@ -285,7 +289,8 @@ export function Experimente() {
     const extra: Record<string, unknown> = {};
     if (entrada) {
       const { origem, ...a } = inicio.current!.attr;
-      Object.assign(extra, a, { atribuicao: origem, plataforma, in_app: emInApp, sessao_nova: inicio.current!.nova });
+      const html = lerHtmlDaPorta(); // o porta_html do index.html (variante "demo"), pra juntar
+      Object.assign(extra, a, { atribuicao: origem, plataforma, in_app: emInApp, sessao_nova: inicio.current!.nova, html_id: html?.id ?? null, html_ms: html?.t ?? null });
     }
     trackEvent("demo_view", { modulo, tempo_ms: msDesdeANavegacao(), entrada, ...extra, ...ids() });
     if (entrada && inicio.current!.nova) fireMetaEvent("ViewContent", { content_name: "porta_demo", content_category: "porta" });
@@ -318,6 +323,7 @@ export function Experimente() {
     trackEvent("demo_pilula", { de: modulo, para, n: trocas.current, ...ids() });
     const q = new URLSearchParams(params);
     q.set("m", para);
+    q.delete("aba");
     navigate({ search: `?${q.toString()}` }, { replace: true });
     if (trocas.current === 2) mostrarFolha("pilula");
   };
@@ -346,6 +352,24 @@ export function Experimente() {
     if (origem === "folha") setFolha(null);
     navigate(urlDoPasso("conta"));
   };
+
+  /* o módulo tentou navegar pra fora (ver ./navegacao.tsx): módulo da demo → troca aqui; o resto → a conta */
+  const desviarRef = useRef<(d: NonNullable<Desvio>) => void>(() => {});
+  desviarRef.current = (d) => {
+    if (d.tipo === "modulo") {
+      trackEvent("demo_navegacao", { para: d.modulo, aba: d.aba, acao: "modulo", ...ids() });
+      const q = new URLSearchParams(params);
+      q.set("m", d.modulo);
+      if (d.aba) q.set("aba", d.aba); else q.delete("aba");
+      q.delete("passo");
+      navigate(`/experimente?${q.toString()}`);
+      return;
+    }
+    trackEvent("demo_navegacao", { para: d.destino, acao: "conta", ...ids() });
+    abrirConta("modulo");
+  };
+  const aoDesviar = useCallback((d: NonNullable<Desvio>) => desviarRef.current(d), []);
+  const demoDoFunil = useMemo<DemoDoFunil>(() => ({ abrirConta: () => desviarRef.current({ tipo: "conta", destino: "modulo" }) }), []);
 
   /* a seta ← do cabeçalho dos módulos: na demo, vai pra conta (mesma fonte do botão, como no /preview) */
   const volta: VoltaDaDemo = { destino: urlDoPasso("conta"), aoTocar: () => cliqueCriar("seta"), modulo, extras: { variante: VARIANTE } };
@@ -636,13 +660,17 @@ export function Experimente() {
             <button type="button" onClick={() => abrirConta("faixa")} className="font-semibold underline underline-offset-2" data-testid="demo-faixa-criar">{BOTAO_CRIAR}</button>
           </div>
         </div>
-        <PreviewUserDataProvider key={modulo} moduleKey={modulo} semente={sementeDoModulo} aoGravar={aoGravar}>
-          <RouteErrorBoundary routeName={`experimente-${modulo}`}>
-            <Suspense fallback={<CarregandoModulo />}>
-              <div data-testid={`demo-modulo-${modulo}`}><Modulo /></div>
-            </Suspense>
-          </RouteErrorBoundary>
-        </PreviewUserDataProvider>
+        <DemoDoFunilProvider value={demoDoFunil}>
+          <PreviewUserDataProvider key={modulo} moduleKey={modulo} semente={sementeDoModulo} aoGravar={aoGravar}>
+            <NavegacaoDaDemo aoDesviar={aoDesviar}>
+              <RouteErrorBoundary routeName={`experimente-${modulo}`}>
+                <Suspense fallback={<CarregandoModulo />}>
+                  <div data-testid={`demo-modulo-${modulo}`}><Modulo /></div>
+                </Suspense>
+              </RouteErrorBoundary>
+            </NavegacaoDaDemo>
+          </PreviewUserDataProvider>
+        </DemoDoFunilProvider>
         <section className="max-w-md mx-auto px-4 pt-4 pb-[calc(28px+env(safe-area-inset-bottom))]" data-testid="demo-fim">
           <div className="rounded-[20px] border border-border bg-card px-5 py-5 text-center">
             <p className="text-[18px] font-extrabold tracking-[-0.02em] leading-tight text-balance">{FIM_TITULO}</p>

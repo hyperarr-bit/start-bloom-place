@@ -63,6 +63,7 @@ import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
+import { useDemoDoFunil } from "@/lib/demo-do-funil";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -78,6 +79,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const voltarDoModulo = useVoltarDoModulo();
   const location = useLocation();
   const isPreview = ehCaminhoDeDemo(location.pathname);
+  // funil-demo (/experimente, 14/10): o Dashboard abre direto no dinheiro — sem Retrospectiva nem Desafio no topo
+  const demoDoFunil = useDemoDoFunil();
   const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
   /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma
@@ -491,14 +494,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
 
         {activeTab === "dashboard" && (
           <>
-            <WrappedBanner />
+            {!demoDoFunil && <WrappedBanner />}
             {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
                 existe conta cadastrada — pedir permissão antes de haver o que
                 lembrar queima a única chance no Android 13+. */}
             <PedirLembretes dueDays={dueDaysTodos as never} />
-            <TrackedCard cardKey="weekly-challenge" tab="dashboard">
-              <WeeklyChallenge expenses={expenses} />
-            </TrackedCard>
+            {!demoDoFunil && (
+              <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+                <WeeklyChallenge expenses={expenses} />
+              </TrackedCard>
+            )}
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
                 totalIncome={totalIncome}

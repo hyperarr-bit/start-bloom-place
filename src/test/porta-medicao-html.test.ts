@@ -108,6 +108,27 @@ describe("index.html: porta_html e porta_erro_js", () => {
     s.remove();
   });
 
+  it("14/10: no /comece o porta_html segue SEM o campo variante (nada muda lá)", () => {
+    rodar("/comece?utm_campaign=lua");
+    expect(corpos()[0].event_data).not.toHaveProperty("variante");
+  });
+
+  it("14/10: no funil-demo (/experimente) mede igual, com variante \"demo\" no porta_html e no porta_erro_js; /experimentar não", () => {
+    rodar("/experimentar");
+    expect(chamadas).toHaveLength(0);
+    sessionStorage.setItem("core_session_id", "sessao-analytics-2");
+    rodar("/experimente?m=rotina&utm_campaign=demo_lua&ad_id=444");
+    const [c] = corpos();
+    expect(c.event_name).toBe("porta_html");
+    expect(c.session_id).toBe("sessao-analytics-2");
+    expect(c.event_data).toMatchObject({ variante: "demo", utm_campaign: "demo_lua", ad_id: "444", t_ms: expect.any(Number) });
+    expect(lerHtmlDaPorta()?.id).toBe(c.event_data.html_id);
+    window.dispatchEvent(new ErrorEvent("error", { message: "TypeError: demo" }));
+    const erros = corpos().filter((x) => x.event_name === "porta_erro_js");
+    expect(erros).toHaveLength(1);
+    expect(erros[0].event_data).toMatchObject({ msg: "TypeError: demo", variante: "demo", html_id: c.event_data.html_id });
+  });
+
   it("fetch que falha não lança nada", () => {
     globalThis.fetch = vi.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
     expect(() => rodar("/comece")).not.toThrow();

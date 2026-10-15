@@ -276,6 +276,9 @@ export function PortaIphone() {
 
   /* ---------------------------------------------------------- a conta */
   const concluindo = useRef(false);
+  /* o código do "abrir logado" é pedido 1x: aqui no concluir, ou (só se a página recarregou no sucesso sem ele)
+   * pelo efeito lá embaixo. 14/10: o efeito também disparava logo depois do concluir — 2 pedidos, 2 códigos. */
+  const pediuNaVolta = useRef(false);
   const concluir = useCallback(async (metodo: string): Promise<Resultado> => {
     if (concluindo.current) return { ok: true };
     concluindo.current = true;
@@ -303,6 +306,7 @@ export function PortaIphone() {
       }
       trackEvent("porta_conta_criada", { metodo, existente, event_id: eventId, gravou: dec.gravar, area: e.escolha, ...ids() });
       setEstado((x) => ({ ...x, passo: "sucesso", metodo, email: u.email ?? x.email, eventId }));
+      pediuNaVolta.current = true;
       void pedirCodigo();
       return { ok: true };
     } catch {
@@ -387,7 +391,6 @@ export function PortaIphone() {
   };
 
   /* recarregou no sucesso sem código (o pedido falhou ou a conta veio de outra aba): tenta 1x */
-  const pediuNaVolta = useRef(false);
   useEffect(() => {
     if (pediuNaVolta.current || authLoading || !user) return;
     if (estado.passo !== "sucesso" || codigoDaPortaOk(estado.codigo)) return;

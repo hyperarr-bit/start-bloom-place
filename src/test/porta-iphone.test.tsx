@@ -866,6 +866,21 @@ describe("abrir o app JÁ LOGADO (porta-handoff)", () => {
     expect(screen.getByTestId("porta-sucesso-dica").textContent).toContain("Entrar");
   });
 
+  it("14/10: conta nova com a sessão já no useAuth (como no aparelho): o código é pedido UMA vez, não 2", async () => {
+    ua(UA.safari);
+    invoke.mockImplementation(async (_n: string, { body }: { body: { acao: string } }) => (body.acao === "criar" ? { data: { codigo: CODIGO, email_enviado: true }, error: null } : { data: { ok: true }, error: null }));
+    await ateConta("dinheiro", "gasto_sem_perceber", "300_500");
+    preencherSenha("ana@exemplo.com", "segredo1");
+    signUp.mockImplementation(async () => { authState.user = usuario(); return { data: { user: { id: "u-1" }, session: { access_token: "x" } }, error: null }; });
+    getUser.mockResolvedValue({ data: { user: usuario() } });
+    fireEvent.click(screen.getByTestId("porta-criar-conta"));
+    await waitFor(() => expect(screen.getByTestId("porta-sucesso")).toBeInTheDocument());
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(invoke.mock.calls.filter((c) => (c[1] as { body: { acao: string } }).body.acao === "criar")).toHaveLength(1);
+    expect(eventos("porta_codigo")).toHaveLength(1);
+  });
+
   it("código sem e-mail enviado: 'Abrir o CORE' na volta, mas sem a faixa verde", async () => {
     ua(UA.safari);
     invoke.mockImplementation(async (_n: string, { body }: { body: { acao: string } }) => (body.acao === "criar" ? { data: { codigo: CODIGO, email_enviado: false }, error: null } : { data: {}, error: null }));

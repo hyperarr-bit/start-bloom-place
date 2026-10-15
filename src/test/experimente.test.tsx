@@ -64,6 +64,10 @@ import ExperimenteRota, { _zerarEstadoDemo } from "@/pages/experimente/Experimen
 import { CONTA_TITULO, FOLHA_TITULO, MODULOS_DEMO, moduloDaUrl } from "@/pages/experimente/conteudo";
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
+import { desvioNaDemo } from "@/pages/experimente/navegacao";
+import { DemoDoFunilProvider } from "@/lib/demo-do-funil";
+import { ModuleTip } from "@/components/ModuleTip";
+import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 
 /* ---------------------------------------------------------------- ambiente */
 const UA = {
@@ -501,6 +505,90 @@ describe("conta (a da Porta) + o que vai pra conta", () => {
     await waitFor(() => expect(passo()).toBe("sucesso"));
     expect(updateUser.mock.calls[0][0].data.porta).toMatchObject({ variante: "demo", metodo: "google" });
     expect(vi.mocked(fireMetaEvent).mock.calls.filter((c) => c[0] === "CompleteRegistration")).toHaveLength(1);
+  });
+});
+
+/* ---------------------------------------------------------------- 14/10 (dono): sem chamada no topo; nada sai do funil */
+describe("só aparece o que a pessoa tocar; o que ela toca fica no funil", () => {
+  it("\"Dicas para começar\" some SÓ no funil-demo (no /preview e no app, igual)", () => {
+    const dica = <ModuleTip moduleId="rotina" tips={["Adicione seus hábitos"]} />;
+    const { unmount } = render(<PreviewUserDataProvider moduleKey="rotina">{dica}</PreviewUserDataProvider>);
+    expect(screen.getByText("Dicas para começar")).toBeInTheDocument();
+    unmount();
+    render(<DemoDoFunilProvider value={{ abrirConta: () => {} }}><PreviewUserDataProvider moduleKey="rotina">{dica}</PreviewUserDataProvider></DemoDoFunilProvider>);
+    expect(screen.queryByText("Dicas para começar")).toBeNull();
+  });
+
+  it("Finanças: Retrospectiva e Desafio da semana fora do topo do Dashboard SÓ no funil-demo", () => {
+    const index = readFileSync(join(process.cwd(), "src/pages/Index.tsx"), "utf8");
+    expect(index).toContain("{!demoDoFunil && <WrappedBanner />}");
+    expect(index).toMatch(/\{!demoDoFunil && \(\s*<TrackedCard cardKey="weekly-challenge"/);
+    expect(index).toContain("const demoDoFunil = useDemoDoFunil();");
+  });
+
+  it("desvioNaDemo: módulo da demo troca aqui (com a aba); o resto do app vai pra conta; /experimente e fora do site seguem", () => {
+    expect(desvioNaDemo("/rotina?aba=meu-mes")).toEqual({ tipo: "modulo", modulo: "rotina", aba: "meu-mes" });
+    expect(desvioNaDemo("/financas")).toEqual({ tipo: "modulo", modulo: "financas", aba: null });
+    for (const d of ["/auth", "/entrar", "/comecar?step=signup", "/home", "/casa", "/conquistas", "/retrospectiva?mes=Setembro", "/planos", "/lp"]) {
+      expect(desvioNaDemo(d)).toMatchObject({ tipo: "conta" });
+    }
+    expect(desvioNaDemo("/experimente?m=rotina&passo=conta")).toBeNull();
+    expect(desvioNaDemo("https://exemplo.com/x")).toBeNull();
+  });
+
+  it("o módulo navegando pra /auth (useNavigate), <Link to=/home> e <a href=/conquistas> → a conta do funil (origem modulo), sem sair", async () => {
+    for (const testid of ["falso-ir-auth", "falso-link-home", "falso-a-conquistas"]) {
+      cleanup();
+      vi.mocked(trackEvent).mockClear();
+      montar();
+      await noModulo("financas", "falso-n-gastos");
+      fireEvent.click(screen.getByTestId(testid));
+      await waitFor(() => expect(passo()).toBe("conta"));
+      expect(screen.queryByTestId("onde")).toBeNull();
+      expect(eventos("demo_navegacao")[0]).toMatchObject({ acao: "conta", variante: "demo" });
+      expect(eventos("demo_criar_conta_click")[0]).toMatchObject({ origem: "modulo" });
+    }
+  });
+
+  it("o módulo navegando pra outro módulo da demo (/rotina?aba=…) troca o módulo AQUI, com a aba na URL", async () => {
+    montar();
+    await noModulo("financas", "falso-n-gastos");
+    fireEvent.click(screen.getByTestId("falso-ir-rotina"));
+    await noModulo("rotina", "falso-habitos");
+    expect(local.search).toContain("m=rotina");
+    expect(local.search).toContain("aba=meu-mes");
+    expect(eventos("demo_navegacao")[0]).toMatchObject({ acao: "modulo", para: "rotina", aba: "meu-mes" });
+    // a pílula volta sem a aba
+    fireEvent.click(screen.getByTestId("demo-pilula-treino"));
+    await noModulo("treino", "falso-exercicio");
+    expect(local.search).not.toContain("aba=");
+  });
+
+  it("link pra fora do site não é desviado", async () => {
+    montar();
+    await noModulo("financas", "falso-n-gastos");
+    fireEvent.click(screen.getByTestId("falso-a-fora"));
+    expect(passo()).toBe("demo");
+    expect(eventos("demo_navegacao")).toEqual([]);
+  });
+
+  it("sucesso no iPhone com a sessão já no useAuth: o código do \"abrir logado\" é pedido UMA vez", async () => {
+    signUp.mockImplementation(async (args: { options: { data: { porta: unknown } } }) => {
+      const u = usuario({ user_metadata: { porta: args.options.data.porta } });
+      authState.user = u;
+      getUser.mockResolvedValue({ data: { user: u } });
+      return { data: { session: { access_token: "t" }, user: u }, error: null };
+    });
+    invoke.mockImplementation(async (_n: string, { body }: { body: { acao: string } }) => (body.acao === "criar" ? { data: { codigo: "ABCDEFGH23", email_enviado: true }, error: null } : { data: { ok: true }, error: null }));
+    montar();
+    await noModulo("financas", "falso-n-gastos");
+    fireEvent.click(screen.getByTestId("demo-topo-criar"));
+    await waitFor(() => expect(passo()).toBe("conta"));
+    await criarComEmail();
+    await waitFor(() => expect(passo()).toBe("sucesso"));
+    await waitFor(() => expect(eventos("porta_codigo")[0]).toMatchObject({ ok: true }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(invoke.mock.calls.filter((c) => (c[1] as { body: { acao: string } }).body.acao === "criar")).toHaveLength(1);
   });
 });
 

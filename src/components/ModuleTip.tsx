@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useDemoDoFunil } from "@/lib/demo-do-funil";
 
 interface ModuleTipProps {
   moduleId: string;
@@ -10,6 +11,8 @@ interface ModuleTipProps {
 }
 
 export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => {
+  // funil-demo (/experimente, 14/10): sem cartão de chamada no topo — só no funil; app e /preview iguais
+  const demoDoFunil = useDemoDoFunil();
   const { get, set: setData } = useUserData();
   const storageKey = `core-tip-seen-${moduleId}`;
   const [visible, setVisible] = useState(() => !get<string>(storageKey, ""));
@@ -19,6 +22,7 @@ export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => 
     setVisible(false);
   };
 
+  if (demoDoFunil) return null;
   return (
     <AnimatePresence>
       {visible && (

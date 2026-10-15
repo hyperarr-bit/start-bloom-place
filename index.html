@@ -191,7 +191,7 @@
     </script>
 
     <script>
-      // ─── PORTA (/comece): medir ANTES do React (12/10) — SÓ ES5, SÓ em /comece ───
+      // ─── PORTA (/comece): medir ANTES do React (12/10) — SÓ ES5, SÓ em /comece e /experimente ───
       //
       // O porta_view sai quando o React monta; quem desiste enquanto o bundle
       // baixa (4G ruim, navegador do Instagram) sumia da conta. Este bloco
@@ -204,9 +204,14 @@
       // sessionStorage "porta-html-v1" pro porta_view levar junto
       // (src/pages/porta/medicao.ts). fetch keepalive assíncrono: não segura
       // nada; qualquer falha é engolida. Fora de /comece não faz NADA.
+      // 14/10: o funil-demo (/experimente) mede igual, com variante "demo" nos
+      // dois eventos (no /comece nada muda: sem o campo variante).
       (function () {
         try {
-          if (String(location.pathname).indexOf("/comece") !== 0) return;
+          var cam = String(location.pathname);
+          var prefixo = cam.indexOf("/comece") === 0 ? "/comece" : (cam === "/experimente" || cam.indexOf("/experimente/") === 0) ? "/experimente" : null;
+          if (!prefixo) return;
+          var variante = prefixo === "/experimente" ? "demo" : null;
           var URL_EV = "https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events";
           var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
           var ss = null;
@@ -240,6 +245,7 @@
             try {
               if (typeof fetch !== "function") return;
               var d = { html_id: h.id, plataforma: plat, in_app: inApp }, k;
+              if (variante) d.variante = variante;
               for (k in q) d[k] = q[k];
               for (k in dados) d[k] = dados[k];
               var ps = null;
@@ -260,7 +266,7 @@
           var erros = 0;
           var erro = function (msg) {
             try {
-              if (erros >= 5 || String(location.pathname).indexOf("/comece") !== 0) return;
+              if (erros >= 5 || String(location.pathname).indexOf(prefixo) !== 0) return;
               erros++;
               var raiz = document.getElementById("root");
               manda("porta_erro_js", { msg: String(msg || "erro").slice(0, 160), t_ms: agora(), montou: !!(raiz && raiz.children && raiz.children.length) });

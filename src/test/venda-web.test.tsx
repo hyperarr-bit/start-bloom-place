@@ -336,6 +336,63 @@ describe("Pix na página", () => {
   });
 });
 
+describe("quem já é assinante não paga de novo", () => {
+  it("entrou na conta que já existe e ela já é assinante (vitalício/loja/anual): sucesso 'você já é assinante', SEM gerar Pix", async () => {
+    definirEmailDaCompra.mockResolvedValue({ erro: "email_em_uso" });
+    signInWithPassword.mockResolvedValue({ error: null });
+    invoke.mockImplementation(async (fn: string) =>
+      fn === "check-subscription" ? { data: { subscribed: true, subscription_end: "2126-01-01T00:00:00Z", billing_period: "lifetime" }, error: null } : { data: null, error: null });
+    await atePaywall();
+    fireEvent.click(screen.getByTestId("venda-anual-pix"));
+    await waitFor(() => expect(passo()).toBe("dados"));
+    preencher("Bia", "bia@exemplo.com");
+    fireEvent.click(screen.getByTestId("venda-dados-cta"));
+    await waitFor(() => expect(screen.getByTestId("venda-dados").getAttribute("data-fase")).toBe("existe"));
+    fireEvent.change(screen.getByTestId("venda-senha"), { target: { value: "segredo1" } });
+    fireEvent.click(screen.getByTestId("venda-entrar"));
+    await waitFor(() => expect(passo()).toBe("sucesso"));
+    expect(invocacoes("asaas-pix")).toHaveLength(0);
+    expect(screen.getByTestId("venda-sucesso-selo").textContent).toBe("Você já é assinante");
+    expect(screen.getByTestId("venda-sucesso-titulo").textContent).toBe("Seu CORE já está liberado");
+    expect(screen.getByTestId("venda-sucesso-plano").textContent).toContain("Não precisa pagar de novo");
+    expect(eventos("venda_ja_assinante")[0]).toMatchObject({ via: "senha" });
+    expect(eventos("venda_pago")).toHaveLength(0);
+    expect(metas("Purchase")).toHaveLength(0);
+  });
+
+  it("conta existente que NÃO é assinante: segue pro Pix normalmente", async () => {
+    definirEmailDaCompra.mockResolvedValue({ erro: "email_em_uso" });
+    signInWithPassword.mockResolvedValue({ error: null });
+    invoke.mockImplementation(async (fn: string, opts: { body?: Record<string, unknown> }) =>
+      fn === "check-subscription" ? { data: { subscribed: false }, error: null }
+        : fn === "asaas-pix" && opts.body?.action === "create" ? { data: PIX_OK, error: null } : { data: null, error: null });
+    await atePaywall();
+    fireEvent.click(screen.getByTestId("venda-anual-pix"));
+    await waitFor(() => expect(passo()).toBe("dados"));
+    preencher("Bia", "bia@exemplo.com");
+    fireEvent.click(screen.getByTestId("venda-dados-cta"));
+    await waitFor(() => expect(screen.getByTestId("venda-dados").getAttribute("data-fase")).toBe("existe"));
+    fireEvent.change(screen.getByTestId("venda-senha"), { target: { value: "segredo1" } });
+    fireEvent.click(screen.getByTestId("venda-entrar"));
+    await waitFor(() => expect(passo()).toBe("pix"));
+    await waitFor(() => expect(invocacoes("asaas-pix")[0]).toMatchObject({ action: "create", offer: "a97" }));
+  });
+
+  it("já logado neste navegador com o mesmo e-mail e assinante (o servidor confirma): não cobra", async () => {
+    getSession.mockResolvedValue({ data: { session: { user: { id: "u-1", email: "ana@exemplo.com" } } } });
+    invoke.mockImplementation(async (fn: string) =>
+      fn === "check-subscription" ? { data: { subscribed: true, subscription_end: "2027-03-01T12:00:00Z" }, error: null } : { data: null, error: null });
+    await atePaywall();
+    fireEvent.click(screen.getByTestId("venda-anual-pix"));
+    await waitFor(() => expect(passo()).toBe("dados"));
+    preencher("Ana", "ana@exemplo.com");
+    fireEvent.click(screen.getByTestId("venda-dados-cta"));
+    await waitFor(() => expect(passo()).toBe("sucesso"));
+    expect(invocacoes("asaas-pix")).toHaveLength(0);
+    expect(screen.getByTestId("venda-sucesso-plano").textContent).toContain("01/03/2027");
+  });
+});
+
 /* ---------------------------------------------------------------- cartão */
 describe("cartão (Cakto)", () => {
   it("anual no cartão: vai pra Cakto com e-mail/nome pré-preenchidos + utm/fbclid (venda_cakto_redirect com fbp/fbc)", async () => {

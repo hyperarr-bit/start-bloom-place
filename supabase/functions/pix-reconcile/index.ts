@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { COLUNAS_DECISAO, decidirGrantPix, ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { creditarPedido } from "../_shared/grant-pix.ts";
+import { valorCobre } from "../_shared/trava-grant.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -70,7 +72,8 @@ const asaasHeaders = (key: string) => ({
 });
 const basicAuth = (key: string) => `Basic ${btoa(`${key}:`)}`;
 
-type Veredito = { pago: boolean; status: string };
+/** `valorReais`: só a Asaas devolve (15/10: o grant exige que cubra o preço da oferta). */
+type Veredito = { pago: boolean; status: string; valorReais?: unknown };
 
 async function statusAbacate(key: string, id: string): Promise<Veredito> {
   const res = await fetch(`${ABACATE_API}/transparents/check?id=${encodeURIComponent(id)}`, {
@@ -89,7 +92,7 @@ async function statusAsaas(key: string, qrCodeId: string): Promise<Veredito> {
   const out = await res.json().catch(() => ({}));
   if (!res.ok) return { pago: false, status: `http_${res.status}` };
   const pago = (out?.data ?? []).find((p: { status?: string }) => ASAAS_PAGOS.has(String(p?.status)));
-  return { pago: Boolean(pago), status: pago ? String(pago.status) : `pendente_${out?.totalCount ?? 0}` };
+  return { pago: Boolean(pago), status: pago ? String(pago.status) : `pendente_${out?.totalCount ?? 0}`, valorReais: pago?.value };
 }
 
 async function statusPagarme(key: string, id: string): Promise<Veredito> {
@@ -294,6 +297,14 @@ serve(async (req) => {
           continue;
         }
         if (!v.pago) continue;
+        const gw = o.orderId.startsWith("pix_char_") ? "abacate" : o.orderId.startsWith("or_") ? "pagarme" : ehUuid(o.orderId) ? "cakto" : "asaas";
+        /* 15/10: na Asaas, o pagamento tem que cobrir o preço DESTE pedido (o valor gravado no create; sem ele, o da
+         * tabela). Não a tabela direto: o downsell da Asaas é 14,90 e a tabela daqui (Cakto) diz 19,90. */
+        if (gw === "asaas" && !valorCobre(v.valorReais, o.amountCents ?? PRECOS_CENTAVOS[o.offer])) {
+          logStep("Valor pago menor que a oferta — não credita", { uid, orderId: o.orderId, offer: o.offer, valor: v.valorReais ?? null });
+          falhas.push({ orderId: o.orderId, erro: "valor_menor" });
+          continue;
+        }
 
         logStep("PAGO sem assinatura", { uid, orderId: o.orderId, offer: o.offer, dryRun });
         if (dryRun) { creditados.push({ uid, ...o, dryRun: true }); break; }
@@ -320,15 +331,16 @@ serve(async (req) => {
         /* 01/10: nunca na linha da loja (ver _shared/linha-pix.ts). `fim` vem
          * daqui (contado da criação do QR), não da decisão — a decisão só diz
          * em qual linha escrever. */
-        const { data: linhas } = await admin
-          .from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", uid);
-        const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], { dias }, inicio);
-        if (decisao.acao === "preservar") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
-        const { error: gErr } = decisao.acao === "atualizar"
-          ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
-          : await admin.from("subscriptions").insert(payload);
-        if (gErr) {
-          falhas.push({ orderId: o.orderId, erro: gErr.message.slice(0, 120) });
+        // 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do webhook e do check da
+        // página). `fim` segue sendo o daqui (contado da criação do QR): o payload ignora o fim decidido.
+        const g = await creditarPedido(admin, {
+          userId: uid, orderId: o.orderId, gateway: gw, concessao: { dias }, agora: inicio,
+          montarPayload: () => payload,
+        });
+        if (g.r === "preservado") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
+        if (g.r === "ja_creditado" || g.r === "em_andamento") { logStep("Pedido já creditado (ou sendo creditado) por outro caminho", { uid, orderId: o.orderId, r: g.r }); break; }
+        if (g.r === "erro") {
+          falhas.push({ orderId: o.orderId, erro: g.msg.slice(0, 120) });
           continue;
         }
         /* Purchase pra Meta (12/08). Mesmo formato do sendMetaCapi do

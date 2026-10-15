@@ -29,11 +29,13 @@ export type LinhaAssinatura = {
   payment_method?: string | null;
   current_period_end?: string | null;
   revenuecat_subscription_id?: string | null;
+  /** o id do pedido que gravou a linha (QR da Asaas, compra da Cakto…) — 15/10: trava de pedido creditado 2x */
+  abacatepay_billing_id?: string | null;
 };
 
 /** O que o `select` precisa trazer pra `decidirGrantPix` decidir. */
 export const COLUNAS_DECISAO =
-  "id, status, plan, billing_period, payment_method, current_period_end, revenuecat_subscription_id";
+  "id, status, plan, billing_period, payment_method, current_period_end, revenuecat_subscription_id, abacatepay_billing_id";
 
 /** Linha da loja = do RevenueCat. O `revenuecat_subscription_id` entra na
  *  conta porque é a chave do upsert dele: uma linha que já foi "virada" pelo
@@ -66,8 +68,13 @@ export const linhaParaEscrever = (linhas: LinhaAssinatura[]): LinhaAssinatura | 
 
 export type Concessao = { dias: number | null };
 
+/** Este pedido já está numa linha própria (já foi creditado)? */
+export const pedidoJaCreditado = (linhas: LinhaAssinatura[], orderId: string | null | undefined): boolean =>
+  !!orderId && linhasProprias(linhas).some((l) => l.abacatepay_billing_id === orderId);
+
 export type DecisaoGrant =
   | { acao: "preservar"; motivo: "vitalicio_pagou_mes"; jaLiberado: true }
+  | { acao: "ja_creditado"; jaLiberado: true }
   | { acao: "atualizar"; linhaId: string; jaLiberado: boolean; fim: string }
   | { acao: "inserir"; jaLiberado: false; fim: string };
 
@@ -78,16 +85,25 @@ export type DecisaoGrant =
  *  - mês pré-pago EMPILHA sobre o período próprio vigente (pagar de novo antes
  *    de vencer não encurta);
  *  - escreve na linha própria (`atualizar`) ou cria uma (`inserir`) — nunca na
- *    linha da loja.
+ *    linha da loja;
+ *  - 15/10: pedido (`orderId`) que já está numa linha própria → `ja_creditado`:
+ *    nada se escreve e nada sai (sem e-mail, CAPI, UTMify). Antes o check da
+ *    página e o webhook creditavam o MESMO pedido duas vezes e a oferta com
+ *    prazo (w25, a97) empilhava (2 anos, 2 e-mails). No vitalício o efeito é o
+ *    de sempre (já não mandava nada na 2ª vez; agora também não reescreve a
+ *    linha). Sem `orderId`, nada muda. A trava de corrida (webhook_events,
+ *    ./trava-grant.ts) cobre quem chega JUNTO.
  */
 export function decidirGrantPix(
   linhas: LinhaAssinatura[],
   concessao: Concessao,
   agora: Date = new Date(),
+  orderId?: string | null,
 ): DecisaoGrant {
   const jaLiberado = temVitalicioProprio(linhas);
   const vitalicio = concessao.dias === null;
   if (jaLiberado && !vitalicio) return { acao: "preservar", motivo: "vitalicio_pagou_mes", jaLiberado: true };
+  if (pedidoJaCreditado(linhas, orderId)) return { acao: "ja_creditado", jaLiberado: true };
 
   const fim = new Date(agora);
   if (vitalicio) fim.setFullYear(fim.getFullYear() + 100);

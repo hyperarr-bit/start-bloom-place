@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { OFERTA_PIX_ANUAL, assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
-import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { creditarPedido } from "../_shared/grant-pix.ts";
+import { valorCobre } from "../_shared/trava-grant.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -406,6 +407,11 @@ serve(async (req) => {
         offer = declarado in PRECOS_CENTAVOS ? declarado : "lifetime";
         logStep("Offer via client fallback", { id, declarado });
       }
+      /* 15/10: o pagamento tem que cobrir o preço da oferta DELE (cada oferta com o seu valor). */
+      if (!valorCobre((r.pago as { value?: unknown }).value, PRECOS_CENTAVOS[offer])) {
+        logStep("Valor pago menor que a oferta — não libera", { id, offer, valor: (r.pago as { value?: unknown }).value ?? null });
+        return jsonResponse({ paid: false, status: "VALOR_MENOR" });
+      }
 
       const now = new Date();
       /* 01/10: TODAS as linhas da pessoa, e a decisão em `decidirGrantPix`
@@ -415,35 +421,43 @@ serve(async (req) => {
        * anual pela chave revenuecat_subscription_id e, no fim da carência, quem
        * pagou 97,90 no Pix ficava sem acesso. A linha da loja agora nunca é
        * tocada: o Pix escreve na própria ou insere uma nova. */
-      const { data: linhas } = await supabaseAdmin.from("subscriptions")
-        .select(COLUNAS_DECISAO).eq("user_id", user.id);
+      /* 15/10: a decisão + a trava de "1 pedido = 1 crédito" moram em _shared/grant-pix.ts (os 3 caminhos da Asaas
+       * — este check, o asaas-webhook e o pix-reconcile — passam por lá). */
       const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
-      const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], concessao, now);
-      if (decisao.acao === "preservar") {
+      const vitalicio = concessao.dias === null;
+      const g = await creditarPedido(supabaseAdmin, {
+        userId: user.id, orderId: id, gateway: "asaas", concessao, agora: now,
+        montarPayload: (fim) => ({
+          user_id: user.id, status: "active",
+          plan: vitalicio ? "lifetime" : concessao.plano,
+          billing_period: vitalicio ? "lifetime" : concessao.periodo,
+          payment_method: "pix", abacatepay_billing_id: id, customer_email: user.email ?? null,
+          current_period_start: now.toISOString(), current_period_end: fim,
+          amount_cents: PRECOS_CENTAVOS[offer],
+        }),
+      });
+      if (g.r === "preservado") {
         // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
         // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.
         logStep("Vitalício pagou o mês — linha preservada", { userId: user.id, offer, id });
         return jsonResponse({ paid: true, status: "CONFIRMED", jaVitalicio: true });
       }
-      const jaLiberado = decisao.jaLiberado;
-      const vitalicio = concessao.dias === null;
-      const payload = {
-        user_id: user.id, status: "active",
-        plan: vitalicio ? "lifetime" : concessao.plano,
-        billing_period: vitalicio ? "lifetime" : concessao.periodo,
-        payment_method: "pix", abacatepay_billing_id: id, customer_email: user.email ?? null,
-        current_period_start: now.toISOString(), current_period_end: decisao.fim,
-        amount_cents: PRECOS_CENTAVOS[offer],
-      };
-      const { error: grantErr } = decisao.acao === "atualizar"
-        ? await supabaseAdmin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
-        : await supabaseAdmin.from("subscriptions").insert(payload);
-      if (grantErr) {
+      if (g.r === "ja_creditado") {
+        // o webhook (ou um check anterior) já creditou ESTE pedido: não escreve, não manda nada
+        logStep("Pedido já creditado — nada a fazer", { userId: user.id, offer, id });
+        return jsonResponse({ paid: true, status: "PAID", jaCreditado: true });
+      }
+      if (g.r === "em_andamento") {
+        logStep("Pedido sendo creditado por outro caminho — tenta de novo", { userId: user.id, offer, id });
+        return jsonResponse({ paid: false, status: "PENDING" });
+      }
+      if (g.r === "erro") {
         // pagou e não gravou: o polling tenta de novo em 3 s e o pix-reconcile é a rede
-        logStep("Grant FALHOU", { userId: user.id, offer, id, message: grantErr.message });
+        logStep("Grant FALHOU", { userId: user.id, offer, id, message: g.msg });
         return jsonResponse({ paid: false, status: "GRANT_ERROR" });
       }
-      logStep("Access granted", { userId: user.id, offer, id, plano: payload.plan, ate: payload.current_period_end, jaLiberado, acao: decisao.acao });
+      const jaLiberado = g.jaLiberado;
+      logStep("Access granted", { userId: user.id, offer, id, ate: g.fim, jaLiberado, acao: g.acao });
 
       if (!jaLiberado) {
         const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
@@ -469,7 +483,7 @@ serve(async (req) => {
               headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
               // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; o resto segue igual
               body: JSON.stringify(offer === OFERTA_PIX_ANUAL
-                ? { from, to: [user.email], subject: assuntoVenda("annual"), html: htmlVenda({ email: user.email, nome: displayName, periodo: "annual", fim: decisao.fim }) }
+                ? { from, to: [user.email], subject: assuntoVenda("annual"), html: htmlVenda({ email: user.email, nome: displayName, periodo: "annual", fim: g.fim }) }
                 : { from, to: [user.email], subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅", html: welcomeHtml(firstName, user.email) }),
             });
           }

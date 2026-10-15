@@ -12,6 +12,9 @@ export const EVENTOS_VENDA = ["ViewContent", "InitiateCheckout"] as const;
 export type EventoVenda = (typeof EVENTOS_VENDA)[number];
 const PREFIXO: Record<EventoVenda, string> = { ViewContent: "venda_vc_", InitiateCheckout: "venda_ic_" };
 const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web"]);
+/** 15/10 (revisão): os ÚNICOS valores aceitos — os preços da venda (anual 97,90; mensal 24,90). Qualquer outro
+ *  número recusa o pedido inteiro (ninguém infla o valor que a Meta vê). ViewContent vai sem valor. */
+export const VALORES_VENDA = [97.9, 24.9] as const;
 const SITE = "https://coreaplicativo.com.br";
 
 export type PedidoCapiVenda = {
@@ -31,7 +34,13 @@ export function validarPedido(body: unknown): PedidoCapiVenda | null {
   const url = urlBruta.startsWith(`${SITE}/assinar`) || urlBruta.startsWith("https://www.coreaplicativo.com.br/assinar") ? urlBruta : `${SITE}/assinar`;
   const fbp = texto(b.fbp, 200);
   const fbc = texto(b.fbc, 500);
-  const valor = typeof b.valor === "number" && b.valor > 0 && b.valor < 1000 ? Math.round(b.valor * 100) / 100 : null;
+  let valor: number | null = null;
+  if (b.valor !== undefined && b.valor !== null) {
+    if (typeof b.valor !== "number" || !(VALORES_VENDA as readonly number[]).includes(b.valor)) return null;
+    valor = b.valor;
+  }
+  if (evento === "InitiateCheckout" && valor === null) return null;
+  if (evento === "ViewContent" && valor !== null) return null;
   const conteudo = texto(b.conteudo, 40);
   return {
     evento, event_id: id, url,

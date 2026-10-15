@@ -75,6 +75,8 @@ export type EstadoVenda = {
   emailEnviado?: boolean;
   /** ISO do fim do acesso (check-subscription), pro "acesso até" do sucesso */
   fim?: string | null;
+  /** 15/10: a conta já era assinante (vitalício, loja ou anual ativo) — sucesso SEM cobrança */
+  jaAssinante?: boolean;
 };
 
 export const CHAVE_ESTADO_VENDA = "venda-estado-v1";
@@ -228,7 +230,7 @@ export function VendaWeb() {
     const plano = e.plano ?? "anual";
     const metodo: MetodoVenda = plano === "mensal" ? "cartao" : e.metodo ?? "pix";
     if (metodo === "pix") {
-      ir("pix", { nome, email: email.toLowerCase(), pix: null, metodo: "pix" });
+      ir("pix", { nome, email: email.toLowerCase(), pix: null, metodo: "pix", jaAssinante: false });
       return;
     }
     const base = cartao[plano];
@@ -239,7 +241,7 @@ export function VendaWeb() {
       return;
     }
     const url = urlDoCakto(base, { email, nome, attr: attrAgora() as unknown as Record<string, string> });
-    ir("cartao", { nome, email: email.toLowerCase(), cartaoUrl: url, metodo: "cartao" });
+    ir("cartao", { nome, email: email.toLowerCase(), cartaoUrl: url, metodo: "cartao", jaAssinante: false });
     setIndoCartao(true);
     // fbp/fbc/url vão junto: o cakto-webhook usa na CAPI do Purchase (o cartão não tem pix_order_created)
     const c = cookiesDaMeta();
@@ -247,11 +249,31 @@ export function VendaWeb() {
     window.setTimeout(() => irProCakto(url), 700);
   };
 
+  /* 15/10 (revisão): conta que JÁ é assinante (vitalício, loja ou anual ativo) não paga de novo — vai pro sucesso
+   * "você já é assinante". Confere no servidor (check-subscription), logo depois de entrar na conta existente. */
+  const irJaAssinante = (nome: string, email: string, fim: string | null, via: string) => {
+    trackEvent("venda_ja_assinante", { via, ...ids() });
+    ir("sucesso", { nome, email: email.toLowerCase(), jaAssinante: true, fim, pix: null });
+  };
+  const conferirJaAssinante = async (): Promise<{ sim: boolean; fim: string | null }> => {
+    try {
+      const { data } = await supabase.functions.invoke("check-subscription");
+      const d = data as { subscribed?: boolean; subscription_end?: string | null } | null;
+      return { sim: !!d?.subscribed, fim: d?.subscription_end ?? null };
+    } catch {
+      return { sim: false, fim: null }; // sem resposta: segue pro pagamento (o Pix de um vitalício é preservado no servidor)
+    }
+  };
+  const seguirOuJaAssinante = async (nome: string, email: string, via: string) => {
+    const j = await conferirJaAssinante();
+    if (j.sim) { irJaAssinante(nome, email, j.fim, via); return; }
+    seguirPagamento(nome, email);
+  };
+
   const onEnviarDados = async (nome: string, email: string): Promise<ResultadoDados> => {
     // a conta logada já é assinante (comprou antes): não cobra de novo
     if (isSubscribed && user?.email && user.email.toLowerCase() === email.toLowerCase()) {
-      trackEvent("venda_ja_assinante", { ...ids() });
-      ir("sucesso", { nome, email: email.toLowerCase() });
+      irJaAssinante(nome, email, null, "sessao");
       return { ok: true };
     }
     const r = await prepararConta({ email, nome, venda: montarVenda() });
@@ -261,21 +283,24 @@ export function VendaWeb() {
       trackEvent("venda_erro", { onde: "conta", msg: erro.slice(0, 120), ...ids() });
       return { ok: false, erro };
     }
-    trackEvent("venda_conta", { nova: (r as { nova: boolean }).nova, via: "email", plano: estadoRef.current.plano, metodo: estadoRef.current.metodo, ...ids() });
-    seguirPagamento(nome, email);
+    const nova = (r as { nova: boolean }).nova;
+    trackEvent("venda_conta", { nova, via: "email", plano: estadoRef.current.plano, metodo: estadoRef.current.metodo, ...ids() });
+    // conta que já existia neste navegador (mesmo e-mail): confere se já é assinante antes de cobrar
+    if (nova) seguirPagamento(nome, email);
+    else await seguirOuJaAssinante(nome, email, "sessao");
     return { ok: true };
   };
   const onEntrarSenha = async (email: string, senha: string, nome: string): Promise<boolean> => {
     const ok = await entrarComSenha(email, senha, nome, montarVenda());
     if (!ok) return false;
     trackEvent("venda_conta", { nova: false, via: "senha", ...ids() });
-    seguirPagamento(nome, email);
+    await seguirOuJaAssinante(nome, email, "senha");
     return true;
   };
   const onEntrouCodigo = async (nome: string, email: string) => {
     await entrouPorCodigo(nome, montarVenda());
     trackEvent("venda_conta", { nova: false, via: "codigo", ...ids() });
-    seguirPagamento(nome, email);
+    await seguirOuJaAssinante(nome, email, "codigo");
   };
 
   /* ---------------------------------------------------------- pago */
@@ -299,7 +324,7 @@ export function VendaWeb() {
   const concluirPago = (metodo: MetodoVenda, valor: number, extra: Record<string, unknown> = {}) => {
     const plano = estadoRef.current.plano ?? "anual";
     trackEvent("venda_pago", { plano, metodo, valor, ...extra, ...ids() });
-    ir("sucesso");
+    ir("sucesso", { jaAssinante: false });
     if (!pediuCodigo.current) { pediuCodigo.current = true; void pedirCodigo(); }
   };
   const onPixPago = useCallback(() => {
@@ -466,7 +491,7 @@ export function VendaWeb() {
     const comCodigo = plataforma === "ios" && codigoDaPortaOk(estado.codigo);
     tela = (
       <SucessoVenda
-        plataforma={plataforma} email={estado.email ?? user?.email ?? null} plano={plano} confirmado voltou={voltou}
+        plataforma={plataforma} email={estado.email ?? user?.email ?? null} plano={plano} confirmado jaAssinante={!!estado.jaAssinante} voltou={voltou}
         abrirApp={comCodigo ? abrirAppComCodigo(estado.codigo as string) : null}
         emailEnviado={comCodigo && !!estado.emailEnviado}
         fimDoAcesso={dataBr(estado.fim)} hrefLoja={hrefLoja} qrUrl={URL_QR_VENDA} onLoja={onLoja}

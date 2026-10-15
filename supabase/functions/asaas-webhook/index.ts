@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { OFERTA_PIX_ANUAL, assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
-import { COLUNAS_DECISAO, decidirGrantPix, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { creditarPedido } from "../_shared/grant-pix.ts";
+import { valorCobre } from "../_shared/trava-grant.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -220,6 +221,11 @@ serve(async (req) => {
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
     if (!(offer in PRECOS_CENTAVOS)) offer = "lifetime";
     const amountCents = PRECOS_CENTAVOS[offer];
+    /* 15/10: o pagamento tem que cobrir o preço da oferta DELE (cada oferta com o seu valor). */
+    if (!valorCobre(pago.value, amountCents)) {
+      logStep("Valor pago menor que a oferta — não libera", { offer, valor: pago.value ?? null, qrCodeId: qrCodeId.slice(0, 20) });
+      return jsonResponse({ received: true, granted: false, warning: "valor_menor" });
+    }
 
     // grant idempotente + dedup com o polling do app
     /* 01/10: TODAS as linhas da pessoa e a decisão em `decidirGrantPix`
@@ -229,35 +235,38 @@ serve(async (req) => {
      * carência da Apple quem pagou o Pix perdia o acesso). A trava de
      * rebaixamento (vitalício que paga o mês → linha preservada, caso de
      * reembolso) e o empilhamento do mês pré-pago vivem lá, testados. */
-    const { data: linhas } = await admin.from("subscriptions")
-      .select(COLUNAS_DECISAO).eq("user_id", userId);
     const { data: u } = await admin.auth.admin.getUserById(userId);
     const email = u?.user?.email ?? null;
     const now = new Date();
     const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
-    const decisao = decidirGrantPix((linhas ?? []) as LinhaAssinatura[], concessao, now);
-    if (decisao.acao === "preservar") {
+    const vitalicio = concessao.dias === null;
+    /* 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do check da página e do reconcile). */
+    const g = await creditarPedido(admin, {
+      userId, orderId: qrCodeId, gateway: "asaas", concessao, agora: now,
+      montarPayload: (fim) => ({
+        user_id: userId, status: "active",
+        plan: vitalicio ? "lifetime" : concessao.plano,
+        billing_period: vitalicio ? "lifetime" : concessao.periodo,
+        payment_method: "pix", abacatepay_billing_id: qrCodeId, customer_email: email, amount_cents: amountCents,
+        current_period_start: now.toISOString(), current_period_end: fim,
+      }),
+    });
+    if (g.r === "preservado") {
       logStep("Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
       return jsonResponse({ received: true, granted: true, jaVitalicio: true });
     }
-    const jaLiberado = decisao.jaLiberado;
-    const vitalicio = concessao.dias === null;
-    const payload = {
-      user_id: userId, status: "active",
-      plan: vitalicio ? "lifetime" : concessao.plano,
-      billing_period: vitalicio ? "lifetime" : concessao.periodo,
-      payment_method: "pix", abacatepay_billing_id: qrCodeId, customer_email: email, amount_cents: amountCents,
-      current_period_start: now.toISOString(), current_period_end: decisao.fim,
-    };
-    const { error: grantErr } = decisao.acao === "atualizar"
-      ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
-      : await admin.from("subscriptions").insert(payload);
-    if (grantErr) {
+    if (g.r === "ja_creditado" || g.r === "em_andamento") {
+      // o check da página / o reconcile já creditou (ou está creditando) ESTE pedido: não escreve, não manda nada
+      logStep(g.r === "ja_creditado" ? "Pedido já creditado — nada a fazer" : "Pedido sendo creditado por outro caminho", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
+      return jsonResponse({ received: true, granted: g.r === "ja_creditado", jaCreditado: g.r === "ja_creditado", emAndamento: g.r === "em_andamento" });
+    }
+    if (g.r === "erro") {
       // 200 mesmo assim (a fila do Asaas não pode pausar); o pix-reconcile credita depois
-      logStep("Grant FALHOU", { userId, offer, qrCodeId: qrCodeId.slice(0, 20), message: grantErr.message });
+      logStep("Grant FALHOU", { userId, offer, qrCodeId: qrCodeId.slice(0, 20), message: g.msg });
       return jsonResponse({ received: true, granted: false, error: "grant_failed" });
     }
-    logStep("Access granted", { userId, offer, plano: payload.plan, ate: payload.current_period_end, qrCodeId: qrCodeId.slice(0, 20), jaLiberado, acao: decisao.acao });
+    const jaLiberado = g.jaLiberado;
+    logStep("Access granted", { userId, offer, ate: g.fim, qrCodeId: qrCodeId.slice(0, 20), jaLiberado, acao: g.acao });
 
     if (!jaLiberado) {
       const { data: p } = await admin.from("profiles").select("display_name").eq("id", userId).maybeSingle();
@@ -276,7 +285,7 @@ serve(async (req) => {
             method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
             // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; o resto segue igual
             body: JSON.stringify(offer === OFERTA_PIX_ANUAL
-              ? { from, to: [email], subject: assuntoVenda("annual"), html: htmlVenda({ email, nome: displayName, periodo: "annual", fim: decisao.fim }) }
+              ? { from, to: [email], subject: assuntoVenda("annual"), html: htmlVenda({ email, nome: displayName, periodo: "annual", fim: g.fim }) }
               : {
                 from, to: [email],
                 // o assunto tem que dizer a verdade: mês pré-pago não é vitalício

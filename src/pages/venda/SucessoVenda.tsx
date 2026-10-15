@@ -16,11 +16,13 @@ import { DICA_CODIGO, DICA_ENTRAR_VENDA, PLANOS, SUCESSO_SELO, SUCESSO_TITULO, t
  *   · `confirmado=false`: voltou da Cakto num navegador sem a sessão (o Instagram apaga o storage) — não dá pra
  *     conferir daqui; o texto diz pra entrar com o e-mail que usou no pagamento.
  */
-export function SucessoVenda({ plataforma, email, plano, confirmado, voltou, abrirApp, emailEnviado, fimDoAcesso, hrefLoja, qrUrl, onLoja, onAbrirApp }: {
+export function SucessoVenda({ plataforma, email, plano, confirmado, jaAssinante = false, voltou, abrirApp, emailEnviado, fimDoAcesso, hrefLoja, qrUrl, onLoja, onAbrirApp }: {
   plataforma: Plataforma;
   email: string | null;
   plano: PlanoVenda;
   confirmado: boolean;
+  /** 15/10: a conta já era assinante — nada foi cobrado agora */
+  jaAssinante?: boolean;
   voltou: boolean;
   abrirApp: string | null;
   emailEnviado: boolean;
@@ -39,10 +41,15 @@ export function SucessoVenda({ plataforma, email, plano, confirmado, voltou, abr
     <div className="pt-2 text-center" data-testid="venda-sucesso" data-plataforma={plataforma} data-confirmado={confirmado ? "" : undefined}>
       <SeloConta />
       <p className="mt-3 text-[12.5px] font-bold uppercase tracking-[0.14em]" style={{ color: MAGENTA }} data-testid="venda-sucesso-selo">
-        {confirmado ? SUCESSO_SELO : "Pagamento no cartão"}
+        {jaAssinante ? "Você já é assinante" : confirmado ? SUCESSO_SELO : "Pagamento no cartão"}
       </p>
-      <TituloCard testid="venda-sucesso-titulo" className="mt-1.5 text-[26px]">{confirmado ? SUCESSO_TITULO : "Agora é só entrar no app"}</TituloCard>
-      {confirmado && (
+      <TituloCard testid="venda-sucesso-titulo" className="mt-1.5 text-[26px]">{jaAssinante ? "Seu CORE já está liberado" : confirmado ? SUCESSO_TITULO : "Agora é só entrar no app"}</TituloCard>
+      {jaAssinante && (
+        <p className="mt-1.5 text-[14px] text-[#6b6670]" data-testid="venda-sucesso-plano">
+          Não precisa pagar de novo{fimDoAcesso ? <> · acesso até <b className="text-[#16121c]">{fimDoAcesso}</b></> : null}.
+        </p>
+      )}
+      {confirmado && !jaAssinante && (
         <p className="mt-1.5 text-[14px] text-[#6b6670]" data-testid="venda-sucesso-plano">
           Plano {PLANOS[plano].nome.toLowerCase()}{fimDoAcesso ? <> · acesso até <b className="text-[#16121c]">{fimDoAcesso}</b></> : null}
         </p>

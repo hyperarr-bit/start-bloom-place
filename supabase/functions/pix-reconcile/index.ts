@@ -338,7 +338,9 @@ serve(async (req) => {
           montarPayload: () => payload,
         });
         if (g.r === "preservado") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
-        if (g.r === "ja_creditado" || g.r === "em_andamento") { logStep("Pedido já creditado (ou sendo creditado) por outro caminho", { uid, orderId: o.orderId, r: g.r }); break; }
+        // revisor 15/10: `continue` (não `break`) — um pedido antigo já creditado não pode impedir o pedido NOVO da
+        // mesma pessoa (cancelou/reembolsou o antigo e pagou outro em 48 h) de ser creditado pela rede de segurança
+        if (g.r === "ja_creditado" || g.r === "em_andamento") { logStep("Pedido já creditado (ou sendo creditado) por outro caminho", { uid, orderId: o.orderId, r: g.r }); continue; }
         if (g.r === "erro") {
           falhas.push({ orderId: o.orderId, erro: g.msg.slice(0, 120) });
           continue;

@@ -319,6 +319,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 // Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
 // (some do build — a condição é substituída por `false` e o import cai fora).
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
+// 16/10: a CONQUISTAS 2 (só sequência + adesivos, 3 direções) — protótipo, só no dev
+const DevConquistasNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistasNova")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
 // 02/10: "Ficou de ontem" e "Esqueceu de marcar?" nas telas de verdade (modo visitante) — só no dev, pra fotografar
@@ -625,6 +627,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevConquistas && (
           <Route path="/dev/conquistas" element={<Suspense fallback={null}><DevConquistas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevConquistasNova && (
+          <Route path="/dev/conquistas-nova" element={<Suspense fallback={null}><DevConquistasNova /></Suspense>} />
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />

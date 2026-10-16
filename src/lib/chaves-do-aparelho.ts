@@ -89,6 +89,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-batismo-pendente", // web: compra sem conta ainda deve e-mail e senha (guarda o id do anônimo)
   "core-compra-anonima", // web: prova da compra anônima, 24 h, pra trazer o Pix pra conta em que entrou
   "core-codigo-pendente", // código promocional validado antes do cadastro, resgatado depois
+  "core-montar-financas", // 1.0.16: "Vamos montar suas Finanças" feito/pulado (+ vistas); a mesma chave vai pra conta
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -120,7 +121,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",
     "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-sem-gasto",
-    "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes",
+    "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [

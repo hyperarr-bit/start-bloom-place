@@ -40,6 +40,7 @@ import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
+import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -139,6 +140,7 @@ export async function initRevenueCat(): Promise<EstadoRC> {
     // 10/10: as chaves das ofertas de saída viajam no metadata das offerings (ofertas-saida.ts)
     registrarChavesRemotas(offerings);
     registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
+    registrarChaveMontarFinancas(offerings); // 1.0.16: `montar_financas: on|off` (lib/montar-financas)
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];

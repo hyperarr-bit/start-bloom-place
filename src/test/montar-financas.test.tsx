@@ -1,0 +1,446 @@
+/**
+ * "VAMOS MONTAR SUAS FINANÇAS" (1.0.16) — o que este arquivo trava, com a conta VAZIA (sem seeds):
+ *   · 3 toques até o número: renda → contas fixas → "Você pode gastar R$ X por dia", e o número
+ *     é o MESMO do card "QUANTO POSSO GASTAR HOJE" do Dashboard (computeDailyBudget);
+ *   · o que a pessoa responde vira dado REAL do módulo (finance-incomes / finance-fixed-expenses,
+ *     no formato das tabelas) e aparece no Finanças de verdade depois;
+ *   · Pular em toda pergunta; eventos sem valor em reais;
+ *   · uma vez só: feito/pulado sobrevive a fechar e reabrir o app (vassoura da abertura), ao
+ *     logout e a outro aparelho (a marca também mora na conta); 2 vistas sem decisão = fim;
+ *   · quem não vê: conta antiga, conta com qualquer dado de Finanças, convidado, demo, site
+ *     (chave web off), app com a metadata `montar_financas: "off"`.
+ */
+process.env.TZ = "America/Sao_Paulo";
+
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { render, screen, act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+
+const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
+const auth = vi.hoisted(() => ({ user: { id: "u-mf", created_at: "" } as { id: string; created_at?: string } | null, loading: false }));
+vi.mock("@/hooks/use-auth", async (orig) => ({
+  ...(await orig<typeof import("@/hooks/use-auth")>()),
+  useAuth: () => ({ user: auth.user, session: null, loading: auth.loading, isSubscribed: true, subLoaded: true }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("@/integrations/supabase/client", () => {
+  const q: any = {
+    select: () => q, eq: () => q, in: () => Promise.resolve({ data: [], error: null }), order: () => q, limit: () => q, gte: () => q, lte: () => q,
+    abortSignal: () => Promise.resolve({ data: [], error: null }),
+    maybeSingle: async () => ({ data: null, error: null }), single: async () => ({ data: null, error: null }),
+    insert: async () => ({ data: null, error: null }), upsert: async () => ({ data: null, error: null }),
+    update: () => q, delete: () => q, then: (r: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(r),
+  };
+  return {
+    supabase: {
+      from: () => q,
+      functions: { invoke: vi.fn(async () => ({ data: null, error: null })) },
+      auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      rpc: async () => ({ data: null, error: null }),
+    },
+  };
+});
+vi.mock("@/lib/analytics", async (orig) => ({
+  ...(await orig<typeof import("@/lib/analytics")>()),
+  trackEvent: (n: string, d: Record<string, unknown> = {}) => { eventos.push([n, d]); },
+  trackEventBeacon: vi.fn(), markActivation: vi.fn(async () => {}),
+}));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }), Toaster: () => null }));
+
+import { UserDataContext, UserDataProvider, useUserData, type UserDataContextType } from "@/hooks/use-user-data";
+import { purgeLocalUserCache } from "@/hooks/use-auth";
+import { computeDailyBudget } from "@/lib/finance-totals";
+import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
+import { cartoesVistosNesteAparelho } from "@/lib/tour-home";
+import {
+  CHAVE_FORCA_MONTAR_FINANCAS, CHAVE_MONTAR_FINANCAS, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW, EVENTO_MONTAR_FINANCAS_FIM,
+  _zerarRemotaMontar, calcularMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar, lerChaveRemotaMontar,
+  marcaDoAparelho, marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, reaisDigitados, registrarChaveMontarFinancas,
+  registrarVistaMontar, temDadosDeFinancas,
+} from "@/lib/montar-financas";
+import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
+import Index from "@/pages/Index";
+
+const UID = "u-mf";
+const HOJE = new Date(2026, 9, 16, 12, 0); // 16/10/2026: faltam 16 dias contando hoje
+const HORA = 3600e3;
+
+/* ── app das lojas × site ── */
+const virarApp = () => { (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; };
+const virarSite = () => { delete (window as any).Capacitor; };
+
+/** Store em memória com `loaded` controlável, gravando o cache local como o provider real. */
+type Controle = { setLoaded: (v: boolean) => void; dados: () => Record<string, unknown> };
+const Provedor = ({ inicial, controle, loadedInicial = true, children }: { inicial: Record<string, unknown>; controle: Controle; loadedInicial?: boolean; children?: React.ReactNode }) => {
+  const [store, setStore] = useState<Record<string, unknown>>(() => ({ ...inicial }));
+  const [loaded, setLoaded] = useState(loadedInicial);
+  const ref = useRef<Record<string, unknown>>({ ...inicial });
+  const get = useCallback(<T,>(k: string, fb: T): T => (k in store ? (store[k] as T) : fb), [store]);
+  const set = useCallback((k: string, v: unknown) => {
+    ref.current = { ...ref.current, [k]: JSON.parse(JSON.stringify(v ?? null)) };
+    localStorage.setItem(`u:${UID}:${k}`, JSON.stringify(v));
+    setStore((prev) => ({ ...prev, [k]: v }));
+  }, []);
+  controle.setLoaded = setLoaded;
+  controle.dados = () => ref.current;
+  const valor = useMemo<UserDataContextType>(() => ({ get, set, loaded, isGuest: !auth.user, fetchKey: async () => null }), [get, set, loaded]);
+  return <UserDataContext.Provider value={valor}>{children}</UserDataContext.Provider>;
+};
+const novoControle = (): Controle => ({ setLoaded: () => {}, dados: () => ({}) });
+
+const montarIndex = (inicial: Record<string, unknown>, controle = novoControle(), loadedInicial = true) => {
+  render(
+    <MemoryRouter initialEntries={["/financas"]}>
+      <Provedor inicial={inicial} controle={controle} loadedInicial={loadedInicial}>
+        <Routes><Route path="/financas" element={<Index />} /></Routes>
+      </Provedor>
+    </MemoryRouter>,
+  );
+  return controle;
+};
+const montarTela = (props: Partial<React.ComponentProps<typeof MontarFinancas>> = {}, inicial: Record<string, unknown> = {}) => {
+  const controle = novoControle();
+  render(
+    <MemoryRouter>
+      <Provedor inicial={inicial} controle={controle}>
+        <MontarFinancas agora={HOJE} esperaMs={0} {...props} />
+      </Provedor>
+    </MemoryRouter>,
+  );
+  return controle;
+};
+const respirar = async (n = 6) => { for (let i = 0; i < n; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); };
+const nomes = () => eventos.map(([n]) => n);
+
+/** Os 3 toques (+ ajustes): faixa R$ 2 a 4 mil → Aluguel, Luz e uma "Outra" (Escola, 700) → resultado. */
+const fazerOsTresToques = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "R$ 2 a 4 mil" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  fireEvent.click(screen.getByRole("button", { name: /Aluguel/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Luz/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Outra/ }));
+  fireEvent.change(screen.getByLabelText("Nome da conta"), { target: { value: "Escola" } });
+  fireEvent.change(screen.getByLabelText("Valor de Escola"), { target: { value: "700" } });
+  fireEvent.click(screen.getByRole("button", { name: "Ver quanto posso gastar" }));
+  await respirar();
+};
+
+beforeAll(() => {
+  window.scrollTo = (() => {}) as typeof window.scrollTo;
+  Element.prototype.scrollIntoView = () => {};
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+  if (!("ResizeObserver" in window)) {
+    class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
+    Object.defineProperty(window, "ResizeObserver", { writable: true, value: ResizeObserverStub });
+    Object.defineProperty(globalThis, "ResizeObserver", { writable: true, value: ResizeObserverStub });
+  }
+});
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(HOJE);
+  localStorage.clear();
+  eventos.length = 0;
+  _zerarRemotaMontar();
+  auth.user = { id: UID, created_at: new Date(HOJE.getTime() - 2 * HORA).toISOString() };
+  auth.loading = false;
+  virarApp();
+});
+afterEach(() => {
+  cleanup();
+  virarSite();
+  vi.useRealTimers();
+});
+
+/* ───────────────────────── a conta ───────────────────────── */
+describe("a conta da tela é a conta do módulo", () => {
+  it("R$ 3.000 − 5 contas (R$ 1.255) em 16/10 = R$ 109 por dia, igual ao computeDailyBudget do Dashboard", () => {
+    const contas = [
+      { id: "a", nome: "Aluguel", emoji: "", valor: 900, categoria: "moradia" },
+      { id: "b", nome: "Luz", emoji: "", valor: 150, categoria: "contas_casa" },
+      { id: "c", nome: "Internet", emoji: "", valor: 100, categoria: "internet_telefone" },
+      { id: "d", nome: "Celular", emoji: "", valor: 60, categoria: "internet_telefone" },
+      { id: "e", nome: "Streaming", emoji: "", valor: 45, categoria: "assinaturas" },
+    ];
+    const r = calcularMontar(3000, contas, HOJE);
+    const painel = computeDailyBudget(3000, 1255, [], contas.map((c) => ({ id: c.id, value: c.valor })), HOJE);
+    expect(r).toMatchObject({ fixos: 1255, contas: 5, livre: 1745, dias: 16, porDia: Math.round(painel.perDay), semFolga: false });
+    expect(r.porDia).toBe(109);
+  });
+  it("contas maiores que a renda: R$ 0 e sem folga; conta sem nome ou sem valor não entra", () => {
+    const r = calcularMontar(1500, [{ id: "a", nome: "Aluguel", emoji: "", valor: 2000, categoria: "moradia" }, { id: "x", nome: "", emoji: "", valor: 300, categoria: "outros" }, { id: "y", nome: "Gás", emoji: "", valor: 0, categoria: "outros" }], HOJE);
+    expect(r).toMatchObject({ porDia: 0, semFolga: true, contas: 1, fixos: 2000 });
+  });
+  it("grava no formato das tabelas (IncomeTable / FixedExpensesTable), sem perfil", () => {
+    const { receita, fixos } = itensParaGravar(3000, [{ id: "luz", nome: " Luz ", emoji: "💡", valor: 150, categoria: "contas_casa" }], HOJE);
+    expect(receita).toEqual([{ id: expect.any(String), description: "Renda do mês", value: 3000, date: "2026-10-16" }]);
+    expect(fixos).toEqual([{ id: expect.any(String), description: "Luz", category: "contas_casa", value: 150, paymentMethod: "boleto" }]);
+    expect(fixos[0].id).not.toBe(receita[0].id);
+  });
+  it("valor digitado como gente digita", () => {
+    expect(reaisDigitados("3.000")).toBe(3000);
+    expect(reaisDigitados("R$ 2.500,90")).toBe(2500);
+    expect(reaisDigitados("")).toBe(0);
+    expect(reaisDigitados("abc")).toBe(0);
+  });
+});
+
+/* ───────────────────────── a chave ───────────────────────── */
+describe("a chave MONTAR_FINANCAS", () => {
+  it("app: ligada; site: desligada; metadata do RevenueCat manda no app (a current vence)", () => {
+    expect(montarFinancasLigado()).toBe(true);
+    virarSite();
+    expect(montarFinancasLigado()).toBe(false);
+    virarApp();
+    registrarChaveMontarFinancas({ current: { metadata: { montar_financas: "off" } }, all: {} });
+    expect(montarFinancasLigado()).toBe(false);
+    expect(lerChaveRemotaMontar({ current: { metadata: {} }, all: { a: { metadata: { montar_financas: "off" } } } })).toBe("off");
+    expect(lerChaveRemotaMontar({ current: { metadata: { montar_financas: "on" } }, all: { a: { metadata: { montar_financas: "off" } } } })).toBe("on");
+    expect(lerChaveRemotaMontar(null)).toBeNull();
+  });
+  it("QA no navegador: ?montar-financas=on liga no site e pula a régua de conta nova; recomecar apaga o 'já vi'", () => {
+    virarSite();
+    guardarForcaMontarDaUrl("?montar-financas=on");
+    expect(montarFinancasLigado()).toBe(true);
+    const get = <T,>(_k: string, f: T) => f;
+    expect(deveMostrarMontarFinancas({ criadoEm: "2025-01-01T00:00:00Z", get, isGuest: false })).toBe(true);
+    marcarMontarDecidido("pulou");
+    expect(guardarForcaMontarDaUrl("?montar-financas=recomecar")).toBe(true);
+    expect(marcaDoAparelho()).toBeNull();
+    guardarForcaMontarDaUrl("?montar-financas=auto");
+    expect(localStorage.getItem(CHAVE_FORCA_MONTAR_FINANCAS)).toBeNull();
+  });
+  it("a força de QA não existe no app da loja", () => {
+    localStorage.setItem(CHAVE_FORCA_MONTAR_FINANCAS, "off");
+    expect(montarFinancasLigado()).toBe(true);
+  });
+});
+
+/* ───────────────────────── a régua ───────────────────────── */
+describe("quem vê", () => {
+  const vazio = <T,>(_k: string, f: T) => f;
+  const com = (dados: Record<string, unknown>) => <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
+  const criadoEm = () => auth.user!.created_at;
+
+  it("conta nova + Finanças vazia (os 4 dias padrão do MEU MÊS sem conta) → vê", () => {
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: com({ "finance-dueDays": [{ day: 5, bills: [] }, { day: 10, bills: [] }] }), isGuest: false })).toBe(true);
+  });
+  it("conta antiga (≥ 48 h) → não", () => {
+    expect(deveMostrarMontarFinancas({ criadoEm: new Date(HOJE.getTime() - 49 * HORA).toISOString(), get: vazio, isGuest: false })).toBe(false);
+    expect(deveMostrarMontarFinancas({ criadoEm: undefined, get: vazio, isGuest: false })).toBe(false);
+  });
+  it("qualquer dado de Finanças → não", () => {
+    for (const dados of [
+      { "finance-incomes": [{ id: 1 }] }, { "finance-expenses": [{ id: 1 }] }, { "finance-fixed-expenses": [{ id: 1 }] },
+      { "finance-installments": [{ id: 1 }] }, { "finance-investments": [{ id: 1 }] }, { "finance-dueDays": [{ day: 5, bills: [{ id: "b" }] }] },
+    ]) {
+      expect(temDadosDeFinancas(com(dados)), JSON.stringify(dados)).toBe(true);
+      expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: com(dados), isGuest: false })).toBe(false);
+    }
+  });
+  it("convidado e demo → não", () => {
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: true })).toBe(false);
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false, isPreview: true })).toBe(false);
+  });
+  it("já decidido no aparelho OU na conta → não; 2 vistas sem decisão → não", () => {
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: com({ [CHAVE_MONTAR_FINANCAS]: { r: "pronto" } }), isGuest: false })).toBe(false);
+    marcarMontarDecidido("pulou");
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(false);
+    localStorage.clear();
+    registrarVistaMontar();
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(true);
+    registrarVistaMontar();
+    expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(false);
+  });
+});
+
+/* ───────────────────────── a tela ───────────────────────── */
+describe("a tela, com a conta vazia", () => {
+  it("3 toques: renda → contas → 'Você pode gastar R$ X por dia'; grava no módulo; eventos sem reais", async () => {
+    const onPronto = vi.fn();
+    const fim = vi.fn();
+    window.addEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
+    const controle = montarTela({ onPronto, origem: "missao" });
+
+    expect(screen.getByText("Quanto entra por mês, mais ou menos?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Continuar" })).toHaveProperty("disabled", true);
+    expect(document.documentElement.hasAttribute("data-montar-financas")).toBe(true);
+    await fazerOsTresToques();
+
+    const d = controle.dados();
+    expect(d["finance-incomes"]).toEqual([expect.objectContaining({ description: "Renda do mês", value: 3000, date: "2026-10-16" })]);
+    expect((d["finance-fixed-expenses"] as any[]).map((f) => [f.description, f.value, f.category])).toEqual([
+      ["Aluguel", 900, "moradia"], ["Luz", 150, "contas_casa"], ["Escola", 700, "outros"],
+    ]);
+    // 3000 − 1750 = 1250 ÷ 16 = 78,125 → R$ 78
+    expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 78");
+    expect(screen.getByText(/até o fim do mês \(16 dias, contando hoje\)/)).toBeTruthy();
+    expect(screen.queryByText(/\bIA\b/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
+    expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false });
+    expect(fim).toHaveBeenCalledTimes(1);
+    expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3 });
+    window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
+
+    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO]);
+    expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3]);
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao" });
+    for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
+    // feito: no aparelho e na conta
+    expect(marcaDoAparelho()?.r).toBe("pronto");
+    expect((d[CHAVE_MONTAR_FINANCAS] as any)?.r).toBe("pronto");
+  });
+
+  it("renda digitada (sem faixa) e 'Não tenho conta fixa' também chegam ao número", async () => {
+    const controle = montarTela();
+    fireEvent.change(screen.getByLabelText("Renda do mês em reais"), { target: { value: "4.800" } });
+    expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("4.800");
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Não tenho conta fixa" }));
+    await respirar();
+    expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 300");
+    expect(controle.dados()["finance-fixed-expenses"]).toBeUndefined();
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toMatchObject({ contas: 0, faixa: "digitou" });
+  });
+
+  it("Voltar da 2ª pergunta guarda a renda; tirar uma conta na tabela desmarca o chip", () => {
+    montarTela();
+    fireEvent.click(screen.getByRole("button", { name: "Até R$ 2 mil" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /^📶 Internet/ }));
+    expect(screen.getByRole("button", { name: /^📶 Internet/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Tirar Internet" }));
+    expect(screen.getByRole("button", { name: /^📶 Internet/ }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: /Voltar/ }));
+    expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("1.500");
+  });
+
+  for (const passo of [1, 2] as const) {
+    it(`Pular na pergunta ${passo}: nada gravado no módulo, marca 'pulou' no aparelho e na conta, evento com o passo`, () => {
+      const onPular = vi.fn();
+      const controle = montarTela({ onPular });
+      if (passo === 2) {
+        fireEvent.click(screen.getByRole("button", { name: "R$ 4 a 7 mil" }));
+        fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Pular" }));
+      expect(onPular).toHaveBeenCalledTimes(1);
+      expect(controle.dados()["finance-incomes"]).toBeUndefined();
+      expect(marcaDoAparelho()?.r).toBe("pulou");
+      expect((controle.dados()[CHAVE_MONTAR_FINANCAS] as any)?.r).toBe("pulou");
+      expect(eventos.find(([n]) => n === EV_PULAR)![1]).toEqual({ passo, origem: "modulo" });
+    });
+  }
+});
+
+/* ───────────────────────── no módulo de verdade ───────────────────────── */
+describe("pages/Index (Finanças de verdade), app da loja", () => {
+  it("conta nova vazia: espera o dado da conta, mostra a tela, e depois do 'pronto' o módulo mostra a renda, as contas e o MESMO número no Dashboard", async () => {
+    const controle = montarIndex({}, novoControle(), false);
+    expect(screen.queryByTestId("montar-financas")).toBeNull(); // ainda carregando: nem módulo vazio nem tela
+    expect(screen.queryByText("MEU FINANCEIRO", { exact: false })).toBeNull();
+    act(() => controle.setLoaded(true));
+    await respirar();
+    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+
+    await fazerOsTresToques();
+    await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
+    const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
+    fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
+    await respirar();
+
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(screen.getAllByText("Renda do mês").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Escola").length).toBeGreaterThan(0);
+    expect(cartoesVistosNesteAparelho("financas")).toBe(true); // a tela substitui os cartões de boas-vindas
+
+    fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
+    await respirar();
+    const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div")!;
+    expect(within(card).getByText(`R$ ${numero}`)).toBeTruthy();
+  });
+
+  it("reabrir Finanças depois do 'pronto' ou do 'pular' não mostra de novo", async () => {
+    montarIndex({});
+    await respirar();
+    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    cleanup();
+    montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+  });
+
+  it("conta antiga, conta com dado, convidado e site: Finanças de sempre", async () => {
+    auth.user = { id: UID, created_at: new Date(HOJE.getTime() - 30 * 24 * HORA).toISOString() };
+    montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    cleanup();
+
+    auth.user = { id: UID, created_at: new Date(HOJE.getTime() - HORA).toISOString() };
+    montarIndex({ "finance-expenses": [{ id: "e1", description: "Café", value: 12, date: "2026-10-16", category: "alimentacao", paymentMethod: "pix" }] });
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    cleanup();
+
+    virarSite();
+    montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+  });
+});
+
+/* ───────────────────────── uma vez só, de verdade ───────────────────────── */
+describe("feito/pulado sobrevive a fechar e reabrir o app, ao logout e a outro aparelho", () => {
+  const abrirEFecharOApp = async () => {
+    let carregou = false;
+    const Sonda = () => { carregou = useUserData().loaded; return null; };
+    render(<UserDataProvider><Sonda /></UserDataProvider>);
+    await waitFor(() => expect(carregou).toBe(true));
+    cleanup();
+  };
+
+  it("a chave é do aparelho (nenhuma vassoura leva)", () => {
+    expect(ehChaveDoAparelho(CHAVE_MONTAR_FINANCAS)).toBe(true);
+    expect(vassouraLeva(CHAVE_MONTAR_FINANCAS)).toBe(false);
+  });
+
+  it("pronto → fechar → reabrir (2×) → sair da conta: continua decidido", async () => {
+    vi.useRealTimers();
+    marcarMontarDecidido("pronto");
+    localStorage.setItem(`u:${UID}:finance-incomes`, "[]"); // cache da conta: a vassoura leva
+    await abrirEFecharOApp();
+    expect(montarJaDecidido()).toBe(true);
+    expect(localStorage.getItem(`u:${UID}:finance-incomes`)).toBeNull();
+    await abrirEFecharOApp();
+    expect(montarJaDecidido()).toBe(true);
+    purgeLocalUserCache();
+    expect(marcaDoAparelho()?.r).toBe("pronto");
+  });
+
+  it("outro aparelho (localStorage vazio): a marca que voltou da conta basta", () => {
+    const daConta = <T,>(k: string, f: T): T => (k === CHAVE_MONTAR_FINANCAS ? ({ r: "pulou", em: "2026-10-16T12:00:00Z" } as T) : f);
+    expect(montarJaDecidido()).toBe(false);
+    expect(montarJaDecidido(daConta)).toBe(true);
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: daConta, isGuest: false })).toBe(false);
+  });
+
+  it("o app fechou NO MEIO (sem decidir): volta 1 vez, e na 2ª vista sem decisão é a última", async () => {
+    montarIndex({});
+    await respirar();
+    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+    cleanup(); // fechou o app na 1ª pergunta
+    montarIndex({});
+    await respirar();
+    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+    cleanup();
+    montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+  });
+});

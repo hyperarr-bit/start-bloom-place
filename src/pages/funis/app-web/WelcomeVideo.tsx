@@ -18,6 +18,11 @@ import { FUNIL_APP_WEB, VARIANTE_APP } from "./conteudo";
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
 export const MOLDURA_WELCOME = "/funil/iphone-mockup.svg";
+/** 17/10 (dono: "o vídeo não funciona, só fica um print"): autoplay negado (NotAllowedError — Modo Pouca Energia;
+ *  17% das aberturas no próprio app) → em vez da tela parada, o celular passa as 6 telas do passeio (as mesmas da
+ *  Porta, 640×1388 como o vídeo), 2 s cada; o 1º toque continua tentando o vídeo. */
+export const TELAS_PASSEIO = [1, 2, 3, 4, 5, 6].map((n) => `/porta/tour/${n}.jpg`);
+const PASSEIO_MS = 2000;
 
 const PROMESSA_PADRAO = "Sua vida inteira organizada num app só.";
 const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
@@ -33,6 +38,12 @@ const TAG = { funil: FUNIL_APP_WEB, variante: VARIANTE_APP, web: true };
 export function WelcomeVideo({ onComecar, onEntrar, area }: { onComecar: () => void; onEntrar: () => void; area?: AreaKey | null }) {
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);
+  const [quadro, setQuadro] = useState(0);
+  useEffect(() => {
+    if (!videoFalhou) return;
+    const t = window.setInterval(() => setQuadro((q) => (q + 1) % TELAS_PASSEIO.length), PASSEIO_MS);
+    return () => window.clearInterval(t);
+  }, [videoFalhou]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
 
@@ -106,7 +117,11 @@ export function WelcomeVideo({ onComecar, onEntrar, area }: { onComecar: () => v
               />
               {/* autoplay negado/vídeo que não carrega: a tela do app parada (o poster) POR CIMA — sem o botão de play
                   do Safari no meio do celular; o toque tenta o vídeo de novo e, rodando, a imagem sai */}
-              {videoFalhou && <img className="wca-poster" src={POSTER_WELCOME} alt="" draggable={false} data-testid="welcome-poster" />}
+              {videoFalhou && (
+                <img className="wca-poster" src={TELAS_PASSEIO[quadro]} alt="" draggable={false} data-testid="welcome-poster" data-quadro={quadro} />
+              )}
+              {/* pré-carrega as telas do passeio pra troca não piscar */}
+              {videoFalhou && <div aria-hidden style={{ display: "none" }}>{TELAS_PASSEIO.map((u) => <img key={u} src={u} alt="" />)}</div>}
             </div>
             <img className="wca-moldura" src={MOLDURA_WELCOME} alt="" draggable={false} />
           </motion.div>

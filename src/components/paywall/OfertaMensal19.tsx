@@ -166,7 +166,7 @@ export function Mensal19Folha({ lugar, oferta, onFechar, onSucesso }: {
               </span>
             </span>
           </div>
-          <p className="text-[12px] font-semibold text-[#4f5a64] mt-1.5">os 16 módulos, sem limite · cancela em 1 toque</p>
+          <p className="text-[12px] font-semibold text-[#4f5a64] mt-1.5">os 16 módulos, sem limite · cancela quando quiser</p>
         </motion.div>
 
         <motion.p

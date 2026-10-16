@@ -315,6 +315,8 @@ describe("ON: a estrutura do Cal AI, cheia de cima a baixo", () => {
       await act(async () => { vi.advanceTimersByTime(450); }); // a caixa abre e libera o CTA
       const { comprarPresente69 } = await import("@/lib/revenuecat");
       await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+      // 16/10: a folha do 97,90 já foi fechada → explicação antes da folha do 69,90
+      await act(async () => { fireEvent.click(screen.getByTestId("explica-folha-continuar")); });
       await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
       expect(vi.mocked(comprarPresente69)).toHaveBeenCalledWith("folha_cancelada");
       expect(eventos("app_sheet_success")[0]).toMatchObject({ produto: "core_anual_69", oferta: "presente69", lugar: "folha_cancelada", segunda_chance: "imediata" });
@@ -334,6 +336,10 @@ describe("ON: a estrutura do Cal AI, cheia de cima a baixo", () => {
       expect(eventos("folha_segunda_chance_view")[0]).toMatchObject({ segunda_chance: "imediata" });
       loja.compraOk = true; loja.motivo = null;
       fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+      // 16/10: na 2ª vez a explicação vem antes da folha (no lugar da pílula de 1,2 s)
+      expect(screen.getByTestId("explica-folha")).toHaveAttribute("data-lugar", "paywall");
+      expect(vi.mocked(comprarAnualIos)).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId("explica-folha-continuar"));
       await waitFor(() => expect(vi.mocked(comprarAnualIos)).toHaveBeenCalledTimes(2));
       expect(eventos("folha_segunda_chance_click")).toHaveLength(1);
     } finally { vi.useRealTimers(); }

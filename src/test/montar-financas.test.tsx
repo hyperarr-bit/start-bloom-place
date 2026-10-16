@@ -57,7 +57,7 @@ import {
   CHAVE_FORCA_MONTAR_FINANCAS, CHAVE_MONTAR_FINANCAS, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW, EVENTO_MONTAR_FINANCAS_FIM,
   _zerarRemotaMontar, calcularMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar, lerChaveRemotaMontar,
   marcaDoAparelho, marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, reaisDigitados, registrarChaveMontarFinancas,
-  registrarVistaMontar, temDadosDeFinancas,
+  registrarVistaMontar, temDadosDeFinancas, _novaAberturaMontar, lerRascunhoMontar, montarAbertoPelaMissao,
 } from "@/lib/montar-financas";
 import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
 import Index from "@/pages/Index";
@@ -115,14 +115,15 @@ const nomes = () => eventos.map(([n]) => n);
 
 /** Os 3 toques (+ ajustes): faixa R$ 2 a 4 mil → Aluguel, Luz e uma "Outra" (Escola, 700) → resultado. */
 const fazerOsTresToques = async () => {
-  fireEvent.click(screen.getByRole("button", { name: "R$ 2 a 4 mil" }));
-  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-  fireEvent.click(screen.getByRole("button", { name: /Aluguel/ }));
-  fireEvent.click(screen.getByRole("button", { name: /Luz/ }));
-  fireEvent.click(screen.getByRole("button", { name: /Outra/ }));
-  fireEvent.change(screen.getByLabelText("Nome da conta"), { target: { value: "Escola" } });
-  fireEvent.change(screen.getByLabelText("Valor de Escola"), { target: { value: "700" } });
-  fireEvent.click(screen.getByRole("button", { name: "Ver quanto posso gastar" }));
+  const tela = () => within(screen.getByTestId("montar-financas")); // Finanças pode estar montada por baixo
+  fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+  fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+  fireEvent.click(tela().getByRole("button", { name: /Aluguel/ }));
+  fireEvent.click(tela().getByRole("button", { name: /Luz/ }));
+  fireEvent.click(tela().getByRole("button", { name: /Outra/ }));
+  fireEvent.change(tela().getByLabelText("Nome da conta"), { target: { value: "Escola" } });
+  fireEvent.change(tela().getByLabelText("Valor de Escola"), { target: { value: "700" } });
+  fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
   await respirar();
 };
 
@@ -144,6 +145,7 @@ beforeEach(() => {
   localStorage.clear();
   eventos.length = 0;
   _zerarRemotaMontar();
+  _novaAberturaMontar();
   auth.user = { id: UID, created_at: new Date(HOJE.getTime() - 2 * HORA).toISOString() };
   auth.loading = false;
   virarApp();
@@ -250,7 +252,9 @@ describe("quem vê", () => {
     expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(false);
     localStorage.clear();
     registrarVistaMontar();
+    registrarVistaMontar(); // a mesma abertura do app não gasta a 2ª vista
     expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(true);
+    _novaAberturaMontar();
     registrarVistaMontar();
     expect(deveMostrarMontarFinancas({ criadoEm: criadoEm(), get: vazio, isGuest: false })).toBe(false);
   });
@@ -434,12 +438,90 @@ describe("feito/pulado sobrevive a fechar e reabrir o app, ao logout e a outro a
     montarIndex({});
     await respirar();
     expect(screen.getByTestId("montar-financas")).toBeTruthy();
-    cleanup(); // fechou o app na 1ª pergunta
+    fireEvent.click(screen.getByRole("button", { name: "R$ 4 a 7 mil" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByRole("button", { name: /^🏠 Aluguel/ }));
+    cleanup(); // fechou o app na 2ª pergunta
+    _novaAberturaMontar();
     montarIndex({});
     await respirar();
-    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+    // volta onde parou, com o que já tinha respondido
+    expect(screen.getByText("Quais contas chegam todo mês?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^🏠 Aluguel/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /Voltar/ }));
+    expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("5.500");
+    expect(eventos.filter(([n]) => n === EV_VIEW).map(([, e]) => e.retomou)).toEqual([false, true]);
     cleanup();
+    _novaAberturaMontar();
     montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+  });
+});
+
+/* ───────────────────────── módulo × missão: uma tela por vez ───────────────────────── */
+describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem juntas", () => {
+  const Ambos = ({ inicial, missao }: { inicial: Record<string, unknown>; missao: boolean }) => (
+    <MemoryRouter initialEntries={["/financas"]}>
+      <Provedor inicial={inicial} controle={novoControle()}>
+        <Routes><Route path="/financas" element={<Index />} /></Routes>
+        {missao && <MontarFinancas origem="missao" agora={HOJE} esperaMs={0} />}
+      </Provedor>
+    </MemoryRouter>
+  );
+
+  it("a missão abre a dela com a do módulo na tela: a do módulo cede (sem decidir), e o que foi respondido passa junto", async () => {
+    const { rerender } = render(<Ambos inicial={{}} missao={false} />);
+    await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
+    expect(document.documentElement.getAttribute("data-montar-financas")).toBe("modulo");
+    fireEvent.click(screen.getByRole("button", { name: "Mais de R$ 7 mil" }));
+    rerender(<Ambos inicial={{}} missao />);
+    await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
+    expect(document.documentElement.getAttribute("data-montar-financas")).toBe("missao");
+    expect(montarAbertoPelaMissao()).toBe(true);
+    expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("8.000");
+    expect(marcaDoAparelho()?.r).toBeUndefined(); // ceder não é pular
+    expect(marcaDoAparelho()?.vistas).toBe(1); // nem gasta a 2ª vista
+    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
+    expect(eventos.find(([n]) => n === EV_PULAR)![1]).toEqual({ passo: 1, origem: "missao" });
+  });
+
+  it("com a da missão já na tela, o módulo não abre a dele; quando ela termina, Finanças aparece cheia", async () => {
+    render(<Ambos inicial={{}} missao />);
+    await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
+    expect(eventos.filter(([n]) => n === EV_VIEW).map(([, e]) => e.origem)).toEqual(["missao"]);
+    await fazerOsTresToques();
+    expect(screen.getByTestId("montar-pronto")).toBeTruthy();
+    expect(lerRascunhoMontar()).toBeNull(); // virou dado: o rascunho sai
+    // a tela de Finanças por baixo já adotou o dado (avisarEscritaDeFora)
+    expect(screen.getAllByText("Renda do mês").length).toBeGreaterThan(0);
+  });
+});
+
+/* ───────────────────────── sair da conta e entrar de novo (conta VAZIA) ───────────────────────── */
+describe("logout → login na mesma conta vazia", () => {
+  it("pulou → sai da conta (vassoura do logout) → entra em outro aparelho (localStorage zerado): não volta", async () => {
+    const controle = montarIndex({});
+    await respirar();
+    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
+    await respirar();
+    const daConta = controle.dados(); // o que subiu pro user_data
+    expect((daConta[CHAVE_MONTAR_FINANCAS] as any)?.r).toBe("pulou");
+    cleanup();
+
+    purgeLocalUserCache(); // logout: o aparelho guarda a marca dele
+    _novaAberturaMontar();
+    montarIndex({});
+    await respirar();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    cleanup();
+
+    localStorage.clear(); // outro aparelho / reinstalou: só a conta lembra
+    _novaAberturaMontar();
+    montarIndex({ [CHAVE_MONTAR_FINANCAS]: daConta[CHAVE_MONTAR_FINANCAS] });
     await respirar();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
   });

@@ -9,6 +9,9 @@ import type { AreaKey } from "@/lib/funnel";
  * `window.Capacitor` = iOS injetado antes da página (Playwright addInitScript).
  *   ?oferta=anual_69  → localStorage.__rc_mock_offering = "anual_69" (braço B, R$ 69,90)
  *   ?area=dinheiro|rotina|corpo|saude|metas
+ *   ?ofertas-saida=curto,…   → chaves das ofertas de saída (lib/ofertas-saida)
+ * 16/10: a moldura é a MESMA do passo "offer" do funil (px-5 pt-4, coluna cheia) — o herói do
+ * curto sangra com -mx-5/-mt-4.
  */
 export default function DevPaywallIos() {
   const q = new URLSearchParams(window.location.search);
@@ -19,7 +22,7 @@ export default function DevPaywallIos() {
   } catch { /* noop */ }
   const area = (q.get("area") ?? "dinheiro") as AreaKey;
   return (
-    <div className="px-5 pt-6 pb-4 bg-background min-h-full">
+    <div className="flex flex-col px-5 pt-4 pb-7 bg-background min-h-[100dvh]">
       <PaywallIOS area={area} answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={() => { /* nada: é só pra olhar */ }} />
     </div>
   );

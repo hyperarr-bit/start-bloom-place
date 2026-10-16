@@ -347,6 +347,8 @@ describe("Paywall do iPhone", () => {
 
       loja.compraOk = true; loja.motivo = null;
       fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+      // 16/10: 2ª vez → a explicação antes da folha; um toque segue pra Apple
+      fireEvent.click(await screen.findByTestId("explica-folha-continuar"));
       await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
       expect(comprarAnualIos).toHaveBeenCalledTimes(2); // a MESMA compra do botão principal
       expect(vezes("folha_segunda_chance_click")).toBe(1);
@@ -357,10 +359,12 @@ describe("Paywall do iPhone", () => {
       montar();
       await fecharFolhaDoAnual();
       fireEvent.click(await screen.findByRole("button", { name: "Tentar de novo" }));
+      fireEvent.click(await screen.findByTestId("explica-folha-continuar")); // 16/10: explicação, 1x por sessão
       await waitFor(() => expect(comprarAnualIos).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
       expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+      expect(screen.queryByTestId("explica-folha")).toBeNull(); // já explicado nesta sessão: direto pra Apple
       await waitFor(() => expect(comprarAnualIos).toHaveBeenCalledTimes(3));
       await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
       expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
@@ -442,6 +446,7 @@ describe("Paywall do iPhone", () => {
       await screen.findByTestId("presente69");
       await waitFor(() => expect(screen.getByTestId("presente69-cta")).toBeEnabled());
       fireEvent.click(screen.getByTestId("presente69-cta"));
+      fireEvent.click(await screen.findByTestId("explica-folha-continuar")); // 16/10
       await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
       expect(comprarPresente69).toHaveBeenCalledWith("folha_cancelada");
       expect(comprarAnualIos).toHaveBeenCalledTimes(1);

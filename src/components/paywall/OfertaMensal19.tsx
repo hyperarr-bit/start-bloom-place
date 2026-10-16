@@ -16,6 +16,9 @@
  * (ou vier sem o produto / com `presente: "off"`), prepararMensal19 devolve null e nada
  * aparece — a chave sozinha não inventa oferta. Marca de "visto" no DESFECHO (compra ou
  * "Agora não"), como no presente: app morto no meio não queima a chance.
+ *
+ * 16/10 (1.0.16): DOWNSELL É MAIS BARATO (regra do dono) — se o 19,90 da loja não valer MENOS que
+ * o mensal da vitrine (core_mensal), nada aparece.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -56,6 +59,10 @@ export async function prepararMensal19(lugar: LugarDoMensal19, fimMs: number | n
   if (!dados) return null;
   let precoDe: string | null = null;
   try { await rc.prefetchAnualIos(); precoDe = rc.precoMensalIos() ?? null; } catch { /* sem o "de" */ }
+  // 16/10: só é degrau se for MAIS BARATO que o mensal da vitrine (mesmo preço = não é oferta)
+  let vitrine: number | null = null;
+  try { vitrine = rc.valorMensalIos() ?? null; } catch { /* mock antigo sem a função */ }
+  if (vitrine && dados.valor && dados.valor >= vitrine) return null;
   if (precoDe === dados.preco) precoDe = null;
   return { ...dados, precoDe, fimMs };
 }

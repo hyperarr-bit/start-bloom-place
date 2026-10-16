@@ -92,6 +92,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
+  "core-intro-vista-", // "já vi a intro" de cada módulo (protótipo 16/10, lib/intro-modulo)
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */
@@ -114,6 +115,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   conta: [
     "core-all-modules-celebrated", "core-onboarding-done", "core-onboarding-reset-v2", "core-user-name",
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
+    "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",

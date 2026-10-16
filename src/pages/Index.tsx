@@ -11,6 +11,8 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesFinancas } from "@/components/cartoes-modulo/cartoes-financas";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
+import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { ArrowLeft, DollarSign, Sparkles } from "lucide-react";
 import { AskCore } from "@/components/ask/AskCore";
 
@@ -464,7 +466,11 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
         {/* 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home): 1ª visita, fora da missão e do
             holofote; nunca na demo. Desligada, não existe o nó. */}
-        {!isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
+        {/* 16/10 — INTRO DO MÓDULO (INTRO_MODULO, lib/intro-modulo, protótipo off): com ela ligada, a 1ª ação guiada
+            substitui os cartões (a porta única dos outros módulos é o BoasVindasDoModulo; Finanças monta os dois à mão). */}
+        {!isPreview && (guardarForcaDaIntro(), introLigada())
+          ? <IntroDoModulo moduleId="financas" />
+          : !isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que

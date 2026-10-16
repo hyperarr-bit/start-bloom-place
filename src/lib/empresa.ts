@@ -34,7 +34,7 @@ export const EMPRESA = {
    *  está no D-U-N-S: a Apple compara o site com o cadastro. */
   endereco: "Rua Inácio Magalhães Júnior, 3 — Parque Piauí, Teresina/PI, CEP 64025-050",
   /** Caixa real (Google Workspace no domínio). A Apple testa este e-mail. */
-  email: "suporte@coreaplicativo.com.br",
+  email: "contato@coreaplicativo.com.br",
   /** Prazo declarado de resposta — promessa pública, manter honesta. */
   prazoResposta: "até 48 horas úteis",
   site: "https://coreaplicativo.com.br",

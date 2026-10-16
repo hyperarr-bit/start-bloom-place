@@ -206,12 +206,14 @@
       // nada; qualquer falha é engolida. Fora de /comece não faz NADA.
       // 14/10: o funil-demo (/experimente) mede igual, com variante "demo" nos
       // dois eventos (no /comece nada muda: sem o campo variante).
+      // 16/10: a demo que vende (/liberar) mede igual, com variante "liberar" e
+      // o venda_session_id (sessionStorage "venda-sessao-v1") quando já existe.
       (function () {
         try {
           var cam = String(location.pathname);
-          var prefixo = cam.indexOf("/comece") === 0 ? "/comece" : (cam === "/experimente" || cam.indexOf("/experimente/") === 0) ? "/experimente" : null;
+          var prefixo = cam.indexOf("/comece") === 0 ? "/comece" : (cam === "/experimente" || cam.indexOf("/experimente/") === 0) ? "/experimente" : (cam === "/liberar" || cam.indexOf("/liberar/") === 0) ? "/liberar" : null;
           if (!prefixo) return;
-          var variante = prefixo === "/experimente" ? "demo" : null;
+          var variante = prefixo === "/experimente" ? "demo" : prefixo === "/liberar" ? "liberar" : null;
           var URL_EV = "https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events";
           var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
           var ss = null;
@@ -251,6 +253,11 @@
               var ps = null;
               try { ps = ss && ss.getItem("porta-sessao-v1"); } catch (e8) {}
               if (ps) d.porta_session_id = ps;
+              if (prefixo === "/liberar") {
+                var vs = null;
+                try { vs = ss && ss.getItem("venda-sessao-v1"); } catch (e8b) {}
+                if (vs) d.venda_session_id = vs;
+              }
               fetch(URL_EV, {
                 method: "POST",
                 keepalive: true,

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, ChevronLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,9 +26,11 @@ import { abrirAppComCodigo, codigoDaPortaOk } from "@/pages/porta/handoff";
 import { lerHtmlDaPorta, msDesdeANavegacao } from "@/pages/porta/medicao";
 import { DemoDoFunilProvider, type DemoDoFunil } from "@/lib/demo-do-funil";
 import { NavegacaoDaDemo, type Desvio } from "./navegacao";
+import { NavDemo } from "./NavDemo";
+import { COMPONENTES, CarregandoModulo } from "./modulos";
 import {
-  AREA_DO_MODULO, BOTAO_CRIAR, CONTA_TITULO, FAIXA_TEXTO, FIM_TEXTO, FIM_TITULO, MODULOS_DEMO, SEGUNDOS_ATE_A_FOLHA,
-  TOPO_SELO, VARIANTE, VOLTAR_DEMO, contaTexto, moduloDaUrl, type ModuloDemo,
+  AREA_DO_MODULO, BOTAO_CRIAR, CONTA_TITULO, FAIXA_TEXTO, FIM_TEXTO, FIM_TITULO, SEGUNDOS_ATE_A_FOLHA,
+  VARIANTE, VOLTAR_DEMO, contaTexto, moduloDaUrl, type ModuloDemo,
 } from "./conteudo";
 import { FolhaDemo } from "./FolhaDemo";
 import { aindaEsta, codificarItens, decodificarItens, itemDaGravacao, juntarItem, levarItensParaConta, type BancoDosItens } from "./itens";
@@ -68,29 +70,6 @@ import { aindaEsta, codificarItens, decodificarItens, itemDaGravacao, juntarItem
  *     porta_voltou_aba, porta_abrir_app_click.
  * Pixel: ViewContent (content_name "porta_demo") 1x por sessão; CompleteRegistration igual à Porta.
  */
-
-const lazyModulo = (carregar: () => Promise<{ default?: unknown }>) =>
-  lazy(async () => {
-    const mod = await carregar();
-    if (mod && typeof mod.default !== "undefined") return mod as { default: React.ComponentType };
-    throw new Error("Failed to fetch dynamically imported module (módulo resolveu vazio)");
-  });
-const COMPONENTES: Record<ModuloDemo, React.ComponentType> = {
-  financas: lazyModulo(() => import("@/pages/Index")),
-  rotina: lazyModulo(() => import("@/pages/Rotina")),
-  treino: lazyModulo(() => import("@/pages/Treino")),
-  saude: lazyModulo(() => import("@/pages/Saude")),
-  dieta: lazyModulo(() => import("@/pages/Dieta")),
-};
-
-const CarregandoModulo = () => (
-  <div className="min-h-[60vh] px-4 pt-6 space-y-3 animate-pulse" aria-busy="true" aria-label="Carregando">
-    <div className="h-8 w-40 rounded-lg bg-muted" />
-    <div className="h-10 rounded-xl bg-muted/70" />
-    <div className="h-40 rounded-2xl bg-muted/60" />
-    <div className="h-24 rounded-2xl bg-muted/50" />
-  </div>
-);
 
 /** Sucesso: segundos até a loja abrir sozinha (igual à Porta). */
 export const SEGUNDOS_ATE_A_LOJA = 3;
@@ -686,63 +665,5 @@ export function Experimente() {
         {folha && <FolhaDemo onCriar={() => { trackEvent("demo_folha_criar", { gatilho: folha, ...ids() }); abrirConta("folha"); }} onFechar={fecharFolha} />}
       </div>
     </VoltaDaDemoProvider>
-  );
-}
-
-/**
- * O topo grudado da demo: a barra (CORE · Modo demonstração · Entrar · Criar conta) + as pílulas.
- * Mesma mecânica da barra do tour do /preview (.demo-tour-nav): gruda no topo e publica a própria altura em
- * --demo-nav-h, pra o cabeçalho grudado do módulo ficar LOGO ABAIXO em vez de disputar o mesmo topo.
- */
-function NavDemo({ modulo, onTrocar, onCriar, onEntrar }: { modulo: ModuloDemo; onTrocar: (m: ModuloDemo) => void; onCriar: () => void; onEntrar: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const publicar = () => {
-      const h = Math.round(el.getBoundingClientRect().height);
-      if (h > 0) el.closest(".demo-com-tour")?.setAttribute("style", `--demo-nav-h:${h}px`);
-    };
-    publicar();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(publicar);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className="demo-tour-nav bg-background border-b border-border" data-testid="demo-nav">
-      <div className="max-w-5xl mx-auto px-3 h-[54px] flex items-center gap-2" data-testid="demo-topo">
-        <span className="flex items-center gap-2 min-w-0 flex-1">
-          <img src={LOGO_PORTA} alt="" width={28} height={28} className="w-7 h-7 shrink-0 rounded-[8px] border border-border bg-white" />
-          <span className="min-w-0 leading-none">
-            <span className="block text-[17px] font-black tracking-[-0.03em] text-foreground">CORE</span>
-            <span className="block mt-[3px] text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground truncate" data-testid="demo-selo">{TOPO_SELO}</span>
-          </span>
-        </span>
-        <button type="button" onClick={onEntrar} className="shrink-0 h-10 px-2.5 text-[14px] font-semibold text-foreground" data-testid="demo-entrar">Entrar</button>
-        <button
-          type="button" onClick={onCriar} data-testid="demo-topo-criar"
-          className="shrink-0 h-10 px-4 rounded-full bg-foreground text-background text-[14px] font-semibold active:scale-[.97] transition-transform"
-        >
-          {BOTAO_CRIAR}
-        </button>
-      </div>
-      <div className="max-w-5xl mx-auto px-3 pb-2.5 flex gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Módulos" data-testid="demo-pilulas">
-        {MODULOS_DEMO.map((m) => {
-          const ativo = m.key === modulo;
-          return (
-            <button
-              key={m.key} type="button" role="tab" aria-selected={ativo} onClick={() => onTrocar(m.key)}
-              data-testid={`demo-pilula-${m.key}`} data-ativo={ativo ? "" : undefined}
-              className={`flex-auto shrink-0 min-h-10 rounded-full px-3 text-[13.5px] font-semibold whitespace-nowrap transition-colors ${
-                ativo ? "bg-foreground text-background" : "bg-card text-foreground border border-border active:bg-secondary"
-              }`}
-            >
-              {m.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }

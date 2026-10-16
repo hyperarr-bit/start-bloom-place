@@ -7,7 +7,14 @@ import { FOLHA_BOTAO, FOLHA_FECHAR, FOLHA_TEXTO, FOLHA_TITULO } from "./conteudo
  * (pointer-events-none) e só o cartão recebe toque. Quem decide QUANDO aparece é a página
  * (30 s ou a 2ª troca de módulo, 1x por sessão).
  */
-export function FolhaDemo({ onCriar, onFechar }: { onCriar: () => void; onFechar: (via: "botao" | "x") => void }) {
+export function FolhaDemo({ onCriar, onFechar, titulo = FOLHA_TITULO, texto = FOLHA_TEXTO, botao = FOLHA_BOTAO }: {
+  onCriar: () => void;
+  onFechar: (via: "botao" | "x") => void;
+  /** 16/10: o /liberar passa as frases dele (sem elas, as do /experimente) */
+  titulo?: string;
+  texto?: string;
+  botao?: string;
+}) {
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[80] px-3 pointer-events-none"
@@ -28,13 +35,13 @@ export function FolhaDemo({ onCriar, onFechar }: { onCriar: () => void; onFechar
         >
           <X className="w-[18px] h-[18px]" />
         </button>
-        <p id="demo-folha-titulo" className="pr-8 text-[19px] font-extrabold tracking-[-0.02em] leading-[1.25] text-balance">{FOLHA_TITULO}</p>
-        <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground">{FOLHA_TEXTO}</p>
+        <p id="demo-folha-titulo" className="pr-8 text-[19px] font-extrabold tracking-[-0.02em] leading-[1.25] text-balance">{titulo}</p>
+        <p className="mt-1.5 text-[14px] leading-snug text-muted-foreground">{texto}</p>
         <button
           type="button" onClick={onCriar} data-testid="demo-folha-criar"
           className="mt-4 w-full h-[50px] rounded-[12px] bg-foreground text-background text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-[.985] transition-transform"
         >
-          {FOLHA_BOTAO} <ArrowRight className="w-4 h-4" />
+          {botao} <ArrowRight className="w-4 h-4" />
         </button>
         <button type="button" onClick={() => onFechar("botao")} data-testid="demo-folha-fechar" className="mt-1 w-full h-10 text-[14px] font-medium text-muted-foreground">
           {FOLHA_FECHAR}

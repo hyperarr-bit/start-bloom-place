@@ -4,7 +4,7 @@
  * isso cai no login ou numa tela vazia, fora do funil. Aqui dentro:
  *   · rota de um dos 5 módulos da demo (/financas, /rotina?aba=…) → troca de módulo NA demo (com a aba);
  *   · qualquer outra rota interna (login, outros módulos, conquistas, retrospectiva…) → a conta do funil;
- *   · /experimente, links externos (https de outro site, mailto, tel) e o voltar do navegador seguem como são.
+ *   · /experimente (e /liberar, a demo que vende no site — 16/10), links externos (https de outro site, mailto, tel) e o voltar do navegador seguem como são.
  * Funciona trocando o `navigator` do React Router SÓ pra dentro da demo (todo useNavigate e <Link> passam por
  * ele) + um clique em captura pra <a href="/…"> solto.
  */
@@ -20,7 +20,7 @@ export function desvioNaDemo(destino: string): Desvio {
   try { u = new URL(destino, "https://demo.local"); } catch { return null; }
   if (u.origin !== "https://demo.local") return null; // outro site: segue
   const caminho = u.pathname.replace(/\/+$/, "") || "/";
-  if (caminho === "/experimente") return null;
+  if (caminho === "/experimente" || caminho === "/liberar") return null;
   const m = caminho.slice(1);
   if (ehModuloDemo(m)) return { tipo: "modulo", modulo: m, aba: u.searchParams.get("aba") };
   return { tipo: "conta", destino: `${caminho}${u.search}`.slice(0, 120) };

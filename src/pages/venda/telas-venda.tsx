@@ -50,19 +50,26 @@ const Beneficio = ({ children }: { children: ReactNode }) => (
   </li>
 );
 
-export function PaywallVenda({ temCartaoAnual, temMensal, onEscolher }: {
+export function PaywallVenda({ temCartaoAnual, temMensal, onEscolher, titulo = PAYWALL_TITULO, sub = PAYWALL_SUB, beneficios = BENEFICIOS, contexto = null }: {
   /** o link da oferta anual da Cakto existe (senão o anual é só Pix) */
   temCartaoAnual: boolean;
   /** o link do mensal existe (senão a linha do mensal não aparece) */
   temMensal: boolean;
   onEscolher: (plano: PlanoVenda, metodo: MetodoVenda) => void;
+  /** 16/10: o /liberar (demo → paywall) passa as frases dele; sem elas, as do /assinar */
+  titulo?: string;
+  sub?: string;
+  beneficios?: readonly string[];
+  /** uma linha acima do título (o /liberar: o módulo que ela mais usou na demo) */
+  contexto?: ReactNode;
 }) {
   const anual = PLANOS.anual;
   const mensal = PLANOS.mensal;
   return (
     <div className="mt-6" data-testid="venda-paywall">
-      <TituloCard testid="venda-paywall-titulo">{PAYWALL_TITULO}</TituloCard>
-      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]">{PAYWALL_SUB}</p>
+      {contexto && <p className="mb-3 text-[13.5px] font-semibold leading-snug" style={{ color: MAGENTA }} data-testid="venda-paywall-contexto">{contexto}</p>}
+      <TituloCard testid="venda-paywall-titulo">{titulo}</TituloCard>
+      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]">{sub}</p>
 
       <div className="relative mt-5 rounded-[16px] border-2 bg-white px-4 pt-4 pb-4" style={{ borderColor: MAGENTA }} data-testid="venda-plano-anual" data-destaque="">
         <span className="absolute -top-[11px] right-4 rounded-full px-2.5 py-[3px] text-[11.5px] font-bold uppercase tracking-[0.08em] text-white" style={{ background: MAGENTA }} data-testid="venda-selo-anual">{SELO_ANUAL}</span>
@@ -90,7 +97,7 @@ export function PaywallVenda({ temCartaoAnual, temMensal, onEscolher }: {
       </div>
 
       <ul className="mt-5 flex flex-col gap-2.5" data-testid="venda-beneficios">
-        {BENEFICIOS.map((b) => <Beneficio key={b}>{b}</Beneficio>)}
+        {beneficios.map((b) => <Beneficio key={b}>{b}</Beneficio>)}
       </ul>
 
       {temMensal && (

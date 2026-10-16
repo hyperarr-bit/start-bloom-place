@@ -6,10 +6,11 @@
  * se desligam na demo (foto não sobe, sem pedido de lembrete/avaliação, sem aviso do limite…) e
  * decidiam isso por `pathname.startsWith("/preview")` — no /experimente eles ligariam. Todos
  * perguntam aqui agora.
+ * 16/10: + /liberar (a mesma demo, que vende o CORE no site com Pix antes do app).
  */
 export const ehCaminhoDeDemo = (pathname: string | null | undefined): boolean => {
   const p = String(pathname ?? "");
-  return p.startsWith("/preview") || p === "/experimente" || p.startsWith("/experimente/");
+  return p.startsWith("/preview") || p === "/experimente" || p.startsWith("/experimente/") || p === "/liberar" || p.startsWith("/liberar/");
 };
 
 /** O mesmo, lendo o endereço da página (fora de componente). Sem window = false. */

@@ -386,6 +386,9 @@ const Experimente = lazyPage(() => import("./pages/experimente/Experimente"));
 // (anual 97,90 Pix na página / cartão na Cakto; mensal 24,90 só cartão) → nome + e-mail → pagamento → sucesso.
 // Só na WEB (SoNaWeb), noindex. A /comece e a /experimente não mudam.
 const VendaWeb = lazyPage(() => import("./pages/venda/VendaWeb"));
+// 16/10: a DEMO QUE VENDE (/liberar?m=…) — o app de verdade com dados de exemplo (como o /experimente), e todo
+// "Liberar meu CORE" abre o PAYWALL do /assinar (anual 97,90 no Pix) → nome + e-mail → Pix → sucesso. Só na WEB.
+const Liberar = lazyPage(() => import("./pages/liberar/Liberar"));
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
@@ -610,6 +613,7 @@ const AnimatedRoutes = () => {
         <Route path="/experimente" element={<SoNaWeb><RouteErrorBoundary routeName="experimente"><Experimente /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

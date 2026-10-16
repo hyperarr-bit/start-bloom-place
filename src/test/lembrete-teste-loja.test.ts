@@ -5,6 +5,8 @@
  * hora acordada, no fuso do aparelho. E a promessa do paywall só vale se o
  * pedido guardado na compra for armado quando a permissão chega (Missão B1),
  * reagendado com o fim real da loja e DESARMADO se a pessoa cancelar/assinar.
+ * 16/10 (1.0.16): mesmo horário, mas o TEXTO virou aviso de uso — nada de
+ * cancelar, cobrança, preço ou "acaba amanhã" (decisão do dono).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -117,19 +119,20 @@ describe("quandoLembrarDoTeste — hora do aviso", () => {
     expect(quandoLembrarDoTeste(fim, madrugada)!.getHours()).toBe(9);
   });
 
-  it("copy diz o preço do ano, que o que montou fica, pede pra conferir o cartão — sem 'cancele hoje em Ajustes' e nada de vitalício", () => {
-    const c = copyDoLembreteDoTeste("R$ 97,90");
-    expect(c.title).toBe("Seu teste grátis do CORE acaba amanhã");
-    expect(c.body).toMatch(/R\$ 97,90 pelo ano inteiro/);
-    expect(c.body).toMatch(/tudo que você montou fica/);
-    // 10/10: 59% das cobranças do fim do teste falham no cartão — o aviso pede pra conferir
-    expect(c.body).toMatch(/confira se o cartão da App Store está ok/);
-    expect(c.body).not.toMatch(/cancele hoje|Ajustes › Assinaturas/);
-    // a promessa do paywall continua honesta: ainda dá pra cancelar
-    expect(c.body).toMatch(/cancelar/);
-    expect(c.body).not.toMatch(/vitalíc|pra sempre/i);
-    // o preço vem da loja: 69,90 no braço B do experimento
-    expect(copyDoLembreteDoTeste("R$ 69,90").body).toMatch(/R\$ 69,90 pelo ano inteiro/);
+  it("16/10: copy é de USO — o que montou + o plano de hoje; sem cancelar, sem cobrança, sem preço, sem 'acaba'", () => {
+    const geral = copyDoLembreteDoTeste();
+    expect(geral.title).toBe("Seu plano de hoje no CORE está pronto");
+    expect(geral.body).toBe("Tudo o que você montou nesses dias está te esperando. Abre e continua de onde parou — leva 1 minuto.");
+    expect(copyDoLembreteDoTeste("dinheiro").title).toBe("Seu plano de hoje em Finanças está pronto");
+    expect(copyDoLembreteDoTeste("rotina").title).toBe("Seu plano de hoje em Rotina está pronto");
+    expect(copyDoLembreteDoTeste("area-que-nao-existe").title).toBe("Seu plano de hoje no CORE está pronto");
+    for (const area of [null, "dinheiro", "rotina", "corpo", "saude", "metas"]) {
+      const c = copyDoLembreteDoTeste(area);
+      const tudo = `${c.title} ${c.body}`;
+      expect(tudo).not.toMatch(/cancel|cobran|cobra|cart[aã]o|R\$|pre[cç]o|acaba|teste|Apple|App Store|Ajustes|assinatura/i);
+      expect(tudo).not.toMatch(/vitalíc|pra sempre/i);
+      expect(tudo).toMatch(/montou/);
+    }
   });
 });
 
@@ -147,17 +150,26 @@ describe("faixa de ids", () => {
 describe("pedido na compra → armado quando a permissão chega", () => {
   const pedido = { fimMs: new Date(2026, 9, 4, 15, 0, 0).getTime(), precoAno: "R$ 97,90" };
 
-  it("permissão já dada: arma na hora, no id 920001, pra 03/10 às 9h, tocando abre /planos", async () => {
+  it("permissão já dada: arma na hora, no id 920001, pra 03/10 às 9h, tocando abre a Home (nunca /planos)", async () => {
     expect(await pedirLembreteDoTeste(pedido)).toBe("armado");
     expect(ln.schedule).toHaveBeenCalledTimes(1);
     const n = ln.schedule.mock.calls[0][0].notifications[0];
     expect(n.id).toBe(920001);
-    expect(n.title).toBe("Seu teste grátis do CORE acaba amanhã");
+    expect(n.title).toBe("Seu plano de hoje no CORE está pronto");
+    expect(n.body).not.toMatch(/cancel|cobran/i);
     expect(n.schedule.at).toEqual(new Date(2026, 9, 3, 9, 0, 0));
-    expect(n.extra?.rota).toBe("/planos");
+    expect(n.extra?.rota).toBe("/home");
     expect(eventos).toContainEqual(["trial_aviso", { acao: "ja_permitido" }]);
     expect(eventos.find((e) => e[0] === "notif_lembrete_teste_armada")?.[1]).toMatchObject({ ok: true, em_h: 42, antes_do_fim_h: 30 });
     expect(pedidoDeLembreteDoTeste()).toEqual(pedido);
+  });
+
+  it("com missão em Finanças: o título fala de Finanças e o toque abre /financas", async () => {
+    localStorage.setItem("core-missao", JSON.stringify({ inicio: Date.now(), area: "dinheiro", d1: false, d2: false, d3: false, vista: false, holofote: "pendente" }));
+    await pedirLembreteDoTeste(pedido);
+    const n = ln.schedule.mock.calls[0][0].notifications[0];
+    expect(n.title).toBe("Seu plano de hoje em Finanças está pronto");
+    expect(n.extra?.rota).toBe("/financas");
   });
 
   it("permissão nunca pedida: guarda o pedido SEM abrir diálogo; a Missão arma depois", async () => {

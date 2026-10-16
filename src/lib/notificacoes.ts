@@ -1144,6 +1144,8 @@ export async function cancelarResgateDoPlano(): Promise<void> {
  *  - Horário: 36 h antes do fim, puxado pra 9h–20h30 do MESMO dia (sempre
  *    entre 24 h e 48 h antes do fim — a Apple exige cancelar com 24 h de
  *    antecedência; depois das 48 h "amanhã" seria mentira). Fuso do aparelho.
+ *  - 16/10 (1.0.16): o TEXTO deixou de falar do fim do teste — virou aviso de
+ *    uso (ver copyDoLembreteDoTeste). Horário e armar/desarmar ficam iguais.
  */
 const BASE_LEMBRETE_TESTE = 920000;
 const CHAVE_LEMBRETE_TESTE = "core-lembrete-teste";
@@ -1166,16 +1168,31 @@ export function quandoLembrarDoTeste(fimMs: number, agora = Date.now()): Date | 
   return logo;
 }
 
-export function copyDoLembreteDoTeste(precoAno: string) {
+/*
+ * 16/10 (dono, 1.0.16): NENHUM texto do app fala em cancelar nem em a Apple
+ * cobrar antes. O aviso continua no mesmo horário (36 h antes do fim), mas
+ * agora é um aviso de USO: lembra o que a pessoa montou e puxa de volta pro
+ * plano do dia. Sem preço, sem "cobrança", sem "cancelar", sem "acaba".
+ * O toque abre o módulo da área da missão (ou a Home), nunca /planos.
+ */
+const NOME_DA_AREA_DO_TESTE: Record<string, string> = {
+  dinheiro: "Finanças",
+  rotina: "Rotina",
+  corpo: "Treino",
+  saude: "Saúde",
+  metas: "Metas",
+};
+
+export function copyDoLembreteDoTeste(area?: string | null) {
+  const nome = area ? NOME_DA_AREA_DO_TESTE[area] : undefined;
   return {
-    title: "Seu teste grátis do CORE acaba amanhã",
-    /* 10/10 (1.0.14): sai o "cancele hoje em Ajustes › Assinaturas" (ensinava o
-     * caminho de sair a quem só queria ser avisado) e entra o cartão — 59% das
-     * cobranças do fim do teste FALHAM no cartão, e a pessoa só descobre quando
-     * o acesso cai. A promessa do paywall ("a gente te avisa") continua a mesma. */
-    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica — só confira se o cartão da App Store está ok. Se não quiser, dá pra cancelar até amanhã.`,
+    title: nome ? `Seu plano de hoje em ${nome} está pronto` : "Seu plano de hoje no CORE está pronto",
+    body: "Tudo o que você montou nesses dias está te esperando. Abre e continua de onde parou — leva 1 minuto.",
   };
 }
+
+/** Pra onde o toque do aviso leva: o módulo da área da missão, senão a Home. */
+const rotaDoLembreteDoTeste = (area?: string | null): string => (area && ROTA_DA_AREA[area]) || "/home";
 
 const lerPedidoDeLembrete = (): PedidoDeLembreteDoTeste | null => {
   try {
@@ -1199,7 +1216,8 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
   const at = quandoLembrarDoTeste(p.fimMs);
   if (!at) { trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "tarde_demais", antes_do_fim_h: Math.round((p.fimMs - Date.now()) / 3600e3) }); return false; }
   const { LN } = plug;
-  const copy = copyDoLembreteDoTeste(p.precoAno);
+  const area = missaoAtual()?.area ?? null;
+  const copy = copyDoLembreteDoTeste(area);
   try {
     await LN.schedule({
       notifications: [{
@@ -1210,7 +1228,7 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
         channelId: CANAL,
         smallIcon: ICONE,
         iconColor: COR_MARCA,
-        extra: { rota: "/planos" },
+        extra: { rota: rotaDoLembreteDoTeste(area), tipo: "lembreteTeste" },
       }],
     });
     trackEvent("notif_lembrete_teste_armada", { ok: true, em_h: Math.round((at.getTime() - Date.now()) / 3600e3), antes_do_fim_h: Math.round((p.fimMs - at.getTime()) / 3600e3) });

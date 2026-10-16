@@ -130,10 +130,43 @@ export function registrarUmPorDiaRemoto(offerings: unknown): void {
     if (!offerings || typeof offerings !== "object") return; // não respondeu de verdade: fica como estava
     umPorDiaRemoto = lerUmPorDiaRemoto(offerings);
     ls.set(CHAVE_UM_POR_DIA_APARELHO, umPorDiaRemoto);
+    tourHomeRemoto = lerTourHomeRemoto(offerings);
+    if (tourHomeRemoto) ls.set(CHAVE_TOUR_HOME_APARELHO, tourHomeRemoto); else ls.del(CHAVE_TOUR_HOME_APARELHO);
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarUmPorDiaRemoto = (): void => { umPorDiaRemoto = undefined; };
+export const _zerarUmPorDiaRemoto = (): void => { umPorDiaRemoto = undefined; tourHomeRemoto = undefined; };
+
+/* ───────────── 1.0.16: `tour_home` (RevenueCat) — qual tour da Home ───────────── */
+/**
+ * `tour_home` em qualquer offering (a `current` vence), só iPhone:
+ *   · "curto" → o tour de 3 passos "faz isso" (o do braço A) pra todo mundo;
+ *   · "longo" → o tour de 5 passos da 1.0.14/1.0.15 (o do braço B) pra todo mundo;
+ *   · "off"   → nenhum tour;
+ *   · ausente → SEGUE O BRAÇO (A = curto, B/sem braço = longo). Ver tour-home.varianteDoTour.
+ * A última resposta fica no aparelho (`core-tour-home-remoto`), como a do `missao_1_por_dia`.
+ */
+export type ModoTourHome = "curto" | "longo" | "off";
+export const CHAVE_REMOTA_TOUR_HOME = "tour_home";
+export const CHAVE_TOUR_HOME_APARELHO = "core-tour-home-remoto";
+let tourHomeRemoto: ModoTourHome | null | undefined;
+const modoTourDe = (v: unknown): ModoTourHome | null => {
+  const t = String(v ?? "").trim().toLowerCase();
+  return t === "curto" || t === "longo" || t === "off" ? t : null;
+};
+export function lerTourHomeRemoto(offerings: unknown): ModoTourHome | null {
+  type Off = { metadata?: Record<string, unknown> } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  let lido: ModoTourHome | null = null;
+  for (const off of Object.values(o?.all ?? {})) if (off !== o?.current) lido = modoTourDe(off?.metadata?.[CHAVE_REMOTA_TOUR_HOME]) ?? lido;
+  return modoTourDe(o?.current?.metadata?.[CHAVE_REMOTA_TOUR_HOME]) ?? lido;
+}
+/** O que o RevenueCat disse sobre o tour (null = nada: segue o braço). Só iPhone. */
+export function modoTourHomeRemoto(): ModoTourHome | null {
+  if (plataformaApp() !== "ios") return null;
+  if (tourHomeRemoto !== undefined) return tourHomeRemoto;
+  return modoTourDe(ls.get(CHAVE_TOUR_HOME_APARELHO));
+}
 
 /**
  * O modo do teste "1 por dia" AQUI: só no app do iPhone; o que o RevenueCat disse nesta abertura,

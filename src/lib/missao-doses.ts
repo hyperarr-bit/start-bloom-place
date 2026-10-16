@@ -258,6 +258,16 @@ export interface EstadoMissaoDoses {
   /** 1.0.16, braço A (uma dose por dia): o convite "Dia N da missão" na Home, por dia — "foi" (tocou em
    *  fazer) ou "depois" (Agora não). 1x por dia: mora AQUI (chave `missao-doses`, que nenhuma vassoura leva). */
   convites?: Record<string, "foi" | "depois">;
+  /** 1.0.16: quantas vezes o convite apareceu SEM decisão no dia (fechou o app com ele aberto): no 2º, chega por hoje */
+  convitesVistos?: Record<string, number>;
+  /** 1.0.16 (4.8): o DONO da missão — hash do id da conta (nunca o id). Outra conta no mesmo aparelho não herda. */
+  dono?: string;
+  /** 1.0.16, braço A: "Sem lembrete" na folha do plano de amanhã (o dia) — não insiste */
+  planoAPulado?: string;
+  /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets), já mostradas (o dia) */
+  dicas?: Partial<Record<2 | 3, string>>;
+  /** 1.0.16: adesivos da missão já ganhos ("missao_dia_1", "missao_dia_2", "missao_3_seguidos"…) — só dado/evento */
+  adesivos?: string[];
 }
 
 export function lerMissao(): EstadoMissaoDoses | null {
@@ -289,6 +299,48 @@ export function iniciarMissao(modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDa
 
 export const apagarMissao = (): void => { ls.del(CHAVE_ESTADO_MISSAO_DOSES); avisar(); };
 
+/** 1.0.16 (4.8): a CÓPIA da missão na conta (useUserData) — reinstalar/trocar de aparelho restaura. */
+export const CHAVE_MISSAO_NA_CONTA = "missao-doses-conta";
+
+/** O dono da missão: FNV-1a do id da conta (o id nunca é gravado nem enviado). */
+export function donoDaConta(userId: string | null | undefined): string | undefined {
+  if (!userId) return undefined;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < userId.length; i++) { h ^= userId.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+
+/** A missão do aparelho vale pra ESTA conta? (sem dono gravado = missão antiga: vale) */
+export const missaoDaConta = (m: EstadoMissaoDoses | null, userId: string | null | undefined): boolean =>
+  !!m && (!m.dono || !userId || m.dono === donoDaConta(userId));
+
+/** Valida uma missão vinda de fora (a cópia da conta). */
+export function missaoValida(x: unknown): EstadoMissaoDoses | null {
+  const m = x as EstadoMissaoDoses | null;
+  if (!m || typeof m !== "object" || m.v !== 1 || typeof m.inicio !== "string" || !Array.isArray(m.modulos) || m.modulos.length !== 3 || !m.modulos.every(ehModulo)) return null;
+  return { ...m, feitos: m.feitos ?? {}, boasVindas: !!m.boasVindas };
+}
+
+/** O que cada dose pede, curto (boas-vindas, convite, lembretes): "1 hábito, 20 s". */
+export const DOSE_CURTA: Record<ModuloDaMissao, { texto: string; seg: number }> = {
+  financas: { texto: "monte em 30 s", seg: 30 },
+  rotina: { texto: "1 hábito, 20 s", seg: 20 },
+  saude: { texto: "1 copo d'água, 10 s", seg: 10 },
+  treino: { texto: "escolhe um treino pronto, 20 s", seg: 20 },
+  dieta: { texto: "1 refeição, 20 s", seg: 20 },
+  desenvolvimento: { texto: "1 meta, 20 s", seg: 20 },
+  hiperfoco: { texto: "1 pensamento, 20 s", seg: 20 },
+  estudos: { texto: "1 matéria, 20 s", seg: 20 },
+  carreira: { texto: "1 tarefa, 20 s", seg: 20 },
+  biblioteca: { texto: "1 livro, 20 s", seg: 20 },
+  casa: { texto: "1 item, 20 s", seg: 20 },
+  beleza: { texto: "1 passo, 20 s", seg: 20 },
+  viagens: { texto: "1 destino, 20 s", seg: 20 },
+  relacionamentos: { texto: "1 pessoa, 20 s", seg: 20 },
+  pet: { texto: "o seu pet, 20 s", seg: 20 },
+  detox: { texto: "1 hábito, 20 s", seg: 20 },
+};
+
 /**
  * Um evento de medição da missão em doses. Na web continua `prototipo: "web"` (a
  * série de 02/10 não muda); no app leva `prototipo: "app"`, a plataforma e a
@@ -302,8 +354,12 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
   // 10/10 (DIA1_CHEIO): com a chave ligada TODO evento da missão leva o braço — é por `variante`
   // que o teste se lê. Desligada, o payload é o de hoje, campo a campo.
   // 1.0.16: + `braco` legível ("um_por_dia" = A, "dia1_cheio" = B) e o modo remoto `missao_1_por_dia`.
+  // 1.0.16: + `dia_cal` (o dia do CALENDÁRIO da missão: 1 = o dia em que nasceu) — "fez dose no dia 2+"
   const variante = varianteDia1();
-  return variante ? { ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() } : base;
+  if (!variante) return base;
+  let diaCal: number | null = null;
+  try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; } catch { diaCal = null; }
+  return { dia_cal: diaCal, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() };
 };
 
 /** O braço desta pessoa pros eventos (só com a chave DIA1_CHEIO ligada), ou null. */
@@ -333,12 +389,51 @@ export function doseLiberadaHoje(m: EstadoMissaoDoses, hoje: string = localDayKe
  * nunca com a dose de hoje feita, pulada hoje, ou a missão cumprida.
  */
 export function conviteDoDiaDevido(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!doseDeHojeDevida(m, hoje)) return false;
+  if (diaDaMissao(m!, hoje) < 2) return false;
+  if (m!.convites?.[hoje]) return false;
+  // fechou o app com o convite aberto, sem decidir: mostra de novo 1 vez naquele dia; depois, só amanhã
+  return (m!.convitesVistos?.[hoje] ?? 0) < 2;
+}
+
+/** A missão do braço A para no 7º dia do calendário (ou com as 3 doses). */
+export const DIA_FIM_DA_MISSAO = 7;
+
+/**
+ * Braço A: há uma dose PRA HOJE ainda não feita? (a linha "Dose de hoje" nas Pendências, o convite,
+ * o passo no módulo). Nunca pra quem escolheu "Explorar", depois do 7º dia, pulada hoje ou já feita hoje.
+ */
+export function doseDeHojeDevida(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
   if (!m || !ehUmPorDia(m) || !m.boasVindas || m.explorou) return false;
   if (missaoCumprida(m) || !doseLiberadaHoje(m, hoje)) return false;
-  if (diaDaMissao(m, hoje) < 2) return false;
-  if (m.convites?.[hoje]) return false;
+  if (diaDaMissao(m, hoje) > DIA_FIM_DA_MISSAO) return false;
   const p = passoPendente(m);
   return !!p && m.pulados?.[p.n] !== hoje;
+}
+
+/** Braço A: a dose pode abrir hoje no módulo? (liberada e dentro dos 7 dias; nos outros braços, sempre) */
+export function doseAbreHoje(m: EstadoMissaoDoses, hoje: string = localDayKey()): boolean {
+  if (!ehUmPorDia(m)) return true;
+  return doseLiberadaHoje(m, hoje) && diaDaMissao(m, hoje) <= DIA_FIM_DA_MISSAO;
+}
+
+/**
+ * Braço A, dia 1: a folha "Amanhã a gente monta sua Rotina em 20 s. Que horas te lembro?" está devendo?
+ * Depois da dose de hoje (e do tour curto, quem chama confere), 1x: some com a hora escolhida ou "Sem lembrete".
+ */
+export function precisaPlanoA(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!m || !ehUmPorDia(m) || !m.boasVindas || m.explorou || missaoCumprida(m)) return false;
+  if (m.lembrete !== undefined || m.planoAPulado) return false;
+  return ([1, 2, 3] as DiaDaMissao[]).some((n) => m.feitos[n]?.dia === hoje);
+}
+
+/** Dias seguidos (até hoje) com dose feita — a sequência da missão (a do hub, por registro, pode ser maior). */
+export function sequenciaDaMissao(m: EstadoMissaoDoses, hoje: string = localDayKey()): number {
+  const dias = new Set(Object.values(m.feitos).map((f) => f?.dia).filter(Boolean) as string[]);
+  let n = 0;
+  let cursor = hoje;
+  while (dias.has(cursor) && n < 60) { n += 1; cursor = somarDias(cursor, -1); }
+  return n;
 }
 
 /** Quantas doses já foram feitas (1..3). */

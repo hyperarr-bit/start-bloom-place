@@ -189,7 +189,7 @@ describe("a chave desligada = o app de hoje, byte a byte", () => {
 
   it("os 3 padrão: a área da porta primeiro, depois Finanças → Rotina → Saúde sem repetir; os rótulos HOJE/AMANHÃ/DIA 3", () => {
     expect(modulosPadrao("rotina")).toEqual(["rotina", "financas", "saude"]);
-    expect(modulosPadrao("corpo")).toEqual(["treino", "financas", "rotina"]);
+    expect(modulosPadrao("corpo")).toEqual(["treino", "saude", "financas"]); // 1.0.16: corpo puxa a Saúde pra 2ª
     expect(modulosPadrao(null)).toEqual(["financas", "rotina", "saude"]);
     const m = iniciarMissao(["financas", "rotina", "saude"], "2026-10-02");
     expect([1, 2, 3].map((n) => rotuloDoPasso(n as 1 | 2 | 3, m, "2026-10-02"))).toEqual(["HOJE", "AMANHÃ", "DIA 3"]);
@@ -213,7 +213,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Hoje · 💰 Finanças");
     expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Domingo · ❤️ Saúde");
-    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", prototipo: "web" }]);
+    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", origem_area: "funil", prototipo: "web" }]);
     // o card ainda não aparece por baixo das boas-vindas? aparece (a Home é a mesma) — mas a missão manda na tela
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     const escolha = screen.getByTestId("missao-doses-escolha");

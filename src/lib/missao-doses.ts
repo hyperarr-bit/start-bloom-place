@@ -51,7 +51,7 @@ import { somarDias } from "@/lib/sequencia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
-import { bracoFixo, bracoGravado, dia1CheioLigado, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -197,6 +197,13 @@ export const MODULOS: Record<ModuloDaMissao, PassoDoModulo> = {
 export const ORDEM_MODULOS: ModuloDaMissao[] = ["financas", "rotina", "saude", "treino", "dieta", "desenvolvimento", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
 
 export const MODULO_DA_AREA: Record<AreaKey, ModuloDaMissao> = { dinheiro: "financas", rotina: "rotina", corpo: "treino", saude: "saude", metas: "desenvolvimento" };
+/**
+ * Os companheiros da 1ª dose (16/10, 1.0.16): a área da porta SEMPRE primeiro (a escolha dela manda);
+ * depois Finanças → Rotina → Saúde. Só "Treino e dieta" (corpo) puxa a Saúde pra 2ª dose: é o mesmo
+ * assunto (corpo) e a dose de Saúde (1 copo d'água, 1 toque) é a que mais converte como 1ª/2ª
+ * experiência (34% × 9% do Treino) — quem escolheu corpo não fica dois dias sem ver nada do corpo.
+ */
+const COMPANHEIROS: Partial<Record<AreaKey, ModuloDaMissao[]>> = { corpo: ["saude", "financas", "rotina"] };
 
 export const ehModulo = (x: unknown): x is ModuloDaMissao => typeof x === "string" && x in MODULOS;
 
@@ -204,7 +211,8 @@ export const ehModulo = (x: unknown): x is ModuloDaMissao => typeof x === "strin
 export function modulosPadrao(area: string | null | undefined): [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao] {
   const primeiro = area && area in MODULO_DA_AREA ? MODULO_DA_AREA[area as AreaKey] : null;
   const out: ModuloDaMissao[] = primeiro ? [primeiro] : [];
-  for (const m of ["financas", "rotina", "saude"] as ModuloDaMissao[]) {
+  const resto = (area && COMPANHEIROS[area as AreaKey]) || (["financas", "rotina", "saude"] as ModuloDaMissao[]);
+  for (const m of resto) {
     if (out.length === 3) break;
     if (!out.includes(m)) out.push(m);
   }
@@ -247,6 +255,9 @@ export interface EstadoMissaoDoses {
   aprofundados?: Record<string, ModuloDaMissao[]>;
   /** braço B (10/10): o 4º passo da missão = o tour da Home ("Arrumar sua Home"); `via` = "tour" | "sem_tour" (tour indisponível/já feito) */
   homeTour?: { dia: string; via: "tour" | "sem_tour" };
+  /** 1.0.16, braço A (uma dose por dia): o convite "Dia N da missão" na Home, por dia — "foi" (tocou em
+   *  fazer) ou "depois" (Agora não). 1x por dia: mora AQUI (chave `missao-doses`, que nenhuma vassoura leva). */
+  convites?: Record<string, "foi" | "depois">;
 }
 
 export function lerMissao(): EstadoMissaoDoses | null {
@@ -290,8 +301,9 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
     : { ...dados, prototipo: "web" };
   // 10/10 (DIA1_CHEIO): com a chave ligada TODO evento da missão leva o braço — é por `variante`
   // que o teste se lê. Desligada, o payload é o de hoje, campo a campo.
+  // 1.0.16: + `braco` legível ("um_por_dia" = A, "dia1_cheio" = B) e o modo remoto `missao_1_por_dia`.
   const variante = varianteDia1();
-  return variante ? { ...base, variante } : base;
+  return variante ? { ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() } : base;
 };
 
 /** O braço desta pessoa pros eventos (só com a chave DIA1_CHEIO ligada), ou null. */
@@ -302,6 +314,32 @@ export function varianteDia1(): BracoDia1 | null {
 
 /** A missão está no braço B ("dia 1 cheio")? Com a chave desligada, nunca — mesmo que o braço tenha ficado gravado. */
 export const ehBracoB = (m: EstadoMissaoDoses | null): boolean => !!m && dia1CheioLigado() && m.braco === "B";
+
+/**
+ * 1.0.16 — BRAÇO A = UMA DOSE POR DIA (metadata `missao_1_por_dia`, lib/dia1-cheio). Com a chave
+ * desligada (braço null, a missão da 1.0.10) nada muda — nem com um "A" que ficou gravado.
+ */
+export const ehUmPorDia = (m: EstadoMissaoDoses | null): boolean => !!m && dia1CheioLigado() && m.braco === "A";
+
+/** A dose de hoje está liberada? No braço A só UMA por dia local (nenhuma feita hoje); nos outros, sempre. */
+export function doseLiberadaHoje(m: EstadoMissaoDoses, hoje: string = localDayKey()): boolean {
+  if (!ehUmPorDia(m)) return true;
+  return !([1, 2, 3] as DiaDaMissao[]).some((n) => m.feitos[n]?.dia === hoje);
+}
+
+/**
+ * Braço A, reabriu num dia NOVO (dia ≥ 2 da missão): o convite "Dia N da missão · <módulo>" na Home
+ * está devendo? 1x por dia (convites[hoje]); nunca pra quem escolheu "Explorar por conta própria",
+ * nunca com a dose de hoje feita, pulada hoje, ou a missão cumprida.
+ */
+export function conviteDoDiaDevido(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+  if (!m || !ehUmPorDia(m) || !m.boasVindas || m.explorou) return false;
+  if (missaoCumprida(m) || !doseLiberadaHoje(m, hoje)) return false;
+  if (diaDaMissao(m, hoje) < 2) return false;
+  if (m.convites?.[hoje]) return false;
+  const p = passoPendente(m);
+  return !!p && m.pulados?.[p.n] !== hoje;
+}
 
 /** Quantas doses já foram feitas (1..3). */
 export const dosesFeitas = (m: EstadoMissaoDoses): number => ([1, 2, 3] as DiaDaMissao[]).filter((n) => m.feitos[n]).length;
@@ -364,6 +402,12 @@ export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = lo
   if (!m.boasVindas) return true;
   if (precisaPlanoAmanha(m, hoje)) return true;
   const dia = diaDaMissao(m, hoje);
+  // 1.0.16, braço A: a dose de hoje já foi → a missão volta amanhã (o tour e os adesivos podem entrar);
+  // num dia novo, o convite "Dia N da missão" é a tela que falta
+  if (ehUmPorDia(m) && !missaoCumprida(m)) {
+    if (!doseLiberadaHoje(m, hoje)) return false;
+    if (dia >= 2) return conviteDoDiaDevido(m, hoje);
+  }
   // dose por fazer no dia 1 (não pulada hoje; no B, "Agora não" encerra a sessão — a Home é da pessoa)
   if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje && !(ehBracoB(m) && m.agoraNao?.dia === hoje);
   // B: as 3 doses feitas e o tour por fazer = o tour É o passo 4 (deveMostrarTourHome deixa passar: não é "em andamento")

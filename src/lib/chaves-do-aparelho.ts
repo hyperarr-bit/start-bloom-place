@@ -56,6 +56,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   // 14/10: festas (adesivo/marco/capa) que JÁ apareceram neste aparelho — fechar o app com a festa aberta não a repete
   "core-festas-mostradas",
   "core-dia1-braco",
+  "core-missao-1-por-dia", // 1.0.16: a última resposta do RevenueCat pro teste "missão 1 por dia" (metadata missao_1_por_dia)
   "core-device-id",
   "core-aviso-cobranca-notif",
   // 14/10 — auditoria das chaves gravadas direto no localStorage (1.0.14 e antes):

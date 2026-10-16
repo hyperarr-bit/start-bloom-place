@@ -35,9 +35,35 @@
  * QA pelo link: `?dia1-cheio=on|ab|off|auto`; `?dia1-cheio=a|b` liga o 50/50 E
  * força o braço (apaga o sorteio deste aparelho). Na build `VITE_V14_QA=1`
  * (lib/v14-qa) a chave vale "on".
+ *
+ * ─── 1.0.16 (16/10) — MISSÃO 1 POR DIA × DIA 1 CHEIO, pelo RevenueCat ───────────────────────
+ * O dado (682 testes): metade dos cancelamentos sai nas primeiras 24 h, 90% até 48 h; quem usa
+ * o app em 3 dias diferentes paga 38% × 15% de quem usa 1 dia. Na 1.0.14/1.0.15 (build de loja
+ * VITE_V14_LOJA=1 → modo "on" = TODO MUNDO no braço B) a missão fecha no dia 1 pra 54 de 55
+ * pessoas (as 3 doses em ~10 min) e 47% nunca reabrem. O teste da 1.0.16:
+ *   · Braço A = UMA DOSE POR DIA: dose 1 hoje (+ "amanhã · <módulo> · te lembro às…", que é o
+ *     plano de amanhã do A e a hora do Lembrete do dia 2); a dose 2 só abre AMANHÃ e a 3 depois
+ *     (`doseLiberadaHoje`): sem "Quero fazer o toque de amanhã agora". Quem reabre num dia novo
+ *     encontra a dose do dia (o convite "Dia N da missão" na Home, 1x por dia, e o passo ao
+ *     entrar no módulo; o toque no Lembrete do dia 2 abre o módulo da dose).
+ *   · Braço B = o de hoje (as 3 doses no dia 1 + "Arrumar sua Home"; dias 2–3 "aprofundar").
+ *
+ * QUEM LIGA: a metadata `missao_1_por_dia` em QUALQUER offering do RevenueCat (a `current`
+ * vence), SÓ NO iPHONE:
+ *   · ausente / "off" → o de hoje (modo da build: "on" na loja = todos no B);
+ *   · "ab"            → 50/50 pelo id do aparelho (sortearBraco), gravado em `core-dia1-braco`;
+ *   · "on"            → TODO MUNDO no braço A (uma por dia).
+ * RevenueCat inalcançável e nunca respondido neste aparelho → o de hoje. A última resposta do
+ * RevenueCat fica no aparelho (`core-missao-1-por-dia`, chave do aparelho) — a missão nasce na
+ * 1ª Home, às vezes antes do getOfferings da abertura responder; sem a cópia, essa pessoa caía
+ * no B fora do sorteio. O braço é da MISSÃO (`missao.braco`): desligar a metadata no meio não
+ * muda o braço de quem já começou — só de quem começa depois.
+ * Eventos: `variante` ("A"/"B", como desde a 1.0.14) + `braco` ("um_por_dia" | "dia1_cheio")
+ * + `missao_1_por_dia` (o modo remoto que valia quando o evento saiu) — eventoDaMissao.
  */
 import { localDayKey } from "@/lib/utils";
 import { v14Ligada } from "@/lib/v14-qa";
+import { plataformaApp } from "@/lib/native-shell";
 
 export type ModoDia1Cheio = "off" | "ab" | "on";
 export const DIA1_CHEIO: ModoDia1Cheio = "off";
@@ -73,10 +99,58 @@ export const forcaDia1Cheio = (): ModoDia1Cheio | null => {
   return f === "on" || f === "off" || f === "ab" ? f : null;
 };
 
-/** O modo que vale AQUI: força de QA > build de QA (VITE_V14_QA → "on") > constante. */
+/* ───────────── 1.0.16: a chave remota `missao_1_por_dia` (RevenueCat) ───────────── */
+
+export type ModoUmPorDia = "off" | "ab" | "on";
+/** O nome da chave no metadata da offering do RevenueCat. */
+export const CHAVE_REMOTA_UM_POR_DIA = "missao_1_por_dia";
+/** A última resposta do RevenueCat neste aparelho (chave do aparelho: sobrevive à abertura e ao logout). */
+export const CHAVE_UM_POR_DIA_APARELHO = "core-missao-1-por-dia";
+/** Em memória: o que o getOfferings DESTA abertura disse (undefined = ainda não respondeu). */
+let umPorDiaRemoto: ModoUmPorDia | undefined;
+
+const modoUmPorDiaDe = (v: unknown): ModoUmPorDia | null => {
+  const t = String(v ?? "").trim().toLowerCase();
+  return t === "on" || t === "ab" || t === "off" ? t : null;
+};
+
+/** Decisão pura: a chave em qualquer offering (a `current` vence); ausente em todas = "off" (o de hoje). */
+export function lerUmPorDiaRemoto(offerings: unknown): ModoUmPorDia {
+  type Off = { metadata?: Record<string, unknown> } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  let lido: ModoUmPorDia | null = null;
+  for (const off of Object.values(o?.all ?? {})) if (off !== o?.current) lido = modoUmPorDiaDe(off?.metadata?.[CHAVE_REMOTA_UM_POR_DIA]) ?? lido;
+  lido = modoUmPorDiaDe(o?.current?.metadata?.[CHAVE_REMOTA_UM_POR_DIA]) ?? lido;
+  return lido ?? "off";
+}
+
+/** O revenuecat.ts chama isto com o resultado de cada getOfferings() que respondeu. */
+export function registrarUmPorDiaRemoto(offerings: unknown): void {
+  try {
+    if (!offerings || typeof offerings !== "object") return; // não respondeu de verdade: fica como estava
+    umPorDiaRemoto = lerUmPorDiaRemoto(offerings);
+    ls.set(CHAVE_UM_POR_DIA_APARELHO, umPorDiaRemoto);
+  } catch { /* metadata estranha: fica como estava */ }
+}
+/** Só testes. */
+export const _zerarUmPorDiaRemoto = (): void => { umPorDiaRemoto = undefined; };
+
+/**
+ * O modo do teste "1 por dia" AQUI: só no app do iPhone; o que o RevenueCat disse nesta abertura,
+ * senão a última resposta guardada no aparelho, senão "off" (RevenueCat nunca respondeu = o de hoje).
+ */
+export function modoUmPorDia(): ModoUmPorDia {
+  if (plataformaApp() !== "ios") return "off";
+  if (umPorDiaRemoto) return umPorDiaRemoto;
+  return modoUmPorDiaDe(ls.get(CHAVE_UM_POR_DIA_APARELHO)) ?? "off";
+}
+
+/** O modo que vale AQUI: força de QA > metadata `missao_1_por_dia` ("ab"/"on") > build de QA/loja (→ "on") > constante. */
 export function modoDia1Cheio(modo: ModoDia1Cheio = DIA1_CHEIO): ModoDia1Cheio {
   const f = forcaDia1Cheio();
   if (f) return f;
+  // 1.0.16: o teste remoto liga o sorteio (ou, em "on", o braço A pra todos — bracoFixo)
+  if (modoUmPorDia() !== "off") return "ab";
   if (v14Ligada()) return "on";
   return modo;
 }
@@ -86,8 +160,16 @@ export function dia1CheioLigado(modo: ModoDia1Cheio = DIA1_CHEIO): boolean {
   return modoDia1Cheio(modo) !== "off";
 }
 
-/** Modo "on": o braço de todo mundo é B, sem sorteio (null nos outros modos). */
-export const bracoFixo = (modo: ModoDia1Cheio = DIA1_CHEIO): BracoDia1 | null => (modoDia1Cheio(modo) === "on" ? "B" : null);
+/**
+ * Braço sem sorteio: modo "on" → B pra todo mundo; metadata `missao_1_por_dia: "on"` (sem força de
+ * QA) → A pra todo mundo. null nos outros casos (sorteio, ou chave desligada).
+ */
+export const bracoFixo = (modo: ModoDia1Cheio = DIA1_CHEIO): BracoDia1 | null => {
+  const m = modoDia1Cheio(modo);
+  if (m === "on") return "B";
+  if (m === "ab" && !forcaDia1Cheio() && modoUmPorDia() === "on") return "A";
+  return null;
+};
 
 /** O braço já sorteado neste aparelho (sem sortear). */
 export const bracoGravado = (): BracoDia1 | null => {

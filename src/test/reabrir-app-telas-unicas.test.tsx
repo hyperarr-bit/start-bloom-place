@@ -61,6 +61,9 @@ const usarOApp = () => {
     ["core-att-status", "denied"], ["core-saida-vista", "123"], ["core-lembrete-teste", JSON.stringify({ fimMs: Date.now() + 3 * 864e5, precoAno: "R$ 97,90" })],
     ["core-funil-w-area", JSON.stringify({ v: "dinheiro", t: Date.now() })], ["core-area-landed", "true"],
     ["core-boas-vindas-visto", "1"], ["core-dia2", "{}"], ["core-presente69-cancelou-visto", "1"],
+    // 1.0.16: o teste "missão 1 por dia" — a resposta do RevenueCat, o braço e o convite do dia (dentro da missão)
+    ["core-missao-1-por-dia", "ab"], ["core-dia1-braco", "A"],
+    ["missao-doses", JSON.stringify({ v: 1, inicio: "2026-10-12", modulos: ["financas", "rotina", "saude"], feitos: {}, boasVindas: true, braco: "A", convites: { "2026-10-13": "depois" } })],
   ] as const) localStorage.setItem(k, v);
   // dado da CONTA (cache do user_data) e chaves antigas sem namespace: a vassoura leva
   localStorage.setItem("u:u1:finance-expenses", JSON.stringify([{ id: 1 }]));
@@ -78,9 +81,11 @@ const esperarTudoVisto = () => {
   expect(localStorage.getItem("core-avaliacao-valor-recusas")).toBe("1");
   expect(momentoRuimRecente()).toBe(true);
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
-    "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto"]) {
+    "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
+    "core-missao-1-por-dia", "core-dia1-braco", "missao-doses"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
+  expect(JSON.parse(localStorage.getItem("missao-doses")!).convites).toEqual({ "2026-10-13": "depois" });
 };
 
 const esperarContaVarrida = () => {

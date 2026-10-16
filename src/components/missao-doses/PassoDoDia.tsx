@@ -356,6 +356,26 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     try { campo?.focus(); } catch { /* noop */ }
   };
 
+  /* 16/10 (1.0.16 — o anel do passo 1 sumia antes do toque, `anel_saiu motivo=ancora_invisivel`): quando o
+   * módulo redesenha e troca o nó, o anel RE-ACHA a âncora pelo mesmo caminho do "achar" — o botão/linha
+   * de adicionar; no passo A da Rotina, a linha do campo; no B, a linha de HOJE da tabela (que se refaz
+   * quando o hábito nasce). Lido na hora (subPassoRef), não no mount. */
+  const reacharAlvo = useCallback((): Element | null => {
+    const sel = (alvoCfg?.passos ?? (cfg.seletor ? [{ seletor: cfg.seletor }] : []))[0]?.seletor;
+    if (subPassoRef.current === "criar") {
+      const linha = linhaDoNovoHabito();
+      return linha && visivel(linha) ? linha : null;
+    }
+    const el = sel ? document.querySelector(sel) : null;
+    if (!el || !visivel(el)) return null;
+    if (subPassoRef.current === "marcar") {
+      const linha = linhaDeHoje(el);
+      return linha !== el && visivel(linha) ? linha : null;
+    }
+    return alvoCfg?.anel ? alvoCfg.anel(el) : el;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const pularPelaFaixa = () => aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos());
   const toqueNaFaixa = () => {
     toquesNaFaixa.current += 1;
@@ -422,7 +442,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
           <Anel
             /* 10/10 (dono): toque FORA e rolagem NÃO fecham o post-it (`fixo`: o anel segue o alvo e o toque só
                clareia o escuro); só "Pular"/o tempo (60 s)/a âncora sumir soltam — e aí a faixa mostra ⌖ pra reabrir. */
-            key={`anotar-${acende}`} fixo interativo duracao={60_000} alvo={alvo} testid="missao-doses-anel" abaixo={!!alvoCfg?.postItAbaixo}
+            key={`anotar-${acende}`} fixo interativo duracao={60_000} alvo={alvo} reachar={reacharAlvo} testid="missao-doses-anel" abaixo={!!alvoCfg?.postItAbaixo}
             aoSair={(motivo) => {
               setAnelVivo(false);
               if (faseRef.current !== "anotar") return;
@@ -493,7 +513,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
  * fazer o toque de amanhã agora" leva pro próximo módulo. No dia 3: "Ver o que
  * você construiu".
  */
-function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
+export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoAmanhaAgora: () => void; aoVerFim: () => void;
   braco?: BracoDoPasso; modo?: ModoDoPasso; aoBoraProxima?: () => void; aoAgoraNao?: () => void; aoFecharDia?: () => void;
@@ -584,7 +604,8 @@ function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanh
             <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
               {hora === "sem" ? "Combinado, até amanhã" : `Combinado, me lembra às ${hora}`}
             </button>
-            <button type="button" className="md-link" data-testid="missao-doses-amanha-agora" onClick={aoAmanhaAgora}>Quero fazer o toque de amanhã agora</button>
+            {/* 1.0.16, braço A (uma dose por dia): sem adiantar — o de amanhã é amanhã (é o que o teste mede) */}
+            {braco !== "A" && <button type="button" className="md-link" data-testid="missao-doses-amanha-agora" onClick={aoAmanhaAgora}>Quero fazer o toque de amanhã agora</button>}
           </>
         ) : (
           <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>

@@ -339,6 +339,8 @@ const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPa
 const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) : null;
 // 09/10: painel da afiliada e aba Afiliados do /admin com dados de exemplo, pra fotografar — só no dev
 const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
+// 16/10: o braço A da 1.0.16 ("uma dose por dia") tela a tela, pra fotografar — só no dev
+const DevMissao1PorDia = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMissao1PorDia")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -655,6 +657,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevAfiliados && (
           <Route path="/dev/afiliados" element={<Suspense fallback={null}><DevAfiliados /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevMissao1PorDia && (
+          <Route path="/dev/missao-1-por-dia" element={<Suspense fallback={null}><DevMissao1PorDia /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />

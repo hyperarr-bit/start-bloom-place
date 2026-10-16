@@ -9,11 +9,11 @@ import { areaEscolhidaNoFunil } from "@/components/missao/MissaoDoTrial";
 import { isNativeShell } from "@/lib/native-shell";
 import { EVENTO_DIA2, LEMBRETE_DO_PLANO, combinarHora } from "@/lib/lembrete-dia2";
 import { agendarProximaDose, pedirPermissaoDia2 } from "@/lib/notificacoes";
-import { bracoDia1, guardarForcaDia1Cheio, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { bracoDia1, guardarForcaDia1Cheio, modoUmPorDia, type PlanoAmanha } from "@/lib/dia1-cheio";
 import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 import {
-  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, diaDaMissao, dosesFeitas, ehBracoB, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, conviteDoDiaDevido, diaDaMissao, doseLiberadaHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -21,6 +21,7 @@ import { BoasVindasDoses } from "./BoasVindasDoses";
 import { PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
+import { ConviteDoDia } from "./ConviteDoDia";
 import "./missao-doses.css";
 
 /**
@@ -65,6 +66,21 @@ export function MissaoDosesNaWeb() {
   guardarForcaDia1Cheio(search);
   const ligada = missaoDosesLigada();
   return ligada ? <Ligada /> : null;
+}
+
+/**
+ * A ÁREA DA MISSÃO (16/10, 1.0.16): a do funil do app (`core-funil-w-area`, que agora sobrevive ao
+ * "liberando" — retomada.ts) → senão a da Porta do site, que viaja na conta (`user_metadata.porta.
+ * respostas.area`; o localStorage do site não chega ao app) → senão null (= Finanças primeiro).
+ */
+export function areaDaMissao(userMetadata?: unknown): string | null {
+  const local = areaEscolhidaNoFunil();
+  if (local && local in AREAS) return local;
+  try {
+    const a = (userMetadata as { porta?: { respostas?: { area?: unknown } | null } | null } | null | undefined)?.porta?.respostas?.area;
+    if (typeof a === "string" && a in AREAS) return a;
+  } catch { /* metadata estranha */ }
+  return local ?? null;
 }
 
 /** O CustomEvent da janela quando a missão fica completa (o tour da Home escuta). Mora em lib/missao-doses. */
@@ -117,7 +133,8 @@ function Ligada() {
   const pendenteAgora = missao ? passoPendente(missao) : null;
   const aprofundar = missao && missao.boasVindas ? aprofundarPendente(missao, pathname, hoje) : null;
   type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar" };
-  const candidato: Passo | null = missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje
+  // 1.0.16 (braço A, uma dose por dia): a dose de amanhã NÃO abre hoje, nem entrando no módulo dela
+  const candidato: Passo | null = missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseLiberadaHoje(missao, hoje)
     ? { n: pendenteAgora.n, modulo: pendenteAgora.modulo, chave: passoAberto }
     : aprofundar ? { n: aprofundar.n, modulo: aprofundar.modulo, chave: passoAberto, modo: "aprofundar" }
     : null;
@@ -137,13 +154,14 @@ function Ligada() {
     if (!user || !loaded || missao || semAcessoNoApp) return;
     // no app: só pra quem é novo nesta versão (a Missão antiga em andamento termina a dela)
     if (isNativeShell() && !missaoDosesMandaNoApp(user.created_at)) return;
-    const area = areaEscolhidaNoFunil();
+    const area = areaDaMissao(user.user_metadata);
     const modulos = modulosPadrao(area);
     // 10/10: o braço do teste "dia 1 cheio" (null com a chave desligada = a missão de hoje)
+    // 1.0.16: com a metadata `missao_1_por_dia` = "ab"/"on", o sorteio é A (uma por dia) × B (dia 1 cheio)
     const braco = bracoDia1();
     const m = iniciarMissao(modulos, hoje, undefined, braco);
     setMissao(m);
-    trackEvent("missao_doses_inicio", eventoDaMissao({ modulos, area: area ?? null }));
+    trackEvent("missao_doses_inicio", eventoDaMissao({ modulos, area: area ?? null, origem_area: areaEscolhidaNoFunil() ? "funil" : area ? "porta" : "padrao", ...(braco ? { missao_1_por_dia: modoUmPorDia() } : {}) }));
   }, [user, loaded, missao, hoje, semAcessoNoApp]);
 
   /* ── O 4º PASSO (B): o tour da Home. Quando ele termina (EVENTO_TOUR_HOME_FIM) a missão fecha:
@@ -177,6 +195,19 @@ function Ligada() {
   const [festaAberta, setFestaAberta] = useState(() => festaNaTela());
   const [esperouFesta, setEsperouFesta] = useState(false);
   const planoDevendo = !!missao && B && precisaPlanoAmanha(missao, hoje);
+  /* 1.0.16, braço A: reabriu num dia novo → o convite "Dia N da missão" na Home (1x por dia). Espera
+     1,2 s (a Home assentar) e qualquer outra festa/folha sair da tela — nunca duas folhas juntas. */
+  const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje);
+  const [conviteLivre, setConviteLivre] = useState(false);
+  useEffect(() => {
+    if (!conviteDevido) { setConviteLivre(false); return; }
+    let estaveis = 0;
+    const t = window.setInterval(() => {
+      estaveis = festaNaTela() ? 0 : estaveis + 1;
+      if (estaveis >= 3) { setConviteLivre(true); window.clearInterval(t); }
+    }, 400);
+    return () => window.clearInterval(t);
+  }, [conviteDevido]);
   const casaVista = (() => {
     try { return ((get<{ adesivos?: string[] } | undefined>("conquistas-vistas", undefined)?.adesivos) ?? []).includes("casa-arrumada"); } catch { return false; }
   })();
@@ -193,7 +224,7 @@ function Ligada() {
 
   const salvar = (m: EstadoMissaoDoses) => { gravarMissao(m); setMissao(m); };
   const areaNome = (() => {
-    const a = areaEscolhidaNoFunil();
+    const a = areaDaMissao(user.user_metadata);
     return a && a in AREAS ? AREAS[a as AreaKey].nome : null;
   })();
   const pendente = passoPendente(missao);
@@ -261,6 +292,18 @@ function Ligada() {
     );
   }
 
+  /* 1.0.16, braço A — o convite do dia (reabriu num dia novo, a dose de hoje está liberada) */
+  if (conviteDevido && conviteLivre) {
+    const decidir = (acao: "foi" | "depois") => {
+      const m = lerMissao() ?? missao;
+      const p = passoPendente(m);
+      salvar({ ...m, convites: { ...m.convites, [hoje]: acao } });
+      trackEvent("missao_convite_dia", eventoDaMissao({ acao, dia_relogio: diaDaMissao(m, hoje), indice: p?.n ?? null, modulo: p?.modulo ?? null }));
+      if (acao === "foi" && p) navigate(MODULOS[p.modulo].rota);
+    };
+    return <ConviteDoDia missao={missao} hoje={hoje} aoIr={() => decidir("foi")} aoDepois={() => decidir("depois")} />;
+  }
+
   /* D8 — no braço B só a partir do dia 3 (as 3 doses foram no dia 1; "em 3 dias" só faz sentido no 3º) */
   if (verFim || (missaoCumprida(missao) && !missao.fimVisto && noHome && (!B || dia >= 3))) {
     return (
@@ -299,7 +342,7 @@ function Ligada() {
         n={n}
         modulo={passo.modulo}
         hoje={hoje}
-        braco={B ? "B" : missao.braco === "A" ? "A" : null}
+        braco={B ? "B" : ehUmPorDia(missao) ? "A" : null}
         modo={passo.modo ?? "dose"}
         aoFeito={(rotulo, segundos) => {
           const m = lerMissao() ?? missao;

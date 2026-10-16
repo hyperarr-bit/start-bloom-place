@@ -193,8 +193,20 @@ export function useDigitando(): boolean {
  * `balao` é a peça que acompanha o anel (o post-it dos chips, o número do
  * passo 3) — com `interativo`, ela recebe toque (chips, botão de seguir).
  */
-export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false }: {
+/** Quanto tempo o anel espera a âncora voltar (re-render/troca do nó) antes de desistir — só com `reachar`. */
+export const TOLERANCIA_ANCORA_MS = 2500;
+
+export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar }: {
   alvo: Element;
+  /**
+   * 16/10 (1.0.16 — "o anel do passo 1 some antes do toque", ~24% das pessoas; no ar:
+   * `missao_doses_anel_saiu motivo=ancora_invisivel`): o módulo REDESENHA e troca o nó que o anel
+   * abraçava (a hidratação da conta, a tabela da Rotina que se refaz depois do hábito novo, um botão
+   * que remonta) — o nó velho sai do DOM e o anel desistia na hora. Com `reachar`, o anel procura a
+   * âncora de novo (mesmo seletor) e segue nela; se ela sumiu de verdade, espera até
+   * TOLERANCIA_ANCORA_MS (o post-it fica na tela) e só então sai. Sem `reachar`: como sempre.
+   */
+  reachar?: () => Element | null;
   recorte?: (el: Element) => Retangulo | null;
   balao: ReactNode;
   interativo?: boolean;
@@ -214,6 +226,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   const saiuRef = useRef(false);
   const aoSairRef = useRef(aoSair);
   aoSairRef.current = aoSair;
+  const reacharRef = useRef(reachar);
+  reacharRef.current = reachar;
 
   useEffect(() => {
     let vivo = true;
@@ -223,18 +237,47 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       saiuRef.current = true;
       aoSairRef.current(motivo);
     };
-    const medir = () => (recorte ? recorte(alvo) : null) ?? alvo.getBoundingClientRect();
+    // o nó que o anel abraça AGORA (com `reachar`, troca quando o módulo redesenha)
+    let atual: Element = alvo;
+    const medir = () => (recorte ? recorte(atual) : null) ?? atual.getBoundingClientRect();
     // rola até o que o anel abraça ficar no meio da área LIVRE (entre o que gruda
     // no topo e o CTA de baixo) — um pouco abaixo do meio, pra caber o balão em cima
-    try {
-      const r = medir();
-      const topo = fundoDoTopoFixo();
-      const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
-      // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
-      const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
-      const delta = r.top - destino;
-      if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
-    } catch { /* noop */ }
+    const rolarPraVer = (forcar: boolean) => {
+      try {
+        const r = medir();
+        const topo = fundoDoTopoFixo();
+        const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
+        // re-achado: só rola se o nó novo ficou fora da área livre
+        if (!forcar && r.top >= topo && r.bottom <= topo + livre) return;
+        // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
+        const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
+        const delta = r.top - destino;
+        if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
+      } catch { /* noop */ }
+    };
+    rolarPraVer(true);
+    const vale = (el: Element): boolean => {
+      if (!el.isConnected) return false;
+      const r = (recorte ? recorte(el) : null) ?? el.getBoundingClientRect();
+      return r.width >= 8 && r.height >= 8;
+    };
+    /* A âncora ainda vale? Senão tenta re-achar (com `reachar`) e, sem ela, espera a tolerância. true = pode medir. */
+    let perdidaDesde = 0;
+    const ancoraOk = (): boolean => {
+      if (vale(atual)) { perdidaDesde = 0; return true; }
+      const buscar = reacharRef.current;
+      if (!buscar) { sair("ancora_invisivel"); return false; }
+      let novo: Element | null = null;
+      try { novo = buscar(); } catch { novo = null; }
+      if (novo && novo !== atual && vale(novo)) {
+        atual = novo; perdidaDesde = 0;
+        rolarPraVer(false);
+        return true;
+      }
+      if (!perdidaDesde) perdidaDesde = Date.now();
+      if (Date.now() - perdidaDesde >= TOLERANCIA_ANCORA_MS) { sair("ancora_invisivel"); return false; }
+      return false;
+    };
     let quadro = 0;
     const aoRolar = () => {
       if (!fixo) { sair("rolagem"); return; }
@@ -243,9 +286,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       quadro = window.requestAnimationFrame(() => {
         quadro = 0;
         if (!vivo) return;
-        const r = medir();
-        if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
-        setRect(r);
+        if (!ancoraOk()) return;
+        setRect(medir());
       });
     };
     // O anel só aparece com a rolagem ASSENTADA (2 leituras iguais): rolagem
@@ -255,17 +297,20 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       if (!vivo) return;
       const y = window.scrollY;
       if (y === ultimoY && ++estaveis >= 2) {
-        const r = medir();
-        if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
-        setRect(r);
+        if (!ancoraOk()) {
+          // com `reachar`: a âncora pode estar remontando — tenta de novo até a tolerância (ancoraOk sai sozinho)
+          if (!saiuRef.current) timers.push(window.setTimeout(assentar, 250));
+          return;
+        }
+        setRect(medir());
         window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
         // fixo: a tela muda de tamanho sem rolar (ela abriu a edição de outra conta, um
         // formulário cresceu, o teclado fechou) — o anel segue o alvo onde ele estiver
         if (fixo) {
           const seguir = window.setInterval(() => {
             if (!vivo) return;
+            if (!ancoraOk()) return; // perdida: o anel fica onde estava (o post-it não pisca) até re-achar ou desistir
             const n = medir();
-            if (!alvo.isConnected || n.width < 8 || n.height < 8) { sair("ancora_invisivel"); return; }
             setRect((ant) => (ant && Math.abs(ant.top - n.top) < 1 && Math.abs(ant.left - n.left) < 1
               && Math.abs(ant.width - n.width) < 1 && Math.abs(ant.height - n.height) < 1 ? ant : n));
           }, 250);
@@ -287,7 +332,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
        * animação de saída, no WKWebView não — o post-it sumia sem registrar nada. */
       if (e.target instanceof Node && balaoRef.current?.contains(e.target)) return;
       if (fixo) { setLeve(true); return; } // fixo: o passo continua na tela, só o escuro clareia
-      if (e.target instanceof Node && alvo.contains(e.target)) {
+      if (e.target instanceof Node && atual.contains(e.target)) {
         // tocou o alvo: a ação segue e o anel se despede sozinho
         window.setTimeout(() => sair("alvo_tocado"), 450);
         return;

@@ -25,7 +25,7 @@
  * lib/v14-qa), que liga as três.
  */
 import { isNativeShell } from "@/lib/native-shell";
-import { contaNova, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
+import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { v14Ligada } from "@/lib/v14-qa";
 
@@ -140,7 +140,9 @@ export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: 
   try { if (!missaoDosesLigada() && trialCartaoAtivo()) return false; } catch { /* sem storage */ }
   if (missaoDosesLigada()) {
     const m = lerMissao();
-    if (m && !m.explorou && (missaoEmAndamento(m) || !missaoCumprida(m))) return false;
+    // 1.0.16, braço A (uma dose por dia): a missão leva 3 dias — o tour não espera ela acabar, só a tela de hoje
+    // (a dose do dia 1 + "amanhã · te lembro às…"; num dia novo, o convite do dia). B e a 1.0.10: como sempre.
+    if (m && !m.explorou && (missaoEmAndamento(m) || (!missaoCumprida(m) && !ehUmPorDia(m)))) return false;
   }
   return true;
 }

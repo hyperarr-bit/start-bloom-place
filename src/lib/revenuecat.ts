@@ -39,6 +39,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
+import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -137,6 +138,7 @@ export async function initRevenueCat(): Promise<EstadoRC> {
     const offerings = await Purchases.getOfferings();
     // 10/10: as chaves das ofertas de saída viajam no metadata das offerings (ofertas-saida.ts)
     registrarChavesRemotas(offerings);
+    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];
@@ -408,6 +410,7 @@ export async function carregarPresente69(): Promise<Presente69 | null> {
   try {
     const offerings = await Purchases.getOfferings();
     registrarChavesRemotas(offerings);
+    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     const pacote = lerPacoteDoPresente(offerings);
     if (!pacote?.product?.priceString) { presente69 = null; return null; }
     const p = pacote.product as { priceString: string; price?: number; currencyCode?: string; introPrice?: IntroAnual };
@@ -519,6 +522,7 @@ export async function carregarMensal19(): Promise<Mensal19 | null> {
   try {
     const offerings = await Purchases.getOfferings();
     registrarChavesRemotas(offerings);
+    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     const pacote = lerPacoteDoMensal19(offerings);
     if (!pacote?.product?.priceString) { mensal19 = null; return null; }
     mensal19 = { pacote, dados: { preco: pacote.product.priceString, produto: ID_MENSAL_19 } };
@@ -1106,6 +1110,7 @@ export async function prefetchAnualIos(): Promise<void> {
   try {
     const offerings = await Purchases.getOfferings();
     registrarChavesRemotas(offerings);
+    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     const atual = offerings?.current;
     const pacote = (atual?.availablePackages ?? []).find((p) => ehAnualDaAppStore(p?.product?.identifier))
       ?? (ehAnualDaAppStore((atual as { annual?: PacoteRC } | undefined)?.annual?.product?.identifier) ? (atual as { annual?: PacoteRC }).annual : undefined);

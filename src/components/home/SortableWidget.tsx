@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { X, Maximize2, Minimize2 } from "lucide-react";
 import { WidgetId, WidgetSize } from "@/hooks/use-home-widgets";
+import { trackEvent } from "@/lib/analytics";
 
 interface SortableWidgetProps {
   id: WidgetId;
@@ -28,6 +29,9 @@ export const SortableWidget = ({ id, size, editing, onRemove, onToggleSize, chil
       style={style}
       className={`relative ${editing ? "animate-jiggle" : ""}`}
       {...(editing ? { ...attributes, ...listeners } : {})}
+      /* 16/10: qual widget recebe toque (fase de captura: vale pra qualquer botão dentro dele,
+         sem mexer em cada widget). Editando, o toque é arrastar/remover — não conta. */
+      onClickCapture={editing ? undefined : () => trackEvent("home_widget", { widget: id, tamanho: size })}
     >
       {editing && (
         <div className="absolute -top-1.5 -right-1.5 z-10 flex gap-1">

@@ -5,6 +5,7 @@ import { MODULOS } from "@/lib/modulos";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useEffect, useState } from "react";
 import { EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR } from "@/lib/tour-home";
+import { trackEvent } from "@/lib/analytics";
 
 const modules = MODULOS;
 
@@ -41,7 +42,7 @@ export const ModuleDrawer = () => {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Módulos</h3>
         <button
-          onClick={() => setEditMode(!editMode)}
+          onClick={() => { if (!editMode) trackEvent("home_modulos_editar", { origem: "engrenagem" }); setEditMode(!editMode); }}
           aria-label={editMode ? "Fechar edição dos módulos" : "Editar módulos"}
           data-tour="modulos-engrenagem"
           className={`p-1.5 rounded-lg transition-colors ${editMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
@@ -81,7 +82,12 @@ export const ModuleDrawer = () => {
               </div>
             )}
             <button
-              onClick={() => !editMode && navigate(m.path)}
+              onClick={() => {
+                if (editMode) return;
+                // 16/10: a Home não gravava evento nenhum — qual módulo da grade leva a pessoa pra dentro
+                trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) });
+                navigate(m.path);
+              }}
               className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl hover:bg-muted/50 transition-colors"
             >
               <div className={`w-10 h-10 rounded-xl ${m.color} flex items-center justify-center relative`}>
@@ -120,7 +126,7 @@ export const ModuleDrawer = () => {
 
       {hiddenCount > 0 && !editMode && (
         <button
-          onClick={() => setEditMode(true)}
+          onClick={() => { trackEvent("home_modulos_editar", { origem: "ocultos", ocultos: hiddenCount }); setEditMode(true); }}
           className="w-full text-center mt-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
         >
           +{hiddenCount} oculto{hiddenCount > 1 ? "s" : ""} · Editar

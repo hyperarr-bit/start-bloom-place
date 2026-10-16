@@ -32,7 +32,12 @@
  *   O "feito/pulou" fica em DOIS lugares: no aparelho (`core-montar-financas`, em
  *   CHAVES_DO_APARELHO — nenhuma vassoura leva) e na conta (mesma chave via useUserData, volta
  *   no login em outro aparelho). Fechar o app NO MEIO (sem Pular nem Pronto) deixa ver de novo,
- *   mas no máximo 2 aberturas: a 2ª vista sem decisão é a última.
+ *   mas no máximo 2 aberturas (1 vista por abertura do app): a 2ª vista sem decisão é a última —
+ *   e ela volta com o que já tinha sido respondido (rascunho na mesma chave do aparelho).
+ *
+ * ── UMA TELA POR VEZ ────────────────────────────────────────────────────────────────────────
+ *   A tela pode abrir pelo módulo (1ª abertura de Finanças) ou pela missão (dose 1 de Finanças).
+ *   `registrarTelaAberta` conta as abertas; a do módulo cede pra da missão e não abre por cima dela.
  */
 import { isNativeShell } from "@/lib/native-shell";
 import { computeDailyBudget } from "@/lib/finance-totals";
@@ -65,7 +70,10 @@ export const EVENTO_MONTAR_FINANCAS_FIM = "montar-financas:fim";
 export const ATRIBUTO_NA_TELA = "data-montar-financas";
 
 export type Resultado = "pronto" | "pulou";
-export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number }
+export type OrigemMontar = "modulo" | "missao";
+/** O que já foi respondido e ainda não virou dado (fechou o app no meio): volta preenchido. */
+export interface RascunhoMontar { etapa: "renda" | "contas"; faixa: string | null; renda: number; contas: ContaEscolhida[] }
+export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number; rascunho?: RascunhoMontar }
 
 const ls = {
   get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -151,15 +159,57 @@ export function montarJaDecidido(get?: <T>(k: string, f: T) => T): boolean {
   if (marcaDoAparelho()?.r) return true;
   try { return !!lerMarcaJson(get?.(CHAVE_MONTAR_FINANCAS, null))?.r; } catch { return false; }
 }
-/** Vista sem decisão (o app fechou no meio): a 2ª é a última. */
+/** Vista sem decisão (o app fechou no meio): a 2ª é a última. Conta 1 por abertura do app —
+ *  a tela do módulo cedendo pra da missão (ou remontando) não gasta a 2ª vista. */
 export const MAX_VISTAS_SEM_DECISAO = 2;
+let vistaNestaAbertura = false;
 export function registrarVistaMontar(): void {
+  if (vistaNestaAbertura) return;
+  vistaNestaAbertura = true;
   const m = marcaDoAparelho() ?? {};
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify({ ...m, vistas: (m.vistas ?? 0) + 1 }));
 }
+/** Só testes: simula fechar e abrir o app de novo (a vista volta a contar). */
+export const _novaAberturaMontar = (): void => { vistaNestaAbertura = false; };
+
+export function guardarRascunhoMontar(r: RascunhoMontar): void {
+  const m = marcaDoAparelho() ?? {};
+  if (m.r) return;
+  ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify({ ...m, rascunho: r }));
+}
+export function lerRascunhoMontar(): RascunhoMontar | null {
+  const r = marcaDoAparelho()?.rascunho;
+  if (!r || (r.etapa !== "renda" && r.etapa !== "contas")) return null;
+  return { etapa: r.etapa, faixa: typeof r.faixa === "string" ? r.faixa : null, renda: Number(r.renda) || 0, contas: Array.isArray(r.contas) ? r.contas : [] };
+}
+
+/* ───────────────────────── uma tela por vez (módulo × missão) ───────────────────────── */
+
+const abertas: Record<OrigemMontar, number> = { modulo: 0, missao: 0 };
+/** Disparado na window quando uma tela abre. `detail: { origem }` — a do módulo cede pra da missão. */
+export const EVENTO_MONTAR_ABERTA = "montar-financas:aberta";
+const pintarAtributo = () => {
+  try {
+    const html = document.documentElement;
+    if (abertas.missao > 0) html.setAttribute(ATRIBUTO_NA_TELA, "missao");
+    else if (abertas.modulo > 0) html.setAttribute(ATRIBUTO_NA_TELA, "modulo");
+    else html.removeAttribute(ATRIBUTO_NA_TELA);
+  } catch { /* sem document */ }
+};
+/** A tela montou; devolve o "desmontou". */
+export function registrarTelaAberta(origem: OrigemMontar): () => void {
+  abertas[origem] += 1;
+  pintarAtributo();
+  try { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_ABERTA, { detail: { origem } })); } catch { /* sem window */ }
+  return () => { abertas[origem] = Math.max(0, abertas[origem] - 1); pintarAtributo(); };
+}
+/** A missão está com a tela aberta agora (a do módulo não aparece). */
+export const montarAbertoPelaMissao = (): boolean => abertas.missao > 0;
+
 /** Grava a decisão no aparelho; devolve a marca pra quem também grava na conta. */
 export function marcarMontarDecidido(r: Resultado): MarcaMontar {
-  const marca: MarcaMontar = { ...(marcaDoAparelho() ?? {}), r, em: new Date().toISOString() };
+  const { rascunho: _r, ...sem } = marcaDoAparelho() ?? {};
+  const marca: MarcaMontar = { ...sem, r, em: new Date().toISOString() };
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify(marca));
   return marca;
 }

@@ -391,6 +391,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
         origem="modulo"
         onPronto={() => { montar.aoPronto(); setActiveTab("financeiro"); window.scrollTo?.(0, 0); }}
         onPular={montar.aoPular}
+        onCeder={montar.aoCeder}
       />
     );
   }

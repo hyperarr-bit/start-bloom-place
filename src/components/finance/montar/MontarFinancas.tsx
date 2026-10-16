@@ -10,25 +10,30 @@
  * ── ONDE APARECE ────────────────────────────────────────────────────────────────────────────
  *  (a) Sozinha, na 1ª abertura de Finanças de uma conta nova sem dado nenhum (pages/Index.tsx,
  *      hook `useMontarFinancasNoModulo` abaixo). Termina na aba MEU FINANCEIRO, já cheia.
- *  (b) PELA MISSÃO — integração (quem cuida da missão em doses liga; nada aqui mexe nela):
+ *  (b) PELA MISSÃO — a dose 1 de Finanças do teste de 3 dias (scratchpad/definitiva/8-trial-desenho.md):
+ *      Montar → "pode gastar R$ X por dia" → (a missão segue com o 1º gasto pelo chip). Quem cuida da
+ *      missão liga; nada aqui mexe nela:
  *
  *        import { MontarFinancas, deveMostrarMontarFinancas, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA }
  *          from "@/components/finance/montar/MontarFinancas";
  *
- *        // jeito 1 — não fazer nada: o passo de Finanças leva a /financas e a tela abre sozinha
- *        // (conta nova, Finanças vazia). Antes de procurar o "+ Novo gasto"
- *        // ('[data-spotlight="add-expense"]'), esperar `document.documentElement.hasAttribute(ATRIBUTO_NA_TELA)`
- *        // ficar falso, ou ouvir `window` EVENTO_MONTAR_FINANCAS_FIM
- *        // (`detail: { resultado: "pronto" | "pulou", contas }`).
- *
- *        // jeito 2 — abrir de onde a missão estiver (folha fixa por cima de tudo, z 200, abaixo da faixa):
  *        const { user } = useAuth(); const { get, isGuest } = useUserData();
- *        if (deveMostrarMontarFinancas({ criadoEm: user?.created_at, get, isGuest }))
- *          <MontarFinancas origem="missao" onPronto={(r) => …r.contas, r.porDia…} onPular={() => …} />
+ *        if (deveMostrarMontarFinancas({ criadoEm: user?.created_at, get, isGuest }))   // chave + conta nova + vazia + não decidiu
+ *          <MontarFinancas origem="missao"
+ *            onPronto={(r: ResumoMontar) => … r.contas, r.porDia, r.semFolga …}   // dado já gravado no módulo
+ *            onPular={() => …} />
+ *        // senão (pulou/fez antes, ou Finanças já tem dado): a dose segue direto pro 1º gasto.
  *
- *      Depois do "pronto", o próximo toque natural é o 1º gasto (o painel já está cheio).
+ *      É uma folha fixa por cima de tudo (z 200), que começa abaixo da faixa da missão. UMA TELA POR VEZ:
+ *      se a do módulo (a) estiver aberta, ela some quando a da missão monta (`onCeder`), e o módulo não
+ *      abre a dele enquanto a da missão estiver na tela. O que já foi respondido passa de uma pra outra
+ *      (rascunho no aparelho). Enquanto aberta: <html data-montar-financas="missao|modulo">; no fim,
+ *      `window` EVENTO_MONTAR_FINANCAS_FIM (`detail: { resultado: "pronto" | "pulou", contas }`) — antes
+ *      de procurar o "+ Novo gasto" ('[data-spotlight="add-expense"]'), esperar o atributo sair.
  *
- * Eventos: montar_financas_view {origem} · montar_financas_passo {n: 1 renda | 2 contas | 3 resultado, origem}
+ * Fechou o app no meio (sem Pular nem Pronto): volta com as respostas preenchidas, no máximo 1 vez.
+ *
+ * Eventos: montar_financas_view {origem, retomou} · montar_financas_passo {n: 1 renda | 2 contas | 3 resultado, origem}
  *          · montar_financas_pronto {contas, faixa, sem_folga, origem} · montar_financas_pular {passo, origem}.
  *          Nunca valor em reais.
  */
@@ -44,18 +49,21 @@ import {
   ATRIBUTO_NA_TELA, CHAVE_MONTAR_FINANCAS, CONTAS_SUGERIDAS, EVENTO_MONTAR_FINANCAS_FIM, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW,
   FAIXAS_DE_RENDA, calcularMontar, contaNovaParaMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar,
   marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, registrarVistaMontar, reaisDigitados,
-  type ContaEscolhida, type Resultado,
+  EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
+  type ContaEscolhida, type OrigemMontar, type Resultado,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
 
-export { deveMostrarMontarFinancas, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA } from "@/lib/montar-financas";
+export { deveMostrarMontarFinancas, montarAbertoPelaMissao, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA } from "@/lib/montar-financas";
 
 export interface ResumoMontar { contas: number; porDia: number; semFolga: boolean }
 export interface PropsMontarFinancas {
   /** De onde abriu (vai nos eventos): a 1ª abertura do módulo ou o passo da missão. */
-  origem?: "modulo" | "missao";
+  origem?: OrigemMontar;
   onPronto?: (r: ResumoMontar) => void;
   onPular?: () => void;
+  /** Só a do módulo: a missão abriu a dela — esta some (sem decidir nada). */
+  onCeder?: () => void;
   /** Só testes/prints: a data "de hoje" (o número depende dos dias que faltam no mês). */
   agora?: Date;
   /** Só testes/prints: duração do "Montando…" em ms (padrão 2200; 0 = pula a espera). */
@@ -67,31 +75,53 @@ const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, montando: 2
 
 const mesCurto = (d: Date) => d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(/\.?\s*de\s*/i, " ").replace(".", "");
 
-export function MontarFinancas({ origem = "modulo", onPronto, onPular, agora, esperaMs = 2200 }: PropsMontarFinancas) {
+export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200 }: PropsMontarFinancas) {
   const { get, set } = useUserData();
   const hoje = useMemo(() => agora ?? new Date(), [agora]);
-  const [etapa, setEtapa] = useState<Etapa>("renda");
-  const [faixa, setFaixa] = useState<string | null>(null);
-  const [renda, setRenda] = useState(0);
-  const [contas, setContas] = useState<ContaEscolhida[]>([]);
-  const outras = useRef(0);
+  // fechou o app no meio: volta com o que já tinha respondido
+  const [rascunho] = useState(() => lerRascunhoMontar());
+  const [etapa, setEtapa] = useState<Etapa>(rascunho?.etapa ?? "renda");
+  const [faixa, setFaixa] = useState<string | null>(rascunho?.faixa ?? null);
+  const [renda, setRenda] = useState(rascunho?.renda ?? 0);
+  const [contas, setContas] = useState<ContaEscolhida[]>(rascunho?.contas ?? []);
+  const outras = useRef((rascunho?.contas ?? []).filter((c) => c.id.startsWith("outra-")).length);
   const inicio = useRef(false);
+  const [cedeu, setCedeu] = useState(() => origem === "modulo" && montarAbertoPelaMissao());
   const resultado = useMemo(() => calcularMontar(renda, contas, hoje), [renda, contas, hoje]);
 
-  // a tela está aberta: trava a rolagem do fundo e avisa quem espera (missão/anel)
+  // uma tela por vez: a do módulo cede pra da missão (abriu antes ou depois)
   useEffect(() => {
-    const html = document.documentElement;
-    html.setAttribute(ATRIBUTO_NA_TELA, "");
-    return () => html.removeAttribute(ATRIBUTO_NA_TELA);
-  }, []);
+    if (origem !== "modulo") return;
+    const aoAbrir = (e: Event) => { if ((e as CustomEvent<{ origem?: string }>).detail?.origem === "missao") setCedeu(true); };
+    window.addEventListener(EVENTO_MONTAR_ABERTA, aoAbrir);
+    return () => window.removeEventListener(EVENTO_MONTAR_ABERTA, aoAbrir);
+  }, [origem]);
+  useEffect(() => { if (cedeu) onCeder?.(); }, [cedeu]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // aberta: <html data-montar-financas="missao|modulo"> trava a rolagem do fundo e avisa quem espera (missão/anel)
+  useEffect(() => (cedeu ? undefined : registrarTelaAberta(origem)), [origem, cedeu]);
 
   useEffect(() => {
-    if (inicio.current) return;
-    inicio.current = true;
-    registrarVistaMontar();
-    trackEvent(EV_VIEW, { origem });
-    trackEvent(EV_PASSO, { n: 1, origem });
-  }, [origem]);
+    if (cedeu || inicio.current) return;
+    const contar = () => {
+      // a do módulo espera 1 volta: se a da missão montou junto (mesmo render), cede sem contar vista
+      if (origem === "modulo" && montarAbertoPelaMissao()) { setCedeu(true); return; }
+      inicio.current = true;
+      registrarVistaMontar();
+      trackEvent(EV_VIEW, { origem, retomou: !!rascunho });
+      trackEvent(EV_PASSO, { n: PASSO_DA_ETAPA[etapa], origem });
+    };
+    if (origem !== "modulo") { contar(); return; }
+    const t = window.setTimeout(contar, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origem, cedeu]);
+
+  // o rascunho acompanha cada resposta (só até virar dado: "Montando" grava e decide)
+  useEffect(() => {
+    if (cedeu || (etapa !== "renda" && etapa !== "contas")) return;
+    guardarRascunhoMontar({ etapa, faixa, renda, contas });
+  }, [cedeu, etapa, faixa, renda, contas]);
 
   const irPara = (e: Etapa) => {
     setEtapa(e);
@@ -160,6 +190,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, agora, es
     </header>
   );
 
+  if (cedeu) return null;
   return (
     <div className="mf" role="dialog" aria-modal="true" aria-label="Vamos montar suas finanças" data-testid="montar-financas" data-etapa={etapa}>
       {cabecalho}
@@ -322,6 +353,7 @@ export function useMontarFinancasNoModulo(isPreview: boolean) {
   const candidato = () => !isPreview && !isGuest && montarFinancasLigado() && contaNovaParaMontar(criadoEm) && !montarJaDecidido();
   const decidir = (): "mostrar" | "nao" => {
     const getSemMarca = recomecou.current ? (<T,>(k: string, f: T): T => (k === CHAVE_MONTAR_FINANCAS ? f : get(k, f))) : get;
+    if (montarAbertoPelaMissao()) return "nao"; // a missão está com a tela dela aberta
     return deveMostrarMontarFinancas({ criadoEm, get: getSemMarca, isGuest, isPreview }) ? "mostrar" : "nao";
   };
   const [estado, setEstado] = useState<"decidindo" | "mostrar" | "nao">(() => {
@@ -343,5 +375,7 @@ export function useMontarFinancasNoModulo(isPreview: boolean) {
     aoPronto: () => { marcarCartoesVistos("financas"); setEstado("nao"); },
     /** Pulou: Finanças de sempre (com os cartões, se a chave deles estiver ligada). */
     aoPular: () => setEstado("nao"),
+    /** A missão abriu a tela dela por cima: a do módulo sai sem decidir (a da missão decide). */
+    aoCeder: () => setEstado("nao"),
   };
 }

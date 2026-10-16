@@ -77,7 +77,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-contas-pagas", // contadores de momento de valor (pedido de nota "na 2ª vez")
   "core-extratos-importados",
   "core-att-status", // o ATT do iPhone já foi pedido (e o estado que vai nos eventos)
-  "core-lembrete-teste", // pedido do aviso "seu teste acaba amanhã", armado quando a permissão vier
+  "core-lembrete-teste", // pedido do aviso de 36 h do teste (texto de uso desde 16/10), armado quando a permissão vier
+  "core-semana-pagante", // 16/10: semana do pagante (começo + último agendamento dos 7 avisos depois do pagamento)
   "core-folha-aberta-em", // saída do app: hora do último toque em comprar
   "core-saida-vista", // saída do app: última morte já reportada (senão reporta a mesma a cada abertura)
   "core-renderer-visto",

@@ -98,6 +98,11 @@ const ios = () => { (window as { Capacitor?: unknown }).Capacitor = { isNativePl
 const ligar = (v: string) => localStorage.setItem(CHAVE_FORCA_OFERTAS, v);
 const voltar = () => act(() => { window.dispatchEvent(new CustomEvent("core:voltar")); });
 const espera = (ms = 30) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+/** 16/10: depois de uma folha fechada, o toque seguinte passa pela meia-folha de explicação. */
+const passarExplicacao = async () => {
+  const b = await screen.findByTestId("explica-folha-continuar");
+  await act(async () => { fireEvent.click(b); });
+};
 
 const montarPaywall = (onPago = vi.fn()) => {
   render(<MemoryRouter><PaywallIOS area="dinheiro" answers={{ gasto: "R$ 100 a R$ 300" }} onPagoSemConta={onPago} /></MemoryRouter>);
@@ -540,6 +545,10 @@ describe("16/10 — fechou a folha do 97,90: presente 69,90 com 3 dias grátis n
     await screen.findByTestId("presente69");
     await espera(450); // a caixa abre e libera o CTA
     await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+    // 16/10: a folha do 97,90 já foi fechada → a explicação antes da folha do 69,90
+    expect(screen.getByTestId("explica-folha")).toHaveAttribute("data-lugar", "presente_folha_cancelada");
+    expect(vi.mocked(comprarPresente69)).not.toHaveBeenCalled();
+    await passarExplicacao();
     await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
     expect(vi.mocked(comprarPresente69)).toHaveBeenCalledWith("folha_cancelada");
     expect(eventos("presente69_toque")).toEqual([{ lugar: "folha_cancelada", segunda_chance: "imediata" }]);
@@ -556,6 +565,7 @@ describe("16/10 — fechou a folha do 97,90: presente 69,90 com 3 dias grátis n
     await espera(450);
     loja.compraPresenteOk = false; // motivo segue "cancelou"
     await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+    await passarExplicacao();
     await espera();
     expect(eventos("presente69_falhou")).toEqual([{ lugar: "folha_cancelada", motivo: "cancelou", segunda_chance: "imediata" }]);
     expect(screen.getByTestId("presente69")).toBeInTheDocument();
@@ -565,9 +575,10 @@ describe("16/10 — fechou a folha do 97,90: presente 69,90 com 3 dias grátis n
     expect(screen.queryByTestId("presente69")).toBeNull();
     expect(eventos("presente69_fechou")).toEqual([{ lugar: "folha_cancelada", segunda_chance: "imediata" }]);
     expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
-    // fechou a folha do 97,90 outra vez: nem presente, nem o cartão de mesmo preço
+    // fechou a folha do 97,90 outra vez (depois da explicação): nem presente, nem o cartão de mesmo preço
     await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    await passarExplicacao();
     await espera();
     await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
     expect(screen.queryByTestId("presente69")).toBeNull();

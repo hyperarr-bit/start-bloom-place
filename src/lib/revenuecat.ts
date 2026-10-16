@@ -228,6 +228,12 @@ export async function conferirTrialCartao(): Promise<void> {
         fimMs: typeof trial?.expirationDateMillis === "number" ? trial.expirationDateMillis : null,
       }))
       .catch(() => { /* noop */ });
+    /* 16/10 (1.0.16): a SEMANA DO PAGANTE (7 avisos de uso depois do pagamento) nasce
+     * aqui — teste com renovação ligada arma pro fim do teste; compra paga recente
+     * confirma; teste cancelado desarma. Solto: nunca segura o boot. */
+    void import("@/lib/semana-do-pagante")
+      .then((m) => m.conferirSemanaDoPagante(ativos as Record<string, import("@/lib/semana-do-pagante").EntitlementDaLoja>))
+      .catch(() => { /* noop */ });
   } catch { /* rede de segurança: nunca pode quebrar o boot */ }
 }
 
@@ -383,6 +389,8 @@ export function lerPacoteDoPresente(offerings: unknown): PacoteRC | null {
 
 export type Presente69 = {
   preco: string;       // "R$ 69,90"
+  /** 16/10: o valor numérico (69.9) — a régua "downsell é MAIS BARATO que a vitrine". null se a loja não disse. */
+  valor?: number | null;
   precoMes: string | null; // "R$ 5,82"
   produto: string;     // core_anual_69
   comTrial: boolean;   // a folha vai dar dias grátis pra ESTA conta (StoreKit disse "elegível")
@@ -432,6 +440,7 @@ export async function carregarPresente69(): Promise<Presente69 | null> {
       pacote,
       dados: {
         preco: p.priceString,
+        valor: p.price && p.price > 0 ? p.price : null,
         precoMes: p.price && p.price > 0 ? formatarMoeda(p.price / 12, p.currencyCode || "BRL") : null,
         produto: ID_ANUAL_69,
         comTrial,
@@ -511,7 +520,8 @@ export function lerPacoteDoMensal19(offerings: unknown): PacoteRC | null {
   return (o.availablePackages ?? []).find(ehO19) ?? (ehO19(o.monthly) ? o.monthly! : null);
 }
 
-export type Mensal19 = { preco: string; produto: string };
+/** `valor` (16/10): o número (19.9) pra régua "mais barato que o mensal da vitrine"; null se a loja não disse. */
+export type Mensal19 = { preco: string; produto: string; valor?: number | null };
 let mensal19: { pacote: PacoteRC; dados: Mensal19 } | null | undefined;
 
 /** Carrega (e guarda) o mensal 19 da offering `mensal_19`. null = ausente, desligado ou loja sem resposta. */
@@ -525,7 +535,8 @@ export async function carregarMensal19(): Promise<Mensal19 | null> {
     registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     const pacote = lerPacoteDoMensal19(offerings);
     if (!pacote?.product?.priceString) { mensal19 = null; return null; }
-    mensal19 = { pacote, dados: { preco: pacote.product.priceString, produto: ID_MENSAL_19 } };
+    const v = Number((pacote.product as { price?: number }).price ?? 0);
+    mensal19 = { pacote, dados: { preco: pacote.product.priceString, produto: ID_MENSAL_19, valor: v > 0 ? v : null } };
     return mensal19.dados;
   } catch {
     return null; // sem cache: a próxima tentativa lê de novo

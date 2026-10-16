@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronRight, ChevronDown, MoreHorizontal, SlidersHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from "@/lib/analytics";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
@@ -304,7 +305,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
     <div>
       <div className="w-full flex items-center justify-between mb-2.5 gap-2">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => { if (!isOpen) trackEvent("home_pendencias_abrir", { pendentes: pending.length }); setIsOpen(!isOpen); }}
           className="flex-1 flex items-center justify-between"
         >
           <div className="flex items-center gap-1.5">
@@ -356,7 +357,12 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                 >
                   <div className="flex items-center">
                     <button
-                      onClick={() => item.action ? abrirAcaoRapida(item.action) : item.route && navigate(item.route)}
+                      onClick={() => {
+                        // 16/10: qual pendência leva a pessoa a agir (sem tipo = compromisso que ela criou)
+                        trackEvent("home_pendencia", { tipo: item.tipo ?? "compromisso", destino: item.action ?? item.route ?? null });
+                        if (item.action) abrirAcaoRapida(item.action);
+                        else if (item.route) navigate(item.route);
+                      }}
                       data-testid="pendencia"
                       className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-all text-left group"
                     >
@@ -396,7 +402,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                           <div className="flex flex-wrap gap-1.5">
                             <button
                               type="button"
-                              onClick={() => gravar(ocultar(prefs, item.tipo!))}
+                              onClick={() => { trackEvent("home_pendencia_menu", { tipo: item.tipo!, escolha: "ocultar" }); gravar(ocultar(prefs, item.tipo!)); }}
                               data-testid={`ocultar-${item.tipo}`}
                               className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-foreground text-background"
                             >
@@ -405,7 +411,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                             {item.tipo === "peso" && prefs.peso.frequencia !== "semanal" && (
                               <button
                                 type="button"
-                                onClick={() => { set(CHAVE_PENDENCIAS_PREFS, comPeso(prefs, "semanal", new Date().getDay())); setMenuAberto(null); setPersonalizar(true); }}
+                                onClick={() => { trackEvent("home_pendencia_menu", { tipo: "peso", escolha: "semanal" }); set(CHAVE_PENDENCIAS_PREFS, comPeso(prefs, "semanal", new Date().getDay())); setMenuAberto(null); setPersonalizar(true); }}
                                 data-testid="peso-semanal"
                                 className="px-2.5 py-1 rounded-lg text-[11px] font-medium border border-border bg-background"
                               >
@@ -430,7 +436,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
               {avisoTreino && (
                 <button
                   type="button"
-                  onClick={() => navigate("/treino")}
+                  onClick={() => { trackEvent("home_pendencia", { tipo: "aviso_treino", destino: "/treino" }); navigate("/treino"); }}
                   data-testid="aviso-treino"
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-border bg-muted/30 text-left"
                 >
@@ -442,7 +448,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
               {avisoConta && (
                 <button
                   type="button"
-                  onClick={() => navigate("/financas")}
+                  onClick={() => { trackEvent("home_pendencia", { tipo: "aviso_conta", destino: "/financas" }); navigate("/financas"); }}
                   data-testid="aviso-conta"
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-amber-300/70 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 text-left"
                 >

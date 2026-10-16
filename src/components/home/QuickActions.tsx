@@ -9,6 +9,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from "@/lib/analytics";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { lancarGasto } from "@/lib/finance-lancar";
 import { numeroBR } from "@/lib/data-normalizers";
@@ -381,7 +382,7 @@ export const QuickActions = () => {
         {actions.map((a, i) => (
           <motion.button
             key={a.id}
-            onClick={() => handleAction(a.id)}
+            onClick={() => { trackEvent("home_acao_rapida", { acao: a.id }); handleAction(a.id); }}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
               successId === a.id 
                 ? "border-green-400 bg-green-50 dark:bg-green-500/10" 

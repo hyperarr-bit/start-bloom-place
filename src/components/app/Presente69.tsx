@@ -18,6 +18,21 @@
  * a folha dá os 3 dias grátis do pacote e o texto é "Antes de ir: 3 dias grátis e
  * depois R$ 69,90/ano". E no "bloqueio", depois do "Agora não", o 2º degrau da
  * escada (chave SAIDA_TESTE_ESCADA): o mensal de 19,90 (OfertaMensal19.tsx).
+ *
+ * 16/10: 4º lugar, "folha_cancelada" — a pessoa FECHOU a folha da Apple do anual de 97,90
+ * (com teste) no paywall do funil. Antes vinha a "2ª chance" com o MESMO 97,90 (19% tocavam,
+ * e esses testes pagavam 9% contra 22%); agora vem o presente: 69,90/ano COM os 3 dias
+ * grátis, "Nada é cobrado hoje". SEM chave: liga sozinho. Volta pra 2ª chance de sempre se
+ * a offering `anual_69` tiver `presente: "off"`, se a loja não responder, se a conta não
+ * tiver direito aos dias grátis (o texto não pode prometer) ou se o 69,90 não for MAIS
+ * BARATO que o anual da tela (braço 69,90 do teste de preço). 1x por sessão do paywall
+ * (quem decide é o PaywallIOS); a marca no desfecho é a MESMA do "x_paywall" — viu o
+ * presente aqui, o Voltar não mostra de novo.
+ *
+ * 16/10 (chave SAIDA_DIRETO_19, metadata `saida_direto_19`): em "cancelou_teste" e
+ * "bloqueio" o 69,90 converteu 0 de 53 — ligada, esses dois lugares PULAM o presente e vão
+ * direto pro mensal 19,90 (prepararDireto19), se a offering `mensal_19` existir. Sem ela,
+ * o presente de sempre.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -26,12 +41,14 @@ import { trackEvent } from "@/lib/analytics";
 import { ehApple, erroFolhaNaoConcluiu, erroJaAtivo, erroNaoPermitido } from "@/lib/loja";
 import type { LugarDoPresente, Presente69 } from "@/lib/revenuecat";
 import { ofertaLigada } from "@/lib/ofertas-saida";
-import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { Mensal19Folha, mensal19JaVisto, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 
 const CHAVES: Record<LugarDoPresente, string> = {
   cancelou_teste: "core-presente69-cancelou-visto", // nas 2 allowlists (use-auth / use-user-data)
   bloqueio: "core-presente69-bloqueio-visto",
   x_paywall: "core-presente69-x-paywall-visto",
+  // a mesma marca do Voltar: quem viu o presente depois de fechar a folha não o vê de novo no Voltar
+  folha_cancelada: "core-presente69-x-paywall-visto",
 };
 export const presenteJaVisto = (lugar: LugarDoPresente): boolean => {
   try { return !!localStorage.getItem(CHAVES[lugar]); } catch { return false; }
@@ -43,17 +60,21 @@ const marcarVisto = (lugar: LugarDoPresente) => {
 /** Como a oferta chegou até a pessoa — vai em todo evento das ofertas de saída (10/10):
  *  "imediata" = na mesma tela, logo depois da folha fechar; "saida" = quando ela ia embora
  *  (Voltar); "proxima_abertura" = numa abertura seguinte do app (teste cancelado, bloqueio). */
-export const segundaChanceDe = (lugar: LugarDoPresente): "saida" | "proxima_abertura" =>
-  lugar === "x_paywall" ? "saida" : "proxima_abertura";
+export const segundaChanceDe = (lugar: LugarDoPresente): "imediata" | "saida" | "proxima_abertura" =>
+  lugar === "folha_cancelada" ? "imediata" : lugar === "x_paywall" ? "saida" : "proxima_abertura";
 
 export type OfertaDoPresente = Presente69 & { precoDe: string | null; fimMs: number | null };
 
 /** Carrega tudo que a folha precisa; null = não mostrar (desligado, sem loja, já visto, lugar errado). */
 export async function prepararPresente(lugar: LugarDoPresente): Promise<OfertaDoPresente | null> {
-  if (!ehApple() || presenteJaVisto(lugar)) return null;
+  if (!ehApple()) return null;
+  // "folha_cancelada": 1x por SESSÃO do paywall (o PaywallIOS controla), não por aparelho
+  if (lugar !== "folha_cancelada" && presenteJaVisto(lugar)) return null;
   const rc = await import("@/lib/revenuecat");
   let fimMs: number | null = null;
-  if (lugar === "x_paywall") {
+  if (lugar === "folha_cancelada") {
+    // sem chave: o interruptor é a offering (`presente: "off"` → carregarPresente69 = null)
+  } else if (lugar === "x_paywall") {
     // quem fecha o paywall do funil não tem assinatura pra ler: a chave decide
     if (!ofertaLigada("x_paywall")) return null;
   } else {
@@ -66,7 +87,41 @@ export async function prepararPresente(lugar: LugarDoPresente): Promise<OfertaDo
   let precoDe: string | null = null;
   try { await rc.prefetchAnualIos(); precoDe = rc.precoAnualIos(); } catch { /* sem o "de" */ }
   if (precoDe === dados.preco) precoDe = null; // a loja já serviu o 69 como anual: não riscar o próprio preço
+  if (lugar === "folha_cancelada") {
+    // só é downsell se for MAIS BARATO que o anual que ela acabou de recusar, e o texto
+    // promete "3 dias grátis · nada é cobrado hoje": sem os dois, a 2ª chance de sempre
+    if (!dados.comTrial || dados.dias <= 0 || !precoDe) return null;
+    let id: string | null = null;
+    try { id = rc.idProdutoAnualIos(); } catch { /* sem o id */ }
+    if (id === dados.produto) return null;
+  }
   return { ...dados, precoDe, fimMs };
+}
+
+/**
+ * SAIDA_DIRETO_19 (16/10): no "cancelou_teste" e no "bloqueio", o mensal 19,90 NO LUGAR do
+ * presente de 69,90. Respostas:
+ *   null                      → a chave está off / não é iPhone / a pessoa não está nesse lugar /
+ *                               a offering `mensal_19` não existe: siga o caminho de sempre (69,90)
+ *   { mensal19: oferta }      → mostre o 19,90 (e nada de 69,90)
+ *   { mensal19: null }        → o 19,90 já foi visto neste aparelho: não mostre nada (nem o 69,90)
+ */
+export async function prepararDireto19(lugar: "cancelou_teste" | "bloqueio"): Promise<{ mensal19: OfertaDoMensal19 | null } | null> {
+  if (!ehApple() || !ofertaLigada("direto_19")) return null;
+  const rc = await import("@/lib/revenuecat");
+  let fimMs: number | null = null;
+  try {
+    const situacao = await rc.situacaoDoPresente();
+    if (situacao?.lugar !== lugar) return null; // mesma régua do presente: quem não cabe aqui segue igual
+    fimMs = situacao.fimMs;
+  } catch { return null; }
+  if (mensal19JaVisto(lugar)) {
+    let existe = false;
+    try { existe = !!(await rc.carregarMensal19()); } catch { /* sem offering */ }
+    return existe ? { mensal19: null } : null;
+  }
+  const m = await prepararMensal19(lugar, fimMs);
+  return m ? { mensal19: m } : null;
 }
 
 const dataCurta = (ms: number) => {
@@ -166,7 +221,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
   const vivo = useRef(true);
 
   // 10/10: lugares novos levam `segunda_chance`; os dois de 07/10 seguem com os eventos de sempre
-  const extra = lugar === "x_paywall" ? { segunda_chance: segundaChanceDe(lugar) } : {};
+  const extra = lugar === "x_paywall" || lugar === "folha_cancelada" ? { segunda_chance: segundaChanceDe(lugar) } : {};
+  // 16/10: depois da folha do 97,90 fechada, o mesmo texto do Voltar (sempre com os dias grátis)
+  const comTeste = (lugar === "x_paywall" || lugar === "folha_cancelada") && oferta.comTrial;
 
   useEffect(() => {
     vivo.current = true;
@@ -228,19 +285,21 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
       <div className="min-h-full max-w-[400px] mx-auto flex flex-col px-6 pb-8 pt-[calc(var(--app-safe-top)+28px)]">
         <motion.div initial={reduzir ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entra} className="text-center">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider">
-            {lugar === "bloqueio" ? "Pra você voltar" : lugar === "x_paywall" ? "Antes de ir" : "Pra você ficar"}
+            {lugar === "bloqueio" ? "Pra você voltar" : lugar === "x_paywall" ? "Antes de ir" : lugar === "folha_cancelada" ? "Um presente pra começar" : "Pra você ficar"}
           </span>
           <h1 className="text-[26px] font-black tracking-[-0.03em] leading-[1.12] text-[#16121c] mt-3">
             {lugar === "bloqueio"
               ? <>Seu teste acabou.<br />Um presente pra voltar.</>
-              : lugar === "x_paywall"
-                ? (oferta.comTrial ? <>Antes de ir:<br />{oferta.dias} dias grátis.</> : <>Antes de ir,<br />um presente.</>)
-                : <>Antes de ir,<br />um presente.</>}
+              : lugar === "folha_cancelada" && comTeste
+                ? <>{oferta.dias} dias grátis<br />e só {oferta.preco}/ano.</>
+                : lugar === "x_paywall"
+                  ? (oferta.comTrial ? <>Antes de ir:<br />{oferta.dias} dias grátis.</> : <>Antes de ir,<br />um presente.</>)
+                  : <>Antes de ir,<br />um presente.</>}
           </h1>
           <p className="text-[13.5px] text-[#4f5a64] mt-2.5 leading-snug">
             {lugar === "bloqueio"
               ? <>Tudo o que você construiu continua aqui. O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>
-              : lugar === "x_paywall"
+              : lugar === "x_paywall" || lugar === "folha_cancelada"
                 ? (oferta.comTrial
                     ? <>{oferta.dias} dias grátis e depois <b className="text-[#16121c]">{oferta.preco}/ano</b>{oferta.precoDe ? <> (em vez de {oferta.precoDe})</> : null}{mes ? <> — {mes} por mês</> : null}.</>
                     : <>O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>)
@@ -279,6 +338,8 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
         >
           {lugar === "cancelou_teste"
             ? <>Nada é cobrado hoje: você continua no teste e só paga <b className="text-[#16121c]">{oferta.preco}</b>{oferta.fimMs ? <> quando ele acabar, em {dataCurta(oferta.fimMs)}</> : <> quando ele acabar</>}. Depois, renova uma vez por ano.</>
+            : lugar === "folha_cancelada" && comTeste
+              ? <><b className="text-[#16121c]">Nada é cobrado hoje.</b> {oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store. Cancelou antes do fim do teste, não paga nada.</>
             : oferta.comTrial
               ? <>{oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store.{lugar === "x_paywall" ? <> Cancelou antes do fim do teste, não paga nada.</> : null}</>
               : <>Cobrado hoje pela App Store: <b className="text-[#16121c]">{oferta.preco}</b>, sem teste grátis (você já usou o seu).</>}
@@ -296,7 +357,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           >
             {comprando
               ? <Loader2 className="w-4 h-4 animate-spin" />
-              : lugar === "x_paywall" && oferta.comTrial
+              : comTeste
                 ? <span className="flex items-center gap-1.5">Começar {oferta.dias} dias grátis <ArrowRight className="w-4 h-4" /></span>
                 : <span className="flex items-center gap-1.5">{lugar === "bloqueio" ? "Voltar com o presente" : "Quero o presente"} — {oferta.preco}/ano <ArrowRight className="w-4 h-4" /></span>}
           </motion.button>
@@ -330,7 +391,15 @@ export const PresenteNoBloqueio = () => {
   const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   useEffect(() => {
     let vivo = true;
-    void prepararPresente("bloqueio").then((o) => { if (vivo && o) setOferta(o); }).catch(() => { /* paywall de sempre */ });
+    void (async () => {
+      // 16/10 (chave SAIDA_DIRETO_19): direto pro 19,90, se a offering existir; senão o 69,90 de sempre
+      try {
+        const direto = await prepararDireto19("bloqueio");
+        if (direto) { if (vivo && direto.mensal19) setMensal19(direto.mensal19); return; }
+      } catch { /* segue pro presente */ }
+      const o = await prepararPresente("bloqueio");
+      if (vivo && o) setOferta(o);
+    })().catch(() => { /* paywall de sempre */ });
     return () => { vivo = false; };
   }, []);
   const segundoDegrau = () => {

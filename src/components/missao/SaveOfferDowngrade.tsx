@@ -25,6 +25,11 @@
  * teste e só paga 19,90 quando ele acabar". Nunca os dois ao mesmo tempo; cada
  * um 1x por aparelho. Quem já tinha recusado o presente antes desta versão (e o
  * app morreu antes do 2º degrau) vê só o 19,90, se o teste cancelado seguir vivo.
+ *
+ * DIRETO NO 19,90 (16/10, chave SAIDA_DIRETO_19 / metadata `saida_direto_19`): o 69,90
+ * converteu 0 de 53 — ligada e com a offering `mensal_19` existindo, o teste cancelado vê
+ * SÓ o 19,90 (mesmo texto honesto: continua no teste, paga quando ele acabar). Sem a
+ * offering, o presente de sempre.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -34,7 +39,7 @@ import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { ehApple } from "@/lib/loja";
-import { Presente69Folha, prepararPresente, presenteJaVisto, type OfertaDoPresente } from "@/components/app/Presente69";
+import { Presente69Folha, prepararDireto19, prepararPresente, presenteJaVisto, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 import { ofertaLigada } from "@/lib/ofertas-saida";
 
@@ -82,6 +87,12 @@ export function SaveOfferDowngrade() {
       }
       if (await rc.estadoTrialCancelado()) {
         if (ehApple()) {
+          // 16/10 (chave SAIDA_DIRETO_19): o 69,90 converteu 0 de 53 aqui — ligada e com a
+          // offering `mensal_19` na loja, vai direto pro 19,90 (que só cobra no fim do teste)
+          try {
+            const direto = await prepararDireto19("cancelou_teste");
+            if (direto) { if (direto.mensal19) setMensal19(direto.mensal19); return; }
+          } catch { /* segue pro presente */ }
           try {
             const oferta = await prepararPresente("cancelou_teste");
             if (oferta) { setPresente(oferta); return; }

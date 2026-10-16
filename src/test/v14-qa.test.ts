@@ -60,6 +60,7 @@ describe("VITE_V14_QA=1: a build de QA", () => {
       expect(tourHomeLigado()).toBe(true);
       expect(moduloOcultaPendenciasLigado()).toBe(true);
       for (const n of OFERTAS) expect(ofertaLigada(n), n).toBe(true);
+      expect(ofertaLigada("direto_19")).toBe(false); // 16/10: só por nome (metadata/lista), nunca no "liga tudo"
       expect(onboarding1TelaLigado()).toBe(true);
       expect(dia1CheioLigado()).toBe(true);
       expect(modoDia1Cheio()).toBe("on");
@@ -108,6 +109,7 @@ describe("VITE_V14_LOJA=1: a 1.0.14 de loja (dono: 'na tora, liga tudo')", () =>
     expect(tourHomeLigado()).toBe(true);
     expect(moduloOcultaPendenciasLigado()).toBe(true);
     for (const n of OFERTAS) expect(ofertaLigada(n), n).toBe(n !== "mensal_19");
+    expect(ofertaLigada("direto_19")).toBe(false); // 16/10: a SAIDA_DIRETO_19 só liga pela metadata saida_direto_19
     expect(onboarding1TelaLigado()).toBe(true);
     expect(modoDia1Cheio()).toBe("on");
     expect(bracoDia1()).toBe("B");

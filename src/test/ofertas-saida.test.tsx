@@ -7,6 +7,9 @@
  *  · OFERTA_MENSAL_19: folha do mensal cancelada → mensal 19,90, só se a offering existir.
  *  · SAIDA_TESTE_ESCADA: recusou o 69,90 (teste cancelado / bloqueio) → mensal 19,90; nunca os dois juntos.
  *  · PAYWALL_TEXTOS: "A Apple vai pedir confirmação…" + selo "economize N%" dos preços reais.
+ *  · 16/10 (SEM chave): folha do 97,90 fechada → presente 69,90 com 3 dias grátis ("folha_cancelada");
+ *    a 2ª chance de mesmo preço só como reserva (presente off/ausente/sem teste/front já 69,90).
+ *  · 16/10 SAIDA_DIRETO_19: teste cancelado/bloqueio direto no 19,90, se a offering mensal_19 existir.
  *  · quem decide: força de QA > metadata do RevenueCat > constante local.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -84,7 +87,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { comprarPresente69, comprarMensal19, lerPacoteDoMensal19, calcularEconomia } from "@/lib/revenuecat";
 import {
   lerChavesRemotas, registrarChavesRemotas, _zerarChavesRemotas, ofertaLigada, guardarForcaDasOfertas,
-  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL, PAYWALL_CURTO, PLANO_CADEADO,
+  CHAVE_FORCA_OFERTAS, OFERTA_X_PAYWALL, OFERTA_MENSAL_19, SAIDA_TESTE_ESCADA, PAYWALL_TEXTOS, PAYWALL_ENXUTO, RECUPERACAO_PAYWALL, PAYWALL_CURTO, PLANO_CADEADO, SAIDA_DIRETO_19,
 } from "@/lib/ofertas-saida";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
@@ -207,7 +210,8 @@ describe("ofertas de saída — com TUDO OFF o paywall do iPhone é o de hoje", 
     expect(vi.mocked(comprarMensal19)).not.toHaveBeenCalled();
   });
 
-  it("a 2ª chance da folha da Apple fica como está — só ganha o campo segunda_chance: 'imediata'", async () => {
+  it("presente desligado/ausente: a 2ª chance da folha da Apple de sempre — só ganha o campo segunda_chance: 'imediata'", async () => {
+    loja.presente = null; // `presente: "off"` na offering anual_69 (ou a loja calada)
     montarPaywall();
     await esperarLoja();
     loja.compraOk = false; loja.motivo = "cancelou";
@@ -353,10 +357,18 @@ describe("OFERTA_MENSAL_19 — fechou a folha do mensal", () => {
     expect(eventos("mensal19_view")).toHaveLength(0);
   });
 
-  it("fechou a folha do ANUAL: continua a 2ª chance de sempre, sem o 19,90", async () => {
+  it("fechou a folha do ANUAL: o presente 69,90 da folha fechada (ou a 2ª chance de sempre), nunca o 19,90", async () => {
     montarPaywall();
     await esperarLoja();
     loja.compraOk = false; loja.motivo = "cancelou";
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "folha_cancelada");
+    await espera();
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    cleanup();
+    loja.presente = null;
+    montarPaywall();
+    await esperarLoja();
     fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
     await screen.findByTestId("ios-segunda-chance");
     await espera();
@@ -483,6 +495,291 @@ describe("SAIDA_TESTE_ESCADA — 69,90 → 'Agora não' → 19,90", () => {
     expect(screen.queryByTestId("mensal19")).toBeNull();
     expect(screen.getByTestId("paywall-gate")).toBeInTheDocument();
     expect(localStorage.getItem("core-mensal19-bloqueio-visto")).toBeTruthy();
+  });
+});
+
+
+/* ───────────────────────────── 16/10: PRESENTE NA FOLHA FECHADA (sem chave) ───────────────────────────── */
+describe("16/10 — fechou a folha do 97,90: presente 69,90 com 3 dias grátis no lugar da 2ª chance de mesmo preço", () => {
+  const fecharFolha97 = async () => {
+    loja.compraOk = false; loja.motivo = "cancelou";
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+  };
+
+  it("abre o presente: 3 dias grátis, 'Nada é cobrado hoje', depois o 69,90 DA LOJA (em vez de 97,90); eventos com lugar 'folha_cancelada' e segunda_chance 'imediata'", async () => {
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    const folha = await screen.findByTestId("presente69");
+    expect(folha).toHaveAttribute("data-lugar", "folha_cancelada");
+    expect(folha.textContent).toMatch(/3 dias grátise só R\$ 69,90\/ano\./);
+    expect(folha.textContent).toMatch(/3 dias grátis e depois R\$ 69,90\/ano \(em vez de R\$ 97,90\)/);
+    expect(screen.getByTestId("presente69-regra").textContent).toBe("Nada é cobrado hoje. 3 dias grátis, depois R$ 69,90 por ano pela App Store. Cancelou antes do fim do teste, não paga nada.");
+    expect(screen.getByTestId("presente69-cta").textContent).toMatch(/Começar 3 dias grátis/);
+    expect(document.body.textContent).not.toMatch(/sem cartão/i);
+    expect(eventos("presente69_view")).toEqual([{ lugar: "folha_cancelada", preco: "R$ 69,90", de: "R$ 97,90", trial: true, segunda_chance: "imediata" }]);
+    // o cartão de mesmo preço NÃO aparece
+    expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
+    expect(eventos("folha_segunda_chance_view")).toHaveLength(0);
+  });
+
+  it("o preço vem da loja (priceString), nunca chumbado", async () => {
+    loja.presente = { preco: "R$ 59,90", precoMes: "R$ 4,99", produto: "core_anual_69", comTrial: true, dias: 3 };
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    const folha = await screen.findByTestId("presente69");
+    expect(folha.textContent).toMatch(/R\$ 59,90/);
+    expect(folha.textContent).not.toMatch(/69,90/);
+  });
+
+  it("tocar compra o core_anual_69 (lugar folha_cancelada): app_sheet_success 'presente69', lembrete do teste com o preço do presente, cadastro", async () => {
+    const onPago = montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    await screen.findByTestId("presente69");
+    await espera(450); // a caixa abre e libera o CTA
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+    await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(comprarPresente69)).toHaveBeenCalledWith("folha_cancelada");
+    expect(eventos("presente69_toque")).toEqual([{ lugar: "folha_cancelada", segunda_chance: "imediata" }]);
+    expect(eventos("presente69_sucesso")[0]).toMatchObject({ lugar: "folha_cancelada", preco: "R$ 69,90" });
+    expect(eventos("app_sheet_success")).toEqual([expect.objectContaining({ produto: "core_anual_69", oferta: "presente69", lugar: "folha_cancelada", offering: "anual_69", funil: "ios", segunda_chance: "imediata" })]);
+    expect(notif.pedirLembrete).toHaveBeenCalledWith(expect.objectContaining({ precoAno: "R$ 69,90" }));
+  });
+
+  it("fechou a folha do PRÓPRIO 69,90: fica no presente, sem erro e sem laço; 'Agora não' devolve o paywall sem cartão; fechar o 97,90 de novo não reabre nada", async () => {
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    await screen.findByTestId("presente69");
+    await espera(450);
+    loja.compraPresenteOk = false; // motivo segue "cancelou"
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+    await espera();
+    expect(eventos("presente69_falhou")).toEqual([{ lugar: "folha_cancelada", motivo: "cancelou", segunda_chance: "imediata" }]);
+    expect(screen.getByTestId("presente69")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(eventos("presente69_view")).toHaveLength(1);
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-agora-nao")); });
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(eventos("presente69_fechou")).toEqual([{ lugar: "folha_cancelada", segunda_chance: "imediata" }]);
+    expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
+    // fechou a folha do 97,90 outra vez: nem presente, nem o cartão de mesmo preço
+    await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    await espera();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
+    expect(eventos("presente69_view")).toHaveLength(1);
+    expect(eventos("folha_segunda_chance_view")).toHaveLength(0);
+  });
+
+  it("com OFERTA_X_PAYWALL: viu o presente na folha fechada → o Voltar não mostra de novo (nesta sessão nem nas próximas)", async () => {
+    ligar("x_paywall");
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    await screen.findByTestId("presente69");
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-agora-nao")); });
+    expect(localStorage.getItem("core-presente69-x-paywall-visto")).toBeTruthy();
+    voltar(); await espera();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    cleanup();
+    montarPaywall();
+    await esperarLoja();
+    voltar(); await espera();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(eventos("presente69_view")).toHaveLength(1);
+  });
+
+  it("com OFERTA_X_PAYWALL: ainda aberto (sem desfecho), o Voltar não empilha um 2º presente", async () => {
+    ligar("x_paywall");
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    await screen.findByTestId("presente69");
+    voltar(); await espera();
+    expect(screen.getAllByTestId("presente69")).toHaveLength(1);
+    expect(screen.getByTestId("presente69")).toHaveAttribute("data-lugar", "folha_cancelada");
+    expect(eventos("presente69_view")).toHaveLength(1);
+  });
+
+  it("com OFERTA_X_PAYWALL: viu o presente pelo Voltar → fechar a folha do 97,90 depois cai na 2ª chance de sempre (1 presente por sessão)", async () => {
+    ligar("x_paywall");
+    montarPaywall();
+    await esperarLoja();
+    voltar();
+    await screen.findByTestId("presente69");
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-agora-nao")); });
+    await fecharFolha97();
+    await screen.findByTestId("ios-segunda-chance");
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(eventos("presente69_view")).toHaveLength(1);
+  });
+
+  it("o presente da folha fechada é 1x por SESSÃO, não por aparelho: o Voltar já visto num paywall anterior não o impede", async () => {
+    localStorage.setItem("core-presente69-x-paywall-visto", "1");
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "folha_cancelada");
+  });
+
+  it("reservas — volta a 2ª chance de mesmo preço: sem direito ao teste no 69,90 (o texto não pode prometer dias grátis) e quando o anual da tela já é o 69,90", async () => {
+    loja.presente = { preco: "R$ 69,90", precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: false, dias: 0 };
+    montarPaywall();
+    await esperarLoja();
+    await fecharFolha97();
+    await screen.findByTestId("ios-segunda-chance");
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    cleanup();
+    // braço 69,90 do teste de preço: o "downsell" seria o mesmo preço
+    loja.presente = { preco: "R$ 69,90", precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: true, dias: 3 };
+    loja.preco = "R$ 69,90";
+    montarPaywall();
+    await screen.findByText("por mês · R$ 69,90/ano");
+    await fecharFolha97();
+    await screen.findByTestId("ios-segunda-chance");
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(eventos("presente69_view")).toHaveLength(0);
+  });
+
+  it("erro da loja (não foi ela que fechou) ou folha do MENSAL fechada: nada de presente", async () => {
+    montarPaywall();
+    await esperarLoja();
+    loja.compraOk = false; loja.motivo = "billing_erro";
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeEnabled());
+    await espera();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    fireEvent.click(screen.getByText("mês"));
+    loja.motivo = "cancelou";
+    fireEvent.click(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Começar por R\$ 24,90\/mês/ })).toBeEnabled());
+    await espera();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+  });
+});
+
+/* ───────────────────────────── 16/10: SAIDA_DIRETO_19 ───────────────────────────── */
+describe("SAIDA_DIRETO_19 — teste cancelado / bloqueio direto no mensal 19,90 (metadata `saida_direto_19`)", () => {
+  const direto = (v = "on") => registrarChavesRemotas({ current: { identifier: "default", metadata: { saida_direto_19: v } }, all: {} });
+  const testeCancelado = () => {
+    loja.situacao = { lugar: "cancelou_teste", fimMs: Date.now() + 2 * 86400e3 };
+    loja.auth = { user: { id: "u1" }, isSubscribed: true, billingPeriod: "annual" };
+  };
+  const bloqueio = () => {
+    loja.situacao = { lugar: "bloqueio", fimMs: null };
+    loja.presente = { ...loja.presente!, comTrial: false, dias: 0 };
+    loja.auth = { user: { id: "u1" }, subLoaded: true, isSubscribed: false, noTrial: true, trialExpired: false };
+  };
+
+  it("a chave: nasce off; liga pela metadata ou pela lista explícita; NÃO entra no `?ofertas-saida=on`; `off` desliga", () => {
+    expect(SAIDA_DIRETO_19).toBe("off");
+    expect(ofertaLigada("direto_19")).toBe(false);
+    expect(lerChavesRemotas({ current: { identifier: "d", metadata: { saida_direto_19: "on" } }, all: {} })).toEqual({ direto_19: "on" });
+    ligar("on");
+    expect(ofertaLigada("escada")).toBe(true);
+    expect(ofertaLigada("direto_19")).toBe(false); // o "liga tudo" de QA não muda a escada de ninguém
+    direto();
+    expect(ofertaLigada("direto_19")).toBe(true); // com `on` forçado, a metadata decide
+    ligar("off");
+    expect(ofertaLigada("direto_19")).toBe(false);
+    ligar("direto_19");
+    _zerarChavesRemotas();
+    expect(ofertaLigada("direto_19")).toBe(true);
+  });
+
+  it("ligada + offering mensal_19: teste cancelado vê SÓ o 19,90, com 'continua no teste e só paga quando ele acabar'", async () => {
+    direto();
+    testeCancelado();
+    render(<SaveOfferDowngrade />);
+    const folha = await screen.findByTestId("mensal19");
+    expect(folha).toHaveAttribute("data-lugar", "cancelou_teste");
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.getByTestId("mensal19-regra").textContent).toMatch(/Nada é cobrado hoje: você continua no teste e só paga R\$ 19,90 quando ele acabar, em \d+ de \w+\. Depois, renova todo mês/);
+    expect(screen.getByTestId("mensal19-cta").textContent).toMatch(/Mudar pro mensal — R\$ 19,90\/mês/);
+    expect(eventos("presente69_view")).toHaveLength(0);
+    await act(async () => { fireEvent.click(screen.getByTestId("mensal19-agora-nao")); });
+    await espera();
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    expect(screen.queryByTestId("presente69")).toBeNull(); // nada de 69,90 depois
+    expect(localStorage.getItem("core-save-offer-visto")).toBeTruthy();
+    cleanup();
+    render(<SaveOfferDowngrade />);
+    await espera();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+  });
+
+  it("ligada + offering mensal_19: bloqueio vê SÓ o 19,90, 'Cobrado hoje', por cima do paywall de sempre", async () => {
+    direto();
+    bloqueio();
+    render(<MemoryRouter initialEntries={["/home"]}><TrialBanner /></MemoryRouter>);
+    const folha = await screen.findByTestId("mensal19");
+    expect(folha).toHaveAttribute("data-lugar", "bloqueio");
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.getByTestId("paywall-gate")).toBeInTheDocument();
+    expect(screen.getByTestId("mensal19-regra").textContent).toMatch(/Cobrado hoje pela App Store: R\$ 19,90\. Renova todo mês/);
+    await act(async () => { fireEvent.click(screen.getByTestId("mensal19-agora-nao")); });
+    await espera();
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+    expect(screen.getByTestId("paywall-gate")).toBeInTheDocument();
+    cleanup();
+    // já viu o 19,90 neste aparelho: na próxima abertura não aparece nada (nem o 69,90)
+    render(<MemoryRouter initialEntries={["/home"]}><TrialBanner /></MemoryRouter>);
+    await espera();
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    expect(screen.queryByTestId("presente69")).toBeNull();
+  });
+
+  it("ligada SEM a offering mensal_19: o 69,90 de sempre nos dois lugares", async () => {
+    direto();
+    loja.mensal19 = null;
+    testeCancelado();
+    render(<SaveOfferDowngrade />);
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "cancelou_teste");
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    cleanup();
+    bloqueio();
+    render(<MemoryRouter initialEntries={["/home"]}><TrialBanner /></MemoryRouter>);
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "bloqueio");
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+  });
+
+  it("desligada (escada ligada): a escada de hoje — 69,90 primeiro, 19,90 só depois do 'Agora não'", async () => {
+    direto("off");
+    ligar("escada");
+    testeCancelado();
+    render(<SaveOfferDowngrade />);
+    await screen.findByTestId("presente69");
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByTestId("presente69-agora-nao")); });
+    expect(await screen.findByTestId("mensal19")).toHaveAttribute("data-lugar", "cancelou_teste");
+    cleanup(); localStorage.clear(); ligar("escada");
+    bloqueio();
+    render(<MemoryRouter initialEntries={["/home"]}><TrialBanner /></MemoryRouter>);
+    await screen.findByTestId("presente69");
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+  });
+
+  it("ligada não mexe no presente do Voltar nem no da folha fechada (paywall do funil)", async () => {
+    direto();
+    ligar("x_paywall");
+    montarPaywall();
+    await esperarLoja();
+    loja.compraOk = false; loja.motivo = "cancelou";
+    fireEvent.click(screen.getByRole("button", { name: /Começar 3 dias grátis/ }));
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "folha_cancelada");
+    expect(screen.queryByTestId("mensal19")).toBeNull();
+    cleanup(); localStorage.clear(); ligar("x_paywall");
+    montarPaywall();
+    await esperarLoja();
+    voltar();
+    expect(await screen.findByTestId("presente69")).toHaveAttribute("data-lugar", "x_paywall");
   });
 });
 

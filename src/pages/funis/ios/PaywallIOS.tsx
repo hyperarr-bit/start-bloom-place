@@ -57,8 +57,12 @@
  *    19,90 (OfertaMensal19, lugar "mensal_paywall"), se a offering `mensal_19` existir.
  *  · PAYWALL_TEXTOS — "A Apple vai pedir confirmação. Nada é cobrado hoje." acima
  *    do botão e selo "economize N%" no anual (N dos preços REAIS: 12×mensal × anual).
- * A 2ª chance da folha da Apple (28/09) fica como está; os eventos ganham o campo
- * `segunda_chance` ("imediata" aqui; "saida"/"proxima_abertura" nas ofertas).
+ * A 2ª chance da folha da Apple (28/09): os eventos ganham o campo `segunda_chance`
+ * ("imediata" aqui; "saida"/"proxima_abertura" nas ofertas). 16/10 (SEM chave): a 1ª folha
+ * do anual 97,90 fechada abre o presente 69,90 COM 3 dias grátis (Presente69, lugar
+ * "folha_cancelada") no lugar do cartão de mesmo preço; o cartão fica de reserva (presente
+ * `off` na offering, loja calada, sem direito ao teste). Um presente por sessão do paywall:
+ * quem viu aqui não vê no Voltar, e vice-versa.
  *
  * SAÍDA SEM COMPRAR (1.0.14): `paywall_saiu {motivo: voltar|outro, segundos_na_tela,
  * viu_oferta}` — uma vez por paywall aberto, quando a tela desmonta sem compra ou
@@ -351,9 +355,13 @@ export function PaywallIOS({
   const [preparando, setPreparando] = useState(false);
   const preparandoRef = useRef<number | null>(null);
   useEffect(() => () => { if (preparandoRef.current) window.clearTimeout(preparandoRef.current); }, []);
-  const [presenteX, setPresenteX] = useState<OfertaDoPresente | null>(null);
+  /* o presente de 69,90 por cima do paywall: no Voltar ("x_paywall") ou depois de fechar a
+   * folha do 97,90 ("folha_cancelada", 16/10). UM presente por sessão do paywall. */
+  const [presente, setPresente] = useState<{ lugar: "x_paywall" | "folha_cancelada"; oferta: OfertaDoPresente } | null>(null);
   const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   const presenteXTentadoRef = useRef(false);
+  const presenteMostradoRef = useRef(false);
+  const folhaCanceladaTratadaRef = useRef(false);
   const comprandoRef = useRef(false);
   comprandoRef.current = comprando;
   /* 1.0.14 — a saída sem compra (paywall_saiu) e a recuperação */
@@ -363,7 +371,7 @@ export function PaywallIOS({
   const compraFeitaRef = useRef(false);
   const viuOfertaRef = useRef(false);
   const recuperacaoArmadaRef = useRef(false);
-  if (presenteX || mensal19) viuOfertaRef.current = true;
+  if (presente || mensal19) viuOfertaRef.current = true;
   const registrarSaida = (motivoForcado?: "voltar" | "outro", beacon = false) => {
     if (saiuRegistradoRef.current || compraFeitaRef.current) return;
     saiuRegistradoRef.current = true;
@@ -464,11 +472,15 @@ export function PaywallIOS({
    * folha da Apple aberta não faz nada; com a chave off, nada muda. */
   useEffect(() => {
     const aoVoltar = () => {
-      if (presenteXTentadoRef.current || comprandoRef.current) return;
+      if (presenteXTentadoRef.current || presenteMostradoRef.current || comprandoRef.current) return;
       if (!ofertaLigada("x_paywall")) return;
       presenteXTentadoRef.current = true;
       void prepararPresente("x_paywall")
-        .then((o) => { if (vivoRef.current && o) setPresenteX(o); })
+        .then((o) => {
+          if (!vivoRef.current || !o || presenteMostradoRef.current) return;
+          presenteMostradoRef.current = true;
+          setPresente({ lugar: "x_paywall", oferta: o });
+        })
         .catch(() => { /* paywall de sempre */ });
     };
     window.addEventListener("core:voltar", aoVoltar);
@@ -500,7 +512,11 @@ export function PaywallIOS({
   /* SEGUNDA CHANCE (28/09): fechar a folha da Apple não gerava resposta
    * nenhuma — e 32% das compras vêm de quem fechou uma primeira vez. Só na
    * desistência da própria pessoa (não em erro), só no anual com teste
-   * grátis, 1 vez por sessão do paywall; some quando a compra dá certo. */
+   * grátis, 1 vez por sessão do paywall; some quando a compra dá certo.
+   * 16/10: a 1ª folha do anual fechada abre o PRESENTE 69,90 com 3 dias grátis
+   * (Presente69, lugar "folha_cancelada") — este cartão de mesmo preço vira a reserva:
+   * presente desligado (`presente: "off"`), loja calada, sem direito ao teste no 69,90,
+   * ou o presente já apareceu nesta sessão (pelo Voltar). */
   const [segundaChance, setSegundaChance] = useState<"nunca" | "visivel" | "usada">("nunca");
   useEffect(() => {
     if (segundaChance === "visivel") trackEvent("folha_segunda_chance_view", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
@@ -518,10 +534,29 @@ export function PaywallIOS({
     setConferindo(false);
   };
 
+  const cartaoDeSempre = () => setSegundaChance((s) => (s === "nunca" ? "visivel" : s));
+  /* 16/10 — fechou a folha do anual com teste. Na 1ª vez da sessão (e se nenhum presente
+   * apareceu ainda), o presente 69,90; senão, ou se ele não vier, o cartão de sempre. A folha
+   * do PRÓPRIO 69,90 fechada fica dentro do Presente69 (erro/"Agora não") e nunca volta aqui. */
+  const depoisDaFolhaCancelada = () => {
+    if (folhaCanceladaTratadaRef.current || presenteMostradoRef.current) { cartaoDeSempre(); return; }
+    folhaCanceladaTratadaRef.current = true;
+    void prepararPresente("folha_cancelada")
+      .then((o) => {
+        if (!vivoRef.current) return;
+        if (!o || presenteMostradoRef.current || comprandoRef.current) { cartaoDeSempre(); return; }
+        presenteMostradoRef.current = true;
+        setSegundaChance("usada"); // o downsell substitui o cartão de mesmo preço nesta sessão
+        setPresente({ lugar: "folha_cancelada", oferta: o });
+      })
+      .catch(() => { if (vivoRef.current) cartaoDeSempre(); });
+  };
+
   const comprar = async (produto: "anual" | "mensal") => {
     if (comprando) return;
     setErro(null);
     setComprando(true);
+    comprandoRef.current = true; // já (o render vem depois): o presente da folha fechada confere isto
     try {
       const rc = await import("@/lib/revenuecat");
       // gate: a compra fica na CONTA logada — RevenueCat com o uid antes da folha (no-op se já está)
@@ -569,7 +604,7 @@ export function PaywallIOS({
       // fechou a folha. Não reabre nada sozinho — só deixa o cartão perto do
       // botão. Sem direito ao teste, "não paga nada" seria mentira: sem cartão.
       if (motivo === "cancelou" && produto === "anual" && comTrial && rc.anualIosTemTrial()) {
-        setSegundaChance((s) => (s === "nunca" ? "visivel" : s));
+        depoisDaFolhaCancelada();
       }
       /* 10/10 (chave OFERTA_MENSAL_19): fechou a folha do MENSAL → o mensal de 19,90,
        * se a offering `mensal_19` existir na loja. 1x por aparelho (marca no desfecho). */
@@ -581,6 +616,7 @@ export function PaywallIOS({
     } catch {
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
     }
+    comprandoRef.current = false;
     setComprando(false);
   };
 
@@ -613,20 +649,22 @@ export function PaywallIOS({
         saída da compra normal: app_sheet_success (com oferta/lugar), lembrete do
         teste quando a folha deu dias grátis, e o cadastro. "Agora não" devolve o
         paywall de sempre, intacto. */}
-    {presenteX && (
+    {presente && (
       <Presente69Folha
-        lugar="x_paywall"
-        oferta={presenteX}
-        onFechar={() => setPresenteX(null)}
+        key={presente.lugar}
+        lugar={presente.lugar}
+        oferta={presente.oferta}
+        onFechar={() => setPresente(null)}
         onSucesso={async () => {
-          trackEvent("app_sheet_success", { produto: presenteX.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar: "x_paywall", offering: "anual_69", preco: presenteX.preco, segunda_chance: "saida" });
+          const { lugar, oferta: p } = presente;
+          trackEvent("app_sheet_success", { produto: p.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar, offering: "anual_69", preco: p.preco, segunda_chance: lugar === "folha_cancelada" ? "imediata" : "saida" });
           try {
             const rc = await import("@/lib/revenuecat");
-            if (seguro(() => rc.ultimaCompraAnualFoiTrial(), presenteX.comTrial)) {
-              void pedirLembreteDoTeste({ fimMs: seguro(() => rc.fimDaUltimaCompraTrial(), null) ?? Date.now() + (presenteX.dias || dias) * 86400e3, precoAno: presenteX.preco }).catch(() => { /* noop */ });
+            if (seguro(() => rc.ultimaCompraAnualFoiTrial(), p.comTrial)) {
+              void pedirLembreteDoTeste({ fimMs: seguro(() => rc.fimDaUltimaCompraTrial(), null) ?? Date.now() + (p.dias || dias) * 86400e3, precoAno: p.preco }).catch(() => { /* noop */ });
             }
           } catch { /* noop */ }
-          setPresenteX(null);
+          setPresente(null);
           concluir();
         }}
       />

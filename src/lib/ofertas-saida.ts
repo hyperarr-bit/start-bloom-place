@@ -26,6 +26,12 @@
  *                       linha, "Sem cobrança hoje" + botão (1 pulso só) + legal; a preparação da
  *                       folha da Apple no toque (~1,2 s). O resto vai pro "ver mais" discreto.
  *                       `paywall_oferta_vista` ganha `paywall_curto: true`
+ *   SAIDA_DIRETO_19     (16/10, dono: o 69,90 converteu 0 de 53 no teste cancelado/bloqueio) em
+ *                       "cancelou_teste" e "bloqueio" PULA o 69,90 e vai direto pro mensal 19,90 —
+ *                       só se a offering `mensal_19` existir (sem ela, o 69,90 de sempre). Não
+ *                       mexe no "x_paywall" nem no "folha_cancelada". Metadata `saida_direto_19`.
+ *                       Fica FORA do "liga tudo" (QA `on`, build de QA, build de loja): só a
+ *                       metadata, a lista explícita `?ofertas-saida=direto_19` ou a constante
  *   PLANO_CADEADO       (10/10) a tela "Seu plano de 3 dias" (ONBOARDING_1TELA) ganha Dia 1/2/3 na
  *                       linguagem dela + bloco "Depois do teste" borrado com cadeado e o botão
  *                       "Desbloquear meu plano" → paywall. `funnel_view step=plano_3_dias` ganha
@@ -33,10 +39,10 @@
  *
  * QUEM DECIDE, nesta ordem (a primeira que responder vale):
  *   1. força de QA deste aparelho, gravada pelo link `?ofertas-saida=…` (ver guardarForcaDasOfertas)
- *   2. a build de QA `VITE_V14_QA=1` (lib/v14-qa): liga as oito
+ *   2. a build de QA `VITE_V14_QA=1` (lib/v14-qa): liga as oito (nunca a SAIDA_DIRETO_19)
  *   3. metadata remota do RevenueCat: QUALQUER offering (current, anual_69, mensal_19…) pode
  *      carregar `oferta_x_paywall`, `oferta_mensal_19`, `saida_teste_escada`, `paywall_textos`,
- *      `paywall_enxuto`, `recuperacao_paywall`, `paywall_curto`, `plano_cadeado` com "on"/"off" —
+ *      `paywall_enxuto`, `recuperacao_paywall`, `paywall_curto`, `plano_cadeado`, `saida_direto_19` com "on"/"off" —
  *      a `current` vence as outras.
  *      Ligar/desligar SEM versão nova.
  *   4. a constante local abaixo ("off" hoje).
@@ -48,7 +54,7 @@
 import { v14Qa, v14Loja } from "@/lib/v14-qa";
 
 export type ModoOferta = "off" | "on";
-export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao" | "curto" | "cadeado";
+export type NomeDaOferta = "x_paywall" | "mensal_19" | "escada" | "textos" | "enxuto" | "recuperacao" | "curto" | "cadeado" | "direto_19";
 
 /** Constantes locais. ROLLBACK/LIGAR sem RevenueCat = trocar aqui + build. */
 export const OFERTA_X_PAYWALL: ModoOferta = "off";
@@ -59,6 +65,7 @@ export const PAYWALL_ENXUTO: ModoOferta = "off";
 export const RECUPERACAO_PAYWALL: ModoOferta = "off";
 export const PAYWALL_CURTO: ModoOferta = "off";
 export const PLANO_CADEADO: ModoOferta = "off";
+export const SAIDA_DIRETO_19: ModoOferta = "off";
 
 const LOCAL: Record<NomeDaOferta, ModoOferta> = {
   x_paywall: OFERTA_X_PAYWALL,
@@ -69,7 +76,11 @@ const LOCAL: Record<NomeDaOferta, ModoOferta> = {
   recuperacao: RECUPERACAO_PAYWALL,
   curto: PAYWALL_CURTO,
   cadeado: PLANO_CADEADO,
+  direto_19: SAIDA_DIRETO_19,
 };
+/** Chaves que NUNCA entram no "liga tudo" (força `on`, build de QA, build de loja): mudam a
+ *  escada pra todo mundo, então só ligam por nome (metadata, lista explícita ou constante). */
+const SO_POR_NOME: ReadonlySet<NomeDaOferta> = new Set<NomeDaOferta>(["direto_19"]);
 
 /** O nome da chave no metadata da offering do RevenueCat. */
 export const CHAVE_REMOTA: Record<NomeDaOferta, string> = {
@@ -81,6 +92,7 @@ export const CHAVE_REMOTA: Record<NomeDaOferta, string> = {
   recuperacao: "recuperacao_paywall",
   curto: "paywall_curto",
   cadeado: "plano_cadeado",
+  direto_19: "saida_direto_19",
 };
 
 export const CHAVE_FORCA_OFERTAS = "ofertas-saida-force"; // nas 2 allowlists (use-auth / use-user-data)
@@ -126,7 +138,7 @@ export const _zerarChavesRemotas = (): void => { remota = {}; };
 
 /* ───────────── 1. força de QA pelo link ───────────── */
 /**
- * `?ofertas-saida=on` liga as 8 neste aparelho; `off` força as 8 desligadas; `auto`
+ * `?ofertas-saida=on` liga as 8 neste aparelho (a `direto_19` só por nome, na lista); `off` força as 8 desligadas; `auto`
  * apaga a força; lista separada por vírgula (`x_paywall,mensal_19,escada,textos,enxuto,recuperacao,curto,cadeado`)
  * liga só essas. Gravado no aparelho porque o funil muda de passo sem levar a query.
  * Também apaga as marcas de "já vi" (`recomecar` junto, ex.: `?ofertas-saida=on,recomecar`).
@@ -166,8 +178,14 @@ export const apagarMarcasDeVisto = (): void => { for (const k of CHAVES_DE_VISTO
 /* ───────────── a resposta ───────────── */
 /** A oferta está ligada AQUI, agora? força de QA > build de QA > metadata do RevenueCat > constante local. */
 export function ofertaLigada(nome: NomeDaOferta): boolean {
+  const soPorNome = SO_POR_NOME.has(nome);
   const f = forcaDasOfertas(nome);
-  if (f) return f === "on";
+  // `?ofertas-saida=on` não liga as "só por nome" (mas `off` desliga): cai na metadata/constante
+  if (f && !(soPorNome && f === "on" && ls.get(CHAVE_FORCA_OFERTAS) === "on")) return f === "on";
+  if (soPorNome) {
+    const r = remota[nome];
+    return r ? r === "on" : LOCAL[nome] === "on";
+  }
   if (v14Qa()) return true;
   const r = remota[nome];
   if (r) return r === "on"; // a metadata do RC manda (é o interruptor de emergência no ar, sem versão nova)

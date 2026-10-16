@@ -8,7 +8,7 @@
  *    economize 67%", "R$ 97,90 cobrado por ano", "R$ 8,16/mês"; card do mensal "Mensal · R$ 24,90/mês";
  *    "✓ Sem cobrança hoje · a gente te avisa dia DD/MM"; botão "Continuar"; legal em 2 linhas;
  *    "Termos · Privacidade · Restaurar compras". O toque mostra a pílula de preparação ~1,2 s e SÓ
- *    ENTÃO abre a folha; 2ª chance, presente no Voltar (botão redondo = core:voltar) e paywall_saiu
+ *    ENTÃO abre a folha; presente 69,90 na folha fechada (16/10; a 2ª chance de mesmo preço vira reserva), presente no Voltar (botão redondo = core:voltar) e paywall_saiu
  *    seguem funcionando; `paywall_oferta_vista` ganha `paywall_curto: true`.
  *  · preços SEMPRE da loja: 69,90 troca tudo; sem o mensal da loja = sem selo e "R$ —".
  */
@@ -297,7 +297,32 @@ describe("ON: a estrutura do Cal AI, cheia de cima a baixo", () => {
     await waitFor(() => expect(vi.mocked(comprarAnualIos)).toHaveBeenCalledTimes(1));
   });
 
-  it("2ª chance da folha continua: fechou a folha → cartão 'Hoje você não paga nada' → 'Tentar de novo' reabre a compra", async () => {
+  it("16/10: fechou a folha do 97,90 → o presente 69,90 com 3 dias grátis por cima (não o cartão de mesmo preço); tocar compra o core_anual_69", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const onPago = montar();
+      await esperarCurto();
+      loja.compraOk = false; loja.motivo = "cancelou";
+      fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+      await act(async () => { vi.advanceTimersByTime(PREPARACAO_DA_FOLHA_MS + 50); });
+      const folha = await screen.findByTestId("presente69");
+      expect(folha).toHaveAttribute("data-lugar", "folha_cancelada");
+      expect(folha.textContent).toMatch(/R\$ 69,90/);
+      expect(folha.textContent).toMatch(/3 dias grátis/);
+      expect(screen.getByTestId("presente69-regra").textContent).toMatch(/Nada é cobrado hoje\./);
+      expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
+      expect(screen.getByTestId("ios-curto")).toBeInTheDocument(); // o paywall continua embaixo
+      await act(async () => { vi.advanceTimersByTime(450); }); // a caixa abre e libera o CTA
+      const { comprarPresente69 } = await import("@/lib/revenuecat");
+      await act(async () => { fireEvent.click(screen.getByTestId("presente69-cta")); });
+      await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(comprarPresente69)).toHaveBeenCalledWith("folha_cancelada");
+      expect(eventos("app_sheet_success")[0]).toMatchObject({ produto: "core_anual_69", oferta: "presente69", lugar: "folha_cancelada", segunda_chance: "imediata" });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("presente desligado (`presente: off` na offering): a 2ª chance de sempre — fechou a folha → cartão 'Hoje você não paga nada' → 'Tentar de novo' reabre a compra", async () => {
+    loja.presente = null;
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       montar();

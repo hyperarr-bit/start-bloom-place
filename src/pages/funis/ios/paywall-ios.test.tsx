@@ -27,6 +27,9 @@ const loja = vi.hoisted(() => ({
   // "segura" pra ensaiar a tela ANTES de a loja responder
   produto: "core_anual_97", offering: "default" as string | null,
   segurar: null as null | (() => void),
+  // 16/10: o presente 69,90 (offering anual_69) que entra quando a folha do 97,90 é fechada
+  presente: { preco: "R$ 69,90", precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: true, dias: 3 } as null | { preco: string; precoMes: string | null; produto: string; comTrial: boolean; dias: number },
+  compraPresenteOk: true,
 }));
 // 01/10: o paywall NÃO abre diálogo de permissão (24/09) — mas a compra em
 // teste GUARDA o pedido do lembrete "acaba amanhã" (pedirLembreteDoTeste), que
@@ -70,12 +73,15 @@ vi.mock("@/lib/revenuecat", () => ({
   compraAssinaturaLocal: vi.fn().mockResolvedValue(false),
   motivoUltimaCompra: () => loja.motivo,
   sincronizarAssinatura: vi.fn(),
+  carregarPresente69: vi.fn(async () => loja.presente),
+  comprarPresente69: vi.fn(async () => loja.compraPresenteOk),
+  marcarToqueDeCompra: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), getAttributionParams: () => ({}) }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null, loading: false }) }));
 
 import { trackEvent } from "@/lib/analytics";
-import { comprarAnualIos, comprar as comprarAssinatura } from "@/lib/revenuecat";
+import { comprarAnualIos, comprar as comprarAssinatura, comprarPresente69 } from "@/lib/revenuecat";
 
 // gasto tem que ser uma CHAVE real do quiz (GASTO_ANCHOR) — senão o cartão
 // âncora nem monta e o teste "passa" sem olhar pra ele (foi assim que a build
@@ -91,6 +97,8 @@ beforeEach(() => {
   localStorage.clear();
   loja.preco = "R$ 97,90"; loja.mes = "R$ 8,16"; loja.dias = 3; loja.trial = true; loja.compraOk = true; loja.motivo = null;
   loja.produto = "core_anual_97"; loja.offering = "default"; loja.segurar = null;
+  loja.presente = { preco: "R$ 69,90", precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: true, dias: 3 }; loja.compraPresenteOk = true;
+  vi.mocked(comprarPresente69).mockClear();
   notif.pedir.mockClear(); notif.agendar.mockClear(); notif.pedirLembrete.mockClear();
   vi.mocked(trackEvent).mockClear(); vi.mocked(comprarAnualIos).mockClear(); vi.mocked(comprarAssinatura).mockClear();
 });
@@ -400,6 +408,52 @@ describe("Paywall do iPhone", () => {
       fireEvent.click(screen.getByText("meses"));
       expect(screen.queryByText(TITULO)).not.toBeInTheDocument();
       expect(vezes("folha_segunda_chance_view")).toBe(0);
+    });
+  });
+
+  // ---------- 16/10: downsell na folha fechada (dono: "downsell com o mesmo preço do front não faz sentido") ----------
+  describe("fechou a folha do 97,90 no iPhone: presente 69,90 com 3 dias grátis no lugar da 2ª chance de mesmo preço", () => {
+    beforeEach(() => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; });
+    afterEach(() => { delete (window as { Capacitor?: unknown }).Capacitor; });
+    const fecharFolha97 = async () => {
+      loja.compraOk = false; loja.motivo = "cancelou";
+      fireEvent.click(await screen.findByRole("button", { name: /Começar 3 dias grátis/ }));
+    };
+
+    it("o presente aparece com o 69,90 da loja e '3 dias grátis · Nada é cobrado hoje'; o cartão 'Tentar de novo' não", async () => {
+      montar();
+      await screen.findByText("por mês · R$ 97,90/ano");
+      await fecharFolha97();
+      const folha = await screen.findByTestId("presente69");
+      expect(folha).toHaveAttribute("data-lugar", "folha_cancelada");
+      expect(folha.textContent).toMatch(/3 dias grátis/);
+      expect(folha.textContent).toMatch(/R\$ 69,90/);
+      expect(screen.getByTestId("presente69-regra").textContent).toMatch(/^Nada é cobrado hoje\./);
+      expect(folha.textContent).toMatch(/renova automaticamente por R\$ 69,90\/ano/); // 3.1.2
+      expect(document.body.textContent).not.toMatch(/sem cartão/i);
+      expect(screen.queryByTestId("ios-segunda-chance")).toBeNull();
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("presente69_view", expect.objectContaining({ lugar: "folha_cancelada", segunda_chance: "imediata" }));
+    });
+
+    it("tocar compra o core_anual_69 e segue pro cadastro; a compra do 97,90 não reabre", async () => {
+      const onPago = vi.fn();
+      montar({ onPago });
+      await fecharFolha97();
+      await screen.findByTestId("presente69");
+      await waitFor(() => expect(screen.getByTestId("presente69-cta")).toBeEnabled());
+      fireEvent.click(screen.getByTestId("presente69-cta"));
+      await waitFor(() => expect(onPago).toHaveBeenCalledTimes(1));
+      expect(comprarPresente69).toHaveBeenCalledWith("folha_cancelada");
+      expect(comprarAnualIos).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(trackEvent)).toHaveBeenCalledWith("app_sheet_success", expect.objectContaining({ produto: "core_anual_69", oferta: "presente69", lugar: "folha_cancelada" }));
+    });
+
+    it("interruptor remoto (`presente: off` → loja sem o presente): volta o cartão de mesmo preço", async () => {
+      loja.presente = null;
+      montar();
+      await fecharFolha97();
+      expect(await screen.findByText("Hoje você não paga nada · cancela em 2 toques")).toBeInTheDocument();
+      expect(screen.queryByTestId("presente69")).toBeNull();
     });
   });
 

@@ -347,7 +347,11 @@ export async function estadoTrialCancelado(): Promise<boolean> {
  *   pessoa nunca assinou: o pacote da `anual_69` traz a oferta introdutória e a
  *   folha dá os 3 dias grátis (StoreKit decide a elegibilidade; o texto segue
  *   `comTrial`). Não depende do customerInfo (lerSituacaoDoPresente), só da chave. */
-export type LugarDoPresente = "cancelou_teste" | "bloqueio" | "x_paywall";
+/* 16/10: 4º lugar, "folha_cancelada" — fechou a folha da Apple do anual 97,90 (com teste)
+ *   no paywall do funil: o presente entra no lugar da 2ª chance de mesmo preço (dono: "um
+ *   downsell com o mesmo preço do front não faz sentido"). Também só da offering + comTrial;
+ *   `presente: "off"` (ou a loja calada) devolve a 2ª chance de sempre. */
+export type LugarDoPresente = "cancelou_teste" | "bloqueio" | "x_paywall" | "folha_cancelada";
 export type SituacaoDoPresente = { lugar: LugarDoPresente; fimMs: number | null } | null;
 const ID_ANUAL_69 = "core_anual_69";
 const OFFERING_PRESENTE = "anual_69";

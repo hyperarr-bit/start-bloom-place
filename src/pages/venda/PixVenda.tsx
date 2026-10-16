@@ -22,6 +22,10 @@ import { cookiesDaMeta } from "./rastreio";
 export type PixGerado = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string | null; criadoEm: number };
 /** As ofertas de Pix que esta tela sabe cobrar (as mesmas das funções de dinheiro). */
 export type OfertaPixVenda = "a97" | "a69" | "w25";
+/** Um pedido de Pix desta sessão que ainda pode ser pago (o QR anterior da escada: a pessoa copiou e voltou). */
+export type PixAnterior = { orderId: string; oferta: OfertaPixVenda; criadoEm: number; expiresAt: string | null };
+/** Qual pedido caiu (o atual ou um anterior) — é ESSE que define a oferta e o valor da venda. */
+export type PixPago = { orderId: string; oferta: OfertaPixVenda };
 
 /** Validade do QR da Asaas (EXPIRA_SEGUNDOS = 1800 na asaas-pix). Sem `expiresAt`, conta 30 min da criação. */
 const VALIDADE_MS = 30 * 60_000;
@@ -34,10 +38,11 @@ const mmss = (ms: number) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "anual", rotulo = "Anual", preco = PLANOS.anual.preco, valor = PLANOS.anual.valor, acesso = "1 ano de acesso", aviso = null }: {
+export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "anual", rotulo = "Anual", preco = PLANOS.anual.preco, valor = PLANOS.anual.valor, acesso = "1 ano de acesso", aviso = null, anteriores }: {
   pix: PixGerado | null;
   onPix: (p: PixGerado | null) => void;
-  onPago: () => void;
+  /** recebe QUAL pedido caiu (o /assinar e o /liberar ignoram: lá só existe o atual) */
+  onPago: (p?: PixPago) => void;
   ids: () => Record<string, string>;
   /** no celular o copia-e-cola vem primeiro; no computador, o QR grande */
   celular: boolean;
@@ -51,6 +56,10 @@ export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "an
   acesso?: string;
   /** uma linha a mais embaixo do resumo (o mensal do Pix: "sem renovação automática") */
   aviso?: ReactNode;
+  /** 17/10 (revisão do /assinatura): os QRs ANTERIORES da sessão que ainda não venceram — a confirmação confere
+   *  esses também, revezando com o atual, até vencerem (quem paga o QR antigo no banco não paga o novo também).
+   *  Sem a prop (/assinar, /liberar), só o atual, como sempre. */
+  anteriores?: PixAnterior[];
 }) {
   const ofertaPix: OfertaPixVenda = oferta ?? OFERTA_PIX_ANUAL;
   /* o campo `oferta` só entra nos eventos quando a tela recebeu uma (o /assinar segue com os eventos de sempre) */
@@ -106,24 +115,43 @@ export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "an
     return () => window.clearInterval(t);
   }, []);
 
-  /* confirmação: check a cada 3 s + na volta da aba */
+  /* confirmação: check a cada 3 s + na volta da aba. Com `anteriores`, reveza: atual, anterior 1, atual, anterior 2…
+   * (só os que não venceram — QR vencido não recebe Pix). */
+  const anterioresRef = useRef(anteriores);
+  anterioresRef.current = anteriores;
+  const chaveAnteriores = (anteriores ?? []).map((a) => a.orderId).join(",");
   useEffect(() => {
-    if (!pix) return;
+    if (!pix && !(anterioresRef.current ?? []).length) return;
     let parado = false;
     let timer: number | null = null;
     let rodando = false;
+    let vez = 0;
+    const alvos = (): PixPago[] => {
+      const vivos = (anterioresRef.current ?? [])
+        .filter((a) => a.orderId !== pix?.orderId && venceEm({ orderId: a.orderId, qrCode: "", qrCodeBase64: null, expiresAt: a.expiresAt, criadoEm: a.criadoEm }) > Date.now())
+        .map((a) => ({ orderId: a.orderId, oferta: a.oferta }));
+      const atual = pix ? [{ orderId: pix.orderId, oferta: ofertaPix }] : [];
+      if (!vivos.length) return atual;
+      // atual de 2 em 2 (é o que ela tem na tela), os anteriores no meio
+      const fila: PixPago[] = [];
+      for (const v of vivos) fila.push(...atual, v);
+      return fila;
+    };
     const conferir = async () => {
       if (parado || pago.current || rodando) return;
+      const fila = alvos();
+      if (!fila.length) return;
+      const alvo = fila[vez++ % fila.length];
       rodando = true;
       try {
         const c = cookiesDaMeta();
         const { data } = await supabase.functions.invoke("asaas-pix", {
-          body: { action: "check", id: pix.orderId, offer: ofertaPix, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
+          body: { action: "check", id: alvo.orderId, offer: alvo.oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
         });
         if ((data as { paid?: boolean } | null)?.paid && !pago.current) {
           pago.current = true;
           void firePixPurchaseOnce("checkout");
-          onPagoRef.current();
+          onPagoRef.current(alvo);
           return;
         }
       } catch { /* tenta de novo */ } finally { rodando = false; }
@@ -140,7 +168,7 @@ export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "an
       window.removeEventListener("pageshow", aoVoltar);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pix?.orderId]);
+  }, [pix?.orderId, chaveAnteriores]);
 
   /* o ÚNICO uso da área de transferência: o toque da pessoa em "Copiar código Pix" */
   const copiar = async () => {

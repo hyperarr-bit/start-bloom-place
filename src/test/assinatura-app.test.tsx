@@ -66,7 +66,7 @@ vi.mock("@/lib/sessao-anonima", () => ({
 import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { markPixPurchasePending } from "@/lib/purchase-tracking";
-import AssinaturaAppRota, { _zerarEstadoApp, CHAVE_ESTADO_APP, passoValido, type EstadoApp } from "@/pages/funis/app-web/AssinaturaApp";
+import AssinaturaAppRota, { _zerarEstadoApp, CHAVE_ESTADO_APP, VALIDADE_ESTADO_MS, estadoValendo, passoValido, type EstadoApp } from "@/pages/funis/app-web/AssinaturaApp";
 import { MENSAL_SEM_RENOVACAO, OFERTAS, proximoDegrau, porMes } from "@/pages/funis/app-web/conteudo";
 import { _zerarSessaoVenda } from "@/pages/venda/rastreio";
 import { AREA_TRACKS } from "@/lib/funnel";
@@ -106,11 +106,14 @@ const preencher = (nome: string, email: string) => {
 };
 const PIX = (id: string) => ({ data: { orderId: id, qrCode: `00020126580014br.gov.bcb.pix-${id}`, qrCodeBase64: null, expiresAt: null }, error: null });
 /** asaas-pix create → um QR por oferta; check → não pago (a não ser que `pago`) */
-const gateway = (opts: { pago?: boolean; assinante?: boolean } = {}) => {
+const gateway = (opts: { pago?: boolean; assinante?: boolean; pagos?: string[]; demoraCheck?: number } = {}) => {
   invoke.mockImplementation(async (fn: string, args?: { body?: Record<string, unknown> }) => {
     const b = args?.body ?? {};
     if (fn === "asaas-pix" && b.action === "create") return PIX(`qr_${b.offer}`);
-    if (fn === "asaas-pix" && b.action === "check") return { data: { paid: !!opts.pago }, error: null };
+    if (fn === "asaas-pix" && b.action === "check") {
+      if (opts.demoraCheck) await new Promise((r) => setTimeout(r, opts.demoraCheck));
+      return { data: { paid: !!opts.pago || (opts.pagos ?? []).includes(String(b.id)) }, error: null };
+    }
     if (fn === "check-subscription") return { data: { subscribed: !!opts.assinante, subscription_end: opts.assinante ? "2027-10-16T12:00:00Z" : null }, error: null };
     return { data: null, error: null };
   });
@@ -442,5 +445,88 @@ describe("o paywall da web e a escada 97,90 → 69,90 → 24,90", () => {
     expect(OFERTAS.a97).toMatchObject({ valor: 97.9, preco: "97,90", plano: "anual" });
     expect(OFERTAS.a69).toMatchObject({ valor: 69.9, preco: "69,90", plano: "anual" });
     expect(OFERTAS.w25).toMatchObject({ valor: 24.9, preco: "24,90", plano: "mensal", acesso: "30 dias de acesso" });
+  });
+});
+
+/* ---------------------------------------------------------------- 2 pagamentos na mesma escada (revisão 17/10) */
+describe("o QR anterior continua valendo: ninguém paga 2 vezes", () => {
+  const criados = () => invocacoes("asaas-pix").filter((b) => b.action === "create").map((b) => b.offer);
+  const conferidos = () => invocacoes("asaas-pix").filter((b) => b.action === "check").map((b) => `${b.id}:${b.offer}`);
+  const logada = () => { authState.user = { id: "u-1", email: "ana@exemplo.com", created_at: "2026-10-16T12:00:00Z", user_metadata: {} }; };
+
+  it("copiou o QR de 97,90, voltou, aceitou o 69,90 e pagou o PRIMEIRO no banco → o Pix confere os dois e a venda é a de 97,90", async () => {
+    semear({});
+    montar();
+    await aceitarEIrProPix(97);
+    logada();
+    fireEvent.click(screen.getByTestId("app-web-voltar"));
+    await ate("oferta_69");
+    fireEvent.click(screen.getByTestId("app-web-aceitar-69"));
+    await ate("pix");
+    await waitFor(() => expect(criados()).toEqual(["a97", "a69"]));
+    gateway({ pagos: ["qr_a97"] }); // ela pagou o QR antigo
+    await ate("sucesso", 12000);
+    expect(conferidos()).toEqual(expect.arrayContaining(["qr_a69:a69", "qr_a97:a97"]));
+    expect(eventos("venda_pago")).toHaveLength(1);
+    expect(eventos("venda_pago")[0]).toMatchObject({ oferta: "a97", valor: 97.9, plano: "anual", order_id: "qr_a97", qr_anterior: true });
+    expect(screen.getByTestId("venda-sucesso-plano").textContent).toContain("Plano anual");
+    expect(criados()).toEqual(["a97", "a69"]); // nenhum QR a mais
+  }, 20000);
+
+  it("voltou do QR depois de pagar no banco → 'Conferindo pagamento…' e sucesso, sem abrir o presente", async () => {
+    semear({});
+    montar();
+    await aceitarEIrProPix(97);
+    gateway({ pagos: ["qr_a97"], demoraCheck: 300 });
+    fireEvent.click(screen.getByTestId("app-web-voltar"));
+    await waitFor(() => expect(screen.getByTestId("app-web-conferindo").textContent).toBe("Conferindo pagamento…"));
+    await ate("sucesso");
+    expect(eventos("venda_downsell_view")).toHaveLength(0);
+    expect(eventos("venda_paywall_recusou")).toHaveLength(0);
+    expect(eventos("venda_pix_pago_no_voltar")[0]).toMatchObject({ order_id: "qr_a97", oferta: "a97" });
+    expect(eventos("venda_pago")).toHaveLength(1);
+    expect(eventos("venda_pago")[0]).toMatchObject({ oferta: "a97", valor: 97.9 });
+  });
+
+  it("a conferência do Voltar não segura ninguém: gateway lento → em ~1,5 s abre o presente", async () => {
+    semear({});
+    montar();
+    await aceitarEIrProPix(97);
+    gateway({ demoraCheck: 5000 });
+    fireEvent.click(screen.getByTestId("app-web-voltar"));
+    await ate("oferta_69", 3000);
+  });
+
+  it("voltou pro 97,90 no fim da escada: o QR de 97,90 que ainda vale VOLTA (sem QR novo pro mesmo preço)", async () => {
+    semear({});
+    montar();
+    await aceitarEIrProPix(97);
+    logada();
+    fireEvent.click(screen.getByTestId("app-web-voltar"));
+    await ate("oferta_69");
+    fireEvent.click(screen.getByTestId("app-web-agora-nao-69"));
+    await ate("oferta_24");
+    fireEvent.click(screen.getByTestId("app-web-agora-nao-24"));
+    await ate("paywall");
+    fireEvent.click(screen.getByTestId("app-web-pagar-97"));
+    await ate("pix");
+    await waitFor(() => expect(screen.getByTestId("venda-pix").getAttribute("data-fase")).toBe("qr"));
+    expect(criados()).toEqual(["a97"]);
+    expect(screen.getByTestId("venda-pix-codigo").textContent).toContain("qr_a97");
+  });
+
+  it("estado guardado vence: mais de 7 dias, ou o sucesso de um acesso que já acabou (o mensal não fica 'liberado' pra sempre)", () => {
+    const agora = Date.parse("2026-12-01T12:00:00Z");
+    expect(estadoValendo({ passo: "quiz", salvoEm: agora - VALIDADE_ESTADO_MS - 1 }, agora)).toBe(false);
+    expect(estadoValendo({ passo: "quiz", salvoEm: agora - 60_000 }, agora)).toBe(true);
+    expect(estadoValendo({ passo: "sucesso", pago: true, fim: "2026-11-15T15:00:00Z", salvoEm: agora - 60_000 }, agora)).toBe(false);
+    expect(estadoValendo({ passo: "sucesso", pago: true, fim: "2027-10-16T15:00:00Z", salvoEm: agora - 60_000 }, agora)).toBe(true);
+    expect(estadoValendo({ passo: "paywall" }, agora)).toBe(true); // estado sem data (antigo) vale
+  });
+
+  it("recarregou com o sucesso do mensal já vencido → começa de novo na welcome", () => {
+    localStorage.setItem(CHAVE_ESTADO_APP, JSON.stringify({ passo: "sucesso", area: "dinheiro", answers: {}, oferta: "w25", pago: true, email: "ana@exemplo.com", fim: "2026-01-01T00:00:00Z", salvoEm: Date.now() }));
+    montar();
+    expect(passo()).toBe("welcome");
   });
 });

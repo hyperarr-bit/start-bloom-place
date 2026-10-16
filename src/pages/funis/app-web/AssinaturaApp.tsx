@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
@@ -16,9 +16,10 @@ import type { Plataforma } from "@/pages/porta/SucessoPorta";
 import { abrirAppComCodigo, codigoDaPortaOk } from "@/pages/porta/handoff";
 /* a venda do /assinar (as MESMAS telas e chamadas ao servidor) */
 import { entrarComSenha, entrouPorCodigo, prepararConta, type VendaNaConta } from "@/pages/venda/conta";
-import { eventoMeta, novoEventId, sessaoDaVenda } from "@/pages/venda/rastreio";
+import { cookiesDaMeta, eventoMeta, novoEventId, sessaoDaVenda } from "@/pages/venda/rastreio";
+import { firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { DadosVenda, type ResultadoDados } from "@/pages/venda/telas-venda";
-import { PixVenda, type PixGerado } from "@/pages/venda/PixVenda";
+import { PixVenda, venceEm, type PixGerado, type PixPago } from "@/pages/venda/PixVenda";
 import { SucessoVenda } from "@/pages/venda/SucessoVenda";
 import { WelcomeVideo } from "./WelcomeVideo";
 import { GraficoComSemWeb } from "./GraficoComSemWeb";
@@ -84,9 +85,20 @@ export type EstadoApp = {
   fim?: string | null;
   jaAssinante?: boolean;
   pago?: boolean;
+  /** 17/10 (revisão): os QRs que ela abriu ANTES nesta escada e ainda não venceram (copiou o de 97,90, voltou e aceitou
+   *  o de 69,90) — o Pix confere esses também; o que cair é o que vale (oferta e valor DELE). */
+  pixAnteriores?: QrAnterior[];
+  /** quando o estado foi gravado (ms) — estado velho não volta (ver lerEstado) */
+  salvoEm?: number;
 };
 
+/** Um QR anterior desta escada: o QR inteiro (pra voltar a ser o atual se ela escolher a mesma oferta) + a oferta dele. */
+export type QrAnterior = PixGerado & { oferta: OfertaApp };
+const vivo = (q: PixGerado, agora = Date.now()) => venceEm(q) > agora;
+
 export const CHAVE_ESTADO_APP = "assinatura-estado-v1";
+/** Estado guardado mais velho que isso recomeça do zero (o funil e o sucesso não ficam pra sempre no aparelho). */
+export const VALIDADE_ESTADO_MS = 7 * 86_400_000;
 const CHAVE_DEGRAUS = "assinatura-degraus-v1";
 const CHAVE_VC = "assinatura-vc-v1";
 
@@ -115,13 +127,14 @@ function lerEstado(): EstadoApp {
     const raw = localStorage.getItem(CHAVE_ESTADO_APP);
     if (raw) {
       const e = JSON.parse(raw) as Partial<EstadoApp>;
-      if (e && typeof e === "object") {
+      if (e && typeof e === "object" && estadoValendo(e)) {
         const base: EstadoApp = {
           ...novoEstado(), ...e,
           area: e.area && e.area in AREAS ? e.area : null,
           answers: e.answers && typeof e.answers === "object" ? e.answers : {},
           oferta: ehOferta(e.oferta) ? e.oferta : null,
           pixOferta: ehOferta(e.pixOferta) ? e.pixOferta : null,
+          pixAnteriores: Array.isArray(e.pixAnteriores) ? e.pixAnteriores.filter((a) => a && typeof a.orderId === "string" && typeof a.qrCode === "string" && ehOferta(a.oferta)) : [],
         } as EstadoApp;
         memoriaEstado = { ...base, passo: passoValido(base) };
         return memoriaEstado;
@@ -132,7 +145,17 @@ function lerEstado(): EstadoApp {
 }
 function gravarEstado(e: EstadoApp): void {
   memoriaEstado = e;
-  try { localStorage.setItem(CHAVE_ESTADO_APP, JSON.stringify(e)); } catch { /* storage bloqueado: fica a memória */ }
+  try { localStorage.setItem(CHAVE_ESTADO_APP, JSON.stringify({ ...e, salvoEm: Date.now() })); } catch { /* storage bloqueado: fica a memória */ }
+}
+/** O estado guardado ainda vale? Não, se tem mais de 7 dias, ou se é o sucesso de um acesso que já acabou (o mensal de
+ *  30 dias não fica mostrando "Seu CORE está liberado" depois de vencer). Sem `salvoEm` (estado antigo): vale. */
+export function estadoValendo(e: Partial<EstadoApp>, agora = Date.now()): boolean {
+  if (typeof e.salvoEm === "number" && agora - e.salvoEm > VALIDADE_ESTADO_MS) return false;
+  if (e.passo === "sucesso" && e.fim) {
+    const fim = Date.parse(e.fim);
+    if (Number.isFinite(fim) && fim < agora) return false;
+  }
+  return true;
 }
 
 /* os presentes já vistos NESTA sessão da venda (1x cada por sessão) */
@@ -306,10 +329,22 @@ export function AssinaturaApp() {
     trackEvent("venda_ja_assinante", { via, ...ids() });
     ir("sucesso", { nome, email: email.toLowerCase(), jaAssinante: true, fim, pix: null, pixOferta: null });
   };
+  /** Vai pro Pix da oferta. QR de outra oferta nunca é reaproveitado — mas também não é esquecido: se ainda não venceu,
+   *  vira um "anterior" que o Pix continua conferindo (quem copiou o de 97,90 e voltou pode pagá-lo no banco). Se já
+   *  existe um anterior vivo DESTA oferta, ele volta a ser o atual (nada de QR novo pro mesmo preço). */
   const irProPix = (extra: Partial<EstadoApp> = {}) => {
-    const oferta = extra.oferta ?? estadoRef.current.oferta;
-    const mesmoQr = estadoRef.current.pixOferta === oferta;
-    ir("pix", { ...extra, jaAssinante: false, ...(mesmoQr ? {} : { pix: null, pixOferta: oferta }) });
+    const e = estadoRef.current;
+    const oferta = extra.oferta ?? e.oferta;
+    if (e.pixOferta === oferta) { ir("pix", { ...extra, jaAssinante: false }); return; }
+    const agora = Date.now();
+    let anteriores = (e.pixAnteriores ?? []).filter((a) => vivo(a, agora));
+    if (e.pix && e.pixOferta && vivo(e.pix, agora) && !anteriores.some((a) => a.orderId === e.pix!.orderId)) {
+      anteriores = [...anteriores, { ...e.pix, oferta: e.pixOferta }];
+    }
+    const deVolta = anteriores.find((a) => a.oferta === oferta) ?? null;
+    if (deVolta) anteriores = anteriores.filter((a) => a.orderId !== deVolta.orderId);
+    const { oferta: _o, ...qr } = deVolta ?? { oferta: null };
+    ir("pix", { ...extra, jaAssinante: false, pix: deVolta ? (qr as PixGerado) : null, pixOferta: oferta, pixAnteriores: anteriores });
   };
 
   const [ocupado, setOcupado] = useState(false);
@@ -334,13 +369,47 @@ export function AssinaturaApp() {
   };
 
   /* ---------------------------------------------------------- o Voltar (da tela e do navegador) */
+  /** Voltou do QR: antes de abrir o próximo degrau, UMA conferência do pedido atual (até ~1,5 s, "Conferindo
+   *  pagamento…") — quem pagou no banco e voltou vai pro sucesso, não pra um presente que cobraria de novo. */
+  const [conferindo, setConferindo] = useState(false);
+  const conferindoRef = useRef(false);
+  const voltarDoPix = async (via: "pix_voltar" | "navegador") => {
+    if (conferindoRef.current) return;
+    const e = estadoRef.current;
+    const atual = e.pix && e.pixOferta ? { orderId: e.pix.orderId, oferta: e.pixOferta } : null;
+    if (atual) {
+      conferindoRef.current = true;
+      setConferindo(true);
+      try {
+        const c = cookiesDaMeta();
+        const r = await Promise.race([
+          supabase.functions.invoke("asaas-pix", { body: { action: "check", id: atual.orderId, offer: atual.oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) } })
+            .then(({ data }) => !!(data as { paid?: boolean } | null)?.paid).catch(() => false),
+          new Promise<boolean>((ok) => window.setTimeout(() => ok(false), 1500)),
+        ]);
+        if (r) {
+          trackEvent("venda_pix_pago_no_voltar", { order_id: atual.orderId, oferta: atual.oferta, ...ids() });
+          void firePixPurchaseOnce("checkout");
+          onPixPago(atual);
+          return;
+        }
+      } finally {
+        conferindoRef.current = false;
+        setConferindo(false);
+      }
+    }
+    if (pagoRef.current || passoRef.current !== "pix") return;
+    // pelo Voltar do navegador a entrada do history já foi consumida: o próximo degrau não empilha outra
+    if (via === "navegador") voltandoRef.current = true;
+    try { recusar(degrauDaOferta(), via); } finally { voltandoRef.current = false; }
+  };
   const degrauDaOferta = (): Degrau => OFERTAS[estadoRef.current.oferta ?? "a97"].degrau;
   const voltarDe = (p: PassoApp, via: "tela" | "navegador"): boolean => {
     const v = via === "navegador" ? "navegador" : null;
     if (p === "paywall") { recusar(97, v ?? "voltar"); return true; }
     if (p === "oferta_69") { recusar(69, v ?? "voltar"); return true; }
     if (p === "oferta_24") { recusar(24, v ?? "voltar"); return true; }
-    if (p === "pix") { recusar(degrauDaOferta(), v ?? "pix_voltar"); return true; }
+    if (p === "pix") { void voltarDoPix(v ?? "pix_voltar"); return true; }
     if (p === "dados") { recuar(TELA_DO_DEGRAU[degrauDaOferta()]); return true; }
     const ant = ANTERIOR[p];
     if (ant) { trackEvent("funnel_click", { cta: "w_back", funil: FUNIL_APP_WEB, variante: VARIANTE_APP, step: p, para: ant, ...(v ? { via: v } : {}) }); recuar(ant); return true; }
@@ -442,11 +511,17 @@ export function AssinaturaApp() {
     }
   };
   const pediuCodigo = useRef(false);
-  const onPixPago = useCallback(() => {
+  /** Caiu um Pix: o atual OU um anterior da escada — a venda é a do pedido que caiu (oferta, valor e plano DELE). */
+  const pagoRef = useRef(false);
+  const onPixPago = useCallback((p?: PixPago) => {
+    if (pagoRef.current) return; // o Voltar (conferência na hora) e a conferência do Pix podem achar o mesmo pagamento
+    pagoRef.current = true;
     const e = estadoRef.current;
-    const o = OFERTAS[e.oferta ?? "a97"];
-    trackEvent("venda_pago", { plano: o.plano, oferta: o.oferta, metodo: "pix", valor: o.valor, degrau: o.degrau, order_id: e.pix?.orderId ?? null, ...ids() });
-    ir("sucesso", { pago: true, jaAssinante: false });
+    const oferta: OfertaApp = p && ehOferta(p.oferta) ? p.oferta : e.oferta ?? "a97";
+    const o = OFERTAS[oferta];
+    const anterior = !!p && p.orderId !== e.pix?.orderId;
+    trackEvent("venda_pago", { plano: o.plano, oferta: o.oferta, metodo: "pix", valor: o.valor, degrau: o.degrau, order_id: p?.orderId ?? e.pix?.orderId ?? null, ...(anterior ? { qr_anterior: true } : {}), ...ids() });
+    ir("sucesso", { pago: true, jaAssinante: false, oferta, pixAnteriores: [] });
     if (!pediuCodigo.current) { pediuCodigo.current = true; void pedirCodigo(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -521,6 +596,7 @@ export function AssinaturaApp() {
       <PixVenda
         key={estado.oferta ?? "a97"}
         pix={estado.pixOferta === estado.oferta ? estado.pix : null} onPix={onPix} onPago={onPixPago} ids={ids} celular={plataforma !== "web"}
+        anteriores={estado.pixAnteriores ?? []}
         oferta={ofertaAtual.oferta} plano={ofertaAtual.plano} rotulo={ofertaAtual.rotulo} preco={ofertaAtual.preco} valor={ofertaAtual.valor}
         acesso={ofertaAtual.oferta === "w25" ? "pagamento único" : ofertaAtual.acesso}
         aviso={ofertaAtual.oferta === "w25" ? MENSAL_SEM_RENOVACAO : null}
@@ -607,7 +683,7 @@ export function AssinaturaApp() {
                 <div className="w-full max-w-md mx-auto" data-testid="app-web-venda">
                   <div className="relative flex items-center justify-center h-9">
                     {passo !== "sucesso" && (
-                      <button type="button" onClick={() => voltarDe(passo, "tela")} aria-label="Voltar" data-testid="app-web-voltar"
+                      <button type="button" onClick={() => voltarDe(passo, "tela")} aria-label="Voltar" data-testid="app-web-voltar" disabled={conferindo}
                         className="absolute left-0 -ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
                         <ChevronLeft className="w-5 h-5" />
                       </button>
@@ -617,6 +693,11 @@ export function AssinaturaApp() {
                       <span className="text-[18px] font-black tracking-[-0.03em] leading-none text-[#16121c]">CORE</span>
                     </span>
                   </div>
+                  {passo === "pix" && conferindo && (
+                    <p className="mt-3 flex items-center justify-center gap-2 rounded-[12px] bg-[#f5f3f7] px-3 py-2 text-[13.5px] font-semibold text-[#16121c]" role="status" data-testid="app-web-conferindo">
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden />Conferindo pagamento…
+                    </p>
+                  )}
                   {passo === "sucesso" ? <div className="mt-6">{telaVenda}</div> : telaVenda}
                 </div>
               )}

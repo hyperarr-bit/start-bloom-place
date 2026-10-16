@@ -90,6 +90,8 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/assinar") ||
     // /liberar (16/10): a demo que vende no site (demo → paywall do /assinar → Pix) — mesma regra do /assinar.
     location.pathname.startsWith("/liberar") ||
+    // /assinatura (16/10): o funil do app na web (paywall da web no Pix com a escada) — mesma regra do /assinar.
+    location.pathname.startsWith("/assinatura") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

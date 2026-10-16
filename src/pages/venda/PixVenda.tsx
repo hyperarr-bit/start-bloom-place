@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,8 @@ import { cookiesDaMeta } from "./rastreio";
  * Área de transferência: SÓ no toque em "Copiar código Pix" (a pessoa pediu). Nada lê o clipboard.
  */
 export type PixGerado = { orderId: string; qrCode: string; qrCodeBase64: string | null; expiresAt: string | null; criadoEm: number };
+/** As ofertas de Pix que esta tela sabe cobrar (as mesmas das funções de dinheiro). */
+export type OfertaPixVenda = "a97" | "a69" | "w25";
 
 /** Validade do QR da Asaas (EXPIRA_SEGUNDOS = 1800 na asaas-pix). Sem `expiresAt`, conta 30 min da criação. */
 const VALIDADE_MS = 30 * 60_000;
@@ -32,14 +34,27 @@ const mmss = (ms: number) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-export function PixVenda({ pix, onPix, onPago, ids, celular }: {
+export function PixVenda({ pix, onPix, onPago, ids, celular, oferta, plano = "anual", rotulo = "Anual", preco = PLANOS.anual.preco, valor = PLANOS.anual.valor, acesso = "1 ano de acesso", aviso = null }: {
   pix: PixGerado | null;
   onPix: (p: PixGerado | null) => void;
   onPago: () => void;
   ids: () => Record<string, string>;
   /** no celular o copia-e-cola vem primeiro; no computador, o QR grande */
   celular: boolean;
+  /** 16/10 (o funil do app na web, /assinatura): a oferta da escada (a97 · a69 · w25). Sem ela, o anual a97 do /assinar. */
+  oferta?: OfertaPixVenda;
+  plano?: "anual" | "mensal";
+  /** a linha do resumo: "<rotulo> · R$ <preco> · <acesso>" (sem as props, a do anual de 97,90) */
+  rotulo?: string;
+  preco?: string;
+  valor?: number;
+  acesso?: string;
+  /** uma linha a mais embaixo do resumo (o mensal do Pix: "sem renovação automática") */
+  aviso?: ReactNode;
 }) {
+  const ofertaPix: OfertaPixVenda = oferta ?? OFERTA_PIX_ANUAL;
+  /* o campo `oferta` só entra nos eventos quando a tela recebeu uma (o /assinar segue com os eventos de sempre) */
+  const daOferta = oferta ? { oferta } : {};
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -57,7 +72,7 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
     try {
       const c = cookiesDaMeta();
       const { data, error } = await supabase.functions.invoke("asaas-pix", {
-        body: { action: "create", offer: OFERTA_PIX_ANUAL, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
+        body: { action: "create", offer: ofertaPix, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
       });
       const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null } | null;
       if (error || !d?.orderId || !d?.qrCode) {
@@ -66,9 +81,9 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
         return;
       }
       const novo: PixGerado = { orderId: d.orderId, qrCode: d.qrCode, qrCodeBase64: d.qrCodeBase64 ?? null, expiresAt: d.expiresAt ?? null, criadoEm: Date.now() };
-      markPixPurchasePending({ offer: OFERTA_PIX_ANUAL, orderId: novo.orderId });
+      markPixPurchasePending({ offer: ofertaPix, orderId: novo.orderId });
       onPix(novo);
-      trackEvent("venda_pix_qr_view", { order_id: novo.orderId, plano: "anual", valor: PLANOS.anual.valor, ...ids() });
+      trackEvent("venda_pix_qr_view", { order_id: novo.orderId, plano, valor, ...daOferta, ...ids() });
     } catch (e) {
       trackEvent("venda_erro", { onde: "pix_create", msg: String(e).slice(0, 160), ...ids() });
       setErro("Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.");
@@ -76,7 +91,8 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
       pedindo.current = false;
       setGerando(false);
     }
-  }, [ids, onPix]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids, onPix, ofertaPix]);
 
   /* sem QR (ou o salvo venceu) → gera na montagem */
   useEffect(() => {
@@ -102,7 +118,7 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
       try {
         const c = cookiesDaMeta();
         const { data } = await supabase.functions.invoke("asaas-pix", {
-          body: { action: "check", id: pix.orderId, offer: OFERTA_PIX_ANUAL, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
+          body: { action: "check", id: pix.orderId, offer: ofertaPix, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
         });
         if ((data as { paid?: boolean } | null)?.paid && !pago.current) {
           pago.current = true;
@@ -152,7 +168,7 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
           <>
             <Loader2 className="mx-auto w-8 h-8 animate-spin text-[#16121c]" aria-hidden />
             <TituloCard testid="venda-pix-titulo" className="mt-4">Gerando seu Pix…</TituloCard>
-            <p className="mt-2 text-[15px] text-[#6b6670]">Anual · R$ {PLANOS.anual.preco}</p>
+            <p className="mt-2 text-[15px] text-[#6b6670]">{rotulo} · R$ {preco}</p>
           </>
         )}
       </div>
@@ -170,9 +186,10 @@ export function PixVenda({ pix, onPix, onPago, ids, celular }: {
   return (
     <div className="mt-6" data-testid="venda-pix" data-fase={vencido ? "vencido" : "qr"}>
       <TituloCard testid="venda-pix-titulo">{vencido ? "Esse Pix venceu" : PIX_TITULO}</TituloCard>
-      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]">
-        Anual · <b className="text-[#16121c]">R$ {PLANOS.anual.preco}</b> · 1 ano de acesso
+      <p className="mt-1.5 text-[15px] leading-snug text-[#6b6670]" data-testid="venda-pix-resumo">
+        {rotulo} · <b className="text-[#16121c]">R$ {preco}</b> · {acesso}
       </p>
+      {aviso && <p className="mt-1.5 text-[13.5px] leading-snug text-[#6b6670]" data-testid="venda-pix-aviso">{aviso}</p>}
 
       {vencido ? (
         <BotaoCard texto="Gerar outro Pix" onClick={() => { onPix(null); void gerar(); }} testid="venda-pix-outro" className="mt-5" />

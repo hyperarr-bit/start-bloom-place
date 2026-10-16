@@ -16,7 +16,7 @@ import { DICA_CODIGO, DICA_ENTRAR_VENDA, PLANOS, SUCESSO_SELO, SUCESSO_TITULO, t
  *   · `confirmado=false`: voltou da Cakto num navegador sem a sessão (o Instagram apaga o storage) — não dá pra
  *     conferir daqui; o texto diz pra entrar com o e-mail que usou no pagamento.
  */
-export function SucessoVenda({ plataforma, email, plano, confirmado, jaAssinante = false, voltou, abrirApp, emailEnviado, fimDoAcesso, hrefLoja, qrUrl, onLoja, onAbrirApp }: {
+export function SucessoVenda({ plataforma, email, plano, confirmado, jaAssinante = false, voltou, abrirApp, emailEnviado, fimDoAcesso, hrefLoja, qrUrl, onLoja, onAbrirApp, planoTexto }: {
   plataforma: Plataforma;
   email: string | null;
   plano: PlanoVenda;
@@ -32,6 +32,9 @@ export function SucessoVenda({ plataforma, email, plano, confirmado, jaAssinante
   qrUrl: string;
   onLoja: (loja: "ios" | "android") => void;
   onAbrirApp: () => void;
+  /** 16/10 (o funil do app na web): a linha do plano pronta ("Mensal · 30 dias, até … · sem renovação automática");
+   *  sem ela, a do /assinar ("Plano anual · acesso até …") */
+  planoTexto?: string | null;
 }) {
   const android = plataforma === "android";
   const web = plataforma === "web";
@@ -51,7 +54,7 @@ export function SucessoVenda({ plataforma, email, plano, confirmado, jaAssinante
       )}
       {confirmado && !jaAssinante && (
         <p className="mt-1.5 text-[14px] text-[#6b6670]" data-testid="venda-sucesso-plano">
-          Plano {PLANOS[plano].nome.toLowerCase()}{fimDoAcesso ? <> · acesso até <b className="text-[#16121c]">{fimDoAcesso}</b></> : null}
+          {planoTexto ?? <>Plano {PLANOS[plano].nome.toLowerCase()}{fimDoAcesso ? <> · acesso até <b className="text-[#16121c]">{fimDoAcesso}</b></> : null}</>}
         </p>
       )}
       <p className="mt-3 text-[15.5px] leading-[1.45] text-[#6b6670] text-pretty" data-testid="venda-sucesso-texto">

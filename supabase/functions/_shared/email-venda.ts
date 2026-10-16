@@ -1,24 +1,52 @@
 /**
  * VENDA DA WEB (/assinar, 15/10) — parte PURA das funções de dinheiro: o nome do produto e o e-mail de boas-vindas
- * de quem comprou o ANUAL (Pix `a97` ou cartão na Cakto) ou o MENSAL no cartão.
+ * de quem comprou o ANUAL (Pix `a97`/`a69` ou cartão na Cakto), o MENSAL no cartão ou o MÊS pré-pago no Pix (`w25`).
  *
  * Por que existe: os e-mails antigos dizem "acesso vitalício" e "a senha que você criou no cadastro". Quem compra
  * na /assinar tem 1 ano (ou 1 mês) e NÃO tem senha (a conta nasce no pagamento, só com nome + e-mail): entra no app
  * com "Entrar sem senha — receber código por e-mail". Testado no vitest (src/test/venda-web-servidor.test.ts).
  */
 export const OFERTA_PIX_ANUAL = "a97";
-export type PeriodoVenda = "annual" | "monthly";
+/** 16/10: o PRESENTE do funil do app na web (/assinatura) — o mesmo anual por R$ 69,90 (6990), 365 dias. */
+export const OFERTA_PIX_ANUAL_69 = "a69";
+/** As ofertas de Pix que são o ANUAL da venda da web (1 ano, não vitalício). */
+export const OFERTAS_PIX_ANUAIS: readonly string[] = [OFERTA_PIX_ANUAL, OFERTA_PIX_ANUAL_69];
+/** O mês pré-pago do Pix (R$ 24,90, 30 dias, NÃO renova): o degrau 3 do /assinatura e a 2ª coluna antiga da web. */
+export const OFERTA_PIX_MES = "w25";
+export type PeriodoVenda = "annual" | "monthly" | "monthly_prepaid";
+
+export const ehAnualDaVenda = (offer: string | null | undefined): boolean => !!offer && OFERTAS_PIX_ANUAIS.includes(offer);
+
+/**
+ * O e-mail de boas-vindas da venda vale pra esta oferta de Pix? Devolve o período (anual / mês pré-pago) ou null
+ * (as outras ofertas seguem com o e-mail antigo). 16/10: o `w25` passou a ter o e-mail da venda — o antigo dizia
+ * "acesso vitalício" e "a senha que você criou" pra quem pagou 30 dias (e a conta do funil novo nem tem senha).
+ */
+export function periodoDoEmailVenda(offer: string | null | undefined): PeriodoVenda | null {
+  if (ehAnualDaVenda(offer)) return "annual";
+  if (offer === OFERTA_PIX_MES) return "monthly_prepaid";
+  return null;
+}
+
+/** O planName da UTMify por oferta de Pix (antes: "annual" só pro a97, "lifetime" pra todo o resto — até o mês). */
+export function planoUtmify(offer: string | null | undefined): string {
+  if (ehAnualDaVenda(offer)) return "annual";
+  if (offer === OFERTA_PIX_MES) return "monthly_prepaid";
+  return "lifetime";
+}
 
 /** O nome que vai pra CAPI (content_name) e pra UTMify — mantém os antigos ("CORE Vitalício") pra quem não é venda. */
 export function nomeDoProduto(args: { offer?: string | null; periodo?: string | null; downsell?: boolean }): string {
-  if (args.offer === OFERTA_PIX_ANUAL || args.periodo === "annual") return "CORE Anual";
+  if (ehAnualDaVenda(args.offer) || args.periodo === "annual") return "CORE Anual";
   if (args.periodo === "monthly") return "CORE Mensal";
-  if (args.periodo === "monthly_prepaid") return "CORE 1 mês";
+  if (args.offer === OFERTA_PIX_MES || args.periodo === "monthly_prepaid") return "CORE 1 mês";
   return args.downsell ? "CORE Vitalício (oferta)" : "CORE Vitalício";
 }
 
 export function assuntoVenda(periodo: PeriodoVenda): string {
-  return periodo === "annual" ? "Seu plano anual do CORE tá ativo ✅" : "Sua assinatura mensal do CORE tá ativa ✅";
+  if (periodo === "annual") return "Seu plano anual do CORE tá ativo ✅";
+  if (periodo === "monthly_prepaid") return "Seus 30 dias de CORE tão ativos ✅";
+  return "Sua assinatura mensal do CORE tá ativa ✅";
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -38,7 +66,10 @@ export function htmlVenda(args: { email: string; nome?: string | null; periodo: 
   const ate = dataBr(args.fim);
   const plano = args.periodo === "annual"
     ? `Seu <b>plano anual</b> está ativo${ate ? ` — acesso até <b>${ate}</b>` : ""}.`
-    : `Sua <b>assinatura mensal</b> está ativa. Renova todo mês no cartão; cancele quando quiser.`;
+    : args.periodo === "monthly_prepaid"
+      // 16/10: o Pix do mês NÃO renova (um cliente se confundiu com o mensal vencido) — o e-mail diz isso com todas as letras
+      ? `Seus <b>30 dias de CORE</b> estão ativos${ate ? ` — acesso até <b>${ate}</b>` : ""}. Sem renovação automática: pra continuar, é só pagar de novo.`
+      : `Sua <b>assinatura mensal</b> está ativa. Renova todo mês no cartão; cancele quando quiser.`;
   const passo = (n: number, t: string) => `<tr><td style="vertical-align:top;padding:0 12px 12px 0;"><div style="width:26px;height:26px;border-radius:13px;background:#d22d80;color:#fff;font-weight:900;font-size:13px;line-height:26px;text-align:center;">${n}</div></td><td style="vertical-align:top;padding:3px 0 12px;font-size:15px;line-height:1.45;color:#16121c;">${t}</td></tr>`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f6f3f5;font-family:-apple-system,Segoe UI,Roboto,Inter,sans-serif;color:#16121c;">
 <div style="max-width:520px;margin:0 auto;padding:28px 20px;">

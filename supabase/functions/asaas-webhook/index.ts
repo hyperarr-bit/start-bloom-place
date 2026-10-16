@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { OFERTA_PIX_ANUAL, assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
+import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 
@@ -35,7 +35,8 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
  * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790 };
+// 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
 /* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
  * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
  * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
@@ -48,6 +49,7 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   w47: { plano: "lifetime", periodo: "lifetime", dias: null },
   w27: { plano: "lifetime", periodo: "lifetime", dias: null }, // 07/09: vitalício web 27,90
   a97: { plano: "core-pro", periodo: "annual", dias: 365 }, // 15/10: anual da venda da web (/assinar)
+  a69: { plano: "core-pro", periodo: "annual", dias: 365 }, // 16/10: presente anual 69,90 do funil do app na web (/assinatura)
 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
@@ -92,7 +94,7 @@ async function sendToUtmify(admin: Admin, args: { userId: string; email: string 
       orderId: args.orderId, platform: "Asaas", paymentMethod: "pix", status: "paid",
       createdAt: nowStamp, approvedDate: nowStamp, refundedAt: null,
       customer: { name: args.name || args.email?.split("@")[0] || "Cliente", email: args.email || "", phone: null, document: null, country: "BR" },
-      products: [{ id: args.offer, name: nomeDoProduto({ offer: args.offer, downsell: isDownsell }), planId: null, planName: args.offer === OFERTA_PIX_ANUAL ? "annual" : "lifetime", quantity: 1, priceInCents: args.amountCents }],
+      products: [{ id: args.offer, name: nomeDoProduto({ offer: args.offer, downsell: isDownsell }), planId: null, planName: planoUtmify(args.offer), quantity: 1, priceInCents: args.amountCents }],
       trackingParameters: { src: null, sck: null, ...utm },
       commission: { totalPriceInCents: args.amountCents, gatewayFeeInCents: 0, userCommissionInCents: args.amountCents },
       isTest: false,
@@ -219,7 +221,12 @@ serve(async (req) => {
     const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
-    if (!(offer in PRECOS_CENTAVOS)) offer = "lifetime";
+    /* 16/10: oferta desconhecida NUNCA vira vitalício (antes: `offer = "lifetime"`) — sem ela na tabela, não credita;
+     * o pix-reconcile tenta de novo depois do deploy que a conhece. 200 sempre (a fila da Asaas não pode pausar). */
+    if (!(offer in PRECOS_CENTAVOS) || !CONCESSAO[offer]) {
+      logStep("Oferta desconhecida — não credita", { offer: offer.slice(0, 20), qrCodeId: qrCodeId.slice(0, 20) });
+      return jsonResponse({ received: true, granted: false, warning: "oferta_desconhecida" });
+    }
     const amountCents = PRECOS_CENTAVOS[offer];
     /* 15/10: o pagamento tem que cobrir o preço da oferta DELE (cada oferta com o seu valor). */
     if (!valorCobre(pago.value, amountCents)) {
@@ -238,7 +245,7 @@ serve(async (req) => {
     const { data: u } = await admin.auth.admin.getUserById(userId);
     const email = u?.user?.email ?? null;
     const now = new Date();
-    const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
+    const concessao = CONCESSAO[offer];
     const vitalicio = concessao.dias === null;
     /* 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do check da página e do reconcile). */
     const g = await creditarPedido(admin, {
@@ -281,11 +288,13 @@ serve(async (req) => {
         const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
         if (resendKey && email) {
           const firstName = (displayName ?? "").split(" ")[0] || null;
+          const periodoVenda = periodoDoEmailVenda(offer);
           await fetch("https://api.resend.com/emails", {
             method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; o resto segue igual
-            body: JSON.stringify(offer === OFERTA_PIX_ANUAL
-              ? { from, to: [email], subject: assuntoVenda("annual"), html: htmlVenda({ email, nome: displayName, periodo: "annual", fim: g.fim }) }
+            // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; 16/10: o a69 e o mês (w25, 30 dias,
+            // sem renovação) também — o antigo dizia "vitalício". O resto segue igual
+            body: JSON.stringify(periodoVenda
+              ? { from, to: [email], subject: assuntoVenda(periodoVenda), html: htmlVenda({ email, nome: displayName, periodo: periodoVenda, fim: g.fim }) }
               : {
                 from, to: [email],
                 // o assunto tem que dizer a verdade: mês pré-pago não é vitalício

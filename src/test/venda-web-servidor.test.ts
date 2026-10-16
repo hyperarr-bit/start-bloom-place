@@ -46,8 +46,9 @@ describe("a97: anual do Pix, 97,90, 1 ano", () => {
   it("e-mail e nome do produto: a97 → 'CORE Anual' e o e-mail da venda (sem 'vitalício'); o resto igual", () => {
     for (const f of ["asaas-pix/index.ts", "asaas-webhook/index.ts"]) {
       const s = fonte(f);
-      expect(s).toContain("offer === OFERTA_PIX_ANUAL");
-      expect(s).toContain('assuntoVenda("annual")');
+      // 16/10: a escolha do e-mail é por oferta (periodoDoEmailVenda: a97/a69 → anual, w25 → mês pré-pago; o resto, o antigo)
+      expect(s).toContain("const periodoVenda = periodoDoEmailVenda(offer);");
+      expect(s).toContain("assuntoVenda(periodoVenda)");
       expect(s).toContain('"Seu acesso vitalício ao CORE tá ativo ✅"');
     }
     expect(nomeDoProduto({ offer: "a97" })).toBe("CORE Anual");

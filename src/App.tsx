@@ -389,6 +389,10 @@ const VendaWeb = lazyPage(() => import("./pages/venda/VendaWeb"));
 // 16/10: a DEMO QUE VENDE (/liberar?m=…) — o app de verdade com dados de exemplo (como o /experimente), e todo
 // "Liberar meu CORE" abre o PAYWALL do /assinar (anual 97,90 no Pix) → nome + e-mail → Pix → sucesso. Só na WEB.
 const Liberar = lazyPage(() => import("./pages/liberar/Liberar"));
+// 16/10: o FUNIL DO APP NA WEB (/assinatura) — as telas do iPhone 1.0.15 (welcome com vídeo → porta → 2 perguntas →
+// sem × com → lembretes → prova → resultado → plano de 3 dias) e o paywall da WEB no Pix com a escada: anual 97,90 →
+// presente anual 69,90 → mensal 24,90 (30 dias, sem renovação). Só na WEB (SoNaWeb), noindex. O app não muda.
+const AssinaturaApp = lazyPage(() => import("./pages/funis/app-web/AssinaturaApp"));
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
@@ -614,6 +618,7 @@ const AnimatedRoutes = () => {
         <Route path="/abrir" element={<SoNaWeb><RouteErrorBoundary routeName="porta-abrir"><AbrirPorta /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

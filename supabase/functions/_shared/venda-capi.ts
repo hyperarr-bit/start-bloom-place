@@ -11,11 +11,16 @@
 export const EVENTOS_VENDA = ["ViewContent", "InitiateCheckout"] as const;
 export type EventoVenda = (typeof EVENTOS_VENDA)[number];
 const PREFIXO: Record<EventoVenda, string> = { ViewContent: "venda_vc_", InitiateCheckout: "venda_ic_" };
-const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web"]);
+const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web", "core_anual69_web", "core_mensal_pix_web"]);
 /** 15/10 (revisão): os ÚNICOS valores aceitos — os preços da venda (anual 97,90; mensal 24,90). Qualquer outro
- *  número recusa o pedido inteiro (ninguém infla o valor que a Meta vê). ViewContent vai sem valor. */
-export const VALORES_VENDA = [97.9, 24.9] as const;
+ *  número recusa o pedido inteiro (ninguém infla o valor que a Meta vê). ViewContent vai sem valor.
+ *  16/10: + 69,90 (o presente anual do funil do app na web, /assinatura). */
+export const VALORES_VENDA = [97.9, 69.9, 24.9] as const;
 const SITE = "https://coreaplicativo.com.br";
+/** As páginas da venda que podem ser a `event_source_url` (o resto vira a /assinar). 16/10: + /assinatura e /liberar. */
+const PAGINAS_VENDA = ["/assinar", "/assinatura", "/liberar"];
+const daVenda = (url: string): boolean =>
+  [SITE, "https://www.coreaplicativo.com.br"].some((base) => PAGINAS_VENDA.some((p) => url === `${base}${p}` || url.startsWith(`${base}${p}?`) || url.startsWith(`${base}${p}/`)));
 
 export type PedidoCapiVenda = {
   evento: EventoVenda; event_id: string; url: string; fbp: string | null; fbc: string | null; valor: number | null; conteudo: string | null;
@@ -31,7 +36,7 @@ export function validarPedido(body: unknown): PedidoCapiVenda | null {
   const id = texto(b.event_id, 80);
   if (!id || !id.startsWith(PREFIXO[evento]) || !/^venda_(vc|ic)_[a-z0-9-]{8,60}$/i.test(id)) return null;
   const urlBruta = texto(b.url, 500) ?? "";
-  const url = urlBruta.startsWith(`${SITE}/assinar`) || urlBruta.startsWith("https://www.coreaplicativo.com.br/assinar") ? urlBruta : `${SITE}/assinar`;
+  const url = daVenda(urlBruta) ? urlBruta : `${SITE}/assinar`;
   const fbp = texto(b.fbp, 200);
   const fbc = texto(b.fbc, 500);
   let valor: number | null = null;

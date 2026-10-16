@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { OFERTA_PIX_ANUAL, assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
+import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 
@@ -50,7 +50,8 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * a tela tem que dizer isso. */
 // 06/09: `w47` = vitalício da web a R$ 47,90 (ordem do dono). Chave nova, w97 fica pra QR antigo.
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790 };
+// 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
 /* O que cada oferta CONCEDE (04/09). A primeira venda da w25 (07:42) recebeu
  * VITALÍCIO por este caminho: a página faz `check` enquanto o QR está aberto,
  * o check liberava com plan "lifetime" chumbado, e o webhook — que já sabia
@@ -64,9 +65,10 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   w47: { plano: "lifetime", periodo: "lifetime", dias: null },
   w27: { plano: "lifetime", periodo: "lifetime", dias: null }, // 07/09: vitalício web 27,90
   a97: { plano: "core-pro", periodo: "annual", dias: 365 }, // 15/10: anual da venda da web (/assinar)
+  a69: { plano: "core-pro", periodo: "annual", dias: 365 }, // 16/10: presente anual 69,90 do funil do app na web (/assinatura)
 };
 const DESCRICAO_PIX: Record<string, string> = {
-  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual",
+  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual",
 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
@@ -151,7 +153,7 @@ async function sendToUtmify(
       orderId: args.orderId, platform: "Asaas", paymentMethod: "pix", status: "paid",
       createdAt: nowStamp, approvedDate: nowStamp, refundedAt: null,
       customer: { name: args.name || args.email?.split("@")[0] || "Cliente", email: args.email || "", phone: null, document: null, country: "BR" },
-      products: [{ id: args.offer, name: nomeDoProduto({ offer: args.offer, downsell: isDownsell }), planId: null, planName: args.offer === OFERTA_PIX_ANUAL ? "annual" : "lifetime", quantity: 1, priceInCents: args.amountCents }],
+      products: [{ id: args.offer, name: nomeDoProduto({ offer: args.offer, downsell: isDownsell }), planId: null, planName: planoUtmify(args.offer), quantity: 1, priceInCents: args.amountCents }],
       trackingParameters: { src: null, sck: null, ...utm },
       commission: { totalPriceInCents: args.amountCents, gatewayFeeInCents: 0, userCommissionInCents: args.amountCents },
       isTest: false,
@@ -403,9 +405,11 @@ serve(async (req) => {
         return jsonResponse({ paid: false, status: "MISMATCH" });
       }
       if (!offer) {
+        // 16/10: oferta desconhecida NUNCA vira vitalício — sem a oferta na tabela, não libera (o reconcile é a rede)
         const declarado = String(body.offer ?? "");
-        offer = declarado in PRECOS_CENTAVOS ? declarado : "lifetime";
         logStep("Offer via client fallback", { id, declarado });
+        if (!(declarado in PRECOS_CENTAVOS)) return jsonResponse({ paid: false, status: "OFERTA_DESCONHECIDA" });
+        offer = declarado;
       }
       /* 15/10: o pagamento tem que cobrir o preço da oferta DELE (cada oferta com o seu valor). */
       if (!valorCobre((r.pago as { value?: unknown }).value, PRECOS_CENTAVOS[offer])) {
@@ -423,7 +427,11 @@ serve(async (req) => {
        * tocada: o Pix escreve na própria ou insere uma nova. */
       /* 15/10: a decisão + a trava de "1 pedido = 1 crédito" moram em _shared/grant-pix.ts (os 3 caminhos da Asaas
        * — este check, o asaas-webhook e o pix-reconcile — passam por lá). */
-      const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
+      const concessao = CONCESSAO[offer];
+      if (!concessao) {
+        logStep("Oferta sem concessão — não libera", { id, offer });
+        return jsonResponse({ paid: false, status: "OFERTA_DESCONHECIDA" });
+      }
       const vitalicio = concessao.dias === null;
       const g = await creditarPedido(supabaseAdmin, {
         userId: user.id, orderId: id, gateway: "asaas", concessao, agora: now,
@@ -478,12 +486,14 @@ serve(async (req) => {
           const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
           if (resendKey && user.email) {
             const firstName = displayName ? displayName.split(" ")[0] : null;
+            const periodoVenda = periodoDoEmailVenda(offer);
             await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-              // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; o resto segue igual
-              body: JSON.stringify(offer === OFERTA_PIX_ANUAL
-                ? { from, to: [user.email], subject: assuntoVenda("annual"), html: htmlVenda({ email: user.email, nome: displayName, periodo: "annual", fim: g.fim }) }
+              // 15/10: o anual da venda da web (sem senha, 1 ano) tem e-mail próprio; 16/10: o a69 e o mês (w25, 30 dias,
+              // sem renovação) também — o antigo dizia "vitalício". O resto segue igual
+              body: JSON.stringify(periodoVenda
+                ? { from, to: [user.email], subject: assuntoVenda(periodoVenda), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoVenda, fim: g.fim }) }
                 : { from, to: [user.email], subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅", html: welcomeHtml(firstName, user.email) }),
             });
           }

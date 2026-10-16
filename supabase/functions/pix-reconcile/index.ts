@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
+import { nomeDoProduto } from "../_shared/email-venda.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -40,17 +41,19 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790 };
+// 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
 const DIAS_DA_OFERTA: Record<string, number | null> = {
-  lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null, a97: 365,
+  lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null, a97: 365, a69: 365,
 };
 /** O plano/período gravado na assinatura de cada oferta com prazo (o resto, `dias: null`, é vitalício). */
 const PERIODO_DA_OFERTA: Record<string, { plano: string; periodo: string }> = {
   w25: { plano: "web", periodo: "monthly_prepaid" },
   a97: { plano: "core-pro", periodo: "annual" },
+  a69: { plano: "core-pro", periodo: "annual" },
 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -230,6 +233,7 @@ serve(async (req) => {
       for (const g of gs ?? []) exibidos.add(String(g.event_data?.order_id ?? ""));
     }
     let adiantadosFora = 0;
+    let ofertasDesconhecidas = 0;
 
     const porUser = new Map<string, Ordem[]>();
     for (const q of qrs ?? []) {
@@ -240,7 +244,10 @@ serve(async (req) => {
       // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
       // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.
       const ofertaCrua = String(q.event_data?.offer ?? "");
-      const offer = ofertaCrua in DIAS_DA_OFERTA ? ofertaCrua : ofertaCrua === "downsell" ? "downsell" : "lifetime";
+      /* 16/10: oferta desconhecida NUNCA vira vitalício (antes caía em "lifetime" — um a69 pago antes do deploy que o
+       * conhece ganharia acesso pra sempre). Fica fora desta passada; o próximo cron, com a oferta na tabela, credita. */
+      if (!(ofertaCrua in DIAS_DA_OFERTA)) { ofertasDesconhecidas++; continue; }
+      const offer = ofertaCrua;
       // 01/08: o VALOR REAL do pedido vem do create (amount_cents no evento).
       // A tabela chumbada virou bug no dia em que o preço mudou (27,90→19,90):
       // o reconcile creditou 2790 pra quem pagou 1990. Preço de tabela agora é
@@ -378,7 +385,7 @@ serve(async (req) => {
                 },
                 custom_data: {
                   value: cents / 100, currency: "BRL",
-                  content_name: o.offer === "a97" ? "CORE Anual" : o.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício",
+                  content_name: nomeDoProduto({ offer: o.offer, downsell: o.offer === "downsell" }),
                 },
               }],
             };
@@ -404,8 +411,8 @@ serve(async (req) => {
       }
     }
 
-    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, creditados: creditados.length, falhas: falhas.length });
-    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, creditados, falhas });
+    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, falhas: falhas.length });
+    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, falhas });
   } catch (e) {
     logStep("ERRO", { e: String(e).slice(0, 200) });
     return jsonResponse({ error: String(e).slice(0, 200) }, 500);

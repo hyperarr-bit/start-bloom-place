@@ -125,7 +125,7 @@ const CAMPO = "w-full h-[52px] rounded-[12px] border bg-white px-4 text-[16px] t
 
 export type ResultadoDados = { ok: true } | { ok: false; existe?: boolean; erro?: string };
 
-export function DadosVenda({ plano, metodo, nomeInicial, emailInicial, emailLogado, onEnviar, onEntrarSenha, onEntrouCodigo, onTrocarPlano, onErroCampo }: {
+export function DadosVenda({ plano, metodo, nomeInicial, emailInicial, emailLogado, onEnviar, onEntrarSenha, onEntrouCodigo, onTrocarPlano, onErroCampo, resumo }: {
   plano: PlanoVenda;
   metodo: MetodoVenda;
   nomeInicial: string;
@@ -137,6 +137,8 @@ export function DadosVenda({ plano, metodo, nomeInicial, emailInicial, emailLoga
   onEntrouCodigo: (nome: string, email: string) => Promise<void>;
   onTrocarPlano: () => void;
   onErroCampo: (campo: "nome" | "email", motivo: string) => void;
+  /** 16/10 (o funil do app na web): o texto do resumo ("Anual · R$ 69,90 · Pix"); sem ele, o do plano do /assinar */
+  resumo?: ReactNode;
 }) {
   const [nome, setNome] = useState(nomeInicial);
   const [email, setEmail] = useState(emailInicial || emailLogado || "");
@@ -201,7 +203,7 @@ export function DadosVenda({ plano, metodo, nomeInicial, emailInicial, emailLoga
 
       <div className="mt-4 flex items-center justify-between gap-3 rounded-[12px] border border-[#ebe8ee] bg-[#faf9fb] px-3.5 py-2.5" data-testid="venda-resumo">
         <span className="text-[14px] text-[#16121c]">
-          <b>{p.nome}</b> · R$ {p.preco}{plano === "mensal" ? "/mês" : ""} · {metodo === "pix" ? "Pix" : "cartão"}
+          {resumo ?? <><b>{p.nome}</b> · R$ {p.preco}{plano === "mensal" ? "/mês" : ""} · {metodo === "pix" ? "Pix" : "cartão"}</>}
         </span>
         <button type="button" onClick={onTrocarPlano} className="text-[13.5px] font-semibold underline underline-offset-2 text-[#16121c]" data-testid="venda-trocar-plano">Trocar</button>
       </div>

@@ -96,7 +96,20 @@
  * introdutória. 2ª chance da folha, presente 69,90 no Voltar, paywall_saiu, recuperação:
  * iguais. `paywall_oferta_vista` ganha `paywall_curto: true`. Com a chave off esta tela
  * é a de hoje, byte a byte.
+ *
+ * 1.0.16 (16/10, definitiva/2-oferta + 3-onboarding; escada em definitiva/escada-oferta.md):
+ *  · EXPLICAÇÃO NA 2ª VEZ (ExplicaFolha): quem JÁ fechou a folha da Apple do anual nesta sessão e
+ *    toca de novo (Continuar ou "Tentar de novo") vê a meia-folha calma antes da folha — os dias do
+ *    teste com datas, "Nada é cobrado hoje", o lembrete (só se a permissão permitir) e como a folha
+ *    é. 1x por produto por sessão; o presente de 69,90 que vem depois da folha fechada faz o mesmo
+ *    (prop `explicar`). Na 1ª vez nada muda (pílula do curto; folha direto no layout longo).
+ *  · UM PRESENTE POR SESSÃO vale também pro mensal 19,90 (antes ele podia vir depois do 69,90).
+ *  · Voltar redondo: depois de ver (e fechar) um presente, ele não recuava nunca mais — agora só
+ *    não recua quando uma oferta ABRE por cima com este toque.
  */
+/** Dias grátis de RESERVA enquanto a loja não respondeu — o número de verdade é o da oferta
+ *  introdutória (rc.diasTrialIos()). Um lugar só nesta tela. */
+export const DIAS_DE_TESTE_PADRAO = 3;
 /** Quanto a pílula "A Apple vai mostrar…" fica na tela antes de a folha abrir. */
 export const PREPARACAO_DA_FOLHA_MS = 1200;
 
@@ -140,6 +153,7 @@ import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -332,7 +346,7 @@ export function PaywallIOS({
   const [anualNaLoja, setAnualNaLoja] = useState<boolean | null>(null);
   const [precoAnual, setPrecoAnual] = useState<string | null>(null);
   const [comTrial, setComTrial] = useState(true);
-  const [dias, setDias] = useState(3);
+  const [dias, setDias] = useState(DIAS_DE_TESTE_PADRAO);
   const [precoMes, setPrecoMes] = useState<string | null>(null);
   const [mesesDeMensal, setMesesDeMensal] = useState<number | null>(null);
   const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
@@ -351,6 +365,10 @@ export function PaywallIOS({
   /* 10/10 — PAYWALL_CURTO: a chave responde na hora (força/QA/constante) e de novo quando a
    * loja traz a metadata; o preço do teste ("R$ 0,00") é o da oferta introdutória da loja. */
   const [curto, setCurto] = useState(() => gate || ofertaLigada("curto"));
+  /* 16/10 — a explicação antes da folha, na 2ª vez (ExplicaFolha) */
+  const folhasCanceladasRef = useRef(0);
+  const explicadosRef = useRef<Set<string>>(new Set());
+  const [explica, setExplica] = useState<{ produto: string; preco: string; precoTeste: string | null; dias: number; continuar: () => void } | null>(null);
   const [precoTeste, setPrecoTeste] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const preparandoRef = useRef<number | null>(null);
@@ -429,7 +447,7 @@ export function PaywallIOS({
         if (rc.temAnualIos()) {
           setPrecoAnual(rc.precoAnualIos());
           setComTrial(rc.anualIosTemTrial());
-          setDias(rc.diasTrialIos() || 3);
+          setDias(rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO);
           setPrecoMes(rc.precoMensalDoAnualIos());
           setMesesDeMensal(rc.mesesDeMensalQuePagamOAno());
           const d = rc.dadosDaOfertaIos();
@@ -444,9 +462,10 @@ export function PaywallIOS({
           setCurto(gate || curtoLigou);
           setEconomia(economiaLida);
           setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
-          if (curtoLigou || gate) setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
+          // 16/10: sempre (a explicação da 2ª folha também mostra o "R$ 0,00" da loja)
+          setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || 3, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}) });
+          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}) });
         }
       };
       lido();
@@ -603,14 +622,21 @@ export function PaywallIOS({
       // "cancelou" = PURCHASE_CANCELLED do RevenueCat (código 1): foi ela que
       // fechou a folha. Não reabre nada sozinho — só deixa o cartão perto do
       // botão. Sem direito ao teste, "não paga nada" seria mentira: sem cartão.
+      // 16/10: a folha do anual já foi fechada nesta sessão → o próximo toque passa pela explicação
+      if (motivo === "cancelou" && produto === "anual") folhasCanceladasRef.current += 1;
       if (motivo === "cancelou" && produto === "anual" && comTrial && rc.anualIosTemTrial()) {
         depoisDaFolhaCancelada();
       }
       /* 10/10 (chave OFERTA_MENSAL_19): fechou a folha do MENSAL → o mensal de 19,90,
        * se a offering `mensal_19` existir na loja. 1x por aparelho (marca no desfecho). */
-      if (motivo === "cancelou" && produto === "mensal" && ofertaLigada("mensal_19")) {
+      // 16/10: UM presente por sessão do paywall — quem já viu o 69,90 não ganha o 19,90 por cima
+      if (motivo === "cancelou" && produto === "mensal" && ofertaLigada("mensal_19") && !presenteMostradoRef.current) {
         void prepararMensal19("mensal_paywall")
-          .then((m) => { if (vivoRef.current && m) setMensal19(m); })
+          .then((m) => {
+            if (!vivoRef.current || !m || presenteMostradoRef.current) return;
+            presenteMostradoRef.current = true;
+            setMensal19(m);
+          })
           .catch(() => { /* paywall de sempre */ });
       }
     } catch {
@@ -630,6 +656,9 @@ export function PaywallIOS({
   };
 
   const mostraMensal = plano === "mensal";
+  /** Tem oferta (presente, mensal 19 ou explicação) por cima AGORA? (o Voltar redondo confere) */
+  const ofertaAbertaRef = useRef(false);
+  ofertaAbertaRef.current = !!(presente || mensal19 || explica);
   // O cartão fala do anual com teste: some com o mensal selecionado e durante
   // a folha aberta; volta com o anual (a mesma exibição — sem novo evento).
   const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
@@ -654,6 +683,7 @@ export function PaywallIOS({
         key={presente.lugar}
         lugar={presente.lugar}
         oferta={presente.oferta}
+        explicar={presente.lugar === "folha_cancelada" || folhasCanceladasRef.current > 0}
         onFechar={() => setPresente(null)}
         onSucesso={async () => {
           const { lugar, oferta: p } = presente;
@@ -681,11 +711,39 @@ export function PaywallIOS({
         }}
       />
     )}
+    {/* 16/10 — a explicação antes da 2ª folha do anual (ExplicaFolha) */}
+    {explica && (
+      <ExplicaFolha
+        lugar="paywall"
+        produto={explica.produto}
+        preco={explica.preco}
+        precoTeste={explica.precoTeste}
+        dias={explica.dias}
+        onContinuar={() => { const seguir = explica.continuar; setExplica(null); seguir(); }}
+        onFechar={() => setExplica(null)}
+      />
+    )}
     </>
   );
 
   /* o toque no botão principal: o MESMO evento de hoje; no curto (anual com teste) a pílula
    * de preparação da folha fica ~1,2 s na tela e só então a compra abre */
+  /* 16/10 — a folha do anual já foi fechada nesta sessão e este produto ainda não foi explicado:
+   * a meia-folha ExplicaFolha vem antes (1x por produto por sessão). true = abriu a explicação. */
+  const explicarAntesDaFolha = (): boolean => {
+    if (!comTrial || folhasCanceladasRef.current < 1 || explicadosRef.current.has(oferta.produto)) return false;
+    explicadosRef.current.add(oferta.produto);
+    setExplica({ produto: oferta.produto, preco: precoAnualTxt, precoTeste, dias, continuar: () => { void comprar("anual"); } });
+    return true;
+  };
+  /** "Tentar de novo" do cartão da 2ª chance (os dois layouts). */
+  const tentarDeNovo = () => {
+    trackEvent("folha_segunda_chance_click", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
+    setSegundaChance("usada");
+    if (explicarAntesDaFolha()) return;
+    void comprar("anual");
+  };
+
   const tocarNoBotao = () => {
     trackEvent("funnel_click", {
       cta: "app_paywall_cta", funil: FUNIL, loja: "ios",
@@ -694,6 +752,8 @@ export function PaywallIOS({
       offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
       ...(curto ? { paywall_curto: true } : {}),
     });
+    // 16/10: na 2ª vez (folha já fechada) a explicação substitui a pílula
+    if (!mostraMensal && !comprando && !preparando && explicarAntesDaFolha()) return;
     if (curto && comTrial && !mostraMensal && !comprando) {
       if (preparando) return;
       setPreparando(true);
@@ -718,7 +778,8 @@ export function PaywallIOS({
     const voltar = () => {
       trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: FUNIL, loja: "ios", paywall_curto: true });
       window.dispatchEvent(new CustomEvent("core:voltar"));
-      if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !viuOfertaRef.current) onVoltar(); }, 400);
+      // 16/10: "oferta aberta AGORA" (não "já viu alguma"): depois de um presente fechado, o Voltar recua
+      if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !ofertaAbertaRef.current) onVoltar(); }, 400);
     };
     const radio = (ativo: boolean) => (
       <span className={`w-6 h-6 rounded-full grid place-items-center shrink-0 ${ativo ? "bg-[#16121c] text-white" : "border-2 border-black/15 bg-white"}`} aria-hidden>
@@ -797,11 +858,7 @@ export function PaywallIOS({
               <button
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
-                onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
-                  setSegundaChance("usada");
-                  void comprar("anual");
-                }}
+                onClick={tentarDeNovo}
               >
                 Tentar de novo
               </button>
@@ -1056,11 +1113,7 @@ export function PaywallIOS({
               <button
                 type="button"
                 className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
-                onClick={() => {
-                  trackEvent("folha_segunda_chance_click", { funil: FUNIL, loja: "ios", produto: oferta.produto, oferta: oferta.oferta, preco: precoAnual, dias, segunda_chance: "imediata" });
-                  setSegundaChance("usada");
-                  void comprar("anual");
-                }}
+                onClick={tentarDeNovo}
               >
                 Tentar de novo
               </button>

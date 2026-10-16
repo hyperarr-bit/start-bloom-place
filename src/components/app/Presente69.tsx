@@ -33,6 +33,14 @@
  * "bloqueio" o 69,90 converteu 0 de 53 — ligada, esses dois lugares PULAM o presente e vão
  * direto pro mensal 19,90 (prepararDireto19), se a offering `mensal_19` existir. Sem ela,
  * o presente de sempre.
+ *
+ * 16/10 (1.0.16, auditoria da escada — definitiva/escada-oferta.md):
+ *  · DOWNSELL É MAIS BARATO (regra do dono), em TODOS os lugares: se o 69,90 não for mais barato
+ *    que o anual da vitrine (mesmo produto, ou valor ≥ o da vitrine), o presente não aparece.
+ *    Antes só o "folha_cancelada" conferia; o Voltar mostrava "presente" com o MESMO preço no
+ *    braço 69,90 do teste de preço.
+ *  · `explicar` (PaywallIOS, depois de uma folha fechada): o 1º toque em "Começar N dias grátis"
+ *    mostra a meia-folha ExplicaFolha antes da folha da Apple (1x por presente aberto).
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -42,6 +50,7 @@ import { ehApple, erroFolhaNaoConcluiu, erroJaAtivo, erroNaoPermitido } from "@/
 import type { LugarDoPresente, Presente69 } from "@/lib/revenuecat";
 import { ofertaLigada } from "@/lib/ofertas-saida";
 import { Mensal19Folha, mensal19JaVisto, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
 
 const CHAVES: Record<LugarDoPresente, string> = {
   cancelou_teste: "core-presente69-cancelou-visto", // nas 2 allowlists (use-auth / use-user-data)
@@ -87,15 +96,27 @@ export async function prepararPresente(lugar: LugarDoPresente): Promise<OfertaDo
   let precoDe: string | null = null;
   try { await rc.prefetchAnualIos(); precoDe = rc.precoAnualIos(); } catch { /* sem o "de" */ }
   if (precoDe === dados.preco) precoDe = null; // a loja já serviu o 69 como anual: não riscar o próprio preço
+  // 16/10: downsell é MAIS BARATO que a vitrine, em todo lugar (regra do dono). A vitrine já é o
+  // próprio 69 (braço do teste de preço) ou vale menos/igual → sem presente.
+  if (!maisBaratoQueAVitrine(rc, dados)) return null;
   if (lugar === "folha_cancelada") {
     // só é downsell se for MAIS BARATO que o anual que ela acabou de recusar, e o texto
     // promete "3 dias grátis · nada é cobrado hoje": sem os dois, a 2ª chance de sempre
     if (!dados.comTrial || dados.dias <= 0 || !precoDe) return null;
-    let id: string | null = null;
-    try { id = rc.idProdutoAnualIos(); } catch { /* sem o id */ }
-    if (id === dados.produto) return null;
   }
   return { ...dados, precoDe, fimMs };
+}
+
+/** A régua do downsell: o presente vale MENOS que o anual da vitrine. Sem o número da loja de um
+ *  dos lados, confia no id (produto diferente = o 69 não é a vitrine). Puro sobre o módulo `rc`. */
+function maisBaratoQueAVitrine(rc: typeof import("@/lib/revenuecat"), dados: Presente69): boolean {
+  let id: string | null = null;
+  try { id = rc.idProdutoAnualIos(); } catch { /* sem o id */ }
+  if (id && id === dados.produto) return false;
+  let vitrine: number | null = null;
+  try { vitrine = rc.valorAnualIos() ?? null; } catch { /* mock antigo sem a função */ }
+  if (vitrine && dados.valor && dados.valor >= vitrine) return false;
+  return true;
 }
 
 /**
@@ -206,9 +227,11 @@ const CaixaDePresente = ({ aberta, reduzir }: { aberta: boolean; reduzir: boolea
   );
 };
 
-export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
+export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar = false }: {
   lugar: LugarDoPresente;
   oferta: OfertaDoPresente;
+  /** 16/10: a pessoa já fechou uma folha da Apple nesta sessão → explicação antes desta (só com teste). */
+  explicar?: boolean;
   /** "Agora não" (já marcado como visto). */
   onFechar: () => void;
   /** Folha fechou com sucesso e o acesso sincronizou (já marcado como visto). */
@@ -224,6 +247,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
   const extra = lugar === "x_paywall" || lugar === "folha_cancelada" ? { segunda_chance: segundaChanceDe(lugar) } : {};
   // 16/10: depois da folha do 97,90 fechada, o mesmo texto do Voltar (sempre com os dias grátis)
   const comTeste = (lugar === "x_paywall" || lugar === "folha_cancelada") && oferta.comTrial;
+  // 16/10: a meia-folha de explicação antes da folha da Apple — 1x por presente aberto
+  const [explicando, setExplicando] = useState(false);
+  const explicouRef = useRef(false);
 
   useEffect(() => {
     vivo.current = true;
@@ -351,7 +377,10 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           <motion.button
             initial={reduzir ? false : { opacity: 0, y: 10 }} animate={{ opacity: aberta ? 1 : 0, y: aberta ? 0 : 10 }} transition={reduzir ? { duration: 0 } : { delay: 0.3 }}
             disabled={comprando || !aberta}
-            onClick={() => void comprar()}
+            onClick={() => {
+              if (explicar && comTeste && !explicouRef.current) { explicouRef.current = true; setExplicando(true); return; }
+              void comprar();
+            }}
             data-testid="presente69-cta"
             className="w-full min-h-[54px] rounded-full text-[16px] font-extrabold text-white bg-[#16121c] shadow-[0_18px_38px_-10px_rgba(22,18,28,.5)] active:scale-[0.985] transition-transform grid place-items-center disabled:opacity-60"
           >
@@ -374,6 +403,17 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso }: {
           </button>
         </div>
       </div>
+      {explicando && (
+        <ExplicaFolha
+          lugar={`presente_${lugar}`}
+          produto={oferta.produto}
+          preco={oferta.preco}
+          precoTeste={null}
+          dias={oferta.dias}
+          onContinuar={() => { setExplicando(false); void comprar(); }}
+          onFechar={() => setExplicando(false)}
+        />
+      )}
     </div>
   );
 }

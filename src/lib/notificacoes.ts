@@ -8,6 +8,9 @@ import {
   type Leitor as LeitorDia2,
 } from "./lembrete-dia2";
 import { lerMissao } from "./missao-doses";
+import {
+  BASE_SEMANA_PAGANTE, assinaturaDaSemana, diasCobertos, gravarSemanaDoPagante, lerSemanaDoPagante, planejarSemanaDoPagante,
+} from "./semana-do-pagante";
 import { localDayKey } from "./utils";
 /* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
    este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
@@ -1144,6 +1147,8 @@ export async function cancelarResgateDoPlano(): Promise<void> {
  *  - Horário: 36 h antes do fim, puxado pra 9h–20h30 do MESMO dia (sempre
  *    entre 24 h e 48 h antes do fim — a Apple exige cancelar com 24 h de
  *    antecedência; depois das 48 h "amanhã" seria mentira). Fuso do aparelho.
+ *  - 16/10 (1.0.16): o TEXTO deixou de falar do fim do teste — virou aviso de
+ *    uso (ver copyDoLembreteDoTeste). Horário e armar/desarmar ficam iguais.
  */
 const BASE_LEMBRETE_TESTE = 920000;
 const CHAVE_LEMBRETE_TESTE = "core-lembrete-teste";
@@ -1166,16 +1171,31 @@ export function quandoLembrarDoTeste(fimMs: number, agora = Date.now()): Date | 
   return logo;
 }
 
-export function copyDoLembreteDoTeste(precoAno: string) {
+/*
+ * 16/10 (dono, 1.0.16): NENHUM texto do app fala em cancelar nem em a Apple
+ * cobrar antes. O aviso continua no mesmo horário (36 h antes do fim), mas
+ * agora é um aviso de USO: lembra o que a pessoa montou e puxa de volta pro
+ * plano do dia. Sem preço, sem "cobrança", sem "cancelar", sem "acaba".
+ * O toque abre o módulo da área da missão (ou a Home), nunca /planos.
+ */
+const NOME_DA_AREA_DO_TESTE: Record<string, string> = {
+  dinheiro: "Finanças",
+  rotina: "Rotina",
+  corpo: "Treino",
+  saude: "Saúde",
+  metas: "Metas",
+};
+
+export function copyDoLembreteDoTeste(area?: string | null) {
+  const nome = area ? NOME_DA_AREA_DO_TESTE[area] : undefined;
   return {
-    title: "Seu teste grátis do CORE acaba amanhã",
-    /* 10/10 (1.0.14): sai o "cancele hoje em Ajustes › Assinaturas" (ensinava o
-     * caminho de sair a quem só queria ser avisado) e entra o cartão — 59% das
-     * cobranças do fim do teste FALHAM no cartão, e a pessoa só descobre quando
-     * o acesso cai. A promessa do paywall ("a gente te avisa") continua a mesma. */
-    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica — só confira se o cartão da App Store está ok. Se não quiser, dá pra cancelar até amanhã.`,
+    title: nome ? `Seu plano de hoje em ${nome} está pronto` : "Seu plano de hoje no CORE está pronto",
+    body: "Tudo o que você montou nesses dias está te esperando. Abre e continua de onde parou — leva 1 minuto.",
   };
 }
+
+/** Pra onde o toque do aviso leva: o módulo da área da missão, senão a Home. */
+const rotaDoLembreteDoTeste = (area?: string | null): string => (area && ROTA_DA_AREA[area]) || "/home";
 
 const lerPedidoDeLembrete = (): PedidoDeLembreteDoTeste | null => {
   try {
@@ -1199,7 +1219,8 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
   const at = quandoLembrarDoTeste(p.fimMs);
   if (!at) { trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "tarde_demais", antes_do_fim_h: Math.round((p.fimMs - Date.now()) / 3600e3) }); return false; }
   const { LN } = plug;
-  const copy = copyDoLembreteDoTeste(p.precoAno);
+  const area = missaoAtual()?.area ?? null;
+  const copy = copyDoLembreteDoTeste(area);
   try {
     await LN.schedule({
       notifications: [{
@@ -1210,7 +1231,7 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
         channelId: CANAL,
         smallIcon: ICONE,
         iconColor: COR_MARCA,
-        extra: { rota: "/planos" },
+        extra: { rota: rotaDoLembreteDoTeste(area), tipo: "lembreteTeste" },
       }],
     });
     trackEvent("notif_lembrete_teste_armada", { ok: true, em_h: Math.round((at.getTime() - Date.now()) / 3600e3), antes_do_fim_h: Math.round((p.fimMs - at.getTime()) / 3600e3) });
@@ -1622,8 +1643,9 @@ export async function cancelarProximaDose(): Promise<void> {
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
  *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é
- *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO } as const;
+ *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14);
+ *  960000 é a semana do pagante (16/10, lib/semana-do-pagante). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO, semanaPagante: BASE_SEMANA_PAGANTE } as const;
 
 /** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
 export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {
@@ -1663,6 +1685,19 @@ export async function sincronizarLembreteDia2(
       trackEvent("lembrete_dia2_agendado", { ok: false, motivo: `sem_permissao_${estado}`, dia_do_uso: plano.ok === true ? plano.diaDoUso : null });
     }
     return { ok: false, motivo: `sem_permissao_${estado}` };
+  }
+  // 16/10: a semana do pagante anda junto (mesma abertura, mesma chave "Primeira semana") e
+  // ganha o dia que cobre — uma notificação por dia, nunca duas.
+  let cobertos: string[] = [];
+  try { cobertos = await sincronizarSemanaDoPagante(get, { ligado: p.ligado !== false, agora }); } catch { /* nunca segura o dia 2 */ }
+  if (plano.ok === true && cobertos.includes(localDayKey(plano.quando))) {
+    const assinaturaCedida = "motivo:semana_do_pagante";
+    if (e.ultimo?.assinatura !== assinaturaCedida) {
+      await limparFaixa(BASE_DIA2);
+      gravarDia2({ ...e, ultimo: { assinatura: assinaturaCedida, motivo: "semana_do_pagante" } });
+      trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "semana_do_pagante", dia_do_uso: plano.diaDoUso });
+    }
+    return { ok: false, motivo: "semana_do_pagante" };
   }
   const assinatura = assinaturaDoPlano(plano);
   // o mesmo plano já está no sistema (e ainda no futuro): nada a refazer
@@ -1724,9 +1759,73 @@ export async function sincronizarLembreteDia2(
   return { ok: true, quando: plano.quando, title, body, repetido: false };
 }
 
-/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta). */
+/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta) — e a semana do
+ *  pagante junto: as duas obedecem à mesma chave "Primeira semana". */
 export async function cancelarLembreteDia2(): Promise<void> {
   await limparFaixa(BASE_DIA2);
+  await cancelarSemanaDoPagante();
+}
+
+/* ─── SEMANA DO PAGANTE (16/10, lib/semana-do-pagante) ──────────────────────────
+   Os 7 avisos depois do pagamento, de uma vez (chegam mesmo pra quem não abre de novo).
+   Chamada de dentro do sincronizarLembreteDia2 (cada abertura, a central de avisos) — só
+   com a permissão JÁ dada; nada aqui pede permissão. Devolve os dias cobertos, que o
+   lembrete do dia 2 cede. O estado nasce no boot pela verdade da loja
+   (revenuecat.conferirTrialCartao → conferirSemanaDoPagante). */
+export async function sincronizarSemanaDoPagante(
+  get: LeitorDia2,
+  p: { ligado?: boolean; agora?: Date } = {},
+): Promise<string[]> {
+  const plug = await plugin();
+  if (!plug) return [];
+  const agora = p.agora ?? new Date();
+  const e = lerSemanaDoPagante();
+  const plano = planejarSemanaDoPagante(get, e, { ligado: p.ligado !== false, agora });
+  if (!e) { await limparFaixa(BASE_SEMANA_PAGANTE); return []; }
+  const assinatura = assinaturaDaSemana(plano);
+  // o mesmo plano já está no sistema: nada a refazer (o 1º aviso ainda é futuro, ou não há aviso)
+  if (e.ultimo?.assinatura === assinatura) return diasCobertos(plano);
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  if (plano.ok === false) {
+    gravarSemanaDoPagante({ ...e, ultimo: { assinatura } });
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: plano.motivo, confirmado: !!e.confirmado, origem: e.origem });
+    return [];
+  }
+  await garantirCanal();
+  const { LN } = plug;
+  try {
+    await LN.schedule({
+      notifications: plano.avisos.map((a) => ({
+        id: a.id, title: a.title, body: a.body,
+        schedule: { at: a.quando, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: a.rota, tipo: "semana_pagante", em: a.quando.toISOString(), dia: a.dia, modulo: a.modulo },
+      })),
+    });
+  } catch {
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: "erro_agendar" });
+    return [];
+  }
+  const dias = diasCobertos(plano);
+  gravarSemanaDoPagante({ ...e, ultimo: { assinatura, dias } });
+  trackEvent("semana_pagante_agendada", {
+    ok: true,
+    avisos: plano.avisos.length,
+    dias: plano.avisos.map((a) => a.dia),
+    modulos: plano.avisos.map((a) => a.modulo),
+    hora: rotuloDeMinutos(plano.avisos[0].quando.getHours() * 60 + plano.avisos[0].quando.getMinutes()),
+    tem_numero: plano.avisos.some((a) => a.temNumero),
+    confirmado: !!e.confirmado,
+    origem: e.origem,
+  });
+  return dias;
+}
+
+/** Desarma os avisos (o estado fica: religar a chave volta a armar o que ainda cabe). */
+export async function cancelarSemanaDoPagante(): Promise<void> {
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  const e = lerSemanaDoPagante();
+  if (e?.ultimo) gravarSemanaDoPagante({ ...e, ultimo: undefined });
 }
 
 /**

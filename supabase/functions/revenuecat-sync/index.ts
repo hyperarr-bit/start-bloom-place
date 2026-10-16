@@ -108,7 +108,18 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // armadilha que já custou caro 4 vezes. A escolha é pela chave MAIS LONGA
   // (infoProduto), então a ordem não salva: a linha tem que existir.
   core_anual_69: { billing: "annual", cents: 6990 },
+  // 17/10 iOS, preços novos (grupo de assinatura 22349268): anual R$ 119,90
+  // (pode ter 3 dias grátis) e mensal R$ 19,90 (nível 2). Sem estas linhas o
+  // startsWith casaria "core_anual"/"core_mensal" e gravaria 159,90 / 24,90 —
+  // dinheiro errado no banco e evento errado na Meta (a armadilha de sempre).
+  // Chave mais longa vence (infoProduto), mas ficam ANTES dos genéricos
+  // como nas outras.
+  core_anual_119: { billing: "annual", cents: 11990 },
   core_anual: { billing: "annual", cents: 15990 },
+  // "monthly" (assinatura que renova), NÃO "monthly_prepaid": é o mesmo preço
+  // do pré-pago Pix (coremensalpix), mas outro produto — o evento da Meta
+  // separa pelo par (cents + billing).
+  core_mensal_19: { billing: "monthly", cents: 1990 },
   core_mensal: { billing: "monthly", cents: 2490 },
   // Era do produto único (06-08/08): seguem no mapa pra base vitalícia
   // (restore, reembolso). Downsell 19,90 ANTES do cheio (startsWith).
@@ -367,6 +378,7 @@ async function mandarCompraProMeta(
       // Purchase genérico quando este caminho chegava primeiro. Dedup por tx (marcador) continua igual.
       6990:  { evento: "compra_anual_69",   sufixo: "a69", aceita: ["annual"] },
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid", "annual"] },
+      11990: { evento: "compra_anual_119",  sufixo: "a119", aceita: ["annual"] }, // 17/10: anual novo do iPhone (core_anual_119)
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
     // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par
@@ -375,7 +387,18 @@ async function mandarCompraProMeta(
     const VITALICIOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
       9790: { evento: "compra_vitalicio_97", sufixo: "v97", aceita: ["lifetime"] },
     };
-    const achado = billing === "lifetime" ? VITALICIOS[cents] : PRECOS[cents];
+    // 17/10: o MENSAL do iPhone de R$ 19,90 (core_mensal_19, assinatura que
+    // renova = billing "monthly") tem o MESMO preço do pré-pago Pix (1990,
+    // "monthly_prepaid") — e o PRECOS é por preço. Mesma saída do vitalício:
+    // mapa próprio escolhido pelo billing. Sem isto ele sairia só como
+    // Purchase genérico; pondo "monthly" no aceita do 1990, viraria
+    // compra_mensal_pix e misturaria os dois sinais. Junta no
+    // compra_mensal_geral como o mensal de 24,90 ("vendeu um mês").
+    const MENSAIS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
+      1990: { evento: "compra_mensal_19", sufixo: "m19", aceita: ["monthly"], junto: MENSAL_GERAL },
+    };
+    const achado = billing === "lifetime" ? VITALICIOS[cents]
+      : (billing === "monthly" && MENSAIS[cents]) || PRECOS[cents];
     const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) {
       eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });

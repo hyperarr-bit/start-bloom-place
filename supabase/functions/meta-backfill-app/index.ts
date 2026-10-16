@@ -291,6 +291,7 @@ async function mandarCompraProMeta(
       // Purchase genérico quando este caminho chegava primeiro. Dedup por tx (marcador) continua igual.
       6990:  { evento: "compra_anual_69",   sufixo: "a69", aceita: ["annual"] },
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid", "annual"] },
+      11990: { evento: "compra_anual_119",  sufixo: "a119", aceita: ["annual"] }, // 17/10: anual novo do iPhone (core_anual_119)
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
     // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par
@@ -299,7 +300,18 @@ async function mandarCompraProMeta(
     const VITALICIOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
       9790: { evento: "compra_vitalicio_97", sufixo: "v97", aceita: ["lifetime"] },
     };
-    const achado = billing === "lifetime" ? VITALICIOS[cents] : PRECOS[cents];
+    // 17/10: o MENSAL do iPhone de R$ 19,90 (core_mensal_19, assinatura que
+    // renova = billing "monthly") tem o MESMO preço do pré-pago Pix (1990,
+    // "monthly_prepaid") — e o PRECOS é por preço. Mesma saída do vitalício:
+    // mapa próprio escolhido pelo billing. Sem isto ele sairia só como
+    // Purchase genérico; pondo "monthly" no aceita do 1990, viraria
+    // compra_mensal_pix e misturaria os dois sinais. Junta no
+    // compra_mensal_geral como o mensal de 24,90 ("vendeu um mês").
+    const MENSAIS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
+      1990: { evento: "compra_mensal_19", sufixo: "m19", aceita: ["monthly"], junto: MENSAL_GERAL },
+    };
+    const achado = billing === "lifetime" ? VITALICIOS[cents]
+      : (billing === "monthly" && MENSAIS[cents]) || PRECOS[cents];
     const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) {
       eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });

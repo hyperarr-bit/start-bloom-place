@@ -226,6 +226,12 @@ export async function conferirTrialCartao(): Promise<void> {
         fimMs: typeof trial?.expirationDateMillis === "number" ? trial.expirationDateMillis : null,
       }))
       .catch(() => { /* noop */ });
+    /* 16/10 (1.0.16): a SEMANA DO PAGANTE (7 avisos de uso depois do pagamento) nasce
+     * aqui — teste com renovação ligada arma pro fim do teste; compra paga recente
+     * confirma; teste cancelado desarma. Solto: nunca segura o boot. */
+    void import("@/lib/semana-do-pagante")
+      .then((m) => m.conferirSemanaDoPagante(ativos as Record<string, import("@/lib/semana-do-pagante").EntitlementDaLoja>))
+      .catch(() => { /* noop */ });
   } catch { /* rede de segurança: nunca pode quebrar o boot */ }
 }
 

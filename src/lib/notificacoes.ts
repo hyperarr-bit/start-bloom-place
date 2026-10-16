@@ -8,6 +8,9 @@ import {
   type Leitor as LeitorDia2,
 } from "./lembrete-dia2";
 import { lerMissao } from "./missao-doses";
+import {
+  BASE_SEMANA_PAGANTE, assinaturaDaSemana, diasCobertos, gravarSemanaDoPagante, lerSemanaDoPagante, planejarSemanaDoPagante,
+} from "./semana-do-pagante";
 import { localDayKey } from "./utils";
 /* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
    este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
@@ -1640,8 +1643,9 @@ export async function cancelarProximaDose(): Promise<void> {
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
  *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é
- *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO } as const;
+ *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14);
+ *  960000 é a semana do pagante (16/10, lib/semana-do-pagante). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO, semanaPagante: BASE_SEMANA_PAGANTE } as const;
 
 /** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
 export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {
@@ -1681,6 +1685,19 @@ export async function sincronizarLembreteDia2(
       trackEvent("lembrete_dia2_agendado", { ok: false, motivo: `sem_permissao_${estado}`, dia_do_uso: plano.ok === true ? plano.diaDoUso : null });
     }
     return { ok: false, motivo: `sem_permissao_${estado}` };
+  }
+  // 16/10: a semana do pagante anda junto (mesma abertura, mesma chave "Primeira semana") e
+  // ganha o dia que cobre — uma notificação por dia, nunca duas.
+  let cobertos: string[] = [];
+  try { cobertos = await sincronizarSemanaDoPagante(get, { ligado: p.ligado !== false, agora }); } catch { /* nunca segura o dia 2 */ }
+  if (plano.ok === true && cobertos.includes(localDayKey(plano.quando))) {
+    const assinaturaCedida = "motivo:semana_do_pagante";
+    if (e.ultimo?.assinatura !== assinaturaCedida) {
+      await limparFaixa(BASE_DIA2);
+      gravarDia2({ ...e, ultimo: { assinatura: assinaturaCedida, motivo: "semana_do_pagante" } });
+      trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "semana_do_pagante", dia_do_uso: plano.diaDoUso });
+    }
+    return { ok: false, motivo: "semana_do_pagante" };
   }
   const assinatura = assinaturaDoPlano(plano);
   // o mesmo plano já está no sistema (e ainda no futuro): nada a refazer
@@ -1742,9 +1759,73 @@ export async function sincronizarLembreteDia2(
   return { ok: true, quando: plano.quando, title, body, repetido: false };
 }
 
-/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta). */
+/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta) — e a semana do
+ *  pagante junto: as duas obedecem à mesma chave "Primeira semana". */
 export async function cancelarLembreteDia2(): Promise<void> {
   await limparFaixa(BASE_DIA2);
+  await cancelarSemanaDoPagante();
+}
+
+/* ─── SEMANA DO PAGANTE (16/10, lib/semana-do-pagante) ──────────────────────────
+   Os 7 avisos depois do pagamento, de uma vez (chegam mesmo pra quem não abre de novo).
+   Chamada de dentro do sincronizarLembreteDia2 (cada abertura, a central de avisos) — só
+   com a permissão JÁ dada; nada aqui pede permissão. Devolve os dias cobertos, que o
+   lembrete do dia 2 cede. O estado nasce no boot pela verdade da loja
+   (revenuecat.conferirTrialCartao → conferirSemanaDoPagante). */
+export async function sincronizarSemanaDoPagante(
+  get: LeitorDia2,
+  p: { ligado?: boolean; agora?: Date } = {},
+): Promise<string[]> {
+  const plug = await plugin();
+  if (!plug) return [];
+  const agora = p.agora ?? new Date();
+  const e = lerSemanaDoPagante();
+  const plano = planejarSemanaDoPagante(get, e, { ligado: p.ligado !== false, agora });
+  if (!e) { await limparFaixa(BASE_SEMANA_PAGANTE); return []; }
+  const assinatura = assinaturaDaSemana(plano);
+  // o mesmo plano já está no sistema: nada a refazer (o 1º aviso ainda é futuro, ou não há aviso)
+  if (e.ultimo?.assinatura === assinatura) return diasCobertos(plano);
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  if (plano.ok === false) {
+    gravarSemanaDoPagante({ ...e, ultimo: { assinatura } });
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: plano.motivo, confirmado: !!e.confirmado, origem: e.origem });
+    return [];
+  }
+  await garantirCanal();
+  const { LN } = plug;
+  try {
+    await LN.schedule({
+      notifications: plano.avisos.map((a) => ({
+        id: a.id, title: a.title, body: a.body,
+        schedule: { at: a.quando, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: a.rota, tipo: "semana_pagante", em: a.quando.toISOString(), dia: a.dia, modulo: a.modulo },
+      })),
+    });
+  } catch {
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: "erro_agendar" });
+    return [];
+  }
+  const dias = diasCobertos(plano);
+  gravarSemanaDoPagante({ ...e, ultimo: { assinatura, dias } });
+  trackEvent("semana_pagante_agendada", {
+    ok: true,
+    avisos: plano.avisos.length,
+    dias: plano.avisos.map((a) => a.dia),
+    modulos: plano.avisos.map((a) => a.modulo),
+    hora: rotuloDeMinutos(plano.avisos[0].quando.getHours() * 60 + plano.avisos[0].quando.getMinutes()),
+    tem_numero: plano.avisos.some((a) => a.temNumero),
+    confirmado: !!e.confirmado,
+    origem: e.origem,
+  });
+  return dias;
+}
+
+/** Desarma os avisos (o estado fica: religar a chave volta a armar o que ainda cabe). */
+export async function cancelarSemanaDoPagante(): Promise<void> {
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  const e = lerSemanaDoPagante();
+  if (e?.ultimo) gravarSemanaDoPagante({ ...e, ultimo: undefined });
 }
 
 /**

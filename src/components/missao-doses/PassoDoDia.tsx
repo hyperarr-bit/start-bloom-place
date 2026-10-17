@@ -538,6 +538,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : montarFeito ? "Último toque · se quiser" : "Agora · 1 toque"}
       pergunta={pergunta}
       descricao={montarFeito ? "Ele entra no seu mês e o quanto dá pra gastar hoje já se ajusta."
+        : semMetaAgua ? "Escolhe a sua meta — o 1º copo de hoje já entra junto."
         : cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
         : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
         : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
@@ -655,8 +656,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   );
 }
 
-/** Lê o score do dia UMA vez (no instante em que a dose abre) e devolve pra missão. */
-function LerScoreDoDia({ aoLer }: { aoLer: (score: number) => void }) {
+/** Lê o score do dia UMA vez (no instante em que a dose abre — ou em que a missão começa) e devolve pra missão. */
+export function LerScoreDoDia({ aoLer }: { aoLer: (score: number) => void }) {
   const dados = useLifeHubData();
   const leu = useRef(false);
   useEffect(() => {
@@ -833,12 +834,14 @@ function AdesivoDeAmanha({ dias, tamanho }: { dias: 2 | 3; tamanho: number }) {
   return <span aria-hidden className="md-adesivo-fogo" data-trancado="" style={{ width: tamanho, height: tamanho }} data-testid="missao-doses-adesivo-amanha" data-adesivo={id}><Fogo dias={0} tamanho={Math.round(tamanho * 0.62)} /></span>;
 }
 
-/** A legenda do adesivo na comemoração pequena. */
-const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: number): string | null => {
-  if (!a) return null;
+/** A legenda do adesivo na comemoração pequena ("Adesivo novo: Primeira Despesa" / "Adesivos novos: X e Y"). */
+export const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: Array<{ nome: string }>): string | null => {
+  if (!a) return extras.length ? `${extras.length === 1 ? "Adesivo novo" : "Adesivos novos"}: ${extras.map((e) => e.nome).join(" e ")}` : null;
   if (a.tipo === "recomeca") return "Voltou! A sequência recomeça hoje.";
-  if (a.tipo === "marca") return "Seu dia 1 ficou marcado.";
-  return `Adesivo novo: ${a.nome}${extras ? ` e mais ${extras}` : ""}`;
+  if (a.tipo === "marca") return extras.length === 1 ? `Seu dia 1 ficou marcado — e veio o adesivo ${extras[0].nome}.` : "Seu dia 1 ficou marcado.";
+  if (!extras.length) return `Adesivo novo: ${a.nome}`;
+  if (extras.length === 1) return `Adesivos novos: ${a.nome} e ${extras[0].nome}`;
+  return `Adesivos novos: ${a.nome} e mais ${extras.length}`;
 };
 
 function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, gastoExtra }: {
@@ -881,7 +884,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   }
 
   const a = escolha.principal;
-  const legenda = legendaDoAdesivo(a, escolha.extras.length);
+  const legenda = legendaDoAdesivo(a, escolha.extras);
   const comArte = !!a && a.tipo !== "recomeca";
   const fechaMissao = n === 3 || !proximo;
   return createPortal(
@@ -908,7 +911,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
           <div className="mt-3.5 rounded-2xl px-4 py-3 flex items-center gap-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
             <span className="min-w-0 flex-1">
               <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {DOSE_CURTA[proximo.modulo].seg} s</span>
-              <span className="block text-[12px] opacity-75 mt-0.5">{n === 1 ? "E o adesivo do dia 2 fica te esperando 🔒" : "E o adesivo dos 3 dias seguidos é seu 🔒"}</span>
+              <span className="block text-[12px] opacity-75 mt-0.5">{n === 1 ? "O adesivo do dia 2 te espera 🔒" : "E o adesivo dos 3 dias é seu 🔒"}</span>
             </span>
             <AdesivoDeAmanha dias={n === 1 ? 2 : 3} tamanho={40} />
           </div>

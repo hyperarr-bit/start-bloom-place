@@ -382,6 +382,7 @@ export const QuickActions = () => {
         {actions.map((a, i) => (
           <motion.button
             key={a.id}
+            data-acao-rapida={a.id}
             onClick={() => { trackEvent("home_acao_rapida", { acao: a.id }); handleAction(a.id); }}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
               successId === a.id 

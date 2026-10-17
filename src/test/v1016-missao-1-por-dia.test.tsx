@@ -446,7 +446,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.getByTestId("missao-doses-adesivo-legenda")).toHaveTextContent("Adesivo novo: Primeira Despesa");
     expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toEqual(expect.arrayContaining(["first-expense", "first-income"]));
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: 📅 Rotina · 20 s");
-    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("E o adesivo do dia 2 fica te esperando 🔒");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("O adesivo do dia 2 te espera 🔒");
     expect(screen.getByTestId("missao-doses-adesivo-amanha")).toHaveAttribute("data-adesivo", "sequencia-2");
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
     expect(screen.queryByTestId("missao-doses-bora-proxima")).toBeNull();
@@ -607,7 +607,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.getByTestId("missao-doses-adesivo-legenda")).toHaveTextContent("Adesivo novo: 2 dias seguidos");
     expect(store.dados["conquistas-vistas"]).toMatchObject({ adesivos: expect.arrayContaining(["sequencia-2"]), marcos: [2] });
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: ❤️ Saúde · 10 s");
-    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("E o adesivo dos 3 dias seguidos é seu 🔒");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("E o adesivo dos 3 dias é seu 🔒");
     expect(screen.getByTestId("missao-doses-hora-12h")).toHaveAttribute("aria-checked", "true"); // a combinada; dá pra trocar
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
     expect(eventos).toContainEqual(["missao_adesivo_mostrado", expect.objectContaining({ id: "sequencia-2", tipo: "reserva", dia: 2, sequencia: 2 })]);

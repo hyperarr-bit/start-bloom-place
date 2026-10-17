@@ -213,7 +213,13 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
       const el = document.querySelector(`[data-tour="${atual.alvo}"]`) as HTMLElement | null;
       try { el?.scrollIntoView({ block: "center", behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
     }, 80);
-    return () => clearTimeout(t);
+    // 1.0.16 (curto): no passo das ações rápidas, a faixa rola pro lado até o "Registrar Gasto" aparecer inteiro
+    const t2 = variante === "curto" && atual.alvo === "acoes-rapidas" ? setTimeout(() => {
+      const gasto = document.querySelector('[data-acao-rapida="expense"]') as HTMLElement | null;
+      const faixa = gasto?.parentElement;
+      try { if (gasto && faixa) faixa.scrollTo({ left: Math.max(0, gasto.offsetLeft - 16), behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
+    }, 450) : undefined;
+    return () => { clearTimeout(t); if (t2) clearTimeout(t2); };
   }, [passo, ativo, reduzir]);
 
   // mede o alvo: no máximo 1x por quadro durante a rolagem + relógio de 250 ms (a receita do holofote)
@@ -282,8 +288,11 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   })();
   const widgetsLivres = WIDGET_CATALOG.filter((w) => !widgetsAtivos.includes(w.id)).slice(0, 3);
   const modulosOcultos = (get<{ hidden?: unknown } | null>("core-module-prefs", null)?.hidden ?? []) as unknown[];
+  // 1.0.16 (curto): os 3 módulos da missão nunca aparecem pra esconder — esconder a Rotina na véspera da dose dela
+  // seria pedir pra pessoa sumir com o plano de amanhã
+  const daMissao = variante === "curto" ? ((() => { try { const m = lerMissao(); return m && !m.explorou ? (m.modulos as string[]) : []; } catch { return []; } })()) : [];
   // os 6 primeiros da grade bastam: o resto a pessoa esconde na própria engrenagem (já aberta)
-  const modulosVisiveis = MODULOS.filter((m) => !modulosOcultos.includes(m.id)).slice(0, 6);
+  const modulosVisiveis = MODULOS.filter((m) => !modulosOcultos.includes(m.id) && !daMissao.includes(m.id)).slice(0, 6);
 
   const chip = "h-8 px-2.5 rounded-full text-[11.5px] font-semibold bg-white/15 border border-white/30 active:scale-95 transition whitespace-nowrap";
   const principal = "h-10 px-4 rounded-full text-[13px] font-bold bg-white text-accent active:scale-95 transition";

@@ -223,8 +223,13 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             </motion.div>
             <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
             <p className="text-[15.5px] text-muted-foreground mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.</p>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-7">Seu plano de 3 dias</p>
-            <div className="mt-2 rounded-2xl bg-card border border-border/60 shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
+            <div className="mt-7 flex items-baseline justify-between gap-3">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Seu plano de 3 dias</p>
+              <button type="button" className="text-[13px] font-bold min-h-9 px-1 -mr-1" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>
+                Trocar
+              </button>
+            </div>
+            <div className="mt-1 rounded-2xl bg-card border border-border/60 shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
               {linhas.map(({ n, cfg }) => (
                 <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
                   <Quadradinho marcado={false} tam={18} />
@@ -242,14 +247,9 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
           <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
             Começar ({seg1} s) <ArrowRight className="w-4 h-4" />
           </button>
-          <div className="flex items-center justify-center gap-5 mt-1">
-            <button type="button" className="md-link" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
-              Explorar por conta própria
-            </button>
-            <button type="button" className="md-link" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>
-              Trocar os módulos
-            </button>
-          </div>
+          <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
+            Explorar por conta própria
+          </button>
         </RodapeColado>
       </div>
     );

@@ -19,7 +19,7 @@ import {
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { BoasVindasDoses } from "./BoasVindasDoses";
-import { PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
+import { LerScoreDoDia, PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
 import { ConviteDoDia } from "./ConviteDoDia";
@@ -329,6 +329,12 @@ function Ligada() {
       return { ...missao, modulos, boasVindas: true };
     };
     return (
+      <>
+      {/* braço A: o score do começo (o "começo X → hoje Y" do "O que você construiu" dizia "0"); o B e a missão
+          antiga ficam byte a byte como estão */}
+      {ehUmPorDia(missao) && missao.scoreNoInicio === undefined && (
+        <LerScoreDoDia aoLer={(score) => { const m = lerMissao() ?? missao; if (m.scoreNoInicio === undefined) salvar({ ...m, scoreNoInicio: score }); }} />
+      )}
       <BoasVindasDoses
         missao={missao}
         nome=""
@@ -348,6 +354,7 @@ function Ligada() {
           trackEvent("missao_pular", eventoDaMissao({ dia: 1, passo: "boas_vindas", segundos: 0, via: "link_boas_vindas" satisfies ViaDoPulo }));
         }}
       />
+      </>
     );
   }
 

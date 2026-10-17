@@ -1417,7 +1417,7 @@ function PassagemDaProxima({ proximo, n, reduzir, aoIr, aoAgoraNao }: { proximo:
     <>
       <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-proxima-dose" data-passagem="auto">
         <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Dose {n + 1} de {TOTAL_PASSOS_B} · {proximo.emoji} {proximo.nome}</span>
-        <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — 20 s</span>
+        <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — {doseCurta(proximo.modulo, n + 1).seg} s</span>
         <span className="block text-[12.5px] text-[#4f5a64] mt-1">{proximo.pedido}.</span>
         <div className="h-1.5 rounded-full bg-black/10 overflow-hidden mt-2.5" aria-hidden>
           <motion.div className="h-full rounded-full" style={{ background: "hsl(var(--accent))" }} initial={{ width: reduzir ? "100%" : "0%" }} animate={{ width: "100%" }} transition={{ duration: reduzir ? 0 : PASSAGEM_B_MS / 1000, ease: "linear" }} />

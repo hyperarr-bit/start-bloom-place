@@ -110,9 +110,17 @@ const INTRO: Record<string, unknown> = {
   core_anual_97: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
   core_anual_69: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
 };
+// 17/10: `localStorage.__rc_mock_intro_dias` = "7" ensaia outra duração do teste grátis (o paywall lê da loja).
+const introDe = (id: string): Record<string, unknown> | undefined => {
+  const base = INTRO[id] as Record<string, unknown> | undefined;
+  if (!base) return undefined;
+  let dias = 0;
+  try { dias = Number(localStorage.getItem("__rc_mock_intro_dias")) || 0; } catch { /* noop */ }
+  return dias > 0 ? { ...base, period: `P${dias}D`, periodNumberOfUnits: dias } : base;
+};
 // 01/10: no iPhone a offering ATUAL decide o braço do teste de preço. `localStorage.__rc_mock_offering`
 // = "anual_69" ensaia o braço B (produto core_anual_69); o padrão é "default" (core_anual_97).
-const produtoMock = (id: string) => ({ identifier: id, priceString: PRECOS[id] ?? "R$ 0,00", ...VALOR(PRECOS[id] ?? "R$ 0,00"), title: `CORE ${id} (mock)`, ...(INTRO[id] ? { introPrice: INTRO[id] } : {}) });
+const produtoMock = (id: string) => ({ identifier: id, priceString: PRECOS[id] ?? "R$ 0,00", ...VALOR(PRECOS[id] ?? "R$ 0,00"), title: `CORE ${id} (mock)`, ...(introDe(id) ? { introPrice: introDe(id) } : {}) });
 const ehIos = () => { try { return (window as any).Capacitor?.getPlatform?.() === "ios"; } catch { return false; } };
 const offeringIos = () => {
   let nome = "default";
@@ -194,7 +202,7 @@ export const Purchases: any = {
         priceString: PRECOS[id] ?? "R$ 0,00",
         ...VALOR(PRECOS[id] ?? "R$ 0,00"),
         title: `CORE ${id} (mock)`,
-        ...(INTRO[id] ? { introPrice: INTRO[id] } : {}),
+        ...(introDe(id) ? { introPrice: introDe(id) } : {}),
       })),
     };
   },

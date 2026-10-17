@@ -44,6 +44,9 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   // while rendering a different component", varredura 26/09).
   const latestRef = useRef<T>(state);
   const origem = useRef<symbol>(Symbol(key));
+  // 16/10: de onde a tela partiu antes de a conta chegar do servidor — vai junto da escrita
+  // feita nesse intervalo pro use-user-data juntar com o servidor sem ressuscitar o padrão.
+  const baseAntesDaConta = useRef<T>(state);
 
   // Outra instância gravou a mesma chave: adota o valor (sem regravar no store).
   useEffect(() => {
@@ -98,7 +101,8 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     latestRef.current = next;
     lastWrittenJson.current = json;
     setState(next);
-    setData(key, next);
+    if (hydratedRef.current) setData(key, next);
+    else setData(key, next, { base: baseAntesDaConta.current });
     // fora da pilha atual: quem escreve pode estar no meio de um updater/render
     const aviso: AvisoDeEscrita = { key, json, value: next, origem: origem.current };
     queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));

@@ -21,7 +21,9 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: () => ({ select: () => selecao, upsert: () => Promise.resolve({ error: null }), delete: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
-      auth: { getSession: async () => ({ data: { session: null } }), getUser: async () => ({ data: { user: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      // 16/10: a sessão do auth acompanha o usuário logado do useAuth — o use-user-data só aceita a
+      // leitura da conta com token desta conta (sem sessão, a RLS devolve vazio sem erro).
+      auth: { getSession: async () => ({ data: { session: { access_token: "t", user: auth.user } } }), getUser: async () => ({ data: { user: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
       functions: { invoke: async () => ({ data: null, error: null }) },
     },
   };

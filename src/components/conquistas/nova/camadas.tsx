@@ -3,7 +3,7 @@ import { Bell, ChevronRight, Share2, Shield, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { trackEvent } from "@/lib/analytics";
 import { normalizarDias, somarDias } from "@/lib/sequencia";
-import { ROTULOS_DA_SEMANA, segundaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
+import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type DiaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
@@ -89,6 +89,36 @@ export const CelebracaoMarco = ({ badge, dias, seq, onContinuar, onCompartilhar 
 
 /* ------------------------------------------------------------------ o detalhe da sequência */
 
+const R = 86, C = 98, FOLGA = 10;
+const TOTAL = 2 * Math.PI * R;
+const ARCO = TOTAL / 7 - FOLGA;
+
+/** O ANEL DE 7 ARCOS da semana (direção B), com o fogo e o número no centro — agora só no detalhe (17/10). */
+export const AnelDaSemana = ({ seq }: { seq: Sequencia }) => {
+  const semana = useMemo(() => semanaDaSequencia(seq.lista, seq.usados, seq.hoje), [seq.lista, seq.usados, seq.hoje]);
+  const hojeIdx = semana.findIndex((d) => d.estado === "hoje");
+  const semHoje: DiaDaSemana[] = semana.map((d) => (d.estado === "hoje" ? { ...d, estado: "futuro" as EstadoDia } : d));
+  const ini = (i: number) => (i * (ARCO + FOLGA) + FOLGA / 2) / TOTAL * Math.PI * 2;
+  const a0 = ini(Math.max(0, hojeIdx)), a1 = a0 + (ARCO / TOTAL) * Math.PI * 2;
+  const p = (a: number) => `${(C + Math.cos(a) * R).toFixed(2)} ${(C + Math.sin(a) * R).toFixed(2)}`;
+  return (
+    <div className="cn-b-anel" data-testid="cn-anel">
+      <svg viewBox="0 0 196 196" aria-hidden>
+        {semHoje.map((d, i) => (
+          <circle key={d.dia} className="cn-b-seg" data-estado={d.estado} cx={C} cy={C} r={R} strokeDasharray={`${ARCO} ${TOTAL - ARCO}`} strokeDashoffset={-(i * (ARCO + FOLGA) + FOLGA / 2)} />
+        ))}
+        {/* o arco de "hoje" tracejado precisa do próprio recorte: um arco só, tracejado, no lugar dele */}
+        {hojeIdx >= 0 && <path className="cn-b-seg" data-estado="hoje" d={`M ${p(a0)} A ${R} ${R} 0 0 1 ${p(a1)}`} />}
+      </svg>
+      <div className="cn-b-centro">
+        <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={44} viva={seq.dias > 0} />
+        <span className="cn-b-num">{seq.dias}</span>
+        <span className="cn-b-rot">{seq.dias === 1 ? "DIA SEGUIDO" : "DIAS SEGUIDOS"}</span>
+      </div>
+    </div>
+  );
+};
+
 const Calendario28 = ({ seq }: { seq: Sequencia }) => {
   const anotados = useMemo(() => new Set(normalizarDias(seq.lista)), [seq.lista]);
   const protegidos = useMemo(() => new Set(seq.usados), [seq.usados]);
@@ -114,12 +144,10 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
     <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
       <SheetContent side="bottom" className="rounded-t-3xl max-h-[92dvh] overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="cn-detalhe-sequencia">
         <div className="max-w-sm mx-auto pt-1" style={varsDaFaixa(seq.faixa)}>
-          <div className="flex items-center gap-3">
-            <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={44} viva={seq.dias > 0} />
-            <div>
-              <SheetTitle className="text-[22px] font-black tracking-tight leading-none">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
-              <SheetDescription className="text-[12px] text-muted-foreground mt-1">{seq.faixa.nome} · recorde {seq.recorde} · {seq.lista.length} dias anotados</SheetDescription>
-            </div>
+          <AnelDaSemana seq={seq} />
+          <div className="text-center mt-2">
+            <SheetTitle className="text-[16px] font-black tracking-tight leading-none">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
+            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{seq.faixa.nome} · recorde {seq.recorde} · {seq.lista.length} dias anotados</SheetDescription>
           </div>
           <div className="mt-4 rounded-2xl border border-border p-3">
             <p className="cn-caps text-muted-foreground mb-2">Últimas 4 semanas</p>

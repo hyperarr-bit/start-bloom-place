@@ -169,11 +169,14 @@ interface PaginaProps {
   destaques: Readonly<Record<string, string>>;
   /** (16/10, Conquistas 2) o rodapé das páginas de seção diz "Faltam N figurinhas nesta página". */
   rodapeFaltam: boolean;
+  /** (17/10) Colou a desta página e tem mais figurinha nova em OUTRA página: o rodapé leva até lá. */
+  proximaNova: { indice: number; titulo: string; quantas: number } | null;
+  onIrPara: (indice: number) => void;
   onSelecionar: (b: Badge) => void;
   onColar?: (b: Badge) => void;
 }
 
-const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, onSelecionar, onColar }: PaginaProps) => {
+const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, proximaNova, onIrPara, onSelecionar, onColar }: PaginaProps) => {
   const grande = p.tipo === "mais-raros";
   const col = grande ? 3 : 4;
   const gapX = grande ? 10 : 6;
@@ -223,6 +226,10 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
       <footer className="alb-pe">
         {pendentesAqui > 0 ? (
           <span className="alb-pe-perto" data-testid="album-pe-colar"><b>{pendentesAqui === 1 ? "1 figurinha nova" : `${pendentesAqui} figurinhas novas`}</b> · toque pra colar</span>
+        ) : proximaNova ? (
+          <button type="button" className="alb-pe-perto alb-pe-proxima" onClick={() => onIrPara(proximaNova.indice)} data-testid="album-pe-proxima">
+            <b>{proximaNova.quantas === 1 ? "Mais 1 figurinha nova" : `Mais ${proximaNova.quantas} figurinhas novas`}</b> em {proximaNova.titulo} <ChevronRight className="inline w-3 h-3 -mt-0.5" aria-hidden />
+          </button>
         ) : (mod || rodapeFaltam) && !grande ? (
           <span className="alb-pe-perto" data-testid="album-pe-pagina">{p.vagas.length > coladasAqui ? <><b>{fraseDaPagina(coladasAqui, p.vagas.length)}</b>{perto ? <> · a mais perto: {perto.name}</> : null}</> : "Página completa — todas coladas."}</span>
         ) : perto ? (
@@ -586,6 +593,16 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     setColadasAgora((s) => new Set([...s, b.id]));
     onColar?.(b);
   }, [onColar]);
+  /** (17/10) Depois de colar as desta página (só então — não em qualquer página): a próxima página de seção que ainda tem figurinha nova. */
+  const proximaNovaDe = useCallback((daqui: number): { indice: number; titulo: string; quantas: number } | null => {
+    if (!pendentesEfetivas.size || !coladasAgora.size || !paginas[daqui]?.vagas.some((b) => coladasAgora.has(b.id))) return null;
+    const ordem = paginas.map((_, i) => i).filter((i) => i > 0 && i !== daqui).sort((a, b) => ((a > daqui ? 0 : 1) - (b > daqui ? 0 : 1)) || a - b);
+    for (const i of ordem) {
+      const quantas = paginas[i].vagas.filter((b) => pendentesEfetivas.has(b.id)).length;
+      if (quantas) return { indice: i, titulo: paginas[i].modulo ? categoriaDe(paginas[i].modulo!).label : paginas[i].raridade ? CAPITULO[paginas[i].raridade!].titulo : paginas[i].titulo, quantas };
+    }
+    return null;
+  }, [paginas, pendentesEfetivas, coladasAgora]);
   /** O ângulo da folha que está virando (0 → −180 pra frente; −180 → 0 pra trás). */
   const rot = useMotionValue(0);
   const rotCapa = useMotionValue(0);
@@ -838,7 +855,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     dir={papel === "sobre" ? virando?.dir : undefined}
                     pagina={p.id}
                     testid={papel === "sobre" ? "album-virando" : undefined}
-                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} onSelecionar={setDetalhe} onColar={colarPendente} />}
+                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} proximaNova={papel === "fundo" ? proximaNovaDe(i) : null} onIrPara={irPara} onSelecionar={setDetalhe} onColar={colarPendente} />}
                     verso={<VersoDaPagina ano={ano} />}
                   />
                   {/* a sombra que a folha projeta na página de baixo: logo DEPOIS dela no DOM (por cima dela, por baixo da que gira) */}

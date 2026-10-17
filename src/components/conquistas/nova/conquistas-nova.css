@@ -22,7 +22,15 @@
 .dark .cn-seq { border-color: var(--fg-borda-escuro, hsl(var(--border))); }
 .cn-seq-cab { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; background: linear-gradient(90deg, var(--fg-a, #fb923c), var(--fg-b, #f43f5e)); color: var(--fg-texto, #fff); }
 .cn-seq[data-faixa="apagado"] .cn-seq-cab { background: linear-gradient(90deg, #a8a29e, #78716c); color: #fff; }
-.cn-b-anel { position: relative; width: 196px; height: 196px; margin: 0 auto; }
+/* a linha compacta: fogo + número + "dias seguidos" | os 7 pontos da semana */
+.cn-seq-linha { display: flex; align-items: center; gap: 10px; }
+.cn-seq-dias { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.cn-seq-num { font-size: 34px; font-weight: 900; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
+.cn-seq-rot { font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.cn-seq-semana { margin-left: auto; display: grid; grid-template-columns: repeat(7, 16px); gap: 3px; flex-shrink: 0; }
+.cn-seq-resumo { margin-top: 8px; font-size: 11.5px; font-weight: 600; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+/* o anel de 7 arcos (só no detalhe da sequência) */
+.cn-b-anel { position: relative; width: 172px; height: 172px; margin: 0 auto; }
 .cn-b-anel > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
 .cn-b-anel .cn-b-seg { fill: none; stroke: hsl(var(--muted)); stroke-width: 9; stroke-linecap: round; }
 .dark .cn-b-anel .cn-b-seg { stroke: hsl(var(--muted) / .9); }
@@ -30,7 +38,7 @@
 .cn-b-anel .cn-b-seg[data-estado="gelo"] { stroke: #7dd3fc; }
 .cn-b-anel .cn-b-seg[data-estado="hoje"] { stroke: var(--fg-meio, #f97316); stroke-dasharray: 3 5; opacity: .8; animation: cn-pulsa 1.6s ease-in-out infinite; }
 .cn-b-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
-.cn-b-num { font-size: 54px; font-weight: 900; letter-spacing: -.05em; line-height: .95; font-variant-numeric: tabular-nums; margin-top: 2px; color: hsl(var(--foreground)); }
+.cn-b-num { font-size: 46px; font-weight: 900; letter-spacing: -.05em; line-height: .95; font-variant-numeric: tabular-nums; margin-top: 2px; color: hsl(var(--foreground)); }
 .cn-b-rot { font-size: 10px; font-weight: 800; letter-spacing: .22em; color: hsl(var(--muted-foreground)); margin-top: 4px; }
 .cn-b-letras { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cn-b-letra { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; color: hsl(var(--muted-foreground) / .7); }
@@ -96,7 +104,8 @@
 .cn-tela-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); }
 .cn-grade4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 4px; }
 .cn-celula { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px 0 4px; border-radius: 12px; }
-.cn-celula-nome { font-size: 10px; font-weight: 800; line-height: 1.1; text-align: center; padding: 0 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* padding em cima + margem negativa: o overflow do line-clamp cortava o acento das maiúsculas ("ÉPICAS" virava "EPICAS") */
+.cn-celula-nome { font-size: 10px; font-weight: 800; line-height: 1.1; text-align: center; padding: .2em 2px 0; margin-top: -.2em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* ---------- toast + celebração do marco + detalhe ---------- */
 .cn-toast { position: fixed; left: 12px; right: 12px; top: calc(10px + var(--app-safe-top, env(safe-area-inset-top, 0px))); z-index: 450; margin: 0 auto; max-width: 366px; display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 10px; border-radius: 16px; background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); box-shadow: 0 16px 36px -16px rgba(0, 0, 0, .55), 0 2px 8px -4px rgba(0, 0, 0, .25); animation: cn-toast-entra .5s cubic-bezier(.34, 1.4, .64, 1) both; text-align: left; }

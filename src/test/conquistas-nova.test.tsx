@@ -208,8 +208,14 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(screen.getByTestId("cn-amanha-frase").textContent).toContain("Faltam 2 dias pro adesivo de 14 dias 🔥");
     expect(screen.getByTestId("cn-amanha-instrucao").textContent).toContain("Vale qualquer anotação");
     expect(document.body.textContent).not.toMatch(/dias de anotação|a vaga já está/);
-    // o cartão da sequência tem a cara dos cards do app: faixa com o título em caixa alta
-    expect(screen.getByTestId("cn-hero").querySelector(".cn-seq-cab")?.textContent).toContain("SEQUÊNCIA");
+    // o cartão da sequência, compacto e com a cara dos cards do app: faixa "SEQUÊNCIA", número + "dias seguidos", os 7 pontos, o resumo numa linha — sem o anel grande
+    const hero = screen.getByTestId("cn-hero");
+    expect(hero.querySelector(".cn-seq-cab")?.textContent).toContain("SEQUÊNCIA");
+    expect(hero.querySelector(".cn-seq-cab")?.textContent).not.toMatch(/fogo (vermelho|laranja)/);
+    expect(hero.querySelector(".cn-seq-num")?.textContent).toBe("12");
+    expect(screen.getByTestId("cn-seq-semana").querySelectorAll("[data-estado]")).toHaveLength(7);
+    expect(screen.getByTestId("cn-seq-resumo").textContent?.replace(/\s+/g, " ")).toContain("Recorde 12 · 1 de 2 protetores · 12 dias anotados");
+    expect(hero.querySelector(".cn-b-anel")).toBeNull();
     expect(screen.getByTestId("cn-colecao")).toBeTruthy();
     expect(screen.queryByTestId("seletor-capa")).toBeNull();
     expect(document.body.textContent).not.toMatch(/INSÍGNIAS|Nível |XP/);
@@ -326,10 +332,42 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(outraTelaAberta()).toBe(false);
   });
 
-  it("o detalhe da sequência (4 semanas) abre e mede", () => {
+  it("duas figurinhas novas em páginas diferentes: colou uma → o rodapé oferece a próxima ('Mais 1 figurinha nova em Raras') e leva até ela", () => {
+    // first-expense (comum) e sequencia-3 (rara) fora do visto
+    const { store } = montar({}, { "conquistas-album-visto": ["sequencia-7", "sequencia-2"] });
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("2");
+    fireEvent.click(screen.getByTestId("cn-album-pacotinho"));
+    avancar(CAPA_SAI_MS + 1000);
+    const tela = screen.getByTestId("album-tela");
+    const paginaDeBaixo = () => tela.querySelector('[data-papel="fundo"]') as HTMLElement;
+    const pendente = paginaDeBaixo().querySelector("[data-pendente]") as HTMLElement;
+    expect(pendente).toBeTruthy();
+    const primeiro = pendente.getAttribute("data-vaga")!;
+    act(() => { fireEvent.click(pendente); });
+    // colou: o rodapé desta página agora aponta pra outra página com figurinha nova
+    const proxima = paginaDeBaixo().querySelector('[data-testid="album-pe-proxima"]') as HTMLElement;
+    expect(proxima.textContent).toMatch(/Mais 1 figurinha nova em (Raras|Comuns)/);
+    const antes = tela.getAttribute("data-atual");
+    act(() => { fireEvent.click(proxima); });
+    avancar(800);
+    expect(tela.getAttribute("data-atual")).not.toBe(antes);
+    const segunda = tela.querySelector('[data-papel="fundo"] [data-pendente]') as HTMLElement;
+    expect(segunda).toBeTruthy();
+    expect(segunda.getAttribute("data-vaga")).not.toBe(primeiro);
+    act(() => { fireEvent.click(segunda); });
+    expect(tela.querySelector('[data-papel="fundo"] [data-pendente]')).toBeNull();
+    expect(tela.querySelector('[data-testid="album-pe-proxima"]')).toBeNull();
+    // as duas viraram vistas: o selo "N novas" some da capa
+    expect((store.dados["conquistas-album-visto"] as string[]).sort()).toEqual(["first-expense", "sequencia-2", "sequencia-3", "sequencia-7"]);
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("0");
+    expect(screen.queryByTestId("cn-album-selo")).toBeNull();
+  });
+
+  it("o detalhe da sequência (4 semanas, com o anel de 7 arcos) abre e mede", () => {
     montar();
     fireEvent.click(screen.getByTestId("cn-abrir-sequencia"));
     expect(screen.getByTestId("cn-detalhe-sequencia")).toBeTruthy();
+    expect(screen.getByTestId("cn-anel")).toBeTruthy();
     expect(screen.getByTestId("cn-calendario").querySelectorAll('[data-estado="feito"]').length).toBe(12);
     expect(nomes()).toContain(EVENTOS2.sequenciaAbrir);
   });

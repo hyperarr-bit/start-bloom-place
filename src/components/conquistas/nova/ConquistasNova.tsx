@@ -7,7 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 import { mesAtualExtenso } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { diaDaMissao, missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
-import { semanaDaSequencia, type DiaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
+import { semanaDaSequencia } from "@/lib/sequencia-semana";
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { AdesivoRaro } from "../adesivos-raridade";
 import { Fogo } from "../Fogo";
@@ -117,63 +117,39 @@ const AcaoDoDia = ({ seq, onAcao }: { seq: Sequencia; onAcao: (rota: string) => 
   );
 };
 
-const R = 86, C = 98, FOLGA = 10;
-const TOTAL = 2 * Math.PI * R;
-const ARCO = TOTAL / 7 - FOLGA;
-
-const AnelSemana = ({ semana }: { semana: DiaDaSemana[] }) => (
-  <svg viewBox="0 0 196 196" aria-hidden>
-    {semana.map((d, i) => (
-      <circle key={d.dia} className="cn-b-seg" data-estado={d.estado} cx={C} cy={C} r={R} strokeDasharray={`${ARCO} ${TOTAL - ARCO}`} strokeDashoffset={-(i * (ARCO + FOLGA) + FOLGA / 2)} />
-    ))}
-  </svg>
-);
-
-/** O arco de "hoje" tracejado precisa do próprio recorte: um arco só, tracejado, no lugar dele. */
-const ArcoHoje = ({ indice }: { indice: number }) => {
-  const ini = (i: number) => (i * (ARCO + FOLGA) + FOLGA / 2) / TOTAL * Math.PI * 2;
-  const a0 = ini(indice), a1 = a0 + (ARCO / TOTAL) * Math.PI * 2;
-  const p = (a: number) => `${(C + Math.cos(a) * R).toFixed(2)} ${(C + Math.sin(a) * R).toFixed(2)}`;
-  return (
-    <svg viewBox="0 0 196 196" aria-hidden>
-      <path className="cn-b-seg" data-estado="hoje" d={`M ${p(a0)} A ${R} ${R} 0 0 1 ${p(a1)}`} />
-    </svg>
-  );
-};
-
+/**
+ * O cartão da SEQUÊNCIA, COMPACTO (dono 17/10: o anel grande empurrava o álbum
+ * pra fora da tela): uma linha com o fogo + o número grande + "dias seguidos"
+ * à esquerda e os 7 pontos da semana (S T Q Q S S D) à direita; embaixo,
+ * "Recorde 12 · 1 de 2 protetores · 13 dias anotados"; e a ação do dia. O anel
+ * de 7 arcos foi pro detalhe da sequência (camadas.tsx). A faixa do cabeçalho
+ * é a dos cards do app ("🔥 SEQUÊNCIA"), sem o nome da faixa do fogo.
+ */
 const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; onDetalhe: () => void; onAcao: (rota: string) => void }) => {
   const { seq } = e;
   const semana = useMemo(() => semanaDaSequencia(seq.lista, seq.usados, seq.hoje), [seq.lista, seq.usados, seq.hoje]);
-  const hojeIdx = semana.findIndex((d) => d.estado === "hoje");
-  const semHoje = semana.map((d) => (d.estado === "hoje" ? { ...d, estado: "futuro" as EstadoDia } : d));
   return (
     <section className="cn-card cn-seq" style={varsDaFaixa(seq.faixa)} aria-label="Sequência" data-testid="cn-hero" data-faixa={seq.faixa.id}>
-      <div className="cn-seq-cab">
+      <button type="button" className="cn-seq-cab w-full" onClick={onDetalhe} data-testid="cn-abrir-sequencia">
         <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={18} semBrilho />
         SEQUÊNCIA
-        <span className="ml-auto text-[11px] font-bold tracking-normal normal-case opacity-90">{seq.dias > 0 ? seq.faixa.nome : "apagado"}</span>
-      </div>
-      <div className="px-4 pt-4 pb-4">
-      <button type="button" onClick={onDetalhe} className="relative block w-full text-center" data-testid="cn-abrir-sequencia">
-        <div className="cn-b-anel">
-          <AnelSemana semana={semHoje} />
-          {hojeIdx >= 0 && <ArcoHoje indice={hojeIdx} />}
-          <div className="cn-b-centro">
-            <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={52} viva={seq.dias > 0} />
-            <span className="cn-b-num">{seq.dias}</span>
-            <span className="cn-b-rot">{seq.dias === 1 ? "DIA SEGUIDO" : "DIAS SEGUIDOS"}</span>
-          </div>
-        </div>
+        <span className="ml-auto inline-flex items-center gap-0.5 text-[10.5px] font-bold tracking-normal normal-case opacity-90">detalhes <ChevronRight className="w-3.5 h-3.5" aria-hidden /></span>
       </button>
-      <div className="cn-b-letras mt-3 px-3">
-        {semana.map((d) => <span key={d.dia} className="cn-b-letra" data-estado={d.estado}><i /> {d.rotulo.charAt(0)}</span>)}
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
-        <span className="cn-b-stat"><b>{seq.recorde}</b><span>recorde</span></span>
-        <span className="cn-b-stat"><b className="inline-flex items-center gap-1"><Shield className="w-3.5 h-3.5" aria-hidden /> {seq.saldo} de 2</b><span>protetores</span></span>
-        <span className="cn-b-stat"><b>{seq.lista.length}</b><span>dias anotados</span></span>
-      </div>
-      <div className="mt-3"><AcaoDoDia seq={seq} onAcao={onAcao} /></div>
+      <div className="px-4 pt-3 pb-3.5">
+        <div className="cn-seq-linha">
+          <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={36} viva={seq.dias > 0} />
+          <span className="cn-seq-dias">
+            <b className="cn-seq-num">{seq.dias}</b>
+            <span className="cn-seq-rot">{seq.dias === 1 ? "dia seguido" : "dias seguidos"}</span>
+          </span>
+          <span className="cn-seq-semana" role="list" aria-label="Semana" data-testid="cn-seq-semana">
+            {semana.map((d) => <span key={d.dia} className="cn-b-letra" data-estado={d.estado} role="listitem" aria-label={`${d.rotulo}: ${d.estado}`}><i /> {d.rotulo.charAt(0)}</span>)}
+          </span>
+        </div>
+        <p className="cn-seq-resumo" data-testid="cn-seq-resumo">
+          Recorde {seq.recorde} · <Shield className="inline w-3 h-3 -mt-0.5" aria-hidden /> {seq.saldo} de 2 protetores · {seq.lista.length} {seq.lista.length === 1 ? "dia anotado" : "dias anotados"}
+        </p>
+        <div className="mt-2.5"><AcaoDoDia seq={seq} onAcao={onAcao} /></div>
       </div>
     </section>
   );

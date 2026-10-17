@@ -1339,6 +1339,51 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
   };
   afterEach(() => { Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true }); });
 
+  it("B11 + D1: fechar o app NA tela do número (com ou sem o gasto anotado ali) → reabrir volta NELA, com os chips (ou o ✓), nunca no anel do 1º gasto; 'Ver no meu mês' → o MEU MÊS → a festa, um gasto só", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoNova("A");
+    const store = montarStore({});
+    montar(store, "/financas");
+    const mf = () => within(screen.getByTestId("montar-financas"));
+    fireEvent.click(mf().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(mf().getByRole("button", { name: /Aluguel/ }));
+    fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
+    avancar(2500); // "Montando…" → "Você pode gastar hoje R$ X" com os chips do 1º gasto
+    expect(screen.getByTestId("montar-postit-gasto")).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    avancar(400); // a dose grava ali mesmo, na tela do número (B11)
+    expect(lerMissao()?.feitos[1]).toBeDefined();
+    expect(lerMissao()?.gastoGuiado).toMatchObject({ n: 1, dia: "2026-10-03" });
+    // (1) o app morre sem ela tocar em nada → reabre na Home → a missão leva de volta pra TELA DO NÚMERO
+    cleanup();
+    montar(store, "/home");
+    for (let i = 0; i < 10; i++) avancar(300);
+    expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
+    expect(screen.getByTestId("montar-postit-gasto")).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    expect(screen.queryByTestId("missao-doses-anel")).toBeNull(); // nunca o anel do passo do gasto
+    expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0);
+    // (2) toca o Café ALI (vira ✓) e o app morre de novo
+    fireEvent.click(screen.getByRole("button", { name: /^Café, R\$ 12/ }));
+    expect(store.dados["finance-expenses"]).toHaveLength(1);
+    cleanup();
+    montar(store, "/financas");
+    for (let i = 0; i < 6; i++) avancar(300);
+    const postit = screen.getByTestId("montar-postit-gasto");
+    expect(postit).toHaveAttribute("data-anotado"); // o ✓ de antes, sem gravar de novo
+    expect(postit).toHaveTextContent("Primeiro gasto no lugar.");
+    expect(screen.queryByTestId("missao-doses-anel")).toBeNull();
+    // (3) "Ver no meu mês →": sem anel — o MEU MÊS (o "Saiu" conta) e a festa; o gasto é um só, a dose é uma só
+    fireEvent.click(screen.getByRole("button", { name: /Ver no meu mês/ }));
+    expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-gasto-extra")).toHaveTextContent("E o gasto de hoje (Café, R$ 12) já entrou no seu mês.");
+    expect(store.dados["finance-expenses"]).toHaveLength(1);
+    expect(eventos.filter(([n]) => n === "missao_doses_dia_feito")).toHaveLength(1);
+    expect(eventos.some(([n, d]) => n === "missao_doses_passo" && d.alvo === "pode_gastar")).toBe(false); // o número já caiu na tela do Montar
+    expect(lerMissao()?.gastoGuiado).toBeUndefined();
+  });
+
   it("a cadeia inteira no relógio falso: 'Ver minhas Finanças' → post-it com os chips em < 1,5 s → 1 TOQUE no chip = o gasto na conta → o 'olha' (≤ 4 s) → a festa; os eventos do Montar e da dose levam o mesmo missao_id/braço", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");

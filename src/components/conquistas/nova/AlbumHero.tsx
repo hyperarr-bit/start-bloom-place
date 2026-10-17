@@ -34,9 +34,10 @@ export const AlbumHero = ({ e, levantando, onAbrir, onPacotinho }: { e: EstadoCo
           )}
         </button>
         <div className="min-w-0 flex flex-col">
-          <span id="cn-titulo-album" className="cn-caps" style={{ color: "hsl(var(--accent))" }}>Álbum de figurinhas</span>
-          <span className="mt-1.5 leading-none tracking-[-.02em] font-black text-[20px] tabular-nums" data-testid="cn-album-contagem">
-            <b className="text-[30px]">{e.abertos}</b> de {e.total} <span className="text-[12px] font-bold text-muted-foreground tracking-normal">coladas</span>
+          {/* (dono 17/10) sem o eyebrow "ÁLBUM DE FIGURINHAS" — a capa já diz; fica só pro leitor de tela */}
+          <span id="cn-titulo-album" className="sr-only">Álbum de figurinhas</span>
+          <span className="mt-1 leading-none tracking-[-.02em] font-black text-[20px] tabular-nums" data-testid="cn-album-contagem" aria-label={`${e.abertos} de ${e.total} figurinhas coladas`}>
+            <b className="text-[30px]">{e.abertos}</b> de {e.total}
           </span>
           <span className="flex items-center gap-2 mt-2 text-[11px] font-extrabold text-muted-foreground">
             <span className="cn-barra flex-1"><i style={{ width: `${pct}%` }} /></span>
@@ -45,14 +46,11 @@ export const AlbumHero = ({ e, levantando, onAbrir, onPacotinho }: { e: EstadoCo
           {novas > 0 ? (
             <button type="button" className="cn-album-pacote" onClick={onPacotinho} data-testid="cn-album-pacotinho" aria-label={`${novas} ${novas === 1 ? "figurinha nova" : "figurinhas novas"} pra colar — abrir o álbum`}>
               <span className="cn-album-pacote-fig" aria-hidden />
-              <span className="min-w-0 text-left">
-                <b className="block text-[11.5px] text-foreground leading-tight">{novas === 1 ? "1 figurinha nova pra colar" : `${novas} figurinhas novas pra colar`}</b>
-                <small className="block text-[10px] text-muted-foreground">toque pra abrir o álbum</small>
-              </span>
+              <b className="min-w-0 text-left text-[12.5px] text-foreground leading-tight">{novas === 1 ? "1 nova pra colar" : `${novas} novas pra colar`}</b>
             </button>
           ) : e.abertos === 0 ? (
             <span className="mt-2.5 text-[11.5px] text-muted-foreground leading-[1.35]" data-testid="cn-album-vazio">
-              Nenhuma figurinha ainda. <b className="text-foreground">Anota algo hoje</b> e a primeira cola.
+              <b className="text-foreground">Anota algo hoje</b> e a primeira cola.
             </span>
           ) : e.paginaMaisPerto ? (
             <span className="mt-2.5 text-[11.5px] text-muted-foreground leading-[1.35]" data-testid="cn-album-pagina">

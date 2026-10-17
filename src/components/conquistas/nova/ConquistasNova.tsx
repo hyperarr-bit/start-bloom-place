@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Check, ChevronRight, Shield } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Shield, Trophy } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { trackEvent } from "@/lib/analytics";
 import { mesAtualExtenso } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { diaDaMissao, missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { semanaDaSequencia } from "@/lib/sequencia-semana";
-import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
+import { raridadeDe, type Badge } from "@/components/gamification/types";
 import { AdesivoRaro } from "../adesivos-raridade";
 import { Fogo } from "../Fogo";
 import { varsDaFaixa } from "../CardSequencia";
-import { AlbumTela, CAPITULO } from "../AlbumTela";
+import { AlbumTela } from "../AlbumTela";
 import { paginaDaFigurinha } from "../album-paginas";
 import { Previa } from "../SeletorDeArte";
 import { StoriesAdesivo } from "../Stories";
 import { compartilharAdesivo } from "../compartilhar-conquistas";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, fraseDoPremio, marcoDoAdesivo, quandoCurto, type ProximoPremio } from "./recompensas";
-import { useConquistasNova, type ColecaoNova, type EstadoConquistasNova, type PaginaDeRaridade } from "./use-conquistas-nova";
+import { EVENTOS2, fraseDoPremio, marcoDoAdesivo, quandoCurto } from "./recompensas";
+import { useConquistasNova, type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import { AlbumHero } from "./AlbumHero";
 import { CelebracaoMarco, ColecaoTela, DetalheSequencia, ToastAdesivo } from "./camadas";
 import "../conquistas.css";
@@ -74,13 +74,14 @@ export const diaDoTeste = (): 1 | 2 | 3 | null => {
 
 /* ------------------------------------------------------------------ cabeçalho */
 
-const Cabecalho = ({ seq, onVoltar }: { seq: Sequencia; onVoltar: () => void }) => (
+const Cabecalho = ({ onVoltar }: { onVoltar: () => void }) => (
   <header className="border-b border-border bg-card sticky top-0 z-50">
     <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
       <button type="button" onClick={onVoltar} className="hover:bg-muted rounded-md p-1 transition-colors" aria-label="Voltar">
         <ArrowLeft className="w-5 h-5" />
       </button>
-      <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={20} semBrilho />
+      {/* o troféu de sempre (dono 17/10: o fogo no cabeçalho não) — o mesmo da TelaConquistas, claro e escuro */}
+      <Trophy className="w-5 h-5 text-amber-500" aria-hidden />
       <h1 className="text-base font-bold tracking-tight">CONQUISTAS</h1>
       <div className="flex items-center gap-2 ml-auto">
         <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -95,25 +96,33 @@ const Cabecalho = ({ seq, onVoltar }: { seq: Sequencia; onVoltar: () => void }) 
 
 /* ------------------------------------------------------------------ o cartão da sequência (B) */
 
+/** "anote o gasto de hoje" → "anote o gasto": o chip já começa com "Hoje:". */
+export const semHojeNoFim = (t: string) => t.replace(/\s+(de\s+)?hoje\b\.?$/i, "");
+
+/**
+ * A ação do dia num chip só — "Hoje: marque um hábito" (dono 17/10: menos
+ * palavras, o olho vai pro número e pro álbum); feito → "Hoje garantido ✓".
+ * A frase inteira fica no aria-label.
+ */
 const AcaoDoDia = ({ seq, onAcao }: { seq: Sequencia; onAcao: (rota: string) => void }) => {
   const { hojeFeito, dias, acao } = seq;
   if (hojeFeito) {
     return (
-      <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="cn-garantido">
-        <span className="font-bold inline-flex items-center gap-1" style={{ color: "hsl(var(--success))" }}>
-          Hoje já está garantido <Check className="w-4 h-4" strokeWidth={3} aria-hidden />
-        </span>
-        {` — ${dias} ${dias === 1 ? "dia seguido" : "dias seguidos"}.`}
+      <p className="cn-seq-feito" data-testid="cn-garantido" aria-label={`Hoje já está garantido — ${dias} ${dias === 1 ? "dia seguido" : "dias seguidos"}`}>
+        <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden /> Hoje garantido
       </p>
     );
   }
   return (
-    <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="cn-acao">
-      {dias > 0 ? <>Anota <b className="text-foreground">1 coisa</b> hoje pra não perder a sequência: </> : <>Anota <b className="text-foreground">1 coisa</b> hoje pra começar: </>}
-      <button type="button" className="cn-acao" onClick={() => { trackEvent(EVENTOS2.acaoToque, { acao: acao.id, via: "principal" }); onAcao(acao.rota); }}>
-        {acao.texto}
-      </button>
-    </p>
+    <button
+      type="button"
+      className="cn-acao cn-acao-chip"
+      data-testid="cn-acao"
+      aria-label={`Anota 1 coisa hoje pra ${dias > 0 ? "não perder a sequência" : "começar"}: ${acao.texto}`}
+      onClick={() => { trackEvent(EVENTOS2.acaoToque, { acao: acao.id, via: "principal" }); onAcao(acao.rota); }}
+    >
+      Hoje: {semHojeNoFim(acao.texto)}
+    </button>
   );
 };
 
@@ -121,7 +130,8 @@ const AcaoDoDia = ({ seq, onAcao }: { seq: Sequencia; onAcao: (rota: string) => 
  * O cartão da SEQUÊNCIA, COMPACTO (dono 17/10: o anel grande empurrava o álbum
  * pra fora da tela): uma linha com o fogo + o número grande + "dias seguidos"
  * à esquerda e os 7 pontos da semana (S T Q Q S S D) à direita; embaixo,
- * "Recorde 12 · 1 de 2 protetores · 13 dias anotados"; e a ação do dia. O anel
+ * "Recorde 12 · 🛡 1 protetor" (dono 17/10: sem "de 2" e sem "dias anotados" —
+ * o detalhe tem tudo); e a ação do dia num chip. O anel
  * de 7 arcos foi pro detalhe da sequência (camadas.tsx). A faixa do cabeçalho
  * é a dos cards do app ("🔥 SEQUÊNCIA"), sem o nome da faixa do fogo.
  */
@@ -146,8 +156,8 @@ const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; on
             {semana.map((d) => <span key={d.dia} className="cn-b-letra" data-estado={d.estado} role="listitem" aria-label={`${d.rotulo}: ${d.estado}`}><i /> {d.rotulo.charAt(0)}</span>)}
           </span>
         </div>
-        <p className="cn-seq-resumo" data-testid="cn-seq-resumo">
-          Recorde {seq.recorde} · <Shield className="inline w-3 h-3 -mt-0.5" aria-hidden /> {seq.saldo} de 2 protetores · {seq.lista.length} {seq.lista.length === 1 ? "dia anotado" : "dias anotados"}
+        <p className="cn-seq-resumo" data-testid="cn-seq-resumo" aria-label={`Recorde ${seq.recorde} dias · ${seq.saldo} de 2 protetores · ${seq.lista.length} dias anotados`}>
+          Recorde {seq.recorde} · <Shield className="inline w-3 h-3 -mt-0.5" aria-hidden /> {seq.saldo} {seq.saldo === 1 ? "protetor" : "protetores"}
         </p>
         <div className="mt-2.5"><AcaoDoDia seq={seq} onAcao={onAcao} /></div>
       </div>
@@ -157,22 +167,16 @@ const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; on
 
 /* ------------------------------------------------------------------ a trilha + amanhã você ganha */
 
-const TextoDoPremio = ({ premio, testeDia }: { premio: ProximoPremio; testeDia: 1 | 2 | 3 | null }) => {
-  const b = premio.adesivo;
-  const r = b ? raridadeDe(b) : null;
-  return (
-    <>
-      <span className="block text-[15px] font-extrabold leading-tight" data-testid="cn-amanha-frase">{fraseDoPremio(premio)}</span>
-      <span className="block text-[11.5px] text-muted-foreground leading-[1.35] mt-0.5" data-testid="cn-amanha-instrucao">
-        {r && r !== "comum" ? `Adesivo ${RARIDADE_LABEL[r].toLowerCase()}${b && premio.daProtetor ? " + 1 protetor" : ""}. ` : b && premio.daProtetor ? "E mais 1 protetor. " : ""}
-        {premio.instrucao}
-        {testeDia && premio.marco === 3 ? " — é o 3º dia da sua missão" : ""}
-      </span>
-    </>
-  );
-};
+/** "Voltei" · "3 dias" · "7 dias" … — o rótulo curto do marco na trilha (o nome inteiro, "3 Dias Seguidos", fica no aria-label). */
+const rotuloDoMarco = (b: Badge, m: number) => (m === 2 ? b.name : `${m} dias`);
 
-const Trilha = ({ e, onAdesivo, testeDia }: { e: EstadoConquistasNova; onAdesivo: (b: Badge) => void; testeDia: 1 | 2 | 3 | null }) => {
+/**
+ * A TRILHA dos marcos (2 → 3 → 7 → 14 → 30 → 100). Enxuta (dono 17/10): sem o
+ * contador "3 de 6", sem "COLADO"/"30 DIAS" embaixo (a cor já diz), só o "EM 2
+ * DIAS" no próximo, e embaixo só "Faltam 2 dias pro adesivo de 14 dias 🔥" — a
+ * explicação ("adesivo raro + 1 protetor · vale qualquer anotação…") vai pro aria-label.
+ */
+const Trilha = ({ e, onAdesivo }: { e: EstadoConquistasNova; onAdesivo: (b: Badge) => void }) => {
   const { premio, trilha, seq } = e;
   const trilhoRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -185,53 +189,35 @@ const Trilha = ({ e, onAdesivo, testeDia }: { e: EstadoConquistasNova; onAdesivo
     <section className="cn-card" aria-label="Próximos prêmios" data-testid="cn-amanha" style={varsDaFaixa(seq.faixa)}>
       <div className="h-11 px-4 flex items-center gap-2 border-b border-border">
         <h2 className="text-[13px] font-extrabold tracking-wide">ADESIVOS DA SEQUÊNCIA</h2>
-        <span className="ml-auto text-[11px] font-bold text-muted-foreground whitespace-nowrap">{trilha.filter((b) => b.unlocked).length} de {trilha.length}</span>
       </div>
       <div className="cn-trilha" ref={trilhoRef}>
         {trilha.map((b) => {
           const m = marcoDoAdesivo(b.id)!;
           const proximo = m === premio.marco;
           return (
-            <button key={b.id} type="button" className="cn-trilha-no" data-feito={b.unlocked ? "" : undefined} data-proximo={proximo ? "" : undefined} data-trancado={!b.unlocked ? "" : undefined} onClick={() => onAdesivo(b)} aria-label={`${m} dias: ${b.name}`}>
+            <button key={b.id} type="button" className="cn-trilha-no" data-feito={b.unlocked ? "" : undefined} data-proximo={proximo ? "" : undefined} data-trancado={!b.unlocked ? "" : undefined} onClick={() => onAdesivo(b)} aria-label={`${b.name} (${m} dias seguidos): ${b.unlocked ? "colado" : proximo ? quandoCurto(premio).toLowerCase() : `faltam ${Math.max(1, m - seq.dias)} dias`}`}>
               <span className="cn-trilha-disco"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={proximo ? 50 : 38} trancado={!b.unlocked} /></span>
-              <span className="cn-trilha-quando">{proximo ? quandoCurto(premio) : b.unlocked ? "colado" : `${m} dias`}</span>
-              <span className="cn-trilha-nome">{b.name}</span>
+              {/* só o próximo tem o "quando"; os outros guardam o espaço (os nomes ficam alinhados) */}
+              <span className="cn-trilha-quando" aria-hidden={!proximo}>{proximo ? quandoCurto(premio) : "\u00a0"}</span>
+              <span className="cn-trilha-nome">{rotuloDoMarco(b, m)}</span>
             </button>
           );
         })}
       </div>
-      <div className="px-4 pb-3.5 pt-1 flex items-start gap-3 border-t border-dashed border-border">
-        <span className="flex-1 min-w-0 pt-2"><TextoDoPremio premio={premio} testeDia={testeDia} /></span>
-      </div>
+      <p className="px-4 pb-3.5 pt-3 border-t border-dashed border-border text-[15px] font-extrabold leading-tight" data-testid="cn-amanha-frase" aria-label={`${fraseDoPremio(premio)}. ${premio.adesivo && premio.daProtetor ? "E mais 1 protetor. " : ""}${premio.instrucao}`}>
+        {fraseDoPremio(premio)}
+      </p>
     </section>
   );
 };
 
-/* ------------------------------------------------------------------ por módulo (secundário) */
+/* ------------------------------------------------------------------ ver todos (secundário) */
 
-const PaginasDoAlbum = ({ e, onPagina, onTodos }: { e: EstadoConquistasNova; onPagina: (p: PaginaDeRaridade) => void; onTodos: () => void }) => (
-  <section className="cn-card" aria-labelledby="cn-titulo-paginas" data-testid="cn-colecao">
-    <div className="h-11 px-4 flex items-center gap-2">
-      <h2 id="cn-titulo-paginas" className="text-[13px] font-extrabold tracking-wide">PÁGINAS DO ÁLBUM</h2>
-      <span className="ml-auto text-[12.5px] font-bold tabular-nums">{e.abertos} de {e.total}</span>
-    </div>
-    <div className="cn-modulos px-3 pb-3">
-      {e.paginasDeRaridade.map((p) => (
-        <button key={p.raridade} type="button" className="cn-modulo" data-rar={p.raridade} data-completa={p.abertos >= p.total ? "" : undefined} onClick={() => onPagina(p)} data-testid={`cn-pagina-${p.raridade}`}>
-          <span className="cn-modulo-icone" aria-hidden>{CAPITULO[p.raridade].icone}</span>
-          <span className="min-w-0 flex-1">
-            {/* leading-none + truncate cortava o acento do "Épicas" */}
-            <span className="cn-serif block text-[16px] leading-[1.15]">{p.titulo}</span>
-            <span className="block text-[10px] font-bold text-muted-foreground mt-0.5 tabular-nums truncate">{p.abertos} de {p.total}{p.total - p.abertos <= 3 && p.total > p.abertos ? <span style={{ color: "hsl(var(--accent))" }}> · faltam {p.total - p.abertos}</span> : p.abertos >= p.total ? " · completa" : ""}</span>
-          </span>
-          <span className="cn-barra w-9 shrink-0"><i style={{ width: `${Math.round((p.abertos / Math.max(1, p.total)) * 100)}%` }} /></span>
-        </button>
-      ))}
-    </div>
-    <button type="button" onClick={onTodos} className="w-full h-10 text-[12px] font-bold text-muted-foreground inline-flex items-center justify-center gap-1 border-t border-border" data-testid="cn-ver-todos">
-      <span>Ver todos os adesivos</span> <ChevronRight className="w-3.5 h-3.5" aria-hidden />
-    </button>
-  </section>
+/** (dono 17/10) sem os chips das páginas na tela principal — o álbum tem as próprias abas; fica só o link discreto da grade. */
+const VerTodos = ({ onTodos }: { onTodos: () => void }) => (
+  <button type="button" onClick={onTodos} className="cn-ver-todos" data-testid="cn-ver-todos">
+    <span>Ver todos os adesivos</span> <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+  </button>
 );
 
 /* ------------------------------------------------------------------ a tela */
@@ -312,27 +298,29 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, onVoltar
   const adesivoMarco = e.adesivos.find((b) => b.id === "sequencia-7") ?? e.adesivos[0];
   const pendentesIds = useMemo(() => e.pendentes.map((b) => b.id), [e.pendentes]);
 
+  // o chip da missão (dono 17/10: curto) — o adesivo de hoje/amanhã já está na trilha, então sem frase repetida aqui
+  const n = e.pendentes.length;
   const missao: ReactNode = testeDia ? (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1" data-testid="cn-missao">
       <span className="cn-pill cn-pill-acento">Missão · dia {testeDia} de 3</span>
-      <span className="text-[11.5px] text-muted-foreground min-w-0">
-        {e.pendentes.length > 0
-          ? <button type="button" className="font-bold text-foreground underline-offset-2 underline" onClick={() => abrirAlbum("missao", e.paginaDasNovas)} data-testid="cn-missao-album">Tem adesivo novo pra colar no álbum ›</button>
-          : testeDia === 3 ? "Último dia: anota 1 coisa e ganha o adesivo de 3 dias." : testeDia === 2 ? "Anota 1 coisa hoje. Amanhã vem o adesivo de 3 dias." : "Anota 1 coisa hoje. Amanhã vem o adesivo \"Voltei\"."}
-      </span>
+      {n > 0 && (
+        <button type="button" className="text-[11.5px] font-bold text-foreground underline underline-offset-2" onClick={() => abrirAlbum("missao", e.paginaDasNovas)} data-testid="cn-missao-album" aria-label={`${n} ${n === 1 ? "adesivo novo" : "adesivos novos"} pra colar — abrir o álbum`}>
+          {n === 1 ? "1 adesivo novo pra colar ›" : `${n} adesivos novos pra colar ›`}
+        </button>
+      )}
     </div>
   ) : null;
 
   return (
     <div className="cn min-h-screen bg-background" data-testid="conquistas-nova">
-      <Cabecalho seq={e.seq} onVoltar={voltar} />
+      <Cabecalho onVoltar={voltar} />
       <main className="cn-main min-h-[calc(100vh-57px)]">
         <div className="max-w-lg mx-auto px-4 pt-4 pb-10 space-y-3.5">
           {missao}
           <CartaoSequencia e={e} onDetalhe={abrirDetalhe} onAcao={irPara} />
           <AlbumHero e={e} levantando={levantando} onAbrir={() => abrirAlbum("capa", 0)} onPacotinho={() => abrirAlbum("pacotinho", e.paginaDasNovas)} />
-          <Trilha e={e} onAdesivo={(b) => tocarAdesivo(b)} testeDia={testeDia} />
-          <PaginasDoAlbum e={e} onPagina={(p) => { trackEvent(EVENTOS2.colecaoAbrir, { colecao: p.raridade }); abrirAlbum("colecao", p.indice); }} onTodos={abrirTodos} />
+          <Trilha e={e} onAdesivo={(b) => tocarAdesivo(b)} />
+          <VerTodos onTodos={abrirTodos} />
         </div>
       </main>
 

@@ -8,7 +8,7 @@ import {
   type Leitor as LeitorDia2,
 } from "./lembrete-dia2";
 import {
-  DIA_FIM_DA_MISSAO, DOSE_CURTA, MODULOS as MODULOS_DA_MISSAO, diaDaMissao as diaDaMissaoDoses, doseDeHojeDevida, ehUmPorDia, lerMissao,
+  DIA_FIM_DA_MISSAO, doseCurta, MODULOS as MODULOS_DA_MISSAO, diaDaMissao as diaDaMissaoDoses, doseDeHojeDevida, ehUmPorDia, lerMissao,
   missaoCumprida as missaoCumpridaDoses, passoPendente, type ModuloDaMissao,
 } from "./missao-doses";
 import {
@@ -1305,11 +1305,11 @@ async function cederSequenciaNoDia(dia: string): Promise<void> {
  *   você. Hoje: 📅 Rotina — 1 hábito, 20 s." (sem dose: "…Hoje dá pra gastar até R$ X." ou só "…com você.")
  * O toque abre o módulo da dose de hoje (ou a Home) — NUNCA /planos.
  */
-export interface ContextoDoAviso { modulo?: ModuloDaMissao | null; porDia?: number | null }
+export interface ContextoDoAviso { modulo?: ModuloDaMissao | null; porDia?: number | null; /** a dose de hoje (1..3): a 1ª é o quiz; as outras, a guiada simples */ n?: number }
 export function copyDoLembreteDoTeste(c: ContextoDoAviso = {}) {
   const base = "Seu plano anual começa sozinho e tudo que você montou fica com você.";
   let resto = "";
-  if (c.modulo) { const cfg = MODULOS_DA_MISSAO[c.modulo]; resto = ` Hoje: ${cfg.emoji} ${cfg.nome} — ${DOSE_CURTA[c.modulo].texto}.`; }
+  if (c.modulo) { const cfg = MODULOS_DA_MISSAO[c.modulo]; resto = ` Hoje: ${cfg.emoji} ${cfg.nome} — ${doseCurta(c.modulo, c.n ?? 2).texto}.`; }
   else if (c.porDia && c.porDia > 0) resto = ` Hoje dá pra gastar até R$ ${reaisInteiros(c.porDia)}.`;
   return { title: "Seu teste grátis termina amanhã", body: base + resto };
 }
@@ -1385,8 +1385,9 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste, get?: L
   }
   const dia = localDayKey(at);
   const modulo = doseNoDiaDoAviso(dia);
+  const nDaDose = modulo ? (() => { try { const m = lerMissao(); return m ? passoPendente(m)?.n ?? 2 : 2; } catch { return 2; } })() : undefined;
   const porDia = !modulo && get ? porDiaDasFinancas(get, at) : null;
-  const copy = copyDoLembreteDoTeste({ modulo, porDia });
+  const copy = copyDoLembreteDoTeste({ modulo, porDia, n: nDaDose });
   const rota = modulo ? MODULOS_DA_MISSAO[modulo].rota : "/home";
   const ass = `${at.toISOString()}|${copy.title}|${copy.body}|${rota}`;
   if (p.ass === ass) return true; // o mesmo aviso já está no sistema

@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { somarDias } from "@/lib/sequencia";
-import { DOSE_CURTA, MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { doseCurta, MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /** "Ontem" / "Na sexta" / "No sábado" — quando a dose anterior foi feita, do jeito que se fala. */
@@ -58,7 +58,7 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
   if (!pendente) return null;
   const cfg = MODULOS[pendente.modulo];
   const dia = pendente.n;
-  const seg = DOSE_CURTA[pendente.modulo].seg;
+  const seg = doseCurta(pendente.modulo, pendente.n).seg;
   // a sequência (dias com QUALQUER registro) está viva em 2 dias e hoje ainda não tem registro: esta dose fecha os 3
   const fechaTres = dia === 3 && seq.dias === 2 && !seq.hojeFeito;
   const anterior = linhaDaDoseAnterior(missao, hoje);

@@ -51,7 +51,7 @@ import { Anel, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, EVENTO_MISSAO_DOSES, conviteDoDiaDevido, doseDeHojeDevida, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao, precisaPlanoA,
   missaoDoDiaEmCena, moduloDaMissaoHoje, definirDonoDaMissao, donoDaConta, marcarDoseNaTela, doseNaTela, CHAVE_MISSAO_NA_CONTA,
-  retomadaDoGasto, setupDaDose, idDaMissao,
+  retomadaDoGasto, setupDaDose, idDaMissao, doseCurta,
 } from "@/lib/missao-doses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "@/components/missao-doses/encaixes";
 import { PASSAGEM_B_MS } from "@/components/missao-doses/PassoDoDia";
@@ -1635,6 +1635,23 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
       });
     }
   }
+
+  it("o pedido curto segue a POSIÇÃO da dose (o quiz é só a 1ª): Finanças em 1º 'monte em 30 s', em 2º/3º '1 gasto, 10 s'; Rotina em 1º 'monte em 3 toques', em 2º '1 hábito'; com o quiz desligado, o pedido da dose simples", async () => {
+    const { copyDoLembreteDoTeste } = await vi.importActual<typeof import("@/lib/notificacoes")>("@/lib/notificacoes");
+    const { fraseDeAmanha } = await import("@/components/missao-doses/PlanoDeAmanhaA");
+    const { registrarChaveMontarRotina, _zerarRemotaMontarRotina } = await import("@/lib/montar-rotina");
+    expect(doseCurta("financas", 1)).toEqual({ texto: "monte em 30 s", seg: 30 });
+    expect(doseCurta("financas", 2)).toEqual({ texto: "1 gasto, 10 s", seg: 10 });
+    expect(doseCurta("financas", 3).texto).toBe("1 gasto, 10 s");
+    expect(doseCurta("rotina", 1)).toEqual({ texto: "monte em 3 toques, 30 s", seg: 30 });
+    expect(doseCurta("rotina", 2)).toEqual({ texto: "1 hábito, 20 s", seg: 20 });
+    expect(doseCurta("saude", 3).texto).toBe("1 copo d'água, 10 s");
+    expect(copyDoLembreteDoTeste({ modulo: "financas", n: 2 }).body).toMatch(/Hoje: 💰 Finanças — 1 gasto, 10 s\.$/);
+    expect(fraseDeAmanha("financas", 2)).toBe("Amanhã é 1 gasto nas suas Finanças: 10 s.");
+    expect(fraseDeAmanha("financas", 1)).toBe("Amanhã a gente monta suas Finanças em 30 s.");
+    registrarChaveMontarRotina({ current: { metadata: { montar_rotina: "off" } } });
+    try { expect(doseCurta("rotina", 1)).toEqual({ texto: "1 hábito, 20 s", seg: 20 }); } finally { _zerarRemotaMontarRotina(); }
+  });
 
   it("a 2ª e a 3ª dose NUNCA abrem o quiz (Finanças depois da Rotina, com o Montar ainda em aberto) — A no dia 2, B no mesmo dia", () => {
     for (const braco of ["A", "B"] as const) {

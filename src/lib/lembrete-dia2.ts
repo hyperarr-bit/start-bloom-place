@@ -35,7 +35,7 @@ import { computeDailyBudget, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import {
-  DOSE_CURTA, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
+  doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
   type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
 import type { QuandoAmanha } from "./dia1-cheio";
@@ -325,7 +325,7 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
   if (ehUmPorDia(missao)) {
     if (missao.explorou || diaDaMissao(missao, somarDias(hoje, 1)) > 7) return null;
     const cfgA = MODULOS[pendente.modulo];
-    const dose = DOSE_CURTA[pendente.modulo];
+    const dose = doseCurta(pendente.modulo, pendente.n);
     const porDia = get ? porDiaDasFinancas(get) : null;
     // o pedido curto, do jeito que se fala ("1 copo d'água", "1 hábito", "1 gasto")
     const toque = pendente.modulo === "saude" ? "1 copo d'água" : cfgA.toque;

@@ -250,7 +250,7 @@ describe("ligada: a porta do módulo", () => {
 
   it("17/10 (achado no app de verdade): o tutorial antigo da página (SpotlightOverlay, que marca spotlight-done na 1ª abertura de QUALQUER conta logada, num efeito que roda antes) não esconde a intro da conta nova; quem já tinha o tutorial gravado ANTES continua sem intro", async () => {
     ligar();
-    const pagina = (m: string) => <><SpotlightOverlay moduleKey={m} steps={[]} /><IntroDoModulo moduleId={m} /></>;
+    const pagina = (m: "casa") => <><SpotlightOverlay moduleKey={m} steps={[]} /><IntroDoModulo moduleId={m} /></>;
     const a = montar(pagina("casa"));
     await dormir(10);
     expect(a.estado.dados["spotlight-done-casa"]).toBe("true"); // a página antiga marcou na mesma abertura

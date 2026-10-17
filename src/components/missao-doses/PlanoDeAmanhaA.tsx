@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { DOSE_CURTA, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { doseCurta, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /**
@@ -23,12 +23,13 @@ export function horaMaisPerto(agora: Date = new Date()): Exclude<Lembrete, "sem"
 }
 
 /** "Amanhã a gente monta sua Rotina em 20 s." — a frase da dose de amanhã, do jeito que se fala. */
-export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined): string {
+export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined, n = 2): string {
   if (!modulo) return "Amanhã tem mais um passo do seu plano.";
   const cfg = MODULOS[modulo];
-  const seg = DOSE_CURTA[modulo].seg;
+  const seg = doseCurta(modulo, n).seg;
   switch (modulo) {
-    case "financas": return `Amanhã a gente monta suas Finanças em ${seg} s.`;
+    // 1.0.16: o quiz é só a 1ª dose — em 2º/3º, Finanças é o gasto de hoje
+    case "financas": return n === 1 ? `Amanhã a gente monta suas Finanças em ${seg} s.` : `Amanhã é 1 gasto nas suas Finanças: ${seg} s.`;
     case "rotina": return `Amanhã a gente monta sua Rotina em ${seg} s.`;
     case "saude": return `Amanhã é a vez da sua Saúde: 1 copo d'água, ${seg} s.`;
     case "treino": return `Amanhã a gente escolhe o seu treino em ${seg} s.`;
@@ -57,7 +58,7 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
         className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
         <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Plano de amanhã</p>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-1.5" data-testid="plano-amanha-a-titulo">
-          {fraseDeAmanha(proxima?.modulo)} Que horas te lembro?
+          {fraseDeAmanha(proxima?.modulo, proxima?.n)} Que horas te lembro?
         </p>
         <div className="flex gap-2 mt-4" role="radiogroup" aria-label="Hora do lembrete">
           {HORAS.map((h) => (

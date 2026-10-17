@@ -4,7 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { DOSE_CURTA, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
@@ -209,7 +209,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
      e os links "Explorar por conta própria" e "Trocar os módulos". */
   if (braco === "A") {
     const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
-    const seg1 = DOSE_CURTA[modulos[0]].seg;
+    const seg1 = doseCurta(modulos[0], 1).seg;
     // "A gente começa pelas Finanças, que foi o que você escolheu." — só se a 1ª dose ainda é a da área escolhida
     const areaDaPorta = areaNome ? (Object.keys(AREAS) as AreaKey[]).find((k) => AREAS[k].nome === areaNome) : undefined;
     const comecaPelaArea = !!areaDaPorta && MODULO_DA_AREA[areaDaPorta] === modulos[0];
@@ -233,7 +233,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               {linhas.map(({ n, cfg }) => (
                 <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
                   <Quadradinho marcado={false} tam={18} />
-                  <span className="md-linha-texto"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome} · {DOSE_CURTA[cfg.modulo].texto}</span>
+                  <span className="md-linha-texto"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome} · {doseCurta(cfg.modulo, n).texto}</span>
                 </div>
               ))}
             </div>

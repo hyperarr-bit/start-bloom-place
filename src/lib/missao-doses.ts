@@ -45,6 +45,8 @@
  * chips gravam — esses são dados de verdade da conta, pelo mesmo `set` que o
  * módulo usa.
  */
+import { montarFinancasLigado } from "@/lib/montar-financas";
+import { montarRotinaLigado } from "@/lib/montar-rotina";
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
@@ -387,6 +389,25 @@ export const DOSE_CURTA: Record<ModuloDaMissao, { texto: string; seg: number }> 
   relacionamentos: { texto: "1 pessoa, 20 s", seg: 20 },
   pet: { texto: "o seu pet, 20 s", seg: 20 },
   detox: { texto: "1 hábito, 20 s", seg: 20 },
+};
+/**
+ * 1.0.16 (regra do dono, 17/10: o quiz "monte o seu módulo" é SÓ a 1ª dose, da área escolhida) — o pedido curto da
+ * dose `n` desse módulo. Finanças em 1º = o Montar ("monte em 30 s"); em 2º/3º = o gasto de hoje ("1 gasto, 10 s").
+ * Rotina em 1º = "Rotina pronta em 3 toques" ("monte em 3 toques, 30 s"); em 2º/3º = 1 hábito. Com o quiz desligado
+ * pela chave remota, o pedido é o da dose guiada simples.
+ */
+export function doseCurta(modulo: ModuloDaMissao, n: number): { texto: string; seg: number } {
+  const primeira = n === 1;
+  if (modulo === "financas" && !(primeira && quizLigado("montar-financas"))) return { texto: "1 gasto, 10 s", seg: 10 };
+  if (modulo === "rotina" && primeira && quizLigado("montar-rotina")) return { texto: "monte em 3 toques, 30 s", seg: 30 };
+  return DOSE_CURTA[modulo];
+}
+const quizLigado = (s: SetupDaDose): boolean => {
+  try {
+    if (s === "montar-financas") return montarFinancasLigado();
+    if (s === "montar-rotina") return montarRotinaLigado();
+  } catch { /* na dúvida, o de sempre */ }
+  return true;
 };
 
 /**

@@ -9,10 +9,14 @@
  *   · `onPronto` leva `primeiroGasto` ({ nome } · null no "Ainda não gastei" · ausente sem tocar);
  *   · fechar o app NA tela do número volta NELA (com os chips já tocados), só hoje e só nesta conta (B11);
  *   · eventos `missao_doses_gasto_no_numero` sem valor em reais;
- *   · no módulo de verdade: o gasto aparece em Finanças e o painel limpo diz "Sobram R$ 54 pra hoje".
+ *   · no módulo de verdade: o gasto aparece em Finanças e o painel limpo diz "Sobram R$ 54 pra hoje";
+ *   · (17/10, revisão tela a tela #15) o fim da tela — a linha "✓ Já está tudo nas suas Finanças…" — fica inteiro
+ *     acima do botão colado: o botão vem no fluxo (sticky) depois dela, com um respiro maior que o degradê dele.
  */
 process.env.TZ = "America/Sao_Paulo";
 
+import fs from "node:fs";
+import path from "node:path";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -451,5 +455,53 @@ describe("no módulo de verdade (a missão por cima de Finanças)", () => {
     await respirar();
     expect(lido(screen.getByTestId("sobram-pra-hoje"))).toBe("Sobram R$ 54 pra hoje · já saiu R$ 12 dos R$ 66 do dia");
     expect(gastosDe(controle)).toHaveLength(1);
+  });
+});
+
+/* ── 17/10, revisão tela a tela #15: o fim da tela do número nunca fica atrás do botão colado ── */
+
+describe("o fim da tela do número fica inteiro acima do botão 'Ver no meu mês' (revisão tela a tela, #15)", () => {
+  const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
+  /** O corpo da regra cujo seletor é EXATAMENTE `seletor` (no começo da linha). */
+  const regra = (seletor: string): string => {
+    const re = new RegExp(`(?:^|\\n)${seletor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`);
+    return re.exec(css)?.[1] ?? "";
+  };
+  const valor = (corpo: string, prop: string): string => new RegExp(`(?:^|;|\\s)${prop}\\s*:\\s*([^;]+)`).exec(corpo)?.[1].trim() ?? "";
+  const px = (v: string): number => Number(/(-?[\d.]+)px/.exec(v)?.[1] ?? NaN);
+
+  it("o botão é colado NO FLUXO (sticky, logo depois do conteúdo que rola): rolado até o fim, a linha '✓ Já está tudo…' — a última — fica inteira acima dele", async () => {
+    montarTela();
+    await ateONumero();
+    fireEvent.click(postIt().getByRole("button", { name: /^Café,/ }));
+    await respirar();
+    const pronto = screen.getByTestId("montar-pronto");
+    // a última coisa do conteúdo é a linha de "já está salvo"; o botão vem DEPOIS dela, no mesmo rolo
+    expect(pronto.lastElementChild?.className).toBe("mf-salvo");
+    expect(lido(pronto.lastElementChild!)).toBe("Já está tudo nas suas Finanças. Dá pra mudar quando quiser.");
+    const rodape = pronto.nextElementSibling as HTMLElement;
+    expect(rodape.className).toBe("mf-rodape");
+    expect(within(rodape).getByRole("button", { name: "Ver no meu mês →" })).toBeTruthy();
+    expect(pronto.parentElement?.className).toBe("mf-corpo"); // o que rola
+    expect(valor(regra(".mf-corpo"), "overflow-y")).toBe("auto");
+    // colado no fluxo (nunca fixed/absolute por cima do conteúdo)
+    expect(valor(regra(".mf-rodape"), "position")).toBe("sticky");
+  });
+
+  it("o RESPIRO: o conteúdo termina com mais espaço que o degradê do botão — a última linha nunca fica no degradê nem atrás do botão", () => {
+    const rodape = regra(".mf-rodape");
+    const degrade = px(/hsl\(var\(--background\)\)\s+(\d+px)\)/.exec(valor(rodape, "background"))?.[1] ?? "");
+    expect(degrade).toBeGreaterThan(0); // o degradê foi achado (senão o teste não prova nada)
+    const padding = valor(regra(".mf-pronto"), "padding").split(/\s+/);
+    const embaixo = px(padding.length >= 3 ? padding[2] : padding[0]);
+    expect(embaixo).toBeGreaterThanOrEqual(degrade + 4);
+    // a área segura de baixo é do .mf (o botão nunca encosta na barra do iPhone)
+    expect(valor(regra(".mf"), "padding-bottom")).toContain("--app-safe-bottom");
+  });
+
+  it("'~~R$ 123~~ R$ 111 pra hoje' numa linha só a 390 px (o 'pra hoje' sozinho na 2ª linha empurrava o fim pra trás do botão): tachado ≤ 22 px e vão ≤ 6 px", () => {
+    // a conta da tela de 390 (cartão de 316 px): tachado 24 px (82) + 8 + R$ 111 (154) + 8 + pra hoje (68) = 320 → quebrava
+    expect(px(valor(regra(".mf-antes"), "font-size"))).toBeLessThanOrEqual(22);
+    expect(px(valor(regra(".mf-grande[data-pra-hoje] strong"), "column-gap"))).toBeLessThanOrEqual(6);
   });
 });

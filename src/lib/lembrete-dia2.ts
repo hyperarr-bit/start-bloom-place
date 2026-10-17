@@ -322,8 +322,17 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
     const cfgA = MODULOS[pendente.modulo];
     const dose = DOSE_CURTA[pendente.modulo];
     const porDia = get ? porDiaDasFinancas(get) : null;
-    const toque = cfgA.toque;
-    const vivo = sequenciaDaMissao(missao, hoje) >= 2; // fez ontem e hoje: amanhã fecha 3 seguidos
+    // o pedido curto, do jeito que se fala ("1 copo d'água", "1 hábito", "1 gasto")
+    const toque = pendente.modulo === "saude" ? "1 copo d'água" : cfgA.toque;
+    // a sequência viva: hoje e ontem com registro (a do app, dias com QUALQUER registro — a régua do adesivo;
+    // sem o dado da conta, a das doses) → amanhã fecha 3 dias seguidos
+    let vivo = sequenciaDaMissao(missao, hoje) >= 2;
+    if (get) {
+      try {
+        const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
+        vivo = seq.hojeFeito && seq.dias >= 2;
+      } catch { /* fica a das doses */ }
+    }
     if (pendente.n === 3 && vivo) {
       return { title: "Dia 3: feche seus 3 dias seguidos 🔥", body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} e o adesivo dos 3 dias é seu. ${dose.seg} segundos.`, modulo: "missao", temNumero: false, rota: cfgA.rota };
     }
@@ -406,14 +415,20 @@ export type PlanoDia2 =
   | { ok: true; quando: Date; origemHora: "missao" | "abertura"; conteudo: ConteudoDia2; diaDoUso: number }
   | { ok: false; motivo: "desligado" | "sem_aviso" | "fim_da_semana" };
 
-/** Tudo o que o agendador precisa, sem tocar no plugin. */
-export function planejarLembreteDia2(get: Leitor, e: EstadoDia2, p: { ligado: boolean; missao: EstadoMissaoDoses | null; area?: string | null; agora?: Date }): PlanoDia2 {
+/** Tudo o que o agendador precisa, sem tocar no plugin. `ajustarHora` (1.0.16): quem agenda pode mover a hora
+ *  (ex.: não empilhar com o lembrete da sequência à noite — notificacoes.horaSemEmpilhar); o dia não muda. */
+export function planejarLembreteDia2(get: Leitor, e: EstadoDia2, p: { ligado: boolean; missao: EstadoMissaoDoses | null; area?: string | null; agora?: Date; ajustarHora?: (min: number) => number }): PlanoDia2 {
   if (!p.ligado) return { ok: false, motivo: "desligado" };
   const agora = p.agora ?? new Date();
   const q = quandoLembrar(e, agora);
   if ("motivo" in q) return { ok: false, motivo: q.motivo };
+  let quando = q.quando;
+  if (p.ajustarHora) {
+    const min = clampHora(p.ajustarHora(quando.getHours() * 60 + quando.getMinutes()));
+    quando = new Date(quando.getFullYear(), quando.getMonth(), quando.getDate(), Math.floor(min / 60), min % 60, 0, 0);
+  }
   const hoje = localDayKey(agora);
-  return { ok: true, quando: q.quando, origemHora: q.origemHora, conteudo: conteudoDoLembrete(get, { missao: p.missao, amanha: q.quando, area: p.area, hoje }), diaDoUso: diaDoUso(e, localDayKey(q.quando)) };
+  return { ok: true, quando, origemHora: q.origemHora, conteudo: conteudoDoLembrete(get, { missao: p.missao, amanha: quando, area: p.area, hoje }), diaDoUso: diaDoUso(e, localDayKey(quando)) };
 }
 
 /** A assinatura do plano: igual à última → nada a refazer no sistema. */

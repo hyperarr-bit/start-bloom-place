@@ -37,6 +37,9 @@ vi.mock("@/lib/notificacoes", () => ({
   pedirPermissao: vi.fn(async () => true),
   pedirPermissaoDia2: vi.fn(async () => "concedeu"),
   agendarProximaDose: vi.fn(async () => ({ ok: true, quando: new Date() })),
+  // o "Rotina pronta em 3 toques" (quiz da 1ª dose da Rotina) pergunta a permissão e arma o aviso do teste
+  estadoPermissao: vi.fn(async () => "granted"),
+  armarLembreteDoTesteSePuder: vi.fn(async () => {}),
 }));
 vi.mock("@/components/missao-doses/ConstruiuEm3Dias", () => ({ ConstruiuEm3Dias: () => <div data-testid="construiu">O que você construiu</div> }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { getSession: async () => ({ data: { session: null } }) }, functions: { invoke: async () => ({ data: null, error: null }) } } }));
@@ -229,6 +232,8 @@ beforeEach(() => {
   _novaAberturaDoTour();
   // 1.0.16: a dose de Finanças virou o "Vamos montar suas Finanças" — aqui, o caminho de quem PULOU (o 1º gasto pelo chip)
   localStorage.setItem("core-montar-financas", JSON.stringify({ r: "pulou" }));
+  // ... e a da Rotina, o "Rotina pronta em 3 toques": idem (quem pulou cria o 1º hábito pelo chip) — os blocos 16 e 18 tiram
+  localStorage.setItem("core-montar-rotina", JSON.stringify({ r: "pulou" }));
   eventos.length = 0;
   _zerarUmPorDiaRemoto();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();
@@ -1053,6 +1058,18 @@ describe("10. conta VAZIA nas 6 áreas da porta: a dose 1 só pede o que a conta
       expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ area_lida: area })]);
       fireEvent.click(screen.getByTestId("missao-doses-comecar"));
       expect(screen.getByTestId("rota")).toHaveTextContent(rota);
+      if (modulo === "treino") {
+        // corpo: o quiz da 1ª dose (EscolherTreino da introdução dos módulos) — 2 toques e a semana sai montada = a dose
+        const q = within(screen.getByTestId("missao-escolher-treino"));
+        fireEvent.click(q.getByRole("button", { name: /Academia/ }));
+        fireEvent.click(q.getByRole("button", { name: "4 dias" }));
+        for (let i = 0; i < 12 && !screen.queryByTestId("missao-doses-festa"); i++) avancar(250);
+        expect(screen.queryByTestId("missao-escolher-treino")).toBeNull();
+        expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
+        expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(/O treino “.+” já está montado na sua semana\./);
+        expect(store.dados["saude-workouts-v2"]).toBeTruthy();
+        return;
+      }
       const postIt = esperarPostIt();
       const chips = within(postIt).getAllByTestId("demo-guia-chip");
       expect(chips.length).toBeGreaterThanOrEqual(3);
@@ -1515,6 +1532,7 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
       it(`braço ${braco}, área "${area}": a 1ª dose é ${modulo}${setup ? ` com o quiz "${setup}"` : " (sem quiz)"}${setup && setup !== "montar-financas" ? " — sem o ramo dele, a dose guiada simples" : ""}`, () => {
         ligar(braco);
         localStorage.removeItem("core-montar-financas"); // o Montar poderia abrir: só a régua da missão decide
+        localStorage.removeItem("core-montar-rotina"); // idem o "Rotina pronta em 3 toques"
         guardarChave(CHAVES_FUNIL_W.area, area);
         const store = montarStore({});
         montar(store, "/home");
@@ -1524,11 +1542,21 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
         expect(screen.getByTestId("rota")).toHaveTextContent(rota);
         expect(setupDaDose(1, modulo as never)).toBe(setup);
         const view = viewDaDose()!;
-        if (setup) expect(view).toMatchObject({ setup, setup_aberto: setup === "montar-financas" });
+        // o quiz em folha: Finanças (Montar), Rotina (Rotina pronta) e Treino (EscolherTreino); Metas é a meta guiada no post-it
+        if (setup) expect(view).toMatchObject({ setup, setup_aberto: setup !== "meta-guiada" });
         else expect(view).not.toHaveProperty("setup");
         if (setup === "montar-financas") {
           expect(screen.getByTestId("montar-financas")).toBeInTheDocument();
           expect(eventos).toContainEqual(["montar_financas_view", expect.objectContaining({ origem: "missao", braco: braco === "A" ? "um_por_dia" : "dia1_cheio" })]);
+        } else if (setup === "montar-rotina") {
+          expect(screen.getByTestId("montar-minha-rotina")).toBeInTheDocument();
+          expect(document.documentElement.getAttribute("data-montar-rotina")).toBe("missao");
+          expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0); // nada da missão por cima do quiz
+          expect(screen.queryByTestId("missao-doses-pular")).toBeNull();
+        } else if (setup === "escolher-treino") {
+          expect(screen.getByTestId("missao-escolher-treino")).toBeInTheDocument();
+          expect(screen.getByText("Onde você treina?")).toBeInTheDocument();
+          expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0);
         } else {
           expect(screen.queryByTestId("montar-financas")).toBeNull();
           const postIt = esperarPostIt();
@@ -1582,6 +1610,7 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
         </div>
       );
     };
+    const deVerdade = SETUPS_ENCAIXADOS["montar-rotina"];
     SETUPS_ENCAIXADOS["montar-rotina"] = { Componente: MontarRotinaFalsa, deveMostrar: () => true, atributo: "data-montar-rotina", depoisDoPronto: "Sua rotina está pronta. Marca o primeiro quando fizer." };
     try {
       for (const braco of ["A", "B"] as const) {
@@ -1615,7 +1644,7 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
         localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
       }
     } finally {
-      delete SETUPS_ENCAIXADOS["montar-rotina"];
+      SETUPS_ENCAIXADOS["montar-rotina"] = deVerdade;
     }
   });
 });
@@ -1623,9 +1652,11 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
 /* ------------------------------------------------------------ 17: "Conhecer mais do <módulo>" e a passagem do B */
 
 describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (ponto de encaixe) e, no B, a passagem sozinha pro próximo módulo", () => {
-  afterEach(() => { CONHECER_MAIS.abrir = null; });
+  const abrirDeVerdade = CONHECER_MAIS.abrir;
+  afterEach(() => { CONHECER_MAIS.abrir = abrirDeVerdade; });
 
   it("sem o tour do outro ramo encaixado, nada de link; encaixado: o link quieto fecha a comemoração AQUI no módulo e abre o tour do módulo", () => {
+    CONHECER_MAIS.abrir = null; // como era antes do merge do ramo da introdução
     ligarUmPorDia("on");
     missaoA({});
     montar(montarStore({}), "/financas");

@@ -25,6 +25,7 @@ import { UserDataContext } from "@/hooks/use-user-data";
 import { MomentosConquistas } from "@/components/conquistas/Momentos";
 import { avisarSequencia } from "@/components/conquistas/aviso-sequencia";
 import { somarDias } from "@/lib/sequencia";
+import { gravarMissao, iniciarMissao } from "@/lib/missao-doses";
 
 const HOJE = "2026-09-26";
 const corrida = (fim: string, n: number) => Array.from({ length: n }, (_, i) => somarDias(fim, -(n - 1 - i)));
@@ -71,6 +72,19 @@ describe("festa do adesivo × teste grátis e tutorial", () => {
     nativo.v = true;
     localStorage.setItem("core-trial-cartao-fim", String(Date.now() + 3 * 86400e3));
     localStorage.setItem("core-missao", JSON.stringify({ inicio: Date.now(), area: "dinheiro", d1: false, d2: false, d3: false, vista: true, holofote: "feito" }));
+    const store = montarStore(cenario());
+    montar(store);
+    await espera(2400);
+    expect(screen.queryByTestId("momento-adesivo")).toBeNull();
+    expect(screen.queryByTestId("momento-popup")).toBeNull();
+    await waitFor(() => expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toEqual(expect.arrayContaining(["first-expense", "first-income"])));
+  });
+
+  it("1.0.16: durante a MISSÃO EM DOSES (sem a missão antiga) a regra é a mesma — nenhuma festa, adesivos entram como vistos", async () => {
+    nativo.v = true;
+    localStorage.setItem("core-trial-cartao-fim", String(Date.now() + 3 * 86400e3));
+    gravarMissao(iniciarMissao(["financas", "rotina", "saude"]));
+    expect(localStorage.getItem("core-missao")).toBeNull(); // só a nova
     const store = montarStore(cenario());
     montar(store);
     await espera(2400);

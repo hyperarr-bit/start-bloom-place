@@ -20,7 +20,16 @@
  * mesmo campo de VAGA ou de NOME (CAMPOS_NATURAIS, único nas três listas); senão, quando tem
  * o mesmo conteúdo.
  *
- * Valor simples VAZIO no servidor ("", 0, false, null) não tem o que proteger: vale o da tela.
+ * REGRA DO VAZIO. Chave ausente no servidor (undefined/null): vale o da tela. Valor simples
+ * VAZIO no servidor ("", 0, false) com a tela tendo MUDADO o valor: vale o da tela também —
+ * inclusive sem base (set direto, fora do usePersistedState). Não há histórico pra proteger, mas
+ * há um custo aceito: daqui o vazio "nunca marcado" e o vazio gravado DE PROPÓSITO noutro
+ * aparelho (ajuste desligado, contador zerado) são o mesmo valor — sem versão no servidor não dá
+ * pra separar. Um ajuste ligado antes de a conta chegar vence o "desligado" de lá; o pior caso é
+ * refazer 1 toque, nunca perder registro. A regra é só pra valor SIMPLES (no topo ou dentro de
+ * objeto): lista/objeto vazio no servidor ([] / {}) passa pela junção normal, e contador montado
+ * do vazio ({count: 1}) × servidor preenchido ({count: 57}) é conflito — fica o do servidor.
+ * Se a tela não mudou nada em relação à base, o vazio do servidor vale (desmarcado lá).
  */
 
 export type ResultadoDaMescla = { valor: unknown; perdeu: boolean };
@@ -74,6 +83,18 @@ const temIdRepetido = (lista: unknown[]): boolean => {
  * Data de REGISTRO ("date", "data", "dia") fica de fora de propósito: em histórico (treino-
  * exercise-history, exames, cuidados) dois registros no mesmo dia são dois registros —
  * fundir apagaria um. Campo repetido numa lista = não é identidade → volta pro conteúdo.
+ *
+ * name/nome/label NUNCA podem valer pra lista de HISTÓRICO sem id (registro de algo que
+ * aconteceu: {name, date}, vacina, medição, sessão). Ali dois itens com o mesmo nome são DOIS
+ * registros, e a trava do "repetido" não salva quando cada lista tem o nome uma vez só:
+ * servidor [{name: "V10", date: "2025-10-01"}, {name: "Raiva", …}] × tela [{name: "V10",
+ * date: "2026-10-17"}] → o V10 novo vira "o mesmo item" do antigo, a data entra em conflito,
+ * fica a do servidor e o registro novo SOME (sobra só o aviso "Seus dados chegaram"). Por isso:
+ * lista de histórico nasce com `id` (com id, o campo natural nem é olhado); campo novo aqui só
+ * se for identidade de COISA (vaga, item de plano, categoria), nunca de registro — ex.: o
+ * `exercise` do treino-exercise-history ({date, exercise, …}, histórico SEM id) não pode entrar.
+ * (Varredura 17/10: as listas sem id com name/nome/label de hoje são todas de coisa — plano do
+ * treino, passos do skincare, categorias, desafios do DP; os históricos sem id não têm esses campos.)
  */
 const CAMPOS_NATURAIS = ["day", "month", "weekStart", "name", "nome", "label"] as const;
 
@@ -180,7 +201,8 @@ const mesclarObjetos = (
 export function mesclar3(base: unknown, local: unknown, servidor: unknown): ResultadoDaMescla {
   if (servidor === undefined || servidor === null) return { valor: local, perdeu: false };
   if (iguais(local, base) || iguais(local, servidor)) return { valor: servidor, perdeu: false };
-  // valor simples vazio no servidor ("" = não marcado, 0, false): não há o que proteger
+  // valor simples vazio no servidor ("" = não marcado, 0, false): não há o que proteger — e o
+  // vazio de propósito noutro aparelho perde pro gesto daqui (ver REGRA DO VAZIO no topo)
   if (servidor === "" || servidor === 0 || servidor === false) return { valor: local, perdeu: false };
   if (base !== undefined && iguais(servidor, base)) return { valor: local, perdeu: false };
   if (Array.isArray(local) && Array.isArray(servidor) && (base === undefined || base === null || Array.isArray(base))) {

@@ -169,6 +169,12 @@ describe("formatos reais: lista sem id com campo de vaga/nome", () => {
       .toEqual([{ date: "2026-10-16", value: 95 }, { date: "2026-10-16", value: 92 }]);
   });
 
+  it("histórico COM id e o mesmo nome nas duas pontas (vacina V10 de 2025 × V10 de hoje): os dois ficam — com id o nome nem é olhado", () => {
+    const servidor = [{ id: "s1", name: "V10", date: "2025-10-01" }, { id: "s2", name: "Raiva", date: "2025-03-01" }];
+    const local = [{ id: "n1", name: "V10", date: "2026-10-17" }];
+    expect(mesclar3([], local, servidor)).toEqual({ valor: [...servidor, ...local], perdeu: false });
+  });
+
   it("nome repetido numa das listas não serve de identidade: volta pra comparação por conteúdo", () => {
     const servidor = [{ name: "Banana", calories: 90 }, { name: "Banana", calories: 90 }];
     const r = mesclar3([], [{ name: "Banana", calories: 120 }], servidor);

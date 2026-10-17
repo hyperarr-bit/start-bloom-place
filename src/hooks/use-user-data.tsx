@@ -277,6 +277,11 @@ type EscritaSegurada = { base: unknown; valor: unknown; sistema: boolean; dia: s
  * src/lib/chaves-do-aparelho.ts), e volta na abertura seguinte DA MESMA conta pra ser juntada
  * na 1ª leitura que der certo. Sai quando o servidor confirma a gravação (ou quando não há o que
  * gravar), no "sair da conta" e quando outra conta entra no aparelho.
+ *
+ * Limite conhecido (revisão 2, 17/10): se o envio CHEGOU mas a resposta não (a cópia fica) e,
+ * antes desta abertura, a pessoa apagou aquele item noutro aparelho, a junção traz o item de
+ * volta. Daqui é indistinguível de "o envio não chegou" (mesmo servidor, mesma cópia) — sem
+ * versão no servidor, a escolha é não perder registro.
  */
 const PREFIXO_SEGURADAS = "core-seguradas-";
 const prefixoSeguradasDe = (uid: string) => `${PREFIXO_SEGURADAS}${uid}:`;

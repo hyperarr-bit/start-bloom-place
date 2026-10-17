@@ -138,10 +138,17 @@ beforeEach(() => {
   _novaAberturaMontarRotina();
   vi.stubEnv("VITE_V14_LOJA", "1");
   auth.user = { id: UID, created_at: new Date(HOJE.getTime() - 2 * 3600e3).toISOString() };
+  // tudo com tamanho (no jsdom nada tem): a missão acha o alvo na hora, sem os ~5 s de procura do fail-open
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top: 300, left: 10, width: 300, height: 44, bottom: 344, right: 310, x: 10, y: 300, toJSON: () => ({}) }) as DOMRect;
+  });
   (window as unknown as ComCapacitor).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
 });
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   delete (window as unknown as ComCapacitor).Capacitor;
   vi.useRealTimers();
@@ -165,6 +172,10 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
       expect(screen.queryByTestId("missao-doses-festa")).toBeNull(); // criar os hábitos NÃO é a dose
       fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
       await respirar();
+      // B: o "olhar explicado" da 1.0.15 entra antes da festa (o "Entendi" adianta); A: a festa direto
+      await waitFor(() => expect(screen.queryByTestId("missao-doses-festa") ?? screen.queryByTestId("missao-doses-entendi")).toBeTruthy(), { timeout: 6000 });
+      const entendi = screen.queryByTestId("missao-doses-entendi");
+      if (entendi) { expect(braco).toBe("B"); fireEvent.click(entendi); }
       await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toBeTruthy(), { timeout: 6000 });
       if (braco === "A") {
         expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
@@ -190,7 +201,6 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     await waitFor(() => expect(screen.getByRole("button", { name: "Entendi" })).toBeTruthy(), { timeout: 4000 });
     fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
     await respirar();
-    // (no jsdom nada tem tamanho: a missão procura o alvo ~5 s e segue com o post-it solto — fail-open)
     await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 9000 });
     const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
     expect(postIt).toHaveTextContent("Sua rotina está pronta. Marca o primeiro quando fizer.");

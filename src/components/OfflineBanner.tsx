@@ -44,11 +44,13 @@ export const OfflineBanner = () => {
         >
           <WifiOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span>
-            {conta !== "sem"
-              ? "Conexão lenta — ainda carregando…"
-              : isOnline
-                ? "Não conseguimos carregar seus dados agora — tentando de novo…"
-                : "Sem conexão — seus dados aparecem quando a internet voltar."}
+            {/* 17/10 (teste no Android 132): com o aparelho SEM rede a 1ª leitura às vezes fica no ar em vez
+                de falhar — dizer "lenta" ali confunde; sem rede é "Sem conexão" em qualquer estado */}
+            {!isOnline
+              ? "Sem conexão — seus dados aparecem quando a internet voltar."
+              : conta !== "sem"
+                ? "Conexão lenta — ainda carregando…"
+                : "Não conseguimos carregar seus dados agora — tentando de novo…"}
           </span>
           {tentarDeNovo && (
             <button

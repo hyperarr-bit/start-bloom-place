@@ -75,7 +75,7 @@ export const ROLAGEM_DO_OLHAR = { duracaoMs: 1000, fracaoDoTopo: 0.54, pausaMs: 
 /** O "olha" de Finanças é um movimento só, ≤ 4 s (dono, 17/10), contado de quando o anel APARECE: o número cai
  *  (1,5 s) → rola até o MEU MÊS (0,45 s; o anel desenha no 1º quadro estável, ~0,25 s) → o "Saiu" conta (1,6 s)
  *  ≈ 3,8 s. Sem renda, só o MEU MÊS (2 s). Cada número conta em 0,8 s (+ 0,1 s) e sobra mais de meio segundo pra ler. */
-export const OLHA_DE_FINANCAS = { podeMs: 1450, rolagemMs: 400, mesMs: 1550, soMesMs: 2000, numeroS: 0.8, atrasoS: 0.1 };
+export const OLHA_DE_FINANCAS = { podeMs: 1450, rolagemMs: 400, mesMs: 1550, soMesMs: 2000, numeroS: 0.8, atrasoS: 0.1, pausaMs: 150, daTelaDoNumeroMs: 150 };
 /** A fração da tela onde a rolagem deixa o topo do card pro anel nascer já no lugar dele (sem 2ª rolagem). */
 const fracaoDoAnel = (el: Element, recorte?: ((e: Element) => Retangulo | null) | null): number => {
   try {
@@ -492,6 +492,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const [doisTempos, setDoisTempos] = useState(false);
   /** D1 com "Ainda não gastei nada hoje" no Montar: o MEU MÊS mostra as contas do mês (sem o "Saiu" contando) */
   const [olhaSemGasto, setOlhaSemGasto] = useState(false);
+  /** D1: o 1º gasto (ou o "ainda não") veio da tela do número — o ✓ já apareceu lá; o MEU MÊS entra logo */
+  const daTelaDoNumero = useRef(false);
   const tempoDoOlharRef = useRef(tempoDoOlhar);
   tempoDoOlharRef.current = tempoDoOlhar;
   const indoProMes = useRef(false);
@@ -580,9 +582,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         setFase("olhar");
         trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", contou: !!num }));
       };
+      // (17/10) o "olha" de Finanças é UM movimento ≤ 4 s desde o toque: rolagem curta (0,4 s) e respiro curto (0,15 s)
       try {
-        rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
-          if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, ROLAGEM_DO_OLHAR.pausaMs));
+        rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : OLHA_DE_FINANCAS.rolagemMs, () => {
+          if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, OLHA_DE_FINANCAS.pausaMs));
         });
       } catch { mostrar(); }
     });
@@ -663,7 +666,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       } else {
         setFase("festa");
       }
-    }, reduzir ? 150 : TEMPOS_DO_PASSO.registrou));
+    }, reduzir ? 150 : daTelaDoNumero.current ? OLHA_DE_FINANCAS.daTelaDoNumeroMs : TEMPOS_DO_PASSO.registrou));
     return () => timers.forEach((t) => window.clearTimeout(t));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
@@ -1026,6 +1029,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (veioPrimeiroGasto) {
       const g = comGasto.primeiroGasto ?? null;
       porDiaAntes.current = null; // o número já caiu na frente dela, na tela do Montar: o "olha" é só o MEU MÊS
+      daTelaDoNumero.current = true;
       if (g) {
         // a tela do número deixa anotar mais de um: o "Saiu" do MEU MÊS conta a soma dos de HOJE (os que ela anotou ali)
         const deHoje = gastosDeHoje();

@@ -91,14 +91,20 @@ html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) 
 .cm-balao-sair { min-height: 36px; padding: 0 6px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.75); text-decoration: underline; text-underline-offset: 2px; }
 .cm-balao-proxima { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #fff; color: #16121c; font-size: 13.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
 .cm-balao-proxima:active { transform: scale(.97); }
-/* a oferta no cartão do fim da intro: secundária (ghost), acima do "Pronto" cheio */
+/* a oferta no cartão do fim da intro (dono 17/10): um BOTÃO de verdade, secundário ao "Pronto" cheio — borda clara que
+   contrasta no cartão escuro, ≥48 px, lâmpada na frente e "›" atrás, rótulo numa linha só, a linha pequena dentro
+   (embaixo do rótulo), estado pressionado visível */
 .im-pronto { flex-direction: column; align-items: stretch; gap: 10px; }
 .im-pronto-linha { display: flex; align-items: center; gap: 10px; }
-.im-pronto-oferta { display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.28); background: transparent; color: #fff; }
-.im-pronto-oferta:active { background: rgba(255,255,255,.08); }
-.im-pronto-oferta-titulo { display: block; font-size: 13px; font-weight: 800; }
-.im-pronto-oferta-linha { display: block; font-size: 11.5px; color: rgba(255,255,255,.7); margin-top: 2px; }
-.im-pronto-principal { width: 100%; min-height: 44px; border-radius: 12px; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+.im-pronto-oferta { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 10px 8px 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.62); background: rgba(255,255,255,.1); color: #fff; text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color .12s ease, border-color .12s ease, transform .12s ease; }
+.im-pronto-oferta:active { background: rgba(255,255,255,.26); border-color: #fff; transform: scale(.985); }
+.im-pronto-oferta-icone { flex: none; width: 22px; height: 22px; color: #fcd34d; }
+.im-pronto-oferta-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.im-pronto-oferta-titulo { display: block; font-size: 13.5px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-pronto-oferta-linha { display: block; font-size: 11px; line-height: 1.3; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-pronto-oferta-seta { flex: none; width: 20px; height: 20px; color: rgba(255,255,255,.9); }
+.im-pronto-principal { width: 100%; min-height: 48px; border-radius: 12px; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+@media (prefers-reduced-motion: reduce) { .im-pronto-oferta { transition: none; } .im-pronto-oferta:active { transform: none; } }
 /* o lembrete inline (3ª abertura): pequeno, dispensável, sem selo */
 .cm-lembrete { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(0,0,0,.08); background: hsl(var(--card)); color: hsl(var(--foreground)); }
 .dark .cm-lembrete { border-color: rgba(255,255,255,.1); }

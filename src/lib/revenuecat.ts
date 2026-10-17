@@ -41,13 +41,16 @@ import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
 import { registrarIntroRemota } from "@/lib/intro-modulo";
+import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
- *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`) e a intro do módulo (16/10, `intro_modulo`). */
+ *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`)
+ *  e o rodízio dos desafios da semana (17/10, `desafios_rodizio`). */
 const registrarChavesDasOfferings = (offerings: unknown): void => {
   registrarChavesRemotas(offerings);
   registrarChaveRemotaConquistas2(offerings);
   registrarIntroRemota(offerings);
+  registrarDesafiosRodizioRemoto(offerings);
 };
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";

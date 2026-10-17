@@ -40,7 +40,7 @@ vi.mock("@/integrations/supabase/client", () => {
     supabase: {
       from: () => q,
       functions: { invoke: vi.fn(async () => ({ data: null, error: null })) },
-      auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: auth.user ? { access_token: "token-de-teste", user: { id: auth.user.id } } : null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
       rpc: async () => ({ data: null, error: null }),
     },
   };

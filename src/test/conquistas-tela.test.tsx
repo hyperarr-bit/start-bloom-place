@@ -137,7 +137,7 @@ describe("linha da sequência na Home", () => {
   const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: ACAO_PADRAO, faixa: faixaDoFogo(12), protegidoOntem: false, ...p });
   const Onde = () => { const l = useLocation(); return <p data-testid="onde">{l.pathname}|{JSON.stringify(l.state)}</p>; };
 
-  it("'12 dias · falta 1 coisa hoje' e abre as Conquistas com origem home", () => {
+  it("'12 dias · hoje: …' e abre as Conquistas com origem home", () => {
     render(
       <MemoryRouter initialEntries={["/home"]}>
         <Routes>
@@ -148,7 +148,7 @@ describe("linha da sequência na Home", () => {
     );
     const linha = screen.getByTestId("linha-sequencia");
     expect(linha).toHaveTextContent("12 dias");
-    expect(linha).toHaveTextContent("falta 1 coisa hoje");
+    expect(linha).toHaveTextContent("hoje:");
     fireEvent.click(linha);
     expect(screen.getByTestId("onde")).toHaveTextContent('/conquistas|{"origem":"home"}');
   });

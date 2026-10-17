@@ -1,4 +1,4 @@
-import { RARIDADE_LABEL, RARIDADE_PLURAL, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
+import { CATEGORIAS, RARIDADE_LABEL, RARIDADE_PLURAL, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
 import { ordenarParaFolha } from "@/lib/conquistas-registro";
 
 /**
@@ -40,6 +40,8 @@ export interface PaginaAlbum {
   tipo: "mais-raros" | "secao";
   titulo: string;
   raridade?: Raridade;
+  /** (16/10, Conquistas 2) a página é de um MÓDULO (Finanças, Rotina…), não de uma raridade. */
+  modulo?: BadgeCategoria;
   /** Conquistados e total do que a página representa (a coleção inteira na 1ª; a seção nas outras). */
   abertos: number;
   total: number;
@@ -104,6 +106,46 @@ export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, str
   }
   return [primeira, ...secoes];
 }
+
+/**
+ * O ÁLBUM POR MÓDULO (16/10, Conquistas 2 — dono: "dar um foco maior no álbum
+ * em si"): a mesma 1ª página "Os mais raros" e, depois, UMA PÁGINA POR MÓDULO
+ * (Sequência, Finanças, Rotina…) na ordem do catálogo — cada figurinha na sua
+ * vaga fixa, as que faltam em silhueta, "faltam N pra completar a página".
+ * Um módulo com mais de 16 figurinhas vira páginas parelhas, como as seções.
+ */
+export function montarAlbumPorModulo(adesivos: Badge[], desbloqueadas: Record<string, string> = {}): PaginaAlbum[] {
+  const [primeira] = montarAlbum(adesivos, desbloqueadas);
+  const paginas: PaginaAlbum[] = [primeira];
+  for (const c of CATEGORIAS) {
+    const da = adesivos.filter((b) => b.category === c.id);
+    if (!da.length) continue;
+    const n = Math.ceil(da.length / VAGAS_POR_PAGINA);
+    const porPagina = Math.ceil(da.length / n);
+    const abertosDa = da.filter((b) => b.unlocked).length;
+    for (let i = 0; i < n; i++) {
+      paginas.push({
+        id: `${c.id}-${i + 1}`,
+        tipo: "secao",
+        titulo: c.label.toUpperCase(),
+        modulo: c.id,
+        abertos: abertosDa,
+        total: da.length,
+        parte: n > 1 ? [i + 1, n] : undefined,
+        vagas: da.slice(i * porPagina, (i + 1) * porPagina),
+        proximos: [],
+      });
+    }
+  }
+  return paginas;
+}
+
+/** A página onde mora a figurinha `id` (ou 0). */
+export const paginaDaFigurinha = (paginas: PaginaAlbum[], id: string): number => {
+  // as páginas de seção/módulo primeiro: a 1ª ("os mais raros") repete as coladas
+  const i = paginas.findIndex((p, k) => k > 0 && p.vagas.some((b) => b.id === id));
+  return i > 0 ? i : 0;
+};
 
 /** "1 lendário · 3 épicos · 5 raros · 6 comuns" (sem os zeros). */
 export const resumoRaridades = (porRaridade: Record<Raridade, { abertos: number; total: number }>): string => {

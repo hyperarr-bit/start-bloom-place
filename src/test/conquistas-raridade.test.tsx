@@ -28,24 +28,24 @@ const leitor = (dados: Record<string, unknown>) => <T,>(k: string, f: T): T => (
 const colecao = (dados: Record<string, unknown> = {}) =>
   mesclarDesbloqueios([...buildBadgesSequencia(0), ...buildBadgesFinancas(leitor(dados)), ...buildBadgesVida(leitor(dados), HOJE)], {}, HOJE).adesivos;
 
-describe("coleção de 65 com raridade", () => {
-  it("65 adesivos: 23 comuns · 21 raros · 14 épicos · 7 lendários, todos com arte e id único", () => {
+describe("coleção de 68 com raridade (16/10: +Voltei, 3 Dias, Duas Semanas)", () => {
+  it("68 adesivos: 24 comuns · 23 raros · 14 épicos · 7 lendários, todos com arte e id único", () => {
     const lista = colecao();
-    expect(lista).toHaveLength(65);
-    expect(new Set(lista.map((b) => b.id)).size).toBe(65);
+    expect(lista).toHaveLength(68);
+    expect(new Set(lista.map((b) => b.id)).size).toBe(68);
     const { porRaridade, colecoes } = contarAdesivos(lista);
-    expect(porRaridade.comum.total).toBe(23);
-    expect(porRaridade.raro.total).toBe(21);
+    expect(porRaridade.comum.total).toBe(24);
+    expect(porRaridade.raro.total).toBe(23);
     expect(porRaridade.epico.total).toBe(14);
     expect(porRaridade.lendario.total).toBe(7);
     expect(lista.filter((b) => !IDS_COM_ARTE.includes(b.id)).map((b) => b.id)).toEqual([]);
-    expect(colecoes.map((c) => `${c.id}:${c.total}`)).toEqual(["sequencia:5", "finance:24", "rotina:7", "leitura:6", "treino:6", "dieta:4", "saude:6", "vida:6", "geral:1"]);
+    expect(colecoes.map((c) => `${c.id}:${c.total}`)).toEqual(["sequencia:8", "finance:24", "rotina:7", "leitura:6", "treino:6", "dieta:4", "saude:6", "vida:6", "geral:1"]);
   });
 
-  it("o XP de cada adesivo é o da raridade (50 · 100 · 200 · 400); máximo possível 8.850", () => {
+  it("o XP de cada adesivo é o da raridade (50 · 100 · 200 · 400); máximo possível 9.100", () => {
     const lista = colecao();
     for (const b of lista) expect(b.xp, b.id).toBe(XP_RARIDADE[raridadeDe(b)]);
-    expect(lista.reduce((s, b) => s + b.xp, 0)).toBe(8850);
+    expect(lista.reduce((s, b) => s + b.xp, 0)).toBe(9100);
     expect(lista.filter((b) => raridadeDe(b) === "lendario").map((b) => b.id).sort()).toEqual(
       ["ano-365", "investor-100k", "leitura-25", "master", "rotina-60", "sequencia-100", "treino-100"],
     );

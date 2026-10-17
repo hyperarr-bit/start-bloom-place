@@ -61,6 +61,8 @@ const usarOApp = () => {
     ["core-att-status", "denied"], ["core-saida-vista", "123"], ["core-lembrete-teste", JSON.stringify({ fimMs: Date.now() + 3 * 864e5, precoAno: "R$ 97,90" })],
     ["core-funil-w-area", JSON.stringify({ v: "dinheiro", t: Date.now() })], ["core-area-landed", "true"],
     ["core-boas-vindas-visto", "1"], ["core-dia2", "{}"], ["core-presente69-cancelou-visto", "1"],
+    // 16/10: a força de QA da Conquistas 2 (sem prefixo varrido) e o toast que já apareceu (core-festas-mostradas)
+    ["conquistas2-force", "on"], ["core-festas-mostradas", JSON.stringify(["first-expense", "sequencia-2"])],
   ] as const) localStorage.setItem(k, v);
   // dado da CONTA (cache do user_data) e chaves antigas sem namespace: a vassoura leva
   localStorage.setItem("u:u1:finance-expenses", JSON.stringify([{ id: 1 }]));
@@ -78,7 +80,8 @@ const esperarTudoVisto = () => {
   expect(localStorage.getItem("core-avaliacao-valor-recusas")).toBe("1");
   expect(momentoRuimRecente()).toBe(true);
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
-    "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto"]) {
+    "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
+    "conquistas2-force", "core-festas-mostradas"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
 };

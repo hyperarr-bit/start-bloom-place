@@ -106,7 +106,7 @@ describe("folha, próximo e textos", () => {
     expect(textoFalta(b("x", { progresso: { atual: 3, alvo: 7 }, unidade: ["livro", "livros"] }))).toBe("mais 4 livros");
     expect(textoFalta(b("x", { progresso: { atual: 6, alvo: 7 }, unidade: ["livro", "livros"] }))).toBe("mais 1 livro");
     expect(textoFalta(b("x", { description: "Todas as contas pagas" }))).toBe("todas as contas pagas");
-    expect(textoFalta({ ...buildBadgesSequencia(4)[0] }, 4)).toBe("mais 3 dias seguidos anotando");
+    expect(textoFalta({ ...buildBadgesSequencia(4).find((b) => b.id === "sequencia-7")! }, 4)).toBe("mais 3 dias seguidos anotando");
   });
 
   it("todo adesivo que existe hoje tem arte própria (nenhum cai na reserva)", () => {

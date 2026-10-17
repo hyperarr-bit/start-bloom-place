@@ -374,12 +374,19 @@ export const Dashboard = ({
       });
     }
 
+    // A taxa de poupança só faz sentido com o mês em uso (17/10, 1.0.16): a conta nova que acabou de montar as
+    // Finanças (renda + contas fixas, zero ou um gasto variável) via "Excelente! Você está poupando 50% da sua
+    // renda" no dia 1 — um elogio vazio, antes de qualquer gasto. O elogio/dica da poupança espera pelo menos
+    // 5 gastos variáveis no mês ou 7 dias desde o primeiro; o aviso de "despesas maiores que a renda" não espera.
+    const datasDosGastos = expenses.map((e) => String(e?.date ?? "")).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort();
+    const diasDesdeOPrimeiroGasto = datasDosGastos.length ? (Date.now() - new Date(`${datasDosGastos[0].slice(0, 10)}T12:00:00`).getTime()) / 86_400_000 : 0;
+    const mesEmUso = expenses.length >= 5 || diasDesdeOPrimeiroGasto >= 7;
     if (totalIncome === 0 && totalExpenses === 0) {
       // Sem dados — não mostra alerta
     } else if (savingsRate >= 20) {
-      list.push({ type: "success", icon: CheckCircle, text: `Excelente! Você está poupando ${savingsRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da sua renda este mês.` });
+      if (mesEmUso) list.push({ type: "success", icon: CheckCircle, text: `Excelente! Você está poupando ${savingsRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da sua renda este mês.` });
     } else if (savingsRate > 0) {
-      list.push({ type: "info", icon: Lightbulb, text: `Sua taxa de poupança é ${savingsRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. Tente chegar a 20%!` });
+      if (mesEmUso) list.push({ type: "info", icon: Lightbulb, text: `Sua taxa de poupança é ${savingsRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. Tente chegar a 20%!` });
     } else if (totalExpenses > totalIncome) {
       list.push({ type: "warning", icon: TrendingDown, text: "Suas despesas estão maiores que sua renda. Revise seus gastos!" });
     }
@@ -389,7 +396,7 @@ export const Dashboard = ({
     }
 
     return list.slice(0, 4);
-  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts]);
+  }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts, expenses]);
 
   const balance = totalIncome - totalExpenses;
 

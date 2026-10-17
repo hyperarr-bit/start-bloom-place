@@ -31,7 +31,7 @@
  *     entrar neste celular não pode herdar o painel.
  *
  * ── A CHAVE ─────────────────────────────────────────────────────────────────────────────────
- *   `PAINEL_LIMPO` (app das lojas) ligada · `PAINEL_LIMPO_WEB` (site) desligada.
+ *   `PAINEL_LIMPO` (app das lojas) DESLIGADA desde 17/10 (dono) · `PAINEL_LIMPO_WEB` (site) desligada.
  *   Metadata do RevenueCat `financas_painel_limpo: "on" | "off"` em QUALQUER offering (a `current`
  *   vence) manda no app sem versão nova (revenuecat.ts registra). Desligar não esquece quem é
  *   elegível: religou, o painel limpo volta pra mesma gente.
@@ -45,8 +45,10 @@ import { isNativeShell } from "@/lib/native-shell";
 import { CHAVE_MONTAR_FINANCAS, temDadosDeFinancas } from "@/lib/montar-financas";
 
 export type ModoChave = "on" | "off";
-/** App das lojas. ROLLBACK = "off" aqui (ou metadata `financas_painel_limpo: "off"` no RevenueCat, sem build). */
-export const PAINEL_LIMPO: ModoChave = "on";
+/** App das lojas. DESLIGADO (dono 17/10, testando a 1.0.16 no Simulador: "tirou os 4 cards receita, despesas, saldo do mês,
+ *  investimentos" e o MEU MÊS ficou repetido) → o Dashboard é o da 1.0.15 pra todo mundo; decidir na 1.0.17 com a medição
+ *  de cada card (uso_resumo). Religar só com ok do dono: "on" aqui ou metadata `financas_painel_limpo: "on"` no RevenueCat. */
+export const PAINEL_LIMPO: ModoChave = "off";
 /** Site (Vercel). */
 export const PAINEL_LIMPO_WEB: ModoChave = "off";
 

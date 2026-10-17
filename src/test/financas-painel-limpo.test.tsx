@@ -218,7 +218,10 @@ describe("quem é elegível", () => {
 
 /* ───────────────────────── a chave ───────────────────────── */
 describe("a chave financas_painel_limpo", () => {
-  it("app: ligada; site: desligada; a metadata do RevenueCat manda no app (a current vence)", () => {
+  it("app: DESLIGADA por padrão (dono 17/10); a metadata 'on' do RevenueCat liga (a current vence); site: desligada", () => {
+    expect(painelLimpoLigado()).toBe(false);
+    expect(mostrarPainelLimpo(true)).toBe(false);
+    registrarChavePainelLimpo({ current: { metadata: { financas_painel_limpo: "on" } }, all: {} });
     expect(painelLimpoLigado()).toBe(true);
     expect(mostrarPainelLimpo(true)).toBe(true);
     expect(mostrarPainelLimpo(false)).toBe(false);
@@ -242,8 +245,9 @@ describe("a chave financas_painel_limpo", () => {
     guardarForcaPainelDaUrl("?painel-limpo=auto");
     expect(localStorage.getItem(CHAVE_FORCA_PAINEL_LIMPO)).toBeNull();
     virarApp();
+    registrarChavePainelLimpo({ current: { metadata: { financas_painel_limpo: "on" } }, all: {} });
     localStorage.setItem(CHAVE_FORCA_PAINEL_LIMPO, "off");
-    expect(mostrarPainelLimpo(true)).toBe(true);
+    expect(mostrarPainelLimpo(true)).toBe(true); // no app a força de QA não vale: segue a chave
   });
 });
 
@@ -285,8 +289,20 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
   });
 });
 
-describe("pages/Index — conta nova abre com o painel limpo", () => {
+describe("pages/Index — padrão da 1.0.16 (dono 17/10): conta nova TAMBÉM abre o Dashboard de sempre", () => {
+  it("passou pelo Montar e abriu o Dashboard: sem painel limpo, sem 'Mais gráficos'", { timeout: 40_000 }, async () => {
+    montarIndex({ ...MES_COM_DADO, [CHAVE_MONTAR_FINANCAS]: { r: "pronto", em: "x" } });
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: /MAIS GRÁFICOS/ })).toBeNull();
+  });
+});
+
+describe("pages/Index — conta nova abre com o painel limpo QUANDO a chave é ligada (metadata 'on')", () => {
   const NOVA = { ...MES_COM_DADO, [CHAVE_MONTAR_FINANCAS]: { r: "pronto", em: "x" } };
+  beforeEach(() => {
+    registrarChavePainelLimpo({ current: { metadata: { financas_painel_limpo: "on" } }, all: {} });
+  });
 
   it("os mais usados no topo, Desafio à vista, o resto no 'Mais gráficos' (fechado); abrir manda o evento", { timeout: 40_000 }, async () => {
     const controle = montarIndex(NOVA);

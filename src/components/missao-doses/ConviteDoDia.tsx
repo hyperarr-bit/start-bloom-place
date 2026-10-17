@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { somarDias } from "@/lib/sequencia";
-import { doseCurta, MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /** "Ontem" / "Na sexta" / "No sábado" — quando a dose anterior foi feita, do jeito que se fala. */
@@ -83,11 +83,11 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
           <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Seu plano de 3 dias</span>
         </div>
         <p className="text-[22px] font-black tracking-[-0.02em] leading-tight mt-2.5" data-testid="missao-doses-convite-titulo">
-          Dia {dia} de 3 · {cfg.emoji} {cfg.nome} · {seg} s
+          Dia {dia} de 3 · {cfg.emoji} {cfg.nome} · {emSegundos(seg)}
         </p>
         {(fechaTres || anterior) && (
           <p className="text-[13.5px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-convite-texto">
-            {fechaTres ? <><b className="text-foreground">Faltam {seg} s pros seus 3 dias seguidos.</b> </> : null}
+            {fechaTres ? <><b className="text-foreground">Faltam {emSegundos(seg)} pros seus 3 dias seguidos.</b> </> : null}
             {anterior}
           </p>
         )}

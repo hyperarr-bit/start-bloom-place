@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
-import { doseCurta, EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, doseDeHojeDevida, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, doseDeHojeDevida, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
 
 /**
  * "DOSE DE HOJE" NAS PENDÊNCIAS (1.0.16, braço A — desenho 8 seção 4.5). A única presença da missão na
@@ -42,7 +42,7 @@ export function LinhaDoseDeHoje({ dose }: { dose: NonNullable<ReturnType<typeof 
       >
         <span className="text-sm" aria-hidden>{cfg.emoji}</span>
         <span className="text-xs font-medium flex-1 min-w-0">
-          <span className="font-bold">Dose de hoje</span> · {cfg.nome} · {doseCurta(dose.modulo, dose.n).seg} s
+          <span className="font-bold">Dose de hoje</span> · {cfg.nome} · {emSegundos(doseCurta(dose.modulo, dose.n).seg)}
         </span>
         <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">Dia {dose.n} de 3</span>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />

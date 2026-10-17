@@ -3,7 +3,7 @@ import type { SetupDaDose } from "@/lib/missao-doses";
 import type { ChipDaMissao, Retangulo } from "@/components/demo-guiada/alvos";
 import { MontarRotina, deveMostrarMontarRotina, ATRIBUTO_NA_TELA as ATRIBUTO_MONTAR_ROTINA, TEXTO_DO_GUIA, quadradinhoDeHoje, recorteDoQuadradinho, type ResumoMontarRotina } from "@/components/rotina/montar/MontarRotina";
 import { abrirConhecerMais, temTour } from "@/lib/conhecer-mais";
-import { INTROS } from "@/lib/intro-modulo";
+import { INTROS, introLigada } from "@/lib/intro-modulo";
 import { EscolherTreinoDaMissao, deveMostrarEscolherTreino, ATRIBUTO_ESCOLHER_TREINO, type ResultadoDaEscolha } from "./EscolherTreinoDaMissao";
 
 /**
@@ -109,5 +109,7 @@ export function metaGuiadaDaIntro(): { pergunta: string; chips: ChipDaMissao[]; 
 export const CONHECER_MAIS: { abrir: ((modulo: string) => void) | null; temPara?: (modulo: string) => boolean } = {
   // ramo da introdução dos módulos (lib/conhecer-mais): o passeio de Finanças, Rotina e Saúde
   abrir: (modulo) => { abrirConhecerMais(modulo, "fim_dose"); },
-  temPara: temTour,
+  /* quem abre o passeio é o ConhecerMaisHost, que só existe com a introdução dos módulos ligada (IntroDoModulo) — com
+     ela desligada (rollback remoto `intro_modulo: "off"`), o link fecharia a festa e nada abriria: sem link (17/10) */
+  temPara: (modulo) => temTour(modulo) && introLigada(),
 };

@@ -15,7 +15,7 @@ import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaM
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
-import { doseCurta, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
 import { introConcluida } from "@/lib/intro-modulo";
 import { lerTelaDoNumero } from "@/lib/montar-financas";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS, metaGuiadaDaIntro } from "./encaixes";
@@ -1418,7 +1418,7 @@ function PassagemDaProxima({ proximo, n, reduzir, aoIr, aoAgoraNao }: { proximo:
     <>
       <div className="mt-3.5 rounded-2xl text-left px-4 py-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-proxima-dose" data-passagem="auto">
         <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Dose {n + 1} de {TOTAL_PASSOS_B} · {proximo.emoji} {proximo.nome}</span>
-        <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — {doseCurta(proximo.modulo, n + 1).seg} s</span>
+        <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — {emSegundos(doseCurta(proximo.modulo, n + 1).seg)}</span>
         <span className="block text-[12.5px] opacity-75 mt-1">{proximo.pedido}.</span>
         <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden mt-2.5" aria-hidden>
           <motion.div className="h-full rounded-full" style={{ background: "hsl(var(--accent))" }} initial={{ width: reduzir ? "100%" : "0%" }} animate={{ width: "100%" }} transition={{ duration: reduzir ? 0 : PASSAGEM_B_MS / 1000, ease: "linear" }} />
@@ -1445,7 +1445,7 @@ export function tomarTransicao(para: ModuloDaMissao, agora: number = Date.now())
 
 const DE_ARTIGO: Record<string, string> = { as: "das", a: "da", o: "do", os: "dos" };
 /** "Conhecer mais das Finanças (1 min)" — só com o tour do outro ramo encaixado (encaixes.ts → CONHECER_MAIS). */
-export const rotuloConhecerMais = (modulo: ModuloDaMissao): string => `Conhecer mais ${DE_ARTIGO[ARTIGO[modulo] ?? "o"]} ${MODULOS[modulo].nome} (1 min)`;
+export const rotuloConhecerMais = (modulo: ModuloDaMissao): string => `Conhecer mais ${DE_ARTIGO[ARTIGO[modulo] ?? "o"]} ${MODULOS[modulo].nome} (1\u00a0min)`;
 function LinkConhecerMais({ modulo, aoConhecerMais }: { modulo: ModuloDaMissao; aoConhecerMais?: () => void }) {
   if (!aoConhecerMais || !CONHECER_MAIS.abrir) return null;
   try { if (CONHECER_MAIS.temPara && !CONHECER_MAIS.temPara(modulo)) return null; } catch { return null; }
@@ -1572,7 +1572,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
         {proximo && (
           <div className="mt-3.5 rounded-2xl px-4 py-3 flex items-center gap-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
             <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {doseCurta(proximo.modulo, n + 1).seg} s</span>
+              <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {emSegundos(doseCurta(proximo.modulo, n + 1).seg)}</span>
               <span className="block text-[12px] opacity-75 mt-0.5">{n === 1 ? "O adesivo do dia 2 te espera 🔒" : "E o adesivo dos 3 dias é seu 🔒"}</span>
             </span>
             <AdesivoDeAmanha dias={n === 1 ? 2 : 3} tamanho={40} />

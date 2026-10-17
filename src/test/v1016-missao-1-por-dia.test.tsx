@@ -51,13 +51,16 @@ import { Anel, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, EVENTO_MISSAO_DOSES, conviteDoDiaDevido, doseDeHojeDevida, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao, precisaPlanoA,
   missaoDoDiaEmCena, moduloDaMissaoHoje, definirDonoDaMissao, donoDaConta, marcarDoseNaTela, doseNaTela, CHAVE_MISSAO_NA_CONTA,
-  retomadaDoGasto, setupDaDose, idDaMissao, doseCurta, dicaDoDiaDevida, MAX_VISTAS_SEM_DECISAO,
+  retomadaDoGasto, setupDaDose, idDaMissao, doseCurta, dicaDoDiaDevida, MAX_VISTAS_SEM_DECISAO, unidadeJunta, emSegundos,
 } from "@/lib/missao-doses";
 import { CHAVE_LEMBRETE_TESTE, CHAVE_TRIAL_CARTAO, DIAS_DE_TESTE_PADRAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
 import { marcarTrialCartaoAte } from "@/lib/teste-gratis";
 import { fraseDoAcesso } from "@/components/missao-doses/BoasVindasDoses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "@/components/missao-doses/encaixes";
-import { PASSAGEM_B_MS } from "@/components/missao-doses/PassoDoDia";
+import { ConhecerMaisHost } from "@/components/intro-modulo/ConhecerMais";
+import { EVENTO_FIM_TOUR } from "@/lib/conhecer-mais";
+import { _zerarIntroRemota, registrarIntroRemota } from "@/lib/intro-modulo";
+import { PASSAGEM_B_MS, rotuloConhecerMais } from "@/components/missao-doses/PassoDoDia";
 import { _novaAberturaDoTour, marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -198,6 +201,24 @@ const montarComHome = (store: Store, rota: string) =>
           <Route path="/financas" element={<FinancasFalsa />} />
           <Route path="/rotina" element={<RotinaFalsa />} />
           <Route path="/saude" element={<SaudeFalsa />} />
+          <Route path="*" element={<Rota />} />
+        </Routes>
+      </Provedor>
+    </MemoryRouter>,
+  );
+/** Como `montarComHome`, com o host DE VERDADE do "Conhecer mais" nos 3 módulos (é a IntroDoModulo que monta ele no app) e
+ *  um "voltar" que sai do módulo no meio do passeio. */
+const SairDoModulo = () => { const ir = useNavigate(); return <button type="button" onClick={() => ir("/rotina")}>sair do módulo</button>; };
+const montarComPasseio = (store: Store, rota: string) =>
+  render(
+    <MemoryRouter initialEntries={[rota]}>
+      <Provedor store={store}>
+        <MissaoDosesNaWeb />
+        <Routes>
+          <Route path="/home" element={<HomeReal />} />
+          <Route path="/financas" element={<><FinancasFalsa /><SairDoModulo /><ConhecerMaisHost moduleId="financas" /></>} />
+          <Route path="/rotina" element={<><RotinaFalsa /><ConhecerMaisHost moduleId="rotina" /></>} />
+          <Route path="/saude" element={<><SaudeFalsa /><ConhecerMaisHost moduleId="saude" /></>} />
           <Route path="*" element={<Rota />} />
         </Routes>
       </Provedor>
@@ -1668,10 +1689,38 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
     expect(doseCurta("rotina", 2)).toEqual({ texto: "1 hábito, 20 s", seg: 20 });
     expect(doseCurta("saude", 3).texto).toBe("1 copo d'água, 10 s");
     expect(copyDoLembreteDoTeste({ modulo: "financas", n: 2 }).body).toMatch(/Hoje: 💰 Finanças — 1 gasto, 10 s\.$/);
-    expect(fraseDeAmanha("financas", 2)).toBe("Amanhã é 1 gasto nas suas Finanças: 10 s.");
-    expect(fraseDeAmanha("financas", 1)).toBe("Amanhã a gente monta suas Finanças em 30 s.");
+    // na TELA o tempo vai preso ao número (U+00A0, #42); o texto das notificações (acima) segue com o espaço comum
+    expect(fraseDeAmanha("financas", 2)).toBe("Amanhã é 1 gasto nas suas Finanças: 10\u00a0s.");
+    expect(fraseDeAmanha("financas", 1)).toBe("Amanhã a gente monta suas Finanças em 30\u00a0s.");
     registrarChaveMontarRotina({ current: { metadata: { montar_rotina: "off" } } });
     try { expect(doseCurta("rotina", 1)).toEqual({ texto: "1 hábito, 20 s", seg: 20 }); } finally { _zerarRemotaMontarRotina(); }
+  });
+
+  it("#42 (revisão tela a tela): na tela, o tempo nunca se separa do número — 'monte em 3 toques, 30 s' com o espaço que não quebra, a linha das boas-vindas equilibra e o resto das telas da missão também ('20 s', '(1 min)')", () => {
+    // o ajudante: só número + unidade (s / min); o resto do texto fica igual
+    expect(unidadeJunta("monte em 3 toques, 30 s")).toBe("monte em 3 toques, 30\u00a0s");
+    expect(unidadeJunta("1 copo d'água, 10 s")).toBe("1 copo d'água, 10\u00a0s");
+    expect(unidadeJunta("Ver em 1 min?")).toBe("Ver em 1\u00a0min?");
+    expect(unidadeJunta("3 toques, 2 sabores, 5 semanas")).toBe("3 toques, 2 sabores, 5 semanas"); // "s" de palavra não
+    expect(emSegundos(20)).toBe("20\u00a0s");
+    expect(rotuloConhecerMais("financas")).toBe("Conhecer mais das Finanças (1\u00a0min)");
+    // as boas-vindas do braço A com a Rotina primeiro (a dose que quebrava a 390 px)
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    localStorage.removeItem("core-montar-rotina"); // o quiz da Rotina ligado: "monte em 3 toques, 30 s"
+    guardarChave(CHAVES_FUNIL_W.area, "rotina");
+    montar(montarStore({}), "/home");
+    const linha = screen.getByTestId("missao-doses-linha-1").querySelector(".md-linha-texto")!;
+    // o "·" preso ao módulo e o pedido da dose num bloco que anda inteiro pra 2ª linha ("Hoje · 📅 Rotina ·" / "monte em…")
+    expect(linha.textContent).toBe("Hoje · 📅 Rotina\u00a0· monte em 3 toques, 30\u00a0s");
+    expect(linha.className).toContain("text-balance");
+    const dose = screen.getByTestId("missao-doses-linha-1-dose");
+    expect(dose.className).toBe("inline-block");
+    expect(dose.textContent).toBe("monte em 3 toques, 30\u00a0s");
+    expect(screen.getByTestId("missao-doses-linha-2").textContent).toContain("1 gasto, 10\u00a0s");
+    expect(screen.getByTestId("missao-doses-comecar").textContent).toContain("Começar (30\u00a0s)");
+    // e nenhum "N s" com espaço comum sobrou na tela
+    expect(screen.getByTestId("missao-doses-boas-vindas").textContent).not.toMatch(/\d (s|min)(?![\p{L}\d])/u);
   });
 
   it("a 2ª e a 3ª dose NUNCA abrem o quiz (Finanças depois da Rotina, com o Montar ainda em aberto) — A no dia 2, B no mesmo dia", () => {
@@ -1819,6 +1868,166 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     avancar(PASSAGEM_B_MS + 500);
     expect(screen.getByTestId("rota")).not.toHaveTextContent("/rotina");
     expect(eventos.map(([n]) => n)).not.toContain("missao_bora_proxima");
+  });
+
+  /* ── 17/10, revisão tela a tela #17: o passeio que a FESTA abriu devolve a pessoa pro caminho da missão ── */
+
+  it("A (#17): 'Conhecer mais' NA FESTA do dia 1 → o passeio abre ali; no 'Sair' ela volta pra HOME — o tour curto e DEPOIS o 'Plano de amanhã' (nunca juntos); reabrir o app não repete nada", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({});
+    const store = montarStore({});
+    montarComPasseio(store, "/financas");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    passarOlhaDeFinancas();
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
+    expect(screen.getByTestId("rota")).toHaveTextContent("/financas"); // o passeio é do módulo: abre AQUI
+    expect(screen.getByTestId("conhecer-mais-faixa")).toHaveTextContent("Conhecer mais · Finanças");
+    expect(eventos).toContainEqual(["conhecer_mais_abrir", { modulo: "financas", origem: "fim_dose" }]);
+    fireEvent.click(screen.getByTestId("conhecer-mais-sair"));
+    expect(screen.queryByTestId("conhecer-mais-faixa")).toBeNull();
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 1, modulo: "financas", completo: false, para: "home", variante: "A" })]);
+    avancar(1500);
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Pendências de hoje");
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull(); // uma folha por vez: o plano espera o tour
+    fireEvent.click(screen.getByTestId("tour-continuar"));
+    fireEvent.click(screen.getByTestId("tour-continuar")); // "Deixar como está"
+    fireEvent.click(screen.getByTestId("tour-concluir"));
+    expect(screen.queryByTestId("tour-balao")).toBeNull();
+    avancar(2000);
+    expect(screen.getByTestId("plano-amanha-a")).toBeInTheDocument(); // a hora do lembrete do dia 2 e a permissão de aviso
+    fireEvent.click(screen.getByTestId("plano-a-hora-20h"));
+    fireEvent.click(screen.getByTestId("plano-a-combinado"));
+    expect(lerMissao()?.lembrete).toBe("20h");
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
+    // fecha e reabre o app 2 h depois: nada de festa, passeio, tour ou plano de novo
+    cleanup();
+    _novaAberturaDoTour();
+    vi.setSystemTime(new Date(2026, 9, 3, 17, 10));
+    montarComPasseio(store, "/home");
+    avancar(4000);
+    for (const t of ["missao-doses-festa", "conhecer-mais-faixa", "tour-balao", "plano-amanha-a", "missao-doses-convite", "missao-dica"]) expect(screen.queryByTestId(t), t).toBeNull();
+  });
+
+  it("A (#17): o passeio que vai até o FIM ('Terminar', completo) também devolve pra Home", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({});
+    montarComPasseio(montarStore({}), "/financas");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    passarOlhaDeFinancas();
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(screen.getByTestId("conhecer-mais-faixa")).toBeInTheDocument();
+    // o "Terminar" da última parada (o passeio de verdade emite isto no fim — conhecer-mais.test trava o lado de lá)
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_FIM_TOUR, { detail: { modulo: "financas", origem: "fim_dose", completo: true } })); });
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(screen.queryByTestId("conhecer-mais-faixa")).toBeNull();
+    expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 1, modulo: "financas", completo: true, para: "home" })]);
+    // uma volta só: outro fim (o mesmo passeio não acaba duas vezes) não navega de novo
+    eventos.length = 0;
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_FIM_TOUR, { detail: { modulo: "financas", origem: "fim_dose", completo: true } })); });
+    expect(eventos.map(([n]) => n)).not.toContain("missao_doses_conhecer_mais_volta");
+  });
+
+  it("A (#17), dia 2: 'Conhecer mais' na festa da Rotina → no 'Sair' a Home, onde vem a dica do dia (o score)", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // domingo 04/10: dia 2 da missão
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } }, { lembrete: "20h", convites: { "2026-10-04": "foi" } });
+    montarComPasseio(montarStore({ "core-home-tour-done": "2026-10-03T15:00:00.000Z" }), "/rotina");
+    const postIt = esperarPostIt();
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    fireEvent.click(screen.getByText("Adicionar"));
+    avancar(400); avancar(1000);
+    fireEvent.click(screen.getByLabelText("Beber água ao acordar DOMINGO"));
+    const festa = terminarOlhar();
+    expect(festa).toHaveTextContent("Dia 2 de 3 feito");
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(screen.getByTestId("conhecer-mais-faixa")).toHaveTextContent("Conhecer mais · Rotina");
+    fireEvent.click(screen.getByTestId("conhecer-mais-sair"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 2, modulo: "rotina", para: "home" })]);
+    avancar(2000);
+    expect(screen.getByTestId("missao-dica")).toHaveAttribute("data-dia", "2");
+  });
+
+  it("B (#17): 'Conhecer mais' na passagem da dose 1 → no 'Sair' do passeio segue pra PRÓXIMA dose (a Rotina abre, como a passagem faria)", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "B"), boasVindas: true }));
+    montarComPasseio(montarStore({}), "/financas");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    passarOlhaDeFinancas();
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(screen.getByTestId("conhecer-mais-faixa")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("conhecer-mais-sair"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
+    expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 1, modulo: "financas", para: "rotina", variante: "B" })]);
+    expect(esperarPostIt()).toHaveTextContent("1 de 2 · criar");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("dose 2 de 4");
+  });
+
+  it("B (#17): 'Conhecer mais' na festa da 3ª dose → no 'Sair' a Home com o 4º passo (a faixa 'Missão · 4 de 4' e o tour) — o plano de amanhã só depois", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({
+      ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "B"), boasVindas: true,
+      feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-03", rotulo: "Beber água ao acordar" } },
+    }));
+    montarComPasseio(montarStore({}), "/saude");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    expect(terminarOlhar()).toHaveTextContent("Terceira dose feita!");
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(screen.getByTestId("conhecer-mais-faixa")).toHaveTextContent("Conhecer mais · Saúde");
+    fireEvent.click(screen.getByTestId("conhecer-mais-sair"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 3, modulo: "saude", para: "home" })]);
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · 4 de 4");
+    avancar(1500);
+    expect(screen.getByTestId("tour-balao")).toBeInTheDocument();
+    expect(screen.queryByTestId("plano-amanha")).toBeNull();
+  });
+
+  it("(#17) só o passeio que A FESTA abriu: saiu do módulo no meio (a seta de voltar) → o fim que chegar depois não leva a lugar nenhum; o passeio do botão de dicas nunca mexe na rota", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({});
+    const store = montarStore({});
+    montarComPasseio(store, "/financas");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    passarOlhaDeFinancas();
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    fireEvent.click(screen.getByText("sair do módulo"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_FIM_TOUR, { detail: { modulo: "financas", origem: "fim_dose", completo: false } })); });
+    expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
+    expect(eventos.map(([n]) => n)).not.toContain("missao_doses_conhecer_mais_volta");
+    cleanup();
+    // o passeio pelo botão de dicas do módulo (origem "menu"): "Sair" fica no módulo
+    montarComPasseio(store, "/financas");
+    avancar(500);
+    act(() => { window.dispatchEvent(new CustomEvent("conhecer-mais:abrir", { detail: { modulo: "financas", origem: "menu" } })); });
+    fireEvent.click(screen.getByTestId("conhecer-mais-sair"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
+    expect(eventos.map(([n]) => n)).not.toContain("missao_doses_conhecer_mais_volta");
+  });
+
+  it("(#17) com a introdução dos módulos desligada (rollback remoto): sem o host do passeio, a festa não oferece o link", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    registrarIntroRemota(offerings({ intro_modulo: "off" }));
+    try {
+      missaoA({});
+      montar(montarStore({}), "/financas");
+      fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+      expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 de 3 feito");
+      expect(screen.queryByTestId("missao-doses-conhecer-mais")).toBeNull();
+      expect(screen.getByTestId("missao-doses-continuar")).toBeInTheDocument();
+    } finally { _zerarIntroRemota(); }
   });
 });
 

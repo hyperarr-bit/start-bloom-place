@@ -8,7 +8,9 @@
  *     aba e pula o card que não existe; sair = conhecer_mais_sair + fim incompleto (sem marcar feito); terminar =
  *     feito (aparelho + conta) e a oferta não volta;
  *   · o lembrete: SÓ na 3ª abertura do módulo, uma vez; "Agora não" apaga pra sempre; "Ver" abre;
- *   · chaves novas classificadas; eventos conhecer_mais_oferta/abrir/parada/sair/fim.
+ *   · chaves novas classificadas; eventos conhecer_mais_oferta/abrir/parada/sair/fim;
+ *   · (17/10, revisão tela a tela #17) o fim — "Sair" ou "Terminar" — avisa quem abriu: `conhecer-mais:fim` na window,
+ *     {modulo, origem, completo}, 1 vez (a missão leva a pessoa de volta pro caminho dela quando abriu pela festa).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -30,7 +32,8 @@ import { AcessoConhecerMais, ConhecerMaisHost } from "@/components/intro-modulo/
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { CHAVE_FORCA_INTRO } from "@/lib/intro-modulo";
 import {
-  ABERTURA_DO_LEMBRETE, CHAVE_TOURS_FEITOS_CONTA, TOURS, abrirConhecerMais, chaveAberturas, chaveLembreteVisto, chaveTourFeito, lembreteDevido, marcarTourFeito, ofertaDoTour, temTour, tourFeito,
+  ABERTURA_DO_LEMBRETE, CHAVE_TOURS_FEITOS_CONTA, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, chaveAberturas, chaveLembreteVisto, chaveTourFeito, lembreteDevido, marcarTourFeito, ofertaDoTour, temTour, tourFeito,
+  type FimDoTour,
 } from "@/lib/conhecer-mais";
 import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
 
@@ -89,10 +92,11 @@ describe("o passeio: configuração, oferta e chaves", () => {
       for (const p of t.paradas) { expect(p.texto.length).toBeGreaterThan(30); expect(p.texto.length).toBeLessThan(170); }
     }
     // dono 17/10: "Ver mais N dicas de X"; a linha pequena numa linha só do botão — entra nome por nome, o resto vira "…"
-    expect(ofertaDoTour("financas")).toEqual({ titulo: "Ver mais 5 dicas de Finanças", linha: "Meu Mês, contas fixas, cartão… · 1 min" });
-    expect(ofertaDoTour("saude")).toEqual({ titulo: "Ver mais 4 dicas de Saúde", linha: "Log médico, remédios, evolução… · 1 min" });
-    expect(ofertaDoTour("rotina")).toEqual({ titulo: "Ver mais 3 dicas de Rotina", linha: "Rotina semanal, meu mês e foco · 1 min" }); // os 3 cabem: sem "…"
-    for (const m of ["financas", "rotina", "saude"]) expect(ofertaDoTour(m)!.linha.replace(/ · 1 min$/, "").length).toBeLessThanOrEqual(33); // 32 letras + "…"
+    // o "1 min" vai preso por um espaço que não quebra (17/10, revisão tela a tela #42: nunca "min" sozinho na linha de baixo)
+    expect(ofertaDoTour("financas")).toEqual({ titulo: "Ver mais 5 dicas de Finanças", linha: "Meu Mês, contas fixas, cartão… · 1\u00a0min" });
+    expect(ofertaDoTour("saude")).toEqual({ titulo: "Ver mais 4 dicas de Saúde", linha: "Log médico, remédios, evolução… · 1\u00a0min" });
+    expect(ofertaDoTour("rotina")).toEqual({ titulo: "Ver mais 3 dicas de Rotina", linha: "Rotina semanal, meu mês e foco · 1\u00a0min" }); // os 3 cabem: sem "…"
+    for (const m of ["financas", "rotina", "saude"]) expect(ofertaDoTour(m)!.linha.replace(/ · 1\u00a0min$/, "").length).toBeLessThanOrEqual(33); // 32 letras + "…"
     expect(ofertaDoTour("casa")).toBeNull();
   });
   it("as chaves novas estão classificadas; feito vale no aparelho e na conta; o lembrete é só na 3ª abertura", () => {
@@ -114,6 +118,9 @@ describe("o passeio: configuração, oferta e chaves", () => {
 describe("o passeio na tela", () => {
   it("abre pelo pedido, passa pelas paradas trocando de aba, pula o card que não existe, 'Terminar' marca feito (aparelho + conta) e emite os eventos", async () => {
     medirTudo();
+    const fins: FimDoTour[] = [];
+    const ouvirFim = (e: Event) => fins.push((e as CustomEvent<FimDoTour>).detail);
+    window.addEventListener(EVENTO_FIM_TOUR, ouvirFim);
     const { estado } = montar(<FinancasFalsa semDividas />);
     expect(screen.queryByTestId("conhecer-mais-faixa")).toBeNull(); // nunca automático
     act(() => { abrirConhecerMais("financas", "menu"); });
@@ -142,12 +149,18 @@ describe("o passeio na tela", () => {
     expect(eventos.find(([n, d]) => n === "conhecer_mais_fim" && d.completo === true)).toBeTruthy();
     expect(nomes()).not.toContain("conhecer_mais_sair");
     expect(document.documentElement.hasAttribute("data-conhecer-mais")).toBe(false);
+    window.removeEventListener(EVENTO_FIM_TOUR, ouvirFim);
+    // quem abriu fica sabendo que acabou, com a origem (a missão leva a pessoa de volta quando abriu pela festa) — 1 vez
+    expect(fins).toEqual([{ modulo: "financas", origem: "menu", completo: true }]);
   });
 
   it("'Sair' no meio: fim incompleto, sem marcar feito; a oferta pode voltar", async () => {
     medirTudo();
+    const fins: FimDoTour[] = [];
+    const ouvirFim = (e: Event) => fins.push((e as CustomEvent<FimDoTour>).detail);
+    window.addEventListener(EVENTO_FIM_TOUR, ouvirFim);
     montar(<FinancasFalsa />);
-    act(() => { abrirConhecerMais("financas", "fim_tutorial"); });
+    act(() => { abrirConhecerMais("financas", "fim_dose"); });
     await waitFor(() => expect(screen.getByTestId("conhecer-mais-balao")).toBeTruthy(), { timeout: 4000 });
     fireEvent.click(screen.getByTestId("conhecer-mais-proxima"));
     await waitFor(() => expect(screen.getByTestId("conhecer-mais-passo").textContent).toBe("2 de 5"), { timeout: 4000 });
@@ -157,6 +170,9 @@ describe("o passeio na tela", () => {
     expect(eventos.find(([n, d]) => n === "conhecer_mais_fim" && d.completo === false)).toBeTruthy();
     expect(localStorage.getItem(chaveTourFeito("financas"))).toBeNull();
     expect(tourFeito("financas")).toBe(false);
+    window.removeEventListener(EVENTO_FIM_TOUR, ouvirFim);
+    // o "Sair" também avisa o fim (incompleto), com quem abriu — aqui, a festa da dose (17/10, revisão tela a tela #17)
+    expect(fins).toEqual([{ modulo: "financas", origem: "fim_dose", completo: false }]);
   });
 
   it("o lembrete: nada na 1ª e 2ª aberturas, aparece na 3ª (com evento de oferta), 'Agora não' apaga pra sempre; 'Ver' abre", async () => {
@@ -225,7 +241,7 @@ describe("o cartão do fim da intro guiada", () => {
     const oferta = screen.getByTestId("intro-modulo-conhecer-mais");
     expect(oferta.tagName).toBe("BUTTON");
     expect(oferta.querySelector(".im-pronto-oferta-titulo")?.textContent).toBe("Ver mais 5 dicas de Finanças");
-    expect(oferta.querySelector(".im-pronto-oferta-linha")?.textContent).toBe("Meu Mês, contas fixas, cartão… · 1 min");
+    expect(oferta.querySelector(".im-pronto-oferta-linha")?.textContent).toBe("Meu Mês, contas fixas, cartão… · 1\u00a0min"); // "1 min" preso
     expect(oferta.querySelector("svg.im-pronto-oferta-icone")).toBeTruthy();
     expect(oferta.querySelector("svg.im-pronto-oferta-seta")).toBeTruthy();
     const partes = ["im-pronto-oferta-icone", "im-pronto-oferta-textos", "im-pronto-oferta-seta"]; // nessa ordem: lâmpada, textos, "›"

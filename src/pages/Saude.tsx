@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
 import { CicloMenstrual } from "@/components/saude/CicloMenstrual";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
@@ -57,7 +58,7 @@ const Saude = () => {
           <Heart className="w-5 h-5 text-red-600" />
           <h1 className="text-base font-bold tracking-tight">SAÚDE</h1>
           <span className="ml-auto text-xs text-muted-foreground">{currentMonth}</span>
-          <ThemeToggle />
+          <AcessoConhecerMais moduleId="saude" /><ThemeToggle />
         </div>
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (

@@ -18,6 +18,7 @@ import { AskCore } from "@/components/ask/AskCore";
 
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { ConviteAvaliacao, type GastoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
@@ -445,7 +446,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             >
               <Sparkles className="w-4 h-4" />
             </button>
-            <ThemeToggle />
+            <AcessoConhecerMais moduleId="financas" /><ThemeToggle />
           </div>
         </div>
         {/* Tabs */}

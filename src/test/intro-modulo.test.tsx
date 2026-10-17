@@ -33,20 +33,25 @@ vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@
 vi.mock("@/lib/missao-doses", async (orig) => ({ ...(await orig<typeof import("@/lib/missao-doses")>()), moduloDaMissaoHoje: () => missaoHoje.v }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }), Toaster: () => null }));
 
-import { UserDataContext, _regrasDeAtivacao, type UserDataContextType } from "@/hooks/use-user-data";
+import { UserDataContext, _regrasDeAtivacao, useUserData, type UserDataContextType } from "@/hooks/use-user-data";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import {
-  CHAVE_FORCA_INTRO, CHAVE_INTRO_VISTAS_CONTA, INTRO_MODULO, INTRO_MODULO_APP, INTROS, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, _zerarIntroRemota,
-  chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introLigada, porQueNaoMostrar, registrarIntroRemota, semConteudo,
+  ATRIBUTO_MONTAR_FINANCAS, CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, EVENTO_MONTAR_FINANCAS_FIM, INTRO_MODULO, INTRO_MODULO_APP, INTROS,
+  ATRIBUTO_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_FIM, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, MODULOS_SEM_NADA, MONTAR_ROTINA, OLHAR_POSSO_GASTAR, _zerarIntroRemota,
+  chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
 } from "@/lib/intro-modulo";
+import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
+import { modeloPara } from "@/lib/intro-modulo-acoes";
 import { adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
 import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CATEGORIAS_PADRAO_MERCADO } from "@/lib/mercado";
 import { MODULOS } from "@/lib/modulos";
 import { CHAVE_FORCA_CARTOES } from "@/lib/tour-home";
 import { CHAVE_FORCA_MISSAO_DOSES, gravarMissao, iniciarMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { guardarForcaDia1Cheio } from "@/lib/dia1-cheio";
 import { localDayKey } from "@/lib/utils";
+const ontem = () => localDayKey(new Date(Date.now() - 86_400_000));
 
 type Dados = Record<string, unknown>;
 function criarStore(inicial: Dados, carregada = true) {
@@ -65,7 +70,8 @@ function criarStore(inicial: Dados, carregada = true) {
 const montar = (ui: ReactNode, inicial: Dados = {}, carregada = true) => {
   const s = criarStore(inicial, carregada);
   const r = render(<MemoryRouter initialEntries={["/casa"]}><s.Provedor>{ui}</s.Provedor></MemoryRouter>);
-  return { ...r, ...s };
+  const get = <T,>(k: string, f: T): T => (k in s.estado.dados ? (s.estado.dados[k] as T) : f);
+  return { ...r, ...s, get };
 };
 const card = () => screen.queryByTestId("intro-modulo-vazio");
 const dormir = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
@@ -80,6 +86,9 @@ afterEach(() => {
   cleanup(); document.body.innerHTML = "";
   document.documentElement.removeAttribute("data-intro-modulo-faixa");
   delete document.documentElement.dataset.missaoDose;
+  document.documentElement.removeAttribute(ATRIBUTO_MONTAR_FINANCAS);
+  document.documentElement.removeAttribute(ATRIBUTO_MONTAR_ROTINA);
+  document.documentElement.removeAttribute("data-escolher-treino");
   document.documentElement.classList.remove("dark");
 });
 
@@ -111,12 +120,15 @@ describe("chave, constantes e classificação", () => {
     expect(vassouraLeva(chaveIntroAberta("casa"))).toBe(false);
     expect(CHAVE_INTRO_VISTAS_CONTA.startsWith("core-")).toBe(true);
     expect(vassouraLeva(CHAVE_INTRO_VISTAS_CONTA)).toBe(true); // da conta: a hidratação traz de volta
+    expect(vassouraLeva(CHAVE_INTRO_FEITAS_CONTA)).toBe(true);
   });
-  it("os 16 módulos: 3 guiadas + 10 estados vazios com captura nos dois temas; Relações, Pet e Beleza sem intro", () => {
+  it("os 16 módulos: 3 guiadas + 9 estados vazios com captura nos dois temas; Treino, Relações, Pet e Beleza sem intro (Treino sem nada por cima)", () => {
     expect([...MODULOS_COM_INTRO, ...MODULOS_SEM_INTRO].sort()).toEqual(MODULOS.map((m) => m.id).sort());
-    expect(MODULOS_COM_INTRO).toHaveLength(13);
+    expect(MODULOS_COM_INTRO).toHaveLength(12);
+    expect(MODULOS_SEM_NADA).toEqual(["treino"]);
+    expect(INTROS.treino).toBeUndefined();
     for (const m of ["financas", "rotina", "saude"]) expect(INTROS[m].formato).toBe("guiada");
-    for (const m of ["treino", "dieta", "estudos", "biblioteca", "casa", "desenvolvimento", "carreira", "detox", "hiperfoco", "viagens"]) {
+    for (const m of ["dieta", "estudos", "biblioteca", "casa", "desenvolvimento", "carreira", "detox", "hiperfoco", "viagens"]) {
       const c = INTROS[m];
       expect(c.formato, m).toBe("vazio");
       if (c.formato !== "vazio") continue;
@@ -199,6 +211,10 @@ describe("ligada: a porta do módulo", () => {
     cleanup();
     const pet = montar(<BoasVindasDoModulo moduleId="pet" />);
     expect(pet.container.innerHTML).toBe("");
+    cleanup();
+    const treino = montar(<BoasVindasDoModulo moduleId="treino" tips={["Dica antiga do Treino"]} />); // 17/10: só a tela dele
+    expect(treino.container.innerHTML).toBe("");
+    expect(screen.queryByText("Dica antiga do Treino")).toBeNull();
   });
 
   it("espera a conta carregar: nada antes do loaded, a intro depois (o 2º aparelho precisa da lista da conta)", async () => {
@@ -214,7 +230,8 @@ describe("ligada: a porta do módulo", () => {
     const cats = CATEGORIAS_PADRAO_MERCADO.map((c, i) => (i === 0 ? { ...c, items: [{ id: "1", text: "Banana", done: false }] } : c));
     expect(porQueNaoMostrar("casa", (k, f) => (k === "casa-grocery-categories" ? (cats as never) : f))).toBe("com_dado");
     expect(porQueNaoMostrar("financas", (k, f) => (k === "finance-expenses" ? ([{ id: "1", value: 10 }] as never) : f))).toBe("com_dado");
-    expect(porQueNaoMostrar("treino", (k, f) => (k === "saude-workouts-v2" ? ({ SEGUNDA: { muscles: ["Peito"], exercises: [] } } as never) : f))).toBe("com_dado");
+    expect(porQueNaoMostrar("rotina", (k, f) => (k === "rotina-habits" ? (["Beber água"] as never) : f))).toBeNull(); // hábitos criados (pelo montar) não contam
+    expect(porQueNaoMostrar("rotina", (k, f) => (k === "rotina-habits-checked" ? ({ SEXTA: [true] } as never) : f))).toBe("com_dado"); // marcou: conta de antes
     expect(porQueNaoMostrar("dieta", (k, f) => (k === "saude-meals" ? ({ SEGUNDA: { Almoço: "arroz" } } as never) : f))).toBe("com_dado");
     expect(porQueNaoMostrar("dieta", (k, f) => (k === "saude-meals" ? ({ SEGUNDA: { Almoço: "" } } as never) : f))).toBeNull(); // o plano padrão é vazio
     expect(porQueNaoMostrar("carreira", (k, f) => (k === "career-day-phases" ? ([{ id: "f1", nome: "Prospecção", memo: "", counts: {} }] as never) : f))).toBeNull(); // fases padrão sem contagem = vazio
@@ -240,7 +257,7 @@ describe("ligada: a porta do módulo", () => {
     expect(Object.keys(localStorage).filter((k) => k.startsWith("core-intro"))).toHaveLength(0);
   });
 
-  it("fechou o app no meio: volta 1 vez; na 2ª aparição já marca vista; a 3ª não existe", () => {
+  it("fechou o app no meio: volta 1 vez; na 2ª aparição já marca vista; a 3ª não existe", async () => {
     const a = montar(<IntroDoModulo moduleId="casa" />);
     expect(card()).toBeTruthy();
     expect(localStorage.getItem(chaveIntroAberta("casa"))).toBeTruthy();
@@ -248,8 +265,14 @@ describe("ligada: a porta do módulo", () => {
     a.unmount(); // fechou sem terminar
     const b = montar(<IntroDoModulo moduleId="casa" />);
     expect(card()).toBeTruthy();
-    expect(localStorage.getItem(chaveIntroVista("casa"))).toBeTruthy();
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^pulada@/); // vista, mas não feita
     expect(b.estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
+    expect(b.estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined();
+    expect(introConcluida("casa", b.get)).toBe(false);
+    fireEvent.click(screen.getByTestId("intro-modulo-acao")); // ela termina mesmo assim: vira feita (o card sai 650 ms depois)
+    await waitFor(() => expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/), { timeout: 2500 });
+    expect(b.estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toEqual(["casa"]);
+    expect(introConcluida("casa", b.get)).toBe(true);
     b.unmount();
     const c = montar(<IntroDoModulo moduleId="casa" />);
     expect(c.container.innerHTML).toBe("");
@@ -273,36 +296,94 @@ describe("ligada: a porta do módulo", () => {
     expect(c.container.innerHTML).toBe("");
   });
 
-  it("missão em doses: dose na tela, módulo de hoje, dose feita e missão em andamento bloqueiam; completa ou abandonada libera", () => {
+  it("missão em doses (dono 17/10): bloqueia SÓ a dose na tela, o módulo da dose de HOJE por fazer e o módulo cuja dose já foi feita; Rotina no dia 1 mostra a intro", () => {
     const get = (_k: string, f: unknown) => f;
     expect(porQueNaoMostrar("casa", get as never)).toBeNull();
+    // (a) uma dose na tela
     document.documentElement.dataset.missaoDose = "1";
     expect(porQueNaoMostrar("casa", get as never)).toBe("missao");
     delete document.documentElement.dataset.missaoDose;
-    missaoHoje.v = "casa"; // o export do ramo da missão
-    expect(porQueNaoMostrar("casa", get as never)).toBe("missao");
-    expect(porQueNaoMostrar("treino", get as never)).toBeNull();
-    missaoHoje.v = null;
     (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = true; // a missão na web só liga por QA
     localStorage.setItem(CHAVE_FORCA_MISSAO_DOSES, "on");
-    const m = iniciarMissao(["financas", "casa", "treino"]);
-    gravarMissao(m); // em andamento: os 3 esperam a própria dose
+    // (b) o export do ramo da missão manda quando existe
+    missaoHoje.v = "casa";
     expect(porQueNaoMostrar("casa", get as never)).toBe("missao");
-    expect(porQueNaoMostrar("treino", get as never)).toBe("missao");
     expect(porQueNaoMostrar("dieta", get as never)).toBeNull();
-    const feita = (n: 1 | 2 | 3) => ({ dia: localDayKey(), rotulo: "x" });
-    gravarMissao({ ...m, feitos: { 1: feita(1), 2: feita(2), 3: feita(3) } } as EstadoMissaoDoses); // completa: as 3 doses foram as intros deles
-    expect(porQueNaoMostrar("casa", get as never)).toBe("missao");
-    expect(porQueNaoMostrar("financas", get as never)).toBe("missao");
+    missaoHoje.v = null;
+    // (b) sem o export: o próximo passo por fazer, se é de hoje no calendário da missão
+    const m = iniciarMissao(["financas", "rotina", "saude"]); // nasceu hoje, braço A (1 dose por dia), dose 1 por fazer
+    gravarMissao(m);
+    expect(porQueNaoMostrar("financas", get as never)).toBe("missao"); // a dose de hoje É a intro de Finanças
+    expect(porQueNaoMostrar("rotina", get as never)).toBeNull(); // abriu Rotina por curiosidade no dia 1: intro normal
+    expect(porQueNaoMostrar("saude", get as never)).toBeNull();
     expect(porQueNaoMostrar("dieta", get as never)).toBeNull();
-    gravarMissao({ ...m, explorou: true } as EstadoMissaoDoses); // pulou a missão inteira: nenhuma dose aconteceu
-    expect(porQueNaoMostrar("casa", get as never)).toBeNull();
-    gravarMissao({ ...m, explorou: true, feitos: { 1: feita(1) } } as EstadoMissaoDoses); // a dose de Finanças aconteceu antes de pular
+    // (c) dose 1 feita hoje: Finanças fica bloqueada (seria repetir a mesma ação); Rotina (dose de amanhã) continua livre
+    const feita = { dia: localDayKey(), rotulo: "Café · R$ 12" };
+    gravarMissao({ ...m, feitos: { 1: feita } } as EstadoMissaoDoses);
     expect(porQueNaoMostrar("financas", get as never)).toBe("missao");
-    expect(porQueNaoMostrar("casa", get as never)).toBeNull();
+    expect(porQueNaoMostrar("rotina", get as never)).toBeNull();
+    // dia 2 (a missão nasceu ontem): a dose 2 (Rotina) é a de hoje → bloqueada enquanto estiver por fazer; Saúde (dia 3) livre
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], ontem()), feitos: { 1: { dia: ontem(), rotulo: "x" } } } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("rotina", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("saude", get as never)).toBeNull();
+    // braço B (as 3 doses no dia 1, só com a chave do dia 1 cheio ligada): o próximo passo por fazer é sempre de hoje
+    guardarForcaDia1Cheio("?dia1-cheio=on");
+    gravarMissao({ ...m, braco: "B", feitos: { 1: feita } } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("rotina", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("saude", get as never)).toBeNull();
+    guardarForcaDia1Cheio("?dia1-cheio=auto");
+    // missão completa: as 3 doses foram as intros deles; o resto, livre
+    gravarMissao({ ...m, feitos: { 1: feita, 2: feita, 3: feita } } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("financas", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("rotina", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("saude", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("dieta", get as never)).toBeNull();
+    // pulou a missão inteira: nenhuma dose aconteceu → tudo livre; com a dose 1 feita antes de pular, só Finanças fica
+    gravarMissao({ ...m, explorou: true } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("financas", get as never)).toBeNull();
+    gravarMissao({ ...m, explorou: true, feitos: { 1: feita } } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("financas", get as never)).toBe("missao");
+    expect(porQueNaoMostrar("rotina", get as never)).toBeNull();
+    // e na tela: a dose de hoje por fazer não ganha a intro; Rotina ganha
+    gravarMissao(m);
     const a = montar(<IntroDoModulo moduleId="financas" />);
     expect(a.container.innerHTML).toBe("");
     expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
+    a.unmount();
+    montar(<IntroDoModulo moduleId="rotina" />);
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marca 1 hábito");
+  });
+
+  it("introConcluida: só a intro FEITA conta (pular não), pelo aparelho, pelo get da conta ou pelo cache do user_data", () => {
+    expect(introConcluida("casa")).toBe(false);
+    localStorage.setItem(chaveIntroVista("casa"), "pulada@2026-10-17T10:00:00.000Z");
+    expect(introConcluida("casa")).toBe(false);
+    localStorage.setItem(chaveIntroVista("casa"), "feita@2026-10-17T10:00:00.000Z");
+    expect(introConcluida("casa")).toBe(true);
+    localStorage.clear();
+    localStorage.setItem("u:conta-x:core-intro-feitas", JSON.stringify(["treino"])); // o cache do user_data, sem precisar do hook
+    expect(introConcluida("treino")).toBe(true);
+    expect(introConcluida("dieta")).toBe(false);
+    localStorage.setItem("guest:core-intro-feitas", JSON.stringify(["dieta"]));
+    expect(introConcluida("dieta")).toBe(true);
+    const get = <T,>(k: string, f: T): T => (k === CHAVE_INTRO_FEITAS_CONTA ? (["estudos"] as never) : f);
+    expect(introConcluida("estudos", get)).toBe(true);
+    expect(introConcluida("casa", get)).toBe(false);
+  });
+
+  it("Montar Finanças na tela: a intro espera; o evento de fim + o atributo saindo do <html> ⇒ ela começa; renda e contas fixas não desqualificam", async () => {
+    document.documentElement.setAttribute(ATRIBUTO_MONTAR_FINANCAS, "1");
+    const dados = { "finance-incomes": [{ id: "r", value: 2400, description: "Salário", date: localDayKey() }], "finance-fixed-expenses": [{ id: "f", value: 1100, description: "Aluguel", day: 5 }] };
+    const { container } = montar(<div><button type="button" data-spotlight="add-expense">+</button><IntroDoModulo moduleId="financas" /></div>, dados);
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
+    expect(localStorage.getItem(chaveIntroAberta("financas"))).toBeNull();
+    // o evento chega enquanto o Montar ainda está saindo (atributo ainda lá): continua esperando
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_FINANCAS_FIM, { detail: { resultado: "pronto" } })); });
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
+    act(() => { document.documentElement.removeAttribute(ATRIBUTO_MONTAR_FINANCAS); });
+    await waitFor(() => expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeTruthy());
+    expect(container).toBeTruthy();
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("toca em 1 gasto");
   });
 
   it("outra guia por cima: presente no mount ⇒ nada; aparecendo logo depois ⇒ a intro sai sem marcar vista", async () => {
@@ -342,38 +423,56 @@ describe("ligada: o estado vazio de cada módulo", () => {
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "botao")).toBeTruthy();
     expect(eventos.find(([n]) => n === "modulo_intro_concluida")).toBeTruthy();
     await waitFor(() => expect(card()).toBeNull(), { timeout: 2500 });
-    expect(localStorage.getItem(chaveIntroVista("casa"))).toBeTruthy();
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/);
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
+    expect(estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toEqual(["casa"]);
+    expect(introConcluida("casa")).toBe(true);
   });
 
-  it("Pular fecha, marca vista e conta como pulada", () => {
+  it("Pular fecha, marca vista (pulada, não feita) e conta como pulada", () => {
     const { estado } = montar(<IntroDoModulo moduleId="casa" />);
     fireEvent.click(screen.getByTestId("intro-modulo-pular"));
     expect(card()).toBeNull();
-    expect(localStorage.getItem(chaveIntroVista("casa"))).toBeTruthy();
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^pulada@/);
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
+    expect(estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined();
+    expect(introConcluida("casa")).toBe(false);
     expect(eventos.find(([n, d]) => n === "modulo_intro_pulou" && d.fase === "vazio")).toBeTruthy();
   });
 
   it("tema: a captura é a do tema da pessoa e acompanha a troca", async () => {
     document.documentElement.classList.add("dark");
-    montar(<IntroDoModulo moduleId="treino" />);
-    expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/treino-escuro.mp4");
-    expect(screen.getByTestId("intro-modulo-poster").getAttribute("src")).toBe("/intro/treino-escuro.jpg");
+    montar(<IntroDoModulo moduleId="dieta" />);
+    expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/dieta-escuro.mp4");
+    expect(screen.getByTestId("intro-modulo-poster").getAttribute("src")).toBe("/intro/dieta-escuro.jpg");
     expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.tema === "escuro")).toBeTruthy();
     document.documentElement.classList.remove("dark");
-    await waitFor(() => expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/treino.mp4"));
+    await waitFor(() => expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/dieta.mp4"));
   });
 
-  it("Treino: 1 toque monta a semana com o Full Body 3x (plano real + dias ativos)", async () => {
-    const { estado } = montar(<IntroDoModulo moduleId="treino" />);
-    fireEvent.click(screen.getByTestId("intro-modulo-acao"));
-    const plano = estado.dados["saude-workouts-v2"] as Record<string, { muscles: string[]; exercises: unknown[] }>;
-    expect(plano.SEGUNDA.muscles).toEqual(["Full Body"]);
-    expect(plano.SEGUNDA.exercises.length).toBeGreaterThan(0);
-    expect(plano["TERÇA"].exercises).toHaveLength(0);
-    expect(estado.dados["treino-active-days"]).toEqual(["SEGUNDA", "QUARTA", "SEXTA"]);
-    await waitFor(() => expect(card()).toBeNull(), { timeout: 2500 });
+  it("EscolherTreino (só a missão monta): 2 perguntas → o modelo existente que casa, gravado pelo caminho do módulo; o bloco de modelos do módulo some enquanto o quiz está na tela", async () => {
+    expect(modeloPara("academia", "2-3").nome).toBe("Full Body 3x");
+    expect(modeloPara("academia", "4").nome).toBe("Upper / Lower");
+    expect(modeloPara("academia", "5-6").nome).toBe("Push / Pull / Legs");
+    expect(modeloPara("casa", "5-6")).toMatchObject({ nome: "Full Body 3x" });
+    expect(modeloPara("casa", "4").aviso).toMatch(/em casa/);
+    const pronto = vi.fn();
+    const { estado } = montar(<EscolherTreino onPronto={pronto} />);
+    expect(document.documentElement.hasAttribute("data-escolher-treino")).toBe(true);
+    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "treino" && d.formato === "escolha")).toBeTruthy();
+    const dias = screen.getAllByTestId("escolher-dias");
+    expect((dias[0] as HTMLButtonElement).disabled).toBe(true); // primeiro "onde"
+    fireEvent.click(screen.getAllByTestId("escolher-onde")[0]); // Academia
+    fireEvent.click(dias[1]); // 4 dias
+    const plano = estado.dados["saude-workouts-v2"] as Record<string, { muscles: string[] }>;
+    expect(plano.SEGUNDA.muscles).toContain("Peito");
+    expect(plano["TERÇA"].muscles).toContain("Quadríceps");
+    expect(estado.dados["treino-active-days"]).toEqual(["SEGUNDA", "TERÇA", "QUINTA", "SEXTA"]);
+    expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "escolha" && d.onde === "academia" && d.dias === "4" && d.modelo === "Upper / Lower")).toBeTruthy();
+    expect(screen.getByTestId("escolher-treino-pronto").textContent).toContain("Upper / Lower");
+    await waitFor(() => expect(pronto).toHaveBeenCalledWith({ onde: "academia", dias: "4", modelo: "Upper / Lower" }), { timeout: 2500 });
+    cleanup();
+    expect(document.documentElement.hasAttribute("data-escolher-treino")).toBe(false);
   });
 
   it("Dieta: o chip grava o café da manhã de HOJE no cardápio, sem mexer no resto", () => {
@@ -452,6 +551,77 @@ describe("ligada: o estado vazio de cada módulo", () => {
   });
 });
 
+describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () => {
+  beforeEach(ligar);
+  it("com o montar na tela a intro espera; 'pronto' + o atributo saindo ⇒ a intro começa pedindo 'marca o primeiro quando fizer' (os hábitos criados não contam como dado)", async () => {
+    expect(MONTAR_ROTINA).toEqual({ evento: EVENTO_MONTAR_ROTINA_FIM, atributo: ATRIBUTO_MONTAR_ROTINA });
+    document.documentElement.setAttribute(ATRIBUTO_MONTAR_ROTINA, "1");
+    expect(montarNaTela(MONTAR_ROTINA)).toBe(true);
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const dados = { "rotina-habits": ["Beber água ao acordar", "Alongar 5 min"] }; // o que o montar criou
+    montar(<div><button type="button" data-spotlight="add-habit">+ Hábito</button><IntroDoModulo moduleId="rotina" /></div>, dados);
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_ROTINA_FIM, { detail: { resultado: "pronto" } })); });
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull(); // o atributo ainda está lá
+    act(() => { document.documentElement.removeAttribute(ATRIBUTO_MONTAR_ROTINA); });
+    await waitFor(() => expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeTruthy());
+    const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 4000 });
+    expect(postIt.at(-1)!.textContent).toContain("Marca o primeiro quando fizer");
+    expect(postIt.at(-1)!.textContent).toContain("A linha de HOJE");
+    medir.mockRestore();
+  });
+  it("o chip da Rotina cria o hábito em 1 TOQUE (preenche o campo real e toca no Adicionar do módulo) e o anel vai pro quadradinho de hoje", async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const DIAS = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+    const Modulo = () => {
+      const { get, set } = useUserData();
+      const [nome, setNome] = useState("");
+      const habitos = get<string[]>("rotina-habits", []) ?? [];
+      return (
+        <div>
+          <div className="rounded-2xl">
+            <button type="button" data-spotlight="add-habit">+ Hábito</button>
+            <div><input placeholder="Nome do hábito..." value={nome} onChange={(e) => setNome(e.target.value)} /><button type="button" onClick={() => { if (nome.trim()) { set("rotina-habits", [...habitos, nome.trim()]); setNome(""); } }}>Adicionar</button></div>
+            <table><tbody>{DIAS.map((d) => <tr key={d}><td>{d}</td>{habitos.map((h) => <td key={h}><input type="checkbox" aria-label={`${h} ${d}`} /></td>)}</tr>)}</tbody></table>
+          </div>
+          <IntroDoModulo moduleId="rotina" />
+        </div>
+      );
+    };
+    const { estado } = montar(<Modulo />);
+    const chips = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 6000 });
+    fireEvent.click(chips[0]); // Beber água ao acordar
+    await waitFor(() => expect(estado.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]), { timeout: 3000 });
+    expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "criar_habito")).toBeTruthy();
+    // passo 2: o anel abraça o QUADRADINHO de hoje (a célula com o checkbox), não a linha inteira
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marca o quadradinho de hoje"), { timeout: 4000 });
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 2");
+    medir.mockRestore();
+  });
+
+  it("âncora perdida (saiu da tela, segundo plano, tempo): o post-it com os chips continua na tela, solto no topo — nunca some em silêncio", async () => {
+    let medida = { top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect;
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(() => medida);
+    montar(<div><div><input placeholder="+ Novo gasto" /><button data-spotlight="add-expense">+</button></div><IntroDoModulo moduleId="financas" /></div>);
+    await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
+    expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeNull(); // com o anel, o post-it mora no anel
+    medida = { ...medida, width: 0, height: 0 } as DOMRect; // o alvo sumiu (a tela mudou)
+    await waitFor(() => expect(screen.getByTestId("intro-modulo-postit-solto")).toBeTruthy(), { timeout: 3000 });
+    expect(screen.getAllByTestId("demo-guia-chip").length).toBeGreaterThan(0);
+    expect(eventos.find(([n, d]) => n === "modulo_intro_anel_saiu" && d.motivo === "ancora_invisivel")).toBeTruthy();
+    medir.mockRestore();
+  });
+
+  it("sem o montar (abriu por curiosidade): a intro de sempre, 'criar' o 1º hábito", async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    montar(<div><button type="button" data-spotlight="add-habit">+ Hábito</button><IntroDoModulo moduleId="rotina" /></div>);
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marca 1 hábito");
+    const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 6000 });
+    expect(postIt.at(-1)!.textContent).toContain("Qual hábito você quer começar hoje?");
+    medir.mockRestore();
+  });
+});
+
 /* ───────────────────────────────── as ações (puras) ───────────────────────────────── */
 describe("as ações de 1 toque são idempotentes e respeitam o que já existe", () => {
   const ctx = (dados: Record<string, unknown>): ContextoDaAcao & { dados: Record<string, unknown> } => ({
@@ -509,6 +679,38 @@ describe("ligada: a intro guiada de Finanças", () => {
     expect(localStorage.getItem(chaveIntroVista("financas"))).toBeTruthy();
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["financas"]);
     expect(document.documentElement.getAttribute("data-intro-modulo-faixa")).toBeNull();
+    medir.mockRestore();
+  });
+
+  it("depois do Montar (renda gravada): o 'olha' vai no QUANTO POSSO GASTAR HOJE do Dashboard, com o número de antes → depois", async () => {
+    const dias = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1;
+    // o Dashboard de mentira: o card com o número REAL da conta (renda − gastos) ÷ dias restantes, como o computeDailyBudget
+    const Modulo = () => {
+      const { get } = useUserData();
+      const gastos = (get<Array<{ value: number }>>("finance-expenses", []) ?? []).reduce((s, e) => s + Number(e.value || 0), 0);
+      return (
+        <div>
+          <header><button type="button">📊 DASHBOARD</button><button type="button">💰 MEU FINANCEIRO</button></header>
+          <div><input placeholder="+ Novo gasto" /><button data-spotlight="add-expense">+</button></div>
+          <div data-missao="posso-gastar"><h3>QUANTO POSSO GASTAR HOJE</h3><p>R$ {Math.round((2400 - gastos) / dias)}</p></div>
+          <IntroDoModulo moduleId="financas" />
+        </div>
+      );
+    };
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const dados = { "finance-incomes": [{ id: "r", value: 2400, description: "Salário", date: localDayKey() }] };
+    expect(OLHAR_POSSO_GASTAR.quando((k, f) => (k === "finance-incomes" ? (dados["finance-incomes"] as never) : f))).toBe(true);
+    expect(OLHAR_POSSO_GASTAR.quando((_k, f) => f)).toBe(false);
+    montar(<Modulo />, dados);
+    const chip = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
+    fireEvent.click(chip[0]); // Café · R$ 12
+    await waitFor(() => expect(screen.getByTestId("intro-modulo-olhar")).toBeTruthy(), { timeout: 6000 });
+    const balao = screen.getByTestId("intro-modulo-olhar");
+    expect(balao.textContent).toContain("Esse número é o seu guia do dia");
+    expect(balao.textContent).toContain("Hoje dá pra gastar");
+    const antes = Math.round(2400 / dias), depois = Math.round((2400 - 12) / dias);
+    if (antes !== depois) expect(balao.textContent).toContain(`R$ ${antes}`);
+    expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.resumo === "alternativo")).toBeTruthy();
     medir.mockRestore();
   });
 });

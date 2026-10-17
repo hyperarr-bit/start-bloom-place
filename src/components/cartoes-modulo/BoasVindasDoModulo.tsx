@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { CartoesDoModulo } from "./CartoesDoModulo";
-import { INTROS, guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { INTROS, MODULOS_SEM_NADA, guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 
 /**
@@ -16,7 +16,8 @@ import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
  * FLUXO em todos os módulos (o código fica de reserva) — o módulo que TEM intro (lib/intro-modulo:
  * Finanças/Rotina/Saúde guiadas, os outros com estado vazio e captura real) mostra ela; o que não
  * tem (Relações, Pet, Beleza — a tela vazia deles já é o primeiro passo) fica com o "Dicas para
- * começar" de sempre, sem cartão. Desligada = o de hoje (travado em src/test/intro-modulo.test.tsx).
+ * começar" de sempre, sem cartão; Treino fica só com a tela dele (MODULOS_SEM_NADA, 17/10). Desligada = o de
+ * hoje (travado em src/test/intro-modulo.test.tsx).
  */
 export const BoasVindasDoModulo = ({ moduleId, tips, icon }: { moduleId: string; tips?: string[]; icon?: string }) => {
   const { pathname } = useLocation();
@@ -25,6 +26,8 @@ export const BoasVindasDoModulo = ({ moduleId, tips, icon }: { moduleId: string;
   guardarForcaDaIntro();
   const comIntro = !demo && introLigada();
   if (comIntro && INTROS[moduleId]) return <IntroDoModulo moduleId={moduleId} />;
+  // 17/10: Treino não ganha nada por cima — a tela vazia dele ("Comece com um modelo pronto") é o 1º passo
+  if (comIntro && MODULOS_SEM_NADA.includes(moduleId)) return null;
   const comCartoes = !demo && !comIntro && cartoesLigados();
   if (comCartoes) return <CartoesDoModulo moduleId={moduleId} />;
   if (!tips?.length) return null;

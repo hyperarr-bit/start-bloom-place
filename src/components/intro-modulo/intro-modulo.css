@@ -63,3 +63,49 @@ html[data-intro-modulo-faixa="1"] header.sticky { top: calc(var(--app-safe-top, 
 @media (prefers-reduced-motion: reduce) {
   .im-vazio-poster, .im-vazio-acao, .im-vazio-chip { transition: none; }
 }
+
+/* ESCOLHER TREINO (2 perguntas; só como 1ª dose da missão na área "corpo") */
+.im-escolha-corpo { padding: 12px 14px 14px; }
+.im-escolha-corpo .im-vazio-pergunta:first-child { margin-top: 0; }
+.im-escolha-corpo .im-vazio-pergunta[data-esperando="1"] { opacity: .45; }
+.im-escolha-pronto { display: flex; align-items: flex-start; gap: 10px; }
+.im-escolha-pronto .im-vazio-pergunta { margin-top: 2px; }
+/* enquanto o quiz está na tela, o bloco "Comece com um modelo pronto" do módulo some (duas escolhas de modelo numa tela só confundem) */
+html[data-escolher-treino] [data-testid="modelos-prontos"] { display: none; }
+/* o 1º exercício de hoje aceso por uns segundos depois do quiz */
+.im-destaque { box-shadow: 0 0 0 3px #2563eb, 0 0 0 9px rgba(37,99,235,.25) !important; border-radius: 10px; transition: box-shadow .25s ease; }
+@media (prefers-reduced-motion: reduce) { .im-destaque { transition: none; } }
+
+/* CONHECER MAIS (passeio opcional de 1 min): a faixa com "Sair" escrito e "2 de 4"; o balão com Próxima/Terminar */
+.cm-faixa { position: fixed; top: var(--app-safe-top, 0px); left: 0; right: 0; z-index: 215; height: var(--intro-modulo-faixa-h); display: flex; align-items: center; gap: 10px; padding: 0 10px 0 14px; background: #16121c; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 6px 18px -10px rgba(0,0,0,.6); }
+.cm-faixa-titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-faixa-passo { flex: none; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: .04em; text-transform: none; }
+.cm-faixa-sair { flex: none; min-height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+html[data-conhecer-mais="1"] body { padding-top: var(--intro-modulo-faixa-h); }
+html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) + var(--intro-modulo-faixa-h)) !important; }
+.cm-balao { border-radius: 16px; padding: 14px 16px 14px; color: #fff; background: #16121c; box-shadow: 0 22px 44px -18px rgba(0,0,0,.7); }
+.cm-balao-passo { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 4px; }
+.cm-balao-titulo { display: block; font-size: 15px; font-weight: 800; line-height: 1.25; }
+.cm-balao-texto { display: block; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.82); margin-top: 4px; }
+.cm-balao-acoes { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.cm-balao-sair { min-height: 36px; padding: 0 6px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.75); text-decoration: underline; text-underline-offset: 2px; }
+.cm-balao-proxima { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #fff; color: #16121c; font-size: 13.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+.cm-balao-proxima:active { transform: scale(.97); }
+/* a oferta no cartão do fim da intro: secundária (ghost), acima do "Pronto" cheio */
+.im-pronto { flex-direction: column; align-items: stretch; gap: 10px; }
+.im-pronto-linha { display: flex; align-items: center; gap: 10px; }
+.im-pronto-oferta { display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.28); background: transparent; color: #fff; }
+.im-pronto-oferta:active { background: rgba(255,255,255,.08); }
+.im-pronto-oferta-titulo { display: block; font-size: 13px; font-weight: 800; }
+.im-pronto-oferta-linha { display: block; font-size: 11.5px; color: rgba(255,255,255,.7); margin-top: 2px; }
+.im-pronto-principal { width: 100%; min-height: 44px; border-radius: 12px; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+/* o lembrete inline (3ª abertura): pequeno, dispensável, sem selo */
+.cm-lembrete { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(0,0,0,.08); background: hsl(var(--card)); color: hsl(var(--foreground)); }
+.dark .cm-lembrete { border-color: rgba(255,255,255,.1); }
+.cm-lembrete-texto { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.35; }
+.cm-lembrete-ver { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; background: #16121c; color: #fff; font-size: 12.5px; font-weight: 800; }
+.dark .cm-lembrete-ver { background: #fff; color: #16121c; }
+.cm-lembrete-nao { flex: none; min-height: 34px; padding: 0 8px; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+/* o acesso permanente no cabeçalho do módulo (ícone + "Dicas") */
+.cm-acesso { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+.cm-acesso:active { background: hsl(var(--muted)); }

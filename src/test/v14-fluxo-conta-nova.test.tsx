@@ -352,13 +352,14 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     expect(nomes()).toContain("modulo_intro_vista");
   });
 
-  it("missão da 1.0.10 (braço A / chave do dia 1 cheio desligada): módulo da missão sem nada por cima (dia 1 e dia 2); fora da missão, a intro", async () => {
+  it("missão da 1.0.10 (braço A / chave do dia 1 cheio desligada): Rotina no dia 1 (dose de amanhã) ganha a intro; dose feita = nada por cima; fora da missão, a intro", async () => {
     guardarForcaDia1Cheio("?dia1-cheio=off"); // a força do link vence a env: a missão de hoje, sem braço
     expect(modoDia1Cheio()).toBe("off");
     missaoGravada({ feitos: { 1: { dia: "2026-10-03", rotulo: "a" } } });
-    montar(montarStore(dados()), "/rotina"); // dia 1: a dose 2 (Rotina) está por fazer
-    await respirar(10);
-    semBoasVindas();
+    montar(montarStore(dados()), "/rotina"); // dia 1: a dose 2 (Rotina) é só amanhã — abriu por curiosidade: a intro (dono 17/10)
+    await respirar(4);
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marca 1 hábito/);
     cleanup();
     vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // dia 2
     montar(montarStore(dados()), "/financas"); // a dose do dia 1 já foi: continua sem nada por cima

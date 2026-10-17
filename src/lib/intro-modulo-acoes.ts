@@ -50,13 +50,23 @@ export function comecarMercado({ get, gravar }: ContextoDaAcao): void {
   gravar("casa-grocery-categories", proximo);
 }
 
-/* ───── Treino: o modelo "Full Body 3x" (3 dias, corpo todo — o mais fácil de manter) ───── */
+/* ───── Treino: um modelo pronto (o EscolherTreino da missão escolhe qual; padrão "Full Body 3x", o mais fácil de manter) ───── */
 export const MODELO_DA_INTRO = "Full Body 3x";
-export function montarTreino({ get, gravar }: ContextoDaAcao): void {
-  const modelo = MODELOS.find((m) => m.name === MODELO_DA_INTRO) ?? MODELOS[MODELOS.length - 1];
+export function montarTreino({ get, gravar }: ContextoDaAcao, nomeDoModelo: string = MODELO_DA_INTRO): { nome: string; diasAtivos: string[] } {
+  const modelo = MODELOS.find((m) => m.name === nomeDoModelo) ?? MODELOS.find((m) => m.name === MODELO_DA_INTRO) ?? MODELOS[MODELOS.length - 1];
   const r = aplicarModelo(mapa(get<unknown>("saude-workouts-v2", {})) as Parameters<typeof aplicarModelo>[0], modelo);
   gravar("saude-workouts-v2", r.plano);
   gravar("treino-active-days", r.diasAtivos);
+  return { nome: modelo.name, diasAtivos: r.diasAtivos };
+}
+/** As 2 perguntas do EscolherTreino → o modelo EXISTENTE que casa (sem modelo "em casa" na lista: Full Body, com aviso). */
+export type OndeTreina = "academia" | "casa";
+export type DiasPorSemana = "2-3" | "4" | "5-6";
+export function modeloPara(onde: OndeTreina, dias: DiasPorSemana): { nome: string; aviso?: string } {
+  if (onde === "casa") return { nome: "Full Body 3x", aviso: "Os exercícios são de academia: troca pelos que dá pra fazer em casa (o nome é só tocar)." };
+  if (dias === "4") return { nome: "Upper / Lower" };
+  if (dias === "5-6") return { nome: "Push / Pull / Legs" };
+  return { nome: "Full Body 3x" };
 }
 
 /* ───── Dieta: o café da manhã de hoje, no cardápio ───── */
@@ -78,11 +88,11 @@ export function adicionarCurso({ get, gravar }: ContextoDaAcao, nome: string): v
 }
 
 /* ───── Biblioteca: um livro "lendo" (a mesma forma do livro novo da estante) ───── */
-export function adicionarLivro({ get, gravar, hoje }: ContextoDaAcao, livro: { titulo: string; autor: string }): void {
+export function adicionarLivro({ get, gravar, hoje }: ContextoDaAcao, livro: { titulo: string; autor: string; capa?: string }): void {
   const livros = lista(get<unknown>("lib-books", []));
   if (livros.some((l) => String(mapa(l).title ?? "").trim().toLowerCase() === livro.titulo.toLowerCase())) return;
   gravar("lib-books", [...livros, {
-    id: id("livro"), title: livro.titulo, author: livro.autor, cover: "", status: "lendo", rating: 0, genre: "", pages: 0, currentPage: 0,
+    id: id("livro"), title: livro.titulo, author: livro.autor, cover: livro.capa ?? "", status: "lendo", rating: 0, genre: "", pages: 0, currentPage: 0,
     notes: "", startDate: localDayKey(hoje ?? new Date()), endDate: "", goalDate: "", quotes: [], lentTo: "", lentDate: "", lentReturnDate: "",
   }]);
 }

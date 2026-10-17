@@ -34,7 +34,7 @@ describe("sequência: Salvo pelo Gelo e Um Ano Anotado", () => {
     expect(rotuloProgresso(meio)).toBe("78/365");
     expect(textoFalta(meio, 10)).toBe("mais 287 dias anotados");
     // os marcos de dias SEGUIDOS continuam falando em "seguidos"
-    expect(textoFalta(buildBadgesSequencia(10)[1], 10)).toBe("mais 20 dias seguidos anotando");
+    expect(textoFalta(buildBadgesSequencia(10).find((b) => b.id === "sequencia-30")!, 10)).toBe("mais 20 dias seguidos anotando");
   });
 });
 

@@ -74,6 +74,9 @@ beforeEach(() => {
   nativo.v = true;
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();
   (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+  // 16/10: no app a Conquistas 2 (chave `conquistas2`) troca o popup pelo toast; a coreografia da missão × festa
+  // é a mesma — aqui ela é testada com a tela de hoje (chave desligada); o toast tem teste próprio (conquistas-nova)
+  localStorage.setItem("conquistas2-force", "off");
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 9, 3, 15, 10));
 });

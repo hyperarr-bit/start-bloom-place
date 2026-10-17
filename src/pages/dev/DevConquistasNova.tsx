@@ -3,16 +3,17 @@ import { useSearchParams } from "react-router-dom";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { localDayKey } from "@/lib/utils";
 import { somarDias } from "@/lib/sequencia";
-import { ConquistasNova, type Direcao } from "@/components/conquistas/nova/ConquistasNova";
+import { ConquistasNova, type CamadaDev } from "@/components/conquistas/nova/ConquistasNova";
 
 /**
  * /dev/conquistas-nova — SÓ NO SERVIDOR DE DESENVOLVIMENTO (App.tsx monta a
  * rota dentro de `import.meta.env.DEV`; some do build). A CONQUISTAS 2
- * (protótipo 16/10) com os dados da demo "Ana Beatriz", em memória, sem conta:
- *   ?direcao=a|b|c       · a direção de visual (padrão a)
+ * (16/10) com os dados da demo "Ana Beatriz", em memória, sem conta:
  *   ?dias=N              · N dias seguidos até ONTEM (padrão 12); &hoje=1 inclui hoje
  *   ?teste=1|2|3         · a pessoa no teste grátis, no dia N da missão (ajusta os dias: 1 → só hoje; 2 → ontem; 3 → anteontem e ontem)
- *   ?camada=toast|marco|colecao|sequencia · abre já com a camada por cima
+ *   ?camada=toast|marco|colecao|sequencia|album|pagina|colar · abre já com a camada por cima
+ *                          (album = o livro na capa; pagina = a página com mais vagas perto de fechar; colar = a página da figurinha nova)
+ *   ?novas=0             · nenhuma figurinha esperando pra colar (padrão: 1, o "Humor em Dia")
  *   ?tema=escuro         · modo escuro
  *   ?zero=1              · conta nova sem nada colado
  */
@@ -71,7 +72,7 @@ const seeds = (hoje: string): Record<string, unknown> => {
       "humor-7": somarDias(hoje, -2), "investor-1k": somarDias(hoje, -33), "challenger": somarDias(hoje, -7), "protetor-1": somarDias(hoje, -4),
     },
     // tudo visto, menos o "Humor em Dia" (colado anteontem) — é o "novo desde a última visita"
-    "conquistas-album-visto": ["first-income", "first-expense", "rotina-1", "treino-1", "sequencia-2", "sequencia-3", "sequencia-7", "rotina-7", "saver-20", "leitura-estante", "agua-7", "leitura-1", "investor-1k", "challenger", "protetor-1"],
+    "conquistas-album-visto": ["first-income", "first-expense", "rotina-1", "treino-1", "sequencia-2", "sequencia-3", "sequencia-7", "rotina-7", "saver-20", "leitura-estante", "agua-7", "leitura-1", "investor-1k", "challenger", "protetor-1", "treino-12", "meta-semanal-4", "rotina-21"],
   };
 };
 
@@ -88,11 +89,10 @@ const Provedor = ({ inicial, children }: { inicial: Record<string, unknown>; chi
 const DevConquistasNova = () => {
   const [params] = useSearchParams();
   const hoje = localDayKey();
-  const direcao = ((["a", "b", "c"].includes(params.get("direcao") ?? "") ? params.get("direcao") : "a") as Direcao);
   const teste = Number(params.get("teste") || 0);
   const testeDia = teste >= 1 && teste <= 3 ? (teste as 1 | 2 | 3) : null;
   const camadaCru = params.get("camada");
-  const camada = (["toast", "marco", "colecao", "sequencia"].includes(camadaCru ?? "") ? camadaCru : null) as "toast" | "marco" | "colecao" | "sequencia" | null;
+  const camada = (["toast", "marco", "colecao", "sequencia", "album", "pagina", "colar"].includes(camadaCru ?? "") ? camadaCru : null) as CamadaDev;
 
   const inicial = useMemo(() => {
     if (params.get("zero") === "1") return { "core-user-name": "Ana Beatriz", "conquistas-desbloqueadas": {}, "conquistas-album-visto": [] };
@@ -115,6 +115,8 @@ const DevConquistasNova = () => {
     // uma quarta protegida no meio da semana passada pra mostrar o gelo
     const lista = dias(nDias - 1 + ate, ate, hoje);
     s["core-dias-anotados"] = ["2026-07-12", ...lista];
+    // sem a chave do visto, a tela grava a linha de base em silêncio (tudo o que está colado vira visto): nenhuma figurinha esperando
+    if (params.get("novas") === "0") delete s["conquistas-album-visto"];
     return s;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoje, params.toString()]);
@@ -125,7 +127,7 @@ const DevConquistasNova = () => {
 
   return (
     <Provedor inicial={inicial}>
-      <ConquistasNova direcao={direcao} testeDia={testeDia} camada={camada} />
+      <ConquistasNova testeDia={testeDia} camada={camada} />
     </Provedor>
   );
 };

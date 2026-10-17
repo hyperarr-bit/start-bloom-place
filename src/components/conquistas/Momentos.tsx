@@ -16,6 +16,9 @@ import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/l
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { EVENTO_MISSAO_DOSES, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
+import { conquistas2Ligada } from "@/lib/conquistas2";
+import { ehMarcoDeFesta, festaDoMarcoNovo, formatoDoAviso } from "./nova/recompensas";
+import { CelebracaoMarco, ToastAdesivo } from "./nova/camadas";
 import "./conquistas.css";
 
 /**
@@ -61,7 +64,18 @@ const lerVistas = (v: unknown): Vistas | null => {
  *  - nada aparece no meio de um registro (teclado aberto, folha/diálogo na tela).
  * Medição: festa_view {raridade, formato}, festa_fechada {ms, como}, festa_tela_cheia_click.
  */
-type Item = { tipo: "marco"; dias: number } | { tipo: "adesivo"; badge: Badge } | { tipo: "popup"; badges: Badge[] } | { tipo: "capa"; capas: CapaId[] };
+type Item = { tipo: "marco"; dias: number } | { tipo: "adesivo"; badge: Badge } | { tipo: "popup"; badges: Badge[] } | { tipo: "capa"; capas: CapaId[] } | { tipo: "toast"; badges: Badge[]; suave: boolean };
+
+/**
+ * CONQUISTAS 2 (16/10, chave `conquistas2`): comum e raro viram um TOAST (3,5 s, por cima de
+ * qualquer tela; o toque abre o álbum na página da figurinha, que espera pra ser colada);
+ * tela cheia só nos marcos (7/30/100 — com o adesivo do marco e os Stories) e nos épicos/
+ * lendários (sem compartilhar: compartilhar só nos marcos). No teste com a Missão valendo,
+ * em vez de silêncio, um toast suave "seu adesivo está esperando no álbum". A festa da capa
+ * premium não aparece (a capa saiu da tela nova; a chave fica). Os 3 adesivos novos da
+ * sequência (2/3/14) só avisam quem bateu o marco HOJE — quem já tinha o recorde cola em silêncio.
+ */
+export const TOAST_MS = 3500;
 
 /** Quantos adesivos RAROS+ ganham festa de tela cheia de uma vez; o resto só cola na folha. */
 export const MAX_FESTAS_DE_UMA_VEZ = 3;
@@ -246,10 +260,12 @@ const useMedirFesta = (dados: Record<string, unknown>) => {
   };
 };
 
-export const MomentoAdesivo = ({ badge, nome, membroDesde, onContinuar, onVerAdesivos, origem = "direto" }: {
+export const MomentoAdesivo = ({ badge, nome, membroDesde, onContinuar, onVerAdesivos, origem = "direto", semCompartilhar }: {
   badge: Badge; nome: string; membroDesde: string; onContinuar: () => void; onVerAdesivos?: () => void;
   /** "popup" quando veio do botão "Ver em tela cheia" do cartão. */
   origem?: "direto" | "popup";
+  /** (16/10, Conquistas 2) compartilhar só nos marcos: o épico/lendário avulso fecha com "Continuar". */
+  semCompartilhar?: boolean;
 }) => {
   const [enviando, setEnviando] = useState(false);
   const raridade = raridadeDe(badge);
@@ -270,11 +286,13 @@ export const MomentoAdesivo = ({ badge, nome, membroDesde, onContinuar, onVerAde
       raridade={raridade}
       rodape={
         <>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button type="button" onClick={compartilhar} disabled={enviando} className={botaoSecundario}>
-              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-              Compartilhar
-            </button>
+          <div className={`grid gap-2.5 ${semCompartilhar ? "grid-cols-1" : "grid-cols-2"}`}>
+            {!semCompartilhar && (
+              <button type="button" onClick={compartilhar} disabled={enviando} className={botaoSecundario}>
+                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                Compartilhar
+              </button>
+            )}
             <button type="button" onClick={() => { fechar("continuar"); onContinuar(); }} className={botaoPrimario}>{origem === "popup" ? "Voltar" : "Continuar"}</button>
           </div>
           {onVerAdesivos && (
@@ -636,7 +654,7 @@ export const gravarFestaMostrada = (ids: string[]): void => {
 /** O que um item da fila grava como "já mostrado": adesivo → id; marco → marco:N; capa → capa:id. */
 export const idsMostradosDoItem = (item: { tipo: string; dias?: number; badges?: { id: string }[]; badge?: { id: string }; capas?: string[] }): string[] =>
   item.tipo === "marco" ? [`marco:${item.dias}`]
-    : item.tipo === "popup" ? (item.badges ?? []).map((b) => b.id)
+    : item.tipo === "popup" || item.tipo === "toast" ? (item.badges ?? []).map((b) => b.id)
     : item.tipo === "capa" ? (item.capas ?? []).map((c) => `capa:${c}`)
     : item.badge ? [item.badge.id] : [];
 
@@ -659,6 +677,8 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   // quando as capas chegaram também vê o popup UMA vez, na 1ª abertura de Conquistas (as capas já
   // estão liberadas no seletor desde antes — o popup só avisa).
   const emConquistas = pathname.startsWith("/conquistas");
+  // (16/10) a Conquistas 2 muda o FORMATO dos avisos (toast × tela cheia); lida uma vez por montagem
+  const c2 = useMemo(() => conquistas2Ligada(), []);
   // a missão do dia (braço B) em cena? relê quando a missão muda (EVENTO_MISSAO_DOSES)
   const [tiqueMissao, setTiqueMissao] = useState(0);
   useEffect(() => {
@@ -713,11 +733,27 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     const marco = [...MARCOS_SEQUENCIA].reverse().find((m) => seq.recorde >= m && !vistas.marcos.includes(m));
     if (marco && !emTesteComMissao()) itens.push({ tipo: "marco", dias: marco });
     // capa nova pelo RECORDE (nunca é tirada): uma festa só, com todas as liberadas desde a última vez
-    const capas = emConquistas ? capasNovas(seq.recorde, capasVistas) : []; // só com a tela de Conquistas aberta
+    const capas = emConquistas && !c2 ? capasNovas(seq.recorde, capasVistas) : []; // só com a tela de Conquistas aberta (e sem a Conquistas 2)
     if (capas.length && !emTesteComMissao()) itens.push({ tipo: "capa", capas });
     let novos = conq.folha
-      .filter((b) => b.unlocked && !/^sequencia-/.test(b.id) && !vistas.adesivos.includes(b.id))
+      // os marcos de 7/30/100 têm a própria festa (acima); na Conquistas 2 os adesivos de 2/3/14 dias entram como os outros
+      .filter((b) => b.unlocked && (c2 ? !ehMarcoDeFesta(b.id) : !/^sequencia-/.test(b.id)) && !vistas.adesivos.includes(b.id))
       .sort((a, b) => pesoDaRaridade(b) - pesoDaRaridade(a));
+    if (c2) {
+      // quem já tinha o recorde quando os adesivos de 2/3/14 chegaram cola em silêncio
+      const silenciosos = novos.filter((b) => !festaDoMarcoNovo(b.id, seq)).map((b) => b.id);
+      novos = novos.filter((b) => festaDoMarcoNovo(b.id, seq));
+      // no teste com a Missão valendo: NADA por cima dela (regra de 28/09) — o adesivo cola quieto e fica
+      // esperando no álbum; quem avisa é a própria tela de Conquistas ("Seu adesivo está esperando no álbum")
+      if (emTesteComMissao()) return { fila: itens, semFesta: [...silenciosos, ...novos.map((b) => b.id)] };
+      if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO);
+      const cheia = novos.filter((b) => formatoDoAviso(b) === "tela_cheia");
+      const toast = novos.filter((b) => formatoDoAviso(b) === "toast");
+      const maxCheia = contaNova ? MAX_FESTAS_CONTA_NOVA : MAX_FESTAS_DE_UMA_VEZ;
+      for (const b of cheia.slice(0, maxCheia)) itens.push({ tipo: "adesivo", badge: b });
+      if (toast.length) itens.push({ tipo: "toast", badges: toast, suave: false });
+      return { fila: itens, semFesta: [...silenciosos, ...cheia.slice(maxCheia).map((b) => b.id)] };
+    }
     if (emTesteComMissao()) return { fila: itens, semFesta: novos.map((b) => b.id) };
     // missão do dia em cena (B): só o "Casa arrumada" passa; o resto espera na fila SEM virar visto
     if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO);
@@ -734,7 +770,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, conq.folha, contaNova, capasVistas, emConquistas, esperaMissao]);
+  }, [loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, contaNova, capasVistas, emConquistas, esperaMissao, c2]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");
@@ -765,7 +801,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   }, [temFila]);
 
   const atual = liberado ? fila[0] : undefined;
-  const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" ? `popup-${atual.badges.map((b) => b.id).join("+")}` : atual.tipo === "capa" ? `capa-${atual.capas.join("+")}` : atual.badge.id) : null;
+  const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" || atual.tipo === "toast" ? `${atual.tipo}-${atual.badges.map((b) => b.id).join("+")}` : atual.tipo === "capa" ? `capa-${atual.capas.join("+")}` : atual.badge.id) : null;
   // "Ver em tela cheia" do popup: a festa de hoje do adesivo escolhido, por cima; "Voltar" devolve ao cartão
   const [telaCheia, setTelaCheia] = useState<Badge | null>(null);
   useEffect(() => { setTelaCheia(null); }, [chaveAtual]);
@@ -787,7 +823,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
       const marcos = [...new Set([...v.marcos, ...MARCOS_SEQUENCIA.filter((m) => m <= item.dias)])];
       const adesivos = [...new Set([...v.adesivos, ...MARCOS_SEQUENCIA.filter((m) => m <= item.dias).map((m) => `sequencia-${m}`)])];
       set(CHAVE_VISTAS, { adesivos, marcos }, { system: true });
-    } else if (item.tipo === "popup") {
+    } else if (item.tipo === "popup" || item.tipo === "toast") {
       set(CHAVE_VISTAS, { ...v, adesivos: [...new Set([...v.adesivos, ...item.badges.map((b) => b.id)])] }, { system: true });
     } else if (item.tipo === "capa") {
       const vistasAgora = lerCapasVistas(get<unknown>(CHAVE_CAPAS_VISTAS, undefined)) ?? [];
@@ -798,6 +834,20 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   };
 
   const continuar = () => { if (atual) marcarVisto(atual); };
+  // o toast some sozinho (3,5 s) — e conta como visto
+  useEffect(() => {
+    if (atual?.tipo !== "toast") return;
+    const item = atual;
+    const t = setTimeout(() => marcarVisto(item), TOAST_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveAtual]);
+  /** O toque no toast: visto + o álbum aberto na página da figurinha (ela espera lá pra ser colada). */
+  const abrirAlbumDoToast = (item: Extract<Item, { tipo: "toast" }>) => {
+    marcarVisto(item);
+    navigate("/conquistas", { state: { origem: item.suave ? "missao" : "toast", album: item.badges[0].id } });
+  };
+  const adesivoDoMarco = (dias: number): Badge | undefined => conq.adesivos.find((b) => b.id === `sequencia-${dias}`);
   const verAdesivos = pathname.startsWith("/conquistas")
     ? undefined
     : () => {
@@ -807,8 +857,21 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
 
   return (
     <AnimatePresence mode="wait">
-      {atual?.tipo === "marco" && (
+      {atual?.tipo === "marco" && !c2 && (
         <MomentoMarco key={chaveAtual!} dias={atual.dias} nome={perfil.nome} membroDesde={perfil.membroDesde} nivel={conq.nivel.name} onContinuar={continuar} />
+      )}
+      {atual?.tipo === "marco" && c2 && (
+        <CelebracaoMarco
+          key={chaveAtual!}
+          badge={adesivoDoMarco(atual.dias) ?? { id: `sequencia-${atual.dias}`, name: `${atual.dias} Dias Seguidos`, description: "", icon: "🔥", category: "sequencia", color: "green", xp: 100, unlocked: true }}
+          dias={atual.dias}
+          seq={seq}
+          onContinuar={continuar}
+          onCompartilhar={() => { const b = adesivoDoMarco(atual.dias); return b ? compartilharAdesivo({ id: b.id, titulo: b.name, descricao: b.description, raridade: raridadeDe(b), nome: perfil.nome, membroDesde: perfil.membroDesde }) : undefined; }}
+        />
+      )}
+      {atual?.tipo === "toast" && (
+        <ToastAdesivo key={chaveAtual!} badge={atual.badges[0]} quantidade={atual.badges.length} suave={atual.suave} onToque={() => abrirAlbumDoToast(atual)} />
       )}
       {atual?.tipo === "capa" && (
         <MomentoCapa
@@ -823,7 +886,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
         />
       )}
       {atual?.tipo === "adesivo" && (
-        <MomentoAdesivo key={chaveAtual!} badge={atual.badge} nome={perfil.nome} membroDesde={perfil.membroDesde} onContinuar={continuar} onVerAdesivos={verAdesivos} />
+        <MomentoAdesivo key={chaveAtual!} badge={atual.badge} nome={perfil.nome} membroDesde={perfil.membroDesde} onContinuar={continuar} onVerAdesivos={verAdesivos} semCompartilhar={c2} />
       )}
       {atual?.tipo === "popup" && !telaCheia && (
         <MomentoPopup key={chaveAtual!} badges={atual.badges} onContinuar={continuar} onTelaCheia={setTelaCheia} onVerAdesivos={verAdesivos} />

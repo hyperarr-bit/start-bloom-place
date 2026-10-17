@@ -1,63 +1,39 @@
-import type { Badge, Raridade } from "@/components/gamification/types";
+import type { Badge } from "@/components/gamification/types";
 import { raridadeDe } from "@/components/gamification/types";
 import { MARCOS_SEQUENCIA } from "@/lib/sequencia";
+import { ADESIVOS_SEQUENCIA_NOVOS, MARCOS_ADESIVO, MARCOS_NOVOS } from "@/lib/conquistas-registro";
 
 /**
- * CONQUISTAS 2 (16/10, protótipo — NÃO ligado no app): só SEQUÊNCIA + ADESIVOS.
+ * CONQUISTAS 2 (16/10): só SEQUÊNCIA + ÁLBUM. A mecânica PURA (sem React, sem
+ * storage). As decisões, com o dado que as sustenta (scratchpad definitiva/5-produto.md):
  *
- * Tudo aqui é PURO (sem React, sem storage). As decisões de mecânica, com o dado
- * que as sustenta (scratchpad definitiva/5-produto.md):
- *
- *  - No teste, quem usa em 3 DIAS DIFERENTES paga 38% (× 15%). O que a tela
- *    precisa fazer é puxar o dia 2 e o dia 3 → adesivos novos da sequência em
- *    2 e 3 dias ("Voltei" e "3 Dias Seguidos"), e "AMANHÃ VOCÊ GANHA…" sempre
- *    visível (o prêmio do dia seguinte é o motivo de voltar).
- *  - 47 pessoas chegaram a 7 dias e 4 a 30: entre 7 e 30 há um deserto de 23
- *    dias → adesivo de 14 dias ("Duas Semanas") no meio.
+ *  - No teste, quem usa em 3 DIAS DIFERENTES paga 38% (× 15%) → adesivos novos
+ *    da sequência em 2 e 3 dias ("Voltei" e "3 Dias Seguidos"; lib/conquistas-registro)
+ *    e "AMANHÃ VOCÊ GANHA…" sempre visível (o prêmio do dia seguinte é o motivo de voltar).
+ *  - Quem abre o álbum no teste paga 53% (× 31%) → o álbum é o herói da tela
+ *    (capa grande, abrir, páginas por módulo com vaga vazia, figurinha nova
+ *    esperando pra ser COLADA).
  *  - A festa em tela cheia (617 pessoas, 1.939 vezes, 1 compartilhamento) é
- *    interrupção → comum e raro viram um AVISO PEQUENO (toast); tela cheia só
- *    nos marcos da sequência (7/30/100) e nos épicos/lendários. Compartilhar
- *    só nos marcos.
- *  - A sequência continua contando "qualquer coisa anotada em qualquer módulo"
- *    (lib/sequencia.ts, `core-dias-anotados`): o dado de quem já usa fica
- *    intacto. Protetor fica (33 pessoas usaram): 1 a cada 7 dias, máximo 2.
+ *    interrupção → comum e raro viram um AVISO PEQUENO (toast, toque abre o álbum
+ *    na página); tela cheia só nos marcos (7/30/100) e nos épicos/lendários.
+ *    Compartilhar só nos marcos.
  */
 
-/** Os marcos da sequência que colam adesivo (os 3 novos + os 3 de sempre). */
-export const MARCOS_ADESIVO = [2, 3, 7, 14, 30, 100] as const;
+export { ADESIVOS_SEQUENCIA_NOVOS, MARCOS_ADESIVO, MARCOS_NOVOS };
 export type MarcoAdesivo = (typeof MARCOS_ADESIVO)[number];
-
-/** Os adesivos NOVOS da sequência (os de 7/30/100 já existem em conquistas-registro). */
-export const ADESIVOS_SEQUENCIA_NOVOS: Record<2 | 3 | 14, { nome: string; descricao: string; raridade: Raridade }> = {
-  2: { nome: "Voltei", descricao: "Anote algo 2 dias seguidos — o 2º dia é o que mais conta", raridade: "comum" },
-  3: { nome: "3 Dias Seguidos", descricao: "Anote algo 3 dias seguidos", raridade: "raro" },
-  14: { nome: "Duas Semanas", descricao: "Anote algo 14 dias seguidos", raridade: "raro" },
-};
 
 export const idDoMarco = (n: number) => `sequencia-${n}`;
 
-/** Monta os 3 adesivos novos (mesmo formato dos de 7/30/100). */
-export const adesivosDaSequenciaNovos = (recorde: number): Badge[] =>
-  ([2, 3, 14] as const).map((n) => {
-    const d = ADESIVOS_SEQUENCIA_NOVOS[n];
-    return {
-      id: idDoMarco(n),
-      name: d.nome,
-      description: d.descricao,
-      icon: "🔥",
-      category: "sequencia",
-      color: "green",
-      raridade: d.raridade,
-      xp: d.raridade === "comum" ? 50 : 100,
-      unlocked: recorde >= n,
-      progresso: { atual: Math.min(Math.max(0, recorde), n), alvo: n },
-    };
-  });
-
-/** Ordena os adesivos da sequência pelo marco (2, 3, 7, 14, 30, 100, depois o resto). */
+/** O marco de um adesivo da sequência (`sequencia-14` → 14), ou null. */
 export const marcoDoAdesivo = (id: string): number | null => {
   const m = /^sequencia-(\d+)$/.exec(id);
   return m ? Number(m[1]) : null;
+};
+
+/** É um dos 3 adesivos novos da sequência (2/3/14)? */
+export const ehAdesivoNovoDaSequencia = (id: string): boolean => {
+  const m = marcoDoAdesivo(id);
+  return m !== null && (MARCOS_NOVOS as readonly number[]).includes(m);
 };
 
 export const ehMarcoDeFesta = (id: string): boolean => {
@@ -76,8 +52,19 @@ export const formatoDoAviso = (b: Pick<Badge, "id" | "xp" | "raridade">): "toast
   return r === "epico" || r === "lendario" ? "tela_cheia" : "toast";
 };
 
-/** Compartilhar só nos marcos (7/30/100 dias) — nunca num adesivo comum. */
+/** Compartilhar só nos marcos (7/30/100 dias) — nunca num adesivo comum, raro, épico ou lendário avulso. */
 export const podeCompartilhar = (b: Pick<Badge, "id">): boolean => ehMarcoDeFesta(b.id);
+
+/**
+ * Os 3 adesivos novos abrem pelo RECORDE (quem já teve 14 dias ganha "Duas
+ * Semanas" na 1ª abertura). A festa/toast é só de quem BATEU o marco hoje:
+ * dias seguidos = o marco e hoje já anotado. O resto cola em silêncio.
+ */
+export const festaDoMarcoNovo = (id: string, seq: { dias: number; hojeFeito: boolean }): boolean => {
+  const m = marcoDoAdesivo(id);
+  if (m === null || !(MARCOS_NOVOS as readonly number[]).includes(m)) return true;
+  return seq.hojeFeito && seq.dias === m;
+};
 
 /* ------------------------------------------------------------------------- *
  * "AMANHÃ VOCÊ GANHA…" — o próximo prêmio da sequência
@@ -95,9 +82,17 @@ export interface ProximoPremio {
   daProtetor: boolean;
   /** Frase pronta pra tela: "Amanhã você ganha" · "Hoje você ganha" · "Em 4 dias você ganha". */
   titulo: string;
+  /** A instrução, clara: "anote algo em qualquer módulo nos próximos 2 dias". */
+  instrucao: string;
 }
 
 const DIAS_POR_PROTETOR = 7;
+
+/** A frase de como ganhar — sem "2 dias de anotação" (16/10: o dono achou confuso). */
+export const instrucaoDoPremio = (quando: ProximoPremio["quando"], faltam: number): string =>
+  quando === "hoje" ? "anote algo em qualquer módulo hoje e ele cola sozinho"
+    : quando === "amanha" ? "anote algo em qualquer módulo hoje e amanhã"
+    : `anote algo em qualquer módulo nos próximos ${faltam} dias`;
 
 /**
  * O próximo prêmio pela sequência DE AGORA (`dias` = dias seguidos contando
@@ -122,11 +117,34 @@ export function proximoPremio(dias: number, hojeFeito: boolean, adesivos: Badge[
   const faltam = Math.max(1, marco - seHoje + (hojeFeito ? 0 : 1));
   const quando: ProximoPremio["quando"] = !hojeFeito && marco === seHoje ? "hoje" : faltam === 1 ? "amanha" : "dias";
   const titulo = quando === "hoje" ? "Hoje você ganha" : quando === "amanha" ? "Amanhã você ganha" : `Em ${faltam} dias você ganha`;
-  return { adesivo, marco, quando, faltam, daProtetor: marco % DIAS_POR_PROTETOR === 0, titulo };
+  return { adesivo, marco, quando, faltam, daProtetor: marco % DIAS_POR_PROTETOR === 0, titulo, instrucao: instrucaoDoPremio(quando, faltam) };
+}
+
+/** "HOJE" · "AMANHÃ" · "EM 2 DIAS" — a pílula da trilha e da vaga do álbum. */
+export const quandoCurto = (p: Pick<ProximoPremio, "quando" | "faltam">): string =>
+  p.quando === "hoje" ? "HOJE" : p.quando === "amanha" ? "AMANHÃ" : `EM ${p.faltam} DIAS`;
+
+/**
+ * O prêmio citado no LEMBRETE das 20h (opt-in, id de notificação de sempre):
+ * pro aviso do dia `i` (0 = hoje), a sequência que a pessoa teria anotando
+ * naquele dia é `seguidosSe`; se isso cola um adesivo, "e cola o 'Voltei'";
+ * se o dia SEGUINTE cola, "e amanhã cola o 'Duas Semanas'". Senão, null.
+ */
+export function premioDoLembrete(seguidosSe: number, adesivos: Badge[]): string | null {
+  const colados = new Set(adesivos.filter((b) => b.unlocked).map((b) => b.id));
+  const nome = (m: number): string | null => {
+    if (!(MARCOS_ADESIVO as readonly number[]).includes(m) || colados.has(idDoMarco(m))) return null;
+    return adesivos.find((b) => b.id === idDoMarco(m))?.name ?? null;
+  };
+  const hoje = nome(seguidosSe);
+  if (hoje) return `Anota e cola o adesivo "${hoje}".`;
+  const amanha = nome(seguidosSe + 1);
+  if (amanha) return `Anota hoje — e amanhã cola o "${amanha}".`;
+  return null;
 }
 
 /* ------------------------------------------------------------------------- *
- * Coleções por módulo ("faltam 2 pra fechar a página")
+ * Coleções por módulo ("faltam 2 pra completar a página")
  * ------------------------------------------------------------------------- */
 
 /** "faltam 2 pra fechar" quando perto; "6 de 24" quando longe; "completa" quando fechou. */
@@ -138,24 +156,35 @@ export const fraseDaColecao = (abertos: number, total: number): string => {
   return `${abertos} de ${total}`;
 };
 
+/** "faltam 2 pra completar a página" · "página completa" — o rodapé de cada página do álbum. */
+export const fraseDaPagina = (abertos: number, total: number): string => {
+  const faltam = total - abertos;
+  if (faltam <= 0) return "Página completa — todas coladas.";
+  return `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} pra completar a página`;
+};
+
 /* ------------------------------------------------------------------------- *
  * Medição — tudo com o prefixo `conquistas2_`
  * ------------------------------------------------------------------------- */
 
 export const EVENTOS2 = {
-  /** Abriu a tela {origem, dias, teste_dia?, direcao}. */
+  /** Abriu a tela {origem, dias, teste_dia}. */
   abrir: "conquistas2_open",
   /** Saiu da tela {ms} — hoje a visita dura ~8 s; a meta é passar de 15. */
   tempo: "conquistas2_tempo",
+  /** Abriu o álbum {origem: capa|pacotinho|toast|missao|vaga|colecao}. */
+  albumAbrir: "conquistas2_album_abrir",
+  /** Colou uma figurinha nova no álbum {id, raridade, restantes}. */
+  figurinhaColar: "conquistas2_figurinha_colar",
   /** O "amanhã você ganha" apareceu {marco, quando}. */
   amanhaVisto: "conquistas2_amanha_visto",
-  /** Tocou num adesivo {id, aberto, colecao}. */
+  /** Tocou num adesivo fora do álbum {id, aberto, colecao}. */
   adesivoToque: "conquistas2_adesivo_toque",
-  /** Abriu a coleção inteira {colecao|"todas"}. */
+  /** Abriu a coleção inteira (ver todos) {colecao|"todas"}. */
   colecaoAbrir: "conquistas2_colecao_abrir",
   /** Abriu o detalhe da sequência {dias}. */
   sequenciaAbrir: "conquistas2_sequencia_abrir",
-  /** Toast de adesivo apareceu {id, raridade} / foi tocado {id}. */
+  /** Toast de adesivo apareceu {id, raridade, quantidade, suave} / foi tocado {id}. */
   toastView: "conquistas2_toast_view",
   toastToque: "conquistas2_toast_toque",
   /** Tela cheia do marco {dias} / compartilhou {dias}. */

@@ -15,6 +15,9 @@ import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade, type LembreteValidade, ty
 import { CHAVE_TAREFAS_CARREIRA, CHAVE_TAREFAS_ROTINA, tarefasAgendaveis, type TarefaAgendavel } from "@/lib/tarefas";
 import { acoesDoDia, textoDoLembrete } from "@/lib/acao-do-dia";
 import { calcularSequencia, diasEfetivos, somarDias, CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK } from "@/lib/sequencia";
+import { CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios } from "@/lib/conquistas-registro";
+import { conquistas2Ligada } from "@/lib/conquistas2";
+import { premioDoLembrete } from "@/components/conquistas/nova/recompensas";
 /** Quantos dias à frente a frase do aviso é prevista (o agendador olha 10). */
 const HORIZONTE_DOS_AVISOS = 10;
 import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
@@ -248,7 +251,18 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     seqAnotada: (() => {
       const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
       const acoes = acoesDoDia(get, hoje, { aFrente: HORIZONTE_DOS_AVISOS });
-      return { dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acoes[0].texto, avisos: acoes.map((a, i) => textoDoLembrete(a, seq.dias + i, somarDias(hoje, i))) };
+      // (16/10, Conquistas 2) o lembrete cita o prêmio: "Anota hoje — e amanhã cola o 'Duas Semanas'." (mesmo id de notificação)
+      const premio = (i: number): string | null => {
+        if (!conquistas2Ligada()) return null;
+        try {
+          const adesivos = mesclarDesbloqueios(buildBadgesSequencia(seq.recorde), get<unknown>(CHAVE_DESBLOQUEADAS, undefined), hoje).adesivos;
+          return premioDoLembrete(seq.dias + i + (seq.hojeFeito ? 0 : 1), adesivos);
+        } catch { return null; }
+      };
+      return {
+        dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acoes[0].texto,
+        avisos: acoes.map((a, i) => { const t = textoDoLembrete(a, seq.dias + i, somarDias(hoje, i)); const p = premio(i); return p ? { ...t, body: `${t.body} ${p}` } : t; }),
+      };
     })(),
     pet: lerDadosDosAvisosPet(get, hoje),
     relacoes: lerDadosDasRelacoes(get),

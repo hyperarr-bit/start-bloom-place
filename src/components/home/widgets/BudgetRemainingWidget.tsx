@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
-import { computeDailyBudget, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 
 const lista = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 const valor = (i: any) => Number(i?.value) || Number(i?.amount) || 0;
@@ -26,6 +26,7 @@ export const BudgetRemainingWidget = () => {
     variableExpenses.reduce((s: number, e: any) => s + valor(e), 0),
     fixedExpenses.reduce((s: number, e: any) => s + valor(e), 0),
     somaParcelasDoMes(parcelas),
+    computeLooseBillsOutflow(dueDays, fixedExpenses),
   );
   const pct = totalIncome > 0 ? Math.min((totalExpense / totalIncome) * 100, 100) : 0;
   const { availableReal: remaining, perDay: dailyBudget, remainingDays: daysLeft } = computeDailyBudget(totalIncome, totalExpense, dueDays, fixedExpenses);

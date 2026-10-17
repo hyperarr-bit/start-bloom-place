@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computeDailyBudget, computeMonthlyOutflow, computeUnpaidBillsEstimate, computeUnpaidOutsideOutflow } from "@/lib/finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow, computeUnpaidBillsEstimate, computeUnpaidOutsideOutflow } from "@/lib/finance-totals";
 import { injetarFaturas } from "@/lib/finance-faturas";
 
 /* "Quanto posso gastar hoje" (varredura 26/09): a conta de um custo fixo e a
  * fatura do cartão já estão na saída do mês — não podem ser descontadas de
- * novo como "pendentes". E hoje conta como dia de gastar. */
+ * novo como "pendentes". E hoje conta como dia de gastar.
+ * (17/10) A conta avulsa com valor também está na saída — paga ou não. */
 const dia26 = new Date(2026, 8, 26, 10); // setembro tem 30 dias
 
 describe("quanto posso gastar hoje", () => {
@@ -12,27 +13,31 @@ describe("quanto posso gastar hoje", () => {
   const contas = [{ day: 28, bills: [{ id: "fx-seg", name: "Seguro", paid: false, value: 100, fixedId: "seg" }] }];
 
   it("fixo de R$ 100 não pago tira R$ 100 do disponível (e não R$ 200)", () => {
-    const sem = computeDailyBudget(3000, computeMonthlyOutflow(500, 0, 0), [], [], dia26);
-    const com = computeDailyBudget(3000, computeMonthlyOutflow(500, 100, 0), contas, fixos, dia26);
+    const sem = computeDailyBudget(3000, computeMonthlyOutflow(500, 0, 0, 0), [], [], dia26);
+    const com = computeDailyBudget(3000, computeMonthlyOutflow(500, 100, 0, computeLooseBillsOutflow(contas, fixos)), contas, fixos, dia26);
     expect(sem.availableReal - com.availableReal).toBe(100);
     expect(com.unpaidBillsEstimate).toBe(0);
   });
 
-  it("a conta avulsa do calendário (sem fixo) continua reservada", () => {
+  it("a conta avulsa do calendário (sem fixo) tira o valor dela UMA vez — pela saída, não pela reserva", () => {
     const avulsa = [{ day: 29, bills: [{ id: "ipva", name: "IPVA", paid: false, value: 800 }] }];
-    const b = computeDailyBudget(3000, 500, avulsa, [], dia26);
-    expect(b.unpaidBillsEstimate).toBe(800);
+    const saida = computeMonthlyOutflow(500, 0, 0, computeLooseBillsOutflow(avulsa, []));
+    expect(saida).toBe(1300);
+    const b = computeDailyBudget(3000, saida, avulsa, [], dia26);
+    expect(b.unpaidBillsEstimate).toBe(0);
     expect(b.availableReal).toBe(1700);
   });
 
   it("conta com fixedId de um fixo que não existe mais conta como avulsa", () => {
     const orfa = [{ day: 28, bills: [{ id: "fx-x", name: "Velho", paid: false, value: 50, fixedId: "apagado" }] }];
-    expect(computeUnpaidOutsideOutflow(orfa, fixos)).toBe(50);
+    expect(computeLooseBillsOutflow(orfa, fixos)).toBe(50);
+    expect(computeUnpaidOutsideOutflow(orfa, fixos)).toBe(0); // já na saída
   });
 
   it("fatura derivada do cartão não é descontada de novo", () => {
     const comFatura = injetarFaturas([], [{ card: "Nubank", label: "Nubank", dueDay: 29, total: 450, variaveis: 300, parcelas: 150, fixos: 0, paga: false, mes: "2026-09" } as never]);
     expect(computeUnpaidOutsideOutflow(comFatura, [])).toBe(0);
+    expect(computeLooseBillsOutflow(comFatura, [])).toBe(0);
     // pra MOSTRAR "a pagar", o total continua contando a fatura
     expect(computeUnpaidBillsEstimate(comFatura, [])).toBe(450);
   });

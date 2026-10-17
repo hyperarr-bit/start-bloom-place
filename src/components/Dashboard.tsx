@@ -11,7 +11,7 @@ import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, D
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeDailyBudget, computeUnpaidOutsideOutflow } from "@/lib/finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeUnpaidOutsideOutflow } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
 import { useMesCorrente, useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { useFinanceCategories } from "@/lib/finance-categories";
@@ -169,7 +169,7 @@ export const Dashboard = ({
     const p = perfil ?? perfilAtivoLocal(userId);
     return ALL_MONTHS.map((month, idx) => ({ month, ...totaisDoMes({ ano: currentYear, idx }, userId, p) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentYear, userId, perfil, mesCorrente, versaoDaVirada, incomes, expenses, fixedExpenses, monthlyInstallments]);
+  }, [currentYear, userId, perfil, mesCorrente, versaoDaVirada, incomes, expenses, fixedExpenses, monthlyInstallments, dueDays]);
 
   // Month progress data
   const monthProgress = useMemo(() => {
@@ -351,8 +351,9 @@ export const Dashboard = ({
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
     // Variable expenses = totalExpenses minus fixed costs and installments
-    // (parcelas são valor fixo do mês — não entram no ritmo diário projetado)
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded - monthlyInstallments);
+    // (parcelas são valor fixo do mês — não entram no ritmo diário projetado;
+    // 17/10: nem as contas avulsas do MEU MÊS, que agora estão em totalExpenses)
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded - monthlyInstallments - computeLooseBillsOutflow(dueDays, fixedExpenses));
     const dailyVariableRate = day > 0 ? variableSpent / day : 0;
     const projectedVariableRemaining = dailyVariableRate * remainingDays;
 
@@ -814,15 +815,15 @@ export const Dashboard = ({
                 <span className="text-muted-foreground">Saldo atual</span>
                 <span className="tabular-nums">R$ {reais(Math.round(dailyBudget.currentBalance))}</span>
               </div>
-              <p className="text-[9px] text-muted-foreground/60">Receita menos tudo que já foi gasto até agora</p>
+              <p className="text-[9px] text-muted-foreground/60">Receita menos tudo que sai no mês, contas pagas ou não</p>
             </div>
             {dailyBudget.unpaidBillsEstimate > 0 && (
               <div className="text-[10px]">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Contas pendentes (reserva)</span>
+                  <span className="text-muted-foreground">Contas sem valor (reserva)</span>
                   <span className="text-orange-400 tabular-nums">-R$ {reais(Math.round(dailyBudget.unpaidBillsEstimate))}</span>
                 </div>
-                <p className="text-[9px] text-muted-foreground/60">Valor reservado para contas que ainda vão vencer este mês</p>
+                <p className="text-[9px] text-muted-foreground/60">Estimativa pelas contas sem valor anotado — anote o valor pra usar o número certo</p>
               </div>
             )}
             <div className="text-[10px] border-t border-border pt-1 mt-1">

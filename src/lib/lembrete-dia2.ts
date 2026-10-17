@@ -31,7 +31,7 @@
 import { isNativeShell } from "./native-shell";
 import { localDayKey } from "./utils";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, diasEfetivos, somarDias } from "./sequencia";
-import { computeDailyBudget, computeMonthlyOutflow } from "./finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import {
@@ -239,8 +239,9 @@ export function conteudoDoModulo(get: Leitor, modulo: ModuloDaMissao, amanha: Da
         if (amanhaConta && depois.getMonth() === amanha.getMonth()) return comModulo("financas", { title: `${amanhaConta.name} vence amanhã`, body: "Já está no seu radar em Finanças. Confere se o dinheiro está separado." }, true);
         const receitas = soma(get<unknown>("finance-incomes", []));
         if (receitas > 0) {
-          const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(get<unknown>("finance-fixed-expenses", [])), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]));
-          const orc = computeDailyBudget(receitas, saida, dueDays, lista(get<unknown>("finance-fixed-expenses", [])), amanha);
+          const fixosDoMes = lista(get<unknown>("finance-fixed-expenses", []));
+          const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(fixosDoMes), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixosDoMes));
+          const orc = computeDailyBudget(receitas, saida, dueDays, fixosDoMes, amanha);
           if (!orc.cantSpend && orc.perDay > 0) return comModulo("financas", { title: `Hoje dá pra gastar até R$ ${reais(Math.floor(orc.perDay))}`, body: "Sem apertar o mês. Anota o 1º gasto do dia e o CORE recalcula na hora." }, true);
         }
         return comModulo("financas", fb, false);

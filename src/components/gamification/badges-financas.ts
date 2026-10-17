@@ -1,8 +1,8 @@
 import { Badge, Raridade, XP_RARIDADE } from "./types";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
-import { computeMonthlyBalance, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
-import { PERFIL_PESSOAL, doPerfil } from "@/lib/finance-perfil";
+import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyBalance, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { PERFIL_PESSOAL, doPerfil, doPerfilDueDays } from "@/lib/finance-perfil";
 
 /**
  * Conquistas de FINANÇAS — saíram do AchievementsPage (26/09) pra serem lidas
@@ -80,7 +80,9 @@ export const lerMesesArquivados = (get: Leitor, hoje = new Date(), perfil?: stri
     const fixed = filtrar(lista(get, chaveArquivada(ano, mes, "fixed")));
     const parcelas = filtrar(lista(get, chaveArquivada(ano, mes, "installments"))) as unknown as Parcela[];
     const receitas = soma(incomes);
-    const saida = computeMonthlyOutflow(soma(expenses), soma(fixed), somaParcelasDoMes(parcelas));
+    const contas = lista(get, chaveArquivada(ano, mes, "dueDays")) as never[];
+    const avulsas = computeArchivedLooseBillsOutflow(perfil ? doPerfilDueDays(contas, perfil) : contas, fixed);
+    const saida = computeMonthlyOutflow(soma(expenses), soma(fixed), somaParcelasDoMes(parcelas), avulsas);
     const lancamentos = incomes.length + expenses.length + fixed.length;
     out.push({
       mes: `${ano}-${String(mes + 1).padStart(2, "0")}`,
@@ -151,7 +153,8 @@ export function medirFinancas(get: Leitor, hoje = new Date()) {
   const totalFixed = soma(fixosDoPerfil);
   const monthlyExpenses = totalExpenses + totalFixed;
   /* A saída do mês é a do Painel: variáveis + fixos + parcelas do mês. */
-  const saidaDoMes = computeMonthlyOutflow(totalExpenses, totalFixed, somaParcelasDoMes(parcelasDoPerfil));
+  /* (17/10) + contas avulsas do MEU MÊS (com valor, pagas ou não), como no Painel. */
+  const saidaDoMes = computeMonthlyOutflow(totalExpenses, totalFixed, somaParcelasDoMes(parcelasDoPerfil), computeLooseBillsOutflow(doPerfilDueDays(dueDays as never[], perfil), fixosDoPerfil));
   const savingsRate = computeSavingsRate(totalIncome, saidaDoMes);
   /*
    * Poupança só vale com o mês anotado (26/09). Com o desbloqueio agora

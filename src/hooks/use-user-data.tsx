@@ -208,6 +208,13 @@ interface UserDataContextType {
    */
   semConexao?: SituacaoDaConta;
   /**
+   * A última leitura da conta trouxe TODAS as páginas (revisão S1, 17/10). Só com isso o usePersistedState
+   * trata "chave fora do store" como "chave que não existe no servidor" e pula a busca por chave. Leitura
+   * que falha (também a 2ª rodada, com a conta já lida) põe false: a busca por chave volta até uma leitura
+   * inteira chegar. Opcional no tipo pra não obrigar os mocks de teste — ausente vale como NÃO completa.
+   */
+  contaCompleta?: boolean;
+  /**
    * Tenta ler a conta de novo agora (botão do aviso, rede voltando, volta pro app). Com a leitura
    * no ar dentro do prazo não faz nada: o que está chegando não é cortado (revisão 2, 17/10).
    */
@@ -383,6 +390,57 @@ const sessaoEhDaConta = async (userId: string): Promise<boolean> => {
   }
 };
 
+/*
+ * LEITURA DA CONTA EM PÁGINAS (revisão S1, 17/10). O PostgREST devolve no máximo `max-rows` linhas
+ * por pedido (1000 neste projeto — conferido em produção em 17/10: pedido de 1500 linhas volta 1000,
+ * content-range 0-999) e corta o resto SEM erro: conta com mais de 1000 linhas perdia as de depois,
+ * calada. Na 1.0.16 isso passou a apagar dado: chave fora do store vale como "não existe no servidor"
+ * (usePersistedState, sem a busca por chave) e a guarda junta as escritas seguradas contra esta
+ * leitura — a próxima escrita numa chave cortada sobrescrevia o servidor. Agora:
+ *  - páginas de PAGINA_DA_CONTA linhas, ordenadas por `key` (única por conta: a ordem é total e uma
+ *    página não muda de um pedido pro outro), até uma vir com menos que isso — conta com menos de 1000
+ *    linhas continua sendo UM pedido; as páginas são juntadas antes de qualquer coisa ser aplicada;
+ *  - offset (`range`) é seguro aqui: linha de user_data só é apagada com a conta inteira (Começar do
+ *    zero, excluir conta), então nenhuma linha viva é pulada entre uma página e a seguinte;
+ *  - antes de CADA página: a leitura ainda vale (não foi trocada, a conta é a mesma, não desmontou) e a
+ *    sessão do auth é desta conta (sem token, a página vazia da chave anônima pareceria o fim);
+ *  - falhou QUALQUER página = a leitura inteira falhou (o caminho de tentar de novo); nunca meia conta.
+ * PAGINA_DA_CONTA tem de ser ≤ o max-rows do projeto (Settings → API do Supabase): uma página mais
+ * curta que o pedido pareceria o fim da conta.
+ */
+const PAGINA_DA_CONTA = 1000;
+/** Teto de páginas (100 mil linhas): só pra um servidor que ignorasse o `range` não prender a leitura num laço. */
+const MAX_PAGINAS_DA_CONTA = 100;
+type LeituraDaConta = { data: any[] | null; error: any; paginas: number };
+const lerContaInteira = async (uid: string, sinal: AbortSignal, vale: () => boolean): Promise<LeituraDaConta> => {
+  const linhas: any[] = [];
+  let paginas = 0;
+  try {
+    while (paginas < MAX_PAGINAS_DA_CONTA) {
+      if (sinal.aborted || !vale()) return { data: null, error: { message: "aborted: a leitura foi trocada" }, paginas };
+      if (!(await sessaoEhDaConta(uid))) return { data: null, error: { message: "sessão do auth ausente ou de outra conta" }, paginas };
+      const de = paginas * PAGINA_DA_CONTA;
+      paginas += 1;
+      const r = await (supabase as any)
+        .from("user_data")
+        .select("key, value")
+        .eq("user_id", uid)
+        .order("key", { ascending: true })
+        .range(de, de + PAGINA_DA_CONTA - 1)
+        .abortSignal(sinal);
+      const d = r?.data ?? null;
+      const e = r?.error ?? null;
+      if (e) return { data: null, error: e, paginas };
+      if (!Array.isArray(d)) return { data: null, error: { message: "resposta sem lista" }, paginas };
+      for (const linha of d) linhas.push(linha);
+      if (d.length < PAGINA_DA_CONTA) return { data: linhas, error: null, paginas };
+    }
+    return { data: null, error: { message: `conta com mais de ${MAX_PAGINAS_DA_CONTA} páginas` }, paginas };
+  } catch (e: any) {
+    return { data: null, error: { message: String(e?.message ?? e) }, paginas };
+  }
+};
+
 export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [store, setStore] = useState<Record<string, any>>({});
@@ -432,6 +490,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   /** Quando a conta começou a faltar (1ª tentativa desta pessoa) — telemetria da recuperação. */
   const inicioDaEspera = useRef<number | null>(null);
   const [semConexao, setSemConexao] = useState<SituacaoDaConta>(null);
+  /** (revisão S1, 17/10) a última leitura da conta veio inteira — ver `contaCompleta` no tipo */
+  const [contaCompleta, setContaCompleta] = useState(false);
   const [tentativa, setTentativa] = useState(0);
   /*
    * LIBERAR SÓ DEPOIS QUE AS TELAS TÊM O VALOR JUNTADO (revisão 17/10). A 1ª leitura certa
@@ -478,6 +538,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       aLiberar.current = null;
       aConfirmar.current.clear();
       setSemConexao(null);
+      setContaCompleta(false);
       setLoaded(false);
       // On switch/logout we wipe per-user cache, but NOT guest data.
       purgeUserLocalCache();
@@ -622,28 +683,16 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       const pedidoEm = Date.now();
       // revisão 2 (17/10): sem corrida com o prazo — a leitura vai até o fim (ou até ser trocada
       // depois do prazo, que a cancela; aí o `vale()` abaixo descarta a resposta dela)
-      const { data, error } = await (async (): Promise<{ data: any[] | null; error: any }> => {
-        try {
-          if (!(await sessaoEhDaConta(uid))) return { data: null, error: { message: "sessão do auth ausente ou de outra conta" } };
-          const r = await (supabase as any)
-            .from("user_data")
-            .select("key, value")
-            .eq("user_id", uid)
-            .abortSignal(leitura.ac.signal);
-          const d = r?.data ?? null;
-          const e = r?.error ?? null;
-          if (!e && !Array.isArray(d)) return { data: null, error: { message: "resposta sem lista" } };
-          return { data: d, error: e };
-        } catch (e: any) {
-          return { data: null, error: { message: String(e?.message ?? e) } };
-        }
-      })();
+      // revisão S1 (17/10): TODAS as páginas da conta, ou falha — ver LEITURA DA CONTA EM PÁGINAS
+      const { data, error, paginas } = await lerContaInteira(uid, leitura.ac.signal, vale);
       if (!vale()) return; // trocada, outra conta ou desmontou: a dona do estado é outra
       leitura.timers.forEach(clearTimeout);
       leituraAtual.current = null;
 
       if (!error && data) {
         const eraSincronizado = sincronizadoRef.current;
+        // quantas contas passam de uma página (1x por abertura; o admin não lê o user_data dos outros)
+        if (!eraSincronizado && paginas > 1) trackEvent("dados_conta_paginada", { paginas, linhas: data.length });
         const map: Record<string, any> = {};
         data.forEach((row: any) => {
           if (row.value === null || row.value === undefined) return;
@@ -754,6 +803,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
         degrauDoPrazo.current = 0;
         inicioDaEspera.current = null;
         setSemConexao(null);
+        setContaCompleta(true); // no mesmo lote do `loaded`: a tela que hidrata agora já vê a conta inteira
         setLoaded(true);
         return;
       }
@@ -761,6 +811,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (error?.message && !String(error.message).includes("aborted")) {
         console.error("[user-data] failed to load:", error);
       }
+      // revisão S1: sem a conta inteira desta leitura, chave fora do store não prova nada — a busca por chave volta
+      setContaCompleta(false);
       // Já sincronizado nesta sessão (2ª rodada, ex.: volta pro app): segue com o que tem.
       if (sincronizadoRef.current) {
         setLoaded(true);
@@ -1136,7 +1188,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, tentarDeNovo }}>
+    <UserDataContext.Provider value={{ get, set, comDia, loaded, fetchKey, isGuest: !user, apagarTudo, semConexao: user ? semConexao : null, contaCompleta: user ? contaCompleta : false, tentarDeNovo }}>
       {children}
     </UserDataContext.Provider>
   );

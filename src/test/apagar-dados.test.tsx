@@ -15,7 +15,7 @@ vi.mock("@/hooks/use-auth", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/analytics", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/analytics")>()), trackEvent: vi.fn(), markActivation: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => {
-  const selecao = { eq: () => selecao, in: () => Promise.resolve({ data: [], error: null }), abortSignal: () => Promise.resolve({ data: [], error: null }), maybeSingle: () => Promise.resolve({ data: null, error: null }) };
+  const selecao = { eq: () => selecao, order: () => selecao, range: () => selecao, in: () => Promise.resolve({ data: [], error: null }), abortSignal: () => Promise.resolve({ data: [], error: null }), maybeSingle: () => Promise.resolve({ data: null, error: null }) };
   return {
     supabase: {
       from: () => ({

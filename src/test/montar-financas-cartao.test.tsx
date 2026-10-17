@@ -144,6 +144,11 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(HOJE);
   localStorage.clear();
+  // 17/10 (merge com a intro dos módulos): estes testes são do Montar e do Dashboard — a intro guiada de Finanças
+  // (que entra depois do Montar quando não há missão em volta, e procura o "+ Novo gasto" clicando na aba MEU
+  // FINANCEIRO) disputava a aba com o clique no DASHBOARD na suíte carregada. Na missão de verdade a dose na tela
+  // segura a intro (data-missao-dose); aqui, a intro já foi vista neste aparelho.
+  localStorage.setItem("core-intro-vista-financas", "pulada@2026-10-17T00:00:00.000Z");
   eventos.length = 0;
   _zerarRemotaMontar();
   _novaAberturaMontar();

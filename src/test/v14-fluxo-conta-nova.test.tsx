@@ -319,7 +319,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
   /* 16/10 (INTRO_MODULO ligada no app): os cartões SAEM do fluxo — a 1ª visita a um módulo fora da missão mostra a
    * INTRO (Finanças guiada = faixa + anel; Casa = estado vazio com a captura real), e a regra da missão continua a
    * mesma: módulo da missão (dose por fazer, dose feita, 'aprofundar') não ganha NADA por cima. */
-  const semBoasVindas = () => { expect(screen.queryByTestId("cartoes-modulo")).toBeNull(); expect(screen.queryByTestId("intro-modulo-faixa")).toBeNull(); expect(screen.queryByTestId("intro-modulo-vazio")).toBeNull(); };
+  const semBoasVindas = () => { expect(screen.queryByTestId("cartoes-modulo")).toBeNull(); expect(screen.queryByTestId("intro-modulo-faixa")).toBeNull(); };
 
   it("dia 1, módulo da missão com a dose já feita: nada por cima (a dose foi a boas-vindas) — nem cartões, nem intro", async () => {
     missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
@@ -340,7 +340,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     montar(montarStore(dados()), "/casa");
     await respirar(4);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-vazio").getAttribute("data-modulo")).toBe("casa");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organiza 1 cômodo"); // a intro de 1 toque da Casa (17/10)
     expect(nomes()).toContain("modulo_intro_vista");
     expect(nomes()).not.toContain("modulo_cartoes_vistos");
   });
@@ -371,7 +371,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     montar(montarStore(dados()), "/casa");
     await respirar(4);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-vazio")).toBeTruthy();
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organiza 1 cômodo");
   });
 
   it("missão da 1.0.10 (sem braço / chave do dia 1 cheio desligada): a dose 2 abre na Rotina no mesmo dia, como sempre — e nada por cima dela (nem cartões, nem intro)", async () => {

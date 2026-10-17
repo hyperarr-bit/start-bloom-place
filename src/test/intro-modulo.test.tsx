@@ -8,8 +8,8 @@
  *     apresentado (dicas fechadas, cartões vistos, tutorial antigo); 1x por aparelho e por conta; a
  *     missão em doses (dose na tela, módulo de hoje, dose feita, missão em andamento) bloqueia; outra
  *     guia por cima bloqueia; fechar no meio = volta 1 vez e a 2ª já marca; logout→login não repete;
- *   · o estado vazio de cada módulo: captura por tema (claro/escuro), sem o rótulo "gravado do app",
- *     e a ação de 1 toque grava o conteúdo no formato do módulo (ou abre o campo real);
+ *   · a intro de 1 toque de cada módulo (17/10, o padrão da Saúde): post-it no controle real, 1 chip grava no
+ *     formato do módulo, o cartão do fim confirma o que entrou, "Pular" sempre à vista; TODOS os 16 têm intro;
  *   · a intro guiada de Finanças: faixa, anel, chip grava o gasto, "pronto" marca vista;
  *   · as regras novas de uso_modulo não mudam a ação das chaves que já tinham regra.
  */
@@ -43,8 +43,10 @@ import {
   chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
 } from "@/lib/intro-modulo";
 import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
+import { IntroDeUmToque } from "@/components/intro-modulo/IntroDeUmToque";
 import { modeloPara } from "@/lib/intro-modulo-acoes";
-import { adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
+import { TREINOS_DE_HOJE, adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, montarTreinoDeHoje, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
+import type { IntroDeUmToqueConfig } from "@/lib/intro-modulo";
 import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CATEGORIAS_PADRAO_MERCADO } from "@/lib/mercado";
 import { MODULOS } from "@/lib/modulos";
@@ -66,7 +68,7 @@ function criarStore(inicial: Dados, carregada = true) {
     const valor = useMemo<UserDataContextType>(() => ({ get, set, loaded: estado.carregada, isGuest: false, fetchKey: async () => null }), [get, set, versao]); // eslint-disable-line react-hooks/exhaustive-deps
     return <UserDataContext.Provider value={valor}>{children}</UserDataContext.Provider>;
   };
-  return { estado, Provedor, carregar: () => { estado.carregada = true; ouvintes.forEach((o) => o()); } };
+  return { estado, Provedor, carregar: () => { estado.carregada = true; ouvintes.forEach((o) => o()); }, subir: () => ouvintes.forEach((o) => o()) };
 }
 const montar = (ui: ReactNode, inicial: Dados = {}, carregada = true) => {
   const s = criarStore(inicial, carregada);
@@ -74,7 +76,22 @@ const montar = (ui: ReactNode, inicial: Dados = {}, carregada = true) => {
   const get = <T,>(k: string, f: T): T => (k in s.estado.dados ? (s.estado.dados[k] as T) : f);
   return { ...r, ...s, get };
 };
-const card = () => screen.queryByTestId("intro-modulo-vazio");
+/** a intro na tela = a faixa de planner no topo (portal no body; vale pra guiada e pra de 1 toque) */
+const card = () => document.querySelector("[data-testid=intro-modulo-faixa]");
+/** como `montar`, com o `set` do store na mão (simular a pessoa mexendo no módulo) */
+const montarComSet = (ui: ReactNode, inicial: Dados = {}) => {
+  const r = montar(ui, inicial);
+  return { ...r, set: (k: string, v: unknown) => { r.estado.dados = { ...r.estado.dados, [k]: JSON.parse(JSON.stringify(v)) }; r.estado.escritas.push(k); r.subir(); } };
+};
+/** o i-ésimo chip do post-it — que só aparece depois de achar (ou desistir de achar, ~5 s) o controle real */
+const chip = async (i = 0) => { await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip").length).toBeGreaterThan(i), { timeout: 8000 }); return screen.getAllByTestId("demo-guia-chip")[i]; };
+const tocar = async (i = 0) => { fireEvent.click(await chip(i)); };
+/** toca num chip e fecha pelo "Pronto" do cartão do fim (é o que marca "feita") */
+const fazerETerminar = async (i = 0) => {
+  await tocar(i);
+  await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 2500 });
+  fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+};
 const dormir = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 const ligar = () => localStorage.setItem(CHAVE_FORCA_INTRO, "on");
 
@@ -123,25 +140,28 @@ describe("chave, constantes e classificação", () => {
     expect(vassouraLeva(CHAVE_INTRO_VISTAS_CONTA)).toBe(true); // da conta: a hidratação traz de volta
     expect(vassouraLeva(CHAVE_INTRO_FEITAS_CONTA)).toBe(true);
   });
-  it("os 16 módulos: 3 guiadas + 9 estados vazios com captura nos dois temas; Treino, Relações, Pet e Beleza sem intro (Treino sem nada por cima)", () => {
-    expect([...MODULOS_COM_INTRO, ...MODULOS_SEM_INTRO].sort()).toEqual(MODULOS.map((m) => m.id).sort());
-    expect(MODULOS_COM_INTRO).toHaveLength(12);
-    expect(MODULOS_SEM_NADA).toEqual(["treino"]);
-    expect(INTROS.treino).toBeUndefined();
+  it("os 16 módulos TÊM intro (dono 17/10): 3 guiadas + 13 de 1 toque, cada uma com a faixa, 1+ passo de 2–5 chips e a frase do fim; nada de vídeo", () => {
+    expect([...MODULOS_COM_INTRO].sort()).toEqual(MODULOS.map((m) => m.id).sort());
+    expect(MODULOS_COM_INTRO).toHaveLength(16);
+    expect(MODULOS_SEM_INTRO).toEqual([]);
+    expect(MODULOS_SEM_NADA).toEqual([]);
     for (const m of ["financas", "rotina", "saude"]) expect(INTROS[m].formato).toBe("guiada");
-    for (const m of ["dieta", "estudos", "biblioteca", "casa", "desenvolvimento", "carreira", "detox", "hiperfoco", "viagens"]) {
+    for (const m of ["treino", "dieta", "estudos", "biblioteca", "casa", "desenvolvimento", "carreira", "detox", "hiperfoco", "viagens", "beleza", "relacionamentos", "pet"]) {
       const c = INTROS[m];
-      expect(c.formato, m).toBe("vazio");
-      if (c.formato !== "vazio") continue;
-      expect(c.midia.video.claro, m).toMatch(/^\/intro\/[a-z]+\.mp4$/);
-      expect(c.midia.video.escuro, m).toMatch(/^\/intro\/[a-z]+-escuro\.mp4$/);
-      expect(c.midia.poster.claro, m).toMatch(/\.jpg$/);
-      expect(JSON.stringify(c).toLowerCase(), m).not.toContain("gravado do app");
-      expect(c.titulo.length, m).toBeGreaterThan(8);
+      expect(c.formato, m).toBe("toque");
+      if (c.formato !== "toque") continue;
+      expect(c.pedido.length, m).toBeGreaterThan(8);
+      expect(c.pronto.length, m).toBeGreaterThan(12);
+      expect(c.passos.length, m).toBeGreaterThanOrEqual(1);
+      for (const p of c.passos) {
+        expect(p.pergunta.length, m).toBeGreaterThan(8);
+        // chips de 2 a 5, ou um passo sem chip que ESCUTA o módulo (Treino: marcar o 1º exercício)
+        if (p.escutar) expect(p.opcoes.length, m).toBe(0);
+        else { expect(p.opcoes.length, m).toBeGreaterThanOrEqual(2); expect(p.opcoes.length, m).toBeLessThanOrEqual(5); expect(!!p.executar || !!p.foco, m).toBe(true); }
+      }
+      const texto = JSON.stringify(c).toLowerCase();
+      for (const proibido of ["no app do celular", ".mp4", "gravado do app"]) expect(texto, m).not.toContain(proibido);
     }
-    expect(INTROS.relacionamentos).toBeUndefined();
-    expect(INTROS.pet).toBeUndefined();
-    expect(INTROS.beleza).toBeUndefined();
   });
   it("semConteudo: nulo, vazio, lista vazia, mapa vazio, texto em branco", () => {
     for (const v of [null, undefined, "", "  ", [], {}, 0, false]) expect(semConteudo(v), String(v)).toBe(true);
@@ -197,24 +217,23 @@ describe("chave desligada (web) = o app de hoje", () => {
 describe("ligada: a porta do módulo", () => {
   beforeEach(ligar);
 
-  it("os cartões saem do fluxo mesmo com a força deles ligada; módulo sem intro fica com as dicas; Pet sem dicas = nada", async () => {
+  it("os cartões saem do fluxo mesmo com a força deles ligada; Relações, Pet e Treino (17/10) também ganham a intro, sem as dicas antigas", async () => {
     localStorage.setItem(CHAVE_FORCA_CARTOES, "on");
     montar(<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} />);
     expect(card()).toBeTruthy();
     await dormir(50);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     expect(screen.queryByText("Dica antiga")).toBeNull();
-    cleanup();
+    cleanup(); document.body.innerHTML = "";
     montar(<BoasVindasDoModulo moduleId="relacionamentos" tips={["Guarde as datas"]} />);
-    expect(screen.getByText("Guarde as datas")).toBeTruthy();
-    await dormir(50);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    cleanup();
-    const pet = montar(<BoasVindasDoModulo moduleId="pet" />);
-    expect(pet.container.innerHTML).toBe("");
-    cleanup();
-    const treino = montar(<BoasVindasDoModulo moduleId="treino" tips={["Dica antiga do Treino"]} />); // 17/10: só a tela dele
-    expect(treino.container.innerHTML).toBe("");
+    expect(card()?.textContent).toContain("anota 1 pessoa");
+    expect(screen.queryByText("Guarde as datas")).toBeNull();
+    cleanup(); document.body.innerHTML = "";
+    montar(<BoasVindasDoModulo moduleId="pet" />);
+    expect(card()?.textContent).toContain("cadastra o seu pet");
+    cleanup(); document.body.innerHTML = "";
+    montar(<BoasVindasDoModulo moduleId="treino" tips={["Dica antiga do Treino"]} />);
+    expect(card()?.textContent).toContain("monta o treino de hoje");
     expect(screen.queryByText("Dica antiga do Treino")).toBeNull();
   });
 
@@ -290,8 +309,8 @@ describe("ligada: a porta do módulo", () => {
     expect(b.estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
     expect(b.estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined();
     expect(introConcluida("casa", b.get)).toBe(false);
-    fireEvent.click(screen.getByTestId("intro-modulo-acao")); // ela termina mesmo assim: vira feita (o card sai 650 ms depois)
-    await waitFor(() => expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/), { timeout: 2500 });
+    await fazerETerminar(); // ela termina mesmo assim: vira feita
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/);
     expect(b.estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toEqual(["casa"]);
     expect(introConcluida("casa", b.get)).toBe(true);
     b.unmount();
@@ -421,33 +440,43 @@ describe("ligada: a porta do módulo", () => {
   });
 });
 
-/* ───────────────────────────────── estado vazio ───────────────────────────────── */
-describe("ligada: o estado vazio de cada módulo", () => {
+/* ───────────────────────────────── a intro de 1 toque ───────────────────────────────── */
+describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10)", () => {
   beforeEach(ligar);
   const hoje = localDayKey();
+  const comodos = () => <div><header><button type="button">🚪 CÔMODOS</button></header><div><input placeholder="Adicionar item..." /><button type="button">+</button></div></div>;
 
-  it("Casa: captura + 1 toque grava os 3 itens na lista real, marca vista no aparelho e na conta, eventos; o card sai", async () => {
-    const { estado } = montar(<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} />);
+  it("Casa: a faixa com 'Pular' à vista desde o 1º segundo, o anel no campo real, 1 chip grava 1 tarefa no cômodo real (a ação #1 da Casa), o cartão do fim confirma o que entrou e 'Pronto' marca vista (aparelho + conta)", async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const { estado } = montar(<>{comodos()}<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} /></>);
     expect(screen.queryByText("Dica antiga")).toBeNull();
-    expect(card()).toBeTruthy();
-    expect(screen.queryByText(/gravado do app/i)).toBeNull();
-    expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/casa.mp4");
-    expect(screen.getByTestId("intro-modulo-poster").getAttribute("src")).toBe("/intro/casa.jpg");
-    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "casa" && d.formato === "vazio" && d.tema === "claro")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("intro-modulo-acao"));
-    const cats = estado.dados["casa-grocery-categories"] as typeof CATEGORIAS_PADRAO_MERCADO;
-    expect(cats.flatMap((c) => c.items.map((i) => i.text))).toEqual(expect.arrayContaining(["Leite", "Pão", "Café"]));
-    expect(cats).toHaveLength(CATEGORIAS_PADRAO_MERCADO.length);
-    expect(screen.getByTestId("intro-modulo-acao").textContent).toContain("Pronto");
-    fireEvent.click(screen.getByTestId("intro-modulo-acao")); // 2º toque não duplica
-    expect((estado.dados["casa-grocery-categories"] as typeof CATEGORIAS_PADRAO_MERCADO).flatMap((c) => c.items)).toHaveLength(3);
-    expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "botao")).toBeTruthy();
+    expect(card()?.textContent).toContain("organiza 1 cômodo");
+    expect(screen.getByTestId("intro-modulo-pular")).toBeTruthy();
+    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "casa" && d.formato === "toque" && d.passos === 1)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 3000 });
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Qual cômodo você quer organizar primeiro?");
+    expect(screen.getAllByTestId("demo-guia-chip").map((c) => c.textContent)).toEqual(["🍳Cozinha", "🛏️Quarto", "🚿Banheiro"]);
+    await tocar(0);
+    const rooms = estado.dados["casa-rooms"] as Array<{ name: string; tasks: Array<{ text: string; done: boolean }> }>;
+    expect(rooms.map((r) => r.name)).toEqual(["COZINHA", "SALA", "QUARTO", "BANHEIRO", "ÁREA DE SERVIÇO", "ESCRITÓRIO"]); // os cômodos padrão nascem junto
+    expect(rooms.flatMap((r) => r.tasks)).toEqual([{ id: expect.any(String), text: "Lavar a louça", done: false }]); // 1 toque = 1 tarefa, no cômodo certo
+    expect(rooms[0].tasks).toHaveLength(1);
+    expect(estado.dados["casa-grocery-categories"]).toBeUndefined();
+    expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "cozinha" && d.passo === 1)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 2500 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Lavar a louça (Cozinha) já está aqui. Casa é isso");
+    expect(screen.queryByTestId("intro-modulo-conhecer-mais")).toBeNull(); // Casa não tem passeio: sem oferta
+    expect(card()?.textContent).toContain("pronto ✓");
+    expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "chip")).toBeTruthy();
     expect(eventos.find(([n]) => n === "modulo_intro_concluida")).toBeTruthy();
-    await waitFor(() => expect(card()).toBeNull(), { timeout: 2500 });
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toBeNull(); // só o "Pronto" (ou o tempo) marca
+    fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+    expect(card()).toBeNull();
     expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/);
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
     expect(estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toEqual(["casa"]);
     expect(introConcluida("casa")).toBe(true);
+    medir.mockRestore();
   });
 
   it("Pular fecha, marca vista (pulada, não feita) e conta como pulada", () => {
@@ -458,17 +487,52 @@ describe("ligada: o estado vazio de cada módulo", () => {
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
     expect(estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined();
     expect(introConcluida("casa")).toBe(false);
-    expect(eventos.find(([n, d]) => n === "modulo_intro_pulou" && d.fase === "vazio")).toBeTruthy();
+    expect(eventos.find(([n, d]) => n === "modulo_intro_pulou" && d.fase === "toque" && d.passo === 1)).toBeTruthy();
   });
 
-  it("tema: a captura é a do tema da pessoa e acompanha a troca", async () => {
-    document.documentElement.classList.add("dark");
-    montar(<IntroDoModulo moduleId="dieta" />);
-    expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/dieta-escuro.mp4");
-    expect(screen.getByTestId("intro-modulo-poster").getAttribute("src")).toBe("/intro/dieta-escuro.jpg");
-    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.tema === "escuro")).toBeTruthy();
-    document.documentElement.classList.remove("dark");
-    await waitFor(() => expect(screen.getByTestId("intro-modulo-video").getAttribute("src")).toBe("/intro/dieta.mp4"));
+  it("sem o controle real na tela (módulo pesado, aba diferente): o post-it fica SOLTO embaixo da faixa e os chips continuam funcionando", async () => {
+    const { estado } = montar(<IntroDoModulo moduleId="estudos" />);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeTruthy(), { timeout: 8000 });
+    expect(screen.queryByTestId("intro-modulo-anel")).toBeNull();
+    await tocar(0);
+    expect(estado.dados["estudos-cursos-andamento"]).toMatchObject([{ name: "Inglês" }]);
+  }, 12_000);
+
+  it("Treino (dono 17/10, 'tipo Rotina, mais completo'): passo 1 'Qual treino você faz hoje?' monta o treino de HOJE no plano real; passo 2 = marcar o 1º exercício no módulo (a ação #1 do Treino); o fim junta os dois", async () => {
+    expect(TREINOS_DE_HOJE.map((t) => t.rotulo)).toEqual(["Peito e tríceps", "Costas e bíceps", "Pernas", "Em casa", "Corrida"]);
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const { estado, set } = montarComSet(<><header><button type="button">📋 PLANO</button><button type="button">🏋️ HOJE</button></header><section data-testid="plano-semana"><h2>MEU PLANO DA SEMANA</h2></section><div data-testid="treino-hoje"><button type="button" aria-label="Marcar Supino reto inteiro">☐</button></div><IntroDoModulo moduleId="treino" /></>);
+    expect(card()?.textContent).toContain("1 de 2 · monta o treino de hoje");
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 3000 });
+    await tocar(0); // Peito e tríceps
+    const plano = estado.dados["saude-workouts-v2"] as Record<string, { muscles: string[]; exercises: Array<{ name: string; sets: string; done: boolean }> }>;
+    const dia = diaDaSemana();
+    expect(plano[dia].muscles).toEqual(["Peito", "Tríceps"]);
+    expect(plano[dia].exercises).toHaveLength(5);
+    expect(plano[dia].exercises[0]).toMatchObject({ name: "Supino reto", sets: "4", done: false });
+    expect(estado.dados["treino-active-days"]).toContain(dia);
+    // passo 2: o anel vai pro quadradinho do 1º exercício de HOJE e espera a pessoa marcar (nenhum chip)
+    await waitFor(() => expect(card()?.textContent).toContain("2 de 2 · monta o treino de hoje"), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Fez o primeiro? Marca ali"), { timeout: 3000 });
+    expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+    expect(screen.queryByTestId("intro-modulo-pronto")).toBeNull();
+    act(() => { set("saude-workouts-v2", { ...plano, [dia]: { ...plano[dia], exercises: plano[dia].exercises.map((e, i) => (i === 0 ? { ...e, done: true } : e)) } }); }); // ela marcou no módulo
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 2500 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Peito e tríceps (5 exercícios) e Supino reto feito já estão aqui. Marca cada série no HOJE");
+    expect(screen.getByTestId("intro-modulo-conhecer-mais").textContent).toContain("Ver mais 4 dicas de Treino"); // o passeio do Treino (17/10)
+    expect(eventos.filter(([n]) => n === "modulo_intro_registrou").map(([, d]) => [d.passo, d.via])).toEqual([[1, "chip"], [2, "foco"]]);
+    medir.mockRestore();
+    // os outros chips, puros: casa = 5 de chão; corrida = cardio de 20 min; dia que já tem exercício fica com os dele
+    const ctx = (dados: Record<string, unknown>): ContextoDaAcao & { dados: Record<string, unknown> } => { const d = { ...dados }; return { dados: d, get: <T,>(k: string, f: T) => (k in d ? (d[k] as T) : f), gravar: (k, v) => { d[k] = v; } }; };
+    const casa = ctx({});
+    expect(montarTreinoDeHoje(casa, "em_casa")).toMatchObject({ rotulo: "Em casa", exercicios: 5 });
+    expect((casa.dados["saude-workouts-v2"] as Record<string, { exercises: Array<{ name: string }> }>)[dia].exercises.map((e) => e.name)).toEqual(["Flexão de braço", "Agachamento livre", "Afundo", "Prancha", "Abdominal supra"]);
+    const corrida = ctx({});
+    montarTreinoDeHoje(corrida, "corrida");
+    expect((corrida.dados["saude-workouts-v2"] as Record<string, { exercises: Array<{ name: string; tipo?: string; duracao?: string }> }>)[dia].exercises).toMatchObject([{ name: "Corrida", tipo: "cardio", duracao: "20" }]);
+    const cheio = ctx({ "saude-workouts-v2": { [dia]: { muscles: ["Costas"], exercises: [{ name: "Remada", sets: "3", reps: "10", carga: "", done: false, obs: "" }] } } });
+    expect(montarTreinoDeHoje(cheio, "pernas").exercicios).toBe(1);
+    expect((cheio.dados["saude-workouts-v2"] as Record<string, { muscles: string[] }>)[dia].muscles).toEqual(["Pernas"]);
   });
 
   it("EscolherTreino (só a missão monta): 2 perguntas → o modelo existente que casa, gravado pelo caminho do módulo; o bloco de modelos do módulo some enquanto o quiz está na tela", async () => {
@@ -496,80 +560,128 @@ describe("ligada: o estado vazio de cada módulo", () => {
     expect(document.documentElement.hasAttribute("data-escolher-treino")).toBe(false);
   });
 
-  it("Dieta: o chip grava o café da manhã de HOJE no cardápio, sem mexer no resto", () => {
+  it("Dieta: o chip grava o café da manhã de HOJE no cardápio, sem mexer no resto", async () => {
     const plano = { SEGUNDA: { "Café da Manhã": "", Almoço: "" }, [diaDaSemana()]: { "Café da Manhã": "", Almoço: "" } };
     const { estado } = montar(<IntroDoModulo moduleId="dieta" />, { "saude-meals": plano });
-    const chips = screen.getAllByTestId("intro-modulo-chip");
-    expect(chips).toHaveLength(3);
-    fireEvent.click(chips[1]);
+    expect(card()?.textContent).toContain("anota o café de hoje");
+    await chip(0);
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("O que foi o seu café da manhã hoje?");
+    expect(screen.getAllByTestId("demo-guia-chip")).toHaveLength(3);
+    await tocar(1);
     const meals = estado.dados["saude-meals"] as Record<string, Record<string, string>>;
     expect(meals[diaDaSemana()]["Café da Manhã"]).toBe("Ovos mexidos");
     expect(meals[diaDaSemana()].Almoço).toBe("");
     expect(meals.SEGUNDA["Café da Manhã"]).toBe("");
-    expect(chips[1].getAttribute("data-feito")).toBe("1");
-    expect((chips[0] as HTMLButtonElement).disabled).toBe(true);
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "ovos")).toBeTruthy();
-  });
+  }, 12_000);
 
-  it("Dieta: o 'depois' abre SÓ o card de hoje — nunca o gatilho do diálogo 'Limpar cardápio' (bug de 16/10)", () => {
+  it("Dieta: o alvo do post-it é o card de HOJE e abre SÓ o botão 'Abrir <dia>' — nunca o gatilho do diálogo 'Limpar cardápio' (bug de 16/10)", () => {
     const limpar = vi.fn(), abrir = vi.fn();
-    document.body.innerHTML = `<div data-spotlight="first-day"><button id="limpar" aria-expanded="false" aria-haspopup="dialog">Limpar</button><button id="abrir" aria-label="Abrir SEXTA" aria-expanded="false">SEXTA</button></div>`;
+    document.body.innerHTML = `<div data-spotlight="first-day"><div id="cabecalho"><button id="limpar" aria-expanded="false" aria-haspopup="dialog">Limpar</button><button id="abrir" aria-label="Abrir SEXTA" aria-expanded="false">SEXTA</button></div></div>`;
     document.getElementById("limpar")!.addEventListener("click", limpar);
     document.getElementById("abrir")!.addEventListener("click", abrir);
     const cfg = INTROS.dieta;
-    if (cfg.formato === "vazio") cfg.depois?.();
+    const alvo = cfg.formato === "toque" ? cfg.passos[0].alvo : undefined;
+    expect(alvo?.aba).toBe("CARDÁPIO");
+    expect(alvo?.achar()?.id).toBe("cabecalho");
     expect(limpar).not.toHaveBeenCalled();
     expect(abrir).toHaveBeenCalledTimes(1);
     // o card já aberto ("Recolher") não é tocado
-    document.body.innerHTML = `<div data-spotlight="first-day"><button id="limpar" aria-expanded="false" aria-haspopup="dialog">Limpar</button><button id="recolher" aria-label="Recolher SEXTA" aria-expanded="true">SEXTA</button></div>`;
+    document.body.innerHTML = `<div data-spotlight="first-day"><div><button id="limpar" aria-expanded="false" aria-haspopup="dialog">Limpar</button><button id="recolher" aria-label="Recolher SEXTA" aria-expanded="true">SEXTA</button></div></div>`;
     const recolher = vi.fn(); document.getElementById("recolher")!.addEventListener("click", recolher); document.getElementById("limpar")!.addEventListener("click", limpar);
-    if (cfg.formato === "vazio") cfg.depois?.();
+    alvo?.achar();
     expect(limpar).not.toHaveBeenCalled();
     expect(recolher).not.toHaveBeenCalled();
   });
 
-  it("Estudos, Biblioteca, Metas, Carreira e Detox: cada chip grava no formato do módulo", () => {
+  it("Estudos, Biblioteca, Metas, Carreira e Detox: cada chip grava no formato do módulo", async () => {
     const e = montar(<IntroDoModulo moduleId="estudos" />);
-    fireEvent.click(screen.getAllByTestId("intro-modulo-chip")[0]);
+    await tocar(0);
     expect(e.estado.dados["estudos-cursos-andamento"]).toMatchObject([{ name: "Inglês" }]);
-    cleanup(); localStorage.clear(); ligar();
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
 
     const b = montar(<IntroDoModulo moduleId="biblioteca" />);
-    fireEvent.click(screen.getAllByTestId("intro-modulo-chip")[0]);
+    await tocar(0);
     expect(b.estado.dados["lib-books"]).toMatchObject([{ title: "Hábitos Atômicos", author: "James Clear", status: "lendo", currentPage: 0, quotes: [] }]);
-    cleanup(); localStorage.clear(); ligar();
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
 
     const d = montar(<IntroDoModulo moduleId="desenvolvimento" />);
-    fireEvent.click(screen.getAllByTestId("intro-modulo-chip")[1]);
+    await tocar(1);
     const metas = d.estado.dados["goals-board-v2"] as Array<{ title: string; actionGroups: unknown[] }>;
     expect(metas).toHaveLength(1);
     expect(metas[0].title).toBe("Guardar R$ 1.000");
     expect(metas[0].actionGroups).toHaveLength(2);
-    cleanup(); localStorage.clear(); ligar();
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
 
     const c = montar(<IntroDoModulo moduleId="carreira" />);
-    fireEvent.click(screen.getAllByTestId("intro-modulo-chip")[2]);
+    await tocar(2);
     expect(c.estado.dados["career-day-tasks"]).toMatchObject([{ texto: "Ligar pro cliente", feito: false, dia: hoje }]);
-    cleanup(); localStorage.clear(); ligar();
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
 
     const x = montar(<IntroDoModulo moduleId="detox" />);
-    fireEvent.click(screen.getAllByTestId("intro-modulo-chip")[1]);
+    await tocar(1);
     expect(x.estado.dados["detox-habits"]).toMatchObject([{ name: "Açúcar", icon: "🍬", startDate: hoje, relapses: [], record: 0, checkins: [] }]);
-  });
+  }, 40_000);
 
-  it("Mente e Viagens: o toque abre o campo real (o conteúdo é da pessoa), nada é gravado", () => {
-    const m = montar(<><input placeholder="O que está pensando?" /><IntroDoModulo moduleId="hiperfoco" /></>);
-    fireEvent.click(screen.getByTestId("intro-modulo-acao"));
-    expect((document.activeElement as HTMLInputElement | null)?.placeholder).toBe("O que está pensando?");
-    expect(m.estado.escritas.filter((k) => !k.startsWith("core-intro"))).toHaveLength(0);
-    expect(card()).toBeNull();
-    expect(localStorage.getItem(chaveIntroVista("hiperfoco"))).toBeTruthy();
-    expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "foco" && d.modulo === "hiperfoco")).toBeTruthy();
-    cleanup(); localStorage.clear(); ligar();
-    montar(<><input placeholder="Destino..." /><IntroDoModulo moduleId="viagens" /></>);
-    fireEvent.click(screen.getByTestId("intro-modulo-acao"));
-    expect((document.activeElement as HTMLInputElement | null)?.placeholder).toBe("Destino...");
-  });
+  it("Mente, Viagens, Beleza, Relações e Pet (17/10): cada chip grava no formato do módulo — 1 toque de verdade, nada de vídeo nem campo vazio", async () => {
+    vi.setSystemTime(new Date(2026, 9, 17, 14, 30));
+    const m = montar(<IntroDoModulo moduleId="hiperfoco" />);
+    await tocar(1);
+    expect(m.estado.dados["hiperfoco-thoughts"]).toEqual({ "2026-10-17": { 14: [expect.objectContaining({ text: "Uma ideia pra não perder", tags: [], hour: 14 })] } });
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+
+    const v = montar(<IntroDoModulo moduleId="viagens" />);
+    await tocar(1);
+    expect(v.estado.dados["travel-bucket"]).toMatchObject([{ name: "Gramado", country: "Brasil", visited: false, priority: "sonho" }]);
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+
+    const b = montar(<IntroDoModulo moduleId="beleza" />);
+    expect(card()?.textContent).toContain("monta o seu skincare");
+    await tocar(0); // Oleosa
+    expect(b.estado.dados["skincare-perfil"]).toMatchObject({ pele: "oleosa", objetivo: "basico", nivel: "iniciante" });
+    expect((b.estado.dados["skincare-am-steps"] as unknown[]).length).toBeGreaterThan(0);
+    expect((b.estado.dados["skincare-pm-steps"] as unknown[]).length).toBeGreaterThan(0);
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+
+    const r = montar(<IntroDoModulo moduleId="relacionamentos" />);
+    await tocar(0); // Mãe
+    expect(r.estado.dados["rel-people"]).toMatchObject([{ name: "Mãe", relation: "Mãe", circulo: "familia", birthday: "" }]);
+    cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+
+    const p = montar(<IntroDoModulo moduleId="pet" />);
+    await tocar(1); // Gato
+    const pets = p.estado.dados["pet-list"] as Array<{ id: string; name: string; species: string }>;
+    expect(pets).toMatchObject([{ name: "Meu gato", species: "Gato", faixa: "adulto" }]);
+    expect((p.estado.dados[`pet-routine-tasks-${pets[0].id}`] as Array<{ id: string }>)[0]).toMatchObject({ id: "food" });
+    vi.useRealTimers();
+  }, 40_000);
+
+  it("vários passos: cada um é 1 toque; a faixa conta '1 de 2'; o fim junta o que entrou", async () => {
+    const escritas: Record<string, unknown> = {};
+    const config: IntroDeUmToqueConfig = {
+      formato: "toque", moduleId: "casa", nome: "Casa", pedido: "2 toques", pronto: "Pronto é isso.",
+      cor: { faixa: "#eee", tinta: "#111", acento: "#222" }, vazio: () => true,
+      passos: [
+        { pergunta: "Primeiro?", opcoes: [{ emoji: "a", rotulo: "Leite", id: "leite" }], executar: (_c, o) => { escritas.p1 = o.id; } },
+        { pergunta: "Segundo?", opcoes: [{ emoji: "b", rotulo: "Pão", id: "pao" }], executar: (_c, o) => { escritas.p2 = o.id; return "Pão francês"; } },
+      ],
+    };
+    const fim = vi.fn();
+    montar(<IntroDeUmToque config={config} aoTerminar={fim} />);
+    expect(card()?.textContent).toContain("1 de 2 · 2 toques");
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-postit")).toBeTruthy(), { timeout: 8000 });
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 2 · 1 toque");
+    await tocar(0);
+    await waitFor(() => expect(card()?.textContent).toContain("2 de 2 · 2 toques"), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Segundo?"), { timeout: 8000 });
+    await tocar(0);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 2500 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Leite e Pão francês já estão aqui. Pronto é isso.");
+    expect(escritas).toEqual({ p1: "leite", p2: "pao" });
+    expect(eventos.filter(([n]) => n === "modulo_intro_registrou").map(([, d]) => d.passo)).toEqual([1, 2]);
+    fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+    expect(fim).toHaveBeenCalledWith("feita");
+  }, 20_000);
 });
 
 describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () => {

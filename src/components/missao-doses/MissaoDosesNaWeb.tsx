@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { marcarIntroVista } from "@/lib/intro-modulo";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
@@ -590,6 +591,10 @@ function Ligada() {
           }
           if (m.feitos[n]) return;
           const feitos = { ...m.feitos, [n]: { dia: hoje, rotulo } };
+          // 17/10 (regra do dono: tutorial é UMA vez por módulo): a dose feita É o tutorial daquele módulo — fica gravada
+          // como intro VISTA ("dose", aparelho + conta), pra nunca repetir, nem reinstalando, nem no 2º aparelho. Não é
+          // "feita": a lista de feitas é só pra missão virar continuação, e a retomada do 1º gasto (depois do Montar) lê ela.
+          try { marcarIntroVista(passo.modulo, get, gravarNaConta, "dose"); } catch { /* storage bloqueado: a regra da missão ainda segura */ }
           const tresDoses = !!(feitos[1] && feitos[2] && feitos[3]);
           // A: 3 doses = missão completa. B: falta o 4º passo (a Home) — `completaEm` só depois dele.
           // (1.0.16: o adesivo NÃO é dado aqui — quem dá é o registro de Conquistas, pela regra do adesivo; a

@@ -88,14 +88,20 @@ describe("Beleza: 'DICAS PRA COMEÇAR' (o print #86)", () => {
 });
 
 describe("as outras dicas com a frase", () => {
-  it("Relações ('Dicas para começar'): no app 'Ligue os avisos: …'; no site 'No app do celular, ligue os avisos: …'", () => {
+  it("Relações: no app (intro ligada, 17/10) a 1ª abertura mostra a INTRO, não as dicas — e nada diz 'no app do celular'; no site 'No app do celular, ligue os avisos: …'", () => {
     noApp();
     abrir(<Relacionamentos />, "/relacionamentos");
-    expect(screen.getByText("Ligue os avisos: na véspera, no dia e o “faz tempo que…”")).toBeInTheDocument();
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")?.textContent).toContain("anota 1 pessoa");
+    expect(screen.queryByText("Ligue os avisos: na véspera, no dia e o “faz tempo que…”")).toBeNull();
     expect(texto()).not.toMatch(/no app do celular/i);
-    cleanup();
+    cleanup(); document.body.innerHTML = ""; localStorage.clear();
     delete (window as { Capacitor?: unknown }).Capacitor;
+    // no site com a intro ligada (QA): a mesma intro, nunca as dicas; no site de hoje (intro desligada): as dicas de sempre, com a frase do app
     noSiteComDicas();
+    abrir(<Relacionamentos />, "/relacionamentos");
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeTruthy();
+    expect(texto()).not.toMatch(/no app do celular/i);
+    cleanup(); document.body.innerHTML = ""; localStorage.clear();
     abrir(<Relacionamentos />, "/relacionamentos");
     expect(screen.getByText("No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”")).toBeInTheDocument();
   });

@@ -32,7 +32,7 @@ import { AcessoConhecerMais, ConhecerMaisHost } from "@/components/intro-modulo/
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { CHAVE_FORCA_INTRO } from "@/lib/intro-modulo";
 import {
-  ABERTURA_DO_LEMBRETE, CHAVE_TOURS_FEITOS_CONTA, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, chaveAberturas, chaveLembreteVisto, chaveTourFeito, lembreteDevido, marcarTourFeito, ofertaDoTour, temTour, tourFeito,
+  ABERTURA_DO_LEMBRETE, CHAVE_TOURS_FEITOS_CONTA, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, chaveAberturas, chaveLembreteVisto, chaveTourAberto, chaveTourFeito, lampadaVisivel, lembreteDevido, marcarTourFeito, ofertaDoTour, temTour, tourFeito,
   type FimDoTour,
 } from "@/lib/conhecer-mais";
 import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
@@ -81,8 +81,8 @@ beforeEach(() => { localStorage.clear(); eventos.length = 0; localStorage.setIte
 afterEach(() => { cleanup(); document.body.innerHTML = ""; document.documentElement.removeAttribute("data-conhecer-mais"); vi.restoreAllMocks(); });
 
 describe("o passeio: configuração, oferta e chaves", () => {
-  it("só Finanças, Rotina e Saúde; 3 a 5 paradas; a oferta diz o que é e quanto dura; nada de FOMO", () => {
-    expect(Object.keys(TOURS).sort()).toEqual(["financas", "rotina", "saude"]);
+  it("Finanças, Rotina, Saúde e Treino (17/10); 3 a 5 paradas; a oferta diz o que é e quanto dura; nada de FOMO", () => {
+    expect(Object.keys(TOURS).sort()).toEqual(["financas", "rotina", "saude", "treino"]);
     expect(temTour("casa")).toBe(false);
     for (const t of Object.values(TOURS)) {
       expect(t.paradas.length).toBeGreaterThanOrEqual(3);
@@ -96,7 +96,8 @@ describe("o passeio: configuração, oferta e chaves", () => {
     expect(ofertaDoTour("financas")).toEqual({ titulo: "Ver mais 5 dicas de Finanças", linha: "Meu Mês, contas fixas, cartão… · 1\u00a0min" });
     expect(ofertaDoTour("saude")).toEqual({ titulo: "Ver mais 4 dicas de Saúde", linha: "Log médico, remédios, evolução… · 1\u00a0min" });
     expect(ofertaDoTour("rotina")).toEqual({ titulo: "Ver mais 3 dicas de Rotina", linha: "Rotina semanal, meu mês e foco · 1\u00a0min" }); // os 3 cabem: sem "…"
-    for (const m of ["financas", "rotina", "saude"]) expect(ofertaDoTour(m)!.linha.replace(/ · 1\u00a0min$/, "").length).toBeLessThanOrEqual(33); // 32 letras + "…"
+    expect(ofertaDoTour("treino")).toEqual({ titulo: "Ver mais 4 dicas de Treino", linha: "Plano da semana, modelos prontos… · 1\u00a0min" });
+    for (const m of ["financas", "rotina", "saude", "treino"]) expect(ofertaDoTour(m)!.linha.replace(/ · 1\u00a0min$/, "").length).toBeLessThanOrEqual(33); // 32 letras + "…"
     expect(ofertaDoTour("casa")).toBeNull();
   });
   it("as chaves novas estão classificadas; feito vale no aparelho e na conta; o lembrete é só na 3ª abertura", () => {
@@ -194,12 +195,30 @@ describe("o passeio na tela", () => {
     expect(localStorage.getItem(chaveLembreteVisto("financas"))).toBeTruthy();
   });
 
-  it("o acesso permanente no cabeçalho ('Dicas') abre o passeio; some pra módulo sem passeio e com a chave desligada", () => {
+  it("a lâmpada do cabeçalho ('Dicas') abre o passeio e SOME depois de usada (dono 17/10) — na hora, e nas próximas aberturas; some também com o passeio feito na conta, pra módulo sem passeio e com a chave desligada", () => {
     medirTudo();
+    expect(lampadaVisivel("financas")).toBe(true);
     montar(<><AcessoConhecerMais moduleId="financas" /><FinancasFalsa /></>);
     fireEvent.click(screen.getByTestId("conhecer-mais-acesso"));
     expect(screen.getByTestId("conhecer-mais-faixa")).toBeTruthy();
     expect(eventos.find(([n, d]) => n === "conhecer_mais_abrir" && d.origem === "menu")).toBeTruthy();
+    expect(screen.queryByTestId("conhecer-mais-acesso")).toBeNull(); // usada: sumiu na hora
+    expect(localStorage.getItem(chaveTourAberto("financas"))).toBeTruthy();
+    expect(lampadaVisivel("financas")).toBe(false);
+    cleanup();
+    expect(montar(<AcessoConhecerMais moduleId="financas" />).container.innerHTML).toBe(""); // e na próxima abertura
+    cleanup(); localStorage.clear(); localStorage.setItem(CHAVE_FORCA_INTRO, "on");
+    // aberto por OUTRO caminho (o fim da intro, o lembrete, a missão) também conta como usada
+    montar(<><AcessoConhecerMais moduleId="saude" /><FinancasFalsa /></>);
+    expect(screen.getByTestId("conhecer-mais-acesso")).toBeTruthy();
+    act(() => { abrirConhecerMais("saude", "fim_dose"); });
+    expect(screen.queryByTestId("conhecer-mais-acesso")).toBeNull();
+    cleanup(); localStorage.clear(); localStorage.setItem(CHAVE_FORCA_INTRO, "on");
+    // feito na CONTA (2º aparelho): nem aparece
+    const get = <T,>(k: string, f: T): T => (k === CHAVE_TOURS_FEITOS_CONTA ? (["rotina"] as never) : f);
+    expect(lampadaVisivel("rotina", get)).toBe(false);
+    expect(ehChaveDoAparelho(chaveTourAberto("rotina"))).toBe(true);
+    expect(vassouraLeva(chaveTourAberto("rotina"))).toBe(false);
     cleanup();
     const a = montar(<AcessoConhecerMais moduleId="casa" />);
     expect(a.container.innerHTML).toBe("");

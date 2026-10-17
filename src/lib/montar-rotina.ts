@@ -66,6 +66,7 @@
  */
 import { isNativeShell } from "@/lib/native-shell";
 import { localDayKey } from "@/lib/utils";
+import { marcadosDoDia, nomesDosHabitos } from "@/lib/rotina-habitos";
 
 export type ModoChave = "on" | "off";
 /** App das lojas. ROLLBACK = "off" aqui (ou metadata `montar_rotina: "off"` no RevenueCat, sem build). */
@@ -488,6 +489,25 @@ export function marcarMontarRotinaDecidido(r: Resultado, origem: OrigemMontar, a
 }
 
 /* ───────────────────────── o 1º quadradinho depois do "pronto" ───────────────────────── */
+
+/**
+ * A marca GUIADA: o quadradinho de HOJE do 1º hábito (`indice` na lista) está marcado? Outro hábito hoje
+ * ou outro dia da semana não contam como a marca do guia (a mesma regra da tabela: grade desta semana,
+ * senão o log por data).
+ */
+export function primeiroMarcadoHoje(p: { habitos: unknown; checked: unknown; semana: unknown; habitLog: unknown; indice: number; hoje: string }): boolean {
+  const nomes = nomesDosHabitos(p.habitos);
+  if (p.indice < 0 || p.indice >= nomes.length) return false;
+  const marcados = marcadosDoDia({
+    nomes,
+    checked: (ehObjeto(p.checked) ? p.checked : {}) as Record<string, boolean[]>,
+    semana: typeof p.semana === "string" ? p.semana : "",
+    habitLog: (ehObjeto(p.habitLog) ? p.habitLog : {}) as Record<string, string[]>,
+    dia: p.hoje,
+    hoje: p.hoje,
+  });
+  return !!marcados[p.indice];
+}
 
 const ehDia = (k: unknown): k is string => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
 const diaDoIso = (iso: string | undefined): string | null => {

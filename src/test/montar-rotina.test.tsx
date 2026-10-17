@@ -71,10 +71,10 @@ import {
   ATRIBUTO_NA_TELA, CHAVE_FORCA_MONTAR_ROTINA, CHAVE_MONTAR_ROTINA, EV_GUIA, EV_PASSO, EV_PERMISSAO, EV_PRIMEIRO, EV_PRONTO, EV_PULAR, EV_VIEW,
   EVENTO_MONTAR_ROTINA_FIM, MONTAR_ROTINA_NO_MODULO, _novaAberturaMontarRotina, _zerarRemotaMontarRotina, agendaParaGravar, deveMostrarMontarRotina,
   guardarForcaMontarRotinaDaUrl, habitosParaGravar, horaDaAgenda, horaFalada, horariosDosItens, inicioDaAgenda, lerChaveRemotaMontarRotina,
-  lerRascunhoRotina, linhasDoDia, marcaDoAparelho, marcarMontarRotinaDecidido, montarRotinaJaDecidido, montarRotinaLigado, primeiroDiaMarcado,
+  lerRascunhoRotina, linhasDoDia, marcaDoAparelho, marcarMontarRotinaDecidido, montarRotinaJaDecidido, montarRotinaLigado, primeiroDiaMarcado, primeiroMarcadoHoje,
   reaproveitarDoOnboarding, registrarChaveMontarRotina, registrarVistaMontarRotina, temDadosDeRotina, type ItemId, type MarcaRotina,
 } from "@/lib/montar-rotina";
-import { MontarRotina, quadradinhoDeHoje, type ResumoMontarRotina } from "@/components/rotina/montar/MontarRotina";
+import { MontarRotina, ehACelulaDoGuia, quadradinhoDeHoje, recorteDoQuadradinho, type ResumoMontarRotina } from "@/components/rotina/montar/MontarRotina";
 import Rotina from "@/pages/Rotina";
 
 const UID = "u-mr";
@@ -502,6 +502,41 @@ describe("a tela, com a conta vazia", () => {
   }
 });
 
+/* ───────────────────────── o alvo do guia, sem tela ───────────────────────── */
+describe("o alvo do guia: só o quadradinho de hoje do 1º hábito", () => {
+  it("a marca guiada é SÓ esse quadradinho: outro hábito hoje ou outro dia não contam", () => {
+    const base = { habitos: ["Beber água", "Treinar"], semana: "2026-10-12", habitLog: {}, indice: 0, hoje: HOJE_DIA };
+    expect(primeiroMarcadoHoje({ ...base, checked: { "SÁBADO": [true, false] } })).toBe(true);
+    expect(primeiroMarcadoHoje({ ...base, checked: { "SÁBADO": [false, true] } })).toBe(false); // outro hábito, hoje
+    expect(primeiroMarcadoHoje({ ...base, checked: { SEXTA: [true, false] } })).toBe(false); // outro dia
+    // grade de outra semana não vale; o log por data de hoje vale
+    expect(primeiroMarcadoHoje({ ...base, semana: "2026-10-05", checked: { "SÁBADO": [true, true] }, habitLog: { [HOJE_DIA]: ["Beber água"] } })).toBe(true);
+    expect(primeiroMarcadoHoje({ ...base, semana: "2026-10-05", checked: { "SÁBADO": [true, true] }, habitLog: { "2026-10-16": ["Beber água"] } })).toBe(false);
+    expect(primeiroMarcadoHoje({ ...base, indice: 5, checked: { "SÁBADO": [true, true] } })).toBe(false);
+  });
+  it("o anel é um quadrado justo em volta do checkbox (não a célula, não a coluna); sem tamanho, zero (o post-it fica solto)", () => {
+    const td = document.createElement("td");
+    const caixa = document.createElement("button");
+    caixa.setAttribute("role", "checkbox");
+    td.appendChild(caixa);
+    const medida = (left: number, top: number, w: number, h: number) => ({ left, top, width: w, height: h, right: left + w, bottom: top + h, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    caixa.getBoundingClientRect = () => medida(100, 200, 16, 16);
+    td.getBoundingClientRect = () => medida(60, 190, 100, 36);
+    expect(recorteDoQuadradinho(td)).toEqual({ top: 194, left: 94, width: 28, height: 28, bottom: 222 });
+    caixa.getBoundingClientRect = () => medida(0, 0, 0, 0);
+    expect(recorteDoQuadradinho(td).width).toBe(0);
+  });
+  it("a célula do guia é conferida pela posição (linha de hoje × coluna do 1º hábito), não pelo nó", () => {
+    const tabela = document.createElement("table");
+    tabela.innerHTML = "<tbody><tr><td>SEXTA</td><td></td><td></td></tr><tr><td>SÁBADO</td><td></td><td></td></tr></tbody>";
+    const [sexta, sabado] = Array.from(tabela.querySelectorAll("tr"));
+    expect(ehACelulaDoGuia(sabado.children[1], 0)).toBe(true);
+    expect(ehACelulaDoGuia(sabado.children[2], 0)).toBe(false);
+    expect(ehACelulaDoGuia(sabado.children[2], 1)).toBe(true);
+    expect(ehACelulaDoGuia(sexta.children[1], 0)).toBe(false);
+  });
+});
+
 /* ───────────────────────── na Rotina de verdade: o guia do 1º quadradinho ───────────────────────── */
 describe("na Rotina de verdade (como a missão abre): cheia, nas Pendências, e o 1º quadradinho guiado", () => {
   const linhaDeHoje = () => screen.getByText("SÁBADO").closest("tr")!;
@@ -555,6 +590,35 @@ describe("na Rotina de verdade (como a missão abre): cheia, nas Pendências, e 
     fireEvent.click(screen.getByRole("button", { name: "Apagar o hábito Treinar" }));
     fireEvent.click(screen.getByRole("button", { name: /Confirmar: apagar o hábito Treinar/ }));
     expect(controle.dados()["rotina-habits"]).toEqual(["Beber água", "Estudar", "Dormir cedo"]);
+  });
+
+  it("durante o guia, os OUTROS quadradinhos ficam segurados (outro dia, outro hábito): nada marcado sem querer; o post-it diz qual é", async () => {
+    const onPronto = vi.fn();
+    const controle = montarNaRotina({ onPronto });
+    await responder({ lembrete: "Agora não" });
+    await waitFor(() => expect(screen.getByTestId("montar-rotina-postit")).toBeTruthy(), { timeout: 3000 });
+    const linhaDeSexta = () => screen.getByText("SEXTA").closest("tr")!;
+    fireEvent.click(within(linhaDeSexta().children[1] as HTMLElement).getByRole("checkbox")); // ontem, na coluna certa
+    await respirar();
+    fireEvent.click(within(linhaDeHoje().children[2] as HTMLElement).getByRole("checkbox")); // hoje, outro hábito
+    await respirar();
+    const d = controle.dados();
+    for (const k of ["rotina-habit-log", "rotina-habits-checked", "heatmap-log", "core-dias-anotados"]) expect(d[k], k).toBeUndefined();
+    expect(within(linhaDeSexta().children[1] as HTMLElement).getByRole("checkbox").getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByText("Esse não. É o quadradinho de hoje, sábado, na coluna de Beber água.")).toBeTruthy();
+    expect(screen.queryByText("Primeiro do dia ✓")).toBeNull();
+    expect(nomes()).not.toContain(EV_PRIMEIRO);
+    // o do guia passa
+    fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
+    await respirar();
+    expect(screen.getByText("Primeiro do dia ✓")).toBeTruthy();
+    expect((controle.dados()["rotina-habit-log"] as Record<string, string[]>)[HOJE_DIA]).toEqual(["Beber água"]);
+    await waitFor(() => expect(onPronto).toHaveBeenCalledTimes(1), { timeout: 4000 });
+    expect((onPronto.mock.calls[0][0] as ResumoMontarRotina).primeiroMarcado).toBe(true);
+    // o guia saiu: a tabela volta inteira (ontem marca, como sempre)
+    fireEvent.click(within(linhaDeSexta().children[1] as HTMLElement).getByRole("checkbox"));
+    await respirar();
+    expect((controle.dados()["rotina-habit-log"] as Record<string, string[]>)["2026-10-16"]).toEqual(["Beber água"]);
   });
 
   it("'Entendi' fecha sem marcar; marcar DEPOIS é contado pelo vigia da Rotina (uma vez, como não guiado)", async () => {

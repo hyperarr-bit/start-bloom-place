@@ -118,7 +118,8 @@ button.mrt-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0
 
 /* o post-it do 1º quadradinho: papel amarelo com fita magenta (o post-it do planner, o mesmo da missão) —
    igual nos dois temas, é papel */
-.mrt-postit { position: relative; }
+/* margem em cima: a fita do post-it nunca encosta no anel justo do quadradinho (o anel põe o balão 16 px abaixo) */
+.mrt-postit { position: relative; margin-top: 10px; }
 .mrt-postit-fita { position: absolute; top: -8px; left: 50%; width: 76px; height: 16px; border-radius: 2px; transform: translateX(-50%) rotate(2deg); background: hsl(330 65% 50% / .55); z-index: 1; }
 .mrt-postit-papel { border-radius: 6px; padding: 14px 16px 12px; background: #fff3b0; color: #262626; box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .7); transform: rotate(-.6deg); text-align: left; }
 .mrt-postit-rotulo { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(38, 38, 38, .6); margin-bottom: 4px; }
@@ -127,6 +128,7 @@ button.mrt-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0
 .mrt-postit-item { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; min-height: 36px; padding: 0 13px 0 11px; border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 rgba(0, 0, 0, .12); }
 .mrt-postit-item em { font-style: normal; font-weight: 600; color: rgba(38, 38, 38, .55); }
 .mrt-postit-dica { display: block; font-size: 12px; line-height: 1.35; margin-top: 8px; color: rgba(38, 38, 38, .62); }
+.mrt-postit-dica[data-segurou] { color: #9a3412; font-weight: 700; }
 .mrt-postit-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
 button.mrt-postit-ok { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #16121c; color: #fff; font-size: 14px; font-weight: 700; }
 .mrt-postit[data-feito] .mrt-postit-titulo { color: #15803d; }

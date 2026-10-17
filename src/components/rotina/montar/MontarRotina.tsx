@@ -57,14 +57,14 @@ import { trackEvent } from "@/lib/analytics";
 import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { armarLembreteDoTesteSePuder, estadoPermissao, pedirPermissao, type EstadoPermissao } from "@/lib/notificacoes";
-import { DIAS_DA_ROTINA, marcadosDoDia, nomesDosHabitos } from "@/lib/rotina-habitos";
+import { DIAS_DA_ROTINA, nomesDosHabitos } from "@/lib/rotina-habitos";
 import { CHAVE_LEMBRETE_ROTINA_MANHA, horaDoLembreteDaManha, textoDaManha } from "@/lib/rotina-manha";
 import { Anel } from "@/components/demo-guiada/pecas";
 import {
   ATRIBUTO_FASE, CHAVE_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_ABERTA, EVENTO_MONTAR_ROTINA_FIM, EV_GUIA, EV_PASSO, EV_PERMISSAO, EV_PRIMEIRO,
   EV_PRONTO, EV_PULAR, EV_VIEW, ITENS_DA_ROTINA, OPCOES_ACORDAR, agendaParaGravar, carimbarPrimeiro, guardarRascunhoRotina,
   habitosParaGravar, horaDaAgenda, horaDaResposta, horaDe, horaFalada, horariosDosItens, inicioDaAgenda, itemDe, itensValidos, lerRascunhoRotina,
-  linhasDoDia, marcarMontarRotinaDecidido, minutosDe, montarRotinaAbertoPelaMissao, normalizarHora, primeiroDoDia,
+  linhasDoDia, marcarMontarRotinaDecidido, minutosDe, montarRotinaAbertoPelaMissao, normalizarHora, primeiroDoDia, primeiroMarcadoHoje,
   reaproveitarDoOnboarding, registrarTelaAberta, registrarVistaMontarRotina,
   type ItemId, type OpcaoAcordar, type OrigemMontar, type PerguntaDoLembrete, type Resultado,
 } from "@/lib/montar-rotina";
@@ -111,15 +111,20 @@ type Etapa = "acordar" | "itens" | "lembrete" | "montando";
 type Fase = "folha" | "guia" | "fim";
 const PASSO: Record<Exclude<Etapa, "montando">, number> = { acordar: 1, itens: 2, lembrete: 3 };
 
+/** O card da tabela HÁBITOS DIÁRIOS (achado pelo botão "+ Hábito"). */
+const cardDosHabitos = (): Element | null => {
+  let card: Element | null = document.querySelector('[data-spotlight="add-habit"]');
+  while (card && !card.querySelector("table")) card = card.parentElement;
+  return card;
+};
+
 /**
  * O quadradinho (a célula) de HOJE do hábito `indice` na tabela HÁBITOS DIÁRIOS da página aberta, ou null.
  * Acha a tabela pelo botão "+ Hábito" do card (`[data-spotlight="add-habit"]`, o mesmo da missão) e a linha
  * pelo nome do dia ("QUINTA"), como a missão faz (demo-guiada/alvos `linhaDeHoje`).
  */
 export function quadradinhoDeHoje(indice: number, agora: Date = new Date()): HTMLElement | null {
-  const botao = document.querySelector('[data-spotlight="add-habit"]');
-  let card: Element | null = botao;
-  while (card && !card.querySelector("table")) card = card.parentElement;
+  const card = cardDosHabitos();
   if (!card) return null;
   const hoje = DIAS_DA_ROTINA[(agora.getDay() + 6) % 7];
   const linha = Array.from(card.querySelectorAll("tbody tr")).find((tr) => (tr.querySelector("td")?.textContent ?? "").trim().toUpperCase() === hoje);
@@ -129,35 +134,27 @@ export function quadradinhoDeHoje(indice: number, agora: Date = new Date()): HTM
 }
 
 /**
- * O recorte do anel: do NOME do hábito (o cabeçalho da coluna) até o quadradinho de hoje — o nome fica legível
- * dentro do anel e o quadradinho de hoje é a ponta de baixo, colada no post-it. Sem cabeçalho, só a célula.
+ * O recorte do anel: SÓ o quadradinho de hoje (o checkbox da célula), num quadrado justo em volta dele — o
+ * anel não abraça outro dia nem outro hábito. Sem tamanho (âncora invisível), devolve o tamanho zero: o anel
+ * sai e o post-it fica solto.
  */
-export function recorteDaColuna(celula: Element): { top: number; left: number; width: number; height: number; bottom: number } {
-  const r = celula.getBoundingClientRect();
-  const linha = celula.parentElement;
-  const tabela = celula.closest("table");
-  const indice = linha ? Array.prototype.indexOf.call(linha.children, celula) : -1;
-  const cab = indice >= 0 ? tabela?.querySelector("thead tr")?.children[indice] : null;
-  const c = cab?.getBoundingClientRect();
-  if (!c || c.width < 8 || c.top > r.top) return { top: r.top, left: r.left, width: r.width, height: r.height, bottom: r.bottom };
-  return { top: c.top, left: Math.min(c.left, r.left), width: Math.max(c.right, r.right) - Math.min(c.left, r.left), height: r.bottom - c.top, bottom: r.bottom };
+export function recorteDoQuadradinho(celula: Element): { top: number; left: number; width: number; height: number; bottom: number } {
+  const caixa = celula.querySelector('[role="checkbox"]') ?? celula;
+  const r = caixa.getBoundingClientRect();
+  if (r.width < 4 || r.height < 4) return { top: r.top, left: r.left, width: r.width, height: r.height, bottom: r.bottom };
+  const lado = Math.max(28, Math.max(r.width, r.height) + 12);
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  return { top: cy - lado / 2, left: cx - lado / 2, width: lado, height: lado, bottom: cy + lado / 2 };
 }
 
-/** Algum hábito marcado HOJE (a mesma regra da tabela: grade desta semana, senão o log por data). */
-const algumMarcadoHoje = (get: <T>(k: string, f: T) => T): boolean => {
-  const nomes = nomesDosHabitos(get<unknown>("rotina-habits", []));
-  if (!nomes.length) return false;
-  const hoje = localDayKey();
-  const checked = get<unknown>("rotina-habits-checked", {});
-  const log = get<unknown>("rotina-habit-log", {});
-  return marcadosDoDia({
-    nomes,
-    checked: (checked && typeof checked === "object" ? checked : {}) as Record<string, boolean[]>,
-    semana: String(get<unknown>("rotina-habits-week", "") ?? ""),
-    habitLog: (log && typeof log === "object" ? log : {}) as Record<string, string[]>,
-    dia: hoje,
-    hoje,
-  }).some(Boolean);
+/** A célula é a do guia: a linha de HOJE, na coluna do 1º hábito (conferido pela posição, não pelo nó —
+ *  trocar de aba e voltar redesenha a tabela). */
+export const ehACelulaDoGuia = (celula: Element, indice: number, agora: Date = new Date()): boolean => {
+  const linha = celula.parentElement;
+  if (!linha) return false;
+  const dia = (linha.querySelector("td")?.textContent ?? "").trim().toUpperCase();
+  return dia === DIAS_DA_ROTINA[(agora.getDay() + 6) % 7] && Array.prototype.indexOf.call(linha.children, celula) === 1 + indice;
 };
 
 export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, guiarPrimeiro = true, agora, esperaMs = 2200 }: PropsMontarRotina) {
@@ -508,8 +505,10 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
  * "MARCA O PRIMEIRO" — depois do "Montando", em cima da Rotina de verdade: o anel (o da missão, `Anel`,
  * no modo `fixo`: segue o alvo, toque fora só clareia o escuro) abraça o quadradinho de HOJE do 1º hábito,
  * com o post-it do dono. O toque no quadradinho é o toque normal da Rotina — a grade, o log e o heatmap
- * gravam como sempre (o dia entra na sequência); aqui só se escuta. Marcou qualquer hábito HOJE =
- * "Primeiro do dia ✓" (1,8 s) e sai. "Entendi" sai sem marcar (marcar depois também conta: o vigia da
+ * gravam como sempre (o dia entra na sequência); aqui só se escuta. Marcou O QUADRADINHO DO GUIA (hoje, na
+ * coluna do 1º hábito) = "Primeiro do dia ✓" (1,8 s) e sai. Enquanto o guia está na tela, o toque nos OUTROS
+ * quadradinhos da tabela (outro dia, outro hábito) é segurado — nada é marcado sem querer — e o post-it diz
+ * qual é o certo. "Entendi" sai sem marcar e devolve a tabela inteira (marcar depois também conta: o vigia da
  * Rotina, useVigiaDoPrimeiroMarcado). Sem a tabela na tela (fail-open): o post-it fica solto no alto.
  */
 function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
@@ -521,10 +520,17 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
   const [alvo, setAlvo] = useState<Element | null>(null);
   const [procurando, setProcurando] = useState(true);
   const [feito, setFeito] = useState(false);
+  // tocou num quadradinho que não é o do guia (outro dia/hábito): o toque foi segurado e o post-it explica
+  const [segurou, setSegurou] = useState(false);
   const acabou = useRef(false);
   const achou = useRef(false);
   const timers = useRef<number[]>([]);
   useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); }, []);
+  // a coluna do 1º hábito (normalmente a 1ª), lida UMA vez
+  const [indice] = useState(() => {
+    const nomes = nomesDosHabitos(get<unknown>("rotina-habits", []));
+    return Math.max(0, primeiro ? nomes.findIndex((n) => n.toLowerCase() === primeiro.nome.toLowerCase()) : 0);
+  });
 
   const fim = (acao: "marcou" | "entendi" | "tempo" | "segundo_plano") => {
     if (acabou.current) return;
@@ -535,8 +541,6 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
 
   // o alvo: a tabela redesenha logo depois da gravação (a Rotina adota o dado no microtask seguinte)
   useEffect(() => {
-    const nomes = nomesDosHabitos(get<unknown>("rotina-habits", []));
-    const indice = Math.max(0, primeiro ? nomes.findIndex((n) => n.toLowerCase() === primeiro.nome.toLowerCase()) : 0);
     let tentativas = 0;
     const tentar = () => {
       if (acabou.current) return;
@@ -551,8 +555,33 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // marcou um quadradinho de hoje (pelo toque normal da Rotina)
-  const marcou = algumMarcadoHoje(get);
+  // marcou O quadradinho do guia (pelo toque normal da Rotina); outro hábito ou outro dia não é a marca guiada
+  const marcou = primeiroMarcadoHoje({
+    habitos: get<unknown>("rotina-habits", []), checked: get<unknown>("rotina-habits-checked", {}), semana: get<unknown>("rotina-habits-week", ""),
+    habitLog: get<unknown>("rotina-habit-log", {}), indice, hoje: localDayKey(),
+  });
+
+  /* Os OUTROS quadradinhos da tabela ficam segurados enquanto o guia está na tela: um toque um pouco ao lado
+     (sexta em cima, o hábito do lado) não marca nada sem querer. Escuta na fase de captura do documento, antes
+     do React: o clique não chega no checkbox. Só checkbox da tabela HÁBITOS DIÁRIOS; rolar, trocar de aba e o
+     resto da tela seguem livres. Sai junto com o guia. */
+  useEffect(() => {
+    if (feito) return;
+    const aoClicar = (e: MouseEvent) => {
+      if (acabou.current) return;
+      const caixa = e.target instanceof Element ? e.target.closest('[role="checkbox"]') : null;
+      const celula = caixa?.closest("td");
+      if (!caixa || !celula || !cardDosHabitos()?.contains(celula)) return;
+      if (ehACelulaDoGuia(celula, indice)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setSegurou(true);
+      timers.current.push(window.setTimeout(() => setSegurou(false), 3500));
+    };
+    document.addEventListener("click", aoClicar, true);
+    return () => document.removeEventListener("click", aoClicar, true);
+  }, [feito, indice]);
+
   useEffect(() => {
     if (!marcou || feito || acabou.current) return;
     setFeito(true);
@@ -567,6 +596,11 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
 
   const item = primeiro ? itemDe(primeiro.id) : null;
   const diaDeHoje = DIAS_DA_ROTINA[(new Date().getDay() + 6) % 7].toLowerCase();
+  const naColuna = primeiro ? `, na coluna de ${primeiro.nome}` : "";
+  // com o anel, o destaque já mostra a coluna; solto (sem anel), a frase diz
+  const dica = segurou ? `Esse não. É o quadradinho de hoje, ${diaDeHoje}${naColuna}.`
+    : alvo ? `É o quadradinho de hoje, ${diaDeHoje}.`
+    : `É o quadradinho de hoje, ${diaDeHoje}${naColuna}.`;
   const postIt = (
     <div className="mrt-postit" data-testid="montar-rotina-postit" {...(feito ? { "data-feito": "" } : {})}>
       <span className="mrt-postit-fita" aria-hidden />
@@ -585,7 +619,7 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
             {primeiro && item && (
               <span className="mrt-postit-item"><span aria-hidden>{item.emoji}</span>{primeiro.nome}<em>· {horaFalada(minutosDe(primeiro.hora))}</em></span>
             )}
-            {alvo && <span className="mrt-postit-dica">É o quadradinho de hoje, {diaDeHoje}.</span>}
+            <span className="mrt-postit-dica" {...(segurou ? { "data-segurou": "" } : {})}>{dica}</span>
             <div className="mrt-postit-acoes">
               <button type="button" className="mrt-postit-ok" onClick={() => fim("entendi")}>Entendi</button>
             </div>
@@ -598,7 +632,7 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
   if (alvo) {
     return (
       <Anel
-        fixo interativo abaixo alvo={alvo} recorte={recorteDaColuna} duracao={DURACAO_DO_GUIA_MS} testid="montar-rotina-anel"
+        fixo interativo abaixo alvo={alvo} recorte={recorteDoQuadradinho} duracao={DURACAO_DO_GUIA_MS} testid="montar-rotina-anel"
         aoSair={(motivo) => {
           // a âncora sumiu (trocou de aba, a tabela redesenhou): o post-it fica, solto
           if (motivo === "ancora_invisivel") { setAlvo(null); return; }

@@ -224,8 +224,10 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     const album = screen.getByTestId("cn-album");
     expect(album.lastElementChild).toBe(screen.getByTestId("cn-album-abrir"));
     // sem o eyebrow e sem "coladas" visíveis (ficam pro leitor de tela); o cabeçalho com o troféu de sempre; a ação num chip "Hoje: …"
-    expect(album.querySelector("#cn-titulo-album")?.className).toContain("sr-only"); // o eyebrow só pro leitor de tela (a capa já diz)
-    expect(screen.getByTestId("cn-album-contagem").textContent?.trim()).toBe("4 de 68");
+    // (dono 17/10, 2ª rodada) o eyebrow rosa "Álbum de figurinhas" e o "coladas" ficam — "textos que informam e são simples"
+    expect(album.querySelector("#cn-titulo-album")?.className).toContain("cn-caps");
+    expect(album.querySelector("#cn-titulo-album")?.textContent).toBe("Álbum de figurinhas");
+    expect(screen.getByTestId("cn-album-contagem").textContent?.replace(/\s+/g, " ").trim()).toBe("4 de 68 coladas");
     expect(screen.getByTestId("cn-album-contagem").getAttribute("aria-label")).toBe("4 de 68 figurinhas coladas");
     expect(document.querySelector("header svg.lucide-trophy")).toBeTruthy();
     expect(document.querySelector("header [data-fogo]")).toBeNull();

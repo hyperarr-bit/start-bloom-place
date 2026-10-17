@@ -1,9 +1,12 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip, Stethoscope } from "lucide-react";
+import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip } from "lucide-react";
 import { AnexosDeSaude } from "./AnexosDeSaude";
-import { caminhoEhPdf } from "@/lib/image-upload";
+import { CampoResumo, CamposPedidoPor, ChipsDePasta, ResumoExpansivel } from "./campos-saude";
+import { DocumentosDeSaude } from "./DocumentosDeSaude";
+import { PastasDeSaude } from "./PastasDeSaude";
+import { normalizarDocumentos, type Documento } from "@/lib/saude-documentos";
 import { toast } from "sonner";
 import { avisarApagado } from "@/lib/desfazer";
 import { isNativeShell } from "@/lib/native-shell";
@@ -19,10 +22,7 @@ import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
 import { reagendarTudo, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 import { CHAVE_AVISO_CONSULTAS, CHAVE_CONSULTAS, momentosDoAviso, rotuloDoAviso } from "@/lib/consulta-avisos";
-import {
-  ESPECIALIDADES_COMUNS, TODOS, aoEscolherMedico, chaveMedico, medicosConhecidos, naPasta, pastasDosExames, rotuloMedico,
-  type MedicoConhecido,
-} from "@/lib/saude-medicos";
+import { TODOS, chaveMedico, medicosConhecidos, naPasta, pastasDosExames, rotuloMedico } from "@/lib/saude-medicos";
 
 interface Appointment {
   id: string;
@@ -57,23 +57,8 @@ interface Exam {
   resumo?: string;
 }
 
-/** Receita, laudo, atestado, carteirinha: o que a pessoa precisa achar na
- *  hora da consulta (11/09, pedido de cliente). Foto + data + nota; nada de
- *  campo obrigatório além do título. */
-interface Documento {
-  id: string;
-  tipo: "receita" | "laudo" | "atestado" | "outro";
-  titulo: string;
-  date: string;
-  notes: string;
-  fotos: string[];
-}
-const TIPOS_DOC: { id: Documento["tipo"]; rotulo: string; emoji: string }[] = [
-  { id: "receita", rotulo: "Receita", emoji: "💊" },
-  { id: "laudo", rotulo: "Laudo", emoji: "🧾" },
-  { id: "atestado", rotulo: "Atestado", emoji: "📄" },
-  { id: "outro", rotulo: "Outro", emoji: "📎" },
-];
+/* Documento (receita, laudo, exame, atestado, vacina…): tipo e regras de
+   compatibilidade em lib/saude-documentos; tela em DocumentosDeSaude. */
 
 interface Biomarker {
   id: string;
@@ -163,98 +148,14 @@ const limparOpcionais = (r: RascunhoExame): RascunhoExame => {
   };
 };
 
-/**
- * "Pedido por" no formulário do exame (novo e edição): médico com sugestão dos
- * que já apareceram em consultas e exames, e especialidade com as mais comuns.
- * Escolher um médico conhecido preenche a especialidade (aoEscolherMedico).
- */
-const CamposPedidoPor = ({ valor, onChange, conhecidos, idBase }: {
-  valor: { medico?: string; especialidade?: string };
-  onChange: (v: { medico: string; especialidade: string }) => void;
-  conhecidos: MedicoConhecido[];
-  idBase: string;
-}) => {
-  const especialidades = useMemo(() => {
-    const extras = conhecidos.map(m => m.especialidade).filter(Boolean);
-    return [...new Set([...ESPECIALIDADES_COMUNS, ...extras])];
-  }, [conhecidos]);
-  return (
-    <div className="grid gap-1.5" data-testid="pedido-por">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-        <Stethoscope className="w-3 h-3" /> Pedido por <span className="font-normal normal-case tracking-normal">(opcional)</span>
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          value={valor.medico ?? ""}
-          onChange={ev => onChange(aoEscolherMedico(valor, ev.target.value, conhecidos))}
-          placeholder="Médico (ex: Dr. Hélio)"
-          aria-label="Médico que pediu o exame"
-          list={`${idBase}-medicos`}
-          className="text-xs h-9"
-        />
-        <Input
-          value={valor.especialidade ?? ""}
-          onChange={ev => onChange({ medico: valor.medico ?? "", especialidade: ev.target.value })}
-          placeholder="Especialidade"
-          aria-label="Especialidade do médico"
-          list={`${idBase}-especialidades`}
-          className="text-xs h-9"
-        />
-      </div>
-      <datalist id={`${idBase}-medicos`}>
-        {conhecidos.map(m => <option key={m.nome} value={m.nome}>{m.especialidade}</option>)}
-      </datalist>
-      <datalist id={`${idBase}-especialidades`}>
-        {especialidades.map(e => <option key={e} value={e} />)}
-      </datalist>
-    </div>
-  );
-};
-
-/** Campo do resumo no formulário, com rótulo: preenchido, o placeholder some e
- *  a pessoa não saberia mais que aquilo é o que aparece na lista. */
-const CampoResumo = ({ valor, onChange }: { valor: string; onChange: (v: string) => void }) => (
-  <div className="grid gap-1.5">
-    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-      📄 Resumo do resultado <span className="font-normal normal-case tracking-normal">(aparece na lista)</span>
-    </p>
-    <Textarea value={valor} onChange={ev => onChange(ev.target.value)} placeholder="Ex: Ressonância normal, sem alterações. Vitamina D 24 (baixa)." aria-label="Resumo do resultado" className="text-xs min-h-[60px]" />
-  </div>
-);
-
-/** Resumo do resultado embaixo do exame: 3 linhas, toque abre o texto inteiro. */
-const ResumoDoExame = ({ texto, nome }: { texto: string; nome: string }) => {
-  const [aberto, setAberto] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => setAberto(!aberto)}
-      aria-expanded={aberto}
-      aria-label={`${aberto ? "Recolher" : "Ler"} resumo de ${nome}`}
-      className="w-full text-left rounded-lg bg-muted/60 px-2.5 py-1.5"
-      data-testid="exame-resumo"
-    >
-      {/* `block` e `line-clamp-3` brigam pelo display (o clamp precisa de -webkit-box) */}
-      <span className={`text-[11px] leading-snug text-foreground/80 whitespace-pre-wrap ${aberto ? "block" : "line-clamp-3"}`}>
-        {texto}
-      </span>
-    </button>
-  );
-};
-
 export const MedicalLog = () => {
   const [appointments, setAppointments] = usePersistedState<Appointment[]>("core-saude-appointments", []);
   const [exams, setExams] = usePersistedState<Exam[]>("core-saude-exams-v2", []);
-  const [documentos, setDocumentos] = usePersistedState<Documento[]>("core-saude-documentos", []);
-  const [showDocForm, setShowDocForm] = useState(false);
-  const [novoDoc, setNovoDoc] = useState<Omit<Documento, "id">>({ tipo: "receita", titulo: "", date: localDayKey(), notes: "", fotos: [] });
-  const [docAberto, setDocAberto] = useState<string | null>(null);
-  const addDocumento = () => {
-    if (!novoDoc.titulo.trim()) return;
-    setDocumentos(prev => [...prev, { ...novoDoc, titulo: novoDoc.titulo.trim(), id: Date.now().toString() }]);
-    setNovoDoc({ tipo: "receita", titulo: "", date: localDayKey(), notes: "", fotos: [] });
-    setShowDocForm(false);
-  };
+  const [documentosGravados, setDocumentos] = usePersistedState<Documento[]>("core-saude-documentos", []);
+  // leitura defensiva: dado de versão antiga/servidor nunca derruba a tela (só exibe; não regrava)
+  const documentos = useMemo(() => normalizarDocumentos(documentosGravados), [documentosGravados]);
+  const fotosDoDocumento = (id: string, fotos: string[]) =>
+    setDocumentos(prev => (Array.isArray(prev) ? prev : []).map(d => String(d?.id) === id ? { ...d, fotos } : d));
   const fotosDoExame = (id: string, fotos: string[]) => setExams(prev => prev.map(e => e.id === id ? { ...e, fotos } : e));
   const [biomarkers, setBiomarkers] = usePersistedState<Biomarker[]>("core-saude-biomarkers", []);
   const [showApptForm, setShowApptForm] = useState(false);
@@ -543,7 +444,7 @@ export const MedicalLog = () => {
 
   /* PASTA DO MÉDICO (13/10): chips no topo da lista filtram os exames por quem
      pediu. É só filtro de tela — o dado continua uma lista só. */
-  const conhecidos = useMemo(() => medicosConhecidos(appointments, exams), [appointments, exams]);
+  const conhecidos = useMemo(() => medicosConhecidos(appointments, exams, documentos), [appointments, exams, documentos]);
   const pastas = useMemo(() => pastasDosExames(exams), [exams]);
   const [pasta, setPasta] = useState<string>(TODOS);
   // a pasta escolhida sumiu (apagou o último exame do médico): volta pra Todos
@@ -795,16 +696,8 @@ export const MedicalLog = () => {
         </div>
 
         {pastas.length > 0 && (
-          <div className="px-4 pb-3 -mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Exames por médico" data-testid="pastas-medico">
-            {[{ chave: TODOS, rotulo: "Todos", total: exams.length }, ...pastas].map(p => {
-              const ativo = pastaValida === p.chave;
-              return (
-                <button key={p.chave} type="button" onClick={() => setPasta(p.chave)} aria-pressed={ativo}
-                  className={`shrink-0 h-8 px-3 rounded-full border text-[11px] font-semibold whitespace-nowrap transition-colors ${ativo ? "bg-foreground text-background border-foreground" : "bg-card border-border text-muted-foreground hover:bg-muted/60"}`}>
-                  {p.chave !== TODOS && p.rotulo !== "Sem médico" && "🩺 "}{p.rotulo} <span className={ativo ? "opacity-70" : "opacity-60"}>{p.total}</span>
-                </button>
-              );
-            })}
+          <div className="px-4 pb-3 -mt-1">
+            <ChipsDePasta pastas={pastas} total={exams.length} ativa={pastaValida} onEscolher={setPasta} rotulo="Exames por médico" testId="pastas-medico" />
           </div>
         )}
         {exams.length > 0 ? (
@@ -928,7 +821,7 @@ export const MedicalLog = () => {
                     <tr data-testid="exame-detalhe">
                       <td colSpan={3} className="pl-3 pr-3 pb-3 pt-0">
                         <div className="space-y-2">
-                          {e.resumo?.trim() && <ResumoDoExame texto={e.resumo.trim()} nome={e.name} />}
+                          {e.resumo?.trim() && <ResumoExpansivel texto={e.resumo.trim()} nome={e.name} />}
                           {expandedExam === e.id && (
                             <>
                               {e.notes && (
@@ -967,71 +860,22 @@ export const MedicalLog = () => {
         )}
       </div>
 
-      {/* ── DOCUMENTOS (11/09): receita, laudo, atestado — foto + data + nota ── */}
-      <div className="rounded-2xl border border-border overflow-hidden bg-card">
-        <div className="bg-amber-200 dark:bg-amber-900/40 px-5 py-4 flex items-center justify-between">
-          <h3 className="text-base font-black uppercase tracking-wide text-foreground">Documentos</h3>
-          <span className="text-3xl">🗂️</span>
-        </div>
-        <div className="p-4 space-y-3">
-          <button onClick={() => setShowDocForm(!showDocForm)}
-            className="w-full h-10 rounded-xl border border-dashed border-border text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5 hover:bg-muted/40 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> {showDocForm ? "Fechar" : "Guardar receita, laudo ou atestado"}
-          </button>
-          {showDocForm && (
-            <div className="grid gap-2 p-3 rounded-xl bg-muted/40" data-testid="form-documento">
-              <div className="flex gap-1.5 flex-wrap">
-                {TIPOS_DOC.map(t => (
-                  <button key={t.id} type="button" onClick={() => setNovoDoc({ ...novoDoc, tipo: t.id })}
-                    className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors ${novoDoc.tipo === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}>
-                    {t.emoji} {t.rotulo}
-                  </button>
-                ))}
-              </div>
-              <Input value={novoDoc.titulo} onChange={e => setNovoDoc({ ...novoDoc, titulo: e.target.value })} placeholder="Título (ex: Receita da Dra. Ana, Laudo do raio-X)" aria-label="Título do documento" className="text-xs h-9" />
-              <CampoData rotulo="Data" value={novoDoc.date} onChange={e => setNovoDoc({ ...novoDoc, date: e.target.value })} className="text-xs h-9" />
-              <Textarea value={novoDoc.notes} onChange={e => setNovoDoc({ ...novoDoc, notes: e.target.value })} placeholder="Notas (posologia, validade, o que o médico disse…)" className="text-xs min-h-[60px]" />
-              <AnexosDeSaude caminhos={novoDoc.fotos} onChange={fotos => setNovoDoc({ ...novoDoc, fotos })} rotulo="documento novo" />
-              <button onClick={addDocumento} disabled={!novoDoc.titulo.trim()}
-                className="h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50">
-                <Check className="w-3.5 h-3.5" /> Guardar
-              </button>
-            </div>
-          )}
-          {documentos.length === 0 && !showDocForm && (
-            <p className="text-xs text-muted-foreground text-center py-2">Receitas e laudos ficam aqui, com foto, pra achar na hora da consulta.</p>
-          )}
-          {[...documentos].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(d => {
-            const tipo = TIPOS_DOC.find(t => t.id === d.tipo) ?? TIPOS_DOC[3];
-            const aberto = docAberto === d.id;
-            return (
-              <div key={d.id} className="rounded-xl border border-border bg-card" data-testid="documento">
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <span className="text-lg">{tipo.emoji}</span>
-                  <button type="button" onClick={() => setDocAberto(aberto ? null : d.id)} className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-bold truncate">{d.titulo}</p>
-                    <p className="text-[10px] text-muted-foreground">{tipo.rotulo}{d.date ? ` · ${mostrarDia(d.date)}` : ""}{d.fotos.length ? ` · ${d.fotos.length} ${d.fotos.some(caminhoEhPdf) ? "anexo" : "foto"}${d.fotos.length > 1 ? "s" : ""}` : ""}</p>
-                  </button>
-                  <button onClick={() => setDocAberto(aberto ? null : d.id)} aria-label={`Abrir ${d.titulo}`}
-                    className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                    <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`} />
-                  </button>
-                  <button onClick={() => apagarComDesfazer(documentos, setDocumentos, d.id, "Documento apagado")} aria-label={`Apagar ${d.titulo}`}
-                    className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
-                  </button>
-                </div>
-                {aberto && (
-                  <div className="px-3 pb-3 space-y-2">
-                    {d.notes && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{d.notes}</p>}
-                    <AnexosDeSaude caminhos={d.fotos} onChange={fotos => setDocumentos(prev => prev.map(x => x.id === d.id ? { ...x, fotos } : x))} rotulo={d.titulo} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* ── DOCUMENTOS (11/09; 16/10 com médico, resumo e pastas) ── */}
+      <DocumentosDeSaude
+        documentos={documentos}
+        setDocumentos={setDocumentos}
+        conhecidos={conhecidos}
+        onApagar={(id, texto) => apagarComDesfazer(documentosGravados, setDocumentos, id, texto)}
+      />
+
+      {/* ── PASTAS (16/10): tudo de cada médico/especialidade junto ── */}
+      <PastasDeSaude
+        consultas={appointments}
+        exames={exams}
+        documentos={documentos}
+        onFotosExame={fotosDoExame}
+        onFotosDocumento={fotosDoDocumento}
+      />
 
       {/* ── BIOMARCADORES ── */}
       <div className="rounded-2xl border border-border overflow-hidden bg-card">

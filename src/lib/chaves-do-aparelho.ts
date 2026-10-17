@@ -93,6 +93,11 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
+  "core-intro-vista-", // "já vi a intro" de cada módulo (16/10, lib/intro-modulo): terminou, feita ou pulada
+  "core-intro-aberta-", // a intro do módulo já APARECEU neste aparelho (fechou o app no meio): a 2ª aparição é a última
+  "core-conhecer-feito-", // o passeio "Conhecer mais" do módulo foi feito neste aparelho (17/10, lib/conhecer-mais)
+  "core-conhecer-lembrete-", // o lembrete do passeio (3ª abertura) já apareceu: nunca mais sozinho
+  "core-conhecer-aberturas-", // quantas vezes o módulo foi aberto neste aparelho (o lembrete é na 3ª)
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */
@@ -115,6 +120,9 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   conta: [
     "core-all-modules-celebrated", "core-onboarding-done", "core-onboarding-reset-v2", "core-user-name",
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
+    "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
+    "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
+    "core-conhecer-feitos", // lista de módulos com o passeio "Conhecer mais" feito nesta conta (lib/conhecer-mais)
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",

@@ -776,8 +776,8 @@ export const Dashboard = ({
           </div>
         </div>
 
-        {/* Quanto Posso Gastar Hoje */}
-        <div className={`rounded-lg border p-4 ${
+        {/* Quanto Posso Gastar Hoje — data-missao: o "olha" da intro do módulo (lib/intro-modulo) mira ESTE card */}
+        <div data-missao="posso-gastar" className={`rounded-lg border p-4 ${
           dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
           dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
           "bg-red-500/5 border-red-500/20"

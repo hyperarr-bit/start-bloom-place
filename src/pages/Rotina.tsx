@@ -30,6 +30,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { useUserData } from "@/hooks/use-user-data";
@@ -687,7 +688,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog, streakL
         </div>
         <div className="flex items-center gap-1 text-white">
           <Flame className="w-3 h-3" />
-          <span className="text-xs font-bold">{streak} dias seguidos</span>
+          <span className="text-xs font-bold">{streak} {streak === 1 ? "dia seguido" : "dias seguidos"}</span>
         </div>
       </div>
       <div className="p-4">
@@ -1366,7 +1367,7 @@ const Rotina = () => {
           <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs">{currentMonth}</span>
-            <ThemeToggle />
+            <AcessoConhecerMais moduleId="rotina" /><ThemeToggle />
           </div>
         </div>
         {/* Barra de abas com "ocultar" (segurar a aba ou o ⋯ no fim) — mesma

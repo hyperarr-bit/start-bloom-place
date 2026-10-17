@@ -52,12 +52,18 @@
 .cn-b-stat span { font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .cn-acao { white-space: nowrap; border-radius: 6px; background: #fef3c7; color: #713f12; font-weight: 700; padding: 1px 7px; }
 .dark .cn-acao { background: #3a3214; color: #f3dc9a; }
+/* (17/10) a ação do dia num chip só: "Hoje: marque um hábito"; feito: "Hoje garantido ✓" */
+.cn-acao-chip { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cn-seq-feito { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; font-weight: 700; background: hsl(var(--success) / .12); color: hsl(var(--success)); margin: 0; }
+/* o link discreto da grade (no lugar do card "PÁGINAS DO ÁLBUM") */
+.cn-ver-todos { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 36px; font-size: 12px; font-weight: 700; color: hsl(var(--muted-foreground)); }
 
 /* ---------- o ÁLBUM (herói): capa grande, pacotinho, "faltam N pra completar a página" ---------- */
 .cn-album { padding: 14px 14px 12px; }
 /* o eyebrow do álbum cabe numa linha ao lado da capa até no iPhone SE (375) */
 .cn-album .cn-caps { font-size: 10.5px; letter-spacing: .1em; }
-.cn-album-corpo { display: grid; grid-template-columns: 142px 1fr; gap: 0 14px; align-items: start; }
+/* (17/10) com menos texto à direita, o bloco "19 de 68 + barra + pacotinho" fica centralizado na altura da capa */
+.cn-album-corpo { display: grid; grid-template-columns: 142px 1fr; gap: 0 14px; align-items: center; }
 .cn-album-capa { position: relative; display: block; text-align: left; transform: rotate(-3deg); transform-origin: 50% 60%; transition: transform .22s cubic-bezier(.34, 1.4, .64, 1), filter .22s; -webkit-tap-highlight-color: transparent; }
 .cn-album-capa:active { transform: rotate(-1deg) scale(.985); }
 /* o toque LEVANTA a capa da mesa (260 ms) antes de o livro abrir */
@@ -66,8 +72,7 @@
 .cn-album-selo b { font-size: 12px; }
 .cn-album-pacote { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 6px 10px 6px 6px; border-radius: 12px; border: 1px dashed #e0438f; background: linear-gradient(90deg, rgba(210, 45, 128, .08), rgba(255, 211, 110, .12)); width: 100%; }
 .cn-album-pacote-fig { width: 26px; height: 34px; border-radius: 4px; background: repeating-linear-gradient(135deg, #e0438f 0 4px, #ffd36e 4px 8px, #6ec8ff 8px 12px, #b98bff 12px 16px); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6), 0 2px 4px rgba(0, 0, 0, .2); transform: rotate(-8deg); flex-shrink: 0; }
-.cn-album-amanha { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 7px 10px; border-radius: 12px; background: hsl(var(--muted) / .6); border: 1px dashed hsl(var(--border)); }
-.cn-album-abrir { margin-top: 10px; width: 100%; height: 44px; border-radius: 12px; background: hsl(var(--foreground)); color: hsl(var(--background)); font-weight: 800; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: transform .12s; }
+.cn-album-abrir { margin-top: 12px; width: 100%; height: 44px; border-radius: 12px; background: hsl(var(--foreground)); color: hsl(var(--background)); font-weight: 800; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: transform .12s; }
 .cn-album-abrir:active { transform: scale(.99); }
 
 /* ---------- a trilha ---------- */
@@ -86,15 +91,7 @@
 .cn-trilha-quando { font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .cn-trilha-no[data-proximo] .cn-trilha-quando { color: hsl(var(--accent)); }
 
-/* ---------- por módulo (secundário) + chips + grade (ver todos) ---------- */
-.cn-modulos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.cn-modulo { display: flex; align-items: center; gap: 7px; min-width: 0; height: 46px; padding: 0 10px 0 9px; border-radius: 12px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); text-align: left; }
-.cn-modulo[data-completa] { border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .06); }
-.cn-modulo-icone { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-style: normal; color: #fff; flex-shrink: 0; }
-.cn-modulo[data-rar="lendario"] .cn-modulo-icone { background: linear-gradient(180deg, #f1d070, #b8860b); color: #4a3305; }
-.cn-modulo[data-rar="epico"] .cn-modulo-icone { background: linear-gradient(180deg, #c4a6ff, #6ec8ff); color: #2b2b2f; }
-.cn-modulo[data-rar="raro"] .cn-modulo-icone { background: linear-gradient(180deg, #4f8ff7, #1d4ed8); }
-.cn-modulo[data-rar="comum"] .cn-modulo-icone { background: linear-gradient(180deg, #8a8580, #57534e); }
+/* ---------- chips + grade (ver todos, secundário) ---------- */
 .cn-b-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 10px; }
 .cn-b-chips::-webkit-scrollbar { display: none; }
 .cn-b-chip { flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }

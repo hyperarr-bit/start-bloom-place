@@ -113,20 +113,25 @@ describe("registro do dia anotado", () => {
     expect(gravacoesDaLista()).toHaveLength(0);
   });
 
-  it("escrita ANTES do servidor responder não grava a lista (apagaria o histórico do servidor)", async () => {
+  it("escrita ANTES do servidor responder não grava a lista em cima do vazio; quando a conta chega, hoje entra POR CIMA da lista do servidor (17/10)", async () => {
     let soltar!: () => void;
     segurarServidor = new Promise<void>((ok) => { soltar = ok; });
     linhasDoServidor = [{ key: CHAVE_DIAS_ANOTADOS, value: ["2026-09-20", "2026-09-25"] }];
     render(<UserDataProvider><Sonda /></UserDataProvider>);
     act(() => api.set("finance-expenses", [{ id: 9 }]));
+    await passaDebounce();
+    expect(gravacoesDaLista()).toHaveLength(0); // sem a lista do servidor, nada é gravado
     await act(async () => { soltar(); });
     await waitFor(() => expect(api.loaded).toBe(true));
     await passaDebounce();
-    expect(gravacoesDaLista()).toHaveLength(0);
-    expect(lista()).toEqual(["2026-09-20", "2026-09-25"]);
-    // a próxima anotação do dia registra normalmente
+    // revisão 17/10: a anotação feita antes da conta chegar conta o dia — uma gravação, com o histórico inteiro
+    expect(gravacoesDaLista()).toHaveLength(1);
+    expect(gravacoesDaLista()[0].value).toEqual(["2026-09-20", "2026-09-25", "2026-09-26"]);
+    expect(lista()).toEqual(["2026-09-20", "2026-09-25", "2026-09-26"]);
+    // a próxima anotação do dia não regrava
     act(() => api.set("finance-expenses", [{ id: 9 }, { id: 10 }]));
-    await waitFor(() => expect(lista()).toEqual(["2026-09-20", "2026-09-25", "2026-09-26"]));
+    await passaDebounce();
+    expect(gravacoesDaLista()).toHaveLength(1);
   });
 
   it("migração: sem lista, a 1ª anotação semeia a sequência do hub e soma hoje", async () => {

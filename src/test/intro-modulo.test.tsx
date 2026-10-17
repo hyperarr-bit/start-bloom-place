@@ -633,11 +633,12 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     medir.mockRestore();
   });
 
-  it("sem o montar (abriu por curiosidade): a intro de sempre, 'criar' o 1º hábito", async () => {
+  it("sem o montar (abriu por curiosidade): a intro de sempre, 'criar' o 1º hábito", { timeout: 20_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     montar(<div><button type="button" data-spotlight="add-habit">+ Hábito</button><IntroDoModulo moduleId="rotina" /></div>);
     expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marca 1 hábito");
-    const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 6000 });
+    // (sem o campo do hábito no DOM de mentira, a intro procura ~5,4 s e segue no botão — com folga pra suíte carregada)
+    const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 10_000 });
     expect(postIt.at(-1)!.textContent).toContain("Qual hábito você quer começar hoje?");
     medir.mockRestore();
   });

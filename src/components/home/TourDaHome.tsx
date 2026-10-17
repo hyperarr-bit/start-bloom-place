@@ -155,6 +155,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   const [alturaBalao, setAlturaBalao] = useState(0);
   /** "✓ Pronto!" (600 ms) depois de uma ação feita — o passo já avançou por baixo */
   const [pronto, setPronto] = useState(false);
+  /** 17/10: o relógio do "✓ Pronto!" — desligado ao desmontar (antes disparava com o tour já fora da tela) */
+  const timerPronto = useRef<number | null>(null);
+  useEffect(() => () => { if (timerPronto.current !== null) window.clearTimeout(timerPronto.current); }, []);
   /** uma folha/modal do app aberta (ex.: "Widgets da Home" pelo botão real): o tour se esconde e volta ao fechar */
   const [folhaAberta, setFolhaAberta] = useState(false);
   const widgetsAoEntrar = useRef(widgetsAtivos.length);
@@ -261,7 +264,11 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
     trackEvent("home_tour_passo", { indice: passo, total: TOTAL, acao, variante });
     setVerPontos(false);
     // ação feita (não "Continuar"/"Concluir"): ✓ Pronto! por 600 ms — o passo avança JÁ, o selo só confirma
-    if (acao !== "continuar" && acao !== "concluir" && acao !== "deixar") { setPronto(true); window.setTimeout(() => setPronto(false), PRONTO_MS); }
+    if (acao !== "continuar" && acao !== "concluir" && acao !== "deixar") {
+      setPronto(true);
+      if (timerPronto.current !== null) window.clearTimeout(timerPronto.current);
+      timerPronto.current = window.setTimeout(() => { timerPronto.current = null; setPronto(false); }, PRONTO_MS);
+    }
     if (passo >= TOTAL - 1) terminar();
     else setPasso((p) => p + 1);
   }, [passo, terminar]);

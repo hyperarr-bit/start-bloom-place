@@ -106,6 +106,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
      visível na tabela — mesma coreografia do ✓ da conta paga. */
   const [convite, setConvite] = useState<GastoDoConvite | null>(null);
   const aoPrimeiroGasto = (gasto: GastoDoConvite) => {
+    // 17/10 (teste sem rede no Android 132): antes de a conta chegar do servidor a lista de gastos
+    // está vazia na tela — um gasto feito nesse meio-tempo NÃO é o 1º da vida de quem já tem histórico
+    if (!userDataLoaded) return;
     if (!reservarConvitePrimeiroGasto(user?.id ?? null, gasto.id)) return;
     window.setTimeout(() => setConvite(gasto), 1200);
   };

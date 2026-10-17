@@ -4,7 +4,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { PERFIL_PESSOAL } from "@/lib/finance-perfil";
-import { fecharSemanaDoDesafio, gastosParaDesafio, lerDesafios, mondayOf } from "@/components/challenges/challenges";
+import { lerDesafios, mondayOf } from "@/components/challenges/challenges";
+import { montarDados } from "@/components/challenges/catalogo";
+import { fecharSemana } from "@/components/challenges/rodizio";
 
 export const CHAVE_DESAFIOS = "finance-challenges";
 
@@ -38,6 +40,10 @@ const useSemanaCorrente = () => {
  * components/challenges) e o resultado entra no histórico — que alimenta as
  * insígnias de desafio.
  *
+ * (17/10) O fechamento é o do rodízio (components/challenges/rodizio): desafio
+ * do catálogo novo (`active.nivel`) fecha com a trava de registro e o motivo;
+ * desafio escolhido pelo app antigo (sem `nivel`) fecha pela regra antiga.
+ *
  * Gravação de SISTEMA (`system: true`): não é gesto da pessoa — sem isso a
  * chave (que casa com /financ/) contaria como "1º lançamento" na ativação.
  * E avisa um card aberto com a mesma chave (avisarEscritaDeFora).
@@ -60,17 +66,19 @@ export const useFechamentoDoDesafio = () => {
     feitoPara.current = alvo;
     const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
     const antes = lerDesafios(bruto);
-    const novo = fecharSemanaDoDesafio(
+    const agora = new Date();
+    const novo = fecharSemana(
       antes,
-      (weekStart) => gastosParaDesafio((chave) => get<unknown>(chave, undefined), weekStart, perfil),
-      new Date(),
+      (weekStart, meta) => montarDados({ ler: (chave) => get<unknown>(chave, undefined), weekStart, perfil, hoje: agora, meta }),
+      agora,
     );
     if (!novo) return;
-    set(CHAVE_DESAFIOS, novo, { system: true });
-    avisarEscritaDeFora(CHAVE_DESAFIOS, novo);
-    if (novo.history.length > antes.history.length) {
-      const fechado = novo.history[novo.history.length - 1];
+    set(CHAVE_DESAFIOS, novo.estado, { system: true });
+    avisarEscritaDeFora(CHAVE_DESAFIOS, novo.estado);
+    const fechado = novo.registro;
+    if (fechado) {
       trackEvent(fechado.result === "win" ? "challenge_won" : "challenge_lost", { challenge: fechado.key, origem: "abertura" });
+      trackEvent("desafio_fechado", { key: fechado.key, venceu: fechado.result === "win", motivo: fechado.motivo ?? (fechado.result === "win" ? "cumpriu" : "nao-cumpriu"), nivel: fechado.nivel ?? null, origem: "abertura" });
     }
   }, [loaded, user?.id, semana, get, set]);
 };

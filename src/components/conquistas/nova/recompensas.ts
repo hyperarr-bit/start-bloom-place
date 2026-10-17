@@ -182,9 +182,9 @@ export const fraseDaPagina = (abertos: number, total: number): string => {
   if (faltam <= 0) return "Página completa — todas coladas.";
   return `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} nesta página`;
 };
-/** "Faltam 2 figurinhas na página das raras" (ou "na página 2 das raras") — a capa fala da página mais perto de fechar. */
+/** "Faltam 2 na página das raras" (ou "na página 2 das raras") — a capa fala da página mais perto de fechar (17/10: sem "figurinhas"). */
 export const fraseDaPaginaMaisPerto = (faltam: number, pagina: string, parte?: number): string =>
-  `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} na página ${parte ? `${parte} ` : ""}das ${pagina}`;
+  `${faltam === 1 ? "Falta 1" : `Faltam ${faltam}`} na página ${parte ? `${parte} ` : ""}das ${pagina}`;
 
 /* ------------------------------------------------------------------------- *
  * Medição — tudo com o prefixo `conquistas2_`

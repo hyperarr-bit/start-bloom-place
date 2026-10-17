@@ -12,6 +12,7 @@ import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
+import { guardarForcaDesafiosRodizio } from "@/lib/desafios-rodizio";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -27,6 +28,7 @@ void iniciarMedicaoDoAparelho();
 guardarForcaDaCobrancaV14();
 guardarForcaDaAvaliacaoV14();
 guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)
+guardarForcaDesafiosRodizio(); // `?desafios-rodizio=on|off|auto`: o rodízio dos desafios da semana neste navegador (QA)
 guardarForcaDasOfertas(); // `?ofertas-saida=…` em qualquer rota: o paywall enxuto mora no gate e no /planos, não só no funil
 
 // Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO

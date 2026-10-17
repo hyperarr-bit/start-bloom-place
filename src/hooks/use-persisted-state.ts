@@ -19,7 +19,8 @@ import { normalizeForKey } from "@/lib/data-normalizers";
  * escrita avisa as outras instâncias DA MESMA CHAVE (evento na window, fora do
  * render); quem escreveu ignora o próprio aviso e nada é regravado no store.
  */
-const EVENTO_MESMA_CHAVE = "core:persisted-state";
+/** O mesmo texto de EVENTO_TELAS_DA_CHAVE (use-user-data) — o teste dados-offline-guard confere. */
+export const EVENTO_MESMA_CHAVE = "core:persisted-state";
 type AvisoDeEscrita = { key: string; json: string; value: unknown; origem: symbol };
 
 /**
@@ -93,12 +94,18 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   }, [loaded]);
 
   const setPersistedState = useCallback((v: T | ((prev: T) => T)) => {
-    const next = typeof v === "function" ? (v as (prev: T) => T)(latestRef.current) : v;
+    // 16/10 (revisão 17/10): escrita feita antes de esta tela hidratar vai com o estado DE ONDE
+    // ela partiu — é a base que o use-user-data usa pra juntar a escrita segurada com o servidor
+    // (o vazio/padrão da abertura, ou o valor velho que a tela ainda mostrava quando a conta
+    // acabou de chegar). Depois de hidratada, a escrita sai como sempre.
+    const anterior = latestRef.current;
+    const next = typeof v === "function" ? (v as (prev: T) => T)(anterior) : v;
     const json = JSON.stringify(next);
     latestRef.current = next;
     lastWrittenJson.current = json;
     setState(next);
-    setData(key, next);
+    if (hydratedRef.current) setData(key, next);
+    else setData(key, next, { base: anterior });
     // fora da pilha atual: quem escreve pode estar no meio de um updater/render
     const aviso: AvisoDeEscrita = { key, json, value: next, origem: origem.current };
     queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));

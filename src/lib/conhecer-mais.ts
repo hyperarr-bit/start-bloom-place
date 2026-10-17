@@ -87,7 +87,7 @@ export const TOURS: Record<ModuloComTour, TourDoModulo> = {
     modulo: "saude", nome: "Saúde",
     paradas: [
       { id: "log-medico", aba: "LOG MÉDICO", nome: "log médico", titulo: "Log médico", texto: "Consultas, exames e documentos, com uma pasta por médico. O app avisa da consulta na véspera.", achar: () => cardPorTitulo(/^(Consultas|Marcar Consulta)$/i) },
-      { id: "remedios", aba: "HOJE", nome: "remédios com horário", titulo: "Vitaminas e remédios", texto: "Põe o remédio com o horário e marca quando tomar. No celular, o app lembra na hora.", achar: () => cardPorTitulo(/^Vitaminas e Rem[ée]dios$/i) },
+      { id: "remedios", aba: "HOJE", nome: "remédios", titulo: "Vitaminas e remédios", texto: "Põe o remédio com o horário e marca quando tomar. No celular, o app lembra na hora.", achar: () => cardPorTitulo(/^Vitaminas e Rem[ée]dios$/i) },
       { id: "evolucao", aba: "EVOLUÇÃO", nome: "evolução", titulo: "Evolução", texto: "Peso e medidas ao longo do tempo, num gráfico só. Anota uma vez por semana e vê a linha andar.", achar: () => cardPorTitulo(/^Progresso de Medidas$/i) ?? cardPorTitulo(/^Fotos de Progresso$/i) },
       { id: "sono", aba: "HOJE", nome: "sono", titulo: "Sono", texto: "Quantas horas você dormiu. Junto com a água, conta como foi o seu dia.", achar: () => cardPorTitulo(/^Sono$/i) },
     ],
@@ -95,14 +95,20 @@ export const TOURS: Record<ModuloComTour, TourDoModulo> = {
 };
 export const temTour = (modulo: string): modulo is ModuloComTour => modulo in TOURS;
 
-/** O rótulo e a linha da oferta (secundária, sem FOMO): "Ver mais 4 coisas úteis de Finanças" · "Meu Mês, contas fixas, cartão e dívidas · 1 min". */
+/** Quantas letras da lista de paradas cabem numa linha só da linha pequena do botão (375 px, 11 px): entra nome por nome; o resto vira "…". */
+const LETRAS_DA_LINHA = 32;
+/** O rótulo e a linha da oferta (secundária, sem FOMO; dono 17/10 — rótulo numa linha só, a linha pequena dentro do botão):
+ *  "Ver mais 5 dicas de Finanças" · "Meu Mês, contas fixas, cartão… · 1 min". */
 export function ofertaDoTour(modulo: string): { titulo: string; linha: string } | null {
   if (!temTour(modulo)) return null;
   const t = TOURS[modulo];
   const nomes = t.paradas.map((p) => p.nome);
-  const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` : nomes[0];
+  const cabem: string[] = [];
+  for (const n of nomes) { if (cabem.length && [...cabem, n].join(", ").length > LETRAS_DA_LINHA) break; cabem.push(n); }
+  const lista = cabem.length < nomes.length ? `${cabem.join(", ")}…`
+    : cabem.length > 1 ? `${cabem.slice(0, -1).join(", ")} e ${cabem[cabem.length - 1]}` : cabem[0];
   const capital = lista.charAt(0).toUpperCase() + lista.slice(1);
-  return { titulo: `Ver mais ${t.paradas.length} coisas úteis de ${t.nome}`, linha: `${capital} · 1 min` };
+  return { titulo: `Ver mais ${t.paradas.length} dicas de ${t.nome}`, linha: `${capital} · 1 min` };
 }
 
 /* ───── marcas (aparelho + conta) ───── */

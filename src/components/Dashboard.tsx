@@ -4,6 +4,7 @@ import { usePaletaGrafico } from "@/lib/paleta-grafico";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { EV_MAIS_GRAFICOS } from "@/lib/financas-painel-limpo";
+import { sobraPraHoje } from "@/lib/montar-financas";
 import { localDayKey } from "@/lib/utils";
 // Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
 const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
@@ -79,6 +80,9 @@ interface DashboardProps {
   totalPorCartao?: ReactNode;
   depoisDoTopo?: ReactNode;
   maisGraficos?: ReactNode;
+  /** Só no painel limpo (17/10): o que ela gastou HOJE (variáveis que contam neste mês) — vira a linha
+   *  "Sobram R$ X pra hoje" no QUANTO POSSO GASTAR HOJE (o que dava no começo do dia − o de hoje). */
+  gastoDeHoje?: number;
 }
 
 /** "Mais gráficos" (painel limpo): fechado toda vez que a tela abre; abrir manda
@@ -191,6 +195,7 @@ export const Dashboard = ({
   totalPorCartao,
   depoisDoTopo,
   maisGraficos,
+  gastoDeHoje,
 }: DashboardProps) => {
   const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
   const { user } = useAuth();
@@ -439,6 +444,18 @@ export const Dashboard = ({
       : "warning";
     return { ...base, status, fixedCostsRecorded };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
+
+  /* "SOBRAM R$ X PRA HOJE" — só no painel limpo (conta nova; o dono decide depois pra todo mundo). O
+     número grande refaz a média do mês com o gasto de hoje dentro (R$ 66 → 65 por um café: ninguém
+     sente); esta linha é o que dava por dia NO COMEÇO de hoje menos o que ela já gastou hoje (70 − 12 =
+     58) — a mesma conta da tela do Montar (lib/montar-financas `sobraPraHoje`). */
+  const praHoje = useMemo(() => {
+    if (!limpo || typeof gastoDeHoje !== "number") return null;
+    const inicio = computeDailyBudget(totalIncome, totalExpenses - gastoDeHoje, dueDays, fixedExpenses);
+    if (inicio.cantSpend) return null;
+    const doDia = Math.round(inicio.perDay);
+    return { doDia, sobra: sobraPraHoje(doDia, gastoDeHoje), gasto: gastoDeHoje };
+  }, [limpo, gastoDeHoje, totalIncome, totalExpenses, dueDays, fixedExpenses]);
 
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {
@@ -902,6 +919,18 @@ export const Dashboard = ({
               "text-red-400"
             }`}>
               R$ {reais(Math.round(dailyBudget.perDay))}
+            </p>
+          )}
+          {praHoje && (
+            <p className="text-xs mt-1" data-testid="sobram-pra-hoje">
+              <span className="font-semibold">
+                {praHoje.sobra >= 0
+                  ? <>Sobram <span className="tabular-nums whitespace-nowrap">R$ {reais(praHoje.sobra)}</span> pra hoje</>
+                  : <>Hoje já passou <span className="tabular-nums whitespace-nowrap">R$ {reais(-praHoje.sobra)}</span> do que dava</>}
+              </span>
+              <span className="text-muted-foreground">
+                {praHoje.gasto > 0 ? ` · já saiu R$\u00a0${reais(praHoje.gasto)} dos R$\u00a0${reais(praHoje.doDia)} do dia` : " · nada gasto hoje ainda"}
+              </span>
             </p>
           )}
           <p className="text-[10px] text-muted-foreground mt-1">

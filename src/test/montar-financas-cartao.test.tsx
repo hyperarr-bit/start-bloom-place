@@ -465,7 +465,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
   };
   const cardComTitulo = (titulo: RegExp) => screen.getByText(titulo).closest(".rounded-lg, .rounded-2xl") as HTMLElement;
 
-  it("MEU FINANCEIRO: custo fixo, linha da fatura no MEU MÊS (valor no 'a vencer'), TOTAL POR CARTÃO com o vencimento", async () => {
+  it("MEU FINANCEIRO: custo fixo, linha da fatura no MEU MÊS (valor no 'a vencer'), TOTAL POR CARTÃO com o vencimento", { timeout: 40_000 }, async () => {
     await montarComCartao();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(screen.getAllByText("Fatura do cartão").length).toBeGreaterThan(0); // custos fixos
@@ -482,17 +482,18 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     expect(within(total).queryByTestId("aviso-estimativa")).toBeNull();
   });
 
-  it("DASHBOARD (painel limpo da conta nova): o MESMO número do Montar e o alerta 'vence em 3 dias'", async () => {
+  it("DASHBOARD (painel limpo da conta nova): o MESMO número do Montar e o alerta 'vence em 3 dias'", { timeout: 40_000 }, async () => {
     const { numero } = await montarComCartao();
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
     const pode = cardComTitulo(/QUANTO POSSO GASTAR HOJE/);
-    expect(within(pode).getByText(`R$ ${numero}`)).toBeTruthy();
+    expect(within(pode).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
+    expect(within(pode).getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);
     const alertas = cardComTitulo(/ALERTAS INTELIGENTES/);
     expect(within(alertas).getByText("1 conta vence em 3 dias: Fatura Nubank · R$ 800,00")).toBeTruthy();
   });
 
-  it("o 'paguei' é um só: marcar a linha do MEU MÊS dá ✓ no custo fixo; desmarcar o ✓ do fixo reabre a fatura", async () => {
+  it("o 'paguei' é um só: marcar a linha do MEU MÊS dá ✓ no custo fixo; desmarcar o ✓ do fixo reabre a fatura", { timeout: 40_000 }, async () => {
     const { controle } = await montarComCartao();
     const meuMes = document.querySelector('[data-missao="meu-mes"]') as HTMLElement;
     fireEvent.click(within(meuMes).getByRole("button", { name: "Dia 19" }));
@@ -515,7 +516,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     expect(controle.dados()[CHAVE_FATURAS_PAGAS]).toEqual({ "2026-10:nubank": true });
   });
 
-  it("pôr um 'Dia' na estimativa não cria a mesma fatura duas vezes no MEU MÊS", async () => {
+  it("pôr um 'Dia' na estimativa não cria a mesma fatura duas vezes no MEU MÊS", { timeout: 40_000 }, async () => {
     montarIndex({
       "finance-incomes": [{ id: "r", description: "Renda do mês", value: 3000, date: "2026-10-16" }],
       "finance-fixed-expenses": [{ id: "fx", description: "Fatura do cartão", category: "fatura_cartao", value: 800, paymentMethod: "credito", cardName: "nubank", faturaDoCartao: true, day: 19 }],

@@ -59,6 +59,10 @@ import { reais } from "@/lib/dinheiro";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { CHAVE_FATURAS_PAGAS, chaveDaFatura } from "@/lib/finance-faturas";
+import { alvoDaMissao, gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/components/demo-guiada/alvos";
+import { normalizarItem } from "@/lib/demo-guiada";
+import { gravacoesDoItem, idDoItem, type Gravacao } from "@/lib/demo-guiada-registro";
+import { localDayKey } from "@/lib/utils";
 import {
   ATRIBUTO_NA_TELA, CHAVE_MONTAR_FINANCAS, CONTAS_SUGERIDAS, EVENTO_MONTAR_FINANCAS_FIM, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW,
   FAIXAS_DE_RENDA, calcularMontar, contaNovaParaMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar,
@@ -66,14 +70,18 @@ import {
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
   faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
-  type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado,
+  EV_GASTO_NO_NUMERO, fecharTelaDoNumero, guardarTelaDoNumero, lerTelaDoNumero, sobraPraHoje,
+  type ContaEscolhida, type GastoDoNumero, type OrigemMontar, type RespostaCartao, type Resultado, type TelaDoNumero,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
 
 export { deveMostrarMontarFinancas, montarAbertoPelaMissao, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA } from "@/lib/montar-financas";
 
-/** `cartao` (16/10): a fatura do cartão entrou. Campo novo, opcional pra quem já lia os outros três. */
-export interface ResumoMontar { contas: number; porDia: number; semFolga: boolean; cartao?: boolean }
+/** `cartao` (16/10): a fatura do cartão entrou. `primeiroGasto` (17/10, só origem "missao"): o 1º gasto que
+ *  ela anotou NA tela do número (`{ nome }` — sem valor) → a missão pula o anel do 1º gasto e vai direto pro
+ *  MEU MÊS + festa; `null` = "Ainda não gastei nada hoje" (a dose conta igual: o Montar gravou); ausente = saiu
+ *  pelo botão sem tocar em nada (a missão segue com o 1º gasto dela, como antes). Campos novos, opcionais. */
+export interface ResumoMontar { contas: number; porDia: number; semFolga: boolean; cartao?: boolean; primeiroGasto?: { nome: string } | null }
 export interface PropsMontarFinancas {
   /** De onde abriu (vai nos eventos): a 1ª abertura do módulo ou o passo da missão. */
   origem?: OrigemMontar;
@@ -93,6 +101,33 @@ const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const mesCurto = (d: Date) => d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(/\.?\s*de\s*/i, " ").replace(".", "");
 const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long" });
+
+/** Os chips do 1º gasto na tela do número: os MESMOS da missão (Café R$ 12 · Uber R$ 23 · Almoço R$ 35). */
+const CHIPS_DO_NUMERO: ChipDaMissao[] = alvoDaMissao("gasto").chips;
+
+/** O número que cai na frente dela (~1 s, desacelerando); sem animação pra quem pediu menos movimento. */
+function useNumeroQueCai(alvo: number, ms = 1100): number {
+  const [v, setV] = useState(alvo);
+  const atual = useRef(alvo);
+  useEffect(() => {
+    const de = atual.current;
+    if (de === alvo) return;
+    const reduzir = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (reduzir || typeof requestAnimationFrame !== "function") { atual.current = alvo; setV(alvo); return; }
+    let raf = 0;
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const passo = (t: number) => {
+      const p = Math.min(1, (t - t0) / ms);
+      const n = Math.round(de + (alvo - de) * (1 - Math.pow(1 - p, 3)));
+      atual.current = n;
+      setV(n);
+      if (p < 1) raf = requestAnimationFrame(passo);
+    };
+    raf = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(raf);
+  }, [alvo, ms]);
+  return v;
+}
 
 /** O que o dia escolhido quer dizer NESTE mês — embaixo dos dias, pra ninguém se surpreender depois. */
 export function dicaDoVencimento(dia: number, hoje: Date): string {
@@ -164,18 +199,24 @@ function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
 
 export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200 }: PropsMontarFinancas) {
   const { get, set } = useUserData();
+  const { user } = useAuth();
+  const criadoEm = (user as { created_at?: string } | null)?.created_at;
   const { custom: cartoesPersonalizados, addCustom, configOf, setConfig } = useFinanceCards();
   const hoje = useMemo(() => agora ?? new Date(), [agora]);
   const folha = useRef<HTMLDivElement>(null);
   useFolhaAcimaDoTeclado(folha);
   const rolo = useRef<HTMLDivElement>(null);
-  // fechou o app no meio: volta com o que já tinha respondido
-  const [rascunho] = useState(() => lerRascunhoMontar());
-  const [etapa, setEtapa] = useState<Etapa>(rascunho?.etapa ?? "renda");
-  const [faixa, setFaixa] = useState<string | null>(rascunho?.faixa ?? null);
-  const [renda, setRenda] = useState(rascunho?.renda ?? 0);
-  const [contas, setContas] = useState<ContaEscolhida[]>(rascunho?.contas ?? []);
-  const [cartao, setCartao] = useState<RespostaCartao>(rascunho?.cartao ?? CARTAO_VAZIO);
+  /* Fechou o app NA TELA DO NÚMERO (só pela missão, hoje, nesta conta — B11): volta nela, com os chips já
+     tocados. Senão, fechou no meio das perguntas: volta com o que já tinha respondido. */
+  const [retomada] = useState<TelaDoNumero | null>(() => (origem === "missao" ? lerTelaDoNumero(criadoEm, agora ?? new Date()) : null));
+  const [rascunho] = useState(() => (retomada ? null : lerRascunhoMontar()));
+  const [etapa, setEtapa] = useState<Etapa>(retomada ? "pronto" : rascunho?.etapa ?? "renda");
+  const [faixa, setFaixa] = useState<string | null>(retomada?.faixa ?? rascunho?.faixa ?? null);
+  const [renda, setRenda] = useState(retomada?.renda ?? rascunho?.renda ?? 0);
+  const [contas, setContas] = useState<ContaEscolhida[]>(retomada?.contas ?? rascunho?.contas ?? []);
+  const [cartao, setCartao] = useState<RespostaCartao>(retomada?.cartao ?? rascunho?.cartao ?? CARTAO_VAZIO);
+  /** os gastos que ela anotou na tela do número (chip ou "✎ outro") */
+  const [gastos, setGastos] = useState<GastoDoNumero[]>(retomada?.gastos ?? []);
   const outras = useRef((rascunho?.contas ?? []).filter((c) => c.id.startsWith("outra-")).length);
   const inicio = useRef(false);
   const [cedeu, setCedeu] = useState(() => origem === "modulo" && montarAbertoPelaMissao());
@@ -200,7 +241,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
       if (origem === "modulo" && montarAbertoPelaMissao()) { setCedeu(true); return; }
       inicio.current = true;
       registrarVistaMontar();
-      trackEvent(EV_VIEW, { origem, retomou: !!rascunho });
+      trackEvent(EV_VIEW, { origem, retomou: !!rascunho || !!retomada });
       trackEvent(EV_PASSO, { n: PASSO_DA_ETAPA[etapa], origem });
     };
     if (origem !== "modulo") { contar(); return; }
@@ -280,6 +321,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     juntar("finance-incomes", receita);
     juntar("finance-fixed-expenses", fixosDaTela);
     decidir("pronto", fixos.length, comCartao);
+    // fechar o app daqui até ela sair da tela do número: a tela volta lá (B11)
+    if (origem === "missao") guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao: resposta, gastos: [] });
     const final = calcularMontar(renda, contas, hoje, resposta);
     trackEvent(EV_PRONTO, {
       contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, origem, cartao: comCartao,
@@ -318,6 +361,92 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   const mudarCartao = (campo: Partial<RespostaCartao>) => setCartao({ ...cartao, ...campo });
   const faturaNaTela = nomeDaFaturaNaTela(cartao.banco);
   const faturaPaga = cartaoCompleto(cartao) && faturaJaVenceu(cartao.dia, hoje);
+
+  /* ── o 1º gasto na tela do número (só origem "missao") ── */
+  const comPostIt = origem === "missao";
+  const abertura = useRef(Date.now());
+  const vistoEm = useRef<number | null>(null);
+  const anotando = useRef(new Set<string>());
+  const [abrirOutro, setAbrirOutro] = useState(false);
+  const [outroNome, setOutroNome] = useState("");
+  const [outroValor, setOutroValor] = useState(0);
+  useEffect(() => {
+    if (!comPostIt || etapa !== "pronto" || vistoEm.current !== null) return;
+    vistoEm.current = Date.now();
+    trackEvent(EV_GASTO_NO_NUMERO, { acao: "view", ms: vistoEm.current - abertura.current, ...(retomada ? { retomou: true } : {}) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comPostIt, etapa]);
+  const msDesdeOView = () => (vistoEm.current === null ? 0 : Date.now() - vistoEm.current);
+  /** Grava pelo `set` do app, no formato que o módulo já lê (as gravações da missão), e avisa o módulo aberto por baixo. */
+  const aplicar = (gravacoes: Gravacao[]) => {
+    for (const g of gravacoes) {
+      const proximo = g.proximo(get<unknown>(g.chave, undefined));
+      if (proximo === undefined) continue;
+      set(g.chave, proximo);
+      avisarEscritaDeFora(g.chave, proximo);
+    }
+  };
+  /** 1 gasto, 1 vez: o mesmo item (mesmo id) tocado de novo — ou o 2º toque de um toque duplo — não grava. */
+  const anotar = (g: GastoDoNumero, gravacoes: Gravacao[], acao: "chip" | "outro"): boolean => {
+    if (anotando.current.has(g.id) || gastos.some((x) => x.id === g.id)) return false;
+    anotando.current.add(g.id);
+    aplicar(gravacoes);
+    const novos = [...gastos, g];
+    setGastos(novos);
+    guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao, gastos: novos });
+    trackEvent(EV_GASTO_NO_NUMERO, { acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) });
+    return true;
+  };
+  const tocarChipDoNumero = (c: ChipDaMissao) => {
+    const item = itemDoChip("gasto", c);
+    if (!item) return;
+    anotar({ id: idDoItem(item), nome: item.nome, emoji: c.emoji, valor: item.valor ?? 0 }, gravacoesDoChip(item, c, hoje), "chip");
+  };
+  const itemDoOutro = normalizarItem({ tipo: "gasto", nome: outroNome, valor: outroValor });
+  const anotarOutro = () => {
+    if (!itemDoOutro) return;
+    if (anotar({ id: idDoItem(itemDoOutro), nome: itemDoOutro.nome, emoji: "🧾", valor: itemDoOutro.valor ?? 0 }, gravacoesDoItem(itemDoOutro, hoje, "conta"), "outro")) {
+      setAbrirOutro(false);
+      setOutroNome("");
+      setOutroValor(0);
+    }
+  };
+  /** Saiu da tela do número (o botão ou "Ainda não gastei"): ela não volta mais. */
+  const sair = (primeiroGasto?: { nome: string } | null) => {
+    fecharTelaDoNumero();
+    onPronto?.({
+      contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao,
+      ...(primeiroGasto !== undefined ? { primeiroGasto } : {}),
+    });
+  };
+  const aindaNaoGastei = () => {
+    trackEvent(EV_GASTO_NO_NUMERO, { acao: "ainda_nao", ms: msDesdeOView() });
+    sair(null);
+  };
+  const gastoDeHoje = gastos.reduce((t, g) => t + g.valor, 0);
+  const praHoje = comPostIt && gastos.length > 0 && !resultado.semFolga;
+  const sobra = sobraPraHoje(resultado.porDia, gastoDeHoje);
+  const numeroNaTela = useNumeroQueCai(praHoje ? Math.max(0, sobra) : resultado.porDia);
+  const idsDosChips = new Set(CHIPS_DO_NUMERO.map((c) => { const i = itemDoChip("gasto", c); return i ? idDoItem(i) : c.nome; }));
+  const anotadosAMao = gastos.filter((g) => !idsDosChips.has(g.id));
+  /** "R$ 58" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */
+  const rs = (v: number) => `R$\u00a0${reais(v)}`;
+  const fraseDosGastos = gastos.length === 0 ? null : (
+    <>
+      {gastos.length === 1 ? <span aria-hidden>{gastos[0].emoji} </span> : null}
+      <b>
+        {gastos.length === 1
+          ? `${gastos[0].nome} · ${rs(gastos[0].valor)}`
+          : `${gastos.slice(0, -1).map((g) => g.nome).join(", ")} e ${gastos[gastos.length - 1].nome} · ${rs(gastoDeHoje)}`}
+      </b>
+      {gastos.length === 1 ? " já está nas suas Finanças." : " já estão nas suas Finanças."}
+      {!resultado.semFolga && (
+        sobra > 0 ? ` Era ${rs(resultado.porDia)} por dia — hoje sobram ${rs(sobra)}.`
+          : sobra === 0 ? ` Era ${rs(resultado.porDia)} por dia — hoje já foi tudo.`
+            : ` Era ${rs(resultado.porDia)} por dia — hoje já passou ${rs(-sobra)}.`
+      )}
+    </>
+  );
 
   const cabecalho = (
     <header className="mf-cab">
@@ -511,11 +640,18 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
         {etapa === "pronto" && (
           <>
             <div className="mf-pronto" data-testid="montar-pronto">
-              <div className="mf-grande">
+              <div className="mf-grande" data-pra-hoje={praHoje ? "" : undefined}>
                 <small>VOCÊ PODE GASTAR HOJE</small>
-                <strong data-testid="montar-por-dia">R$ {reais(resultado.porDia)}<em>por dia</em></strong>
+                {praHoje ? (
+                  <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)} aria-label={`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}>
+                    <s className="mf-antes" aria-hidden>R$ {reais(resultado.porDia)}</s>
+                    <span aria-hidden>R$ {reais(numeroNaTela)}</span><em aria-hidden>pra hoje</em>
+                  </strong>
+                ) : (
+                  <strong data-testid="montar-por-dia">R$ {reais(resultado.porDia)}<em>por dia</em></strong>
+                )}
                 <p>
-                  {resultado.semFolga
+                  {praHoje ? fraseDosGastos : resultado.semFolga
                     ? resultado.cartao
                       ? "Suas contas fixas e a fatura já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
                       : "Suas contas fixas já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
@@ -524,6 +660,59 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                       : `até o fim do mês (${resultado.dias} dias, contando hoje), já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`}
                 </p>
               </div>
+              {comPostIt && (
+                <div className="mf-postit" data-testid="montar-postit-gasto" data-anotado={gastos.length ? "" : undefined}>
+                  <span className="mf-postit-fita" aria-hidden />
+                  <div className="mf-postit-papel">
+                    <span className="mf-postit-rotulo">{gastos.length ? "Anotado ✓" : "E hoje · 1 toque"}</span>
+                    <span className="mf-postit-pergunta">{gastos.length ? "Primeiro gasto no lugar." : "Já gastou com alguma coisa hoje?"}</span>
+                    <span className="mf-postit-texto">
+                      {gastos.length
+                        ? resultado.semFolga ? fraseDosGastos : "A cada gasto que você anota, o quanto sobra pra hoje se ajusta sozinho."
+                        : "Toca num e ele já entra nas suas Finanças. Dá pra mudar depois."}
+                    </span>
+                    <div className="mf-postit-chips">
+                      {CHIPS_DO_NUMERO.map((c) => {
+                        const item = itemDoChip("gasto", c);
+                        const feito = !!item && gastos.some((g) => g.id === idDoItem(item));
+                        return (
+                          <button key={c.nome} type="button" className="mf-postit-chip" aria-pressed={feito} data-feito={feito ? "" : undefined}
+                            aria-label={`${c.nome}, R$ ${reais(c.valor ?? 0)}${feito ? ", anotado" : ""}`} onClick={() => tocarChipDoNumero(c)}>
+                            {feito ? <Check size={16} strokeWidth={3.5} aria-hidden /> : <span aria-hidden>{c.emoji}</span>}
+                            <span>{c.nome}</span><span className="mf-postit-valor">· R$ {reais(c.valor ?? 0)}</span>
+                          </button>
+                        );
+                      })}
+                      {anotadosAMao.map((g) => (
+                        <span key={g.id} className="mf-postit-chip" data-feito="" aria-label={`${g.nome}, R$ ${reais(g.valor)}, anotado`}>
+                          <Check size={16} strokeWidth={3.5} aria-hidden /><span>{g.nome}</span><span className="mf-postit-valor">· R$ {reais(g.valor)}</span>
+                        </span>
+                      ))}
+                      {!abrirOutro && (
+                        <button type="button" className="mf-postit-outro" onClick={() => setAbrirOutro(true)}>✎ outro</button>
+                      )}
+                    </div>
+                    {abrirOutro && (
+                      <div className="mf-postit-form" data-testid="montar-outro-gasto">
+                        <input className="mf-postit-nome" aria-label="Com o que você gastou" placeholder="Com o quê?" maxLength={40} autoFocus
+                          value={outroNome} onChange={(e) => setOutroNome(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") anotarOutro(); }} />
+                        <label className="mf-postit-quanto">
+                          <small>R$</small>
+                          <input aria-label="Quanto foi, em reais" inputMode="numeric" enterKeyHint="done" placeholder="0"
+                            value={outroValor ? reais(outroValor) : ""} onChange={(e) => setOutroValor(reaisDigitados(e.target.value))}
+                            onKeyDown={(e) => { if (e.key === "Enter") anotarOutro(); }} />
+                        </label>
+                        <button type="button" className="mf-postit-anotar" disabled={!itemDoOutro} onClick={anotarOutro}>Anotar</button>
+                        <button type="button" className="mf-postit-fechar" aria-label="Fechar" onClick={() => { setAbrirOutro(false); setOutroNome(""); setOutroValor(0); }}><X size={15} aria-hidden /></button>
+                      </div>
+                    )}
+                    {gastos.length === 0 && (
+                      <button type="button" className="mf-postit-ainda-nao" onClick={aindaNaoGastei}>Ainda não gastei nada hoje →</button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="mf-folha">
                 <div className="mf-faixa">🧾 A conta do seu mês</div>
                 <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
@@ -541,8 +730,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
               <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está tudo nas suas Finanças. Dá pra mudar quando quiser.</p>
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={() => onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao })}>
-                Ver minhas Finanças
+              <button type="button" className="mf-cta" onClick={() => sair(gastos.length ? { nome: gastos[0].nome } : undefined)}>
+                {gastos.length ? "Ver no meu mês →" : "Ver minhas Finanças"}
               </button>
             </div>
           </>

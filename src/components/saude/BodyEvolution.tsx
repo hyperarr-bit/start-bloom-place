@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Camera, ArrowLeftRight } from "lucide-react";
+import { Plus, Trash2, Camera, ArrowLeftRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
@@ -262,7 +262,7 @@ export const BodyEvolution = () => {
         <div className="p-4">
           <button onClick={() => setShowForm(!showForm)}
             className="w-full py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors flex items-center justify-center gap-2 mb-3">
-            <Plus className="w-3.5 h-3.5" /> {showForm ? "Cancelar" : "Registrar Medidas"}
+            {showForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {showForm ? "Cancelar" : "Registrar Medidas"}
           </button>
         </div>
 

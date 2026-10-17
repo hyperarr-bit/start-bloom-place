@@ -464,7 +464,7 @@ export const MedicalLog = () => {
             onClick={() => setShowApptForm(!showApptForm)}
             className="w-full py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors flex items-center justify-center gap-2"
           >
-            <Plus className="w-3.5 h-3.5" /> {showApptForm ? "Cancelar" : "Nova Consulta"}
+            {showApptForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {showApptForm ? "Cancelar" : "Nova Consulta"}
           </button>
 
           <AnimatePresence>
@@ -668,7 +668,7 @@ export const MedicalLog = () => {
             onClick={() => setShowExamForm(!showExamForm)}
             className="w-full py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors flex items-center justify-center gap-2"
           >
-            <Plus className="w-3.5 h-3.5" /> {showExamForm ? "Cancelar" : "Novo Exame"}
+            {showExamForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {showExamForm ? "Cancelar" : "Novo Exame"}
           </button>
 
           <AnimatePresence>
@@ -886,7 +886,7 @@ export const MedicalLog = () => {
         <div className="p-4">
           <button onClick={() => setShowBioForm(!showBioForm)}
             className="w-full py-2.5 rounded-xl bg-[hsl(var(--saude-green)/0.1)] hover:bg-[hsl(var(--saude-green)/0.15)] text-[hsl(var(--saude-green))] text-xs font-bold transition-colors flex items-center justify-center gap-2 mb-3">
-            <Plus className="w-3.5 h-3.5" /> {showBioForm ? "Cancelar" : "Novo Biomarcador"}
+            {showBioForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {showBioForm ? "Cancelar" : "Novo Biomarcador"}
           </button>
 
           <AnimatePresence>

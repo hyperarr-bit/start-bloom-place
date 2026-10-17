@@ -1064,52 +1064,68 @@ describe("9. o tour curto do braço A (3 passos 'faz isso', logo depois da dose 
 
 /* ------------------------------------------------------------ 10: as 6 áreas com conta vazia */
 
-describe("10. conta VAZIA nas 6 áreas da porta: a dose 1 só pede o que a conta vazia tem (ou cria na hora) e o chip GRAVA", () => {
+describe("10. conta VAZIA nas 6 áreas da porta × os DOIS braços: a dose 1 só pede o que a conta vazia tem (ou cria na hora) e o chip GRAVA", () => {
   const casos: Array<[string, string, string]> = [
     ["dinheiro", "financas", "/financas"], ["rotina", "rotina", "/rotina"], ["corpo", "treino", "/treino"],
     ["saude", "saude", "/saude"], ["metas", "desenvolvimento", "/desenvolvimento"], ["tudo", "financas", "/financas"],
   ];
-  for (const [area, modulo, rota] of casos) {
-    it(`área "${area}": a missão nasce em ${modulo}, a dose abre em ${rota} e fecha com a festa pequena`, () => {
-      vi.stubEnv("VITE_V14_LOJA", "1");
-      ligarUmPorDia("on");
-      guardarChave(CHAVES_FUNIL_W.area, area);
-      const store = montarStore({});
-      montar(store, "/home");
-      expect(lerMissao()?.modulos[0]).toBe(modulo);
-      expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ area_lida: area })]);
-      fireEvent.click(screen.getByTestId("missao-doses-comecar"));
-      expect(screen.getByTestId("rota")).toHaveTextContent(rota);
-      if (modulo === "treino") {
-        // corpo: o quiz da 1ª dose (EscolherTreino da introdução dos módulos) — 2 toques e a semana sai montada = a dose
-        const q = within(screen.getByTestId("missao-escolher-treino"));
-        fireEvent.click(q.getByRole("button", { name: /Academia/ }));
-        fireEvent.click(q.getByRole("button", { name: "4 dias" }));
-        for (let i = 0; i < 12 && !screen.queryByTestId("missao-doses-festa"); i++) avancar(250);
-        expect(screen.queryByTestId("missao-escolher-treino")).toBeNull();
-        expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
-        expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(/O treino “.+” já está montado na sua semana\./);
-        expect(store.dados["saude-workouts-v2"]).toBeTruthy();
-        return;
-      }
-      const postIt = esperarPostIt();
-      const chips = within(postIt).getAllByTestId("demo-guia-chip");
-      expect(chips.length).toBeGreaterThanOrEqual(3);
-      fireEvent.click(chips[0]);
-      if (modulo === "rotina") {
-        fireEvent.click(screen.getByText("Adicionar"));
-        avancar(400); avancar(1000);
-        fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
-      }
-      avancar(700);
-      // Finanças termina olhando o MEU MÊS (sozinho, ≤ 4 s); os outros vão direto pra festa no braço A
-      if (modulo === "financas") passarOlhaDeFinancas();
-      expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
-      // o registro é DE VERDADE, na chave que o módulo lê
-      const chave = { financas: "finance-expenses", rotina: "rotina-habits-checked", treino: "saude-workouts-v2", saude: "core-saude-water", desenvolvimento: "goals-board-v2" }[modulo]!;
-      expect(store.dados[chave], chave).toBeTruthy();
-      if (modulo === "saude") expect(store.dados["core-saude-water-goal"]).toBe(6);
-    });
+  /** A: a comemoração pequena ("Dia 1 de 3 feito"); B: a festa com a passagem pra próxima (o "olhar" do B, se vier, no Entendi). */
+  const ateAFesta = (braco: "A" | "B") => {
+    for (let i = 0; i < 40 && !screen.queryByTestId("missao-doses-festa"); i++) {
+      const entendi = screen.queryByTestId("missao-doses-entendi");
+      if (entendi && braco === "B") fireEvent.click(entendi);
+      avancar(250);
+    }
+    return screen.getByTestId("missao-doses-festa");
+  };
+  const conferirFesta = (braco: "A" | "B") => {
+    const festa = ateAFesta(braco);
+    if (braco === "A") expect(festa).toHaveTextContent("Dia 1 de 3 feito ✅");
+    else { expect(festa).toHaveTextContent("Primeira dose feita!"); expect(screen.getByTestId("missao-doses-agora-o")).toHaveTextContent(/^Agora (a|as|o|os) .+ — \d+ s$/); }
+  };
+  for (const braco of ["A", "B"] as const) {
+    for (const [area, modulo, rota] of casos) {
+      it(`braço ${braco}, área "${area}": a missão nasce em ${modulo}, a dose abre em ${rota} e fecha com a festa do braço`, () => {
+        vi.stubEnv("VITE_V14_LOJA", "1");
+        if (braco === "A") ligarUmPorDia("on"); else { ligarUmPorDia("ab"); localStorage.setItem(CHAVE_BRACO_DIA1, "B"); }
+        guardarChave(CHAVES_FUNIL_W.area, area);
+        const store = montarStore({});
+        montar(store, "/home");
+        expect(lerMissao()).toMatchObject({ braco, modulos: [modulo, expect.any(String), expect.any(String)] });
+        expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ area_lida: area })]);
+        if (braco === "B") fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+        fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+        expect(screen.getByTestId("rota")).toHaveTextContent(rota);
+        if (modulo === "treino") {
+          // corpo: o quiz da 1ª dose (EscolherTreino da introdução dos módulos) — 2 toques e a semana sai montada = a dose
+          const q = within(screen.getByTestId("missao-escolher-treino"));
+          fireEvent.click(q.getByRole("button", { name: /Academia/ }));
+          fireEvent.click(q.getByRole("button", { name: "4 dias" }));
+          conferirFesta(braco);
+          expect(screen.queryByTestId("missao-escolher-treino")).toBeNull();
+          expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(braco === "A" ? /O treino “.+” já está montado na sua semana\./ : /já está/);
+          expect(store.dados["saude-workouts-v2"]).toBeTruthy();
+          return;
+        }
+        const postIt = esperarPostIt();
+        const chips = within(postIt).getAllByTestId("demo-guia-chip");
+        expect(chips.length).toBeGreaterThanOrEqual(3);
+        fireEvent.click(chips[0]);
+        if (modulo === "rotina") {
+          fireEvent.click(screen.getByText("Adicionar"));
+          avancar(400); avancar(1000);
+          fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
+        }
+        avancar(700);
+        // Finanças termina olhando o MEU MÊS (sozinho, ≤ 4 s); os outros vão direto pra festa no braço A
+        conferirFesta(braco);
+        // o registro é DE VERDADE, na chave que o módulo lê
+        const chave = { financas: "finance-expenses", rotina: "rotina-habits-checked", treino: "saude-workouts-v2", saude: "core-saude-water", desenvolvimento: "goals-board-v2" }[modulo]!;
+        expect(store.dados[chave], chave).toBeTruthy();
+        if (modulo === "saude") expect(store.dados["core-saude-water-goal"]).toBe(6);
+        expect(lerMissao()?.feitos[1]?.dia).toBe("2026-10-03");
+      });
+    }
   }
 });
 

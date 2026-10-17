@@ -17,7 +17,6 @@ import { localDayKey } from "@/lib/utils";
  *   ?tela=financas | rotina | saude | treino | dieta | estudos | biblioteca | casa | desenvolvimento |
  *         carreira | hiperfoco | detox | viagens | relacionamentos | pet | beleza     (padrão: financas)
  *   &cheio=1   · a conta de um mês (preview-seeds) — pra GRAVAR a captura real do módulo em uso
- *   &pj=0      · com &cheio=1 em Finanças: tira a empresa semeada ("Minha empresa") — o topo de quem NÃO tem PJ
  *   &sem=1     · sem a intro (a chave fica como está) — a tela de hoje, pra comparar
  *   &tema=escuro · tema escuro (a classe .dark no <html>, como o ThemeProvider faz)
  *   &vista=1   · simula "já vi" neste navegador (a intro não aparece)
@@ -78,9 +77,9 @@ const DevIntroModulo = () => {
   const [flags] = useState(() => ({
     tela: params.get("tela") ?? "financas", cheio: params.get("cheio") === "1", sem: params.get("sem") === "1", escuro: params.get("tema") === "escuro",
     vista: params.get("vista") === "1", missao: params.get("missao") === "dia1", montar: params.get("montar") === "1", escolher: params.get("escolher") === "1",
-    tour: params.get("tour") === "1", aberturas: Number(params.get("aberturas") ?? "") || 0, semPj: params.get("pj") === "0",
+    tour: params.get("tour") === "1", aberturas: Number(params.get("aberturas") ?? "") || 0,
   }));
-  const { tela, cheio, sem, escuro, vista, missao, montar, escolher, tour, aberturas, semPj } = flags;
+  const { tela, cheio, sem, escuro, vista, missao, montar, escolher, tour, aberturas } = flags;
   useMemo(() => {
     try {
       localStorage.setItem(CHAVE_FORCA_INTRO, sem ? "off" : "on");
@@ -120,7 +119,6 @@ const DevIntroModulo = () => {
         const capas: Record<string, string> = { "Hábitos Atômicos": "https://covers.openlibrary.org/b/isbn/9788550807560-L.jpg" };
         seeds["lib-books"] = (seeds["lib-books"] as Array<Record<string, unknown>>).map((l) => (capas[String(l.title)] ? { ...l, cover: capas[String(l.title)] } : l));
       }
-      if (semPj) { delete seeds["finance-perfis"]; delete seeds["finance-perfil-ativo"]; }
       return seeds;
     }
     // a conta nova não tem nada (dicas fechadas contam como "módulo já apresentado" — então nada é marcado aqui)
@@ -137,7 +135,7 @@ const DevIntroModulo = () => {
     // o que o Montar Rotina cria: os hábitos (nada marcado ainda)
     if (montar && tela === "rotina") base["rotina-habits"] = ["Beber água ao acordar", "Alongar 5 min", "Arrumar a cama"];
     return base;
-  }, [cheio, tela, montar, semPj]);
+  }, [cheio, tela, montar]);
   const Pagina = paginaDe(tela);
   const [escolhaFeita, setEscolhaFeita] = useState(false);
   return (

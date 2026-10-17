@@ -1,23 +1,15 @@
 /**
- * Barra de perfis PF/PJ — só existe pra quem JÁ TEM empresa cadastrada.
- *
- * 17/10 (1.0.16, dono: "quebra o design"): o link "Separar pessoa física e
- * empresa", que ficava no topo do MEU FINANCEIRO pra todo mundo, saiu. A
- * maioria esmagadora de quem usa Finanças não tem PJ — a entrada agora mora
- * em Ajustes de Finanças (o ⚙ no fim da fila de abas, AjustesFinancas). Sem
- * empresa, este componente não desenha nada; quando a pessoa escolhe a
- * entrada no menu, o Index pede `criarAgora` e o formulário de sempre abre
- * aqui no topo ([Pessoal] [+] · Nome da empresa · Criar) — criar pelo menu é
- * exatamente o que o link fazia. Com empresa, a barra é a de antes (chips, +,
- * gerenciar): quem usa PJ troca de perfil aqui todo dia.
+ * Barra de perfis PF/PJ. Nasce invisível: enquanto não existir nenhuma empresa
+ * cadastrada, o único elemento é um link discreto — a pessoa que não tem PJ
+ * (a maioria esmagadora dos 981 usuários de Finanças) não ganha uma barra de
+ * filtro no topo do módulo que ela usa todo dia.
  *
  * A lógica de dados fica em @/lib/finance-perfil; aqui é só a escolha.
  */
-import { useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, Plus, Trash2, User, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { trackEvent } from "@/lib/analytics";
-import { PERFIL_PESSOAL, PERFIL_TODOS, novoPerfil, type Perfil } from "@/lib/finance-perfil";
+import { PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 
 interface Props {
   perfis: Perfil[];
@@ -27,36 +19,21 @@ interface Props {
   onRemover?: (id: string) => void;
   ativo: string;
   setAtivo: (id: string) => void;
-  /** Pedido do menu de Ajustes ("Separar as finanças da empresa (PJ)"): abre o
-   *  formulário de criar. O componente avisa `aoAtenderPedido` na hora — o
-   *  pedido não pode reabrir o formulário quando a aba remonta. */
-  criarAgora?: boolean;
-  aoAtenderPedido?: () => void;
 }
 
-export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover, criarAgora, aoAtenderPedido }: Props) => {
+const novoId = () => `pj${Date.now().toString(36)}`;
+
+export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover }: Props) => {
   const [criando, setCriando] = useState(false);
   const [nome, setNome] = useState("");
   const [gerindo, setGerindo] = useState(false);
-  /** De onde veio o formulário aberto — só pro evento (sem nome de empresa). */
-  const [origem, setOrigem] = useState<"barra" | "menu">("barra");
-
-  /* Layout effect de propósito: o formulário entra no MESMO quadro do toque
-     no menu (o autoFocus abre o teclado ainda dentro do gesto, no iPhone). */
-  useLayoutEffect(() => {
-    if (!criarAgora) return;
-    setOrigem("menu");
-    setCriando(true);
-    aoAtenderPedido?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [criarAgora]);
 
   const criar = () => {
-    const r = novoPerfil(perfis, nome);
-    if (!r) return;
-    setPerfis(r.perfis);
-    setAtivo(r.id);
-    trackEvent("financas_pj_criada", { origem, empresas: r.perfis.length });
+    const limpo = nome.trim();
+    if (!limpo) return;
+    const id = novoId();
+    setPerfis([...perfis, { id, nome: limpo }]);
+    setAtivo(id);
     setNome("");
     setCriando(false);
   };
@@ -69,8 +46,17 @@ export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover,
     if (ativo === id) setAtivo(PERFIL_PESSOAL);
   };
 
-  // Sem empresa e sem formulário aberto: nada no topo (a entrada é o menu ⚙).
-  if (perfis.length === 0 && !criando) return null;
+  if (perfis.length === 0 && !criando) {
+    return (
+      <button
+        onClick={() => setCriando(true)}
+        className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+      >
+        <Building2 className="w-3 h-3" />
+        Separar pessoa física e empresa
+      </button>
+    );
+  }
 
   const chip = (id: string, texto: string, icone: React.ReactNode) => (
     <button
@@ -89,13 +75,13 @@ export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover,
   );
 
   return (
-    <div className="space-y-2" data-testid="seletor-de-perfil">
+    <div className="space-y-2">
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
         {chip(PERFIL_PESSOAL, "Pessoal", <User className="w-3 h-3" />)}
         {perfis.map((p) => chip(p.id, p.nome, <Building2 className="w-3 h-3" />))}
         {perfis.length > 0 && chip(PERFIL_TODOS, "Tudo junto", <span className="text-[10px]">Σ</span>)}
         <button
-          onClick={() => { setOrigem("barra"); setCriando(true); }}
+          onClick={() => setCriando(true)}
           aria-label="Adicionar empresa"
           className="h-8 w-8 shrink-0 rounded-full border border-dashed border-border text-muted-foreground flex items-center justify-center hover:text-foreground"
         >

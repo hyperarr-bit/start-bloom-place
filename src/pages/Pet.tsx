@@ -35,6 +35,7 @@ import { PesoDoPet } from "@/components/pet/peso-do-pet";
 import { AvisosDoPet, DicaDoPet } from "@/components/pet/avisos-do-pet";
 import { MandarCarteirinha } from "@/components/pet/mandar-carteirinha";
 import type { TipoCuidado } from "@/lib/pet-cuidados";
+import { isNativeShell } from "@/lib/native-shell";
 
 const ABAS = [
   { id: "hoje", label: "HOJE", icon: "☀️" },
@@ -193,7 +194,8 @@ const OQueVemPronto = () => (
         ["🪪", "RG do pet", "Foto, idade, peso, microchip e o contato do veterinário — o que perguntam na clínica."],
         ["☑️", "O dia do pet", "Comida, passeio, água e remédio com quadradinho. Dá pra marcar da tela inicial."],
         ["💉", "Carteirinha", "Vacinas, vermífugo e antipulgas da idade, com a próxima data calculada sozinha."],
-        ["🔔", "Aviso no dia", "No app do celular: da vacina, do vermífugo e do remédio. Nasce desligado — você liga se quiser."],
+        // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado
+        ["🔔", "Aviso no dia", isNativeShell() ? "Da vacina, do vermífugo e do remédio. Nasce desligado — você liga se quiser." : "No app do celular: da vacina, do vermífugo e do remédio. Nasce desligado — você liga se quiser."],
       ].map(([emoji, titulo, texto], i) => (
         <li key={titulo} className={`flex gap-3 px-3.5 py-3 ${i ? "border-t border-border" : ""}`}>
           <span className="text-[18px] leading-none mt-0.5" aria-hidden="true">{emoji}</span>

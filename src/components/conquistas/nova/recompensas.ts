@@ -88,6 +88,10 @@ export interface ProximoPremio {
 
 const DIAS_POR_PROTETOR = 7;
 
+/** "1 dia anotado" · "3 dias anotados" — número + palavra no singular/plural certo (17/10, revisão tela a tela #102:
+ *  a folha da sequência dizia "1 dias anotados"). */
+export const contagem = (n: number, um: string, varios: string): string => `${n} ${n === 1 ? um : varios}`;
+
 /** "adesivo de 14 dias" · "adesivo 'Voltei'" · "adesivo de 3 dias" — como a frase chama o prêmio (16/10, dono: nome concreto). */
 export const nomeDoPremio = (marco: number, adesivo: Badge | null): string => {
   if (!adesivo) return "protetor";

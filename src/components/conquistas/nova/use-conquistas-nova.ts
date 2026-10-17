@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { CATEGORIAS, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
 import { ORDEM_RARIDADE, montarAlbum, paginaDaFigurinha, type PaginaAlbum } from "../album-paginas";
-import { ordenarParaFolha } from "@/lib/conquistas-registro";
+import { CHAVE_ALBUM_VISTO, ordenarParaFolha } from "@/lib/conquistas-registro";
 import { anoDeMembro, useConquistas, usePerfilConquistas, useSequencia, type Sequencia } from "../use-conquistas";
 import { fraseDaColecao, idDoMarco, marcoDoAdesivo, proximoPremio, quandoCurto, type ProximoPremio } from "./recompensas";
 
@@ -88,8 +88,8 @@ export interface EstadoConquistasNova {
   colar: (id: string) => void;
 }
 
-/** A mesma chave da tela de hoje (TelaConquistas): o que a pessoa já viu colado. */
-export const CHAVE_ALBUM_VISTO = "conquistas-album-visto";
+/** A mesma chave da tela de hoje (TelaConquistas): o que a pessoa já viu colado (mora no registro). */
+export { CHAVE_ALBUM_VISTO };
 
 const lerVisto = (v: unknown): string[] | null => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null);
 
@@ -101,7 +101,9 @@ export function useConquistasNova(): EstadoConquistasNova {
   const vistoCru = get<unknown>(CHAVE_ALBUM_VISTO, undefined);
   const visto = useMemo(() => lerVisto(vistoCru), [vistoCru]);
 
-  // a linha de base (1ª vez desta versão): tudo que já está colado entra como visto, em silêncio — igual à tela de hoje
+  // a linha de base (1ª vez desta versão): tudo que já está colado entra como visto, em silêncio — igual à tela de hoje.
+  // Só pra quem JÁ tinha registro e nunca abriu o álbum: a conta nova ganha a base `[]` junto com o registro
+  // (useConquistas, 17/10 #95) — senão a 1ª figurinha entrava aqui como "vista" e nunca pedia pra ser colada.
   const coladasTxt = useMemo(() => conq.adesivos.filter((b) => b.unlocked).map((b) => b.id).join(","), [conq.adesivos]);
   useEffect(() => {
     if (!loaded || !conq.registroPronto || visto) return;

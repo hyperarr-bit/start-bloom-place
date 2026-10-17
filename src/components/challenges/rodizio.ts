@@ -14,9 +14,20 @@
  *    segunda a domingo, diferente entre semanas). Eram 3; o dono pediu 4 (17/10):
  *    "sem Uber, quem trabalha não pode se dar esse luxo; tendo 4 fica melhor de
  *    escolher" — com 4 sempre sobra uma que cabe na vida da pessoa.
- *  · Conta com pouco dado: menos de 4 opções é aceitável; nunca se inventa
- *    desafio sem dado. Com 0 ou 1 fora do descanso, repete a usada há mais tempo
- *    — card sem escolha é pior que repetir.
+ *  · Conta com pouco dado (17/10, revisão tela a tela #103 — a conta nova via 3; dono:
+ *    "Atualmente são 4 não é? Melhor deixar 4 msm"): as vagas que sobram são
+ *    completadas com os GENÉRICOS — os que fazem sentido pra qualquer pessoa, sem
+ *    depender de hábito (GENERICOS, na ordem: guarda da semana, nada em Outros, dias
+ *    sem gastar, anotar) —, sem repetir na semana e respeitando o descanso de 4
+ *    semanas. Restrição de hábito que a pessoa não tem (Uber, delivery, crédito…) e
+ *    "Semana sem parcelar" (só pra quem parcelou) nunca entram pra completar.
+ *    O que o "Montar suas finanças" grava já conta como dado: a "Renda do mês"
+ *    (finance-incomes) deixa a guarda da semana elegível; as contas fixas dele não
+ *    têm dia de vencimento, então "Contas da semana em dia" (que pede conta vencendo
+ *    nesta semana) continua só pra quem tem conta com dia no MEU MÊS. Genérico em
+ *    descanso fica de fora: aí podem sobrar 3 (raro: pouco dado + um genérico usado
+ *    nas últimas 4 semanas). Com 0 ou 1 fora do descanso, repete o usado há mais
+ *    tempo (elegível ou genérico) — card sem escolha é pior que repetir.
  *  · Fechamento: `active` COM `nivel` → catálogo novo (regra própria, motivo);
  *    SEM `nivel` (escolhido pelo app antigo) → regra antiga, como sempre foi.
  */
@@ -29,6 +40,12 @@ import { CATALOGO, type DadosDaSemana, type DefDesafio, avaliarNoCatalogo, defDo
 
 export const SEMANAS_DE_DESCANSO = 4;
 export const OPCOES_POR_SEMANA = 4;
+/**
+ * Os desafios que servem pra QUALQUER pessoa (17/10) — completam as 4 vagas quando os elegíveis pelo dado
+ * não bastam. Na ordem de "mais genérico": guardar um pouco (o desafio das 52 semanas: dá pra qualquer um,
+ * vai pra Reserva em Meu Financeiro), categorizar os gastos, dias sem gastar, anotar.
+ */
+export const GENERICOS = ["guarda-da-semana", "sem-outros", "tres-dias-zero", "registro-5-dias"] as const;
 
 /** djb2 — só pra embaralhar de um jeito estável dentro da semana. */
 const semente = (s: string): number => {
@@ -98,6 +115,13 @@ export function montarOfertas(d: DadosDaSemana, estado: ChallengesState): Oferta
     itens.push(oferta(def, "nova"));
   }
 
+  // pouco dado (conta nova): completa até 4 com os genéricos — sem repetir na semana e respeitando o descanso
+  const genericos = GENERICOS.map((key) => defDoCatalogo(key)).filter((def): def is DefDesafio => !!def);
+  for (const def of genericos) {
+    if (itens.length >= OPCOES_POR_SEMANA) break;
+    if (!jaTem(def.key) && !emDescanso.has(def.key)) itens.push(oferta(def, "nova"));
+  }
+
   // mistura: ao menos 1 ação positiva (troca a última vaga "nova", nunca a variação nem o calendário)
   const temAcao = () => itens.some((i) => defDoCatalogo(i.key)?.tipo === "acao");
   if (itens.length >= OPCOES_POR_SEMANA && !temAcao()) {
@@ -106,12 +130,13 @@ export function montarOfertas(d: DadosDaSemana, estado: ChallengesState): Oferta
     if (acao && ultima.origem === "nova") itens[itens.length - 1] = oferta(acao, "nova");
   }
 
-  // quase nada fora do descanso (0 ou 1 opção): repete a usada há mais tempo — card
+  // quase nada fora do descanso (0 ou 1 opção): repete a usada há mais tempo (elegível ou genérica) — card
   // sem escolha é pior que repetir; com 2+ opções o descanso de 4 semanas vale inteiro
   if (itens.length < 2) {
     const ultimaVez = new Map<string, string>();
     for (const h of usadas) if (!ultimaVez.has(h.key) || h.weekStart > ultimaVez.get(h.key)!) ultimaVez.set(h.key, h.weekStart);
-    const descansando = elegiveis.filter((def) => !jaTem(def.key) && emDescanso.has(def.key)).sort((a, b) => (ultimaVez.get(a.key) ?? "").localeCompare(ultimaVez.get(b.key) ?? ""));
+    const candidatas = [...elegiveis, ...genericos.filter((def) => !elegiveis.includes(def))];
+    const descansando = candidatas.filter((def) => !jaTem(def.key) && emDescanso.has(def.key)).sort((a, b) => (ultimaVez.get(a.key) ?? "").localeCompare(ultimaVez.get(b.key) ?? ""));
     for (const def of descansando) {
       if (itens.length >= OPCOES_POR_SEMANA) break;
       itens.push(oferta(def, "nova"));

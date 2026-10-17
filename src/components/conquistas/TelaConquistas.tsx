@@ -29,13 +29,14 @@ import { compartilharAdesivo } from "./compartilhar-conquistas";
 import { TOTAL_INSIGNIAS, type Insignia } from "./insignias";
 import { useInsignias } from "./use-insignias";
 import { useConquistas, usePerfilConquistas, useSequencia } from "./use-conquistas";
+import { CHAVE_ALBUM_VISTO } from "@/lib/conquistas-registro";
 import "./conquistas.css";
 
 export { CHAVE_CAPA };
 /** Quem escondeu o card "Desafio da semana" no Painel de Finanças (o adesivo Desafiante oferece religar). */
 export const CHAVE_DESAFIOS_OCULTOS = "finance-challenges-hidden";
-/** As figurinhas que a pessoa já viu no álbum (o pacotinho conta o que colou desde então). */
-export const CHAVE_ALBUM_VISTO = "conquistas-album-visto";
+/** As figurinhas que a pessoa já viu no álbum (o pacotinho conta o que colou desde então) — a chave mora no registro. */
+export { CHAVE_ALBUM_VISTO };
 
 /** "Set 2026" — o mês do cabeçalho quando a tela é estreita. */
 const mesCurto = (d = new Date()) => {

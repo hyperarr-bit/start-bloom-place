@@ -23,6 +23,7 @@ import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { isNativeShell } from "@/lib/native-shell";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -136,7 +137,8 @@ const Beleza = () => {
               dicas={[
                 "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
                 "Toque num passo pra escolher o produto e os dias da semana",
-                "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
+                // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado — lá a dica é só o que fazer
+                isNativeShell() ? "Ligue o lembrete da manhã e da noite — ele diz o passo do dia" : "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
                 "Cadastre seus produtos para rastrear validade e custo por dose",
               ]}
             />}

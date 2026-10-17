@@ -132,7 +132,7 @@ export function carregarDicionario(): Promise<void> {
     carregandoDicionario = import("virtual:medicao-textos")
       .then((m) => { dicionario = new Set(String(m.default ?? "").split("\n").filter(Boolean)); })
       .catch(() => { dicionario = new Set(); })
-      .then(() => { processarPendentes(); });
+      .then(() => { processarPendentes(); aquecerPeneira(); });
   }
   return carregandoDicionario;
 }
@@ -191,6 +191,15 @@ const atualizarPeneira = (): void => {
     coletarTextos(v, textos);
     textosPorChave.set(k, { valor: v, textos });
   }
+};
+
+/** Monta a peneira no tempo ocioso (a 1ª montagem percorre o store inteiro; depois só o que muda). */
+const aquecerPeneira = (): void => {
+  try {
+    const ocioso = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    if (ocioso) ocioso(() => atualizarPeneira(), { timeout: 5000 });
+    else setTimeout(atualizarPeneira, 1500);
+  } catch { /* noop */ }
 };
 
 /** O texto (já normalizado) aparece nos dados da pessoa? */
@@ -274,7 +283,7 @@ const limparAtributo = (v: string | null | undefined, max = 40): string | null =
 
 /** Id de aba (do código) → minúsculas, sem acento, só [a-z0-9_-]. */
 export const limparId = (v: string | null | undefined): string | null => {
-  const s = String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, MAX.aba);
+  const s = String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, MAX.aba);
   return s || null;
 };
 
@@ -617,7 +626,8 @@ export function anotarAba(modulo: string, aba: string | null | undefined): void 
     const a = limparId(aba);
     if (!a) return;
     if (estado.tela !== modulo) {
-      if (!TELAS.has(modulo)) return;
+      // só adota o módulo se a ROTA for dele (a demo do funil, /preview, nunca conta)
+      if (!TELAS.has(modulo) || telaDaRota(typeof window !== "undefined" ? window.location.pathname : "") !== modulo) return;
       anotarTela(`/${modulo}`);
     }
     if (a === estado.aba) return;
@@ -780,8 +790,10 @@ export function descarregarResumo(motivo: MotivoDoEnvio = "fundo"): Record<strin
   try {
     fecharTrecho();
     if (!ligada()) { zerarResumo(); return null; }
-    const vazio = !r.n.size && !r.t.size && !r.f.size && !r.b.size && estado.msAtivo < 1000;
-    if (vazio) { zerarResumo(); if (motivo === "timer" || motivo === "cheio") abrirTrecho(); return null; }
+    // só tempo (voltou pra mesma tela e saiu sem tocar): espera juntar 30 s — trocar de aba no navegador
+    // a cada instante não vira um evento por troca
+    const vazio = !r.n.size && !r.t.size && !r.f.size && !r.b.size && estado.msAtivo < 30_000;
+    if (vazio) { if (visivel()) abrirTrecho(); return null; }
     const payload: Record<string, unknown> = { v: 1, seq: ++estado.seq, motivo, ms: Math.round(estado.msAtivo) };
     const n = objeto(r.n), t = objeto(r.t), s = objeto(r.s, 1000), f = objeto(r.f), b = objeto(r.b);
     if (n) payload.n = n;
@@ -792,8 +804,9 @@ export function descarregarResumo(motivo: MotivoDoEnvio = "fundo"): Record<strin
     if (Object.keys(r.fora).length) payload.fora = { ...r.fora };
     zerarResumo();
     // despedida (fundo/saída) vai pelo keepalive; com o app aberto, o caminho normal
-    if (motivo === "timer" || motivo === "cheio") { trackEvent("uso_resumo", payload); abrirTrecho(); }
+    if (motivo === "timer" || motivo === "cheio") trackEvent("uso_resumo", payload);
     else trackEventBeacon("uso_resumo", payload);
+    if (visivel()) abrirTrecho(); // o relógio da tela continua (no fundo, quem reabre é a volta)
     return payload;
   } catch {
     return null;

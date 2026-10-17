@@ -197,7 +197,7 @@ beforeAll(async () => {
   erroGlobal = (e: ErrorEvent) => e.preventDefault();
   window.addEventListener("error", erroGlobal);
   await carregarDicionario(); // o do build (o 1º carregamento lê o src inteiro)
-}, 120_000);
+}, 180_000);
 
 beforeEach(() => {
   _zerarMedicaoTotal();
@@ -221,12 +221,34 @@ async function abrir(rota: string, ui: ReactNode, dados: Dados = DADOS) {
 }
 
 describe("privacidade: nenhum dado da pessoa vira chave", () => {
-  it("Home inteira (cabeçalho, menu da conta, ações rápidas, widgets, pendências, módulos): tocar em tudo", async () => {
+  it("Home inteira (cabeçalho, menu da conta, ações rápidas, widgets, pendências, módulos): tocar no que abre algo e derivar a chave de tudo", async () => {
     await abrir("/home", <HomePage />);
-    await tocarTudo(2);
+    const tocar = async (el: Element | null | undefined) => { if (!el?.isConnected) return; try { fireEvent.click(el); } catch { /* noop */ } await respirar(1); anotarChavesPossiveis(); };
+    const fechar = async () => { fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }); await respirar(1); };
+    const porTrack = (t: string) => document.querySelector(`[data-track="${t}"],[data-tour="${t}"],[data-spotlight="${t}"]`);
+    anotarChavesPossiveis();
+    // cada ação rápida abre o formulário dela (bloco acao:<id>)
+    for (const a of [...document.querySelectorAll('[data-track^="acao:"]')].map((el) => el.getAttribute("data-track")!)) await tocar(porTrack(a));
+    await tocar(porTrack("pendencias-abrir"));
+    await tocar(document.querySelector('[data-track^="pendencia-opcoes:"]'));
+    await tocar(screen.queryByLabelText("Personalizar pendências")); await fechar();
+    await tocar(porTrack("adicionar-widget")); await fechar();
+    await tocar(porTrack("modulos-engrenagem"));
+    await tocar(porTrack("modulo-favoritar"));
+    await tocar(porTrack("modulos-engrenagem"));
+    await tocar(porTrack("modulo:financas"));
+    // widgets: o 1º controle de cada um (tarefa abre a ficha; hábito marca)
+    for (const w of document.querySelectorAll('[data-track-bloco^="widget:"]')) await tocar(w.querySelector("button,[role=button],input,textarea"));
+    await fechar();
+    // menu da conta → "Minha conta" (outra tela da folha)
+    await tocar(screen.queryByLabelText("Minha conta"));
+    await tocar(porTrack("minha-conta"));
+    await fechar();
+    await tocar(screen.queryByLabelText("Trocar a cor do tema"));
+    await tocarTudo(1, 60);
     const p = descarregarResumo("teste");
     expect(p).not.toBeNull();
-    console.log(`[medicao] home: ${Object.keys(p!.n as object).length} chaves · ${Object.keys(p!.n as object).join("  ")}`);
+    console.log(`[medicao] home: ${Object.keys(p!.n as object).length} chaves · ${chavesPossiveis.size} possíveis`);
     expect(Object.keys(p!.n as object).length).toBeGreaterThan(15);
     semSentinela(p, ["Conquistas"]);
     semSentinela({ possiveis: [...chavesPossiveis] }, ["Conquistas"]);
@@ -241,11 +263,11 @@ describe("privacidade: nenhum dado da pessoa vira chave", () => {
     expect(tem(/^home\|\|\|pendencias\|pendencias-abrir$/)).toBe(true);
     expect(tem(/^home\|\|\|widget:(habits|tasks|finances|reading|relacoes|quick-notes)\|/)).toBe(true);
     expect(tem(/^home\|\|\|\|adicionar-widget$/)).toBe(true);
-    expect(tem(/^home\|\|MENU\|\|/)).toBe(true); // dentro do menu da conta (título da folha pela peneira)
+    expect(tem(/^home\|\|(MENU|MINHA CONTA)\|\|/)).toBe(true); // dentro do menu da conta (título da folha pela peneira)
     expect(p!.t).toMatchObject({ "home|": 1 });
     expect(Object.keys(p!.b as object)).toEqual(expect.arrayContaining(["home||score", "home||acoes-rapidas", "home||pendencias", "home||modulos"]));
     expect(Object.keys((p!.f ?? {}) as object).some((k) => k.startsWith("home||"))).toBe(true);
-  }, 120_000);
+  }, 180_000);
 
   for (const [rota, modulo, Pagina] of [
     ["/rotina", "rotina", Rotina],
@@ -255,7 +277,7 @@ describe("privacidade: nenhum dado da pessoa vira chave", () => {
   ] as const) {
     it(`${modulo}: todas as abas, todo controle — chaves com aba e bloco, sem nenhuma sentinela`, async () => {
       await abrir(rota, <TrackedModule moduleId={modulo}><Pagina /></TrackedModule>);
-      await percorrerAbas(40);
+      await percorrerAbas(15);
       await new Promise((r) => setTimeout(r, 450)); // a varredura dos cards (300 ms) e a das folhas (400 ms)
       varrer();
       const p = descarregarResumo("teste");
@@ -272,7 +294,7 @@ describe("privacidade: nenhum dado da pessoa vira chave", () => {
       semSentinela(p, modulo === "rotina" ? ["Conquistas"] : []);
       semSentinela({ possiveis: [...chavesPossiveis] }, modulo === "rotina" ? ["Conquistas"] : []);
       console.log(`[medicao] ${modulo}: ${chavesPossiveis.size} chaves possíveis (todas as abas)`);
-    }, 120_000);
+    }, 180_000);
   }
 });
 

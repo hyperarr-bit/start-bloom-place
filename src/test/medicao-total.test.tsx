@@ -87,6 +87,21 @@ describe("agregador da sessão", () => {
     expect(enviados.beacon).toHaveLength(0);
   });
 
+  it("só tempo (voltou e saiu sem tocar) espera juntar 30 s; a aba de um módulo que não é a rota (demo) não conta", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
+    instalarMedicaoTotal({ aceitarSinteticos: true, dedupeMs: 0 });
+    anotarTela("/home");
+    expect(descarregarResumo("teste")).not.toBeNull(); // a entrada na Home (t) sai
+    vi.advanceTimersByTime(10_000);
+    expect(descarregarResumo("teste")).toBeNull(); // 10 s de tempo, nada mais: segura
+    vi.advanceTimersByTime(25_000);
+    expect(descarregarResumo("teste")!.s).toEqual({ "home|": 35 }); // juntou 35 s: sai tudo
+    anotarTela("/inicio");
+    anotarAba("financas", "dashboard"); // TrackedModule fora da rota do módulo (ex.: demo do funil)
+    expect(_resumoAtual().t).toEqual({});
+  });
+
   it("clique sintético (el.click() do código) não conta em produção", () => {
     instalarMedicaoTotal({ dedupeMs: 0 });
     anotarTela("/home");

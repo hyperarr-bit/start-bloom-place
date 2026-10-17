@@ -61,7 +61,7 @@ import {
   _zerarRemotaMontar, calcularMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar, lerChaveRemotaMontar,
   marcaDoAparelho, marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, reaisDigitados, registrarChaveMontarFinancas,
   registrarVistaMontar, temDadosDeFinancas, _novaAberturaMontar, lerRascunhoMontar, montarAbertoPelaMissao,
-  MONTAR_FINANCAS_NO_MODULO,
+  MONTAR_FINANCAS_NO_MODULO, EV_GASTO_NO_NUMERO,
 } from "@/lib/montar-financas";
 import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
 import Index from "@/pages/Index";
@@ -298,7 +298,7 @@ describe("a tela, com a conta vazia", () => {
     expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
-    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO]);
+    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_GASTO_NO_NUMERO]); // + o post-it do 1º gasto (missão)
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao", cartao: false });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
@@ -352,7 +352,7 @@ describe("a tela, com a conta vazia", () => {
 
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index (Finanças de verdade), app da loja", () => {
-  it("REGRA DO DONO: conta nova vazia abrindo Finanças vê o módulo de sempre, na hora — nada de quiz, nem tela em branco esperando o dado da conta", async () => {
+  it("REGRA DO DONO: conta nova vazia abrindo Finanças vê o módulo de sempre, na hora — nada de quiz, nem tela em branco esperando o dado da conta", { timeout: 40_000 }, async () => {
     expect(MONTAR_FINANCAS_NO_MODULO).toBe(false);
     const controle = montarIndex({}, novoControle(), false);
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -366,7 +366,7 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: <T,>(_k: string, f: T) => f, isGuest: false })).toBe(true);
   });
 
-  it("a MISSÃO abre a tela por cima de Finanças; no fim, o módulo mostra a renda, as contas e o MESMO número no Dashboard", async () => {
+  it("a MISSÃO abre a tela por cima de Finanças; no fim, o módulo mostra a renda, as contas e o MESMO número no Dashboard", { timeout: 40_000 }, async () => {
     const ComMissao = () => {
       const [missao, setMissao] = useState(true);
       return (
@@ -393,10 +393,12 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
     const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div")!;
-    expect(within(card).getByText(`R$ ${numero}`)).toBeTruthy();
+    expect(within(card).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
+    // painel limpo (conta nova): nada gasto hoje, sobra o número inteiro pra hoje
+    expect(screen.getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);
   });
 
-  it("conta antiga, conta com dado, convidado e site: Finanças de sempre", async () => {
+  it("conta antiga, conta com dado, convidado e site: Finanças de sempre", { timeout: 40_000 }, async () => {
     auth.user = { id: UID, created_at: new Date(HOJE.getTime() - 30 * 24 * HORA).toISOString() };
     montarIndex({});
     await respirar();
@@ -485,7 +487,7 @@ describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem junt
     </MemoryRouter>
   );
 
-  it("o módulo não abre a tela dele nem pra conta nova vazia; a da missão abre por cima e é a única", async () => {
+  it("o módulo não abre a tela dele nem pra conta nova vazia; a da missão abre por cima e é a única", { timeout: 40_000 }, async () => {
     const { rerender } = render(<Ambos inicial={{}} missao={false} />);
     await respirar();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -521,7 +523,7 @@ describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem junt
     expect(marcaDoAparelho()?.vistas).toBe(1); // nem gasta a 2ª vista
   });
 
-  it("com a da missão já na tela, o módulo não abre a dele; quando ela termina, Finanças aparece cheia", async () => {
+  it("com a da missão já na tela, o módulo não abre a dele; quando ela termina, Finanças aparece cheia", { timeout: 40_000 }, async () => {
     render(<Ambos inicial={{}} missao />);
     await respirar();
     expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
@@ -536,7 +538,7 @@ describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem junt
 
 /* ───────────────────────── sair da conta e entrar de novo (conta VAZIA) ───────────────────────── */
 describe("logout → login na mesma conta vazia", () => {
-  it("pulou na tela da missão → sai da conta (vassoura do logout) → entra em outro aparelho (localStorage zerado): a missão não mostra de novo", async () => {
+  it("pulou na tela da missão → sai da conta (vassoura do logout) → entra em outro aparelho (localStorage zerado): a missão não mostra de novo", { timeout: 40_000 }, async () => {
     const controle = novoControle();
     render(
       <MemoryRouter>

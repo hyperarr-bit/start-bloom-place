@@ -57,6 +57,21 @@
  *   gasto, fixo, parcela, investimento ou conta no MEU MÊS) · ainda não terminou nem pulou.
  *   Quem já usa Finanças nunca vê — nem se a chave for ligada pra todo mundo.
  *
+ * ── O 1º GASTO NA TELA DO NÚMERO (17/10, D1 do relatório 11 — só origem "missao") ──────────────
+ *   Quem toca num chip faz 100% do passo 1 (112/112, mediana 10 s), mas só 42% tocavam: a pessoa saía
+ *   da tela calma do número pra uma tabela escurecida, com abas por baixo. Agora o post-it "Já gastou
+ *   com alguma coisa hoje?" mora NA tela "Você pode gastar hoje R$ X": Café R$ 12 · Uber R$ 23 ·
+ *   Almoço R$ 35 (os chips da missão, demo-guiada/alvos) · ✎ outro (nome + valor ali mesmo) · "Ainda
+ *   não gastei nada hoje →". 1 toque = 1 gasto variável de verdade (`finance-expenses`, o mesmo objeto
+ *   do "+ Novo gasto", à vista, hoje, id estável: tocar duas vezes não duplica) e o número cai na frente
+ *   dela: ~~R$ 70~~ R$ 58 pra hoje — "pra hoje" = o que dá por dia MENOS o que ela gastou hoje (não a
+ *   média refeita do mês, que só mexe R$ 66 → 65). `onPronto` leva `primeiroGasto: { nome } | null`.
+ *   Evento `missao_doses_gasto_no_numero {acao: view|chip|outro|ainda_nao, ms}` (nunca valor).
+ *   FECHAR O APP NA TELA DO NÚMERO (B11): o Montar já está decidido ("pronto" grava na entrada do
+ *   "Montando"), mas a tela volta — com o número e os chips já tocados — no mesmo dia e na mesma conta
+ *   (`numero` na marca do aparelho; `deveMostrarMontarFinancas` responde sim enquanto ela existir).
+ *   Sai da marca quando a pessoa sai da tela (o botão ou "Ainda não gastei").
+ *
  * ── UMA VEZ SÓ (chamado de 14/10: "toda vez que eu entro aparece o tutorial") ────────────────
  *   O "feito/pulou" fica em DOIS lugares: no aparelho (`core-montar-financas`, em
  *   CHAVES_DO_APARELHO — nenhuma vassoura leva) e na conta (mesma chave via useUserData, volta
@@ -116,7 +131,24 @@ export type EtapaComRascunho = "renda" | "contas" | "cartao";
 /** A resposta do passo do cartão. `usa: null` = ainda não respondeu; `banco: null` = não escolheu. */
 export interface RespostaCartao { usa: boolean | null; banco: string | null; valor: number; dia: number | null }
 export const CARTAO_VAZIO: RespostaCartao = { usa: null, banco: null, valor: 0, dia: null };
-export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number; rascunho?: RascunhoMontar }
+export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number; rascunho?: RascunhoMontar; numero?: TelaDoNumero }
+/** Um gasto anotado na tela do número (chip ou "✎ outro"). */
+export interface GastoDoNumero { id: string; nome: string; emoji: string; valor: number }
+/**
+ * A tela do número em aberto (B11): o que ela respondeu (pra refazer a conta igual) e os gastos que já
+ * tocou ali. `conta` é o `created_at` da conta — a marca do aparelho não é por conta, e outra pessoa que
+ * entrar neste celular nunca pode ver o número de quem saiu. `dia`: só volta no mesmo dia.
+ */
+export interface TelaDoNumero {
+  conta: string;
+  dia: string;
+  renda: number;
+  faixa: string | null;
+  contas: ContaEscolhida[];
+  cartao: RespostaCartao;
+  gastos: GastoDoNumero[];
+}
+export const EV_GASTO_NO_NUMERO = "missao_doses_gasto_no_numero";
 
 const ls = {
   get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -269,11 +301,46 @@ export const montarAbertoPelaMissao = (): boolean => abertas.missao > 0;
 
 /** Grava a decisão no aparelho; devolve a marca pra quem também grava na conta. */
 export function marcarMontarDecidido(r: Resultado): MarcaMontar {
-  const { rascunho: _r, ...sem } = marcaDoAparelho() ?? {};
+  const { rascunho: _r, numero: _n, ...sem } = marcaDoAparelho() ?? {};
   const marca: MarcaMontar = { ...sem, r, em: new Date().toISOString() };
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify(marca));
   return marca;
 }
+
+/* ───────────────────────── a tela do número em aberto (B11) ───────────────────────── */
+
+/** Guarda (ou atualiza) a tela do número — só depois do "pronto". */
+export function guardarTelaDoNumero(t: TelaDoNumero): void {
+  const m = marcaDoAparelho();
+  if (m?.r !== "pronto") return;
+  ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify({ ...m, numero: t }));
+}
+const ehGastoDoNumero = (g: unknown): g is GastoDoNumero => {
+  const x = g as Partial<GastoDoNumero> | null;
+  return !!x && typeof x.id === "string" && typeof x.nome === "string" && Number.isFinite(Number(x.valor)) && Number(x.valor) > 0;
+};
+/** A tela do número desta conta, de hoje — ou null. */
+export function lerTelaDoNumero(criadoEm: string | null | undefined, agora: Date = new Date()): TelaDoNumero | null {
+  const m = marcaDoAparelho();
+  const t = m?.numero;
+  if (m?.r !== "pronto" || !t || typeof t !== "object") return null;
+  if (!criadoEm || t.conta !== criadoEm || t.dia !== localDayKey(agora)) return null;
+  return {
+    conta: t.conta, dia: t.dia, renda: Number(t.renda) || 0, faixa: typeof t.faixa === "string" ? t.faixa : null,
+    contas: Array.isArray(t.contas) ? t.contas : [], cartao: lerRespostaCartao(t.cartao),
+    gastos: Array.isArray(t.gastos) ? t.gastos.filter(ehGastoDoNumero).map((g) => ({ id: g.id, nome: g.nome, emoji: typeof g.emoji === "string" ? g.emoji : "🧾", valor: Number(g.valor) })) : [],
+  };
+}
+/** Ela saiu da tela do número: não volta mais. */
+export function fecharTelaDoNumero(): void {
+  const m = marcaDoAparelho();
+  if (!m?.numero) return;
+  const { numero: _n, ...sem } = m;
+  ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify(sem));
+}
+
+/** "Pra hoje": o que dá por dia menos o que ela já gastou hoje (pode passar: negativo). */
+export const sobraPraHoje = (porDia: number, gastoHoje: number): number => Math.round((Math.round(porDia) - (Number(gastoHoje) || 0)) * 100) / 100;
 
 /* ───────────────────────── régua ───────────────────────── */
 
@@ -310,6 +377,8 @@ export interface ContextoMontar {
 export function deveMostrarMontarFinancas({ criadoEm, get, isGuest, isPreview, agora = Date.now() }: ContextoMontar): boolean {
   if (!montarFinancasLigado()) return false;
   if (isGuest || isPreview) return false;
+  // fechou o app NA tela do número (já decidido, já com dado no módulo): a tela volta lá, hoje (B11)
+  if (lerTelaDoNumero(criadoEm, new Date(agora))) return true;
   if (montarJaDecidido(get)) return false;
   if ((marcaDoAparelho()?.vistas ?? 0) >= MAX_VISTAS_SEM_DECISAO) return false;
   if (!contaNovaParaMontar(criadoEm, agora)) return false;

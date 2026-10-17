@@ -387,6 +387,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
   const totalVariableExpenses = variaveisMes.total;
+  /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do
+     painel limpo (Dashboard `gastoDeHoje`). */
+  const hojeKey = localDayKey();
+  const gastoDeHoje = variaveisMes.noMes.reduce((t: number, e: any) => t + (e?.date === hojeKey ? Number(e?.value) || 0 : 0), 0);
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
   const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
@@ -599,6 +603,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
                 limpo
+                gastoDeHoje={gastoDeHoje}
                 meuMes={
                   <TrackedCard cardKey="month-calendar" tab="dashboard">
                     <MonthCalendar

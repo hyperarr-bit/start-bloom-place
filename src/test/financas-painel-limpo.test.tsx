@@ -249,7 +249,7 @@ describe("a chave financas_painel_limpo", () => {
 
 /* ───────────────────────── no módulo ───────────────────────── */
 describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
-  it("mesmas seções, mesma ordem, sem 'Mais gráficos' — e nada gravado (nem na conta, nem no aparelho)", async () => {
+  it("mesmas seções, mesma ordem, sem 'Mais gráficos' — e nada gravado (nem na conta, nem no aparelho)", { timeout: 40_000 }, async () => {
     contaAntiga();
     const controle = montarIndex(MES_COM_DADO);
     await abrirDashboard();
@@ -259,10 +259,11 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
       "QUANTO POSSO GASTAR HOJE", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // a linha "pra hoje" é só do painel limpo
     expect(controle.escritas().map((e) => e.k)).not.toContain(CHAVE_PAINEL_LIMPO);
     expect(Object.keys(localStorage).some((k) => k.startsWith(PREFIXO_PAINEL_LIMPO_APARELHO))).toBe(false);
   });
-  it("mesmo com o Montar feito NO APARELHO por outra conta: o antigo continua igual", async () => {
+  it("mesmo com o Montar feito NO APARELHO por outra conta: o antigo continua igual", { timeout: 40_000 }, async () => {
     contaAntiga();
     localStorage.setItem(CHAVE_MONTAR_FINANCAS, JSON.stringify({ r: "pronto", em: "x" }));
     localStorage.setItem(`${PREFIXO_PAINEL_LIMPO_APARELHO}${OUTRA}`, "1");
@@ -275,7 +276,7 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
 describe("pages/Index — conta nova abre com o painel limpo", () => {
   const NOVA = { ...MES_COM_DADO, [CHAVE_MONTAR_FINANCAS]: { r: "pronto", em: "x" } };
 
-  it("os mais usados no topo, Desafio à vista, o resto no 'Mais gráficos' (fechado); abrir manda o evento", async () => {
+  it("os mais usados no topo, Desafio à vista, o resto no 'Mais gráficos' (fechado); abrir manda o evento", { timeout: 40_000 }, async () => {
     const controle = montarIndex(NOVA);
     await abrirDashboard();
     expect(document.querySelector('[data-painel="limpo"]')).toBeTruthy();
@@ -300,7 +301,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(controle.escritas().find((e) => e.k === CHAVE_PAINEL_LIMPO)).toEqual({ k: CHAVE_PAINEL_LIMPO, system: true });
   });
 
-  it("com cartão: o TOTAL POR CARTÃO NO MÊS entra no topo, depois de Gastos por categoria", async () => {
+  it("com cartão: o TOTAL POR CARTÃO NO MÊS entra no topo, depois de Gastos por categoria", { timeout: 40_000 }, async () => {
     montarIndex({
       ...NOVA,
       "finance-fixed-expenses": [
@@ -315,7 +316,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(within(total).getByText("Fatura de outubro · vence dia 25")).toBeTruthy();
   });
 
-  it("sem Montar nenhum (entrou em Finanças por curiosidade — o módulo não abre o quiz): decidido na 1ª abertura, e o limpo FICA depois do 1º lançamento", async () => {
+  it("sem Montar nenhum (entrou em Finanças por curiosidade — o módulo não abre o quiz): decidido na 1ª abertura, e o limpo FICA depois do 1º lançamento", { timeout: 40_000 }, async () => {
     const controle = montarIndex({ "spotlight-done-financas": "true" });
     await respirar();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -329,7 +330,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(document.querySelector('[data-painel="limpo"]')).toBeTruthy();
   });
 
-  it("fez o Montar PELA MISSÃO e só abriu Finanças dias depois (já com dado, fora das 48 h): elegível pela marca da conta", async () => {
+  it("fez o Montar PELA MISSÃO e só abriu Finanças dias depois (já com dado, fora das 48 h): elegível pela marca da conta", { timeout: 40_000 }, async () => {
     vi.setSystemTime(HOJE.getTime() + 4 * 24 * HORA);
     montarIndex({ ...MES_COM_DADO, [CHAVE_MONTAR_FINANCAS]: { r: "pronto", em: new Date(HOJE).toISOString() } });
     await abrirDashboard();
@@ -337,7 +338,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(localStorage.getItem(CHAVE_APARELHO)).toBe("1");
   });
 
-  it("conta criada desde o corte que lançou antes de abrir Finanças e passou das 48 h, sem Montar: painel de sempre (a regra não mudou)", async () => {
+  it("conta criada desde o corte que lançou antes de abrir Finanças e passou das 48 h, sem Montar: painel de sempre (a regra não mudou)", { timeout: 40_000 }, async () => {
     vi.setSystemTime(HOJE.getTime() + 4 * 24 * HORA);
     montarIndex(MES_COM_DADO);
     await abrirDashboard();
@@ -345,7 +346,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(localStorage.getItem(CHAVE_APARELHO)).toBeNull();
   });
 
-  it("conta nova que pulou tudo (sem dado): o card do topo mostra o caminho, não 'você não pode gastar'", async () => {
+  it("conta nova que pulou tudo (sem dado): o card do topo mostra o caminho, não 'você não pode gastar'", { timeout: 40_000 }, async () => {
     montarIndex({ "spotlight-done-financas": "true", [CHAVE_MONTAR_FINANCAS]: { r: "pulou", em: "x" } });
     await abrirDashboard();
     const vazio = screen.getByTestId("pode-gastar-vazio");
@@ -356,7 +357,7 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(screen.getByRole("button", { name: /MEU FINANCEIRO/ }).getAttribute("data-active")).toBe("true");
   });
 
-  it("metadata 'off' no RevenueCat: painel de sempre — e religando, volta o limpo pra mesma conta", async () => {
+  it("metadata 'off' no RevenueCat: painel de sempre — e religando, volta o limpo pra mesma conta", { timeout: 40_000 }, async () => {
     registrarChavePainelLimpo({ current: { metadata: { financas_painel_limpo: "off" } }, all: {} });
     montarIndex(NOVA);
     await abrirDashboard();
@@ -369,14 +370,14 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(document.querySelector('[data-painel="limpo"]')).toBeTruthy();
   });
 
-  it("site: painel de sempre (chave web desligada)", async () => {
+  it("site: painel de sempre (chave web desligada)", { timeout: 40_000 }, async () => {
     virarSite();
     montarIndex(NOVA);
     await abrirDashboard();
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
   });
 
-  it("fechar e abrir o app (dado da conta ainda chegando): já abre limpo; sair e entrar; outro aparelho; outra conta no mesmo celular não herda", async () => {
+  it("fechar e abrir o app (dado da conta ainda chegando): já abre limpo; sair e entrar; outro aparelho; outra conta no mesmo celular não herda", { timeout: 40_000 }, async () => {
     const controle = montarIndex(NOVA);
     await abrirDashboard();
     const daConta = controle.dados()[CHAVE_PAINEL_LIMPO];

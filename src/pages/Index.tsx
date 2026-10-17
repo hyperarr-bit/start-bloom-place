@@ -53,7 +53,7 @@ import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
 import { YearComparison } from "@/components/finance/YearComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
-import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
@@ -403,7 +403,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // "Despesas do mês" oficial (fixas + variáveis + parcelas) — é o número que
   // Dashboard, Relatórios, Saúde e a barra de resumo mostram. Fonte única em
   // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
-  const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments);
+  // (17/10) + contas avulsas do MEU MÊS (com valor, pagas ou não): marcar
+  // paga não pode mais fazer o dinheiro sumir.
+  const contasAvulsasDoMes = computeLooseBillsOutflow(dueDays as any[], fixedExpenses);
+  const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments, contasAvulsasDoMes);
 
   /* Reserva de emergência DECLARADA pela pessoa (08/08). Enquanto ela não
      registrar, o app segue estimando como antes — ver FinancialHealth. */
@@ -890,6 +893,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               totalExpenses={totalVariableExpenses}
               totalFixedExpenses={totalFixedExpenses}
               monthlyInstallments={monthlyInstallments}
+              looseBills={contasAvulsasDoMes}
               totalDebts={totalDebts}
               totalInvestments={totalInvestments}
               emergencyFundGoal={emergencyFundGoal}

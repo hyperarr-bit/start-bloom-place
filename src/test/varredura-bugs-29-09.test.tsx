@@ -208,7 +208,7 @@ describe("Resumo do mês que acabou — dinheiro com 2 casas", () => {
  * ============================================================ */
 describe("Saúde Financeira", () => {
   const base = {
-    totalIncome: 5001, totalExpenses: 1000, totalFixedExpenses: 1500, monthlyInstallments: 0, totalDebts: 0,
+    totalIncome: 5001, totalExpenses: 1000, totalFixedExpenses: 1500, monthlyInstallments: 0, looseBills: 0, totalDebts: 0,
     totalInvestments: 0, emergencyFundGoal: 0, dueDays: [], installments: [], wishlistItems: [], trips: [], investments: [],
   };
 

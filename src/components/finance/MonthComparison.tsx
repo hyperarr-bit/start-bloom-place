@@ -2,10 +2,10 @@ import { useState, useMemo } from "react";
 import { ArrowLeftRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData, anosComLancamentos } from "@/components/finance/storage-keys";
-import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
+import { doPerfil, doPerfilDueDays, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceCategories } from "@/lib/finance-categories";
-import { computeMonthlyOutflow } from "@/lib/finance-totals";
+import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import {
   type Parcela, chaveArquivadaDeParcelas, mesesAnteriores, mesesEntre, projetarParcelas, somaParcelasDoMes,
   valorDaParcelaNoMes, viradaDeParcelas,
@@ -33,6 +33,7 @@ export const categoryLabels: Record<string, string> = {
   academia: "Academia", transporte_fixo: "Transporte Fixo",
   fatura_cartao: "Fatura Cartão", financiamento: "Financiamento",
   pensao: "Pensão", outros: "Outros",
+  contas_avulsas: "Contas do mês",
 };
 
 export const COLORS = [
@@ -130,12 +131,26 @@ export const parcelasDoMesDe = (m: MesAno, userId: string | null, perfil: string
 /** Categoria da parcela como o card de parcelamentos mostra ("roupa" antigo = vestuário). */
 const categoriaDaParcela = (c?: string) => (c === "roupa" ? "vestuario" : c || "outros");
 
+/** Contas avulsas do mês (17/10): a chave de contas DAQUELE mês (corrente =
+ *  `finance-dueDays`, como no Index; outro mês = o retrato dele, pela regra de
+ *  arquivo — conta de fixo nunca vira avulsa). Mês sem retrato = 0. */
+export const avulsasDoMesDe = (m: MesAno, userId: string | null, perfil: string): number => {
+  const keys = getFinanceStorageKeys(ALL_MONTHS[m.idx], m.ano);
+  const lista = (chave: string) => { const v = readMonthData(userId, chave); return Array.isArray(v) ? v : []; };
+  const dueDays = doPerfilDueDays(lista(keys.dueDays), perfil);
+  const fixos = doPerfil(lista(keys.fixed), perfil);
+  return keys.dueDays === "finance-dueDays"
+    ? computeLooseBillsOutflow(dueDays, fixos)
+    : computeArchivedLooseBillsOutflow(dueDays, fixos);
+};
+
 /** Totais do mês com a MESMA conta do Dashboard: fixos + variáveis + parcelas
- *  (computeMonthlyOutflow, lib/finance-totals). */
+ *  + contas avulsas (computeMonthlyOutflow, lib/finance-totals). */
 export const totaisDoMes = (m: MesAno, userId: string | null, perfil: string, agora = new Date()) => {
   const t = getMonthTotals(ALL_MONTHS[m.idx], userId, m.ano, perfil);
   const parcelas = somaParcelasDoMes(parcelasDoMesDe(m, userId, perfil, agora));
-  return { ...t, parcelas, despesas: computeMonthlyOutflow(t.custosVariaveis, t.custosFixos, parcelas) };
+  const avulsas = avulsasDoMesDe(m, userId, perfil);
+  return { ...t, parcelas, avulsas, despesas: computeMonthlyOutflow(t.custosVariaveis, t.custosFixos, parcelas, avulsas) };
 };
 
 export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string, agora = new Date()): Record<string, number> => {
@@ -159,6 +174,9 @@ export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: 
     const cat = categoriaDaParcela(p.category);
     grouped[cat] = (grouped[cat] || 0) + v;
   });
+  // (17/10) as contas avulsas do MEU MÊS também são despesa do mês — mesma razão
+  const avulsas = avulsasDoMesDe(m, userId, perfil);
+  if (avulsas > 0) grouped.contas_avulsas = (grouped.contas_avulsas || 0) + avulsas;
 
   return grouped;
 };

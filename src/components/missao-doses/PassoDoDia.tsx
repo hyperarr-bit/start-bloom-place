@@ -93,7 +93,9 @@ const MODELOS_DA_DOSE = ["ABC Clássico", "Upper / Lower", "Full Body 3x"];
 export const CHIPS_DE_TREINO: ChipDaMissao[] = MODELOS_DE_TREINO
   .filter((m) => MODELOS_DA_DOSE.includes(m.name)).concat(MODELOS_DE_TREINO.filter((m) => !MODELOS_DA_DOSE.includes(m.name)))
   .slice(0, 3).map((m) => ({ emoji: m.emoji, nome: m.name }));
-export const CHIPS_DE_META_AGUA: ChipDaMissao[] = [6, 8, 10].map((n) => ({ emoji: "💧", nome: `Meta de ${n} copos`, valor: n }));
+export const CHIPS_DE_META_AGUA: ChipDaMissao[] = [6, 8, 10].map((n) => ({ emoji: "💧", nome: `Meta de ${n} copos` }));
+/** A meta do chip ("Meta de 8 copos" → 8) — fora do `valor`, que o post-it mostra como R$. */
+const metaDoChip = (c: ChipDaMissao): number => Number(/(\d+)/.exec(c.nome)?.[1] ?? 0);
 
 /**
  * O PASSO DO DIA dentro do módulo de verdade (D3/D7 → olhar → D4): a faixa
@@ -358,9 +360,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       return;
     }
     // 1.0.16: Saúde sem meta — o chip grava a meta e o 1º copo (o copo segue pelo caminho de sempre, abaixo)
-    if (semMetaAgua && chip.valor) {
-      try { set("core-saude-water-goal", chip.valor); avisarEscritaDeFora("core-saude-water-goal", chip.valor); } catch { /* noop */ }
-      chip = { emoji: "💧", nome: `1 copo d'água · meta ${chip.valor}` };
+    const meta = semMetaAgua ? metaDoChip(chip) : 0;
+    if (meta > 0) {
+      try { set("core-saude-water-goal", meta); avisarEscritaDeFora("core-saude-water-goal", meta); } catch { /* noop */ }
+      chip = { emoji: "💧", nome: `1 copo d'água · meta ${meta}` };
     }
     const item = itemDoChip(cfg.tipo, semMetaAgua ? { emoji: "💧", nome: "1 copo d'água" } : chip);
     trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, valor: chip.valor, ok: !!item }));

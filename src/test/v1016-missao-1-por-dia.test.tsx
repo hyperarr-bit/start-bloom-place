@@ -46,8 +46,9 @@ import { purgeLocalUserCache } from "@/hooks/use-auth";
 import { MissaoDosesNaWeb, areaDaMissao } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { Anel, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
 import {
-  CHAVE_ESTADO_MISSAO_DOSES, conviteDoDiaDevido, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao,
+  CHAVE_ESTADO_MISSAO_DOSES, EVENTO_MISSAO_DOSES, conviteDoDiaDevido, doseDeHojeDevida, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao, precisaPlanoA,
 } from "@/lib/missao-doses";
+import { marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
 import {
   CHAVE_BRACO_DIA1, CHAVE_UM_POR_DIA_APARELHO, _zerarUmPorDiaRemoto, bracoDia1, idDoAparelho, lerUmPorDiaRemoto, modoDia1Cheio, modoUmPorDia, registrarUmPorDiaRemoto, sortearBraco,
 } from "@/lib/dia1-cheio";
@@ -136,6 +137,9 @@ const offerings = (meta: Record<string, unknown> | null, outra?: Record<string, 
   return { current, all: { default: current, ...(outra ? { anual_69: { identifier: "anual_69", metadata: outra } } : {}) } };
 };
 const ligarUmPorDia = (modo: "on" | "ab" | "off") => registrarUmPorDiaRemoto(offerings({ missao_1_por_dia: modo }));
+/** Uma missão do braço A nascida em 03/10 (o dia 1), com as boas-vindas vistas. */
+const missaoA = (feitos: Record<number, { dia: string; rotulo: string }>, extra: Record<string, unknown> = {}) =>
+  localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "A"), boasVindas: true, feitos, ...extra }));
 const iphone = () => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; };
 const hojeDe = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -333,34 +337,70 @@ describe("3. a metadata `missao_1_por_dia` do RevenueCat", () => {
 /* ------------------------------------------------------------ 4: o braço A, dia a dia */
 
 describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () => {
-  it("dia 1: boas-vindas 'um por dia' → dose 1 → festa com 'Amanhã · Rotina · te lembro às' e SEM adiantar; a Rotina não abre a dose 2 hoje", () => {
+  it("dia 1 (conta VAZIA, área dinheiro): boas-vindas de 1 tela → Montar Finanças é a dose → festa PEQUENA 'Dia 1 de 3 feito ✅' + adesivo 'Dia 1' + amanhã trancado → Home → (tour curto) → 'Plano de amanhã' 8/12/20 → a Rotina não abre a dose 2 hoje", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
+    localStorage.removeItem("core-montar-financas"); // a dose de Finanças de verdade
     const store = montarStore({});
     montar(store, "/home");
-    expect(lerMissao()?.braco).toBe("A");
-    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("1 toque por dia");
-    expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "A", braco: "um_por_dia", missao_1_por_dia: "on" })]);
+    const boas = screen.getByTestId("missao-doses-boas-vindas");
+    expect(boas).toHaveTextContent("Tá dentro! 🎉");
+    expect(boas).toHaveTextContent("Seu plano de 3 dias");
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Hoje · 💰 Finanças · monte em 30 s");
+    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Amanhã · 📅 Rotina · 1 hábito, 20 s");
+    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Dia 3 · ❤️ Saúde · 1 copo d'água, 10 s");
+    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent("Começar (30 s)");
+    expect(screen.getByTestId("missao-doses-trocar")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
-    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
-    const festa = terminarOlhar();
-    expect(festa).toHaveTextContent("Primeiro registro feito!");
-    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã · 📅 Rotina");
+    // a dose = "Vamos montar suas Finanças" (renda → contas → o número dela)
+    const mf = () => within(screen.getByTestId("montar-financas"));
+    fireEvent.click(mf().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(mf().getByRole("button", { name: /Aluguel/ }));
+    fireEvent.click(mf().getByRole("button", { name: "Ver quanto posso gastar" }));
+    avancar(2500);
+    expect(screen.queryByTestId("demo-guia-postit")).toBeNull(); // nada da missão por cima do Montar
+    fireEvent.click(mf().getByRole("button", { name: "Ver minhas Finanças" }));
+    expect(Array.isArray(store.dados["finance-incomes"])).toBe(true);
+    const festa = screen.getByTestId("missao-doses-festa");
+    expect(festa).toHaveAttribute("data-braco", "A");
+    expect(festa).not.toHaveAttribute("data-tela-cheia");
+    expect(festa).toHaveTextContent("Dia 1 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(/Pode gastar R\$ [\d.]+ por dia já está nas suas Finanças/);
+    expect(screen.getByTestId("missao-doses-adesivo")).toHaveTextContent("Adesivo · Dia 1");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: 📅 Rotina · 20 s");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("adesivo do dia 2 🔒");
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
     expect(screen.queryByTestId("missao-doses-bora-proxima")).toBeNull();
-    expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 1, variante: "A", braco: "um_por_dia" })]);
-    fireEvent.click(screen.getByTestId("missao-doses-combinado"));
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "montar_financas", acao: "feito", variante: "A", dia_cal: 1 })]);
+    expect(eventos).toContainEqual(["adesivo_desbloqueado", expect.objectContaining({ id: "missao_dia_1", origem: "missao_dia_1" })]);
+    expect(eventos).toContainEqual(["montar_financas_view", expect.objectContaining({ origem: "missao" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-continuar"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/home");
     const m = lerMissao()!;
+    expect(m.adesivos).toEqual(["missao_dia_1"]);
     expect(doseLiberadaHoje(m)).toBe(false);
-    expect(missaoEmAndamento(m)).toBe(false); // o tour/adesivos podem entrar: a missão volta amanhã
-    expect(conviteDoDiaDevido(m)).toBe(false); // dia 1: sem convite
-    // o Lembrete do dia 2 aponta pra dose de amanhã
-    const lembrete = conteudoDoLembrete(store.valor().get, { missao: m, amanha: new Date(2026, 9, 4, 12, 0), hoje: "2026-10-03" });
-    expect(lembrete.title).toBe("🔥 Dia 2 da missão: 📅 Rotina");
-    expect(lembrete.rota).toBe("/rotina");
-    // ela entra sozinha na Rotina no MESMO dia: nada de dose 2
+    expect(missaoEmAndamento(m)).toBe(false); // a Home é dela: o tour curto pode entrar
+    expect(varianteDoTour(m)).toBe("curto");
+    expect(precisaPlanoA(m)).toBe(true);
+    // o tour curto ainda não aconteceu: a folha do plano ESPERA ele
+    avancar(3000);
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
+    marcarTourFeito(); // ... o tour curto acabou
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_DOSES)); });
+    avancar(2000);
+    expect(screen.getByTestId("plano-amanha-a-titulo")).toHaveTextContent("Amanhã a gente monta sua Rotina em 20 s. Que horas te lembro?");
+    fireEvent.click(screen.getByTestId("plano-a-hora-20h"));
+    fireEvent.click(screen.getByTestId("plano-a-combinado"));
+    expect(lerMissao()?.lembrete).toBe("20h");
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
+    // fechar → reabrir no mesmo dia: nada volta (boas-vindas, Montar, festa, plano)
+    cleanup();
+    montar(store, "/home");
+    avancar(4000);
+    for (const t of ["missao-doses-boas-vindas", "plano-amanha-a", "missao-doses-convite", "missao-doses-festa"]) expect(screen.queryByTestId(t), t).toBeNull();
+    // ela entra sozinha na Rotina no MESMO dia: uso livre, nada de dose 2
     cleanup();
     montar(store, "/rotina");
     avancar(4000);
@@ -368,73 +408,115 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.queryByTestId("demo-guia-postit")).toBeNull();
   });
 
-  it("dia 2: reabriu → o convite 'Dia 2 da missão · Rotina' (1x) → 'Bora' leva pra Rotina e a dose 2 acontece; dia 3: 'Agora não' → não volta ao fechar/reabrir nem depois do logout; a dose segue no módulo", () => {
+  it("23:59 → 00:01: a dose 2 não abre no dia 1 e abre no dia 2 (relógio falso)", () => {
+    ligarUmPorDia("on");
+    const store = montarStore({});
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } });
+    vi.setSystemTime(new Date(2026, 9, 3, 23, 59));
+    montar(store, "/rotina");
+    avancar(4000);
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    cleanup();
+    vi.setSystemTime(new Date(2026, 9, 4, 0, 1));
+    montar(store, "/rotina");
+    esperarPostIt();
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
+  });
+
+  it("pulou o dia 2: no dia 3 vem 'Dia 2 de 3' (a ordem, não o calendário); a missão para no 7º dia", () => {
+    ligarUmPorDia("on");
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } });
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 0));
+    montar(montarStore({}), "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 2 de 3 · 📅 Rotina · 20 s");
+    cleanup();
+    const m = lerMissao()!;
+    expect(conviteDoDiaDevido(m, "2026-10-09")).toBe(true); // dia 7
+    expect(conviteDoDiaDevido(m, "2026-10-10")).toBe(false); // dia 8: acabou
+    expect(doseDeHojeDevida(m, "2026-10-10")).toBe(false);
+  });
+
+  it("dia 2: convite 1x ('Dia 2 de 3 · Rotina · 20 s' + o de ontem) → 'Bora' → 3 hábitos prontos → festa 'Dia 2 de 3' + 'Sequência: 2 dias 🔥' + adesivo + 3 dias trancado + hora; dica do score; dia 3: convite 'Faltam 10 s' → 'Agora não' não volta (reabrir, logout) → a linha 'Dose de hoje' fica → Saúde (meta + copo) → a ÚNICA festa em tela cheia '3 dias seguidos' → 'O que você construiu'", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     const store = montarStore({});
-    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({
-      ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "A"), boasVindas: true, lembrete: "12h",
-      feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } },
-    }));
-    // dia 2, 10h
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { lembrete: "12h" });
     vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
     montar(store, "/home");
     expect(screen.queryByTestId("missao-doses-convite")).toBeNull(); // espera a Home assentar
     avancar(1500);
     const convite = screen.getByTestId("missao-doses-convite");
-    expect(convite).toHaveTextContent("Dia 2 da missão");
-    expect(convite).toHaveTextContent("📅 Rotina");
-    expect(convite).toHaveTextContent("Ontem: Café · R$ 12 nas suas Finanças");
-    expect(eventos).toContainEqual(["missao_convite_dia", expect.objectContaining({ acao: "view", dia_relogio: 2, indice: 2, modulo: "rotina", braco: "um_por_dia" })]);
+    expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 2 de 3 · 📅 Rotina · 20 s");
+    expect(convite).toHaveTextContent("Ontem você montou suas Finanças: R$ 61 por dia.");
+    expect(eventos).toContainEqual(["missao_convite", expect.objectContaining({ acao: "visto", dia: 2, modulo: "rotina", braco: "um_por_dia", dia_cal: 2 })]);
     fireEvent.click(screen.getByTestId("missao-doses-convite-ir"));
     expect(lerMissao()?.convites).toEqual({ "2026-10-04": "foi" });
+    expect(eventos).toContainEqual(["missao_convite", expect.objectContaining({ acao: "bora", dia: 2 })]);
     expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
     const postIt = esperarPostIt();
     expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
+    expect(within(postIt).getAllByTestId("demo-guia-chip")).toHaveLength(3);
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     fireEvent.click(screen.getByText("Adicionar"));
     avancar(400); avancar(1000);
     fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
     const festa = terminarOlhar();
-    expect(festa).toHaveTextContent("Dia 2 feito!");
-    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã · ❤️ Saúde");
+    expect(festa).toHaveTextContent("Dia 2 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-sequencia")).toHaveTextContent("Sequência: 2 dias 🔥");
+    expect(screen.getByTestId("missao-doses-adesivo")).toHaveTextContent("Adesivo · Dia 2");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: ❤️ Saúde · 10 s");
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("o adesivo 3 dias seguidos é seu 🔒");
+    expect(screen.getByTestId("missao-doses-hora-12h")).toHaveAttribute("aria-checked", "true"); // a combinada; dá pra trocar
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
+    expect(eventos).toContainEqual(["sequencia_marco", expect.objectContaining({ dias: 2 })]);
     fireEvent.click(screen.getByTestId("missao-doses-combinado"));
-    expect(lerMissao()?.feitos[2]?.dia).toBe("2026-10-04");
-    // a Saúde não abre hoje
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toHaveAttribute("data-dia", "2"); // 1 balão no score
+    fireEvent.click(screen.getByTestId("missao-dica-entendi"));
+    expect(lerMissao()?.dicas?.[2]).toBe("2026-10-04");
     cleanup();
+    // a Saúde não abre hoje
     montar(store, "/saude");
     avancar(4000);
     expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
     cleanup();
 
-    // dia 3: convite da Saúde → "Agora não"
+    // dia 3: o convite fala da sequência → "Agora não"
     vi.setSystemTime(new Date(2026, 9, 5, 19, 0));
     eventos.length = 0;
     montar(store, "/home");
     avancar(1500);
-    expect(screen.getByTestId("missao-doses-convite")).toHaveTextContent("Dia 3 da missão");
-    expect(screen.getByTestId("missao-doses-convite")).toHaveTextContent("❤️ Saúde");
+    expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 3 de 3 · ❤️ Saúde · 10 s");
+    expect(screen.getByTestId("missao-doses-convite")).toHaveTextContent("Faltam 10 s pros seus 3 dias seguidos.");
     fireEvent.click(screen.getByTestId("missao-doses-convite-depois"));
     expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
-    expect(eventos).toContainEqual(["missao_convite_dia", expect.objectContaining({ acao: "depois", indice: 3 })]);
+    expect(eventos).toContainEqual(["missao_convite", expect.objectContaining({ acao: "depois", dia: 3 })]);
     cleanup();
-    // fechar → reabrir
-    montar(store, "/home");
-    avancar(3000);
+    montar(store, "/home"); avancar(3000);
+    expect(screen.queryByTestId("missao-doses-convite")).toBeNull(); // fechar → reabrir
+    cleanup();
+    purgeLocalUserCache(); // sair da conta e entrar de novo
+    montar(store, "/home"); avancar(3000);
     expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
     cleanup();
-    // sair da conta e entrar de novo (vassoura do logout)
-    purgeLocalUserCache();
-    expect(lerMissao()?.convites?.["2026-10-05"]).toBe("depois");
-    montar(store, "/home");
-    avancar(3000);
-    expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
-    cleanup();
-    // a dose de hoje continua no módulo dela
+    // a dose de hoje continua no módulo dela (e na linha das Pendências — testada no bloco 6)
     montar(store, "/saude");
-    esperarPostIt();
+    const postIt3 = esperarPostIt();
     expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 3 de 3");
+    const chips3 = within(postIt3).getAllByTestId("demo-guia-chip");
+    expect(chips3.map((c) => c.textContent)).toEqual(["💧Meta de 6 copos", "💧Meta de 8 copos", "💧Meta de 10 copos"]);
+    fireEvent.click(chips3[1]);
+    expect(store.dados["core-saude-water-goal"]).toBe(8);
+    const festa3 = terminarOlhar();
+    expect(festa3).toHaveAttribute("data-tela-cheia");
+    expect(festa3).toHaveTextContent("3 dias seguidos!");
+    expect(screen.getByTestId("missao-doses-adesivo")).toHaveAttribute("data-adesivo", "missao_3_seguidos");
+    expect(festa3).not.toHaveTextContent(/R\$ ?97|assin|plano anual|oferta/i);
+    expect(eventos).toContainEqual(["adesivo_desbloqueado", expect.objectContaining({ id: "missao_3_seguidos", origem: "missao_dia_3" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-ver-fim"));
+    expect(screen.getByTestId("construiu")).toBeInTheDocument();
   });
 
   it("o convite espera outra folha/festa sair da tela (nunca duas folhas juntas)", () => {

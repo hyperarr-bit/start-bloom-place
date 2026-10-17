@@ -237,6 +237,8 @@ export const SETUP_DO_MODULO: Partial<Record<ModuloDaMissao, SetupDaDose>> = {
 };
 export const setupDaDose = (n: number, modulo: ModuloDaMissao, modo: "dose" | "aprofundar" = "dose"): SetupDaDose | null =>
   n === 1 && modo === "dose" ? SETUP_DO_MODULO[modulo] ?? null : null;
+/** Um quiz encaixado (Rotina, Treino) aparece no máximo 2 vezes sem decisão (fechou o app no meio = volta 1 vez). */
+export const MAX_VISTAS_DO_SETUP = 2;
 
 /* ------------------------------------------------------------------ o estado */
 
@@ -285,6 +287,9 @@ export interface EstadoMissaoDoses {
    *  meio, a dose volta no passo do gasto ao reabrir no mesmo dia (retomadaDoGasto). Sai quando o gasto entra, ela
    *  pula, ou a comemoração aparece. */
   gastoGuiado?: { n: DiaDaMissao; dia: string; retomadas?: number };
+  /** 1.0.16: o quiz encaixado da 1ª dose (Rotina, Treino) — pulado (o dia: nunca mais) e quantas vezes apareceu */
+  setupPulado?: Partial<Record<SetupDaDose, string>>;
+  setupVistas?: Partial<Record<SetupDaDose, number>>;
   /** 1.0.16 (relatório 11, B10): quantas vezes a dose `n` montou (cada entrada no módulo é um `view` novo) e a hora
    *  da 1ª vista dela — o tempo de verdade até o feito é desde a 1ª, não desde a última montagem */
   montagens?: Partial<Record<DiaDaMissao, number>>;
@@ -556,24 +561,9 @@ export function moduloDaMissaoHoje(hoje: string = localDayKey()): ModuloDaMissao
   } catch { return null; }
 }
 
-/**
- * 1.0.16 — A INTRODUÇÃO DO MÓDULO JÁ FOI FEITA? (contrato com o ramo da introdução dos módulos, v1016-cartoes)
- * No braço A, quem abre Rotina ou Saúde no dia 1 por curiosidade ganha a 1ª ação guiada daquele módulo (o mesmo
- * anel/post-it das doses), gravada no aparelho em `core-intro-vista-<módulo>` e na conta em `core-intro-vistas`
- * (lista de ids). A dose daquele módulo nos dias 2–3 não repete a 1ª ação: vira CONTINUAÇÃO (Rotina: marcar o
- * hábito de hoje; Saúde: mais 1 copo, sem perguntar a meta de novo; Finanças: o gasto de hoje, sem o Montar).
- * Aquele ramo exporta `introConcluida(modulo)` em src/lib/intro-modulo.ts — que ainda não existe aqui: este
- * leitor lê as MESMAS chaves direto, pra valer antes e depois do merge (dá pra trocar por ele depois).
- */
-export const PREFIXO_INTRO_VISTA = "core-intro-vista-";
-export const CHAVE_INTRO_VISTAS_CONTA = "core-intro-vistas";
-export function introDoModuloConcluida(modulo: string, get?: <T>(k: string, f: T) => T): boolean {
-  try {
-    if (ls.get(`core-intro-vista-${modulo}`)) return true;
-    const daConta = get?.<unknown>(CHAVE_INTRO_VISTAS_CONTA, null);
-    return Array.isArray(daConta) && daConta.includes(modulo);
-  } catch { return false; }
-}
+/* 1.0.16 — a introdução do módulo já foi FEITA? → `introConcluida(modulo, get)` de lib/intro-modulo (o ramo da
+ * introdução, no v1016 desde 17/10): a dose dos dias 2–3 daquele módulo vira CONTINUAÇÃO (PassoDoDia). Pular a
+ * introdução não conta. */
 
 /**
  * 1.0.16 — DOSE NA TELA (contrato com Conquistas e com os cartões dos módulos): enquanto QUALQUER peça da

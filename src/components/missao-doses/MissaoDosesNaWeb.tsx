@@ -611,6 +611,12 @@ function Ligada() {
           fechar();
           try { CONHECER_MAIS.abrir?.(passo.modulo); } catch { /* o tour é de outro ramo: nunca derruba a missão */ }
         } : undefined}
+        /* o quiz da 1ª dose (Rotina, Treino): apareceu (no máximo 2 vezes sem decidir) ou foi pulado (nunca mais) */
+        aoSetup={(setup, acao) => {
+          const m = lerMissao() ?? missao;
+          if (acao === "pulou") salvar({ ...m, setupPulado: { ...m.setupPulado, [setup]: hoje } });
+          else salvar({ ...m, setupVistas: { ...m.setupVistas, [setup]: (m.setupVistas?.[setup] ?? 0) + 1 } });
+        }}
         /* ── braço A (1.0.16) ── */
         aoMostrarAdesivo={(ids) => {
           const m = lerMissao() ?? missao;

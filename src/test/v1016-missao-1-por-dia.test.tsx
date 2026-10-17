@@ -1139,7 +1139,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
   it("Rotina apresentada no dia 1 (chave do aparelho): no dia 2 a dose é 'Já fez o seu hábito hoje?' com o hábito DELA — nada de 'crie o 1º hábito'; marcou → festa", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
-    localStorage.setItem("core-intro-vista-rotina", "2026-10-03T16:00:00.000Z"); // a introdução da Rotina (ramo dos cartões)
+    localStorage.setItem("core-intro-vista-rotina", "feita@2026-10-03T16:00:00.000Z"); // a introdução da Rotina FEITA (lib/intro-modulo)
     const store = montarStore({ "rotina-habits": ["Beber água ao acordar"], "rotina-habits-checked": { SÁBADO: [true] }, [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"] });
     missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { convites: { "2026-10-04": "foi" }, lembrete: "12h" });
     vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // domingo, dia 2
@@ -1160,7 +1160,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
   it("Saúde apresentada (chave da CONTA): no dia 3 não pergunta a meta de novo — 'Mais 1 copo d'água hoje?' e 1 toque", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
-    const store = montarStore({ "core-intro-vistas": ["saude"], [CHAVE_DIAS_ANOTADOS]: ["2026-10-03", "2026-10-04"] });
+    const store = montarStore({ "core-intro-feitas": ["saude"], [CHAVE_DIAS_ANOTADOS]: ["2026-10-03", "2026-10-04"] });
     missaoA({ 1: { dia: "2026-10-03", rotulo: "x" }, 2: { dia: "2026-10-04", rotulo: "y" } }, { convites: { "2026-10-05": "foi" } });
     vi.setSystemTime(new Date(2026, 9, 5, 9, 0));
     montar(store, "/saude");
@@ -1178,7 +1178,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     localStorage.removeItem("core-montar-financas"); // nem decidido: só a introdução foi feita
-    const store = montarStore({ "core-intro-vistas": ["financas"] });
+    const store = montarStore({ "core-intro-feitas": ["financas"] });
     missaoA({});
     montar(store, "/financas");
     const postIt = esperarPostIt();
@@ -1191,7 +1191,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
   it("Treino apresentado com plano (a introdução aplicou um modelo): a dose é anotar 1 exercício de hoje — nunca um 2º modelo por cima", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
-    localStorage.setItem("core-intro-vista-treino", "2026-10-03T12:00:00.000Z");
+    localStorage.setItem("core-intro-vista-treino", "feita@2026-10-03T12:00:00.000Z");
     const plano = { SEGUNDA: { exercises: [{ name: "Supino" }] }, QUARTA: { exercises: [{ name: "Agachamento livre" }] } };
     const store = montarStore({ "saude-workouts-v2": plano });
     localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["treino", "saude", "financas"], "2026-10-03", undefined, "A"), boasVindas: true }));
@@ -1212,7 +1212,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
     cleanup();
     // B com a introdução da Saúde gravada: "toda outra dose é a guiada simples, ou a continuação se a introdução daquele
     // módulo já foi feita" — vale nos dois braços (o B não é a 1.0.15 byte a byte)
-    localStorage.setItem("core-intro-vista-saude", "1");
+    localStorage.setItem("core-intro-vista-saude", "feita@2026-10-04T09:00:00.000Z");
     localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "saude", "rotina"], "2026-10-04", undefined, "B"), boasVindas: true, feitos: { 1: { dia: "2026-10-04", rotulo: "Café · R$ 12" } } }));
     montar(montarStore({}), "/saude");
     expect(esperarPostIt()).toHaveTextContent("Mais 1 copo d'água hoje?");

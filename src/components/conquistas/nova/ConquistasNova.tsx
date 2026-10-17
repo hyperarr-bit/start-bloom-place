@@ -19,7 +19,7 @@ import { Previa } from "../SeletorDeArte";
 import { StoriesAdesivo } from "../Stories";
 import { compartilharAdesivo } from "../compartilhar-conquistas";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, fraseDoPremio, marcoDoAdesivo, quandoCurto } from "./recompensas";
+import { EVENTOS2, contagem, fraseDoPremio, marcoDoAdesivo, quandoCurto } from "./recompensas";
 import { useConquistasNova, type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import { AlbumHero } from "./AlbumHero";
 import { CelebracaoMarco, ColecaoTela, DetalheSequencia, ToastAdesivo } from "./camadas";
@@ -155,7 +155,7 @@ const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; on
             {semana.map((d) => <span key={d.dia} className="cn-b-letra" data-estado={d.estado} role="listitem" aria-label={`${d.rotulo}: ${d.estado}`}><i /> {d.rotulo.charAt(0)}</span>)}
           </span>
         </div>
-        <p className="cn-seq-resumo" data-testid="cn-seq-resumo" aria-label={`Recorde ${seq.recorde} dias · ${seq.saldo} de 2 protetores · ${seq.lista.length} dias anotados`}>
+        <p className="cn-seq-resumo" data-testid="cn-seq-resumo" aria-label={`Recorde ${contagem(seq.recorde, "dia", "dias")} · ${seq.saldo} de 2 protetores · ${contagem(seq.lista.length, "dia anotado", "dias anotados")}`}>
           Recorde {seq.recorde} · <Shield className="inline w-3 h-3 -mt-0.5" aria-hidden /> {seq.saldo} {seq.saldo === 1 ? "protetor" : "protetores"}
         </p>
         <div className="mt-2.5"><AcaoDoDia seq={seq} onAcao={onAcao} /></div>
@@ -194,7 +194,7 @@ const Trilha = ({ e, onAdesivo }: { e: EstadoConquistasNova; onAdesivo: (b: Badg
           const m = marcoDoAdesivo(b.id)!;
           const proximo = m === premio.marco;
           return (
-            <button key={b.id} type="button" className="cn-trilha-no" data-feito={b.unlocked ? "" : undefined} data-proximo={proximo ? "" : undefined} data-trancado={!b.unlocked ? "" : undefined} onClick={() => onAdesivo(b)} aria-label={`${b.name} (${m} dias seguidos): ${b.unlocked ? "colado" : proximo ? quandoCurto(premio).toLowerCase() : `faltam ${Math.max(1, m - seq.dias)} dias`}`}>
+            <button key={b.id} type="button" className="cn-trilha-no" data-feito={b.unlocked ? "" : undefined} data-proximo={proximo ? "" : undefined} data-trancado={!b.unlocked ? "" : undefined} onClick={() => onAdesivo(b)} aria-label={`${b.name} (${m} dias seguidos): ${b.unlocked ? "colado" : proximo ? quandoCurto(premio).toLowerCase() : (m - seq.dias <= 1 ? "falta 1 dia" : `faltam ${m - seq.dias} dias`)}`}>
               <span className="cn-trilha-disco"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={proximo ? 50 : 38} trancado={!b.unlocked} /></span>
               {/* só o próximo tem o "quando"; os outros guardam o espaço (os nomes ficam alinhados) */}
               <span className="cn-trilha-quando" aria-hidden={!proximo}>{proximo ? quandoCurto(premio) : "\u00a0"}</span>

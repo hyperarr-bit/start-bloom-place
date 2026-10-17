@@ -14,6 +14,8 @@ import { ehDia, MAX_DIAS_GUARDADOS } from "@/lib/sequencia";
 export const CHAVE_DESBLOQUEADAS = "conquistas-desbloqueadas";
 /** O que já foi comemorado ({ adesivos: ids, marcos: [7, 30…] }) — cada momento aparece UMA vez. */
 export const CHAVE_VISTAS = "conquistas-vistas";
+/** O que a pessoa já viu colado no ÁLBUM (ids): o que falta aqui espera no álbum como "nova pra colar". */
+export const CHAVE_ALBUM_VISTO = "conquistas-album-visto";
 
 /** Mestre do CORE é lendário (27/09) e abre no Diamante da escada nova. */
 export const XP_MESTRE = 400;

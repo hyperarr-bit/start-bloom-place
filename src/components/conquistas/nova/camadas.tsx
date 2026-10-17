@@ -12,7 +12,7 @@ import { Fogo } from "../Fogo";
 import { varsDaFaixa } from "../CardSequencia";
 import { LembreteDaSequencia } from "../LembreteDaSequencia";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, ehMarcoDeFesta, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
+import { EVENTOS2, contagem, ehMarcoDeFesta, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
 import { resumoRaridadesCurto, type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import "../conquistas.css";
 import "./conquistas-nova.css";
@@ -147,7 +147,7 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
           <AnelDaSemana seq={seq} />
           <div className="text-center mt-2">
             <SheetTitle className="text-[16px] font-black tracking-tight leading-none">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
-            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{seq.faixa.nome} · recorde {seq.recorde} · {seq.lista.length} dias anotados</SheetDescription>
+            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{seq.faixa.nome} · recorde {seq.recorde} · {contagem(seq.lista.length, "dia anotado", "dias anotados")}</SheetDescription>
           </div>
           <div className="mt-4 rounded-2xl border border-border p-3">
             <p className="cn-caps text-muted-foreground mb-2">Últimas 4 semanas</p>

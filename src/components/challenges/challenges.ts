@@ -65,7 +65,7 @@ export interface OfertasDaSemana { weekStart: string; itens: OfertaDaSemana[] }
 export interface ChallengesState {
   active: DesafioAtivo | null;
   history: RegistroDesafio[];
-  /** As 3 opções da segunda-feira (fixas até domingo). Campo novo, opcional. */
+  /** As 4 opções da segunda-feira (fixas até domingo). Campo novo, opcional. */
   ofertas?: OfertasDaSemana;
 }
 

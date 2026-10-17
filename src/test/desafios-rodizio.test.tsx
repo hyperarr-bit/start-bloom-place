@@ -35,7 +35,8 @@ import { fecharSemanaDoDesafio, lerDesafios, type ChallengesState, type GastoDoD
 import {
   CATALOGO, avaliarNoCatalogo, blackFridayDe, defDoCatalogo, inferirDiaDoPagamento, montarDados, semanaDoAno, semanaPreBlackFriday,
 } from "@/components/challenges/catalogo";
-import { escolher, fecharSemana, montarOfertas, nivelParaOferta, variacaoDaSemanaPassada } from "@/components/challenges/rodizio";
+import { GENERICOS, escolher, fecharSemana, montarOfertas, nivelParaOferta, variacaoDaSemanaPassada } from "@/components/challenges/rodizio";
+import { CONTAS_SUGERIDAS, itensParaGravar } from "@/lib/montar-financas";
 import { CHAVE_FORCA_DESAFIOS_RODIZIO, _zerarDesafiosRodizioRemoto, desafiosRodizioLigado, lerChaveRemotaDesafiosRodizio, registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
 import { medirFinancas } from "@/components/gamification/badges-financas";
 
@@ -92,12 +93,12 @@ const habito = (): Record<string, unknown> => ({
 /* ═══════════════════ o catálogo ═══════════════════ */
 
 describe("catálogo: elegibilidade pelo dado da pessoa", () => {
-  it("conta vazia: só os desafios que não dependem de hábito (anotar, dias zerados, categoria) — e nada quebra", () => {
+  it("conta vazia: elegíveis só os que não dependem de hábito (anotar, dias zerados, categoria); a 4ª vaga vem do genérico 'guarda da semana' (dono 17/10: 'Melhor deixar 4 msm') — e nada quebra", () => {
     const d = dadosDe({}, SEMANA, QUARTA);
     const elegiveis = CATALOGO.filter((c) => c.elegivel(d)).map((c) => c.key);
     expect(elegiveis.sort()).toEqual(["registro-5-dias", "sem-outros", "tres-dias-zero"]);
     const ofertas = montarOfertas(d, { active: null, history: [] });
-    expect(keys(ofertas).sort()).toEqual(["registro-5-dias", "sem-outros", "tres-dias-zero"]);
+    expect(keys(ofertas).sort()).toEqual(["guarda-da-semana", "registro-5-dias", "sem-outros", "tres-dias-zero"]);
     for (const c of CATALOGO) expect(() => avaliarNoCatalogo(c, 1, d)).not.toThrow();
   });
 
@@ -319,21 +320,71 @@ describe("rodízio: 4 opções, sem repetir em 4 semanas, variação e revanche"
     expect(variacaoDaSemanaPassada(d(), [{ key: "tres-dias-zero", weekStart: "2026-10-05", result: "win" }])).toEqual({ key: "tres-dias-zero", nivel: 2, origem: "variacao" });
   });
 
-  it("com 2+ opções fora do descanso, a chave usada semana passada NÃO entra pra completar as 4", () => {
+  it("com 2+ opções fora do descanso, a chave usada semana passada NÃO entra pra completar as 4 (quem completa é o genérico)", () => {
     const dConta = dadosDe({ "finance-expenses": [gasto("2026-10-01", 48, "delivery", { description: "iFood" })] }, SEMANA, QUARTA); // 4 elegíveis
     const o = montarOfertas(dConta, { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-05", result: "win", nivel: 1 }] });
-    expect(keys(o).sort()).toEqual(["registro-5-dias", "sem-outros", "tres-dias-zero"]);
+    expect(keys(o).sort()).toEqual(["guarda-da-semana", "registro-5-dias", "sem-outros", "tres-dias-zero"]);
   });
 
-  it("tudo em descanso: repete a usada há mais tempo em vez de deixar o card vazio", () => {
+  it("tudo em descanso (os 3 elegíveis e os genéricos): repete o usado há mais tempo em vez de deixar o card vazio", () => {
     const dConta = dadosDe({}, SEMANA, QUARTA); // só 3 elegíveis
     const history = [
+      { key: "guarda-da-semana", weekStart: "2026-09-14", result: "loss" as const, nivel: 1, motivo: "nao-cumpriu" as const },
       { key: "registro-5-dias", weekStart: "2026-09-21", result: "loss" as const, nivel: 1, motivo: "nao-cumpriu" as const },
       { key: "tres-dias-zero", weekStart: "2026-09-28", result: "loss" as const, nivel: 1, motivo: "regra" as const },
       { key: "sem-outros", weekStart: "2026-10-05", result: "loss" as const, nivel: 1, motivo: "nao-cumpriu" as const },
     ];
     const o = montarOfertas(dConta, { active: null, history });
-    expect(keys(o)).toEqual(["registro-5-dias", "tres-dias-zero", "sem-outros"]); // da mais antiga pra mais recente
+    expect(keys(o)).toEqual(["guarda-da-semana", "registro-5-dias", "tres-dias-zero", "sem-outros"]); // da mais antiga pra mais recente
+  });
+});
+
+describe("4 opções pra conta nova (17/10, revisão tela a tela #103: a conta nova via 3)", () => {
+  const contasDoMontar = CONTAS_SUGERIDAS.filter((c) => ["aluguel", "luz", "internet", "streaming"].includes(c.id));
+
+  it("fez o 'Montar suas finanças' (os itens EXATOS que ele grava): a 'Renda do mês' deixa a guarda da semana elegível PELO DADO; as contas fixas dele não têm dia, então 'Contas da semana' não entra — e são 4", () => {
+    const { receita, fixos } = itensParaGravar(3000, contasDoMontar, QUARTA);
+    const d = dadosDe({ "finance-incomes": receita, "finance-fixed-expenses": fixos }, SEMANA, QUARTA);
+    expect(d.receitasRecentes).toBe(1);
+    expect(d.fixos).toHaveLength(4);
+    expect(d.contas).toEqual([]); // sem dia de vencimento: nenhuma conta vencendo nesta semana
+    const elegiveis = CATALOGO.filter((c) => c.elegivel(d)).map((c) => c.key);
+    expect(elegiveis).toContain("guarda-da-semana");
+    expect(elegiveis).not.toContain("contas-em-dia");
+    expect(elegiveis).not.toContain("faxina-assinaturas"); // 1 assinatura só (Streaming)
+    const o = montarOfertas(d, { active: null, history: [] });
+    expect(o.itens).toHaveLength(4);
+    expect(keys(o).sort()).toEqual(["guarda-da-semana", "registro-5-dias", "sem-outros", "tres-dias-zero"]);
+  });
+
+  it("o complemento só traz GENÉRICOS: nenhuma restrição de hábito que a pessoa não tem e nada de 'Semana sem parcelar' sem parcela", () => {
+    expect([...GENERICOS]).toEqual(["guarda-da-semana", "sem-outros", "tres-dias-zero", "registro-5-dias"]);
+    for (const semana of ["2026-10-12", "2026-10-19", "2026-10-26", "2026-11-02"]) {
+      const o = montarOfertas(dadosDe({}, semana, new Date(`${semana}T10:00:00`)), { active: null, history: [] });
+      expect(o.itens, semana).toHaveLength(4);
+      for (const k of keys(o)) expect(GENERICOS as readonly string[], `${semana}: ${k}`).toContain(k);
+      expect(keys(o)).not.toContain("sem-parcelar");
+    }
+    // quem parcelou continua ganhando "Semana sem parcelar" pelo dado (a regra não mudou)
+    const comParcela = montarOfertas(dadosDe({ "finance-installments": [parcela("p1", "2026-09-22")] }, SEMANA, QUARTA), { active: null, history: [] });
+    expect(keys(comParcela)).toContain("sem-parcelar");
+    expect(comParcela.itens).toHaveLength(4);
+  });
+
+  it("o complemento respeita o descanso de 4 semanas: a guarda usada há 2 semanas fica de fora (aí sobram 3 — os genéricos todos usados ou descansando)", () => {
+    const o = montarOfertas(dadosDe({}, SEMANA, QUARTA), { active: null, history: [{ key: "guarda-da-semana", weekStart: "2026-09-28", result: "loss", nivel: 1, motivo: "nao-cumpriu" }] });
+    expect(keys(o)).not.toContain("guarda-da-semana");
+    expect(keys(o).sort()).toEqual(["registro-5-dias", "sem-outros", "tres-dias-zero"]);
+    // 5 semanas depois, volta
+    const depois = montarOfertas(dadosDe({}, SEMANA, QUARTA), { active: null, history: [{ key: "guarda-da-semana", weekStart: "2026-09-07", result: "loss", nivel: 1, motivo: "nao-cumpriu" }] });
+    expect(keys(depois)).toContain("guarda-da-semana");
+  });
+
+  it("venceu a guarda que veio do complemento (pôs na Reserva): na semana seguinte ela volta como VARIAÇÃO, no nível 2", () => {
+    const dados = { "finance-emergency-fund": { meses: 6, guardado: 42, registrada: false } };
+    const o = montarOfertas(dadosDe(dados, "2026-10-19", new Date(2026, 9, 19, 9)), { active: null, history: [{ key: "guarda-da-semana", weekStart: SEMANA, result: "win", nivel: 1, motivo: "cumpriu" }] });
+    expect(o.itens[0]).toEqual({ key: "guarda-da-semana", nivel: 2, origem: "variacao" });
+    expect(o.itens).toHaveLength(4);
   });
 });
 
@@ -483,7 +534,7 @@ const montar = (store: ReturnType<typeof criarStore>) =>
   render(<UserDataContext.Provider value={store.valor}><WeeklyChallenge expenses={(store.dados["finance-expenses"] as never) ?? []} /></UserDataContext.Provider>);
 
 describe("o card: segunda com as opções, escolha, meio da semana, virada", () => {
-  it("conta vazia: só as 3 opções sem hábito (menos de 4 é aceitável), sem nota de regra de registro, ofertas gravadas como ESCRITA DE SISTEMA e o evento desafio_ofertas (1x)", async () => {
+  it("conta vazia: 4 opções — as 3 sem hábito + a guarda da semana (o print #103 tinha 3) —, sem nota de regra de registro, ofertas gravadas como ESCRITA DE SISTEMA e o evento desafio_ofertas (1x)", async () => {
     quando(2026, 10, 12);
     const store = criarStore({});
     montar(store);
@@ -492,13 +543,15 @@ describe("o card: segunda com as opções, escolha, meio da semana, virada", () 
     expect(screen.getByTestId("oferta-registro-5-dias")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-tres-dias-zero")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-sem-outros")).toBeInTheDocument();
+    expect(screen.getByTestId("oferta-guarda-da-semana")).toHaveTextContent("Guarda R$ 42 (semana 42)");
+    expect(document.querySelectorAll('[data-testid^="oferta-"]')).toHaveLength(4);
     expect(screen.queryByText(/anote algo em pelo menos|dias anotados/)).toBeNull();
-    expect(screen.getByText(/Escolhe 1 das 3 pra esta semana/)).toBeInTheDocument();
+    expect(screen.getByText(/Escolhe 1 das 4 pra esta semana/)).toBeInTheDocument();
     expect(desafios(store.dados).ofertas?.weekStart).toBe("2026-10-12");
     expect(store.sistema).toEqual(["finance-challenges"]);
     expect(eventos("desafio_ofertas")).toHaveLength(1);
     expect(eventos("desafio_ofertas")[0]).toMatchObject({ weekStart: "2026-10-12" });
-    expect(eventos("desafio_ofertas")[0].keys).toHaveLength(3);
+    expect(eventos("desafio_ofertas")[0].keys).toHaveLength(4);
   });
 
   it("com hábito: 4 opções na segunda ('Escolhe 1 das 4') e cada uma com data-testid", async () => {

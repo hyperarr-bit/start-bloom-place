@@ -23,8 +23,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { trackEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -376,11 +374,7 @@ const Dieta = () => {
   /* META DIÁRIA DE CALORIAS (10/10, chamado: "como faço para alterar a meta de
      calorias diárias?") — ver lib/dieta-consumo. Automática = soma do cardápio
      do dia; fixa = o número digitado, gravado na chave ANTIGA (que o app antigo
-     lê) + a flag de modo numa chave nova.
-     17/10 (1.0.16, dono: o card no topo do cardápio "quebra o design"): virou
-     UMA linha embaixo do "Cardápio semanal" ("Meta de calorias: 2.000 kcal ·
-     ajustar") que abre uma folha com os mesmos controles e as mesmas chaves. */
-  const [metaAberta, setMetaAberta] = useState(false);
+     lê) + a flag de modo numa chave nova. */
   const [modoMetaBruto, setModoMeta] = usePersistedState<string>(CHAVE_META_KCAL_MODO, "auto");
   const modoMeta: ModoMetaKcal = normalizarModoMeta(modoMetaBruto);
   const [metaFixaBruta, setMetaFixa] = usePersistedState<number>(CHAVE_META_KCAL_ANTIGA, META_KCAL_PADRAO);
@@ -738,19 +732,6 @@ const Dieta = () => {
     setEditingRecipeId(null);
   };
 
-  // A meta de HOJE (a linha do cardápio e a folha): a mesma conta do widget da Home.
-  const planejadoHoje = kcalDoPlano(mealKcal[getDiaryDayName(today)]);
-  const metaHoje = metaDoDia({ kcalPlanejadas: planejadoHoje, metaAntiga: metaFixa, modo: modoMeta });
-  const abrirMeta = () => {
-    setMetaAberta(true);
-    trackEvent("dieta_meta_kcal_abrir", { modo: modoMeta });
-  };
-  // Fechar a folha (Pronto, X, toque fora) grava o número digitado — o blur nem sempre chega antes de a folha sumir.
-  const fecharMeta = () => {
-    gravarMetaFixa();
-    setMetaAberta(false);
-  };
-
   return (
     <div className="min-h-screen bg-background pb-20">
       {DietaCompletionDialog}
@@ -801,66 +782,47 @@ const Dieta = () => {
           ]}
         />
           {activeTab === "cardapio" && <div className="space-y-4">
-            {/* Cabeçalho do cardápio. 17/10: a META DIÁRIA DE CALORIAS (card de 10/10 no topo) virou a 2ª linha daqui —
-                quem perguntou "como faço para alterar a meta de calorias" acha "Meta de calorias … · ajustar" logo de cara. */}
             <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Cardápio semanal — clique para editar:</p>
-                <button
-                  type="button"
-                  onClick={abrirMeta}
-                  data-testid="meta-kcal-link"
-                  className="mt-0.5 text-left text-xs text-muted-foreground"
-                >
-                  Meta de calorias: <span className="font-semibold text-foreground">{metaHoje.toLocaleString("pt-BR")} kcal</span>
-                  {" · "}
-                  <span className="font-semibold text-primary underline underline-offset-2">ajustar</span>
-                </button>
-              </div>
+              <p className="text-xs text-muted-foreground">Cardápio semanal — clique para editar:</p>
               <Button size="sm" variant={showMealConfig ? "default" : "outline"} className="text-xs h-7" onClick={() => setShowMealConfig(!showMealConfig)}>
                 <Settings className="w-3 h-3 mr-1" /> Refeições ({meals.length})
               </Button>
             </div>
 
-            {/* A folha da meta: os mesmos controles e as mesmas chaves do card de 10/10 (lib/dieta-consumo). */}
-            <Sheet open={metaAberta} onOpenChange={(aberta) => { if (aberta) setMetaAberta(true); else fecharMeta(); }}>
-              <SheetContent
-                side="bottom"
-                className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto pb-[max(1.25rem,var(--app-safe-bottom))]"
-                overlayClassName="z-[290]"
-                data-testid="meta-kcal"
-              >
-                <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
-                  <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />
-                </div>
-                <SheetHeader className="px-5 pt-4 pb-3 text-left">
-                  <SheetTitle className="text-sm font-semibold">Meta diária de calorias</SheetTitle>
-                  <SheetDescription className="text-[11px] leading-snug">Vale pro widget de calorias da Home e pros macros.</SheetDescription>
-                </SheetHeader>
-                <div className="px-5 space-y-3">
-                  <p className="text-sm" data-testid="meta-kcal-hoje">
-                    Hoje: <span className="font-bold">{metaHoje.toLocaleString("pt-BR")} kcal</span>
-                    <span className="text-muted-foreground"> · {modoMeta === "fixa" ? "fixa" : planejadoHoje > 0 ? "soma do cardápio" : "padrão (cardápio sem kcal)"}</span>
-                  </p>
-                  <div className="grid grid-cols-2 rounded-lg border border-border overflow-hidden text-xs font-medium">
-                    <button
-                      type="button"
-                      onClick={() => setModoMeta("auto")}
-                      aria-pressed={modoMeta === "auto"}
-                      data-testid="meta-kcal-auto"
-                      className={`py-2 ${modoMeta === "auto" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
-                    >
-                      Automática
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModoMeta("fixa")}
-                      aria-pressed={modoMeta === "fixa"}
-                      data-testid="meta-kcal-fixa"
-                      className={`py-2 border-l border-border ${modoMeta === "fixa" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
-                    >
-                      Fixa
-                    </button>
+            {/* META DIÁRIA DE CALORIAS (10/10) — discreta, no topo do cardápio */}
+            {(() => {
+              const planejadoHoje = kcalDoPlano(mealKcal[getDiaryDayName(today)]);
+              const metaHoje = metaDoDia({ kcalPlanejadas: planejadoHoje, metaAntiga: metaFixa, modo: modoMeta });
+              return (
+                <div className="rounded-xl border border-border bg-card px-3 py-2.5 space-y-2" data-testid="meta-kcal">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-muted-foreground">META DIÁRIA DE CALORIAS</p>
+                      <p className="text-xs" data-testid="meta-kcal-hoje">
+                        Hoje: <span className="font-bold">{metaHoje.toLocaleString("pt-BR")} kcal</span>
+                        <span className="text-muted-foreground"> · {modoMeta === "fixa" ? "fixa" : planejadoHoje > 0 ? "soma do cardápio" : "padrão (cardápio sem kcal)"}</span>
+                      </p>
+                    </div>
+                    <div className="flex rounded-lg border border-border overflow-hidden text-[11px] font-medium shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setModoMeta("auto")}
+                        aria-pressed={modoMeta === "auto"}
+                        data-testid="meta-kcal-auto"
+                        className={`px-2.5 py-1.5 ${modoMeta === "auto" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+                      >
+                        Automática
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModoMeta("fixa")}
+                        aria-pressed={modoMeta === "fixa"}
+                        data-testid="meta-kcal-fixa"
+                        className={`px-2.5 py-1.5 border-l border-border ${modoMeta === "fixa" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+                      >
+                        Fixa
+                      </button>
+                    </div>
                   </div>
                   {modoMeta === "fixa" ? (
                     <div className="flex items-center gap-2">
@@ -870,22 +832,21 @@ const Dieta = () => {
                         min={500}
                         max={10000}
                         step={50}
-                        aria-label="Meta fixa em kcal por dia"
+                        aria-label="Meta diária de calorias"
                         value={metaDigitada ?? String(metaFixa)}
                         onChange={(e) => setMetaDigitada(e.target.value)}
                         onBlur={gravarMetaFixa}
                         onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                        className="h-9 w-28 text-sm"
+                        className="h-8 w-28 text-sm"
                       />
-                      <span className="text-xs text-muted-foreground">kcal por dia</span>
+                      <span className="text-xs text-muted-foreground">kcal por dia — vale pro widget da Home e pros macros</span>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-muted-foreground leading-snug">A meta é a soma das kcal das refeições do dia no cardápio. Sem kcal anotadas, vale {META_KCAL_PADRAO.toLocaleString("pt-BR")} kcal.</p>
+                    <p className="text-[10px] text-muted-foreground leading-snug">A meta é a soma das kcal das refeições do dia no cardápio. Sem kcal anotadas, vale {META_KCAL_PADRAO.toLocaleString("pt-BR")} kcal.</p>
                   )}
-                  <Button className="w-full h-10" onClick={fecharMeta}>Pronto</Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              );
+            })()}
 
             {showMealConfig && (
               <div className="bg-muted/30 rounded-xl border border-border p-3 space-y-3">

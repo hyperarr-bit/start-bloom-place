@@ -613,11 +613,6 @@ export function aprofundarPendente(m: EstadoMissaoDoses, rota: string, hoje: str
   return null;
 }
 
-/**
- * PONTO DE ENCAIXE DO TOUR DA HOME (10/10, pra quem fizer o tour): enquanto isto é true a
- * missão (ou a folha do plano de amanhã, ou "O que você construiu") ainda tem tela pra
- * mostrar — o tour deve ESPERAR. Reler ao evento EVENTO_MISSAO_DOSES (e ao `missao_completa`).
- */
 /** 1.0.16 (relatório 11, B10): mais uma montagem da dose `n` — devolve o nº dela e quanto tempo passou desde a 1ª
  *  vista. Só com braço (a missão desligada fica a 1.0.15, campo a campo). */
 export function registrarMontagem(n: DiaDaMissao, agora: number = Date.now()): { montagem: number; msDesdePrimeira: number } {
@@ -654,6 +649,11 @@ export function retomadaDoGasto(m: EstadoMissaoDoses | null, hoje: string = loca
   const retomadas = g.retomadas ?? 0;
   return retomadas < MAX_RETOMADAS_DO_GASTO ? { n: g.n, retomadas } : null;
 }
+/**
+ * PONTO DE ENCAIXE DO TOUR DA HOME (10/10, pra quem fizer o tour): enquanto isto é true a
+ * missão (ou a folha do plano de amanhã, ou "O que você construiu") ainda tem tela pra
+ * mostrar — o tour deve ESPERAR. Reler ao evento EVENTO_MISSAO_DOSES (e ao `missao_completa`).
+ */
 export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
   if (!m) return false;
   if (!m.boasVindas) return true;

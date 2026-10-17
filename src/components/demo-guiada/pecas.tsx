@@ -106,7 +106,7 @@ export function BotaoSeguir({ children, onClick, claro = false, testid, cheio = 
 /* ------------------------------------------------------------ passo 1 */
 
 /** Onde acaba o que gruda no topo (barra de módulos + cabeçalho do módulo). */
-const fundoDoTopoFixo = (): number => {
+export const fundoDoTopoFixo = (): number => {
   let fundo = 0;
   document.querySelectorAll(".demo-tour-nav, header.sticky").forEach((el) => {
     const r = el.getBoundingClientRect();
@@ -204,7 +204,7 @@ export function useDigitando(): boolean {
 /** Quanto tempo o anel espera a âncora voltar (re-render/troca do nó) antes de desistir — só com `reachar`. */
 export const TOLERANCIA_ANCORA_MS = 2500;
 
-export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar, rapido = false, aoAparecer }: {
+export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar, rapido = false, aoAparecer, recolhido = false }: {
   alvo: Element;
   /**
    * 16/10 (1.0.16 — "o anel do passo 1 some antes do toque", ~24% das pessoas; no ar:
@@ -229,6 +229,9 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   rapido?: boolean;
   /** 17/10: o anel acabou de aparecer de verdade (o relógio de quem segura um tempo de leitura começa aqui) */
   aoAparecer?: () => void;
+  /** 17/10 (relatório 11, D4): o alvo saiu da área visível — o anel não desenha nada (nem o escuro) e segue
+   *  acompanhando o alvo; quem chamou mostra o post-it colado embaixo da faixa. Voltou: desenha de novo, sem rolar. */
+  recolhido?: boolean;
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
@@ -394,7 +397,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rect, digitando]);
 
-  if (!rect || digitando) return null;
+  if (!rect || digitando || recolhido) return null;
   const pad = 8;
   const largura = Math.min(window.innerWidth - 12, rect.width + pad * 2);
   const esquerda = Math.max(6, Math.min(rect.left - pad, window.innerWidth - 6 - largura));
@@ -437,7 +440,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
  * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
  * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
  */
-export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria }: {
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria, rotuloEscrever = "✎ escrever o meu", compacto = false }: {
   pergunta: string;
   chips: ChipDaMissao[];
   /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
@@ -452,21 +455,25 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
   descricao?: string;
   /** 1.0.16: uma saída de texto no pé do post-it (o gasto de carona depois do Montar: "Agora não") */
   secundaria?: { texto: string; aoTocar: () => void; testid?: string };
+  /** 17/10 (relatório 11): o rótulo do "escrever" (a missão diz "✎ outro") */
+  rotuloEscrever?: string;
+  /** 17/10 (D4): colado embaixo da faixa — só a pergunta e os chips */
+  compacto?: boolean;
 }) {
   const reduzir = useReducedMotion();
   return (
     <div className="relative" data-testid="demo-guia-postit">
       <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
       <motion.div
-        className="rounded-md px-4 pt-3.5 pb-3.5 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)]"
+        className={`rounded-md px-4 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)] ${compacto ? "pt-2.5 pb-2.5" : "pt-3.5 pb-3.5"}`}
         style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
         initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
       >
         <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{rotulo}</span>
         <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
-        {descricao && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
+        {descricao && !compacto && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
         {chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className={`${compacto ? "mt-2" : "mt-3"} flex flex-wrap gap-2`}>
             {chips.map((c, i) => {
               const marcado = tocado === c.nome;
               return (
@@ -495,13 +502,13 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
                 style={{ borderColor: "rgba(38,38,38,.45)", color: "rgba(38,38,38,.85)" }}
                 initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduzir ? 0 : 0.12 + chips.length * 0.07, duration: 0.3 }}
               >
-                ✎ escrever o meu
+                {rotuloEscrever}
               </motion.button>
             )}
           </div>
         )}
-        {dica && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
-        {secundaria && (
+        {dica && !compacto && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
+        {secundaria && !compacto && (
           <button type="button" onClick={secundaria.aoTocar} data-testid={secundaria.testid ?? "demo-guia-secundaria"}
             className="mt-2 -mb-1 min-h-10 px-1 text-[13px] font-bold underline underline-offset-2" style={{ color: "rgba(38,38,38,.7)" }}>
             {secundaria.texto}

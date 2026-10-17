@@ -112,7 +112,12 @@ beforeEach(() => {
   eventos.length = 0;
   nativo.v = false;
   // o jsdom não tem tamanho: o anel/olhar se posicionam por getBoundingClientRect
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) } as DOMRect);
+  // o cabeçalho fixo do módulo fica no TOPO (0–56); o resto, em 100–148 (o post-it "colado embaixo da faixa" decide por aí)
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) }) as DOMRect;
+  });
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   vi.setSystemTime(new Date(2026, 9, 2, 10, 0)); // sexta, 02/10/2026
 });

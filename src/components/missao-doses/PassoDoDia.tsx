@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Crosshair } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
-import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO_MONTAR_NA_TELA, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
+import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO_MONTAR_NA_TELA, EVENTO_MONTAR_FINANCAS_FIM, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MODELOS as MODELOS_DE_TREINO, aplicarModelo } from "@/lib/treino-plano";
 import { trackEvent } from "@/lib/analytics";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
-import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, topoPreferidoDoAnel } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
-import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, introDoModuloConcluida, marcarDoseNaTela, setupDaDose, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, introDoModuloConcluida, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "./encaixes";
 import { horaSugeridaDaMissao, porDiaExato } from "@/lib/lembrete-dia2";
 import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
@@ -24,6 +24,10 @@ import { Fogo } from "@/components/conquistas/Fogo";
 import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
 
+/** 17/10 (relatório 11, D2) — a copy do 1º gasto. */
+export const PERGUNTA_DO_GASTO = "Já gastou com alguma coisa hoje?";
+export const DESCRICAO_DO_GASTO = "Toca num e ele já entra ali embaixo, em CUSTOS VARIÁVEIS. Dá pra mudar depois.";
+export const AINDA_NAO_GASTEI = "Ainda não gastei nada hoje →";
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
 export const PULAR_DEPOIS_DE_MS = 20_000;
 export const TEMPOS_DO_PASSO = {
@@ -35,9 +39,30 @@ export const TEMPOS_DO_PASSO = {
 };
 
 type Fase = "achar" | "anotar" | "registrou" | "olhar" | "festa";
-export type ViaDoPulo = "link_boas_vindas" | "faixa_20s" | "toque_fora" | "passo";
+export type ViaDoPulo = "link_boas_vindas" | "faixa_20s" | "toque_fora" | "passo" | "ainda_nao";
 
 const visivel = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 8 && r.height > 8; };
+
+/* 17/10 (relatório 11, D2/B7): o anel do 1º gasto abraça o card CUSTOS VARIÁVEIS do TÍTULO até a linha do campo — o
+ * formulário de CUSTOS FIXOS, igualzinho ("+ / Valor / Dia"), fica fora do anel (e embaixo do post-it). */
+const cardDoNovoGasto = (botao: Element): Element | null => botao.parentElement?.closest(".rounded-lg, .rounded-xl, .rounded-2xl") ?? null;
+const recorteDoNovoGasto = (card: Element): Retangulo | null => {
+  const r = card.getBoundingClientRect();
+  const botao = card.querySelector('[data-spotlight="add-expense"]');
+  const linha = botao?.parentElement?.querySelector("input") ? botao.parentElement : botao;
+  const fim = linha ? linha.getBoundingClientRect().bottom + 8 : r.top + 120;
+  return { top: r.top, left: r.left, width: r.width, height: Math.max(24, fim - r.top), bottom: fim };
+};
+/** A aba ativa do módulo (os botões de aba levam `data-active` e `data-spotlight`), pros eventos. */
+const abaAtiva = (): string | null => {
+  try {
+    const a = document.querySelector('[data-spotlight][data-active="true"]')?.getAttribute("data-spotlight") ?? null;
+    return a ? a.replace(/^tab-/, "") : null;
+  } catch { return null; }
+};
+/** Um botão de ABA do módulo (o DASHBOARD ao lado do MEU FINANCEIRO era tocável por baixo do escuro: 64 de 93 perdas). */
+const botaoDeAba = (alvo: EventTarget | null): HTMLElement | null =>
+  alvo instanceof Element ? (alvo.closest('[data-spotlight^="tab-"], [data-spotlight="financeiro"]') as HTMLElement | null) : null;
 
 /* 10/10 (dono: "ficou muito rápido o MEU MÊS; deixa mais embaixo e lento pra o usuário ver") — a rolagem até o
  * card é ANIMADA à mão (rAF, ease-in-out, ~1 s): o `behavior: smooth` no WKWebView é curto/instantâneo e, quando o
@@ -148,7 +173,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   modulo: ModuloDaMissao;
   hoje: string;
   aoFeito: (rotulo: string, segundos: number) => void;
-  aoPular: (via: ViaDoPulo, passo: "toque" | "olhar", segundos: number) => void;
+  aoPular: (via: ViaDoPulo, passo: "toque" | "olhar", segundos: number, extra?: Record<string, unknown>) => void;
   aoCombinar: (lembrete: Lembrete) => void;
   aoAmanhaAgora: () => void;
   aoVerFim: () => void;
@@ -202,6 +227,16 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     try { return Object.values((get<Record<string, { exercises?: unknown[] }>>("saude-workouts-v2", {}) ?? {}) as Record<string, { exercises?: unknown[] }>).some((d) => Array.isArray(d?.exercises) && d.exercises.length > 0); } catch { return false; }
   });
   const treinoPronto = modulo === "treino" && modo === "dose" && !temPlanoDeTreino;
+  /** 17/10 (relatório 11): a dose de Finanças — anel no card inteiro, copy nova, "✎ outro", "Ainda não gastei nada hoje" */
+  const doseDeGasto = cfg.tipo === "gasto" && modo === "dose" && comBraco; // sem braço (chave desligada): a 1.0.15, campo a campo
+  const anelDe = (el: Element): Element => {
+    if (doseDeGasto) { const card = cardDoNovoGasto(el); if (card && visivel(card)) return card; }
+    return alvoCfg?.anel ? alvoCfg.anel(el) : el;
+  };
+  const getRef = useRef(get);
+  getRef.current = get;
+  /** B10: a montagem desta dose (1ª, 2ª…) — gravada na missão no mount */
+  const montagemRef = useRef(1);
   /* 1.0.16 — O QUIZ DA 1ª DOSE (regra final do dono, 17/10; lib/missao-doses → setupDaDose): só a 1ª dose — a área
    * escolhida no funil — abre o "monte o seu módulo", nos dois braços; as outras doses nunca. FINANÇAS: o "Vamos
    * montar suas Finanças" (conta nova, Finanças vazia, chave ligada); "Pronto" = a dose (o número DELA já está no
@@ -242,10 +277,11 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   subPassoRef.current = subPasso;
   const chips: ChipDaMissao[] = fraseDoSetup ? [] : subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : treinoPronto ? CHIPS_DE_TREINO : semMetaAgua ? CHIPS_DE_META_AGUA : (alvoCfg?.chips ?? []);
   const pergunta = fraseDoSetup ? fraseDoSetup : subPasso === "criar" ? PERGUNTA_HABITO_VAZIO : subPasso === "marcar" ? PERGUNTA_HABITO_MARCAR
-    : montarFeito ? "E o gasto de hoje? Toca num:"
+    // 17/10 (relatório 11, D2): o 1º gasto pergunta do jeito que se fala, em qualquer caminho (depois do Montar, sem
+    // ele, ou continuação) — "Toca num e ele já entra ali embaixo, em CUSTOS VARIÁVEIS"
+    : doseDeGasto ? PERGUNTA_DO_GASTO
     : continuacao && cfg.tipo === "habito" ? "Já fez o seu hábito hoje?"
     : continuacao && cfg.tipo === "agua" ? "Mais 1 copo d'água hoje?"
-    : continuacao && cfg.tipo === "gasto" ? "Anota o gasto de hoje:"
     : continuacao && cfg.tipo === "exercicio" && !treinoPronto ? "Anota 1 exercício de hoje:"
     : treinoPronto ? "Escolhe um treino pronto" : semMetaAgua ? "Quantos copos por dia?" : (alvoCfg?.pergunta ?? cfg.pedido);
   const chipTocado = useRef<ChipDaMissao | null>(null);
@@ -257,8 +293,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const [anelVivo, setAnelVivo] = useState(false);
   const [acende, setAcende] = useState(0);
   const [perdeuAlvo, setPerdeuAlvo] = useState(false);
-  /** por que o anel do passo saiu (o evento de "voltou" conta) */
+  /** por que o anel do passo saiu (o evento de "voltou" conta) e quando */
   const motivoDaSaida = useRef<string | null>(null);
+  const saiuEm = useRef<number | null>(null);
   const [tocado, setTocado] = useState<string | null>(null);
   const [rotulo, setRotulo] = useState("");
   const [numero, setNumero] = useState<Numero | null>(null);
@@ -274,10 +311,15 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   useEffect(() => {
     document.documentElement.setAttribute("data-missao-doses-faixa", "1");
     const soltarDose = marcarDoseNaTela();
+    if (modo === "dose" && comBraco) { try { montagemRef.current = registrarMontagem(n).montagem; } catch { /* noop */ } }
     const passagem = modo === "dose" ? tomarTransicao(modulo) : null;
     if (passagem) trackEvent("missao_doses_transicao", eventoDaMissao({ de: passagem.de, para: passagem.para, ms: passagem.ms, via: passagem.via, indice: n }));
-    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "view", ...(continuacao ? { continuacao: true, intro_feita: introFeita } : {}), ...(setup ? { setup, setup_aberto: montarAberto || setupAberto } : {}), ...(retomarGasto ? { retomada: "gasto_depois_do_montar" } : {}) }));
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "view", ...(continuacao ? { continuacao: true, intro_feita: introFeita } : {}), ...(setup ? { setup, setup_aberto: montarAberto || setupAberto } : {}), ...(retomarGasto ? { retomada: "gasto_depois_do_montar" } : {}), ...(comBraco ? { montagem: montagemRef.current } : {}), ...(doseDeGasto ? { aba: abaAtiva() } : {}) }));
     if (montarAberto) trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "view" }));
+    if (montarAberto || setupAberto) {
+      const comecar = tomarComecar();
+      if (comecar !== null) trackEvent("missao_doses_modulo_abriu", eventoDaMissao({ dia: n, modulo, ms_desde_comecar: comecar, tela: montarAberto ? "montar" : "setup" }));
+    }
     if (setupAberto && setup) trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "setup", setup, acao: "view" }));
     return () => { document.documentElement.removeAttribute("data-missao-doses-faixa"); soltarDose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -322,7 +364,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         return;
       }
       if (el && visivel(el)) {
-        setAlvo(alvoCfg?.anel ? alvoCfg.anel(el) : el);
+        setAlvo(anelDe(el));
         setAnelVivo(true);
         setFase("anotar");
         return;
@@ -408,7 +450,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         setNumero(num);
       }
       setFase("registrou");
-      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: montarFeitoRef.current ? "gasto_extra" : "toque", acao: "feito", via, segundos: segundos() }));
+      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: montarFeitoRef.current ? "gasto_extra" : "toque", acao: "feito", via, segundos: segundos(), ...(comBraco ? { montagem: montagemRef.current, ms_desde_primeiro_view: msDesdePrimeiraVista(n) } : {}) }));
       return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -427,6 +469,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    *  (pulou o Montar, ou Finanças é a 2ª/3ª dose — sem quiz), só o "mes". Nos dois braços. */
   const [tempoDoOlhar, setTempoDoOlhar] = useState<"pode" | "mes" | null>(null);
   const [doisTempos, setDoisTempos] = useState(false);
+  /** D1 com "Ainda não gastei nada hoje" no Montar: o MEU MÊS mostra as contas do mês (sem o "Saiu" contando) */
+  const [olhaSemGasto, setOlhaSemGasto] = useState(false);
   const tempoDoOlharRef = useRef(tempoDoOlhar);
   tempoDoOlharRef.current = tempoDoOlhar;
   const indoProMes = useRef(false);
@@ -613,12 +657,18 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   }, [fase]);
 
   /* CHIPS — 1 toque grava NA CONTA pelo mesmo `set` do módulo, no formato que ele já lê (alvos.ts). */
+  /** Onde o chip foi tocado (o post-it no anel, solto ou colado embaixo da faixa), quando e a que horas (relatório 11 §7). */
+  const ondeDoChip = (): Record<string, unknown> => ({
+    onde: !alvo ? "postit_solto" : anelFora ? "postit_doca" : "postit_anel",
+    ms_desde_view: Date.now() - t0.current,
+    hora_local: new Date().getHours(),
+  });
   const tocarChip = (chip: ChipDaMissao) => {
     if (!cfg.tipo) return;
     // 1.0.16: Treino — o chip aplica o modelo pronto (plano + dias de treino), pelo formato da aba PLANO
     if (treinoPronto) {
       const modelo = MODELOS_DE_TREINO.find((m) => m.name === chip.nome);
-      trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!modelo, tipo: "treino_modelo" }));
+      trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!modelo, tipo: "treino_modelo", ...ondeDoChip() }));
       if (!modelo) return;
       chipTocado.current = chip; viaRef.current = "chip"; setTocado(chip.nome);
       try {
@@ -636,7 +686,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       chip = { emoji: "💧", nome: `1 copo d'água · meta ${meta}` };
     }
     const item = itemDoChip(cfg.tipo, semMetaAgua ? { emoji: "💧", nome: "1 copo d'água" } : chip);
-    trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, valor: chip.valor, ok: !!item }));
+    // (17/10: sem `valor` — nada de reais em evento, nem o do chip)
+    trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!item, ...ondeDoChip() }));
     if (!item) return;
     chipTocado.current = chip;
     setTocado(chip.nome);
@@ -696,7 +747,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       const linha = linhaDeHoje(el);
       return linha !== el && visivel(linha) ? linha : null;
     }
-    return alvoCfg?.anel ? alvoCfg.anel(el) : el;
+    return anelDe(el);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -719,7 +770,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       const el = reacharAlvo();
       if (el) {
         setPerdeuAlvo(false); setAlvo(el); setAcende((x) => x + 1); setAnelVivo(true);
-        trackEvent("missao_doses_anel_voltou", eventoDaMissao({ dia: n, modulo, tentativas, ...(motivoDaSaida.current ? { motivo: motivoDaSaida.current } : {}) }));
+        trackEvent("missao_doses_anel_voltou", eventoDaMissao({ dia: n, modulo, tentativas, ...(motivoDaSaida.current ? { motivo: motivoDaSaida.current } : {}), ...(saiuEm.current ? { ms_fora: Date.now() - saiuEm.current } : {}) }));
+        saiuEm.current = null;
         motivoDaSaida.current = null;
         return;
       }
@@ -730,28 +782,130 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, alvo, montarAberto, setupAberto, subPasso, voltouDoFundo]);
 
+  /* B8 (relatório 11: 64 de 93 perdas da âncora = ela tocou na aba DASHBOARD, ao lado, tocável por baixo do escuro):
+   * no meio do passo, um toque numa ABA do módulo não troca de aba — o post-it chacoalha e diz "primeiro o gasto".
+   * Só na fase do toque (o "achar" e o "olha" trocam de aba por código em outras fases). O "Pular" e a seta de voltar
+   * seguem livres. */
+  const [chacoalha, setChacoalha] = useState(0);
+  const [avisoDeAba, setAvisoDeAba] = useState(false);
+  useEffect(() => {
+    if (fase !== "anotar") return;
+    let t = 0;
+    const aoClicar = (e: MouseEvent) => {
+      const aba = botaoDeAba(e.target);
+      if (!aba || aba.getAttribute("data-active") === "true") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setChacoalha((x) => x + 1);
+      setAvisoDeAba(true);
+      window.clearTimeout(t);
+      t = window.setTimeout(() => setAvisoDeAba(false), 2600);
+      trackEvent("missao_doses_aba", eventoDaMissao({ dia: n, modulo, de: abaAtiva(), para: (aba.getAttribute("data-spotlight") ?? "").replace(/^tab-/, ""), bloqueada: true, ms_desde_view: Date.now() - t0.current }));
+    };
+    document.addEventListener("click", aoClicar, true);
+    return () => { document.removeEventListener("click", aoClicar, true); window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
+
+  /* D4 (relatório 11, B6): ela rolou e o alvo saiu da área visível — o anel recolhe (sem escuro) e o post-it fica
+   * COLADO embaixo da faixa, só a pergunta e os chips (que gravam igual); o alvo voltou, o anel desenha de novo no
+   * lugar (sem rolar a tela dela). Só depois de o anel ter aparecido (a rolagem dele até o alvo não conta). */
+  const [anelFora, setAnelFora] = useState(false);
+  const anelForaRef = useRef(false);
+  const anelApareceu = useRef(false);
+  /** só uma rolagem DEPOIS de o anel aparecer recolhe ele (a rolagem dele até o alvo, e redesenho sem rolar, não) */
+  const rolouDesdeOAnel = useRef(false);
+  const foraDesde = useRef<number | null>(null);
+  const fecharFora = () => {
+    if (foraDesde.current === null) return;
+    const ms = Date.now() - foraDesde.current;
+    foraDesde.current = null;
+    if (ms > 2000) trackEvent("missao_doses_postit_fora", eventoDaMissao({ dia: n, modulo, ms_fora: ms, scroll_y: Math.round(window.scrollY) }));
+  };
+  useEffect(() => {
+    if (fase !== "anotar" || !alvo || !anelVivo) {
+      if (anelForaRef.current) { anelForaRef.current = false; setAnelFora(false); fecharFora(); }
+      return;
+    }
+    const medir = () => {
+      if (!anelApareceu.current || !alvo.isConnected) return;
+      if (!anelForaRef.current && !rolouDesdeOAnel.current) return;
+      const r = (doseDeGasto ? recorteDoNovoGasto(alvo) : null) ?? alvo.getBoundingClientRect();
+      const fora = r.bottom < fundoDoTopoFixo() + 24 || r.top > alturaVisivel() - 24;
+      if (fora === anelForaRef.current) return;
+      anelForaRef.current = fora;
+      if (fora) foraDesde.current = Date.now(); else fecharFora();
+      setAnelFora(fora);
+    };
+    const aoRolar = () => { if (anelApareceu.current) rolouDesdeOAnel.current = true; medir(); };
+    const t = window.setInterval(medir, 300);
+    window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
+    window.addEventListener("resize", medir);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("scroll", aoRolar, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", medir);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, alvo, anelVivo]);
+  useEffect(() => () => fecharFora(), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Os sinais das primeiras 48 h (relatório 11 §7, nunca valor em reais): o post-it apareceu (anel ou solto) e em
+   * quanto tempo; o teclado abriu/fechou no passo; quanto o módulo levou do "Começar" até a 1ª tela da dose. */
+  const postItVisto = useRef(false);
+  const marcarPostItVisto = (ancora: "anel" | "solto") => {
+    if (postItVisto.current) return;
+    postItVisto.current = true;
+    trackEvent("missao_doses_postit", eventoDaMissao({ dia: n, modulo, ancora, ms_desde_view: Date.now() - t0.current, aba: doseDeGasto ? abaAtiva() : null, montagem: montagemRef.current }));
+    const comecar = tomarComecar();
+    if (comecar !== null) trackEvent("missao_doses_modulo_abriu", eventoDaMissao({ dia: n, modulo, ms_desde_comecar: comecar, tela: "postit" }));
+  };
+  useEffect(() => {
+    if (fase === "anotar" && !alvo && !montarAberto && !setupAberto) marcarPostItVisto("solto");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, alvo, montarAberto, setupAberto]);
+  useEffect(() => {
+    if (fase !== "anotar") return;
+    const ehCampo = (el: EventTarget | null) => el instanceof HTMLElement && /^(INPUT|TEXTAREA)$/.test(el.tagName);
+    let aberto = false;
+    const mudou = (agora: boolean) => {
+      if (agora === aberto) return;
+      aberto = agora;
+      trackEvent("missao_doses_teclado", eventoDaMissao({ dia: n, modulo, aberto, ms_desde_view: Date.now() - t0.current }));
+    };
+    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) mudou(true); };
+    const saiu = () => window.setTimeout(() => mudou(ehCampo(document.activeElement)), 120);
+    document.addEventListener("focusin", entrou);
+    document.addEventListener("focusout", saiu);
+    return () => { document.removeEventListener("focusin", entrou); document.removeEventListener("focusout", saiu); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
+
   /** Depois do Montar, "Agora não" (ou o "Pular" da faixa) = a dose está feita, sem o gasto de carona. */
-  const fecharSemGasto = () => {
+  const fecharSemGasto = (acao: "agora_nao" | "ainda_nao" = "agora_nao") => {
     if (faseRef.current !== "achar" && faseRef.current !== "anotar") return;
-    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "gasto_extra", acao: "agora_nao", segundos: segundos() }));
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "gasto_extra", acao, segundos: segundos(), montagem: montagemRef.current }));
     aoGastoGuiado?.("fim");
     faseRef.current = "festa";
     setAnelVivo(false);
     setFase("festa");
   };
+  /** O que o "pular" leva junto pro evento (relatório 11 §7: fase, aba, post-it à vista, montagem). */
+  const extrasDoPulo = (): Record<string, unknown> => (comBraco ? { fase: faseRef.current, aba: abaAtiva(), postit_visivel: faseRef.current === "anotar" ? true : null, montagem: montagemRef.current } : {});
   const pularPelaFaixa = () => {
     if (montarFeitoRef.current) { fecharSemGasto(); return; }
-    aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos());
+    aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos(), extrasDoPulo());
+  };
+  /* "Ainda não gastei nada hoje →" (D2): depois do Montar (ou na retomada) a dose JÁ está gravada — vai pra festa;
+   * sem o Montar, ela não tem o que anotar hoje: a dose fica pra amanhã (o mesmo caminho do "Pular", medido à parte). */
+  const aindaNaoGastei = () => {
+    if (montarFeitoRef.current) { fecharSemGasto("ainda_nao"); return; }
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "ainda_nao", segundos: segundos(), montagem: montagemRef.current }));
+    aoPular("ainda_nao", "toque", segundos(), extrasDoPulo());
   };
   const toqueNaFaixa = () => {
     toquesNaFaixa.current += 1;
     if (toquesNaFaixa.current >= 2) setPularVisivel(true);
-  };
-  const mostrarOnde = () => {
-    setPerdeuAlvo(false);
-    const el = reacharAlvo();
-    if (el) setAlvo(el);
-    setAcende((x) => x + 1); setAnelVivo(true);
   };
   const entendi = useCallback((via: "botao" | "auto") => {
     if (faseRef.current !== "olhar") return;
@@ -782,39 +936,51 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
           : B ? <>Missão · dose {n} de {total}</>
           : <>Missão · dia {n} de 3</>}
       </span>
-      {perdeuAlvo && fase === "anotar" && (
-        <button type="button" className="md-faixa-onde" data-testid="missao-doses-onde" aria-label="Mostrar onde tocar" title="Mostrar onde" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
-      )}
+      {/* 17/10 (relatório 11, B4): sem o ⌖ "mostrar onde" — 1 uso em 145 e remontava o anel no nó morto; o post-it
+          nunca some (solto/colado embaixo da faixa) e o anel volta sozinho */}
       {pularVisivel && fase !== "festa" && !montarAberto && (
         <button type="button" className="md-faixa-pular" data-testid="missao-doses-pular" onClick={(e) => { e.stopPropagation(); pularPelaFaixa(); }}>Pular</button>
       )}
     </div>
   );
 
-  const postIt = (
-    <PostItDaMissao
-      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : montarFeito ? "Agora · o 1º gasto" : "Agora · 1 toque"}
-      pergunta={pergunta}
-      descricao={montarFeito ? "Ele entra no seu mês e o quanto dá pra gastar hoje já se ajusta."
-        : semMetaAgua ? "Escolhe a sua meta — o 1º copo de hoje já entra junto."
-        : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: toca no quadradinho da linha de HOJE.` : "Toca no quadradinho da linha de HOJE.")
-        : continuacao && cfg.tipo === "agua" ? "Ele entra na sua meta de hoje."
-        : cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
-        : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
-        : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
-        : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
-      chips={chips}
-      tocado={tocado}
-      aoChip={tocarChip}
-      aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
-      dica={chips.length && alvoCfg?.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
-    />
+  /* O post-it do passo. `compacto` = colado embaixo da faixa (o alvo fora da tela ou sumido): só a pergunta e os chips,
+   * que gravam igual. Tocar numa ABA do módulo no meio do passo não troca de aba: o post-it chacoalha (B8). */
+  const postItDe = (compacto: boolean) => (
+    <motion.div animate={chacoalha && !reduzir ? { x: chacoalha % 2 ? [0, -9, 9, -6, 6, -2, 0] : [0, 9, -9, 6, -6, 2, 0] } : undefined} transition={{ duration: 0.45 }}>
+      <PostItDaMissao
+        rotulo={avisoDeAba ? "Primeiro o gasto — depois é só explorar" : subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
+        pergunta={pergunta}
+        descricao={doseDeGasto ? DESCRICAO_DO_GASTO
+          : semMetaAgua ? "Escolhe a sua meta — o 1º copo de hoje já entra junto."
+          : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: toca no quadradinho da linha de HOJE.` : "Toca no quadradinho da linha de HOJE.")
+          : continuacao && cfg.tipo === "agua" ? "Ele entra na sua meta de hoje."
+          : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
+          : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
+          : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
+        chips={chips}
+        tocado={tocado}
+        aoChip={tocarChip}
+        aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
+        rotuloEscrever={doseDeGasto ? "✎ outro" : undefined}
+        dica={chips.length && alvoCfg?.escrever && !doseDeGasto ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+        secundaria={doseDeGasto ? { texto: AINDA_NAO_GASTEI, aoTocar: aindaNaoGastei, testid: "missao-doses-ainda-nao" } : undefined}
+        compacto={compacto}
+      />
+    </motion.div>
   );
+  const postIt = postItDe(false);
 
   /* 1.0.16 — a dose de Finanças = "Vamos montar suas Finanças" (folha fixa abaixo da faixa da missão) */
   const montarPronto = (r: ResumoMontar) => {
     const rot = r.semFolga || !(r.porDia > 0) ? `Renda e ${r.contas} ${r.contas === 1 ? "conta" : "contas"} do mês` : `Pode gastar R$ ${reais(Math.floor(r.porDia))} por dia`;
-    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos() }));
+    /* D1 (relatório 11; ramo v1016-financas): o 1º gasto pode vir JÁ na tela do número ("Você pode gastar hoje R$ X")
+     * — `primeiroGasto` {nome} (tocou um chip ali) ou `null` ("Ainda não gastei nada hoje"). Com o campo, nada de anel:
+     * direto pro MEU MÊS e a festa (a dose conta nos dois casos: o Montar gravou renda e contas). Sem o campo (o Montar
+     * de antes), o 1º gasto guiado pelo anel, como sempre. */
+    const comGasto = r as ResumoMontar & { primeiroGasto?: { nome: string; valor?: number } | null };
+    const veioPrimeiroGasto = Object.prototype.hasOwnProperty.call(comGasto, "primeiroGasto");
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos(), ...(veioPrimeiroGasto ? { primeiro_gasto: comGasto.primeiroGasto ? "chip" : "nenhum" } : {}) }));
     // a tela substitui os cartões de Finanças (como no caminho do módulo, useMontarFinancasNoModulo.aoPronto)
     try { marcarCartoesVistos("financas"); } catch { /* storage bloqueado */ }
     rotuloDoMontar.current = rot;
@@ -824,6 +990,23 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     setRotulo(rot);
     setNumero(null);
     setMontarFeito(true);
+    if (veioPrimeiroGasto) {
+      const g = comGasto.primeiroGasto ?? null;
+      porDiaAntes.current = null; // o número já caiu na frente dela, na tela do Montar: o "olha" é só o MEU MÊS
+      if (g) {
+        const valor = typeof g.valor === "number" && g.valor > 0 ? g.valor : valorDoGastoPeloNome(g.nome);
+        valorDoGasto.current = valor;
+        setGastoExtra(valor ? `${g.nome} · R$ ${reais(valor)}` : g.nome);
+      } else {
+        setOlhaSemGasto(true);
+      }
+      aoFeito(rot, segundos());
+      aoGastoGuiado?.("fim");
+      setMontarAberto(false);
+      faseRef.current = "registrou";
+      setFase("registrou");
+      return;
+    }
     // a dose conta JÁ (fechar o app no gasto de carona não pode desfazer o Montar); a comemoração chama de
     // novo no fim e a missão ignora a 2ª vez (o dia já está gravado)
     aoFeito(rot, segundos());
@@ -833,6 +1016,41 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // assim que o Montar sair da tela (o atributo <html data-montar-financas> some no desmontar)
     setMontarAberto(false);
   };
+  /** O valor do gasto que o Montar acabou de gravar (o mais novo com esse nome) — pro "Saiu" do MEU MÊS contar. */
+  const valorDoGastoPeloNome = (nome: string): number | null => {
+    try {
+      const lista = (getRef.current<Array<{ description?: unknown; value?: unknown }>>("finance-expenses", []) ?? []);
+      for (let i = lista.length - 1; i >= 0; i--) {
+        if (String(lista[i]?.description ?? "").trim().toLowerCase() === nome.trim().toLowerCase()) { const v = Number(lista[i]?.value); return v > 0 ? v : null; }
+      }
+    } catch { /* noop */ }
+    return null;
+  };
+  /* B11 (relatório 11): o Montar marca "decidido" na ENTRADA do "Montando" — fechar o app na tela do número perdia a
+   * dose (ela só gravava no "Ver minhas Finanças"). Agora a dose grava ali mesmo (o mesmo rótulo do número, que é a
+   * conta do card) e o 1º gasto fica pendente: reabrir volta no passo do gasto. */
+  useEffect(() => {
+    if (!montarAberto || !comBraco) return;
+    let t = 0;
+    const aoDecidir = (e: Event) => {
+      const d = (e as CustomEvent<{ resultado?: string; contas?: number }>).detail;
+      if (d?.resultado !== "pronto" || montarFeitoRef.current) return;
+      t = window.setTimeout(() => {
+        if (montarFeitoRef.current) return;
+        let porDia: number | null = null;
+        try { const v = porDiaExato(getRef.current); porDia = v === null ? null : Math.round(v); } catch { porDia = null; }
+        const contas = d.contas ?? 0;
+        const rot = porDia && porDia > 0 ? `Pode gastar R$ ${reais(porDia)} por dia` : `Renda e ${contas} ${contas === 1 ? "conta" : "contas"} do mês`;
+        rotuloDoMontar.current = rot;
+        aoFeito(rot, segundos());
+        aoGastoGuiado?.("pendente");
+        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "decidiu", segundos: segundos() }));
+      }, 300);
+    };
+    window.addEventListener(EVENTO_MONTAR_FINANCAS_FIM, aoDecidir);
+    return () => { window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, aoDecidir); window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montarAberto]);
   const montarPulou = () => {
     setMontarAberto(false);
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "pulou", segundos: segundos() }));
@@ -865,7 +1083,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       {/* fora do AnimatePresence (um portal ali dentro era descartado: o post-it solto NUNCA montava) */}
       {!alvo && fase === "anotar" && !montarAberto && !setupAberto && createPortal(
           <motion.div key="postit-solto" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 64px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} data-testid="missao-doses-postit-solto">
-            <div className="w-[92%] max-w-[360px] pointer-events-auto">{postIt}</div>
+            <div className="w-[92%] max-w-[360px] pointer-events-auto">{doseDeGasto ? postItDe(true) : postIt}</div>
+          </motion.div>,
+          document.body,
+        )}
+      {/* D4: o alvo saiu da área visível — o post-it fica colado embaixo da faixa (o anel recolhido segue o alvo) */}
+      {anelFora && anelVivo && alvo && fase === "anotar" && createPortal(
+          <motion.div key="postit-doca" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 10px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="missao-doses-postit-doca">
+            <div className="w-[92%] max-w-[360px] pointer-events-auto">{postItDe(true)}</div>
           </motion.div>,
           document.body,
         )}
@@ -877,16 +1102,20 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             /* 17/10: sem tempo — o post-it do passo fica até o registro, o "Pular" ou o "Agora não" (36 saíam pelo
                tempo de 60 s e o passo ficava sem chips) */
             key={`anotar-${acende}`} fixo interativo duracao={null} alvo={alvo} reachar={reacharAlvo} testid="missao-doses-anel" abaixo={!!alvoCfg?.postItAbaixo}
+            recorte={doseDeGasto ? recorteDoNovoGasto : undefined} recolhido={anelFora}
+            aoAparecer={() => { anelApareceu.current = true; rolouDesdeOAnel.current = false; marcarPostItVisto("anel"); }}
             aoSair={(motivo, info) => {
               setAnelVivo(false);
+              anelApareceu.current = false;
               if (faseRef.current !== "anotar") return;
               setPerdeuAlvo(true);
+              saiuEm.current = Date.now();
               // 1.0.16 (defeito 5) + 17/10: a âncora sumiu de vez, o app foi pro 2º plano (ela saiu pra ver o valor no
               // banco e voltou) ou o anel saiu por qualquer outro motivo — o post-it com os chips FICA na tela, solto
               // (os chips gravam sozinhos), e a procura acima traz o anel de volta sozinha
               motivoDaSaida.current = motivo;
               setAlvo(null);
-              trackEvent("missao_doses_anel_saiu", eventoDaMissao({ dia: n, modulo, motivo, voltou: !!info?.voltou, ms: info?.ms ?? null }));
+              trackEvent("missao_doses_anel_saiu", eventoDaMissao({ dia: n, modulo, motivo, voltou: !!info?.voltou, ms: info?.ms ?? null, aba_na_saida: abaAtiva(), postit_visivel: true }));
             }}
             balao={postIt}
           />
@@ -900,7 +1129,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="missao-doses-olhar">
                 <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1" data-testid="missao-doses-olhar-tempo">{doisTempos ? `Olha · ${tempoDoOlhar === "mes" ? 2 : 1} de 2` : "Olha · 1 de 1"}</span>
                 <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{tempoDoOlhar === "pode" ? "Quanto você pode gastar hoje" : tempoDoOlhar === "mes" && doisTempos ? "E o seu mês" : cfg.olhar.titulo}</span>
-                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{tempoDoOlhar === "pode" ? "Esse gasto já entrou na conta — e o número se ajusta sozinho a cada gasto que você anota." : tempoDoOlhar === "mes" ? "O gasto entrou no dia de hoje e o “Saiu” do mês somou sozinho." : cfg.olhar.texto}</span>
+                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{tempoDoOlhar === "pode" ? "Esse gasto já entrou na conta — e o número se ajusta sozinho a cada gasto que você anota." : tempoDoOlhar === "mes" && olhaSemGasto ? "Suas contas do mês já estão aqui. Cada gasto que você anotar entra no dia dele." : tempoDoOlhar === "mes" ? "O gasto entrou no dia de hoje e o “Saiu” do mês somou sozinho." : cfg.olhar.texto}</span>
                 {numero && tempoDoOlhar === "pode" && numero.antes === numero.depois ? (
                   /* o gasto é pequeno perto do mês: o "por dia" arredondado nem mexe — mostra o que saiu, sem fingir */
                   <span className="block mt-2 text-[13px] text-white/80" data-testid="missao-doses-olhar-numero">

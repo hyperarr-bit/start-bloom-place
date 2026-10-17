@@ -234,7 +234,12 @@ beforeEach(() => {
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();
   conta.user_metadata = {};
   iphone();
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) } as DOMRect);
+  // o cabeçalho fixo do módulo fica no TOPO (0–56); o resto, em 100–148 (o post-it "colado embaixo da faixa" decide por aí)
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) }) as DOMRect;
+  });
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   vi.setSystemTime(new Date(2026, 9, 3, 15, 10)); // sábado 03/10/2026, 15:10 — dia 1 da missão
 });
@@ -457,7 +462,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(lerMissao()?.feitos[1]?.rotulo).toMatch(/^Pode gastar R\$ [\d.]+ por dia$/);
     // o 1º gasto guiado: post-it com os 3 prontos + "escrever o meu" (o anel só procura o "+ Novo gasto" com o Montar fora da tela)
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("E o gasto de hoje? Toca num:");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     expect(within(postIt).getAllByTestId("demo-guia-chip")).toHaveLength(3);
     expect(within(postIt).getByTestId("demo-guia-escrever")).toBeInTheDocument();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]); // ☕ Café
@@ -592,7 +597,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(document.documentElement.hasAttribute("data-missao-dose")).toBe(false);
     montar(store2, "/financas");
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("E o gasto de hoje? Toca num:");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(lerMissao()?.pulados).toBeUndefined();
   });
@@ -1178,7 +1183,7 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
     montar(store, "/financas");
     const postIt = esperarPostIt();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
-    expect(postIt).toHaveTextContent("Anota o gasto de hoje:");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 de 3 feito ✅");
   });
@@ -1270,7 +1275,7 @@ describe("14. dose de Finanças (os dois braços): Montar → 1º gasto guiado �
     montar(store, "/financas");
     fireEvent.click(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Pular" }));
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("Qual foi o seu último gasto?");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     andar(2200);
     expect(eventos.some(([n, d]) => n === "missao_doses_passo" && d.alvo === "pode_gastar")).toBe(false);
@@ -1319,7 +1324,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     const t0 = fazerMontar();
     const tPostIt = ate(postItNaTela);
     const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
-    expect(postIt).toHaveTextContent("E o gasto de hoje? Toca num:");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     expect(within(postIt).getAllByTestId("demo-guia-chip").map((c) => c.textContent)).toEqual(["☕Café· R$ 12", "🚗Uber· R$ 23", "🍔Almoço· R$ 35"]);
     expect(within(postIt).getByTestId("demo-guia-escrever")).toBeInTheDocument();
     expect(screen.getByTestId("missao-doses-anel")).toBeInTheDocument(); // o anel já está no "+ Novo gasto" (aba MEU FINANCEIRO)
@@ -1378,7 +1383,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     visibilidade("hidden");
     expect(eventos).toContainEqual(["missao_doses_anel_saiu", expect.objectContaining({ motivo: "segundo_plano" })]);
     const solto = screen.getByTestId("missao-doses-postit-solto");
-    expect(solto).toHaveTextContent("E o gasto de hoje? Toca num:");
+    expect(solto).toHaveTextContent("Já gastou com alguma coisa hoje?");
     expect(within(solto).getAllByTestId("demo-guia-chip")).toHaveLength(3);
     visibilidade("visible");
     avancar(50);
@@ -1410,7 +1415,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     ate(postItNaTela);
     expect(Date.now() - t0).toBeLessThanOrEqual(1500);
     const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
-    expect(postIt).toHaveTextContent("E o gasto de hoje? Toca num:");
+    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
     expect(within(postIt).getAllByTestId("demo-guia-chip")).toHaveLength(3);
     expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(screen.queryByTestId("tour-balao")).toBeNull();
@@ -1545,7 +1550,7 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
       montar(store, "/financas");
       const postIt = esperarPostIt();
       expect(screen.queryByTestId("montar-financas"), braco).toBeNull();
-      expect(postIt, braco).toHaveTextContent("Qual foi o seu último gasto?");
+      expect(postIt, braco).toHaveTextContent("Já gastou com alguma coisa hoje?");
       expect(viewDaDose(), braco).not.toHaveProperty("setup");
       fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
       passarOlhaDeFinancas(); // o MEU MÊS de sempre (sem renda, sem número de "pode gastar")

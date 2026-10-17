@@ -285,6 +285,10 @@ export interface EstadoMissaoDoses {
    *  meio, a dose volta no passo do gasto ao reabrir no mesmo dia (retomadaDoGasto). Sai quando o gasto entra, ela
    *  pula, ou a comemoração aparece. */
   gastoGuiado?: { n: DiaDaMissao; dia: string; retomadas?: number };
+  /** 1.0.16 (relatório 11, B10): quantas vezes a dose `n` montou (cada entrada no módulo é um `view` novo) e a hora
+   *  da 1ª vista dela — o tempo de verdade até o feito é desde a 1ª, não desde a última montagem */
+  montagens?: Partial<Record<DiaDaMissao, number>>;
+  primeiraVista?: Partial<Record<DiaDaMissao, number>>;
   /** 1.0.16, braço A: "Sem lembrete" na folha do plano de amanhã (o dia) — não insiste */
   planoAPulado?: string;
   /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets), já mostradas (o dia) */
@@ -614,6 +618,29 @@ export function aprofundarPendente(m: EstadoMissaoDoses, rota: string, hoje: str
  * missão (ou a folha do plano de amanhã, ou "O que você construiu") ainda tem tela pra
  * mostrar — o tour deve ESPERAR. Reler ao evento EVENTO_MISSAO_DOSES (e ao `missao_completa`).
  */
+/** 1.0.16 (relatório 11, B10): mais uma montagem da dose `n` — devolve o nº dela e quanto tempo passou desde a 1ª
+ *  vista. Só com braço (a missão desligada fica a 1.0.15, campo a campo). */
+export function registrarMontagem(n: DiaDaMissao, agora: number = Date.now()): { montagem: number; msDesdePrimeira: number } {
+  const m = lerMissao();
+  if (!m || !m.braco) return { montagem: 1, msDesdePrimeira: 0 };
+  const montagem = (m.montagens?.[n] ?? 0) + 1;
+  const primeira = m.primeiraVista?.[n] ?? agora;
+  gravarMissao({ ...m, montagens: { ...m.montagens, [n]: montagem }, primeiraVista: { ...m.primeiraVista, [n]: primeira } });
+  return { montagem, msDesdePrimeira: Math.max(0, agora - primeira) };
+}
+export const msDesdePrimeiraVista = (n: DiaDaMissao, agora: number = Date.now()): number | null => {
+  const t = lerMissao()?.primeiraVista?.[n];
+  return typeof t === "number" ? Math.max(0, agora - t) : null;
+};
+/** B12: a hora do "Começar" das boas-vindas (memória da abertura) — a 1ª tela da dose mede quanto o módulo levou. */
+let comecouEm: number | null = null;
+export const marcarComecar = (agora: number = Date.now()): void => { comecouEm = agora; };
+export function tomarComecar(agora: number = Date.now()): number | null {
+  const t = comecouEm;
+  comecouEm = null;
+  return t === null ? null : Math.max(0, agora - t);
+}
+
 /**
  * 1.0.16 (dono, 17/10 — "foca no primeiro passo de Finanças"; 67 saíram do app no meio do "anota 1 gasto"): o app
  * foi fechado/morto DEPOIS do Montar e ANTES do 1º gasto → reabrindo no MESMO dia, a dose volta direto no passo do

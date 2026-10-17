@@ -14,7 +14,7 @@ import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  definirDonoDaMissao, missaoDaConta, missaoValida, precisaPlanoA, retomadaDoGasto,
+  definirDonoDaMissao, marcarComecar, missaoDaConta, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -370,6 +370,7 @@ function Ligada() {
           const m = comModulos(modulos);
           salvar(m);
           trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "comecar", modulos, ...(B ? { tela: 2 } : {}) }));
+          marcarComecar(); // B12: quanto o módulo leva do "Começar" até a 1ª tela da dose
           navigate(MODULOS[modulos[0]].rota);
         }}
         aoExplorar={(modulos) => {
@@ -542,9 +543,10 @@ function Ligada() {
             }
           }
         }}
-        aoPular={(via, passoPulado, segundos) => {
-          trackEvent("missao_pular", eventoDaMissao({ dia: n, passo: passoPulado, segundos, via, ...(passo.modo ? { modo: passo.modo } : {}) }));
-          if (via === "faixa_20s") {
+        aoPular={(via, passoPulado, segundos, extra) => {
+          trackEvent("missao_pular", eventoDaMissao({ dia: n, passo: passoPulado, segundos, via, ...(passo.modo ? { modo: passo.modo } : {}), ...(extra ?? {}) }));
+          // "Ainda não gastei nada hoje" (sem o Montar) = a dose fica pra depois, como o "Pular" (medido à parte pelo `via`)
+          if (via === "faixa_20s" || via === "ainda_nao") {
             const m = lerMissao() ?? missao;
             if (passo.modo === "aprofundar") {
               const deHoje = m.aprofundados?.[hoje] ?? [];

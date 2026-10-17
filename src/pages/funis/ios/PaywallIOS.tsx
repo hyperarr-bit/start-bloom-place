@@ -668,7 +668,7 @@ export function PaywallIOS({
     <>
     {comprando && (
       <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">
-        <div className="mx-auto max-w-[92%] rounded-2xl bg-[#16121c] text-white text-[12.5px] font-bold px-4 py-2.5 shadow-lg flex items-center gap-2">
+        <div className="mx-auto max-w-[92%] rounded-2xl bg-[#16121c] text-white dark:bg-white dark:text-[#16121c] text-[12.5px] font-bold px-4 py-2.5 shadow-lg flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> Abrindo o pagamento…
         </div>
       </div>
@@ -789,9 +789,9 @@ export function PaywallIOS({
     return (
       <div className="relative w-full flex-1 flex flex-col" data-testid="ios-curto">
         {/* 1. a imagem sangrando até as bordas (o px-5/pt-4 do funil é desfeito aqui); é ela que encolhe */}
-        <div className="relative flex-1 min-h-[150px] max-h-[440px] -mx-5 -mt-4 overflow-hidden bg-[#f6f6f7]" data-testid="ios-curto-hero">
+        <div className="relative flex-1 min-h-[150px] max-h-[440px] -mx-5 -mt-4 overflow-hidden bg-[#f6f6f7] dark:bg-background" data-testid="ios-curto-hero">
           <img src="/paywall-hero.jpg" alt="" draggable={false} className="absolute inset-0 w-full h-full object-cover object-top select-none scale-[1.07] origin-top" />
-          <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-white via-white/85 to-transparent" aria-hidden />
+          <div className="absolute inset-x-0 bottom-0 h-[48%] bg-gradient-to-t from-white via-white/85 to-transparent dark:from-background dark:via-background/85" aria-hidden />
           {!gate && <button
             type="button" aria-label="Voltar" data-testid="ios-curto-voltar" onClick={voltar}
             className="absolute top-3 left-4 w-11 h-11 rounded-full bg-white text-[#16121c] shadow-[0_2px_12px_rgba(0,0,0,0.18)] grid place-items-center active:scale-95 transition-transform"
@@ -802,7 +802,7 @@ export function PaywallIOS({
 
         <div className="shrink-0 max-w-sm w-full mx-auto flex flex-col">
           {/* 2. o título */}
-          <h1 className="text-center text-[26px] font-black tracking-[-0.02em] leading-[1.12] text-[#16121c] -mt-1">
+          <h1 className="text-center text-[26px] font-black tracking-[-0.02em] leading-[1.12] text-[#16121c] dark:text-foreground -mt-1">
             {comTrial && !mostraMensal
               ? <>Comece seus {dias} dias grátis{" "}<br />pra continuar</>
               : <>Escolha seu plano{" "}<br />pra continuar</>}
@@ -813,7 +813,7 @@ export function PaywallIOS({
             <div
               role="radio" aria-checked={plano === "anual"} tabIndex={0} data-testid="ios-curto-anual"
               onClick={() => escolher("anual")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("anual"); }}
-              className={`rounded-2xl overflow-hidden border-[2.5px] bg-white transition-colors ${plano === "anual" ? "border-[#16121c]" : "border-black/10"}`}
+              className={`rounded-2xl overflow-hidden border-[2.5px] bg-white transition-colors ${plano === "anual" ? "border-[#16121c] dark:border-white" : "border-black/10 dark:border-white/20"}`}
             >
               {comTrial && (
                 <div className={`text-center text-[12px] font-extrabold tracking-[0.1em] py-[6px] ${plano === "anual" ? "bg-[#16121c] text-white" : "bg-black/10 text-[#16121c]"}`}>
@@ -835,7 +835,7 @@ export function PaywallIOS({
             <div
               role="radio" aria-checked={plano === "mensal"} tabIndex={0} data-testid="ios-curto-mensal"
               onClick={() => escolher("mensal")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") escolher("mensal"); }}
-              className={`rounded-2xl border-[2.5px] flex items-center gap-3 px-3.5 py-3.5 text-[#16121c] transition-colors ${plano === "mensal" ? "border-[#16121c] bg-white" : "border-black/10 bg-[#f6f6f7]"}`}
+              className={`rounded-2xl border-[2.5px] flex items-center gap-3 px-3.5 py-3.5 text-[#16121c] transition-colors ${plano === "mensal" ? "border-[#16121c] dark:border-white bg-white" : "border-black/10 dark:border-white/20 bg-[#f6f6f7]"}`}
             >
               {radio(plano === "mensal")}
               <b className="flex-1 text-[15.5px] font-bold">Mensal</b>
@@ -867,7 +867,7 @@ export function PaywallIOS({
 
           {/* 5. a linha única + o botão (1 pulso) + o legal */}
           {comTrial && !mostraMensal && (
-            <p className="mt-3 text-center text-[12.5px] font-semibold text-[#16121c]" data-testid="ios-sem-cobranca">
+            <p className="mt-3 text-center text-[12.5px] font-semibold text-[#16121c] dark:text-foreground" data-testid="ios-sem-cobranca">
               <span className="text-accent" aria-hidden>✓</span> Sem cobrança hoje{aviso ? <span className="text-muted-foreground"> · a gente te avisa dia {aviso}</span> : null}
             </p>
           )}
@@ -876,7 +876,7 @@ export function PaywallIOS({
               <motion.div
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}
                 role="status" data-testid="ios-preparando-folha"
-                className="absolute inset-x-0 -top-2 -translate-y-full z-10 rounded-2xl bg-[#16121c] text-white text-[12.5px] font-semibold leading-snug px-3.5 py-2.5 shadow-lg text-center"
+                className="absolute inset-x-0 -top-2 -translate-y-full z-10 rounded-2xl bg-[#16121c] text-white dark:bg-white dark:text-[#16121c] text-[12.5px] font-semibold leading-snug px-3.5 py-2.5 shadow-lg text-center"
               >
                 A Apple vai mostrar <b>{precoAnualTxt}/ano</b>: é o valor depois dos {dias} dias. Hoje: <b>{precoTeste ?? "nada"}</b>.
               </motion.div>
@@ -884,7 +884,7 @@ export function PaywallIOS({
             <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 0.9, delay: 0.5, ease: "easeInOut" }}>
               <Button
                 size="lg"
-                className="w-full h-14 rounded-full bg-[#16121c] hover:bg-[#16121c]/90 text-white text-[17px] font-bold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.45)]"
+                className="w-full h-14 rounded-full bg-[#16121c] hover:bg-[#16121c]/90 text-white dark:bg-white dark:hover:bg-white/90 dark:text-[#16121c] text-[17px] font-bold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.45)]"
                 disabled={comprando || preparando}
                 onClick={tocarNoBotao}
               >
@@ -942,8 +942,9 @@ export function PaywallIOS({
             >
               Tenho um código
             </button>
-            {/* gate: a conta já está logada e não há venda no site — sem o "Já paguei pelo site" (e sem o "·" sobrando) */}
-            {!gate && <>{" · "}<JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" /></>}
+            {/* gate: a conta já está logada e não há venda no site — sem o "Já paguei pelo site" (e sem o "·" sobrando);
+                o " · " vai DENTRO da linha: no site a linha não existe e o ponto ficava sobrando (17/10) */}
+            {!gate && <JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" separador=" · " />}
           </p>
           {resgatouCodigo && (
             <button
@@ -1090,7 +1091,7 @@ export function PaywallIOS({
 
       {/* CTA fixo */}
       <div
-        className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white via-white/95 to-transparent pt-8"
+        className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white via-white/95 to-transparent dark:from-background dark:via-background/95 pt-8"
         style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
@@ -1124,7 +1125,7 @@ export function PaywallIOS({
           {textos && comTrial && !mostraMensal && (
             <p className="text-center mb-2" data-testid="ios-apple-confirma">
               {/* fundo opaco: a linha fica na zona do degradê da barra e sobreporia o conteúdo */}
-              <span className="inline-block rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-foreground shadow-[0_2px_10px_-4px_rgba(0,0,0,0.25)]">
+              <span className="inline-block rounded-full bg-white dark:bg-card px-3 py-1 text-[12px] font-semibold text-foreground shadow-[0_2px_10px_-4px_rgba(0,0,0,0.25)]">
                 A Apple vai pedir confirmação. Nada é cobrado hoje.
               </span>
             </p>

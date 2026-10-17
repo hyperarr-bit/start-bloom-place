@@ -50,6 +50,7 @@ import {
   horaSemEmpilhar, avisoDoTesteNoDia, planejarLembreteSequencia, diaComAvisoDoTeste, agendarLembreteSequencia, BASES_LEMBRETES as BASES_DOS_TIPOS,
 } from "@/lib/notificacoes";
 import { diaDoAviso } from "@/pages/funis/ios/PaywallIOS";
+import { diasAteOAviso, passosDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 import { combinarHora, conteudoDaMissao, registrarAbertura } from "@/lib/lembrete-dia2";
 import { localDayKey } from "@/lib/utils";
 
@@ -105,6 +106,22 @@ describe("quandoLembrarDoTeste — o dia que o paywall prometeu", () => {
           expect(min, rotulo).toBeLessThanOrEqual(20 * 60 + 30);
           expect(fim - alvo!.getTime(), rotulo).toBeGreaterThanOrEqual(24 * H);
         }
+      }
+    }
+  });
+
+  it("17/10 — o passo do lembrete da linha do tempo do paywall minimalista ('Amanhã' em 3 dias, 'Dia 6' em 7) é o dia em que este aviso toca", () => {
+    for (const [dias, rotulo] of [[3, "Amanhã"], [7, "Dia 6"]] as const) {
+      for (const [hh, mm] of [[8, 0], [14, 0], [20, 0], [23, 30]]) {
+        const inicio = new Date(2026, 9, 31, hh, mm, 0); // com virada do mês
+        const fim = inicio.getTime() + dias * 24 * H;
+        const passo = passosDoTeste({ dias, precoAnual: "R$ 97,90", precoTeste: "R$ 0,00", aviso: "sim" }).find((p) => p.tipo === "aviso");
+        expect(passo?.quando, `${dias}d ${hh}:${mm}`).toBe(rotulo);
+        const prometido = new Date(inicio);
+        prometido.setDate(prometido.getDate() + diasAteOAviso(dias)!);
+        expect(diaDoAvisoDoTeste(fim, inicio.getTime()), `${dias}d ${hh}:${mm}`).toBe(localDayKey(prometido));
+        const alvo = quandoLembrarDoTeste(fim, inicio.getTime(), { inicioMs: inicio.getTime() });
+        expect(alvo && localDayKey(alvo), `${dias}d ${hh}:${mm}`).toBe(localDayKey(prometido));
       }
     }
   });

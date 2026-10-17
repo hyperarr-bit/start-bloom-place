@@ -7,6 +7,8 @@
  *      mensal 19,90 incluído); mensal 19,90 some sem a offering; o Voltar redondo volta a recuar
  *      depois de um presente fechado.
  * (A variante B do paywall saiu do escopo em 16/10: o paywall curto da 1.0.14 fica como está.)
+ * 17/10: aqui é a explicação/escada de HOJE — a chave `paywall_minimalista` desligada (força de QA "off");
+ * a versão enxuta dela, com o paywall minimalista, está em paywall-minimalista.test.tsx.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
@@ -70,6 +72,7 @@ vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ get: (_k: string
 import { trackEvent } from "@/lib/analytics";
 import { comprarAnualIos, comprar as comprarAssinatura, comprarPresente69 } from "@/lib/revenuecat";
 import { CHAVE_FORCA_OFERTAS, _zerarChavesRemotas } from "@/lib/ofertas-saida";
+import { CHAVE_FORCA_PAYWALL_MINIMALISTA, _zerarRemotaMinimalista } from "@/lib/paywall-minimalista";
 import { PaywallIOS, PREPARACAO_DA_FOLHA_MS, DIAS_DE_TESTE_PADRAO } from "@/pages/funis/ios/PaywallIOS";
 import { linhasDaExplicacao } from "@/components/paywall/ExplicaFolha";
 import { prepararPresente } from "@/components/app/Presente69";
@@ -90,6 +93,8 @@ const esperarCurto = () => screen.findByText("R$ 97,90 cobrado por ano");
 beforeEach(() => {
   localStorage.clear();
   _zerarChavesRemotas();
+  _zerarRemotaMinimalista();
+  localStorage.setItem(CHAVE_FORCA_PAYWALL_MINIMALISTA, "off"); // a explicação de hoje (a chave minimalista desligada)
   vi.mocked(trackEvent).mockClear();
   vi.mocked(comprarAnualIos).mockClear();
   vi.mocked(comprarAssinatura).mockClear();

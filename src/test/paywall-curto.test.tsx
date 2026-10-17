@@ -11,6 +11,8 @@
  *    ENTÃO abre a folha; presente 69,90 na folha fechada (16/10; a 2ª chance de mesmo preço vira reserva), presente no Voltar (botão redondo = core:voltar) e paywall_saiu
  *    seguem funcionando; `paywall_oferta_vista` ganha `paywall_curto: true`.
  *  · preços SEMPRE da loja: 69,90 troca tudo; sem o mensal da loja = sem selo e "R$ —".
+ * 17/10: este é o curto de HOJE, que a chave `paywall_minimalista` desligada devolve byte a byte — por isso
+ * cada teste daqui roda com a força de QA "off" (o minimalista tem o próprio arquivo, paywall-minimalista).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
@@ -74,7 +76,8 @@ vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ get: (_k: string
 import { trackEvent } from "@/lib/analytics";
 import { comprarAnualIos, comprar as comprarAssinatura } from "@/lib/revenuecat";
 import { CHAVE_FORCA_OFERTAS, PAYWALL_CURTO, PLANO_CADEADO, ofertaLigada, registrarChavesRemotas, _zerarChavesRemotas, lerChavesRemotas } from "@/lib/ofertas-saida";
-import { PaywallIOS, PREPARACAO_DA_FOLHA_MS, diaDoAviso, linhaDoTempoDoTeste } from "@/pages/funis/ios/PaywallIOS";
+import { PaywallIOS, PREPARACAO_DA_FOLHA_MS, diaDoAviso } from "@/pages/funis/ios/PaywallIOS";
+import { CHAVE_FORCA_PAYWALL_MINIMALISTA, _zerarRemotaMinimalista } from "@/lib/paywall-minimalista";
 
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
 const ios = () => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; };
@@ -90,6 +93,8 @@ const dd = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); re
 beforeEach(() => {
   localStorage.clear();
   _zerarChavesRemotas();
+  _zerarRemotaMinimalista();
+  localStorage.setItem(CHAVE_FORCA_PAYWALL_MINIMALISTA, "off"); // o curto de hoje (a chave minimalista desligada)
   vi.mocked(trackEvent).mockClear();
   vi.mocked(comprarAnualIos).mockClear();
   vi.mocked(comprarAssinatura).mockClear();
@@ -117,19 +122,8 @@ describe("a chave PAYWALL_CURTO (e a PLANO_CADEADO)", () => {
     expect(ofertaLigada("textos")).toBe(false);
   });
 
-  it("linha do tempo pura: Dia 1 = hoje; aviso no dia N−1; cobrança no dia N com o preço da loja; sem preço do teste = 'sem cobrança'", () => {
+  it("o dia do aviso da linha única do Cal AI: Dia 1 = hoje, aviso no dia N−1 (17/10: a linha do tempo antiga daqui saiu — a de verdade é a LinhaDoTempoDoTeste, testada em paywall-minimalista)", () => {
     const hoje = new Date(2026, 9, 10);
-    expect(linhaDoTempoDoTeste(3, "R$ 97,90", "R$ 0,00", hoje).map((l) => l.t)).toEqual([
-      "Hoje · R$ 0,00", "Dia 2 (11/10) · a gente te avisa", "Dia 3 (12/10) · R$ 97,90/ano só se você continuar",
-    ]);
-    expect(linhaDoTempoDoTeste(7, "R$ 69,90", "$0.00", hoje).map((l) => l.t)).toEqual([
-      "Hoje · $0.00", "Dia 6 (15/10) · a gente te avisa", "Dia 7 (16/10) · R$ 69,90/ano só se você continuar",
-    ]);
-    expect(linhaDoTempoDoTeste(3, "R$ 97,90", null, hoje)[0].t).toBe("Hoje · sem cobrança");
-    expect(linhaDoTempoDoTeste(1, "R$ 97,90", "R$ 0,00", hoje).map((l) => l.t)).toEqual(["Hoje · R$ 0,00", "Dia 1 (10/10) · R$ 97,90/ano só se você continuar"]);
-    // a virada do mês
-    expect(linhaDoTempoDoTeste(3, "R$ 97,90", "R$ 0,00", new Date(2026, 9, 31))[2].t).toMatch(/Dia 3 \(02\/11\)/);
-    // a linha única do Cal AI: o dia do aviso (N−1)
     expect(diaDoAviso(3, hoje)).toBe("11/10");
     expect(diaDoAviso(7, hoje)).toBe("15/10");
     expect(diaDoAviso(3, new Date(2026, 9, 31))).toBe("01/11");

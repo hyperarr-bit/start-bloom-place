@@ -8,6 +8,8 @@
  *     do gate (recarrega "/"), cancelando a régua do gate; eventos com funil "gate_ios";
  *   · chave desligada pela metadata do RevenueCat → volta o gate antigo (PaywallAssinatura);
  *   · Android, e iPhone com a chave off: o PaywallAssinatura de sempre.
+ * 17/10: o curto acima é o de HOJE (a chave `paywall_minimalista` desligada, força de QA "off"); o gate com o
+ * paywall minimalista ligado tem o próprio bloco no fim.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
@@ -16,6 +18,7 @@ import { MemoryRouter } from "react-router-dom";
 const estado = vi.hoisted(() => ({
   auth: { user: { id: "uid-porta", email: "ana@exemplo.com", created_at: new Date().toISOString(), user_metadata: {} as Record<string, unknown> }, loading: false, trialExpired: false, noTrial: true, isSubscribed: false, subLoaded: true, trialDay: 1, trialHoursLeft: 0 },
   metadataCurto: null as null | "on" | "off",
+  metadataMini: null as null | "on" | "off",
 }));
 const rcMock = vi.hoisted(() => ({
   identificar: vi.fn(async (_u: string | null) => undefined),
@@ -30,10 +33,12 @@ const notif = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/revenuecat", async (original) => {
   const ofertas = await import("@/lib/ofertas-saida");
+  const mini = await import("@/lib/paywall-minimalista");
   return {
     ...(await original<typeof import("@/lib/revenuecat")>()),
     initRevenueCat: vi.fn(async () => {
       if (estado.metadataCurto) ofertas.registrarChavesRemotas({ current: { identifier: "d", metadata: { paywall_curto: estado.metadataCurto } }, all: {} });
+      if (estado.metadataMini) mini.registrarChavePaywallMinimalista({ current: { identifier: "d", metadata: { paywall_minimalista: estado.metadataMini } }, all: {} });
       return "pronto";
     }),
     prefetchAnualIos: vi.fn(async () => undefined),
@@ -89,6 +94,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { signOut: 
 
 import { trackEvent } from "@/lib/analytics";
 import { CHAVE_FORCA_OFERTAS, _zerarChavesRemotas } from "@/lib/ofertas-saida";
+import { CHAVE_FORCA_PAYWALL_MINIMALISTA, _zerarRemotaMinimalista } from "@/lib/paywall-minimalista";
 import { TrialBanner } from "@/components/TrialBanner";
 import { _zerarParabens, linhaDoPlano } from "@/components/porta/ParabensPorta";
 
@@ -100,9 +106,12 @@ let href = "";
 beforeEach(() => {
   localStorage.clear();
   _zerarChavesRemotas();
+  _zerarRemotaMinimalista();
+  localStorage.setItem(CHAVE_FORCA_PAYWALL_MINIMALISTA, "off"); // o curto de hoje; o minimalista tem o bloco do fim
   _zerarParabens();
   estado.auth.user.user_metadata = {};
   estado.metadataCurto = null;
+  estado.metadataMini = null;
   vi.mocked(trackEvent).mockClear();
   [rcMock.identificar, rcMock.comprarAnual, rcMock.restaurar, notif.resgate, notif.cancelarResgate, notif.cancelarRegua, notif.recuperar, signOut].forEach((f) => f.mockClear());
   rcMock.comprarAnual.mockResolvedValue(true);
@@ -241,5 +250,50 @@ describe("'Você ganhou 3 dias grátis' — conta da Porta (user_metadata.porta)
     expect(linhaDoPlano({ respostas: { area: "dinheiro" } })).toBe("Seu plano de Dinheiro já está salvo.");
     expect(linhaDoPlano({ respostas: { area: "tudo" } })).toBe("Seu plano de 3 dias já está salvo.");
     expect(linhaDoPlano(null)).toBe("Seu plano de 3 dias já está salvo.");
+  });
+});
+
+/* 17/10 — o gate com o paywall MINIMALISTA (chave `paywall_minimalista` ligada, como sai na 1.0.16) */
+describe("gate do iPhone com o paywall minimalista (chave ligada)", () => {
+  beforeEach(() => { localStorage.removeItem(CHAVE_FORCA_PAYWALL_MINIMALISTA); });
+
+  it("sem Voltar; título, linha do tempo e cartão do anual com o preço da loja; 'Começar teste grátis'; conta/excluir/termos/restaurar; sem 'Já é cliente'", async () => {
+    montar();
+    expect(await screen.findByTestId("ios-minimalista")).toBeInTheDocument();
+    expect(screen.queryByTestId("ios-curto")).toBeNull();
+    expect(screen.queryByTestId("ios-mini-voltar")).toBeNull();
+    expect(screen.getByTestId("ios-mini-titulo").textContent).toMatch(/Experimente\s*3 dias grátis/);
+    await waitFor(() => expect(screen.getByTestId("ios-mini-plano").textContent).toContain("R$ 97,90/ano"));
+    expect(screen.getByTestId("ios-mini-linha").textContent).toContain("Dia 3 — R$ 97,90/ano");
+    expect(screen.getByRole("button", { name: "Começar teste grátis" })).toBeInTheDocument();
+    expect(screen.getByTestId("gate-trocar-conta").textContent).toBe("Entrar com outra conta");
+    fireEvent.click(screen.getByTestId("gate-excluir-conta"));
+    expect(screen.getByTestId("excluir-dialogo")).toBeInTheDocument();
+    expect(screen.getByText("Termos")).toBeInTheDocument();
+    expect(screen.getByText("Restaurar compras")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Já é cliente/);
+    await waitFor(() => expect(eventos("paywall_oferta_vista")[0]).toMatchObject({ funil: "gate_ios", paywall_curto: true, minimalista: true }));
+  });
+
+  it("'Começar teste grátis': sem pílula, RevenueCat com o uid ANTES da folha, comprarAnualIos e o pós-compra do gate", async () => {
+    montar();
+    await screen.findByTestId("ios-minimalista");
+    await waitFor(() => expect(screen.getByTestId("ios-mini-plano").textContent).toContain("R$ 97,90"));
+    fireEvent.click(screen.getByRole("button", { name: "Começar teste grátis" }));
+    expect(screen.queryByTestId("ios-preparando-folha")).toBeNull();
+    await waitFor(() => expect(rcMock.comprarAnual).toHaveBeenCalledTimes(1));
+    expect(rcMock.identificar).toHaveBeenCalledWith("uid-porta");
+    expect(rcMock.identificar.mock.invocationCallOrder[0]).toBeLessThan(rcMock.comprarAnual.mock.invocationCallOrder[0]);
+    await waitFor(() => expect(href).toBe("/"));
+    expect(notif.cancelarResgate).toHaveBeenCalled();
+    expect(eventos("funnel_click").find((e) => e.cta === "app_paywall_cta")).toMatchObject({ funil: "gate_ios", paywall_curto: true, minimalista: true });
+  });
+
+  it("interruptor no ar: a metadata `paywall_minimalista: off` chega com as offerings → o curto de hoje no gate", async () => {
+    estado.metadataMini = "off";
+    montar();
+    expect(await screen.findByTestId("ios-curto")).toBeInTheDocument();
+    expect(screen.queryByTestId("ios-minimalista")).toBeNull();
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeInTheDocument();
   });
 });

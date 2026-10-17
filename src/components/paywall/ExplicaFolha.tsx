@@ -17,14 +17,20 @@
  * NUNCA fala de a Apple cobrar antes do fim (veto do dono). Um toque em "Continuar pra Apple"
  * abre a folha. Eventos: explica_folha_view / explica_folha_continuar / explica_folha_fechar
  * (com `ms` na tela).
+ *
+ * 17/10 (`enxuto`, com o paywall minimalista ligado): a linha do tempo é a MESMA do paywall
+ * (components/paywall/LinhaDoTempoDoTeste, copy do dono: Hoje — R$ 0,00 · Amanhã — Lembrete ·
+ * Dia 3 — R$ 97,90/ano) e a explicação da folha da Apple cabe numa frase. Sem `enxuto`, a tela de
+ * 16/10, igual. A leitura da permissão é a mesma nos dois (lerAvisoDoTeste).
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Bell, Check, Lock, Sparkles } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { LinhaDoTempoDoTeste, lerAvisoDoTeste, passosDoTeste, type AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 
-/** Estado do lembrete do fim do teste, como a tela promete. */
-export type AvisoDoTeste = "sim" | "se_ligar" | "nao";
+/** Estado do lembrete do fim do teste, como a tela promete (mora com a linha do tempo desde 17/10). */
+export type { AvisoDoTeste };
 
 const dataCurta = (d: Date): string => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 
@@ -47,23 +53,10 @@ export function linhasDaExplicacao(dias: number, preco: string, precoTeste: stri
   return linhas;
 }
 
-/** O estado da permissão de notificação vira o que a tela pode prometer. */
-async function lerAviso(): Promise<AvisoDoTeste> {
-  // só no servidor de desenvolvimento (some do build): o navegador não tem o plugin de notificação
-  if (import.meta.env.DEV) {
-    try {
-      const f = localStorage.getItem("__dev_aviso_teste");
-      if (f === "sim" || f === "se_ligar" || f === "nao") return f;
-    } catch { /* noop */ }
-  }
-  try {
-    const { estadoPermissao } = await import("@/lib/notificacoes");
-    const e = await estadoPermissao();
-    return e === "granted" ? "sim" : e === "prompt" ? "se_ligar" : "nao";
-  } catch { return "nao"; }
-}
+/** O estado da permissão de notificação vira o que a tela pode prometer (o mesmo do paywall minimalista). */
+const lerAviso = lerAvisoDoTeste;
 
-export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: avisoForcado, onContinuar, onFechar }: {
+export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: avisoForcado, enxuto = false, onContinuar, onFechar }: {
   /** De onde veio: "paywall" (Continuar/Tentar de novo) ou o presente ("presente_folha_cancelada"…). */
   lugar: string;
   produto: string;
@@ -72,8 +65,10 @@ export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: a
   /** O que a folha mostra hoje pelo teste ("R$ 0,00"), da loja; null = só o texto. */
   precoTeste: string | null;
   dias: number;
-  /** Só dev/testes: pula a leitura da permissão. */
+  /** Pula a leitura da permissão: dev/testes, ou o paywall que já leu (a mesma promessa nas duas telas). */
   aviso?: AvisoDoTeste;
+  /** 17/10: o paywall minimalista está ligado — a linha do tempo do paywall e a frase curta da folha. */
+  enxuto?: boolean;
   onContinuar: () => void;
   onFechar: () => void;
 }) {
@@ -129,7 +124,12 @@ export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: a
           Como funcionam seus {dias} dias grátis
         </h2>
 
-        {/* a linha do tempo, com as datas reais */}
+        {/* a linha do tempo: 17/10 enxuto = a MESMA do paywall minimalista; senão a de 16/10, com as datas reais */}
+        {enxuto ? (
+          <div className="mt-3.5">
+            <LinhaDoTempoDoTeste passos={passosDoTeste({ dias, precoAnual: preco, precoTeste, aviso })} testid="explica-folha-linhas" />
+          </div>
+        ) : (
         <ol className="mt-3.5 relative" data-testid="explica-folha-linhas">
           <span className="absolute left-[13px] top-3 bottom-3 w-[2px] bg-border" aria-hidden />
           {linhas.map((l) => (
@@ -145,6 +145,7 @@ export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: a
             </li>
           ))}
         </ol>
+        )}
 
         {/* como a folha da Apple é */}
         <div className="mt-3 rounded-2xl bg-secondary px-3.5 py-3 flex gap-3 items-start" data-testid="explica-folha-apple">
@@ -154,10 +155,16 @@ export function ExplicaFolha({ lugar, produto, preco, precoTeste, dias, aviso: a
             <div className="mt-1 h-1.5 w-3/4 rounded bg-muted-foreground/35" />
             <div className="mt-2 h-3 w-full rounded-[4px] bg-[#0a84ff]" />
           </div>
+          {enxuto ? (
+            <p className="text-[12.5px] leading-snug self-center">
+              <b>Na tela da Apple</b>, confirme com 2 cliques no botão lateral (ou Touch ID).
+            </p>
+          ) : (
           <p className="text-[12.5px] leading-snug">
             <b>Na tela da Apple</b> aparece o teste grátis e o valor do ano depois dele.{" "}
             <span className="text-muted-foreground">Pra confirmar: clique 2 vezes no botão lateral e olhe pra tela (Face ID). No iPhone com botão de início, é o Touch ID.</span>
           </p>
+          )}
         </div>
 
         <button

@@ -383,6 +383,7 @@ export const QuickActions = () => {
           <motion.button
             key={a.id}
             onClick={() => { trackEvent("home_acao_rapida", { acao: a.id }); handleAction(a.id); }}
+            data-track={`acao:${a.id}`}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
               successId === a.id 
                 ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
@@ -421,7 +422,7 @@ export const QuickActions = () => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="bg-card rounded-2xl border border-border/50 p-3 shadow-sm">
+            <div className="bg-card rounded-2xl border border-border/50 p-3 shadow-sm" data-track-bloco={`acao:${activeAction}`}>
               {/* Close button */}
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">

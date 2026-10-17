@@ -19,8 +19,8 @@
  *
  * PRIVACIDADE — chave nunca leva texto que a pessoa digitou. Uma chave só é montada de:
  *  - nome de tela (lista fixa abaixo) e id de aba (do código, via TrackedModule);
- *  - atributos escritos no código: data-track, data-track-bloco, data-folha, data-card,
- *    data-tour, data-spotlight (nunca data-testid: há testid com nome de categoria);
+ *  - atributos escritos no código: data-track, data-track-bloco, data-folha, data-camada-guia,
+ *    data-card, data-tour, data-spotlight (nunca data-testid: há testid com nome de categoria);
  *  - papel do elemento (botao, aba, chave, campo…), nome do ícone lucide, posição (#2) ou "@lista";
  *  - TEXTO DE TELA (rótulo, título do card, título da folha) só pela peneira `textoSeguro`:
  *    cada pedaço com 3+ letras tem que ser IGUAL a um texto escrito no código de uma tela
@@ -208,7 +208,9 @@ export function textoSeguro(texto: string | null | undefined): string | null {
   return n;
 }
 
-const PULAR_TEXTO = 'svg,style,script,noscript,[aria-hidden="true"]';
+/** Texto que nunca é lido: ícone, estilo e o que a pessoa digitou (o React põe o valor inicial do
+ *  <textarea> como nó de texto; <select> mostra a opção escolhida). */
+const PULAR_TEXTO = 'svg,style,script,noscript,textarea,select,[aria-hidden="true"]';
 const MAX_PEDACOS = 24;
 const MAX_CHARS = 240;
 
@@ -230,7 +232,8 @@ const pedacosDeTexto = (el: Element): string[] | null => {
   return out;
 };
 
-/** O texto visível do elemento, se TODO pedaço com 3+ letras passar na peneira. */
+/** O texto visível do elemento, se TODO pedaço com 3+ letras passar na peneira. Devolve o 1º pedaço:
+ *  "Pendências de hoje · 3 pendentes" e "Pendências de hoje" são a mesma chave. */
 export function textoSeguroDosNos(el: Element | null | undefined): string | null {
   if (!el || !dicionario) return null;
   const pedacos = pedacosDeTexto(el);
@@ -242,8 +245,7 @@ export function textoSeguroDosNos(el: Element | null | undefined): string | null
     if (!dicionario.has(n) || ehDadoDaPessoa(n)) return null; // um pedaço que não é do código derruba tudo
     bons.push(n);
   }
-  if (!bons.length) return null;
-  return normalizarChave(bons.join(" "));
+  return bons[0] ?? null;
 }
 
 /* ─────────────────────────── montagem da chave ─────────────────────────── */
@@ -254,10 +256,11 @@ const SEL_CONTROLE = [
   '[role="menuitem"]', '[role="menuitemcheckbox"]', '[role="menuitemradio"]', '[role="option"]',
   '[role="slider"]', '[role="combobox"]', "[data-track]",
 ].join(",");
-/** Folha = diálogo, gaveta, menu, lista de opções, ou overlay marcado com data-folha. */
-const SEL_FOLHA = '[data-folha],[role="dialog"],[role="alertdialog"],[aria-modal="true"],[role="menu"],[role="listbox"]';
+/** Folha = diálogo, gaveta, menu, lista de opções, overlay marcado com data-folha, ou camada de guia
+ *  (`data-camada-guia`: missão, intro do módulo, Conhecer mais, tour da Home, tutorial, cartões). */
+const SEL_FOLHA = '[data-folha],[data-camada-guia],[role="dialog"],[role="alertdialog"],[aria-modal="true"],[role="menu"],[role="listbox"]';
 /** As que contam como "abriu" (menu e lista de opções contam pelo toque que abriu). */
-const SEL_FOLHA_VISTA = '[data-folha],[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
+const SEL_FOLHA_VISTA = '[data-folha],[data-camada-guia],[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
 const SEL_TITULO = 'h1,h2,h3,h4,[class*="font-black"],[class*="font-bold"],[class*="font-semibold"]';
 const SEL_BLOCO_VISTO = "[data-track-bloco],[data-tour]";
 
@@ -302,6 +305,8 @@ const ehControleNativo = (el: Element): boolean => { try { return el.matches(SEL
 export function controleDoAlvo(alvo: Element): Element | null {
   let el: Element | null = alvo;
   for (let i = 0; el && el !== document.body && el !== document.documentElement && i < 30; i++, el = el.parentElement) {
+    // tocar no <label> é tocar no controle dele (a chave/caixa/campo): o clique que o navegador repete no controle cai no dedupe
+    if (el.tagName === "LABEL") return (el as HTMLLabelElement).control ?? el.querySelector('input:not([type="hidden"]),button,select,textarea,[role="switch"],[role="checkbox"]') ?? el;
     if (ehControleNativo(el)) return el;
     if (temOnClick(el)) {
       if (!pareceCard(el) && el.querySelectorAll(SEL_CONTROLE).length > 2) return null; // toque em área morta
@@ -458,9 +463,10 @@ export function blocoDoControle(c: Element, limite: Element | null): { nome: str
   return card ?? landmark;
 }
 
-/** O nome da folha: data-folha > título (aria-labelledby) > aria-label > 1º heading — tudo pela peneira. */
+/** O nome da folha: data-folha > data-camada-guia > título (aria-labelledby) > aria-label > 1º heading — tudo pela peneira. */
 export function nomeDaFolha(raiz: Element): string {
-  const exp = limparAtributo(raiz.getAttribute("data-folha") ?? raiz.closest("[data-folha]")?.getAttribute("data-folha"), MAX.folha);
+  const exp = limparAtributo(raiz.getAttribute("data-folha") ?? raiz.closest("[data-folha]")?.getAttribute("data-folha"), MAX.folha)
+    ?? limparAtributo(raiz.getAttribute("data-camada-guia"), MAX.folha);
   if (exp) return exp;
   const lb = raiz.getAttribute("aria-labelledby");
   if (lb) {
@@ -866,6 +872,8 @@ export function desinstalarMedicaoTotal(): void {
 
 /* ─────────────────────────── só testes ─────────────────────────── */
 
+/** A tela e a aba que a medição acha que estão abertas. */
+export const _telaEAba = (): { tela: string | null; aba: string | null } => ({ tela: estado.tela, aba: estado.aba });
 /** O resumo como está agora (sem mandar). */
 export function _resumoAtual(): { n: Record<string, number>; t: Record<string, number>; s: Record<string, number>; f: Record<string, number>; b: Record<string, number>; fora: Partial<Record<Mapa, number>> } {
   return {

@@ -30,6 +30,7 @@ import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { guardarForcasDaUrl } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
+import { contarUso } from "@/lib/medicao-total";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -241,7 +242,7 @@ const HomePage = () => {
   );
 
   const longPressHandlers = useLongPress(() => {
-    if (activeWidgets.length > 0) setEditingWidgets(true);
+    if (activeWidgets.length > 0) { setEditingWidgets(true); contarUso("widgets-editar-segurar", "widgets"); }
   }, 600);
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -249,7 +250,7 @@ const HomePage = () => {
     if (over && active.id !== over.id) {
       const oldIndex = activeWidgets.findIndex(w => w.id === active.id);
       const newIndex = activeWidgets.findIndex(w => w.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) reorder(oldIndex, newIndex);
+      if (oldIndex !== -1 && newIndex !== -1) { reorder(oldIndex, newIndex); contarUso("widget-arrastar", "widgets"); }
     }
   };
 
@@ -369,7 +370,7 @@ const HomePage = () => {
 
             {/* Widgets */}
             {activeWidgets.length > 0 && (
-              <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+              <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers} data-track-bloco="widgets">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={activeWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
                     <WidgetGrid

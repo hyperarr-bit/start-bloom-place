@@ -81,7 +81,7 @@ function CardSeuDiaLigado({ lifeData }: { lifeData: LifeHubData; sequencia: Sequ
   const pulouHoje = !!pendente && missao.pulados?.[pendente.n] === hoje;
 
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm" aria-labelledby="seu-dia-titulo" data-testid="seu-dia" data-dia={dia} data-feitos={feitos}>
+    <section className="rounded-2xl border border-border bg-card shadow-sm" aria-labelledby="seu-dia-titulo" data-testid="seu-dia" data-track-bloco="seu-dia" data-dia={dia} data-feitos={feitos}>
       <div
         role={pendente ? "button" : undefined}
         tabIndex={pendente ? 0 : undefined}

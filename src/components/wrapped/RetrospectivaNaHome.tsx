@@ -61,6 +61,7 @@ export const RetrospectivaNaHome = ({ agora: agoraFixo }: { agora?: Date }) => {
       className="relative overflow-hidden"
       style={{ borderRadius: 16, background: P3.mesa, color: P3.creme, fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}
       data-testid="retrospectiva-na-home"
+      data-track-bloco="retrospectiva"
     >
       <div aria-hidden style={{ position: "absolute", left: 14, top: 0, right: 0, bottom: 0, borderRadius: "4px 16px 16px 4px", ...linho() }} />
       <div aria-hidden style={{ ...vinheta, left: 14 }} />

@@ -28,6 +28,7 @@ export const SortableWidget = ({ id, size, editing, onRemove, onToggleSize, chil
       ref={setNodeRef}
       style={style}
       className={`relative ${editing ? "animate-jiggle" : ""}`}
+      data-track-bloco={`widget:${id}`}
       {...(editing ? { ...attributes, ...listeners } : {})}
       /* 16/10: qual widget recebe toque (fase de captura: vale pra qualquer botão dentro dele,
          sem mexer em cada widget). Editando, o toque é arrastar/remover — não conta. */
@@ -37,12 +38,14 @@ export const SortableWidget = ({ id, size, editing, onRemove, onToggleSize, chil
         <div className="absolute -top-1.5 -right-1.5 z-10 flex gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSize(id); }}
+            data-track="widget-tamanho"
             className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center shadow-sm border border-border/50"
           >
             {size === "small" ? <Maximize2 className="w-2.5 h-2.5" /> : <Minimize2 className="w-2.5 h-2.5" />}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(id); }}
+            data-track="widget-remover"
             className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm"
           >
             <X className="w-3 h-3" />

@@ -315,11 +315,34 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
     expect(within(total).getByText("Fatura de outubro · vence dia 25")).toBeTruthy();
   });
 
-  it("decidido na 1ª abertura do módulo, com a tela do Montar ainda na frente", async () => {
-    montarIndex({});
+  it("sem Montar nenhum (entrou em Finanças por curiosidade — o módulo não abre o quiz): decidido na 1ª abertura, e o limpo FICA depois do 1º lançamento", async () => {
+    const controle = montarIndex({ "spotlight-done-financas": "true" });
     await respirar();
-    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(localStorage.getItem(CHAVE_APARELHO)).toBe("1");
+    expect(controle.escritas().find((e) => e.k === CHAVE_PAINEL_LIMPO)).toEqual({ k: CHAVE_PAINEL_LIMPO, system: true });
+    cleanup();
+    // dias depois, já com dado e fora das 48 h: continua limpo (decidido e lembrado)
+    vi.setSystemTime(HOJE.getTime() + 5 * 24 * HORA);
+    montarIndex(MES_COM_DADO);
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeTruthy();
+  });
+
+  it("fez o Montar PELA MISSÃO e só abriu Finanças dias depois (já com dado, fora das 48 h): elegível pela marca da conta", async () => {
+    vi.setSystemTime(HOJE.getTime() + 4 * 24 * HORA);
+    montarIndex({ ...MES_COM_DADO, [CHAVE_MONTAR_FINANCAS]: { r: "pronto", em: new Date(HOJE).toISOString() } });
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeTruthy();
+    expect(localStorage.getItem(CHAVE_APARELHO)).toBe("1");
+  });
+
+  it("conta criada desde o corte que lançou antes de abrir Finanças e passou das 48 h, sem Montar: painel de sempre (a regra não mudou)", async () => {
+    vi.setSystemTime(HOJE.getTime() + 4 * 24 * HORA);
+    montarIndex(MES_COM_DADO);
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    expect(localStorage.getItem(CHAVE_APARELHO)).toBeNull();
   });
 
   it("conta nova que pulou tudo (sem dado): o card do topo mostra o caminho, não 'você não pode gastar'", async () => {
@@ -354,7 +377,6 @@ describe("pages/Index — conta nova abre com o painel limpo", () => {
   });
 
   it("fechar e abrir o app (dado da conta ainda chegando): já abre limpo; sair e entrar; outro aparelho; outra conta no mesmo celular não herda", async () => {
-    localStorage.setItem(CHAVE_MONTAR_FINANCAS, JSON.stringify({ r: "pronto", em: "x" })); // o que o Montar deixa no aparelho
     const controle = montarIndex(NOVA);
     await abrirDashboard();
     const daConta = controle.dados()[CHAVE_PAINEL_LIMPO];

@@ -9,7 +9,9 @@
  *   · uma vez só: feito/pulado sobrevive a fechar e reabrir o app (vassoura da abertura), ao
  *     logout e a outro aparelho (a marca também mora na conta); 2 vistas sem decisão = fim;
  *   · quem não vê: conta antiga, conta com qualquer dado de Finanças, convidado, demo, site
- *     (chave web off), app com a metadata `montar_financas: "off"`.
+ *     (chave web off), app com a metadata `montar_financas: "off"`;
+ *   · REGRA DO DONO (17/10): abrir Finanças NÃO abre o quiz (`MONTAR_FINANCAS_NO_MODULO = false`) — nem
+ *     tela em branco esperando o dado da conta; a única porta é a missão (origem "missao").
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -59,6 +61,7 @@ import {
   _zerarRemotaMontar, calcularMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar, lerChaveRemotaMontar,
   marcaDoAparelho, marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, reaisDigitados, registrarChaveMontarFinancas,
   registrarVistaMontar, temDadosDeFinancas, _novaAberturaMontar, lerRascunhoMontar, montarAbertoPelaMissao,
+  MONTAR_FINANCAS_NO_MODULO,
 } from "@/lib/montar-financas";
 import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
 import Index from "@/pages/Index";
@@ -349,16 +352,36 @@ describe("a tela, com a conta vazia", () => {
 
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index (Finanças de verdade), app da loja", () => {
-  it("conta nova vazia: espera o dado da conta, mostra a tela, e depois do 'pronto' o módulo mostra a renda, as contas e o MESMO número no Dashboard", async () => {
+  it("REGRA DO DONO: conta nova vazia abrindo Finanças vê o módulo de sempre, na hora — nada de quiz, nem tela em branco esperando o dado da conta", async () => {
+    expect(MONTAR_FINANCAS_NO_MODULO).toBe(false);
     const controle = montarIndex({}, novoControle(), false);
-    expect(screen.queryByTestId("montar-financas")).toBeNull(); // ainda carregando: nem módulo vazio nem tela
-    expect(screen.queryByText("MEU FINANCEIRO", { exact: false })).toBeNull();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(screen.getByRole("button", { name: /MEU FINANCEIRO/ })).toBeTruthy(); // o módulo já está na tela
     act(() => controle.setLoaded(true));
     await respirar();
-    expect(screen.getByTestId("montar-financas")).toBeTruthy();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(document.documentElement.hasAttribute("data-montar-financas")).toBe(false);
+    expect(eventos.some(([n]) => n === EV_VIEW)).toBe(false);
+    expect(marcaDoAparelho()).toBeNull(); // nenhuma vista gasta: a missão ainda pode abrir a tela
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: <T,>(_k: string, f: T) => f, isGuest: false })).toBe(true);
+  });
 
+  it("a MISSÃO abre a tela por cima de Finanças; no fim, o módulo mostra a renda, as contas e o MESMO número no Dashboard", async () => {
+    const ComMissao = () => {
+      const [missao, setMissao] = useState(true);
+      return (
+        <MemoryRouter initialEntries={["/financas"]}>
+          <Provedor inicial={{}} controle={novoControle()}>
+            <Routes><Route path="/financas" element={<Index />} /></Routes>
+            {missao && <MontarFinancas origem="missao" agora={HOJE} esperaMs={0} onPronto={() => setMissao(false)} />}
+          </Provedor>
+        </MemoryRouter>
+      );
+    };
+    render(<ComMissao />);
+    await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
     await fazerOsTresToques();
-    await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
     fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
     await respirar();
@@ -366,24 +389,11 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(screen.getAllByText("Renda do mês").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Escola").length).toBeGreaterThan(0);
-    expect(cartoesVistosNesteAparelho("financas")).toBe(true); // a tela substitui os cartões de boas-vindas
 
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
     const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div")!;
     expect(within(card).getByText(`R$ ${numero}`)).toBeTruthy();
-  });
-
-  it("reabrir Finanças depois do 'pronto' ou do 'pular' não mostra de novo", async () => {
-    montarIndex({});
-    await respirar();
-    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
-    await respirar();
-    expect(screen.queryByTestId("montar-financas")).toBeNull();
-    cleanup();
-    montarIndex({});
-    await respirar();
-    expect(screen.queryByTestId("montar-financas")).toBeNull();
   });
 
   it("conta antiga, conta com dado, convidado e site: Finanças de sempre", async () => {
@@ -441,17 +451,17 @@ describe("feito/pulado sobrevive a fechar e reabrir o app, ao logout e a outro a
     expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: daConta, isGuest: false })).toBe(false);
   });
 
-  it("o app fechou NO MEIO (sem decidir): volta 1 vez, e na 2ª vista sem decisão é a última", async () => {
-    montarIndex({});
-    await respirar();
+  it("o app fechou NO MEIO da tela da missão (sem decidir): volta 1 vez, com o que já tinha respondido, e a 2ª vista sem decisão é a última", async () => {
+    const vazio = <T,>(_k: string, f: T) => f;
+    montarTela({ origem: "missao" });
     expect(screen.getByTestId("montar-financas")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "R$ 4 a 7 mil" }));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     fireEvent.click(screen.getByRole("button", { name: /^🏠 Aluguel/ }));
     cleanup(); // fechou o app na 2ª pergunta
     _novaAberturaMontar();
-    montarIndex({});
-    await respirar();
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: vazio, isGuest: false })).toBe(true);
+    montarTela({ origem: "missao" });
     // volta onde parou, com o que já tinha respondido
     expect(screen.getByText("Quais contas chegam todo mês?")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^🏠 Aluguel/ }).getAttribute("aria-pressed")).toBe("true");
@@ -460,9 +470,7 @@ describe("feito/pulado sobrevive a fechar e reabrir o app, ao logout e a outro a
     expect(eventos.filter(([n]) => n === EV_VIEW).map(([, e]) => e.retomou)).toEqual([false, true]);
     cleanup();
     _novaAberturaMontar();
-    montarIndex({});
-    await respirar();
-    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: vazio, isGuest: false })).toBe(false);
   });
 });
 
@@ -477,22 +485,40 @@ describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem junt
     </MemoryRouter>
   );
 
-  it("a missão abre a dela com a do módulo na tela: a do módulo cede (sem decidir), e o que foi respondido passa junto", async () => {
+  it("o módulo não abre a tela dele nem pra conta nova vazia; a da missão abre por cima e é a única", async () => {
     const { rerender } = render(<Ambos inicial={{}} missao={false} />);
     await respirar();
-    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
-    expect(document.documentElement.getAttribute("data-montar-financas")).toBe("modulo");
-    fireEvent.click(screen.getByRole("button", { name: "Mais de R$ 7 mil" }));
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(document.documentElement.hasAttribute("data-montar-financas")).toBe(false);
     rerender(<Ambos inicial={{}} missao />);
     await respirar();
     expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
     expect(document.documentElement.getAttribute("data-montar-financas")).toBe("missao");
-    expect(montarAbertoPelaMissao()).toBe(true);
+    expect(eventos.filter(([n]) => n === EV_VIEW).map(([, e]) => e.origem)).toEqual(["missao"]);
+    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
+    expect(eventos.find(([n]) => n === EV_PULAR)![1]).toEqual({ passo: 1, origem: "missao" });
+  });
+
+  it("código guardado (se a do módulo for religada): ela cede pra da missão sem decidir, e o que foi respondido passa junto", async () => {
+    const Duas = ({ missao }: { missao: boolean }) => (
+      <MemoryRouter>
+        <Provedor inicial={{}} controle={novoControle()}>
+          <MontarFinancas origem="modulo" agora={HOJE} esperaMs={0} />
+          {missao && <MontarFinancas origem="missao" agora={HOJE} esperaMs={0} />}
+        </Provedor>
+      </MemoryRouter>
+    );
+    const { rerender } = render(<Duas missao={false} />);
+    await respirar();
+    expect(document.documentElement.getAttribute("data-montar-financas")).toBe("modulo");
+    fireEvent.click(screen.getByRole("button", { name: "Mais de R$ 7 mil" }));
+    rerender(<Duas missao />);
+    await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
+    expect(document.documentElement.getAttribute("data-montar-financas")).toBe("missao");
     expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("8.000");
     expect(marcaDoAparelho()?.r).toBeUndefined(); // ceder não é pular
     expect(marcaDoAparelho()?.vistas).toBe(1); // nem gasta a 2ª vista
-    fireEvent.click(screen.getByRole("button", { name: "Pular" }));
-    expect(eventos.find(([n]) => n === EV_PULAR)![1]).toEqual({ passo: 1, origem: "missao" });
   });
 
   it("com a da missão já na tela, o módulo não abre a dele; quando ela termina, Finanças aparece cheia", async () => {
@@ -510,25 +536,33 @@ describe("a tela da missão (origem 'missao') e a do módulo nunca aparecem junt
 
 /* ───────────────────────── sair da conta e entrar de novo (conta VAZIA) ───────────────────────── */
 describe("logout → login na mesma conta vazia", () => {
-  it("pulou → sai da conta (vassoura do logout) → entra em outro aparelho (localStorage zerado): não volta", async () => {
-    const controle = montarIndex({});
-    await respirar();
+  it("pulou na tela da missão → sai da conta (vassoura do logout) → entra em outro aparelho (localStorage zerado): a missão não mostra de novo", async () => {
+    const controle = novoControle();
+    render(
+      <MemoryRouter>
+        <Provedor inicial={{}} controle={controle}>
+          <MontarFinancas origem="missao" agora={HOJE} esperaMs={0} />
+        </Provedor>
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Pular" }));
-    await respirar();
-    const daConta = controle.dados(); // o que subiu pro user_data
-    expect((daConta[CHAVE_MONTAR_FINANCAS] as any)?.r).toBe("pulou");
+    const daConta = controle.dados()[CHAVE_MONTAR_FINANCAS]; // o que subiu pro user_data
+    expect((daConta as any)?.r).toBe("pulou");
     cleanup();
+    const vazio = <T,>(_k: string, f: T) => f;
+    const comAConta = <T,>(k: string, f: T): T => (k === CHAVE_MONTAR_FINANCAS ? (daConta as T) : f);
 
     purgeLocalUserCache(); // logout: o aparelho guarda a marca dele
     _novaAberturaMontar();
-    montarIndex({});
-    await respirar();
-    expect(screen.queryByTestId("montar-financas")).toBeNull();
-    cleanup();
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: vazio, isGuest: false })).toBe(false);
 
     localStorage.clear(); // outro aparelho / reinstalou: só a conta lembra
     _novaAberturaMontar();
-    montarIndex({ [CHAVE_MONTAR_FINANCAS]: daConta[CHAVE_MONTAR_FINANCAS] });
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: vazio, isGuest: false })).toBe(true); // sem marca nenhuma, mostraria
+    expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: comAConta, isGuest: false })).toBe(false);
+
+    // e o módulo, aberto depois do login, continua sem quiz
+    montarIndex({ [CHAVE_MONTAR_FINANCAS]: daConta });
     await respirar();
     expect(screen.queryByTestId("montar-financas")).toBeNull();
   });

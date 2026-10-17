@@ -11,8 +11,8 @@
  *
  * ── QUEM VÊ ─────────────────────────────────────────────────────────────────────────────────
  *   Conta logada (não convidado, não demo /preview) e ELEGÍVEL, decidido UMA vez e guardado:
- *     · passou pelo "Vamos montar suas Finanças" (a marca DA CONTA — a do aparelho pode ser de
- *       outra conta que entrou antes neste celular); OU
+ *     · passou pelo "Vamos montar suas Finanças" — desde 17/10 só pela MISSÃO do teste (a marca DA
+ *       CONTA — a do aparelho pode ser de outra conta que entrou antes neste celular); OU
  *     · criada a partir de PAINEL_LIMPO_CONTAS_DESDE (16/10, 1.0.16 em construção) e, na 1ª vez que
  *       abre Finanças nesta versão, sem dado nenhum de Finanças (`temDadosDeFinancas`) ou com
  *       menos de 48 h (a régua de conta nova do Montar e da missão: quem lançou um gasto pela Home

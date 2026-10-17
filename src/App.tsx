@@ -42,6 +42,7 @@ import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
 import { PreFolhaLembrete } from "@/components/missao-doses/PreFolhaLembrete";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
+import { anotarTela } from "@/lib/medicao-total";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -532,6 +533,14 @@ const TelemetriaWebView = () => {
   return null;
 };
 
+/** 1.0.16 — medição total (lib/medicao-total): a rota atual vira a "tela" do resumo de uso da
+ *  sessão. Fora das telas do app (funil, site, login) a medição não conta nada. */
+const MedicaoDeTelas = () => {
+  const { pathname } = useLocation();
+  useEffect(() => { anotarTela(pathname); }, [pathname]);
+  return null;
+};
+
 const DeepLinks = () => {
   const navigate = useNavigate();
   // navigate troca de identidade a cada navegação; com ele nas deps o efeito
@@ -766,6 +775,7 @@ const App = () => {
                 <DeepLinks />
                 <GuardaDemoShell />
                 <TelemetriaWebView />
+                <MedicaoDeTelas />
                 <GracePeriodBanner />
                 {/* 26/09: cartão recusado na App Store/Google Play (só no app). */}
                 <AvisoCobrancaRecusada />

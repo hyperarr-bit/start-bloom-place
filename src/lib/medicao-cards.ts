@@ -26,6 +26,8 @@
  * pessoas viram cada card e quantas usaram.
  */
 import { trackEvent } from "@/lib/analytics";
+import { normalizarChave } from "@/lib/medicao-normalizar";
+import { anotarVistaDeCard } from "@/lib/medicao-total";
 
 const VISTOS = "core_cards_vistos";
 const USADOS = "core_cards_usados";
@@ -46,16 +48,9 @@ const lembrar = (chaveStorage: string, chave: string): boolean => {
 };
 
 /** "🔁 O QUE VOCÊ REPETE NO DIA" → "O QUE VOCE REPETE NO DIA" (sem acento,
- *  sem emoji, sem número), no máximo 32 caracteres. Exportado pro teste. */
-export const normalizarChave = (texto: string): string =>
-  texto
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^\p{L}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase()
-    .slice(0, 32)
-    .trim();
+ *  sem emoji, sem número), no máximo 32 caracteres. Exportado pro teste.
+ *  1.0.16: mora em lib/medicao-normalizar (a medição total e o dicionário do build usam a mesma). */
+export { normalizarChave };
 
 const ehCaixaAlta = (t: string) => {
   const letras = t.replace(/[^\p{L}]/gu, "");
@@ -104,6 +99,8 @@ export function instalarMedicaoDeCards(modulo: string, abaAtual: () => string | 
       io.unobserve(el);
       const card = el[MARCA];
       if (!card) continue;
+      // 1.0.16: a medição total anota a vista no resumo da sessão (chave pela peneira de privacidade, dedupe próprio)
+      anotarVistaDeCard(el, modulo, abaAtual());
       if (lembrar(VISTOS, chaveDe(el))) continue;
       trackEvent("card_view", { modulo, aba: abaAtual() || "", card });
     }

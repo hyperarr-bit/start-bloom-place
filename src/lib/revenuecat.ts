@@ -42,15 +42,17 @@ import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
 import { registrarIntroRemota } from "@/lib/intro-modulo";
 import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
+import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`)
- *  e o rodízio dos desafios da semana (17/10, `desafios_rodizio`). */
+ *  e o rodízio dos desafios da semana (17/10, `desafios_rodizio`) e a medição total (1.0.16, `medicao_total`). */
 const registrarChavesDasOfferings = (offerings: unknown): void => {
   registrarChavesRemotas(offerings);
   registrarChaveRemotaConquistas2(offerings);
   registrarIntroRemota(offerings);
   registrarDesafiosRodizioRemoto(offerings);
+  registrarMedicaoTotalRemota(offerings);
 };
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";

@@ -7,6 +7,7 @@ import { localDayKey } from "@/lib/utils";
 import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { iguais, mesclar3 } from "@/lib/mesclar-dados";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, registrarDiaRetroativo, temConteudo } from "@/lib/sequencia";
+import { registrarLeitorDosDados } from "@/lib/medicao-total";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
@@ -395,6 +396,12 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   // enxerga o store) e o dia já registrado nesta sessão.
   const storeRef = useRef(store);
   storeRef.current = store;
+  // 1.0.16 — a medição total lê o store EM MEMÓRIA (só leitura) pra nunca usar texto da pessoa numa
+  // chave: texto do código que também está nos dados (sugestão que virou hábito, categoria) fica de fora.
+  useEffect(() => {
+    registrarLeitorDosDados(() => storeRef.current);
+    return () => registrarLeitorDosDados(null);
+  }, []);
   const loadedRef = useRef(loaded);
   loadedRef.current = loaded;
   const diaAnotadoRef = useRef<string | null>(null);

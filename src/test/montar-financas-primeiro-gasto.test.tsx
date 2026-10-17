@@ -112,7 +112,11 @@ const ateONumero = async () => {
   expect(screen.getByTestId("montar-pronto")).toBeTruthy();
 };
 const gastosDe = (c: Controle) => ((c.dados()["finance-expenses"] ?? []) as any[]);
-const doNumero = () => eventos.filter(([n]) => n === EV_GASTO_NO_NUMERO).map(([, e]) => e);
+/** Os eventos da tela do número, sem o envelope da missão (eventoDaMissao: protótipo, plataforma, versão, braço). */
+const doNumero = () => eventos.filter(([n]) => n === EV_GASTO_NO_NUMERO).map(([, e]) => {
+  const { prototipo: _p, plataforma: _pl, versao: _v, variante: _b, ...resto } = e;
+  return resto;
+});
 /** O texto como se lê (o "R$" vai preso ao número por um espaço que não quebra: \u00a0). */
 const lido = (el: Element) => (el.textContent ?? "").replace(/\u00a0/g, " ");
 
@@ -157,6 +161,8 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(postIt().getByRole("button", { name: "Ainda não gastei nada hoje →" })).toBeTruthy();
     expect(tela().getByRole("button", { name: "Ver minhas Finanças" })).toBeTruthy();
     expect(doNumero()).toEqual([{ acao: "view", ms: 0 }]);
+    // o mesmo envelope dos outros eventos da missão (é por versão/braço que as 48 h se leem)
+    expect(eventos.find(([n]) => n === EV_GASTO_NO_NUMERO)![1]).toMatchObject({ prototipo: "app", plataforma: "ios", versao: "dev" });
     cleanup();
     localStorage.clear();
     _novaAberturaMontar();

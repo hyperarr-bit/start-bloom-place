@@ -78,6 +78,7 @@ import { alvoDaMissao, gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/
 import { normalizarItem } from "@/lib/demo-guiada";
 import { gravacoesDoItem, idDoItem, type Gravacao } from "@/lib/demo-guiada-registro";
 import { localDayKey } from "@/lib/utils";
+import { eventoDaMissao } from "@/lib/missao-doses";
 import {
   ATRIBUTO_NA_TELA, CHAVE_MONTAR_FINANCAS, CONTAS_SUGERIDAS, EVENTO_MONTAR_FINANCAS_FIM, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW,
   FAIXAS_DE_RENDA, calcularMontar, contaNovaParaMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar,
@@ -390,10 +391,12 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   useEffect(() => {
     if (!comPostIt || etapa !== "pronto" || vistoEm.current !== null) return;
     vistoEm.current = Date.now();
-    trackEvent(EV_GASTO_NO_NUMERO, { acao: "view", ms: vistoEm.current - abertura.current, ...(retomada ? { retomou: true } : {}) });
+    evNumero({ acao: "view", ms: vistoEm.current - abertura.current, ...(retomada ? { retomou: true } : {}) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comPostIt, etapa]);
   const msDesdeOView = () => (vistoEm.current === null ? 0 : Date.now() - vistoEm.current);
+  /** Evento da missão (o mesmo envelope dos outros `missao_doses_*`: protótipo, versão, braço do Dia 1). */
+  const evNumero = (dados: Record<string, unknown>) => trackEvent(EV_GASTO_NO_NUMERO, eventoDaMissao(dados));
   /** Grava pelo `set` do app, no formato que o módulo já lê (as gravações da missão), e avisa o módulo aberto por baixo. */
   const aplicar = (gravacoes: Gravacao[]) => {
     for (const g of gravacoes) {
@@ -412,7 +415,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     const novos = [...gastos, g];
     setGastos(novos);
     guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao, gastos: novos });
-    trackEvent(EV_GASTO_NO_NUMERO, { acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) });
+    evNumero({ acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) });
     return novos;
   };
   const tocarChipDoNumero = (c: ChipDaMissao) => {
@@ -450,7 +453,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   };
   const aindaNaoGastei = () => {
     if (saiu.current) return;
-    trackEvent(EV_GASTO_NO_NUMERO, { acao: "ainda_nao", ms: msDesdeOView() });
+    evNumero({ acao: "ainda_nao", ms: msDesdeOView() });
     sair(null);
   };
   const gastoDeHoje = gastos.reduce((t, g) => t + g.valor, 0);

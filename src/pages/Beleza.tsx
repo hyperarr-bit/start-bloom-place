@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { mesAtualExtenso } from "@/lib/utils";
 import { useSearchParams } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -17,6 +16,7 @@ import type { PerfilDaPele } from "@/lib/beleza-rotina";
 import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useLocation } from "react-router-dom";
 import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
@@ -58,7 +58,6 @@ const Beleza = () => {
   const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
   /* ROTINA VAZIA VAI PRO TOPO (28/09, protótipo): quem ainda não tem rotina vê as
      3 perguntas antes das dicas e do Espelho — é a ação da tela. Depois de montar,
      a Rotina volta pro lugar de sempre (abaixo do Espelho); o "rotina pronta"
@@ -107,8 +106,8 @@ const Beleza = () => {
           </Button>
           <Droplets className="w-5 h-5 text-bz-acento" />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>

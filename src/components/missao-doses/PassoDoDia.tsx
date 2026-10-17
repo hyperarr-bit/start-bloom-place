@@ -1305,11 +1305,11 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
   if (modo === "aprofundar") {
     return createPortal(
       <motion.div className="fixed inset-0 z-[230] flex items-end sm:items-center justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.55)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-modo="aprofundar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-        <motion.div initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }} className="relative w-full max-w-[340px] rounded-3xl bg-white p-5 text-center text-[#16121c] shadow-2xl">
-          <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">🔥 Dia {diaDaMissao(missao, hoje)} · {cfg.emoji} {cfg.nome} ✓</span>
+        <motion.div initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }} className="md-tema relative w-full max-w-[340px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-center shadow-2xl">
+          <span className="inline-block rounded-full bg-foreground text-background text-[12px] font-extrabold px-3.5 py-1.5">🔥 Dia {diaDaMissao(missao, hoje)} · {cfg.emoji} {cfg.nome} ✓</span>
           <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
-          <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
-            {cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. Um uso de verdade por dia é o que faz o hábito pegar.
+          <p className="text-[13.5px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
+            {cfg.emoji} <b className="text-foreground">{rotulo}</b> já está {cfg.onde}. Um uso de verdade por dia é o que faz o hábito pegar.
           </p>
           <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>Fechar</button>
         </motion.div>
@@ -1324,22 +1324,23 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
       <motion.div
         initial={reduzir ? false : { y: 26, scale: 0.92, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 20, delay: 0.08 }}
-        className="relative w-full max-w-[340px] rounded-3xl bg-white p-5 text-center text-[#16121c] shadow-2xl"
+        /* 17/10 (print do dono): o cartão seguia branco no modo escuro — agora é o papel do tema, como no braço A */
+        className="md-tema relative w-full max-w-[340px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-center shadow-2xl"
       >
-        <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${TOTAL_PASSOS_B} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
+        <span className="inline-block rounded-full bg-foreground text-background text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${TOTAL_PASSOS_B} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
-        <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
+        <p className="text-[13.5px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
           {/* 1.0.16: a dose de Finanças virou o Montar (nos dois braços) — o texto do "olhar" fala de um gasto que talvez não exista */}
           {modulo === "financas" && /^(Pode gastar|Renda e )/.test(rotulo)
             ? <>{cfg.emoji} {fraseDoFeito(modulo, rotulo, porDiaAgora)}</>
-            : <>{cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}</>}
+            : <>{cfg.emoji} <b className="text-foreground">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}</>}
         </p>
         {/* o 1º gasto depois do Montar (na tela do número ou de carona) — nos dois braços */}
-        {gastoExtra && <p className="text-[12.5px] text-[#4f5a64] leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
-        <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
+        {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
+        <div className="h-2 rounded-full bg-foreground/10 overflow-hidden mt-3.5">
           <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
         </div>
-        <p className="text-[11px] text-black/50 mt-1.5 font-semibold">{B ? `Missão de hoje · ${n} de ${TOTAL_PASSOS_B}` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
+        <p className="text-[11px] text-muted-foreground mt-1.5 font-semibold">{B ? `Missão de hoje · ${n} de ${TOTAL_PASSOS_B}` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
 
         {/* BRAÇO B (DIA1_CHEIO): as 3 doses são de HOJE — a festa LEVA pra próxima sozinha (17/10: 22% e 18% se
             perdiam entre um módulo e outro); "Ir agora" adianta, "Agora não" para */}
@@ -1353,10 +1354,10 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
         ) : B ? (
           <>
             {/* a 3ª dose feita: falta o 4º passo — arrumar a Home (o tour, 5 toques) */}
-            <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-falta-home">
-              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Falta 1 · 🏡 Sua Home</span>
+            <div className="mt-3.5 rounded-2xl text-left px-4 py-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-falta-home">
+              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Falta 1 · 🏡 Sua Home</span>
               <span className="block text-[15px] font-extrabold leading-snug mt-0.5">Falta 1: arrumar sua Home</span>
-              <span className="block text-[12px] text-[#4f5a64] mt-1">5 toques e ela fica do seu jeito — e a missão de hoje fecha.</span>
+              <span className="block text-[12px] opacity-75 mt-1">5 toques e ela fica do seu jeito — e a missão de hoje fecha.</span>
             </div>
             <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-fechar-dia" onClick={aoFecharDia}>
               Arrumar minha Home <ArrowRight className="w-4 h-4" />
@@ -1365,10 +1366,10 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
           </>
         ) : proximo ? (
           <>
-            <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-amanha">
-              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Amanhã · {proximo.emoji} {proximo.nome}</span>
+            <div className="mt-3.5 rounded-2xl text-left px-4 py-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
+              <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Amanhã · {proximo.emoji} {proximo.nome}</span>
               <span className="block text-[15px] font-extrabold leading-snug mt-0.5">{proximo.pedido}</span>
-              <span className="block text-[12px] text-[#4f5a64] mt-1.5">Te lembro às:</span>
+              <span className="block text-[12px] opacity-75 mt-1.5">Te lembro às:</span>
               <div className="flex flex-wrap gap-2 mt-1.5" role="radiogroup" aria-label="Hora do lembrete">
                 {HORAS_DO_LEMBRETE.map((h) => (
                   <button key={h.id} type="button" role="radio" aria-checked={hora === h.id} className="md-hora" data-marcada={hora === h.id ? "" : undefined} data-sem={h.id === "sem" ? "" : undefined} data-testid={`missao-doses-hora-${h.id}`} onClick={() => setHora(h.id)}>{h.rotulo}</button>
@@ -1415,11 +1416,11 @@ function PassagemDaProxima({ proximo, n, reduzir, aoIr, aoAgoraNao }: { proximo:
   }, []);
   return (
     <>
-      <div className="mt-3.5 rounded-2xl text-left px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-proxima-dose" data-passagem="auto">
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Dose {n + 1} de {TOTAL_PASSOS_B} · {proximo.emoji} {proximo.nome}</span>
+      <div className="mt-3.5 rounded-2xl text-left px-4 py-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-proxima-dose" data-passagem="auto">
+        <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Dose {n + 1} de {TOTAL_PASSOS_B} · {proximo.emoji} {proximo.nome}</span>
         <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — {doseCurta(proximo.modulo, n + 1).seg} s</span>
-        <span className="block text-[12.5px] text-[#4f5a64] mt-1">{proximo.pedido}.</span>
-        <div className="h-1.5 rounded-full bg-black/10 overflow-hidden mt-2.5" aria-hidden>
+        <span className="block text-[12.5px] opacity-75 mt-1">{proximo.pedido}.</span>
+        <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden mt-2.5" aria-hidden>
           <motion.div className="h-full rounded-full" style={{ background: "hsl(var(--accent))" }} initial={{ width: reduzir ? "100%" : "0%" }} animate={{ width: "100%" }} transition={{ duration: reduzir ? 0 : PASSAGEM_B_MS / 1000, ease: "linear" }} />
         </div>
       </div>

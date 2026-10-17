@@ -164,12 +164,22 @@ export function ConhecerMaisHost({ moduleId }: { moduleId: string }) {
   );
 }
 
-/** O acesso permanente: o botão "Dicas" no cabeçalho do módulo (só nos módulos com passeio, com a chave da intro ligada). */
+/**
+ * O acesso permanente: o botão "Dicas" no cabeçalho do módulo (só nos módulos com passeio, com a chave da intro
+ * ligada). Só o ícone (17/10, print do dono a 390 px: com a palavra "Dicas" o cabeçalho de Finanças não cabia e o
+ * ✨ ficava achatado) — a mesma forma e tamanho do botão do tema, ao lado dele; o nome fica no aria-label e no
+ * `title` (o leitor de tela e o toque longo dizem "Dicas").
+ */
 export function AcessoConhecerMais({ moduleId }: { moduleId: string }) {
   if (!temTour(moduleId) || !introLigada()) return null;
   return (
-    <button type="button" className="cm-acesso" data-testid="conhecer-mais-acesso" aria-label={`Dicas de ${TOURS[moduleId].nome}`} onClick={() => abrirConhecerMais(moduleId, "menu")}>
-      <Lightbulb className="w-4 h-4" aria-hidden="true" /><span>Dicas</span>
+    <button
+      type="button"
+      // as mesmas classes do botão do tema (ThemeToggle); `bg-muted` também tira este botão da regra global de
+      // index.css que infla botões só-ícone (padding 8 px + margin −8 px) — a área de toque de 44 px aqui é o ::before
+      className="relative shrink-0 grid place-items-center w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 text-foreground transition-colors before:absolute before:-inset-1 before:content-['']"
+      data-testid="conhecer-mais-acesso" aria-label="Dicas" title={`Dicas de ${TOURS[moduleId].nome}`} onClick={() => abrirConhecerMais(moduleId, "menu")}>
+      <Lightbulb className="w-4 h-4" aria-hidden="true" />
     </button>
   );
 }

@@ -11,10 +11,15 @@ html[data-intro-modulo-faixa="1"] header.sticky { top: calc(var(--app-safe-top, 
   box-shadow: 0 1px 0 rgba(0,0,0,.08);
 }
 .im-faixa-titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.im-faixa-pular { flex: none; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.7); color: inherit; font: inherit; font-size: 11px; letter-spacing: .04em; text-transform: none; font-weight: 700; }
+/* `button.` NAS REGRAS COM FUNDO (polimento 17/10): esta folha entra ANTES do index.css (main.tsx importa o App
+   antes do index.css), e o preflight `button, [type="button"] { background-color: transparent }` tem a MESMA
+   especificidade de uma classe — ganhava por vir depois, e o "Ver" do lembrete, o "Próxima" do balão do passeio e
+   o botão principal do "pronto" ficavam sem fundo (texto branco no branco / grafite no grafite). Mesma receita do
+   `button.md-botao` da missão (03/10). */
+button.im-faixa-pular { flex: none; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.7); color: inherit; font: inherit; font-size: 11px; letter-spacing: .04em; text-transform: none; font-weight: 700; }
 /* (a classe "bg-faixa" só escapa da regra global de área de toque dos botões só-ícone) */
 .im-faixa-onde { flex: none; width: 26px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.7); display: grid; place-items: center; color: inherit; }
-.dark .im-faixa-pular, .dark .im-faixa-onde { background: rgba(0,0,0,.18); }
+.dark button.im-faixa-pular, .dark .im-faixa-onde { background: rgba(0,0,0,.18); }
 
 /* o "pronto": cartão pequeno em cima do rodapé, não uma festa em tela cheia */
 .im-pronto {
@@ -25,7 +30,7 @@ html[data-intro-modulo-faixa="1"] header.sticky { top: calc(var(--app-safe-top, 
 .im-pronto-check { flex: none; width: 26px; height: 26px; border-radius: 999px; background: #22c55e; color: #fff; display: grid; place-items: center; }
 .im-pronto-texto { flex: 1; font-size: 13px; line-height: 1.35; }
 .im-pronto-texto b { color: #fff; }
-.im-pronto-fechar { flex: none; height: 32px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font-size: 12.5px; font-weight: 700; }
+button.im-pronto-fechar { flex: none; height: 32px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font-size: 12.5px; font-weight: 700; }
 
 /* ESTADO VAZIO: faixa de planner + captura REAL (vídeo com o poster por cima até tocar) + 1 ação */
 .im-vazio { border-radius: 18px; overflow: hidden; border: 1px solid rgba(0,0,0,.08); background: hsl(var(--card)); color: hsl(var(--foreground)); }
@@ -43,17 +48,17 @@ html[data-intro-modulo-faixa="1"] header.sticky { top: calc(var(--app-safe-top, 
 .im-vazio-titulo { font-size: 16px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
 .im-vazio-texto { margin-top: 4px; font-size: 12.5px; line-height: 1.4; color: hsl(var(--muted-foreground)); }
 /* o <span> em volta do rótulo tira o botão da regra global de área de toque (button:has(> svg:only-child)) */
-.im-vazio-acao { margin-top: 10px; min-height: 40px; padding: 8px 14px; border-radius: 999px; color: #fff; background: var(--im-acento, #16121c); font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; text-align: left; line-height: 1.2; box-shadow: 0 2px 0 rgba(0,0,0,.12); transition: transform .12s ease; }
+button.im-vazio-acao { margin-top: 10px; min-height: 40px; padding: 8px 14px; border-radius: 999px; color: #fff; background: var(--im-acento, #16121c); font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; text-align: left; line-height: 1.2; box-shadow: 0 2px 0 rgba(0,0,0,.12); transition: transform .12s ease; }
 .im-vazio-acao:active { transform: scale(.97); }
-.im-vazio-acao[data-feito="1"] { background: #16a34a; }
+button.im-vazio-acao[data-feito="1"] { background: #16a34a; }
 .im-vazio-pergunta { margin-top: 10px; font-size: 12.5px; font-weight: 700; }
 .im-vazio-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
 .im-vazio-chip { min-height: 34px; padding: 6px 11px; border-radius: 999px; border: 1.5px solid var(--im-acento, #16121c); color: var(--im-acento, #16121c); background: transparent; font-size: 12.5px; font-weight: 700; line-height: 1.2; display: inline-flex; align-items: center; gap: 5px; text-align: left; transition: transform .12s ease, background-color .12s ease, color .12s ease; }
 .im-vazio-chip:active { transform: scale(.97); }
-.im-vazio-chip[data-feito="1"] { background: var(--im-acento, #16121c); color: #fff; }
+button.im-vazio-chip[data-feito="1"] { background: var(--im-acento, #16121c); color: #fff; }
 .im-vazio-chip:disabled:not([data-feito="1"]) { opacity: .45; }
 .dark .im-vazio-chip { border-color: color-mix(in srgb, var(--im-acento, #fff) 70%, #fff); color: color-mix(in srgb, var(--im-acento, #fff) 70%, #fff); }
-.dark .im-vazio-chip[data-feito="1"] { background: var(--im-acento, #16121c); color: #fff; }
+.dark button.im-vazio-chip[data-feito="1"] { background: var(--im-acento, #16121c); color: #fff; }
 .im-vazio-detalhe { margin-top: 6px; font-size: 11px; line-height: 1.35; color: hsl(var(--muted-foreground)); }
 /* telas estreitas (375): a captura encolhe um pouco pra sobrar linha pro texto */
 @media (max-width: 379px) {
@@ -80,7 +85,7 @@ html[data-escolher-treino] [data-testid="modelos-prontos"] { display: none; }
 .cm-faixa { position: fixed; top: var(--app-safe-top, 0px); left: 0; right: 0; z-index: 215; height: var(--intro-modulo-faixa-h); display: flex; align-items: center; gap: 10px; padding: 0 10px 0 14px; background: #16121c; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; box-shadow: 0 6px 18px -10px rgba(0,0,0,.6); }
 .cm-faixa-titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cm-faixa-passo { flex: none; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: .04em; text-transform: none; }
-.cm-faixa-sair { flex: none; min-height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+button.cm-faixa-sair { flex: none; min-height: 28px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; }
 html[data-conhecer-mais="1"] body { padding-top: var(--intro-modulo-faixa-h); }
 html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) + var(--intro-modulo-faixa-h)) !important; }
 .cm-balao { border-radius: 16px; padding: 14px 16px 14px; color: #fff; background: #16121c; box-shadow: 0 22px 44px -18px rgba(0,0,0,.7); }
@@ -89,29 +94,36 @@ html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) 
 .cm-balao-texto { display: block; font-size: 12.5px; line-height: 1.45; color: rgba(255,255,255,.82); margin-top: 4px; }
 .cm-balao-acoes { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .cm-balao-sair { min-height: 36px; padding: 0 6px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.75); text-decoration: underline; text-underline-offset: 2px; }
-.cm-balao-proxima { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #fff; color: #16121c; font-size: 13.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+button.cm-balao-proxima { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #fff; color: #16121c; font-size: 13.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
 .cm-balao-proxima:active { transform: scale(.97); }
 /* a oferta no cartão do fim da intro (dono 17/10): um BOTÃO de verdade, secundário ao "Pronto" cheio — borda clara que
    contrasta no cartão escuro, ≥48 px, lâmpada na frente e "›" atrás, rótulo numa linha só, a linha pequena dentro
    (embaixo do rótulo), estado pressionado visível */
 .im-pronto { flex-direction: column; align-items: stretch; gap: 10px; }
 .im-pronto-linha { display: flex; align-items: center; gap: 10px; }
-.im-pronto-oferta { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 10px 8px 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.62); background: rgba(255,255,255,.1); color: #fff; text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color .12s ease, border-color .12s ease, transform .12s ease; }
-.im-pronto-oferta:active { background: rgba(255,255,255,.26); border-color: #fff; transform: scale(.985); }
+button.im-pronto-oferta { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 10px 8px 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,.62); background: rgba(255,255,255,.1); color: #fff; text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color .12s ease, border-color .12s ease, transform .12s ease; }
+button.im-pronto-oferta:active { background: rgba(255,255,255,.26); border-color: #fff; transform: scale(.985); }
 .im-pronto-oferta-icone { flex: none; width: 22px; height: 22px; color: #fcd34d; }
 .im-pronto-oferta-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .im-pronto-oferta-titulo { display: block; font-size: 13.5px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .im-pronto-oferta-linha { display: block; font-size: 11px; line-height: 1.3; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .im-pronto-oferta-seta { flex: none; width: 20px; height: 20px; color: rgba(255,255,255,.9); }
-.im-pronto-principal { width: 100%; min-height: 48px; border-radius: 12px; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+button.im-pronto-principal { width: 100%; min-height: 48px; border-radius: 12px; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
 @media (prefers-reduced-motion: reduce) { .im-pronto-oferta { transition: none; } .im-pronto-oferta:active { transform: none; } }
 /* o lembrete inline (3ª abertura): pequeno, dispensável, sem selo */
 .cm-lembrete { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(0,0,0,.08); background: hsl(var(--card)); color: hsl(var(--foreground)); }
 .dark .cm-lembrete { border-color: rgba(255,255,255,.1); }
 .cm-lembrete-texto { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.35; }
-.cm-lembrete-ver { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; background: #16121c; color: #fff; font-size: 12.5px; font-weight: 800; }
-.dark .cm-lembrete-ver { background: #fff; color: #16121c; }
+button.cm-lembrete-ver { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; background: #16121c; color: #fff; font-size: 12.5px; font-weight: 800; }
+.dark button.cm-lembrete-ver { background: #fff; color: #16121c; }
 .cm-lembrete-nao { flex: none; min-height: 34px; padding: 0 8px; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
 /* o acesso permanente no cabeçalho do módulo (ícone + "Dicas") */
-.cm-acesso { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
-.cm-acesso:active { background: hsl(var(--muted)); }
+/* o botão "Dicas" do cabeçalho (17/10) virou só o ícone, com as classes do botão do tema — ver AcessoConhecerMais */
+
+/* ÁREAS DE TOQUE DE 44 PX (polimento 17/10): os botões pequenos das faixas e do estado vazio ("Pular" tem 26 px,
+   "Fechar" 28–32, os chips 34) ganham um ::before invisível que estica o alvo do toque — nada muda no desenho. */
+.im-faixa-pular, .im-pronto-fechar, .im-vazio-fechar, .im-vazio-chip { position: relative; }
+.im-faixa-pular::before { content: ""; position: absolute; inset: -9px -6px; }
+.im-pronto-fechar::before { content: ""; position: absolute; inset: -6px -4px; }
+.im-vazio-fechar::before { content: ""; position: absolute; inset: -8px -4px; }
+.im-vazio-chip::before { content: ""; position: absolute; inset: -5px -2px; }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { reais } from "@/lib/dinheiro";
-import { mesAtualExtenso, localDayKey } from "@/lib/utils";
+import { localDayKey } from "@/lib/utils";
 import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -18,6 +18,7 @@ import { AskCore } from "@/components/ask/AskCore";
 
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
@@ -426,17 +427,6 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     ? goals.reduce((sum: number, g: any) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100), 0) / goals.length
     : 0;
 
-  const currentMonth = mesAtualExtenso();
-  /* Versão curta pra tela estreita (05/08). Medido no motor do aparelho do
-     dono (Chromium 77, 360px): "agosto de 2026" ocupa 87px e o cabeçalho
-     precisa de 329px num espaço de 328 — por isso ele via "Agosto De 2..."
-     cortado. Abaixo de 400px entra "Ago 2026" (~50px) e o rótulo cabe
-     inteiro; daí pra cima nada muda. */
-  const mesCurto = new Date()
-    .toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
-    .replace(/\.?\s*de\s*/i, " ")
-    .replace(".", "");
-
   const tabs = [
     { id: "dashboard", label: "📊 DASHBOARD" },
     { id: "financeiro", label: "💰 MEU FINANCEIRO" },
@@ -509,20 +499,19 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <DollarSign className="w-5 h-5 text-amber-600" />
+          <DollarSign className="w-5 h-5 text-amber-600 shrink-0" />
           <h1 className="text-base font-bold tracking-tight shrink-0">FINANÇAS</h1>
-          <div className="flex items-center gap-2 ml-auto min-w-0">
-            {/* truncate + nowrap (04/08): sem isto "agosto de 2026" QUEBRAVA em
-                duas linhas no aperto e caía por cima do título/chips (foto do
-                dono no aparelho de tela estreita). Mês é rótulo — ou cabe numa
-                linha, ou encurta. */}
-            <span className="text-muted-foreground text-xs whitespace-nowrap truncate max-[399px]:hidden">{currentMonth}</span>
-            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap min-[400px]:hidden">{mesCurto}</span>
-            {/* Pergunte ao CORE — disponível em qualquer aba */}
+          {/* O mês numa linha só (MesDoCabecalho: "Out 2026" no celular, por extenso de 460 px pra cima; some a
+              375 px — Finanças tem 3 botões). 17/10, print do dono a 390 px: o ✨ "completamente achatado" e
+              "Outubro muito junto de Finanças" — os botões e o mês não encolhem mais (shrink-0) e o "Dicas" virou
+              só o ícone, do tamanho do botão do tema. */}
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho compacto />
+            {/* Pergunte ao CORE — disponível em qualquer aba (a área de toque de 44 px é o ::before invisível) */}
             <button
               onClick={() => setAskOpen(true)}
               aria-label="Pergunte ao CORE"
-              className="grid place-items-center w-9 h-9 rounded-xl transition-colors" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
+              className="relative shrink-0 grid place-items-center w-9 h-9 rounded-xl transition-colors before:absolute before:-inset-1 before:content-['']" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
             >
               <Sparkles className="w-4 h-4" />
             </button>

@@ -5,10 +5,11 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
-import { parseLocalDay, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
+import { parseLocalDay, localDayKey, dataSegura } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import {
   ArrowLeft, Plus, X, Trash2, Check, GraduationCap, BookOpen,
   Clock, ArrowRight, FileText, ExternalLink, Pencil
@@ -149,7 +150,6 @@ const Estudos = () => {
   const location = useLocation();
   const isPreview = location.pathname.startsWith("/preview");
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
 
   // CURSOS
   const [cursosAndamento, setCursosAndamento] = usePersistedState<Course[]>("estudos-cursos-andamento", []);
@@ -476,8 +476,8 @@ const Estudos = () => {
           </Button>
           <GraduationCap className="w-5 h-5 text-indigo-600" />
           <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>

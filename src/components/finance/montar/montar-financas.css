@@ -40,7 +40,7 @@ html[data-montar-financas] body { overflow: hidden; }
 .mf-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0; }
 .mf-cab-icone { color: var(--mf-ambar); width: 22px; height: 22px; }
 .mf-cab-nome { font-size: 17px; font-weight: 800; letter-spacing: .02em; }
-.mf-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); text-transform: capitalize; }
+.mf-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); }
 
 .mf-corpo { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .mf-corpo > * { flex-shrink: 0; } /* senão a tabela de contas encolhe (overflow hidden) em vez de a tela rolar */
@@ -195,3 +195,7 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 }
 /* "＋ Outra"/"← Voltar": o texto mora num <span> — com o svg como único filho, a regra global
    `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */
+
+/* área de toque de 44 px no "Tirar" da conta (34 px) — ::before invisível (polimento 17/10) */
+button.mf-tirar { position: relative; }
+button.mf-tirar::before { content: ""; position: absolute; inset: -5px; }

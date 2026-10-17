@@ -89,27 +89,27 @@ export function PreFolhaLembrete() {
   );
 }
 
-/** A folha em si (exportada pro /dev e pros testes): grafite + magenta, papel do planner. */
+/** A folha em si (exportada pro /dev e pros testes): grafite + magenta, papel do planner — no tema do app (17/10: era branca no escuro). */
 export function Folha({ hora, conteudo, aoSim, aoAgoraNao }: { hora: string; conteudo: ConteudoDia2; aoSim: () => void; aoAgoraNao: () => void }) {
   return (
     <motion.div className="fixed inset-0 z-[250] flex items-end justify-center" style={{ background: "rgba(15,12,20,.45)" }} data-camada-guia="pre-folha-lembrete" data-testid="pre-folha-lembrete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} role="dialog" aria-modal="true" aria-labelledby="pre-folha-titulo">
       <motion.div
         initial={{ y: 40 }} animate={{ y: 0 }} transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="w-full max-w-[440px] rounded-t-3xl bg-white text-[#16121c] shadow-2xl px-5 pt-5"
+        className="md-tema w-full max-w-[440px] rounded-t-3xl bg-card text-card-foreground shadow-2xl px-5 pt-5"
         style={{ paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       >
         <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: "#16121c" }}><Bell className="w-5 h-5" /></span>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-foreground text-background"><Bell className="w-5 h-5" /></span>
           <div className="min-w-0">
             <p id="pre-folha-titulo" className="text-[19px] font-black tracking-[-0.02em] leading-tight">Quer que eu te lembre amanhã às {hora}?</p>
-            <p className="text-[13px] text-[#4f5a64] mt-1 leading-snug">Um aviso só por dia, na primeira semana, na hora em que você costuma abrir o CORE.</p>
+            <p className="text-[13px] text-muted-foreground mt-1 leading-snug">Um aviso só por dia, na primeira semana, na hora em que você costuma abrir o CORE.</p>
           </div>
         </div>
         {/* o gostinho: a notificação como ela vai chegar */}
-        <div className="mt-4 rounded-2xl border border-black/10 px-3.5 py-3 text-left" style={{ background: "#FFF8D6" }} data-testid="pre-folha-previa">
-          <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]" style={{ color: "#8a4b12" }}>Amanhã · {hora}</span>
+        <div className="mt-4 rounded-2xl border border-black/10 dark:border-white/10 px-3.5 py-3 text-left bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="pre-folha-previa">
+          <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Amanhã · {hora}</span>
           <span className="block text-[14.5px] font-extrabold leading-snug mt-0.5">{conteudo.title}</span>
-          <span className="block text-[12.5px] text-[#4f5a64] leading-snug mt-0.5">{conteudo.body}</span>
+          <span className="block text-[12.5px] opacity-75 leading-snug mt-0.5">{conteudo.body}</span>
         </div>
         <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="pre-folha-sim" onClick={aoSim}>Sim, me lembra às {hora}</button>
         <button type="button" className="md-link mt-1" data-testid="pre-folha-nao" onClick={aoAgoraNao}>Agora não</button>

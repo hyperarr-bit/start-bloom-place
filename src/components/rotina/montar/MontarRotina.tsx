@@ -54,7 +54,8 @@ import { ArrowLeft, Bell, Calendar, Check, Clock } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey } from "@/lib/utils";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { armarLembreteDoTesteSePuder, estadoPermissao, pedirPermissao, type EstadoPermissao } from "@/lib/notificacoes";
 import { DIAS_DA_ROTINA, nomesDosHabitos } from "@/lib/rotina-habitos";
@@ -366,7 +367,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
       <header className="mrt-cab">
         <Calendar className="mrt-cab-icone" aria-hidden />
         <span className="mrt-cab-nome">ROTINA</span>
-        <span className="mrt-cab-mes">{mesAtualExtenso(hoje)}</span>
+        <MesDoCabecalho data={hoje} className="mrt-cab-mes" />
       </header>
       <div className="mrt-corpo">
         {etapa === "acordar" && (

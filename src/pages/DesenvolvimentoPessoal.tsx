@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { localDayKey, mesAtualExtenso, dataSegura, parseLocalDay, semanaAtualId } from "@/lib/utils";
+import { localDayKey, dataSegura, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
@@ -11,6 +11,7 @@ import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { toast } from "sonner";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import {
   ArrowLeft, Plus, X, Trash2, Star, Target, Heart, Shield, Brain,
   Lightbulb, BookOpen, Award, Eye, Sparkles, Edit3, Check, ChevronRight,
@@ -312,7 +313,6 @@ const DesenvolvimentoPessoal = () => {
   const abas = useAbasOcultas("desenvolvimento", ABAS_DP);
   const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
   const { set: setUserData, isGuest } = useUserData();
-  const currentMonth = mesAtualExtenso();
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);
@@ -503,8 +503,8 @@ const DesenvolvimentoPessoal = () => {
           <Button variant="ghost" size="icon" onClick={voltarDoModulo} aria-label={isPreview ? "Voltar" : "Todos os módulos"}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>

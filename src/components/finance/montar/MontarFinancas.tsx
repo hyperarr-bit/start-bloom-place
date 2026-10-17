@@ -66,6 +66,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, Check, DollarSign, Plus, X } from "lucide-react";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
@@ -118,7 +119,6 @@ type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto";
 const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, cartao: 3, montando: 3, pronto: 4 };
 const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
 
-const mesCurto = (d: Date) => d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(/\.?\s*de\s*/i, " ").replace(".", "");
 const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long" });
 
 /** Os chips do 1º gasto na tela do número: os MESMOS da missão (Café R$ 12 · Uber R$ 23 · Almoço R$ 35). */
@@ -490,7 +490,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     <header className="mf-cab">
       <DollarSign className="mf-cab-icone" aria-hidden />
       <span className="mf-cab-nome">FINANÇAS</span>
-      <span className="mf-cab-mes">{mesCurto(hoje)}</span>
+      <MesDoCabecalho data={hoje} className="mf-cab-mes" />
     </header>
   );
   const barra = (n: number) => (

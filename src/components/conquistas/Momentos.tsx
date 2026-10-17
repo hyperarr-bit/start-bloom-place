@@ -15,7 +15,7 @@ import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
 import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
-import { EVENTO_MISSAO_DOSES, ehUmPorDia, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
+import { DIA_FIM_DA_MISSAO, EVENTO_MISSAO_DOSES, diaDaMissao as diaDaMissaoDoses, ehUmPorDia, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
 import { conquistas2Ligada } from "@/lib/conquistas2";
 import { ehMarcoDeFesta, festaDoMarcoNovo, formatoDoAviso } from "./nova/recompensas";
 import { CelebracaoMarco, ToastAdesivo } from "./nova/camadas";
@@ -93,7 +93,15 @@ export const formatoDaFesta = (b: Pick<Badge, "xp" | "raridade">): "popup" | "te
  * a Missão estiver valendo, o adesivo cola quieto na folha — igual à 1.0.6 no caminho que converte.
  */
 export const emTesteComMissao = (): boolean => {
-  try { return isNativeShell() && trialCartaoAtivo() && !!missaoAtual(); } catch { return false; }
+  try {
+    if (!isNativeShell() || !trialCartaoAtivo()) return false;
+    if (missaoAtual()) return true;
+    // 1.0.16: a conta nova tem a MISSÃO EM DOSES (lib/missao-doses), não a antiga — a regra vale igual enquanto
+    // ela está nos dias da missão (quem "explorou por conta própria" saiu dela). Mesma leitura do diaDoTeste da
+    // Conquistas 2 e da pílula "Missão · dia N de 3".
+    const nova = lerMissao();
+    return !!nova && !nova.explorou && diaDaMissaoDoses(nova) <= DIA_FIM_DA_MISSAO;
+  } catch { return false; }
 };
 const pesoDaRaridade = (b: Badge) => RARIDADES.indexOf(raridadeDe(b));
 

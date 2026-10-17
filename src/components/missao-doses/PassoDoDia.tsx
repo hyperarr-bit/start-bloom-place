@@ -1344,7 +1344,12 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
         {/* BRAÇO B (DIA1_CHEIO): as 3 doses são de HOJE — a festa LEVA pra próxima sozinha (17/10: 22% e 18% se
             perdiam entre um módulo e outro); "Ir agora" adianta, "Agora não" para */}
         {B && proximo ? (
-          <PassagemDaProxima proximo={proximo} n={n} reduzir={reduzir} aoIr={(via) => aoBoraProxima?.(via)} aoAgoraNao={aoAgoraNao} />
+          <>
+            <PassagemDaProxima proximo={proximo} n={n} reduzir={reduzir} aoIr={(via) => aoBoraProxima?.(via)} aoAgoraNao={aoAgoraNao} />
+            {/* o link quieto também aqui (dono, 17/10: "no fim da comemoração de cada dose"); tocar fecha a festa — e a
+                passagem junto (o tempo dela morre com ela) — e abre o passeio do módulo */}
+            <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />
+          </>
         ) : B ? (
           <>
             {/* a 3ª dose feita: falta o 4º passo — arrumar a Home (o tour, 5 toques) */}

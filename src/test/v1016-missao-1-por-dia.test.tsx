@@ -1767,6 +1767,25 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     expect(lerMissao()?.feitos[1]).toBeDefined(); // a dose continua feita
   });
 
+  it("B: o link quieto também na passagem — tocar fecha a festa, PARA a passagem (a Rotina não abre sozinha) e abre o passeio do módulo", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    const abrir = vi.fn();
+    CONHECER_MAIS.abrir = abrir;
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "B"), boasVindas: true }));
+    montar(montarStore({}), "/financas");
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
+    passarOlhaDeFinancas();
+    expect(screen.getByTestId("missao-doses-proxima-dose")).toHaveTextContent("Agora a Rotina — 20 s");
+    fireEvent.click(screen.getByTestId("missao-doses-conhecer-mais"));
+    expect(abrir).toHaveBeenCalledWith("financas");
+    avancar(PASSAGEM_B_MS + 500);
+    expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
+    expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
+    expect(lerMissao()?.feitos[1]).toBeDefined();
+  });
+
   it("B: 'Agora não' na festa PARA a passagem (a Rotina não abre sozinha)", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("ab");

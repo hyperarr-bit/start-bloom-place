@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { computeDailyBudget, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import { dataSegura } from "@/lib/utils";
 import { avisarApagado } from "@/lib/desfazer";
 
@@ -68,7 +68,8 @@ export const previsaoDoMes = (
 ) => {
   const fixos = (fixedExpenses ?? []).reduce((s: number, e) => s + (Number(e?.value) || 0), 0);
   const variaveis = Math.max(0, gastosFixosEVariaveis - fixos);
-  const saidaDoMes = computeMonthlyOutflow(variaveis, fixos, parcelasDoMes || 0);
+  // (17/10) + contas avulsas do MEU MÊS, como no Index
+  const saidaDoMes = computeMonthlyOutflow(variaveis, fixos, parcelasDoMes || 0, computeLooseBillsOutflow(dueDays as any[] ?? [], fixedExpenses ?? []));
   const base = computeDailyBudget(receita, saidaDoMes, dueDays ?? [], fixedExpenses ?? []);
   const dia = agora.getDate();
   const diasNoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();

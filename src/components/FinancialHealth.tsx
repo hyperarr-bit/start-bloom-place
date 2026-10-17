@@ -60,6 +60,8 @@ interface FinancialHealthProps {
   totalExpenses: number;
   totalFixedExpenses: number;
   monthlyInstallments: number;
+  /** Contas avulsas do MEU MÊS com valor, pagas ou não (computeLooseBillsOutflow, 17/10). */
+  looseBills: number;
   totalDebts: number;
   totalInvestments: number;
   emergencyFundGoal: number;
@@ -80,6 +82,7 @@ export const FinancialHealth = ({
   totalExpenses,
   totalFixedExpenses,
   monthlyInstallments,
+  looseBills,
   totalDebts,
   totalInvestments,
   emergencyFundGoal,
@@ -93,7 +96,7 @@ export const FinancialHealth = ({
   // === METRICS ===
   // Mesmas funções do Index/Relatórios (lib/finance-totals) — a taxa daqui TEM
   // que bater com a do resto do app.
-  const totalRealExpenses = computeMonthlyOutflow(totalExpenses, totalFixedExpenses, monthlyInstallments);
+  const totalRealExpenses = computeMonthlyOutflow(totalExpenses, totalFixedExpenses, monthlyInstallments, looseBills);
   const savingsRate = computeSavingsRate(totalIncome, totalRealExpenses);
   const debtToIncome = totalIncome > 0 ? (totalDebts / (totalIncome * 12)) * 100 : 0;
   /*
@@ -254,7 +257,7 @@ export const FinancialHealth = ({
   const hasAnyData = totalIncome > 0 || totalExpenses > 0 || totalDebts > 0 || investments.length > 0 || totalFixedExpenses > 0;
   // Considera dados suficientes para calcular score só quando há receita E pelo menos uma despesa (variável, fixa ou parcela).
   // Evita exibir score baixíssimo só porque o usuário ainda está cadastrando os dados (ex.: durante o tutorial).
-  const hasEnoughData = totalIncome > 0 && (totalExpenses + totalFixedExpenses + monthlyInstallments) > 0;
+  const hasEnoughData = totalIncome > 0 && totalRealExpenses > 0;
 
   if (!hasAnyData) {
     return (

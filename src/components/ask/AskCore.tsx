@@ -72,14 +72,15 @@ const QUESTIONS: Question[] = [
       if (ctx.totalIncome <= 0) return "Ainda não vi nenhuma receita este mês — registra sua renda na aba Meu Financeiro que eu te digo na hora.";
       if (b.cantSpend) {
         return b.unpaidBillsEstimate > 0
-          ? `Hoje o ideal é segurar. Seu saldo do mês (${fmt(b.currentBalance)}) já está comprometido com ${fmt(b.unpaidBillsEstimate)} de contas a vencer.\n\nQualquer gasto agora sai do que deveria sobrar.`
+          ? `Hoje o ideal é segurar. Seu saldo do mês (${fmt(b.currentBalance)}) já está comprometido com ${fmt(b.unpaidBillsEstimate)} de contas sem valor anotado (estimativa).\n\nQualquer gasto agora sai do que deveria sobrar.`
           : `Hoje o ideal é segurar. O que saiu no mês já passou do que entrou (saldo de ${fmt(b.currentBalance)}).\n\nQualquer gasto agora aumenta o buraco.`;
       }
-      // Mesma conta do card (26/09): contas de custo fixo e fatura já estão
-      // no que saiu do mês; a reserva é só das contas avulsas em aberto.
-      const reserva = b.unpaidBillsEstimate > 0 ? `, e já separei ${fmt(b.unpaidBillsEstimate)} pras contas avulsas a vencer` : "";
+      // Mesma conta do card: contas de custo fixo, fatura (26/09) e contas
+      // avulsas com valor (17/10) já estão no que saiu do mês; a reserva é só
+      // a estimativa das contas sem valor anotado.
+      const reserva = b.unpaidBillsEstimate > 0 ? `, e já separei ${fmt(b.unpaidBillsEstimate)} pras contas sem valor anotado` : "";
       const dias = b.remainingDays === 1 ? "hoje é o último dia do mês" : `÷ ${b.remainingDays} dias, contando hoje`;
-      return `Você pode gastar até ${fmt(b.perDay)} hoje sem apertar o resto do mês.\n\nA conta: sobram ${fmt(b.availableReal)} livres (já sem os custos fixos, as parcelas e o cartão${reserva}) ${dias}.`;
+      return `Você pode gastar até ${fmt(b.perDay)} hoje sem apertar o resto do mês.\n\nA conta: sobram ${fmt(b.availableReal)} livres (já sem os custos fixos, as contas do mês, as parcelas e o cartão${reserva}) ${dias}.`;
     },
   },
   {

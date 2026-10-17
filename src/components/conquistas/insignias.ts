@@ -353,7 +353,7 @@ const totaisDe = (f: FinancasDoMes, mesId: string): TotaisDoMes => {
   const variaveis = soma(expenses);
   const fixos = soma(f.fixed);
   const parcelas = somaParcelasDoMes(f.parcelas as Parcela[]);
-  const saida = computeMonthlyOutflow(variaveis, fixos, parcelas);
+  const saida = computeMonthlyOutflow(variaveis, fixos, parcelas, f.avulsas ?? 0);
   return {
     receitas, saida, fixos, parcelas,
     expenses: expenses as { date?: string; category?: string }[],

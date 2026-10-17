@@ -3,7 +3,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
-import { computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
+import { computeLooseBillsOutflow, computeMonthlyBalance, computeMonthlyOutflow } from "@/lib/finance-totals";
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
 import {
@@ -156,9 +156,9 @@ export function useLifeHubData(): LifeHubData {
        fixas + variáveis + parcelas do mês — nenhuma tela com fórmula própria. */
     const parcelasBrutas = get<unknown>("finance-installments", []);
     const parcelasDoMes = somaParcelasDoMes(doPerfil(Array.isArray(parcelasBrutas) ? parcelasBrutas : [], perfil) as Parcela[]);
-    const monthBalance = computeMonthlyBalance(totalIncome, computeMonthlyOutflow(totalVariableExpense, totalFixedExpense, parcelasDoMes));
-
     const dueDays = doPerfilDueDays(get<any[]>("finance-dueDays", []), perfil);
+    // (17/10) + contas avulsas do MEU MÊS, como no módulo
+    const monthBalance = computeMonthlyBalance(totalIncome, computeMonthlyOutflow(totalVariableExpense, totalFixedExpense, parcelasDoMes, computeLooseBillsOutflow(dueDays, fixedExpenses)));
     /* MÊS DE VERDADE, NÃO DE 30 DIAS (26/09, auditoria da virada). A conta
        seguinte era `30 - hoje + dia`: em 31/10 a conta do dia 1º "vencia
        hoje", em 28/02 "vencia em 3 dias" (é amanhã), e a do dia 31 num mês

@@ -213,7 +213,7 @@ describe("Um total só entre a planilha do mês e o financeiro geral", () => {
     const parcelas = somaParcelasDoMes(lista);
     expect(parcelas).toBe(100); // a quitada não conta
     const antigo = 500 + 1000; // variáveis + fixos, como a MonthlySheet fazia
-    const unico = computeMonthlyOutflow(500, 1000, parcelas);
+    const unico = computeMonthlyOutflow(500, 1000, parcelas, 0);
     expect(unico).toBe(1600);
     expect(unico).not.toBe(antigo);
   });

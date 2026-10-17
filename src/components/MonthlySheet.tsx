@@ -11,7 +11,7 @@ import { Notes } from "@/components/Notes";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
-import { computeMonthlyOutflow } from "@/lib/finance-totals";
+import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow } from "@/lib/finance-totals";
 import {
   type Parcela, mesIdDe, mesesAnteriores, somarMeses, chaveArquivadaDeParcelas, projetarParcelas, somaParcelasDoMes,
 } from "@/lib/finance-parcelas";
@@ -120,7 +120,11 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
      as parcelas do mês — a mesma pessoa via dois números pro mesmo mês. Agora
      as duas telas passam pela mesma função de lib/finance-totals. */
   const parcelasDoMes = somaParcelasDoMes([...(installments as Parcela[]), ...projetadas]);
-  const despesas = computeMonthlyOutflow(totalExpenses, totalFixed, parcelasDoMes);
+  // (17/10) + contas avulsas DESTE mês (a chave de contas dele), pagas ou não.
+  // Outro mês: regra do arquivo (conta de fixo nunca vira avulsa — o fixo
+  // projetado tem outro id).
+  const avulsasDoMes = (isCurrent ? computeLooseBillsOutflow : computeArchivedLooseBillsOutflow)(dueDays as any[], [...fixedExpenses, ...fixosProjetados]);
+  const despesas = computeMonthlyOutflow(totalExpenses, totalFixed, parcelasDoMes, avulsasDoMes);
   const balance = totalIncome - despesas;
 
   return (

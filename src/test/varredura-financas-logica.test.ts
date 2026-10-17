@@ -163,15 +163,19 @@ describe("Previsão dos Desejos = previsão do Dashboard", () => {
 
   it("saída do mês inclui a parcela (3.718, não 3.568) e as contas vêm de lib/finance-totals", () => {
     const p = previsaoDoMes(6200, 3104 + 464, 150, fixos, dueDays, agora);
-    expect(p.saidaDoMes).toBe(computeMonthlyOutflow(464, 3104, 150));
-    expect(p.saidaDoMes).toBe(3718);
-    const base = computeDailyBudget(6200, 3718, dueDays, fixos);
+    // 17/10: + o IPVA avulso de R$ 300 (conta avulsa do mês entra na saída)
+    expect(p.saidaDoMes).toBe(computeMonthlyOutflow(464, 3104, 150, 300));
+    expect(p.saidaDoMes).toBe(4018);
+    const base = computeDailyBudget(6200, 4018, dueDays, fixos);
+    expect(p.contasPendentes).toBe(0); // o IPVA já está na saída — não reserva de novo
     expect(p.contasPendentes).toBe(base.unpaidBillsEstimate);
     // nunca mais "quantidade × média dos fixos" (3 × 388 = 1.164)
     expect(p.contasPendentes).not.toBe(3 * (3104 / 8));
     const projecao = (464 / 26) * 4;
     expect(p.projecaoVariavel).toBeCloseTo(projecao, 6);
-    expect(p.saldoProjetado).toBeCloseTo(6200 - 3718 - base.unpaidBillsEstimate - projecao, 6);
+    expect(p.saldoProjetado).toBeCloseTo(6200 - 4018 - base.unpaidBillsEstimate - projecao, 6);
+    // o disponível é o MESMO de antes (6.200 − 3.718 − 300 reservados = 2.182): só mudou de lugar
+    expect(base.availableReal).toBe(2182);
   });
 });
 

@@ -1,6 +1,6 @@
 import { getMonthKey, readMonthData } from "@/components/finance/storage-keys";
-import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
-import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { doPerfil, doPerfilDueDays, perfilAtivoLocal } from "@/lib/finance-perfil";
+import { computeArchivedLooseBillsOutflow, computeLooseBillsOutflow, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import {
   chaveArquivadaDeParcelas, mesesAnteriores, mesesEntre, projetarParcelas, somaParcelasDoMes,
   valorDaParcelaNoMes, viradaDeParcelas, type Parcela,
@@ -366,6 +366,8 @@ export interface FinancasDoMes {
   expenses: Item[];
   fixed: Item[];
   parcelas: Parcela[];
+  /** (17/10) contas avulsas do MEU MÊS daquele mês (com valor, pagas ou não) — computeLooseBillsOutflow */
+  avulsas?: number;
 }
 
 const chaveDoMes = (ano: number, mesIdx: number, sufixo: string) =>
@@ -410,11 +412,13 @@ export const lerFinancasDoMes = (
   if (atras === 0) {
     const balde = lista<Parcela>(ler("finance-installments"));
     const fontes = [atual, ...mesesAnteriores(atual, 24)].map((mes) => ({ mes, itens: lista<Parcela>(ler(chaveArquivadaDeParcelas(mes))) }));
+    const fixed = doPerfil(lista<Item>(ler("finance-fixed-expenses")), perfil);
     return {
       incomes: doPerfil(lista<Item>(ler("finance-incomes")), perfil),
       expenses: doPerfil(lista<Item>(ler("finance-expenses")), perfil),
-      fixed: doPerfil(lista<Item>(ler("finance-fixed-expenses")), perfil),
+      fixed,
       parcelas: doPerfil(viradaDeParcelas(balde, atual, fontes)?.lista ?? balde, perfil),
+      avulsas: computeLooseBillsOutflow(doPerfilDueDays(lista<any>(ler("finance-dueDays")), perfil), fixed),
     };
   }
 
@@ -450,6 +454,8 @@ export const lerFinancasDoMes = (
     expenses: doPerfil(expenses, perfil),
     fixed: doPerfil(fixed, perfil),
     parcelas: doPerfil([...proprias, ...projetadas], perfil),
+    // (17/10) só o retrato de contas DAQUELE mês; sem retrato, 0 (não se inventa)
+    avulsas: computeArchivedLooseBillsOutflow(doPerfilDueDays(lista<any>(ler(chaveDoMes(ano, mesIdx, "dueDays"))), perfil), doPerfil(fixed, perfil)),
   };
 };
 
@@ -464,6 +470,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   contas_casa: "Contas da Casa", plano_saude: "Plano de Saúde",
   assinaturas: "Assinaturas", internet_telefone: "Internet/Telefone",
   academia: "Academia", beleza: "Beleza", outros: "Outros",
+  contas_avulsas: "Contas do mês",
 };
 
 export type EgoMoment =
@@ -499,7 +506,7 @@ export interface WrappedData {
 
 const totaisDe = (f: FinancasDoMes) => ({
   receitas: soma(f.incomes),
-  saiu: computeMonthlyOutflow(soma(f.expenses), soma(f.fixed), somaParcelasDoMes(f.parcelas)),
+  saiu: computeMonthlyOutflow(soma(f.expenses), soma(f.fixed), somaParcelasDoMes(f.parcelas), f.avulsas ?? 0),
 });
 
 /** Monta o bloco de finanças a partir dos lançamentos já lidos. Null se o mês não tem nada. */
@@ -509,9 +516,9 @@ const montarWrapped = (
 ): WrappedData | null => {
   const { expenses, fixed, parcelas } = f;
   const income = soma(f.incomes);
-  // "Saiu" = fixos + variáveis + PARCELAS do mês, como no Dashboard (26/09,
-  // varredura: a parcela do celular sumia da retrospectiva e o mês parecia
-  // mais folgado do que foi).
+  // "Saiu" = fixos + variáveis + PARCELAS do mês + contas avulsas (17/10),
+  // como no Dashboard (26/09, varredura: a parcela do celular sumia da
+  // retrospectiva e o mês parecia mais folgado do que foi).
   const outflow = totaisDe(f).saiu;
   if (income <= 0 && outflow <= 0) return null;
 
@@ -527,6 +534,7 @@ const montarWrapped = (
     const cat = p.category === "roupa" ? "vestuario" : p.category || "outros";
     byCategory[cat] = (byCategory[cat] || 0) + v;
   }
+  if ((f.avulsas ?? 0) > 0) byCategory.contas_avulsas = (byCategory.contas_avulsas || 0) + (f.avulsas ?? 0);
   const topCategories = Object.entries(byCategory)
     .filter(([, value]) => value > 0)
     .sort((a, b) => b[1] - a[1])

@@ -1,5 +1,6 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
+import { CHAVE_TRIAL_CARTAO, EVENTO_TRIAL_CARTAO } from "@/lib/teste-da-loja";
 
 /**
  * TESTE GRÁTIS DE 3 DIAS DO APP DA LOJA (16/08) — o relógio.
@@ -168,7 +169,7 @@ export function limparGuiaSemente(): void {
  * dela (usar 2+ vezes nos 3 dias é o que evita o cancelamento). O marcador
  * local diz "esse assinante está nos 3 dias de teste do cartão": a Trilha
  * continua visível até ele expirar, e aí some sozinha. */
-const CHAVE_TRIAL_CARTAO = "core-trial-cartao-fim";
+// a chave (`core-trial-cartao-fim`) e o evento moram em lib/teste-da-loja: as boas-vindas da missão também leem
 
 export function marcarTrialCartao(dias = 7): void {
   // 23/08: default 7 — o trial da vitrine nova é o anual de 7 dias (oferta
@@ -187,7 +188,7 @@ export function marcarTrialCartaoAte(fimMs: number): void {
   if (!Number.isFinite(fimMs) || fimMs <= Date.now()) return;
   try {
     localStorage.setItem(CHAVE_TRIAL_CARTAO, String(fimMs));
-    window.dispatchEvent(new Event("core:trial-cartao"));
+    window.dispatchEvent(new Event(EVENTO_TRIAL_CARTAO));
   } catch { /* noop */ }
 }
 

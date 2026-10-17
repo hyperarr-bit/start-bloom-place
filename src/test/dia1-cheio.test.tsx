@@ -56,6 +56,7 @@ import {
 import { ESPERA_AVALIACAO_MS } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { PASSAGEM_B_MS } from "@/components/missao-doses/PassoDoDia";
 import { conteudoDoLembrete, lerDia2, registrarAbertura, type Leitor } from "@/lib/lembrete-dia2";
+import { CHAVE_LEMBRETE_TESTE } from "@/lib/teste-da-loja";
 
 /* ------------------------------------------------------------ o aparelho de mentira */
 
@@ -284,6 +285,8 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
 
   it("boas-vindas B em DUAS telas curtas: 'Tá dentro! 🎉' → 'Vamos lá' → 'Hoje é só 3 toques.' com as 3 doses e 'Começar'; dose 1 → faixa 'Missão · dose 1 de 4' (sem o módulo) → festa que LEVA pra próxima sozinha ('Agora a Rotina — 20 s', 'Ir agora', 'Agora não')", () => {
     ligarB();
+    // veio do paywall: comprou o anual com 3 dias grátis (o pedido do aviso do teste guarda o início e o fim)
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: Date.now() + 3 * 864e5, precoAno: "R$ 97,90", inicioMs: Date.now() }));
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("B");
     // tela 1: a comemoração por ter entrado — curta, sem lista, sem barra, sem link

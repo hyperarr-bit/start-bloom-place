@@ -3,6 +3,7 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
+import { CHAVE_LEMBRETE_TESTE } from "./teste-da-loja";
 import {
   BASE_DIA2, ID_DIA2, assinaturaDoPlano, diaDaSemana1a7, gravarDia2, lerDia2, planejarLembreteDia2, porDiaDasFinancas, registrarAbertura, rotuloDeMinutos,
   type Leitor as LeitorDia2,
@@ -1170,7 +1171,7 @@ export async function cancelarResgateDoPlano(): Promise<void> {
  *    uso (ver copyDoLembreteDoTeste). Horário e armar/desarmar ficam iguais.
  */
 const BASE_LEMBRETE_TESTE = 920000;
-const CHAVE_LEMBRETE_TESTE = "core-lembrete-teste";
+// a chave (`core-lembrete-teste`) mora em lib/teste-da-loja: as boas-vindas da missão leem os dias do teste dela
 
 /** O pedido do aviso (guardado no aparelho, `core-lembrete-teste`):
  *  · `inicioMs` (1.0.16): quando o teste começou (a compra) — é dele que sai o dia prometido no paywall;

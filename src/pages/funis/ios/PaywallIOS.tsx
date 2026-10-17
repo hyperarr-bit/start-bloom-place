@@ -138,8 +138,9 @@
  *   aviso, passos).
  */
 /** Dias grátis de RESERVA enquanto a loja não respondeu — o número de verdade é o da oferta
- *  introdutória (rc.diasTrialIos()). Um lugar só nesta tela. */
-export const DIAS_DE_TESTE_PADRAO = 3;
+ *  introdutória (rc.diasTrialIos()). 17/10: mora em lib/teste-da-loja (as boas-vindas da missão também
+ *  leem); daqui continua exportado pra quem já lia deste arquivo. */
+export { DIAS_DE_TESTE_PADRAO };
 /** Quanto a pílula "A Apple vai mostrar…" fica na tela antes de a folha abrir. */
 export const PREPARACAO_DA_FOLHA_MS = 1200;
 
@@ -151,6 +152,7 @@ export { diaDoAviso };
 /** Um `core:voltar` nos últimos N ms faz a saída contar como "voltar". */
 export const JANELA_DO_VOLTAR_MS = 10_000;
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
+import { DIAS_DE_TESTE_PADRAO } from "@/lib/teste-da-loja";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";

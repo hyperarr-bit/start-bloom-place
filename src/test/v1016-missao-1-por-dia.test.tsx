@@ -53,6 +53,9 @@ import {
   missaoDoDiaEmCena, moduloDaMissaoHoje, definirDonoDaMissao, donoDaConta, marcarDoseNaTela, doseNaTela, CHAVE_MISSAO_NA_CONTA,
   retomadaDoGasto, setupDaDose, idDaMissao, doseCurta, dicaDoDiaDevida, MAX_VISTAS_SEM_DECISAO,
 } from "@/lib/missao-doses";
+import { CHAVE_LEMBRETE_TESTE, CHAVE_TRIAL_CARTAO, DIAS_DE_TESTE_PADRAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
+import { marcarTrialCartaoAte } from "@/lib/teste-gratis";
+import { fraseDoAcesso } from "@/components/missao-doses/BoasVindasDoses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "@/components/missao-doses/encaixes";
 import { PASSAGEM_B_MS } from "@/components/missao-doses/PassoDoDia";
 import { _novaAberturaDoTour, marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
@@ -434,6 +437,8 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     ligarUmPorDia("on");
     localStorage.removeItem("core-montar-financas"); // a dose de Finanças de verdade
     guardarChave(CHAVES_FUNIL_W.area, "dinheiro");
+    // veio do paywall: comprou o anual com 3 dias grátis (o pedido do aviso do teste guarda o início e o fim)
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: Date.now() + 3 * 864e5, precoAno: "R$ 97,90", inicioMs: Date.now() }));
     const store = montarStore({});
     montar(store, "/home");
     const boas = screen.getByTestId("missao-doses-boas-vindas");
@@ -2093,5 +2098,107 @@ describe("19. as telas da missão quando a pessoa NÃO decide: aparecer conta, n
     montar(store, "/home");
     avancar(5000);
     expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------ 20: as boas-vindas (revisão pré-build, 17/10) */
+
+describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só com o teste da loja de verdade", () => {
+  const vistasDasBoasVindas = () => eventos.filter(([n, d]) => n === "missao_doses_boas_vindas" && d.acao === "view").map(([, d]) => d);
+  const pedidoDoTeste = (dias: number) =>
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: Date.now() + dias * 864e5, precoAno: "R$ 97,90", inicioMs: Date.now() }));
+
+  it("boas-vindas: o braço A também manda o 'view' (com o braço) — 1 por abertura em que a tela aparece, então o funil A×B tem o 'viu' e o alarme de telas que voltam enxerga o A", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    const store = montarStore({});
+    montar(store, "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1, variante: "A", braco: "um_por_dia" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-trocar"));
+    fireEvent.click(screen.getByTestId("missao-doses-pronto")); // voltar da escolha dos módulos não é outra vista
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+    expect(vistasDasBoasVindas()).toHaveLength(1);
+    cleanup(); // fechou o app na tela, sem decidir
+    montar(store, "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
+    expect(vistasDasBoasVindas()).toHaveLength(2); // a tela voltou noutra abertura: é isso que o alarme (telas-repetidas) lê
+  });
+
+  it("boas-vindas do braço B: o 'view' segue por tela, agora também com o braço legível", () => {
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "B");
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1, variante: "B", braco: "dia1_cheio" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1 }), expect.objectContaining({ tela: 2, braco: "dia1_cheio" })]);
+  });
+
+  it("boas-vindas do A: 'Seus N dias grátis começaram' só com teste da loja de verdade — 3 dias (comprou o teste no paywall), 7 dias (o código da App Store); quem pagou no site ou assinou o mensal lê 'Seu acesso começou'", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    const abrirBoasVindas = () => {
+      cleanup();
+      localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+      montar(montarStore({}), "/home");
+      expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+      return screen.getByTestId("missao-doses-subtitulo");
+    };
+    // 1) comprou o anual com 3 dias grátis no paywall (o pedido do aviso guarda o início e o fim do teste)
+    pedidoDoTeste(3);
+    expect(abrirBoasVindas()).toHaveTextContent("Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.");
+    localStorage.removeItem(CHAVE_LEMBRETE_TESTE);
+    // 2) o código de 7 dias da App Store (afiliados): nenhuma compra no app — a loja confirmou o teste no boot
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + 7 * 864e5 - 60_000));
+    expect(abrirBoasVindas()).toHaveTextContent("Seus 7 dias grátis começaram. Os 16 módulos já estão abertos.");
+    localStorage.removeItem(CHAVE_TRIAL_CARTAO);
+    // 3) pagou no site (Pix/cartão) ou assinou o mensal no app (cobra hoje): teste nenhum
+    expect(abrirBoasVindas()).toHaveTextContent("Seu acesso começou. Os 16 módulos já estão abertos.");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).not.toHaveTextContent(/dias? grátis/);
+    // 4) um teste que já acabou não conta
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() - 1));
+    expect(abrirBoasVindas()).toHaveTextContent("Seu acesso começou.");
+  });
+
+  it("boas-vindas do B (já no ar): a mesma regra — sem teste, 'Seu acesso começou agora'; o boot que confirma o teste DEPOIS da 1ª tela troca a frase pra 'Seus 3 dias grátis começaram agora'", () => {
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seu acesso começou agora. Dá pra usar tudo.");
+    act(() => { marcarTrialCartaoAte(Date.now() + 3 * 864e5 - 60_000); }); // revenuecat.conferirTrialCartao respondeu
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seus 3 dias grátis começaram agora. Dá pra usar tudo.");
+    cleanup();
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+    localStorage.removeItem(CHAVE_TRIAL_CARTAO);
+    pedidoDoTeste(7);
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seus 7 dias grátis começaram agora. Dá pra usar tudo.");
+  });
+
+  it("diasDoTesteDaLoja / fraseDoAcesso (puras): o pedido da compra (início → fim) dá os dias exatos; sem início ou só com o marcador da loja, os que faltam (nunca menos que a reserva); acabou ou ilegível = sem teste", () => {
+    const agora = Date.now();
+    const DIA = 864e5;
+    expect(DIAS_DE_TESTE_PADRAO).toBe(3);
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 7 * DIA, precoAno: "R$ 97,90", inicioMs: agora }));
+    expect(diasDoTesteDaLoja(agora)).toBe(7);
+    expect(diasDoTesteDaLoja(agora + 2 * DIA)).toBe(7); // é o teste dela, não o que falta
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 3 * 60_000, precoAno: "R$ 97,90", inicioMs: agora })); // sandbox (3 min)
+    expect(diasDoTesteDaLoja(agora)).toBe(DIAS_DE_TESTE_PADRAO);
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 3 * DIA, precoAno: "R$ 97,90" })); // pedido de antes da 1.0.16
+    expect(diasDoTesteDaLoja(agora)).toBe(3);
+    expect(diasDoTesteDaLoja(agora + 2 * DIA)).toBe(3); // nunca "seu 1 dia grátis"
+    expect(diasDoTesteDaLoja(agora + 3 * DIA + 1)).toBeNull(); // acabou
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, "{lixo");
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(agora + 7 * DIA - 60_000));
+    expect(diasDoTesteDaLoja(agora)).toBe(7);
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(agora - 1));
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    expect(fraseDoAcesso(3)).toBe("Seus 3 dias grátis começaram");
+    expect(fraseDoAcesso(7)).toBe("Seus 7 dias grátis começaram");
+    expect(fraseDoAcesso(1)).toBe("Seu 1 dia grátis começou");
+    expect(fraseDoAcesso(null)).toBe("Seu acesso começou");
   });
 });

@@ -58,7 +58,7 @@ import {
   CHAVE_BRACO_DIA1, CHAVE_UM_POR_DIA_APARELHO, _zerarUmPorDiaRemoto, bracoDia1, idDoAparelho, lerUmPorDiaRemoto, modoDia1Cheio, modoUmPorDia, registrarUmPorDiaRemoto, sortearBraco,
 } from "@/lib/dia1-cheio";
 import { CHAVES_FUNIL_W, guardarChave, lerChave, limparProgresso } from "@/pages/funis/w/retomada";
-import { conteudoDoLembrete } from "@/lib/lembrete-dia2";
+import { conteudoDoLembrete, porDiaExato } from "@/lib/lembrete-dia2";
 import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CHAVE_DIAS_ANOTADOS, contaComoAnotacao, registrarDia, temConteudo } from "@/lib/sequencia";
 import { localDayKey } from "@/lib/utils";
@@ -95,14 +95,26 @@ const Provedor = ({ store, children }: { store: Store; children: ReactNode }) =>
 const Rota = () => { const { pathname } = useLocation(); return <p data-testid="rota">{pathname}</p>; };
 const HomeFalsa = () => <div><Rota /><p>home de sempre</p></div>;
 /** Finanças que REMONTA o botão de adicionar quando `__versao` muda (a hidratação da conta redesenhando o módulo). */
+/** Finanças com as DUAS abas que a dose usa: MEU FINANCEIRO (o "+ Novo gasto", aba de quem é nova) e DASHBOARD (o card
+ *  "QUANTO POSSO GASTAR HOJE", com o número pela mesma conta do card de verdade, arredondado igual). */
 const FinancasFalsa = () => {
   const { get } = useUserData();
+  const [aba, setAba] = useState<"financeiro" | "dashboard">("financeiro");
   const versao = get<number>("__versao", 0);
   const semBotao = get<boolean>("__semBotao", false); // a linha do "+ Novo gasto" some DE VEZ (o módulo trocou de tela)
+  const porDia = porDiaExato(get);
   return (
     <div><Rota /><header className="sticky">FINANÇAS</header>
-      {!semBotao && <div key={`linha-${versao}`}><input placeholder="Novo gasto" /><button type="button" data-spotlight="add-expense">+</button></div>}
-      <section data-spotlight="add-bill"><h3>MEU MÊS</h3></section></div>
+      <nav><button type="button" data-spotlight="tab-dashboard" onClick={() => setAba("dashboard")}>DASHBOARD</button><button type="button" data-spotlight="financeiro" onClick={() => setAba("financeiro")}>MEU FINANCEIRO</button></nav>
+      {aba === "financeiro" ? (
+        <>
+          {!semBotao && <div key={`linha-${versao}`}><input placeholder="Novo gasto" /><button type="button" data-spotlight="add-expense">+</button></div>}
+          <section data-spotlight="add-bill"><h3>MEU MÊS</h3></section>
+        </>
+      ) : (
+        <div data-spotlight="pode-gastar"><h3>QUANTO POSSO GASTAR HOJE</h3><p data-testid="pode-gastar-valor">R$ {porDia === null ? 0 : Math.round(porDia)}</p></div>
+      )}
+    </div>
   );
 };
 const DIAS_ROTINA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
@@ -421,20 +433,31 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     fireEvent.click(mf().getByRole("button", { name: "R$ 2 a 4 mil" }));
     fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
     fireEvent.click(mf().getByRole("button", { name: /Aluguel/ }));
-    fireEvent.click(mf().getByRole("button", { name: "Ver quanto posso gastar" }));
+    fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    // 3º passo (opcional): o cartão — "Não uso cartão" já monta
+    fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
     avancar(2500);
     expect(screen.queryByTestId("demo-guia-postit")).toBeNull(); // nada da missão por cima do Montar
     fireEvent.click(mf().getByRole("button", { name: "Ver minhas Finanças" }));
     expect(Array.isArray(store.dados["finance-incomes"])).toBe(true);
     // a dose JÁ conta no "Pronto" do Montar (fechar o app no gasto de carona não desfaz o Montar)
     expect(lerMissao()?.feitos[1]?.rotulo).toMatch(/^Pode gastar R\$ [\d.]+ por dia$/);
-    // o 1º gasto de carona: post-it com os 3 prontos + "Agora não" (o anel só procura o "+ Novo gasto" com o Montar fora da tela)
+    // o 1º gasto guiado: post-it com os 3 prontos + "escrever o meu" (o anel só procura o "+ Novo gasto" com o Montar fora da tela)
     const postIt = esperarPostIt();
     expect(postIt).toHaveTextContent("E o gasto de hoje? Toca num:");
     expect(within(postIt).getAllByTestId("demo-guia-chip")).toHaveLength(3);
-    expect(within(postIt).getByTestId("missao-doses-gasto-agora-nao")).toBeInTheDocument();
+    expect(within(postIt).getByTestId("demo-guia-escrever")).toBeInTheDocument();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]); // ☕ Café
-    avancar(700);
+    // o "olha": a aba troca pro DASHBOARD e o "QUANTO POSSO GASTAR HOJE" acende com o número de antes → depois
+    avancar(600); avancar(300); avancar(1100); avancar(600); avancar(800);
+    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Quanto você pode gastar hoje");
+    expect(screen.getByTestId("missao-doses-olhar")).toHaveTextContent("Esse gasto já entrou na conta");
+    const olhar = eventos.find(([nome, d]) => nome === "missao_doses_passo" && d.passo === "olhar" && d.acao === "view")?.[1];
+    expect(olhar).toMatchObject({ alvo: "pode_gastar" });
+    // 29 dias no mês (03/10): R$ 12 não mexem no "por dia" arredondado — o balão diz o que saiu, sem fingir uma queda
+    expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent(`R$ ${olhar!.depois} por dia`);
+    expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent("Saíram R$ 12 do que sobra no mês.");
+    fireEvent.click(screen.getByTestId("missao-doses-entendi"));
     const festa = screen.getByTestId("missao-doses-festa");
     expect(festa).toHaveAttribute("data-braco", "A");
     expect(festa).not.toHaveAttribute("data-tela-cheia");
@@ -498,7 +521,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.queryByTestId("demo-guia-postit")).toBeNull();
   });
 
-  it("depois do Montar o gasto é opcional: 'Agora não' vai direto pra festa (a dose NÃO conta como pulada); fechar o app no post-it do gasto não desfaz a dose", () => {
+  it("depois do Montar: o 'Pular' da faixa (aos 20 s) fecha a dose com a festa — a dose NÃO conta como pulada; fechar o app no post-it do gasto não desfaz a dose", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     const fazerMontar = () => {
@@ -506,16 +529,19 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
       fireEvent.click(mf().getByRole("button", { name: "Até R$ 2 mil" }));
       fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
       fireEvent.click(mf().getByRole("button", { name: "Não tenho conta fixa" }));
+      fireEvent.click(mf().getByRole("button", { name: "Pular" })); // pula só a pergunta do cartão: o Montar fecha igual
       avancar(2500);
       fireEvent.click(mf().getByRole("button", { name: "Ver minhas Finanças" }));
     };
-    // 1) "Agora não"
+    // 1) o "Pular" da faixa, que aparece aos 20 s
     localStorage.removeItem("core-montar-financas");
     missaoA({});
     const store = montarStore({});
     montar(store, "/financas");
     fazerMontar();
-    fireEvent.click(within(esperarPostIt()).getByTestId("missao-doses-gasto-agora-nao"));
+    esperarPostIt();
+    avancar(20_000);
+    fireEvent.click(screen.getByTestId("missao-doses-pular"));
     const festa = screen.getByTestId("missao-doses-festa");
     expect(festa).toHaveTextContent("Dia 1 de 3 feito ✅");
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
@@ -1064,5 +1090,130 @@ describe("12. a âncora sumiu DE VEZ: o post-it fica (e grava); ela volta: o ane
     avancar(700);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
     expect((store.dados["finance-expenses"] as Array<{ description: string }>)[0]).toMatchObject({ description: "Uber" });
+  });
+});
+
+/* ------------------------------------------------------------ 13: módulo já apresentado → a dose continua */
+
+describe("13. contrato com a introdução dos módulos: o módulo já apresentado no dia 1 (por curiosidade) — a dose CONTINUA, não repete a 1ª ação", () => {
+  const hojeDaRotina = () => DIAS_ROTINA[(new Date().getDay() + 6) % 7];
+
+  it("Rotina apresentada no dia 1 (chave do aparelho): no dia 2 a dose é 'Já fez o seu hábito hoje?' com o hábito DELA — nada de 'crie o 1º hábito'; marcou → festa", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    localStorage.setItem("core-intro-vista-rotina", "2026-10-03T16:00:00.000Z"); // a introdução da Rotina (ramo dos cartões)
+    const store = montarStore({ "rotina-habits": ["Beber água ao acordar"], "rotina-habits-checked": { SÁBADO: [true] }, [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"] });
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { convites: { "2026-10-04": "foi" }, lembrete: "12h" });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // domingo, dia 2
+    montar(store, "/rotina");
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Já fez o seu hábito hoje?");
+    expect(postIt).toHaveTextContent("“Beber água ao acordar”: toca no quadradinho da linha de HOJE.");
+    expect(postIt).not.toHaveTextContent("Qual hábito você quer começar hoje?");
+    expect(within(postIt).queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "toque", acao: "view", continuacao: true, intro_feita: true })]);
+    fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${hojeDaRotina()}`));
+    avancar(700);
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 2 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("“Beber água ao acordar” já está na sua Rotina, com o quadradinho de hoje marcado.");
+    expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]); // nenhum hábito novo
+  });
+
+  it("Saúde apresentada (chave da CONTA): no dia 3 não pergunta a meta de novo — 'Mais 1 copo d'água hoje?' e 1 toque", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    const store = montarStore({ "core-intro-vistas": ["saude"], [CHAVE_DIAS_ANOTADOS]: ["2026-10-03", "2026-10-04"] });
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "x" }, 2: { dia: "2026-10-04", rotulo: "y" } }, { convites: { "2026-10-05": "foi" } });
+    vi.setSystemTime(new Date(2026, 9, 5, 9, 0));
+    montar(store, "/saude");
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Mais 1 copo d'água hoje?");
+    const chips = within(postIt).getAllByTestId("demo-guia-chip");
+    expect(chips.map((c) => c.textContent)).toEqual(["💧1 copo d'água"]);
+    fireEvent.click(chips[0]);
+    expect(store.dados["core-saude-water-goal"]).toBeUndefined(); // a meta não foi perguntada de novo
+    avancar(700);
+    expect(screen.getByTestId("missao-doses-festa")).toHaveAttribute("data-tela-cheia"); // 3 dias seguidos
+  });
+
+  it("Finanças apresentada (chave da conta): a dose de Finanças é o gasto de hoje — o Montar não abre", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    localStorage.removeItem("core-montar-financas"); // nem decidido: só a introdução foi feita
+    const store = montarStore({ "core-intro-vistas": ["financas"] });
+    missaoA({});
+    montar(store, "/financas");
+    const postIt = esperarPostIt();
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(postIt).toHaveTextContent("Anota o gasto de hoje:");
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    avancar(700);
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
+  });
+
+  it("sem introdução (o caminho normal) nada muda: Rotina vazia ensina a criar o 1º hábito; o braço B nunca lê a introdução", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "x" } }, { convites: { "2026-10-04": "foi" } });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    montar(montarStore({}), "/rotina");
+    expect(esperarPostIt()).toHaveTextContent("Qual hábito você quer começar hoje?");
+    cleanup();
+    // B com a introdução gravada: segue o de hoje (o contrato é do braço A)
+    localStorage.setItem("core-intro-vista-saude", "1");
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["saude", "financas", "rotina"], "2026-10-04", undefined, "B"), boasVindas: true }));
+    montar(montarStore({}), "/saude");
+    expect(esperarPostIt()).toHaveTextContent("Quantos copos por dia?");
+  });
+});
+
+/* ------------------------------------------------------------ 14: a dose de Finanças termina OLHANDO o número */
+
+describe("14. dose de Finanças (os dois braços): Montar → 1º gasto guiado → 'olha' no QUANTO POSSO GASTAR HOJE → festa", () => {
+  const montarAte2mil = () => {
+    const mf = () => within(screen.getByTestId("montar-financas"));
+    fireEvent.click(mf().getByRole("button", { name: "Até R$ 2 mil" }));
+    fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(mf().getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
+    avancar(2500);
+    fireEvent.click(mf().getByRole("button", { name: "Ver minhas Finanças" }));
+  };
+
+  it("fim do mês (28/10, 4 dias): o número CAI na frente dela — R$ 375 → R$ 372 — e a aba vira o DASHBOARD", () => {
+    ligarUmPorDia("on");
+    localStorage.removeItem("core-montar-financas");
+    vi.setSystemTime(new Date(2026, 9, 28, 10, 0));
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-28", undefined, "A"), boasVindas: true }));
+    conta.created_at = new Date(2026, 9, 28, 9, 0).toISOString();
+    const store = montarStore({});
+    montar(store, "/financas");
+    montarAte2mil();
+    fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]); // ☕ Café · R$ 12
+    avancar(600); avancar(300); avancar(1100); avancar(600); avancar(800);
+    expect(screen.getByTestId("pode-gastar-valor")).toHaveTextContent("R$ 372"); // o card de verdade, já com o gasto
+    const numero = screen.getByTestId("missao-doses-olhar-numero");
+    expect(numero).toHaveTextContent("Por dia:");
+    expect(numero).toHaveTextContent("R$ 375");
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "pode_gastar", antes: 375, depois: 372 })]);
+    fireEvent.click(screen.getByTestId("missao-doses-entendi"));
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
+  });
+
+  it("pulou o Montar e não tem renda: o 1º gasto guiado direto; sem número de 'pode gastar' pra mostrar, não troca de aba — braço A vai pra festa", () => {
+    ligarUmPorDia("on");
+    localStorage.removeItem("core-montar-financas");
+    missaoA({});
+    const store = montarStore({});
+    montar(store, "/financas");
+    fireEvent.click(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Pular" }));
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Qual foi o seu último gasto?");
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
+    avancar(2000);
+    expect(eventos.some(([n, d]) => n === "missao_doses_passo" && d.alvo === "pode_gastar")).toBe(false);
+    expect(screen.queryByTestId("pode-gastar-valor")).toBeNull(); // ficou no MEU FINANCEIRO
+    avancar(1000);
+    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅"); // braço A: sem o olhar dos outros
   });
 });

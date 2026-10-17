@@ -11,11 +11,11 @@ import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
-import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
-import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
+import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, introDoModuloConcluida, marcarDoseNaTela, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { horaSugeridaDaMissao, porDiaExato } from "@/lib/lembrete-dia2";
 import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
 import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
 import { temArte } from "@/components/conquistas/adesivos-arte";
@@ -159,14 +159,23 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * (conta antiga, dia 2), direto no (B) como sempre. Lido UMA vez no mount. */
   const [semHabito] = useState(() => cfg.tipo === "habito" && !(Array.isArray(get<unknown>("rotina-habits", undefined)) && (get<unknown[]>("rotina-habits", []) ?? []).length > 0));
   const [subPasso, setSubPasso] = useState<"criar" | "marcar" | null>(semHabito ? "criar" : null);
-  const [semMetaAgua] = useState(() => cfg.tipo === "agua" && modo === "dose" && !(Number(get<unknown>("core-saude-water-goal", 0)) > 0));
+  /* 1.0.16 (contrato com a introdução dos módulos): o módulo já foi apresentado — a introdução guiada (ramo
+   * v1016-cartoes) fez a 1ª ação dele no dia 1, numa visita por curiosidade. A dose NÃO repete a 1ª ação: vira
+   * continuação (Rotina: marca o hábito de hoje — o que ela criou; Saúde: mais 1 copo, sem a meta de novo;
+   * Finanças: o gasto de hoje, sem o Montar). Só no braço A (o contrato é do "1 por dia"; o B fica como a
+   * 1.0.15). Lido uma vez no mount. */
+  const [introFeita] = useState(() => braco === "A" && modo === "dose" && introDoModuloConcluida(modulo, get));
+  const [semMetaAgua] = useState(() => cfg.tipo === "agua" && modo === "dose" && !introFeita && !(Number(get<unknown>("core-saude-water-goal", 0)) > 0));
+  /** a dose continua o que ela já fez no módulo (a introdução, ou o hábito que já existe num dia 2+) */
+  const [continuacao] = useState(() => braco === "A" && modo === "dose" && (introFeita || (cfg.tipo === "habito" && !semHabito && n > 1)));
+  const [habitoDela] = useState(() => { const nomes = cfg.tipo === "habito" ? nomesDosHabitos(get<unknown>("rotina-habits", [])).filter(Boolean) : []; return nomes.length === 1 ? nomes[0] : null; });
   const treinoPronto = modulo === "treino" && modo === "dose";
   /* 1.0.16 — FINANÇAS: a dose 1 é o "Vamos montar suas Finanças" (conta nova, Finanças vazia, chave ligada).
    * "Pronto" = a dose (o número DELA já está no módulo); "Pular" = segue pro 1º gasto pelo chip. Lido no mount. */
   const { user } = useAuth();
   const { isGuest } = useUserData();
   const [montarAberto, setMontarAberto] = useState(() => {
-    if (modulo !== "financas" || modo !== "dose") return false;
+    if (modulo !== "financas" || modo !== "dose" || introFeita) return false;
     try { return deveMostrarMontarFinancas({ criadoEm: (user as { created_at?: string } | null)?.created_at, get, isGuest: !!isGuest }); } catch { return false; }
   });
   /* Depois do "Pronto" do Montar a dose JÁ está feita (o número dela está no módulo). O 1º gasto pelo chip vem
@@ -181,6 +190,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const chips: ChipDaMissao[] = subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : treinoPronto ? CHIPS_DE_TREINO : semMetaAgua ? CHIPS_DE_META_AGUA : (alvoCfg?.chips ?? []);
   const pergunta = subPasso === "criar" ? PERGUNTA_HABITO_VAZIO : subPasso === "marcar" ? PERGUNTA_HABITO_MARCAR
     : montarFeito ? "E o gasto de hoje? Toca num:"
+    : continuacao && cfg.tipo === "habito" ? "Já fez o seu hábito hoje?"
+    : continuacao && cfg.tipo === "agua" ? "Mais 1 copo d'água hoje?"
+    : continuacao && cfg.tipo === "gasto" ? "Anota o gasto de hoje:"
     : treinoPronto ? "Escolhe um treino pronto" : semMetaAgua ? "Quantos copos por dia?" : (alvoCfg?.pergunta ?? cfg.pedido);
   const chipTocado = useRef<ChipDaMissao | null>(null);
   const reduzir = !!useReducedMotion();
@@ -206,7 +218,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   useEffect(() => {
     document.documentElement.setAttribute("data-missao-doses-faixa", "1");
     const soltarDose = marcarDoseNaTela();
-    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "view" }));
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "view", ...(continuacao ? { continuacao: true, intro_feita: introFeita } : {}) }));
     return () => { document.documentElement.removeAttribute("data-missao-doses-faixa"); soltarDose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -336,6 +348,54 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura]);
 
+  /* O "QUANTO POSSO GASTAR HOJE" de ANTES do gasto (o número que o Montar acabou de mostrar, ou o da conta) e o
+   * olhar nele depois do gasto — só na dose de Finanças, com renda anotada. */
+  const porDiaAntes = useRef<number | null>(null);
+  const [olharNoNumero, setOlharNoNumero] = useState<{ gasto: number | null } | null>(null);
+  useEffect(() => {
+    if (cfg.tipo !== "gasto" || modo !== "dose" || montarAberto || porDiaAntes.current !== null) return;
+    if (fase !== "achar" && fase !== "anotar") return;
+    try { const v = porDiaExato(get); if (v !== null) porDiaAntes.current = Math.round(v); } catch { /* sem número: olhar de sempre */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, montarAberto]);
+  const olharNoPodeGastar = (timers: number[]) => {
+    const lerNumero = (): number | null => {
+      const t = document.querySelector('[data-spotlight="pode-gastar"] [data-testid="pode-gastar-valor"]')?.textContent ?? "";
+      const n = Number(t.replace(/[^\d]/g, ""));
+      return t && Number.isFinite(n) ? n : null;
+    };
+    const card = () => document.querySelector('[data-spotlight="pode-gastar"]');
+    if (!card()) (document.querySelector('[data-spotlight="tab-dashboard"]') as HTMLElement | null)?.click();
+    let tentativas = 0;
+    const procurar = () => {
+      if (faseRef.current !== "registrou") return;
+      const el = card();
+      if (!el || !visivel(el)) {
+        if (++tentativas >= 12) { setFase("festa"); return; } // o card não veio (~3 s): a festa segue, sem travar
+        timers.push(window.setTimeout(procurar, 250));
+        return;
+      }
+      const antes = porDiaAntes.current ?? 0;
+      let depois = lerNumero();
+      if (depois === null) { try { const v = porDiaExato(get); depois = v === null ? 0 : Math.round(v); } catch { depois = antes; } }
+      const valorDoGasto = (() => { const c = chipTocado.current; return c?.valor ?? null; })();
+      setNumero({ titulo: "Por dia", antes, depois, formatar: (x) => `R$ ${reais(Math.round(x))}` });
+      setOlharNoNumero({ gasto: valorDoGasto });
+      const mostrar = () => {
+        if (faseRef.current !== "registrou") return;
+        setOlharEm(el);
+        setFase("olhar");
+        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "pode_gastar", antes, depois }));
+      };
+      try {
+        rolarAte(el, 0.42, reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
+          if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, ROLAGEM_DO_OLHAR.pausaMs));
+        });
+      } catch { mostrar(); }
+    };
+    timers.push(window.setTimeout(procurar, 250));
+  };
+
   /* REGISTROU → o chip ficou ✓ e a linha apareceu; depois, o OLHAR (ou direto a festa). */
   useEffect(() => {
     if (fase !== "registrou") return;
@@ -343,9 +403,16 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     timers.push(window.setTimeout(() => {
       if (faseRef.current !== "registrou") return;
       setAnelVivo(false);
-      // depois do Montar o número já foi mostrado: o gasto de carona vai direto pra comemoração (sem o "olhar").
-      // 1.0.16, braço A: a dose é curta (10–30 s, desenho 8 4.0) — sem o "olhar explicado" da 1.0.10 por cima
-      if (montarFeitoRef.current || (braco === "A" && modo === "dose")) { setFase("festa"); return; }
+      /* 1.0.16 (dono, 17/10 — os dois braços): a dose de Finanças termina OLHANDO o "QUANTO POSSO GASTAR HOJE"
+       * mudar com o gasto que ela acabou de anotar. O card mora no DASHBOARD (no painel limpo, o 1º bloco): troca
+       * de aba, espera ele montar e acende ele com o número antes → depois (o "depois" é o que o card mostra). Sem
+       * renda (pulou o Montar, nada anotado) não há número: fica o "olhar" de sempre do MEU MÊS. */
+      if (cfg.tipo === "gasto" && modo === "dose" && porDiaAntes.current !== null) {
+        olharNoPodeGastar(timers);
+        return;
+      }
+      // 1.0.16, braço A: a dose é curta (10–30 s, desenho 8 4.0) — sem o "olhar explicado" da 1.0.10 nos outros módulos
+      if (braco === "A" && modo === "dose") { setFase("festa"); return; }
       const el = alvoCfg?.olhar?.achar() ?? null;
       if (el && visivel(el)) {
         // 10/10: rolagem VISÍVEL até o card (metade de baixo) → pausa → o anel acende e o balão entra → o número
@@ -535,10 +602,12 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
 
   const postIt = (
     <PostItDaMissao
-      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : montarFeito ? "Último toque · se quiser" : "Agora · 1 toque"}
+      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : montarFeito ? "Agora · o 1º gasto" : "Agora · 1 toque"}
       pergunta={pergunta}
       descricao={montarFeito ? "Ele entra no seu mês e o quanto dá pra gastar hoje já se ajusta."
         : semMetaAgua ? "Escolhe a sua meta — o 1º copo de hoje já entra junto."
+        : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: toca no quadradinho da linha de HOJE.` : "Toca no quadradinho da linha de HOJE.")
+        : continuacao && cfg.tipo === "agua" ? "Ele entra na sua meta de hoje."
         : cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
         : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
         : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
@@ -548,7 +617,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       aoChip={tocarChip}
       aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
       dica={chips.length && alvoCfg?.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
-      secundaria={montarFeito ? { texto: "Agora não", aoTocar: fecharSemGasto, testid: "missao-doses-gasto-agora-nao" } : undefined}
     />
   );
 
@@ -560,6 +628,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     try { marcarCartoesVistos("financas"); } catch { /* storage bloqueado */ }
     rotuloDoMontar.current = rot;
     montarFeitoRef.current = true;
+    // o número que o Montar acabou de mostrar É o do card (a mesma conta, arredondada igual): é o "antes" do olhar
+    porDiaAntes.current = r.semFolga || !(r.porDia > 0) ? null : Math.round(r.porDia);
     setRotulo(rot);
     setNumero(null);
     setMontarFeito(true);
@@ -613,10 +683,16 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             balao={(
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="missao-doses-olhar">
                 <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Olha · 1 de 1</span>
-                <span className="block text-[15px] font-extrabold leading-snug">{cfg.olhar.titulo}</span>
-                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{cfg.olhar.texto}</span>
-                {numero && (
-                  <span className="flex items-baseline gap-2 mt-2">
+                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{olharNoNumero ? "Quanto você pode gastar hoje" : cfg.olhar.titulo}</span>
+                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olharNoNumero ? "Esse gasto já entrou na conta — e o número se ajusta sozinho a cada gasto que você anota." : cfg.olhar.texto}</span>
+                {numero && olharNoNumero && numero.antes === numero.depois ? (
+                  /* o gasto é pequeno perto do mês: o "por dia" arredondado nem mexe — mostra o que saiu, sem fingir */
+                  <span className="block mt-2 text-[13px] text-white/80" data-testid="missao-doses-olhar-numero">
+                    <b className="text-[22px] font-black tracking-tight text-white">{numero.formatar(numero.depois)}</b> por dia
+                    {olharNoNumero.gasto ? <span className="block text-[12px] text-white/60 mt-0.5">Saíram R$ {reais(olharNoNumero.gasto)} do que sobra no mês.</span> : null}
+                  </span>
+                ) : numero && (
+                  <span className="flex items-baseline gap-2 mt-2" data-testid="missao-doses-olhar-numero">
                     <span className="text-[12px] text-white/50">{numero.titulo}:</span>
                     <span className="text-[13px] text-white/50 line-through tabular-nums">{numero.formatar(numero.antes)}</span>
                     <span className="text-white/50 text-[13px]">→</span>

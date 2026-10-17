@@ -97,6 +97,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
+  "core-intro-vista-", // 1.0.16: a introdução guiada do módulo foi feita (ramo v1016-cartoes grava; a missão lê)
   "core-financas-painel-", // 1.0.16: conta <id> é do painel limpo de Finanças (lib/financas-painel-limpo); a conta guarda o mesmo
 ];
 

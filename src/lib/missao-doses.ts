@@ -517,6 +517,25 @@ export function moduloDaMissaoHoje(hoje: string = localDayKey()): ModuloDaMissao
 }
 
 /**
+ * 1.0.16 — A INTRODUÇÃO DO MÓDULO JÁ FOI FEITA? (contrato com o ramo da introdução dos módulos, v1016-cartoes)
+ * No braço A, quem abre Rotina ou Saúde no dia 1 por curiosidade ganha a 1ª ação guiada daquele módulo (o mesmo
+ * anel/post-it das doses), gravada no aparelho em `core-intro-vista-<módulo>` e na conta em `core-intro-vistas`
+ * (lista de ids). A dose daquele módulo nos dias 2–3 não repete a 1ª ação: vira CONTINUAÇÃO (Rotina: marcar o
+ * hábito de hoje; Saúde: mais 1 copo, sem perguntar a meta de novo; Finanças: o gasto de hoje, sem o Montar).
+ * Aquele ramo exporta `introConcluida(modulo)` em src/lib/intro-modulo.ts — que ainda não existe aqui: este
+ * leitor lê as MESMAS chaves direto, pra valer antes e depois do merge (dá pra trocar por ele depois).
+ */
+export const PREFIXO_INTRO_VISTA = "core-intro-vista-";
+export const CHAVE_INTRO_VISTAS_CONTA = "core-intro-vistas";
+export function introDoModuloConcluida(modulo: string, get?: <T>(k: string, f: T) => T): boolean {
+  try {
+    if (ls.get(`core-intro-vista-${modulo}`)) return true;
+    const daConta = get?.<unknown>(CHAVE_INTRO_VISTAS_CONTA, null);
+    return Array.isArray(daConta) && daConta.includes(modulo);
+  } catch { return false; }
+}
+
+/**
  * 1.0.16 — DOSE NA TELA (contrato com Conquistas e com os cartões dos módulos): enquanto QUALQUER peça da
  * dose está montada (a faixa, o "Vamos montar suas Finanças" da missão, o anel/post-it, a comemoração),
  * `<html data-missao-dose="1">`. Toast, popup de adesivo e cartão de boas-vindas do módulo ficam quietos.

@@ -166,7 +166,7 @@ export const linhaDeHoje = (el: Element): Element => {
   return linha ?? el;
 };
 
-const nomesDosHabitos = (v: unknown): string[] =>
+export const nomesDosHabitos = (v: unknown): string[] =>
   lista(v).map((h) => (typeof h === "string" ? h : String(mapa(h).name ?? ""))).map((n) => n.trim());
 const feitosNoDia = (grade: unknown, dia: string) => lista(mapa(grade)[dia]).filter((x) => x === true).length;
 const feitosNaSemana = (grade: unknown) => Object.values(mapa(grade)).reduce<number>((s, d) => s + lista(d).filter((x) => x === true).length, 0);

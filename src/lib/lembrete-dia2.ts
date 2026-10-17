@@ -209,13 +209,18 @@ export function moduloMaisUsado(get: Leitor): ModuloDaMissao | null {
  * Montar Finanças), ou null sem renda / sem folga. Usado no aviso do teste (920001) e nos lembretes do braço A.
  */
 export function porDiaDasFinancas(get: Leitor, dia: Date = new Date()): number | null {
+  const v = porDiaExato(get, dia);
+  return v === null ? null : Math.floor(v);
+}
+/** O "quanto posso gastar por dia" SEM arredondar (o card do Dashboard mostra Math.round disto), ou null sem renda/folga. */
+export function porDiaExato(get: Leitor, dia: Date = new Date()): number | null {
   try {
     const receitas = soma(get<unknown>("finance-incomes", []));
     if (!(receitas > 0)) return null;
     const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
     const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(get<unknown>("finance-fixed-expenses", [])), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]));
     const orc = computeDailyBudget(receitas, saida, dueDays, lista(get<unknown>("finance-fixed-expenses", [])), dia);
-    return !orc.cantSpend && orc.perDay > 0 ? Math.floor(orc.perDay) : null;
+    return !orc.cantSpend && orc.perDay > 0 ? orc.perDay : null;
   } catch { return null; }
 }
 

@@ -877,8 +877,8 @@ export const Dashboard = ({
     </div>
   ) : (
     <>
-        {/* Quanto Posso Gastar Hoje */}
-        <div className={`rounded-lg border p-4 ${
+        {/* Quanto Posso Gastar Hoje — `data-spotlight` é a âncora do "olha" da dose de Finanças da missão (1.0.16) */}
+        <div data-spotlight="pode-gastar" className={`rounded-lg border p-4 ${
           dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
           dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
           "bg-red-500/5 border-red-500/20"
@@ -896,7 +896,7 @@ export const Dashboard = ({
               </p>
             </>
           ) : (
-            <p className={`text-2xl font-bold tabular-nums ${
+            <p data-testid="pode-gastar-valor" className={`text-2xl font-bold tabular-nums ${
               dailyBudget.status === "good" ? "text-green-400" :
               dailyBudget.status === "warning" ? "text-orange-400" :
               "text-red-400"

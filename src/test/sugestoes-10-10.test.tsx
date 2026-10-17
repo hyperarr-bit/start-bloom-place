@@ -18,7 +18,7 @@
 process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, within, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { useCallback, useMemo, useReducer, type ReactNode } from "react";
 
@@ -283,16 +283,40 @@ describe("3) Meta de calorias editável — lib", () => {
 });
 
 describe("3) Meta de calorias editável — tela da Dieta (aba CARDÁPIO)", () => {
+  /* 17/10 (1.0.16, dono: o card no topo "quebra o design"): o card META DIÁRIA DE CALORIAS virou UMA
+     linha embaixo do "Cardápio semanal" ("Meta de calorias: 1.650 kcal · ajustar") que abre uma folha
+     com os mesmos controles (Automática / Fixa) e as mesmas chaves. */
   const DIA = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"][new Date().getDay()];
   const seeds = {
     "spotlight-done-dieta": "true",
     "saude-meals-kcal": { [DIA]: { "Café da Manhã": 350, Almoço: 700, Janta: 600 } },
   };
-  it("nasce Automática mostrando a soma do cardápio de hoje; Fixa grava o modo na chave nova e o número na chave ANTIGA; Automática de volta não apaga o número", async () => {
+  const abrirFolha = async () => {
+    fireEvent.click(await screen.findByTestId("meta-kcal-link"));
+    return screen.findByTestId("meta-kcal");
+  };
+
+  it("o topo do cardápio não tem mais o card: uma linha 'Meta de calorias: 1.650 kcal · ajustar' no cabeçalho, antes dos dias", async () => {
     const { default: Dieta } = await import("@/pages/Dieta");
     const store = criarStore(seeds);
     store.montar(<Dieta />);
-    const campo = await screen.findByTestId("meta-kcal");
+    const linha = await screen.findByTestId("meta-kcal-link");
+    expect(linha).toHaveTextContent("Meta de calorias: 1.650 kcal · ajustar");
+    expect(screen.queryByText("META DIÁRIA DE CALORIAS")).toBeNull();
+    expect(screen.queryByTestId("meta-kcal")).toBeNull(); // a folha só abre no toque
+    expect(screen.queryByRole("button", { name: "Automática" })).toBeNull();
+    expect(linha.compareDocumentPosition(screen.getByTestId("dia-SEGUNDA")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(store.estado.escritas).toEqual([]); // abrir a Dieta não grava nada
+  });
+
+  it("a linha abre a folha: nasce Automática com a soma do cardápio; Fixa grava o modo na chave nova e o número na chave ANTIGA; Automática de volta não apaga o número", async () => {
+    const { trackEvent } = await import("@/lib/analytics");
+    const { default: Dieta } = await import("@/pages/Dieta");
+    const store = criarStore(seeds);
+    store.montar(<Dieta />);
+    const campo = await abrirFolha();
+    expect(trackEvent).toHaveBeenCalledWith("dieta_meta_kcal_abrir", { modo: "auto" });
+    expect(within(campo).getByText("Meta diária de calorias")).toBeInTheDocument();
     expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 1.650 kcal · soma do cardápio");
     expect(within(campo).getByTestId("meta-kcal-auto")).toHaveAttribute("aria-pressed", "true");
     expect(store.ler(CHAVE_META_KCAL_MODO)).toBeUndefined(); // abrir não grava nada
@@ -301,7 +325,7 @@ describe("3) Meta de calorias editável — tela da Dieta (aba CARDÁPIO)", () =
     expect(store.ler(CHAVE_META_KCAL_MODO)).toBe("fixa");
     expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBeUndefined(); // sem número digitado nada vai pra chave antiga: o padrão 2000 vale nas duas pontas (app novo e antigo)
     expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 2.000 kcal · fixa");
-    const input = within(campo).getByLabelText("Meta diária de calorias") as HTMLInputElement;
+    const input = within(campo).getByLabelText("Meta fixa em kcal por dia") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "1800" } });
     fireEvent.blur(input);
     expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1800);
@@ -315,6 +339,30 @@ describe("3) Meta de calorias editável — tela da Dieta (aba CARDÁPIO)", () =
     expect(store.ler(CHAVE_META_KCAL_MODO)).toBe("auto");
     expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1800); // o número fica guardado
     expect(within(campo).getByTestId("meta-kcal-hoje")).toHaveTextContent("Hoje: 1.650 kcal · soma do cardápio");
+  });
+
+  it("fechar a folha grava o número digitado mesmo sem blur (Pronto e Esc); a linha mostra a meta nova e a folha reabre em Fixa", async () => {
+    const { default: Dieta } = await import("@/pages/Dieta");
+    const store = criarStore(seeds);
+    store.montar(<Dieta />);
+    let campo = await abrirFolha();
+    fireEvent.click(within(campo).getByTestId("meta-kcal-fixa"));
+    fireEvent.change(within(campo).getByLabelText("Meta fixa em kcal por dia"), { target: { value: "1900" } });
+    fireEvent.click(within(campo).getByRole("button", { name: "Pronto" }));
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(1900);
+    await waitFor(() => expect(screen.queryByTestId("meta-kcal")).toBeNull());
+    expect(screen.getByTestId("meta-kcal-link")).toHaveTextContent("Meta de calorias: 1.900 kcal · ajustar");
+
+    campo = await abrirFolha();
+    expect(within(campo).getByTestId("meta-kcal-fixa")).toHaveAttribute("aria-pressed", "true");
+    const input = within(campo).getByLabelText("Meta fixa em kcal por dia") as HTMLInputElement;
+    expect(input.value).toBe("1900");
+    fireEvent.change(input, { target: { value: "2100" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("meta-kcal")).toBeNull());
+    expect(store.ler(CHAVE_META_KCAL_ANTIGA)).toBe(2100);
+    expect(store.ler(CHAVE_META_KCAL_MODO)).toBe("fixa");
+    expect(screen.getByTestId("meta-kcal-link")).toHaveTextContent("Meta de calorias: 2.100 kcal · ajustar");
   });
 });
 

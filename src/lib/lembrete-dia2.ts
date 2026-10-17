@@ -34,6 +34,7 @@ import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, diasEfetivos,
 import { computeDailyBudget, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
+import { gastoDoDia, praHojeDoDia, type PraHoje } from "./montar-financas";
 import {
   doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
   type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
@@ -212,15 +213,30 @@ export function porDiaDasFinancas(get: Leitor, dia: Date = new Date()): number |
   const v = porDiaExato(get, dia);
   return v === null ? null : Math.floor(v);
 }
+/** As entradas do card QUANTO POSSO GASTAR HOJE lidas das Finanças dela (null sem renda). */
+function entradasDoCard(get: Leitor) {
+  const receitas = soma(get<unknown>("finance-incomes", []));
+  if (!(receitas > 0)) return null;
+  const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
+  const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(get<unknown>("finance-fixed-expenses", [])), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]));
+  return { receitas, saida, dueDays, fixos: lista(get<unknown>("finance-fixed-expenses", [])) };
+}
 /** O "quanto posso gastar por dia" SEM arredondar (o card do Dashboard mostra Math.round disto), ou null sem renda/folga. */
 export function porDiaExato(get: Leitor, dia: Date = new Date()): number | null {
   try {
-    const receitas = soma(get<unknown>("finance-incomes", []));
-    if (!(receitas > 0)) return null;
-    const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
-    const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(get<unknown>("finance-fixed-expenses", [])), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]));
-    const orc = computeDailyBudget(receitas, saida, dueDays, lista(get<unknown>("finance-fixed-expenses", [])), dia);
+    const e = entradasDoCard(get);
+    if (!e) return null;
+    const orc = computeDailyBudget(e.receitas, e.saida, e.dueDays, e.fixos, dia);
     return !orc.cantSpend && orc.perDay > 0 ? orc.perDay : null;
+  } catch { return null; }
+}
+/** 17/10 — a linha "Sobram R$ X pra hoje" do card do Dashboard, com as Finanças DELA (a MESMA conta: montar-financas
+ *  `praHojeDoDia`; o gasto de hoje = os gastos com a data de hoje). null sem renda / sem folga no começo do dia. */
+export function praHojeDasFinancas(get: Leitor, dia: Date = new Date()): PraHoje | null {
+  try {
+    const e = entradasDoCard(get);
+    if (!e) return null;
+    return praHojeDoDia(e.receitas, e.saida, gastoDoDia(get<unknown>("finance-expenses", []), localDayKey(dia)), e.dueDays, e.fixos, dia);
   } catch { return null; }
 }
 

@@ -347,9 +347,30 @@ export function fecharTelaDoNumero(): void {
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify(sem));
 }
 
-/** "Pra hoje": o que dá por dia menos o que ela já gastou hoje (pode passar: negativo). Hoje só a linha "Sobram R$ X
- *  pra hoje" do painel limpo (Dashboard, desligado na 1.0.16) usa — o Dashboard de sempre mostra a média do mês refeita. */
+/** "Pra hoje": o que dá por dia menos o que ela já gastou hoje (pode passar: negativo). */
 export const sobraPraHoje = (porDia: number, gastoHoje: number): number => Math.round((Math.round(porDia) - (Number(gastoHoje) || 0)) * 100) / 100;
+
+/** A linha "Sobram R$ X pra hoje": `doDia` = o QUANTO POSSO GASTAR HOJE do COMEÇO de hoje (a mesma conta do card, sem
+ *  os gastos de hoje), `sobra` = doDia − o gasto de hoje, `gasto` = o gasto de hoje. */
+export interface PraHoje { doDia: number; sobra: number; gasto: number }
+/** 17/10 (dono, opção 3) — A ÚNICA conta do "Sobram R$ X pra hoje": a linha do card QUANTO POSSO GASTAR HOJE (Dashboard,
+ *  de sempre e painel limpo) e o "Sobra pra hoje" do balão do MEU MÊS na missão (lib/lembrete-dia2 `praHojeDasFinancas`).
+ *  O número grande do card refaz a média do mês com o gasto de hoje dentro (um café de R$ 12 com 15 dias pela frente tira
+ *  R$ 0,80 — ninguém sente); esta é o que dava no começo do dia menos o de hoje (123 − 12 = 111). `saidaDoMes` é a saída
+ *  do mês JÁ com os gastos de hoje (a mesma que o card usa). Sem folga no começo do dia → null (o card já diz R$ 0). */
+export function praHojeDoDia(renda: number, saidaDoMes: number, gastoDeHoje: number, dueDays: unknown[], fixos: unknown[], dia: Date = new Date()): PraHoje | null {
+  const gasto = Number(gastoDeHoje) || 0;
+  const inicio = computeDailyBudget(renda, saidaDoMes - gasto, dueDays as never[], fixos as never[], dia);
+  if (inicio.cantSpend) return null;
+  const doDia = Math.round(inicio.perDay);
+  return { doDia, sobra: sobraPraHoje(doDia, gasto), gasto };
+}
+/** O gasto DO DIA (padrão: hoje, no fuso do aparelho) numa lista de gastos variáveis: soma dos `value` com `date` igual
+ *  ao dia. Virou o dia, volta pra 0. */
+export function gastoDoDia(gastos: unknown, diaKey: string = localDayKey()): number {
+  if (!Array.isArray(gastos)) return 0;
+  return Math.round(gastos.reduce<number>((t, e) => t + (e && (e as { date?: unknown }).date === diaKey ? Number((e as { value?: unknown }).value) || 0 : 0), 0) * 100) / 100;
+}
 
 /* ───────────────────────── régua ───────────────────────── */
 

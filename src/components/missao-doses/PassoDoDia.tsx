@@ -20,7 +20,7 @@ import { introConcluida } from "@/lib/intro-modulo";
 import { EV_PRIMEIRO_GASTO, lerTelaDoNumero, msDesdeOResultado } from "@/lib/montar-financas";
 import { CHAVE_SEM_GASTO, marcarDiaSemGasto } from "@/lib/acao-do-dia";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS, metaGuiadaDaIntro } from "./encaixes";
-import { horaSugeridaDaMissao, porDiaExato } from "@/lib/lembrete-dia2";
+import { horaSugeridaDaMissao, porDiaExato, praHojeDasFinancas } from "@/lib/lembrete-dia2";
 import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
 import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
 import { temArte } from "@/components/conquistas/adesivos-arte";
@@ -35,6 +35,10 @@ export const DESCRICAO_DO_GASTO = "Toca num e ele já entra na sua lista.";
 export const AINDA_NAO_GASTEI = "Ainda não gastei nada hoje →";
 /** O balão do "olha" de Finanças (um só, no MEU MÊS): a linha do número do card QUANTO POSSO GASTAR HOJE. */
 export const HOJE_AINDA_DA = "Hoje ainda dá pra gastar";
+/** 17/10 (dono, opção 3): com gasto, o balão mostra a sobra de HOJE — a mesma conta da linha "Sobram R$ X pra hoje" do
+ *  card QUANTO POSSO GASTAR HOJE do Dashboard (lib/montar-financas `praHojeDoDia`). */
+export const SOBRA_PRA_HOJE = "Sobra pra hoje";
+export const JA_PASSOU_HOJE = "Hoje já passou do que dava";
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
 export const PULAR_DEPOIS_DE_MS = 20_000;
 export const TEMPOS_DO_PASSO = {
@@ -82,7 +86,8 @@ export const ROLAGEM_DO_OLHAR = { duracaoMs: 1000, fracaoDoTopo: 0.54, pausaMs: 
 export const OLHA_DE_FINANCAS = { rolagemMs: 400, pausaMs: 150, comGastoMs: 2400, semGastoMs: 1900, numeroS: 0.8, atrasoS: 0.1 };
 /** O que o balão do "olha" de Finanças mostra: o "Saiu" do mês (antes → depois, com gasto) e o número do card QUANTO
  *  POSSO GASTAR HOJE do Dashboard (`antes` só quando o gasto mexeu nele) — sem renda, sem o número. */
-type OlhaDeFinancas = { saiu: Numero | null; pode: { antes: number | null; depois: number } | null; semGasto: boolean };
+/** `pode.sobra`: o número é a SOBRA de hoje (com gasto; "Sobra pra hoje") — sem ela, o "Hoje ainda dá pra gastar" (o número grande do card). */
+type OlhaDeFinancas = { saiu: Numero | null; pode: { antes: number | null; depois: number; sobra?: boolean } | null; semGasto: boolean };
 /** A fração da tela onde a rolagem deixa o topo do card pro anel nascer já no lugar dele (sem 2ª rolagem). */
 const fracaoDoAnel = (el: Element, recorte?: ((e: Element) => Retangulo | null) | null): number => {
   try {
@@ -499,6 +504,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    *  contando com o gasto e, com renda, "Hoje ainda dá pra gastar R$ X" — o MESMO número do card QUANTO POSSO GASTAR
    *  HOJE do Dashboard (porDiaExato, arredondado igual), riscado quando o gasto mexeu nele (um café num mês com 15
    *  dias pela frente mexe centavos: o número fica, sem fingir queda). "Ainda não gastei nada hoje": só o número.
+   *  17/10 (dono, opção 3): COM gasto, no lugar do "Hoje ainda dá", "Sobra pra hoje ~~R$ 123~~ R$ 111" — a linha
+   *  "Sobram R$ X pra hoje" do card do Dashboard (praHojeDasFinancas = a mesma conta).
    *  Nos dois braços; a missão sem braço (a 1.0.15) olha o mesmo MEU MÊS com o balão de sempre. */
   const [olhaFin, setOlhaFin] = useState<OlhaDeFinancas | null>(null);
   useEffect(() => {
@@ -546,6 +553,16 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         try { const v = porDiaExato(getRef.current); depois = v === null ? 0 : Math.round(v); } catch { depois = antes; }
         pode = { antes: depois !== antes ? antes : null, depois };
         setPorDiaDepois(depois);
+        /* 17/10 (dono, opção 3): com gasto, "Sobra pra hoje ~~R$ 123~~ R$ 111" — a linha "Sobram R$ X pra hoje" do card do
+           Dashboard (a mesma conta), que um café MEXE (o número grande, a média do mês, quase não). "Não gastei": o de cima. */
+        if (!semGasto) {
+          let ph: ReturnType<typeof praHojeDasFinancas> = null;
+          try { ph = praHojeDasFinancas(getRef.current); } catch { ph = null; }
+          if (ph && ph.gasto > 0) {
+            const antesDoGasto = Math.round((ph.sobra + (valorDoGasto.current ?? 0)) * 100) / 100;
+            pode = { antes: ph.sobra >= 0 && antesDoGasto !== ph.sobra ? antesDoGasto : null, depois: ph.sobra, sobra: true };
+          }
+        }
       }
       setOlhaFin({ saiu, pode, semGasto });
       setNumero(saiu); // a missão sem braço (a 1.0.15) mostra o balão de sempre, com o "Saiu" contando
@@ -1141,19 +1158,25 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
                         </span>
                       </div>
                     )}
-                    {olhaFin.pode && (
-                      <div className="flex items-baseline justify-between gap-3 py-1.5" data-testid="missao-doses-olhar-pode" data-valor={olhaFin.pode.depois}>
-                        <span className="text-[13px] text-white/65">{HOJE_AINDA_DA}</span>
-                        <span className="flex items-baseline gap-2 whitespace-nowrap">
-                          {olhaFin.pode.antes !== null && <s className="text-[13px] text-white/45 tabular-nums">R$ {reais(olhaFin.pode.antes)}</s>}
-                          <span className="text-[20px] font-black tracking-tight leading-none">
-                            {olhaFin.pode.antes !== null
-                              ? <ContaSubindo de={olhaFin.pode.antes} para={olhaFin.pode.depois} formatar={(x) => `R$ ${reais(Math.round(x))}`} duracao={OLHA_DE_FINANCAS.numeroS} atraso={OLHA_DE_FINANCAS.atrasoS} />
-                              : <span className="tabular-nums">R$ {reais(olhaFin.pode.depois)}</span>}
+                    {olhaFin.pode && (() => {
+                      const { antes, depois, sobra } = olhaFin.pode;
+                      const passou = !!sobra && depois < 0;
+                      // a sobra sai no formato da linha do card (centavos quando tem); o "Hoje ainda dá", inteiro como o número grande
+                      const formatar = sobra ? (x: number) => `R$ ${reais(x)}` : (x: number) => `R$ ${reais(Math.round(x))}`;
+                      return (
+                        <div className="flex items-baseline justify-between gap-3 py-1.5" data-testid="missao-doses-olhar-pode" data-valor={depois} data-sobra={sobra ? "" : undefined}>
+                          <span className="text-[13px] text-white/65">{passou ? JA_PASSOU_HOJE : sobra ? SOBRA_PRA_HOJE : HOJE_AINDA_DA}</span>
+                          <span className="flex items-baseline gap-2 whitespace-nowrap">
+                            {antes !== null && <s className="text-[13px] text-white/45 tabular-nums">{formatar(antes)}</s>}
+                            <span className="text-[20px] font-black tracking-tight leading-none">
+                              {antes !== null
+                                ? <ContaSubindo de={antes} para={depois} formatar={formatar} duracao={OLHA_DE_FINANCAS.numeroS} atraso={OLHA_DE_FINANCAS.atrasoS} />
+                                : <span className="tabular-nums">{formatar(passou ? -depois : depois)}</span>}
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olhaFin.semGasto ? "Suas contas do mês já estão aqui." : "O gasto já entrou no seu mês."}</span>

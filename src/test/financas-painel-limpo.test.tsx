@@ -58,6 +58,9 @@ import {
   painelLimpoLigado, registrarChavePainelLimpo,
 } from "@/lib/financas-painel-limpo";
 import Index from "@/pages/Index";
+import { Dashboard } from "@/components/Dashboard";
+import { gastoDoDia, praHojeDoDia } from "@/lib/montar-financas";
+import { praHojeDasFinancas } from "@/lib/lembrete-dia2";
 
 const UID = "u-pl";
 const OUTRA = "u-outra";
@@ -263,11 +266,11 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
       "QUANTO POSSO GASTAR HOJE", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
-    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // a linha "pra hoje" é só do painel limpo
+    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // sem gasto HOJE: o card de sempre, sem a linha "pra hoje"
     expect(controle.escritas().map((e) => e.k)).not.toContain(CHAVE_PAINEL_LIMPO);
     expect(Object.keys(localStorage).some((k) => k.startsWith(PREFIXO_PAINEL_LIMPO_APARELHO))).toBe(false);
   });
-  it("com gasto HOJE: o QUANTO POSSO GASTAR HOJE do cliente antigo é o de sempre (sem a linha 'Sobram R$ X pra hoje')", { timeout: 40_000 }, async () => {
+  it("com gasto HOJE (17/10, dono, opção 3): o QUANTO POSSO GASTAR HOJE de sempre ganha SÓ a linha discreta 'Sobram R$ X pra hoje' (e embaixo 'já saiu R$ 12 dos R$ Y do dia')", { timeout: 40_000 }, async () => {
     contaAntiga();
     const comCafeHoje = [...(MES_COM_DADO["finance-expenses"] as unknown[]), { id: "e3", description: "Café", value: 12, date: "2026-10-16", category: "alimentacao", paymentMethod: "pix" }];
     montarIndex({ ...MES_COM_DADO, "finance-expenses": comCafeHoje });
@@ -275,9 +278,19 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
     const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div.rounded-lg") as HTMLElement;
     expect(card).toBeTruthy();
-    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull();
-    expect(card.textContent).not.toMatch(/pra hoje|Sobram|já saiu/);
+    // renda 4.200 − (Mercado 380 + Farmácia 72 + Aluguel 1.300) = 2.448 no começo do dia ÷ 16 dias = R$ 153; − Café 12 = 141
+    const linha = within(card).getByTestId("sobram-pra-hoje");
+    expect(linha.textContent!.replace(/\u00a0/g, " ")).toBe("Sobram R$ 141 pra hoje já saiu R$ 12 dos R$ 153 do dia");
+    expect(within(card).getByTestId("pode-gastar-valor")).toHaveTextContent("R$ 152"); // o número grande de sempre: (2.448 − 12) ÷ 16
     expect(card.textContent).toMatch(/dias restantes no mês, contando hoje/);
+  });
+  it("gasto só de ONTEM (virou o dia): a linha some — o card é o de sempre", { timeout: 40_000 }, async () => {
+    contaAntiga();
+    const comCafeOntem = [...(MES_COM_DADO["finance-expenses"] as unknown[]), { id: "e3", description: "Café", value: 12, date: "2026-10-15", category: "alimentacao", paymentMethod: "pix" }];
+    montarIndex({ ...MES_COM_DADO, "finance-expenses": comCafeOntem });
+    await abrirDashboard();
+    expect(screen.getByText("QUANTO POSSO GASTAR HOJE")).toBeTruthy();
+    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull();
   });
   it("mesmo com o Montar feito NO APARELHO por outra conta: o antigo continua igual", { timeout: 40_000 }, async () => {
     contaAntiga();
@@ -286,6 +299,64 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     montarIndex(MES_COM_DADO);
     await abrirDashboard();
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+  });
+});
+
+/* ───────────── a linha "Sobram R$ X pra hoje" no card de SEMPRE (17/10, dono, opção 3) ───────────── */
+describe("Dashboard de sempre — a linha 'Sobram R$ X pra hoje' (só com gasto hoje; não muda mais nada no card)", () => {
+  const props = {
+    totalIncome: 4200, totalExpenses: 1764, totalDebts: 0, totalInvestments: 0, expenses: [], fixedExpenses: [], dueDays: [],
+    savingsRate: 0, incomes: [],
+  } as unknown as React.ComponentProps<typeof Dashboard>;
+  const cardCom = (extra: Partial<React.ComponentProps<typeof Dashboard>>): HTMLElement => {
+    const { container, unmount } = render(
+      <MemoryRouter><Provedor inicial={{}} controle={novoControle()}><Dashboard {...props} {...extra} /></Provedor></MemoryRouter>,
+    );
+    const card = container.querySelector('[data-spotlight="pode-gastar"]')!.cloneNode(true) as HTMLElement;
+    unmount();
+    return card;
+  };
+  it("sem gasto hoje (gastoDeHoje 0): o DOM do card é IDÊNTICO ao de antes (sem a prop)", () => {
+    const antes = cardCom({});
+    const agora = cardCom({ gastoDeHoje: 0 });
+    expect(agora.outerHTML).toBe(antes.outerHTML);
+    expect(agora.querySelector('[data-testid="sobram-pra-hoje"]')).toBeNull();
+  });
+  it("com gasto hoje: a linha entra logo abaixo do número e o RESTO do card é idêntico", () => {
+    const antes = cardCom({});
+    const agora = cardCom({ gastoDeHoje: 12 });
+    const linha = agora.querySelector('[data-testid="sobram-pra-hoje"]')!;
+    expect(linha.previousElementSibling?.getAttribute("data-testid")).toBe("pode-gastar-valor");
+    // 4.200 − (1.764 − 12) = 2.448 no começo do dia ÷ 16 dias = 153 → 153 − 12 = 141
+    expect(linha.textContent!.replace(/\u00a0/g, " ")).toBe("Sobram R$ 141 pra hoje já saiu R$ 12 dos R$ 153 do dia");
+    expect(linha.className).toBe("text-xs mt-1"); // o estilo da linha do painel limpo
+    linha.remove();
+    expect(agora.outerHTML).toBe(antes.outerHTML);
+  });
+  it("a conta é UMA (montar-financas praHojeDoDia) — a mesma do balão da missão (lembrete-dia2 praHojeDasFinancas); Café/Uber/Almoço; virou o dia, zera", () => {
+    const get = (gastos: unknown[]) => <T,>(k: string, f: T): T => (({
+      "finance-incomes": [{ value: 3000 }],
+      "finance-fixed-expenses": [{ value: 900 }, { value: 150 }, { value: 100 }],
+      "finance-expenses": gastos,
+    } as Record<string, unknown>)[k] as T) ?? f;
+    const hoje = "2026-10-16";
+    // 3.000 − 1.150 = 1.850 ÷ 16 dias = 115,6 → R$ 116 por dia no começo de hoje
+    for (const [nome, valor] of [["Café", 12], ["Uber", 23], ["Almoço", 35]] as const) {
+      const gastos = [{ description: nome, value: valor, date: hoje }];
+      const doBalao = praHojeDasFinancas(get(gastos), HOJE);
+      expect(doBalao).toEqual({ doDia: 116, sobra: 116 - valor, gasto: valor });
+      expect(praHojeDoDia(3000, 1150 + valor, valor, [], [{ value: 900 }, { value: 150 }, { value: 100 }], HOJE)).toEqual(doBalao); // o card
+    }
+    // os três no mesmo dia: 116 − 70 = 46
+    const tres = [{ value: 12, date: hoje }, { value: 23, date: hoje }, { value: 35, date: hoje }];
+    expect(praHojeDasFinancas(get(tres), HOJE)).toEqual({ doDia: 116, sobra: 46, gasto: 70 });
+    // virou o dia (17/10, 00:01): o gasto de ontem não é mais "de hoje" — gasto 0, e o "do dia" recomeça com o mês já pagando o de ontem
+    const amanha = new Date(2026, 9, 17, 0, 1);
+    expect(gastoDoDia(tres, hoje)).toBe(70);
+    expect(gastoDoDia(tres, "2026-10-17")).toBe(0);
+    expect(praHojeDasFinancas(get(tres), amanha)).toEqual({ doDia: Math.round((3000 - 1150 - 70) / 15), sobra: Math.round((3000 - 1150 - 70) / 15), gasto: 0 });
+    // passou do que dava: negativo (o card diz "Hoje já passou R$ X do que dava")
+    expect(praHojeDasFinancas(get([{ value: 150, date: hoje }]), HOJE)).toEqual({ doDia: 116, sobra: -34, gasto: 150 });
   });
 });
 

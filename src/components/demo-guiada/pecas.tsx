@@ -120,6 +120,14 @@ const alturaDoRodapeFixo = (): number => {
   return parseFloat(v) || 0;
 };
 
+/** 17/10: onde o Anel quer o TOPO do que ele abraça (a mesma conta do `rolarPraVer` dele) — quem rola a tela ANTES de
+ *  montar o anel pousa direto ali, e o anel não precisa de uma 2ª rolagem (nem de esperar ela assentar). */
+export const topoPreferidoDoAnel = (altura: number, abaixo = false): number => {
+  const topo = fundoDoTopoFixo();
+  const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
+  return altura > livre - 40 ? topo + 20 : topo + (livre - altura) * (abaixo ? 0.22 : 0.62);
+};
+
 /**
  * PASSO 1 DE 3 (30/09): o passo que já nasce feito ("área escolhida ✓") aparece
  * antes de a demo andar sozinha. Cartão solto embaixo do topo fixo: não

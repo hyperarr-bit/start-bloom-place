@@ -1183,6 +1183,20 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
     expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 de 3 feito ✅");
   });
 
+  it("Treino apresentado com plano (a introdução aplicou um modelo): a dose é anotar 1 exercício de hoje — nunca um 2º modelo por cima", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    localStorage.setItem("core-intro-vista-treino", "2026-10-03T12:00:00.000Z");
+    const plano = { SEGUNDA: { exercises: [{ name: "Supino" }] }, QUARTA: { exercises: [{ name: "Agachamento livre" }] } };
+    const store = montarStore({ "saude-workouts-v2": plano });
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["treino", "saude", "financas"], "2026-10-03", undefined, "A"), boasVindas: true }));
+    montar(store, "/treino");
+    const postIt = esperarPostIt();
+    expect(postIt).toHaveTextContent("Anota 1 exercício de hoje:");
+    expect(postIt).not.toHaveTextContent("Escolhe um treino pronto");
+    expect(within(postIt).getAllByTestId("demo-guia-chip").map((c) => c.textContent)).toEqual(["🦵Agachamento", "🏃Corrida", "🚶Caminhada"]);
+  });
+
   it("sem introdução (o caminho normal) nada muda: Rotina vazia ensina a criar o 1º hábito; e o braço B TAMBÉM continua quando a introdução foi feita (regra final do dono, 17/10)", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");

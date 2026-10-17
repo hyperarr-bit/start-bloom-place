@@ -39,6 +39,10 @@ export interface EncaixeDoSetup {
   atributo: string;
   /** a frase do post-it depois do "pronto" — o passo guiado que conta como a dose */
   depoisDoPronto: string;
+  /** opcional: onde o anel vai depois do "pronto" (ex.: o ✓ do 1º exercício do modelo). Sem ele, o controle de
+   *  sempre do módulo (na Rotina, a linha de HOJE da tabela — o certo pro "marca o primeiro"). Se marcar esse item
+   *  não mexe numa chave que o `alvos.ts` do tipo já reconhece como registro, estender o `achar` dele junto. */
+  alvoDepoisDoPronto?: () => Element | null;
 }
 
 export const SETUPS_ENCAIXADOS: Partial<Record<Exclude<SetupDaDose, "montar-financas">, EncaixeDoSetup>> = {};

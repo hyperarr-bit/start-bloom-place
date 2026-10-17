@@ -518,7 +518,8 @@ export const CATALOGO: DefDesafio[] = [
       const ids = Array.isArray(d.meta.ids) ? (d.meta.ids as unknown[]).map(String) : null;
       const total = atuais.reduce((s, f) => s + num(f.value), 0);
       const aMenos = ids ? ids.filter((id) => !atuais.some((f) => String(f.id ?? "") === id)).length : 0;
-      const mudou = aMenos > 0 || (typeof d.meta.total === "number" && total < d.meta.total);
+      // total menor que o retrato por ≥ R$ 1 (soma de centavos em ponto flutuante não é faxina)
+      const mudou = aMenos > 0 || (typeof d.meta.total === "number" && total < d.meta.total - 1);
       const confirmou = !!d.meta.revisado;
       const done = mudou || confirmou;
       return {

@@ -321,6 +321,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 // 16/10: a CONQUISTAS 2 (só sequência + adesivos, 3 direções) — protótipo, só no dev
 const DevConquistasNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistasNova")) : null;
+// 17/10: o card DESAFIO DA SEMANA em rodízio, cena a cena (segunda, meio, vitória, derrota) — só no dev, pra fotografar
+const DevDesafios = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDesafios")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
 // 02/10: "Ficou de ontem" e "Esqueceu de marcar?" nas telas de verdade (modo visitante) — só no dev, pra fotografar
@@ -632,6 +634,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevConquistasNova && (
           <Route path="/dev/conquistas-nova" element={<Suspense fallback={null}><DevConquistasNova /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevDesafios && (
+          <Route path="/dev/desafios" element={<Suspense fallback={null}><DevDesafios /></Suspense>} />
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />

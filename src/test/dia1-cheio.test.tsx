@@ -454,7 +454,7 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     expect(screen.queryByPlaceholderText("Nome do hábito...")).toBeNull();
   });
 
-  it("'Agora não' no meio: missao_agora_nao, a notificação de +3 h é armada pra próxima dose, e a folha do plano de amanhã entra ALI (no módulo), sem jargão; 'Combinado' vira a hora do lembrete, pede a permissão UMA vez e leva pra Home", async () => {
+  it("'Agora não' no meio: missao_agora_nao, SEM a notificação de +3 h (1.0.16: no máximo 1 aviso de teste por dia), e a folha do plano de amanhã entra ALI (no módulo), sem jargão; 'Combinado' vira a hora do lembrete, pede a permissão UMA vez e leva pra Home", async () => {
     ligarB();
     registrarAbertura(new Date(2026, 9, 3, 15, 10), conta.created_at);
     const store = montarStore(dados());
@@ -464,9 +464,10 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     fireEvent.click(screen.getByTestId("missao-doses-agora-nao"));
     expect(eventos).toContainEqual(["missao_agora_nao", expect.objectContaining({ indice: 1, variante: "B" })]);
     expect(lerMissao()?.agoraNao).toEqual({ dia: "2026-10-03", indice: 1 });
-    expect(notif.proximaDose).toHaveBeenCalledWith(expect.objectContaining({ indice: 2, nome: "Rotina", rota: "/rotina" }));
+    // 1.0.16 (dono, 17/10): a "próxima dose" em +3 h (900002) saiu dos dois braços
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(eventos).toContainEqual(["missao_proxima_dose_armada", expect.objectContaining({ ok: true, indice: 2 })]);
+    expect(notif.proximaDose).not.toHaveBeenCalled();
+    expect(eventos.map(([n]) => n)).not.toContain("missao_proxima_dose_armada");
     expect(screen.getByTestId("rota")).toHaveTextContent("/financas"); // ainda no contexto da missão
     // a folha do plano de amanhã: pelo VALOR dos avisos, sem "dia 2"
     const folha = screen.getByTestId("plano-amanha");

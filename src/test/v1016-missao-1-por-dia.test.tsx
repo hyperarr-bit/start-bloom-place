@@ -1097,8 +1097,8 @@ describe("10. conta VAZIA nas 6 áreas da porta: a dose 1 só pede o que a conta
 
 /* ------------------------------------------------------------ 11: o 900002 e o braço B */
 
-describe("11. 'próxima dose' em +3 h (900002): nunca no braço A; no B (o controle) continua", () => {
-  it("A: a dose 1 inteira não arma nada; B: o 'Agora não' arma como na 1.0.15", async () => {
+describe("11. 'próxima dose' em +3 h (900002): fora dos dois braços (dono, 17/10 — no máximo 1 aviso de teste por dia)", () => {
+  it("A: a dose 1 inteira não arma nada; B: o 'Agora não' também não arma (o do dia 2 já leva a dose)", async () => {
     const notif = await import("@/lib/notificacoes");
     const armar = vi.mocked(notif.agendarProximaDose);
     armar.mockClear();
@@ -1121,7 +1121,9 @@ describe("11. 'próxima dose' em +3 h (900002): nunca no braço A; no B (o contr
     fireEvent.click(within(esperarPostIt()).getAllByTestId("demo-guia-chip")[0]);
     terminarOlhar();
     fireEvent.click(screen.getByTestId("missao-doses-agora-nao"));
-    expect(armar).toHaveBeenCalledTimes(1);
+    expect(armar).not.toHaveBeenCalled();
+    expect(eventos.map(([n]) => n)).toContain("missao_agora_nao");
+    expect(eventos.map(([n]) => n)).not.toContain("missao_proxima_dose_armada");
   });
 });
 

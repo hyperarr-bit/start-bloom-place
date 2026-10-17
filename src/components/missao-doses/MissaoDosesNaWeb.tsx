@@ -590,10 +590,10 @@ function Ligada() {
           const m = lerMissao() ?? missao;
           salvar({ ...m, agoraNao: { dia: hoje, indice: n } });
           trackEvent("missao_agora_nao", eventoDaMissao({ indice: n }));
-          // a próxima dose volta em 3 h, na faixa da missão (não pede permissão; sem ela, fica só o Lembrete do dia 2).
-          // SÓ no braço B (o "Agora não" nem existe no A — desenho 8 4.6: o 900002 sai do braço A; a guarda é explícita)
+          // 1.0.16 (dono, 17/10): SEM a "próxima dose" em +3 h (900002) nos dois braços — no máximo 1 aviso de teste por
+          // dia, e o do dia 2 já leva a dose. Só a missão SEM braço (a da 1.0.15 que ainda roda) arma, como sempre armou.
           const prox = passoPendente(m);
-          if (prox && isNativeShell() && !ehUmPorDia(m)) {
+          if (prox && isNativeShell() && !m.braco) {
             const cfg = MODULOS[prox.modulo];
             void agendarProximaDose({ indice: prox.n, nome: cfg.nome, emoji: cfg.emoji, pedido: cfg.pedido, rota: cfg.rota })
               .then((r) => trackEvent("missao_proxima_dose_armada", eventoDaMissao(r.ok === true ? { ok: true, indice: prox.n, em: r.quando.toISOString() } : { ok: false, indice: prox.n, motivo: r.motivo })))

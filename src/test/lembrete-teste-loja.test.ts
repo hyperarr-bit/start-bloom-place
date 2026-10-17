@@ -47,7 +47,7 @@ vi.mock("@/lib/analytics", () => ({ trackEvent: (n: string, d: Record<string, un
 import {
   quandoLembrarDoTeste, copyDoLembreteDoTeste, pedirLembreteDoTeste, armarLembreteDoTesteSePuder, diaDoAvisoDoTeste,
   sincronizarLembreteDoTeste, cancelarLembreteDoTeste, pedidoDeLembreteDoTeste, FAIXAS_AVULSAS, BASES_LEMBRETES, sincronizarLembreteDia2,
-  horaSemEmpilhar, avisoDoTesteNoDia,
+  horaSemEmpilhar, avisoDoTesteNoDia, planejarLembreteSequencia, diaComAvisoDoTeste, agendarLembreteSequencia, BASES_LEMBRETES as BASES_DOS_TIPOS,
 } from "@/lib/notificacoes";
 import { diaDoAviso } from "@/pages/funis/ios/PaywallIOS";
 import { combinarHora, conteudoDaMissao, registrarAbertura } from "@/lib/lembrete-dia2";
@@ -378,6 +378,76 @@ describe("1.0.16 — não empilhar com o lembrete da sequência (opt-in, à noit
   });
 
   const pedido = () => ({ fimMs: new Date(2026, 9, 4, 15, 0, 0).getTime(), precoAno: "R$ 97,90" });
+});
+
+describe("1.0.16 (dono, 17/10) — no MÁXIMO 1 aviso de teste por dia, CONTANDO o da sequência; e sem empilhar com o de manhã da Rotina", () => {
+  const leitor = (dados: Record<string, unknown>) => <T,>(k: string, f: T) => (k in dados ? (dados[k] as T) : f);
+  const pedido = () => ({ fimMs: new Date(2026, 9, 4, 15, 0, 0).getTime(), precoAno: "R$ 97,90" });
+  const seqPendentes = () => ln.pendentes.filter((n) => n.id >= BASES_DOS_TIPOS.sequencia && n.id < BASES_DOS_TIPOS.sequencia + 10000);
+  const diaDe = (n: { schedule?: { at?: Date } }) => localDayKey(new Date(n.schedule!.at!));
+
+  it("horaSemEmpilhar com o lembrete de manhã da Rotina (07:15): o aviso das 8h vai pra hora de uso (15h) ou meio-dia; longe dele, fica", () => {
+    const s = (horaDeUso: number | null, manha: number | null) => ({ ligada: false, hora: 20, horaDeUso, manha });
+    expect(horaSemEmpilhar(8 * 60, s(15 * 60, 7 * 60 + 15))).toBe(15 * 60);
+    expect(horaSemEmpilhar(8 * 60, s(7 * 60 + 40, 7 * 60 + 15))).toBe(12 * 60); // a hora de uso também é colada no de manhã
+    expect(horaSemEmpilhar(20 * 60, s(9 * 60, 7 * 60 + 15))).toBe(20 * 60); // de noite: não empilha com o de manhã
+    expect(horaSemEmpilhar(12 * 60, s(null, 11 * 60 + 15))).toBe(15 * 60); // o de manhã perto do meio-dia: 15h
+    expect(horaSemEmpilhar(8 * 60, s(9 * 60, null))).toBe(8 * 60); // o de manhã desligado
+  });
+
+  it("o 930001 combinado pras 8h, com o lembrete de manhã da Rotina ligado às 07:15: sai das 8h (vai pra hora de uso)", async () => {
+    combinarHora("8h", new Date(2026, 9, 2, 14, 0));
+    registrarAbertura(new Date(2026, 9, 2, 14, 0), new Date(2026, 9, 1, 14, 0).toISOString());
+    vi.setSystemTime(new Date(2026, 9, 2, 14, 0));
+    const manha = { "rotina-lembrete-manha-prefs": { ligado: true, hora: "07:15" } };
+    const r = await sincronizarLembreteDia2(leitor(manha), { criadoEm: new Date(2026, 9, 1, 14, 0).toISOString(), agora: new Date(2026, 9, 2, 14, 0) });
+    expect(r.ok).toBe(true);
+    const n = ln.pendentes.find((x) => x.id === 930001)!;
+    expect(new Date(n.schedule!.at!).getHours()).toBe(14); // a 1ª abertura de hoje, longe das 07:15
+  });
+
+  it("planejar a sequência PULA os dias com aviso de teste (920001 e 930001); sem aviso, todo dia às 20h", () => {
+    const dados = { dias: 1, anotouHoje: false, acao: "anotar 1 gasto" };
+    const agora = new Date(2026, 9, 1, 15, 0);
+    const todos = planejarLembreteSequencia(dados, 20, agora).map((p) => localDayKey(p.quando));
+    expect(todos.slice(0, 3)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
+    const pulando = planejarLembreteSequencia(dados, 20, agora, (dia) => dia === "2026-10-02").map((p) => localDayKey(p.quando));
+    expect(pulando).not.toContain("2026-10-02");
+    expect(pulando.slice(0, 2)).toEqual(["2026-10-01", "2026-10-03"]);
+  });
+
+  it("dia 2 com o 920001 marcado: a sequência (opt-in, 20h) não toca nesse dia — nem se ela já estava marcada antes do aviso, nem se for marcada depois", async () => {
+    const seq = { dias: 1, anotouHoje: false, acao: "anotar 1 gasto" };
+    // (a) a sequência marcada ANTES: 01, 02, 03… às 20h
+    await agendarLembreteSequencia(seq, { hora: 20, ligado: true });
+    expect(seqPendentes().map(diaDe)).toContain("2026-10-02");
+    // o aviso do teste entra pro dia 2 → tira o da sequência do dia 2 (os outros dias ficam)
+    await pedirLembreteDoTeste(pedido());
+    expect(ln.pendentes.find((n) => n.id === 920001)).toBeTruthy();
+    expect(avisoDoTesteNoDia("2026-10-02")).toBe(true);
+    expect(diaComAvisoDoTeste("2026-10-02")).toBe(true);
+    expect(seqPendentes().map(diaDe)).not.toContain("2026-10-02");
+    expect(seqPendentes().map(diaDe)).toContain("2026-10-03");
+    // (b) a sequência replanejada DEPOIS (marcou algo, trocou a hora): continua sem o dia 2
+    await agendarLembreteSequencia(seq, { hora: 20, ligado: true });
+    expect(seqPendentes().map(diaDe)).not.toContain("2026-10-02");
+    // no máximo 1 aviso de teste em cada dia (920001, 930001 e a sequência juntos)
+    const porDia = new Map<string, number>();
+    for (const n of ln.pendentes.filter((x) => x.id === 920001 || x.id === 930001 || (x.id >= BASES_DOS_TIPOS.sequencia && x.id < BASES_DOS_TIPOS.sequencia + 10000))) porDia.set(diaDe(n), (porDia.get(diaDe(n)) ?? 0) + 1);
+    expect([...porDia.values()].every((q) => q <= 1)).toBe(true);
+  });
+
+  it("o 930001 de amanhã também fica com o dia: a sequência daquele dia sai", async () => {
+    const seq = { dias: 2, anotouHoje: true, acao: "marcar 1 hábito" };
+    await agendarLembreteSequencia(seq, { hora: 20, ligado: true });
+    registrarAbertura(new Date(2026, 9, 1, 15, 0), new Date(2026, 9, 1, 14, 0).toISOString());
+    const r = await sincronizarLembreteDia2(leitor({}), { criadoEm: new Date(2026, 9, 1, 14, 0).toISOString(), agora: new Date(2026, 9, 1, 15, 0) });
+    expect(r.ok).toBe(true);
+    const dia930 = diaDe(ln.pendentes.find((n) => n.id === 930001)!);
+    expect(dia930).toBe("2026-10-02");
+    expect(seqPendentes().map(diaDe)).not.toContain(dia930);
+    expect(diaComAvisoDoTeste(dia930)).toBe(true);
+  });
 });
 
 describe("1.0.16 — palavras proibidas em TODO texto de teste (920001, 930001 dos dois braços, 900002)", () => {

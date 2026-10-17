@@ -410,6 +410,10 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
   try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; missaoId = m ? idDaMissao(m) : null; } catch { diaCal = null; }
   return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() };
 };
+/** 1.0.16 (relatório 11 §7: nunca valor em reais em evento): o rótulo do feito sem o número — "Café · R$ 12" →
+ *  "Café · R$ x", "Pode gastar R$ 61 por dia" → "Pode gastar R$ x por dia". O resto do rótulo (nome do hábito, do
+ *  treino) fica: é o que já se media. */
+export const semValor = (rotulo: unknown): string => String(rotulo ?? "").replace(/R\$\s*-?[\d.,]+/g, "R$ x");
 /** 1.0.16: um id estável da missão nos eventos (o hash da conta que já mora no estado + o dia em que ela nasceu) —
  *  junta o funil Montar → 1º gasto → olha → festa (montar_financas_* com origem "missao" e missao_doses_*). Sem
  *  e-mail nem id da conta: o `dono` é o hash FNV que a missão já guarda. */

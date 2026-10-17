@@ -14,6 +14,7 @@ import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
+import { localDayKey } from "@/lib/utils";
 import { DOSE_CURTA, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
 import { introConcluida } from "@/lib/intro-modulo";
 import { lerTelaDoNumero } from "@/lib/montar-financas";
@@ -287,6 +288,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const montarFeitoRef = useRef(retomarGasto);
   const rotuloDoMontar = useRef(retomarGasto ? (missao.feitos[n]?.rotulo ?? "") : "");
   const [gastoExtra, setGastoExtra] = useState<string | null>(null);
+  /** quantos gastos de hoje o "gastoExtra" junta (a tela do número deixa anotar mais de um) */
+  const [gastosNoExtra, setGastosNoExtra] = useState(1);
   const subPassoRef = useRef(subPasso);
   subPassoRef.current = subPasso;
   const chips: ChipDaMissao[] = fraseDoSetup ? [] : subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : treinoPronto ? CHIPS_DE_TREINO : semMetaAgua ? CHIPS_DE_META_AGUA : metaGuiada ? metaGuiada.chips : (alvoCfg?.chips ?? []);
@@ -529,7 +532,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         setOlharEm(el);
         setTempoDoOlhar("pode");
         setFase("olhar");
-        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "pode_gastar", antes, depois }));
+        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "pode_gastar", caiu: depois < antes })); // sem valor em reais
       };
       try {
         rolarAte(el, fracaoDoAnel(el), reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
@@ -575,7 +578,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         setOlharEm(card);
         setTempoDoOlhar("mes");
         setFase("olhar");
-        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", ...(num ? { antes: num.antes, depois: num.depois } : {}) }));
+        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", contou: !!num }));
       };
       try {
         rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
@@ -599,7 +602,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       const num = numeroDoMes(card);
       const pousar = () => { if (faseRef.current !== "olhar") return; setNumero(num); setOlharEm(card); setTempoDoOlhar("mes"); };
       try { rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : OLHA_DE_FINANCAS.rolagemMs, pousar); } catch { pousar(); }
-      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", tempo: 2, ...(num ? { antes: num.antes, depois: num.depois } : {}) }));
+      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", tempo: 2, contou: !!num }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, modulo, reduzir]);
@@ -1024,9 +1027,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       const g = comGasto.primeiroGasto ?? null;
       porDiaAntes.current = null; // o número já caiu na frente dela, na tela do Montar: o "olha" é só o MEU MÊS
       if (g) {
-        const valor = typeof g.valor === "number" && g.valor > 0 ? g.valor : valorDoGastoPeloNome(g.nome);
+        // a tela do número deixa anotar mais de um: o "Saiu" do MEU MÊS conta a soma dos de HOJE (os que ela anotou ali)
+        const deHoje = gastosDeHoje();
+        const valor = deHoje.total > 0 ? deHoje.total : typeof g.valor === "number" && g.valor > 0 ? g.valor : valorDoGastoPeloNome(g.nome);
         valorDoGasto.current = valor;
-        setGastoExtra(valor ? `${g.nome} · R$ ${reais(valor)}` : g.nome);
+        const nomes = deHoje.nomes.length ? deHoje.nomes : [g.nome];
+        const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` : nomes[0];
+        setGastoExtra(valor ? `${lista} · R$ ${reais(valor)}` : lista);
+        setGastosNoExtra(nomes.length);
       } else {
         setOlhaSemGasto(true);
       }
@@ -1045,6 +1053,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // a dose está feita; o 1º gasto vem de carona (opcional): o "achar" volta a procurar o "+ Novo gasto"
     // assim que o Montar sair da tela (o atributo <html data-montar-financas> some no desmontar)
     setMontarAberto(false);
+  };
+  /** Os gastos variáveis de HOJE na conta (na tela do número, os que ela acabou de anotar): nomes e a soma. */
+  const gastosDeHoje = (): { nomes: string[]; total: number } => {
+    try {
+      const dia = localDayKey();
+      const lista = (getRef.current<Array<{ description?: unknown; value?: unknown; date?: unknown }>>("finance-expenses", []) ?? []).filter((e) => e && e.date === dia);
+      return { nomes: lista.map((e) => String(e.description ?? "").trim()).filter(Boolean), total: lista.reduce((t, e) => t + (Number(e.value) || 0), 0) };
+    } catch { return { nomes: [], total: 0 }; }
   };
   /** O valor do gasto que o Montar acabou de gravar (o mais novo com esse nome) — pro "Saiu" do MEU MÊS contar. */
   const valorDoGastoPeloNome = (nome: string): number | null => {
@@ -1218,6 +1234,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             aoConhecerMais={aoConhecerMais}
             aoMostrarAdesivo={aoMostrarAdesivo}
             gastoExtra={gastoExtra}
+            gastosNoExtra={gastosNoExtra}
             porDiaAgora={porDiaDepois}
           />
         )}
@@ -1247,7 +1264,7 @@ export function LerScoreDoDia({ aoLer }: { aoLer: (score: number) => void }) {
  * fazer o toque de amanhã agora" leva pro próximo módulo. No dia 3: "Ver o que
  * você construiu".
  */
-export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia, aoMostrarAdesivo, gastoExtra, porDiaAgora, aoConhecerMais }: {
+export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia, aoMostrarAdesivo, gastoExtra, gastosNoExtra = 1, porDiaAgora, aoConhecerMais }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoAmanhaAgora: () => void; aoVerFim: () => void;
   braco?: BracoDoPasso; modo?: ModoDoPasso; aoBoraProxima?: (via?: "auto" | "botao") => void; aoAgoraNao?: () => void; aoFecharDia?: () => void;
@@ -1255,6 +1272,8 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
   aoMostrarAdesivo?: (ids: string[]) => void;
   /** braço A, Finanças: o gasto que entrou de carona depois do Montar ("Café · R$ 12") */
   gastoExtra?: string | null;
+  /** quantos gastos o `gastoExtra` junta ("os gastos de hoje") */
+  gastosNoExtra?: number;
   /** Finanças: o "por dia" que o card mostrou no "olha" (já com o gasto de hoje) */
   porDiaAgora?: number | null;
   /** o link quieto "Conhecer mais do <módulo> (1 min)" (encaixes.ts) */
@@ -1275,7 +1294,7 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
      sem confete) com o adesivo REAL que a dose abriu e o de amanhã TRANCADO; a ÚNICA festa em tela cheia do
      teste é a do adesivo "3 dias seguidos" (adesivo-da-dose.tsx). */
   if (braco === "A" && modo === "dose") {
-    return <ComemoracaoUmPorDia n={n} missao={missao} modulo={modulo} rotulo={rotulo} hoje={hoje} aoCombinar={aoCombinar} aoVerFim={aoVerFim} aoFecharDia={aoFecharDia} aoMostrarAdesivo={aoMostrarAdesivo} gastoExtra={gastoExtra} porDiaAgora={porDiaAgora} aoConhecerMais={aoConhecerMais} />;
+    return <ComemoracaoUmPorDia n={n} missao={missao} modulo={modulo} rotulo={rotulo} hoje={hoje} aoCombinar={aoCombinar} aoVerFim={aoVerFim} aoFecharDia={aoFecharDia} aoMostrarAdesivo={aoMostrarAdesivo} gastoExtra={gastoExtra} gastosNoExtra={gastosNoExtra} porDiaAgora={porDiaAgora} aoConhecerMais={aoConhecerMais} />;
   }
 
   /* APROFUNDAR (B, dias 2–3): festa curta — o que ela fez já está no módulo; "Fechar". */
@@ -1311,6 +1330,8 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
             ? <>{cfg.emoji} {fraseDoFeito(modulo, rotulo, porDiaAgora)}</>
             : <>{cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}</>}
         </p>
+        {/* o 1º gasto depois do Montar (na tela do número ou de carona) — nos dois braços */}
+        {gastoExtra && <p className="text-[12.5px] text-[#4f5a64] leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
         <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
           <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
         </div>
@@ -1450,8 +1471,9 @@ export function fraseDoFeito(modulo: ModuloDaMissao, rotulo: string, porDiaAgora
 }
 
 /** O gasto de carona depois do Montar ("Café · R$ 12") numa frase. */
-export const fraseDoGastoExtra = (g: string): string => {
+export const fraseDoGastoExtra = (g: string, quantos = 1): string => {
   const m = /^(.+?) · (R\$ .+)$/.exec(g.trim());
+  if (quantos > 1) return m ? `E os gastos de hoje (${m[1]}, ${m[2]}) já entraram no seu mês.` : `E “${g.trim()}” já entraram no seu mês.`;
   return m ? `E o gasto de hoje (${m[1]}, ${m[2]}) já entrou no seu mês.` : `E “${g.trim()}” já entrou no seu mês.`;
 };
 
@@ -1474,10 +1496,10 @@ export const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: Array<{ nome: 
   return `Adesivos novos: ${a.nome} e mais ${extras.length}`;
 };
 
-function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, gastoExtra, porDiaAgora, aoConhecerMais }: {
+function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, gastoExtra, gastosNoExtra = 1, porDiaAgora, aoConhecerMais }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoVerFim: () => void; aoFecharDia?: () => void;
-  aoMostrarAdesivo?: (ids: string[]) => void; gastoExtra?: string | null; porDiaAgora?: number | null; aoConhecerMais?: () => void;
+  aoMostrarAdesivo?: (ids: string[]) => void; gastoExtra?: string | null; gastosNoExtra?: number; porDiaAgora?: number | null; aoConhecerMais?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const cfg = MODULOS[modulo];
@@ -1536,7 +1558,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
         {legenda && <p className="text-[13.5px] font-bold leading-snug mt-1" data-testid="missao-doses-adesivo-legenda">{legenda}</p>}
         {n >= 2 && seq.dias >= 2 && <p className="text-[13.5px] font-extrabold mt-1" data-testid="missao-doses-sequencia">Sequência: {seq.dias} dias 🔥</p>}
         <p className="text-[13.5px] text-muted-foreground leading-snug mt-2" data-testid="missao-doses-festa-texto">{cfg.emoji} {frase}</p>
-        {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra)}</p>}
+        {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
         {proximo && (
           <div className="mt-3.5 rounded-2xl px-4 py-3 flex items-center gap-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
             <span className="min-w-0 flex-1">

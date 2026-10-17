@@ -273,7 +273,8 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Marca 1 hábito no quadradinho");
     expect(lerMissao()?.feitos[1]).toEqual({ dia: "2026-10-02", rotulo: "Café · R$ 12" });
-    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ 12", prototipo: "web" }]);
+    // (17/10: nunca valor em reais em evento — o rótulo vai sem o número)
+    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ x", prototipo: "web" }]);
     // a faixa agora marca 1 de 3
     expect(screen.getByTestId("missao-doses-faixa").querySelector("[role=img]")).toHaveAttribute("aria-label", "1 de 3 feitos");
     fireEvent.click(screen.getByTestId("missao-doses-hora-20h"));

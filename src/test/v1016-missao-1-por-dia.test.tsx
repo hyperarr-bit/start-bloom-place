@@ -477,9 +477,11 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Quanto você pode gastar hoje");
     expect(screen.getByTestId("missao-doses-olhar")).toHaveTextContent("Esse gasto já entrou na conta");
     const olhar = eventos.find(([nome, d]) => nome === "missao_doses_passo" && d.passo === "olhar" && d.acao === "view")?.[1];
-    expect(olhar).toMatchObject({ alvo: "pode_gastar" });
+    expect(olhar).toMatchObject({ alvo: "pode_gastar", caiu: false });
+    expect(olhar).not.toHaveProperty("antes"); // (17/10) nunca valor em reais em evento
     // 29 dias no mês (03/10): R$ 12 não mexem no "por dia" arredondado — o balão diz o que saiu, sem fingir uma queda
-    expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent(`R$ ${olhar!.depois} por dia`);
+    const porDiaDoCard = (screen.getByTestId("pode-gastar-valor").textContent ?? "").replace(/\D/g, "");
+    expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent(`R$ ${porDiaDoCard} por dia`);
     expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent("Saíram R$ 12 do que sobra no mês.");
     expect(screen.getByTestId("missao-doses-olhar-tempo")).toHaveTextContent("Olha · 1 de 2");
     // o "Entendi" do 1º tempo leva pro 2º: a rolagem pousa no MEU MÊS e o "Saiu" do mês conta + R$ 12 (a batida do 1.0.14)
@@ -489,10 +491,12 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(ultimo("missao-doses-olhar-tempo")).toHaveTextContent("Olha · 2 de 2");
     expect(ultimo("missao-doses-olhar-titulo")).toHaveTextContent("E o seu mês");
     expect(ultimo("missao-doses-olhar")).toHaveTextContent("O gasto entrou no dia de hoje e o “Saiu” do mês somou sozinho.");
-    const mes = eventos.find(([nome, d]) => nome === "missao_doses_passo" && d.alvo === "meu_mes")?.[1] as { antes: number; depois: number };
-    expect(mes.depois - mes.antes).toBe(12);
+    const mes = eventos.find(([nome, d]) => nome === "missao_doses_passo" && d.alvo === "meu_mes")?.[1];
+    expect(mes).toMatchObject({ contou: true }); // (17/10) o valor nunca vai no evento
+    // na tela: o "Saiu" do mês de ANTES (as contas fixas do Montar) → + R$ 12
+    const saiuAgora = Number((screen.getByTestId("meu-mes-saiu").textContent ?? "").replace(/\D/g, ""));
     expect(ultimo("missao-doses-olhar-numero")).toHaveTextContent("Saiu no mês:");
-    expect(ultimo("missao-doses-olhar-numero")).toHaveTextContent(`R$ ${mes.antes.toLocaleString("pt-BR")}`);
+    expect(ultimo("missao-doses-olhar-numero")).toHaveTextContent(`R$ ${(saiuAgora - 12).toLocaleString("pt-BR")}`);
     // ... e a festa entra SOZINHA (o 2º tempo segura 1,5 s desde que o anel apareceu)
     andar(1300);
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
@@ -1269,13 +1273,13 @@ describe("14. dose de Finanças (os dois braços): Montar → 1º gasto guiado �
     const numero = screen.getByTestId("missao-doses-olhar-numero");
     expect(numero).toHaveTextContent("Por dia:");
     expect(numero).toHaveTextContent("R$ 375");
-    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "pode_gastar", antes: 375, depois: 372 })]);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "pode_gastar", caiu: true })]);
     // sem tocar em nada: 1,4 s no número → o MEU MÊS (o "Saiu" conta + R$ 12) → 1,5 s → a festa (< 4 s com o anel na tela)
     const anelNaTela = Date.now();
     andar(1700);
     const ultimo = (id: string) => screen.getAllByTestId(id).at(-1)!;
     expect(ultimo("missao-doses-olhar-tempo")).toHaveTextContent("Olha · 2 de 2");
-    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "meu_mes", tempo: 2, antes: 0, depois: 12 })]);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "meu_mes", tempo: 2, contou: true })]);
     expect(ultimo("missao-doses-olhar-numero")).toHaveTextContent("Saiu no mês:");
     for (let i = 0; i < 40 && !screen.queryByTestId("missao-doses-festa"); i++) avancar(50);
     expect(Date.now() - anelNaTela).toBeLessThanOrEqual(4000);
@@ -1296,7 +1300,8 @@ describe("14. dose de Finanças (os dois braços): Montar → 1º gasto guiado �
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     andar(2200);
     expect(eventos.some(([n, d]) => n === "missao_doses_passo" && d.alvo === "pode_gastar")).toBe(false);
-    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "meu_mes", antes: 0, depois: 12 })]);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "meu_mes", contou: true })]);
+    expect(screen.getByTestId("missao-doses-olhar-numero")).toHaveTextContent("R$ 0"); // o "Saiu" conta de R$ 0 → R$ 12 na tela
     expect(screen.getByTestId("missao-doses-olhar-tempo")).toHaveTextContent("Olha · 1 de 1");
     expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Olha o seu mês");
     expect(screen.getByTestId("meu-mes-saiu")).toHaveTextContent("↓ Saiu R$ 12"); // o MEU MÊS do painel limpo (a aba virou o DASHBOARD)
@@ -1385,8 +1390,8 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     (document.activeElement as HTMLElement | null)?.blur();
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "gasto_extra", acao: "feito", via: "digitado" })]);
     passarOlhaDeFinancas();
-    const mes = eventos.find(([n, d]) => n === "missao_doses_passo" && d.alvo === "meu_mes")?.[1] as { antes: number; depois: number };
-    expect(mes.depois - mes.antes).toBe(18);
+    const mes = eventos.find(([n, d]) => n === "missao_doses_passo" && d.alvo === "meu_mes")?.[1];
+    expect(mes).toMatchObject({ contou: true }); // o "Saiu" contou + R$ 18 na tela (o valor nunca vai no evento)
     expect(screen.getByTestId("missao-doses-gasto-extra")).toHaveTextContent("E o gasto de hoje (Padaria, R$ 18) já entrou no seu mês.");
   });
 

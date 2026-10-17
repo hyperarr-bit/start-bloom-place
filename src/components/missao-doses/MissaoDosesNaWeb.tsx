@@ -14,7 +14,7 @@ import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  definirDonoDaMissao, marcarComecar, missaoDaConta, missaoValida, precisaPlanoA, retomadaDoGasto,
+  definirDonoDaMissao, marcarComecar, missaoDaConta, semValor, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -525,7 +525,7 @@ function Ligada() {
             const deHoje = m.aprofundados?.[hoje] ?? [];
             if (deHoje.includes(passo.modulo)) return;
             salvar({ ...m, aprofundados: { ...m.aprofundados, [hoje]: [...deHoje, passo.modulo] } });
-            trackEvent("missao_aprofundar_feito", eventoDaMissao({ dia, modulo: passo.modulo, segundos, rotulo }));
+            trackEvent("missao_aprofundar_feito", eventoDaMissao({ dia, modulo: passo.modulo, segundos, rotulo: semValor(rotulo) }));
             return;
           }
           if (m.feitos[n]) return;
@@ -535,7 +535,7 @@ function Ligada() {
           // (1.0.16: o adesivo NÃO é dado aqui — quem dá é o registro de Conquistas, pela regra do adesivo; a
           // comemoração só mostra o que abriu: adesivo-da-dose.tsx, evento `missao_adesivo_mostrado`)
           salvar({ ...m, feitos, ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
-          trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: n, dia_relogio: dia, modulo: passo.modulo, segundos, rotulo }));
+          trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: n, dia_relogio: dia, modulo: passo.modulo, segundos, rotulo: semValor(rotulo) }));
           // 10/10 (DIA1_CHEIO): os eventos do teste, só com a chave ligada (eventoDaMissao põe `variante`)
           if (m.braco && eventoDaMissao().variante) {
             trackEvent("missao_dose_concluida", eventoDaMissao({ indice: n, modulo: passo.modulo, dia_relogio: dia, segundos }));

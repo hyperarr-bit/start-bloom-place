@@ -16,7 +16,9 @@ import { cn, mesAtualExtenso } from "@/lib/utils";
 export function MesDoCabecalho({ data, compacto = false, className }: { data?: Date; compacto?: boolean; className?: string }) {
   const d = data ?? new Date();
   const extenso = mesAtualExtenso(d);
-  const curto = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  // "out." → "Out" (em JS, não pela classe `capitalize`: as telas têm testes que cobram zero `.capitalize` no DOM)
+  const abrev = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  const curto = abrev.charAt(0).toUpperCase() + abrev.slice(1);
   return (
     <span
       className={cn("text-xs text-muted-foreground whitespace-nowrap shrink-0", compacto && "max-[389px]:hidden", className)}
@@ -24,7 +26,7 @@ export function MesDoCabecalho({ data, compacto = false, className }: { data?: D
       aria-label={extenso}
     >
       <span className="max-[459px]:hidden">{extenso}</span>
-      <span className="min-[460px]:hidden capitalize">{curto} {d.getFullYear()}</span>
+      <span className="min-[460px]:hidden">{curto} {d.getFullYear()}</span>
     </span>
   );
 }

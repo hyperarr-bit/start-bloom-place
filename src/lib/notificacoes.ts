@@ -22,6 +22,7 @@ import type { DadosDoSkincare } from "./beleza-lembrete";
 import type { DadosDoCabelo } from "./beleza-cabelo";
 import type { Cuidado } from "./beleza-cuidados";
 import type { LembreteValidade, ProdutoMeu } from "./beleza-produtos";
+import type { DadosRotinaManha } from "./rotina-manha";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -51,7 +52,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "consulta" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "consulta" | "rotinaManha" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -80,6 +81,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
   consulta: 1810000, // 13/10: consulta médica de Saúde — véspera 19h e 2 h antes (lib/consulta-avisos)
+  rotinaManha: 1820000, // 17/10: "Rotina pronta em 3 toques" — 1 aviso de manhã com os hábitos do dia (lib/rotina-manha)
   relacoes: 1900000, // 29/09: aniversário NO DIA + "faz tempo que não fala com…" (Relações, lib/relacoes-lembrete)
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
   cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
@@ -554,6 +556,16 @@ export async function agendarRotina(
       };
     });
   return agendarSerie("rotina", "/rotina", avisos);
+}
+
+/* ─── Rotina de MANHÃ (17/10, 1.0.16 — "Rotina pronta em 3 toques", 3ª pergunta) ─────────
+   A conta mora em lib/rotina-manha (pura): 1 aviso por dia, 15 min depois da hora de acordar, com os
+   hábitos do dia (o que já foi marcado hoje sai; tudo marcado = sem aviso hoje). Nasce desligado: liga
+   no "Sim" da pergunta (chave `rotina-lembrete-manha-prefs`) ou na central. O toque abre a Rotina. */
+export async function agendarRotinaManha(dados: DadosRotinaManha): Promise<number> {
+  if (!dados.prefs.ligado) { await limparFaixa(BASES.rotinaManha); return 0; }
+  const { planejarRotinaManha } = await import("./rotina-manha");
+  return agendarSerie("rotinaManha", "/rotina", planejarRotinaManha(dados, BASES.rotinaManha));
 }
 
 /**

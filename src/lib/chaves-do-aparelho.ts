@@ -88,6 +88,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-batismo-pendente", // web: compra sem conta ainda deve e-mail e senha (guarda o id do anônimo)
   "core-compra-anonima", // web: prova da compra anônima, 24 h, pra trazer o Pix pra conta em que entrou
   "core-codigo-pendente", // código promocional validado antes do cadastro, resgatado depois
+  "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */

@@ -337,6 +337,8 @@ const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevH
 const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPaywallIos")) : null;
 // 03/10: os textos do Lembrete do dia 2 em cada cenário + a pré-folha da permissão, pra fotografar — só no dev
 const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) : null;
+// 17/10: "Rotina pronta em 3 toques" (1.0.16) por cima da Rotina de verdade, conta vazia em memória — só no dev
+const DevMontarRotina = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMontarRotina")) : null;
 // 09/10: painel da afiliada e aba Afiliados do /admin com dados de exemplo, pra fotografar — só no dev
 const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
 import NotFound from "./pages/NotFound";
@@ -652,6 +654,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevDia2 && (
           <Route path="/dev/dia2" element={<Suspense fallback={null}><DevDia2 /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevMontarRotina && (
+          <Route path="/dev/montar-rotina" element={<Suspense fallback={null}><DevMontarRotina /></Suspense>} />
         )}
         {import.meta.env.DEV && DevAfiliados && (
           <Route path="/dev/afiliados" element={<Suspense fallback={null}><DevAfiliados /></Suspense>} />

@@ -39,6 +39,7 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
+import { registrarChaveMontarRotina } from "@/lib/montar-rotina";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -137,6 +138,7 @@ export async function initRevenueCat(): Promise<EstadoRC> {
     const offerings = await Purchases.getOfferings();
     // 10/10: as chaves das ofertas de saída viajam no metadata das offerings (ofertas-saida.ts)
     registrarChavesRemotas(offerings);
+    registrarChaveMontarRotina(offerings); // 1.0.16: `montar_rotina: on|off` (lib/montar-rotina)
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];

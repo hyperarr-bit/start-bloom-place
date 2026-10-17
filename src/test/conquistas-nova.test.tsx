@@ -22,8 +22,8 @@ vi.mock("@/lib/native-shell", async (importOriginal) => ({ ...(await importOrigi
 
 import { UserDataContext } from "@/hooks/use-user-data";
 import { ConquistasNova, LEVANTAR_MS } from "@/components/conquistas/nova/ConquistasNova";
-import { EVENTOS2, festaDoMarcoNovo, formatoDoAviso, fraseDaColecao, fraseDaPagina, podeCompartilhar, premioDoLembrete, proximoPremio } from "@/components/conquistas/nova/recompensas";
-import { MomentosConquistas, TOAST_MS } from "@/components/conquistas/Momentos";
+import { EVENTOS2, festaDoMarcoNovo, formatoDoAviso, fraseDaColecao, fraseDaPagina, fraseDaPaginaMaisPerto, fraseDoPremio, podeCompartilhar, premioDoLembrete, proximoPremio } from "@/components/conquistas/nova/recompensas";
+import { MomentosConquistas, TOAST_MS, outraTelaAberta } from "@/components/conquistas/Momentos";
 import { montarAlbumPorModulo, paginaDaFigurinha } from "@/components/conquistas/album-paginas";
 import { CAPA_SAI_MS } from "@/components/conquistas/AlbumTela";
 import { ADESIVOS_SEQUENCIA_NOVOS, buildBadgesSequencia } from "@/lib/conquistas-registro";
@@ -102,47 +102,54 @@ describe("os adesivos novos da sequência (no registro de verdade)", () => {
 });
 
 describe("o próximo prêmio (amanhã você ganha) e o lembrete", () => {
-  it("dia 1 do teste, já anotou hoje: amanhã vem o Voltei, com a instrução clara", () => {
+  it("dia 1 do teste, já anotou hoje: 'Amanhã: adesivo \"Voltei\" 🔥'", () => {
     const p = proximoPremio(1, true, buildBadgesSequencia(1));
     expect(p.marco).toBe(2);
     expect(p.quando).toBe("amanha");
-    expect(p.titulo).toBe("Amanhã você ganha");
-    expect(p.instrucao).toBe("anote algo em qualquer módulo hoje e amanhã");
+    expect(fraseDoPremio(p)).toBe('Amanhã: adesivo "Voltei" 🔥');
+    expect(p.instrucao).toBe("Vale qualquer anotação: gasto, hábito, água, página lida");
   });
-  it("dia 2 do teste, ainda sem anotar: HOJE ganha o Voltei", () => {
+  it("dia 2 do teste, ainda sem anotar: 'Anota algo hoje e ganha o adesivo \"Voltei\"'", () => {
     const p = proximoPremio(1, false, buildBadgesSequencia(1));
     expect(p.quando).toBe("hoje");
-    expect(p.instrucao).toMatch(/hoje e ele cola sozinho/);
+    expect(fraseDoPremio(p)).toBe('Anota algo hoje e ganha o adesivo "Voltei"');
+    expect(p.instrucao).toBe("Anota algo hoje pra não perder a sequência");
   });
-  it("12 dias até ontem: em 2 dias vem Duas Semanas + protetor — 'anote algo em qualquer módulo nos próximos 2 dias'", () => {
+  it("12 dias até ontem: 'Faltam 2 dias pro adesivo de 14 dias 🔥' (+ protetor)", () => {
     const p = proximoPremio(12, false, buildBadgesSequencia(12));
     expect(p.marco).toBe(14);
     expect(p.faltam).toBe(2);
     expect(p.daProtetor).toBe(true);
-    expect(p.titulo).toBe("Em 2 dias você ganha");
-    expect(p.instrucao).toBe("anote algo em qualquer módulo nos próximos 2 dias");
+    expect(p.adesivo?.name).toBe("14 Dias Seguidos");
+    expect(fraseDoPremio(p)).toBe("Faltam 2 dias pro adesivo de 14 dias 🔥");
+  });
+  it("2 dias anotados: 'Amanhã: adesivo de 3 dias 🔥'", () => {
+    expect(fraseDoPremio(proximoPremio(2, true, buildBadgesSequencia(2)))).toBe("Amanhã: adesivo de 3 dias 🔥");
   });
   it("recorde antigo já colou o 3 e o 7: pula o 3, mas o 7 fica (dá protetor) sem adesivo", () => {
     const p = proximoPremio(2, true, buildBadgesSequencia(10));
     expect(p.marco).toBe(7);
     expect(p.adesivo).toBeNull();
+    expect(fraseDoPremio(p)).toBe("Faltam 5 dias pro próximo protetor 🔥");
   });
   it("o lembrete das 20h cita o prêmio de hoje ou de amanhã", () => {
     const a = buildBadgesSequencia(12);
-    expect(premioDoLembrete(13, a)).toBe('Anota hoje — e amanhã cola o "Duas Semanas".');
-    expect(premioDoLembrete(14, a)).toBe('Anota e cola o adesivo "Duas Semanas".');
+    expect(premioDoLembrete(13, a)).toBe("Amanhã vem o adesivo de 14 dias 🔥");
+    expect(premioDoLembrete(14, a)).toBe("Hoje cola o adesivo de 14 dias 🔥");
     expect(premioDoLembrete(9, a)).toBeNull();
     expect(premioDoLembrete(2, buildBadgesSequencia(12))).toBeNull(); // já colado
   });
   it("as frases da coleção e da página", () => {
     expect(fraseDaColecao(4, 7)).toBe("faltam 3 pra fechar");
-    expect(fraseDaPagina(6, 8)).toBe("Faltam 2 figurinhas pra completar a página");
-    expect(fraseDaPagina(7, 8)).toBe("Falta 1 figurinha pra completar a página");
+    expect(fraseDaPagina(6, 8)).toBe("Faltam 2 figurinhas nesta página");
+    expect(fraseDaPagina(7, 8)).toBe("Falta 1 figurinha nesta página");
     expect(fraseDaPagina(8, 8)).toMatch(/completa/);
+    expect(fraseDaPaginaMaisPerto(2, "raras")).toBe("Faltam 2 figurinhas na página das raras");
+    expect(fraseDaPaginaMaisPerto(1, "comuns", 2)).toBe("Falta 1 figurinha na página 2 das comuns");
   });
 });
 
-describe("o álbum por módulo", () => {
+describe("o álbum por módulo (função guardada; a tela usa o álbum por raridade de 02/10)", () => {
   it("1ª página os mais raros; depois uma página por módulo, com vaga fixa e parelhas quando passa de 16", () => {
     const paginas = montarAlbumPorModulo(buildBadgesSequencia(3));
     expect(paginas[0].id).toBe("mais-raros");
@@ -198,10 +205,11 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(screen.getByTestId("cn-hero")).toBeTruthy();
     expect(screen.getByTestId("cn-album")).toBeTruthy();
     expect(screen.getByTestId("cn-album-contagem").textContent).toMatch(/4 de \d+/);
-    expect(screen.getByTestId("cn-amanha").textContent).toMatch(/Em 2 dias você ganha/i);
-    expect(screen.getByTestId("cn-amanha").textContent).toContain("Duas Semanas");
-    expect(screen.getByTestId("cn-amanha-instrucao").textContent).toContain("anote algo em qualquer módulo nos próximos 2 dias");
-    expect(screen.getByTestId("cn-amanha-instrucao").textContent).not.toMatch(/dias de anotação/);
+    expect(screen.getByTestId("cn-amanha-frase").textContent).toContain("Faltam 2 dias pro adesivo de 14 dias 🔥");
+    expect(screen.getByTestId("cn-amanha-instrucao").textContent).toContain("Vale qualquer anotação");
+    expect(document.body.textContent).not.toMatch(/dias de anotação|a vaga já está/);
+    // o cartão da sequência tem a cara dos cards do app: faixa com o título em caixa alta
+    expect(screen.getByTestId("cn-hero").querySelector(".cn-seq-cab")?.textContent).toContain("SEQUÊNCIA");
     expect(screen.getByTestId("cn-colecao")).toBeTruthy();
     expect(screen.queryByTestId("seletor-capa")).toBeNull();
     expect(document.body.textContent).not.toMatch(/INSÍGNIAS|Nível |XP/);
@@ -213,7 +221,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     montar();
     expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("1");
     expect(screen.getByTestId("cn-album-selo").textContent).toMatch(/1 nova/);
-    expect(screen.getByTestId("cn-album-pacotinho").textContent).toMatch(/1 figurinha nova esperando/);
+    expect(screen.getByTestId("cn-album-pacotinho").textContent).toMatch(/1 figurinha nova pra colar/);
     fireEvent.click(screen.getByTestId("cn-ver-todos"));
     expect(screen.getByTestId("cn-colecao-tela")).toBeTruthy();
     expect(eventos.find(([n]) => n === EVENTOS2.colecaoAbrir)?.[1]).toEqual({ colecao: "todas" });
@@ -222,7 +230,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   it("sem figurinha nova: 'faltam N pra completar a página'", () => {
     montar({}, { "conquistas-album-visto": ["sequencia-7", "sequencia-3", "sequencia-2", "first-expense"] });
     expect(screen.queryByTestId("cn-album-selo")).toBeNull();
-    expect(screen.getByTestId("cn-album-pagina").textContent).toMatch(/Faltam \d+ pra completar a página/);
+    expect(screen.getByTestId("cn-album-pagina").textContent).toMatch(/Faltam? \d+ figurinhas? na página (\d )?das (raras|comuns|épicas|lendárias)/);
   });
 
   it("toque na capa: levanta 260 ms e abre o álbum de verdade (3D) na capa; a vaga de amanhã tem a pílula", () => {
@@ -234,15 +242,16 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(screen.getByTestId("album-tela")).toBeTruthy();
     expect(screen.getByTestId("album-capa-3d")).toBeTruthy();
     expect(eventos.find(([n]) => n === EVENTOS2.albumAbrir)?.[1]).toMatchObject({ origem: "capa" });
-    // a capa sai e a página de sequência (aba) tem a vaga do 14 marcada "EM 2 DIAS"
+    // o álbum é o de hoje (por raridade): a capa sai e a página das RARAS tem a vaga do 14 marcada "EM 2 DIAS"
     avancar(CAPA_SAI_MS + 1000);
-    fireEvent.click(screen.getByTestId("album-aba-sequencia"));
+    expect(screen.queryByTestId("album-aba-sequencia")).toBeNull();
+    fireEvent.click(screen.getByTestId("album-aba-raro"));
     avancar(1000);
-    const vaga = document.querySelector('[data-vaga="sequencia-14"]')!;
+    const vaga = document.querySelector('[data-papel="fundo"] [data-vaga="sequencia-14"]')!;
     expect(vaga.hasAttribute("data-destaque")).toBe(true);
     expect(vaga.querySelector('[data-testid="vaga-destaque"]')?.textContent).toBe("EM 2 DIAS");
-    // páginas por módulo com vagas vazias e "faltam N pra completar a página"
-    expect(document.querySelector('[data-papel="fundo"] [data-testid="album-pe-modulo"]')?.textContent).toMatch(/Faltam \d+ figurinhas pra completar a página/);
+    // vagas vazias e "Faltam N figurinhas nesta página"
+    expect(document.querySelector('[data-papel="fundo"] [data-testid="album-pe-pagina"]')?.textContent).toMatch(/Faltam \d+ figurinhas nesta página/);
   });
 
   it("o pacotinho abre o álbum na página da figurinha nova, que espera SOLTA; o toque COLA (peel), grava o visto e mede", async () => {
@@ -270,9 +279,10 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(eventos.find(([n]) => n === EVENTOS2.abrir)?.[1]).toMatchObject({ origem: "toast" });
   });
 
-  it("os chips por módulo abrem o álbum na página do módulo; a trilha abre na página da sequência", () => {
+  it("as páginas do álbum (Lendárias · Épicas · Raras · Comuns) abrem o álbum na página certa", () => {
     montar();
-    fireEvent.click(screen.getByTestId("cn-colecao-finance"));
+    expect(screen.getByTestId("cn-colecao").textContent).toMatch(/Lendárias.*Épicas.*Raras.*Comuns/s);
+    fireEvent.click(screen.getByTestId("cn-pagina-raro"));
     expect(eventos.find(([n]) => n === EVENTOS2.albumAbrir)?.[1]).toMatchObject({ origem: "colecao" });
     expect(screen.getByTestId("album-tela").getAttribute("data-atual")).not.toBe("0");
   });
@@ -280,10 +290,40 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   it("no teste grátis (dia 2, sem anotar hoje): a missão, 'Hoje você ganha Voltei' e o adesivo esperando no álbum", () => {
     montar({ testeDia: 2 }, { "core-dias-anotados": [somarDias(HOJE, -1)], "conquistas-desbloqueadas": { "first-expense": somarDias(HOJE, -1) }, "conquistas-album-visto": [] });
     expect(screen.getByTestId("cn-missao").textContent).toMatch(/dia 2 de 3/);
-    expect(screen.getByTestId("cn-amanha").textContent).toMatch(/Hoje você ganha/i);
-    expect(screen.getByTestId("cn-amanha").textContent).toContain("Voltei");
+    expect(screen.getByTestId("cn-amanha-frase").textContent).toContain('Anota algo hoje e ganha o adesivo "Voltei"');
     fireEvent.click(screen.getByTestId("cn-missao-album"));
     expect(eventos.find(([n]) => n === EVENTOS2.albumAbrir)?.[1]).toMatchObject({ origem: "missao" });
+  });
+
+  it("quem já usa (dado antigo, sem os 3 adesivos novos no visto): nada se perde — 12 dias, os 4 colados de antes, e os novos de 2/3 dias aparecem como figurinhas novas pra colar", () => {
+    // o registro de antes de 16/10: só o 7, o first-expense e o visto antigo (sem sequencia-2/3)
+    const { store } = montar({}, { "conquistas-desbloqueadas": { "sequencia-7": "2026-10-10", "first-expense": "2026-09-01" }, "conquistas-album-visto": ["sequencia-7", "first-expense"] });
+    expect(screen.getByTestId("cn-hero").textContent).toContain("12");
+    expect(screen.getByTestId("cn-album-contagem").textContent).toMatch(/4 de 68/); // 7 + first-expense + os 2 novos pelo recorde (2 e 3)
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("2");
+    expect(screen.getByTestId("cn-album-pacotinho").textContent).toMatch(/2 figurinhas novas pra colar/);
+    // as chaves de sempre continuam lá, intactas (a tela só lê; o visto antigo não foi reescrito)
+    expect(store.dados["core-dias-anotados"]).toHaveLength(12);
+    expect(store.dados["conquistas-album-visto"]).toEqual(["sequencia-7", "first-expense"]);
+    // o registro ganha os 2 novos com a data de hoje (como qualquer adesivo que abre); os de antes ficam com a data deles
+    const desbloqueadas = store.dados["conquistas-desbloqueadas"] as Record<string, string>;
+    expect(desbloqueadas).toMatchObject({ "sequencia-7": "2026-10-10", "first-expense": "2026-09-01", "sequencia-2": HOJE, "sequencia-3": HOJE });
+  });
+
+  it("conta vazia: a capa com '?' e 'Nenhuma figurinha ainda. Anota algo hoje e a primeira cola.'", () => {
+    montar({}, { "core-dias-anotados": [], "conquistas-desbloqueadas": {}, "conquistas-album-visto": [], "finance-expenses": [] });
+    expect(screen.getByTestId("cn-album-contagem").textContent).toMatch(/0 de 68/);
+    expect(screen.getByTestId("cn-album-vazio").textContent).toContain("Anota algo hoje");
+    // 0 dias: anotar hoje é o 1º dia, amanhã o 2º → "Faltam 2 dias pro adesivo 'Voltei'"
+    expect(screen.getByTestId("cn-amanha-frase").textContent).toContain('Faltam 2 dias pro adesivo "Voltei" 🔥');
+  });
+
+  it("a dose da missão em cena (data-missao-dose=\"1\", contrato com o ramo da missão) segura toast e festa", () => {
+    expect(outraTelaAberta()).toBe(false);
+    document.documentElement.dataset.missaoDose = "1";
+    expect(outraTelaAberta()).toBe(true);
+    delete document.documentElement.dataset.missaoDose;
+    expect(outraTelaAberta()).toBe(false);
   });
 
   it("o detalhe da sequência (4 semanas) abre e mede", () => {

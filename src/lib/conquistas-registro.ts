@@ -33,17 +33,17 @@ export const ALVO_ANO = 365;
 
 /**
  * Os adesivos NOVOS da sequência (CONQUISTAS 2, 16/10): DIA 2 "Voltei" (comum),
- * 3 DIAS (raro) e 14 DIAS "Duas Semanas" (raro). Por quê: no teste grátis, quem
+ * 3 DIAS (raro) e 14 DIAS (raro). Por quê: no teste grátis, quem
  * usa em 3 dias diferentes paga 38% (× 15%) — a tela precisa puxar o dia 2 e o
  * dia 3; e 47 pessoas chegaram a 7 dias e só 4 a 30 — faltava um degrau no meio.
- * Abrem pelo RECORDE como os outros: quem já teve 14 dias ganha o "Duas Semanas"
+ * Abrem pelo RECORDE como os outros: quem já teve 14 dias ganha o de 14 dias
  * na 1ª abertura, em silêncio (Momentos.tsx só festeja o marco batido HOJE).
  */
 export const MARCOS_NOVOS = [2, 3, 14] as const;
 export const ADESIVOS_SEQUENCIA_NOVOS: Record<(typeof MARCOS_NOVOS)[number], { nome: string; descricao: string; raridade: "comum" | "raro" }> = {
-  2: { nome: "Voltei", descricao: "Anote algo 2 dias seguidos — o 2º dia é o que mais conta", raridade: "comum" },
+  2: { nome: "Voltei", descricao: "Anote algo 2 dias seguidos", raridade: "comum" },
   3: { nome: "3 Dias Seguidos", descricao: "Anote algo 3 dias seguidos", raridade: "raro" },
-  14: { nome: "Duas Semanas", descricao: "Anote algo 14 dias seguidos", raridade: "raro" },
+  14: { nome: "14 Dias Seguidos", descricao: "Anote algo 14 dias seguidos", raridade: "raro" },
 };
 /** Todos os marcos que colam adesivo, em ordem (a trilha da Conquistas 2). */
 export const MARCOS_ADESIVO = [2, 3, 7, 14, 30, 100] as const;

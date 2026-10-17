@@ -261,7 +261,8 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       };
       return {
         dias: seq.dias, anotouHoje: seq.hojeFeito, acao: acoes[0].texto,
-        avisos: acoes.map((a, i) => { const t = textoDoLembrete(a, seq.dias + i, somarDias(hoje, i)); const p = premio(i); return p ? { ...t, body: `${t.body} ${p}` } : t; }),
+        // com o prêmio, o "Leva 10 segundos." sai: "Falta 1 coisa: marque um hábito. Amanhã vem o adesivo de 14 dias 🔥"
+        avisos: acoes.map((a, i) => { const t = textoDoLembrete(a, seq.dias + i, somarDias(hoje, i)); const p = premio(i); return p ? { ...t, body: `${t.body.replace(/\s*Leva 10 segundos\.$/, "")} ${p}` } : t; }),
       };
     })(),
     pet: lerDadosDosAvisosPet(get, hoje),

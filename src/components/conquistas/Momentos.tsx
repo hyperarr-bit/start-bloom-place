@@ -108,7 +108,9 @@ export const outraTelaAberta = () =>
   typeof document !== "undefined" &&
   (!!document.querySelector('[data-testid="celebracao-100"], [role="dialog"]:not([data-momento]), [role="alertdialog"], [data-camada-guia]')
     // 10/10: a faixa da missão em doses no topo = passo em andamento (entre o anel e a festa há frestas sem camada)
-    || document.documentElement.hasAttribute("data-missao-doses-faixa"));
+    || document.documentElement.hasAttribute("data-missao-doses-faixa")
+    // 16/10 (contrato com o ramo da missão): `document.documentElement.dataset.missaoDose = "1"` enquanto uma dose está na tela
+    || document.documentElement.dataset.missaoDose === "1");
 
 /**
  * 10/10 (print do dono: o adesivo "Primeira Despesa" POR CIMA do post-it da dose 2 — "cliquei e saiu da

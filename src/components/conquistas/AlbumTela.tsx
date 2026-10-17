@@ -167,11 +167,13 @@ interface PaginaProps {
   /** (16/10) As que esperam pra ser coladas (toque) e as vagas com a pílula do próximo prêmio. */
   pendentes: ReadonlySet<string>;
   destaques: Readonly<Record<string, string>>;
+  /** (16/10, Conquistas 2) o rodapé das páginas de seção diz "Faltam N figurinhas nesta página". */
+  rodapeFaltam: boolean;
   onSelecionar: (b: Badge) => void;
   onColar?: (b: Badge) => void;
 }
 
-const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, onSelecionar, onColar }: PaginaProps) => {
+const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, onSelecionar, onColar }: PaginaProps) => {
   const grande = p.tipo === "mais-raros";
   const col = grande ? 3 : 4;
   const gapX = grande ? 10 : 6;
@@ -191,8 +193,9 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
   const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : mod ? mod.label : cap!.titulo;
   const contagem = grande ? `${p.abertos} de ${p.total}` : p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`;
   const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : mod ? mod.frase : `${cap!.material} · ${cap!.frase}`;
-  // (16/10) a vaga vazia com a pílula do próximo prêmio ("AMANHÃ") fica à vista
+  // (16/10) as figurinhas novas desta página (esperando o toque) e as vagas vazias DESTA página (uma seção pode ter 2 páginas)
   const pendentesAqui = p.vagas.filter((b) => pendentes.has(b.id)).length;
+  const coladasAqui = p.vagas.filter((b) => b.unlocked).length;
   return (
     <div className="alb-pag" data-pagina={p.id} data-rar={p.raridade ?? (mod ? "modulo" : "destaque")} data-modulo={p.modulo} style={mod ? ({ "--mod": mod.cor } as CSSProperties) : undefined} data-testid={`album-tela-pagina-${indice}`}>
       <span className="alb-marca" aria-hidden><Adesivo id={cap ? cap.emblema : mod ? (p.vagas[p.vagas.length - 1]?.id ?? "sequencia-100") : "sequencia-100"} tamanho={Math.round(largura * 0.5)} /></span>
@@ -220,8 +223,8 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
       <footer className="alb-pe">
         {pendentesAqui > 0 ? (
           <span className="alb-pe-perto" data-testid="album-pe-colar"><b>{pendentesAqui === 1 ? "1 figurinha nova" : `${pendentesAqui} figurinhas novas`}</b> · toque pra colar</span>
-        ) : mod && !grande ? (
-          <span className="alb-pe-perto" data-testid="album-pe-modulo">{p.total > p.abertos ? <><b>{fraseDaPagina(p.abertos, p.total)}</b>{perto ? <> · a mais perto: {perto.name}</> : null}</> : "Página completa — todas coladas."}</span>
+        ) : (mod || rodapeFaltam) && !grande ? (
+          <span className="alb-pe-perto" data-testid="album-pe-pagina">{p.vagas.length > coladasAqui ? <><b>{fraseDaPagina(coladasAqui, p.vagas.length)}</b>{perto ? <> · a mais perto: {perto.name}</> : null}</> : "Página completa — todas coladas."}</span>
         ) : perto ? (
           <span className="alb-pe-perto">A mais perto: <b>{perto.name}</b> · <Destacar texto={textoFalta(perto, diasDeSequencia)} /></span>
         ) : !grande && p.abertos >= p.total ? (
@@ -532,6 +535,8 @@ export interface AlbumTelaProps {
   onColar?: (b: Badge) => void;
   /** (16/10) Pílula numa vaga vazia: { "sequencia-14": "AMANHÃ" } — o próximo prêmio da sequência. */
   destaques?: Record<string, string>;
+  /** (16/10) Rodapé "Faltam N figurinhas nesta página" nas páginas de seção (a tela nova liga; a de hoje fica igual). */
+  rodapeFaltam?: boolean;
   onFechar: () => void;
   /** (16/10) opcional: sem ele, os botões de compartilhar o álbum somem. */
   onCompartilhar?: () => void;
@@ -541,7 +546,7 @@ export interface AlbumTelaProps {
 const SEM_PENDENTES: string[] = [];
 const SEM_DESTAQUES: Record<string, string> = {};
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
@@ -833,7 +838,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     dir={papel === "sobre" ? virando?.dir : undefined}
                     pagina={p.id}
                     testid={papel === "sobre" ? "album-virando" : undefined}
-                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} onSelecionar={setDetalhe} onColar={colarPendente} />}
+                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} onSelecionar={setDetalhe} onColar={colarPendente} />}
                     verso={<VersoDaPagina ano={ano} />}
                   />
                   {/* a sombra que a folha projeta na página de baixo: logo DEPOIS dela no DOM (por cima dela, por baixo da que gira) */}

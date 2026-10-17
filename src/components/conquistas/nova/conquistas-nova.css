@@ -1,8 +1,8 @@
 /* CONQUISTAS 2 (16/10) — direção B "Fogo & trilha" + o ÁLBUM como herói.
    Tokens de escopo (claro + escuro); nada global muda. */
 
-.cn { --cn-papel: #fbf6ea; --cn-ponto: rgba(60, 50, 40, .16); --cn-tinta: #2b2b2f; --cn-grafite: #1c1c22; --cn-grafite-2: #26262e; }
-.dark .cn { --cn-papel: hsl(var(--card)); --cn-ponto: rgba(255, 255, 255, .10); --cn-tinta: hsl(var(--foreground)); --cn-grafite: #14161c; --cn-grafite-2: #1d2029; }
+.cn { --cn-papel: #fbf6ea; --cn-ponto: rgba(60, 50, 40, .16); --cn-tinta: #2b2b2f; --cn-grafite: #1c1c22; }
+.dark .cn { --cn-papel: hsl(var(--card)); --cn-ponto: rgba(255, 255, 255, .10); --cn-tinta: hsl(var(--foreground)); --cn-grafite: #14161c; }
 
 .cn-pontilhado { background-image: radial-gradient(circle, var(--cn-ponto) 1.1px, transparent 1.4px); background-size: 14px 14px; }
 .cn-serif { font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; letter-spacing: -.01em; }
@@ -16,32 +16,39 @@
 .cn-barra > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a81f62, #e0438f); }
 .cn-prog { position: absolute; right: -4px; bottom: 0; z-index: 4; height: 16px; padding: 0 5px; border-radius: 999px; background: hsl(var(--foreground)); color: hsl(var(--background)); font-size: 9px; font-weight: 800; display: inline-flex; align-items: center; white-space: nowrap; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); font-variant-numeric: tabular-nums; line-height: 1; }
 
-/* ---------- o cartão da sequência (grafite, anel de 7, caminho dos prêmios) ---------- */
-.cn-b-hero { position: relative; border-radius: 22px; overflow: hidden; background: var(--cn-grafite); color: #fff; }
-.cn-b-hero::before { content: ""; position: absolute; inset: -40% -20% auto -20%; height: 110%; background: radial-gradient(ellipse at 50% 40%, var(--fg-brilho, rgba(249, 115, 22, .5)), transparent 62%); opacity: .75; pointer-events: none; }
+/* ---------- o cartão da SEQUÊNCIA na linguagem dos cards do app (16/10, dono: o grafite com brilho "parecia fora do app"):
+   faixa colorida do fogo com o título em caixa alta (igual ao card da sequência de hoje), superfície do card, tokens do escuro ---------- */
+.cn-seq { border-color: var(--fg-borda, hsl(var(--border))); }
+.dark .cn-seq { border-color: var(--fg-borda-escuro, hsl(var(--border))); }
+.cn-seq-cab { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; background: linear-gradient(90deg, var(--fg-a, #fb923c), var(--fg-b, #f43f5e)); color: var(--fg-texto, #fff); }
+.cn-seq[data-faixa="apagado"] .cn-seq-cab { background: linear-gradient(90deg, #a8a29e, #78716c); color: #fff; }
 .cn-b-anel { position: relative; width: 196px; height: 196px; margin: 0 auto; }
 .cn-b-anel > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-.cn-b-anel .cn-b-seg { fill: none; stroke: rgba(255, 255, 255, .13); stroke-width: 9; stroke-linecap: round; }
-.cn-b-anel .cn-b-seg[data-estado="feito"] { stroke: var(--fg-meio, #f97316); filter: drop-shadow(0 0 5px var(--fg-brilho, rgba(249, 115, 22, .6))); }
+.cn-b-anel .cn-b-seg { fill: none; stroke: hsl(var(--muted)); stroke-width: 9; stroke-linecap: round; }
+.dark .cn-b-anel .cn-b-seg { stroke: hsl(var(--muted) / .9); }
+.cn-b-anel .cn-b-seg[data-estado="feito"] { stroke: var(--fg-meio, #f97316); }
 .cn-b-anel .cn-b-seg[data-estado="gelo"] { stroke: #7dd3fc; }
-.cn-b-anel .cn-b-seg[data-estado="hoje"] { stroke: var(--fg-claro, #fde68a); stroke-dasharray: 3 5; opacity: .9; animation: cn-pulsa 1.6s ease-in-out infinite; }
+.cn-b-anel .cn-b-seg[data-estado="hoje"] { stroke: var(--fg-meio, #f97316); stroke-dasharray: 3 5; opacity: .8; animation: cn-pulsa 1.6s ease-in-out infinite; }
 .cn-b-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
-.cn-b-num { font-size: 54px; font-weight: 900; letter-spacing: -.05em; line-height: .95; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.cn-b-rot { font-size: 10px; font-weight: 800; letter-spacing: .22em; opacity: .75; margin-top: 4px; }
+.cn-b-num { font-size: 54px; font-weight: 900; letter-spacing: -.05em; line-height: .95; font-variant-numeric: tabular-nums; margin-top: 2px; color: hsl(var(--foreground)); }
+.cn-b-rot { font-size: 10px; font-weight: 800; letter-spacing: .22em; color: hsl(var(--muted-foreground)); margin-top: 4px; }
 .cn-b-letras { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.cn-b-letra { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; opacity: .55; }
-.cn-b-letra[data-estado="feito"], .cn-b-letra[data-estado="hoje"], .cn-b-letra[data-estado="gelo"] { opacity: 1; }
-.cn-b-letra i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .25); }
-.cn-b-letra[data-estado="feito"] i { background: var(--fg-meio, #f97316); }
-.cn-b-letra[data-estado="gelo"] i { background: #7dd3fc; }
-.cn-b-letra[data-estado="hoje"] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-claro, #fde68a); }
+.cn-b-letra { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; color: hsl(var(--muted-foreground) / .7); }
+.cn-b-letra[data-estado="feito"], .cn-b-letra[data-estado="hoje"], .cn-b-letra[data-estado="gelo"] { color: hsl(var(--foreground)); }
+.cn-b-letra i { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+.cn-b-letra[data-estado="feito"] i { background: var(--fg-meio, #f97316); box-shadow: none; }
+.cn-b-letra[data-estado="gelo"] i { background: #7dd3fc; box-shadow: none; }
+.cn-b-letra[data-estado="hoje"] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-meio, #f97316); }
 .cn-b-stat { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.cn-b-stat b { font-size: 15px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-.cn-b-stat span { font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .6; }
-.cn-b-acao { border-radius: 8px; background: rgba(255, 255, 255, .14); color: #fff; font-weight: 700; padding: 2px 8px; white-space: nowrap; }
+.cn-b-stat b { font-size: 15px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
+.cn-b-stat span { font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.cn-acao { white-space: nowrap; border-radius: 6px; background: #fef3c7; color: #713f12; font-weight: 700; padding: 1px 7px; }
+.dark .cn-acao { background: #3a3214; color: #f3dc9a; }
 
 /* ---------- o ÁLBUM (herói): capa grande, pacotinho, "faltam N pra completar a página" ---------- */
 .cn-album { padding: 14px 14px 12px; }
+/* o eyebrow do álbum cabe numa linha ao lado da capa até no iPhone SE (375) */
+.cn-album .cn-caps { font-size: 10.5px; letter-spacing: .1em; }
 .cn-album-corpo { display: grid; grid-template-columns: 142px 1fr; gap: 0 14px; align-items: start; }
 .cn-album-capa { position: relative; display: block; text-align: left; transform: rotate(-3deg); transform-origin: 50% 60%; transition: transform .22s cubic-bezier(.34, 1.4, .64, 1), filter .22s; -webkit-tap-highlight-color: transparent; }
 .cn-album-capa:active { transform: rotate(-1deg) scale(.985); }
@@ -75,6 +82,11 @@
 .cn-modulos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .cn-modulo { display: flex; align-items: center; gap: 7px; min-width: 0; height: 46px; padding: 0 10px 0 9px; border-radius: 12px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); text-align: left; }
 .cn-modulo[data-completa] { border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .06); }
+.cn-modulo-icone { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-style: normal; color: #fff; flex-shrink: 0; }
+.cn-modulo[data-rar="lendario"] .cn-modulo-icone { background: linear-gradient(180deg, #f1d070, #b8860b); color: #4a3305; }
+.cn-modulo[data-rar="epico"] .cn-modulo-icone { background: linear-gradient(180deg, #c4a6ff, #6ec8ff); color: #2b2b2f; }
+.cn-modulo[data-rar="raro"] .cn-modulo-icone { background: linear-gradient(180deg, #4f8ff7, #1d4ed8); }
+.cn-modulo[data-rar="comum"] .cn-modulo-icone { background: linear-gradient(180deg, #8a8580, #57534e); }
 .cn-b-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 10px; }
 .cn-b-chips::-webkit-scrollbar { display: none; }
 .cn-b-chip { flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }

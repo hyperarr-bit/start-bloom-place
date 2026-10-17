@@ -43,9 +43,9 @@ export const ToastAdesivo = ({ badge, quantidade = 1, colecao, suave, onToque }:
     <button type="button" className="cn-toast" data-rar={r} data-suave={suave ? "" : undefined} data-testid="cn-toast" data-quantidade={quantidade} onClick={() => { trackEvent(EVENTOS2.toastToque, { id: badge.id, quantidade, suave: !!suave }); onToque?.(); }}>
       <span className="shrink-0 grid place-items-center w-12 h-12"><AdesivoRaro id={badge.id} raridade={r} tamanho={46} giro={-5} /></span>
       <span className="flex-1 min-w-0">
-        <span className="cn-toast-eyebrow block">{suave ? "Pra colar no álbum" : quantidade > 1 ? `${quantidade} adesivos novos` : `Adesivo ${r === "comum" ? "novo" : RARIDADE_LABEL[r].toLowerCase()}`}</span>
-        <span className="cn-toast-nome block truncate">{suave ? "Seu adesivo está esperando no álbum" : quantidade > 1 ? `${badge.name} e mais ${quantidade - 1}` : badge.name}</span>
-        <span className="cn-toast-sub block truncate">{suave ? `${badge.name} · toque pra colar` : `${colecao ? `${colecao} · ` : ""}toque pra colar no álbum`}</span>
+        <span className="cn-toast-eyebrow block">{quantidade > 1 ? `${quantidade} adesivos novos` : r === "comum" ? "Adesivo novo" : `Adesivo ${RARIDADE_LABEL[r].toLowerCase()}`}</span>
+        <span className="cn-toast-nome block truncate">{quantidade > 1 ? `${badge.name} e mais ${quantidade - 1}` : badge.name}</span>
+        <span className="cn-toast-sub block truncate">{colecao ? `${colecao} · ` : ""}toque pra colar no álbum</span>
       </span>
       <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden />
       <span className="cn-toast-barra" aria-hidden />
@@ -67,7 +67,7 @@ export const CelebracaoMarco = ({ badge, dias, seq, onContinuar, onCompartilhar 
       <div aria-hidden className="cn-festa-raios" />
       {confetes.map((c, i) => <span key={i} aria-hidden className="cn-confete" style={{ left: `${c.x}%`, width: c.w, height: c.w * 1.7, background: c.cor, "--atraso": `${c.atraso}s`, "--dur": `${c.dur}s`, "--giro": `${c.giro}deg` } as CSSProperties} />)}
       <div className="relative flex-1 flex flex-col items-center justify-center px-8 text-center">
-        <p className="cn-caps mb-5" style={{ color: "#fde68a" }}>Marco de sequência</p>
+        <p className="cn-caps mb-5" style={{ color: "#fde68a" }}>Sequência</p>
         <div style={{ transform: "rotate(-5deg)" }}>
           <AdesivoRaro id={badge.id} raridade={raridadeDe(badge)} tamanho={200} bordaGrossa titulo={badge.name} />
         </div>
@@ -133,7 +133,7 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
             </div>
           </div>
           <div className="mt-3 rounded-2xl border border-border px-3 py-1">
-            <p className="cn-caps text-muted-foreground pt-2 pb-1">Próximos prêmios</p>
+            <p className="cn-caps text-muted-foreground pt-2 pb-1">Próximos adesivos</p>
             {proximos.map((b) => {
               const m = marcoDoAdesivo(b.id)!;
               const faltam = Math.max(1, m - seq.dias);
@@ -141,8 +141,8 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
                 <button type="button" key={b.id} className="cn-premio-linha w-full text-left" onClick={() => onAdesivo(b)}>
                   <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={40} trancado />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-extrabold leading-tight">{b.name}{m % 7 === 0 ? <span className="text-muted-foreground font-bold text-[11px]"> + 1 protetor</span> : ""}</p>
-                    <p className="text-[11px] text-muted-foreground">{m} dias seguidos · adesivo {RARIDADE_LABEL[raridadeDe(b)].toLowerCase()}{ehMarcoDeFesta(b.id) ? " · festa e Stories" : ""}</p>
+                    <p className="text-[13px] font-extrabold leading-tight">{b.name}{m % 7 === 0 ? <span className="text-muted-foreground font-bold text-[11px]"> e mais 1 protetor</span> : ""}</p>
+                    <p className="text-[11px] text-muted-foreground">adesivo {RARIDADE_LABEL[raridadeDe(b)].toLowerCase()}{ehMarcoDeFesta(b.id) ? " · com comemoração e Stories" : ""}</p>
                   </div>
                   <span className="cn-pill cn-pill-suave">{faltam === 1 ? "amanhã" : `em ${faltam} dias`}</span>
                 </button>
@@ -150,13 +150,13 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
             })}
           </div>
           <p className="mt-3 text-[11.5px] text-muted-foreground leading-[1.4]">
-            <b className="text-foreground">O que conta:</b> anotar qualquer coisa em qualquer módulo — um gasto, um hábito, a água, uma página lida. Abrir o app sem anotar não conta.
+            <b className="text-foreground">O que conta:</b> anotar qualquer coisa, em qualquer módulo — um gasto, um hábito, a água, uma página lida. Só abrir o app não conta.
           </p>
           {/* o lembrete das 20h de sempre (opt-in, mesmo id de notificação); só no app */}
           <div onClickCapture={() => trackEvent(EVENTOS2.lembreteLigar, {})} data-testid="cn-lembrete">
             <LembreteDaSequencia />
           </div>
-          <p className="mt-2 text-[10.5px] text-muted-foreground inline-flex items-center gap-1"><Bell className="w-3 h-3" aria-hidden /> O lembrete diz o adesivo que cola amanhã.</p>
+          <p className="mt-2 text-[10.5px] text-muted-foreground inline-flex items-center gap-1"><Bell className="w-3 h-3" aria-hidden /> O lembrete avisa qual adesivo vem amanhã.</p>
         </div>
       </SheetContent>
     </Sheet>

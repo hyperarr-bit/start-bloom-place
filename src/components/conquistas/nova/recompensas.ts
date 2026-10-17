@@ -80,19 +80,37 @@ export interface ProximoPremio {
   faltam: number;
   /** O marco também dá protetor (a cada 7). */
   daProtetor: boolean;
-  /** Frase pronta pra tela: "Amanhã você ganha" · "Hoje você ganha" · "Em 4 dias você ganha". */
+  /** Rótulo curto: "Amanhã você ganha" · "Hoje você ganha" · "Em 4 dias você ganha" (a trilha usa `fraseDoPremio`). */
   titulo: string;
-  /** A instrução, clara: "anote algo em qualquer módulo nos próximos 2 dias". */
+  /** A instrução embaixo: "Anota algo hoje pra não perder a sequência" · "Vale qualquer anotação: …". */
   instrucao: string;
 }
 
 const DIAS_POR_PROTETOR = 7;
 
-/** A frase de como ganhar — sem "2 dias de anotação" (16/10: o dono achou confuso). */
-export const instrucaoDoPremio = (quando: ProximoPremio["quando"], faltam: number): string =>
-  quando === "hoje" ? "anote algo em qualquer módulo hoje e ele cola sozinho"
-    : quando === "amanha" ? "anote algo em qualquer módulo hoje e amanhã"
-    : `anote algo em qualquer módulo nos próximos ${faltam} dias`;
+/** "adesivo de 14 dias" · "adesivo 'Voltei'" · "adesivo de 3 dias" — como a frase chama o prêmio (16/10, dono: nome concreto). */
+export const nomeDoPremio = (marco: number, adesivo: Badge | null): string => {
+  if (!adesivo) return "protetor";
+  if (marco === 2) return `adesivo "Voltei"`;
+  return `adesivo de ${marco} dias`;
+};
+
+/**
+ * A frase do prêmio, curta e concreta (dono 16/10: "Faltam 2 dias pro adesivo de 14 dias 🔥"):
+ *  hoje   → "Anota algo hoje e ganha o adesivo 'Voltei'"
+ *  amanhã → "Amanhã: adesivo de 3 dias 🔥"
+ *  N dias → "Faltam 2 dias pro adesivo de 14 dias 🔥"
+ */
+export const fraseDoPremio = (p: Pick<ProximoPremio, "quando" | "faltam" | "marco" | "adesivo">): string => {
+  const nome = nomeDoPremio(p.marco, p.adesivo);
+  if (p.quando === "hoje") return `Anota algo hoje e ganha o ${nome}`;
+  if (p.quando === "amanha") return `Amanhã: ${p.adesivo ? nome : "mais 1 protetor"} 🔥`;
+  return `Faltam ${p.faltam} dias pro ${p.adesivo ? nome : "próximo protetor"} 🔥`;
+};
+
+/** A instrução embaixo da frase: o que conta. */
+export const instrucaoDoPremio = (quando: ProximoPremio["quando"], _faltam: number): string =>
+  quando === "hoje" ? "Anota algo hoje pra não perder a sequência" : "Vale qualquer anotação: gasto, hábito, água, página lida";
 
 /**
  * O próximo prêmio pela sequência DE AGORA (`dias` = dias seguidos contando
@@ -127,19 +145,21 @@ export const quandoCurto = (p: Pick<ProximoPremio, "quando" | "faltam">): string
 /**
  * O prêmio citado no LEMBRETE das 20h (opt-in, id de notificação de sempre):
  * pro aviso do dia `i` (0 = hoje), a sequência que a pessoa teria anotando
- * naquele dia é `seguidosSe`; se isso cola um adesivo, "e cola o 'Voltei'";
- * se o dia SEGUINTE cola, "e amanhã cola o 'Duas Semanas'". Senão, null.
+ * naquele dia é `seguidosSe`; se isso cola um adesivo, "Hoje cola o adesivo de
+ * 14 dias 🔥"; se o dia SEGUINTE cola, "Amanhã vem o adesivo de 14 dias 🔥".
+ * Senão, null. Entra depois de "Falta 1 coisa: X." no corpo do aviso.
  */
 export function premioDoLembrete(seguidosSe: number, adesivos: Badge[]): string | null {
   const colados = new Set(adesivos.filter((b) => b.unlocked).map((b) => b.id));
   const nome = (m: number): string | null => {
     if (!(MARCOS_ADESIVO as readonly number[]).includes(m) || colados.has(idDoMarco(m))) return null;
-    return adesivos.find((b) => b.id === idDoMarco(m))?.name ?? null;
+    const b = adesivos.find((x) => x.id === idDoMarco(m));
+    return b ? nomeDoPremio(m, b) : null;
   };
   const hoje = nome(seguidosSe);
-  if (hoje) return `Anota e cola o adesivo "${hoje}".`;
+  if (hoje) return `Hoje cola o ${hoje} 🔥`;
   const amanha = nome(seguidosSe + 1);
-  if (amanha) return `Anota hoje — e amanhã cola o "${amanha}".`;
+  if (amanha) return `Amanhã vem o ${amanha} 🔥`;
   return null;
 }
 
@@ -156,12 +176,15 @@ export const fraseDaColecao = (abertos: number, total: number): string => {
   return `${abertos} de ${total}`;
 };
 
-/** "faltam 2 pra completar a página" · "página completa" — o rodapé de cada página do álbum. */
+/** "Faltam 2 figurinhas nesta página" · "Página completa" — o rodapé de cada página do álbum. */
 export const fraseDaPagina = (abertos: number, total: number): string => {
   const faltam = total - abertos;
   if (faltam <= 0) return "Página completa — todas coladas.";
-  return `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} pra completar a página`;
+  return `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} nesta página`;
 };
+/** "Faltam 2 figurinhas na página das raras" (ou "na página 2 das raras") — a capa fala da página mais perto de fechar. */
+export const fraseDaPaginaMaisPerto = (faltam: number, pagina: string, parte?: number): string =>
+  `${faltam === 1 ? "Falta 1 figurinha" : `Faltam ${faltam} figurinhas`} na página ${parte ? `${parte} ` : ""}das ${pagina}`;
 
 /* ------------------------------------------------------------------------- *
  * Medição — tudo com o prefixo `conquistas2_`

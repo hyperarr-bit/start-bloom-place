@@ -12,14 +12,14 @@ import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamificatio
 import { AdesivoRaro } from "../adesivos-raridade";
 import { Fogo } from "../Fogo";
 import { varsDaFaixa } from "../CardSequencia";
-import { AlbumTela } from "../AlbumTela";
+import { AlbumTela, CAPITULO } from "../AlbumTela";
 import { paginaDaFigurinha } from "../album-paginas";
 import { Previa } from "../SeletorDeArte";
 import { StoriesAdesivo } from "../Stories";
 import { compartilharAdesivo } from "../compartilhar-conquistas";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, marcoDoAdesivo, quandoCurto, type ProximoPremio } from "./recompensas";
-import { useConquistasNova, type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
+import { EVENTOS2, fraseDoPremio, marcoDoAdesivo, quandoCurto, type ProximoPremio } from "./recompensas";
+import { useConquistasNova, type ColecaoNova, type EstadoConquistasNova, type PaginaDeRaridade } from "./use-conquistas-nova";
 import { AlbumHero } from "./AlbumHero";
 import { CelebracaoMarco, ColecaoTela, DetalheSequencia, ToastAdesivo } from "./camadas";
 import "../conquistas.css";
@@ -29,13 +29,16 @@ import "./conquistas-nova.css";
  * CONQUISTAS 2 (16/10; atrás da chave `conquistas2`, lib/conquistas2.ts).
  * Direção B "Fogo & trilha" com o ÁLBUM como herói:
  *
- *  1. o cartão grafite da sequência: o número de dias no centro do ANEL DE 7
- *     ARCOS (a semana), recorde · protetores · dias anotados, a ação do dia;
- *  2. o ÁLBUM: a capa grande e tocável, "faltam N pra completar a página",
- *     o pacotinho com as figurinhas novas esperando pra ser COLADAS (toque →
- *     o peel), a vaga do prêmio de amanhã já marcada no álbum;
- *  3. a TRILHA dos marcos (2 → 3 → 7 → 14 → 30 → 100) e "AMANHÃ VOCÊ GANHA…";
- *  4. por módulo (chips, abrem o álbum na página) e "ver todos" (a grade, secundária).
+ *  1. o cartão da SEQUÊNCIA na linguagem dos cards do app (faixa colorida com
+ *     o título em caixa alta, superfície clara, tokens do escuro — dono 16/10:
+ *     o grafite com brilho "parecia fora do app"): o número de dias no centro
+ *     do ANEL DE 7 ARCOS (a semana), recorde · protetores · dias anotados, a ação do dia;
+ *  2. o ÁLBUM: a capa grande e tocável, "faltam N figurinhas na página das raras",
+ *     o pacotinho com as figurinhas novas pra COLAR (toque → o peel), a vaga do
+ *     próximo adesivo já marcada no álbum — o álbum é o de hoje, POR RARIDADE;
+ *  3. a TRILHA dos marcos (2 → 3 → 7 → 14 → 30 → 100) e "Faltam 2 dias pro adesivo de 14 dias 🔥";
+ *  4. as páginas do álbum (Lendárias · Épicas · Raras · Comuns, abrem o álbum na página)
+ *     e "ver todos" (a grade por módulo, secundária).
  *
  * Fora: a capa do planner, as insígnias, o nível, a roseta e o seletor de
  * capas (os arquivos ficam; a chave da capa também). Emprestado da direção A:
@@ -96,18 +99,18 @@ const AcaoDoDia = ({ seq, onAcao }: { seq: Sequencia; onAcao: (rota: string) => 
   const { hojeFeito, dias, acao } = seq;
   if (hojeFeito) {
     return (
-      <p className="text-[12.5px] leading-relaxed text-white/80" data-testid="cn-garantido">
-        <span className="font-bold inline-flex items-center gap-1" style={{ color: "#fde68a" }}>
-          Hoje já tá garantido <Check className="w-4 h-4" strokeWidth={3} aria-hidden />
+      <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="cn-garantido">
+        <span className="font-bold inline-flex items-center gap-1" style={{ color: "hsl(var(--success))" }}>
+          Hoje já está garantido <Check className="w-4 h-4" strokeWidth={3} aria-hidden />
         </span>
         {` — ${dias} ${dias === 1 ? "dia seguido" : "dias seguidos"}.`}
       </p>
     );
   }
   return (
-    <p className="text-[12.5px] leading-relaxed text-white/80" data-testid="cn-acao">
-      {dias > 0 ? <>Hoje falta <b className="text-white">1 coisa</b> pra manter: </> : <>Anote <b className="text-white">1 coisa</b> hoje pra começar: </>}
-      <button type="button" className="cn-b-acao" onClick={() => { trackEvent(EVENTOS2.acaoToque, { acao: acao.id, via: "principal" }); onAcao(acao.rota); }}>
+    <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="cn-acao">
+      {dias > 0 ? <>Anota <b className="text-foreground">1 coisa</b> hoje pra não perder a sequência: </> : <>Anota <b className="text-foreground">1 coisa</b> hoje pra começar: </>}
+      <button type="button" className="cn-acao" onClick={() => { trackEvent(EVENTOS2.acaoToque, { acao: acao.id, via: "principal" }); onAcao(acao.rota); }}>
         {acao.texto}
       </button>
     </p>
@@ -144,7 +147,13 @@ const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; on
   const hojeIdx = semana.findIndex((d) => d.estado === "hoje");
   const semHoje = semana.map((d) => (d.estado === "hoje" ? { ...d, estado: "futuro" as EstadoDia } : d));
   return (
-    <section className="cn-b-hero px-4 pt-5 pb-4" style={varsDaFaixa(seq.faixa)} aria-label="Sequência" data-testid="cn-hero">
+    <section className="cn-card cn-seq" style={varsDaFaixa(seq.faixa)} aria-label="Sequência" data-testid="cn-hero" data-faixa={seq.faixa.id}>
+      <div className="cn-seq-cab">
+        <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={18} semBrilho />
+        SEQUÊNCIA
+        <span className="ml-auto text-[11px] font-bold tracking-normal normal-case opacity-90">{seq.dias > 0 ? seq.faixa.nome : "apagado"}</span>
+      </div>
+      <div className="px-4 pt-4 pb-4">
       <button type="button" onClick={onDetalhe} className="relative block w-full text-center" data-testid="cn-abrir-sequencia">
         <div className="cn-b-anel">
           <AnelSemana semana={semHoje} />
@@ -159,12 +168,13 @@ const CartaoSequencia = ({ e, onDetalhe, onAcao }: { e: EstadoConquistasNova; on
       <div className="cn-b-letras mt-3 px-3">
         {semana.map((d) => <span key={d.dia} className="cn-b-letra" data-estado={d.estado}><i /> {d.rotulo.charAt(0)}</span>)}
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3">
+      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
         <span className="cn-b-stat"><b>{seq.recorde}</b><span>recorde</span></span>
         <span className="cn-b-stat"><b className="inline-flex items-center gap-1"><Shield className="w-3.5 h-3.5" aria-hidden /> {seq.saldo} de 2</b><span>protetores</span></span>
         <span className="cn-b-stat"><b>{seq.lista.length}</b><span>dias anotados</span></span>
       </div>
       <div className="mt-3"><AcaoDoDia seq={seq} onAcao={onAcao} /></div>
+      </div>
     </section>
   );
 };
@@ -176,15 +186,11 @@ const TextoDoPremio = ({ premio, testeDia }: { premio: ProximoPremio; testeDia: 
   const r = b ? raridadeDe(b) : null;
   return (
     <>
-      <span className="cn-caps block" style={{ color: "hsl(var(--accent))" }}>{premio.titulo}</span>
-      <span className="block text-[16px] font-extrabold leading-tight mt-0.5">
-        {b ? b.name : "+1 protetor"}
-        {b && premio.daProtetor && <span className="text-muted-foreground font-bold text-[12px]"> + 1 protetor</span>}
-      </span>
+      <span className="block text-[15px] font-extrabold leading-tight" data-testid="cn-amanha-frase">{fraseDoPremio(premio)}</span>
       <span className="block text-[11.5px] text-muted-foreground leading-[1.35] mt-0.5" data-testid="cn-amanha-instrucao">
-        {r && r !== "comum" ? `adesivo ${RARIDADE_LABEL[r].toLowerCase()} · ` : ""}
+        {r && r !== "comum" ? `Adesivo ${RARIDADE_LABEL[r].toLowerCase()}${b && premio.daProtetor ? " + 1 protetor" : ""}. ` : b && premio.daProtetor ? "E mais 1 protetor. " : ""}
         {premio.instrucao}
-        {testeDia && premio.marco === 3 ? " · é o 3º dia da sua missão" : ""}
+        {testeDia && premio.marco === 3 ? " — é o 3º dia da sua missão" : ""}
       </span>
     </>
   );
@@ -202,8 +208,8 @@ const Trilha = ({ e, onAdesivo, testeDia }: { e: EstadoConquistasNova; onAdesivo
   return (
     <section className="cn-card" aria-label="Próximos prêmios" data-testid="cn-amanha" style={varsDaFaixa(seq.faixa)}>
       <div className="h-11 px-4 flex items-center gap-2 border-b border-border">
-        <h2 className="text-[13px] font-extrabold tracking-wide">TRILHA DA SEQUÊNCIA</h2>
-        <span className="ml-auto text-[11px] font-bold text-muted-foreground whitespace-nowrap">{trilha.filter((b) => b.unlocked).length} de {trilha.length} marcos</span>
+        <h2 className="text-[13px] font-extrabold tracking-wide">ADESIVOS DA SEQUÊNCIA</h2>
+        <span className="ml-auto text-[11px] font-bold text-muted-foreground whitespace-nowrap">{trilha.filter((b) => b.unlocked).length} de {trilha.length}</span>
       </div>
       <div className="cn-trilha" ref={trilhoRef}>
         {trilha.map((b) => {
@@ -227,21 +233,22 @@ const Trilha = ({ e, onAdesivo, testeDia }: { e: EstadoConquistasNova; onAdesivo
 
 /* ------------------------------------------------------------------ por módulo (secundário) */
 
-const PorModulo = ({ e, onColecao, onTodos }: { e: EstadoConquistasNova; onColecao: (c: ColecaoNova) => void; onTodos: () => void }) => (
-  <section className="cn-card" aria-labelledby="cn-titulo-modulos" data-testid="cn-colecao">
+const PaginasDoAlbum = ({ e, onPagina, onTodos }: { e: EstadoConquistasNova; onPagina: (p: PaginaDeRaridade) => void; onTodos: () => void }) => (
+  <section className="cn-card" aria-labelledby="cn-titulo-paginas" data-testid="cn-colecao">
     <div className="h-11 px-4 flex items-center gap-2">
-      <h2 id="cn-titulo-modulos" className="text-[13px] font-extrabold tracking-wide">PÁGINAS DO ÁLBUM</h2>
+      <h2 id="cn-titulo-paginas" className="text-[13px] font-extrabold tracking-wide">PÁGINAS DO ÁLBUM</h2>
       <span className="ml-auto text-[12.5px] font-bold tabular-nums">{e.abertos} de {e.total}</span>
     </div>
     <div className="cn-modulos px-3 pb-3">
-      {e.colecoes.filter((c) => c.id !== "geral").map((c) => (
-        <button key={c.id} type="button" className="cn-modulo" data-completa={c.abertos >= c.total ? "" : undefined} onClick={() => onColecao(c)} data-testid={`cn-colecao-${c.id}`}>
-          <span className="text-[15px] leading-none" aria-hidden>{c.emoji}</span>
+      {e.paginasDeRaridade.map((p) => (
+        <button key={p.raridade} type="button" className="cn-modulo" data-rar={p.raridade} data-completa={p.abertos >= p.total ? "" : undefined} onClick={() => onPagina(p)} data-testid={`cn-pagina-${p.raridade}`}>
+          <span className="cn-modulo-icone" aria-hidden>{CAPITULO[p.raridade].icone}</span>
           <span className="min-w-0 flex-1">
-            <span className="cn-serif block text-[16px] leading-none truncate">{c.label}</span>
-            <span className="block text-[10px] font-bold text-muted-foreground mt-0.5 tabular-nums truncate">{c.abertos}/{c.total}{c.total - c.abertos <= 3 && c.total > c.abertos ? <span style={{ color: "hsl(var(--accent))" }}> · faltam {c.total - c.abertos}</span> : c.abertos >= c.total ? " · completa" : ""}</span>
+            {/* leading-none + truncate cortava o acento do "Épicas" */}
+            <span className="cn-serif block text-[16px] leading-[1.15]">{p.titulo}</span>
+            <span className="block text-[10px] font-bold text-muted-foreground mt-0.5 tabular-nums truncate">{p.abertos} de {p.total}{p.total - p.abertos <= 3 && p.total > p.abertos ? <span style={{ color: "hsl(var(--accent))" }}> · faltam {p.total - p.abertos}</span> : p.abertos >= p.total ? " · completa" : ""}</span>
           </span>
-          <span className="cn-barra w-9 shrink-0"><i style={{ width: `${Math.round((c.abertos / Math.max(1, c.total)) * 100)}%` }} /></span>
+          <span className="cn-barra w-9 shrink-0"><i style={{ width: `${Math.round((p.abertos / Math.max(1, p.total)) * 100)}%` }} /></span>
         </button>
       ))}
     </div>
@@ -334,8 +341,8 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, onVoltar
       <span className="cn-pill cn-pill-acento">Missão · dia {testeDia} de 3</span>
       <span className="text-[11.5px] text-muted-foreground min-w-0">
         {e.pendentes.length > 0
-          ? <button type="button" className="font-bold text-foreground underline-offset-2 underline" onClick={() => abrirAlbum("missao", e.paginaDasNovas)} data-testid="cn-missao-album">Seu adesivo está esperando no álbum ›</button>
-          : testeDia === 3 ? "Último dia: anote 1 coisa e cola o adesivo raro." : testeDia === 2 ? "Voltou! Anote 1 coisa hoje e amanhã vem o raro." : "Anote 1 coisa hoje; amanhã já tem adesivo."}
+          ? <button type="button" className="font-bold text-foreground underline-offset-2 underline" onClick={() => abrirAlbum("missao", e.paginaDasNovas)} data-testid="cn-missao-album">Tem adesivo novo pra colar no álbum ›</button>
+          : testeDia === 3 ? "Último dia: anota 1 coisa e ganha o adesivo de 3 dias." : testeDia === 2 ? "Anota 1 coisa hoje. Amanhã vem o adesivo de 3 dias." : "Anota 1 coisa hoje. Amanhã vem o adesivo \"Voltei\"."}
       </span>
     </div>
   ) : null;
@@ -349,7 +356,7 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, onVoltar
           <CartaoSequencia e={e} onDetalhe={abrirDetalhe} onAcao={irPara} />
           <AlbumHero e={e} levantando={levantando} onAbrir={() => abrirAlbum("capa", 0)} onPacotinho={() => abrirAlbum("pacotinho", e.paginaDasNovas)} />
           <Trilha e={e} onAdesivo={(b) => tocarAdesivo(b)} testeDia={testeDia} />
-          <PorModulo e={e} onColecao={(c) => { trackEvent(EVENTOS2.colecaoAbrir, { colecao: c.id }); abrirAlbum("colecao", c.pagina); }} onTodos={abrirTodos} />
+          <PaginasDoAlbum e={e} onPagina={(p) => { trackEvent(EVENTOS2.colecaoAbrir, { colecao: p.raridade }); abrirAlbum("colecao", p.indice); }} onTodos={abrirTodos} />
         </div>
       </main>
 
@@ -368,6 +375,7 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, onVoltar
             pendentes={pendentesIds}
             onColar={colar}
             destaques={e.destaques}
+            rodapeFaltam
             maisRaros={e.paginas[0].vagas}
             abertos={e.abertos}
             total={e.total}

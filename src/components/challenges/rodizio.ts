@@ -1,19 +1,22 @@
 /**
- * RODÍZIO DOS DESAFIOS (17/10) — quem decide as 3 opções da segunda e como a
+ * RODÍZIO DOS DESAFIOS (17/10) — quem decide as 4 opções da segunda e como a
  * semana fecha. Puro: o card e o hook de abertura chamam daqui e gravam.
  *
- *  · Vaga 1 = o da semana passada, como VARIAÇÃO (venceu → nível seguinte) ou
- *    REVANCHE (perdeu só por falta de registro). Perdeu quebrando a regra, ou
- *    venceu o último nível → a chave descansa.
- *  · Vagas 2 e 3 = novas ELEGÍVEIS (a pessoa tem o dado), sem repetir chave usada
+ *  · Vaga 1 = o da semana passada, como VARIAÇÃO (venceu → nível seguinte).
+ *    Perdeu, ou venceu o último nível → a chave descansa. (REVANCHE só pra
+ *    registro antigo com motivo `sem-registro`, da 1ª versão do rodízio, que
+ *    exigia dias anotados — o dono tirou a regra em 17/10; o registro fica.)
+ *  · Vagas 2 a 4 = novas ELEGÍVEIS (a pessoa tem o dado), sem repetir chave usada
  *    nas últimas 4 semanas; CALENDÁRIO primeiro (pré-Black Friday → sem comprinha
  *    online; semana do pagamento → guarda da semana; dezembro → rolê com teto —
  *    o calendário passa por cima do descanso); pelo menos 1 ação positiva entre
- *    as 3 quando houver; ordem embaralhada por semente da semana (estável de
- *    segunda a domingo, diferente entre semanas).
- *  · Conta com pouco dado: menos de 3 opções é aceitável; nunca se inventa
- *    desafio sem dado. Sem NENHUMA fora do descanso, repete a usada há mais tempo
- *    — card vazio é pior que repetir.
+ *    as 4 quando houver; ordem embaralhada por semente da semana (estável de
+ *    segunda a domingo, diferente entre semanas). Eram 3; o dono pediu 4 (17/10):
+ *    "sem Uber, quem trabalha não pode se dar esse luxo; tendo 4 fica melhor de
+ *    escolher" — com 4 sempre sobra uma que cabe na vida da pessoa.
+ *  · Conta com pouco dado: menos de 4 opções é aceitável; nunca se inventa
+ *    desafio sem dado. Com 0 ou 1 fora do descanso, repete a usada há mais tempo
+ *    — card sem escolha é pior que repetir.
  *  · Fechamento: `active` COM `nivel` → catálogo novo (trava de registro, motivo);
  *    SEM `nivel` (escolhido pelo app antigo) → regra antiga, como sempre foi.
  */
@@ -25,7 +28,7 @@ import {
 import { CATALOGO, type DadosDaSemana, type DefDesafio, avaliarNoCatalogo, defDoCatalogo } from "./catalogo";
 
 export const SEMANAS_DE_DESCANSO = 4;
-export const OPCOES_POR_SEMANA = 3;
+export const OPCOES_POR_SEMANA = 4;
 
 /** djb2 — só pra embaralhar de um jeito estável dentro da semana. */
 const semente = (s: string): number => {
@@ -46,7 +49,7 @@ export const nivelParaOferta = (def: DefDesafio, history: RegistroDesafio[]): nu
   return Math.min(def.niveis, maior + 1);
 };
 
-/** Vaga 1: o da semana passada como variação (venceu → nível seguinte) ou revanche (faltou anotar). */
+/** Vaga 1: o da semana passada como variação (venceu → nível seguinte); revanche só de registro antigo `sem-registro`. */
 export const variacaoDaSemanaPassada = (d: DadosDaSemana, history: RegistroDesafio[]): OfertaDaSemana | null => {
   const anterior = segundaAnterior(d.weekStart);
   const daSemana = history.filter((h) => h.weekStart === anterior);
@@ -103,8 +106,9 @@ export function montarOfertas(d: DadosDaSemana, estado: ChallengesState): Oferta
     if (acao && ultima.origem === "nova") itens[itens.length - 1] = oferta(acao, "nova");
   }
 
-  // nada fora do descanso: repete a usada há mais tempo (card vazio é pior)
-  if (itens.length < OPCOES_POR_SEMANA) {
+  // quase nada fora do descanso (0 ou 1 opção): repete a usada há mais tempo — card
+  // sem escolha é pior que repetir; com 2+ opções o descanso de 4 semanas vale inteiro
+  if (itens.length < 2) {
     const ultimaVez = new Map<string, string>();
     for (const h of usadas) if (!ultimaVez.has(h.key) || h.weekStart > ultimaVez.get(h.key)!) ultimaVez.set(h.key, h.weekStart);
     const descansando = elegiveis.filter((def) => !jaTem(def.key) && emDescanso.has(def.key)).sort((a, b) => (ultimaVez.get(a.key) ?? "").localeCompare(ultimaVez.get(b.key) ?? ""));

@@ -41,6 +41,7 @@ import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
+import { registrarChavePainelLimpo } from "@/lib/financas-painel-limpo";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -141,6 +142,7 @@ export async function initRevenueCat(): Promise<EstadoRC> {
     registrarChavesRemotas(offerings);
     registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
     registrarChaveMontarFinancas(offerings); // 1.0.16: `montar_financas: on|off` (lib/montar-financas)
+    registrarChavePainelLimpo(offerings); // 1.0.16: `financas_painel_limpo: on|off` (lib/financas-painel-limpo)
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];

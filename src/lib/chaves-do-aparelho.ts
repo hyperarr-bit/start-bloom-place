@@ -97,6 +97,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
+  "core-financas-painel-", // 1.0.16: conta <id> é do painel limpo de Finanças (lib/financas-painel-limpo); a conta guarda o mesmo
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */
@@ -124,6 +125,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",
     "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-sem-gasto",
     "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
+    "core-financas-painel", // 1.0.16: { limpo: true } do painel limpo (a cópia do aparelho é a família core-financas-painel-<id>)
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [

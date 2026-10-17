@@ -11,9 +11,12 @@
  * do cartão, que é opcional, só pula o cartão (a renda e as contas respondidas ficam).
  *
  * ── ONDE APARECE ────────────────────────────────────────────────────────────────────────────
- *  (a) Sozinha, na 1ª abertura de Finanças de uma conta nova sem dado nenhum (pages/Index.tsx,
- *      hook `useMontarFinancasNoModulo` abaixo). Termina na aba MEU FINANCEIRO, já cheia.
- *  (b) PELA MISSÃO — a dose 1 de Finanças do teste de 3 dias (scratchpad/definitiva/8-trial-desenho.md):
+ *  (a) DESLIGADA em 17/10 (dono: "não quero que a pessoa clique em um módulo e apareça um quiz — é só
+ *      se a pessoa escolher primeiro"; lib/montar-financas `MONTAR_FINANCAS_NO_MODULO = false`): era
+ *      sozinha, na 1ª abertura de Finanças de uma conta nova sem dado (pages/Index.tsx, hook
+ *      `useMontarFinancasNoModulo` abaixo). O código fica, desligado.
+ *  (b) PELA MISSÃO — a ÚNICA porta: a dose 1 de Finanças do teste de 3 dias, pra quem escolheu
+ *      dinheiro/"tudo" (scratchpad/definitiva/8-trial-desenho.md):
  *      Montar → "pode gastar R$ X por dia" → (a missão segue com o 1º gasto pelo chip). Quem cuida da
  *      missão liga; nada aqui mexe nela:
  *
@@ -62,7 +65,7 @@ import {
   marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, registrarVistaMontar, reaisDigitados,
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
-  faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela,
+  faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
   type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
@@ -555,15 +558,18 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
  *   · "nao"       → Finanças de sempre (cliente antigo nem chega a "decidindo");
  *   · "decidindo" → conta nova esperando o dado da conta (o módulo mostra a tela em branco);
  *   · "mostrar"   → a tela de montar.
+ * `abrirNoModulo` (17/10: `MONTAR_FINANCAS_NO_MODULO`, desligado) — `false` = sempre "nao", na hora:
+ * nem a tela nem a espera em branco. O `?montar-financas=` de QA continua sendo lido aqui (é ele que
+ * deixa testar a tela da missão no navegador).
  */
-export function useMontarFinancasNoModulo(isPreview: boolean) {
+export function useMontarFinancasNoModulo(isPreview: boolean, abrirNoModulo: boolean = MONTAR_FINANCAS_NO_MODULO) {
   const { user } = useAuth();
   const { get, set, loaded, isGuest } = useUserData();
   const criadoEm = (user as { created_at?: string } | null)?.created_at;
   // `?montar-financas=recomecar` (QA, navegador): lido UMA vez por montagem
   const recomecou = useRef<boolean | null>(null);
   if (recomecou.current === null) recomecou.current = guardarForcaMontarDaUrl();
-  const candidato = () => !isPreview && !isGuest && montarFinancasLigado() && contaNovaParaMontar(criadoEm) && !montarJaDecidido();
+  const candidato = () => abrirNoModulo && !isPreview && !isGuest && montarFinancasLigado() && contaNovaParaMontar(criadoEm) && !montarJaDecidido();
   const decidir = (): "mostrar" | "nao" => {
     const getSemMarca = recomecou.current ? (<T,>(k: string, f: T): T => (k === CHAVE_MONTAR_FINANCAS ? f : get(k, f))) : get;
     if (montarAbertoPelaMissao()) return "nao"; // a missão está com a tela dela aberta

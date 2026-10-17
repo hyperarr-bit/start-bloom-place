@@ -44,7 +44,14 @@
  *   aparelho e libera a régua de conta nova; a conta precisa estar VAZIA de Finanças).
  *   Ordem: força de QA (navegador) > metadata remota (app) > constante.
  *
- * ── QUEM VÊ ─────────────────────────────────────────────────────────────────────────────────
+ * ── QUEM ABRE (17/10, regra do dono) ────────────────────────────────────────────────────────
+ *   SÓ A MISSÃO do teste, na 1ª dose de quem escolheu dinheiro/"tudo" (`<MontarFinancas origem="missao">`).
+ *   "Não quero que a pessoa clique em um módulo e apareça um quiz — é só se a pessoa escolher primeiro":
+ *   entrar em Finanças NÃO abre a tela (`MONTAR_FINANCAS_NO_MODULO = false`, abaixo); quem entra por
+ *   curiosidade ganha o tutorial guiado do 1º gasto (outro ramo). O hook do módulo e a tela "modulo"
+ *   continuam no código, desligados — `true` religa sem mais nada.
+ *
+ * ── QUEM VÊ (quando a missão pergunta `deveMostrarMontarFinancas`) ─────────────────────────────────
  *   chave ligada · conta logada (não convidado, não demo /preview) · conta NOVA (< 48 h, a mesma
  *   régua do tour e da missão; a força de QA pula só esta) · Finanças sem NENHUM dado (receita,
  *   gasto, fixo, parcela, investimento ou conta no MEU MÊS) · ainda não terminou nem pulou.
@@ -58,8 +65,9 @@
  *   e ela volta com o que já tinha sido respondido (rascunho na mesma chave do aparelho).
  *
  * ── UMA TELA POR VEZ ────────────────────────────────────────────────────────────────────────
- *   A tela pode abrir pelo módulo (1ª abertura de Finanças) ou pela missão (dose 1 de Finanças).
- *   `registrarTelaAberta` conta as abertas; a do módulo cede pra da missão e não abre por cima dela.
+ *   A tela abria pelo módulo (1ª abertura de Finanças) ou pela missão (dose 1 de Finanças); desde
+ *   17/10 só pela missão. `registrarTelaAberta` conta as abertas; se a do módulo for religada, ela
+ *   cede pra da missão e não abre por cima dela.
  */
 import { isNativeShell } from "@/lib/native-shell";
 import { computeDailyBudget } from "@/lib/finance-totals";
@@ -70,6 +78,14 @@ export type ModoChave = "on" | "off";
 export const MONTAR_FINANCAS: ModoChave = "on";
 /** Site (Vercel). */
 export const MONTAR_FINANCAS_WEB: ModoChave = "off";
+/**
+ * A tela abre SOZINHA quando a pessoa entra em Finanças? DESLIGADO (17/10, dono: "não quero que a
+ * pessoa clique em um módulo e apareça um quiz — é só se a pessoa escolher primeiro"). Quem abre é a
+ * missão do teste, na 1ª dose de quem escolheu dinheiro/"tudo" (origem "missao"); quem abre Finanças
+ * por curiosidade ganha o tutorial guiado do 1º gasto (outro ramo). Com `false`, pages/Index nunca
+ * mostra a tela nem espera em branco pelo dado da conta. `true` religa a abertura pelo módulo.
+ */
+export const MONTAR_FINANCAS_NO_MODULO: boolean = false;
 
 /** Nome da chave no metadata das offerings do RevenueCat. */
 export const CHAVE_REMOTA_MONTAR_FINANCAS = "montar_financas";

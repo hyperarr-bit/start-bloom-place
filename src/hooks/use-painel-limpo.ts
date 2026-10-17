@@ -7,9 +7,9 @@ import {
 
 /**
  * O Dashboard de Finanças abre LIMPO? (1.0.16 — régua, chave e memória em lib/financas-painel-limpo.)
- * Chamado no topo de pages/Index — na abertura do módulo, em qualquer aba e ANTES da tela do Montar —
- * pra a decisão sair com o módulo ainda vazio, antes do primeiro lançamento. O "sim" é guardado no
- * aparelho (por conta) e na conta assim que o dado da conta chega.
+ * Chamado no topo de pages/Index — na abertura do módulo, em qualquer aba — pra a decisão sair com o
+ * módulo ainda vazio, antes do primeiro lançamento (não depende do Montar, que desde 17/10 só abre pela
+ * missão). O "sim" é guardado no aparelho (por conta) e na conta assim que o dado da conta chega.
  */
 export function usePainelLimpo(isPreview: boolean): boolean {
   const { user } = useAuth();

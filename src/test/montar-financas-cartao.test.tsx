@@ -436,14 +436,28 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
 
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
-  /** Montar inteiro dentro do módulo, com o cartão vencendo dia 19 (daqui a 3 dias). */
+  /** A tela da MISSÃO (a única porta desde 17/10) por cima de Finanças, com o cartão vencendo dia 19
+   *  (daqui a 3 dias); "Ver minhas Finanças" fecha a tela e o módulo por baixo já adotou o dado. */
   const montarComCartao = async (dia = 19) => {
-    const controle = montarIndex({});
+    const controle = novoControle();
+    const ComMissao = () => {
+      const [missao, setMissao] = useState(true);
+      return (
+        <MemoryRouter initialEntries={["/financas"]}>
+          <Provedor inicial={{}} controle={controle}>
+            <Routes><Route path="/financas" element={<Index />} /></Routes>
+            {missao && <MontarFinancas origem="missao" agora={HOJE} esperaMs={0} onPronto={() => setMissao(false)} />}
+          </Provedor>
+        </MemoryRouter>
+      );
+    };
+    render(<ComMissao />);
     await respirar();
+    expect(screen.getAllByTestId("montar-financas")).toHaveLength(1); // só a da missão: o módulo não abre a dele
     ateOCartao();
     responderCartao({ banco: "Nubank", valor: "800", dia });
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
-    await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 }); // o "Montando…" de 2,2 s
+    await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
     fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
     await respirar();

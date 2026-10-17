@@ -68,6 +68,7 @@ import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 import { MontarFinancas, useMontarFinancasNoModulo } from "@/components/finance/montar/MontarFinancas";
+import { MONTAR_FINANCAS_NO_MODULO } from "@/lib/montar-financas";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -85,11 +86,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const isPreview = location.pathname.startsWith("/preview");
   const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
-  /* 1.0.16 — "Vamos montar suas Finanças" (lib/montar-financas): conta nova, Finanças vazia,
-     1ª abertura → 3 perguntas no lugar do módulo vazio. Cliente antigo: estado "nao" na hora. */
-  const montar = useMontarFinancasNoModulo(isPreview);
+  /* 1.0.16 — "Vamos montar suas Finanças" (lib/montar-financas). REGRA DO DONO (17/10): entrar em
+     Finanças NÃO abre o quiz — "não quero que a pessoa clique em um módulo e apareça um quiz, é só se a
+     pessoa escolher primeiro". Quem abre a tela é a MISSÃO do teste (1ª dose de quem escolheu
+     dinheiro/"tudo", origem "missao"); a curiosidade ganha o tutorial do 1º gasto (outro ramo).
+     `MONTAR_FINANCAS_NO_MODULO` = false: o hook responde "nao" na hora (sem tela em branco esperando o
+     dado da conta) e os dois retornos lá embaixo ficam travados. O hook continua lendo o QA da URL. */
+  const montar = useMontarFinancasNoModulo(isPreview, MONTAR_FINANCAS_NO_MODULO);
   /* 1.0.16 — PAINEL LIMPO do Dashboard (conta nova; lib/financas-painel-limpo). Decidido AQUI, na
-     abertura do módulo (antes da tela do Montar e do 1º lançamento); cliente antigo: sempre o de hoje. */
+     abertura do módulo (antes do 1º lançamento; não depende do Montar — quem passou por ele PELA MISSÃO
+     entra pela marca da conta); cliente antigo: sempre o de hoje. */
   const painelLimpo = usePainelLimpo(isPreview);
   /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma
      por aparelho, só se nunca lançou nada, só se a cota permite) acontece
@@ -434,8 +440,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
   ];
 
-  if (montar.estado === "decidindo") return <div className="min-h-screen bg-background" />;
-  if (montar.estado === "mostrar") {
+  // travado por MONTAR_FINANCAS_NO_MODULO (17/10, ver lá em cima): o módulo não abre o quiz sozinho
+  if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "decidindo") return <div className="min-h-screen bg-background" />;
+  if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "mostrar") {
     return (
       <MontarFinancas
         origem="modulo"

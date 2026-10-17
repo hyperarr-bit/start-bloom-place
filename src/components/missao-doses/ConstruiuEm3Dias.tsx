@@ -25,6 +25,11 @@ const nomeDoDia = (dia: string): string => {
  * cada dia, o score (do começo → hoje), a sequência com a semana, os adesivos
  * colados e as pendências de amanhã. "Continuar com o meu CORE" fecha e marca
  * como visto (uma vez só).
+ *
+ * 17/10 (revisão tela a tela, #39): a tela é mais alta que um iPhone de 390×844 — o botão ficava no fim do
+ * conteúdo e saía cortado embaixo. Agora ele fica COLADO embaixo (sticky, no fluxo: rolado até o fim, nada fica
+ * atrás dele), com um degradê do fundo por cima do que rola por baixo e a área segura de baixo. O título equilibra
+ * as 2 linhas ("O que você construiu / em 3 dias" — nada de "dias" sozinho).
  */
 export function ConstruiuEm3Dias({ missao, aoContinuar }: { missao: EstadoMissaoDoses; aoContinuar: () => void }) {
   const dados = useLifeHubData();
@@ -54,9 +59,11 @@ export function ConstruiuEm3Dias({ missao, aoContinuar }: { missao: EstadoMissao
   return (
     <div className="fixed inset-0 z-[240] overflow-y-auto bg-background text-foreground" data-camada-guia="missao-doses-fim" data-testid="missao-doses-fim" style={{ paddingTop: "var(--app-safe-top)" }}>
       <Confete />
-      <div className="min-h-full max-w-[420px] mx-auto flex flex-col px-4 pt-6 pb-8">
+      <div className="min-h-full max-w-[420px] mx-auto flex flex-col px-4 pt-6">
         <span className="self-center inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: "#1a8f5a" }}>🏆 Missão cumprida · 3 de 3</span>
-        <h1 className="text-[27px] font-black tracking-[-0.03em] leading-[1.1] text-center mt-3">O que você construiu em 3 dias</h1>
+        {/* text-balance (iOS 17.5+) + o "3 dias" preso por um espaço que não quebra (no iOS mais velho, no pior caso
+            "O que você construiu em / 3 dias") */}
+        <h1 className="text-[27px] font-black tracking-[-0.03em] leading-[1.1] text-center mt-3 text-balance" data-testid="missao-doses-fim-titulo">O que você construiu em 3{"\u00a0"}dias</h1>
 
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="rounded-2xl border border-border bg-card overflow-hidden mt-5" data-testid="missao-doses-fim-missao">
           <div className="md-secao" data-cor="grafite"><span className="inline-flex items-center gap-2"><Quadradinho marcado claro tam={14} /> Sua missão dos 3 dias</span><b>100%</b></div>
@@ -135,8 +142,10 @@ export function ConstruiuEm3Dias({ missao, aoContinuar }: { missao: EstadoMissao
           </div>
         </motion.section>
 
-        <div className="mt-auto pt-6">
-          <button type="button" className="md-botao" data-testid="missao-doses-continuar" onClick={aoContinuar}>
+        {/* o botão COLADO embaixo (missao-doses.css, .md-fim-rodape): sticky dentro do que rola — rolado até o fim, as
+            pendências ficam inteiras acima dele —, o degradê do fundo apaga o que passa por baixo e a área segura do iPhone */}
+        <div className="md-fim-rodape" data-testid="missao-doses-fim-rodape">
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-continuar" onClick={aoContinuar}>
             Continuar com o meu CORE <ArrowRight className="w-4 h-4" />
           </button>
         </div>

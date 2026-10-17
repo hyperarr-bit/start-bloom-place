@@ -114,7 +114,7 @@ const FinancasFalsa = () => {
   const saiu = soma("finance-expenses") + soma("finance-fixed-expenses");
   return (
     <div><Rota /><header className="sticky">FINANÇAS</header>
-      <nav><button type="button" data-spotlight="tab-dashboard" onClick={() => setAba("dashboard")}>DASHBOARD</button><button type="button" data-spotlight="financeiro" onClick={() => setAba("financeiro")}>MEU FINANCEIRO</button></nav>
+      <nav><button type="button" data-spotlight="tab-dashboard" data-active={aba === "dashboard"} onClick={() => setAba("dashboard")}>DASHBOARD</button><button type="button" data-spotlight="financeiro" data-active={aba === "financeiro"} onClick={() => setAba("financeiro")}>MEU FINANCEIRO</button></nav>
       {aba === "financeiro" ? (
         !semBotao && <div key={`linha-${versao}`}><input placeholder="Novo gasto" /><button type="button" data-spotlight="add-expense">+</button></div>
       ) : (
@@ -1798,5 +1798,81 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     avancar(PASSAGEM_B_MS + 500);
     expect(screen.getByTestId("rota")).not.toHaveTextContent("/rotina");
     expect(eventos.map(([n]) => n)).not.toContain("missao_bora_proxima");
+  });
+});
+
+/* ------------------------------------------------------------ 18: o 1º gasto à prova de toque (B8, D4, toque duplo, teclado) */
+
+describe("18. o 1º gasto à prova de toque (relatório 11): a aba ao lado não troca, o post-it cola embaixo da faixa, o toque duplo grava 1", () => {
+  const dose = () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({});
+    const store = montarStore({});
+    montar(store, "/financas");
+    const postIt = esperarPostIt();
+    return { store, postIt };
+  };
+
+  it("B8: no meio do passo, o toque na aba DASHBOARD não troca de aba — o post-it fica (e avisa), o evento conta, e o chip grava depois", () => {
+    const { store } = dose();
+    eventos.length = 0;
+    fireEvent.click(screen.getByText("DASHBOARD"));
+    expect(screen.getByText("DASHBOARD")).toHaveAttribute("data-active", "false"); // continua no MEU FINANCEIRO
+    expect(screen.getByPlaceholderText("Novo gasto")).toBeInTheDocument();
+    const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
+    expect(postIt).toHaveTextContent("Primeiro o gasto — depois é só explorar");
+    expect(eventos).toContainEqual(["missao_doses_aba", expect.objectContaining({ de: "financeiro", para: "dashboard", bloqueada: true })]);
+    expect(eventos.map(([n]) => n)).not.toContain("missao_doses_anel_saiu");
+    avancar(2700); // o aviso some sozinho
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).not.toHaveTextContent("Primeiro o gasto");
+    fireEvent.click(within(screen.getAllByTestId("demo-guia-postit").at(-1)!).getAllByTestId("demo-guia-chip")[1]);
+    expect(store.dados["finance-expenses"]).toHaveLength(1);
+    expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 de 3 feito ✅");
+    // fora do passo (a festa na tela), as abas voltam a trocar normalmente
+    fireEvent.click(screen.getByTestId("missao-doses-continuar"));
+  });
+
+  it("toque DUPLO no chip (ou o dedo que treme) grava 1 gasto só e 1 dose só", () => {
+    const { store, postIt } = dose();
+    const cafe = within(postIt).getAllByTestId("demo-guia-chip")[0];
+    fireEvent.click(cafe);
+    fireEvent.click(cafe);
+    expect(store.dados["finance-expenses"]).toHaveLength(1);
+    passarOlhaDeFinancas();
+    expect(eventos.filter(([n]) => n === "missao_doses_dia_feito")).toHaveLength(1);
+    expect(store.dados["finance-expenses"]).toHaveLength(1);
+  });
+
+  it("D4/B6: ela rolou e o alvo saiu da tela — o anel recolhe e o post-it COLA embaixo da faixa (só a pergunta e os chips), e o chip dali grava em 1 toque", () => {
+    const { store } = dose();
+    expect(screen.getByTestId("missao-doses-anel")).toBeInTheDocument();
+    // a rolagem pra cima: tudo (menos o cabeçalho fixo) vai pra baixo da área visível
+    vi.mocked(Element.prototype.getBoundingClientRect).mockImplementation(function (this: Element) {
+      return (this.matches?.("header.sticky, .demo-tour-nav")
+        ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+        : { top: 2400, left: 10, width: 300, height: 48, bottom: 2448, right: 310, x: 10, y: 2400, toJSON: () => ({}) }) as DOMRect;
+    });
+    act(() => { window.dispatchEvent(new Event("scroll")); });
+    avancar(400);
+    const doca = screen.getByTestId("missao-doses-postit-doca");
+    expect(within(doca).getByTestId("demo-guia-postit")).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    expect(within(doca).queryByText(/Ainda não gastei/)).toBeNull(); // colado: só a pergunta e os chips
+    expect(screen.queryByTestId("missao-doses-anel")).toBeNull(); // o anel recolhido não desenha (nem o escuro)
+    fireEvent.click(within(doca).getAllByTestId("demo-guia-chip")[2]);
+    expect((store.dados["finance-expenses"] as Array<{ description: string }>)[0]).toMatchObject({ description: "Almoço" });
+    expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ onde: "postit_doca", nome: "Almoço" })]);
+  });
+
+  it("o teclado no passo (✎ outro → o campo do módulo) é medido: aberto e fechado", () => {
+    dose();
+    eventos.length = 0;
+    fireEvent.click(within(screen.getAllByTestId("demo-guia-postit").at(-1)!).getByTestId("demo-guia-escrever"));
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Novo gasto"));
+    act(() => { (document.activeElement as HTMLElement).dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+    expect(eventos).toContainEqual(["missao_doses_teclado", expect.objectContaining({ aberto: true })]);
+    act(() => { (document.activeElement as HTMLElement).blur(); document.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
+    avancar(200);
+    expect(eventos).toContainEqual(["missao_doses_teclado", expect.objectContaining({ aberto: false })]);
   });
 });

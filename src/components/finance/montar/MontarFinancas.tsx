@@ -108,6 +108,8 @@ export interface PropsMontarFinancas {
   agora?: Date;
   /** Só testes/prints: duração do "Montando…" em ms (padrão 2200; 0 = pula a espera). */
   esperaMs?: number;
+  /** Só /dev e testes: a conta (`created_at`) quando não há login — a volta na tela do número (B11) é por conta. */
+  contaCriadaEm?: string;
 }
 
 type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto";
@@ -212,10 +214,10 @@ function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
   }, [ref]);
 }
 
-export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200 }: PropsMontarFinancas) {
+export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200, contaCriadaEm }: PropsMontarFinancas) {
   const { get, set } = useUserData();
   const { user } = useAuth();
-  const criadoEm = (user as { created_at?: string } | null)?.created_at;
+  const criadoEm = contaCriadaEm ?? (user as { created_at?: string } | null)?.created_at;
   const { custom: cartoesPersonalizados, addCustom, configOf, setConfig } = useFinanceCards();
   const hoje = useMemo(() => agora ?? new Date(), [agora]);
   const folha = useRef<HTMLDivElement>(null);
@@ -693,7 +695,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                   <span className="mf-postit-fita" aria-hidden />
                   <div className="mf-postit-papel">
                     <span className="mf-postit-rotulo">{gastos.length ? "Anotado ✓" : "E hoje · 1 toque"}</span>
-                    <span className="mf-postit-pergunta">{gastos.length ? "Primeiro gasto no lugar." : "Já gastou com alguma coisa hoje?"}</span>
+                    <span className="mf-postit-pergunta">{gastos.length > 1 ? "Gastos de hoje no lugar." : gastos.length ? "Primeiro gasto no lugar." : "Já gastou com alguma coisa hoje?"}</span>
                     <span className="mf-postit-texto">
                       {gastos.length
                         ? resultado.semFolga ? fraseDosGastos : "A cada gasto que você anota, o quanto sobra pra hoje se ajusta sozinho."

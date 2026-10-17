@@ -207,6 +207,7 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(gastosDe(controle).map((g) => [g.description, g.value])).toEqual([["Café", 12], ["Uber", 23]]);
     expect(screen.getByTestId("montar-pra-hoje").getAttribute("data-valor")).toBe("31");
     expect(lido(screen.getByTestId("montar-pronto"))).toContain("Café e Uber · R$ 35 já estão nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 31.");
+    expect(postIt().getByText("Gastos de hoje no lugar.")).toBeTruthy();
     fireEvent.click(tela().getByRole("button", { name: "Ver no meu mês →" }));
     expect(onPronto.mock.calls[0][0].primeiroGasto).toEqual({ nome: "Café" });
   });

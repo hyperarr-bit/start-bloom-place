@@ -139,3 +139,7 @@
 @keyframes cn-gira { to { transform: rotate(360deg); } }
 @keyframes cn-cai { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(105vh) rotate(var(--giro, 200deg)); opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { .cn-b-seg, .cn-toast, .cn-festa-raios, .cn-confete, .cn-album-capa { animation: none !important; transition: none !important; } }
+
+/* área de toque de 44 px nos chips de filtro da coleção (28 px de altura) — ::before invisível (polimento 17/10) */
+.cn-b-chip { position: relative; }
+.cn-b-chip::before { content: ""; position: absolute; inset: -8px -3px; }

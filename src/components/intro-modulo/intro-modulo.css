@@ -114,3 +114,11 @@ html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) 
 .cm-lembrete-nao { flex: none; min-height: 34px; padding: 0 8px; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
 /* o acesso permanente no cabeçalho do módulo (ícone + "Dicas") */
 /* o botão "Dicas" do cabeçalho (17/10) virou só o ícone, com as classes do botão do tema — ver AcessoConhecerMais */
+
+/* ÁREAS DE TOQUE DE 44 PX (polimento 17/10): os botões pequenos das faixas e do estado vazio ("Pular" tem 26 px,
+   "Fechar" 28–32, os chips 34) ganham um ::before invisível que estica o alvo do toque — nada muda no desenho. */
+.im-faixa-pular, .im-pronto-fechar, .im-vazio-fechar, .im-vazio-chip { position: relative; }
+.im-faixa-pular::before { content: ""; position: absolute; inset: -9px -6px; }
+.im-pronto-fechar::before { content: ""; position: absolute; inset: -6px -4px; }
+.im-vazio-fechar::before { content: ""; position: absolute; inset: -8px -4px; }
+.im-vazio-chip::before { content: ""; position: absolute; inset: -5px -2px; }

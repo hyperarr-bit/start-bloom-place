@@ -195,3 +195,7 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 }
 /* "＋ Outra"/"← Voltar": o texto mora num <span> — com o svg como único filho, a regra global
    `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */
+
+/* área de toque de 44 px no "Tirar" da conta (34 px) — ::before invisível (polimento 17/10) */
+button.mf-tirar { position: relative; }
+button.mf-tirar::before { content: ""; position: absolute; inset: -5px; }

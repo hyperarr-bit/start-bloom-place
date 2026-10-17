@@ -67,3 +67,7 @@ button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 5
 /* O fundo das boas-vindas do braço A: o azul-céu de sempre no claro; no escuro, o papel do tema (sem tela branca à noite). */
 .md-fundo-boas { background: linear-gradient(180deg, #eaf5fd 0%, #ffffff 55%); }
 .dark .md-fundo-boas { background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 60%); }
+
+/* área de toque de 44 px no "Pular" da faixa (36 px) — ::before invisível (polimento 17/10) */
+.md-faixa-pular { position: relative; }
+.md-faixa-pular::before { content: ""; position: absolute; inset: -4px; }

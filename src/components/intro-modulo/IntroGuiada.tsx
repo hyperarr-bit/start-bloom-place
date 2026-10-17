@@ -13,7 +13,7 @@ import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia
 import "./intro-modulo.css";
 
 /**
- * A INTRO GUIADA DO MÓDULO (protótipo 16/10): a MESMA mecânica da dose da missão —
+ * A INTRO GUIADA DO MÓDULO (16/10): a MESMA mecânica da dose da missão —
  * faixa no topo, anel no controle real, post-it com chips (1 toque = registro de
  * verdade na conta), o "olhar" no resumo que recalculou — só que sem missão em volta:
  * sem dia 1/2/3, sem "amanhã", sem festa em tela cheia. Termina num cartão pequeno
@@ -204,10 +204,10 @@ export function IntroGuiada({ config, aoTerminar }: { config: IntroGuiadaConfig;
   const entendi = useCallback((via: "botao" | "auto") => { if (faseRef.current !== "olhar") return; trackEvent("modulo_intro_olhar", { modulo: m, via }); setFase("pronto"); }, [m]);
 
   const faixa = (
-    <div className="im-faixa" data-testid="intro-modulo-faixa" data-fase={fase} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
+    <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "agora olha" : config.pedido}</span>
       {perdeuAlvo && fase === "anotar" && (
-        <button type="button" className="im-faixa-onde" data-testid="intro-modulo-onde" aria-label="Mostrar onde tocar" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
+        <button type="button" className="im-faixa-onde bg-faixa" data-testid="intro-modulo-onde" aria-label="Mostrar onde tocar" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
       )}
       {pularVisivel && fase !== "pronto" && (
         <button type="button" className="im-faixa-pular" data-testid="intro-modulo-pular" onClick={(e) => { e.stopPropagation(); pular(fase === "olhar" ? "olhar" : "toque"); }}>Pular</button>

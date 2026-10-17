@@ -92,7 +92,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
-  "core-intro-vista-", // "já vi a intro" de cada módulo (protótipo 16/10, lib/intro-modulo)
+  "core-intro-vista-", // "já vi a intro" de cada módulo (16/10, lib/intro-modulo): terminou, feita ou pulada
+  "core-intro-aberta-", // a intro do módulo já APARECEU neste aparelho (fechou o app no meio): a 2ª aparição é a última
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */

@@ -22,6 +22,7 @@ import { useLocation } from "react-router-dom";
 import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
+import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -69,7 +70,10 @@ const Beleza = () => {
   // 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home) no lugar do "Dicas pra começar"; nunca na demo
   const { pathname } = useLocation();
   guardarForcasDaUrl(); // a força do link (`?cartoes=on`) tem que estar guardada ANTES de perguntar se está ligado
-  const comCartoes = !pathname.startsWith("/preview") && cartoesLigados();
+  guardarForcaDaIntro();
+  // 16/10 (1.0.16): com a intro do módulo ligada os cartões saem do fluxo em todos os módulos; a Beleza não tem intro
+  // (a tela vazia dela — as 3 perguntas — já é o primeiro passo) e fica com as DicasDaBeleza de sempre.
+  const comCartoes = !pathname.startsWith("/preview") && !introLigada() && cartoesLigados();
 
   // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
   useEffect(() => {

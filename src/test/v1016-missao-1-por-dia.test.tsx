@@ -853,6 +853,24 @@ describe("6. 'Dose de hoje' nas Pendências — a ÚNICA presença da missão na
 /* ------------------------------------------------------------ 7: contrato + a missão é da CONTA */
 
 describe("7. contrato com Conquistas e cartões; a missão é da CONTA (não do aparelho)", () => {
+  it("Conquistas: o 'Missão · dia N de 3' sai da missão NOVA quando não há a antiga (missaoAtual/diaDaMissao intocados: a antiga, se existir, manda)", async () => {
+    const { diaDoTeste } = await import("@/components/conquistas/nova/ConquistasNova");
+    localStorage.setItem("core-trial-cartao-fim", String(new Date(2026, 9, 6, 15, 0).getTime()));
+    expect(diaDoTeste()).toBeNull(); // sem missão nenhuma
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } });
+    expect(diaDoTeste()).toBe(1);
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    expect(diaDoTeste()).toBe(2);
+    vi.setSystemTime(new Date(2026, 9, 7, 10, 0)); // passou do dia 3
+    expect(diaDoTeste()).toBeNull();
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "A"), boasVindas: true, explorou: true }));
+    expect(diaDoTeste()).toBeNull(); // foi explorar: sem missão
+    // a missão ANTIGA (core-missao, 1.0.9) continua mandando quando existe
+    localStorage.setItem("core-missao", JSON.stringify({ inicio: new Date(2026, 9, 2, 9, 0).getTime(), area: "dinheiro", d1: true, d2: false, d3: false, vista: true, holofote: "feito" }));
+    expect(diaDoTeste()).toBe(3);
+  });
+
   it("moduloDaMissaoHoje(): null sem missão, com as boas-vindas na tela e pra quem foi explorar; a dose devida hoje; a feita hoje; amanhã, a próxima", () => {
     ligarUmPorDia("on");
     expect(moduloDaMissaoHoje()).toBeNull();

@@ -343,6 +343,8 @@ const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) 
 const DevMontarFinancas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMontarFinancas")) : null;
 // 16/10: Finanças no modo convidado (o que o /dev/montar-financas gravou), pra ver o painel limpo com ?painel-limpo=on — só no dev
 const DevFinancas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevFinancas")) : null;
+// 17/10: "Rotina pronta em 3 toques" (1.0.16) por cima da Rotina de verdade, conta vazia em memória — só no dev
+const DevMontarRotina = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMontarRotina")) : null;
 // 09/10: painel da afiliada e aba Afiliados do /admin com dados de exemplo, pra fotografar — só no dev
 const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
 // 16/10: o braço A da 1.0.16 ("uma dose por dia") tela a tela, pra fotografar — só no dev
@@ -671,6 +673,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevFinancas && (
           <Route path="/dev/financas" element={<Suspense fallback={null}><DevFinancas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevMontarRotina && (
+          <Route path="/dev/montar-rotina" element={<Suspense fallback={null}><DevMontarRotina /></Suspense>} />
         )}
         {import.meta.env.DEV && DevAfiliados && (
           <Route path="/dev/afiliados" element={<Suspense fallback={null}><DevAfiliados /></Suspense>} />

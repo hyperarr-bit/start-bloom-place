@@ -31,6 +31,9 @@ import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { nomeComQuem } from "@/lib/saude-dependentes";
 import { localDayKey } from "@/lib/utils";
 import { algumLigado, lerDadosDoSkincare, type DadosDoSkincare } from "@/lib/beleza-lembrete";
+// 17/10 (1.0.16, "Rotina pronta em 3 toques"): o lembrete de manhã da Rotina — prefs na chave própria
+import { agendarRotinaManha } from "@/lib/notificacoes";
+import { lerDadosRotinaManha, type DadosRotinaManha } from "@/lib/rotina-manha";
 
 /**
  * A fonte única de "o que agendar" (27/07).
@@ -119,6 +122,8 @@ export interface DadosDosLembretes {
   cuidados?: Cuidado[];
   /** validade dos produtos (28/09, Onda 1): MEUS PRODUTOS + o interruptor (nasce desligado) */
   validade?: { produtos: ProdutoMeu[]; prefs: LembreteValidade };
+  /** Rotina de manhã (17/10): o interruptor e a hora (`rotina-lembrete-manha-prefs`), os hábitos e os marcados hoje */
+  rotinaManha?: DadosRotinaManha;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -274,6 +279,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
       produtos: (() => { const l = get<unknown>("beauty-products", []); return Array.isArray(l) ? (l as ProdutoMeu[]) : []; })(),
       prefs: lerLembreteValidade(get<unknown>(CHAVE_LEMBRETE_VALIDADE, undefined)),
     },
+    rotinaManha: lerDadosRotinaManha(get, hoje),
   };
 }
 
@@ -321,6 +327,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     !!dados.cuidados && algumAvisoDeCuidado(dados.cuidados) && dados.cuidados,
     // (28/09) validade: só as datas e o PAO de cada produto contam (e o interruptor)
     !!dados.validade && dados.validade.prefs.ligado && [dados.validade.prefs, dados.validade.produtos.filter((p) => p && !p.finished).map((p) => [p.id, p.expiry, p.openedDate, p.paoMonths])],
+    // (17/10) Rotina de manhã: ligar/mudar a hora, os hábitos e o que foi marcado hoje mudam o plano
+    !!dados.rotinaManha && dados.rotinaManha.prefs.ligado && dados.rotinaManha,
   ]);
 }
 
@@ -360,5 +368,6 @@ export async function reagendarTudo(
     cabelo: d.cabelo ? await agendarCabelo(d.cabelo) : 0,
     cuidados: d.cuidados ? await agendarCuidados(d.cuidados) : 0,
     validade: d.validade ? await agendarValidade(d.validade.produtos, d.validade.prefs) : 0,
+    rotinaManha: d.rotinaManha ? await agendarRotinaManha(d.rotinaManha) : 0,
   };
 }

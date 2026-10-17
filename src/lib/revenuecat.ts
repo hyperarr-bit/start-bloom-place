@@ -44,11 +44,12 @@ import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
 import { registrarChavePainelLimpo } from "@/lib/financas-painel-limpo";
 import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
 import { registrarIntroRemota } from "@/lib/intro-modulo";
+import { registrarChaveMontarRotina } from "@/lib/montar-rotina";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`) e as
  *  do teste da 1.0.16 — `missao_1_por_dia` (ab|on|off) + `tour_home` (curto|longo|off) em lib/dia1-cheio,
- *  `montar_financas` (on|off) e `financas_painel_limpo` (on|off). Cada uma isolada: uma metadata estranha nunca
+ *  `montar_financas` (on|off), `financas_painel_limpo` (on|off) e `montar_rotina` (on|off). Cada uma isolada: uma metadata estranha nunca
  *  derruba as outras. */
 const registrarChavesDasOfferings = (offerings: unknown): void => {
   const cada: Array<(o: unknown) => void> = [
@@ -58,6 +59,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarUmPorDiaRemoto,
     registrarChaveMontarFinancas,
     registrarChavePainelLimpo,
+    registrarChaveMontarRotina,
   ];
   for (const f of cada) {
     try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }

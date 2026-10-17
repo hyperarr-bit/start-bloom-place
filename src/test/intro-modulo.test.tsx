@@ -36,6 +36,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 import { UserDataContext, _regrasDeAtivacao, useUserData, type UserDataContextType } from "@/hooks/use-user-data";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import {
   ATRIBUTO_MONTAR_FINANCAS, CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, EVENTO_MONTAR_FINANCAS_FIM, INTRO_MODULO, INTRO_MODULO_APP, INTROS,
   ATRIBUTO_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_FIM, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, MODULOS_SEM_NADA, MONTAR_ROTINA, OLHAR_POSSO_GASTAR, _zerarIntroRemota,
@@ -245,6 +246,26 @@ describe("ligada: a porta do módulo", () => {
     expect(porQueNaoMostrar("casa", (k, f) => (k === "spotlight-done-casa" ? ("true" as never) : f))).toBe("ja_apresentado");
     localStorage.setItem("core-cartoes-vistos-casa", "2026-10-14");
     expect(porQueNaoMostrar("casa", (_k, f) => f)).toBe("ja_apresentado");
+  });
+
+  it("17/10 (achado no app de verdade): o tutorial antigo da página (SpotlightOverlay, que marca spotlight-done na 1ª abertura de QUALQUER conta logada, num efeito que roda antes) não esconde a intro da conta nova; quem já tinha o tutorial gravado ANTES continua sem intro", async () => {
+    ligar();
+    const pagina = (m: string) => <><SpotlightOverlay moduleKey={m} steps={[]} /><IntroDoModulo moduleId={m} /></>;
+    const a = montar(pagina("casa"));
+    await dormir(10);
+    expect(a.estado.dados["spotlight-done-casa"]).toBe("true"); // a página antiga marcou na mesma abertura
+    expect(card()).toBeTruthy(); // e a intro aparece mesmo assim
+    a.unmount();
+    // fechou o app no meio: a marca veio dessa visita — a intro volta 1 vez
+    const b = montar(pagina("casa"), { "spotlight-done-casa": "true" });
+    await dormir(10);
+    expect(card()).toBeTruthy();
+    b.unmount();
+    localStorage.clear(); ligar();
+    // conta de antes: o tutorial antigo já estava gravado ANTES desta abertura (e a intro nunca apareceu aqui) ⇒ nada
+    const c = montar(pagina("casa"), { "spotlight-done-casa": "true" });
+    await dormir(10);
+    expect(card()).toBeNull();
   });
 
   it("1x: já vista neste aparelho OU nesta conta (2º aparelho) ⇒ nada", () => {

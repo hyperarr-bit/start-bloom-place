@@ -155,9 +155,14 @@ export const QuickActions = () => {
     return () => window.removeEventListener(EVENTO_ACAO_RAPIDA, aoPedir);
   }, []);
 
+  // o "✓" some sozinho em 1,5 s — e o relógio morre com o componente (sair da Home antes disso disparava
+  // setState num componente desmontado; nos testes, "window is not defined" depois do fim do arquivo)
+  const timerSucesso = useRef<number | null>(null);
+  useEffect(() => () => { if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current); }, []);
   const showSuccess = (id: ActionId) => {
     setSuccessId(id);
-    setTimeout(() => setSuccessId(null), 1500);
+    if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
+    timerSucesso.current = window.setTimeout(() => { timerSucesso.current = null; setSuccessId(null); }, 1500);
   };
 
   const addWater = () => {

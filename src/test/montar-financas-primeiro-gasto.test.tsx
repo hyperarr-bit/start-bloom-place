@@ -291,6 +291,31 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect("primeiroGasto" in r).toBe(false);
   });
 
+  it("o número só anima quando está na tela: digitar a renda não roda quadro a quadro; o Café roda", async () => {
+    const semMenosMovimento = ((q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    const antes = window.matchMedia;
+    window.matchMedia = semMenosMovimento;
+    const raf = vi.spyOn(window, "requestAnimationFrame");
+    const quadrosDoNumero = () => raf.mock.calls.filter(([cb]) => (cb as { name?: string }).name === "passo").length;
+    try {
+      montarTela();
+      for (const v of ["2", "25", "250", "2500", "3000"]) fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: v } });
+      await respirar();
+      expect(quadrosDoNumero()).toBe(0);
+      fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+      fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+      fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+      await respirar();
+      expect(quadrosDoNumero()).toBe(0);
+      fireEvent.click(postIt().getByRole("button", { name: /^Café,/ }));
+      await respirar();
+      expect(quadrosDoNumero()).toBeGreaterThan(0);
+    } finally {
+      raf.mockRestore();
+      window.matchMedia = antes;
+    }
+  });
+
   it("o gasto passa do que dá no dia: R$ 0 pra hoje e 'hoje já passou'", async () => {
     montarTela();
     fireEvent.click(tela().getByRole("button", { name: "Até R$ 2 mil" })); // 1.500

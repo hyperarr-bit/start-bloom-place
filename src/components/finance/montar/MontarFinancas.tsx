@@ -123,15 +123,17 @@ const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long
 /** Os chips do 1º gasto na tela do número: os MESMOS da missão (Café R$ 12 · Uber R$ 23 · Almoço R$ 35). */
 const CHIPS_DO_NUMERO: ChipDaMissao[] = alvoDaMissao("gasto").chips;
 
-/** O número que cai na frente dela (~1 s, desacelerando); sem animação pra quem pediu menos movimento. */
-function useNumeroQueCai(alvo: number, ms = 1100): number {
+/** O número que cai na frente dela (~1 s, desacelerando); sem animação pra quem pediu menos movimento.
+ *  `animar` = o número está na tela ("pra hoje"): fora disso só acompanha o valor, sem quadro a quadro (digitar a
+ *  renda mudava o "por dia" a cada tecla e redesenhava a tela inteira ~60 vezes por segundo). */
+function useNumeroQueCai(alvo: number, animar: boolean, ms = 1100): number {
   const [v, setV] = useState(alvo);
   const atual = useRef(alvo);
   useEffect(() => {
     const de = atual.current;
     if (de === alvo) return;
     const reduzir = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    if (reduzir || typeof requestAnimationFrame !== "function") { atual.current = alvo; setV(alvo); return; }
+    if (!animar || reduzir || typeof requestAnimationFrame !== "function") { atual.current = alvo; setV(alvo); return; }
     let raf = 0;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const passo = (t: number) => {
@@ -143,7 +145,7 @@ function useNumeroQueCai(alvo: number, ms = 1100): number {
     };
     raf = requestAnimationFrame(passo);
     return () => cancelAnimationFrame(raf);
-  }, [alvo, ms]);
+  }, [alvo, animar, ms]);
   return v;
 }
 
@@ -459,7 +461,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   const gastoDeHoje = gastos.reduce((t, g) => t + g.valor, 0);
   const praHoje = comPostIt && gastos.length > 0 && !resultado.semFolga;
   const sobra = sobraPraHoje(resultado.porDia, gastoDeHoje);
-  const numeroNaTela = useNumeroQueCai(praHoje ? Math.max(0, sobra) : resultado.porDia);
+  const numeroNaTela = useNumeroQueCai(praHoje ? Math.max(0, sobra) : resultado.porDia, praHoje);
   const idsDosChips = new Set(CHIPS_DO_NUMERO.map((c) => { const i = itemDoChip("gasto", c); return i ? idDoItem(i) : c.nome; }));
   const anotadosAMao = gastos.filter((g) => !idsDosChips.has(g.id));
   /** "R$ 58" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */

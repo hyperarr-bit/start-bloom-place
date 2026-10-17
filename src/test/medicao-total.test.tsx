@@ -329,6 +329,19 @@ describe("folhas e blocos vistos", () => {
     expect(_resumoAtual().f).toEqual({ "home||widgets": 2 });
   });
 
+  it("etapa nova na MESMA folha (montar finanças/rotina troca o data-folha no elemento) conta como vista nova", () => {
+    instalarMedicaoTotal({ aceitarSinteticos: true, dedupeMs: 0 });
+    anotarTela("/financas");
+    const d = document.createElement("div");
+    d.setAttribute("role", "dialog");
+    d.setAttribute("data-folha", "montar-financas:renda");
+    document.body.appendChild(d);
+    varrer();
+    d.setAttribute("data-folha", "montar-financas:contas");
+    varrer(); varrer();
+    expect(_resumoAtual().f).toEqual({ "financas||montar-financas:renda": 1, "financas||montar-financas:contas": 1 });
+  });
+
   it("bloco explícito (data-tour/data-track-bloco) visto 1× por sessão; botão com data-tour não é bloco", () => {
     instalarMedicaoTotal({ aceitarSinteticos: true, dedupeMs: 0 });
     anotarTela("/home");

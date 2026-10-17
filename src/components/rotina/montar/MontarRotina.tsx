@@ -362,7 +362,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   const nItens = escolhidos.length;
 
   return (
-    <div className="mrt" role="dialog" aria-modal="true" aria-label="Vamos montar sua rotina" data-testid="montar-minha-rotina" data-etapa={etapa}>
+    <div className="mrt" role="dialog" aria-modal="true" aria-label="Vamos montar sua rotina" data-testid="montar-minha-rotina" data-etapa={etapa} data-folha={`montar-rotina:${etapa}`}>
       <header className="mrt-cab">
         <Calendar className="mrt-cab-icone" aria-hidden />
         <span className="mrt-cab-nome">ROTINA</span>

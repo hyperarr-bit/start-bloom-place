@@ -21,7 +21,7 @@ const ATRIBUTOS = new Set(["data-track", "data-track-bloco", "data-folha", "data
 /** Nome de propriedade que é ID do código (nunca texto da pessoa). */
 const PROP_ID = /^(id|tipo|key|v|modulo|rar|spotlight)$/;
 /** Identificadores revisados: props repassadas cujas chamadas são conferidas, ou estado com id do código. */
-const IDENTIFICADORES_OK = new Set(["id", "rotulo", "activeAction", "testid", "dataCard", "card", "camada", "testId"]);
+const IDENTIFICADORES_OK = new Set(["id", "rotulo", "activeAction", "testid", "dataCard", "card", "camada", "testId", "etapa"]); // etapa: estado (união de literais) dos fluxos montar finanças/rotina
 /** Componentes que repassam a prop pra um desses atributos: a CHAMADA também é conferida. */
 const CHAMADAS_CONFERIDAS: Record<string, string[]> = { CartaoPet: ["dataCard"], Secao: ["card"], Casca: ["testid"] };
 

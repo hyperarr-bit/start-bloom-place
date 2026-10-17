@@ -560,7 +560,8 @@ const estado = {
   ultimoToque: -Infinity,
   noFundo: false,
   vistos: new Set<string>(),
-  folhasAbertas: new Set<Element>(),
+  /** folha aberta → o nome com que foi contada (mudou o nome no mesmo elemento = etapa nova = vista nova) */
+  folhasAbertas: new Map<Element, string>(),
   pendentes: [] as Array<{ alvo: Element; tela: string; aba: string | null }>,
   desligar: [] as Array<() => void>,
 };
@@ -725,14 +726,14 @@ const agendarVarredura = () => {
 /** Folhas abertas agora (sem as que estão dentro de outra marcada) e blocos explícitos novos. */
 export function varrer(): void {
   try {
-    if (!estado.tela || !ligada()) { estado.folhasAbertas = new Set(); return; }
-    const abertas = new Set<Element>();
+    if (!estado.tela || !ligada()) { estado.folhasAbertas = new Map(); return; }
+    const abertas = new Map<Element, string>();
     const contadas = new Set<string>();
     document.querySelectorAll(SEL_FOLHA_VISTA).forEach((el) => {
       if (el.parentElement?.closest(SEL_FOLHA_VISTA)) return; // a de fora é que conta
-      abertas.add(el);
-      if (estado.folhasAbertas.has(el)) return;
       const nome = nomeDaFolha(el);
+      abertas.set(el, nome);
+      if (estado.folhasAbertas.get(el) === nome) return; // já contada com esse nome (etapa)
       const chave = `${estado.tela}|${estado.aba ?? ""}|${nome}`;
       if (contadas.has(chave)) return;
       contadas.add(chave);
@@ -753,7 +754,8 @@ const conectarObservadores = () => {
   if (typeof document === "undefined") return;
   if (!mo && typeof MutationObserver !== "undefined") {
     mo = new MutationObserver(agendarVarredura);
-    mo.observe(document.body, { childList: true, subtree: true });
+    // etapa nova numa folha que fica aberta troca o data-folha no mesmo elemento (montar finanças/rotina)
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-folha", "data-camada-guia"] });
   }
   if (!io && typeof IntersectionObserver !== "undefined") {
     io = new IntersectionObserver((entradas) => {
@@ -771,7 +773,7 @@ const desconectarObservadores = () => {
   mo?.disconnect(); mo = null;
   io?.disconnect(); io = null;
   if (varreduraAgendada !== null) { clearTimeout(varreduraAgendada); varreduraAgendada = null; }
-  estado.folhasAbertas = new Set();
+  estado.folhasAbertas = new Map();
 };
 
 /* ─────────────────────────── envio ─────────────────────────── */

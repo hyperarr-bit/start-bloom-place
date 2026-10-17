@@ -499,7 +499,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
 
   if (cedeu) return null;
   return (
-    <div ref={folha} className="mf" role="dialog" aria-modal="true" aria-label="Vamos montar suas finanças" data-testid="montar-financas" data-etapa={etapa}>
+    <div ref={folha} className="mf" role="dialog" aria-modal="true" aria-label="Vamos montar suas finanças" data-testid="montar-financas" data-etapa={etapa} data-folha={`montar-financas:${etapa}`}>
       {cabecalho}
       <div className="mf-corpo">
         {etapa === "renda" && (

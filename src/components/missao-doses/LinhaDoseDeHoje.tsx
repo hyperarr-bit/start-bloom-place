@@ -32,6 +32,7 @@ export function LinhaDoseDeHoje({ dose }: { dose: NonNullable<ReturnType<typeof 
     <div className="rounded-xl border border-border/50 bg-card overflow-hidden" data-testid="pendencia-dose-de-hoje">
       <button
         type="button"
+        data-track="pendencia:dose_de_hoje"
         onClick={() => {
           trackEvent("home_pendencia", { tipo: "dose_de_hoje", destino: cfg.rota });
           trackEvent("missao_pendencia_dose", eventoDaMissao({ indice: dose.n, modulo: dose.modulo }));

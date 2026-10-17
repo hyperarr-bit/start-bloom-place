@@ -70,6 +70,8 @@ const usarOApp = () => {
       v: 1, inicio: "2026-10-12", modulos: ["financas", "rotina", "saude"], feitos: { 1: { dia: "2026-10-12", rotulo: "Pode gastar R$ 61 por dia" } }, boasVindas: true, braco: "A",
       convites: { "2026-10-13": "depois" }, convitesVistos: { "2026-10-13": 1 }, lembrete: "20h", dicas: { 2: "2026-10-13" }, adesivosMostrados: ["first-income"], scoreAntes: { 2: 20 },
     })],
+    // 16/10: a força de QA da Conquistas 2 (sem prefixo varrido) e o toast que já apareceu (core-festas-mostradas)
+    ["conquistas2-force", "on"], ["core-festas-mostradas", JSON.stringify(["first-expense", "sequencia-2"])],
   ] as const) localStorage.setItem(k, v);
   // dado da CONTA (cache do user_data) e chaves antigas sem namespace: a vassoura leva
   localStorage.setItem("u:u1:finance-expenses", JSON.stringify([{ id: 1 }]));
@@ -88,7 +90,8 @@ const esperarTudoVisto = () => {
   expect(momentoRuimRecente()).toBe(true);
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
     "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
-    "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas"]) {
+    "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas",
+    "conquistas2-force", "core-festas-mostradas"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
   const missao = JSON.parse(localStorage.getItem("missao-doses")!);

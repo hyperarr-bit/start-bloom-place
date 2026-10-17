@@ -167,7 +167,10 @@ function Ligada() {
   // 1.0.16 (braço A, uma dose por dia): a dose de amanhã NÃO abre hoje, nem entrando no módulo dela (nem depois do 7º dia)
   const candidato: Passo | null = retomada && pathname.startsWith(MODULOS.financas.rota)
     ? { n: retomada.n, modulo: "financas", chave: passoAberto, retomar: true }
-    : missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje)
+    /* 1.0.16 (regra do dono, 17/10: "quiz só se a pessoa escolher primeiro"): quem tocou "Explorar por conta própria"
+       abre os módulos por CURIOSIDADE — nada de dose (nem o Montar) ao entrar neles; a introdução do módulo cuida da
+       1ª visita. Sem braço (a missão da 1.0.10/1.0.15 que já estava rodando), como sempre foi. */
+    : missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje) && !(missao.braco && missao.explorou)
     ? { n: pendenteAgora.n, modulo: pendenteAgora.modulo, chave: passoAberto }
     : aprofundar ? { n: aprofundar.n, modulo: aprofundar.modulo, chave: passoAberto, modo: "aprofundar" }
     : null;

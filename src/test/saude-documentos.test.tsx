@@ -73,8 +73,8 @@ describe("Saúde: fotos e documentos", () => {
 
   it("documento: receita com título, data, nota e foto entra em core-saude-documentos e abre com a miniatura", async () => {
     const dados = montar();
-    fireEvent.click(screen.getByRole("button", { name: /Guardar receita, laudo ou atestado/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Laudo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Guardar exame, laudo, receita ou atestado/ }));
+    fireEvent.click(screen.getByRole("button", { name: "🧾 Laudo" }));
     fireEvent.change(screen.getByLabelText("Título do documento"), { target: { value: "Laudo do raio-X" } });
     fireEvent.change(screen.getByLabelText("Anexar foto de documento novo"), { target: { files: [foto()] } });
     await waitFor(() => expect(within(screen.getByTestId("form-documento")).getAllByTestId("anexo")).toHaveLength(1));

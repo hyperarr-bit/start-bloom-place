@@ -164,12 +164,6 @@ const tocarChipAteAFesta = () => {
 };
 /** Dá tempo pro import dinâmico dos cartões (I/O real, fora do relógio falso) e pros relógios curtos. */
 const respirar = async (n = 12) => { for (let i = 0; i < n; i++) { await act(async () => { await new Promise((r) => setImmediate(r)); }); avancar(100); } };
-/** O import dinâmico da config lê o arquivo de verdade (100–300 ms reais na 1ª vez): espera pelo relógio REAL (performance.now não é falso aqui). */
-const esperarCartoes = async () => {
-  const inicio = performance.now();
-  while (!screen.queryByTestId("cartoes-modulo") && performance.now() - inicio < 4000) { await act(async () => { await new Promise((r) => setImmediate(r)); }); avancar(50); }
-  return screen.queryByTestId("cartoes-modulo");
-};
 const missaoGravada = (extra: Record<string, unknown>, inicio = "2026-10-03") => {
   const m = iniciarMissao(["financas", "rotina", "saude"], inicio);
   localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...m, boasVindas: true, ...extra }));
@@ -321,68 +315,94 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
   });
 });
 
-describe("cartões de boas-vindas × missão em doses (regra obrigatória)", () => {
-  it("dia 1, módulo da missão com a dose já feita: sem cartões (a dose foi a boas-vindas)", async () => {
+describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.0.16: a intro do módulo no lugar dos cartões", () => {
+  /* 16/10 (INTRO_MODULO ligada no app): os cartões SAEM do fluxo — a 1ª visita a um módulo fora da missão mostra a
+   * INTRO (Finanças guiada = faixa + anel; Casa = estado vazio com a captura real), e a regra da missão continua a
+   * mesma: módulo da missão (dose por fazer, dose feita, 'aprofundar') não ganha NADA por cima. */
+  const semBoasVindas = () => { expect(screen.queryByTestId("cartoes-modulo")).toBeNull(); expect(screen.queryByTestId("intro-modulo-faixa")).toBeNull(); expect(screen.queryByTestId("intro-modulo-vazio")).toBeNull(); };
+
+  it("dia 1, módulo da missão com a dose já feita: nada por cima (a dose foi a boas-vindas) — nem cartões, nem intro", async () => {
     missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
     montar(montarStore(dados()), "/financas");
     await respirar(10);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    semBoasVindas();
   });
 
-  it("dia 2, módulo da missão em 'aprofundar' (o bug do dono): a faixa da missão aparece e os cartões NÃO; módulo fora da missão (Casa): cartões", async () => {
+  it("dia 2, módulo da missão em 'aprofundar' (o bug do dono): a faixa da missão aparece e nada por cima; módulo fora da missão (Casa): a intro (estado vazio), sem cartões", async () => {
     vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // dia 2
     missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "a" }, 2: { dia: "2026-10-03", rotulo: "b" }, 3: { dia: "2026-10-03", rotulo: "c" } }, completaEm: "2026-10-03", planoAmanha: { quando: "manha", dia: "2026-10-03" } });
     montar(montarStore(dados()), "/financas");
     expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent(/Aprofundar/);
     await respirar(10);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    semBoasVindas();
     expect(nomes()).not.toContain("modulo_cartoes_vistos");
     cleanup();
     montar(montarStore(dados()), "/casa");
-    const folha = await esperarCartoes();
-    expect(folha).not.toBeNull();
-    expect(folha!.className).toContain("ct-casa");
-    expect(nomes()).toContain("modulo_cartoes_vistos");
+    await respirar(4);
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(screen.getByTestId("intro-modulo-vazio").getAttribute("data-modulo")).toBe("casa");
+    expect(nomes()).toContain("modulo_intro_vista");
+    expect(nomes()).not.toContain("modulo_cartoes_vistos");
   });
 
-  it("pulou a missão inteira: cartões em qualquer módulo, inclusive os 3 da missão", async () => {
+  it("pulou a missão inteira: a intro em qualquer módulo, inclusive os 3 da missão (Finanças guiada), e nunca cartões", async () => {
     missaoGravada({ braco: "B", explorou: true });
     montar(montarStore(dados()), "/financas");
-    const folha = await esperarCartoes();
-    expect(folha).not.toBeNull();
-    expect(folha!.getAttribute("data-modulo")).toBe("financas");
+    await respirar(4);
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/toca em 1 gasto/);
+    expect(nomes()).toContain("modulo_intro_vista");
   });
 
-  it("missão da 1.0.10 (braço A / chave do dia 1 cheio desligada): módulo da missão sem cartões (dia 1 e dia 2); fora da missão, cartões", async () => {
+  it("braço A (uma dose por dia): Rotina no dia 1 (a dose é só amanhã) abriu por curiosidade → a intro; dia 2, Finanças com a dose feita = nada por cima; fora da missão, a intro", async () => {
+    guardarForcaDia1Cheio("?dia1-cheio=a"); // o teste ligado com o braço A forçado (a missão grava o braço dela)
+    missaoGravada({ braco: "A", feitos: { 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } } });
+    montar(montarStore(dados()), "/rotina"); // dia 1: a dose 2 (Rotina) é só amanhã — a intro (dono 17/10: "não vai esperar o dia 2")
+    await respirar(4);
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marca 1 hábito/);
+    cleanup();
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // dia 2
+    montar(montarStore(dados()), "/financas"); // a dose do dia 1 já foi: continua sem nada por cima
+    await respirar(10);
+    semBoasVindas();
+    cleanup();
+    montar(montarStore(dados()), "/casa");
+    await respirar(4);
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    expect(screen.getByTestId("intro-modulo-vazio")).toBeTruthy();
+  });
+
+  it("missão da 1.0.10 (sem braço / chave do dia 1 cheio desligada): a dose 2 abre na Rotina no mesmo dia, como sempre — e nada por cima dela (nem cartões, nem intro)", async () => {
     guardarForcaDia1Cheio("?dia1-cheio=off"); // a força do link vence a env: a missão de hoje, sem braço
     expect(modoDia1Cheio()).toBe("off");
     missaoGravada({ feitos: { 1: { dia: "2026-10-03", rotulo: "a" } } });
-    montar(montarStore(dados()), "/rotina"); // dia 1: a dose 2 (Rotina) está por fazer
-    await respirar(10);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    cleanup();
-    vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // dia 2
-    montar(montarStore(dados()), "/financas"); // a dose do dia 1 já foi: continua sem cartões
-    await respirar(10);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    cleanup();
-    montar(montarStore(dados()), "/casa");
-    expect(await esperarCartoes()).not.toBeNull();
+    montar(montarStore(dados()), "/rotina");
+    await respirar(4);
+    expect(screen.getByTestId("missao-doses-faixa")).toBeTruthy();
+    semBoasVindas();
   });
 
-  it("conta antiga (nunca viu missão): cartões na 1ª visita de cada módulo, e só uma vez por aparelho", async () => {
+  it("conta antiga (nunca viu missão), módulo vazio: a intro na 1ª visita de cada módulo, e só uma vez por aparelho; sem cartões", async () => {
     conta.created_at = new Date(2026, 8, 20, 9, 0).toISOString(); // 13 dias: a missão não nasce
     montar(montarStore(dados()), "/financas");
     expect(lerMissao()).toBeNull();
-    const folha = await esperarCartoes();
-    expect(folha).not.toBeNull();
-    fireEvent.click(screen.getByTestId("cartoes-ja-sei"));
+    await respirar(4);
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
+    const faixa = screen.getByTestId("intro-modulo-faixa");
+    fireEvent.click(faixa); fireEvent.click(faixa); // 2 toques na faixa = o "Pular" aparece
+    fireEvent.click(screen.getByTestId("intro-modulo-pular"));
+    expect(screen.queryByTestId("intro-modulo-faixa")).toBeNull();
+    expect(localStorage.getItem("core-intro-vista-financas")).toBeTruthy();
     cleanup();
     montar(montarStore(dados()), "/financas");
     await respirar(10);
-    expect(screen.queryByTestId("cartoes-modulo")).toBeNull(); // já viu neste aparelho
+    semBoasVindas(); // já viu neste aparelho
     cleanup();
     montar(montarStore(dados()), "/rotina");
-    expect(await esperarCartoes()).not.toBeNull(); // outro módulo: 1ª visita
+    await respirar(4);
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marca 1 hábito/); // outro módulo: 1ª visita
+    expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
   });
 });

@@ -33,9 +33,25 @@ const ACTIVATION_RULES: Array<{ match: RegExp; action: string; meaningful?: (v: 
   { match: /workout|treino|exercise/i, action: "first_workout" },
   { match: /saude-meals|dieta-diary|dieta-recipes|meal/i, action: "first_meal" },
   { match: /dieta-smart-list/i, action: "first_grocery" },
+  // 16/10 (intro do módulo): módulos que não tinham regra nenhuma — a 1ª escrita deles não virava
+  // uso_modulo. Só chaves que NÃO casavam com nada acima nem com as genéricas abaixo (estudos-notebooks
+  // segue first_note; career-day-tasks e pet-routine-tasks seguem first_task — os painéis não mudam).
+  { match: /^casa-(grocery-categories|rooms|maint-tasks|shopping-list)/i, action: "first_casa", meaningful: (v) => Array.isArray(v) && v.some((c: any) => (Array.isArray(c?.items) && c.items.length > 0) || (Array.isArray(c?.tasks) && c.tasks.length > 0) || (!c?.items && !c?.tasks)) },
+  { match: /^estudos-(cursos-andamento|aprendizados|subjects|exams|cursos-desejo)/i, action: "first_estudo" },
+  { match: /^lib-books/i, action: "first_book" },
+  { match: /^career-(day-phases|jobs|skills|contacts|portfolio)/i, action: "first_career", meaningful: (v) => Array.isArray(v) && v.some((f: any) => !f?.counts || Object.keys(f.counts).length > 0) },
+  { match: /^(hiperfoco-thoughts|mente-dreams)/i, action: "first_thought" },
+  { match: /^rel-(people|dates|moments|gifts|events)/i, action: "first_relacao" },
+  { match: /^detox-(habits|diary)/i, action: "first_detox" },
+  { match: /^pet-(list|health|cuidados|pesos|expenses|diary)/i, action: "first_pet" },
+  { match: /^travel-/i, action: "first_trip" },
+  { match: /^(skincare|beauty|cabelo|beleza)-/i, action: "first_beleza" },
+  { match: /^dp-/i, action: "first_dp" },
   { match: /task|rotina/i, action: "first_task" },
   { match: /note/i, action: "first_note" },
 ];
+/** Só testes (src/test/intro-modulo.test.tsx): as regras são privadas do hook. */
+export const _regrasDeAtivacao = ACTIVATION_RULES;
 
 const isMeaningful = (value: any): boolean => {
   if (value == null) return false;

@@ -1,5 +1,5 @@
 import { Badge, fracaoDe } from "@/components/gamification/types";
-import { ehDia, MARCOS_SEQUENCIA, MAX_DIAS_GUARDADOS } from "@/lib/sequencia";
+import { ehDia, MAX_DIAS_GUARDADOS } from "@/lib/sequencia";
 
 /**
  * CONQUISTAS QUE NÃO VOLTAM ATRÁS (26/09).
@@ -32,23 +32,44 @@ export const xpPelaTabelaAntiga = (adesivos: Badge[]): number =>
 export const ALVO_ANO = 365;
 
 /**
- * Adesivos da sequência (dias com algo anotado): 7, 30 e 100 dias seguidos
- * (raro · épico · lendário), "Salvo pelo Gelo" (1 protetor já segurou um dia
- * vazio) e "Um Ano Anotado" (365 dias no total).
+ * Os adesivos NOVOS da sequência (CONQUISTAS 2, 16/10): DIA 2 "Voltei" (comum),
+ * 3 DIAS (raro) e 14 DIAS (raro). Por quê: no teste grátis, quem
+ * usa em 3 dias diferentes paga 38% (× 15%) — a tela precisa puxar o dia 2 e o
+ * dia 3; e 47 pessoas chegaram a 7 dias e só 4 a 30 — faltava um degrau no meio.
+ * Abrem pelo RECORDE como os outros: quem já teve 14 dias ganha o de 14 dias
+ * na 1ª abertura, em silêncio (Momentos.tsx só festeja o marco batido HOJE).
+ */
+export const MARCOS_NOVOS = [2, 3, 14] as const;
+export const ADESIVOS_SEQUENCIA_NOVOS: Record<(typeof MARCOS_NOVOS)[number], { nome: string; descricao: string; raridade: "comum" | "raro" }> = {
+  2: { nome: "Voltei", descricao: "Anote algo 2 dias seguidos", raridade: "comum" },
+  3: { nome: "3 Dias Seguidos", descricao: "Anote algo 3 dias seguidos", raridade: "raro" },
+  14: { nome: "14 Dias Seguidos", descricao: "Anote algo 14 dias seguidos", raridade: "raro" },
+};
+/** Todos os marcos que colam adesivo, em ordem (a trilha da Conquistas 2). */
+export const MARCOS_ADESIVO = [2, 3, 7, 14, 30, 100] as const;
+
+/**
+ * Adesivos da sequência (dias com algo anotado): 2, 3, 7, 14, 30 e 100 dias
+ * seguidos (comum · raro · raro · raro · épico · lendário), "Salvo pelo Gelo"
+ * (1 protetor já segurou um dia vazio) e "Um Ano Anotado" (365 dias no total).
  */
 export const buildBadgesSequencia = (recorde: number, extra: { protetoresUsados?: number; diasAnotados?: number } = {}): Badge[] => {
-  const marcos: Badge[] = MARCOS_SEQUENCIA.map((n) => ({
-    id: `sequencia-${n}`,
-    name: `${n} Dias Seguidos`,
-    description: `Anote algo no app ${n} dias seguidos`,
-    icon: "🔥",
-    category: "sequencia" as const,
-    color: "green",
-    raridade: n === 7 ? ("raro" as const) : n === 30 ? ("epico" as const) : ("lendario" as const),
-    xp: n === 7 ? 100 : n === 30 ? 200 : 400,
-    unlocked: recorde >= n,
-    progresso: { atual: Math.min(Math.max(0, recorde), n), alvo: n },
-  }));
+  const marcos: Badge[] = MARCOS_ADESIVO.map((n) => {
+    const novo = (MARCOS_NOVOS as readonly number[]).includes(n) ? ADESIVOS_SEQUENCIA_NOVOS[n as 2 | 3 | 14] : null;
+    const raridade = novo ? novo.raridade : n === 7 ? ("raro" as const) : n === 30 ? ("epico" as const) : ("lendario" as const);
+    return {
+      id: `sequencia-${n}`,
+      name: novo ? novo.nome : `${n} Dias Seguidos`,
+      description: novo ? novo.descricao : `Anote algo no app ${n} dias seguidos`,
+      icon: "🔥",
+      category: "sequencia" as const,
+      color: "green",
+      raridade,
+      xp: raridade === "comum" ? 50 : raridade === "raro" ? 100 : raridade === "epico" ? 200 : 400,
+      unlocked: recorde >= n,
+      progresso: { atual: Math.min(Math.max(0, recorde), n), alvo: n },
+    };
+  });
   const usados = Math.max(0, extra.protetoresUsados ?? 0);
   const dias = Math.max(0, Math.min(MAX_DIAS_GUARDADOS, extra.diasAnotados ?? 0));
   return [

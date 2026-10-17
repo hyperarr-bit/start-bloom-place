@@ -11,6 +11,7 @@ import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
+import { guardarForcaConquistas2 } from "@/lib/conquistas2";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -25,6 +26,7 @@ void iniciarMedicaoDoAparelho();
 // As chaves de QA da 1.0.14 pelo link (`?cobranca-v14=on`, `?avaliacao-v14=on`): gravadas no aparelho, como a MISSAO_DOSES.
 guardarForcaDaCobrancaV14();
 guardarForcaDaAvaliacaoV14();
+guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)
 guardarForcaDasOfertas(); // `?ofertas-saida=…` em qualquer rota: o paywall enxuto mora no gate e no /planos, não só no funil
 
 // Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO

@@ -19,7 +19,7 @@ import { eventoDaMissao, type DiaDaMissao, type ModuloDaMissao } from "@/lib/mis
  *     em Finanças, "Primeiro Dia" na Rotina, "Primeiro Treino"), se abriu agora; senão, a marca "Dia 1"
  *     (sem id nenhum);
  *   · dias 2 e 3: o adesivo da SEQUÊNCIA — `sequencia-2` ("Voltei") e `sequencia-3` ("3 Dias Seguidos"),
- *     que o ramo das Conquistas cria. Enquanto o id não existe no registro (como neste ramo), a reserva é a
+ *     que o ramo das Conquistas cria (no registro desde o merge de 17/10). Se o id faltar (registro antigo), a reserva é a
  *     arte genérica do fogo + "2 dias seguidos" / "3 dias seguidos", contada pela sequência do app (dias com
  *     QUALQUER registro — a mesma régua do adesivo). Pulou um dia: nenhum adesivo de sequência, só
  *     "Voltou! A sequência recomeça hoje" (sem drama);

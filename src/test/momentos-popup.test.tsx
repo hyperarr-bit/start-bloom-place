@@ -79,7 +79,8 @@ describe("14/10: fechar o app com a festa aberta não a repete", () => {
     primeira.unmount(); // "fechou o app"
     eventos.length = 0;
     montar(store); // reabriu (mesma conta, mesmo aparelho)
-    await waitFor(() => expect(vistas(store)).toContain("first-expense"));
+    // timeout maior: com a suíte inteira rodando (trava do preparar-loja) a máquina fica lenta e o "vira visto" passa de 1 s
+    await waitFor(() => expect(vistas(store)).toContain("first-expense"), { timeout: 5000 });
     await espera(2500);
     expect(screen.queryByTestId("momento-popup")).toBeNull();
     expect(eventos.filter((e) => e[0] === "festa_view")).toHaveLength(0);

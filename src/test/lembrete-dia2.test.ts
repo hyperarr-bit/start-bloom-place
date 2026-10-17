@@ -235,7 +235,8 @@ describe("sincronizarLembreteDia2 — a cada abertura, no app", () => {
     expect(n.schedule.at).toEqual(as(2026, 10, 4, 19, 17));
     expect(n.title).toMatch(/^Hoje dá pra gastar até R\$ /);
     expect(n.extra).toMatchObject({ tipo: "dia2", rota: "/financas", em: as(2026, 10, 4, 19, 17).toISOString() });
-    expect(eventos).toContainEqual(["lembrete_dia2_agendado", { ok: true, dia_da_semana_1a7: 7, modulo: "financas", hora: "19:17", tem_numero: true, dia_do_uso: 2, missao: false, origem_hora: "abertura" }]);
+    // (16/10: o evento ganhou dia_cal, braco e pulado_por_920 — sem missão, vazios)
+    expect(eventos).toContainEqual(["lembrete_dia2_agendado", { ok: true, dia_da_semana_1a7: 7, modulo: "financas", hora: "19:17", tem_numero: true, dia_do_uso: 2, missao: false, origem_hora: "abertura", dia_cal: null, braco: null, pulado_por_920: false }]);
     // a 2ª abertura no mesmo dia, sem nada novo: não refaz (nem cancela, nem agenda, nem mede de novo)
     ln.schedule.mockClear(); ln.cancel.mockClear(); eventos.length = 0;
     vi.setSystemTime(as(2026, 10, 3, 21, 0));

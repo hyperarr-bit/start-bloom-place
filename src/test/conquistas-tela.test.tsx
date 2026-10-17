@@ -92,7 +92,7 @@ describe("tela de Conquistas", () => {
     expect(screen.getByRole("button", { name: "anote o gasto de hoje" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /não gastei nada hoje/ })).toBeInTheDocument();
     expect(screen.getByText("MEUS ADESIVOS")).toBeInTheDocument();
-    expect(screen.getAllByText(/de 65/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/de 68/).length).toBeGreaterThan(0);
     // a semana: 12 dias até ontem (sexta) → SEG…SEX feitos, SÁB (hoje) em aberto, DOM futuro
     const semana = Array.from(document.querySelectorAll('[data-testid="card-sequencia"] .seq-dia')).map((d) => d.getAttribute("data-estado"));
     expect(semana).toEqual(["feito", "feito", "feito", "feito", "feito", "hoje", "futuro"]);

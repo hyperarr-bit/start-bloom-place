@@ -319,6 +319,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 // Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
 // (some do build — a condição é substituída por `false` e o import cai fora).
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
+// 16/10: a CONQUISTAS 2 (só sequência + adesivos, 3 direções) — protótipo, só no dev
+const DevConquistasNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistasNova")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
 // 02/10: "Ficou de ontem" e "Esqueceu de marcar?" nas telas de verdade (modo visitante) — só no dev, pra fotografar
@@ -345,6 +347,8 @@ const DevFinancas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevFina
 const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
 // 16/10: o braço A da 1.0.16 ("uma dose por dia") tela a tela, pra fotografar — só no dev
 const DevMissao1PorDia = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMissao1PorDia")) : null;
+// 16/10: a intro do módulo (1ª ação guiada em Finanças/Rotina/Saúde + estado vazio da Casa) numa conta vazia em memória — só no dev
+const DevIntroModulo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevIntroModulo")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -632,6 +636,9 @@ const AnimatedRoutes = () => {
         {import.meta.env.DEV && DevConquistas && (
           <Route path="/dev/conquistas" element={<Suspense fallback={null}><DevConquistas /></Suspense>} />
         )}
+        {import.meta.env.DEV && DevConquistasNova && (
+          <Route path="/dev/conquistas-nova" element={<Suspense fallback={null}><DevConquistasNova /></Suspense>} />
+        )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />
         )}
@@ -670,6 +677,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevMissao1PorDia && (
           <Route path="/dev/missao-1-por-dia" element={<Suspense fallback={null}><DevMissao1PorDia /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevIntroModulo && (
+          <Route path="/dev/intro-modulo" element={<Suspense fallback={null}><DevIntroModulo /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />

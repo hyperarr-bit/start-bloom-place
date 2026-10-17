@@ -42,6 +42,27 @@ import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
 import { registrarChavePainelLimpo } from "@/lib/financas-painel-limpo";
+import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
+import { registrarIntroRemota } from "@/lib/intro-modulo";
+
+/** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
+ *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`) e as
+ *  do teste da 1.0.16 — `missao_1_por_dia` (ab|on|off) + `tour_home` (curto|longo|off) em lib/dia1-cheio,
+ *  `montar_financas` (on|off) e `financas_painel_limpo` (on|off). Cada uma isolada: uma metadata estranha nunca
+ *  derruba as outras. */
+const registrarChavesDasOfferings = (offerings: unknown): void => {
+  const cada: Array<(o: unknown) => void> = [
+    registrarChavesRemotas,
+    registrarChaveRemotaConquistas2,
+    registrarIntroRemota,
+    registrarUmPorDiaRemoto,
+    registrarChaveMontarFinancas,
+    registrarChavePainelLimpo,
+  ];
+  for (const f of cada) {
+    try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }
+  }
+};
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -139,10 +160,7 @@ export async function initRevenueCat(): Promise<EstadoRC> {
 
     const offerings = await Purchases.getOfferings();
     // 10/10: as chaves das ofertas de saída viajam no metadata das offerings (ofertas-saida.ts)
-    registrarChavesRemotas(offerings);
-    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
-    registrarChaveMontarFinancas(offerings); // 1.0.16: `montar_financas: on|off` (lib/montar-financas)
-    registrarChavePainelLimpo(offerings); // 1.0.16: `financas_painel_limpo: on|off` (lib/financas-painel-limpo)
+    registrarChavesDasOfferings(offerings);
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.
     const pacotes = offerings?.current?.availablePackages ?? [];
@@ -421,8 +439,7 @@ export async function carregarPresente69(): Promise<Presente69 | null> {
   if (!Purchases || !configurado) return null;
   try {
     const offerings = await Purchases.getOfferings();
-    registrarChavesRemotas(offerings);
-    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
+    registrarChavesDasOfferings(offerings);
     const pacote = lerPacoteDoPresente(offerings);
     if (!pacote?.product?.priceString) { presente69 = null; return null; }
     const p = pacote.product as { priceString: string; price?: number; currencyCode?: string; introPrice?: IntroAnual };
@@ -535,8 +552,7 @@ export async function carregarMensal19(): Promise<Mensal19 | null> {
   if (!Purchases || !configurado) return null;
   try {
     const offerings = await Purchases.getOfferings();
-    registrarChavesRemotas(offerings);
-    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
+    registrarChavesDasOfferings(offerings);
     const pacote = lerPacoteDoMensal19(offerings);
     if (!pacote?.product?.priceString) { mensal19 = null; return null; }
     const v = Number((pacote.product as { price?: number }).price ?? 0);
@@ -1124,8 +1140,7 @@ export async function prefetchAnualIos(): Promise<void> {
   // 1) o pacote anual da offering ATUAL (o experimento decide qual é)
   try {
     const offerings = await Purchases.getOfferings();
-    registrarChavesRemotas(offerings);
-    registrarUmPorDiaRemoto(offerings); // 1.0.16: o teste "missão 1 por dia" (metadata missao_1_por_dia)
+    registrarChavesDasOfferings(offerings);
     const atual = offerings?.current;
     const pacote = (atual?.availablePackages ?? []).find((p) => ehAnualDaAppStore(p?.product?.identifier))
       ?? (ehAnualDaAppStore((atual as { annual?: PacoteRC } | undefined)?.annual?.product?.identifier) ? (atual as { annual?: PacoteRC }).annual : undefined);

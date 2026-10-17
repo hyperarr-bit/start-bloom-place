@@ -631,7 +631,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(doseDeHojeDevida(m, "2026-10-10")).toBe(false);
   });
 
-  it("dia 2: convite 1x ('Dia 2 de 3 · Rotina · 20 s' + o de ontem) → 'Bora' → 3 hábitos prontos → festa PEQUENA com o adesivo da sequência de 2 dias (reserva do fogo enquanto o registro não tem 'sequencia-2') + 'Sequência: 2 dias 🔥' + o dos 3 dias trancado + a hora; dica do score; dia 3: convite 'Faltam 10 s' → 'Agora não' não volta (reabrir, logout) → Saúde (meta + copo) → a ÚNICA festa em tela cheia, '3 dias seguidos' → 'O que você construiu'", () => {
+  it("dia 2: convite 1x ('Dia 2 de 3 · Rotina · 20 s' + o de ontem) → 'Bora' → 3 hábitos prontos → festa PEQUENA com o adesivo da sequência de 2 dias (o 'Voltei' do registro, sequencia-2) + 'Sequência: 2 dias 🔥' + o dos 3 dias trancado + a hora; dica do score; dia 3: convite 'Faltam 10 s' → 'Agora não' não volta (reabrir, logout) → Saúde (meta + copo) → a ÚNICA festa em tela cheia, '3 dias seguidos' → 'O que você construiu'", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     // dia 1 (03/10) teve registro: a sequência do app tem 1 dia
@@ -664,16 +664,16 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(festa).toHaveTextContent("Dia 2 de 3 feito ✅");
     expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("📅 “Beber água ao acordar” já está na sua Rotina, com o quadradinho de hoje marcado.");
     expect(screen.getByTestId("missao-doses-sequencia")).toHaveTextContent("Sequência: 2 dias 🔥");
-    // o adesivo da sequência: o id do registro ("sequencia-2", do ramo das Conquistas); aqui ainda não existe → a reserva do fogo
+    // o adesivo da sequência: o REAL do registro (Conquistas 2, merge 17/10) — "sequencia-2" = "Voltei", com a arte dele
     expect(screen.getByTestId("missao-doses-adesivo")).toHaveAttribute("data-adesivo", "sequencia-2");
-    expect(within(screen.getByTestId("missao-doses-adesivo")).getByTestId("missao-doses-adesivo-arte")).toHaveAttribute("data-arte", "fogo");
-    expect(screen.getByTestId("missao-doses-adesivo-legenda")).toHaveTextContent("Adesivo novo: 2 dias seguidos");
+    expect(within(screen.getByTestId("missao-doses-adesivo")).getByTestId("missao-doses-adesivo-arte")).toHaveAttribute("data-arte", "registro");
+    expect(screen.getByTestId("missao-doses-adesivo-legenda")).toHaveTextContent("Adesivo novo: Voltei");
     expect(store.dados["conquistas-vistas"]).toMatchObject({ adesivos: expect.arrayContaining(["sequencia-2"]), marcos: [2] });
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: ❤️ Saúde · 10 s");
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("E o adesivo dos 3 dias é seu 🔒");
     expect(screen.getByTestId("missao-doses-hora-12h")).toHaveAttribute("aria-checked", "true"); // a combinada; dá pra trocar
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
-    expect(eventos).toContainEqual(["missao_adesivo_mostrado", expect.objectContaining({ id: "sequencia-2", tipo: "reserva", dia: 2, sequencia: 2 })]);
+    expect(eventos).toContainEqual(["missao_adesivo_mostrado", expect.objectContaining({ id: "sequencia-2", tipo: "registro", dia: 2, sequencia: 2 })]);
     fireEvent.click(screen.getByTestId("missao-doses-combinado"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/home");
     expect(lerMissao()?.scoreAntes?.[2]).toEqual(expect.any(Number)); // o score de ANTES da dose (a dica conta "de X pra Y")

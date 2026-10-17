@@ -61,13 +61,15 @@ describe("pasta do médico (filtro)", () => {
     expect(chips).toEqual(["Todos 4", "🩺 Dr. Hélio · Neurologia 2", "🩺 Dra. Camila · Médica da família 1", "Sem médico 1"]);
     expect(nomesNaTabela()).toEqual(["Eletroencefalograma", "Ressonância do crânio", "Hemograma", "Glicemia"]); // data desc
 
-    fireEvent.click(screen.getByRole("button", { name: /Dr\. Hélio · Neurologia/ }));
-    expect(screen.getByRole("button", { name: /Dr\. Hélio · Neurologia/ })).toHaveAttribute("aria-pressed", "true");
+    // os chips do card de Exames (a estante de Pastas, mais abaixo, tem botões com o mesmo nome)
+    const chipsExames = within(screen.getByTestId("pastas-medico"));
+    fireEvent.click(chipsExames.getByRole("button", { name: /Dr\. Hélio · Neurologia/ }));
+    expect(chipsExames.getByRole("button", { name: /Dr\. Hélio · Neurologia/ })).toHaveAttribute("aria-pressed", "true");
     expect(nomesNaTabela()).toEqual(["Eletroencefalograma", "Ressonância do crânio"]);
 
-    fireEvent.click(screen.getByRole("button", { name: /Sem médico/ }));
+    fireEvent.click(chipsExames.getByRole("button", { name: /Sem médico/ }));
     expect(nomesNaTabela()).toEqual(["Glicemia"]);
-    fireEvent.click(screen.getByRole("button", { name: /^Todos/ }));
+    fireEvent.click(chipsExames.getByRole("button", { name: /^Todos/ }));
     expect(nomesNaTabela()).toHaveLength(4);
   });
 

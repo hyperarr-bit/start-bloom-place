@@ -111,17 +111,17 @@ describe("as páginas", () => {
     expect(tres.proximos).toEqual([]);
   });
 
-  it("na coleção de verdade (65): 7 páginas — 1 + lendários 1 + épicos 1 (14 cabem) + raros 2 (11 + 10) + comuns 2 (12 + 11) — e o total fecha", () => {
+  it("na coleção de verdade (68, 16/10): 7 páginas — 1 + lendários 1 + épicos 1 (14 cabem) + raros 2 (12 + 11) + comuns 2 (12 + 12) — e o total fecha", () => {
     const { adesivos, desbloqueadas } = colecao({ "sequencia-7": "2026-09-20", "leitura-1": "2026-09-21", "rotina-21": "2026-09-10" });
     const paginas = montarAlbum(adesivos, desbloqueadas);
     expect(paginas.map((p) => p.id)).toEqual(["mais-raros", "lendario-1", "epico-1", "raro-1", "raro-2", "comum-1", "comum-2"]);
     expect(paginas[0].vagas.map((x) => x.id)).toEqual(["rotina-21", "leitura-1", "sequencia-7"]);
-    expect(paginas[0].total).toBe(65);
+    expect(paginas[0].total).toBe(68);
     const soma = paginas.slice(1).reduce((s, p) => s + p.vagas.length, 0);
-    expect(soma).toBe(65);
+    expect(soma).toBe(68);
     expect(paginas.filter((p) => p.raridade === "epico").map((p) => p.vagas.length)).toEqual([14]);
-    expect(paginas.filter((p) => p.raridade === "raro").map((p) => p.vagas.length)).toEqual([11, 10]);
-    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([12, 11]);
+    expect(paginas.filter((p) => p.raridade === "raro").map((p) => p.vagas.length)).toEqual([12, 11]);
+    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([12, 12]);
   });
 });
 

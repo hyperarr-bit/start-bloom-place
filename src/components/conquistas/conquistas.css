@@ -432,6 +432,8 @@
 .alb-dica mark { background: #fef3c7; color: #7c5a0a; padding: 0 3px; border-radius: 3px; }
 .alb-pe { position: relative; z-index: 1; margin-top: auto; padding-top: 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #6f665a; line-height: 1.3; }
 .alb-pe-perto { min-width: 0; }
+.alb-pe-proxima { text-align: left; color: #b4245f; padding: 0; background: none; border: 0; }
+.alb-pe-proxima b { color: #b4245f; }
 .alb-pe-perto b { color: #2b2b2f; }
 .alb-pag-num { font-size: 9px; font-weight: 700; color: #a39a8a; letter-spacing: .08em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -478,7 +480,8 @@
 .vaga-n small { font-size: 6px; font-weight: 800; letter-spacing: .08em; vertical-align: top; margin-right: 1px; }
 .vaga[data-aberta="true"] .vaga-n { color: rgba(140,130,114,.55); }
 .vaga-fig { position: relative; z-index: 2; line-height: 0; }
-.vaga-nome { font-size: 8.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; text-align: center; color: #2b2b2f; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* (17/10) padding em cima + margem negativa: o overflow do line-clamp cortava o acento das maiúsculas — "MÊS FECHADO" saía "MES FECHADO" */
+.vaga-nome { font-size: 8.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; text-align: center; color: #2b2b2f; max-width: 100%; padding-top: .22em; margin-top: -.22em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .vaga-nome[data-falta] { color: #8c8272; }
 /* a barrinha fina de progresso (sai a pílula preta) — cresce por transform, nunca por width */
 .vaga-barra { display: block; width: 72%; height: 3px; border-radius: 999px; background: rgba(120,100,70,.16); overflow: hidden; margin-top: 1px; }
@@ -559,3 +562,23 @@ html[data-album-aberto] [data-testid="tela-conquistas"] *, html[data-album-abert
 /* (02/10, dono: "arrastando fica travado") durante o arrasto o dedo é da folha (pointer capture): o que está dentro dela sai do
    teste de toque — uma troca só, no começo do gesto — e o WebKit não refaz a geometria das figurinhas a cada movimento */
 .alb-folha[data-arrastando] > * { pointer-events: none; }
+
+/* ============================== CONQUISTAS 2 (16/10): o álbum POR MÓDULO, a figurinha esperando pra COLAR ============================== */
+/* a placa do capítulo na cor do módulo (--mod vem do componente: CAPITULO_MODULO) */
+.alb-pag[data-rar="modulo"] .alb-cap { background: linear-gradient(100deg, color-mix(in srgb, var(--mod, #2b2b2f) 82%, #000) 0%, var(--mod, #2b2b2f) 48%, color-mix(in srgb, var(--mod, #2b2b2f) 78%, #fff) 64%, color-mix(in srgb, var(--mod, #2b2b2f) 86%, #000) 100%); }
+.alb-pag[data-rar="modulo"] .alb-cap-linha, .alb-pag[data-rar="modulo"] .alb-cap-titulo h3, .alb-pag[data-rar="modulo"] .alb-cap-titulo b { color: #fff; }
+.alb-pag[data-rar="modulo"] .alb-cap-frase { color: rgba(255,255,255,.82); }
+.alb-pag[data-rar="modulo"] { background-color: #fbf6ea; }
+.alb-aba[data-rar="modulo"] { background: linear-gradient(180deg, color-mix(in srgb, var(--mod, #2b2b2f) 70%, #fff), var(--mod, #2b2b2f)); padding: 6px 0 7px; }
+.alb-aba[data-rar="modulo"] > i { font-size: 11px; }
+/* a figurinha NOVA, solta por cima da vaga (toque pra colar): levantada, torta, sombra maior — nada em loop */
+.vaga[data-pendente] .vaga-caixa { background: rgba(255,255,255,.42); box-shadow: inset 0 0 0 1px rgba(120,100,70,.28), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(120,100,70,.14), inset 0 2px 4px rgba(60,40,10,.10); }
+.vaga[data-pendente] .vaga-n { visibility: visible; color: rgba(140,130,114,.55); }
+.vaga-fig-solta { transform: translate(5px, -7px); filter: drop-shadow(0 10px 10px rgba(0,0,0,.28)); }
+.vaga-fig-solta > .fig { filter: drop-shadow(0 1px 1px rgba(0,0,0,.2)); }
+.vaga-colar { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); z-index: 4; height: 15px; padding: 0 7px; border-radius: 999px; background: #d22d80; color: #fff; font-size: 8px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; line-height: 15px; white-space: nowrap; box-shadow: 0 2px 5px rgba(210,45,128,.45); }
+/* a pílula do próximo prêmio ("AMANHÃ") numa vaga vazia */
+.vaga-destaque { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); z-index: 3; height: 14px; padding: 0 6px; border-radius: 999px; background: #d22d80; color: #fff; font-size: 7.5px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; line-height: 14px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.vaga[data-destaque] .vaga-caixa { box-shadow: inset 0 0 0 1.5px #d22d80, inset 0 0 0 3.5px #fff5fa, inset 0 0 0 4.5px rgba(210,45,128,.22), inset 0 2px 5px rgba(120,20,70,.10); background: rgba(255,240,247,.8); }
+/* com o álbum aberto, a tela nova de trás também para de animar */
+html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *, html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *::before, html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *::after { animation-play-state: paused !important; }

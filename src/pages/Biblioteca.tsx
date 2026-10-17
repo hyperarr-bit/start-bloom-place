@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
+import { introLigada } from "@/lib/intro-modulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { supabase } from "@/integrations/supabase/client";
@@ -583,7 +584,10 @@ const Biblioteca = () => {
         </div>
       </header>
 
+      {/* 16/10: a intro do módulo fica dentro da calha da página (o "Dicas" antigo segue como era, colado na borda) */}
+      <div className={introLigada() ? "px-4 pt-4 [&:empty]:hidden" : undefined}>
       <BoasVindasDoModulo moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
+      </div>
 
       {/* Stats */}
       <div className="px-4 py-2">

@@ -215,14 +215,98 @@ const WRITE_WARN_BYTES = 100_000;
 const MS_LEITURA_LENTA = 8_000;
 /** Espera entre as tentativas de ler a conta depois de uma falha (a última se repete). */
 const ESPERAS_NOVA_TENTATIVA = [2_000, 5_000, 10_000, 20_000, 30_000];
+/**
+ * Limite de cada tentativa de ler a conta (revisão 17/10): leitura pendurada (rede morta sem
+ * erro) prendia o app em "Conexão lenta" até matar o processo. Passou do limite, a leitura é
+ * cancelada e conta como falha; o limite cresce a cada falha — conta grande em rede fraca
+ * ganha mais tempo na tentativa seguinte.
+ */
+const MS_LIMITE_LEITURA = [15_000, 30_000, 60_000];
 
 /**
  * Escrita feita ANTES de a conta chegar do servidor (16/10). Não sobe: fica aqui até a
  * leitura dar certo e aí é juntada com o servidor (lib/mesclar-dados). `base` é o que a
  * tela via quando escreveu pela 1ª vez; `valor`, a última escrita; `sistema`, se TODAS
- * foram escritas de sistema (essas não geram aviso).
+ * foram escritas de sistema (essas não geram aviso nem contam como dia anotado); `dia`, o
+ * dia (localDayKey) da última escrita de gesto — é o dia que entra na sequência; dentro de
+ * "marcar outro dia" (comDia) é o dia dito ali, e null quando ali se disse "dia nenhum".
  */
-type EscritaSegurada = { base: unknown; valor: unknown; sistema: boolean };
+type EscritaSegurada = { base: unknown; valor: unknown; sistema: boolean; dia: string | null };
+
+/*
+ * ESCRITA SEGURADA SOBREVIVE A FECHAR O APP (revisão 17/10). Anotou antes de a conta chegar
+ * e o iPhone matou o app: a escrita morava só na memória e no cache `u:<id>:…`, que a vassoura
+ * da próxima abertura apaga — o registro sumia. Agora cada escrita segurada também vai pra uma
+ * chave do APARELHO, `core-seguradas-<id da conta>:<chave>` (família em
+ * src/lib/chaves-do-aparelho.ts), e volta na abertura seguinte DA MESMA conta pra ser juntada
+ * na 1ª leitura que der certo. Sai quando o servidor confirma a gravação (ou quando não há o que
+ * gravar), no "sair da conta" e quando outra conta entra no aparelho.
+ */
+const PREFIXO_SEGURADAS = "core-seguradas-";
+const prefixoSeguradasDe = (uid: string) => `${PREFIXO_SEGURADAS}${uid}:`;
+const guardarSegurada = (uid: string, key: string, e: EscritaSegurada) =>
+  safeSetItem(prefixoSeguradasDe(uid) + key, JSON.stringify(e));
+const esquecerSegurada = (uid: string, key: string) => safeRemoveItem(prefixoSeguradasDe(uid) + key);
+const lerSeguradasGuardadas = (uid: string): Record<string, EscritaSegurada> => {
+  const out: Record<string, EscritaSegurada> = {};
+  const prefixo = prefixoSeguradasDe(uid);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefixo)) continue;
+      const raw = safeGetItem(k);
+      if (!raw) continue;
+      try {
+        const e = JSON.parse(raw);
+        if (e && typeof e === "object" && "valor" in e) {
+          out[k.slice(prefixo.length)] = { base: e.base, valor: e.valor, sistema: !!e.sistema, dia: typeof e.dia === "string" || e.dia === null ? e.dia : localDayKey() };
+        }
+      } catch { /* entrada estragada: ignora */ }
+    }
+  } catch { /* storage bloqueado */ }
+  return out;
+};
+/** Apaga as escritas seguradas guardadas no aparelho: as de uma conta, ou as de todas MENOS uma. */
+const apagarSeguradasGuardadas = (filtro: { daConta: string } | { menosDa: string }) => {
+  try {
+    const manter = "menosDa" in filtro ? prefixoSeguradasDe(filtro.menosDa) : null;
+    const apagar = "daConta" in filtro ? prefixoSeguradasDe(filtro.daConta) : PREFIXO_SEGURADAS;
+    const sair: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(apagar) || (manter && k.startsWith(manter))) continue;
+      sair.push(k);
+    }
+    sair.forEach(safeRemoveItem);
+  } catch { /* storage bloqueado */ }
+};
+
+/**
+ * Aviso de "esta chave mudou" pras telas abertas (o mesmo evento do usePersistedState —
+ * EVENTO_MESMA_CHAVE lá; o teste dados-offline-guard confere que é o mesmo texto). Disparado
+ * SÍNCRONO: a tela adota o valor antes de a próxima escrita dela sair.
+ */
+export const EVENTO_TELAS_DA_CHAVE = "core:persisted-state";
+const avisarTelasDaChave = (key: string, value: unknown) => {
+  try {
+    window.dispatchEvent(new CustomEvent(EVENTO_TELAS_DA_CHAVE, {
+      detail: { key, json: JSON.stringify(value), value, origem: Symbol("servidor") },
+    }));
+  } catch { /* sem window */ }
+};
+
+/** O que a 1ª leitura certa deixa pro momento em que as telas já têm o valor juntado. */
+type Liberacao = {
+  uid: string;
+  /** como o servidor fica depois de subir o juntado */
+  confirmado: Record<string, unknown>;
+  /** como o servidor estava na leitura */
+  servidor: Record<string, unknown>;
+  juntadasNaLeitura: string[];
+  dias: Set<string>;
+  perdidas: string[];
+  medida: { falhas: number; ms: number; seguradas: number; juntadas: number } | null;
+};
 
 /**
  * A sessão do auth é mesmo desta conta? Sem token válido o supabase-js manda a chave
@@ -275,11 +359,30 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   /** Hora da última escrita de cada chave: escrita feita DEPOIS do pedido de leitura ganha do retrato. */
   const ultimaEscrita = useRef<Map<string, number>>(new Map());
   const leituraNoAr = useRef(false);
+  /** Desde quando a rodada de leitura atual está no ar ("tentar de novo" só corta leitura velha). */
+  const leituraDesde = useRef<number | null>(null);
   const falhasSeguidas = useRef(0);
   /** Quando a conta começou a faltar (1ª tentativa desta pessoa) — telemetria da recuperação. */
   const inicioDaEspera = useRef<number | null>(null);
   const [semConexao, setSemConexao] = useState<"sem" | "lenta" | null>(null);
   const [tentativa, setTentativa] = useState(0);
+  /*
+   * LIBERAR SÓ DEPOIS QUE AS TELAS TÊM O VALOR JUNTADO (revisão 17/10). A 1ª leitura certa
+   * junta e manda o store novo pro React, mas as telas só adotam no efeito de hidratação do
+   * próximo commit; um toque nesse intervalo gravava o valor VELHO da tela — e, se a escrita
+   * já estivesse liberada, ia direto pro servidor. Então a leitura deixa a `Liberacao` aqui e
+   * quem solta as escritas é um efeito do provider, que roda DEPOIS dos efeitos das telas
+   * (filhos primeiro) no mesmo commit; o que chegou no intervalo é juntado de novo antes.
+   */
+  const aLiberar = useRef<Liberacao | null>(null);
+  const [liberacao, setLiberacao] = useState(0);
+  /**
+   * Chaves juntadas cuja cópia guardada no aparelho espera o servidor confirmar a gravação →
+   * a BASE original dela (relativa ao servidor de verdade). Escrita que chega antes da
+   * confirmação regrava a cópia com ESTA base: se o app morrer antes do envio, a próxima
+   * abertura junta de novo contra o servidor (que ainda não tem o juntado) e nada se perde.
+   */
+  const aConfirmar = useRef<Map<string, unknown>>(new Map());
 
   // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
@@ -297,15 +400,27 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       inFlightFetches.current.clear();
       // 16/10: o que estava segurado/sincronizado era da outra conta (ou de ninguém)
       sincronizadoRef.current = false;
-      seguradas.current = {};
       ultimaEscrita.current.clear();
       falhasSeguidas.current = 0;
       inicioDaEspera.current = null;
+      aLiberar.current = null;
+      aConfirmar.current.clear();
       setSemConexao(null);
-      setStore({});
       setLoaded(false);
       // On switch/logout we wipe per-user cache, but NOT guest data.
       purgeUserLocalCache();
+      // 17/10: escrita segurada guardada no aparelho — a de quem saiu vai embora; a de outra
+      // conta também (não fica dado de ninguém esperando aqui); a desta conta VOLTA pro store e
+      // pra fila de junção (anotou, o app morreu antes de a conta chegar: o registro não some).
+      if (prevUserId) apagarSeguradasGuardadas({ daConta: prevUserId });
+      let restauradas: Record<string, EscritaSegurada> = {};
+      if (nextUserId) {
+        apagarSeguradasGuardadas({ menosDa: nextUserId });
+        restauradas = lerSeguradasGuardadas(nextUserId);
+        for (const [k, e] of Object.entries(restauradas)) safeSetItem(userKey(nextUserId, k), JSON.stringify(e.valor));
+      }
+      seguradas.current = restauradas;
+      setStore(Object.fromEntries(Object.entries(restauradas).map(([k, e]) => [k, e.valor])));
       lastUserIdRef.current = nextUserId;
     }
   }, [user]);
@@ -324,11 +439,15 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
     // -------- AUTHENTICATED --------
     const ac = new AbortController();
+    // rodada cancelada (troca de conta, 2ª rodada, tentar de novo, desmontou): a nova é dona do estado
+    let cancelada = false;
     let timerLenta: ReturnType<typeof setTimeout> | null = null;
+    let timerLimite: ReturnType<typeof setTimeout> | null = null;
     let timerDeNovo: ReturnType<typeof setTimeout> | null = null;
 
     const run = async () => {
       leituraNoAr.current = true; // (16/10) uma rodada por vez: "tentar de novo" espera esta acabar
+      leituraDesde.current = Date.now();
       if (inicioDaEspera.current === null) inicioDaEspera.current = Date.now();
       // Step 0: migrate any guest data into this account before we hydrate.
       const guestData = readAllGuestData();
@@ -407,35 +526,44 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       } catch {}
 
       // Step 2: refresh from Supabase (server wins for non-heavy keys).
-      if (ac.signal.aborted) return;
+      if (cancelada) return;
       const pedidoEm = Date.now();
       if (!sincronizadoRef.current) {
         timerLenta = setTimeout(() => {
-          if (!sincronizadoRef.current && !ac.signal.aborted) setSemConexao((s) => s ?? "lenta");
+          if (!sincronizadoRef.current && !cancelada) setSemConexao((s) => s ?? "lenta");
         }, MS_LEITURA_LENTA);
       }
-      let data: any[] | null = null;
-      let error: any = null;
-      try {
-        if (!(await sessaoEhDaConta(user.id))) {
-          error = { message: "sessão do auth ausente ou de outra conta" };
-        } else {
+      // 17/10: a tentativa tem prazo — leitura pendurada vira falha e entra no "tentar de novo"
+      // (corrida com o prazo: nem uma promessa que ignora o cancelamento prende a rodada)
+      const limite = MS_LIMITE_LEITURA[Math.min(falhasSeguidas.current, MS_LIMITE_LEITURA.length - 1)];
+      const estouro = new Promise<{ data: null; error: { message: string } }>((ok) => {
+        timerLimite = setTimeout(() => {
+          ac.abort();
+          ok({ data: null, error: { message: `leitura da conta passou de ${limite / 1000} s` } });
+        }, limite);
+      });
+      const leitura = (async (): Promise<{ data: any[] | null; error: any }> => {
+        try {
+          if (!(await sessaoEhDaConta(user.id))) return { data: null, error: { message: "sessão do auth ausente ou de outra conta" } };
           const r = await (supabase as any)
             .from("user_data")
             .select("key, value")
             .eq("user_id", user.id)
             .abortSignal(ac.signal);
-          data = r?.data ?? null;
-          error = r?.error ?? null;
-          if (!error && !Array.isArray(data)) error = { message: "resposta sem lista" };
+          const d = r?.data ?? null;
+          const e = r?.error ?? null;
+          if (!e && !Array.isArray(d)) return { data: null, error: { message: "resposta sem lista" } };
+          return { data: d, error: e };
+        } catch (e: any) {
+          return { data: null, error: { message: String(e?.message ?? e) } };
         }
-      } catch (e: any) {
-        error = { message: String(e?.message ?? e) };
-      }
+      })();
+      const { data, error } = await Promise.race([leitura, estouro]);
       if (timerLenta) { clearTimeout(timerLenta); timerLenta = null; }
-      // cancelada (troca de conta, 2ª rodada, desmontou): a rodada nova já é dona do estado
-      if (ac.signal.aborted) return;
+      if (timerLimite) { clearTimeout(timerLimite); timerLimite = null; }
+      if (cancelada) return;
       leituraNoAr.current = false;
+      leituraDesde.current = null;
 
       if (!error && data) {
         const uid = user.id;
@@ -466,6 +594,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
          */
         const mesclados: Record<string, any> = {};
         const perdidas: string[] = [];
+        // dias em que a pessoa ANOTOU algo enquanto a conta não chegava (entram na sequência na liberação)
+        const dias = new Set<string>();
         let juntadas = 0;
         const nSeguradas = Object.keys(seguradas.current).length;
         for (const [k, h] of Object.entries(seguradas.current)) {
@@ -473,7 +603,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           mesclados[k] = r.valor;
           if (!iguais(r.valor, h.valor)) juntadas++;
           if (r.perdeu && !h.sistema && contaComoAnotacao(k)) perdidas.push(k);
+          if (h.dia && !h.sistema && contaComoAnotacao(k) && temConteudo(r.valor) && !iguais(r.valor, map[k])) dias.add(h.dia);
         }
+        const seguradasDaLeitura = seguradas.current;
         seguradas.current = {};
         /*
          * ESCRITA RECENTE GANHA DO SERVIDOR. A resposta é um retrato tirado
@@ -489,7 +621,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           if (t >= pedidoEm && !(k in mesclados)) recentes.add(k);
         }
         for (const [k, v] of Object.entries(mesclados)) {
-          if (!(k in map) || !iguais(v, map[k])) pendingWrites.current[k] = v;
+          if (!(k in map) || !iguais(v, map[k])) {
+            pendingWrites.current[k] = v;
+            ultimaEscrita.current.set(k, Date.now()); // um retrato pedido antes deste envio chegar não desfaz o juntado
+            aConfirmar.current.set(k, seguradasDaLeitura[k].base); // a guardada no aparelho sai quando o servidor confirmar
+          } else {
+            esquecerSegurada(uid, k); // o servidor já tem exatamente isto
+          }
         }
         for (const [k, v] of Object.entries(map)) {
           if (k in mesclados || recentes.has(k) || k in pendingWrites.current) continue;
@@ -497,7 +635,6 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           if (json.length < HEAVY_KEY_BYTES) safeSetItem(userKey(uid, k), json);
         }
         for (const [k, v] of Object.entries(mesclados)) safeSetItem(userKey(uid, k), JSON.stringify(v));
-        sincronizadoRef.current = true;
         setStore(prev => {
           const next = { ...prev };
           Object.assign(next, map);
@@ -518,24 +655,24 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           flushTimer.current = setTimeout(() => flushRef.current(), DEBOUNCE_MS);
         }
         if (!eraSincronizado) {
+          // 17/10: a escrita só volta a subir direto na liberação (efeito do provider, depois que
+          // as telas adotaram o valor juntado) — ver `aLiberar`.
           const ms = Date.now() - (inicioDaEspera.current ?? pedidoEm);
-          // Medida da exposição (16/10): só quando algo fugiu do normal — leitura que falhou
-          // antes, que demorou, ou escrita feita em cima do vazio que teria apagado o servidor
-          // (`juntadas`: o servidor tinha dado e a junção trouxe de volta).
-          if (falhasSeguidas.current > 0 || ms > MS_LEITURA_LENTA || juntadas > 0 || perdidas.length > 0) {
-            trackEvent("dados_conta_atrasada", {
-              falhas: falhasSeguidas.current,
-              ms,
-              seguradas: nSeguradas,
-              juntadas,
-              perdidas: perdidas.length,
-            });
-          }
-          if (perdidas.length > 0) {
-            toast("Seus dados voltaram", {
-              description: "Parte do que você mudou sem internet não deu pra juntar com o que já estava salvo. Dá uma conferida?",
-            });
-          }
+          aLiberar.current = {
+            uid,
+            confirmado: { ...map, ...mesclados },
+            servidor: map,
+            juntadasNaLeitura: Object.keys(mesclados),
+            dias,
+            perdidas,
+            // Medida da exposição (16/10): só quando algo fugiu do normal — leitura que falhou
+            // antes, que demorou, ou escrita feita em cima do vazio que teria apagado o servidor
+            // (`juntadas`: o servidor tinha dado e a junção trouxe de volta).
+            medida: falhasSeguidas.current > 0 || ms > MS_LEITURA_LENTA || juntadas > 0 || perdidas.length > 0
+              ? { falhas: falhasSeguidas.current, ms, seguradas: nSeguradas, juntadas }
+              : null,
+          };
+          setLiberacao((n) => n + 1);
         }
         falhasSeguidas.current = 0;
         inicioDaEspera.current = null;
@@ -562,16 +699,22 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
     run();
     return () => {
+      cancelada = true;
       ac.abort();
       leituraNoAr.current = false;
+      leituraDesde.current = null;
       if (timerLenta) clearTimeout(timerLenta);
+      if (timerLimite) clearTimeout(timerLimite);
       if (timerDeNovo) clearTimeout(timerDeNovo);
     };
   }, [user, authLoading, tentativa]);
 
   // 16/10: sem a conta ainda, tenta de novo assim que a rede volta ou a pessoa volta pro app.
+  // 17/10: leitura no ar há pouco segue (não corta o que está chegando); no ar há mais de
+  // MS_LEITURA_LENTA ("conexão lenta" na tela), o botão/volta da rede começa outra.
   const tentarDeNovo = useCallback(() => {
-    if (!userRef.current || sincronizadoRef.current || leituraNoAr.current) return;
+    if (!userRef.current || sincronizadoRef.current) return;
+    if (leituraNoAr.current && Date.now() - (leituraDesde.current ?? 0) < MS_LEITURA_LENTA) return;
     setTentativa((t) => t + 1);
   }, []);
   useEffect(() => {
@@ -583,6 +726,85 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       document.removeEventListener("visibilitychange", aoVoltarPraTela);
     };
   }, [tentarDeNovo]);
+
+  /*
+   * LIBERAÇÃO (17/10): roda no commit em que o store juntado e o `loaded` chegam às telas,
+   * DEPOIS dos efeitos de hidratação delas (o React roda os efeitos dos filhos antes dos do
+   * pai). Só aqui a escrita volta a subir direto pro servidor.
+   */
+  useEffect(() => {
+    const lib = aLiberar.current;
+    if (!lib) return;
+    aLiberar.current = null;
+    if (userRef.current?.id !== lib.uid) return;
+    const uid = lib.uid;
+
+    // 1) escrita feita entre a junção e agora: a tela ainda via o valor velho — junta de novo
+    const novos: Record<string, unknown> = {};
+    const perdidas = [...lib.perdidas];
+    for (const [k, h] of Object.entries(seguradas.current)) {
+      const atual = k in lib.confirmado ? lib.confirmado[k] : undefined;
+      const r = mesclar3(h.base, h.valor, atual);
+      novos[k] = r.valor;
+      if (r.perdeu && !h.sistema && contaComoAnotacao(k)) perdidas.push(k);
+      if (h.dia && !h.sistema && contaComoAnotacao(k) && temConteudo(r.valor) && !iguais(r.valor, lib.servidor[k])) lib.dias.add(h.dia);
+      if (atual === undefined || !iguais(r.valor, atual)) {
+        pendingWrites.current[k] = r.valor;
+        ultimaEscrita.current.set(k, Date.now());
+        if (!aConfirmar.current.has(k)) aConfirmar.current.set(k, h.base);
+        guardarSegurada(uid, k, { ...h, base: aConfirmar.current.get(k) }); // a cópia do aparelho espera este envio
+      } else if (!aConfirmar.current.has(k)) {
+        esquecerSegurada(uid, k); // nada a gravar e nenhum envio da leitura pendente nesta chave
+      }
+    }
+    seguradas.current = {};
+
+    // 2) anotou antes de a conta chegar: o dia entra na sequência (registrarDiaAnotado desiste
+    //    antes do `loaded`, e a junção sobe o dado sem anotar o dia — revisão 17/10)
+    const hoje = localDayKey();
+    const listaAntes = CHAVE_DIAS_ANOTADOS in novos ? novos[CHAVE_DIAS_ANOTADOS] : lib.confirmado[CHAVE_DIAS_ANOTADOS];
+    const hub = lib.confirmado[CHAVE_HUB_STREAK];
+    let lista: unknown = listaAntes;
+    let entrouHoje = false;
+    for (const dia of [...lib.dias].sort()) {
+      const nova = dia === hoje ? registrarDia(lista, hoje, hub) : registrarDiaRetroativo(lista, dia, hoje, hub);
+      if (nova) {
+        lista = nova;
+        if (dia === hoje) entrouHoje = true;
+      }
+    }
+    if (lib.dias.has(hoje)) diaAnotadoRef.current = hoje;
+    if (lista !== listaAntes) {
+      novos[CHAVE_DIAS_ANOTADOS] = lista;
+      pendingWrites.current[CHAVE_DIAS_ANOTADOS] = lista;
+      ultimaEscrita.current.set(CHAVE_DIAS_ANOTADOS, Date.now());
+    }
+
+    // 3) as telas adotam o valor juntado ANTES de a escrita voltar a subir direto
+    if (Object.keys(novos).length > 0) {
+      setStore((prev) => ({ ...prev, ...novos }));
+      for (const [k, v] of Object.entries(novos)) safeSetItem(userKey(uid, k), JSON.stringify(v));
+    }
+    for (const k of new Set([...lib.juntadasNaLeitura, ...Object.keys(novos)])) {
+      avisarTelasDaChave(k, k in novos ? novos[k] : lib.confirmado[k]);
+    }
+    sincronizadoRef.current = true;
+    if (Object.keys(pendingWrites.current).length > 0) {
+      if (flushTimer.current) clearTimeout(flushTimer.current);
+      flushTimer.current = setTimeout(() => flushRef.current(), DEBOUNCE_MS);
+    }
+
+    if (lib.medida) trackEvent("dados_conta_atrasada", { ...lib.medida, perdidas: perdidas.length });
+    if (perdidas.length > 0) {
+      toast("Seus dados chegaram", {
+        description: "Parte do que você mudou enquanto eles carregavam não deu pra juntar com o que já estava salvo. Dá uma conferida?",
+      });
+    }
+    if (entrouHoje && Array.isArray(lista)) {
+      const { dias } = calcularSequencia(lista as string[], hoje);
+      import("@/components/conquistas/aviso-sequencia").then((m) => m.avisarSequencia(dias)).catch(() => {});
+    }
+  }, [liberacao]);
 
   // Lazy fetch a single key (used for heavy entries like dream board).
   const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
@@ -640,6 +862,10 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (attempt < 2) {
         setTimeout(() => persistKey(userId, key, value, attempt + 1), 500 * Math.pow(2, attempt));
       }
+    } else if (aConfirmar.current.has(key) && userRef.current?.id === userId) {
+      // 17/10: o servidor tem o juntado (ou algo feito em cima dele): a cópia guardada no aparelho sai
+      aConfirmar.current.delete(key);
+      esquecerSegurada(userId, key);
     }
   }, []);
 
@@ -726,7 +952,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       } catch {}
     }
 
-    // a base de uma escrita segurada é o que a tela via ANTES desta escrita
+    // a base de uma escrita segurada é o que a tela via ANTES desta escrita: a que a própria
+    // tela diz (usePersistedState manda o estado de onde partiu) ou, sem isso, o store
     const antes = storeRef.current;
     setStore(prev => ({ ...prev, [key]: value }));
     const userId = userRef.current?.id;
@@ -736,13 +963,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (!sincronizadoRef.current) {
         // 16/10: a conta ainda não chegou do servidor — NÃO sobe (apagaria o que está
         // lá). Fica segurada e é juntada com o servidor quando a leitura der certo.
+        // 17/10: e fica guardada no aparelho — fechar o app antes da conta chegar não perde.
         const h = seguradas.current[key];
+        const diaDaEscrita = escopoDiaRef.current ? escopoDiaRef.current.dia : localDayKey();
         if (h) {
           h.valor = value;
           h.sistema = h.sistema && !!opts?.system;
+          if (!opts?.system) h.dia = diaDaEscrita;
         } else {
-          seguradas.current[key] = { base: key in antes ? antes[key] : opts?.base, valor: value, sistema: !!opts?.system };
+          const base = opts && "base" in opts ? opts.base : key in antes ? antes[key] : undefined;
+          seguradas.current[key] = { base, valor: value, sistema: !!opts?.system, dia: diaDaEscrita };
         }
+        const e = seguradas.current[key];
+        guardarSegurada(userId, key, aConfirmar.current.has(key) ? { ...e, base: aConfirmar.current.get(key) } : e);
       } else {
         pendingWrites.current[key] = value;
         if (flushTimer.current) clearTimeout(flushTimer.current);
@@ -805,7 +1038,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     pendingWrites.current = {};
     const { error } = await (supabase as any).from("user_data").delete().eq("user_id", userId);
     if (error) return { ok: false, erro: "Não deu pra apagar agora. Confere a internet e tenta de novo." };
+    // 17/10: o que entrou na fila enquanto o delete estava no ar (ex.: a escrita segurada que a
+    // liberação soltou) também sai — senão o flush recriava a linha logo depois de apagar
+    if (flushTimer.current) { clearTimeout(flushTimer.current); flushTimer.current = null; }
+    pendingWrites.current = {};
     seguradas.current = {}; // o que estava esperando a conta chegar também sai
+    aConfirmar.current.clear();
+    apagarSeguradasGuardadas({ daConta: userId });
     purgeUserLocalCache();
     setStore({});
     return { ok: true };

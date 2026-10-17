@@ -13,6 +13,10 @@ import { UserDataContext } from "@/hooks/use-user-data";
  *
  * A faixa fica ABAIXO da área segura do topo (o guarda do notch cobre o top-0) e acima da
  * tela em branco da Home enquanto carrega (z-[100]).
+ *
+ * 17/10 (revisão): "Sem conexão" só quando o aparelho está MESMO sem rede; com rede e o
+ * servidor falhando (5xx, relógio torto fazendo o token parecer vencido) a faixa diz que está
+ * tentando de novo. "Tentar de novo" também na conexão lenta (corta a leitura velha).
  */
 export const OfflineBanner = () => {
   const { isOnline, pendingCount } = useOfflineQueue();
@@ -35,11 +39,13 @@ export const OfflineBanner = () => {
         >
           <WifiOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span>
-            {conta === "sem"
-              ? "Sem conexão — seus dados aparecem quando a internet voltar."
-              : "Conexão lenta — seus dados aparecem assim que carregarem."}
+            {conta === "lenta"
+              ? "Conexão lenta — seus dados aparecem assim que carregarem."
+              : isOnline
+                ? "Não conseguimos carregar seus dados agora — tentando de novo…"
+                : "Sem conexão — seus dados aparecem quando a internet voltar."}
           </span>
-          {conta === "sem" && tentarDeNovo && (
+          {tentarDeNovo && (
             <button
               type="button"
               onClick={() => tentarDeNovo()}

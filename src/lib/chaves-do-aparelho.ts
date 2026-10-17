@@ -93,6 +93,11 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
 /** Famílias de chaves do aparelho (prefixo + id). */
 export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-cartoes-vistos-", // "já vi os cartões" de cada módulo (14/10)
+  // 17/10: escrita feita antes de a conta chegar do servidor, guardada até ser juntada
+  // (`core-seguradas-<id da conta>:<chave>`, use-user-data). A vassoura da abertura NÃO pode
+  // levar — é o que faz o registro sobreviver a fechar o app; quem apaga é o próprio
+  // use-user-data (servidor confirmou, saiu da conta, outra conta entrou, "começar do zero").
+  "core-seguradas-",
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */

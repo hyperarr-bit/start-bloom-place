@@ -176,12 +176,26 @@ describe("o que NÃO anota dia", () => {
     expect(textosDeToast().filter((t) => String(t).includes("ontem"))).toEqual([]);
   });
 
-  it("antes do servidor responder não grava a lista (apagaria o histórico do servidor)", async () => {
+  it("antes do servidor responder não grava a lista em cima do vazio; com a conta, entra o dia MARCADO (ontem), não hoje (17/10)", async () => {
     linhasDoServidor = [{ key: CHAVE_DIAS_ANOTADOS, value: ["2026-09-20", "2026-09-25"] }];
     render(<UserDataProvider><Sonda /></UserDataProvider>);
     act(() => marcar("beleza", "2026-10-01", true, () => api.set("skincare-feitos-noite", { "2026-10-01": [0] })));
     await waitFor(() => expect(api.loaded).toBe(true));
     await passaDebounce();
+    // revisão 17/10: a escrita segurada conta o dia na liberação — o do escopo do "marcar outro dia",
+    // por cima da lista do servidor (o histórico fica inteiro), numa gravação só
+    expect(lista()).toEqual(["2026-09-20", "2026-09-25", "2026-10-01"]);
+    expect(gravacoesDaLista()).toHaveLength(1);
+    expect(gravacoesDaLista()[0].value).toEqual(["2026-09-20", "2026-09-25", "2026-10-01"]);
+  });
+
+  it("antes do servidor responder, dentro de 'dia nenhum' (comDia(null)): nem na liberação anota", async () => {
+    linhasDoServidor = [{ key: CHAVE_DIAS_ANOTADOS, value: ["2026-09-20", "2026-09-25"] }];
+    render(<UserDataProvider><Sonda /></UserDataProvider>);
+    act(() => { api.comDia!(null, () => api.set("skincare-feitos-noite", { "2026-09-10": [0] })); });
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await passaDebounce();
     expect(lista()).toEqual(["2026-09-20", "2026-09-25"]);
+    expect(gravacoesDaLista()).toHaveLength(0);
   });
 });

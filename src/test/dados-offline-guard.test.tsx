@@ -22,7 +22,7 @@ const servidores = new Map<string, Map<string, unknown>>();
 const doServidor = (uid: string) => { let m = servidores.get(uid); if (!m) { m = new Map(); servidores.set(uid, m); } return m; };
 const servidor = () => doServidor("u1");
 const upserts: Linha[] = [];
-let leituraTotal: "ok" | "erro" | "segurar" = "ok";
+let leituraTotal: "ok" | "erro" | "segurar" | "pendurar" = "ok";
 let leituraChave: "ok" | "erro" | "segurar" = "ok";
 let gravacaoFalha = false;
 let sessaoValida = true;
@@ -50,6 +50,7 @@ vi.mock("@/integrations/supabase/client", () => {
         leiturasTotais++;
         const foto = [...doServidor(uid).entries()].map(([key, value]) => ({ key, value: clonar(value) }));
         if (leituraTotal === "erro") return Promise.resolve({ data: null, error: ERRO_REDE });
+        if (leituraTotal === "pendurar") return new Promise(() => {}); // rede morta: nunca responde, nem ao cancelar
         if (leituraTotal === "segurar") {
           return new Promise((ok) => {
             soltarLeitura = () => ok({ data: foto, error: null });
@@ -101,6 +102,10 @@ import { useHomeWidgets } from "@/hooks/use-home-widgets";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { CHAVE_DIAS_ANOTADOS } from "@/lib/sequencia";
 import { trackEvent } from "@/lib/analytics";
+import { mesclarPerfilDueDays } from "@/lib/finance-perfil";
+import { EVENTO_TELAS_DA_CHAVE } from "@/hooks/use-user-data";
+import { EVENTO_MESMA_CHAVE } from "@/hooks/use-persisted-state";
+import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 
 type Gasto = { id: string; valor: number };
 let api: UserDataContextType;
@@ -117,6 +122,8 @@ const montar = () => render(arvore());
 const esperar = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 const ANTIGOS: Gasto[] = [{ id: "a", valor: 10 }, { id: "b", valor: 20 }, { id: "c", valor: 30 }];
 const ids = (v: unknown) => (Array.isArray(v) ? v.map((x: Gasto) => x.id) : v);
+// o aviso da junção (o da sequência sai 2,4 s depois e pode cair no teste seguinte — não conta)
+const avisosDeJuncao = () => toastFn.mock.calls.filter((c) => c[0] === "Seus dados chegaram");
 const voltaARede = async () => {
   leituraTotal = "ok";
   leituraChave = "ok";
@@ -258,7 +265,7 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
     expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d"]);
     expect(ids(gastos)).toEqual(["a", "b", "c", "d"]);
     expect(trackEvent).toHaveBeenCalledWith("dados_conta_atrasada", expect.objectContaining({ falhas: 1, seguradas: 1, juntadas: 1, perdidas: 0 }));
-    expect(toastFn).not.toHaveBeenCalled(); // juntou sem perder nada: nada a avisar
+    expect(avisosDeJuncao()).toHaveLength(0); // juntou sem perder nada: nada a avisar
   });
 
   it("tenta de novo sozinho depois de uma falha (sem precisar de evento)", async () => {
@@ -286,21 +293,42 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
     expect(ids(gastos)).toEqual(["a", "b", "c"]);
   });
 
-  it("dias anotados: a 1ª anotação feita sem rede não grava a lista; com a conta, entra hoje SEM perder os dias", async () => {
+  it("dias anotados: a anotação feita sem rede NÃO grava a lista em cima do vazio; na junção, hoje entra SEM perder os dias", async () => {
     servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-10-13", "2026-10-14", "2026-10-15"]);
     leituraTotal = "erro";
     montar();
     await esperar(100);
     act(() => api.set("todo-list", [{ id: "t1", texto: "pagar luz" }]));
+    await esperar(400);
+    expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-10-13", "2026-10-14", "2026-10-15"]); // nada subiu sem a conta
     await voltaARede();
     await waitFor(() => expect(api.loaded).toBe(true));
     await esperar(400);
-    expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-10-13", "2026-10-14", "2026-10-15"]);
+    // revisão 17/10: o registro feito antes da conta chegar conta o dia (antes só a próxima anotação contava)
+    expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]);
     expect(servidor().get("todo-list")).toEqual([{ id: "t1", texto: "pagar luz" }]); // não existia lá: sobe inteiro
-    // a próxima anotação (já com a conta) entra no dia de hoje, por cima da lista certa
+    // a próxima anotação do dia não regrava a lista
+    const gravacoes = upserts.filter((u) => u.key === CHAVE_DIAS_ANOTADOS).length;
     act(() => api.set("todo-list", [{ id: "t1", texto: "pagar luz" }, { id: "t2", texto: "mercado" }]));
     await esperar(400);
-    expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16"]);
+    expect(upserts.filter((u) => u.key === CHAVE_DIAS_ANOTADOS)).toHaveLength(gravacoes);
+  });
+
+  it("dias anotados: anotou ONTEM sem rede, fechou o app e só voltou hoje — o dia de ontem entra (janela de 2 dias)", async () => {
+    servidor().set(CHAVE_DIAS_ANOTADOS, ["2026-10-13", "2026-10-14"]);
+    vi.setSystemTime(new Date(2026, 9, 15, 22, 0)); // 15/10 à noite
+    leituraTotal = "erro";
+    const r = montar();
+    await esperar(100);
+    act(() => api.set("todo-list", [{ id: "t1", texto: "pagar luz" }]));
+    r.unmount(); // o app morreu sem a conta chegar
+    vi.setSystemTime(new Date(2026, 9, 16, 9, 0)); // reabre no dia seguinte, com rede
+    leituraTotal = "ok";
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect(servidor().get("todo-list")).toEqual([{ id: "t1", texto: "pagar luz" }]);
+    expect(servidor().get(CHAVE_DIAS_ANOTADOS)).toEqual(["2026-10-13", "2026-10-14", "2026-10-15"]);
   });
 
   it("conflito de valor (água de hoje: 3 no servidor, 1 feito sem rede): fica o do servidor e a pessoa é avisada", async () => {
@@ -315,7 +343,7 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
     expect(servidor().get("water-log")).toEqual({ "2026-10-15": 8, "2026-10-16": 3 });
     expect(api.get("water-log", {})).toEqual({ "2026-10-15": 8, "2026-10-16": 3 });
     expect(upserts.filter((u) => u.key === "water-log")).toHaveLength(0); // juntado = servidor: nada a subir
-    expect(toastFn).toHaveBeenCalledWith("Seus dados voltaram", expect.objectContaining({ description: expect.any(String) }));
+    expect(toastFn).toHaveBeenCalledWith("Seus dados chegaram", expect.objectContaining({ description: expect.stringContaining("enquanto eles carregavam") }));
   });
 
   it("conflito numa escrita de SISTEMA ou de ajuste de tela não avisa ninguém", async () => {
@@ -330,7 +358,7 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
     await esperar(400);
     expect(servidor().get("finance-perfil-ativo")).toBe("pj");
     expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c"]);
-    expect(toastFn).not.toHaveBeenCalled(); // perfil é ajuste de tela; gastos foi escrita de sistema
+    expect(avisosDeJuncao()).toHaveLength(0); // perfil é ajuste de tela; gastos foi escrita de sistema
   });
 
   it("leitura demorada: depois de 8 s o aviso diz 'conexão lenta'; a resposta chega e tudo segue", async () => {
@@ -461,29 +489,274 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
   });
 });
 
+/* ------------------------------------------------------------------------- *
+ * Revisão 17/10 — os casos do revisor viram teste de verdade
+ * ------------------------------------------------------------------------- */
+const guardadasNoAparelho = (uid = "u1") => Object.keys(localStorage).filter((k) => k.startsWith(`core-seguradas-${uid}:`));
+
+describe("revisão 17/10: contas do mês (finance-dueDays) gravadas antes de a conta chegar", () => {
+  const DUE_PADRAO = [
+    { day: 5, color: "yellow", bills: [] as { id: string; name: string; paid: boolean }[] },
+    { day: 10, color: "slate", bills: [] as { id: string; name: string; paid: boolean }[] },
+    { day: 20, color: "indigo", bills: [] as { id: string; name: string; paid: boolean }[] },
+    { day: 30, color: "emerald", bills: [] as { id: string; name: string; paid: boolean }[] },
+  ];
+  type Dia = (typeof DUE_PADRAO)[number];
+  let due: Dia[] = [];
+  let setDue: (v: Dia[] | ((p: Dia[]) => Dia[])) => void = () => {};
+  const Contas = () => { const [d, sd] = usePersistedState<Dia[]>("finance-dueDays", DUE_PADRAO); due = d; setDue = sd; return null; };
+
+  it("conta no Dia 5 sem rede → rede volta: UM Dia 5 com as contas do servidor + a nova; a conta seguinte entra UMA vez", async () => {
+    servidor().set("finance-dueDays", [
+      { day: 5, color: "yellow", bills: [{ id: "s1", name: "Aluguel", paid: true }, { id: "s2", name: "Internet", paid: false }] },
+      { day: 10, color: "slate", bills: [{ id: "s3", name: "Cartão", paid: false }] },
+      { day: 20, color: "indigo", bills: [] }, { day: 30, color: "emerald", bills: [] },
+    ]);
+    leituraTotal = "erro";
+    render(<UserDataProvider><Sonda /><Contas /></UserDataProvider>);
+    await esperar(100);
+    // o que o MonthCalendar.setBillsForDay faz: mapeia pelo dia
+    act(() => setDue((p) => p.map((d) => (d.day === 5 ? { ...d, bills: [...d.bills, { id: "n1", name: "Luz", paid: false }] } : d))));
+    await voltaARede();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    const noServidor = servidor().get("finance-dueDays") as Dia[];
+    expect(noServidor.filter((d) => d.day === 5)).toHaveLength(1);
+    expect(noServidor.find((d) => d.day === 5)!.bills.map((b) => b.id)).toEqual(["s1", "s2", "n1"]);
+    expect(due.filter((d) => d.day === 5)).toHaveLength(1); // a tela também
+    // a PRÓXIMA conta no Dia 5 (já com a conta lida), pelo caminho do calendário + perfil Pessoal
+    const proxima = due.map((d) => (d.day === 5 ? { ...d, bills: [...d.bills, { id: "x", name: "Academia", paid: false }] } : d));
+    act(() => setDue(mesclarPerfilDueDays(due, proxima, "pessoal")));
+    await esperar(400);
+    const depois = servidor().get("finance-dueDays") as Dia[];
+    expect(depois.flatMap((d) => d.bills).filter((b) => b.id === "x")).toHaveLength(1);
+    expect(depois.filter((d) => d.day === 5)).toHaveLength(1);
+  });
+});
+
+describe("revisão 17/10: anotou e FECHOU o app antes de a conta chegar", () => {
+  it("leitura lenta, tarefa nova, app vai pro fundo e morre: ao reabrir o registro existe e sobe junto com o do servidor", async () => {
+    servidor().set("todo-list", [{ id: "a", text: "antiga" }]);
+    leituraTotal = "segurar";
+    let setTodos: (v: { id: string; text: string }[] | ((p: { id: string; text: string }[]) => { id: string; text: string }[])) => void = () => {};
+    const Tarefas = () => { const [, st] = usePersistedState<{ id: string; text: string }[]>("todo-list", []); setTodos = st; return null; };
+    const r = render(<UserDataProvider><Sonda /><Tarefas /></UserDataProvider>);
+    await esperar(50);
+    act(() => setTodos((p) => [...p, { id: "n", text: "nova" }]));
+    await esperar(400);
+    // vai pro fundo: o provider força o envio — a segurada não pode subir (a conta não chegou)
+    const vis = Object.getOwnPropertyDescriptor(Document.prototype, "visibilityState");
+    try {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+        window.dispatchEvent(new Event("visibilitychange"));
+        window.dispatchEvent(new Event("pagehide"));
+      });
+      await esperar(300);
+      expect(upserts).toHaveLength(0);
+      expect(guardadasNoAparelho()).toEqual(["core-seguradas-u1:todo-list"]); // guardada no aparelho
+      expect(vassouraLeva("core-seguradas-u1:todo-list")).toBe(false); // a vassoura da abertura não leva
+      r.unmount(); // o iOS mata o processo
+    } finally {
+      delete (document as unknown as Record<string, unknown>).visibilityState;
+      if (vis) Object.defineProperty(Document.prototype, "visibilityState", vis);
+    }
+    // reabre: novo provider (a vassoura da abertura limpa o u:*), leitura ok
+    leituraTotal = "ok";
+    render(<UserDataProvider><Sonda /></UserDataProvider>);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    expect(api.get<{ id: string }[]>("todo-list", []).map((t) => t.id)).toEqual(["a", "n"]);
+    await esperar(400);
+    expect((servidor().get("todo-list") as { id: string }[]).map((t) => t.id)).toEqual(["a", "n"]);
+    expect(guardadasNoAparelho()).toEqual([]); // o servidor confirmou: a cópia do aparelho sai
+  });
+
+  it("a junção não subiu (rede caiu de novo): a cópia do aparelho FICA pra próxima abertura", async () => {
+    servidor().set("todo-list", [{ id: "a", text: "antiga" }]);
+    leituraTotal = "erro";
+    const r = montar();
+    await esperar(100);
+    act(() => api.set("todo-list", [{ id: "n", text: "nova" }]));
+    gravacaoFalha = true; // lê, mas a gravação falha (3 tentativas)
+    await voltaARede();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(2200);
+    expect(guardadasNoAparelho()).toEqual(["core-seguradas-u1:todo-list"]);
+    r.unmount();
+    gravacaoFalha = false;
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect((servidor().get("todo-list") as { id: string }[]).map((t) => t.id)).toEqual(["a", "n"]);
+    expect(guardadasNoAparelho()).toEqual([]);
+  });
+
+  it("toque no intervalo da liberação + envio falhando + app morre: a próxima abertura junta tudo (a cópia guarda a base ORIGINAL)", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "segurar";
+    const r = montar();
+    await esperar(50);
+    act(() => setGastos((p) => [...p, { id: "d", valor: 5 }]));
+    gravacaoFalha = true; // a conta chega, mas nenhuma gravação passa
+    await act(async () => {
+      soltarLeitura?.();
+      for (let i = 0; i < 20; i++) await Promise.resolve();
+      setGastos((p) => [...p, { id: "e", valor: 7 }]); // a tela ainda via só o 'd'
+    });
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(2200); // as 3 tentativas falham
+    const copia = JSON.parse(localStorage.getItem("core-seguradas-u1:finance-expenses") ?? "null");
+    expect(copia?.base).toEqual([]); // base relativa ao servidor de verdade (que não tem o juntado)
+    r.unmount(); // morreu antes de conseguir gravar
+    gravacaoFalha = false;
+    leituraTotal = "ok";
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d", "e"]);
+    expect(guardadasNoAparelho()).toEqual([]);
+  });
+
+  it("sair da conta apaga o que ela tinha guardado; outra conta entrando apaga o de quem não é ela", async () => {
+    leituraTotal = "erro";
+    const r = montar();
+    await esperar(100);
+    act(() => api.set("todo-list", [{ id: "n", text: "nova" }]));
+    expect(guardadasNoAparelho("u1")).toHaveLength(1);
+    auth.user = null; // saiu
+    r.rerender(arvore());
+    await esperar(50);
+    expect(guardadasNoAparelho("u1")).toHaveLength(0);
+    // sobra de uma conta antiga no aparelho (ex.: sessão trocada por link, sem sair)
+    localStorage.setItem("core-seguradas-u9:todo-list", JSON.stringify({ base: [], valor: [{ id: "z" }], sistema: false, dia: "2026-10-16" }));
+    leituraTotal = "ok";
+    auth.user = { id: "u1" };
+    r.rerender(arvore());
+    await waitFor(() => expect(api.loaded).toBe(true));
+    expect(guardadasNoAparelho("u9")).toHaveLength(0);
+    expect(upserts.filter((u) => u.user_id === "u9")).toHaveLength(0);
+  });
+});
+
+describe("revisão 17/10: leitura que nunca responde (rede pendurada)", () => {
+  it("passa do limite (15 s) → vira falha, aparece o 'tentar de novo' e a próxima tentativa carrega", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "pendurar";
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date(2026, 9, 16, 10, 0));
+    montar();
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(api.semConexao).toBe("lenta");
+    await act(async () => { await vi.advanceTimersByTimeAsync(6_500); }); // 15 s: estourou
+    expect(api.semConexao).toBe("sem");
+    expect(api.loaded).toBe(false);
+    leituraTotal = "ok";
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_100); }); // 1ª espera: 2 s
+    expect(api.loaded).toBe(true);
+    expect(api.semConexao).toBeNull();
+  });
+
+  it("evento online / volta pro app / botão com a 1ª leitura pendurada há mais de 8 s: começa outra na hora", async () => {
+    leituraTotal = "pendurar";
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(new Date(2026, 9, 16, 10, 0));
+    render(<UserDataProvider><Sonda /></UserDataProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
+    expect(api.semConexao).toBe("lenta");
+    const antes = leiturasTotais;
+    leituraTotal = "ok";
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+    expect(leiturasTotais).toBeGreaterThan(antes);
+    expect(api.loaded).toBe(true);
+  });
+
+  it("leitura no ar há pouco (< 8 s): a volta pro app NÃO corta (o que está chegando continua)", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "segurar";
+    montar();
+    await esperar(50);
+    const antes = leiturasTotais;
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); window.dispatchEvent(new Event("online")); });
+    await esperar(50);
+    expect(leiturasTotais).toBe(antes);
+    await act(async () => { soltarLeitura?.(); });
+    await waitFor(() => expect(api.loaded).toBe(true));
+    expect(ids(gastos)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("revisão 17/10: liberar a escrita só depois que as telas têm o valor juntado", () => {
+  it("toque no intervalo entre a junção e as telas atualizarem: não grava o valor velho da tela por cima do juntado", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "segurar";
+    montar();
+    await esperar(50);
+    act(() => setGastos((p) => [...p, { id: "d", valor: 5 }])); // segurada (a conta não chegou)
+    await act(async () => {
+      soltarLeitura?.();
+      for (let i = 0; i < 20; i++) await Promise.resolve(); // a junção rodou, o React ainda não redesenhou
+      expect(localStorage.getItem("u:u1:finance-expenses")).toContain('"a"'); // juntado já no cache
+      expect(ids(gastos)).toEqual(["d"]); // a tela ainda mostra o velho…
+      setGastos((p) => [...p, { id: "e", valor: 7 }]); // …e a pessoa toca de novo
+    });
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d", "e"]);
+    expect(ids(gastos)).toEqual(["a", "b", "c", "d", "e"]); // a tela adota o juntado
+    const enviosDosGastos = upserts.filter((u) => u.key === "finance-expenses");
+    expect(enviosDosGastos.length).toBeGreaterThan(0);
+    expect(enviosDosGastos.every((u) => (u.value as Gasto[]).length >= 4)).toBe(true); // nenhum envio só com d/e
+  });
+
+  it("o aviso de 'chave mudou' do provider é o MESMO evento que o usePersistedState ouve", () => {
+    expect(EVENTO_TELAS_DA_CHAVE).toBe(EVENTO_MESMA_CHAVE);
+  });
+});
+
 describe("o aviso na tela (OfflineBanner)", () => {
   const contexto = (extra: Partial<UserDataContextType>): UserDataContextType => ({
     get: (_k, f) => f, set: () => {}, loaded: false, isGuest: false, fetchKey: async () => null, ...extra,
   });
 
-  it("sem a conta: diz que os dados aparecem quando a internet voltar e o botão tenta de novo", async () => {
+  it("sem a conta e o aparelho SEM rede: 'Sem conexão…' e o botão tenta de novo", async () => {
     const { OfflineBanner } = await import("@/components/OfflineBanner");
     const { UserDataContext } = await import("@/hooks/use-user-data");
     const { screen, fireEvent } = await import("@testing-library/react");
     const tentar = vi.fn();
-    render(<UserDataContext.Provider value={contexto({ semConexao: "sem", tentarDeNovo: tentar })}><OfflineBanner /></UserDataContext.Provider>);
-    expect(screen.getByRole("status").textContent).toContain("Sem conexão — seus dados aparecem quando a internet voltar.");
-    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
-    expect(tentar).toHaveBeenCalledTimes(1);
+    const onLine = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+    try {
+      render(<UserDataContext.Provider value={contexto({ semConexao: "sem", tentarDeNovo: tentar })}><OfflineBanner /></UserDataContext.Provider>);
+      expect(screen.getByRole("status").textContent).toContain("Sem conexão — seus dados aparecem quando a internet voltar.");
+      fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+      expect(tentar).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (navigator as unknown as Record<string, unknown>).onLine;
+      if (onLine) Object.defineProperty(Navigator.prototype, "onLine", onLine);
+    }
   });
 
-  it("leitura demorando: 'conexão lenta', sem botão; com a conta em dia: nada", async () => {
+  it("sem a conta COM rede (servidor falhando, relógio torto): não diz 'sem conexão' — diz que está tentando de novo", async () => {
+    const { OfflineBanner } = await import("@/components/OfflineBanner");
+    const { UserDataContext } = await import("@/hooks/use-user-data");
+    const { screen } = await import("@testing-library/react");
+    render(<UserDataContext.Provider value={contexto({ semConexao: "sem", tentarDeNovo: () => {} })}><OfflineBanner /></UserDataContext.Provider>);
+    const texto = screen.getByRole("status").textContent ?? "";
+    expect(texto).toContain("Não conseguimos carregar seus dados agora — tentando de novo…");
+    expect(texto).not.toContain("Sem conexão");
+  });
+
+  it("leitura demorando: 'conexão lenta'; com a conta em dia: nada", async () => {
     const { OfflineBanner } = await import("@/components/OfflineBanner");
     const { UserDataContext } = await import("@/hooks/use-user-data");
     const { screen } = await import("@testing-library/react");
     const r = render(<UserDataContext.Provider value={contexto({ semConexao: "lenta" })}><OfflineBanner /></UserDataContext.Provider>);
     expect(screen.getByRole("status").textContent).toContain("Conexão lenta — seus dados aparecem assim que carregarem.");
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull(); // sem tentarDeNovo no contexto, sem botão
     r.unmount();
     render(<UserDataContext.Provider value={contexto({ semConexao: null, loaded: true })}><OfflineBanner /></UserDataContext.Provider>);
     expect(screen.queryByRole("status")).toBeNull();

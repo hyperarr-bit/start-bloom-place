@@ -196,6 +196,8 @@ const montar = (props: Partial<Parameters<typeof ConquistasNova>[0]> = {}, extra
   return { store, ...r };
 };
 const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
+/** Quantas vezes um texto aparece na tela (a frase do próximo adesivo só pode aparecer UMA vez: na trilha). */
+const vezes = (txt: string) => (document.body.textContent ?? "").split(txt).length - 1;
 
 describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   // aqui o relógio inteiro é falso: a capa levanta (260 ms) e o álbum 3D abre (CAPA_SAI_MS) sem esperar de verdade
@@ -207,6 +209,11 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(screen.getByTestId("cn-album-contagem").textContent).toMatch(/4 de \d+/);
     expect(screen.getByTestId("cn-amanha-frase").textContent).toContain("Faltam 2 dias pro adesivo de 14 dias 🔥");
     expect(screen.getByTestId("cn-amanha-instrucao").textContent).toContain("Vale qualquer anotação");
+    // (dono 17/10) a frase do próximo adesivo aparece UMA vez (na trilha): o card do álbum termina no "Abrir o álbum"
+    expect(screen.queryByTestId("cn-album-amanha")).toBeNull();
+    expect(vezes("Faltam 2 dias pro adesivo de 14 dias")).toBe(1);
+    const album = screen.getByTestId("cn-album");
+    expect(album.lastElementChild).toBe(screen.getByTestId("cn-album-abrir"));
     expect(document.body.textContent).not.toMatch(/dias de anotação|a vaga já está/);
     // o cartão da sequência, compacto e com a cara dos cards do app: faixa "SEQUÊNCIA", número + "dias seguidos", os 7 pontos, o resumo numa linha — sem o anel grande
     const hero = screen.getByTestId("cn-hero");
@@ -297,6 +304,9 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     montar({ testeDia: 2 }, { "core-dias-anotados": [somarDias(HOJE, -1)], "conquistas-desbloqueadas": { "first-expense": somarDias(HOJE, -1) }, "conquistas-album-visto": [] });
     expect(screen.getByTestId("cn-missao").textContent).toMatch(/dia 2 de 3/);
     expect(screen.getByTestId("cn-amanha-frase").textContent).toContain('Anota algo hoje e ganha o adesivo "Voltei"');
+    // o chip da missão fica; a frase do adesivo de hoje aparece UMA vez (trilha), nada no card do álbum
+    expect(vezes('Anota algo hoje e ganha o adesivo "Voltei"')).toBe(1);
+    expect(screen.queryByTestId("cn-album-amanha")).toBeNull();
     fireEvent.click(screen.getByTestId("cn-missao-album"));
     expect(eventos.find(([n]) => n === EVENTOS2.albumAbrir)?.[1]).toMatchObject({ origem: "missao" });
   });
@@ -320,8 +330,11 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     montar({}, { "core-dias-anotados": [], "conquistas-desbloqueadas": {}, "conquistas-album-visto": [], "finance-expenses": [] });
     expect(screen.getByTestId("cn-album-contagem").textContent).toMatch(/0 de 68/);
     expect(screen.getByTestId("cn-album-vazio").textContent).toContain("Anota algo hoje");
-    // 0 dias: anotar hoje é o 1º dia, amanhã o 2º → "Faltam 2 dias pro adesivo 'Voltei'"
+    // 0 dias: anotar hoje é o 1º dia, amanhã o 2º → "Faltam 2 dias pro adesivo 'Voltei'" — só na trilha, não no card do álbum
     expect(screen.getByTestId("cn-amanha-frase").textContent).toContain('Faltam 2 dias pro adesivo "Voltei" 🔥');
+    expect(vezes('Faltam 2 dias pro adesivo "Voltei"')).toBe(1);
+    expect(screen.queryByTestId("cn-album-amanha")).toBeNull();
+    expect(screen.getByTestId("cn-album").lastElementChild).toBe(screen.getByTestId("cn-album-abrir"));
   });
 
   it("a dose da missão em cena (data-missao-dose=\"1\", contrato com o ramo da missão) segura toast e festa", () => {

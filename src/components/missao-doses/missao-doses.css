@@ -44,7 +44,8 @@ button.md-botao[data-tom="magenta"], .md-botao[data-tom="magenta"] { background:
 /* 10/10 (regra do dono pro funil): o botão principal colado embaixo tem 56 px, como nas outras telas do funil */
 button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 56px; }
 .md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }
-.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+/* `button.md-hora` (17/10): como o md-botao — esta folha entra antes do index.css e o preflight `[type="button"]` zerava o fundo branco */
+button.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
 .md-hora[data-marcada] { background: #16121c; color: #fff; }
 .md-hora[data-sem] { border-color: rgba(22,18,28,.35); color: rgba(22,18,28,.55); }
 .md-hora[data-sem][data-marcada] { background: rgba(22,18,28,.75); color: #fff; }

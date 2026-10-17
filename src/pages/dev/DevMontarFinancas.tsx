@@ -7,9 +7,9 @@ import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
  * `import.meta.env.DEV`; some do build). A tela "Vamos montar suas Finanças" solta, pra o dono
  * aprovar o visual e pros prints (390×844, claro e escuro). Sem conta: grava no modo convidado
  * deste navegador. `?espera=ms` segura o "Montando…" (padrão 2200), `?data=AAAA-MM-DD` fixa o dia,
- * `?origem=missao` mostra a tela como a missão abre (com o post-it do 1º gasto na tela do número),
- * `?conta=<qualquer coisa>` finge uma conta (a volta na tela do número é por conta — B11): com ela,
- * recarregar a página na tela do número volta NELA, com os chips já tocados.
+ * `?origem=missao` mostra a tela como a missão abre (a tela do número SÓ com o número e "Continuar →";
+ * o 1º gasto é o tutorial da missão, depois), `?conta=<qualquer coisa>` finge uma conta (a volta no número
+ * ainda não visto é por conta — B11): com ela, recarregar a página no "Montando…" volta no número.
  */
 export default function DevMontarFinancas() {
   const [q] = useSearchParams();
@@ -36,7 +36,7 @@ export default function DevMontarFinancas() {
       contaCriadaEm={conta}
       agora={agora}
       esperaMs={Number.isFinite(espera) ? espera : 2200}
-      onPronto={(r) => setFim(`Pronto: ${r.contas} contas · R$ ${r.porDia}/dia${r.primeiroGasto ? ` · 1º gasto: ${r.primeiroGasto.nome}` : r.primeiroGasto === null ? " · ainda não gastou" : ""}`)}
+      onPronto={(r) => setFim(`Pronto: ${r.contas} contas · R$ ${r.porDia}/dia`)}
       onPular={() => setFim("Pulou")}
     />
   );

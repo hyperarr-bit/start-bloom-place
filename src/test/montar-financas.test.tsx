@@ -61,7 +61,7 @@ import {
   _zerarRemotaMontar, calcularMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar, lerChaveRemotaMontar,
   marcaDoAparelho, marcarMontarDecidido, montarFinancasLigado, montarJaDecidido, reaisDigitados, registrarChaveMontarFinancas,
   registrarVistaMontar, temDadosDeFinancas, _novaAberturaMontar, lerRascunhoMontar, montarAbertoPelaMissao,
-  MONTAR_FINANCAS_NO_MODULO, EV_GASTO_NO_NUMERO,
+  MONTAR_FINANCAS_NO_MODULO, EV_PRIMEIRO_GASTO,
 } from "@/lib/montar-financas";
 import { MontarFinancas } from "@/components/finance/montar/MontarFinancas";
 import Index from "@/pages/Index";
@@ -297,13 +297,15 @@ describe("a tela, com a conta vazia", () => {
     expect(screen.queryByTestId("montar-fatura")).toBeNull(); // sem cartão, sem linha de fatura
     expect(controle.dados()["finance-card-config"]).toBeUndefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar →" })); // pela missão: o 1º gasto é o tutorial, depois
     expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);
     expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
-    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_GASTO_NO_NUMERO]); // + o post-it do 1º gasto (missão)
+    // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado") e o "Continuar →"
+    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO]);
+    expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, e]) => e.acao)).toEqual(["resultado", "continuar"]);
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao", cartao: false });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
@@ -371,7 +373,7 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: <T,>(_k: string, f: T) => f, isGuest: false })).toBe(true);
   });
 
-  it("a MISSÃO abre a tela por cima de Finanças; no fim, o módulo mostra a renda, as contas e o MESMO número no Dashboard", { timeout: 40_000 }, async () => {
+  it("a MISSÃO abre a tela por cima de Finanças; no fim, o módulo mostra a renda, as contas e o MESMO número no Dashboard de sempre", { timeout: 40_000 }, async () => {
     const ComMissao = () => {
       const [missao, setMissao] = useState(true);
       return (
@@ -388,7 +390,7 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
     await fazerOsTresToques();
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
-    fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar →" }));
     await respirar();
 
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -398,10 +400,10 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
     // (a suíte inteira carregada: o Dashboard pode levar mais que os 6 respiros pra montar)
-    const card = (await screen.findByText("QUANTO POSSO GASTAR HOJE", {}, { timeout: 10_000 })).closest("div")!;
-    expect(within(card).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
-    // painel limpo (conta nova): nada gasto hoje, sobra o número inteiro pra hoje
-    expect(screen.getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);
+    await screen.findByText("QUANTO POSSO GASTAR HOJE", {}, { timeout: 10_000 });
+    // o Dashboard de sempre (painel limpo desligado na 1.0.16): o card mostra o MESMO número do Montar
+    expect(screen.getByTestId("pode-gastar-valor").textContent).toBe(`R$ ${numero}`);
+    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // a linha "Sobram R$ X pra hoje" era do painel limpo
   });
 
   it("conta antiga, conta com dado, convidado e site: Finanças de sempre", { timeout: 40_000 }, async () => {

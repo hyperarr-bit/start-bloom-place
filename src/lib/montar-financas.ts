@@ -57,20 +57,19 @@
  *   gasto, fixo, parcela, investimento ou conta no MEU MÊS) · ainda não terminou nem pulou.
  *   Quem já usa Finanças nunca vê — nem se a chave for ligada pra todo mundo.
  *
- * ── O 1º GASTO NA TELA DO NÚMERO (17/10, D1 do relatório 11 — só origem "missao") ──────────────
- *   Quem toca num chip faz 100% do passo 1 (112/112, mediana 10 s), mas só 42% tocavam: a pessoa saía
- *   da tela calma do número pra uma tabela escurecida, com abas por baixo. Agora o post-it "Já gastou
- *   com alguma coisa hoje?" mora NA tela "Você pode gastar hoje R$ X": Café R$ 12 · Uber R$ 23 ·
- *   Almoço R$ 35 (os chips da missão, demo-guiada/alvos) · ✎ outro (nome + valor ali mesmo) · "Ainda
- *   não gastei nada hoje →". 1 toque = 1 gasto variável de verdade (`finance-expenses`, o mesmo objeto
- *   do "+ Novo gasto", à vista, hoje, id estável: tocar duas vezes não duplica) e o número cai na frente
- *   dela: ~~R$ 70~~ R$ 58 pra hoje — "pra hoje" = o que dá por dia MENOS o que ela gastou hoje (não a
- *   média refeita do mês, que só mexe R$ 66 → 65). `onPronto` leva `primeiroGasto: { nome } | null`.
- *   Evento `missao_doses_gasto_no_numero {acao: view|chip|outro|ainda_nao, ms}` (nunca valor).
- *   FECHAR O APP NA TELA DO NÚMERO (B11): o Montar já está decidido ("pronto" grava na entrada do
- *   "Montando"), mas a tela volta — com o número e os chips já tocados — no mesmo dia e na mesma conta
- *   (`numero` na marca do aparelho; `deveMostrarMontarFinancas` responde sim enquanto ela existir).
- *   Sai da marca quando a pessoa sai da tela (o botão ou "Ainda não gastei").
+ * ── A TELA DO NÚMERO É SÓ O NÚMERO (17/10, revisão do dono no Simulador) ─────────────────────────
+ *   "Quando mostra o 'quanto posso gastar hoje' ele deveria ser o foco, só que ele é dividido pelo 'já
+ *   gastou alguma coisa hoje?'. Isso deveria aparecer no tutorial em si, não no montar o plano." A tela
+ *   final (origem "missao") é o número como herói — "VOCÊ PODE GASTAR HOJE / R$ X por dia" (sobe de 0 em
+ *   ~0,6 s), a linha curta e A CONTA DO SEU MÊS — e o botão "Continuar →". O 1º gasto ("Já gastou com
+ *   alguma coisa hoje?", os chips, "Ainda não gastei nada hoje") saiu daqui: é o tutorial guiado no
+ *   formulário de verdade de Finanças, que a missão abre em seguida (missao-doses/PassoDoDia).
+ *   FECHAR O APP ANTES DE VER O NÚMERO (B11): o Montar já está decidido ("pronto" grava na entrada do
+ *   "Montando"); se o app morre no "Montando…", a tela volta NO NÚMERO, no mesmo dia e na mesma conta
+ *   (`numero` na marca do aparelho; `deveMostrarMontarFinancas` responde sim enquanto ela existir). O número
+ *   VISTO é tela de uma vez: sai da marca assim que aparece — reabrir depois disso leva direto pro
+ *   tutorial do 1º gasto (a missão retoma o passo do gasto), nunca de novo pra tela do número.
+ *   Evento do passo inteiro (número → tutorial → 1º gasto): `missao_doses_primeiro_gasto` (EV_PRIMEIRO_GASTO).
  *
  * ── UMA VEZ SÓ (chamado de 14/10: "toda vez que eu entro aparece o tutorial") ────────────────
  *   O "feito/pulou" fica em DOIS lugares: no aparelho (`core-montar-financas`, em
@@ -132,12 +131,10 @@ export type EtapaComRascunho = "renda" | "contas" | "cartao";
 export interface RespostaCartao { usa: boolean | null; banco: string | null; valor: number; dia: number | null }
 export const CARTAO_VAZIO: RespostaCartao = { usa: null, banco: null, valor: 0, dia: null };
 export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number; rascunho?: RascunhoMontar; numero?: TelaDoNumero }
-/** Um gasto anotado na tela do número (chip ou "✎ outro"). */
-export interface GastoDoNumero { id: string; nome: string; emoji: string; valor: number }
 /**
- * A tela do número em aberto (B11): o que ela respondeu (pra refazer a conta igual) e os gastos que já
- * tocou ali. `conta` é o `created_at` da conta — a marca do aparelho não é por conta, e outra pessoa que
- * entrar neste celular nunca pode ver o número de quem saiu. `dia`: só volta no mesmo dia.
+ * A tela do número AINDA NÃO VISTA (B11): o que ela respondeu, pra refazer a conta igual. `conta` é o
+ * `created_at` da conta — a marca do aparelho não é por conta, e outra pessoa que entrar neste celular nunca
+ * pode ver o número de quem saiu. `dia`: só volta no mesmo dia.
  */
 export interface TelaDoNumero {
   conta: string;
@@ -146,9 +143,25 @@ export interface TelaDoNumero {
   faixa: string | null;
   contas: ContaEscolhida[];
   cartao: RespostaCartao;
-  gastos: GastoDoNumero[];
 }
-export const EV_GASTO_NO_NUMERO = "missao_doses_gasto_no_numero";
+
+/**
+ * O PASSO 1 DE FINANÇAS DA MISSÃO, do número ao 1º gasto, num evento só (17/10):
+ *   `missao_doses_primeiro_gasto {acao, ms, ...}` — acao: "resultado" (a tela do número apareceu) · "continuar"
+ *   (tocou "Continuar →") · "tutorial" (o post-it do 1º gasto apareceu no formulário de verdade) · "chip" (tocou
+ *   um pronto, com o nome do chip) · "escrever" ("✎ escrever o meu") · "gasto" (o gasto entrou, `via` chip |
+ *   digitado) · "nao_gastei" ("Ainda não gastei nada hoje") · "olha" (o balão do MEU MÊS apareceu).
+ *   `ms` = desde a tela do número aparecer NESTA abertura do app (null depois de reabrir); os do tutorial levam
+ *   também `ms_tutorial` (desde o post-it). Nunca valor em reais. Vai no envelope da missão (eventoDaMissao).
+ */
+export const EV_PRIMEIRO_GASTO = "missao_doses_primeiro_gasto";
+let resultadoVistoEm: number | null = null;
+/** A tela do número acabou de aparecer (o relógio do passo 1 começa aqui). */
+export const marcarResultadoVisto = (agora: number = Date.now()): void => { resultadoVistoEm = agora; };
+/** ms desde a tela do número (nesta abertura do app), ou null. */
+export const msDesdeOResultado = (agora: number = Date.now()): number | null => (resultadoVistoEm === null ? null : Math.max(0, agora - resultadoVistoEm));
+/** Só testes. */
+export const _zerarResultadoVisto = (): void => { resultadoVistoEm = null; };
 
 const ls = {
   get: (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -307,19 +320,15 @@ export function marcarMontarDecidido(r: Resultado): MarcaMontar {
   return marca;
 }
 
-/* ───────────────────────── a tela do número em aberto (B11) ───────────────────────── */
+/* ───────────────────────── a tela do número ainda não vista (B11) ───────────────────────── */
 
-/** Guarda (ou atualiza) a tela do número — só depois do "pronto". */
+/** Guarda a tela do número por ver — só depois do "pronto" (na entrada do "Montando…"). */
 export function guardarTelaDoNumero(t: TelaDoNumero): void {
   const m = marcaDoAparelho();
   if (m?.r !== "pronto") return;
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify({ ...m, numero: t }));
 }
-const ehGastoDoNumero = (g: unknown): g is GastoDoNumero => {
-  const x = g as Partial<GastoDoNumero> | null;
-  return !!x && typeof x.id === "string" && typeof x.nome === "string" && Number.isFinite(Number(x.valor)) && Number(x.valor) > 0;
-};
-/** A tela do número desta conta, de hoje — ou null. */
+/** A tela do número desta conta, de hoje, ainda não vista — ou null. */
 export function lerTelaDoNumero(criadoEm: string | null | undefined, agora: Date = new Date()): TelaDoNumero | null {
   const m = marcaDoAparelho();
   const t = m?.numero;
@@ -328,10 +337,9 @@ export function lerTelaDoNumero(criadoEm: string | null | undefined, agora: Date
   return {
     conta: t.conta, dia: t.dia, renda: Number(t.renda) || 0, faixa: typeof t.faixa === "string" ? t.faixa : null,
     contas: Array.isArray(t.contas) ? t.contas : [], cartao: lerRespostaCartao(t.cartao),
-    gastos: Array.isArray(t.gastos) ? t.gastos.filter(ehGastoDoNumero).map((g) => ({ id: g.id, nome: g.nome, emoji: typeof g.emoji === "string" ? g.emoji : "🧾", valor: Number(g.valor) })) : [],
   };
 }
-/** Ela saiu da tela do número: não volta mais. */
+/** A tela do número apareceu (ou ela saiu dela): não volta mais. */
 export function fecharTelaDoNumero(): void {
   const m = marcaDoAparelho();
   if (!m?.numero) return;
@@ -339,7 +347,8 @@ export function fecharTelaDoNumero(): void {
   ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify(sem));
 }
 
-/** "Pra hoje": o que dá por dia menos o que ela já gastou hoje (pode passar: negativo). */
+/** "Pra hoje": o que dá por dia menos o que ela já gastou hoje (pode passar: negativo). Hoje só a linha "Sobram R$ X
+ *  pra hoje" do painel limpo (Dashboard, desligado na 1.0.16) usa — o Dashboard de sempre mostra a média do mês refeita. */
 export const sobraPraHoje = (porDia: number, gastoHoje: number): number => Math.round((Math.round(porDia) - (Number(gastoHoje) || 0)) * 100) / 100;
 
 /* ───────────────────────── régua ───────────────────────── */

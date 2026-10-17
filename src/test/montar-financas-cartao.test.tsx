@@ -442,7 +442,7 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
   /** A tela da MISSÃO (a única porta desde 17/10) por cima de Finanças, com o cartão vencendo dia 19
-   *  (daqui a 3 dias); "Ver minhas Finanças" fecha a tela e o módulo por baixo já adotou o dado. */
+   *  (daqui a 3 dias); "Continuar →" fecha a tela e o módulo por baixo já adotou o dado. */
   const montarComCartao = async (dia = 19) => {
     const controle = novoControle();
     const ComMissao = () => {
@@ -464,7 +464,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
-    fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar →" })); // a tela do número pela missão: só o número
     await respirar();
     return { controle, numero };
   };
@@ -487,14 +487,14 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     expect(within(total).queryByTestId("aviso-estimativa")).toBeNull();
   });
 
-  it("DASHBOARD (painel limpo da conta nova): o MESMO número do Montar e o alerta 'vence em 3 dias'", { timeout: 40_000 }, async () => {
+  it("DASHBOARD de sempre (painel limpo desligado na 1.0.16): o MESMO número do Montar e o alerta 'vence em 3 dias'", { timeout: 40_000 }, async () => {
     const { numero } = await montarComCartao();
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
     await screen.findByText(/QUANTO POSSO GASTAR HOJE/, {}, { timeout: 10_000 }); // a suíte carregada: o Dashboard pode demorar
     const pode = cardComTitulo(/QUANTO POSSO GASTAR HOJE/);
-    expect(within(pode).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
-    expect(within(pode).getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);
+    expect(within(pode).getByTestId("pode-gastar-valor").textContent).toBe(`R$ ${numero}`);
+    expect(within(pode).queryByTestId("sobram-pra-hoje")).toBeNull(); // a linha "Sobram R$ X pra hoje" era do painel limpo
     const alertas = cardComTitulo(/ALERTAS INTELIGENTES/);
     expect(within(alertas).getByText("1 conta vence em 3 dias: Fatura Nubank · R$ 800,00")).toBeTruthy();
   });

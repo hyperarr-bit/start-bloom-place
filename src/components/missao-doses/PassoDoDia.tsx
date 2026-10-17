@@ -17,7 +17,8 @@ import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
 import { doseCurta, emSegundos, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
 import { introConcluida } from "@/lib/intro-modulo";
-import { lerTelaDoNumero } from "@/lib/montar-financas";
+import { EV_PRIMEIRO_GASTO, lerTelaDoNumero, msDesdeOResultado } from "@/lib/montar-financas";
+import { CHAVE_SEM_GASTO, marcarDiaSemGasto } from "@/lib/acao-do-dia";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS, metaGuiadaDaIntro } from "./encaixes";
 import { horaSugeridaDaMissao, porDiaExato } from "@/lib/lembrete-dia2";
 import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
@@ -27,10 +28,13 @@ import { Fogo } from "@/components/conquistas/Fogo";
 import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
 
-/** 17/10 (relatório 11, D2) — a copy do 1º gasto. */
+/** 17/10 (relatório 11, D2; revisão do dono — o 1º gasto é o tutorial no formulário, não a tela do número) — a copy
+ *  do 1º gasto: curta (o dono odeia texto demais). */
 export const PERGUNTA_DO_GASTO = "Já gastou com alguma coisa hoje?";
-export const DESCRICAO_DO_GASTO = "Toca num e ele já entra ali embaixo, em CUSTOS VARIÁVEIS. Dá pra mudar depois.";
+export const DESCRICAO_DO_GASTO = "Toca num e ele já entra na sua lista.";
 export const AINDA_NAO_GASTEI = "Ainda não gastei nada hoje →";
+/** O balão do "olha" de Finanças (um só, no MEU MÊS): a linha do número do card QUANTO POSSO GASTAR HOJE. */
+export const HOJE_AINDA_DA = "Hoje ainda dá pra gastar";
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
 export const PULAR_DEPOIS_DE_MS = 20_000;
 export const TEMPOS_DO_PASSO = {
@@ -72,10 +76,13 @@ const botaoDeAba = (alvo: EventTarget | null): HTMLElement | null =>
  * scroller é um container (não o window), nem anima. O card para com o TOPO a ~55 % da altura visível — a metade
  * de baixo — pra o balão "Olha o seu mês" caber ACIMA dele sem tampar o cabeçalho nem os chips Entrou/Saiu. */
 export const ROLAGEM_DO_OLHAR = { duracaoMs: 1000, fracaoDoTopo: 0.54, pausaMs: 500, numeroS: 1.5 };
-/** O "olha" de Finanças é um movimento só, ≤ 4 s (dono, 17/10), contado de quando o anel APARECE: o número cai
- *  (1,5 s) → rola até o MEU MÊS (0,45 s; o anel desenha no 1º quadro estável, ~0,25 s) → o "Saiu" conta (1,6 s)
- *  ≈ 3,8 s. Sem renda, só o MEU MÊS (2 s). Cada número conta em 0,8 s (+ 0,1 s) e sobra mais de meio segundo pra ler. */
-export const OLHA_DE_FINANCAS = { podeMs: 1450, rolagemMs: 400, mesMs: 1550, soMesMs: 2000, numeroS: 0.8, atrasoS: 0.1, pausaMs: 150, daTelaDoNumeroMs: 150 };
+/** O "olha" de Finanças é UM balão no MEU MÊS (17/10, revisão do dono: nada de ir e voltar pelo Dashboard), ≤ 4 s
+ *  desde o toque: rolagem curta (0,4 s) → respiro (0,15 s) → o anel desenha no 1º quadro estável → o "Saiu" e o
+ *  número contam (0,8 s + 0,1 s) → a festa entra sozinha 2,4 s depois do anel ("não gastei": só o número, 1,9 s). */
+export const OLHA_DE_FINANCAS = { rolagemMs: 400, pausaMs: 150, comGastoMs: 2400, semGastoMs: 1900, numeroS: 0.8, atrasoS: 0.1 };
+/** O que o balão do "olha" de Finanças mostra: o "Saiu" do mês (antes → depois, com gasto) e o número do card QUANTO
+ *  POSSO GASTAR HOJE do Dashboard (`antes` só quando o gasto mexeu nele) — sem renda, sem o número. */
+type OlhaDeFinancas = { saiu: Numero | null; pode: { antes: number | null; depois: number } | null; semGasto: boolean };
 /** A fração da tela onde a rolagem deixa o topo do card pro anel nascer já no lugar dele (sem 2ª rolagem). */
 const fracaoDoAnel = (el: Element, recorte?: ((e: Element) => Retangulo | null) | null): number => {
   try {
@@ -252,9 +259,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const { isGuest } = useUserData();
   const criadoEm = (user as { created_at?: string } | null)?.created_at;
   const [montarAberto, setMontarAberto] = useState(() => {
-    /* D1/B11 (ramo v1016-financas): o app fechou NA tela do número ("Você pode gastar hoje R$ X", já decidido) — o
-     * Montar reabre nela, com os chips do 1º gasto (lib/montar-financas lerTelaDoNumero, hoje, nesta conta). A dose
-     * já gravada não troca essa volta pelo passo do gasto. Sem a tela do número em aberto: o passo do gasto. */
+    /* B11: o app morreu no "Montando…" (já decidido) ANTES de o número aparecer — o Montar reabre direto no número
+     * ("Você pode gastar hoje R$ X"; lib/montar-financas lerTelaDoNumero, hoje, nesta conta). O número que já
+     * apareceu não volta: a retomada é o tutorial do 1º gasto (o passo do gasto, com os chips). */
     if (setup !== "montar-financas" || introFeita) return false;
     try {
       if (retomarGasto && !lerTelaDoNumero(criadoEm)) return false;
@@ -288,8 +295,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const montarFeitoRef = useRef(retomarGasto);
   const rotuloDoMontar = useRef(retomarGasto ? (missao.feitos[n]?.rotulo ?? "") : "");
   const [gastoExtra, setGastoExtra] = useState<string | null>(null);
-  /** quantos gastos de hoje o "gastoExtra" junta (a tela do número deixa anotar mais de um) */
-  const [gastosNoExtra, setGastosNoExtra] = useState(1);
+  /** "Ainda não gastei nada hoje" depois do Montar: o dia sem gasto foi anotado e o "olha" é só o número */
+  const semGastoRef = useRef(false);
+  /** quando o post-it do 1º gasto apareceu (o tutorial) — o `ms_tutorial` do evento do passo 1 */
+  const tutorialEm = useRef<number | null>(null);
   const subPassoRef = useRef(subPasso);
   subPassoRef.current = subPasso;
   const chips: ChipDaMissao[] = fraseDoSetup ? [] : subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : treinoPronto ? CHIPS_DE_TREINO : semMetaAgua ? CHIPS_DE_META_AGUA : metaGuiada ? metaGuiada.chips : (alvoCfg?.chips ?? []);
@@ -461,11 +470,12 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       }
       faseRef.current = "registrou";
       if (montarFeitoRef.current) {
-        // o gasto de carona depois do Montar: a dose continua sendo o número dela (o rótulo do Montar fica)
+        // o 1º gasto depois do Montar (o tutorial): a dose continua sendo o número dela (o rótulo do Montar fica)
         aoGastoGuiado?.("fim");
         setGastoExtra(rot);
         setRotulo(rotuloDoMontar.current);
         setNumero(null);
+        evPrimeiroGasto("gasto", { via });
       } else {
         setRotulo(rot);
         setNumero(num);
@@ -484,66 +494,19 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const valorDoGasto = useRef<number | null>(null);
   /** o "por dia" depois do gasto (a comemoração conta "agora dá R$ X por dia") */
   const [porDiaDepois, setPorDiaDepois] = useState<number | null>(null);
-  /** O "OLHA" DE FINANÇAS (dono, 17/10: "no passo da missão não mostra o Meu Mês tipo o antigo?") — UM movimento
-   *  contínuo, ≤ 4 s, que dá pra pular. Com renda, 2 tempos: "pode" = o QUANTO POSSO GASTAR HOJE caindo; "mes" = a
-   *  rolagem pousa no MEU MÊS e o "Saiu" do mês conta (a batida do 1.0.14, com o mesmo ContaSubindo). Sem renda
-   *  (pulou o Montar, ou Finanças é a 2ª/3ª dose — sem quiz), só o "mes". Nos dois braços. */
-  const [tempoDoOlhar, setTempoDoOlhar] = useState<"pode" | "mes" | null>(null);
-  const [doisTempos, setDoisTempos] = useState(false);
-  /** D1 com "Ainda não gastei nada hoje" no Montar: o MEU MÊS mostra as contas do mês (sem o "Saiu" contando) */
-  const [olhaSemGasto, setOlhaSemGasto] = useState(false);
-  /** D1: o 1º gasto (ou o "ainda não") veio da tela do número — o ✓ já apareceu lá; o MEU MÊS entra logo */
-  const daTelaDoNumero = useRef(false);
-  const tempoDoOlharRef = useRef(tempoDoOlhar);
-  tempoDoOlharRef.current = tempoDoOlhar;
-  const indoProMes = useRef(false);
+  /** O "OLHA" DE FINANÇAS (17/10, revisão do dono: "um balão só e curto", com o painel de sempre no Dashboard) — UM
+   *  balão no MEU MÊS, na aba onde ela está (MEU FINANCEIRO — sem ir e voltar pelo Dashboard): o "Saiu" do mês
+   *  contando com o gasto e, com renda, "Hoje ainda dá pra gastar R$ X" — o MESMO número do card QUANTO POSSO GASTAR
+   *  HOJE do Dashboard (porDiaExato, arredondado igual), riscado quando o gasto mexeu nele (um café num mês com 15
+   *  dias pela frente mexe centavos: o número fica, sem fingir queda). "Ainda não gastei nada hoje": só o número.
+   *  Nos dois braços; a missão sem braço (a 1.0.15) olha o mesmo MEU MÊS com o balão de sempre. */
+  const [olhaFin, setOlhaFin] = useState<OlhaDeFinancas | null>(null);
   useEffect(() => {
     if (cfg.tipo !== "gasto" || modo !== "dose" || montarAberto || porDiaAntes.current !== null) return;
     if (fase !== "achar" && fase !== "anotar") return;
     try { const v = porDiaExato(get); if (v !== null) porDiaAntes.current = Math.round(v); } catch { /* sem número: só o MEU MÊS */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, montarAberto]);
-
-  /** 1º tempo: o card mora no DASHBOARD (no painel limpo, o 1º bloco) — troca de aba, espera ele montar e acende ele
-   *  com o número antes → depois (o "depois" é o que o card mostra). */
-  const olharNoPodeGastar = (timers: number[]) => {
-    const lerNumero = (): number | null => {
-      const t = document.querySelector('[data-spotlight="pode-gastar"] [data-testid="pode-gastar-valor"]')?.textContent ?? "";
-      const n = Number(t.replace(/[^\d]/g, ""));
-      return t && Number.isFinite(n) ? n : null;
-    };
-    const card = () => document.querySelector('[data-spotlight="pode-gastar"]');
-    if (!card()) (document.querySelector('[data-spotlight="tab-dashboard"]') as HTMLElement | null)?.click();
-    let tentativas = 0;
-    const procurar = () => {
-      if (faseRef.current !== "registrou") return;
-      const el = card();
-      if (!el || !visivel(el)) {
-        if (++tentativas >= 12) { olharNoMeuMes(timers); return; } // o card não veio (~3 s): fica só o MEU MÊS
-        timers.push(window.setTimeout(procurar, 250));
-        return;
-      }
-      const antes = porDiaAntes.current ?? 0;
-      let depois = lerNumero();
-      if (depois === null) { try { const v = porDiaExato(get); depois = v === null ? 0 : Math.round(v); } catch { depois = antes; } }
-      setNumero({ titulo: "Por dia", antes, depois, formatar: (x) => `R$ ${reais(Math.round(x))}` });
-      setPorDiaDepois(depois);
-      setDoisTempos(true);
-      const mostrar = () => {
-        if (faseRef.current !== "registrou") return;
-        setOlharEm(el);
-        setTempoDoOlhar("pode");
-        setFase("olhar");
-        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "pode_gastar", caiu: depois < antes })); // sem valor em reais
-      };
-      try {
-        rolarAte(el, fracaoDoAnel(el), reduzir ? 0 : ROLAGEM_DO_OLHAR.duracaoMs, () => {
-          if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, ROLAGEM_DO_OLHAR.pausaMs));
-        });
-      } catch { mostrar(); }
-    };
-    timers.push(window.setTimeout(procurar, 250));
-  };
 
   /** O "Saiu" do MEU MÊS (já com o gasto) → antes = ele − o gasto. */
   const numeroDoMes = (card: Element): Numero | null => {
@@ -552,10 +515,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (saiu === null || !(saiu > 0) || !valorDoGasto.current) return null;
     return { titulo: "Saiu no mês", antes: Math.max(0, saiu - (valorDoGasto.current ?? 0)), depois: saiu, formatar: reaisDoMes };
   };
-  /** O MEU MÊS na tela: no painel limpo ele mora no DASHBOARD; no de sempre, na aba MEU FINANCEIRO — troca de aba se
-   *  precisar e espera ele montar (~2 s); não veio → `null`. */
+  /** O MEU MÊS na tela: no Dashboard de sempre ele mora na aba MEU FINANCEIRO (a do formulário do gasto: acha na hora,
+   *  sem trocar de aba); no painel limpo, também no DASHBOARD. Espera ele montar (~2 s); não veio → `null`. */
   const acharMeuMes = (timers: number[], aoAchar: (card: Element | null) => void) => {
-    const abas = ['[data-spotlight="tab-dashboard"]', '[data-spotlight="financeiro"]'];
+    const abas = ['[data-spotlight="financeiro"]', '[data-spotlight="tab-dashboard"]'];
     let tentativas = 0;
     const procurar = () => {
       const f = faseRef.current;
@@ -568,21 +531,33 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     };
     procurar();
   };
-  /** Só o MEU MÊS (sem renda) — o "olha" de 1 tempo. */
+  /** O "olha" de Finanças: rola até o MEU MÊS e acende ele com o balão (um só). */
   const olharNoMeuMes = (timers: number[]) => {
     acharMeuMes(timers, (card) => {
       if (faseRef.current !== "registrou") return;
       if (!card) { setFase("festa"); return; }
-      const num = numeroDoMes(card);
-      setNumero(num);
+      const semGasto = semGastoRef.current;
+      const saiu = semGasto ? null : numeroDoMes(card);
+      const antes = porDiaAntes.current;
+      let pode: OlhaDeFinancas["pode"] = null;
+      if (antes !== null) {
+        // o número do card do Dashboard AGORA (já com o gasto): a mesma conta, arredondada igual (cantSpend → R$ 0)
+        let depois = antes;
+        try { const v = porDiaExato(getRef.current); depois = v === null ? 0 : Math.round(v); } catch { depois = antes; }
+        pode = { antes: depois !== antes ? antes : null, depois };
+        setPorDiaDepois(depois);
+      }
+      setOlhaFin({ saiu, pode, semGasto });
+      setNumero(saiu); // a missão sem braço (a 1.0.15) mostra o balão de sempre, com o "Saiu" contando
       const mostrar = () => {
         if (faseRef.current !== "registrou") return;
         setOlharEm(card);
-        setTempoDoOlhar("mes");
         setFase("olhar");
-        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", contou: !!num }));
+        // sem valor em reais: só se o "Saiu" contou e se o número do card mudou
+        trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", contou: !!saiu, ...(pode ? { caiu: pode.antes !== null } : {}), ...(semGasto ? { sem_gasto: true } : {}) }));
+        evPrimeiroGasto("olha", { com_gasto: !semGasto, numero: !!pode, caiu: !!pode && pode.antes !== null });
       };
-      // (17/10) o "olha" de Finanças é UM movimento ≤ 4 s desde o toque: rolagem curta (0,4 s) e respiro curto (0,15 s)
+      // ≤ 4 s desde o toque: rolagem curta (0,4 s) e respiro curto (0,15 s)
       try {
         rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : OLHA_DE_FINANCAS.rolagemMs, () => {
           if (reduzir) mostrar(); else timers.push(window.setTimeout(mostrar, OLHA_DE_FINANCAS.pausaMs));
@@ -590,45 +565,25 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       } catch { mostrar(); }
     });
   };
-  /** 2º tempo: do número pro MEU MÊS — a rolagem pousa nele e o "Saiu" conta. Uma vez só (o relógio e o
-   *  "Entendi" podem chegar juntos). */
-  const timersDoMes = useRef<number[]>([]);
-  useEffect(() => () => timersDoMes.current.forEach((t) => window.clearTimeout(t)), []);
-  const irProMeuMes = useCallback(() => {
-    if (faseRef.current !== "olhar" || indoProMes.current) return;
-    indoProMes.current = true;
-    // o anel do número sai ANTES da rolagem (e de qualquer troca de aba: a âncora dele sumiria e o anel fecharia o olha)
-    setOlharEm(null);
-    acharMeuMes(timersDoMes.current, (card) => {
-      if (faseRef.current !== "olhar") return;
-      if (!card) { setFase("festa"); return; }
-      const num = numeroDoMes(card);
-      const pousar = () => { if (faseRef.current !== "olhar") return; setNumero(num); setOlharEm(card); setTempoDoOlhar("mes"); };
-      try { rolarAte(card, fracaoDoAnel(card, alvoCfg?.olhar?.recorte), reduzir ? 0 : OLHA_DE_FINANCAS.rolagemMs, pousar); } catch { pousar(); }
-      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "view", alvo: "meu_mes", tempo: 2, contou: !!num }));
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [n, modulo, reduzir]);
-  /* Cada tempo segura o número contar e um respiro, contado de quando o anel APARECE (o anel só desenha com a tela
-   * assentada); no fim, a festa entra sozinha (dá pra pular antes). Se o anel não aparecer (teclado aberto, a tela
-   * não assentou), o relógio começa mesmo assim em 2,5 s — o "olha" nunca prende a dose. */
-  const [olhaNaTela, setOlhaNaTela] = useState<"pode" | "mes" | null>(null);
+  /* O balão segura o número contar e um respiro, contado de quando o anel APARECE (o anel só desenha com a tela
+   * assentada); no fim, a festa entra sozinha ("Entendi" adianta). Se o anel não aparecer (teclado aberto, a tela não
+   * assentou), o relógio começa mesmo assim em 2,5 s — o "olha" nunca prende a dose. */
+  const [olhaNaTela, setOlhaNaTela] = useState(false);
   useEffect(() => {
-    if (fase !== "olhar" || !tempoDoOlhar || olhaNaTela === tempoDoOlhar) return;
-    const t = window.setTimeout(() => setOlhaNaTela(tempoDoOlhar), 2500);
+    if (fase !== "olhar" || !olhaFin || olhaNaTela) return;
+    const t = window.setTimeout(() => setOlhaNaTela(true), 2500);
     return () => window.clearTimeout(t);
-  }, [fase, tempoDoOlhar, olhaNaTela]);
+  }, [fase, olhaFin, olhaNaTela]);
   useEffect(() => {
-    if (fase !== "olhar" || !olhaNaTela || olhaNaTela !== tempoDoOlhar) return;
+    if (fase !== "olhar" || !olhaFin || !olhaNaTela) return;
     const t = window.setTimeout(() => {
-      if (olhaNaTela === "pode") { irProMeuMes(); return; }
       if (faseRef.current !== "olhar") return;
       trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "feito", via: "auto" }));
       setFase("festa");
-    }, olhaNaTela === "pode" ? OLHA_DE_FINANCAS.podeMs : doisTempos ? OLHA_DE_FINANCAS.mesMs : OLHA_DE_FINANCAS.soMesMs);
+    }, olhaFin.semGasto ? OLHA_DE_FINANCAS.semGastoMs : OLHA_DE_FINANCAS.comGastoMs);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase, olhaNaTela, tempoDoOlhar]);
+  }, [fase, olhaFin, olhaNaTela]);
 
   /* REGISTROU → o chip ficou ✓ e a linha apareceu; depois, o OLHAR (ou direto a festa). */
   useEffect(() => {
@@ -637,15 +592,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     timers.push(window.setTimeout(() => {
       if (faseRef.current !== "registrou") return;
       setAnelVivo(false);
-      /* 1.0.16 (dono, 17/10 — os dois braços): a dose de Finanças termina OLHANDO o "QUANTO POSSO GASTAR HOJE"
-       * mudar com o gasto que ela acabou de anotar. O card mora no DASHBOARD (no painel limpo, o 1º bloco): troca
-       * de aba, espera ele montar e acende ele com o número antes → depois (o "depois" é o que o card mostra). Sem
-       * renda (pulou o Montar, nada anotado) não há número: fica o "olhar" de sempre do MEU MÊS. */
-      if (cfg.tipo === "gasto" && modo === "dose") {
-        if (porDiaAntes.current !== null) olharNoPodeGastar(timers);
-        else olharNoMeuMes(timers);
-        return;
-      }
+      /* Finanças (os dois braços, e a missão sem braço): o "olha" é o balão do MEU MÊS — o "Saiu" somou e, com renda,
+       * o "Hoje ainda dá pra gastar" do card do Dashboard (ver `olhaFin`). */
+      if (cfg.tipo === "gasto" && modo === "dose") { olharNoMeuMes(timers); return; }
       // 1.0.16, braço A: a dose é curta (10–30 s, desenho 8 4.0) — sem o "olhar explicado" da 1.0.10 nos outros módulos
       if (braco === "A" && modo === "dose") { setFase("festa"); return; }
       const el = alvoCfg?.olhar?.achar() ?? null;
@@ -666,7 +615,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       } else {
         setFase("festa");
       }
-    }, reduzir ? 150 : daTelaDoNumero.current ? OLHA_DE_FINANCAS.daTelaDoNumeroMs : TEMPOS_DO_PASSO.registrou));
+    // "não gastei": nenhum chip pra virar ✓ nem linha pra aparecer — o balão entra logo
+    }, reduzir || semGastoRef.current ? 150 : TEMPOS_DO_PASSO.registrou));
     return () => timers.forEach((t) => window.clearTimeout(t));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
@@ -690,6 +640,19 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     ms_desde_view: Date.now() - t0.current,
     hora_local: new Date().getHours(),
   });
+  /** O passo 1 de Finanças da missão, do número ao 1º gasto (lib/montar-financas EV_PRIMEIRO_GASTO) — só no tutorial
+   *  que vem DEPOIS do Montar (ou na retomada dele). `ms` desde a tela do número (nesta abertura), `ms_tutorial` desde
+   *  o post-it. Nunca valor em reais. */
+  const evPrimeiroGasto = (acao: string, extra: Record<string, unknown> = {}) => {
+    if (!montarFeitoRef.current || cfg.tipo !== "gasto") return;
+    try {
+      trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({
+        acao, ms: msDesdeOResultado(),
+        ...(tutorialEm.current !== null && acao !== "tutorial" ? { ms_tutorial: Date.now() - tutorialEm.current } : {}),
+        ...(retomarGasto ? { retomada: true } : {}), ...extra,
+      }));
+    } catch { /* a medição nunca derruba a missão */ }
+  };
   const tocarChip = (chip: ChipDaMissao) => {
     if (!cfg.tipo) return;
     // 1.0.16: Treino — o chip aplica o modelo pronto (plano + dias de treino), pelo formato da aba PLANO
@@ -715,6 +678,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     const item = itemDoChip(cfg.tipo, semMetaAgua ? { emoji: "💧", nome: "1 copo d'água" } : chip);
     // (17/10: sem `valor` — nada de reais em evento, nem o do chip)
     trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!item, ...ondeDoChip() }));
+    if (cfg.tipo === "gasto") evPrimeiroGasto("chip", { chip: chip.nome });
     if (!item) return;
     chipTocado.current = chip;
     setTocado(chip.nome);
@@ -746,6 +710,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   };
   const escreverOMeu = () => {
     trackEvent("missao_doses_escrever", eventoDaMissao({ dia: n, modulo }));
+    evPrimeiroGasto("escrever");
     // post-it solto (a âncora tinha sumido ou ela voltou do 2º plano): acha a linha do campo agora e devolve o anel
     let base: Element | null = alvo;
     if (!base) {
@@ -884,6 +849,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (postItVisto.current) return;
     postItVisto.current = true;
     trackEvent("missao_doses_postit", eventoDaMissao({ dia: n, modulo, ancora, ms_desde_view: Date.now() - t0.current, aba: doseDeGasto ? abaAtiva() : null, montagem: montagemRef.current }));
+    // o tutorial do 1º gasto depois do Montar ABRIU (o post-it no formulário de verdade)
+    if (montarFeitoRef.current && cfg.tipo === "gasto") { tutorialEm.current = Date.now(); evPrimeiroGasto("tutorial", { ancora, aba: abaAtiva() }); }
     const comecar = tomarComecar();
     if (comecar !== null) trackEvent("missao_doses_modulo_abriu", eventoDaMissao({ dia: n, modulo, ms_desde_comecar: comecar, tela: "postit" }));
   };
@@ -923,12 +890,30 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (montarFeitoRef.current) { fecharSemGasto(); return; }
     aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos(), extrasDoPulo());
   };
-  /* "Ainda não gastei nada hoje →" (D2): depois do Montar (ou na retomada) a dose JÁ está gravada — vai pra festa;
-   * sem o Montar, ela não tem o que anotar hoje: a dose fica pra amanhã (o mesmo caminho do "Pular", medido à parte). */
+  /* "Ainda não gastei nada hoje →" (D2): depois do Montar (ou na retomada) a dose JÁ está gravada — o mesmo registro
+   * do "não gastei nada hoje" da Home (lib/acao-do-dia, `finance-sem-gasto`: conta pra sequência), o balão curto no MEU
+   * MÊS ("Hoje ainda dá pra gastar R$ X") e a festa. Sem o Montar, ela não tem o que anotar hoje: a dose fica pra
+   * amanhã (o mesmo caminho do "Pular", medido à parte). */
   const aindaNaoGastei = () => {
-    if (montarFeitoRef.current) { fecharSemGasto("ainda_nao"); return; }
+    if (montarFeitoRef.current) { naoGasteiHoje(); return; }
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "ainda_nao", segundos: segundos(), montagem: montagemRef.current }));
     aoPular("ainda_nao", "toque", segundos(), extrasDoPulo());
+  };
+  const naoGasteiHoje = () => {
+    if (faseRef.current !== "achar" && faseRef.current !== "anotar") return; // o toque duplo registra 1 vez
+    faseRef.current = "registrou";
+    try {
+      const novo = marcarDiaSemGasto(getRef.current<unknown>(CHAVE_SEM_GASTO, {}), localDayKey());
+      if (novo) set(CHAVE_SEM_GASTO, novo);
+    } catch { /* a missão nunca derruba o módulo */ }
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "gasto_extra", acao: "ainda_nao", segundos: segundos(), montagem: montagemRef.current }));
+    evPrimeiroGasto("nao_gastei");
+    aoGastoGuiado?.("fim"); // reabrir não volta no tutorial
+    semGastoRef.current = true;
+    setRotulo(rotuloDoMontar.current);
+    setNumero(null);
+    setAnelVivo(false);
+    setFase("registrou");
   };
   const toqueNaFaixa = () => {
     toquesNaFaixa.current += 1;
@@ -936,11 +921,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   };
   const entendi = useCallback((via: "botao" | "auto") => {
     if (faseRef.current !== "olhar") return;
-    // Finanças: o "Entendi" do 1º tempo (o número) adianta pro 2º (o MEU MÊS); o do 2º, pra festa
-    if (via === "botao" && tempoDoOlharRef.current === "pode") { irProMeuMes(); return; }
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "olhar", acao: "feito", via }));
     setFase("festa");
-  }, [n, modulo, irProMeuMes]);
+  }, [n, modulo]);
   const pularOlhar = () => {
     if (faseRef.current !== "olhar") return;
     aoPular("passo", "olhar", segundos());
@@ -998,7 +981,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         tocado={tocado}
         aoChip={tocarChip}
         aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
-        rotuloEscrever={doseDeGasto ? "✎ outro" : undefined}
         dica={chips.length && alvoCfg?.escrever && !doseDeGasto ? "Ou escreve o seu ali no campo e toca no +." : undefined}
         secundaria={doseDeGasto ? { texto: AINDA_NAO_GASTEI, aoTocar: aindaNaoGastei, testid: "missao-doses-ainda-nao" } : undefined}
         compacto={compacto}
@@ -1007,16 +989,12 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   );
   const postIt = postItDe(false);
 
-  /* 1.0.16 — a dose de Finanças = "Vamos montar suas Finanças" (folha fixa abaixo da faixa da missão) */
+  /* 1.0.16 — a dose de Finanças = "Vamos montar suas Finanças" (folha fixa abaixo da faixa da missão). O "Continuar →"
+   * da tela do número (SÓ o número — 17/10, revisão do dono) traz pra cá: a dose já conta e o 1º gasto é o TUTORIAL no
+   * formulário de verdade (o anel no "+ Novo gasto", o post-it "Já gastou com alguma coisa hoje?"). */
   const montarPronto = (r: ResumoMontar) => {
     const rot = r.semFolga || !(r.porDia > 0) ? `Renda e ${r.contas} ${r.contas === 1 ? "conta" : "contas"} do mês` : `Pode gastar R$ ${reais(Math.floor(r.porDia))} por dia`;
-    /* D1 (relatório 11; ramo v1016-financas): o 1º gasto pode vir JÁ na tela do número ("Você pode gastar hoje R$ X")
-     * — `primeiroGasto` {nome} (tocou um chip ali) ou `null` ("Ainda não gastei nada hoje"). Com o campo, nada de anel:
-     * direto pro MEU MÊS e a festa (a dose conta nos dois casos: o Montar gravou renda e contas). Sem o campo (o Montar
-     * de antes), o 1º gasto guiado pelo anel, como sempre. */
-    const comGasto = r as ResumoMontar & { primeiroGasto?: { nome: string; valor?: number } | null };
-    const veioPrimeiroGasto = Object.prototype.hasOwnProperty.call(comGasto, "primeiroGasto");
-    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos(), ...(veioPrimeiroGasto ? { primeiro_gasto: comGasto.primeiroGasto ? "chip" : "nenhum" } : {}) }));
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos() }));
     // a tela substitui os cartões de Finanças (como no caminho do módulo, useMontarFinancasNoModulo.aoPronto)
     try { marcarCartoesVistos("financas"); } catch { /* storage bloqueado */ }
     rotuloDoMontar.current = rot;
@@ -1026,59 +1004,18 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     setRotulo(rot);
     setNumero(null);
     setMontarFeito(true);
-    if (veioPrimeiroGasto) {
-      const g = comGasto.primeiroGasto ?? null;
-      porDiaAntes.current = null; // o número já caiu na frente dela, na tela do Montar: o "olha" é só o MEU MÊS
-      daTelaDoNumero.current = true;
-      if (g) {
-        // a tela do número deixa anotar mais de um: o "Saiu" do MEU MÊS conta a soma dos de HOJE (os que ela anotou ali)
-        const deHoje = gastosDeHoje();
-        const valor = deHoje.total > 0 ? deHoje.total : typeof g.valor === "number" && g.valor > 0 ? g.valor : valorDoGastoPeloNome(g.nome);
-        valorDoGasto.current = valor;
-        const nomes = deHoje.nomes.length ? deHoje.nomes : [g.nome];
-        const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` : nomes[0];
-        setGastoExtra(valor ? `${lista} · R$ ${reais(valor)}` : lista);
-        setGastosNoExtra(nomes.length);
-      } else {
-        setOlhaSemGasto(true);
-      }
-      aoFeito(rot, segundos());
-      aoGastoGuiado?.("fim");
-      setMontarAberto(false);
-      faseRef.current = "registrou";
-      setFase("registrou");
-      return;
-    }
-    // a dose conta JÁ (fechar o app no gasto de carona não pode desfazer o Montar); a comemoração chama de
-    // novo no fim e a missão ignora a 2ª vez (o dia já está gravado)
+    // a dose conta JÁ (fechar o app no tutorial não pode desfazer o Montar); a comemoração chama de novo no fim e a
+    // missão ignora a 2ª vez (o dia já está gravado)
     aoFeito(rot, segundos());
-    // fechar o app daqui até o gasto: ao reabrir, a dose volta NO PASSO DO GASTO (nunca no Montar)
+    // fechar o app daqui até o gasto: ao reabrir, a dose volta NO TUTORIAL DO GASTO (nunca no Montar)
     aoGastoGuiado?.("pendente");
-    // a dose está feita; o 1º gasto vem de carona (opcional): o "achar" volta a procurar o "+ Novo gasto"
-    // assim que o Montar sair da tela (o atributo <html data-montar-financas> some no desmontar)
+    // o "achar" volta a procurar o "+ Novo gasto" assim que o Montar sair da tela (o atributo <html
+    // data-montar-financas> some no desmontar)
     setMontarAberto(false);
   };
-  /** Os gastos variáveis de HOJE na conta (na tela do número, os que ela acabou de anotar): nomes e a soma. */
-  const gastosDeHoje = (): { nomes: string[]; total: number } => {
-    try {
-      const dia = localDayKey();
-      const lista = (getRef.current<Array<{ description?: unknown; value?: unknown; date?: unknown }>>("finance-expenses", []) ?? []).filter((e) => e && e.date === dia);
-      return { nomes: lista.map((e) => String(e.description ?? "").trim()).filter(Boolean), total: lista.reduce((t, e) => t + (Number(e.value) || 0), 0) };
-    } catch { return { nomes: [], total: 0 }; }
-  };
-  /** O valor do gasto que o Montar acabou de gravar (o mais novo com esse nome) — pro "Saiu" do MEU MÊS contar. */
-  const valorDoGastoPeloNome = (nome: string): number | null => {
-    try {
-      const lista = (getRef.current<Array<{ description?: unknown; value?: unknown }>>("finance-expenses", []) ?? []);
-      for (let i = lista.length - 1; i >= 0; i--) {
-        if (String(lista[i]?.description ?? "").trim().toLowerCase() === nome.trim().toLowerCase()) { const v = Number(lista[i]?.value); return v > 0 ? v : null; }
-      }
-    } catch { /* noop */ }
-    return null;
-  };
-  /* B11 (relatório 11): o Montar marca "decidido" na ENTRADA do "Montando" — fechar o app na tela do número perdia a
-   * dose (ela só gravava no "Ver minhas Finanças"). Agora a dose grava ali mesmo (o mesmo rótulo do número, que é a
-   * conta do card) e o 1º gasto fica pendente: reabrir volta no passo do gasto. */
+  /* B11 (relatório 11): o Montar marca "decidido" na ENTRADA do "Montando" — fechar o app ali ou na tela do número perdia a
+   * dose (ela só gravava no botão da tela do número). Agora a dose grava ali mesmo (o mesmo rótulo do número, que é a
+   * conta do card) e o 1º gasto fica pendente: reabrir volta no número ainda não visto ou, se já viu, no tutorial. */
   useEffect(() => {
     if (!montarAberto || !comBraco) return;
     let t = 0;
@@ -1185,26 +1122,57 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         )}
         {fase === "olhar" && olharEm && (
           <Anel
-            key={`olhar-${tempoDoOlhar ?? "unico"}`} fixo interativo alvo={olharEm} recorte={tempoDoOlhar === "pode" ? undefined : alvoCfg?.olhar?.recorte} duracao={TEMPOS_DO_PASSO.olhar} testid="missao-doses-anel-olhar"
-            rapido={!!tempoDoOlhar} aoAparecer={tempoDoOlhar ? () => setOlhaNaTela(tempoDoOlhar) : undefined}
+            key={olhaFin ? "olhar-financas" : "olhar"} fixo interativo alvo={olharEm} recorte={alvoCfg?.olhar?.recorte} duracao={TEMPOS_DO_PASSO.olhar} testid="missao-doses-anel-olhar"
+            rapido={!!olhaFin} aoAparecer={olhaFin ? () => setOlhaNaTela(true) : undefined}
             aoSair={() => entendi("auto")}
-            balao={(
+            balao={olhaFin && doseDeGasto ? (
+              /* Finanças (17/10, revisão do dono): UM balão, curto — o "Saiu" do mês e o número do card do Dashboard.
+                 A missão SEM braço (a 1.0.15, chave desligada) fica com o balão de sempre, logo abaixo. */
+              <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="missao-doses-olhar" data-olha="financas" data-sem-gasto={olhaFin.semGasto ? "" : undefined}>
+                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{olhaFin.semGasto ? "Dia sem gasto anotado ✓" : cfg.olhar.titulo}</span>
+                {olhaFin.saiu || olhaFin.pode ? (
+                  <div className="mt-1.5 divide-y divide-white/10" data-testid="missao-doses-olhar-numero">
+                    {olhaFin.saiu && (
+                      <div className="flex items-baseline justify-between gap-3 py-1.5" data-testid="missao-doses-olhar-saiu">
+                        <span className="text-[13px] text-white/65">{olhaFin.saiu.titulo}</span>
+                        <span className="flex items-baseline gap-2 whitespace-nowrap">
+                          <s className="text-[13px] text-white/45 tabular-nums">{olhaFin.saiu.formatar(olhaFin.saiu.antes)}</s>
+                          <span className="text-[20px] font-black tracking-tight leading-none"><ContaSubindo de={olhaFin.saiu.antes} para={olhaFin.saiu.depois} formatar={olhaFin.saiu.formatar} duracao={OLHA_DE_FINANCAS.numeroS} atraso={OLHA_DE_FINANCAS.atrasoS} /></span>
+                        </span>
+                      </div>
+                    )}
+                    {olhaFin.pode && (
+                      <div className="flex items-baseline justify-between gap-3 py-1.5" data-testid="missao-doses-olhar-pode" data-valor={olhaFin.pode.depois}>
+                        <span className="text-[13px] text-white/65">{HOJE_AINDA_DA}</span>
+                        <span className="flex items-baseline gap-2 whitespace-nowrap">
+                          {olhaFin.pode.antes !== null && <s className="text-[13px] text-white/45 tabular-nums">R$ {reais(olhaFin.pode.antes)}</s>}
+                          <span className="text-[20px] font-black tracking-tight leading-none">
+                            {olhaFin.pode.antes !== null
+                              ? <ContaSubindo de={olhaFin.pode.antes} para={olhaFin.pode.depois} formatar={(x) => `R$ ${reais(Math.round(x))}`} duracao={OLHA_DE_FINANCAS.numeroS} atraso={OLHA_DE_FINANCAS.atrasoS} />
+                              : <span className="tabular-nums">R$ {reais(olhaFin.pode.depois)}</span>}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olhaFin.semGasto ? "Suas contas do mês já estão aqui." : "O gasto já entrou no seu mês."}</span>
+                )}
+                <div className="mt-2.5">
+                  <BotaoSeguir claro onClick={() => entendi("botao")} testid="missao-doses-entendi">Entendi</BotaoSeguir>
+                </div>
+              </div>
+            ) : (
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="missao-doses-olhar">
-                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1" data-testid="missao-doses-olhar-tempo">{doisTempos ? `Olha · ${tempoDoOlhar === "mes" ? 2 : 1} de 2` : "Olha · 1 de 1"}</span>
-                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{tempoDoOlhar === "pode" ? "Quanto você pode gastar hoje" : tempoDoOlhar === "mes" && doisTempos ? "E o seu mês" : cfg.olhar.titulo}</span>
-                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{tempoDoOlhar === "pode" ? "Esse gasto já entrou na conta — e o número se ajusta sozinho a cada gasto que você anota." : tempoDoOlhar === "mes" && olhaSemGasto ? "Suas contas do mês já estão aqui. Cada gasto que você anotar entra no dia dele." : tempoDoOlhar === "mes" ? "O gasto entrou no dia de hoje e o “Saiu” do mês somou sozinho." : cfg.olhar.texto}</span>
-                {numero && tempoDoOlhar === "pode" && numero.antes === numero.depois ? (
-                  /* o gasto é pequeno perto do mês: o "por dia" arredondado nem mexe — mostra o que saiu, sem fingir */
-                  <span className="block mt-2 text-[13px] text-white/80" data-testid="missao-doses-olhar-numero">
-                    <b className="text-[22px] font-black tracking-tight text-white">{numero.formatar(numero.depois)}</b> por dia
-                    {valorDoGasto.current ? <span className="block text-[12px] text-white/60 mt-0.5">Saíram R$ {reais(valorDoGasto.current)} do que sobra no mês.</span> : null}
-                  </span>
-                ) : numero && (
+                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1" data-testid="missao-doses-olhar-tempo">Olha · 1 de 1</span>
+                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{cfg.olhar.titulo}</span>
+                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{cfg.olhar.texto}</span>
+                {numero && (
                   <span className="flex items-baseline gap-2 mt-2" data-testid="missao-doses-olhar-numero">
                     <span className="text-[12px] text-white/50">{numero.titulo}:</span>
                     <span className="text-[13px] text-white/50 line-through tabular-nums">{numero.formatar(numero.antes)}</span>
                     <span className="text-white/50 text-[13px]">→</span>
-                    <span className="text-[22px] font-black tracking-tight leading-none"><ContaSubindo de={numero.antes} para={numero.depois} formatar={numero.formatar} duracao={tempoDoOlhar ? OLHA_DE_FINANCAS.numeroS : ROLAGEM_DO_OLHAR.numeroS} {...(tempoDoOlhar ? { atraso: OLHA_DE_FINANCAS.atrasoS } : {})} /></span>
+                    <span className="text-[22px] font-black tracking-tight leading-none"><ContaSubindo de={numero.antes} para={numero.depois} formatar={numero.formatar} duracao={ROLAGEM_DO_OLHAR.numeroS} /></span>
                   </span>
                 )}
                 <div className="mt-3 flex items-center gap-3">
@@ -1238,7 +1206,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             aoConhecerMais={aoConhecerMais}
             aoMostrarAdesivo={aoMostrarAdesivo}
             gastoExtra={gastoExtra}
-            gastosNoExtra={gastosNoExtra}
             porDiaAgora={porDiaDepois}
           />
         )}
@@ -1335,7 +1302,7 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
             ? <>{cfg.emoji} {fraseDoFeito(modulo, rotulo, porDiaAgora)}</>
             : <>{cfg.emoji} <b className="text-foreground">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}</>}
         </p>
-        {/* o 1º gasto depois do Montar (na tela do número ou de carona) — nos dois braços */}
+        {/* o 1º gasto depois do Montar (o tutorial no formulário) — nos dois braços */}
         {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
         <div className="h-2 rounded-full bg-foreground/10 overflow-hidden mt-3.5">
           <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />

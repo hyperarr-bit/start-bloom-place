@@ -111,42 +111,6 @@ button.mf-dia[aria-pressed="true"] { border-color: var(--mf-ambar); background: 
 .mf-valor-grande input::placeholder { color: hsl(var(--muted-foreground) / .45); }
 .mf-conta span small { font-size: 12.5px; }
 
-/* o 1º gasto na tela do número (17/10, D1 — só pela missão): o MESMO post-it da missão (papel amarelo,
-   fita magenta, tinta grafite — demo-guiada/pecas PostItDaMissao), igual no claro e no escuro */
-.mf-postit { position: relative; margin-top: 12px; }
-.mf-postit-fita { position: absolute; top: -8px; left: 50%; width: 76px; height: 16px; border-radius: 2px; transform: translateX(-50%) rotate(2deg); background: hsl(330 65% 50% / .55); z-index: 1; }
-.mf-postit-papel { display: block; border-radius: 6px; padding: 14px 16px 12px; background: #FFF3B0; color: #262626; transform: rotate(-.6deg); box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .55); text-align: left; }
-.mf-postit-rotulo { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(38, 38, 38, .6); margin-bottom: 4px; }
-.mf-postit-pergunta { display: block; font-size: 16px; font-weight: 800; line-height: 1.25; letter-spacing: -.01em; }
-.mf-postit-texto { display: block; font-size: 13px; line-height: 1.35; margin-top: 4px; color: rgba(38, 38, 38, .78); }
-.mf-postit-texto b { color: #262626; }
-.mf-postit-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-button.mf-postit-chip, span.mf-postit-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px 0 12px; border-radius: 999px; border: 0; background: #fff; color: #262626; font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 rgba(0, 0, 0, .12); transition: transform .1s, background-color .15s, color .15s; }
-button.mf-postit-chip:active { transform: scale(.95); }
-.mf-postit-valor { font-weight: 600; color: rgba(38, 38, 38, .55); }
-.mf-postit-chip[data-feito] { background: #16121c; color: #fff; animation: mf-pulso .35s ease-out; }
-.mf-postit-chip[data-feito] .mf-postit-valor { color: rgba(255, 255, 255, .7); }
-button.mf-postit-outro { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px dashed rgba(38, 38, 38, .45); background: transparent; color: rgba(38, 38, 38, .85); font-size: 13.5px; font-weight: 600; }
-.mf-postit-form { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-input.mf-postit-nome { flex: 1; min-width: 0; height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(38, 38, 38, .2); background: #fff; color: #262626; font-family: inherit; font-weight: 600; outline: none; }
-.mf-postit-quanto { display: inline-flex; align-items: center; gap: 3px; height: 40px; padding: 0 8px; border-radius: 10px; border: 1px solid rgba(38, 38, 38, .2); background: #fff; color: #262626; flex-shrink: 0; }
-.mf-postit-quanto small { font-size: 12px; font-weight: 700; color: rgba(38, 38, 38, .55); }
-.mf-postit-quanto input { width: 44px; border: 0; outline: none; background: transparent; color: inherit; font-family: inherit; font-weight: 700; text-align: right; padding: 0; }
-input.mf-postit-nome:focus, .mf-postit-quanto:focus-within { border-color: #262626; }
-button.mf-postit-anotar { height: 40px; padding: 0 12px; border-radius: 10px; border: 0; background: #16121c; color: #fff; font-size: 13.5px; font-weight: 750; flex-shrink: 0; }
-button.mf-postit-anotar:disabled { opacity: .35; }
-button.mf-postit-fechar { width: 32px; height: 40px; display: grid; place-items: center; border: 0; background: none; color: rgba(38, 38, 38, .6); flex-shrink: 0; }
-button.mf-postit-ainda-nao { display: block; margin-top: 10px; padding: 6px 0 2px; border: 0; background: none; color: rgba(38, 38, 38, .72); font-size: 13.5px; font-weight: 650; text-align: left; }
-
-/* o número caindo: ~~R$ 70~~ R$ 58 pra hoje — numa linha só a 390 px com valores de 3 dígitos (17/10, #15: com
-   24 px + gap 8 sobravam 4 px e o "pra hoje" descia sozinho pra 2ª linha, empurrando o fim da tela pra trás do botão) */
-.mf-grande[data-pra-hoje] strong { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; }
-.mf-grande[data-pra-hoje] strong em { margin-left: 0; }
-.mf-antes { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--mf-ambar-texto); opacity: .5; text-decoration: line-through; text-decoration-thickness: 2px; }
-.mf-grande b { font-weight: 800; }
-
-@keyframes mf-pulso { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
-
 /* teclado do iPhone aberto: a folha cabe na área visível (useFolhaAcimaDoTeclado) — sai o
    cabeçalho e o "Pular" enquanto se digita, o botão fica logo acima do teclado */
 .mf[data-teclado] .mf-cab, .mf[data-teclado] button.mf-pular { display: none; }
@@ -188,6 +152,15 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 .mf-conta[data-total] span { color: hsl(var(--foreground)); }
 .mf-salvo { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 0 2px; font-size: 13px; color: hsl(var(--muted-foreground)); line-height: 1.4; }
 .mf-salvo i { color: var(--mf-ok); flex-shrink: 0; margin-top: 1px; }
+/* a tela do número pela MISSÃO (17/10, revisão do dono: "o 'quanto posso gastar hoje' deveria ser o foco"): o número
+   é o herói — maior e com mais ar; o 1º gasto não mora mais aqui (é o tutorial no formulário de verdade, depois do
+   "Continuar →"). Sem a linha "✓ Já está tudo…": a conta do mês é a última coisa antes do botão. */
+.mf-pronto[data-heroi] { padding-top: 22px; }
+.mf-pronto[data-heroi] .mf-grande { padding: 24px 20px 20px; }
+.mf-pronto[data-heroi] .mf-grande strong { font-size: 58px; margin-top: 8px; }
+.mf-pronto[data-heroi] .mf-grande strong em { font-size: 19px; margin-left: 6px; }
+.mf-pronto[data-heroi] .mf-grande p { font-size: 14.5px; margin-top: 8px; }
+.mf-pronto[data-heroi] .mf-folha { margin-top: 16px; }
 
 @keyframes mf-gira { to { transform: rotate(360deg); } }
 @keyframes mf-entra { to { opacity: 1; transform: none; } }
@@ -195,7 +168,6 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 @media (prefers-reduced-motion: reduce) {
   .mf-orbe, .mf-orbe > div { animation: none; }
   .mf-passo, .mf-pronto { animation-duration: .01s; }
-  .mf-postit-chip[data-feito] { animation: none; }
 }
 /* "＋ Outra"/"← Voltar": o texto mora num <span> — com o svg como único filho, a regra global
    `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */

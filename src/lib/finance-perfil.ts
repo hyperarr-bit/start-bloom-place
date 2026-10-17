@@ -65,6 +65,17 @@ export const perfilDe = (item: ItemComPerfil | undefined | null) => {
   return p;
 };
 
+/** Cria uma empresa (perfil PJ): a lista nova + o id, ou null pra nome em branco.
+ *  UM caminho só (17/10): o "+" da barra de quem já tem empresa e a entrada
+ *  "Separar as finanças da empresa (PJ)" dos Ajustes de Finanças abrem o MESMO
+ *  formulário da barra, que chama isto. Id no formato de sempre (`pj<base36>`). */
+export const novoPerfil = (perfis: Perfil[], nome: string, agora: number = Date.now()): { perfis: Perfil[]; id: string } | null => {
+  const limpo = String(nome ?? "").trim();
+  if (!limpo) return null;
+  const id = `pj${agora.toString(36)}`;
+  return { perfis: [...(Array.isArray(perfis) ? perfis : []), { id, nome: limpo }], id };
+};
+
 /** Re-etiqueta pro pessoal tudo o que era de um perfil (usado ao apagar a empresa). */
 export const devolverAoPessoal = <T extends ItemComPerfil>(itens: T[], perfilApagado: string): T[] =>
   (itens || []).map((i) => (i?.perfil === perfilApagado ? { ...i, perfil: PERFIL_PESSOAL } : i));

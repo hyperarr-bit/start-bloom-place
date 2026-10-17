@@ -63,6 +63,7 @@ import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
+import { AjustesFinancas } from "@/components/finance/AjustesFinancas";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -192,6 +193,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     setFixedExpensesTodos(devolverAoPessoal(fixedExpensesTodos, id));
     setInstallmentsTodos(devolverAoPessoal(installmentsTodos as any[], id));
     setDueDaysTodos((dueDaysTodos as any[]).map((d: any) => ({ ...d, bills: devolverAoPessoal(Array.isArray(d?.bills) ? d.bills : [], id) })));
+  };
+  /* 17/10 — "Separar as finanças da empresa (PJ)" saiu do topo e foi pros
+     Ajustes (⚙ no fim das abas). A entrada traz a pessoa pro MEU FINANCEIRO,
+     no topo, e pede o formulário de sempre da barra de perfis. */
+  const [criarEmpresaAgora, setCriarEmpresaAgora] = useState(false);
+  const abrirCriacaoDeEmpresa = () => {
+    setOpenMonth(null);
+    setActiveTab("financeiro");
+    setCriarEmpresaAgora(true);
+    try { window.scrollTo({ top: 0 }); } catch { /* jsdom/WebView antigo */ }
   };
 
   const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
@@ -452,18 +463,23 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <AcessoConhecerMais moduleId="financas" /><ThemeToggle />
           </div>
         </div>
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={tab.id === "financeiro" ? "financeiro" : `tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Tabs — e, no fim da fila (fora da rolagem), o ⚙ dos Ajustes de
+            Finanças (17/10): o cabeçalho de cima não tem mais espaço no iPhone. */}
+        <div className="max-w-7xl mx-auto pr-4 pb-2 flex items-center">
+          <div className="flex-1 min-w-0 flex gap-1 overflow-x-auto scrollbar-hide px-4">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id} data-active={activeTab === tab.id}
+                data-spotlight={tab.id === "financeiro" ? "financeiro" : `tab-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`notion-tab whitespace-nowrap text-[11px] ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* Na demo não: lá a empresa semeada já mostra a barra PF × PJ. */}
+          {!isPreview && <AjustesFinancas empresas={perfis.length} onSepararEmpresa={abrirCriacaoDeEmpresa} />}
         </div>
       </header>
 
@@ -568,19 +584,20 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                     acabou — preparar agosto" com tudo zerado. Recap é ritual
                     de quem TEM mês anterior; a demo é vitrine. */}
                 {/* Antes de tudo porque muda o significado de todo número
-                    abaixo. Some inteiro pra quem não tem empresa — vira um
-                    link de uma linha (ver o componente). */}
+                    abaixo. Só existe pra quem TEM empresa (ou enquanto o
+                    formulário pedido pelos Ajustes está aberto) — 17/10: o
+                    link de uma linha que todo mundo via aqui foi pro ⚙. */}
                 {/* 15/09: a demo tem um perfil de empresa semeado — mostra o
                     seletor pra quem visita ver que existe PF × PJ. */}
-                {(!isPreview || perfis.length > 0) && (
-                  <SeletorDePerfil
-                    perfis={perfis}
-                    setPerfis={setPerfis}
-                    onRemover={removerPerfil}
-                    ativo={perfilValido}
-                    setAtivo={setPerfilAtivo}
-                  />
-                )}
+                <SeletorDePerfil
+                  perfis={perfis}
+                  setPerfis={setPerfis}
+                  onRemover={removerPerfil}
+                  ativo={perfilValido}
+                  setAtivo={setPerfilAtivo}
+                  criarAgora={criarEmpresaAgora}
+                  aoAtenderPedido={() => setCriarEmpresaAgora(false)}
+                />
                 {!isPreview && (
                   <TrackedCard cardKey="month-turnover" tab="financeiro">
                     <MonthTurnover onOpenMonth={abrirMes} aplicarNoMesCorrente={aplicarNoMesCorrente} />

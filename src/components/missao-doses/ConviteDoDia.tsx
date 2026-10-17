@@ -47,14 +47,15 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
   hoje: string;
   aoIr: () => void;
   aoDepois: () => void;
-  /** chamado 1x quando a folha aparece (quem chama conta a vista e manda `missao_convite acao=visto`) */
+  /** chamado 1x quando a folha aparece (quem chama conta a vista e manda `missao_convite acao=visto`) — só se ela
+   *  desenha de fato (sem passo pendente ela não desenha nada, e nada conta) */
   aoVer?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const seq = useSequencia();
   const pendente = passoPendente(missao);
   const feitas = dosesFeitas(missao);
-  useEffect(() => { aoVer?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (pendente) aoVer?.(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!pendente) return null;
   const cfg = MODULOS[pendente.modulo];
   const dia = pendente.n;

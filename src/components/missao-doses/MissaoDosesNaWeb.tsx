@@ -13,7 +13,7 @@ import { bracoDia1, guardarForcaDia1Cheio, modoUmPorDia, type PlanoAmanha } from
 import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
-  CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, dicaDoDiaDevida, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
   definirDonoDaMissao, marcarComecar, missaoDaConta, semValor, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
@@ -281,9 +281,17 @@ function Ligada() {
   const [festaAberta, setFestaAberta] = useState(() => festaNaTela());
   const [esperouFesta, setEsperouFesta] = useState(false);
   const planoDevendo = !!missao && B && precisaPlanoAmanha(missao, hoje);
+  /* 1.0.16 (revisão pré-build, 17/10): o convite e a dica contam a vista quando APARECEM — e a tela que está aberta
+     não pode sumir por causa da própria vista (a 2ª chance do convite contava "visto" e sumia no mesmo instante). O
+     dia do convite / a dica NA TELA (vista já contada) ficam aqui até a decisão ou até ela sair da Home. */
+  const [conviteNaTela, setConviteNaTela] = useState<string | null>(null);
+  const [dicaNaTela, setDicaNaTela] = useState<2 | 3 | null>(null);
+  useEffect(() => {
+    if (pathname !== "/home") { setConviteNaTela(null); setDicaNaTela(null); } // voltar pra Home é outra aparição
+  }, [pathname]);
   /* 1.0.16, braço A: reabriu num dia novo → o convite "Dia N da missão" na Home (1x por dia). Espera
      1,2 s (a Home assentar) e qualquer outra festa/folha sair da tela — nunca duas folhas juntas. */
-  const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje);
+  const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje, conviteNaTela === hoje);
   const [conviteLivre, setConviteLivre] = useState(false);
   /* 1.0.16, braço A — a folha "Plano de amanhã" (dia 1): depois da dose, da comemoração e do tour curto */
   const tourPendente = (() => { try { return !tourFeito(get) && deveMostrarTourHome(user?.created_at); } catch { return false; } })();
@@ -298,14 +306,9 @@ function Ligada() {
     }, 400);
     return () => window.clearInterval(t);
   }, [planoADevido]);
-  /* 1.0.16, braço A — as dicas de 1 balão: dia 2 (score) e dia 3 (widgets), depois da dose do dia, na Home */
-  const diaDaDica = (() => {
-    if (!missao || !ehUmPorDia(missao) || pathname !== "/home" || emCurso || missao.explorou) return null;
-    const d = ([2, 3] as const).find((n) => missao.feitos[n]?.dia === hoje && !missao.dicas?.[n]);
-    if (!d) return null;
-    if (d === 3 && !missao.fimVisto) return null; // dia 3: depois de "O que você construiu"
-    return d;
-  })();
+  /* 1.0.16, braço A — as dicas de 1 balão: dia 2 (score) e dia 3 (widgets), depois da dose do dia, na Home. O véu
+     deixa o toque passar (ela sai sem o "Entendi"): cada aparição conta, e sem decisão a 2ª é a última */
+  const diaDaDica = !missao || pathname !== "/home" || emCurso ? null : dicaDoDiaDevida(missao, hoje, dicaNaTela);
   const [dicaLivre, setDicaLivre] = useState(false);
   useEffect(() => {
     if (!diaDaDica) { setDicaLivre(false); return; }
@@ -426,11 +429,16 @@ function Ligada() {
       trackEvent("missao_convite", eventoDaMissao({ acao: acao === "foi" ? "bora" : "depois", dia: p?.n ?? null, modulo: p?.modulo ?? null }));
       if (acao === "foi" && p) navigate(MODULOS[p.modulo].rota);
     };
+    /* a folha ENTROU na tela (1x por aparição): conta a vista e manda o "visto". Gravar a missão avisa todo mundo
+       (EVENTO_MISSAO_DOSES) e esta orquestra relê — a folha só continua porque a vista dela já está marcada como
+       "na tela" (conviteNaTela) ANTES de a contagem subir. */
     const aoVer = () => {
       const m = lerMissao() ?? missao;
-      gravarMissao({ ...m, convitesVistos: { ...m.convitesVistos, [hoje]: (m.convitesVistos?.[hoje] ?? 0) + 1 } }); // sem setMissao: o convite fica na tela
+      const vez = (m.convitesVistos?.[hoje] ?? 0) + 1;
+      setConviteNaTela(hoje);
+      salvar({ ...m, convitesVistos: { ...m.convitesVistos, [hoje]: vez } });
       const p = passoPendente(m);
-      trackEvent("missao_convite", eventoDaMissao({ acao: "visto", dia: p?.n ?? null, modulo: p?.modulo ?? null }));
+      trackEvent("missao_convite", eventoDaMissao({ acao: "visto", dia: p?.n ?? null, modulo: p?.modulo ?? null, vez }));
     };
     return <ConviteDoDia missao={missao} hoje={hoje} aoVer={aoVer} aoIr={() => decidir("foi")} aoDepois={() => decidir("depois")} />;
   }
@@ -460,9 +468,23 @@ function Ligada() {
     );
   }
 
-  /* 1.0.16, braço A — a dica de 1 balão do dia */
+  /* 1.0.16, braço A — a dica de 1 balão do dia: a vista conta quando ela APARECE (como o convite); o "Entendi" fecha de vez */
   if (diaDaDica && dicaLivre) {
-    return <DicaDoDia dia={diaDaDica} scoreAntes={missao.scoreAntes?.[diaDaDica]} aoFechar={() => { const m = lerMissao() ?? missao; salvar({ ...m, dicas: { ...m.dicas, [diaDaDica]: hoje } }); }} />;
+    const n = diaDaDica;
+    return (
+      <DicaDoDia
+        dia={n}
+        scoreAntes={missao.scoreAntes?.[n]}
+        aoVer={() => {
+          const m = lerMissao() ?? missao;
+          const vez = (m.dicasVistas?.[n] ?? 0) + 1;
+          setDicaNaTela(n); // antes de a contagem subir: a dica aberta não sai pela própria vista
+          salvar({ ...m, dicasVistas: { ...m.dicasVistas, [n]: vez } });
+          return vez;
+        }}
+        aoFechar={() => { const m = lerMissao() ?? missao; setDicaNaTela(null); salvar({ ...m, dicas: { ...m.dicas, [n]: hoje } }); }}
+      />
+    );
   }
 
   /* D8 — no braço B só a partir do dia 3 (as 3 doses foram no dia 1; "em 3 dias" só faz sentido no 3º) */

@@ -281,7 +281,8 @@ export interface EstadoMissaoDoses {
   /** 1.0.16, braço A (uma dose por dia): o convite "Dia N da missão" na Home, por dia — "foi" (tocou em
    *  fazer) ou "depois" (Agora não). 1x por dia: mora AQUI (chave `missao-doses`, que nenhuma vassoura leva). */
   convites?: Record<string, "foi" | "depois">;
-  /** 1.0.16: quantas vezes o convite apareceu SEM decisão no dia (fechou o app com ele aberto): no 2º, chega por hoje */
+  /** 1.0.16: quantas vezes o convite APARECEU no dia (conta na hora em que ele entra na tela): sem decisão, a 2ª é a
+   *  última por hoje (MAX_VISTAS_SEM_DECISAO) */
   convitesVistos?: Record<string, number>;
   /** 1.0.16 (4.8): o DONO da missão — hash do id da conta (nunca o id). Outra conta no mesmo aparelho não herda. */
   dono?: string;
@@ -298,8 +299,11 @@ export interface EstadoMissaoDoses {
   primeiraVista?: Partial<Record<DiaDaMissao, number>>;
   /** 1.0.16, braço A: "Sem lembrete" na folha do plano de amanhã (o dia) — não insiste */
   planoAPulado?: string;
-  /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets), já mostradas (o dia) */
+  /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets) FECHADAS no "Entendi" (o dia) */
   dicas?: Partial<Record<2 | 3, string>>;
+  /** 1.0.16 (revisão pré-build, 17/10): quantas vezes cada dica APARECEU (conta na hora em que entra na tela). O véu
+   *  dela deixa o toque passar — quem fecha o app ou sai da Home sem o "Entendi" a vê no máximo 2 vezes, nunca mais */
+  dicasVistas?: Partial<Record<2 | 3, number>>;
   /** 1.0.16: os adesivos que as comemorações das doses MOSTRARAM — ids REAIS do registro de Conquistas
    *  ("first-expense", "sequencia-2"…) ou a marca sem id ("marca:dia-1"). Só dado: quem dá o adesivo é o
    *  registro (a regra do próprio adesivo); a comemoração só mostra e marca como visto. */
@@ -470,16 +474,41 @@ export function doseLiberadaHoje(m: EstadoMissaoDoses, hoje: string = localDayKe
 }
 
 /**
+ * 1.0.16: o convite do dia e as dicas de 1 balão contam a vista quando APARECEM; sem decisão ("Bora"/"Agora não",
+ * "Entendi"), a 2ª vista é a última (fechou o app ou saiu da Home com a tela aberta: volta 1 vez, depois nunca mais
+ * naquele dia) — a mesma régua do quiz encaixado (MAX_VISTAS_DO_SETUP) e do tour da Home.
+ */
+export const MAX_VISTAS_SEM_DECISAO = 2;
+
+/**
  * Braço A, reabriu num dia NOVO (dia ≥ 2 da missão): o convite "Dia N da missão · <módulo>" na Home
  * está devendo? 1x por dia (convites[hoje]); nunca pra quem escolheu "Explorar por conta própria",
  * nunca com a dose de hoje feita, pulada hoje, ou a missão cumprida.
+ * `naTela` (17/10): o convite que JÁ está na tela teve a vista contada ao aparecer — essa vista não o tira da tela
+ * (antes, a 2ª chance contava "visto" e sumia no mesmo instante).
  */
-export function conviteDoDiaDevido(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
+export function conviteDoDiaDevido(m: EstadoMissaoDoses | null, hoje: string = localDayKey(), naTela = false): boolean {
   if (!doseDeHojeDevida(m, hoje)) return false;
   if (diaDaMissao(m!, hoje) < 2) return false;
   if (m!.convites?.[hoje]) return false;
   // fechou o app com o convite aberto, sem decidir: mostra de novo 1 vez naquele dia; depois, só amanhã
-  return (m!.convitesVistos?.[hoje] ?? 0) < 2;
+  const vistas = (m!.convitesVistos?.[hoje] ?? 0) - (naTela ? 1 : 0);
+  return vistas < MAX_VISTAS_SEM_DECISAO;
+}
+
+/**
+ * Braço A — a dica de 1 balão que está devendo HOJE na Home: 2 (o score) no dia da dose 2, 3 (os widgets) no dia da
+ * dose 3 e só depois de "O que você construiu" — ou null. Some com o "Entendi" (dicas[n]) e, sem ele, depois de
+ * MAX_VISTAS_SEM_DECISAO aparições (dicasVistas[n]). `naTela`: a dica que JÁ está na tela (a vista dela foi contada
+ * quando ela apareceu) não sai por causa da própria vista. Nunca pra quem foi "Explorar por conta própria".
+ */
+export function dicaDoDiaDevida(m: EstadoMissaoDoses | null, hoje: string = localDayKey(), naTela: 2 | 3 | null = null): 2 | 3 | null {
+  if (!m || !ehUmPorDia(m) || m.explorou) return null;
+  const d = ([2, 3] as const).find((n) => m.feitos[n]?.dia === hoje && !m.dicas?.[n]);
+  if (!d) return null;
+  if (d === 3 && !m.fimVisto) return null; // dia 3: depois de "O que você construiu"
+  const vistas = (m.dicasVistas?.[d] ?? 0) - (naTela === d ? 1 : 0);
+  return vistas < MAX_VISTAS_SEM_DECISAO ? d : null;
 }
 
 /** A missão do braço A para no 7º dia do calendário (ou com as 3 doses). */

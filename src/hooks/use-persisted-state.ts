@@ -41,6 +41,9 @@ export const avisarEscritaDeFora = (key: string, value: unknown) => {
  * conta nova abrindo Finanças = 26 pedidos que voltam vazios (Rotina 16, Saúde 17), no meio da missão.
  * Depois do 1º 2º plano (outro aparelho pode ter criado a chave nesse meio-tempo), a busca volta a
  * acontecer exatamente como antes.
+ * Revisão S1 (17/10): e só quando o provider diz que a última leitura da conta veio INTEIRA
+ * (`contaCompleta`, todas as páginas — o servidor corta cada resposta em 1000 linhas). Leitura que
+ * falhou, ou provider que não diz, = a busca por chave acontece como antes.
  */
 let saiuDaTela = false;
 if (typeof document !== "undefined") {
@@ -49,7 +52,7 @@ if (typeof document !== "undefined") {
 const contaFrescaNestaAbertura = () => !saiuDaTela && (typeof document === "undefined" || document.visibilityState !== "hidden");
 
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
-  const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
+  const { get, set: setData, loaded, isGuest, fetchKey, contaCompleta } = useUserData();
 
   const [state, setState] = useState<T>(() => normalizeForKey(key, get(key, initial)));
   const lastWrittenJson = useRef<string>(JSON.stringify(state));
@@ -93,8 +96,10 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     // aparelho/sessão sem cache local a aba abria vazia e a PRÓXIMA escrita
     // sobrescrevia o histórico inteiro. Aqui: se o store não tem a chave,
     // busca no servidor; só aplica se o usuário não escreveu nesse meio-tempo.
-    // 17/10: menos enquanto o app não saiu da tela desde que abriu — ver contaFrescaNestaAbertura.
-    if (!isGuest && !contaFrescaNestaAbertura() && get(key, undefined as unknown as T) === undefined) {
+    // 17/10: menos enquanto o app não saiu da tela desde que abriu, com a conta lida INTEIRA — ver
+    // contaFrescaNestaAbertura.
+    const ausenteNoServidor = contaCompleta === true && contaFrescaNestaAbertura();
+    if (!isGuest && !ausenteNoServidor && get(key, undefined as unknown as T) === undefined) {
       const baseline = lastWrittenJson.current;
       fetchKey<T>(key).then((remote) => {
         if (remote == null) return;

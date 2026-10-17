@@ -48,6 +48,9 @@ vi.mock("@/integrations/supabase/client", () => {
     let chave: string | null = null;
     const q: Record<string, (...a: unknown[]) => unknown> = {
       eq: (col: unknown, v: unknown) => { if (col === "user_id") uid = v as string; if (col === "key") chave = v as string; return q; },
+      // a leitura da conta vem em páginas ordenadas (revisão S1) — aqui a conta é pequena: a 1ª página é a conta toda
+      order: () => q,
+      range: () => q,
       in: () => Promise.resolve({ data: [], error: null }),
       // leitura de TODAS as chaves (hidratação): retrato tirado na hora do pedido
       abortSignal: (sinal: unknown) => {

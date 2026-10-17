@@ -29,7 +29,7 @@ vi.mock("@/hooks/use-auth", async (orig) => ({
 }));
 vi.mock("@/integrations/supabase/client", () => {
   const q: any = {
-    select: () => q, eq: () => q, in: () => Promise.resolve({ data: [], error: null }), order: () => q, limit: () => q, gte: () => q, lte: () => q,
+    select: () => q, eq: () => q, in: () => Promise.resolve({ data: [], error: null }), order: () => q, range: () => q, limit: () => q, gte: () => q, lte: () => q,
     abortSignal: () => Promise.resolve({ data: [], error: null }),
     maybeSingle: async () => ({ data: null, error: null }), single: async () => ({ data: null, error: null }),
     insert: async () => ({ data: null, error: null }), upsert: async () => ({ data: null, error: null }),

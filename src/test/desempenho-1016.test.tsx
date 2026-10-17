@@ -43,16 +43,28 @@ const fingirSegundoPlano = () => {
 };
 
 describe("usePersistedState: a chave que não está na conta não vira um pedido por chave", () => {
+  // (antes do teste que finge o 2º plano: depois dele, a busca volta de qualquer jeito)
+  it("revisão S1: sem a conta lida INTEIRA (leitura incompleta, ou provider que não diz), chave ausente busca no servidor mesmo com o app na tela", () => {
+    const fetchKey = vi.fn(async () => null);
+    const Chave = ({ k }: { k: string }) => { usePersistedState(k, [] as unknown[]); return null; };
+    render(<UserDataContext.Provider value={contexto({ fetchKey, contaCompleta: false })}><Chave k="finance-notes" /></UserDataContext.Provider>);
+    expect(fetchKey).toHaveBeenCalledWith("finance-notes");
+    cleanup();
+    render(<UserDataContext.Provider value={contexto({ fetchKey })}><Chave k="finance-goals" /></UserDataContext.Provider>);
+    expect(fetchKey).toHaveBeenCalledWith("finance-goals");
+  });
+
   it("com o app na tela desde a leitura da conta, chave ausente NÃO busca no servidor; depois do 2º plano, busca como antes", () => {
     const fetchKey = vi.fn(async () => null);
     const Chave = ({ k }: { k: string }) => { usePersistedState(k, [] as unknown[]); return null; };
-    render(<UserDataContext.Provider value={contexto({ fetchKey })}><Chave k="finance-notes" /><Chave k="finance-goals" /></UserDataContext.Provider>);
+    // revisão S1: o provider diz que a leitura da conta veio inteira (todas as páginas)
+    render(<UserDataContext.Provider value={contexto({ fetchKey, contaCompleta: true })}><Chave k="finance-notes" /><Chave k="finance-goals" /></UserDataContext.Provider>);
     // conta nova abrindo Finanças: eram 26 pedidos assim, todos voltando vazios
     expect(fetchKey).not.toHaveBeenCalled();
     cleanup();
     // foi pro 2º plano: outro aparelho pode ter criado a chave nesse meio-tempo → a rede de segurança volta
     fingirSegundoPlano();
-    render(<UserDataContext.Provider value={contexto({ fetchKey })}><Chave k="finance-wishlist" /></UserDataContext.Provider>);
+    render(<UserDataContext.Provider value={contexto({ fetchKey, contaCompleta: true })}><Chave k="finance-wishlist" /></UserDataContext.Provider>);
     expect(fetchKey).toHaveBeenCalledWith("finance-wishlist");
   });
 });

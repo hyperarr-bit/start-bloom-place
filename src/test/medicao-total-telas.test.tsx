@@ -43,7 +43,7 @@ vi.mock("@/integrations/supabase/client", () => {
   const q: Record<string, unknown> = {};
   const fim = async () => ({ data: linhasDoServidor, error: null });
   Object.assign(q, {
-    select: () => q, eq: () => q, in: () => q, order: () => q, limit: () => q, gte: () => q, lte: () => q, neq: () => q, is: () => q,
+    select: () => q, eq: () => q, in: () => q, order: () => q, range: () => q, limit: () => q, gte: () => q, lte: () => q, neq: () => q, is: () => q,
     abortSignal: fim, maybeSingle: async () => ({ data: null, error: null }), single: async () => ({ data: null, error: null }),
     insert: async () => ({ data: null, error: null }), upsert: async () => ({ data: null, error: null }),
     update: () => q, delete: () => q, then: (r: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(r),

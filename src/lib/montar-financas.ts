@@ -13,6 +13,28 @@
  *   · `finance-fixed-expenses` ← 1 custo fixo por conta marcada (categoria dos fixos, boleto).
  * Sem perfil (= Pessoal) — conta nova não tem empresa.
  *
+ * ── O 3º PASSO, OPCIONAL: CARTÃO DE CRÉDITO (16/10, aprovado pelo dono) ──────────────────────
+ *   "Você usa cartão de crédito?" → qual cartão (opcional) + a fatura deste mês, mais ou menos +
+ *   o dia do vencimento. Vira dado das estruturas DE CARTÃO do módulo (as mesmas do TOTAL POR
+ *   CARTÃO NO MÊS, da linha "Fatura Nubank · R$ X" do MEU MÊS e dos ALERTAS INTELIGENTES):
+ *     · `finance-card-config[cartão]` ← { dueDay, mesDoVencimento: true } (o que a engrenagem do
+ *       TOTAL POR CARTÃO grava pra cartão novo; quem já tinha fechamento continua com ele);
+ *     · `finance-custom-cards`        ← só sem banco escolhido / "Outro": cartão "Cartão" (renomeia
+ *       na engrenagem);
+ *     · `finance-fixed-expenses`      ← 1 custo fixo "Fatura do cartão" NO CRÉDITO desse cartão,
+ *       categoria Fatura Cartão, SEM dia, marcado `faturaDoCartao` (lib/finance-faturas
+ *       `ehEstimativaDaFatura`) — a linha da fatura do MEU MÊS é a conta dele;
+ *     · `finance-faturas-pagas`       ← se o vencimento DESTE mês já passou: a de agora entra paga.
+ *   POR QUE CUSTO FIXO, e não parcela 1x nem gasto: a fatura volta todo mês (o aviso de véspera
+ *   volta junto — é ele que puxa a pessoa de volta), entra inteira no "quanto posso gastar" como
+ *   todo fixo, não infla o ritmo de gasto variável (previsão, alerta de ritmo, desafio da semana)
+ *   e não é dívida (parcela 1x virava "Dívidas R$ X" e destravava "Livre de Dívidas"/"Quitador").
+ *   CONTA DUAS VEZES? Não com as contas fixas: o chip "💳 Cartão" saiu do 2º passo (o cartão tem
+ *   o passo dele). Nem com as compras anotadas daqui pra frente neste mês: o cartão nasce com
+ *   "conta no mês do vencimento", então a compra de hoje vai pra fatura do mês que vem. Quem passa a
+ *   anotar TODA compra do cartão vê, a partir do mês seguinte, a estimativa + as compras — o TOTAL
+ *   POR CARTÃO avisa pra apagar a estimativa (components/finance/TotalPorCartao).
+ *
  * ── A CHAVE ─────────────────────────────────────────────────────────────────────────────────
  *   `MONTAR_FINANCAS`      — app das lojas (iPhone e Android). LIGADA nesta build.
  *   `MONTAR_FINANCAS_WEB`  — site. Desligada (a venda/funil da web não muda sem pedido).
@@ -58,7 +80,8 @@ export const PARAM_QA_MONTAR_FINANCAS = "montar-financas";
 /** "Já vi / feito" — no aparelho (localStorage direto) E na conta (useUserData). Ver chaves-do-aparelho.ts. */
 export const CHAVE_MONTAR_FINANCAS = "core-montar-financas";
 
-/** Eventos de analytics (dados sem valor em reais — só contagens e passo). */
+/** Eventos de analytics (dados sem valor em reais — só contagens e passo).
+ *  `montar_financas_passo.n`: 1 renda · 2 contas · 3 cartão · 4 resultado. */
 export const EV_VIEW = "montar_financas_view";
 export const EV_PASSO = "montar_financas_passo";
 export const EV_PRONTO = "montar_financas_pronto";
@@ -72,7 +95,11 @@ export const ATRIBUTO_NA_TELA = "data-montar-financas";
 export type Resultado = "pronto" | "pulou";
 export type OrigemMontar = "modulo" | "missao";
 /** O que já foi respondido e ainda não virou dado (fechou o app no meio): volta preenchido. */
-export interface RascunhoMontar { etapa: "renda" | "contas"; faixa: string | null; renda: number; contas: ContaEscolhida[] }
+export interface RascunhoMontar { etapa: EtapaComRascunho; faixa: string | null; renda: number; contas: ContaEscolhida[]; cartao?: RespostaCartao }
+export type EtapaComRascunho = "renda" | "contas" | "cartao";
+/** A resposta do passo do cartão. `usa: null` = ainda não respondeu; `banco: null` = não escolheu. */
+export interface RespostaCartao { usa: boolean | null; banco: string | null; valor: number; dia: number | null }
+export const CARTAO_VAZIO: RespostaCartao = { usa: null, banco: null, valor: 0, dia: null };
 export interface MarcaMontar { r?: Resultado; em?: string; vistas?: number; rascunho?: RascunhoMontar }
 
 const ls = {
@@ -179,9 +206,27 @@ export function guardarRascunhoMontar(r: RascunhoMontar): void {
 }
 export function lerRascunhoMontar(): RascunhoMontar | null {
   const r = marcaDoAparelho()?.rascunho;
-  if (!r || (r.etapa !== "renda" && r.etapa !== "contas")) return null;
-  return { etapa: r.etapa, faixa: typeof r.faixa === "string" ? r.faixa : null, renda: Number(r.renda) || 0, contas: Array.isArray(r.contas) ? r.contas : [] };
+  if (!r || (r.etapa !== "renda" && r.etapa !== "contas" && r.etapa !== "cartao")) return null;
+  let contas: ContaEscolhida[] = Array.isArray(r.contas) ? r.contas : [];
+  let cartao = lerRespostaCartao(r.cartao);
+  // rascunho de antes do passo do cartão: o chip "💳 Cartão" das contas fixas vira a resposta do cartão
+  const antigo = contas.find((c) => c?.id === "cartao");
+  if (antigo) {
+    contas = contas.filter((c) => c?.id !== "cartao");
+    if (cartao.usa === null) cartao = { ...cartao, usa: true, valor: Number(antigo.valor) || 0 };
+  }
+  return { etapa: r.etapa, faixa: typeof r.faixa === "string" ? r.faixa : null, renda: Number(r.renda) || 0, contas, cartao };
 }
+const lerRespostaCartao = (v: unknown): RespostaCartao => {
+  const c = (v && typeof v === "object" ? v : {}) as Partial<Record<keyof RespostaCartao, unknown>>;
+  const dia = Number(c.dia);
+  return {
+    usa: c.usa === true ? true : c.usa === false ? false : null,
+    banco: typeof c.banco === "string" && (c.banco === BANCO_OUTRO || BANCOS_DO_CARTAO.some((b) => b.value === c.banco)) ? c.banco : null,
+    valor: Math.max(0, Math.round(Number(c.valor) || 0)),
+    dia: Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : null,
+  };
+};
 
 /* ───────────────────────── uma tela por vez (módulo × missão) ───────────────────────── */
 
@@ -268,14 +313,14 @@ export const FAIXAS_DE_RENDA: FaixaDeRenda[] = [
 ];
 
 export interface ContaSugerida { id: string; nome: string; emoji: string; valor: number; categoria: string }
-/** Contas fixas mais comuns, com valor típico (ajustável) e a categoria de FIXED_CATEGORIES. */
+/** Contas fixas mais comuns, com valor típico (ajustável) e a categoria de FIXED_CATEGORIES.
+ *  Sem "Cartão" (saiu em 16/10): a fatura tem o passo dela — nos dois lugares, contava duas vezes. */
 export const CONTAS_SUGERIDAS: ContaSugerida[] = [
   { id: "aluguel", nome: "Aluguel", emoji: "🏠", valor: 900, categoria: "moradia" },
   { id: "luz", nome: "Luz", emoji: "💡", valor: 150, categoria: "contas_casa" },
   { id: "agua", nome: "Água", emoji: "💧", valor: 80, categoria: "contas_casa" },
   { id: "internet", nome: "Internet", emoji: "📶", valor: 100, categoria: "internet_telefone" },
   { id: "celular", nome: "Celular", emoji: "📱", valor: 60, categoria: "internet_telefone" },
-  { id: "cartao", nome: "Cartão", emoji: "💳", valor: 500, categoria: "fatura_cartao" },
   { id: "streaming", nome: "Streaming", emoji: "🎬", valor: 45, categoria: "assinaturas" },
   { id: "academia", nome: "Academia", emoji: "🏋️", valor: 100, categoria: "academia" },
   { id: "condominio", nome: "Condomínio", emoji: "🏢", valor: 400, categoria: "condominio" },
@@ -295,13 +340,81 @@ export const reaisDigitados = (texto: string): number => {
 export const contasValidas = (contas: ContaEscolhida[]): ContaEscolhida[] =>
   contas.filter((c) => c.nome.trim().length > 0 && c.valor > 0);
 
-/** O número da tela final — a MESMA função do card "QUANTO POSSO GASTAR HOJE" do Dashboard. */
-export function calcularMontar(renda: number, contas: ContaEscolhida[], agora: Date = new Date()) {
+/* ───────────────────────── o cartão ───────────────────────── */
+
+/** Os bancos do chip "Qual cartão?" — MESMOS `value`/rótulo das bandeiras de DEFAULT_CARDS
+ *  (lib/finance-cards; o teste confere). Copiados pra não puxar o hook do useUserData pro grafo do
+ *  revenuecat.ts. `de` é a contração certa: "Fatura do Nubank", "Fatura da Caixa". */
+export interface BancoDoCartao { value: string; label: string; de: "do" | "da" }
+export const BANCOS_DO_CARTAO: BancoDoCartao[] = [
+  { value: "nubank", label: "Nubank", de: "do" },
+  { value: "itau", label: "Itaú", de: "do" },
+  { value: "bradesco", label: "Bradesco", de: "do" },
+  { value: "santander", label: "Santander", de: "do" },
+  { value: "bb", label: "Banco do Brasil", de: "do" },
+  { value: "caixa", label: "Caixa", de: "da" },
+  { value: "inter", label: "Inter", de: "do" },
+  { value: "c6", label: "C6 Bank", de: "do" },
+  { value: "picpay", label: "PicPay", de: "do" },
+  { value: "neon", label: "Neon", de: "do" },
+];
+/** Chip "Outro" (cartão de loja, Mercado Pago…) e quem não escolhe: cartão personalizado com este nome. */
+export const BANCO_OUTRO = "outro";
+export const NOME_DO_CARTAO_SEM_BANCO = "Cartão";
+/** A descrição do custo fixo — genérica de propósito: renomear o cartão não deixa o nome velho. */
+export const DESCRICAO_DA_FATURA = "Fatura do cartão";
+
+const bancoDe = (v: string | null | undefined) => BANCOS_DO_CARTAO.find((b) => b.value === v) ?? null;
+/** "Fatura do Nubank" / "Fatura da Caixa" / "Fatura do cartão". */
+export const nomeDaFaturaNaTela = (banco: string | null | undefined): string => {
+  const b = bancoDe(banco);
+  return b ? `Fatura ${b.de} ${b.label}` : "Fatura do cartão";
+};
+
+/** Respondeu "uso" e deu valor e dia: o cartão entra. */
+export const cartaoCompleto = (r: RespostaCartao | null | undefined): r is RespostaCartao & { usa: true; dia: number } =>
+  !!r && r.usa === true && r.valor > 0 && Number.isInteger(r.dia) && (r.dia as number) >= 1 && (r.dia as number) <= 31;
+
+const diasNoMes = (agora: Date) => new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
+/** O dia em que vence NESTE mês: "dia 31" em novembro é o dia 30 (como o MEU MÊS e o aviso de véspera). */
+export const diaDoVencimentoNoMes = (dia: number, agora: Date = new Date()): number => Math.min(dia, diasNoMes(agora));
+/** A fatura deste mês já venceu? (então ela entra como paga — ninguém quer ver "atrasada" no 1º dia) */
+export const faturaJaVenceu = (dia: number, agora: Date = new Date()): boolean => diaDoVencimentoNoMes(dia, agora) < agora.getDate();
+/** "YYYY-MM" de uma data local (a chave do "paguei" da fatura). */
+export const mesDe = (agora: Date): string => `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+
+/** O custo fixo da fatura, no formato do FixedExpensesTable (+ o carimbo de paga, se já venceu). */
+export function fixoDaFatura(r: RespostaCartao & { dia: number }, card: string, agora: Date = new Date()) {
+  return {
+    id: `mf-${agora.getTime()}-cartao`,
+    description: DESCRICAO_DA_FATURA,
+    category: "fatura_cartao",
+    value: r.valor,
+    paymentMethod: "credito",
+    cardName: card,
+    faturaDoCartao: true as const,
+    ...(faturaJaVenceu(r.dia, agora) ? { pagoEm: mesDe(agora) } : {}),
+  };
+}
+
+/** O vencimento no cartão: o que a engrenagem do TOTAL POR CARTÃO grava pra cartão novo (só o
+ *  vencimento + "conta no mês do vencimento"). Quem já tinha FECHAMENTO fica com ele (a regra do
+ *  fechamento é mais precisa e o `mesDoVencimento` só vale sem ele — finance-cards `setConfig`). */
+export const configDoCartao = (dia: number, atual?: { closingDay?: number } | null) =>
+  ({ closingDay: atual?.closingDay, dueDay: dia, mesDoVencimento: true });
+
+/** O número da tela final — a MESMA função do card "QUANTO POSSO GASTAR HOJE" do Dashboard.
+ *  Com o cartão, a fatura é mais um fixo (é o que ela vira no módulo): sai do mês inteira. */
+export function calcularMontar(renda: number, contas: ContaEscolhida[], agora: Date = new Date(), cartao?: RespostaCartao | null) {
   const validas = contasValidas(contas);
   const fixos = validas.reduce((s, c) => s + c.valor, 0);
-  const fixosComoNoModulo = validas.map((c) => ({ id: c.id, value: c.valor }));
-  const base = computeDailyBudget(renda, fixos, [], fixosComoNoModulo, agora);
-  return { renda, fixos, contas: validas.length, livre: base.availableReal, porDia: base.cantSpend ? 0 : Math.round(base.perDay), dias: base.remainingDays, semFolga: base.cantSpend };
+  const fatura = cartaoCompleto(cartao) ? cartao.valor : 0;
+  const fixosComoNoModulo = [...validas.map((c) => ({ id: c.id, value: c.valor })), ...(fatura ? [{ id: "fatura", value: fatura }] : [])];
+  const base = computeDailyBudget(renda, fixos + fatura, [], fixosComoNoModulo, agora);
+  return {
+    renda, fixos, contas: validas.length, fatura, cartao: fatura > 0,
+    livre: base.availableReal, porDia: base.cantSpend ? 0 : Math.round(base.perDay), dias: base.remainingDays, semFolga: base.cantSpend,
+  };
 }
 
 /** Os itens exatamente no formato que IncomeTable/FixedExpensesTable gravam. */

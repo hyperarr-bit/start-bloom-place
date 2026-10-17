@@ -54,7 +54,9 @@ import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
-import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import { CHAVE_FATURAS_PAGAS, chaveDaFatura, ehEstimativaDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
+import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
@@ -86,6 +88,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   /* 1.0.16 — "Vamos montar suas Finanças" (lib/montar-financas): conta nova, Finanças vazia,
      1ª abertura → 3 perguntas no lugar do módulo vazio. Cliente antigo: estado "nao" na hora. */
   const montar = useMontarFinancasNoModulo(isPreview);
+  /* 1.0.16 — PAINEL LIMPO do Dashboard (conta nova; lib/financas-painel-limpo). Decidido AQUI, na
+     abertura do módulo (antes da tela do Montar e do 1º lançamento); cliente antigo: sempre o de hoje. */
+  const painelLimpo = usePainelLimpo(isPreview);
   /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma
      por aparelho, só se nunca lançou nada, só se a cota permite) acontece
      AQUI, na hora do toque; a folha entra 1,2s depois, com a linha nova já
@@ -228,10 +233,49 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     });
   }, [mesAgora, mesAnterior, expenses, expensesAnterior, fixedExpenses, installments, cartoes, configOf, labelDoCartao, faturasPagas, getUserData, perfilValido]);
   const dueDaysComFaturas = useMemo(() => injetarFaturas(dueDays as any[], faturas), [dueDays, faturas]);
+  /* 1.0.16 — A FATURA DO MONTAR É UMA SÓ NOS DOIS LUGARES. A estimativa ("Fatura do cartão", custo
+     fixo marcado — lib/finance-faturas `ehEstimativaDaFatura`) não tem conta própria no MEU MÊS: a
+     linha da fatura é a conta dela. Então o ✓ dela nos custos fixos (carimbo `pagoEm` do mês) e o
+     "paguei" da linha andam juntos — marcou num, marca no outro. Fixo sem a marca: nada muda. */
+  const cartaoTemVencimento = (card: unknown) => typeof card === "string" && !!configOf(card)?.dueDay;
+  const comEstimativasMarcadas = (lista: any[], marcadas: { card: string; paga: boolean }[]): any[] => {
+    if (!marcadas.length) return lista;
+    let mudou = false;
+    const nova = lista.map((f) => {
+      const m = ehEstimativaDaFatura(f) ? marcadas.find((x) => x.card === f.cardName) : undefined;
+      if (!m) return f;
+      if (m.paga && f.pagoEm !== mesAgora) { mudou = true; return { ...f, pagoEm: mesAgora }; }
+      if (!m.paga && f.pagoEm === mesAgora) { mudou = true; const { pagoEm: _p, ...resto } = f; return resto; }
+      return f;
+    });
+    return mudou ? nova : lista;
+  };
+  /** O ✓ de um custo fixo mudou: se for a estimativa de um cartão com vencimento, a fatura acompanha. */
+  const setFixedExpensesComFatura = (lista: any[]) => {
+    const antes = new Map((fixedExpenses as any[]).map((f) => [f?.id, f]));
+    const mudaram: { card: string; paga: boolean }[] = [];
+    for (const f of Array.isArray(lista) ? lista : []) {
+      if (!ehEstimativaDaFatura(f) || !cartaoTemVencimento(f.cardName)) continue;
+      const a = antes.get(f.id);
+      if (!a) continue;
+      const pagaAgora = f.pagoEm === mesAgora;
+      if ((a.pagoEm === mesAgora) !== pagaAgora && !mudaram.some((m) => m.card === f.cardName)) mudaram.push({ card: f.cardName, paga: pagaAgora });
+    }
+    setFixedExpenses(comEstimativasMarcadas(lista, mudaram));
+    if (mudaram.length) marcarFaturas(mudaram);
+  };
   const setDueDaysComFaturas = (lista: any[]) => {
     const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
     setDueDays(reais as any[]);
     if (!marcadas.length) return;
+    // a estimativa só segue a fatura que MUDOU (tocar outra conta devolve todas as faturas de novo)
+    const mudaram = marcadas.filter((m) => (faturas.find((f) => f.card === m.card)?.paga ?? false) !== m.paga);
+    const fixosNovos = comEstimativasMarcadas(fixedExpenses as any[], mudaram);
+    if (fixosNovos !== fixedExpenses) setFixedExpenses(fixosNovos as any[]);
+    marcarFaturas(marcadas);
+  };
+  /** "Paguei" das faturas: o `finance-faturas-pagas` + as parcelas daquele cartão no mês (22/09). */
+  const marcarFaturas = (marcadas: { card: string; paga: boolean }[]) => {
     const pagas = { ...(faturasPagas ?? {}) };
     let parcelasNovas = installments as Parcela[];
     let mudouParcela = false;
@@ -287,6 +331,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDataLoaded]);
 
+  // muda quando uma estimativa da fatura ganha/perde o vencimento do cartão (o sync abaixo depende disso)
+  const chaveDasEstimativas = (fixedExpensesTodos as any[]).filter(ehEstimativaDaFatura).map((f) => `${f.id}:${configOf(f.cardName)?.dueDay ?? ""}`).join("|");
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
   // O sync devolve null quando nada mudou — sem loop de render.
@@ -295,10 +341,14 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     /* LISTA COMPLETA de propósito. O sync apaga toda conta cujo custo fixo
        não esteja na lista (finance-sync.ts): com a lista filtrada por perfil,
        trocar pra "Empresa X" apagaria as contas do Pessoal do calendário. */
-    const synced = syncFixedExpensesToBills(fixedExpensesTodos, dueDaysTodos);
+    /* 1.0.16: a estimativa da fatura do Montar (num cartão com vencimento) NÃO vira conta própria,
+       nem se a pessoa puser um "Dia" nela — a linha "Fatura Nubank · R$ X" é a conta dela; as duas no
+       mesmo dia eram a mesma fatura duas vezes no MEU MÊS e nos alertas. */
+    const fixosQueViramConta = (fixedExpensesTodos as any[]).filter((f) => !(ehEstimativaDaFatura(f) && cartaoTemVencimento(f.cardName)));
+    const synced = syncFixedExpensesToBills(fixosQueViramConta, dueDaysTodos);
     if (synced) setDueDaysTodos(synced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userDataLoaded, fixedExpensesTodos, dueDaysTodos]);
+  }, [userDataLoaded, fixedExpensesTodos, dueDaysTodos, chaveDasEstimativas]);
 
   const [annualData, setAnnualData] = usePersistedState("finance-annual", 
     months.map((m) => ({
@@ -510,7 +560,80 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           </div>
         )}
 
-        {activeTab === "dashboard" && (
+        {/* 1.0.16 — PAINEL LIMPO (conta nova, lib/financas-painel-limpo): os mais usados no topo, na
+            ordem do dono, o Desafio da semana à vista e o resto no "Mais gráficos". Os pedaços que
+            moram em outras abas (MEU MÊS, TOTAL POR CARTÃO) entram com os MESMOS dados e setters da aba
+            MEU FINANCEIRO. O convite dos lembretes conta a fatura do cartão como conta a lembrar (é
+            ela que o aviso de véspera traz). Cliente antigo: o bloco de baixo, idêntico ao de antes. */}
+        {activeTab === "dashboard" && painelLimpo && (
+          <>
+            <WrappedBanner />
+            <PedirLembretes dueDays={dueDaysComFaturas as never} />
+            <TrackedCard cardKey="dashboard" tab="dashboard">
+              <Dashboard
+                totalIncome={totalIncome}
+                totalExpenses={monthlyOutflow}
+                monthlyInstallments={monthlyInstallments}
+                totalDebts={totalDebts}
+                totalInvestments={totalInvestments}
+                expenses={expenses}
+                fixedExpenses={fixedExpenses}
+                dueDays={dueDaysComFaturas as any[]}
+                savingsRate={savingsRate}
+                incomes={incomes}
+                onNavigate={(tab) => setActiveTab(tab)}
+                perfil={perfilValido}
+                limpo
+                meuMes={
+                  <TrackedCard cardKey="month-calendar" tab="dashboard">
+                    <MonthCalendar
+                      incomes={incomes}
+                      expenses={expenses}
+                      fixedExpenses={fixedExpenses}
+                      dueDays={dueDaysComFaturas as any[]}
+                      setDueDays={setDueDaysComFaturas}
+                      installments={installments}
+                      totalIncome={totalIncome}
+                      monthlyOutflow={monthlyOutflow}
+                      reserva={{
+                        guardado: reservaEmergencia.guardado,
+                        meta: metaDaReserva(monthlyOutflow, reservaEmergencia.meses),
+                        registrada: reservaEmergencia.registrada,
+                      }}
+                      onAbrirReserva={() => { setActiveTab("financeiro"); window.setTimeout(irParaReserva, 250); }}
+                    />
+                  </TrackedCard>
+                }
+                totalPorCartao={
+                  <TotalPorCartao
+                    parcelas={installments as Parcela[]}
+                    variableExpenses={expenses}
+                    variableExpensesAnterior={expensesAnterior}
+                    fixos={fixedExpenses}
+                    mes={mesAgora}
+                  />
+                }
+                depoisDoTopo={
+                  <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+                    <WeeklyChallenge expenses={expenses} />
+                  </TrackedCard>
+                }
+                maisGraficos={
+                  <>
+                    <TrackedCard cardKey="month-comparison" tab="dashboard">
+                      <MonthComparison perfil={perfilValido} />
+                    </TrackedCard>
+                    <TrackedCard cardKey="year-comparison" tab="dashboard">
+                      <YearComparison perfil={perfilValido} />
+                    </TrackedCard>
+                  </>
+                }
+              />
+            </TrackedCard>
+          </>
+        )}
+
+        {activeTab === "dashboard" && !painelLimpo && (
           <>
             <WrappedBanner />
             {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
@@ -612,7 +735,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="min-w-0">
                   <TrackedCard cardKey="fixed-expenses" tab="financeiro">
                     {/* 08/10: ✓ de paga direto na lista (a conta fx-<id> do MEU MÊS; sem Dia, o carimbo pagoEm do mês) */}
-                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesAgora} />
+                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpensesComFatura} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesAgora} />
                   </TrackedCard>
                 </div>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
@@ -663,6 +786,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                     setInstallments={setInstallments}
                     variableExpenses={expenses}
                     variableExpensesAnterior={expensesAnterior}
+                    fixos={fixedExpenses}
                     mes={mesAgora}
                   />
                 </TrackedCard>

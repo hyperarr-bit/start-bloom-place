@@ -90,6 +90,32 @@ button.mf-tirar { width: 34px; height: 34px; display: grid; place-items: center;
 .mf-renda input::placeholder { color: hsl(var(--muted-foreground) / .45); }
 .mf-renda p { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; }
 
+/* passo do cartão (16/10): campos em linhas da mesma folha de planner */
+.mf-campo { padding: 12px 14px 14px; border-top: 1px solid hsl(var(--border)); }
+.mf-faixa + .mf-campo { border-top: 0; }
+.mf-rotulo { display: block; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
+/* fileira que rola pro lado (bancos, dias): sem barra; a ponta direita esmaece pra mostrar que tem mais */
+.mf-rolo { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -14px; padding: 2px 36px 4px 14px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.mf-rolo::-webkit-scrollbar { display: none; }
+button.mf-banco { flex-shrink: 0; height: 40px; padding: 0 13px; border-radius: 12px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 14.5px; font-weight: 650; white-space: nowrap; transition: border-color .15s, background-color .15s; }
+button.mf-banco[aria-pressed="true"] { border-color: var(--mf-ambar); background: var(--mf-ambar-suave); color: var(--mf-ambar-texto); }
+button.mf-dia { flex-shrink: 0; width: 42px; height: 42px; padding: 0; display: grid; place-items: center; border-radius: 999px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; transition: border-color .15s, background-color .15s; }
+button.mf-dia[aria-pressed="true"] { border-color: var(--mf-ambar); background: var(--mf-ambar); color: #fff; }
+.dark button.mf-dia[aria-pressed="true"] { color: #1c1917; }
+.mf-dica { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; line-height: 1.35; }
+.mf-valor-grande { display: flex; align-items: baseline; gap: 8px; border-bottom: 2px solid hsl(var(--border)); padding-bottom: 6px; transition: border-color .15s; }
+.mf-valor-grande:focus-within { border-color: var(--mf-ambar); }
+.mf-valor-grande small { font-size: 18px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+/* !important: o index.css força 16px em todo input no celular (anti-zoom do Safari) */
+.mf-valor-grande input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-size: 28px !important; font-weight: 800; letter-spacing: -.02em; color: inherit; font-family: inherit; font-variant-numeric: tabular-nums; padding: 0; }
+.mf-valor-grande input::placeholder { color: hsl(var(--muted-foreground) / .45); }
+.mf-conta span small { font-size: 12.5px; }
+
+/* teclado do iPhone aberto: a folha cabe na área visível (useFolhaAcimaDoTeclado) — sai o
+   cabeçalho e o "Pular" enquanto se digita, o botão fica logo acima do teclado */
+.mf[data-teclado] .mf-cab, .mf[data-teclado] button.mf-pular { display: none; }
+.mf[data-teclado] .mf-rodape { padding-top: 10px; padding-bottom: 10px; }
+
 /* rodapé grudado embaixo: o botão nunca some atrás da lista de contas */
 .mf-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 18px 22px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 18px); }
 button.mf-cta { width: 100%; min-height: 56px; border-radius: 16px; border: 0; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .15s, transform .1s; }

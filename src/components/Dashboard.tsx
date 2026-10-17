@@ -3,6 +3,7 @@ import { reais } from "@/lib/dinheiro";
 import { usePaletaGrafico } from "@/lib/paleta-grafico";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { trackEvent } from "@/lib/analytics";
+import { EV_MAIS_GRAFICOS } from "@/lib/financas-painel-limpo";
 import { localDayKey } from "@/lib/utils";
 // Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
 const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
@@ -68,9 +69,10 @@ interface DashboardProps {
   perfil?: string;
   /**
    * 1.0.16 — PAINEL LIMPO (conta nova; régua e chave em lib/financas-painel-limpo). No topo: Quanto
-   * posso gastar hoje → Alertas → `meuMes` → Gastos por categoria → `totalPorCartao` → `depoisDoTopo`;
-   * todo o resto (números, receitas × despesas, previsão, patrimônio, progresso, método, fixos ×
-   * variáveis, top 5, últimas, + `maisGraficos`) vai pro "Mais gráficos" lá embaixo. Nada some.
+   * posso gastar hoje → Alertas → `meuMes` → Gastos por categoria → `totalPorCartao` → `depoisDoTopo`
+   * (o Desafio da semana); todo o resto (números, receitas × despesas, previsão, patrimônio,
+   * progresso, método, fixos × variáveis, top 5, últimas, + `maisGraficos`) vai pro "Mais gráficos"
+   * lá embaixo, fechado. Nada some. Sem `limpo`, o painel é o de sempre, na mesma ordem.
    */
   limpo?: boolean;
   meuMes?: ReactNode;
@@ -79,7 +81,9 @@ interface DashboardProps {
   maisGraficos?: ReactNode;
 }
 
-/** "Mais gráficos" (painel limpo): fechado por padrão; abrir manda `financas_mais_graficos_abrir`. */
+/** "Mais gráficos" (painel limpo): fechado toda vez que a tela abre; abrir manda
+ *  `financas_mais_graficos_abrir`. Os cards de dentro ficam FORA da caixa do botão (irmãos dela),
+ *  senão a medição por card (lib/medicao-cards) os veria como um card só. */
 const MaisGraficos = ({ children }: { children: ReactNode }) => {
   const [aberto, setAberto] = useState(false);
   return (
@@ -87,16 +91,19 @@ const MaisGraficos = ({ children }: { children: ReactNode }) => {
       <button
         type="button"
         aria-expanded={aberto}
-        onClick={() => { if (!aberto) trackEvent("financas_mais_graficos_abrir", {}); setAberto(!aberto); }}
+        aria-controls="financas-mais-graficos"
+        onClick={() => { if (!aberto) trackEvent(EV_MAIS_GRAFICOS, {}); setAberto(!aberto); }}
         className="w-full bg-card rounded-lg border border-border px-4 py-3 flex items-center gap-3 text-left"
       >
         <span className="flex-1 min-w-0">
           <span className="block text-xs font-bold">📈 MAIS GRÁFICOS</span>
-          <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">Previsão do mês, patrimônio, simuladores e mais</span>
+          <span className="block text-[11px] text-muted-foreground mt-0.5">
+            {aberto ? "Toque pra esconder" : "Previsão do fim do mês, patrimônio, comparações e mais"}
+          </span>
         </span>
         <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`} />
       </button>
-      {aberto && <div className="space-y-4" data-testid="mais-graficos">{children}</div>}
+      {aberto && <div id="financas-mais-graficos" className="space-y-4" data-testid="mais-graficos">{children}</div>}
     </div>
   );
 };
@@ -322,11 +329,15 @@ export const Dashboard = ({
       const billsArr = Array.isArray(d?.bills) ? d.bills : [];
       const unpaidBills = billsArr.filter((b) => !b?.paid);
       if (unpaidBills.length === 0) return;
-      if (d.day < today) {
+      // "dia 31" num mês de 30 dias vence no dia 30 — como o MEU MÊS mostra e o aviso de véspera
+      // agenda (16/10: a fatura do Montar aceita vencimento 29–31; antes dizia "amanhã" no dia 30)
+      const dia = Math.min(Number(d.day), daysInMonth);
+      if (!Number.isFinite(dia)) return;
+      if (dia < today) {
         unpaidBills.forEach((b) => overdueNames.push(b.name));
         return;
       }
-      const daysUntilDue = d.day - today;
+      const daysUntilDue = dia - today;
       if (daysUntilDue > 5) return;
       const names = unpaidBills.map((b) => b.name).join(", ");
       // "conta(s) vencem" é jeito de programador escrever. Alerta de dinheiro
@@ -842,7 +853,29 @@ export const Dashboard = ({
         </div>
     </>
   );
-  const blocoPodeGastar = (
+  /* Painel limpo, conta sem nada lançado (pulou o Montar): o card não pode abrir dizendo "Você não
+     pode gastar" pra quem ainda não contou quanto ganha — mostra o caminho. O de sempre não muda. */
+  const semNadaAinda = limpo && totalIncome <= 0 && totalExpenses <= 0;
+  const blocoPodeGastar = semNadaAinda ? (
+    <div className="bg-card rounded-lg border border-border p-4" data-testid="pode-gastar-vazio">
+      <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+        <Wallet className="w-4 h-4" />
+        QUANTO POSSO GASTAR HOJE
+      </h3>
+      <p className="text-sm text-muted-foreground leading-snug">
+        Anota quanto entra no mês e suas contas fixas — aqui aparece quanto dá pra gastar por dia.
+      </p>
+      {onNavigate && (
+        <button
+          type="button"
+          onClick={() => onNavigate("financeiro")}
+          className="mt-3 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1"
+        >
+          Anotar minha renda <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  ) : (
     <>
         {/* Quanto Posso Gastar Hoje */}
         <div className={`rounded-lg border p-4 ${

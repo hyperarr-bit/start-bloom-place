@@ -1,7 +1,8 @@
 /**
  * "VAMOS MONTAR SUAS FINANÇAS" (1.0.16) — o que este arquivo trava, com a conta VAZIA (sem seeds):
- *   · 3 toques até o número: renda → contas fixas → "Você pode gastar R$ X por dia", e o número
- *     é o MESMO do card "QUANTO POSSO GASTAR HOJE" do Dashboard (computeDailyBudget);
+ *   · 3 perguntas até o número: renda → contas fixas → cartão de crédito (opcional) → "Você pode
+ *     gastar R$ X por dia", e o número é o MESMO do card "QUANTO POSSO GASTAR HOJE" do Dashboard
+ *     (computeDailyBudget) — com a fatura do cartão também (testes do cartão: montar-financas-cartao);
  *   · o que a pessoa responde vira dado REAL do módulo (finance-incomes / finance-fixed-expenses,
  *     no formato das tabelas) e aparece no Finanças de verdade depois;
  *   · Pular em toda pergunta; eventos sem valor em reais;
@@ -113,7 +114,7 @@ const montarTela = (props: Partial<React.ComponentProps<typeof MontarFinancas>> 
 const respirar = async (n = 6) => { for (let i = 0; i < n; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); };
 const nomes = () => eventos.map(([n]) => n);
 
-/** Os 3 toques (+ ajustes): faixa R$ 2 a 4 mil → Aluguel, Luz e uma "Outra" (Escola, 700) → resultado. */
+/** As 3 perguntas (+ ajustes): faixa R$ 2 a 4 mil → Aluguel, Luz e uma "Outra" (Escola, 700) → "Não uso cartão" → resultado. */
 const fazerOsTresToques = async () => {
   const tela = () => within(screen.getByTestId("montar-financas")); // Finanças pode estar montada por baixo
   fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
@@ -123,7 +124,9 @@ const fazerOsTresToques = async () => {
   fireEvent.click(tela().getByRole("button", { name: /Outra/ }));
   fireEvent.change(tela().getByLabelText("Nome da conta"), { target: { value: "Escola" } });
   fireEvent.change(tela().getByLabelText("Valor de Escola"), { target: { value: "700" } });
-  fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
+  fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+  expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+  fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
   await respirar();
 };
 
@@ -262,7 +265,7 @@ describe("quem vê", () => {
 
 /* ───────────────────────── a tela ───────────────────────── */
 describe("a tela, com a conta vazia", () => {
-  it("3 toques: renda → contas → 'Você pode gastar R$ X por dia'; grava no módulo; eventos sem reais", async () => {
+  it("3 perguntas: renda → contas → 'Não uso cartão' → 'Você pode gastar R$ X por dia'; grava no módulo; eventos sem reais", async () => {
     const onPronto = vi.fn();
     const fim = vi.fn();
     window.addEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
@@ -283,15 +286,18 @@ describe("a tela, com a conta vazia", () => {
     expect(screen.getByText(/até o fim do mês \(16 dias, contando hoje\)/)).toBeTruthy();
     expect(screen.queryByText(/\bIA\b/)).toBeNull();
 
+    expect(screen.queryByTestId("montar-fatura")).toBeNull(); // sem cartão, sem linha de fatura
+    expect(controle.dados()["finance-card-config"]).toBeUndefined();
+
     fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
-    expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false });
+    expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);
-    expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3 });
+    expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
-    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO]);
-    expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3]);
-    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao" });
+    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO]);
+    expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao", cartao: false });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
     // feito: no aparelho e na conta
     expect(marcaDoAparelho()?.r).toBe("pronto");
@@ -304,6 +310,7 @@ describe("a tela, com a conta vazia", () => {
     expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("4.800");
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     fireEvent.click(screen.getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(screen.getByRole("button", { name: "Não uso cartão" }));
     await respirar();
     expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 300");
     expect(controle.dados()["finance-fixed-expenses"]).toBeUndefined();

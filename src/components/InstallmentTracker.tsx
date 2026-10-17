@@ -37,6 +37,8 @@ interface InstallmentTrackerProps {
   /** Parcelas de OUTROS meses que vencem neste — só leitura, marcadas
    *  "previsto". Quem edita é a planilha do mês onde elas moram. */
   projetadas?: Installment[];
+  /** Custos fixos do mês: o TOTAL POR CARTÃO lê só a estimativa da fatura do Montar (1.0.16). */
+  fixos?: any[];
 }
 
 /**
@@ -74,7 +76,7 @@ const catValue = (v?: string) => (v ? CAT_LEGADA[v] ?? v : "outros");
 const brl = (v: number) => (Number.isFinite(v) ? v : 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const InstallmentTracker = ({
-  installments, setInstallments, variableExpenses = [], variableExpensesAnterior = [], mes, projetadas = [],
+  installments, setInstallments, variableExpenses = [], variableExpensesAnterior = [], mes, projetadas = [], fixos,
 }: InstallmentTrackerProps) => {
   const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
   const { labelOf: getCatLabel, styleOf: getCatStyle } = useFinanceCategories();
@@ -442,7 +444,7 @@ export const InstallmentTracker = ({
       </div>
 
       {/* Card spending summary — 1.0.16: mora em TotalPorCartao (o painel limpo do Dashboard mostra o mesmo) */}
-      <TotalPorCartao parcelas={todas} variableExpenses={variableExpenses} variableExpensesAnterior={variableExpensesAnterior} mes={mesDaChave} />
+      <TotalPorCartao parcelas={todas} variableExpenses={variableExpenses} variableExpensesAnterior={variableExpensesAnterior} fixos={fixos} mes={mesDaChave} />
     </div>
   );
 };

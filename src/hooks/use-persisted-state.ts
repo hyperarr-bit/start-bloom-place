@@ -33,6 +33,21 @@ export const avisarEscritaDeFora = (key: string, value: unknown) => {
   const aviso: AvisoDeEscrita = { key, json: JSON.stringify(value), value, origem: Symbol("fora") };
   queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));
 };
+/*
+ * 17/10 (desempenho): desde 08/08 a leitura da conta traz TODAS as chaves, as pesadas também (ver
+ * use-user-data, "CHAVE PESADA VAI PRA MEMÓRIA"), e ela só libera `loaded` quando chegou do servidor.
+ * Então, numa abertura em que o app ainda não foi pro 2º plano, chave que não está no store não existe
+ * no servidor — e a busca por chave lá embaixo virava 1 pedido por chave AUSENTE a cada módulo aberto:
+ * conta nova abrindo Finanças = 26 pedidos que voltam vazios (Rotina 16, Saúde 17), no meio da missão.
+ * Depois do 1º 2º plano (outro aparelho pode ter criado a chave nesse meio-tempo), a busca volta a
+ * acontecer exatamente como antes.
+ */
+let saiuDaTela = false;
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saiuDaTela = true; });
+}
+const contaFrescaNestaAbertura = () => !saiuDaTela && (typeof document === "undefined" || document.visibilityState !== "hidden");
+
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
   const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
 
@@ -78,7 +93,8 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     // aparelho/sessão sem cache local a aba abria vazia e a PRÓXIMA escrita
     // sobrescrevia o histórico inteiro. Aqui: se o store não tem a chave,
     // busca no servidor; só aplica se o usuário não escreveu nesse meio-tempo.
-    if (!isGuest && get(key, undefined as unknown as T) === undefined) {
+    // 17/10: menos enquanto o app não saiu da tela desde que abriu — ver contaFrescaNestaAbertura.
+    if (!isGuest && !contaFrescaNestaAbertura() && get(key, undefined as unknown as T) === undefined) {
       const baseline = lastWrittenJson.current;
       fetchKey<T>(key).then((remote) => {
         if (remote == null) return;

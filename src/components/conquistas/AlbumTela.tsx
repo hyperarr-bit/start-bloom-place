@@ -617,12 +617,16 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   // a base das vizinhas acompanha a página atual, mas só com a folha parada
   useEffect(() => { if (!virando) setBase(atual); }, [virando, atual]);
   // depois da abertura, as outras páginas montam uma a uma — e nunca no meio de uma virada (o relógio para e volta com a folha parada)
+  // 17/10 (desempenho): nem no meio das figurinhas colando na abertura (`abertura`, até ~4,3 s). Começavam aos ~3,1 s: cada
+  // página montada (e pintada com as figurinhas, os filtros e o foil) dava um quadro de 120–250 ms no WebKit bem no fim do
+  // "colar" (5 quadros assim por abertura). Agora a 1ª entra 300 ms depois que a abertura assenta; as vizinhas da página
+  // aberta continuam montadas desde o início, então virar pra frente/pra trás não muda nada.
   const extrasComecaram = useRef(false);
   useEffect(() => {
-    if (!aberto || extras >= n || virando) return;
-    const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : reduzir ? 300 : CAPA_SAI_MS + 900);
+    if (!aberto || extras >= n || virando || abertura) return;
+    const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : 300);
     return () => clearTimeout(t);
-  }, [aberto, extras, n, reduzir, virando]);
+  }, [aberto, extras, n, virando, abertura]);
 
   // abrir: a capa vira na lombada e as figurinhas da página de abertura colam uma a uma
   useEffect(() => {

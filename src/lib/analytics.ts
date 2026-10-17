@@ -372,8 +372,12 @@ export const trackEvent = (
     const payload = { ...meta, ...propriedadesComuns(), ...data };
     anotarPeloEvento(eventName);
 
-    supabase.auth.getUser().then(({ data: u }) => {
-      const userId = u?.user?.id ?? null;
+    // 17/10 (desempenho): getSession (a sessão do aparelho) e não getUser — o getUser vai ao servidor
+    // (/auth/v1/user) a CADA evento: cada evento eram 2 pedidos em fila (abrir Finanças numa conta nova
+    // = 6 idas ao /auth/v1/user só pra telemetria). O insert sai com o token da mesma sessão e a RLS
+    // confere o dono do mesmo jeito; a renovação do token vencido acontece igual nos dois.
+    supabase.auth.getSession().then(({ data: s }) => {
+      const userId = s?.session?.user?.id ?? null;
       (supabase as any)
         .from("analytics_events")
         .insert({

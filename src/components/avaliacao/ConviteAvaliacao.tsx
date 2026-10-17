@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Check, Star } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
@@ -81,6 +81,14 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, momento = null, o
     trackEvent("app_avaliacao_convite", { motivo, acao: "visto", pagante });
   }, [aberto, motivo, pagante]);
 
+  /* 17/10 (desempenho): a folha FECHADA ficava montada em toda abertura de Finanças — e o Drawer (vaul),
+     mesmo fechado, lê window.scrollY ao montar (força o estilo e o layout da página inteira no meio da
+     montagem: ~90 ms no Mac, ~300 ms com a CPU 4× mais lenta), escuta a rolagem e lê o tamanho da janela a
+     cada render. Agora só monta na 1ª vez que abre (montar já aberta é o caminho de sempre do
+     ConviteDeValor) e fica montada depois, pra a saída animar igual. */
+  const [jaAbriu, setJaAbriu] = useState(aberto);
+  useEffect(() => { if (aberto) setJaAbriu(true); }, [aberto]);
+
   const aceitar = () => {
     decidiu.current = true;
     trackEvent("app_avaliacao_convite", { motivo, acao: "aceitou", pagante });
@@ -104,6 +112,7 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, momento = null, o
       ? {}
       : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: atraso, duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } };
 
+  if (!aberto && !jaAbriu) return null;
   return (
     <Drawer open={aberto} onOpenChange={(aberto) => { if (!aberto) recusar(); }}>
       <DrawerContent

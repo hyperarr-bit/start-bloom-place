@@ -98,6 +98,11 @@ export const PREFIXOS_DO_APARELHO: readonly string[] = [
   "core-conhecer-feito-", // o passeio "Conhecer mais" do módulo foi feito neste aparelho (17/10, lib/conhecer-mais)
   "core-conhecer-lembrete-", // o lembrete do passeio (3ª abertura) já apareceu: nunca mais sozinho
   "core-conhecer-aberturas-", // quantas vezes o módulo foi aberto neste aparelho (o lembrete é na 3ª)
+  // 17/10: escrita feita antes de a conta chegar do servidor, guardada até ser juntada
+  // (`core-seguradas-<id da conta>:<chave>`, use-user-data). A vassoura da abertura NÃO pode
+  // levar — é o que faz o registro sobreviver a fechar o app; quem apaga é o próprio
+  // use-user-data (servidor confirmou, saiu da conta, outra conta entrou, "começar do zero").
+  "core-seguradas-",
 ];
 
 /** A chave é do aparelho (nenhuma vassoura apaga)? */

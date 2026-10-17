@@ -79,6 +79,7 @@ import { alvoDaMissao, gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/
 import { normalizarItem } from "@/lib/demo-guiada";
 import { gravacoesDoItem, idDoItem, type Gravacao } from "@/lib/demo-guiada-registro";
 import { localDayKey } from "@/lib/utils";
+import { eventoDaMissao } from "@/lib/missao-doses";
 import {
   ATRIBUTO_NA_TELA, CHAVE_MONTAR_FINANCAS, CONTAS_SUGERIDAS, EVENTO_MONTAR_FINANCAS_FIM, EV_PASSO, EV_PRONTO, EV_PULAR, EV_VIEW,
   FAIXAS_DE_RENDA, calcularMontar, contaNovaParaMontar, deveMostrarMontarFinancas, guardarForcaMontarDaUrl, itensParaGravar,
@@ -123,15 +124,17 @@ const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long
 /** Os chips do 1º gasto na tela do número: os MESMOS da missão (Café R$ 12 · Uber R$ 23 · Almoço R$ 35). */
 const CHIPS_DO_NUMERO: ChipDaMissao[] = alvoDaMissao("gasto").chips;
 
-/** O número que cai na frente dela (~1 s, desacelerando); sem animação pra quem pediu menos movimento. */
-function useNumeroQueCai(alvo: number, ms = 1100): number {
+/** O número que cai na frente dela (~1 s, desacelerando); sem animação pra quem pediu menos movimento.
+ *  `animar` = o número está na tela ("pra hoje"): fora disso só acompanha o valor, sem quadro a quadro (digitar a
+ *  renda mudava o "por dia" a cada tecla e redesenhava a tela inteira ~60 vezes por segundo). */
+function useNumeroQueCai(alvo: number, animar: boolean, ms = 1100): number {
   const [v, setV] = useState(alvo);
   const atual = useRef(alvo);
   useEffect(() => {
     const de = atual.current;
     if (de === alvo) return;
     const reduzir = typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-    if (reduzir || typeof requestAnimationFrame !== "function") { atual.current = alvo; setV(alvo); return; }
+    if (!animar || reduzir || typeof requestAnimationFrame !== "function") { atual.current = alvo; setV(alvo); return; }
     let raf = 0;
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const passo = (t: number) => {
@@ -143,7 +146,7 @@ function useNumeroQueCai(alvo: number, ms = 1100): number {
     };
     raf = requestAnimationFrame(passo);
     return () => cancelAnimationFrame(raf);
-  }, [alvo, ms]);
+  }, [alvo, animar, ms]);
   return v;
 }
 
@@ -393,10 +396,12 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   useEffect(() => {
     if (!comPostIt || etapa !== "pronto" || vistoEm.current !== null) return;
     vistoEm.current = Date.now();
-    trackEvent(EV_GASTO_NO_NUMERO, ev({ acao: "view", ms: vistoEm.current - abertura.current, ...(retomada ? { retomou: true } : {}) }));
+    evNumero({ acao: "view", ms: vistoEm.current - abertura.current, ...(retomada ? { retomou: true } : {}) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comPostIt, etapa]);
   const msDesdeOView = () => (vistoEm.current === null ? 0 : Date.now() - vistoEm.current);
+  /** Evento da missão (o mesmo envelope dos outros `missao_doses_*`: protótipo, versão, braço do Dia 1). */
+  const evNumero = (dados: Record<string, unknown>) => trackEvent(EV_GASTO_NO_NUMERO, eventoDaMissao(dados));
   /** Grava pelo `set` do app, no formato que o módulo já lê (as gravações da missão), e avisa o módulo aberto por baixo. */
   const aplicar = (gravacoes: Gravacao[]) => {
     for (const g of gravacoes) {
@@ -415,7 +420,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     const novos = [...gastos, g];
     setGastos(novos);
     guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao, gastos: novos });
-    trackEvent(EV_GASTO_NO_NUMERO, ev({ acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) }));
+    evNumero({ acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) });
     return novos;
   };
   const tocarChipDoNumero = (c: ChipDaMissao) => {
@@ -453,13 +458,13 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   };
   const aindaNaoGastei = () => {
     if (saiu.current) return;
-    trackEvent(EV_GASTO_NO_NUMERO, ev({ acao: "ainda_nao", ms: msDesdeOView() }));
+    evNumero({ acao: "ainda_nao", ms: msDesdeOView() });
     sair(null);
   };
   const gastoDeHoje = gastos.reduce((t, g) => t + g.valor, 0);
   const praHoje = comPostIt && gastos.length > 0 && !resultado.semFolga;
   const sobra = sobraPraHoje(resultado.porDia, gastoDeHoje);
-  const numeroNaTela = useNumeroQueCai(praHoje ? Math.max(0, sobra) : resultado.porDia);
+  const numeroNaTela = useNumeroQueCai(praHoje ? Math.max(0, sobra) : resultado.porDia, praHoje);
   const idsDosChips = new Set(CHIPS_DO_NUMERO.map((c) => { const i = itemDoChip("gasto", c); return i ? idDoItem(i) : c.nome; }));
   const anotadosAMao = gastos.filter((g) => !idsDosChips.has(g.id));
   /** "R$ 58" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */
@@ -676,7 +681,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
               <div className="mf-grande" data-pra-hoje={praHoje ? "" : undefined}>
                 <small>VOCÊ PODE GASTAR HOJE</small>
                 {praHoje ? (
-                  <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)} aria-label={`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}>
+                  <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)}>
+                    {/* leitor de tela: a frase inteira (aria-label num <strong> não é lido no VoiceOver) */}
+                    <span className="sr-only">{`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}</span>
                     <s className="mf-antes" aria-hidden>{rs(resultado.porDia)}</s>
                     <span aria-hidden>{rs(numeroNaTela)}</span><em aria-hidden>pra hoje</em>
                   </strong>
@@ -712,13 +719,13 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                           <button key={c.nome} type="button" className="mf-postit-chip" aria-pressed={feito} data-feito={feito ? "" : undefined}
                             aria-label={`${c.nome}, R$ ${reais(c.valor ?? 0)}${feito ? ", anotado" : ""}`} onClick={() => tocarChipDoNumero(c)}>
                             {feito ? <Check size={16} strokeWidth={3.5} aria-hidden /> : <span aria-hidden>{c.emoji}</span>}
-                            <span>{c.nome}</span><span className="mf-postit-valor">· R$ {reais(c.valor ?? 0)}</span>
+                            <span>{c.nome}</span><span className="mf-postit-valor">· {rs(c.valor ?? 0)}</span>
                           </button>
                         );
                       })}
                       {anotadosAMao.map((g) => (
                         <span key={g.id} className="mf-postit-chip" data-feito="" aria-label={`${g.nome}, R$ ${reais(g.valor)}, anotado`}>
-                          <Check size={16} strokeWidth={3.5} aria-hidden /><span>{g.nome}</span><span className="mf-postit-valor">· R$ {reais(g.valor)}</span>
+                          <Check size={16} strokeWidth={3.5} aria-hidden /><span>{g.nome}</span><span className="mf-postit-valor">· {rs(g.valor)}</span>
                         </span>
                       ))}
                       {!abrirOutro && (

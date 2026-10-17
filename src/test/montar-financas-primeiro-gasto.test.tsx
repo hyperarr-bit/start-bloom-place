@@ -112,7 +112,11 @@ const ateONumero = async () => {
   expect(screen.getByTestId("montar-pronto")).toBeTruthy();
 };
 const gastosDe = (c: Controle) => ((c.dados()["finance-expenses"] ?? []) as any[]);
-const doNumero = () => eventos.filter(([n]) => n === EV_GASTO_NO_NUMERO).map(([, e]) => e);
+/** Os eventos da tela do número, sem o envelope da missão (eventoDaMissao: protótipo, plataforma, versão, braço). */
+const doNumero = () => eventos.filter(([n]) => n === EV_GASTO_NO_NUMERO).map(([, e]) => {
+  const { prototipo: _p, plataforma: _pl, versao: _v, variante: _b, ...resto } = e;
+  return resto;
+});
 /** O texto como se lê (o "R$" vai preso ao número por um espaço que não quebra: \u00a0). */
 const lido = (el: Element) => (el.textContent ?? "").replace(/\u00a0/g, " ");
 
@@ -157,6 +161,8 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(postIt().getByRole("button", { name: "Ainda não gastei nada hoje →" })).toBeTruthy();
     expect(tela().getByRole("button", { name: "Ver minhas Finanças" })).toBeTruthy();
     expect(doNumero()).toEqual([{ acao: "view", ms: 0 }]);
+    // o mesmo envelope dos outros eventos da missão (é por versão/braço que as 48 h se leem)
+    expect(eventos.find(([n]) => n === EV_GASTO_NO_NUMERO)![1]).toMatchObject({ prototipo: "app", plataforma: "ios", versao: "dev" });
     cleanup();
     localStorage.clear();
     _novaAberturaMontar();
@@ -181,9 +187,9 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(postIt().getByRole("button", { name: "Café, R$ 12, anotado" }).getAttribute("aria-pressed")).toBe("true");
     const numero = screen.getByTestId("montar-pra-hoje");
     expect(numero.getAttribute("data-valor")).toBe("54");
-    expect(numero.getAttribute("aria-label")).toBe("Era R$ 66 por dia; sobram R$ 54 pra hoje");
+    expect(numero.querySelector(".sr-only")!.textContent).toBe("Era R$ 66 por dia; sobram R$ 54 pra hoje"); // o que o leitor de tela lê
     // ~~R$ 66~~ R$ 54 pra hoje (com "menos movimento", na hora) — o "R$" nunca fica sozinho no fim da linha
-    expect(numero.textContent).toBe("R$\u00a066R$\u00a054pra hoje");
+    expect(Array.from(numero.querySelectorAll("[aria-hidden]")).map((e) => e.textContent).join("")).toBe("R$\u00a066R$\u00a054pra hoje");
     expect(lido(screen.getByTestId("montar-pronto"))).toContain("Café · R$ 12 já está nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 54.");
     expect(screen.getByTestId("montar-pronto").textContent).toContain("Café · R$\u00a012 já está nas suas Finanças. Era R$\u00a066 por dia — hoje sobram R$\u00a054.");
     expect(postIt().getByText("Primeiro gasto no lugar.")).toBeTruthy();
@@ -283,6 +289,31 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     fireEvent.click(tela().getByRole("button", { name: "Ver minhas Finanças" }));
     const r = onPronto.mock.calls[0][0] as ResumoMontar;
     expect("primeiroGasto" in r).toBe(false);
+  });
+
+  it("o número só anima quando está na tela: digitar a renda não roda quadro a quadro; o Café roda", async () => {
+    const semMenosMovimento = ((q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    const antes = window.matchMedia;
+    window.matchMedia = semMenosMovimento;
+    const raf = vi.spyOn(window, "requestAnimationFrame");
+    const quadrosDoNumero = () => raf.mock.calls.filter(([cb]) => (cb as { name?: string }).name === "passo").length;
+    try {
+      montarTela();
+      for (const v of ["2", "25", "250", "2500", "3000"]) fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: v } });
+      await respirar();
+      expect(quadrosDoNumero()).toBe(0);
+      fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+      fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+      fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+      await respirar();
+      expect(quadrosDoNumero()).toBe(0);
+      fireEvent.click(postIt().getByRole("button", { name: /^Café,/ }));
+      await respirar();
+      expect(quadrosDoNumero()).toBeGreaterThan(0);
+    } finally {
+      raf.mockRestore();
+      window.matchMedia = antes;
+    }
   });
 
   it("o gasto passa do que dá no dia: R$ 0 pra hoje e 'hoje já passou'", async () => {

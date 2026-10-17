@@ -263,6 +263,18 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     expect(controle.escritas().map((e) => e.k)).not.toContain(CHAVE_PAINEL_LIMPO);
     expect(Object.keys(localStorage).some((k) => k.startsWith(PREFIXO_PAINEL_LIMPO_APARELHO))).toBe(false);
   });
+  it("com gasto HOJE: o QUANTO POSSO GASTAR HOJE do cliente antigo é o de sempre (sem a linha 'Sobram R$ X pra hoje')", { timeout: 40_000 }, async () => {
+    contaAntiga();
+    const comCafeHoje = [...(MES_COM_DADO["finance-expenses"] as unknown[]), { id: "e3", description: "Café", value: 12, date: "2026-10-16", category: "alimentacao", paymentMethod: "pix" }];
+    montarIndex({ ...MES_COM_DADO, "finance-expenses": comCafeHoje });
+    await abrirDashboard();
+    expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
+    const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div.rounded-lg") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull();
+    expect(card.textContent).not.toMatch(/pra hoje|Sobram|já saiu/);
+    expect(card.textContent).toMatch(/dias restantes no mês, contando hoje/);
+  });
   it("mesmo com o Montar feito NO APARELHO por outra conta: o antigo continua igual", { timeout: 40_000 }, async () => {
     contaAntiga();
     localStorage.setItem(CHAVE_MONTAR_FINANCAS, JSON.stringify({ r: "pronto", em: "x" }));

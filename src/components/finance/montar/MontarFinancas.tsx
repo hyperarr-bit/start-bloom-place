@@ -676,7 +676,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
               <div className="mf-grande" data-pra-hoje={praHoje ? "" : undefined}>
                 <small>VOCÊ PODE GASTAR HOJE</small>
                 {praHoje ? (
-                  <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)} aria-label={`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}>
+                  <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)}>
+                    {/* leitor de tela: a frase inteira (aria-label num <strong> não é lido no VoiceOver) */}
+                    <span className="sr-only">{`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}</span>
                     <s className="mf-antes" aria-hidden>{rs(resultado.porDia)}</s>
                     <span aria-hidden>{rs(numeroNaTela)}</span><em aria-hidden>pra hoje</em>
                   </strong>
@@ -712,13 +714,13 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                           <button key={c.nome} type="button" className="mf-postit-chip" aria-pressed={feito} data-feito={feito ? "" : undefined}
                             aria-label={`${c.nome}, R$ ${reais(c.valor ?? 0)}${feito ? ", anotado" : ""}`} onClick={() => tocarChipDoNumero(c)}>
                             {feito ? <Check size={16} strokeWidth={3.5} aria-hidden /> : <span aria-hidden>{c.emoji}</span>}
-                            <span>{c.nome}</span><span className="mf-postit-valor">· R$ {reais(c.valor ?? 0)}</span>
+                            <span>{c.nome}</span><span className="mf-postit-valor">· {rs(c.valor ?? 0)}</span>
                           </button>
                         );
                       })}
                       {anotadosAMao.map((g) => (
                         <span key={g.id} className="mf-postit-chip" data-feito="" aria-label={`${g.nome}, R$ ${reais(g.valor)}, anotado`}>
-                          <Check size={16} strokeWidth={3.5} aria-hidden /><span>{g.nome}</span><span className="mf-postit-valor">· R$ {reais(g.valor)}</span>
+                          <Check size={16} strokeWidth={3.5} aria-hidden /><span>{g.nome}</span><span className="mf-postit-valor">· {rs(g.valor)}</span>
                         </span>
                       ))}
                       {!abrirOutro && (

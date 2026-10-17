@@ -187,9 +187,9 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(postIt().getByRole("button", { name: "Café, R$ 12, anotado" }).getAttribute("aria-pressed")).toBe("true");
     const numero = screen.getByTestId("montar-pra-hoje");
     expect(numero.getAttribute("data-valor")).toBe("54");
-    expect(numero.getAttribute("aria-label")).toBe("Era R$ 66 por dia; sobram R$ 54 pra hoje");
+    expect(numero.querySelector(".sr-only")!.textContent).toBe("Era R$ 66 por dia; sobram R$ 54 pra hoje"); // o que o leitor de tela lê
     // ~~R$ 66~~ R$ 54 pra hoje (com "menos movimento", na hora) — o "R$" nunca fica sozinho no fim da linha
-    expect(numero.textContent).toBe("R$\u00a066R$\u00a054pra hoje");
+    expect(Array.from(numero.querySelectorAll("[aria-hidden]")).map((e) => e.textContent).join("")).toBe("R$\u00a066R$\u00a054pra hoje");
     expect(lido(screen.getByTestId("montar-pronto"))).toContain("Café · R$ 12 já está nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 54.");
     expect(screen.getByTestId("montar-pronto").textContent).toContain("Café · R$\u00a012 já está nas suas Finanças. Era R$\u00a066 por dia — hoje sobram R$\u00a054.");
     expect(postIt().getByText("Primeiro gasto no lugar.")).toBeTruthy();

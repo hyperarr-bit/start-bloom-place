@@ -98,7 +98,7 @@ export interface DefDesafio {
   titulo: (nivel: number, d: DadosDaSemana) => string;
   desc: (nivel: number, d: DadosDaSemana) => string;
   elegivel: (d: DadosDaSemana) => boolean;
-  /** A regra do desafio em si — a trava de registro entra por fora (avaliarNoCatalogo). */
+  /** A regra do desafio em si — o motivo do fechamento entra por fora (avaliarNoCatalogo). */
   avaliar: (nivel: number, d: DadosDaSemana) => Avaliacao;
   /** Retrato gravado em `active.meta` na hora da escolha (ex.: quanto já tinha na reserva). */
   retrato?: (d: DadosDaSemana) => Record<string, unknown>;

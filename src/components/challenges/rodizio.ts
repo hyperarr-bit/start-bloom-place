@@ -17,7 +17,7 @@
  *  · Conta com pouco dado: menos de 4 opções é aceitável; nunca se inventa
  *    desafio sem dado. Com 0 ou 1 fora do descanso, repete a usada há mais tempo
  *    — card sem escolha é pior que repetir.
- *  · Fechamento: `active` COM `nivel` → catálogo novo (trava de registro, motivo);
+ *  · Fechamento: `active` COM `nivel` → catálogo novo (regra própria, motivo);
  *    SEM `nivel` (escolhido pelo app antigo) → regra antiga, como sempre foi.
  */
 

@@ -1,8 +1,9 @@
 /**
  * DESAFIO DA SEMANA EM RODÍZIO (17/10) — components/challenges/{catalogo,rodizio}.
- * Conta vazia, elegibilidade pelo dado, sem repetir chave em 4 semanas, a TRAVA
- * DE REGISTRO (quem para de anotar não vence), a virada da semana com relógio
- * simulado, o calendário, a chave remota e a compatibilidade com o app antigo.
+ * Conta vazia, elegibilidade pelo dado, sem repetir chave em 4 semanas, cada
+ * desafio vencendo pela própria regra (o dono tirou o mínimo de dias anotados),
+ * a virada da semana com relógio simulado, o calendário, a chave remota e a
+ * compatibilidade com o app antigo (inclusive registros `sem-registro` da 1ª versão).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -32,8 +33,7 @@ import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
 import { fecharSemanaDoDesafio, lerDesafios, type ChallengesState, type GastoDoDesafio } from "@/components/challenges/challenges";
 import {
-  CATALOGO, MIN_DIAS_ANOTADOS, avaliarNoCatalogo, blackFridayDe, defDoCatalogo, inferirDiaDoPagamento, montarDados, semanaDoAno, semanaPreBlackFriday,
-  type DadosDaSemana,
+  CATALOGO, avaliarNoCatalogo, blackFridayDe, defDoCatalogo, inferirDiaDoPagamento, montarDados, semanaDoAno, semanaPreBlackFriday,
 } from "@/components/challenges/catalogo";
 import { escolher, fecharSemana, montarOfertas, nivelParaOferta, variacaoDaSemanaPassada } from "@/components/challenges/rodizio";
 import { CHAVE_FORCA_DESAFIOS_RODIZIO, _zerarDesafiosRodizioRemoto, desafiosRodizioLigado, lerChaveRemotaDesafiosRodizio, registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
@@ -56,6 +56,8 @@ const quando = (a: number, m: number, d: number, h = 10) => {
 let seq = 0;
 const gasto = (date: string, value: number, category = "alimentacao", extra: Partial<GastoDoDesafio> & { description?: string } = {}): GastoDoDesafio =>
   ({ id: `g${++seq}`, date, value, category, description: extra.description ?? category, ...extra });
+const parcela = (id: string, date: string | undefined, extra: Record<string, unknown> = {}) =>
+  ({ id, description: "Celular", totalValue: 1200, installmentValue: 100, paidInstallments: 0, totalInstallments: 12, cardName: "nubank", category: "eletronicos", ...(date ? { date } : {}), ...extra });
 const lerDe = (dados: Record<string, unknown>) => (k: string) => dados[k];
 const dadosDe = (dados: Record<string, unknown>, weekStart: string, hoje: Date, meta: Record<string, unknown> = {}) =>
   montarDados({ ler: lerDe(dados), weekStart, perfil: "pessoal", hoje, meta });
@@ -82,6 +84,7 @@ const habito = (): Record<string, unknown> => ({
   ],
   "finance-dueDays": [{ day: 15, color: "yellow", bills: [{ id: "b1", name: "Luz", paid: false }, { id: "b2", name: "Internet", paid: true }] }],
   "finance-emergency-fund": { meses: 6, guardado: 500, registrada: true },
+  "finance-installments": [parcela("p1", "2026-09-22")],
   "finance-incomes": [{ id: "r1", description: "Salário", value: 3200, date: "2026-10-05" }],
   "finance-2026-setembro-incomes": [{ id: "r0", description: "Salário", value: 3200, date: "2026-09-05" }],
 });
@@ -101,7 +104,7 @@ describe("catálogo: elegibilidade pelo dado da pessoa", () => {
   it("com hábito nas últimas 4 semanas tudo fica elegível: Uber (3 corridas), crédito (3 no credito), mercado (3 dias), marmita, formiga, comprinha, contas da semana, assinaturas, guarda", () => {
     const d = dadosDe(habito(), SEMANA, QUARTA);
     const elegiveis = CATALOGO.filter((c) => c.elegivel(d)).map((c) => c.key);
-    for (const k of ["uber-2x", "sem-credito", "mercado-1x", "marmita", "gasto-formiga", "sem-comprinha-online", "contas-em-dia", "faxina-assinaturas", "guarda-da-semana", "sem-delivery", "sem-outros", "menos-que-passada", "role-com-teto"]) {
+    for (const k of ["uber-2x", "sem-credito", "mercado-1x", "marmita", "gasto-formiga", "sem-comprinha-online", "contas-em-dia", "faxina-assinaturas", "guarda-da-semana", "sem-delivery", "sem-outros", "menos-que-passada", "role-com-teto", "sem-parcelar"]) {
       expect(elegiveis, k).toContain(k);
     }
   });
@@ -124,40 +127,40 @@ describe("catálogo: elegibilidade pelo dado da pessoa", () => {
     expect(def("role-com-teto").elegivel(dadosDe({ "finance-expenses": [gasto("2026-10-06", 30, "lazer")] }, SEMANA, QUARTA))).toBe(false);
   });
 
+  it("'semana sem parcelar' só pra quem parcelou nas últimas 8 semanas (data da compra, ou o id = Date.now da criação)", () => {
+    const sem = def("sem-parcelar");
+    expect(sem.elegivel(dadosDe({}, SEMANA, QUARTA))).toBe(false);
+    expect(sem.elegivel(dadosDe({ "finance-installments": [parcela("p1", "2026-09-22")] }, SEMANA, QUARTA))).toBe(true);
+    expect(sem.elegivel(dadosDe({ "finance-installments": [parcela("p1", "2026-07-10")] }, SEMANA, QUARTA))).toBe(false); // 13 semanas: velho
+    const idDe = (a: number, m: number, d: number) => String(new Date(a, m - 1, d, 12).getTime());
+    expect(sem.elegivel(dadosDe({ "finance-installments": [parcela(idDe(2026, 9, 30), undefined)] }, SEMANA, QUARTA))).toBe(true);
+    expect(sem.elegivel(dadosDe({ "finance-installments": [parcela(idDe(2026, 6, 30), undefined)] }, SEMANA, QUARTA))).toBe(false);
+  });
+
   it("'gastar menos que semana passada' só com semana anterior anotada em 3+ dias (senão a comparação não vale)", () => {
     expect(def("menos-que-passada").elegivel(dadosDe({ "finance-expenses": [gasto("2026-10-06", 500)] }, SEMANA, QUARTA))).toBe(false);
     expect(def("menos-que-passada").elegivel(dadosDe({ "finance-expenses": [gasto("2026-10-05", 50), gasto("2026-10-07", 50), gasto("2026-10-09", 50)] }, SEMANA, QUARTA))).toBe(true);
   });
 });
 
-describe("a trava de registro: desafio de restrição só vale com 4+ dias anotados", () => {
+describe("restrição vence pela PRÓPRIA regra — sem mínimo de dias anotados (dono 17/10: 'é pra ser divertido')", () => {
   const semDelivery = def("sem-delivery");
 
-  it("semana inteira sem delivery mas só 2 dias anotados: NÃO vence — 'faltou anotar' (sem-registro)", () => {
+  it("semana inteira sem delivery, só 2 dias anotados: vitória 'cumpriu' com a coroa", () => {
     const d = dadosDe({ "finance-expenses": [gasto("2026-10-13", 30), gasto("2026-10-16", 25)] }, SEMANA, new Date(2026, 9, 19, 9));
     const ev = avaliarNoCatalogo(semDelivery, 1, d);
-    expect(ev.done).toBe(false);
-    expect(ev.failed).toBe(true);
-    expect(ev.motivo).toBe("sem-registro");
-    expect(ev.statusText).toMatch(/Faltou anotar/);
+    expect(ev).toMatchObject({ done: true, failed: false, motivo: "cumpriu", statusText: "Semana limpa, zero delivery 👑" });
   });
 
-  it("4 dias anotados (3 gastos + 1 'não gastei nada hoje') e zero delivery: vitória com os dois contadores", () => {
-    const dados = { "finance-expenses": [gasto("2026-10-12", 30), gasto("2026-10-13", 25), gasto("2026-10-15", 40)], "finance-sem-gasto": { "2026-10-17": true } };
-    const ev = avaliarNoCatalogo(semDelivery, 1, dadosDe(dados, SEMANA, new Date(2026, 9, 19, 9)));
-    expect(ev.done).toBe(true);
-    expect(ev.motivo).toBe("cumpriu");
-    expect(ev.statusText).toBe("Semana limpa, zero delivery · 4 dias anotados 👑");
-  });
-
-  it("no meio da semana a linha mostra os dois contadores: '2 de 4 dias anotados · zero delivery até aqui'", () => {
+  it("no meio da semana a linha é só a do desafio: 'zero delivery até aqui' (nenhum contador de dias)", () => {
     const d = dadosDe({ "finance-expenses": [gasto("2026-10-12", 30), gasto("2026-10-13", 25)] }, SEMANA, QUARTA);
     const ev = avaliarNoCatalogo(semDelivery, 1, d);
     expect(ev.failed).toBe(false);
-    expect(ev.statusText).toBe(`2 de ${MIN_DIAS_ANOTADOS} dias anotados · zero delivery até aqui`);
+    expect(ev.statusText).toBe("zero delivery até aqui");
+    expect(ev.statusText).not.toMatch(/dias anotados/);
   });
 
-  it("quebrou a regra (um delivery): derrota por 'regra', mesmo com registro em dia", () => {
+  it("quebrou a regra (um delivery): derrota por 'regra'", () => {
     const d = dadosDe({ "finance-expenses": [gasto("2026-10-12", 30), gasto("2026-10-13", 48, "delivery")] }, SEMANA, QUARTA);
     const ev = avaliarNoCatalogo(semDelivery, 1, d);
     expect(ev.failed).toBe(true);
@@ -165,19 +168,19 @@ describe("a trava de registro: desafio de restrição só vale com 4+ dias anota
     expect(ev.statusText).toMatch(/Rolou um delivery/);
   });
 
-  it("sábado com 1 dia anotado: ainda dá (hoje + domingo + ... não) → 1 + 2 < 4, já era por falta de registro", () => {
-    const d = dadosDe({ "finance-expenses": [gasto("2026-10-12", 30)] }, SEMANA, new Date(2026, 9, 17, 10));
-    expect(avaliarNoCatalogo(semDelivery, 1, d).motivo).toBe("sem-registro");
+  it("'gastar menos que semana passada': a linha é o dinheiro, e fecha abaixo do teto no fim da semana", () => {
+    const dados = { "finance-expenses": [gasto("2026-10-05", 100), gasto("2026-10-07", 100), gasto("2026-10-09", 100), gasto("2026-10-13", 100)] };
+    expect(avaliarNoCatalogo(def("menos-que-passada"), 1, dadosDe(dados, SEMANA, QUARTA)).statusText).toBe("R$ 100 de R$ 300");
+    expect(avaliarNoCatalogo(def("menos-que-passada"), 1, dadosDe(dados, SEMANA, new Date(2026, 9, 19, 9)))).toMatchObject({ done: true, statusText: "Fechou abaixo: R$ 100 de R$ 300 👑" });
   });
 
-  it("'gastar menos que semana passada' também exige registro: R$ 0 anotados não é vitória", () => {
-    const dados = { "finance-expenses": [gasto("2026-10-05", 100), gasto("2026-10-07", 100), gasto("2026-10-09", 100)] };
-    const ev = avaliarNoCatalogo(def("menos-que-passada"), 1, dadosDe(dados, SEMANA, new Date(2026, 9, 19, 9)));
-    expect(ev.done).toBe(false);
-    expect(ev.motivo).toBe("sem-registro");
+  it("não bateu a meta até domingo (restrição sem quebra, ex.: 2 dias zerados com 1 só): 'nao-cumpriu'", () => {
+    const dados = { "finance-expenses": [12, 13, 14, 15, 16, 17].map((dia) => gasto(`2026-10-${dia}`, 10)) };
+    const ev = avaliarNoCatalogo(def("tres-dias-zero"), 1, dadosDe(dados, SEMANA, new Date(2026, 9, 19, 9)));
+    expect(ev).toMatchObject({ done: false, failed: true, motivo: "nao-cumpriu" });
   });
 
-  it("ação positiva não tem trava: 'Anotar em 5 dias' fecha na hora com 5 dias; 'Contas da semana' conta as pagas", () => {
+  it("ação positiva fecha na hora: 'Anotar em 5 dias' com 5 dias; 'Contas da semana' conta as pagas", () => {
     const dados = { ...habito(), "finance-expenses": [12, 13, 14, 15, 16].map((dia) => gasto(`2026-10-${dia}`, 10)) };
     const d = dadosDe(dados, SEMANA, new Date(2026, 9, 16, 20));
     expect(avaliarNoCatalogo(def("registro-5-dias"), 1, d)).toMatchObject({ done: true, motivo: "cumpriu" });
@@ -196,7 +199,7 @@ describe("níveis, retrato e confirmação", () => {
     expect(nivelParaOferta(uber, [{ key: "uber-2x", weekStart: "2026-08-03", result: "win", nivel: 3 }])).toBe(3);
     const d = dadosDe({ "finance-expenses": [gasto("2026-10-12", 22, "transporte", { description: "Uber" }), gasto("2026-10-13", 22, "transporte", { description: "99" }), gasto("2026-10-14", 22, "transporte", { description: "Uber" })] }, SEMANA, QUARTA);
     expect(avaliarNoCatalogo(uber, 1, d)).toMatchObject({ failed: true, motivo: "regra" });
-    expect(avaliarNoCatalogo(uber, 1, { ...d, semana: d.semana.slice(0, 2) }).statusText).toBe("3 de 4 dias anotados · 2 de 2 corridas usadas");
+    expect(avaliarNoCatalogo(uber, 1, { ...d, semana: d.semana.slice(0, 2) }).statusText).toBe("2 de 2 corridas usadas");
   });
 
   it("guarda da semana: semana 42 do ano pede R$ 42; o retrato guarda quanto já tinha e o progresso é a diferença", () => {
@@ -227,28 +230,61 @@ describe("níveis, retrato e confirmação", () => {
     expect(avaliarNoCatalogo(faxina, 1, confirmou)).toMatchObject({ done: true, statusText: "Revisadas: todas valem ✓" });
   });
 
+  it("semana sem parcelar: o retrato de segunda guarda as parcelas; nova = fora do retrato E comprada nesta semana; cadastrar compra antiga não perde; sem parcela nova até domingo vence", () => {
+    const sem = def("sem-parcelar");
+    const antes = { "finance-installments": [parcela("p1", "2026-09-22")], "finance-expenses": [gasto("2026-10-12", 30), gasto("2026-10-13", 25)] };
+    const d = dadosDe(antes, SEMANA, QUARTA);
+    const ativo = escolher({ key: "sem-parcelar", nivel: 1 }, d);
+    expect(ativo.meta).toEqual({ parcelas: ["id:p1"] });
+    // nada novo no meio da semana
+    expect(avaliarNoCatalogo(sem, 1, d).statusText).toBe("nenhuma parcela nova");
+    // entrou uma parcela comprada na quarta: perdeu pela regra
+    const nova = dadosDe({ ...antes, "finance-installments": [parcela("p1", "2026-09-22"), parcela("p2", "2026-10-14")] }, SEMANA, QUARTA, ativo.meta);
+    expect(avaliarNoCatalogo(sem, 1, nova)).toMatchObject({ failed: true, motivo: "regra" });
+    expect(avaliarNoCatalogo(sem, 1, nova).statusText).toMatch(/Entrou uma compra parcelada/);
+    // cadastrou HOJE uma compra de agosto (pondo a casa em ordem): não é parcela nova
+    const antiga = dadosDe({ ...antes, "finance-installments": [parcela("p1", "2026-09-22"), parcela("p3", "2026-08-20")] }, SEMANA, QUARTA, ativo.meta);
+    expect(avaliarNoCatalogo(sem, 1, antiga).failed).toBe(false);
+    // sem data legível, o id (Date.now) diz quando foi criada: criada nesta semana = nova
+    const porId = dadosDe({ ...antes, "finance-installments": [parcela("p1", "2026-09-22"), parcela(String(new Date(2026, 9, 13, 15).getTime()), undefined)] }, SEMANA, QUARTA, ativo.meta);
+    expect(avaliarNoCatalogo(sem, 1, porId).motivo).toBe("regra");
+    // semana inteira sem parcela nova: vitória (sem mínimo de dias anotados)
+    const fim = dadosDe(antes, SEMANA, new Date(2026, 9, 19, 9), ativo.meta);
+    expect(avaliarNoCatalogo(sem, 1, fim)).toMatchObject({ done: true, motivo: "cumpriu", statusText: "Semana sem parcela nova 👑" });
+    // o retrato é campo opcional de `active.meta`: o leitor novo mantém, o antigo ignora
+    expect(lerDesafios({ active: { ...ativo }, history: [] }).active?.meta).toEqual({ parcelas: ["id:p1"] });
+  });
+
   it("'dias sem gastar': hoje só conta zerado com 'não gastei nada hoje'; dia passado sem gasto é zerado", () => {
     const zero = def("tres-dias-zero");
     const d = dadosDe({ "finance-expenses": [gasto("2026-10-12", 30)], "finance-sem-gasto": { "2026-10-14": true } }, SEMANA, QUARTA);
-    // seg gastou, ter zerado (passou sem gasto), qua zerado (marcado) → 2 de 2 → vitória do nível 1, com 3 dias anotados? não: trava de 4
+    // seg gastou, ter zerado (passou sem gasto), qua zerado (marcado) → 2 de 2 → vitória do nível 1 na hora (a frase já tem emoji: sem coroa dobrada)
     const ev = avaliarNoCatalogo(zero, 1, d);
-    expect(ev.done).toBe(false);
-    expect(ev.statusText).toBe("2 de 4 dias anotados · regra cumprida, anota hoje e fecha 👊");
+    expect(ev).toMatchObject({ done: true, motivo: "cumpriu", statusText: "2 dias sem gastar. Monge 🧘" });
+    // só o gasto de segunda, quarta sem marca: 1 de 2 (hoje não conta zerado sem o toque)
+    expect(avaliarNoCatalogo(zero, 1, dadosDe({ "finance-expenses": [gasto("2026-10-12", 30)] }, SEMANA, QUARTA)).statusText).toBe("1 de 2 dias zerados");
   });
 });
 
 /* ═══════════════════ o rodízio ═══════════════════ */
 
-describe("rodízio: 3 opções, sem repetir em 4 semanas, variação e revanche", () => {
+describe("rodízio: 4 opções, sem repetir em 4 semanas, variação e revanche", () => {
   const d = () => dadosDe(habito(), SEMANA, QUARTA);
 
-  it("monta 3 opções, estáveis dentro da semana, com ao menos 1 ação positiva", () => {
+  it("monta 4 opções (dono 17/10: 'tendo 4 fica melhor de escolher'), estáveis dentro da semana, com ao menos 1 ação positiva", () => {
     const a = montarOfertas(d(), { active: null, history: [] });
     const b = montarOfertas(d(), { active: null, history: [] });
-    expect(a.itens).toHaveLength(3);
+    expect(a.itens).toHaveLength(4);
     expect(a).toEqual(b);
     expect(a.itens.some((i) => def(i.key).tipo === "acao")).toBe(true);
-    expect(new Set(keys(a)).size).toBe(3);
+    expect(new Set(keys(a)).size).toBe(4);
+  });
+
+  it("a variação ocupa a vaga 1 e sobram 3 novas; com variação + calendário ainda há 2 novas", () => {
+    const comVariacao = montarOfertas(d(), { active: null, history: [{ key: "uber-2x", weekStart: "2026-10-05", result: "win", nivel: 1 }] });
+    expect(comVariacao.itens).toHaveLength(4);
+    expect(comVariacao.itens[0].origem).toBe("variacao");
+    expect(comVariacao.itens.slice(1).every((i) => i.origem === "nova")).toBe(true);
   });
 
   it("chave usada há 2 semanas não volta; há 5 semanas volta", () => {
@@ -272,13 +308,21 @@ describe("rodízio: 3 opções, sem repetir em 4 semanas, variação e revanche"
     expect(keys(venceu3)).not.toContain("uber-2x");
   });
 
-  it("perdeu por FALTA DE REGISTRO → revanche (mesma chave, mesmo nível); perdeu quebrando a regra → descansa", () => {
-    const faltou = montarOfertas(d(), { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-05", result: "loss", nivel: 1, motivo: "sem-registro" }] });
-    expect(faltou.itens[0]).toEqual({ key: "sem-delivery", nivel: 1, origem: "revanche" });
+  it("perdeu (regra ou não cumpriu) → descansa; registro ANTIGO com motivo 'sem-registro' (1ª versão) ainda vira revanche", () => {
     const quebrou = montarOfertas(d(), { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-05", result: "loss", nivel: 1, motivo: "regra" }] });
     expect(keys(quebrou)).not.toContain("sem-delivery");
+    const naoCumpriu = montarOfertas(d(), { active: null, history: [{ key: "tres-dias-zero", weekStart: "2026-10-05", result: "loss", nivel: 1, motivo: "nao-cumpriu" }] });
+    expect(keys(naoCumpriu)).not.toContain("tres-dias-zero");
+    const antigo = montarOfertas(d(), { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-05", result: "loss", nivel: 1, motivo: "sem-registro" }] });
+    expect(antigo.itens[0]).toEqual({ key: "sem-delivery", nivel: 1, origem: "revanche" });
     // registro antigo (sem nivel) vencido: a variação também vale, como nível 1 → 2
     expect(variacaoDaSemanaPassada(d(), [{ key: "tres-dias-zero", weekStart: "2026-10-05", result: "win" }])).toEqual({ key: "tres-dias-zero", nivel: 2, origem: "variacao" });
+  });
+
+  it("com 2+ opções fora do descanso, a chave usada semana passada NÃO entra pra completar as 4", () => {
+    const dConta = dadosDe({ "finance-expenses": [gasto("2026-10-01", 48, "delivery", { description: "iFood" })] }, SEMANA, QUARTA); // 4 elegíveis
+    const o = montarOfertas(dConta, { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-05", result: "win", nivel: 1 }] });
+    expect(keys(o).sort()).toEqual(["registro-5-dias", "sem-outros", "tres-dias-zero"]);
   });
 
   it("tudo em descanso: repete a usada há mais tempo em vez de deixar o card vazio", () => {
@@ -333,11 +377,13 @@ describe("fechamento da semana que passou (regra nova × regra antiga)", () => {
   const dadosDa = (dados: Record<string, unknown>, hoje: Date) => (weekStart: string, meta: Record<string, unknown>) => dadosDe(dados, weekStart, hoje, meta);
   const SEG_SEGUINTE = new Date(2026, 9, 19, 9);
 
-  it("ativo do catálogo (com nivel), sem delivery mas só 2 dias anotados → derrota 'sem-registro'", () => {
+  it("ativo do catálogo (com nivel) com um delivery na semana → derrota 'regra'; sem delivery → vitória 'cumpriu'", () => {
     const estado: ChallengesState = { active: { key: "sem-delivery", weekStart: SEMANA, nivel: 1 }, history: [] };
-    const r = fecharSemana(estado, dadosDa({ "finance-expenses": [gasto("2026-10-13", 30), gasto("2026-10-16", 25)] }, SEG_SEGUINTE), SEG_SEGUINTE);
-    expect(r?.registro).toEqual({ key: "sem-delivery", weekStart: SEMANA, nivel: 1, result: "loss", motivo: "sem-registro" });
+    const r = fecharSemana(estado, dadosDa({ "finance-expenses": [gasto("2026-10-13", 30), gasto("2026-10-16", 48, "delivery")] }, SEG_SEGUINTE), SEG_SEGUINTE);
+    expect(r?.registro).toEqual({ key: "sem-delivery", weekStart: SEMANA, nivel: 1, result: "loss", motivo: "regra" });
     expect(r?.estado.active).toBeNull();
+    const v = fecharSemana(estado, dadosDa({ "finance-expenses": [gasto("2026-10-13", 30), gasto("2026-10-16", 25)] }, SEG_SEGUINTE), SEG_SEGUINTE);
+    expect(v?.registro).toEqual({ key: "sem-delivery", weekStart: SEMANA, nivel: 1, result: "win", motivo: "cumpriu" });
   });
 
   it("o mesmo ativo ESCOLHIDO PELO APP ANTIGO (sem nivel) fecha pela regra antiga: 2 dias anotados e zero delivery = vitória", () => {
@@ -346,7 +392,7 @@ describe("fechamento da semana que passou (regra nova × regra antiga)", () => {
     expect(r?.registro).toEqual({ key: "sem-delivery", weekStart: SEMANA, result: "win" });
   });
 
-  it("4 dias anotados e zero delivery → vitória 'cumpriu' com nivel; ofertas de semana velha saem", () => {
+  it("zero delivery → vitória 'cumpriu' com nivel; ofertas de semana velha saem", () => {
     const estado: ChallengesState = { active: { key: "sem-delivery", weekStart: SEMANA, nivel: 1 }, history: [], ofertas: { weekStart: SEMANA, itens: [{ key: "sem-delivery", nivel: 1 }] } };
     const dados = { "finance-expenses": [12, 13, 15, 17].map((dia) => gasto(`2026-10-${dia}`, 20)) };
     const r = fecharSemana(estado, dadosDa(dados, SEG_SEGUINTE), SEG_SEGUINTE);
@@ -436,8 +482,8 @@ const eventos = (nome: string) => (trackEvent as Mock).mock.calls.filter((c) => 
 const montar = (store: ReturnType<typeof criarStore>) =>
   render(<UserDataContext.Provider value={store.valor}><WeeklyChallenge expenses={(store.dados["finance-expenses"] as never) ?? []} /></UserDataContext.Provider>);
 
-describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () => {
-  it("conta vazia: as 3 opções sem hábito, a nota da trava, ofertas gravadas como ESCRITA DE SISTEMA e o evento desafio_ofertas (1x)", async () => {
+describe("o card: segunda com as opções, escolha, meio da semana, virada", () => {
+  it("conta vazia: só as 3 opções sem hábito (menos de 4 é aceitável), sem nota de regra de registro, ofertas gravadas como ESCRITA DE SISTEMA e o evento desafio_ofertas (1x)", async () => {
     quando(2026, 10, 12);
     const store = criarStore({});
     montar(store);
@@ -446,12 +492,23 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
     expect(screen.getByTestId("oferta-registro-5-dias")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-tres-dias-zero")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-sem-outros")).toBeInTheDocument();
-    expect(screen.getByText(/anote algo em pelo menos 4 dias da semana/)).toBeInTheDocument();
+    expect(screen.queryByText(/anote algo em pelo menos|dias anotados/)).toBeNull();
+    expect(screen.getByText(/Escolhe 1 das 3 pra esta semana/)).toBeInTheDocument();
     expect(desafios(store.dados).ofertas?.weekStart).toBe("2026-10-12");
     expect(store.sistema).toEqual(["finance-challenges"]);
     expect(eventos("desafio_ofertas")).toHaveLength(1);
     expect(eventos("desafio_ofertas")[0]).toMatchObject({ weekStart: "2026-10-12" });
     expect(eventos("desafio_ofertas")[0].keys).toHaveLength(3);
+  });
+
+  it("com hábito: 4 opções na segunda ('Escolhe 1 das 4') e cada uma com data-testid", async () => {
+    quando(2026, 10, 12);
+    const store = criarStore(habito());
+    montar(store);
+    await act(async () => {});
+    expect(screen.getByText(/Escolhe 1 das 4 pra esta semana/)).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-testid^="oferta-"]')).toHaveLength(4);
+    expect(desafios(store.dados).ofertas?.itens).toHaveLength(4);
   });
 
   it("escolher grava active com nivel (gesto da pessoa, sem system) e dispara desafio_escolhido; o card vira progresso", async () => {
@@ -467,7 +524,7 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
     expect(screen.getByTestId("desafio-status")).toHaveTextContent("0 de 5 dias anotados");
   });
 
-  it("meio da semana: 'Semana sem delivery' com 2 dias anotados mostra os dois contadores", async () => {
+  it("meio da semana: 'Semana sem delivery' mostra só a linha do desafio", async () => {
     quando(2026, 10, 14);
     const store = criarStore({
       "finance-challenges": { active: { key: "sem-delivery", weekStart: "2026-10-12", nivel: 1 }, history: [] },
@@ -476,10 +533,11 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
     montar(store);
     await act(async () => {});
     expect(screen.getByText("Semana sem delivery")).toBeInTheDocument();
-    expect(screen.getByTestId("desafio-status")).toHaveTextContent("2 de 4 dias anotados · zero delivery até aqui");
+    expect(screen.getByTestId("desafio-status")).toHaveTextContent("zero delivery até aqui");
+    expect(screen.getByTestId("desafio-status")).not.toHaveTextContent(/dias anotados/);
   });
 
-  it("virada com relógio simulado: ativo da semana passada sem registro fecha como 'faltou anotar' e volta como REVANCHE nas opções", async () => {
+  it("virada com relógio simulado: ativo da semana passada sem delivery (2 dias anotados) fecha como VITÓRIA e a chave descansa nas opções novas", async () => {
     quando(2026, 10, 19); // segunda seguinte
     const store = criarStore({
       "finance-challenges": { active: { key: "sem-delivery", weekStart: "2026-10-12", nivel: 1 }, history: [] },
@@ -489,11 +547,23 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
     await act(async () => {});
     await act(async () => {});
     const s = desafios(store.dados);
-    expect(s.history).toEqual([{ key: "sem-delivery", weekStart: "2026-10-12", nivel: 1, result: "loss", motivo: "sem-registro" }]);
+    expect(s.history).toEqual([{ key: "sem-delivery", weekStart: "2026-10-12", nivel: 1, result: "win", motivo: "cumpriu" }]);
     expect(s.active).toBeNull();
-    expect(eventos("desafio_fechado")[0]).toMatchObject({ key: "sem-delivery", venceu: false, motivo: "sem-registro" });
+    expect(eventos("desafio_fechado")[0]).toMatchObject({ key: "sem-delivery", venceu: true, motivo: "cumpriu" });
     expect(s.ofertas?.weekStart).toBe("2026-10-19");
-    expect(s.ofertas?.itens[0]).toEqual({ key: "sem-delivery", nivel: 1, origem: "revanche" });
+    expect(s.ofertas?.itens.map((i) => i.key)).not.toContain("sem-delivery");
+    expect(screen.queryByTestId("oferta-sem-delivery")).toBeNull();
+  });
+
+  it("registro ANTIGO com motivo 'sem-registro' (1ª versão do rodízio) lê normal e ainda vira revanche com a etiqueta", async () => {
+    quando(2026, 10, 19);
+    const store = criarStore({
+      "finance-challenges": { active: null, history: [{ key: "sem-delivery", weekStart: "2026-10-12", nivel: 1, result: "loss", motivo: "sem-registro" }] },
+      "finance-expenses": [gasto("2026-10-01", 48, "delivery", { description: "iFood" })],
+    });
+    montar(store);
+    await act(async () => {});
+    expect(desafios(store.dados).ofertas?.itens[0]).toEqual({ key: "sem-delivery", nivel: 1, origem: "revanche" });
     expect(screen.getByTestId("oferta-sem-delivery")).toHaveTextContent(/revanche/i);
   });
 
@@ -555,7 +625,7 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
 describe("fecha na ABERTURA do app (hook), com a regra nova", () => {
   const SemPainel = () => { useFechamentoDoDesafio(); return <p>home</p>; };
 
-  it("4 dias anotados e zero delivery → vitória 'cumpriu' gravada como sistema + evento desafio_fechado (origem abertura)", async () => {
+  it("zero delivery → vitória 'cumpriu' gravada como sistema + evento desafio_fechado (origem abertura)", async () => {
     quando(2026, 10, 19);
     const store = criarStore({
       "finance-challenges": { active: { key: "sem-delivery", weekStart: "2026-10-12", nivel: 1 }, history: [] },

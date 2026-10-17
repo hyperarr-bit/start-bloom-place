@@ -17,18 +17,30 @@
  *      `useMontarFinancasNoModulo` abaixo). O código fica, desligado.
  *  (b) PELA MISSÃO — a ÚNICA porta: a dose 1 de Finanças do teste de 3 dias, pra quem escolheu
  *      dinheiro/"tudo" (scratchpad/definitiva/8-trial-desenho.md):
- *      Montar → "pode gastar R$ X por dia" → (a missão segue com o 1º gasto pelo chip). Quem cuida da
- *      missão liga; nada aqui mexe nela:
+ *      Montar → "pode gastar R$ X por dia" + O 1º GASTO ALI MESMO (17/10, D1 do relatório 11, só nesta
+ *      porta): o post-it "Já gastou com alguma coisa hoje?" — Café R$ 12 · Uber R$ 23 · Almoço R$ 35 ·
+ *      ✎ outro (nome + valor ali, sem sair) · "Ainda não gastei nada hoje →". 1 toque = 1 gasto variável de
+ *      verdade (`finance-expenses`, o objeto do "+ Novo gasto", id estável: 2 toques gravam 1), o chip vira ✓,
+ *      o número cai (~~R$ 70~~ R$ 58 pra hoje = o do dia − o gasto de hoje) e o botão vira "Ver no meu mês →".
+ *      Quem cuida da missão liga; nada aqui mexe nela:
  *
  *        import { MontarFinancas, deveMostrarMontarFinancas, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA }
  *          from "@/components/finance/montar/MontarFinancas";
  *
  *        const { user } = useAuth(); const { get, isGuest } = useUserData();
  *        if (deveMostrarMontarFinancas({ criadoEm: user?.created_at, get, isGuest }))   // chave + conta nova + vazia + não decidiu
- *          <MontarFinancas origem="missao"
- *            onPronto={(r: ResumoMontar) => … r.contas, r.porDia, r.semFolga, r.cartao …}   // dado já gravado no módulo
+ *          <MontarFinancas origem="missao"                                               //   (ou: a tela do número em aberto, B11)
+ *            onPronto={(r: ResumoMontar) => … r.contas, r.porDia, r.semFolga, r.cartao, r.primeiroGasto …}   // dado já gravado
  *            onPular={() => …} />
  *        // senão (pulou/fez antes, ou Finanças já tem dado): a dose segue direto pro 1º gasto.
+ *
+ *      `r.primeiroGasto`: { nome } = anotou na tela do número (a missão pula o anel do 1º gasto: MEU MÊS + festa)
+ *      · null = "Ainda não gastei nada hoje" (a dose conta igual) · ausente = saiu pelo botão sem anotar nada (a
+ *      missão segue com o 1º gasto dela, como antes).
+ *      FECHAR O APP NA TELA DO NÚMERO (B11): o Montar já decidiu (grava na entrada do "Montando"), mas até ela
+ *      sair da tela (o botão ou "Ainda não gastei") `deveMostrarMontarFinancas` responde true — hoje, nesta conta
+ *      (`lerTelaDoNumero(criadoEm)` de lib/montar-financas ≠ null) — e a tela abre DE NOVO NELA, com os chips já
+ *      tocados. Quem abre não pode trocar essa volta pelo passo do gasto só porque a dose já foi gravada.
  *
  *      É uma folha fixa por cima de tudo (z 200), que começa abaixo da faixa da missão. UMA TELA POR VEZ:
  *      se a do módulo (a) estiver aberta, ela some quando a da missão monta (`onCeder`), e o módulo não
@@ -47,7 +59,10 @@
  *
  * Eventos: montar_financas_view {origem, retomou} · montar_financas_passo {n: 1 renda | 2 contas | 3 cartão
  *          | 4 resultado, origem} · montar_financas_pronto {contas, faixa, sem_folga, origem, cartao (+ cartao_pulou
- *          quando pulou o cartão)} · montar_financas_pular {passo, origem}. Nunca valor em reais.
+ *          quando pulou o cartão)} · montar_financas_pular {passo, origem} · (só origem "missao")
+ *          missao_doses_gasto_no_numero {acao: view | chip | outro | ainda_nao, ms (view: desde a abertura da tela;
+ *          os outros: desde o view), chip: nome do chip, retomou (view depois de fechar o app ali)}. Nunca valor em
+ *          reais (nem o nome digitado no "✎ outro").
  */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, Check, DollarSign, Plus, X } from "lucide-react";
@@ -386,16 +401,17 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
       avisarEscritaDeFora(g.chave, proximo);
     }
   };
-  /** 1 gasto, 1 vez: o mesmo item (mesmo id) tocado de novo — ou o 2º toque de um toque duplo — não grava. */
-  const anotar = (g: GastoDoNumero, gravacoes: Gravacao[], acao: "chip" | "outro"): boolean => {
-    if (anotando.current.has(g.id) || gastos.some((x) => x.id === g.id)) return false;
+  /** 1 gasto, 1 vez: o mesmo item (mesmo id) tocado de novo — ou o 2º toque de um toque duplo — não grava.
+   *  Devolve a lista nova, ou null quando não anotou. */
+  const anotar = (g: GastoDoNumero, gravacoes: Gravacao[], acao: "chip" | "outro"): GastoDoNumero[] | null => {
+    if (anotando.current.has(g.id) || gastos.some((x) => x.id === g.id)) return null;
     anotando.current.add(g.id);
-    aplicar(gravacoes);
+    try { aplicar(gravacoes); } catch { anotando.current.delete(g.id); return null; } // a tela nunca derruba o módulo
     const novos = [...gastos, g];
     setGastos(novos);
     guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao, gastos: novos });
     trackEvent(EV_GASTO_NO_NUMERO, { acao, ms: msDesdeOView(), ...(acao === "chip" ? { chip: g.nome } : {}) });
-    return true;
+    return novos;
   };
   const tocarChipDoNumero = (c: ChipDaMissao) => {
     const item = itemDoChip("gasto", c);
@@ -403,16 +419,27 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     anotar({ id: idDoItem(item), nome: item.nome, emoji: c.emoji, valor: item.valor ?? 0 }, gravacoesDoChip(item, c, hoje), "chip");
   };
   const itemDoOutro = normalizarItem({ tipo: "gasto", nome: outroNome, valor: outroValor });
-  const anotarOutro = () => {
-    if (!itemDoOutro) return;
-    if (anotar({ id: idDoItem(itemDoOutro), nome: itemDoOutro.nome, emoji: "🧾", valor: itemDoOutro.valor ?? 0 }, gravacoesDoItem(itemDoOutro, hoje, "conta"), "outro")) {
-      setAbrirOutro(false);
-      setOutroNome("");
-      setOutroValor(0);
-    }
+  const campoDoValor = useRef<HTMLInputElement>(null);
+  const fecharOutro = () => { setAbrirOutro(false); setOutroNome(""); setOutroValor(0); };
+  const anotarOutro = (): GastoDoNumero[] | null => {
+    if (!itemDoOutro) return null;
+    const novos = anotar({ id: idDoItem(itemDoOutro), nome: itemDoOutro.nome, emoji: "🧾", valor: itemDoOutro.valor ?? 0 }, gravacoesDoItem(itemDoOutro, hoje, "conta"), "outro");
+    if (novos) fecharOutro();
+    return novos;
   };
-  /** Saiu da tela do número (o botão ou "Ainda não gastei"): ela não volta mais. */
+  /** "Ver no meu mês →" / "Ver minhas Finanças". Com o "✎ outro" preenchido e o botão grande tocado direto (o
+   *  "Anotar" ficou pra trás — com o teclado aberto, o botão grande fica logo acima dele): anota antes de sair. */
+  const verFinancas = () => {
+    if (saiu.current) return;
+    const lista = abrirOutro && itemDoOutro ? anotarOutro() ?? gastos : gastos;
+    sair(lista.length ? { nome: lista[0].nome } : undefined);
+  };
+  /** Saiu da tela do número (o botão ou "Ainda não gastei"): ela não volta mais. Uma vez só (toque duplo no
+   *  botão não chama o `onPronto` duas vezes). */
+  const saiu = useRef(false);
   const sair = (primeiroGasto?: { nome: string } | null) => {
+    if (saiu.current) return;
+    saiu.current = true;
     fecharTelaDoNumero();
     onPronto?.({
       contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao,
@@ -420,6 +447,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     });
   };
   const aindaNaoGastei = () => {
+    if (saiu.current) return;
     trackEvent(EV_GASTO_NO_NUMERO, { acao: "ainda_nao", ms: msDesdeOView() });
     sair(null);
   };
@@ -644,8 +672,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                 <small>VOCÊ PODE GASTAR HOJE</small>
                 {praHoje ? (
                   <strong data-testid="montar-pra-hoje" data-valor={Math.max(0, sobra)} aria-label={`Era R$ ${reais(resultado.porDia)} por dia; sobram R$ ${reais(Math.max(0, sobra))} pra hoje`}>
-                    <s className="mf-antes" aria-hidden>R$ {reais(resultado.porDia)}</s>
-                    <span aria-hidden>R$ {reais(numeroNaTela)}</span><em aria-hidden>pra hoje</em>
+                    <s className="mf-antes" aria-hidden>{rs(resultado.porDia)}</s>
+                    <span aria-hidden>{rs(numeroNaTela)}</span><em aria-hidden>pra hoje</em>
                   </strong>
                 ) : (
                   <strong data-testid="montar-por-dia">R$ {reais(resultado.porDia)}<em>por dia</em></strong>
@@ -695,16 +723,16 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                     {abrirOutro && (
                       <div className="mf-postit-form" data-testid="montar-outro-gasto">
                         <input className="mf-postit-nome" aria-label="Com o que você gastou" placeholder="Com o quê?" maxLength={40} autoFocus
-                          value={outroNome} onChange={(e) => setOutroNome(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") anotarOutro(); }} />
+                          value={outroNome} onChange={(e) => setOutroNome(e.target.value)} enterKeyHint="next"
+                          onKeyDown={(e) => { if (e.key === "Enter") { if (itemDoOutro) anotarOutro(); else campoDoValor.current?.focus(); } }} />
                         <label className="mf-postit-quanto">
                           <small>R$</small>
-                          <input aria-label="Quanto foi, em reais" inputMode="numeric" enterKeyHint="done" placeholder="0"
+                          <input ref={campoDoValor} aria-label="Quanto foi, em reais" inputMode="numeric" enterKeyHint="done" placeholder="0"
                             value={outroValor ? reais(outroValor) : ""} onChange={(e) => setOutroValor(reaisDigitados(e.target.value))}
                             onKeyDown={(e) => { if (e.key === "Enter") anotarOutro(); }} />
                         </label>
-                        <button type="button" className="mf-postit-anotar" disabled={!itemDoOutro} onClick={anotarOutro}>Anotar</button>
-                        <button type="button" className="mf-postit-fechar" aria-label="Fechar" onClick={() => { setAbrirOutro(false); setOutroNome(""); setOutroValor(0); }}><X size={15} aria-hidden /></button>
+                        <button type="button" className="mf-postit-anotar" disabled={!itemDoOutro} onClick={() => anotarOutro()}>Anotar</button>
+                        <button type="button" className="mf-postit-fechar" aria-label="Fechar" onClick={fecharOutro}><X size={15} aria-hidden /></button>
                       </div>
                     )}
                     {gastos.length === 0 && (
@@ -730,8 +758,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
               <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está tudo nas suas Finanças. Dá pra mudar quando quiser.</p>
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={() => sair(gastos.length ? { nome: gastos[0].nome } : undefined)}>
-                {gastos.length ? "Ver no meu mês →" : "Ver minhas Finanças"}
+              <button type="button" className="mf-cta" onClick={verFinancas}>
+                {gastos.length || (abrirOutro && itemDoOutro) ? "Ver no meu mês →" : "Ver minhas Finanças"}
               </button>
             </div>
           </>

@@ -113,6 +113,8 @@ const ateONumero = async () => {
 };
 const gastosDe = (c: Controle) => ((c.dados()["finance-expenses"] ?? []) as any[]);
 const doNumero = () => eventos.filter(([n]) => n === EV_GASTO_NO_NUMERO).map(([, e]) => e);
+/** O texto como se lê (o "R$" vai preso ao número por um espaço que não quebra: \u00a0). */
+const lido = (el: Element) => (el.textContent ?? "").replace(/\u00a0/g, " ");
 
 beforeAll(() => {
   // "menos movimento": o número cai na hora (a animação não depende da velocidade da máquina)
@@ -180,8 +182,10 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     const numero = screen.getByTestId("montar-pra-hoje");
     expect(numero.getAttribute("data-valor")).toBe("54");
     expect(numero.getAttribute("aria-label")).toBe("Era R$ 66 por dia; sobram R$ 54 pra hoje");
-    expect(numero.textContent).toBe("R$ 66R$ 54pra hoje"); // ~~R$ 66~~ R$ 54 pra hoje (com "menos movimento", na hora)
-    expect(screen.getByTestId("montar-pronto").textContent).toContain("Café · R$ 12 já está nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 54.");
+    // ~~R$ 66~~ R$ 54 pra hoje (com "menos movimento", na hora) — o "R$" nunca fica sozinho no fim da linha
+    expect(numero.textContent).toBe("R$\u00a066R$\u00a054pra hoje");
+    expect(lido(screen.getByTestId("montar-pronto"))).toContain("Café · R$ 12 já está nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 54.");
+    expect(screen.getByTestId("montar-pronto").textContent).toContain("Café · R$\u00a012 já está nas suas Finanças. Era R$\u00a066 por dia — hoje sobram R$\u00a054.");
     expect(postIt().getByText("Primeiro gasto no lugar.")).toBeTruthy();
     expect(postIt().queryByRole("button", { name: /Ainda não gastei/ })).toBeNull();
     expect(doNumero()).toEqual([{ acao: "view", ms: 0 }, { acao: "chip", ms: 0, chip: "Café" }]);
@@ -202,7 +206,7 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     await respirar();
     expect(gastosDe(controle).map((g) => [g.description, g.value])).toEqual([["Café", 12], ["Uber", 23]]);
     expect(screen.getByTestId("montar-pra-hoje").getAttribute("data-valor")).toBe("31");
-    expect(screen.getByTestId("montar-pronto").textContent).toContain("Café e Uber · R$ 35 já estão nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 31.");
+    expect(lido(screen.getByTestId("montar-pronto"))).toContain("Café e Uber · R$ 35 já estão nas suas Finanças. Era R$ 66 por dia — hoje sobram R$ 31.");
     fireEvent.click(tela().getByRole("button", { name: "Ver no meu mês →" }));
     expect(onPronto.mock.calls[0][0].primeiroGasto).toEqual({ nome: "Café" });
   });
@@ -224,6 +228,39 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     expect(postIt().getByLabelText("Padaria, R$ 9, anotado")).toBeTruthy();
     expect(screen.getByTestId("montar-pra-hoje").getAttribute("data-valor")).toBe("57");
     expect(doNumero().map((e) => e.acao)).toEqual(["view", "outro"]);
+  });
+
+  it("✎ outro preenchido e o botão grande tocado direto (sem o 'Anotar'): anota 1 vez e sai com ele como 1º gasto", async () => {
+    const onPronto = vi.fn();
+    const controle = montarTela({ onPronto });
+    await ateONumero();
+    fireEvent.click(postIt().getByRole("button", { name: "✎ outro" }));
+    expect(tela().getByRole("button", { name: "Ver minhas Finanças" })).toBeTruthy(); // vazio: nada a anotar
+    fireEvent.change(postIt().getByLabelText("Com o que você gastou"), { target: { value: "Farmácia" } });
+    fireEvent.change(postIt().getByLabelText("Quanto foi, em reais"), { target: { value: "27" } });
+    const cta = tela().getByRole("button", { name: "Ver no meu mês →" });
+    fireEvent.click(cta);
+    fireEvent.click(cta); // toque duplo
+    await respirar();
+    expect(gastosDe(controle).map((g) => [g.description, g.value, g.category, g.date])).toEqual([["Farmácia", 27, "outros", "2026-10-16"]]);
+    expect(onPronto).toHaveBeenCalledTimes(1);
+    expect(onPronto.mock.calls[0][0].primeiroGasto).toEqual({ nome: "Farmácia" });
+    expect(doNumero().map((e) => e.acao)).toEqual(["view", "outro"]);
+    for (const e of doNumero()) expect(JSON.stringify(e)).not.toMatch(/Farm|27/); // nem o nome digitado nem o valor
+  });
+
+  it("✎ outro: Enter no nome sem valor leva pro campo do valor; o X fecha sem gravar nada", async () => {
+    const controle = montarTela();
+    await ateONumero();
+    fireEvent.click(postIt().getByRole("button", { name: "✎ outro" }));
+    const nome = postIt().getByLabelText("Com o que você gastou");
+    fireEvent.change(nome, { target: { value: "Pão" } });
+    fireEvent.keyDown(nome, { key: "Enter" });
+    expect(document.activeElement).toBe(postIt().getByLabelText("Quanto foi, em reais"));
+    fireEvent.click(postIt().getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByTestId("montar-outro-gasto")).toBeNull();
+    expect(gastosDe(controle)).toEqual([]);
+    expect(tela().getByRole("button", { name: "Ver minhas Finanças" })).toBeTruthy();
   });
 
   it("'Ainda não gastei nada hoje →': sai com primeiroGasto null, nada gravado em gastos", async () => {
@@ -260,7 +297,7 @@ describe("a tela do número com o post-it do 1º gasto (só pela missão)", () =
     fireEvent.click(postIt().getByRole("button", { name: /^Uber,/ })); // + 23 = 58
     await respirar();
     expect(screen.getByTestId("montar-pra-hoje").getAttribute("data-valor")).toBe("0");
-    expect(screen.getByTestId("montar-pronto").textContent).toContain("Era R$ 38 por dia — hoje já passou R$ 20.");
+    expect(lido(screen.getByTestId("montar-pronto"))).toContain("Era R$ 38 por dia — hoje já passou R$ 20.");
     expect(sobraPraHoje(37.5, 58)).toBe(-20);
   });
 
@@ -380,7 +417,7 @@ describe("no módulo de verdade (a missão por cima de Finanças)", () => {
     expect(screen.getAllByText("Café").length).toBeGreaterThan(0); // CUSTOS VARIÁVEIS de hoje
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
-    expect(screen.getByTestId("sobram-pra-hoje").textContent).toBe("Sobram R$ 54 pra hoje · já saiu R$ 12 dos R$ 66 do dia");
+    expect(lido(screen.getByTestId("sobram-pra-hoje"))).toBe("Sobram R$ 54 pra hoje · já saiu R$ 12 dos R$ 66 do dia");
     expect(gastosDe(controle)).toHaveLength(1);
   });
 });

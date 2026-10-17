@@ -13,6 +13,7 @@ import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
 import { guardarForcaDesafiosRodizio } from "@/lib/desafios-rodizio";
+import { guardarForcaMedicaoTotal, instalarMedicaoTotal } from "@/lib/medicao-total";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -30,6 +31,10 @@ guardarForcaDaAvaliacaoV14();
 guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)
 guardarForcaDesafiosRodizio(); // `?desafios-rodizio=on|off|auto`: o rodízio dos desafios da semana neste navegador (QA)
 guardarForcaDasOfertas(); // `?ofertas-saida=…` em qualquer rota: o paywall enxuto mora no gate e no /planos, não só no funil
+// 1.0.16 — medição total: os toques das telas do app contados em memória e enviados num `uso_resumo` por
+// sessão (segundo plano/fechar). Chave remota `medicao_total`; `?medicao-total=on|off|auto` no navegador (QA).
+guardarForcaMedicaoTotal();
+instalarMedicaoTotal();
 
 // Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO
 // (o Recharts exige, e o throw sobe até o RouteErrorBoundary). Instala antes

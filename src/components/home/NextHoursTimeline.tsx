@@ -13,6 +13,7 @@ import {
 } from "@/lib/home-pendencias";
 import { PersonalizarPendencias } from "@/components/home/PersonalizarPendencias";
 import { EVENTO_PENDENCIAS_ABRIR } from "@/lib/tour-home";
+import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -292,6 +293,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const { get, set } = useUserData();
   const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date(), normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
   const prefs: PendenciasPrefs = data.pendenciasPrefs ?? PREFS_PADRAO;
+  // 1.0.16 (braço A): a dose de hoje da missão — uma linha na lista, fora do score
+  const dose = useDoseDeHoje();
+  const totalPendentes = pending.length + (dose ? 1 : 0);
   const gravar = (p: PendenciasPrefs) => { set(CHAVE_PENDENCIAS_PREFS, p); setMenuAberto(null); };
   // 10/10 — o tour da Home pede pra lista abrir (acende o "⋯"); sem o evento, nada muda
   useEffect(() => {
@@ -305,7 +309,8 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
     <div>
       <div className="w-full flex items-center justify-between mb-2.5 gap-2">
         <button
-          onClick={() => { if (!isOpen) trackEvent("home_pendencias_abrir", { pendentes: pending.length }); setIsOpen(!isOpen); }}
+          onClick={() => { if (!isOpen) trackEvent("home_pendencias_abrir", { pendentes: totalPendentes }); setIsOpen(!isOpen); }}
+          data-track="pendencias-abrir"
           className="flex-1 flex items-center justify-between"
         >
           <div className="flex items-center gap-1.5">
@@ -315,9 +320,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            {pending.length > 0 && (
+            {totalPendentes > 0 && (
               <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                {pending.length} pendente{pending.length > 1 ? "s" : ""}
+                {totalPendentes} pendente{totalPendentes > 1 ? "s" : ""}
               </span>
             )}
             <ChevronDown
@@ -337,6 +342,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
         </button>
       </div>
 
+      {/* 1.0.16 (braço A): a dose de hoje fica à vista mesmo com a lista fechada — é a ÚNICA presença da missão
+          na Home (nenhum card novo); aberta, ela é a 1ª linha da lista */}
+      {dose && !isOpen && <LinhaDoseDeHoje dose={dose} />}
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div
@@ -347,6 +355,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
             className="overflow-hidden"
           >
             <div className="space-y-1.5">
+              {dose && <LinhaDoseDeHoje dose={dose} />}
               {pending.map((item, i) => (
                 <motion.div
                   key={`p-${item.tipo ?? i}`}
@@ -364,6 +373,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                         else if (item.route) navigate(item.route);
                       }}
                       data-testid="pendencia"
+                      data-track={`pendencia:${item.tipo ?? "compromisso"}`}
                       className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-all text-left group"
                     >
                       <span className="text-sm">{item.emoji}</span>
@@ -380,6 +390,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                         aria-label={`Opções de ${nomeDoTipo(item.tipo)}`}
                         aria-expanded={menuAberto === item.tipo}
                         data-testid={`opcoes-${item.tipo}`}
+                        data-track={`pendencia-opcoes:${item.tipo}`}
                         className="shrink-0 w-8 self-stretch flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors"
                       >
                         <MoreHorizontal className="w-3.5 h-3.5" />
@@ -438,6 +449,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                   type="button"
                   onClick={() => { trackEvent("home_pendencia", { tipo: "aviso_treino", destino: "/treino" }); navigate("/treino"); }}
                   data-testid="aviso-treino"
+                  data-track="pendencia:aviso_treino"
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-border bg-muted/30 text-left"
                 >
                   <span className="text-sm">🏋️</span>
@@ -450,6 +462,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                   type="button"
                   onClick={() => { trackEvent("home_pendencia", { tipo: "aviso_conta", destino: "/financas" }); navigate("/financas"); }}
                   data-testid="aviso-conta"
+                  data-track="pendencia:aviso_conta"
                   className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-amber-300/70 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 text-left"
                 >
                   <span className="text-sm">📅</span>
@@ -483,6 +496,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                   type="button"
                   onClick={() => setPersonalizar(true)}
                   data-testid="ocultos-resumo"
+                  data-track="pendencias-ocultos"
                   className="w-full text-center text-[10px] text-muted-foreground py-1"
                 >
                   {prefs.ocultos.length} {prefs.ocultos.length === 1 ? "tipo oculto" : "tipos ocultos"} · personalizar

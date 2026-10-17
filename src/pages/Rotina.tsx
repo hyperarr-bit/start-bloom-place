@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { alternarHabitoNoDia, marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,6 +36,11 @@ import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
+import { useMontarRotinaNoModulo, useVigiaDoPrimeiroMarcado } from "@/components/rotina/montar/use-montar-rotina";
+
+/* 1.0.16 — "Rotina pronta em 3 toques" (components/rotina/montar). Só desce se o caminho do módulo for
+   religado (MONTAR_ROTINA_NO_MODULO, hoje false): o quiz é da missão, não da 1ª abertura da Rotina. */
+const MontarRotinaNoModulo = lazy(() => import("@/components/rotina/montar/MontarRotina").then((m) => ({ default: m.MontarRotina })));
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 
@@ -1212,6 +1217,11 @@ const Rotina = () => {
   useSetTrackedTab(activeTab);
   const fasesUsadas = useFasesEmUso();
   const currentMonth = mesAtualExtenso();
+  /* 1.0.16 — "Rotina pronta em 3 toques". Dono, 17/10: o quiz NÃO abre por entrar na Rotina — só pela missão
+     (dose 1 de quem escolheu Rotina). Aqui: o vigia do 1º quadradinho marcado depois do guia (evento
+     montar_rotina_primeiro_marcado, uma vez) e o caminho do módulo, fechado (estado sempre "nao"). */
+  useVigiaDoPrimeiroMarcado();
+  const montarNoModulo = useMontarRotinaNoModulo();
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);
@@ -1348,6 +1358,12 @@ const Rotina = () => {
   return (
     <div className="min-h-screen bg-background">
       {RotinaCompletionDialog}
+      {montarNoModulo.estado === "decidindo" && <div className="fixed inset-0 z-[200] bg-background" aria-hidden />}
+      {montarNoModulo.estado === "mostrar" && (
+        <Suspense fallback={<div className="fixed inset-0 z-[200] bg-background" aria-hidden />}>
+          <MontarRotinaNoModulo origem="modulo" onPronto={montarNoModulo.aoPronto} onPular={montarNoModulo.aoPular} onCeder={montarNoModulo.aoCeder} />
+        </Suspense>
+      )}
       <SpotlightOverlay
         moduleKey="rotina"
         onComplete={onRotinaComplete}

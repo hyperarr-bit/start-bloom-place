@@ -25,9 +25,10 @@
  * lib/v14-qa), que liga as três.
  */
 import { isNativeShell } from "@/lib/native-shell";
-import { contaNova, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
+import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { v14Ligada } from "@/lib/v14-qa";
+import { modoTourHomeRemoto } from "@/lib/dia1-cheio";
 
 export type ModoChave = "off" | "on";
 /** Cartões de boas-vindas (Finanças e Beleza). ROLLBACK/LIGAR = trocar aqui. */
@@ -131,19 +132,64 @@ export const marcarCartoesVistos = (moduleId: string): void => ls.set(chaveCarto
  * (hook useTourDaHome em components/home/TourDaHome): o fluxo esperado é missão
  * (3 doses) → plano de amanhã → tour da Home → festa "Casa arrumada".
  */
+/**
+ * 1.0.16 (desenho 8 seção 7c) — QUAL tour: metadata `tour_home` ("curto" | "longo" | "off") manda; sem ela,
+ * segue o braço da missão: A (uma dose por dia) = o CURTO de 3 passos "faz isso", logo depois da dose 1;
+ * B / sem braço = o LONGO de 5 passos de hoje, depois das 3 doses. null = nenhum tour.
+ */
+export type VarianteDoTour = "curto" | "longo";
+export function varianteDoTour(m = lerMissao()): VarianteDoTour | null {
+  const r = modoTourHomeRemoto();
+  if (r === "off") return null;
+  if (r) return r;
+  return ehUmPorDia(m) ? "curto" : "longo";
+}
+
 export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: number = Date.now()): boolean {
   if (!tourHomeLigado()) return false;
+  if (!varianteDoTour()) return false;
   if (tourFeitoNesteAparelho()) return false;
+  if (tourSemMaisAberturas()) return false;
   if (!tourForcadoPorQa() && !contaNova(criadoEm, agora)) return false;
   // 10/10: a trava do teste grátis era da Missão de 3 dias do iPhone (1.0.8). Com a missão em doses ligada o
   // tour É o 4º passo da missão — e quase toda conta nova do iPhone está em teste grátis: sem isto ninguém via o tour.
   try { if (!missaoDosesLigada() && trialCartaoAtivo()) return false; } catch { /* sem storage */ }
   if (missaoDosesLigada()) {
     const m = lerMissao();
-    if (m && !m.explorou && (missaoEmAndamento(m) || !missaoCumprida(m))) return false;
+    // 1.0.16, braço A (uma dose por dia): a missão leva 3 dias — o tour não espera ela acabar, só a tela de hoje
+    // (a dose do dia 1 + "amanhã · te lembro às…"; num dia novo, o convite do dia). B e a 1.0.10: como sempre.
+    if (m && !m.explorou && (missaoEmAndamento(m) || (!missaoCumprida(m) && !ehUmPorDia(m)))) return false;
+    // 1.0.16, braço A: quem tocou "Explorar por conta própria" vê o tour curto na 1ª VOLTA à Home, não no
+    // mesmo segundo (desenho 8, 7c) — a missão marca `saiuDaHome` quando ela abre outra tela
+    if (m && m.explorou && ehUmPorDia(m) && !m.saiuDaHome) return false;
   }
   return true;
 }
+
+/**
+ * 1.0.16 — FECHOU O APP NO MEIO DO TOUR: ele volta, mas no máximo em 2 aberturas (a mesma régua do "Vamos montar
+ * suas Finanças"): a 2ª vez que aparece sem chegar ao fim é a última. Conta 1 por abertura do app, quando o tour
+ * APARECE de verdade (o `home_tour_visto`). Chave do aparelho (chaves-do-aparelho.ts).
+ */
+export const CHAVE_TOUR_VISTAS = "core-home-tour-vistas";
+export const MAX_ABERTURAS_DO_TOUR = 2;
+let tourVistoNestaAbertura = false;
+export function registrarTourVisto(): void {
+  if (tourVistoNestaAbertura) return;
+  tourVistoNestaAbertura = true;
+  ls.set(CHAVE_TOUR_VISTAS, String((Number(ls.get(CHAVE_TOUR_VISTAS)) || 0) + 1));
+}
+/** O tour já apareceu nas aberturas que tinha (e não nesta): não volta mais. */
+export const tourSemMaisAberturas = (): boolean => !tourVistoNestaAbertura && (Number(ls.get(CHAVE_TOUR_VISTAS)) || 0) >= MAX_ABERTURAS_DO_TOUR;
+/** Só testes: simula fechar e abrir o app de novo. */
+export const _novaAberturaDoTour = (): void => { tourVistoNestaAbertura = false; };
+
+/** O tour já foi feito — neste aparelho OU na conta (`core-home-tour-done` sobe pro user_data: reinstalar ou
+ *  trocar de aparelho não repete o tour; desenho 8, 4.8). `get` é o do useUserData. */
+export const tourFeito = (get?: <T>(k: string, f: T) => T): boolean => {
+  if (tourFeitoNesteAparelho()) return true;
+  try { return !!get?.(CHAVE_TOUR_FEITO, null); } catch { return false; }
+};
 
 /* ------------------------------------------------------------ eventos entre as peças da Home */
 

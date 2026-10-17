@@ -44,6 +44,7 @@ export const WidgetPicker = ({ open, onOpenChange, activeWidgets, onToggle, onTo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        data-folha="widgets-escolher"
         className="w-[calc(100%-2rem)] max-w-[380px] rounded-[28px] border-0 p-0 gap-0
                    shadow-[0_24px_70px_-12px_rgba(0,0,0,0.45)] overflow-hidden"
       >
@@ -72,6 +73,7 @@ export const WidgetPicker = ({ open, onOpenChange, activeWidgets, onToggle, onTo
                       <motion.button
                         key={widget.id}
                         onClick={() => onToggle(widget.id)}
+                        data-track={`widget-escolher:${widget.id}`}
                         whileTap={{ scale: 0.96 }}
                         aria-pressed={isActive}
                         className={`relative text-left rounded-[20px] border p-3 transition-colors ${
@@ -131,6 +133,7 @@ export const WidgetPicker = ({ open, onOpenChange, activeWidgets, onToggle, onTo
                               <span
                                 key={rotulo}
                                 role="button"
+                                data-track={`widget-tamanho:${rotulo}`}
                                 tabIndex={0}
                                 aria-pressed={grande === querGrande}
                                 onClick={() => { if (grande !== querGrande) onToggleSize(widget.id); }}

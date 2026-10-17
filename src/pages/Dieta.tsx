@@ -763,6 +763,7 @@ const Dieta = () => {
             <button
               key={tab.id}
               onClick={() => { salvarEdicaoAberta(); setEditingMeal(null); setActiveTab(tab.id); reportTab?.(tab.id); }}
+              data-track={`tab-${tab.id}`}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
               <span>{tab.icon}</span>

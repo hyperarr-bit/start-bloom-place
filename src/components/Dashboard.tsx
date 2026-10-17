@@ -1,13 +1,16 @@
 import { LembreteDoLimite } from "@/components/finance/LembreteDoLimite";
 import { reais } from "@/lib/dinheiro";
 import { usePaletaGrafico } from "@/lib/paleta-grafico";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { trackEvent } from "@/lib/analytics";
+import { EV_MAIS_GRAFICOS } from "@/lib/financas-painel-limpo";
+import { sobraPraHoje } from "@/lib/montar-financas";
 import { localDayKey } from "@/lib/utils";
 // Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
 const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
 const GraficoReceitasDespesas = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoReceitasDespesas })));
 const GraficoPatrimonio = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoPatrimonio })));
-import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet, ChevronDown } from "lucide-react";
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
@@ -65,7 +68,49 @@ interface DashboardProps {
   onNavigate?: (tab: string) => void;
   /** Perfil ativo (PF/PJ): sem ele o gráfico anual não recalculava ao trocar o chip (13/09). */
   perfil?: string;
+  /**
+   * 1.0.16 — PAINEL LIMPO (conta nova; régua e chave em lib/financas-painel-limpo). No topo: Quanto
+   * posso gastar hoje → Alertas → `meuMes` → Gastos por categoria → `totalPorCartao` → `depoisDoTopo`
+   * (o Desafio da semana); todo o resto (números, receitas × despesas, previsão, patrimônio,
+   * progresso, método, fixos × variáveis, top 5, últimas, + `maisGraficos`) vai pro "Mais gráficos"
+   * lá embaixo, fechado. Nada some. Sem `limpo`, o painel é o de sempre, na mesma ordem.
+   */
+  limpo?: boolean;
+  meuMes?: ReactNode;
+  totalPorCartao?: ReactNode;
+  depoisDoTopo?: ReactNode;
+  maisGraficos?: ReactNode;
+  /** Só no painel limpo (17/10): o que ela gastou HOJE (variáveis que contam neste mês) — vira a linha
+   *  "Sobram R$ X pra hoje" no QUANTO POSSO GASTAR HOJE (o que dava no começo do dia − o de hoje). */
+  gastoDeHoje?: number;
 }
+
+/** "Mais gráficos" (painel limpo): fechado toda vez que a tela abre; abrir manda
+ *  `financas_mais_graficos_abrir`. Os cards de dentro ficam FORA da caixa do botão (irmãos dela),
+ *  senão a medição por card (lib/medicao-cards) os veria como um card só. */
+const MaisGraficos = ({ children }: { children: ReactNode }) => {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className="space-y-4">
+      <button
+        type="button"
+        aria-expanded={aberto}
+        aria-controls="financas-mais-graficos"
+        onClick={() => { if (!aberto) trackEvent(EV_MAIS_GRAFICOS, {}); setAberto(!aberto); }}
+        className="w-full bg-card rounded-lg border border-border px-4 py-3 flex items-center gap-3 text-left"
+      >
+        <span className="flex-1 min-w-0">
+          <span className="block text-xs font-bold">📈 MAIS GRÁFICOS</span>
+          <span className="block text-[11px] text-muted-foreground mt-0.5">
+            {aberto ? "Toque pra esconder" : "Previsão do fim do mês, patrimônio, comparações e mais"}
+          </span>
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`} />
+      </button>
+      {aberto && <div id="financas-mais-graficos" className="space-y-4" data-testid="mais-graficos">{children}</div>}
+    </div>
+  );
+};
 
 // 17/09: a paleta agora depende do tema — ver src/lib/paleta-grafico.ts (usePaletaGrafico dentro do componente)
 
@@ -145,6 +190,12 @@ export const Dashboard = ({
   monthlyInstallments = 0,
   onNavigate,
   perfil,
+  limpo = false,
+  meuMes,
+  totalPorCartao,
+  depoisDoTopo,
+  maisGraficos,
+  gastoDeHoje,
 }: DashboardProps) => {
   const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
   const { user } = useAuth();
@@ -283,11 +334,15 @@ export const Dashboard = ({
       const billsArr = Array.isArray(d?.bills) ? d.bills : [];
       const unpaidBills = billsArr.filter((b) => !b?.paid);
       if (unpaidBills.length === 0) return;
-      if (d.day < today) {
+      // "dia 31" num mês de 30 dias vence no dia 30 — como o MEU MÊS mostra e o aviso de véspera
+      // agenda (16/10: a fatura do Montar aceita vencimento 29–31; antes dizia "amanhã" no dia 30)
+      const dia = Math.min(Number(d.day), daysInMonth);
+      if (!Number.isFinite(dia)) return;
+      if (dia < today) {
         unpaidBills.forEach((b) => overdueNames.push(b.name));
         return;
       }
-      const daysUntilDue = d.day - today;
+      const daysUntilDue = dia - today;
       if (daysUntilDue > 5) return;
       const names = unpaidBills.map((b) => b.name).join(", ");
       // "conta(s) vencem" é jeito de programador escrever. Alerta de dinheiro
@@ -390,6 +445,18 @@ export const Dashboard = ({
     return { ...base, status, fixedCostsRecorded };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
+  /* "SOBRAM R$ X PRA HOJE" — só no painel limpo (conta nova; o dono decide depois pra todo mundo). O
+     número grande refaz a média do mês com o gasto de hoje dentro (R$ 66 → 65 por um café: ninguém
+     sente); esta linha é o que dava por dia NO COMEÇO de hoje menos o que ela já gastou hoje (70 − 12 =
+     58) — a mesma conta da tela do Montar (lib/montar-financas `sobraPraHoje`). */
+  const praHoje = useMemo(() => {
+    if (!limpo || typeof gastoDeHoje !== "number") return null;
+    const inicio = computeDailyBudget(totalIncome, totalExpenses - gastoDeHoje, dueDays, fixedExpenses);
+    if (inicio.cantSpend) return null;
+    const doDia = Math.round(inicio.perDay);
+    return { doDia, sobra: sobraPraHoje(doDia, gastoDeHoje), gasto: gastoDeHoje };
+  }, [limpo, gastoDeHoje, totalIncome, totalExpenses, dueDays, fixedExpenses]);
+
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {
     const all = [
@@ -435,8 +502,10 @@ export const Dashboard = ({
     return "bg-green-400";
   };
 
-  return (
-    <div className="space-y-4">
+  /* 1.0.16 — os blocos do painel com nome, pra o PAINEL LIMPO (conta nova, lib/financas-painel-limpo)
+     poder reordenar. Sem `limpo`, a ordem e o DOM são exatamente os de antes. */
+  const blocoNumeros = (
+    <>
       {/* Quick Stats Row
           O valor NÃO pode quebrar em duas linhas: "R$" numa linha e o número
           na outra parece card estourado. Cabia num iPhone (430px de largura em
@@ -483,7 +552,10 @@ export const Dashboard = ({
           </div>
         </div>
       </div>
-
+    </>
+  );
+  const blocoAlertas = (
+    <>
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">
@@ -514,10 +586,10 @@ export const Dashboard = ({
           </div>
         </div>
       )}
-
-
-      {/* Charts Grid */}
-      <div className="grid lg:grid-cols-2 gap-4">
+    </>
+  );
+  const blocoCategorias = (
+    <>
         {/* Expense Pie Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
           <h3 className="text-xs font-bold mb-3">📊 GASTOS POR CATEGORIA</h3>
@@ -540,7 +612,10 @@ export const Dashboard = ({
             <p className="text-sm text-muted-foreground text-center py-8">Sem despesas cadastradas</p>
           )}
         </div>
-
+    </>
+  );
+  const blocoReceitasDespesas = (
+    <>
         {/* Monthly Bar Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
           <h3 className="text-xs font-bold mb-3">📈 RECEITAS VS DESPESAS</h3>
@@ -552,8 +627,10 @@ export const Dashboard = ({
             <p className="text-sm text-muted-foreground text-center py-8">Preencha o orçamento anual para ver o gráfico</p>
           )}
         </div>
-      </div>
-
+    </>
+  );
+  const blocoPatrimonio = (
+    <>
       {/* Patrimony Evolution */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">💰 EVOLUÇÃO DO PATRIMÔNIO</h3>
@@ -565,7 +642,10 @@ export const Dashboard = ({
           <p className="text-sm text-muted-foreground text-center py-8">Dados insuficientes</p>
         )}
       </div>
-
+    </>
+  );
+  const blocoProgresso = (
+    <>
       {/* Month Progress */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">⏳ PROGRESSO DO MÊS</h3>
@@ -589,7 +669,10 @@ export const Dashboard = ({
           </div>
         </div>
       </div>
-
+    </>
+  );
+  const blocoMetodo = (
+    <>
       {/* Payment Method */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">💳 GASTO POR MÉTODO</h3>
@@ -622,7 +705,10 @@ export const Dashboard = ({
           <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
         )}
       </div>
-
+    </>
+  );
+  const blocoFixosVariaveis = (
+    <>
       {/* Fixed vs Variable */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">⚖️ FIXOS VS VARIÁVEIS</h3>
@@ -653,7 +739,10 @@ export const Dashboard = ({
           </div>
         )}
       </div>
-
+    </>
+  );
+  const blocoTop5 = (
+    <>
       {/* Top 5 Maiores Gastos */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
@@ -687,7 +776,10 @@ export const Dashboard = ({
           <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
         )}
       </div>
-
+    </>
+  );
+  const blocoUltimas = (
+    <>
       {/* Últimas Transações */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">🧾 ÚLTIMAS TRANSAÇÕES</h3>
@@ -718,9 +810,10 @@ export const Dashboard = ({
           <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
         )}
       </div>
-
-      {/* Forecast + Daily Budget */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    </>
+  );
+  const blocoPrevisao = (
+    <>
         {/* Previsão de Saldo */}
         <div className={`rounded-lg border p-4 ${forecast.projectedBalance >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
           <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
@@ -775,9 +868,35 @@ export const Dashboard = ({
             </div>
           </div>
         </div>
-
-        {/* Quanto Posso Gastar Hoje — data-missao: o "olha" da intro do módulo (lib/intro-modulo) mira ESTE card */}
-        <div data-missao="posso-gastar" className={`rounded-lg border p-4 ${
+    </>
+  );
+  /* Painel limpo, conta sem nada lançado (pulou o Montar): o card não pode abrir dizendo "Você não
+     pode gastar" pra quem ainda não contou quanto ganha — mostra o caminho. O de sempre não muda. */
+  const semNadaAinda = limpo && totalIncome <= 0 && totalExpenses <= 0;
+  const blocoPodeGastar = semNadaAinda ? (
+    <div className="bg-card rounded-lg border border-border p-4" data-testid="pode-gastar-vazio">
+      <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+        <Wallet className="w-4 h-4" />
+        QUANTO POSSO GASTAR HOJE
+      </h3>
+      <p className="text-sm text-muted-foreground leading-snug">
+        Anota quanto entra no mês e suas contas fixas — aqui aparece quanto dá pra gastar por dia.
+      </p>
+      {onNavigate && (
+        <button
+          type="button"
+          onClick={() => onNavigate("financeiro")}
+          className="mt-3 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1"
+        >
+          Anotar minha renda <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  ) : (
+    <>
+        {/* Quanto Posso Gastar Hoje — `data-spotlight` é a âncora do "olha" da dose de Finanças da missão (1.0.16);
+            `data-missao`, o do "olha" da intro do módulo (lib/intro-modulo) */}
+        <div data-spotlight="pode-gastar" data-missao="posso-gastar" className={`rounded-lg border p-4 ${
           dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
           dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
           "bg-red-500/5 border-red-500/20"
@@ -795,12 +914,24 @@ export const Dashboard = ({
               </p>
             </>
           ) : (
-            <p className={`text-2xl font-bold tabular-nums ${
+            <p data-testid="pode-gastar-valor" className={`text-2xl font-bold tabular-nums ${
               dailyBudget.status === "good" ? "text-green-400" :
               dailyBudget.status === "warning" ? "text-orange-400" :
               "text-red-400"
             }`}>
               R$ {reais(Math.round(dailyBudget.perDay))}
+            </p>
+          )}
+          {praHoje && (
+            <p className="text-xs mt-1" data-testid="sobram-pra-hoje">
+              <span className="font-semibold">
+                {praHoje.sobra >= 0
+                  ? <>Sobram <span className="tabular-nums whitespace-nowrap">R$ {reais(praHoje.sobra)}</span> pra hoje</>
+                  : <>Hoje já passou <span className="tabular-nums whitespace-nowrap">R$ {reais(-praHoje.sobra)}</span> do que dava</>}
+              </span>
+              <span className="text-muted-foreground">
+                {praHoje.gasto > 0 ? ` · já saiu R$\u00a0${reais(praHoje.gasto)} dos R$\u00a0${reais(praHoje.doDia)} do dia` : " · nada gasto hoje ainda"}
+              </span>
             </p>
           )}
           <p className="text-[10px] text-muted-foreground mt-1">
@@ -851,6 +982,53 @@ export const Dashboard = ({
             </p>
           )}
         </div>
+    </>
+  );
+
+  if (limpo) {
+    return (
+      <div className="space-y-4" data-painel="limpo">
+        {blocoPodeGastar}
+        {blocoAlertas}
+        {meuMes}
+        {blocoCategorias}
+        {totalPorCartao}
+        {depoisDoTopo}
+        <MaisGraficos>
+          {blocoNumeros}
+          <div className="grid lg:grid-cols-2 gap-4">
+            {blocoReceitasDespesas}
+            {blocoPrevisao}
+          </div>
+          {blocoPatrimonio}
+          {blocoProgresso}
+          {blocoMetodo}
+          {blocoFixosVariaveis}
+          {blocoTop5}
+          {blocoUltimas}
+          {maisGraficos}
+        </MaisGraficos>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {blocoNumeros}
+      {blocoAlertas}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {blocoCategorias}
+        {blocoReceitasDespesas}
+      </div>
+      {blocoPatrimonio}
+      {blocoProgresso}
+      {blocoMetodo}
+      {blocoFixosVariaveis}
+      {blocoTop5}
+      {blocoUltimas}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {blocoPrevisao}
+        {blocoPodeGastar}
       </div>
     </div>
   );

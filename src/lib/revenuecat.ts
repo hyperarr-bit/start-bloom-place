@@ -39,18 +39,36 @@ import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
+import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
+import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
+import { registrarChavePainelLimpo } from "@/lib/financas-painel-limpo";
 import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
 import { registrarIntroRemota } from "@/lib/intro-modulo";
+import { registrarChaveMontarRotina } from "@/lib/montar-rotina";
 import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
+import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
- *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`)
- *  e o rodízio dos desafios da semana (17/10, `desafios_rodizio`). */
+ *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
+ *  rodízio dos desafios da semana (17/10, `desafios_rodizio`) e as
+ *  do teste da 1.0.16 — `missao_1_por_dia` (ab|on|off) + `tour_home` (curto|longo|off) em lib/dia1-cheio,
+ *  `montar_financas` (on|off), `financas_painel_limpo` (on|off), `montar_rotina` (on|off) e a medição total (`medicao_total`,
+ *  on|off, lib/medicao-total). Cada uma isolada: uma metadata estranha nunca derruba as outras. */
 const registrarChavesDasOfferings = (offerings: unknown): void => {
-  registrarChavesRemotas(offerings);
-  registrarChaveRemotaConquistas2(offerings);
-  registrarIntroRemota(offerings);
-  registrarDesafiosRodizioRemoto(offerings);
+  const cada: Array<(o: unknown) => void> = [
+    registrarChavesRemotas,
+    registrarChaveRemotaConquistas2,
+    registrarIntroRemota,
+    registrarDesafiosRodizioRemoto,
+    registrarUmPorDiaRemoto,
+    registrarChaveMontarFinancas,
+    registrarChavePainelLimpo,
+    registrarChaveMontarRotina,
+    registrarMedicaoTotalRemota,
+  ];
+  for (const f of cada) {
+    try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }
+  }
 };
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";

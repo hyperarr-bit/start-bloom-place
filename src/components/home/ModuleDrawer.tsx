@@ -64,6 +64,7 @@ export const ModuleDrawer = () => {
               <div className="absolute -top-1 -right-1 z-10 flex gap-0.5">
                 <button
                   onClick={() => toggleFavorite(m.id)}
+                  data-track="modulo-favoritar"
                   className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
                     isFavorite(m.id) ? "bg-yellow-400 text-white" : "bg-card border border-border text-muted-foreground"
                   }`}
@@ -72,6 +73,7 @@ export const ModuleDrawer = () => {
                 </button>
                 <button
                   onClick={() => toggleHidden(m.id)}
+                  data-track={`modulo-ocultar:${m.id}`}
                   aria-label={isHidden(m.id) ? `Mostrar ${m.label}` : `Esconder ${m.label}`}
                   className={`w-5 h-5 rounded-full flex items-center justify-center ${
                     isHidden(m.id) ? "bg-destructive text-white" : "bg-card border border-border text-muted-foreground"
@@ -88,6 +90,7 @@ export const ModuleDrawer = () => {
                 trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) });
                 navigate(m.path);
               }}
+              data-track={`modulo:${m.id}`}
               className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl hover:bg-muted/50 transition-colors"
             >
               <div className={`w-10 h-10 rounded-xl ${m.color} flex items-center justify-center relative`}>
@@ -104,6 +107,7 @@ export const ModuleDrawer = () => {
               <div className="flex justify-center gap-1 -mt-1 pb-1">
                 <button
                   onClick={() => moveModule(m.id, -1, idsOrdenados)}
+                  data-track="modulo-mover-frente"
                   disabled={i === 0}
                   aria-label={`Mover ${m.label} pra frente`}
                   className="w-6 h-6 rounded-full bg-card border border-border text-muted-foreground flex items-center justify-center disabled:opacity-30"
@@ -112,6 +116,7 @@ export const ModuleDrawer = () => {
                 </button>
                 <button
                   onClick={() => moveModule(m.id, 1, idsOrdenados)}
+                  data-track="modulo-mover-tras"
                   disabled={i === visible.length - 1}
                   aria-label={`Mover ${m.label} pra trás`}
                   className="w-6 h-6 rounded-full bg-card border border-border text-muted-foreground flex items-center justify-center disabled:opacity-30"
@@ -127,6 +132,7 @@ export const ModuleDrawer = () => {
       {hiddenCount > 0 && !editMode && (
         <button
           onClick={() => { trackEvent("home_modulos_editar", { origem: "ocultos", ocultos: hiddenCount }); setEditMode(true); }}
+          data-track="modulos-ocultos-editar"
           className="w-full text-center mt-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
         >
           +{hiddenCount} oculto{hiddenCount > 1 ? "s" : ""} · Editar

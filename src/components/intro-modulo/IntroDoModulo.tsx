@@ -60,6 +60,19 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   /** o montar do módulo acabou de terminar com "pronto" (a intro guiada muda o pedido) */
   const depoisDoMontar = useRef(false);
   const montar = config?.montar;
+  /* 17/10 (achado na missão 1.0.16, no app de verdade): o SpotlightOverlay antigo de cada módulo marca
+   * `spotlight-done-<módulo>` pra QUALQUER conta logada na 1ª abertura do módulo — e o efeito dele roda ANTES do
+   * desta porta (ele vem antes na árvore). Lido depois, isso virava "módulo já apresentado" e a intro NUNCA aparecia
+   * pra conta nova logada (Casa, Saúde, Rotina…). O "tutorial antigo" vale pelo que estava gravado ANTES desta
+   * abertura: a leitura fica congelada no 1º render com a conta carregada (antes de qualquer efeito). E se a intro já
+   * APARECEU neste aparelho (fechou o app no meio), a marca veio dessa visita: não conta (a intro volta 1 vez). */
+  const chaveDoTutorial = `spotlight-done-${moduleId}`;
+  const tutorialAntes = useRef<{ v: unknown } | null>(null);
+  if (loaded && tutorialAntes.current === null) {
+    try { tutorialAntes.current = { v: introAbertaNesteAparelho(moduleId) ? "" : get<unknown>(chaveDoTutorial, "") }; } catch { tutorialAntes.current = { v: "" }; }
+  }
+  const leitorDaDecisao: Leitor = <T,>(k: string, f: T): T =>
+    (k === chaveDoTutorial && tutorialAntes.current ? ((tutorialAntes.current.v ?? f) as T) : getRef.current(k, f));
 
   useEffect(() => {
     if (!loaded || estado !== "decidindo") return;
@@ -76,7 +89,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
       return () => { window.removeEventListener(montar.evento, ouvirFim); obs?.disconnect(); };
     }
     const outraGuia = outraGuiaAtiva(moduleId, getRef.current);
-    if (porQueNaoMostrar(moduleId, getRef.current, { outraGuiaAtiva: outraGuia }) !== null) { setEstado("nada"); return; }
+    if (porQueNaoMostrar(moduleId, leitorDaDecisao, { outraGuiaAtiva: outraGuia }) !== null) { setEstado("nada"); return; }
     if (!abertaTratada.current) {
       abertaTratada.current = true;
       if (introAbertaNesteAparelho(moduleId)) marcarIntroVista(moduleId, getRef.current, setRef.current, "pulada"); // 2ª aparição: a última

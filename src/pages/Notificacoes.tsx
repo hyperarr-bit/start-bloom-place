@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Wallet, Wrench } from "lucide-react";
+import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Sunrise, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -14,6 +14,7 @@ import { CHAVE_LEMBRETE_SKINCARE, algumLigado, lerLembreteSkincare } from "@/lib
 import { CHAVE_LEMBRETE_CABELO, lembreteCabeloLigado, lerLembreteCabelo } from "@/lib/beleza-cabelo";
 import { CHAVE_CUIDADOS, algumAvisoDeCuidado, cuidadosValidos } from "@/lib/beleza-cuidados";
 import { CHAVE_LEMBRETE_VALIDADE, lerLembreteValidade } from "@/lib/beleza-produtos";
+import { CHAVE_LEMBRETE_ROTINA_MANHA, lerLembreteRotinaManha } from "@/lib/rotina-manha";
 import { trackEvent } from "@/lib/analytics";
 import { CHAVE_LEMBRETE as CHAVE_LEMBRETE_PET } from "@/lib/pet";
 import { algumLigadoPet, lerPrefsLembretePet, type PrefsLembretePet } from "@/lib/pet-avisos";
@@ -262,6 +263,27 @@ const Notificacoes = () => {
     const novo = { manha: { ...skincare.manha, ligado: valor }, noite: { ...skincare.noite, ligado: valor } };
     set(CHAVE_LEMBRETE_SKINCARE, novo);
     const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_SKINCARE ? (novo as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
+  };
+
+  /** Rotina de manhã (17/10, "Rotina pronta em 3 toques"): chave própria. Liga/desliga e muda a hora
+   *  (nasce 15 min depois da hora de acordar respondida na Rotina; sem resposta, 07:15). */
+  const rotinaManha = lerLembreteRotinaManha(get<unknown>(CHAVE_LEMBRETE_ROTINA_MANHA, undefined));
+  const aplicarRotinaManha = async (mudanca: Partial<typeof rotinaManha>, campo: "rotina_manha" | "rotina_manha_hora") => {
+    trackEvent("notif_pref", { campo, valor: campo === "rotina_manha" ? !!mudanca.ligado : true });
+    if (mudanca.ligado && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    const novo = { ...rotinaManha, ...mudanca };
+    set(CHAVE_LEMBRETE_ROTINA_MANHA, novo);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_LEMBRETE_ROTINA_MANHA ? (novo as unknown as typeof fb) : get(k, fb));
     filaRef.current = filaRef.current.then(async () => {
       const { reagendarTudo } = await import("@/lib/reagendar");
       await reagendarTudo(leitor, prefsRef.current);
@@ -595,6 +617,27 @@ const Notificacoes = () => {
         />
 
         <LinhaAviso
+          icone={<Sunrise className="w-4 h-4" />}
+          titulo="Rotina de manhã"
+          descricao={`Todo dia às ${rotinaManha.hora}, com os hábitos do dia. O que você já marcou não entra no aviso.`}
+          ligado={rotinaManha.ligado}
+          onChange={(v) => void aplicarRotinaManha({ ligado: v }, "rotina_manha")}
+          rodape={rodapeDe("rotinaManha", rotinaManha.ligado, "Crie um hábito na Rotina pra ter o que lembrar")}
+          extra={rotinaManha.ligado ? (
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Horário</span>
+              <input
+                type="time"
+                aria-label="Horário do lembrete de manhã"
+                value={rotinaManha.hora}
+                onChange={(e) => { if (/^\d{2}:\d{2}$/.test(e.target.value)) void aplicarRotinaManha({ hora: e.target.value }, "rotina_manha_hora"); }}
+                className="h-10 rounded-full bg-muted px-4 text-[14px] font-semibold tabular-nums text-foreground"
+              />
+            </label>
+          ) : undefined}
+        />
+
+        <LinhaAviso
           icone={<CalendarCheck className="w-4 h-4" />}
           titulo="Fechamento do dia"
           descricao="Um toque à noite pra marcar os hábitos. Se você já marcou, o aviso do dia não vem."
@@ -647,7 +690,7 @@ const Notificacoes = () => {
 };
 
 const LinhaAviso = ({
-  icone, titulo, descricao, ligado, onChange, rodape, hora, onHora,
+  icone, titulo, descricao, ligado, onChange, rodape, hora, onHora, extra,
 }: {
   icone: React.ReactNode;
   titulo: string;
@@ -657,6 +700,8 @@ const LinhaAviso = ({
   rodape?: string;
   hora?: number;
   onHora?: (h: number) => void;
+  /** 17/10: um controle próprio embaixo (a Rotina de manhã tem hora com minuto) */
+  extra?: React.ReactNode;
 }) => (
   <div className={`rounded-2xl border p-4 transition-colors ${ligado ? "border-border bg-card" : "border-border/60 bg-card/40"}`}>
     <div className="flex items-start gap-3">
@@ -670,6 +715,7 @@ const LinhaAviso = ({
       <Switch checked={ligado} onCheckedChange={onChange} aria-label={titulo} />
     </div>
     {rodape && <p className="mt-2.5 pl-12 text-[11.5px] text-muted-foreground/80">{rodape}</p>}
+    {extra && <div className="mt-3.5 pt-3.5 border-t border-border/60">{extra}</div>}
     {hora !== undefined && onHora && (
       <div className="mt-3.5 pt-3.5 border-t border-border/60">
         <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground mb-2">Horário</p>

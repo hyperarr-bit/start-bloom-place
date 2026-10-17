@@ -63,6 +63,7 @@ export const CelebracaoDia100 = ({ score, streak }: { score: number; streak: num
           aria-modal="true"
           aria-label="Dia completo"
           data-testid="celebracao-100"
+          data-folha="dia-100"
           className="fixed inset-0 z-[400] flex flex-col bg-background text-foreground overflow-hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

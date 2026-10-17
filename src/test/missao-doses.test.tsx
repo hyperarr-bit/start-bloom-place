@@ -112,7 +112,12 @@ beforeEach(() => {
   eventos.length = 0;
   nativo.v = false;
   // o jsdom não tem tamanho: o anel/olhar se posicionam por getBoundingClientRect
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) } as DOMRect);
+  // o cabeçalho fixo do módulo fica no TOPO (0–56); o resto, em 100–148 (o post-it "colado embaixo da faixa" decide por aí)
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) }) as DOMRect;
+  });
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   vi.setSystemTime(new Date(2026, 9, 2, 10, 0)); // sexta, 02/10/2026
 });
@@ -189,7 +194,7 @@ describe("a chave desligada = o app de hoje, byte a byte", () => {
 
   it("os 3 padrão: a área da porta primeiro, depois Finanças → Rotina → Saúde sem repetir; os rótulos HOJE/AMANHÃ/DIA 3", () => {
     expect(modulosPadrao("rotina")).toEqual(["rotina", "financas", "saude"]);
-    expect(modulosPadrao("corpo")).toEqual(["treino", "financas", "rotina"]);
+    expect(modulosPadrao("corpo")).toEqual(["treino", "saude", "financas"]); // 1.0.16: corpo puxa a Saúde pra 2ª
     expect(modulosPadrao(null)).toEqual(["financas", "rotina", "saude"]);
     const m = iniciarMissao(["financas", "rotina", "saude"], "2026-10-02");
     expect([1, 2, 3].map((n) => rotuloDoPasso(n as 1 | 2 | 3, m, "2026-10-02"))).toEqual(["HOJE", "AMANHÃ", "DIA 3"]);
@@ -213,7 +218,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Hoje · 💰 Finanças");
     expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Domingo · ❤️ Saúde");
-    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", prototipo: "web" }]);
+    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", area_lida: "dinheiro", area_respondida: null, origem_area: "funil", prototipo: "web" }]);
     // o card ainda não aparece por baixo das boas-vindas? aparece (a Home é a mesma) — mas a missão manda na tela
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     const escolha = screen.getByTestId("missao-doses-escolha");
@@ -268,7 +273,8 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Marca 1 hábito no quadradinho");
     expect(lerMissao()?.feitos[1]).toEqual({ dia: "2026-10-02", rotulo: "Café · R$ 12" });
-    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ 12", prototipo: "web" }]);
+    // (17/10: nunca valor em reais em evento — o rótulo vai sem o número)
+    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ x", prototipo: "web" }]);
     // a faixa agora marca 1 de 3
     expect(screen.getByTestId("missao-doses-faixa").querySelector("[role=img]")).toHaveAttribute("aria-label", "1 de 3 feitos");
     fireEvent.click(screen.getByTestId("missao-doses-hora-20h"));
@@ -318,7 +324,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/saude");
     const postIt = esperarPostIt();
-    fireEvent.click(within(postIt).getByTestId("demo-guia-chip"));
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]); // 1.0.16: sem meta de água, o chip é a meta (6/8/10) + o 1º copo
     expect((store.dados["core-saude-water"] as Record<string, number>)["2026-10-02"]).toBe(1);
     passarPeloOlhar();
     const festa3 = screen.getByTestId("missao-doses-festa");

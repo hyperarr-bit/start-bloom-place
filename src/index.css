@@ -1129,7 +1129,10 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
  * rosa tá muito grande". Varredura dos 16 módulos da demo: era o único botão
  * com fundo visível pego pela regra.
  */
-button:has(> svg:only-child):not([class*="bg-"]):not([style*="background"]):not([class*="border"]):not([class*="absolute"]):not([class*="fixed"]):not([class^="p-"]):not([class*=" p-"]):not([class*=" px-"]):not([class*=" py-"]) {
+/* 1.0.16 (harness da missão): `:only-child` só conta ELEMENTOS — um botão de TEXTO com uma seta ("Bora →",
+ * "Continuar →") também casava, ganhava margem −8 px e o botão largo da missão (`.md-botao`) subia por cima do
+ * texto de cima ("dia" cortado no convite, o cadeado na festa). O botão largo da missão fica de fora. */
+button:has(> svg:only-child):not(.md-botao):not([class*="bg-"]):not([style*="background"]):not([class*="border"]):not([class*="absolute"]):not([class*="fixed"]):not([class^="p-"]):not([class*=" p-"]):not([class*=" px-"]):not([class*=" py-"]) {
   padding: 8px;
   margin: -8px;
   box-sizing: content-box;

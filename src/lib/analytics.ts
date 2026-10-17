@@ -299,6 +299,8 @@ export const capturarDispositivoApp = async () => {
       tela_a: window.screen?.height ?? 0,
       densidade: window.devicePixelRatio ?? 1,
       nucleos: navigator.hardwareConcurrency ?? 0,
+      // 17/10 (relatório 11 §7): o corte por modo escuro não existia
+      tema: document.documentElement.classList.contains("dark") ? "escuro" : "claro",
     });
   } catch {
     // telemetria nunca derruba o app

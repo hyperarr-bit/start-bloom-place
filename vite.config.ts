@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
 import { componentTagger } from "lovable-tagger";
+import { medicaoTextos } from "./vite-plugin-medicao-textos";
 
 /**
  * A versão do app, lida do build.gradle no momento do build (29/07).
@@ -82,7 +83,9 @@ export default defineConfig(({ mode }) => ({
      */
     cssTarget: "chrome61",
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  // medicaoTextos (1.0.16): o dicionário de textos do código que a medição total usa como peneira de
+  // privacidade — ver vite-plugin-medicao-textos.ts. Sai num pedaço próprio, carregado só nas telas do app.
+  plugins: [react(), medicaoTextos(path.resolve(__dirname)), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

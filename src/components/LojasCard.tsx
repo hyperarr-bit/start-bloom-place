@@ -93,7 +93,7 @@ export const LojasCard = ({ variant }: { variant: "home" | "welcome" }) => {
   const ap = aparelhoDaWeb();
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-4 shadow-sm relative" data-testid="lojas-card">
+    <div className="bg-card border border-border rounded-2xl p-4 shadow-sm relative" data-testid="lojas-card" data-track-bloco="lojas">
       {variant === "home" && (
         <button
           onClick={dispensar}

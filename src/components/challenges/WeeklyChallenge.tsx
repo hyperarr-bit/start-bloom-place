@@ -11,7 +11,7 @@ import {
   CHALLENGES, challengeByKey, mondayOf, avaliarDesafio, gastosParaDesafio, lerDesafios,
   EMPTY_CHALLENGES, type ChallengesState, type OfertaDaSemana, type RegistroDesafio,
 } from "./challenges";
-import { type Avaliacao, NOTA_DA_TRAVA, avaliarNoCatalogo, defDoCatalogo, montarDados } from "./catalogo";
+import { type Avaliacao, avaliarNoCatalogo, defDoCatalogo, montarDados } from "./catalogo";
 import { escolher, fecharSemana, montarOfertas, ofertasVisiveis } from "./rodizio";
 
 const CHAVE = "finance-challenges";
@@ -32,12 +32,13 @@ const diaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pad
  * semana virou sem cumprir → derrota registrada e opções de novo.
  *
  * RODÍZIO (17/10, lib/desafios-rodizio + ./rodizio): com a chave ligada, toda
- * segunda o card monta 3 opções (variação/revanche do da semana passada +
+ * segunda o card monta 4 opções (variação/revanche do da semana passada +
  * novas elegíveis, calendário na frente), grava em `ofertas` como escrita de
  * SISTEMA (não é gesto da pessoa: não conta como lançamento nem como dia
- * anotado) e cada desafio de restrição só vale com 4+ dias anotados. Com a
- * chave desligada, o card de sempre (CHALLENGES). O `active` sem `nivel` —
- * escolhido pelo app antigo — segue a regra antiga até fechar.
+ * anotado); cada desafio vence pela própria regra (o dono tirou o mínimo de
+ * dias anotados em 17/10: "é pra ser divertido"). Com a chave desligada, o
+ * card de sempre (CHALLENGES). O `active` sem `nivel` — escolhido pelo app
+ * antigo — segue a regra antiga até fechar.
  */
 export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
   const [state, setState] = usePersistedState<ChallengesState>(CHAVE, EMPTY_CHALLENGES);
@@ -93,7 +94,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
   // Os dados desta semana (títulos com número, elegibilidade, retrato da escolha).
   const dadosDaSemana = useMemo(() => dadosDa(thisMonday), [expenses, get, perfil, thisMonday]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // As 3 opções da segunda: calculadas de forma estável pela semente da semana,
+  // As 4 opções da segunda: calculadas de forma estável pela semente da semana,
   // e gravadas uma vez (escrita de sistema + aviso pro snapshot deste card).
   const ofertasDaSemana = useMemo(
     () => (estado.ofertas?.weekStart === thisMonday ? estado.ofertas : montarOfertas(dadosDaSemana, estado)),
@@ -182,7 +183,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
 
   if (hidden) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 flex items-center gap-2.5 text-[12px] text-muted-foreground" data-testid="desafios-desligados">
+      <div className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 flex items-center gap-2.5 text-[12px] text-muted-foreground" data-testid="desafios-desligados" data-track-bloco="desafio-semana">
         <Target className="w-4 h-4 shrink-0" aria-hidden />
         <span className="min-w-0"><b className="text-foreground font-bold">Desafios semanais</b> estão desligados</span>
         <button type="button" onClick={religar} className="ml-auto shrink-0 h-[30px] px-3 rounded-lg bg-foreground text-background text-[12px] font-bold whitespace-nowrap active:scale-[0.98] transition-transform">
@@ -217,7 +218,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
               desenhada pro celular (web/PC, 11/09). */}
           <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
             {CHALLENGES.map((c) => (
-              <button key={c.key} onClick={() => escolherLegado(c.key)} className={opcaoClasse}>
+              <button key={c.key} onClick={() => escolherLegado(c.key)} className={opcaoClasse} data-track={`desafio-escolher:${c.key}`}>
                 <span className="text-xl shrink-0">{c.emoji}</span>
                 <span className="flex-1 min-w-0">
                   <span className="block text-[13px] font-bold leading-tight">{c.title}</span>
@@ -234,20 +235,23 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
     const abertas = ofertasVisiveis({ ...estado, ofertas: ofertasDaSemana }, thisMonday);
     const etiqueta = (o: OfertaDaSemana) => (o.origem === "variacao" ? `nível ${o.nivel}` : o.origem === "revanche" ? "revanche" : null);
     return (
-      <div className="bg-card rounded-lg border border-border p-4" data-testid="desafio-ofertas">
+      <div className="bg-card rounded-lg border border-border p-4" data-testid="desafio-ofertas" data-track-bloco="desafio-semana">
         {cabecalho}
         {abertas.length === 0 ? (
           <p className="text-[12px] text-muted-foreground">Você fechou os desafios desta semana. Segunda tem mais. 🎯</p>
         ) : (
           <>
-            <p className="text-[11px] text-muted-foreground -mt-1.5 mb-2.5">Escolhe 1 pra esta semana · opções novas toda segunda</p>
-            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-2">
+            <p className="text-[11px] text-muted-foreground -mt-1.5 mb-2.5">
+              {abertas.length > 1 ? `Escolhe 1 das ${abertas.length} pra esta semana` : "Escolhe pra esta semana"} · opções novas toda segunda
+            </p>
+            {/* No computador as quatro cabem em duas colunas, como o card de sempre (web/PC, 11/09). */}
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
               {abertas.map((o) => {
                 const def = defDoCatalogo(o.key);
                 if (!def) return null;
                 const tag = etiqueta(o);
                 return (
-                  <button key={o.key} onClick={() => escolherOferta(o)} className={opcaoClasse} data-testid={`oferta-${o.key}`}>
+                  <button key={o.key} onClick={() => escolherOferta(o)} className={opcaoClasse} data-testid={`oferta-${o.key}`} data-track={`desafio-escolher:${o.key}`}>
                     <span className="text-xl shrink-0">{def.emoji}</span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-[13px] font-bold leading-tight">
@@ -261,9 +265,6 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
                 );
               })}
             </div>
-            {abertas.some((o) => defDoCatalogo(o.key)?.tipo === "restricao") && (
-              <p className="text-[10.5px] text-muted-foreground mt-2.5 leading-snug">{NOTA_DA_TRAVA}</p>
-            )}
           </>
         )}
       </div>
@@ -277,7 +278,7 @@ export const WeeklyChallenge = ({ expenses, agoraDev }: Props) => {
   const confirmacao = defNovo?.confirmacao && !ev.done && !ev.failed ? defNovo.confirmacao : null;
 
   return (
-    <div className={`bg-card rounded-lg border p-4 ${ev.done ? "border-emerald-500/40" : "border-border"}`} data-testid="desafio-ativo">
+    <div className={`bg-card rounded-lg border p-4 ${ev.done ? "border-emerald-500/40" : "border-border"}`} data-testid="desafio-ativo" data-track-bloco="desafio-semana">
       {cabecalho}
 
       <div className="flex items-center gap-3">

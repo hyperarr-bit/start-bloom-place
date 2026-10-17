@@ -87,10 +87,13 @@ describe("retomada do funil W — o progresso sobrevive ao app morrer", () => {
     expect(passoDeRetomada("offer", false)).toBeNull();
   });
 
-  it("limparProgresso apaga as quatro chaves (conta nasceu, funil acabou)", () => {
+  it("limparProgresso apaga o progresso do funil (conta nasceu) MAS a área fica pra Missão (16/10)", () => {
     for (const k of Object.values(CHAVES_FUNIL_W)) guardarChave(k, "x");
     limparProgresso();
-    for (const k of Object.values(CHAVES_FUNIL_W)) expect(localStorage.getItem(k)).toBeNull();
+    for (const k of Object.values(CHAVES_FUNIL_W)) {
+      if (k === CHAVES_FUNIL_W.area) expect(lerChave<string>(k)).toBe("x");
+      else expect(localStorage.getItem(k)).toBeNull();
+    }
   });
 });
 

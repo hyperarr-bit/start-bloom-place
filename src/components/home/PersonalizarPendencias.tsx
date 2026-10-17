@@ -32,6 +32,7 @@ export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange, po
         className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto pb-[max(1.25rem,var(--app-safe-bottom))]"
         overlayClassName="z-[290]"
         data-testid="personalizar-pendencias"
+        data-folha="pendencias-personalizar"
       >
         <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
           <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />
@@ -58,7 +59,7 @@ export function PersonalizarPendencias({ open, onOpenChange, prefs, onChange, po
                       {peloModulo ? "Escondido junto com o módulo (religue o módulo em Módulos › ⚙)" : c.tipo === "peso" && ligado ? rotuloDoPeso(prefs) : c.descricao}
                     </span>
                   </span>
-                  <Switch checked={ligado} disabled={peloModulo} onCheckedChange={(v) => alternar(c.tipo, v)} aria-label={`Mostrar ${c.nome}`} className="scale-90" />
+                  <Switch checked={ligado} disabled={peloModulo} onCheckedChange={(v) => alternar(c.tipo, v)} aria-label={`Mostrar ${c.nome}`} className="scale-90" data-track={`pendencia-mostrar:${c.tipo}`} />
                 </label>
                 {c.tipo === "peso" && ligado && (
                   <div className="px-3 pb-2.5 space-y-2" data-testid="peso-frequencia">

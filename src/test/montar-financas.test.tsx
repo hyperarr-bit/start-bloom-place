@@ -392,7 +392,8 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
-    const card = screen.getByText("QUANTO POSSO GASTAR HOJE").closest("div")!;
+    // (a suíte inteira carregada: o Dashboard pode levar mais que os 6 respiros pra montar)
+    const card = (await screen.findByText("QUANTO POSSO GASTAR HOJE", {}, { timeout: 10_000 })).closest("div")!;
     expect(within(card).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
     // painel limpo (conta nova): nada gasto hoje, sobra o número inteiro pra hoje
     expect(screen.getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);

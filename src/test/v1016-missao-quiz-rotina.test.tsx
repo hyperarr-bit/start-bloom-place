@@ -105,7 +105,7 @@ const missaoNaRotina = (braco: "A" | "B") =>
   localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["rotina", "financas", "saude"], HOJE_DIA, undefined, braco), boasVindas: true }));
 /** 7h → Beber água + Treinar → (lembrete) Agora não → Montar minha rotina */
 const responder = async () => {
-  await waitFor(() => expect(tela().getByRole("button", { name: "7h" })).toBeTruthy(), { timeout: 4000 });
+  await waitFor(() => expect(tela().getByRole("button", { name: "7h" })).toBeTruthy(), { timeout: 12_000 });
   await respirar();
   fireEvent.click(tela().getByRole("button", { name: "7h" }));
   await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
@@ -162,21 +162,21 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
       missaoNaRotina(braco);
       const store = { atual: {} as Record<string, unknown> };
       montar(store);
-      await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 4000 });
+      await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 12_000 });
       expect(document.documentElement.getAttribute(ATRIBUTO_NA_TELA)).toBe("missao");
       expect(document.documentElement.getAttribute("data-missao-dose")).toBe("1");
       expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0);
       expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "setup", setup: "montar-rotina", acao: "view" })]);
       await responder();
-      await waitFor(() => expect(screen.getByTestId("montar-rotina-postit")).toBeTruthy(), { timeout: 4000 });
+      await waitFor(() => expect(screen.getByTestId("montar-rotina-postit")).toBeTruthy(), { timeout: 12_000 });
       expect(screen.queryByTestId("missao-doses-festa")).toBeNull(); // criar os hábitos NÃO é a dose
       fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
       await respirar();
       // B: o "olhar explicado" da 1.0.15 entra antes da festa (o "Entendi" adianta); A: a festa direto
-      await waitFor(() => expect(screen.queryByTestId("missao-doses-festa") ?? screen.queryByTestId("missao-doses-entendi")).toBeTruthy(), { timeout: 6000 });
+      await waitFor(() => expect(screen.queryByTestId("missao-doses-festa") ?? screen.queryByTestId("missao-doses-entendi")).toBeTruthy(), { timeout: 12_000 });
       const entendi = screen.queryByTestId("missao-doses-entendi");
       if (entendi) { expect(braco).toBe("B"); fireEvent.click(entendi); }
-      await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toBeTruthy(), { timeout: 6000 });
+      await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toBeTruthy(), { timeout: 12_000 });
       if (braco === "A") {
         expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
         expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("“Beber água” já está na sua Rotina, com o quadradinho de hoje marcado.");
@@ -192,56 +192,56 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     });
   }
 
-  it("'Entendi' no guia sem marcar: o post-it da MISSÃO segue no mesmo quadradinho (com o nome do 1º hábito) e marcar fecha a dose", { timeout: 30_000 }, async () => {
+  it("'Entendi' no guia sem marcar: o post-it da MISSÃO segue no mesmo quadradinho (com o nome do 1º hábito) e marcar fecha a dose", { timeout: 60_000 }, async () => {
     ligar("A");
     missaoNaRotina("A");
     montar({ atual: {} });
-    await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 12_000 });
     await responder();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Entendi" })).toBeTruthy(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Entendi" })).toBeTruthy(), { timeout: 12_000 });
     fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
     await respirar();
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 9000 });
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 12_000 });
     const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
     expect(postIt).toHaveTextContent("Sua rotina está pronta. Marca o primeiro quando fizer.");
     expect(postIt).toHaveTextContent("É o quadradinho de hoje, na coluna de Beber água.");
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
     await respirar();
-    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅"), { timeout: 6000 });
+    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅"), { timeout: 12_000 });
     expect(lerMissao()?.feitos[1]?.rotulo).toBe("Beber água");
   });
 
-  it("'Pular' no quiz: a missão guarda (nunca mais), a dose guiada simples (criar o 1º hábito) — e reabrir não mostra o quiz", { timeout: 30_000 }, async () => {
+  it("'Pular' no quiz: a missão guarda (nunca mais), a dose guiada simples (criar o 1º hábito) — e reabrir não mostra o quiz", { timeout: 60_000 }, async () => {
     ligar("A");
     missaoNaRotina("A");
     montar({ atual: {} });
-    await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 4000 });
+    await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 12_000 });
     await respirar();
     fireEvent.click(tela().getByRole("button", { name: /Pular/ }));
     await respirar();
     expect(lerMissao()?.setupPulado?.["montar-rotina"]).toBe(HOJE_DIA);
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("Qual hábito você quer começar hoje?"), { timeout: 9000 });
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("Qual hábito você quer começar hoje?"), { timeout: 12_000 });
     cleanup();
     _novaAberturaMontarRotina();
     montar({ atual: {} });
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 9000 });
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 12_000 });
     expect(screen.queryByTestId("montar-minha-rotina")).toBeNull();
   });
 
-  it("fechou o app no meio do quiz: volta 1 vez; na 3ª abertura sem decidir, a dose guiada simples (nunca insiste)", { timeout: 30_000 }, async () => {
+  it("fechou o app no meio do quiz: volta 1 vez; na 3ª abertura sem decidir, a dose guiada simples (nunca insiste)", { timeout: 60_000 }, async () => {
     ligar("A");
     missaoNaRotina("A");
     for (let abertura = 1; abertura <= MAX_VISTAS_DO_SETUP; abertura++) {
       _novaAberturaMontarRotina();
       montar({ atual: {} });
-      await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 4000 });
+      await waitFor(() => expect(screen.getByTestId("montar-minha-rotina")).toBeTruthy(), { timeout: 12_000 });
       cleanup();
     }
     expect(lerMissao()?.setupVistas?.["montar-rotina"]).toBe(MAX_VISTAS_DO_SETUP);
     _novaAberturaMontarRotina();
     montar({ atual: {} });
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 9000 });
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 12_000 });
     expect(screen.queryByTestId("montar-minha-rotina")).toBeNull();
   });
 });

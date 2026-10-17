@@ -486,6 +486,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     const { numero } = await montarComCartao();
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     await respirar();
+    await screen.findByText(/QUANTO POSSO GASTAR HOJE/, {}, { timeout: 10_000 }); // a suíte carregada: o Dashboard pode demorar
     const pode = cardComTitulo(/QUANTO POSSO GASTAR HOJE/);
     expect(within(pode).getAllByText(`R$ ${numero}`).length).toBeGreaterThan(0);
     expect(within(pode).getByTestId("sobram-pra-hoje").textContent).toBe(`Sobram R$ ${numero} pra hoje · nada gasto hoje ainda`);

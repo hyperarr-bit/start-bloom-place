@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, Crosshair } from "lucide-react";
+import { Check, ChevronRight, Crosshair, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
@@ -305,9 +305,14 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
             <span className="im-pronto-texto"><b>{rotulo}</b> já está aqui. {config.pronto}</span>
           </div>
           {oferta && (
+            /* dono 17/10: um BOTÃO de verdade (borda clara, ≥48 px, lâmpada na frente, "›" atrás), secundário ao "Pronto" cheio */
             <button type="button" className="im-pronto-oferta" data-testid="intro-modulo-conhecer-mais" onClick={verMais}>
-              <span className="im-pronto-oferta-titulo">{oferta.titulo}</span>
-              <span className="im-pronto-oferta-linha">{oferta.linha}</span>
+              <Lightbulb className="im-pronto-oferta-icone" aria-hidden="true" />
+              <span className="im-pronto-oferta-textos">
+                <span className="im-pronto-oferta-titulo">{oferta.titulo}</span>
+                <span className="im-pronto-oferta-linha">{oferta.linha}</span>
+              </span>
+              <ChevronRight className="im-pronto-oferta-seta" aria-hidden="true" />
             </button>
           )}
           <button type="button" className="im-pronto-principal" data-testid="intro-modulo-fechar" onClick={() => aoTerminar("feita")}>Pronto</button>

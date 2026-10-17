@@ -1,7 +1,7 @@
 /**
  * CONHECER MAIS (17/10, lib/conhecer-mais + components/intro-modulo/ConhecerMais) — o que este arquivo trava:
  *   · só Finanças, Rotina e Saúde têm passeio; 3–5 paradas cada; nenhuma frase de FOMO; a oferta diz o que é e
- *     quanto dura ("Ver mais 4 coisas úteis de Saúde" · "Log médico, … e sono · 1 min");
+ *     quanto dura ("Ver mais 4 dicas de Saúde" · "Log médico, remédios, evolução… · 1 min" — a linha pequena cabe numa linha só);
  *   · nunca automático: o cartão do fim da intro oferece como controle SECUNDÁRIO acima do "Pronto"; o passeio só
  *     abre por `abrirConhecerMais` (fim da intro, lembrete, botão de dicas, missão);
  *   · dentro do passeio: faixa com "Sair" escrito e "2 de 4", "Próxima" (a última "Terminar"); a parada troca a
@@ -88,9 +88,11 @@ describe("o passeio: configuração, oferta e chaves", () => {
       for (const proibido of ["não perca", "nao perca", "vai perder", "última chance", "imperdível"]) expect(texto, proibido).not.toContain(proibido);
       for (const p of t.paradas) { expect(p.texto.length).toBeGreaterThan(30); expect(p.texto.length).toBeLessThan(170); }
     }
-    expect(ofertaDoTour("financas")).toEqual({ titulo: "Ver mais 5 coisas úteis de Finanças", linha: "Meu Mês, contas fixas, cartão, dívidas e desafio da semana · 1 min" });
-    expect(ofertaDoTour("saude")?.titulo).toBe("Ver mais 4 coisas úteis de Saúde");
-    expect(ofertaDoTour("rotina")?.linha).toBe("Rotina semanal, meu mês e foco · 1 min");
+    // dono 17/10: "Ver mais N dicas de X"; a linha pequena numa linha só do botão — entra nome por nome, o resto vira "…"
+    expect(ofertaDoTour("financas")).toEqual({ titulo: "Ver mais 5 dicas de Finanças", linha: "Meu Mês, contas fixas, cartão… · 1 min" });
+    expect(ofertaDoTour("saude")).toEqual({ titulo: "Ver mais 4 dicas de Saúde", linha: "Log médico, remédios, evolução… · 1 min" });
+    expect(ofertaDoTour("rotina")).toEqual({ titulo: "Ver mais 3 dicas de Rotina", linha: "Rotina semanal, meu mês e foco · 1 min" }); // os 3 cabem: sem "…"
+    for (const m of ["financas", "rotina", "saude"]) expect(ofertaDoTour(m)!.linha.replace(/ · 1 min$/, "").length).toBeLessThanOrEqual(33); // 32 letras + "…"
     expect(ofertaDoTour("casa")).toBeNull();
   });
   it("as chaves novas estão classificadas; feito vale no aparelho e na conta; o lembrete é só na 3ª abertura", () => {
@@ -219,8 +221,15 @@ describe("o cartão do fim da intro guiada", () => {
     const botoes = Array.from(pronto.querySelectorAll("button"));
     expect(botoes.map((b) => b.getAttribute("data-testid"))).toEqual(["intro-modulo-conhecer-mais", "intro-modulo-fechar"]); // a oferta ACIMA, o Pronto por último
     expect(screen.getByTestId("intro-modulo-fechar").textContent).toBe("Pronto");
-    expect(screen.getByTestId("intro-modulo-conhecer-mais").textContent).toContain("Ver mais 5 coisas úteis de Finanças");
-    expect(screen.getByTestId("intro-modulo-conhecer-mais").textContent).toContain("1 min");
+    // dono 17/10: um botão de verdade — lâmpada na frente, rótulo numa linha + linha pequena dentro, "›" atrás
+    const oferta = screen.getByTestId("intro-modulo-conhecer-mais");
+    expect(oferta.tagName).toBe("BUTTON");
+    expect(oferta.querySelector(".im-pronto-oferta-titulo")?.textContent).toBe("Ver mais 5 dicas de Finanças");
+    expect(oferta.querySelector(".im-pronto-oferta-linha")?.textContent).toBe("Meu Mês, contas fixas, cartão… · 1 min");
+    expect(oferta.querySelector("svg.im-pronto-oferta-icone")).toBeTruthy();
+    expect(oferta.querySelector("svg.im-pronto-oferta-seta")).toBeTruthy();
+    const partes = ["im-pronto-oferta-icone", "im-pronto-oferta-textos", "im-pronto-oferta-seta"]; // nessa ordem: lâmpada, textos, "›"
+    expect(Array.from(oferta.children).map((c) => partes.find((k) => c.classList.contains(k)))).toEqual(partes);
     expect(eventos.find(([n, d]) => n === "conhecer_mais_oferta" && d.origem === "fim_tutorial")).toBeTruthy();
     fireEvent.click(screen.getByTestId("intro-modulo-conhecer-mais"));
     await waitFor(() => expect(screen.getByTestId("conhecer-mais-faixa")).toBeTruthy(), { timeout: 3000 });

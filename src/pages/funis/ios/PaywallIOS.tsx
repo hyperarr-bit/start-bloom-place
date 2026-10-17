@@ -106,6 +106,36 @@
  *  · UM PRESENTE POR SESSÃO vale também pro mensal 19,90 (antes ele podia vir depois do 69,90).
  *  · Voltar redondo: depois de ver (e fechar) um presente, ele não recuava nunca mais — agora só
  *    não recua quando uma oferta ABRE por cima com este toque.
+ *
+ * PAYWALL MINIMALISTA (17/10, chave `paywall_minimalista` em lib/paywall-minimalista, LIGADA; dono:
+ * "minimalismo é melhor, tanto na estrutura do paywall quanto na copy"). Vale onde o curto vale (funil e
+ * gate); desligada, o curto de hoje byte a byte. De cima pra baixo, sem rolar em 390×844 e 375×667:
+ *   · Voltar redondo (só funil): o MESMO `core:voltar` (presente 69,90 / recuo do funil);
+ *   · "Experimente 3 dias grátis" + "Veja exatamente como funciona sua assinatura." (copy do dono);
+ *   · a linha do tempo do teste (components/paywall/LinhaDoTempoDoTeste, a mesma da ExplicaFolha):
+ *     Hoje — R$ 0,00 · Amanhã — Lembrete · Dia 3 — R$ 97,90/ano, preços da loja; o lembrete só aparece se a
+ *     permissão deixa o 920001 sair (e cai no dia que o aviso cai: diaDoAviso);
+ *   · UM cartão do plano (anual: "3 dias grátis · R$ 8,16/mês" e o valor do ano como o preço mais visível,
+ *     como a Apple quer) + "Começar teste grátis" + "Ver plano mensal" (troca cartão, título e linha do
+ *     tempo pro mensal, que cobra hoje) + "Renova automaticamente até você cancelar." + o rodapé de sempre.
+ *   O que SAIU, e por quê (o que tinha número ficou, no menor tamanho):
+ *   · a imagem grande, o cabeçalho "3 DIAS GRÁTIS" e o "economize 67%" do cartão (o dono: "deixar
+ *     minimalista TUDO"; título e linha do tempo já dizem os dias);
+ *   · o cartão do mensal à vista → link "Ver plano mensal" (o anual pré-selecionado é o medido em 15–18/09);
+ *     a CONTA contra o mensal (29/08: sem ela o barato levou 92%) fica no "R$ 8,16/mês" do cartão e no link
+ *     de volta "Ver plano anual · R$ 8,16/mês";
+ *   · "Sem cobrança hoje · a gente te avisa dia DD/MM" → são os passos Hoje e Amanhã da linha;
+ *   · a pílula de 1,2 s "A Apple vai mostrar…" → a linha mostra Hoje R$ 0,00 e Dia 3 o preço ANTES do toque,
+ *     e a folha abre direto; na 2ª vez a ExplicaFolha (enxuta) continua;
+ *   · o legal em 2 linhas → 1 (preço e período estão no cartão, colado no botão).
+ *   Ficaram: a 2ª chance (32% das compras vêm de quem fechou a folha uma vez), o presente 69,90 (folha
+ *   fechada e Voltar), a ExplicaFolha da 2ª vez, o lembrete armado na compra (01/10: sem a promessa a
+ *   renovação ligada caiu de 56% pra 44%), Termos · Privacidade · Restaurar (3.1.1/3.1.2), "Tenho um código"
+ *   (Offer Codes, afiliados), "Já é cliente?" (compra do site), paywall_saiu e a recuperação.
+ *   Sempre CLARO (LIGHT_VARS + tema-claro — "paywall sempre claro"), também no gate com o app no escuro.
+ *   Eventos: os de sempre + `minimalista: true` (paywall_oferta_vista, os funnel_click da tela) e
+ *   `paywall_linha_tempo_view` 1x por paywall aberto, com a linha do teste à vista (dias, preço, braço,
+ *   aviso, passos).
  */
 /** Dias grátis de RESERVA enquanto a loja não respondeu — o número de verdade é o da oferta
  *  introdutória (rc.diasTrialIos()). Um lugar só nesta tela. */
@@ -113,31 +143,15 @@ export const DIAS_DE_TESTE_PADRAO = 3;
 /** Quanto a pílula "A Apple vai mostrar…" fica na tela antes de a folha abrir. */
 export const PREPARACAO_DA_FOLHA_MS = 1200;
 
-const dataCurta = (d: Date): string => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-/**
- * A linha do tempo do paywall curto — pura, 3 linhas: "Hoje · R$ 0,00" / "Dia 2 (DD/MM) · a
- * gente te avisa" / "Dia 3 (DD/MM) · R$ 97,90/ano só se você continuar". Dia 1 = hoje; a
- * duração e os preços vêm da loja. Sem o preço do teste (loja calada): "sem cobrança".
- */
-/** "a gente te avisa dia DD/MM": o dia N−1 do teste (Dia 1 = hoje). null se o teste tem menos de 3 dias. */
-export function diaDoAviso(dias: number, hoje: Date = new Date()): string | null {
-  const n = Math.max(1, dias);
-  if (n < 3) return null;
-  const d = new Date(hoje); d.setDate(d.getDate() + n - 2);
-  return dataCurta(d);
-}
-export function linhaDoTempoDoTeste(dias: number, precoAnual: string, precoTeste: string | null, hoje: Date = new Date()): Array<{ t: string; cheio: boolean }> {
-  const em = (n: number) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return dataCurta(d); };
-  const n = Math.max(1, dias);
-  const linhas: Array<{ t: string; cheio: boolean }> = [{ t: `Hoje · ${precoTeste ?? "sem cobrança"}`, cheio: true }];
-  if (n >= 3) linhas.push({ t: `Dia ${n - 1} (${em(n - 2)}) · a gente te avisa`, cheio: false });
-  linhas.push({ t: `Dia ${n} (${em(n - 1)}) · ${precoAnual}/ano só se você continuar`, cheio: false });
-  return linhas;
-}
+/* "a gente te avisa dia DD/MM" (o dia N−1 do teste, Dia 1 = hoje): 17/10 a conta mora com a linha do
+ * tempo (components/paywall/LinhaDoTempoDoTeste), a MESMA do aviso 920001 (lib/notificacoes); daqui ela
+ * continua exportada pra quem já lia deste arquivo. A linha do tempo antiga daqui (linhaDoTempoDoTeste,
+ * sem uso na tela desde o curto do Cal AI) saiu — a de verdade é o passosDoTeste de lá. */
+export { diaDoAviso };
 /** Um `core:voltar` nos últimos N ms faz a saída contar como "voltar". */
 export const JANELA_DO_VOLTAR_MS = 10_000;
 import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -154,6 +168,8 @@ import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
 import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
+import { LinhaDoTempoDoTeste, diaDoAviso, lerAvisoDoTeste, passosDoTeste, passosSemTeste, type AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
+import { guardarForcaDoMinimalista, paywallMinimalistaLigado } from "@/lib/paywall-minimalista";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -209,6 +225,30 @@ const selosPara = (teste: boolean) => teste
       { emoji: "⚡", label: "Acesso na hora" },
       { emoji: "✕", label: "Cancele quando quiser" },
     ];
+
+/* 17/10 (minimalista): paywall sempre claro, mesmo com o app no escuro — no gate o TrialBanner não força o
+ * claro como o funil força (era o "R$ 97,90 por ano" branco no branco do legal do gate escuro). As mesmas
+ * variáveis claras do funil (ComecarW/PaywallFlow). */
+const TEMA_CLARO = {
+  "--background": "0 0% 100%", "--foreground": "0 0% 15%", "--card": "0 0% 100%", "--card-foreground": "0 0% 15%",
+  "--primary": "0 0% 20%", "--primary-foreground": "0 0% 100%", "--secondary": "40 20% 96%", "--secondary-foreground": "0 0% 15%",
+  "--muted": "40 15% 95%", "--muted-foreground": "0 0% 45%", "--accent": "330 65% 50%", "--accent-foreground": "0 0% 100%",
+  "--border": "0 0% 90%", "--input": "0 0% 90%", "--ring": "0 0% 20%",
+} as CSSProperties;
+
+/* 17/10 (minimalista): os tamanhos do meio crescem com a altura da tela, em linha reta entre o iPhone SE
+ * (667 de altura: tudo no mínimo, cabe sem rolar) e o iPhone 14 (844: sem o buraco que o dono não quer —
+ * "muito espaço não preenchido", 10/10). As `--passo-*` são da LinhaDoTempoDoTeste. */
+const ESCALA_DA_TELA = {
+  "--mini-respiro": "clamp(4px, 10.2vh - 62px, 28px)",
+  "--mini-titulo": "clamp(26px, 4vh, 34px)",
+  "--mini-sub": "clamp(14px, 0.56vh + 10.3px, 15px)",
+  "--mini-antes-da-linha": "clamp(12px, 11.3vh - 61.4px, 36px)",
+  "--passo-gap": "clamp(10px, 8.5vh - 45.5px, 28px)",
+  "--passo-icone": "clamp(30px, 4.5vh, 38px)",
+  "--passo-titulo": "clamp(15px, 1.41vh + 5.6px, 17.5px)",
+  "--passo-texto": "clamp(12.5px, 1vh + 6.1px, 14.5px)",
+} as CSSProperties;
 
 /* 01/10 (teste de preço 97,90 × 69,90): NENHUM preço chumbado. Enquanto a loja
  * não responde, o lugar do preço mostra um traço — um "R$ 97,90" de reserva
@@ -365,6 +405,11 @@ export function PaywallIOS({
   /* 10/10 — PAYWALL_CURTO: a chave responde na hora (força/QA/constante) e de novo quando a
    * loja traz a metadata; o preço do teste ("R$ 0,00") é o da oferta introdutória da loja. */
   const [curto, setCurto] = useState(() => gate || ofertaLigada("curto"));
+  /* 17/10 — PAYWALL MINIMALISTA (lib/paywall-minimalista): só muda o layout curto. Responde na hora
+   * (força de QA `?paywall-minimalista=` / constante) e de novo quando a loja traz a metadata. */
+  const [minimalista, setMinimalista] = useState(() => { guardarForcaDoMinimalista(); return paywallMinimalistaLigado(); });
+  /* o passo do lembrete na linha do tempo: só se o 920001 vai mesmo sair (null = lendo a permissão) */
+  const [aviso, setAviso] = useState<AvisoDoTeste | null>(null);
   /* 16/10 — a explicação antes da folha, na 2ª vez (ExplicaFolha) */
   const folhasCanceladasRef = useRef(0);
   const explicadosRef = useRef<Set<string>>(new Set());
@@ -460,12 +505,15 @@ export function PaywallIOS({
           // gate: a metadata desligou o curto (interruptor de emergência) → o TrialBanner volta pro gate antigo
           if (gate && !curtoLigou) onChaveDesligada?.();
           setCurto(gate || curtoLigou);
+          // 17/10: a metadata `paywall_minimalista` chegou junto (desligar sem versão nova)
+          const miniLigou = paywallMinimalistaLigado();
+          setMinimalista(miniLigou);
           setEconomia(economiaLida);
           setPrecoMensalLoja(seguro(() => rc.precoMensalIos() ?? null, null));
           // 16/10: sempre (a explicação da 2ª folha também mostra o "R$ 0,00" da loja)
           setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}) });
+          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}), ...((curtoLigou || gate) && miniLigou ? { minimalista: true } : {}) });
         }
       };
       lido();
@@ -662,6 +710,25 @@ export function PaywallIOS({
   // O cartão fala do anual com teste: some com o mensal selecionado e durante
   // a folha aberta; volta com o anual (a mesma exibição — sem novo evento).
   const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
+  /* 17/10 — o paywall minimalista: o layout curto com a chave `paywall_minimalista` */
+  const mini = curto && minimalista;
+  // o lembrete da linha do tempo só aparece se o 920001 vai mesmo sair (permissão), lida 1x
+  useEffect(() => {
+    if (!mini || aviso !== null) return;
+    let vivo = true;
+    void lerAvisoDoTeste().then((a) => { if (vivo) setAviso(a); }).catch(() => { if (vivo) setAviso("nao"); });
+    return () => { vivo = false; };
+  }, [mini, aviso]);
+  // `paywall_linha_tempo_view`: 1x por paywall aberto, com a linha do TESTE à vista e os dados da loja
+  const linhaVistaRef = useRef(false);
+  const mostraLinhaDoTeste = mini && comTrial && !mostraMensal;
+  useEffect(() => {
+    if (!mostraLinhaDoTeste || linhaVistaRef.current || precoAnual === null || aviso === null) return;
+    linhaVistaRef.current = true;
+    const passos = passosDoTeste({ dias, precoAnual, precoTeste, aviso });
+    trackEvent("paywall_linha_tempo_view", { funil: FUNIL, loja: "ios", area, oferta: oferta.oferta, produto: oferta.produto, preco: precoAnual, dias, aviso, passos: passos.length, minimalista: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostraLinhaDoTeste, precoAnual, aviso, dias, precoTeste]);
 
   /* o que aparece POR CIMA do paywall, igual nos dois layouts (de hoje e curto) */
   const sobreposicoes = (
@@ -684,6 +751,7 @@ export function PaywallIOS({
         lugar={presente.lugar}
         oferta={presente.oferta}
         explicar={presente.lugar === "folha_cancelada" || folhasCanceladasRef.current > 0}
+        {...(mini ? { enxuto: true } : {})}
         onFechar={() => setPresente(null)}
         onSucesso={async () => {
           const { lugar, oferta: p } = presente;
@@ -719,6 +787,7 @@ export function PaywallIOS({
         preco={explica.preco}
         precoTeste={explica.precoTeste}
         dias={explica.dias}
+        {...(mini ? { enxuto: true, ...(aviso ? { aviso } : {}) } : {})}
         onContinuar={() => { const seguir = explica.continuar; setExplica(null); seguir(); }}
         onFechar={() => setExplica(null)}
       />
@@ -751,10 +820,12 @@ export function PaywallIOS({
       oferta: mostraMensal ? "mensal" : oferta.oferta,
       offering: oferta.offering, preco: mostraMensal ? precoMensalTxt : precoAnual,
       ...(curto ? { paywall_curto: true } : {}),
+      ...(mini ? { minimalista: true } : {}),
     });
     // 16/10: na 2ª vez (folha já fechada) a explicação substitui a pílula
     if (!mostraMensal && !comprando && !preparando && explicarAntesDaFolha()) return;
-    if (curto && comTrial && !mostraMensal && !comprando) {
+    // 17/10: no minimalista a linha do tempo já disse "Hoje R$ 0,00 · Dia 3 R$ 97,90/ano" ANTES do toque — sem pílula
+    if (curto && !mini && comTrial && !mostraMensal && !comprando) {
       if (preparando) return;
       setPreparando(true);
       preparandoRef.current = window.setTimeout(() => {
@@ -768,19 +839,193 @@ export function PaywallIOS({
     void comprar(plano);
   };
 
+  /* o Voltar redondo = o "X" do paywall: o MESMO `core:voltar` do funil (presente 69,90 com
+   * OFERTA_X_PAYWALL, recuperação); o recuo de passo é do funil (`onVoltar`), se ele passar —
+   * e só quando nenhuma folha de oferta abriu por cima. (Os dois layouts curtos: o de hoje e o minimalista.) */
+  const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: FUNIL, oferta: oferta.oferta, preco: precoAnual, paywall_curto: true, ...(mini ? { minimalista: true } : {}) }); };
+  const voltar = () => {
+    trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: FUNIL, loja: "ios", paywall_curto: true, ...(mini ? { minimalista: true } : {}) });
+    window.dispatchEvent(new CustomEvent("core:voltar"));
+    // 16/10: "oferta aberta AGORA" (não "já viu alguma"): depois de um presente fechado, o Voltar recua
+    if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !ofertaAbertaRef.current) onVoltar(); }, 400);
+  };
+  /* compra pendente, erro e o cartão da 2ª chance — os mesmos nos dois layouts curtos */
+  const avisosDaCompra = (
+    <>
+      {pendente && (
+        <div className="mt-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] leading-snug p-2.5">
+          <b>Compra em processamento.</b> A App Store ainda está confirmando — o acesso libera sozinho aqui.
+          <button className="block w-full text-center font-bold underline underline-offset-2 mt-1 disabled:opacity-50" disabled={conferindo} onClick={() => void confirmarPagamento()}>
+            {conferindo ? "Conferindo…" : "Já comprei — atualizar"}
+          </button>
+        </div>
+      )}
+      {erro && <p className="mt-2 text-[12px] text-destructive text-center">{erro}</p>}
+      {mostraSegundaChance && (
+        <div role="status" data-testid="ios-segunda-chance" className="mt-2.5 rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 flex items-center gap-2.5 text-left">
+          {/* minimalista: a linha do tempo logo acima já diz "Hoje — R$ 0,00" — o cartão fica numa linha */}
+          <p className="flex-1 text-[12.5px] font-bold leading-snug text-foreground">{mini ? "Hoje você não paga nada." : "Hoje você não paga nada · cancela em 2 toques"}</p>
+          <button
+            type="button"
+            className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
+            onClick={tentarDeNovo}
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
+    </>
+  );
+  /* Termos · Privacidade · Restaurar (3.1.1/3.1.2), a conta no gate e o código — os mesmos nos dois layouts curtos */
+  const rodapeDaLoja = (
+    <>
+      {/* 3.1.1 / 3.1.2 numa linha discreta, como no Cal AI; o Offer Code e o "já paguei pelo site" na de baixo */}
+      <p className="mt-1.5 text-center text-[11.5px] text-muted-foreground">
+        <a href="/termos" className="underline underline-offset-2">Termos</a>
+        {" · "}
+        <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>
+        {" · "}
+        <button
+          type="button" className="underline underline-offset-2"
+          onClick={async () => {
+            trackEvent("app_restore_paywall", {});
+            const rc = await import("@/lib/revenuecat");
+            const ok = await rc.restaurar();
+            if (ok) { if (gate) concluir(); else window.location.href = "/"; }
+          }}
+        >
+          Restaurar compras
+        </button>
+      </p>
+      {gate && (
+        <p className="mt-0.5 text-center text-[11px] text-muted-foreground" data-testid="gate-ios-conta">
+          <button type="button" className="underline underline-offset-2" onClick={() => void trocarConta()} data-testid="gate-trocar-conta">Entrar com outra conta</button>
+          {usuarioLogado && (
+            <>
+              {" · "}
+              <button type="button" className="underline underline-offset-2" onClick={() => setExcluirAberto(true)} data-testid="gate-excluir-conta">Excluir conta</button>
+              <DeleteAccountDialog open={excluirAberto} onOpenChange={setExcluirAberto} />
+            </>
+          )}
+        </p>
+      )}
+      <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
+        <button
+          type="button" className="underline underline-offset-2" data-testid="ios-tenho-codigo"
+          onClick={async () => {
+            trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: FUNIL });
+            const rc = await import("@/lib/revenuecat");
+            const abriu = await rc.abrirResgateApple();
+            if (abriu) setResgatouCodigo(true);
+            else setErro("Não consegui abrir o resgate. Tenta de novo em alguns segundos.");
+          }}
+        >
+          Tenho um código
+        </button>
+        {/* gate: a conta já está logada e não há venda no site — sem o "Já paguei pelo site" (e sem o "·" sobrando) */}
+        {/* o " · " vai DENTRO da linha: no site a linha não existe e o ponto ficava sobrando (polimento 17/10) */}
+        {!gate && <JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" separador=" · " />}
+      </p>
+      {resgatouCodigo && (
+        <button
+          type="button"
+          className="block w-full text-center text-[12.5px] font-bold underline underline-offset-2 disabled:opacity-50 mt-1"
+          disabled={conferindo}
+          onClick={() => void confirmarPagamento()}
+        >
+          {conferindo ? "Conferindo…" : "Já resgatei — continuar"}
+        </button>
+      )}
+    </>
+  );
+
+  /* 17/10 — o PAYWALL MINIMALISTA (ver o cabeçalho): título + linha do tempo + um cartão do plano + botão */
+  if (mini) {
+    const precoMensalMini = precoMensalLoja ?? SEM_PRECO;
+    const passos = mostraMensal
+      ? passosSemTeste({ preco: precoMensalMini, periodo: "mes" })
+      : comTrial
+        ? passosDoTeste({ dias, precoAnual: precoAnualTxt, precoTeste, aviso })
+        : passosSemTeste({ preco: precoAnualTxt, periodo: "ano" });
+    return (
+      <div style={TEMA_CLARO} className="tema-claro relative w-full flex-1 flex flex-col bg-background text-foreground" data-testid="ios-minimalista" data-plano={plano}>
+        {!gate && (
+          <button
+            type="button" aria-label="Voltar" data-testid="ios-mini-voltar" onClick={voltar}
+            className="self-start -ml-1 w-10 h-10 rounded-full bg-secondary text-[#16121c] grid place-items-center shrink-0 active:scale-95 transition-transform"
+          >
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+          </button>
+        )}
+
+        {/* o título e a linha do tempo no meio do espaço que sobra: tudo cresce com a altura da tela
+            (sem buraco no 390×844) e aperta no 375×667 — ver ESCALA_DA_TELA */}
+        <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto py-[var(--mini-respiro)]" style={ESCALA_DA_TELA}>
+          <h1 className="text-[length:var(--mini-titulo)] font-black tracking-[-0.03em] leading-[1.06] text-[#16121c]" data-testid="ios-mini-titulo">
+            {mostraMensal
+              ? <>Assine o{" "}<br />plano mensal</>
+              : comTrial
+                ? <>Experimente{" "}<br />{dias} dias grátis</>
+                : <>Assine o{" "}<br />plano anual</>}
+          </h1>
+          <p className="mt-2 text-[length:var(--mini-sub)] leading-snug text-muted-foreground">Veja exatamente como funciona sua assinatura.</p>
+          <div className="mt-[var(--mini-antes-da-linha)]">
+            <LinhaDoTempoDoTeste passos={passos} testid="ios-mini-linha" />
+          </div>
+        </div>
+
+        {/* o plano (preço e período colados no botão, o valor cobrado como o preço mais visível), o botão e o legal */}
+        <div className="shrink-0 max-w-sm w-full mx-auto flex flex-col">
+          {avisosDaCompra}
+          <div data-testid="ios-mini-plano" className="mt-3 rounded-2xl border-2 border-[#16121c] px-4 py-3 flex items-center gap-3 text-[#16121c]">
+            <span className="w-6 h-6 rounded-full grid place-items-center shrink-0 bg-[#16121c] text-white" aria-hidden>
+              <Check className="w-3.5 h-3.5" strokeWidth={3.5} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <b className="block text-[15.5px] font-bold leading-tight">{mostraMensal ? "Plano mensal" : "Plano anual"}</b>
+              {(mostraMensal || comTrial) && (
+                <span className="block text-[12.5px] text-muted-foreground mt-0.5 whitespace-nowrap">{mostraMensal ? "Cancele quando quiser" : `${dias} dias grátis`}</span>
+              )}
+            </span>
+            {/* o valor cobrado é o preço mais visível (3.1.2); o por mês do anual é a CONTA contra o mensal */}
+            <span className="shrink-0 text-right">
+              <span className="block text-[17px] font-extrabold tracking-tight leading-tight">
+                {mostraMensal ? precoMensalMini : precoAnualTxt}
+                <span className="text-[13px] font-semibold text-muted-foreground">{mostraMensal ? "/mês" : "/ano"}</span>
+              </span>
+              {!mostraMensal && <span className="block text-[12.5px] text-muted-foreground mt-0.5">{precoMesTxt}/mês</span>}
+            </span>
+          </div>
+          <motion.div className="mt-3" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 0.9, delay: 0.5, ease: "easeInOut" }}>
+            <Button
+              size="lg" data-testid="ios-mini-cta"
+              className="w-full h-14 rounded-full bg-[#16121c] hover:bg-[#16121c]/90 text-white text-[17px] font-bold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.45)]"
+              disabled={comprando}
+              onClick={tocarNoBotao}
+            >
+              {comprando
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : mostraMensal ? `Assinar por ${precoMensalMini}/mês` : comTrial ? "Começar teste grátis" : `Assinar por ${precoAnualTxt}/ano`}
+            </Button>
+          </motion.div>
+          {/* o mensal fica a um toque (cobra hoje, sem teste); a volta mostra a conta do anual */}
+          <button
+            type="button" data-testid="ios-mini-trocar-plano" onClick={() => escolher(mostraMensal ? "anual" : "mensal")}
+            className="self-center mt-1 px-3 py-2 text-[13.5px] font-semibold text-muted-foreground underline underline-offset-4 decoration-black/20"
+          >
+            {mostraMensal ? (precoMes ? `Ver plano anual · ${precoMesTxt}/mês` : "Ver plano anual") : "Ver plano mensal"}
+          </button>
+          <p className="text-[11px] text-muted-foreground text-center leading-snug" data-testid="ios-mini-legal">Renova automaticamente até você cancelar.</p>
+          {rodapeDaLoja}
+        </div>
+        {sobreposicoes}
+      </div>
+    );
+  }
+
   if (curto) {
     const precoMensalCurto = precoMensalLoja ?? SEM_PRECO;
     const aviso = comTrial ? diaDoAviso(dias) : null;
-    const escolher = (p: "anual" | "mensal") => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: FUNIL, oferta: oferta.oferta, preco: precoAnual, paywall_curto: true }); };
-    /* o Voltar redondo = o "X" do paywall: o MESMO `core:voltar` do funil (presente 69,90 com
-     * OFERTA_X_PAYWALL, recuperação); o recuo de passo é do funil (`onVoltar`), se ele passar —
-     * e só quando nenhuma folha de oferta abriu por cima. */
-    const voltar = () => {
-      trackEvent("funnel_click", { cta: "ios_paywall_voltar", funil: FUNIL, loja: "ios", paywall_curto: true });
-      window.dispatchEvent(new CustomEvent("core:voltar"));
-      // 16/10: "oferta aberta AGORA" (não "já viu alguma"): depois de um presente fechado, o Voltar recua
-      if (onVoltar) window.setTimeout(() => { if (vivoRef.current && !ofertaAbertaRef.current) onVoltar(); }, 400);
-    };
     const radio = (ativo: boolean) => (
       <span className={`w-6 h-6 rounded-full grid place-items-center shrink-0 ${ativo ? "bg-[#16121c] text-white" : "border-2 border-black/15 bg-white"}`} aria-hidden>
         {ativo && <Check className="w-3.5 h-3.5" strokeWidth={3.5} />}
@@ -843,27 +1088,7 @@ export function PaywallIOS({
             </div>
           </div>
 
-          {pendente && (
-            <div className="mt-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12px] leading-snug p-2.5">
-              <b>Compra em processamento.</b> A App Store ainda está confirmando — o acesso libera sozinho aqui.
-              <button className="block w-full text-center font-bold underline underline-offset-2 mt-1 disabled:opacity-50" disabled={conferindo} onClick={() => void confirmarPagamento()}>
-                {conferindo ? "Conferindo…" : "Já comprei — atualizar"}
-              </button>
-            </div>
-          )}
-          {erro && <p className="mt-2 text-[12px] text-destructive text-center">{erro}</p>}
-          {mostraSegundaChance && (
-            <div role="status" data-testid="ios-segunda-chance" className="mt-2.5 rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 flex items-center gap-2.5 text-left">
-              <p className="flex-1 text-[12.5px] font-bold leading-snug text-foreground">Hoje você não paga nada · cancela em 2 toques</p>
-              <button
-                type="button"
-                className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
-                onClick={tentarDeNovo}
-              >
-                Tentar de novo
-              </button>
-            </div>
-          )}
+          {avisosDaCompra}
 
           {/* 5. a linha única + o botão (1 pulso) + o legal */}
           {comTrial && !mostraMensal && (
@@ -899,63 +1124,7 @@ export function PaywallIOS({
                 ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnualTxt} por ano</strong>.{" "}<br />Renova automaticamente, a menos que cancele na App Store.</>
                 : <>{precoAnualTxt} por ano pela App Store.{" "}<br />Renova automaticamente, a menos que cancele na App Store.</>}
           </p>
-          {/* 3.1.1 / 3.1.2 numa linha discreta, como no Cal AI; o Offer Code e o "já paguei pelo site" na de baixo */}
-          <p className="mt-1.5 text-center text-[11.5px] text-muted-foreground">
-            <a href="/termos" className="underline underline-offset-2">Termos</a>
-            {" · "}
-            <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>
-            {" · "}
-            <button
-              type="button" className="underline underline-offset-2"
-              onClick={async () => {
-                trackEvent("app_restore_paywall", {});
-                const rc = await import("@/lib/revenuecat");
-                const ok = await rc.restaurar();
-                if (ok) { if (gate) concluir(); else window.location.href = "/"; }
-              }}
-            >
-              Restaurar compras
-            </button>
-          </p>
-          {gate && (
-            <p className="mt-0.5 text-center text-[11px] text-muted-foreground" data-testid="gate-ios-conta">
-              <button type="button" className="underline underline-offset-2" onClick={() => void trocarConta()} data-testid="gate-trocar-conta">Entrar com outra conta</button>
-              {usuarioLogado && (
-                <>
-                  {" · "}
-                  <button type="button" className="underline underline-offset-2" onClick={() => setExcluirAberto(true)} data-testid="gate-excluir-conta">Excluir conta</button>
-                  <DeleteAccountDialog open={excluirAberto} onOpenChange={setExcluirAberto} />
-                </>
-              )}
-            </p>
-          )}
-          <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
-            <button
-              type="button" className="underline underline-offset-2" data-testid="ios-tenho-codigo"
-              onClick={async () => {
-                trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: FUNIL });
-                const rc = await import("@/lib/revenuecat");
-                const abriu = await rc.abrirResgateApple();
-                if (abriu) setResgatouCodigo(true);
-                else setErro("Não consegui abrir o resgate. Tenta de novo em alguns segundos.");
-              }}
-            >
-              Tenho um código
-            </button>
-            {/* gate: a conta já está logada e não há venda no site — sem o "Já paguei pelo site" (e sem o "·" sobrando);
-                o " · " vai DENTRO da linha: no site a linha não existe e o ponto ficava sobrando (17/10) */}
-            {!gate && <JaPagouPeloSite origem="rodape_legal" logado={!!usuarioLogado} className="inline" separador=" · " />}
-          </p>
-          {resgatouCodigo && (
-            <button
-              type="button"
-              className="block w-full text-center text-[12.5px] font-bold underline underline-offset-2 disabled:opacity-50 mt-1"
-              disabled={conferindo}
-              onClick={() => void confirmarPagamento()}
-            >
-              {conferindo ? "Conferindo…" : "Já resgatei — continuar"}
-            </button>
-          )}
+          {rodapeDaLoja}
         </div>
         {sobreposicoes}
       </div>

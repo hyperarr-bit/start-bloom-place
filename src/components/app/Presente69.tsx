@@ -41,6 +41,13 @@
  *    braço 69,90 do teste de preço.
  *  · `explicar` (PaywallIOS, depois de uma folha fechada): o 1º toque em "Começar N dias grátis"
  *    mostra a meia-folha ExplicaFolha antes da folha da Apple (1x por presente aberto).
+ *
+ * 17/10 (`enxuto`, o paywall minimalista ligado; dono: "minimalismo é melhor"): nos dois lugares do
+ * paywall com teste ("x_paywall" e "folha_cancelada") sai o parágrafo que repetia o título e o cartão
+ * ("3 dias grátis e depois R$ 69,90/ano (em vez de R$ 97,90) — R$ 5,82 por mês") e a regra fica em
+ * "Nada é cobrado hoje. Cancelou antes do fim do teste, não paga nada." (o preço e a renovação já
+ * estão no cartão e na linha da App Store embaixo do botão). A explicação da 2ª folha vem enxuta.
+ * Sem `enxuto` (e no "cancelou_teste"/"bloqueio"), o texto de sempre.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -227,11 +234,13 @@ const CaixaDePresente = ({ aberta, reduzir }: { aberta: boolean; reduzir: boolea
   );
 };
 
-export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar = false }: {
+export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar = false, enxuto = false }: {
   lugar: LugarDoPresente;
   oferta: OfertaDoPresente;
   /** 16/10: a pessoa já fechou uma folha da Apple nesta sessão → explicação antes desta (só com teste). */
   explicar?: boolean;
+  /** 17/10: o paywall minimalista está ligado — o texto curto nos lugares do paywall com teste. */
+  enxuto?: boolean;
   /** "Agora não" (já marcado como visto). */
   onFechar: () => void;
   /** Folha fechou com sucesso e o acesso sincronizou (já marcado como visto). */
@@ -247,6 +256,8 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
   const extra = lugar === "x_paywall" || lugar === "folha_cancelada" ? { segunda_chance: segundaChanceDe(lugar) } : {};
   // 16/10: depois da folha do 97,90 fechada, o mesmo texto do Voltar (sempre com os dias grátis)
   const comTeste = (lugar === "x_paywall" || lugar === "folha_cancelada") && oferta.comTrial;
+  // 17/10: o texto curto do paywall minimalista (só nos lugares do paywall, com os dias grátis)
+  const curtinho = enxuto && comTeste;
   // 16/10: a meia-folha de explicação antes da folha da Apple — 1x por presente aberto
   const [explicando, setExplicando] = useState(false);
   const explicouRef = useRef(false);
@@ -322,7 +333,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
                   ? (oferta.comTrial ? <>Antes de ir:<br />{oferta.dias} dias grátis.</> : <>Antes de ir,<br />um presente.</>)
                   : <>Antes de ir,<br />um presente.</>}
           </h1>
-          <p className="text-[13.5px] text-[#4f5a64] mt-2.5 leading-snug">
+          {!curtinho && <p className="text-[13.5px] text-[#4f5a64] mt-2.5 leading-snug">
             {lugar === "bloqueio"
               ? <>Tudo o que você construiu continua aqui. O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>
               : lugar === "x_paywall" || lugar === "folha_cancelada"
@@ -330,7 +341,7 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
                     ? <>{oferta.dias} dias grátis e depois <b className="text-[#16121c]">{oferta.preco}/ano</b>{oferta.precoDe ? <> (em vez de {oferta.precoDe})</> : null}{mes ? <> — {mes} por mês</> : null}.</>
                     : <>O ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>)
                 : <>Você cancelou a renovação — tudo bem. Se quiser ficar, o ano inteiro{oferta.precoDe ? <> sai de <s>{oferta.precoDe}</s></> : null} por <b className="text-[#16121c]">{oferta.preco}</b>{mes ? <> — {mes} por mês</> : null}.</>}
-          </p>
+          </p>}
         </motion.div>
 
         <div className="grid place-items-center mt-2 -mb-2" aria-hidden>
@@ -362,7 +373,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
           className="text-[12px] text-[#4f5a64] text-center leading-snug mt-4"
           data-testid="presente69-regra"
         >
-          {lugar === "cancelou_teste"
+          {curtinho
+            ? <><b className="text-[#16121c]">Nada é cobrado hoje.</b> Cancelou antes do fim do teste, não paga nada.</>
+            : lugar === "cancelou_teste"
             ? <>Nada é cobrado hoje: você continua no teste e só paga <b className="text-[#16121c]">{oferta.preco}</b>{oferta.fimMs ? <> quando ele acabar, em {dataCurta(oferta.fimMs)}</> : <> quando ele acabar</>}. Depois, renova uma vez por ano.</>
             : lugar === "folha_cancelada" && comTeste
               ? <><b className="text-[#16121c]">Nada é cobrado hoje.</b> {oferta.dias} dias grátis, depois <b className="text-[#16121c]">{oferta.preco}</b> por ano pela App Store. Cancelou antes do fim do teste, não paga nada.</>
@@ -408,8 +421,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
           lugar={`presente_${lugar}`}
           produto={oferta.produto}
           preco={oferta.preco}
-          precoTeste={null}
+          precoTeste={enxuto ? oferta.precoTeste ?? null : null}
           dias={oferta.dias}
+          enxuto={enxuto}
           onContinuar={() => { setExplicando(false); void comprar(); }}
           onFechar={() => setExplicando(false)}
         />

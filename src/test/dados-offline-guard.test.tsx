@@ -16,6 +16,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, waitFor, act } from "@testing-library/react";
+import { useEffect } from "react";
 
 type Linha = { user_id: string; key: string; value: unknown };
 const servidores = new Map<string, Map<string, unknown>>();
@@ -852,6 +853,56 @@ describe("revisão 17/10: liberar a escrita só depois que as telas têm o valor
 
   it("o aviso de 'chave mudou' do provider é o MESMO evento que o usePersistedState ouve", () => {
     expect(EVENTO_TELAS_DA_CHAVE).toBe(EVENTO_MESMA_CHAVE);
+  });
+});
+
+describe("revisão 2 (17/10): cópia guardada e liberação — casos do revisor", () => {
+  it("cópia guardada que sobrou (o envio chegou, a resposta não) e o servidor JÁ tem o juntado: nada duplica e a cópia sai", async () => {
+    servidor().set("finance-expenses", [...ANTIGOS, { id: "d", valor: 5 }]);
+    localStorage.setItem("core-seguradas-u1:finance-expenses", JSON.stringify({ base: [], valor: [{ id: "d", valor: 5 }], sistema: false, dia: "2026-10-16" }));
+    montar();
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d"]);
+    expect(upserts).toHaveLength(0);
+    expect(guardadasNoAparelho()).toEqual([]);
+  });
+
+  it("efeito que grava ao carregar (como o check-in da Home) sobe UMA vez e não deixa cópia guardada", async () => {
+    servidor().set("gamification-lastCheckIn", "2026-10-15");
+    const CheckIn = () => {
+      const { loaded, get, set } = useUserData();
+      useEffect(() => {
+        if (!loaded) return;
+        if (get<string>("gamification-lastCheckIn", "") !== "2026-10-16") set("gamification-lastCheckIn", "2026-10-16");
+      }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+      return null;
+    };
+    render(<UserDataProvider><Sonda /><CheckIn /></UserDataProvider>);
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(400);
+    expect(servidor().get("gamification-lastCheckIn")).toBe("2026-10-16");
+    expect(upserts.filter((u) => u.key === "gamification-lastCheckIn")).toHaveLength(1);
+    expect(guardadasNoAparelho()).toEqual([]);
+  });
+
+  it("duas telas na mesma chave; a 1ª grava antes de a conta chegar; depois a 2ª grava: ninguém perde nada", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "segurar";
+    let outra: Gasto[] = [];
+    let setOutra: (v: Gasto[] | ((p: Gasto[]) => Gasto[])) => void = () => {};
+    const Widget = () => { const [g, s] = usePersistedState<Gasto[]>("finance-expenses", []); outra = g; setOutra = s; return null; };
+    render(<UserDataProvider><Sonda /><Financas /><Widget /></UserDataProvider>);
+    await esperar(50);
+    act(() => setGastos((p) => [...p, { id: "d", valor: 5 }]));
+    await act(async () => { soltarLeitura?.(); });
+    await waitFor(() => expect(api.loaded).toBe(true));
+    await esperar(50);
+    expect(ids(gastos)).toEqual(["a", "b", "c", "d"]);
+    expect(ids(outra)).toEqual(["a", "b", "c", "d"]); // a outra tela também adotou o juntado
+    act(() => setOutra((p) => [...p, { id: "e", valor: 6 }]));
+    await esperar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d", "e"]);
   });
 });
 

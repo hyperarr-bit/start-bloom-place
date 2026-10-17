@@ -171,6 +171,9 @@ interface OpcoesDeEscrita {
   base?: unknown;
 }
 
+/** Situação da leitura da conta, pro aviso na tela (ver `semConexao`). */
+export type SituacaoDaConta = "sem" | "lenta" | "demorando" | null;
+
 interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
   set: (key: string, value: any, opts?: OpcoesDeEscrita) => void;
@@ -181,12 +184,16 @@ interface UserDataContextType {
    */
   loaded: boolean;
   /**
-   * A conta ainda não chegou do servidor e a leitura falhou ("sem") ou está demorando
-   * ("lenta"); null quando está tudo certo (ou convidado). Opcional no tipo pra não
-   * obrigar os mocks de teste.
+   * A conta ainda não chegou do servidor: a última leitura falhou ("sem"); a leitura no ar
+   * passou de 8 s mas está dentro do prazo ("lenta" — nada a corta); ou passou do prazo e segue
+   * no ar ("demorando" — aí o "tentar de novo" troca por uma nova). null quando está tudo certo
+   * (ou convidado). Opcional no tipo pra não obrigar os mocks de teste.
    */
-  semConexao?: "sem" | "lenta" | null;
-  /** Tenta ler a conta de novo agora (botão do aviso de sem conexão). */
+  semConexao?: SituacaoDaConta;
+  /**
+   * Tenta ler a conta de novo agora (botão do aviso, rede voltando, volta pro app). Com a leitura
+   * no ar dentro do prazo não faz nada: o que está chegando não é cortado (revisão 2, 17/10).
+   */
   tentarDeNovo?: () => void;
   /**
    * Marcar OUTRO dia (02/10): roda `fn` (uma ou várias escritas, SÍNCRONAS) dizendo
@@ -215,13 +222,42 @@ const WRITE_WARN_BYTES = 100_000;
 const MS_LEITURA_LENTA = 8_000;
 /** Espera entre as tentativas de ler a conta depois de uma falha (a última se repete). */
 const ESPERAS_NOVA_TENTATIVA = [2_000, 5_000, 10_000, 20_000, 30_000];
-/**
- * Limite de cada tentativa de ler a conta (revisão 17/10): leitura pendurada (rede morta sem
- * erro) prendia o app em "Conexão lenta" até matar o processo. Passou do limite, a leitura é
- * cancelada e conta como falha; o limite cresce a cada falha — conta grande em rede fraca
- * ganha mais tempo na tentativa seguinte.
+/*
+ * PRAZO DE CADA LEITURA DA CONTA — O PRAZO NÃO CORTA (revisão 2, 17/10).
+ *
+ * A 1ª versão (15/30/60 s) cancelava a leitura no estouro. Só que o user_data guarda FOTO em
+ * base64 (desejos, viagens, pet antigo): uma chave sozinha passa de MB, e conta pesada em rede
+ * fraca leva minutos. Uma leitura de 70 s era cortada aos 15, 30 e 60 s, recomeçava do zero a
+ * cada vez e o app ficava sem a conta pra sempre (9 pedidos em 10 min) — na v1016, sem prazo,
+ * carregava em 70 s com UM pedido; uma de 20 s levava 37 s, com 2 downloads e a faixa de falha.
+ * Sem como medir o progresso do download, "pendurada" e "pesada" são iguais vistas daqui.
+ *
+ * Então o prazo só diz até quando a leitura no ar é "normal":
+ *  - dentro dele, NADA a interrompe: nem o botão, nem a volta pro app, nem a rede voltando, nem o
+ *    auth reemitindo a sessão (volta pro app, token renovado) — a faixa diz "ainda carregando";
+ *  - passou dele, a leitura SEGUE (pode ser só pesada), mas a faixa mostra o "Tentar de novo" e
+ *    esses gatilhos podem trocá-la por uma nova (a velha é cancelada — se estava pendurada numa
+ *    conexão morta, ninguém mais espera por ela);
+ *  - cada troca (ou falha) depois do prazo DOBRA o prazo da próxima, sem teto — o botão nunca
+ *    volta a escada pros 15 s; só a conta chegando (ou outra conta entrando) zera. O limite de 16
+ *    dobras só mantém o setTimeout válido (~11 dias).
  */
-const MS_LIMITE_LEITURA = [15_000, 30_000, 60_000];
+const MS_PRAZO_LEITURA = 15_000;
+const prazoDaLeitura = (degrau: number) => MS_PRAZO_LEITURA * 2 ** Math.min(degrau, 16);
+
+/** A leitura da conta no ar (uma por vez): de quem, desde quando, até quando é "normal". */
+type LeituraNoAr = {
+  uid: string;
+  ac: AbortController;
+  desde: number;
+  prazo: number;
+  /** relógios da faixa desta leitura ("lenta" aos 8 s, "demorando" no prazo) */
+  timers: ReturnType<typeof setTimeout>[];
+};
+const cancelarLeitura = (l: LeituraNoAr) => {
+  l.ac.abort();
+  l.timers.forEach(clearTimeout);
+};
 
 /**
  * Escrita feita ANTES de a conta chegar do servidor (16/10). Não sobe: fica aqui até a
@@ -358,13 +394,16 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const seguradas = useRef<Record<string, EscritaSegurada>>({});
   /** Hora da última escrita de cada chave: escrita feita DEPOIS do pedido de leitura ganha do retrato. */
   const ultimaEscrita = useRef<Map<string, number>>(new Map());
-  const leituraNoAr = useRef(false);
-  /** Desde quando a rodada de leitura atual está no ar ("tentar de novo" só corta leitura velha). */
-  const leituraDesde = useRef<number | null>(null);
+  /** (revisão 2, 17/10) a leitura da conta no ar — ver PRAZO DE CADA LEITURA DA CONTA */
+  const leituraAtual = useRef<LeituraNoAr | null>(null);
+  /** quantas vezes o prazo da leitura já dobrou enquanto a conta não chega */
+  const degrauDoPrazo = useRef(0);
+  /** a próxima tentativa marcada depois de uma falha */
+  const timerNovaTentativa = useRef<ReturnType<typeof setTimeout> | null>(null);
   const falhasSeguidas = useRef(0);
   /** Quando a conta começou a faltar (1ª tentativa desta pessoa) — telemetria da recuperação. */
   const inicioDaEspera = useRef<number | null>(null);
-  const [semConexao, setSemConexao] = useState<"sem" | "lenta" | null>(null);
+  const [semConexao, setSemConexao] = useState<SituacaoDaConta>(null);
   const [tentativa, setTentativa] = useState(0);
   /*
    * LIBERAR SÓ DEPOIS QUE AS TELAS TÊM O VALOR JUNTADO (revisão 17/10). A 1ª leitura certa
@@ -401,6 +440,11 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // 16/10: o que estava segurado/sincronizado era da outra conta (ou de ninguém)
       sincronizadoRef.current = false;
       ultimaEscrita.current.clear();
+      // revisão 2 (17/10): a leitura no ar e a tentativa marcada também — o efeito da hidratação
+      // não corta mais leitura ao rodar de novo, então quem corta na troca de conta é aqui
+      if (leituraAtual.current) { cancelarLeitura(leituraAtual.current); leituraAtual.current = null; }
+      if (timerNovaTentativa.current) { clearTimeout(timerNovaTentativa.current); timerNovaTentativa.current = null; }
+      degrauDoPrazo.current = 0;
       falhasSeguidas.current = 0;
       inicioDaEspera.current = null;
       aLiberar.current = null;
@@ -438,17 +482,37 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // -------- AUTHENTICATED --------
-    const ac = new AbortController();
-    // rodada cancelada (troca de conta, 2ª rodada, tentar de novo, desmontou): a nova é dona do estado
-    let cancelada = false;
-    let timerLenta: ReturnType<typeof setTimeout> | null = null;
-    let timerLimite: ReturnType<typeof setTimeout> | null = null;
-    let timerDeNovo: ReturnType<typeof setTimeout> | null = null;
+    // Revisão 2 (17/10): uma leitura por vez, e a que está no ar DENTRO DO PRAZO segue — esta
+    // rodada (auth reemitindo a sessão na volta pro app ou ao renovar o token, botão, rede
+    // voltando, tentativa marcada) não faz nada. Passou do prazo: é trocada por uma nova, com o
+    // dobro do prazo. Sem leitura no ar: começa uma (a tentativa marcada, se houver, sai).
+    const anterior = leituraAtual.current;
+    if (anterior) {
+      if (anterior.uid === user.id && Date.now() - anterior.desde < anterior.prazo) return;
+      cancelarLeitura(anterior);
+      leituraAtual.current = null;
+      if (anterior.uid === user.id) {
+        degrauDoPrazo.current += 1;
+        // trocou a vencida: a faixa volta pro "ainda carregando" sem botão até a nova vencer
+        if (!sincronizadoRef.current) setSemConexao("lenta");
+      }
+    }
+    if (timerNovaTentativa.current) { clearTimeout(timerNovaTentativa.current); timerNovaTentativa.current = null; }
+
+    const uid = user.id;
+    const leitura: LeituraNoAr = { uid, ac: new AbortController(), desde: Date.now(), prazo: prazoDaLeitura(degrauDoPrazo.current), timers: [] };
+    leituraAtual.current = leitura;
+    // esta leitura ainda é a dona do estado? (não foi trocada, a conta não mudou, não desmontou)
+    const vale = () => leituraAtual.current === leitura && userRef.current?.id === uid;
+    if (inicioDaEspera.current === null) inicioDaEspera.current = leitura.desde;
+    // a faixa enquanto a conta não chega: "lenta" aos 8 s (sem botão: nada corta a leitura no
+    // prazo); passou do prazo, "demorando" (o botão aparece e troca a leitura)
+    leitura.timers.push(
+      setTimeout(() => { if (vale() && !sincronizadoRef.current) setSemConexao("lenta"); }, MS_LEITURA_LENTA),
+      setTimeout(() => { if (vale() && !sincronizadoRef.current) setSemConexao("demorando"); }, leitura.prazo),
+    );
 
     const run = async () => {
-      leituraNoAr.current = true; // (16/10) uma rodada por vez: "tentar de novo" espera esta acabar
-      leituraDesde.current = Date.now();
-      if (inicioDaEspera.current === null) inicioDaEspera.current = Date.now();
       // Step 0: migrate any guest data into this account before we hydrate.
       const guestData = readAllGuestData();
       const guestKeys = Object.keys(guestData);
@@ -526,30 +590,18 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       } catch {}
 
       // Step 2: refresh from Supabase (server wins for non-heavy keys).
-      if (cancelada) return;
+      if (!vale()) return;
       const pedidoEm = Date.now();
-      if (!sincronizadoRef.current) {
-        timerLenta = setTimeout(() => {
-          if (!sincronizadoRef.current && !cancelada) setSemConexao((s) => s ?? "lenta");
-        }, MS_LEITURA_LENTA);
-      }
-      // 17/10: a tentativa tem prazo — leitura pendurada vira falha e entra no "tentar de novo"
-      // (corrida com o prazo: nem uma promessa que ignora o cancelamento prende a rodada)
-      const limite = MS_LIMITE_LEITURA[Math.min(falhasSeguidas.current, MS_LIMITE_LEITURA.length - 1)];
-      const estouro = new Promise<{ data: null; error: { message: string } }>((ok) => {
-        timerLimite = setTimeout(() => {
-          ac.abort();
-          ok({ data: null, error: { message: `leitura da conta passou de ${limite / 1000} s` } });
-        }, limite);
-      });
-      const leitura = (async (): Promise<{ data: any[] | null; error: any }> => {
+      // revisão 2 (17/10): sem corrida com o prazo — a leitura vai até o fim (ou até ser trocada
+      // depois do prazo, que a cancela; aí o `vale()` abaixo descarta a resposta dela)
+      const { data, error } = await (async (): Promise<{ data: any[] | null; error: any }> => {
         try {
-          if (!(await sessaoEhDaConta(user.id))) return { data: null, error: { message: "sessão do auth ausente ou de outra conta" } };
+          if (!(await sessaoEhDaConta(uid))) return { data: null, error: { message: "sessão do auth ausente ou de outra conta" } };
           const r = await (supabase as any)
             .from("user_data")
             .select("key, value")
-            .eq("user_id", user.id)
-            .abortSignal(ac.signal);
+            .eq("user_id", uid)
+            .abortSignal(leitura.ac.signal);
           const d = r?.data ?? null;
           const e = r?.error ?? null;
           if (!e && !Array.isArray(d)) return { data: null, error: { message: "resposta sem lista" } };
@@ -558,15 +610,11 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           return { data: null, error: { message: String(e?.message ?? e) } };
         }
       })();
-      const { data, error } = await Promise.race([leitura, estouro]);
-      if (timerLenta) { clearTimeout(timerLenta); timerLenta = null; }
-      if (timerLimite) { clearTimeout(timerLimite); timerLimite = null; }
-      if (cancelada) return;
-      leituraNoAr.current = false;
-      leituraDesde.current = null;
+      if (!vale()) return; // trocada, outra conta ou desmontou: a dona do estado é outra
+      leitura.timers.forEach(clearTimeout);
+      leituraAtual.current = null;
 
       if (!error && data) {
-        const uid = user.id;
         const eraSincronizado = sincronizadoRef.current;
         const map: Record<string, any> = {};
         data.forEach((row: any) => {
@@ -675,6 +723,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           setLiberacao((n) => n + 1);
         }
         falhasSeguidas.current = 0;
+        degrauDoPrazo.current = 0;
         inicioDaEspera.current = null;
         setSemConexao(null);
         setLoaded(true);
@@ -692,29 +741,37 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       // 16/10: a conta NÃO chegou — `loaded` fica false (nada de tela "carregada" com o
       // store vazio), o aviso aparece e tenta de novo sozinho.
       falhasSeguidas.current += 1;
+      // revisão 2: falhou DEPOIS do prazo (ex.: o sistema desistiu da conexão lenta) — a próxima
+      // ganha o dobro; falha rápida (sem rede) não mexe no prazo
+      if (Date.now() - leitura.desde >= leitura.prazo) degrauDoPrazo.current += 1;
       setSemConexao("sem");
       const espera = ESPERAS_NOVA_TENTATIVA[Math.min(falhasSeguidas.current - 1, ESPERAS_NOVA_TENTATIVA.length - 1)];
-      timerDeNovo = setTimeout(() => setTentativa((t) => t + 1), espera);
+      timerNovaTentativa.current = setTimeout(() => {
+        timerNovaTentativa.current = null;
+        setTentativa((t) => t + 1);
+      }, espera);
     };
 
     run();
-    return () => {
-      cancelada = true;
-      ac.abort();
-      leituraNoAr.current = false;
-      leituraDesde.current = null;
-      if (timerLenta) clearTimeout(timerLenta);
-      if (timerLimite) clearTimeout(timerLimite);
-      if (timerDeNovo) clearTimeout(timerDeNovo);
-    };
+    // Sem limpeza de propósito (revisão 2): rodar de novo NÃO corta a leitura no prazo. Quem
+    // cancela é a troca de conta (efeito acima), desmontar (efeito abaixo) e a troca da leitura
+    // vencida (no começo deste efeito).
   }, [user, authLoading, tentativa]);
 
+  // desmontou: a leitura no ar e a tentativa marcada vão embora
+  useEffect(() => () => {
+    if (leituraAtual.current) { cancelarLeitura(leituraAtual.current); leituraAtual.current = null; }
+    if (timerNovaTentativa.current) { clearTimeout(timerNovaTentativa.current); timerNovaTentativa.current = null; }
+  }, []);
+
   // 16/10: sem a conta ainda, tenta de novo assim que a rede volta ou a pessoa volta pro app.
-  // 17/10: leitura no ar há pouco segue (não corta o que está chegando); no ar há mais de
-  // MS_LEITURA_LENTA ("conexão lenta" na tela), o botão/volta da rede começa outra.
+  // Revisão 2 (17/10): com a leitura no ar DENTRO DO PRAZO o gatilho não faz nada (não corta o
+  // que está chegando nem zera o prazo); sem leitura no ar (esperando a tentativa marcada) ou
+  // com a do ar vencida, o efeito da hidratação começa outra.
   const tentarDeNovo = useCallback(() => {
     if (!userRef.current || sincronizadoRef.current) return;
-    if (leituraNoAr.current && Date.now() - (leituraDesde.current ?? 0) < MS_LEITURA_LENTA) return;
+    const l = leituraAtual.current;
+    if (l && Date.now() - l.desde < l.prazo) return;
     setTentativa((t) => t + 1);
   }, []);
   useEffect(() => {

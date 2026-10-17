@@ -22,7 +22,10 @@ const servidores = new Map<string, Map<string, unknown>>();
 const doServidor = (uid: string) => { let m = servidores.get(uid); if (!m) { m = new Map(); servidores.set(uid, m); } return m; };
 const servidor = () => doServidor("u1");
 const upserts: Linha[] = [];
-let leituraTotal: "ok" | "erro" | "segurar" | "pendurar" = "ok";
+let leituraTotal: "ok" | "erro" | "segurar" | "pendurar" | "demorar" = "ok";
+/** "demorar": a resposta leva isto (conta pesada em rede fraca) — e, com `demoraFalha`, chega como erro */
+let msDaLeitura = 0;
+let demoraFalha = false;
 let leituraChave: "ok" | "erro" | "segurar" = "ok";
 let gravacaoFalha = false;
 let sessaoValida = true;
@@ -51,6 +54,13 @@ vi.mock("@/integrations/supabase/client", () => {
         const foto = [...doServidor(uid).entries()].map(([key, value]) => ({ key, value: clonar(value) }));
         if (leituraTotal === "erro") return Promise.resolve({ data: null, error: ERRO_REDE });
         if (leituraTotal === "pendurar") return new Promise(() => {}); // rede morta: nunca responde, nem ao cancelar
+        if (leituraTotal === "demorar") {
+          const falha = demoraFalha;
+          return new Promise((ok) => {
+            const t = setTimeout(() => ok(falha ? { data: null, error: ERRO_REDE } : { data: foto, error: null }), msDaLeitura);
+            (sinal as AbortSignal)?.addEventListener?.("abort", () => { clearTimeout(t); ok({ data: null, error: { message: "AbortError: aborted" } }); });
+          });
+        }
         if (leituraTotal === "segurar") {
           return new Promise((ok) => {
             soltarLeitura = () => ok({ data: foto, error: null });
@@ -134,6 +144,8 @@ beforeEach(() => {
   servidores.clear();
   upserts.length = 0;
   leituraTotal = "ok";
+  msDaLeitura = 0;
+  demoraFalha = false;
   leituraChave = "ok";
   gravacaoFalha = false;
   sessaoValida = true;
@@ -412,6 +424,7 @@ describe("o conserto: segurar, avisar, tentar de novo e juntar", () => {
     expect(ids(doServidor("u1").get("finance-expenses"))).toEqual(["a", "b", "c"]);
     expect(ids(doServidor("u2").get("finance-expenses"))).toEqual(["x"]);
     expect(ids(api.get("finance-expenses", []))).toEqual(["x"]);
+    expect(Object.keys(localStorage).filter((k) => k.startsWith("core-seguradas-"))).toEqual([]); // nem a cópia do aparelho fica
   });
 
   it("sair e entrar de novo: o que ficou segurado antes de sair é descartado; a conta volta inteira", async () => {
@@ -639,39 +652,164 @@ describe("revisão 17/10: anotou e FECHOU o app antes de a conta chegar", () => 
   });
 });
 
-describe("revisão 17/10: leitura que nunca responde (rede pendurada)", () => {
-  it("passa do limite (15 s) → vira falha, aparece o 'tentar de novo' e a próxima tentativa carrega", async () => {
-    servidor().set("finance-expenses", ANTIGOS);
-    leituraTotal = "pendurar";
-    vi.useRealTimers();
+/*
+ * Revisão 2 (17/10): o prazo de 15/30/60 s CORTAVA a leitura — conta pesada (foto em base64 no
+ * user_data) em rede fraca nunca carregava (70 s → 9 pedidos em 10 min, sem a conta pra sempre;
+ * na v1016 eram 70 s e UM pedido) e uma leitura de 20 s levava 37 s, com 2 downloads e a faixa de
+ * falha. Agora o prazo não corta: só libera o "tentar de novo" (e os gatilhos) depois dele.
+ */
+describe("revisão 2 (17/10): prazo da leitura × conta pesada em rede fraca — o prazo não corta", () => {
+  const relogioFalso = () => {
+    vi.useRealTimers(); // o beforeEach só falsifica o Date; aqui o relógio dos timers também
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     vi.setSystemTime(new Date(2026, 9, 16, 10, 0));
+  };
+  const avancar = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  /** anda de `passo` em `passo` até a conta chegar (ou o teto), anotando a faixa de cada instante */
+  const andarAteCarregar = async (teto: number, passo = 1_000) => {
+    const faixas: { t: number; faixa: unknown }[] = [];
+    let t = 0;
+    while (!api?.loaded && t < teto) {
+      await avancar(passo);
+      t += passo;
+      faixas.push({ t, faixa: api.semConexao });
+    }
+    return { t, faixas, faixaEm: (ms: number) => faixas.find((f) => f.t === ms)?.faixa };
+  };
+
+  it("leitura de 20 s: carrega aos 20 s com UM pedido e sem a faixa de falha (antes: 37 s, 2 downloads e 'não conseguimos carregar')", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "demorar";
+    msDaLeitura = 20_000;
+    relogioFalso();
     montar();
-    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
-    expect(api.semConexao).toBe("lenta");
-    await act(async () => { await vi.advanceTimersByTimeAsync(6_500); }); // 15 s: estourou
-    expect(api.semConexao).toBe("sem");
-    expect(api.loaded).toBe(false);
-    leituraTotal = "ok";
-    await act(async () => { await vi.advanceTimersByTimeAsync(2_100); }); // 1ª espera: 2 s
+    const { t, faixas, faixaEm } = await andarAteCarregar(600_000);
     expect(api.loaded).toBe(true);
+    expect(t).toBeLessThanOrEqual(21_000);
+    expect(leiturasTotais).toBe(1);
+    expect(faixaEm(9_000)).toBe("lenta"); // "Conexão lenta — ainda carregando…" (sem botão)
+    expect(faixaEm(16_000)).toBe("demorando"); // passou do prazo: segue no ar, o botão aparece
+    expect(faixas.some((f) => f.faixa === "sem")).toBe(false);
     expect(api.semConexao).toBeNull();
+    expect(ids(gastos)).toEqual(["a", "b", "c"]);
   });
 
-  it("evento online / volta pro app / botão com a 1ª leitura pendurada há mais de 8 s: começa outra na hora", async () => {
-    leituraTotal = "pendurar";
-    vi.useRealTimers();
-    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
-    vi.setSystemTime(new Date(2026, 9, 16, 10, 0));
-    render(<UserDataProvider><Sonda /></UserDataProvider>);
-    await act(async () => { await vi.advanceTimersByTimeAsync(9_000); });
-    expect(api.semConexao).toBe("lenta");
-    const antes = leiturasTotais;
-    leituraTotal = "ok";
-    await act(async () => { window.dispatchEvent(new Event("online")); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(50); });
-    expect(leiturasTotais).toBeGreaterThan(antes);
+  it("leitura de 70 s (conta de vários MB em 3G fraco): carrega com UM pedido (antes: 9 pedidos em 10 min e nunca carregava)", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "demorar";
+    msDaLeitura = 70_000;
+    relogioFalso();
+    montar();
+    const { t, faixas } = await andarAteCarregar(600_000, 5_000);
     expect(api.loaded).toBe(true);
+    expect(t).toBeLessThanOrEqual(75_000);
+    expect(leiturasTotais).toBe(1);
+    expect(faixas.some((f) => f.faixa === "sem")).toBe(false);
+    expect(ids(gastos)).toEqual(["a", "b", "c"]);
+  });
+
+  it("botão, rede voltando, volta pro app e o auth reemitindo a sessão DENTRO do prazo: nada é cortado nem recomeça", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "demorar";
+    msDaLeitura = 20_000;
+    relogioFalso();
+    const r = montar();
+    await avancar(9_000);
+    expect(api.semConexao).toBe("lenta");
+    act(() => api.tentarDeNovo?.());
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    auth.user = { id: "u1" }; // o auth emite a sessão de novo (volta pro app, token renovado): objeto novo, mesma conta
+    r.rerender(arvore());
+    await avancar(5_000); // 14 s: ainda no prazo
+    act(() => api.tentarDeNovo?.());
+    await avancar(1_000);
+    expect(leiturasTotais).toBe(1);
+    expect(api.loaded).toBe(false);
+    act(() => setGastos((p) => [...p, { id: "d", valor: 5 }])); // segurada enquanto isso
+    await avancar(6_000); // 21 s: a MESMA leitura chegou
+    expect(api.loaded).toBe(true);
+    expect(leiturasTotais).toBe(1);
+    await avancar(400);
+    expect(ids(servidor().get("finance-expenses"))).toEqual(["a", "b", "c", "d"]);
+    expect(ids(gastos)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("leitura pendurada: nada corta sozinho; passou do prazo, o botão troca por uma nova que ganha o DOBRO do prazo (o botão não volta a escada pros 15 s)", async () => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "pendurar";
+    relogioFalso();
+    montar();
+    await avancar(16_000);
+    expect(api.semConexao).toBe("demorando");
+    await avancar(60_000); // ninguém tocou em nada: nada é cortado nem recomeça sozinho
+    expect(leiturasTotais).toBe(1);
+    expect(api.loaded).toBe(false);
+    act(() => api.tentarDeNovo?.()); // passou do prazo: troca
+    await avancar(10);
+    expect(leiturasTotais).toBe(2);
+    expect(api.semConexao).toBe("lenta"); // o botão some até a nova vencer
+    await avancar(16_000); // 16 s da 2ª: o prazo dela é 30 s
+    act(() => api.tentarDeNovo?.());
+    await avancar(10);
+    expect(leiturasTotais).toBe(2); // não cortou
+    expect(api.semConexao).toBe("lenta");
+    await avancar(15_000); // 31 s da 2ª: venceu
+    expect(api.semConexao).toBe("demorando");
+    leituraTotal = "ok";
+    act(() => api.tentarDeNovo?.());
+    await avancar(10);
+    expect(leiturasTotais).toBe(3);
+    expect(api.loaded).toBe(true);
+    expect(api.semConexao).toBeNull();
+    expect(ids(gastos)).toEqual(["a", "b", "c"]);
+  });
+
+  it.each(["rede voltando", "volta pro app", "auth reemitindo a sessão"])("leitura pendurada há mais que o prazo + %s: começa outra na hora", async (gatilho) => {
+    servidor().set("finance-expenses", ANTIGOS);
+    leituraTotal = "pendurar";
+    relogioFalso();
+    const r = montar();
+    await avancar(16_000);
+    expect(api.semConexao).toBe("demorando");
+    leituraTotal = "ok";
+    if (gatilho === "rede voltando") await act(async () => { window.dispatchEvent(new Event("online")); });
+    else if (gatilho === "volta pro app") await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    else { auth.user = { id: "u1" }; r.rerender(arvore()); }
+    await avancar(50);
+    expect(leiturasTotais).toBe(2);
+    expect(api.loaded).toBe(true);
+    expect(ids(gastos)).toEqual(["a", "b", "c"]);
+  });
+
+  it("falhou DEPOIS do prazo (o sistema desistiu da conexão): a próxima ganha o dobro; falha rápida (sem rede) não mexe no prazo", async () => {
+    leituraTotal = "erro";
+    relogioFalso();
+    render(<UserDataProvider><Sonda /></UserDataProvider>);
+    await avancar(10);
+    expect(api.semConexao).toBe("sem");
+    await avancar(2_000); // 2ª tentativa sozinha: falha rápida de novo
+    expect(leiturasTotais).toBe(2);
+    leituraTotal = "demorar";
+    msDaLeitura = 60_000;
+    demoraFalha = true;
+    await avancar(5_000); // 3ª tentativa: o prazo continua 15 s (as falhas rápidas não dobraram)
+    expect(leiturasTotais).toBe(3);
+    await avancar(16_000);
+    expect(api.semConexao).toBe("demorando");
+    await avancar(44_100); // aos 60 s a conexão cai com erro — depois do prazo
+    expect(api.semConexao).toBe("sem");
+    leituraTotal = "pendurar";
+    await avancar(10_000); // 4ª tentativa (espera de 10 s): prazo de 30 s
+    expect(leiturasTotais).toBe(4);
+    await avancar(16_000);
+    act(() => api.tentarDeNovo?.());
+    await avancar(10);
+    expect(leiturasTotais).toBe(4); // 16 s < 30 s: não corta
+    await avancar(15_000);
+    expect(api.semConexao).toBe("demorando");
   });
 
   it("leitura no ar há pouco (< 8 s): a volta pro app NÃO corta (o que está chegando continua)", async () => {
@@ -750,13 +888,18 @@ describe("o aviso na tela (OfflineBanner)", () => {
     expect(texto).not.toContain("Sem conexão");
   });
 
-  it("leitura demorando: 'conexão lenta'; com a conta em dia: nada", async () => {
+  it("leitura no prazo: 'ainda carregando' SEM botão (nada corta o que está chegando); passou do prazo: o botão aparece; conta em dia: nada", async () => {
     const { OfflineBanner } = await import("@/components/OfflineBanner");
     const { UserDataContext } = await import("@/hooks/use-user-data");
-    const { screen } = await import("@testing-library/react");
-    const r = render(<UserDataContext.Provider value={contexto({ semConexao: "lenta" })}><OfflineBanner /></UserDataContext.Provider>);
-    expect(screen.getByRole("status").textContent).toContain("Conexão lenta — seus dados aparecem assim que carregarem.");
-    expect(screen.queryByRole("button")).toBeNull(); // sem tentarDeNovo no contexto, sem botão
+    const { screen, fireEvent } = await import("@testing-library/react");
+    const tentar = vi.fn();
+    const r = render(<UserDataContext.Provider value={contexto({ semConexao: "lenta", tentarDeNovo: tentar })}><OfflineBanner /></UserDataContext.Provider>);
+    expect(screen.getByRole("status").textContent).toContain("Conexão lenta — ainda carregando…");
+    expect(screen.queryByRole("button")).toBeNull(); // no prazo, o botão não faria nada: não aparece
+    r.rerender(<UserDataContext.Provider value={contexto({ semConexao: "demorando", tentarDeNovo: tentar })}><OfflineBanner /></UserDataContext.Provider>);
+    expect(screen.getByRole("status").textContent).toContain("Conexão lenta — ainda carregando…");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(tentar).toHaveBeenCalledTimes(1);
     r.unmount();
     render(<UserDataContext.Provider value={contexto({ semConexao: null, loaded: true })}><OfflineBanner /></UserDataContext.Provider>);
     expect(screen.queryByRole("status")).toBeNull();

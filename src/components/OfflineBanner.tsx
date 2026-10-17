@@ -16,13 +16,18 @@ import { UserDataContext } from "@/hooks/use-user-data";
  *
  * 17/10 (revisão): "Sem conexão" só quando o aparelho está MESMO sem rede; com rede e o
  * servidor falhando (5xx, relógio torto fazendo o token parecer vencido) a faixa diz que está
- * tentando de novo. "Tentar de novo" também na conexão lenta (corta a leitura velha).
+ * tentando de novo.
+ *
+ * Revisão 2 (17/10): leitura no ar dentro do prazo ("lenta") NÃO tem botão — nada corta o que
+ * está chegando (conta pesada em rede fraca leva minutos), e um botão que não faz nada só
+ * confunde. O "Tentar de novo" aparece quando ele faz algo: a última leitura falhou ("sem") ou a
+ * do ar passou do prazo e segue carregando ("demorando" — o botão troca por uma nova).
  */
 export const OfflineBanner = () => {
   const { isOnline, pendingCount } = useOfflineQueue();
   const dados = useContext(UserDataContext);
   const conta = dados?.semConexao ?? null;
-  const tentarDeNovo = dados?.tentarDeNovo;
+  const tentarDeNovo = conta === "lenta" ? undefined : dados?.tentarDeNovo;
 
   return (
     <AnimatePresence>
@@ -39,8 +44,8 @@ export const OfflineBanner = () => {
         >
           <WifiOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span>
-            {conta === "lenta"
-              ? "Conexão lenta — seus dados aparecem assim que carregarem."
+            {conta !== "sem"
+              ? "Conexão lenta — ainda carregando…"
               : isOnline
                 ? "Não conseguimos carregar seus dados agora — tentando de novo…"
                 : "Sem conexão — seus dados aparecem quando a internet voltar."}

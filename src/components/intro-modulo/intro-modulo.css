@@ -113,5 +113,4 @@ html[data-conhecer-mais="1"] header.sticky { top: calc(var(--app-safe-top, 0px) 
 .dark .cm-lembrete-ver { background: #fff; color: #16121c; }
 .cm-lembrete-nao { flex: none; min-height: 34px; padding: 0 8px; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
 /* o acesso permanente no cabeçalho do módulo (ícone + "Dicas") */
-.cm-acesso { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: hsl(var(--muted-foreground)); }
-.cm-acesso:active { background: hsl(var(--muted)); }
+/* o botão "Dicas" do cabeçalho (17/10) virou só o ícone, com as classes do botão do tema — ver AcessoConhecerMais */

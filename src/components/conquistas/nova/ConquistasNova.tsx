@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Check, ChevronRight, Shield, Trophy } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { trackEvent } from "@/lib/analytics";
-import { mesAtualExtenso } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { diaDaMissao, missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { diaDaMissao as diaDaMissaoDoses, lerMissao as lerMissaoDoses } from "@/lib/missao-doses";
@@ -56,10 +56,6 @@ export interface PropsConquistasNova {
   onVoltar?: () => void;
 }
 
-const mesCurto = (d = new Date()) => {
-  const m = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-  return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${d.getFullYear()}`;
-};
 const ORIGENS = ["home", "menu", "celebracao", "toast", "missao"];
 /** A capa "levanta" este tempo antes de o álbum abrir. */
 export const LEVANTAR_MS = 260;
@@ -89,11 +85,8 @@ const Cabecalho = ({ onVoltar }: { onVoltar: () => void }) => (
       {/* o troféu de sempre (dono 17/10: o fogo no cabeçalho não) — o mesmo da TelaConquistas, claro e escuro */}
       <Trophy className="w-5 h-5 text-amber-500" aria-hidden />
       <h1 className="text-base font-bold tracking-tight">CONQUISTAS</h1>
-      <div className="flex items-center gap-2 ml-auto">
-        <span className="text-muted-foreground text-xs whitespace-nowrap">
-          <span className="hidden min-[400px]:inline">{mesAtualExtenso()}</span>
-          <span className="min-[400px]:hidden">{mesCurto()}</span>
-        </span>
+      <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+        <MesDoCabecalho />
         <ThemeToggle />
       </div>
     </div>

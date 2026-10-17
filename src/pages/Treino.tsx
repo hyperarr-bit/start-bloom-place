@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Dumbbell, Flame } from "lucide-react";
 import { toast } from "sonner";
-import { localDayKey, mesAtualExtenso, parseLocalDay, semanaAtualId } from "@/lib/utils";
+import { localDayKey, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -38,6 +38,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
@@ -176,7 +177,6 @@ const Treino = () => {
   const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
   const today = localDayKey();
   const hojeData = useMemo(() => parseLocalDay(today), [today]);
   const todayDayName = DIAS[indiceDoDia(hojeData)];
@@ -790,7 +790,7 @@ const Treino = () => {
                 {sequencia} sem
               </span>
             )}
-            <span className="hidden min-[425px]:inline text-muted-foreground text-xs whitespace-nowrap">{currentMonth}</span>
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>

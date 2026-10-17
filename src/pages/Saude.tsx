@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
 import { CicloMenstrual } from "@/components/saude/CicloMenstrual";
@@ -38,7 +39,6 @@ const Saude = () => {
   });
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
-  const currentMonth = mesAtualExtenso();
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,10 +55,12 @@ const Saude = () => {
           <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Heart className="w-5 h-5 text-red-600" />
-          <h1 className="text-base font-bold tracking-tight">SAÚDE</h1>
-          <span className="ml-auto text-xs text-muted-foreground">{currentMonth}</span>
-          <AcessoConhecerMais moduleId="saude" /><ThemeToggle />
+          <Heart className="w-5 h-5 text-red-600 shrink-0" />
+          <h1 className="text-base font-bold tracking-tight shrink-0">SAÚDE</h1>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
+            <AcessoConhecerMais moduleId="saude" /><ThemeToggle />
+          </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (

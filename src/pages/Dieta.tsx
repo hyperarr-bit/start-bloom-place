@@ -6,7 +6,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
 import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, kcalDoPlano, metaDoDia, normalizarModoMeta, type ModoMetaKcal } from "@/lib/dieta-consumo";
-import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { enviarParaMercado } from "@/lib/mercado";
 import { avisarApagado } from "@/lib/desfazer";
 import { fotografarDias, itensDoCardapio, primeiraMaiuscula, restaurarDias, statusAderencia } from "@/components/dieta/cardapio";
@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Checkbox } from "@/components/ui/checkbox";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Switch } from "@/components/ui/switch";
@@ -330,7 +331,6 @@ const Dieta = () => {
   const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
   // `today` é ESTADO (não const de render): o app fica vivo em memória no
   // celular e, sem isso, "hoje" congelava no dia em que a aba abriu — cliente
   // via sexta 17 no sábado (18/07). localDayKey = dia LOCAL (toISOString virava
@@ -747,8 +747,8 @@ const Dieta = () => {
           <Button variant="ghost" size="icon" aria-label="Voltar" onClick={() => { salvarEdicaoAberta(); voltarDoModulo(); }}><ArrowLeft className="w-5 h-5" /></Button>
           <Apple className="w-5 h-5 text-green-600" />
           <h1 className="text-base font-bold tracking-tight">DIETA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>

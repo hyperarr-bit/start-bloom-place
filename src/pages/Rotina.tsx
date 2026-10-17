@@ -3,7 +3,7 @@ import { alternarHabitoNoDia, marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } fr
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
-import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
+import { semanaAtualId, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
@@ -30,6 +30,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
@@ -1216,7 +1217,6 @@ const Rotina = () => {
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const fasesUsadas = useFasesEmUso();
-  const currentMonth = mesAtualExtenso();
   /* 1.0.16 — "Rotina pronta em 3 toques". Dono, 17/10: o quiz NÃO abre por entrar na Rotina — só pela missão
      (dose 1 de quem escolheu Rotina). Aqui: o vigia do 1º quadradinho marcado depois do guia (evento
      montar_rotina_primeiro_marcado, uma vez) e o caminho do módulo, fechado (estado sempre "nao"). */
@@ -1379,10 +1379,10 @@ const Rotina = () => {
           <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Calendar className="w-5 h-5 text-emerald-600" />
-          <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />
+          <h1 className="text-base font-bold tracking-tight shrink-0">ROTINA</h1>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <AcessoConhecerMais moduleId="rotina" /><ThemeToggle />
           </div>
         </div>

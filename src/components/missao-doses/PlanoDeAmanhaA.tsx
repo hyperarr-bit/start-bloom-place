@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { doseCurta, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /**
@@ -29,12 +29,12 @@ export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined, n = 2):
   const seg = doseCurta(modulo, n).seg;
   switch (modulo) {
     // 1.0.16: o quiz é só a 1ª dose — em 2º/3º, Finanças é o gasto de hoje
-    case "financas": return n === 1 ? `Amanhã a gente monta suas Finanças em ${seg} s.` : `Amanhã é 1 gasto nas suas Finanças: ${seg} s.`;
-    case "rotina": return `Amanhã a gente monta sua Rotina em ${seg} s.`;
-    case "saude": return `Amanhã é a vez da sua Saúde: 1 copo d'água, ${seg} s.`;
-    case "treino": return `Amanhã a gente escolhe o seu treino em ${seg} s.`;
-    case "desenvolvimento": return `Amanhã a gente escolhe a sua primeira meta em ${seg} s.`;
-    default: return `Amanhã é a vez de ${cfg.emoji} ${cfg.nome}: ${seg} s.`;
+    case "financas": return n === 1 ? `Amanhã a gente monta suas Finanças em ${emSegundos(seg)}.` : `Amanhã é 1 gasto nas suas Finanças: ${emSegundos(seg)}.`;
+    case "rotina": return `Amanhã a gente monta sua Rotina em ${emSegundos(seg)}.`;
+    case "saude": return `Amanhã é a vez da sua Saúde: 1 copo d'água, ${emSegundos(seg)}.`;
+    case "treino": return `Amanhã a gente escolhe o seu treino em ${emSegundos(seg)}.`;
+    case "desenvolvimento": return `Amanhã a gente escolhe a sua primeira meta em ${emSegundos(seg)}.`;
+    default: return `Amanhã é a vez de ${cfg.emoji} ${cfg.nome}: ${emSegundos(seg)}.`;
   }
 }
 

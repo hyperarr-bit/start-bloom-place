@@ -14,6 +14,8 @@
  */
 process.env.TZ = "America/Sao_Paulo";
 
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -32,6 +34,7 @@ vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@
 import { UserDataContext } from "@/hooks/use-user-data";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
+import { ConstruiuEm3Dias } from "@/components/missao-doses/ConstruiuEm3Dias";
 import { PULAR_DEPOIS_DE_MS } from "@/components/missao-doses/PassoDoDia";
 import { CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MISSAO_DOSES, MISSAO_DOSES_APP, lerMissao, missaoDosesLigada, guardarForcaDaUrl, diaDaMissao, modulosPadrao, rotuloDoPasso, iniciarMissao } from "@/lib/missao-doses";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -424,5 +427,49 @@ describe("pular, sem trava dura", () => {
     expect(eventos).toContainEqual(["missao_pular", { dia: 1, passo: "olhar", segundos: expect.any(Number), via: "passo", prototipo: "web" }]);
     expect(screen.getByTestId("missao-doses-festa")).toBeInTheDocument();
     expect(lerMissao()?.feitos[1]?.rotulo).toBe("Café · R$ 12");
+  });
+});
+
+/* ------------------------------------------------------------ 17/10, revisão tela a tela #39 */
+
+describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a tela, #39)", () => {
+  const missaoCumprida = () => ({
+    ...iniciarMissao(["financas", "rotina", "saude"], "2026-09-30"), boasVindas: true,
+    feitos: { 1: { dia: "2026-09-30", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-01", rotulo: "Beber água ao acordar" }, 3: { dia: "2026-10-02", rotulo: "1 copo d'água · meta 8" } },
+  });
+
+  it("o 'Continuar com o meu CORE' fica COLADO embaixo (sticky no que rola, com degradê e a área segura) — rolado até o fim, nada fica atrás dele", () => {
+    const aoContinuar = vi.fn();
+    render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} aoContinuar={aoContinuar} /></Provedor></MemoryRouter>);
+    const fim = screen.getByTestId("missao-doses-fim");
+    expect(fim.className).toContain("overflow-y-auto"); // a folha inteira rola
+    const rodape = screen.getByTestId("missao-doses-fim-rodape");
+    // o botão mora no rodapé colado — e o rodapé é a ÚLTIMA coisa da coluna que rola (no fluxo: rolado até o fim, as
+    // pendências ficam inteiras acima dele)
+    expect(within(rodape).getByTestId("missao-doses-continuar")).toHaveTextContent("Continuar com o meu CORE");
+    expect(rodape.parentElement!.lastElementChild).toBe(rodape);
+    expect(fim.contains(rodape)).toBe(true);
+    // a regra do rodapé (missao-doses.css): colado no fluxo, empurrado pro fim quando sobra espaço, degradê, área segura
+    expect(rodape.className).toBe("md-fim-rodape");
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/missao-doses/missao-doses.css"), "utf8");
+    const regra = /(?:^|\n)\.md-fim-rodape\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    const prop = (nome: string) => new RegExp(`(?:^|;|\\s)${nome}\\s*:\\s*([^;]+)`).exec(regra)?.[1].trim() ?? "";
+    expect(prop("position")).toBe("sticky");
+    expect(prop("bottom")).toBe("0");
+    expect(prop("margin").split(/\s+/)[0]).toBe("auto");
+    expect(prop("padding")).toContain("--app-safe-bottom"); // por cima da barra do iPhone
+    expect(prop("background")).toMatch(/^linear-gradient\(to bottom, hsl\(var\(--background\) \/ 0\)/); // o que rola por baixo some no degradê
+    // a ordem não mudou: pendências de amanhã e, por último, o botão
+    expect(rodape.previousElementSibling).toBe(screen.getByTestId("missao-doses-fim-pendencias"));
+    fireEvent.click(screen.getByTestId("missao-doses-continuar"));
+    expect(aoContinuar).toHaveBeenCalledTimes(1);
+  });
+
+  it("o título equilibra as 2 linhas (text-balance) e o '3 dias' não se separa — nunca 'dias' sozinho na 2ª linha", () => {
+    render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} aoContinuar={() => {}} /></Provedor></MemoryRouter>);
+    const titulo = screen.getByTestId("missao-doses-fim-titulo");
+    expect(titulo.tagName).toBe("H1");
+    expect(titulo.className.split(/\s+/)).toContain("text-balance");
+    expect(titulo.textContent).toBe("O que você construiu em 3\u00a0dias");
   });
 });

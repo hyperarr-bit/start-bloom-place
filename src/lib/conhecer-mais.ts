@@ -108,7 +108,7 @@ export function ofertaDoTour(modulo: string): { titulo: string; linha: string } 
   const lista = cabem.length < nomes.length ? `${cabem.join(", ")}…`
     : cabem.length > 1 ? `${cabem.slice(0, -1).join(", ")} e ${cabem[cabem.length - 1]}` : cabem[0];
   const capital = lista.charAt(0).toUpperCase() + lista.slice(1);
-  return { titulo: `Ver mais ${t.paradas.length} dicas de ${t.nome}`, linha: `${capital} · 1 min` };
+  return { titulo: `Ver mais ${t.paradas.length} dicas de ${t.nome}`, linha: `${capital} · 1\u00a0min` };
 }
 
 /* ───── marcas (aparelho + conta) ───── */
@@ -148,6 +148,14 @@ export const lembreteDevido = (modulo: string, aberturas: number, get?: Leitor):
 /* ───── abrir de qualquer lugar ───── */
 export const EVENTO_ABRIR_TOUR = "conhecer-mais:abrir";
 export interface PedidoDeTour { modulo: ModuloComTour; origem: OrigemDoTour }
+/**
+ * O passeio ACABOU ("Sair" na faixa ou no balão, "Terminar", ou as paradas acabaram) — a window recebe este evento
+ * com quem abriu (`origem`). Quem abriu pelo fim de uma dose (a missão, "fim_dose") devolve a pessoa pro caminho dela
+ * (17/10, revisão tela a tela #17: tocar "Conhecer mais" na festa do dia 1 deixava a pessoa em Finanças sem o tour
+ * curto e sem o "Plano de amanhã" naquela sessão).
+ */
+export const EVENTO_FIM_TOUR = "conhecer-mais:fim";
+export interface FimDoTour { modulo: ModuloComTour; origem: OrigemDoTour; completo: boolean }
 /**
  * Abre o passeio do módulo — pelo fim da intro, pelo lembrete, pelo botão de dicas ou pela missão (fim de uma dose).
  * Dispara um evento na window que o ConhecerMaisHost (montado nos 3 módulos) escuta. Devolve false se o módulo não tem passeio.

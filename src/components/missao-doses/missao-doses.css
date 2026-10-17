@@ -69,6 +69,12 @@ button.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border
 .md-fundo-boas { background: linear-gradient(180deg, #eaf5fd 0%, #ffffff 55%); }
 .dark .md-fundo-boas { background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 60%); }
 
+/* "O QUE VOCÊ CONSTRUIU EM 3 DIAS" (17/10, revisão tela a tela #39): a tela é mais alta que um iPhone de 390×844 e o
+   botão saía cortado embaixo. Agora ele fica colado: sticky no fim da coluna que rola (no fluxo — rolado até o fim, nada
+   fica atrás dele), as margens negativas levam o degradê de borda a borda da coluna (px-4) e o padding de baixo leva
+   a área segura do iPhone. O degradê (28 px) apaga o que passa por baixo do botão. */
+.md-fim-rodape { position: sticky; bottom: 0; z-index: 1; margin: auto -16px 0; padding: 28px 16px calc(var(--app-safe-bottom, 0px) + 16px); background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 28px); }
+
 /* área de toque de 44 px no "Pular" da faixa (36 px) — ::before invisível (polimento 17/10) */
 .md-faixa-pular { position: relative; }
 .md-faixa-pular::before { content: ""; position: absolute; inset: -4px; }

@@ -375,7 +375,16 @@ export function missaoValida(x: unknown): EstadoMissaoDoses | null {
   return { ...m, feitos: m.feitos ?? {}, boasVindas: !!m.boasVindas };
 }
 
-/** O que cada dose pede, curto (boas-vindas, convite, lembretes): "1 hábito, 20 s". */
+/**
+ * NÚMERO E UNIDADE JUNTOS NA TELA ("30 s", "1 min"): o espaço entre os dois vira um que não quebra (U+00A0) — nunca
+ * um "s" sozinho na linha de baixo (revisão tela a tela 17/10, #42: "Hoje · 📅 Rotina · monte em 3 toques, 30 / s").
+ * Só pra EXIBIR: o texto que vai pras notificações (DOSE_CURTA, doseCurta) segue com o espaço comum.
+ */
+export const unidadeJunta = (texto: string): string => texto.replace(/(\d) (s|min)(?![\p{L}\d])/gu, "$1\u00a0$2");
+/** "20 s" com o espaço que não quebra — o tempo da dose na tela. */
+export const emSegundos = (seg: number): string => `${seg}\u00a0s`;
+
+/** O que cada dose pede, curto (boas-vindas, convite, lembretes): "1 hábito, 20 s". Na tela, sempre por `unidadeJunta`. */
 export const DOSE_CURTA: Record<ModuloDaMissao, { texto: string; seg: number }> = {
   financas: { texto: "monte em 30 s", seg: 30 },
   rotina: { texto: "1 hábito, 20 s", seg: 20 },

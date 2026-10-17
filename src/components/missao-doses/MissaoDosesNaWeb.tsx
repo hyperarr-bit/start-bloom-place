@@ -21,6 +21,7 @@ import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { BoasVindasDoses } from "./BoasVindasDoses";
 import { LerScoreDoDia, PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { CONHECER_MAIS } from "./encaixes";
+import { EVENTO_FIM_TOUR, type FimDoTour } from "@/lib/conhecer-mais";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
 import { ConviteDoDia } from "./ConviteDoDia";
@@ -193,6 +194,43 @@ function Ligada() {
     const reler = () => setMissao(lerMissao());
     window.addEventListener(EVENTO_MISSAO_DOSES, reler);
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, []);
+
+  /* 1.0.16 (revisão tela a tela 17/10, #17) — "CONHECER MAIS" TOCADO NA FESTA: a festa fecha e o passeio do módulo
+     abre ali mesmo. Quando ele acaba ("Sair"/"Terminar"), a pessoa volta pro caminho da missão — antes ela ficava no
+     módulo, e no braço A o tour curto e o "Plano de amanhã" (onde ela escolhe a hora do lembrete do dia 2 e dá a
+     permissão de aviso) só vinham na próxima volta à Home. Agora:
+       · braço A (qualquer dia) e a 3ª dose do B → a Home: lá o tour curto, o plano, a dica do dia ou "O que você
+         construiu" seguem a ordem de sempre (cada um espera a tela do outro sair — nunca duas folhas juntas);
+       · B, doses 1 e 2 → a PRÓXIMA dose (a festa ia sozinha pra ela; o passeio só interrompeu a passagem).
+     Só o passeio que ESTA festa abriu (mesmo módulo, origem "fim_dose"); saiu do módulo no meio → esquece. */
+  const voltarDoPasseio = useRef<{ modulo: ModuloDaMissao; n: DiaDaMissao } | null>(null);
+  const navegar = useRef(navigate);
+  navegar.current = navigate;
+  useEffect(() => {
+    const v = voltarDoPasseio.current;
+    if (v && !pathname.startsWith(MODULOS[v.modulo].rota)) voltarDoPasseio.current = null;
+  }, [pathname]);
+  useEffect(() => {
+    const aoFimDoPasseio = (e: Event) => {
+      const d = (e as CustomEvent<FimDoTour>).detail;
+      const v = voltarDoPasseio.current;
+      if (!v || !d || d.origem !== "fim_dose" || d.modulo !== v.modulo) return;
+      voltarDoPasseio.current = null;
+      try {
+        const m = lerMissao();
+        const hojeAgora = localDayKey();
+        const prox = m ? passoPendente(m) : null;
+        const proxima = m && prox && ehBracoB(m) && diaDaMissao(m, hojeAgora) === 1 && m.agoraNao?.dia !== hojeAgora ? prox : null;
+        trackEvent("missao_doses_conhecer_mais_volta", eventoDaMissao({ dia: v.n, modulo: v.modulo, completo: !!d.completo, para: proxima ? proxima.modulo : "home" }));
+        if (proxima) {
+          setPassoAberto((x) => x + 1);
+          navegar.current(MODULOS[proxima.modulo].rota);
+        } else navegar.current("/home");
+      } catch { /* nunca derruba a missão */ }
+    };
+    window.addEventListener(EVENTO_FIM_TOUR, aoFimDoPasseio);
+    return () => window.removeEventListener(EVENTO_FIM_TOUR, aoFimDoPasseio);
   }, []);
 
   // nasce na 1ª entrada logada: a área da porta primeiro
@@ -627,11 +665,13 @@ function Ligada() {
           fechar();
           navigate("/home"); // B: "Arrumar minha Home" → o tour é o 4º passo
         }}
-        /* 1.0.16: "Conhecer mais do <módulo> (1 min)" — fecha a comemoração AQUI no módulo e abre o tour do outro ramo */
+        /* 1.0.16: "Conhecer mais do <módulo> (1 min)" — fecha a comemoração AQUI no módulo e abre o tour do outro ramo;
+           quando o passeio acabar, a missão leva a pessoa de volta pro caminho dela (voltarDoPasseio, acima) */
         aoConhecerMais={CONHECER_MAIS.abrir ? () => {
           trackEvent("missao_doses_conhecer_mais", eventoDaMissao({ dia: n, modulo: passo.modulo }));
           fechar();
-          try { CONHECER_MAIS.abrir?.(passo.modulo); } catch { /* o tour é de outro ramo: nunca derruba a missão */ }
+          voltarDoPasseio.current = { modulo: passo.modulo, n };
+          try { CONHECER_MAIS.abrir?.(passo.modulo); } catch { voltarDoPasseio.current = null; /* o tour é de outro ramo: nunca derruba a missão */ }
         } : undefined}
         /* o quiz da 1ª dose (Rotina, Treino): apareceu (no máximo 2 vezes sem decidir) ou foi pulado (nunca mais) */
         aoSetup={(setup, acao) => {

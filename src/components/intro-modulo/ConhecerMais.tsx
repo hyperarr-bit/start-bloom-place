@@ -6,8 +6,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { introLigada } from "@/lib/intro-modulo";
 import {
-  EVENTO_ABRIR_TOUR, TOURS, abrirConhecerMais, lembreteDevido, marcarLembreteVisto, marcarTourFeito, registrarAbertura, temTour, tourFeito,
-  type ModuloComTour, type OrigemDoTour, type PedidoDeTour,
+  EVENTO_ABRIR_TOUR, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, lembreteDevido, marcarLembreteVisto, marcarTourFeito, registrarAbertura, temTour, tourFeito,
+  type FimDoTour, type ModuloComTour, type OrigemDoTour, type PedidoDeTour,
 } from "@/lib/conhecer-mais";
 import { Anel } from "@/components/demo-guiada/pecas";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
@@ -53,7 +53,9 @@ export function ConhecerMais({ modulo, origem, aoFim }: { modulo: ModuloComTour;
     trackEvent("conhecer_mais_fim", { modulo, completo });
     if (completo) marcarTourFeito(modulo, get, set);
     aoFim(completo);
-  }, [modulo, get, set, aoFim]);
+    // quem abriu fica sabendo que acabou (a missão, quando abriu pela festa da dose, leva a pessoa de volta pro caminho dela)
+    try { window.dispatchEvent(new CustomEvent<FimDoTour>(EVENTO_FIM_TOUR, { detail: { modulo, origem, completo } })); } catch { /* sem window */ }
+  }, [modulo, origem, get, set, aoFim]);
 
   /* cada parada: troca a aba (se precisar), espera o card, rola até ele e acende o anel */
   useEffect(() => {
@@ -154,7 +156,7 @@ export function ConhecerMaisHost({ moduleId }: { moduleId: string }) {
       {lembrete && !pedido && (
         <div className="cm-lembrete mb-4" data-testid="conhecer-mais-lembrete" role="note">
           <Lightbulb className="w-4 h-4 shrink-0" style={{ color: "#d97706" }} aria-hidden="true" />
-          <span className="cm-lembrete-texto">Dica: tem {oferta} coisas úteis aqui que pouca gente descobre. Ver em 1 min?</span>
+          <span className="cm-lembrete-texto">Dica: tem {oferta} coisas úteis aqui que pouca gente descobre. Ver em 1{"\u00a0"}min?</span>
           <button type="button" className="cm-lembrete-ver" data-testid="conhecer-mais-lembrete-ver" onClick={() => { marcarLembreteVisto(moduleId); setLembrete(false); abrirConhecerMais(moduleId, "lembrete"); }}>Ver</button>
           <button type="button" className="cm-lembrete-nao" data-testid="conhecer-mais-lembrete-nao" onClick={() => { marcarLembreteVisto(moduleId); setLembrete(false); }}>Agora não</button>
         </div>

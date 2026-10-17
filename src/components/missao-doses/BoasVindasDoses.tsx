@@ -4,7 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, unidadeJunta, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 
@@ -264,7 +264,11 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               {linhas.map(({ n, cfg }) => (
                 <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
                   <Quadradinho marcado={false} tam={18} />
-                  <span className="md-linha-texto"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome} · {doseCurta(cfg.modulo, n).texto}</span>
+                  {/* 17/10 (#42, "monte em 3 toques, 30 / s"): o tempo nunca se separa do número ("30 s") e o pedido da dose
+                      anda INTEIRO pra 2ª linha quando não cabe ("Hoje · 📅 Rotina ·" / "monte em 3 toques, 30 s") — o
+                      inline-block só quebra por dentro se o pedido sozinho for maior que a linha; o "·" fica preso ao
+                      nome do módulo (nunca começa a 2ª linha) */}
+                  <span className="md-linha-texto text-balance"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome}{"\u00a0"}· <span className="inline-block" data-testid={`missao-doses-linha-${n}-dose`}>{unidadeJunta(doseCurta(cfg.modulo, n).texto)}</span></span>
                 </div>
               ))}
             </div>
@@ -276,7 +280,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
         </div>
         <RodapeColado tema>
           <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
-            Começar ({seg1} s) <ArrowRight className="w-4 h-4" />
+            Começar ({emSegundos(seg1)}) <ArrowRight className="w-4 h-4" />
           </button>
           <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
             Explorar por conta própria
@@ -315,7 +319,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                   <Quadradinho marcado={false} tam={18} />
                   <span className="min-w-0 flex-1">
                     <span className="md-linha-rotulo">{quando} · {cfg.emoji} {cfg.nome}</span>
-                    <span className="md-linha-texto">{cfg.pedido}{n === 1 ? " · 10 s" : ""}</span>
+                    <span className="md-linha-texto">{cfg.pedido}{n === 1 ? ` · ${emSegundos(10)}` : ""}</span>
                   </span>
                   <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"}>{pill(n)}</span>
                 </div>
@@ -339,7 +343,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
           Explorar por conta própria
         </button>
         <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
-          {B ? "Começar a dose 1 · 20 s" : "Fazer o toque de hoje"} <ArrowRight className="w-4 h-4" />
+          {B ? `Começar a dose 1 · ${emSegundos(20)}` : "Fazer o toque de hoje"} <ArrowRight className="w-4 h-4" />
         </button>
       </RodapeColado>
     </div>

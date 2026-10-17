@@ -32,7 +32,7 @@ import "./missao-doses.css";
 const AVISOS: Array<{ emoji: string; texto: string }> = [
   { emoji: "🔔", texto: "Conta vencendo — antes do juros" },
   { emoji: "✅", texto: "Hábito do dia — na hora que você escolher" },
-  { emoji: "🎯", texto: "Sua próxima dose da missão — 20 s" },
+  { emoji: "🎯", texto: "Sua próxima dose da missão — 20\u00a0s" },
 ];
 
 export function PlanoDeAmanha({ missao, hoje = localDayKey(), aoCombinar, aoPular }: {

@@ -568,4 +568,4 @@ export function avaliarNoCatalogo(def: DefDesafio, nivel: number, d: DadosDaSema
 }
 
 /** O que a pessoa precisa ler ao escolher: a trava, em uma linha. */
-export const NOTA_DA_TRAVA = `Desafio de "não gastar" só vale com ${MIN_DIAS_ANOTADOS}+ dias anotados — anotar é o jogo.`;
+export const NOTA_DA_TRAVA = `Pra valer, anote algo em pelo menos ${MIN_DIAS_ANOTADOS} dias da semana.`;

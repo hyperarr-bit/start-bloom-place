@@ -446,7 +446,7 @@ describe("o card: segunda com 3 opções, escolha, meio da semana, virada", () =
     expect(screen.getByTestId("oferta-registro-5-dias")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-tres-dias-zero")).toBeInTheDocument();
     expect(screen.getByTestId("oferta-sem-outros")).toBeInTheDocument();
-    expect(screen.getByText(/só vale com 4\+ dias anotados/)).toBeInTheDocument();
+    expect(screen.getByText(/anote algo em pelo menos 4 dias da semana/)).toBeInTheDocument();
     expect(desafios(store.dados).ofertas?.weekStart).toBe("2026-10-12");
     expect(store.sistema).toEqual(["finance-challenges"]);
     expect(eventos("desafio_ofertas")).toHaveLength(1);

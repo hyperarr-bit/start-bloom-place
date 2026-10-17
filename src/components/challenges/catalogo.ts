@@ -5,12 +5,15 @@
  * pessoal engaje". Pesquisa, veredito da lista do Grok e o desenho inteiro em
  * scratchpad/definitiva/12-desafios.md. O que importa aqui:
  *
- *  · A FALHA de todo desafio de restrição ("zero delivery"): quem PARA DE ANOTAR
- *    vence. Então todo desafio do tipo `restricao` só fecha com ≥ 4 dias anotados
- *    na semana (gasto variável no dia, ou o toque "não gastei nada hoje", que
- *    grava `finance-sem-gasto`) — ver `avaliarNoCatalogo`. Perder por falta de
- *    registro é "faltou anotar" (motivo `sem-registro`), não regra quebrada, e o
- *    desafio volta como revanche.
+ *  · Desafio de restrição ("zero delivery") vence pela PRÓPRIA regra. A pesquisa
+ *    apontou o risco (quem para de anotar vence) e a 1ª versão exigia 4 dias
+ *    anotados na semana; o dono TIROU a regra (17/10): "não é sempre que temos
+ *    gastos; isso quebra a vontade de participar; não é pra ser algo sério, só
+ *    algo divertido". O que segura o risco agora é o resto do desenho: só se
+ *    oferece o desafio a quem tem o hábito no dado (abaixo), metade do cardápio é
+ *    ação positiva, e "dias sem gastar" conta o toque "não gastei nada hoje".
+ *    Registro antigo com motivo `sem-registro` (gravado pela 1ª versão) continua
+ *    lendo normal — a chave sincroniza e nunca perde campo.
  *  · Metade do cardápio é AÇÃO positiva (anotar, categorizar, pagar conta, guardar,
  *    revisar assinaturas): impossível vencer por omissão.
  *  · Só se oferece o que a pessoa tem DADO pra sustentar (`elegivel`): Uber só pra
@@ -73,6 +76,8 @@ export interface DadosDaSemana {
   semGasto: Set<string>;
   /** Custos fixos (finance-fixed-expenses) do perfil. */
   fixos: Record<string, unknown>[];
+  /** Parcelamentos vivos (finance-installments) do perfil. */
+  parcelas: Record<string, unknown>[];
   /** Contas (finance-dueDays) que vencem em dias desta semana. */
   contas: ContaDaSemana[];
   reserva: { guardado: number; registrada: boolean };
@@ -93,7 +98,7 @@ export interface DefDesafio {
   titulo: (nivel: number, d: DadosDaSemana) => string;
   desc: (nivel: number, d: DadosDaSemana) => string;
   elegivel: (d: DadosDaSemana) => boolean;
-  /** A regra do desafio em si — a trava de registro entra por fora (avaliarNoCatalogo). */
+  /** A regra do desafio em si — o motivo do fechamento entra por fora (avaliarNoCatalogo). */
   avaliar: (nivel: number, d: DadosDaSemana) => Avaliacao;
   /** Retrato gravado em `active.meta` na hora da escolha (ex.: quanto já tinha na reserva). */
   retrato?: (d: DadosDaSemana) => Record<string, unknown>;
@@ -135,6 +140,20 @@ const ehAssinatura = (f: Record<string, unknown>) => f.category === "assinaturas
 
 /** Arredonda a R$ 5 (teto legível), nunca abaixo de R$ 20. */
 const tetoDeLazer = (d: DadosDaSemana) => Math.max(20, Math.round(soma(d.anterior.filter(ehLazer)) / 2 / 5) * 5);
+
+/* ───── parcelamentos: quando a compra aconteceu ─────
+ * O registro tem `date` (data da compra; o formulário põe hoje por padrão) e o
+ * `id` é o Date.now() da hora em que foi criado (InstallmentTracker e o "Parcelar"
+ * do + Novo gasto). A data da compra vale primeiro: quem cadastra HOJE uma compra
+ * de dois meses atrás (pondo a casa em ordem) não "parcelou esta semana". */
+const diaDaParcela = (p: Record<string, unknown>): string | null => {
+  const data = typeof p.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(p.date) ? p.date.slice(0, 10) : null;
+  if (data) return data;
+  const id = Number(p.id);
+  return Number.isFinite(id) && id > 1_000_000_000_000 ? diaLocal(new Date(id)) : null;
+};
+/** Impressão estável de uma parcela pro retrato de segunda (sem id, o conteúdo). */
+const impressaoDaParcela = (p: Record<string, unknown>): string => (p.id != null ? `id:${String(p.id)}` : `sem-id:${texto(p)}|${num(p.totalValue)}|${num(p.totalInstallments)}`);
 
 /** Semana ISO do ano da segunda-feira (o "N" do desafio das 52 semanas). */
 export const semanaDoAno = (weekStart: string): number => {
@@ -269,6 +288,7 @@ export function montarDados({ ler, weekStart, perfil, hoje = new Date(), extras 
   const diasAnotados = new Set([...semana.map(data).filter((d) => naSemana.has(d)), ...semGasto]);
 
   const fixos = doPerfil(lista(ler("finance-fixed-expenses")) as (Record<string, unknown> & { perfil?: string })[], perfil);
+  const parcelas = doPerfil(lista(ler("finance-installments")) as (Record<string, unknown> & { perfil?: string })[], perfil);
   const reservaBruta = ler("finance-emergency-fund") as { guardado?: unknown; registrada?: unknown } | null | undefined;
   const reserva = { guardado: num(reservaBruta?.guardado), registrada: reservaBruta?.registrada === true };
 
@@ -281,7 +301,7 @@ export function montarDados({ ler, weekStart, perfil, hoje = new Date(), extras 
   return {
     weekStart, hoje: hojeStr, dias, elapsedDays, semanaAcabou,
     semana, anterior, historico4, historico8, diasAnotados, semGasto,
-    fixos, contas: contasDaSemana(ler, dias, perfil, hoje), reserva, receitasRecentes, diaPagamento,
+    fixos, parcelas, contas: contasDaSemana(ler, dias, perfil, hoje), reserva, receitasRecentes, diaPagamento,
     calendario: { blackFriday: semanaPreBlackFriday(weekStart), dezembro: weekStart.slice(5, 7) === "12", pagamento: semanaDoPagamento(dias, diaPagamento) },
     meta,
   };
@@ -356,6 +376,28 @@ export const CATALOGO: DefDesafio[] = [
         unidade: ["corrida usada", "corridas usadas"], zero: "zero corrida até aqui",
         passou: limite === 0 ? `Rolou uma corrida de app... ${PASSOU_OUTRO}` : `Passou das ${limite} ${plural(limite, "corrida", "corridas")}. ${PASSOU_OUTRO}`,
         venceu: `Deu certo: ${corridas} ${plural(corridas, "corrida", "corridas")} na semana`,
+      });
+    },
+  },
+  {
+    /* O dono gostou (17/10). O defeito apontado na pesquisa — "quase ninguém parcela numa
+       semana qualquer, vence-se sem fazer nada" — fica contido por dois lados: só é
+       oferecido a quem PARCELOU nas últimas 8 semanas, e a parcela nova é vista contra
+       o RETRATO das parcelas de segunda (ids), com a data da compra decidindo se é nova. */
+    key: "sem-parcelar", emoji: "🧾", tipo: "restricao", niveis: 1,
+    titulo: () => "Semana sem parcelar",
+    desc: () => "Nenhuma compra nova parcelada até domingo",
+    elegivel: (d) => {
+      const desde = diasAtras(d.weekStart, 56);
+      return d.parcelas.some((p) => { const dia = diaDaParcela(p); return !!dia && dia >= desde; });
+    },
+    retrato: (d) => ({ parcelas: d.parcelas.map(impressaoDaParcela) }),
+    avaliar: (_n, d) => {
+      const retrato = new Set(Array.isArray(d.meta.parcelas) ? (d.meta.parcelas as unknown[]).map(String) : []);
+      // nova = fora do retrato de segunda E comprada nesta semana (ou depois); sem data legível, conta
+      const novas = d.parcelas.filter((p) => { if (retrato.has(impressaoDaParcela(p))) return false; const dia = diaDaParcela(p); return dia === null || dia >= d.weekStart; }).length;
+      return comTeto(novas, 0, d, {
+        unidade: ["parcela nova", "parcelas novas"], zero: "nenhuma parcela nova", passou: `Entrou uma compra parcelada... ${PASSOU_OUTRO}`, venceu: "Semana sem parcela nova",
       });
     },
   },
@@ -532,40 +574,20 @@ export const CATALOGO: DefDesafio[] = [
 
 export const defDoCatalogo = (key: string): DefDesafio | null => CATALOGO.find((c) => c.key === key) ?? null;
 
-/* ───────────────────────────── a trava de registro ───────────────────────────── */
-
-/** Dias anotados (gasto ou "não gastei nada hoje") que um desafio de RESTRIÇÃO exige pra valer. */
-export const MIN_DIAS_ANOTADOS = 4;
+/* ───────────────────────────── a avaliação com motivo ───────────────────────────── */
 
 /**
- * Avalia o desafio no catálogo novo. Pra `restricao`, a regra do desafio só fecha com
- * a trava de registro: a linha de progresso mostra os dois contadores e perder por
- * falta de registro é "faltou anotar" (`sem-registro`), tratado como revanche no rodízio.
- * Semana acabada sem vencer = `nao-cumpriu`.
+ * Avalia o desafio no catálogo novo e põe o MOTIVO do fechamento: `cumpriu`, `regra`
+ * (restrição quebrada) ou `nao-cumpriu` (ação não feita / meta não batida até domingo).
+ * Cada desafio vence pela própria regra — sem mínimo de dias anotados (dono, 17/10).
  */
 export function avaliarNoCatalogo(def: DefDesafio, nivel: number, d: DadosDaSemana): Avaliacao {
   const n = Math.min(Math.max(1, nivel), def.niveis);
   const bruto = def.avaliar(n, d);
-  if (def.tipo === "acao") {
-    if (bruto.done) return { ...bruto, motivo: "cumpriu" };
-    if (bruto.failed) return { ...bruto, motivo: "nao-cumpriu" };
-    if (d.semanaAcabou) return { ...bruto, failed: true, motivo: "nao-cumpriu", statusText: "Não deu essa semana — a próxima tem." };
-    return bruto;
-  }
-  const anotados = d.diasAnotados.size;
-  const registroOk = anotados >= MIN_DIAS_ANOTADOS;
-  const registroImpossivel = anotados + diasQueFaltam(d) < MIN_DIAS_ANOTADOS;
-  const linhaRegistro = `${anotados} de ${MIN_DIAS_ANOTADOS} dias anotados`;
-  if (bruto.failed) return { ...bruto, motivo: bruto.motivo ?? "regra" };
-  if (registroImpossivel) {
-    return { pct: (anotados / MIN_DIAS_ANOTADOS) * 100, done: false, failed: true, motivo: "sem-registro", statusText: `Faltou anotar: sem ${MIN_DIAS_ANOTADOS} dias anotados o desafio não fecha. Na próxima vale de novo.` };
-  }
-  if (bruto.done && registroOk) return { pct: 100, done: true, failed: false, motivo: "cumpriu", statusText: `${bruto.statusText} · ${anotados} dias anotados 👑` };
-  if (d.semanaAcabou) return { pct: bruto.pct, done: false, failed: true, motivo: "nao-cumpriu", statusText: "Não deu essa semana — a próxima tem." };
-  // regra cumprida até aqui (domingo), só falta o registro de hoje
-  const andamento = bruto.done ? "regra cumprida, anota hoje e fecha 👊" : bruto.statusText;
-  return { pct: Math.min(bruto.pct, registroOk ? 100 : (anotados / MIN_DIAS_ANOTADOS) * 100), done: false, failed: false, statusText: `${linhaRegistro} · ${andamento}` };
+  // a coroa só quando a frase de vitória não traz emoji próprio ("Monge 🧘")
+  const coroa = def.tipo === "restricao" && !/\p{Extended_Pictographic}/u.test(bruto.statusText) ? " 👑" : "";
+  if (bruto.done) return { ...bruto, pct: 100, motivo: "cumpriu", statusText: `${bruto.statusText}${coroa}` };
+  if (bruto.failed) return { ...bruto, motivo: bruto.motivo ?? (def.tipo === "restricao" ? "regra" : "nao-cumpriu") };
+  if (d.semanaAcabou) return { ...bruto, failed: true, motivo: "nao-cumpriu", statusText: "Não deu essa semana — a próxima tem." };
+  return bruto;
 }
-
-/** O que a pessoa precisa ler ao escolher: a trava, em uma linha. */
-export const NOTA_DA_TRAVA = `Pra valer, anote algo em pelo menos ${MIN_DIAS_ANOTADOS} dias da semana.`;

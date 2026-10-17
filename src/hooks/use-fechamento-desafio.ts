@@ -41,7 +41,7 @@ const useSemanaCorrente = () => {
  * insígnias de desafio.
  *
  * (17/10) O fechamento é o do rodízio (components/challenges/rodizio): desafio
- * do catálogo novo (`active.nivel`) fecha com a trava de registro e o motivo;
+ * do catálogo novo (`active.nivel`) fecha pela própria regra, com o motivo;
  * desafio escolhido pelo app antigo (sem `nivel`) fecha pela regra antiga.
  *
  * Gravação de SISTEMA (`system: true`): não é gesto da pessoa — sem isso a

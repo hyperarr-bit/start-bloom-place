@@ -137,7 +137,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",
-    "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-sem-gasto",
+    "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-perfis", "finance-sem-gasto",
     "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
     "core-financas-painel", // 1.0.16: { limpo: true } do painel limpo (a cópia do aparelho é a família core-financas-painel-<id>)
   ],

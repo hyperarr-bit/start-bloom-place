@@ -10,8 +10,7 @@ import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
  * /dev/desafios — SÓ NO SERVIDOR DE DESENVOLVIMENTO (App.tsx monta a rota dentro de
  * `import.meta.env.DEV`; some do build). O card DESAFIO DA SEMANA (Finanças › Painel)
  * em cada cena do rodízio, com dados de demo e o "agora" fixo num dia da semana, pra
- * fotografar: ?cena=segunda (padrão) | meio | vitoria | derrota | faltou | faxina ·
- * ?tema=escuro.
+ * fotografar: ?cena=segunda (padrão) | meio | vitoria | derrota | faxina · ?tema=escuro.
  */
 
 const Provedor = ({ inicial, children }: { inicial: Record<string, unknown>; children: ReactNode }) => {
@@ -57,6 +56,9 @@ const seeds = (seg: string, cena: string): { dados: Record<string, unknown>; ago
     "finance-dueDays": [
       { day: Number(dia(3).slice(8, 10)), color: "yellow", bills: [{ id: "b1", name: "Luz", paid: true, value: 180 }, { id: "b2", name: "Internet", paid: false, value: 99 }] },
     ],
+    "finance-installments": [
+      { id: "p1", description: "Celular novo", totalValue: 1800, installmentValue: 150, paidInstallments: 1, totalInstallments: 12, cardName: "nubank", category: "eletronicos", date: somarDias(seg, -24) },
+    ],
     "finance-emergency-fund": { meses: 6, guardado: 1200, registrada: true },
     "finance-incomes": [{ id: "r1", description: "Salário", value: 3400, date: `${seg.slice(0, 7)}-05` }],
     "finance-challenges": { active: null, history: [{ key: "uber-2x", weekStart: somarDias(seg, -7), result: "win", nivel: 1, motivo: "cumpriu" }] },
@@ -70,7 +72,7 @@ const seeds = (seg: string, cena: string): { dados: Record<string, unknown>; ago
     case "meio":
       ativo("sem-delivery");
       semana([g(dia(0), 118, "mercado", "Mercado"), g(dia(1), 24, "transporte", "Uber"), g(dia(2), 12, "alimentacao", "Café")]);
-      return { dados: base, agora: as(dia(3)) }; // quinta: 3 de 4 dias anotados
+      return { dados: base, agora: as(dia(3)) }; // quinta, zero delivery até aqui
     case "vitoria":
       ativo("registro-5-dias");
       semana([0, 1, 2, 3, 4].map((i) => g(dia(i), 20 + i, "alimentacao", "Almoço")));
@@ -79,16 +81,12 @@ const seeds = (seg: string, cena: string): { dados: Record<string, unknown>; ago
       ativo("sem-delivery");
       semana([g(dia(0), 118, "mercado", "Mercado"), g(dia(1), 48, "delivery", "iFood", "credito"), g(dia(2), 12, "alimentacao", "Café")]);
       return { dados: base, agora: as(dia(3)) };
-    case "faltou":
-      ativo("sem-credito");
-      semana([g(dia(0), 118, "mercado", "Mercado")]);
-      return { dados: base, agora: as(dia(5)) }; // sábado com 1 dia anotado: não fecha mais
     case "faxina":
       ativo("faxina-assinaturas", 1, { ids: ["f2", "f3", "f4"], total: 96.7 });
       semana([g(dia(0), 118, "mercado", "Mercado"), g(dia(1), 24, "transporte", "Uber")]);
       return { dados: base, agora: as(dia(2)) };
     default:
-      return { dados: base, agora: as(dia(0), 9) }; // segunda de manhã: as 3 opções
+      return { dados: base, agora: as(dia(0), 9) }; // segunda de manhã: as 4 opções
   }
 };
 

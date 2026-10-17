@@ -18,7 +18,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
@@ -51,8 +51,11 @@ import { Anel, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, EVENTO_MISSAO_DOSES, conviteDoDiaDevido, doseDeHojeDevida, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao, precisaPlanoA,
   missaoDoDiaEmCena, moduloDaMissaoHoje, definirDonoDaMissao, donoDaConta, marcarDoseNaTela, doseNaTela, CHAVE_MISSAO_NA_CONTA,
-  retomadaDoGasto, setupDaDose, idDaMissao, doseCurta,
+  retomadaDoGasto, setupDaDose, idDaMissao, doseCurta, dicaDoDiaDevida, MAX_VISTAS_SEM_DECISAO,
 } from "@/lib/missao-doses";
+import { CHAVE_LEMBRETE_TESTE, CHAVE_TRIAL_CARTAO, DIAS_DE_TESTE_PADRAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
+import { marcarTrialCartaoAte } from "@/lib/teste-gratis";
+import { fraseDoAcesso } from "@/components/missao-doses/BoasVindasDoses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "@/components/missao-doses/encaixes";
 import { PASSAGEM_B_MS } from "@/components/missao-doses/PassoDoDia";
 import { _novaAberturaDoTour, marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
@@ -434,6 +437,8 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     ligarUmPorDia("on");
     localStorage.removeItem("core-montar-financas"); // a dose de Finanças de verdade
     guardarChave(CHAVES_FUNIL_W.area, "dinheiro");
+    // veio do paywall: comprou o anual com 3 dias grátis (o pedido do aviso do teste guarda o início e o fim)
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: Date.now() + 3 * 864e5, precoAno: "R$ 97,90", inicioMs: Date.now() }));
     const store = montarStore({});
     montar(store, "/home");
     const boas = screen.getByTestId("missao-doses-boas-vindas");
@@ -1890,5 +1895,310 @@ describe("18. o 1º gasto à prova de toque (relatório 11): a aba ao lado não 
     act(() => { (document.activeElement as HTMLElement).blur(); document.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
     avancar(200);
     expect(eventos).toContainEqual(["missao_doses_teclado", expect.objectContaining({ aberto: false })]);
+  });
+});
+
+/* ------------------------------------------------------------ 19: quando a pessoa NÃO decide (revisão pré-build, 17/10) */
+
+describe("19. as telas da missão quando a pessoa NÃO decide: aparecer conta, no máximo 2 vezes, e o 'visto' só com a tela na tela", () => {
+  /** Os toques que levam a outra tela e de volta pra Home (o véu da dica deixa o toque passar pro que está embaixo). */
+  const Navegar = () => {
+    const ir = useNavigate();
+    return (
+      <nav>
+        <button type="button" data-testid="ir-saude" onClick={() => ir("/saude")}>Saúde</button>
+        <button type="button" data-testid="ir-home" onClick={() => ir("/home")}>Home</button>
+      </nav>
+    );
+  };
+  const montarComNavegacao = (store: Store, rota: string) =>
+    render(
+      <MemoryRouter initialEntries={[rota]}>
+        <Provedor store={store}>
+          <MissaoDosesNaWeb />
+          <Navegar />
+          <Routes>
+            <Route path="/home" element={<HomeFalsa />} />
+            <Route path="/saude" element={<SaudeFalsa />} />
+            <Route path="*" element={<Rota />} />
+          </Routes>
+        </Provedor>
+      </MemoryRouter>,
+    );
+  /** Dia 2 (04/10, 18:00) com a dose 2 FEITA hoje e o lembrete combinado: a dica do score está devendo. */
+  const dia2ComADoseFeita = () => {
+    missaoA(
+      { 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" } },
+      { lembrete: "12h", scoreAntes: { 2: 20 }, dono: donoDaConta("u1") },
+    );
+    vi.setSystemTime(new Date(2026, 9, 4, 18, 0));
+  };
+  const vistasDaDica = () => eventos.filter(([n, d]) => n === "missao_dica_dia" && d.acao === "view").map(([, d]) => d);
+  const vistasDoConvite = () => eventos.filter(([n, d]) => n === "missao_convite" && d.acao === "visto").map(([, d]) => d);
+
+  it("dica do dia: aparece (conta) → fecha o app SEM o 'Entendi' → reabre: a 2ª vez FICA na tela → reabre: nunca mais — nem saindo da conta, nem reinstalando (a cópia da conta lembra)", () => {
+    ligarUmPorDia("on");
+    dia2ComADoseFeita();
+    const store = montarStore({});
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toHaveAttribute("data-dia", "2");
+    expect(lerMissao()?.dicasVistas).toEqual({ 2: 1 }); // contou quando APARECEU (antes, só o "Entendi" gravava)
+    expect(vistasDaDica()).toEqual([expect.objectContaining({ dia: 2, vez: 1, braco: "um_por_dia" })]);
+    cleanup(); // fechou o app com o balão aberto
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toBeInTheDocument(); // a 2ª (e última) vez
+    avancar(5000);
+    expect(screen.getByTestId("missao-dica")).toBeInTheDocument(); // e ela FICA: a própria vista não a tira da tela
+    expect(lerMissao()?.dicasVistas).toEqual({ 2: 2 });
+    expect(lerMissao()?.dicas).toBeUndefined(); // ela não decidiu
+    expect(vistasDaDica().map((d) => d.vez)).toEqual([1, 2]);
+    cleanup();
+    montar(store, "/home");
+    avancar(5000);
+    expect(screen.queryByTestId("missao-dica")).toBeNull(); // 3ª abertura no mesmo dia: chega
+    cleanup();
+    purgeLocalUserCache(); // saiu da conta e entrou de novo (a vassoura do logout)
+    montar(store, "/home");
+    avancar(5000);
+    expect(screen.queryByTestId("missao-dica")).toBeNull();
+    cleanup();
+    // reinstalou: o aparelho limpo — a missão volta pela cópia da conta, com as vistas
+    expect(store.dados[CHAVE_MISSAO_NA_CONTA]).toMatchObject({ dicasVistas: { 2: 2 } });
+    localStorage.clear();
+    montar(store, "/home");
+    avancar(5000);
+    expect(lerMissao()?.dicasVistas).toEqual({ 2: 2 });
+    expect(screen.queryByTestId("missao-dica")).toBeNull();
+    expect(vistasDaDica()).toHaveLength(2);
+  });
+
+  it("dica do dia: o toque passa pelo véu e ela sai da Home SEM decidir → volta pra Home (2ª vez, fica) → sai e volta de novo: não aparece mais", () => {
+    ligarUmPorDia("on");
+    dia2ComADoseFeita();
+    montarComNavegacao(montarStore({}), "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ir-saude")); // abriu outro módulo com o balão aberto
+    expect(screen.queryByTestId("missao-dica")).toBeNull();
+    avancar(2000);
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull(); // (a dose 3 é só amanhã)
+    fireEvent.click(screen.getByTestId("ir-home"));
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toBeInTheDocument(); // a 2ª vez
+    avancar(5000);
+    expect(screen.getByTestId("missao-dica")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ir-saude"));
+    fireEvent.click(screen.getByTestId("ir-home"));
+    avancar(5000);
+    expect(screen.queryByTestId("missao-dica")).toBeNull(); // nunca mais
+    expect(lerMissao()?.dicasVistas).toEqual({ 2: 2 });
+    expect(vistasDaDica()).toHaveLength(2);
+  });
+
+  it("dica do dia 3 (depois de 'O que você construiu'): a conta é dela, separada da do dia 2; o 'Entendi' segue fechando de vez já na 1ª vez", () => {
+    ligarUmPorDia("on");
+    missaoA(
+      { 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" }, 3: { dia: "2026-10-05", rotulo: "1 copo" } },
+      { lembrete: "12h", fimVisto: true, dicas: { 2: "2026-10-04" }, dicasVistas: { 2: 2 } },
+    );
+    vi.setSystemTime(new Date(2026, 9, 5, 19, 0));
+    const store = montarStore({});
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-dica")).toHaveAttribute("data-dia", "3");
+    expect(lerMissao()?.dicasVistas).toEqual({ 2: 2, 3: 1 });
+    fireEvent.click(screen.getByTestId("missao-dica-entendi"));
+    expect(screen.queryByTestId("missao-dica")).toBeNull();
+    expect(lerMissao()?.dicas).toEqual({ 2: "2026-10-04", 3: "2026-10-05" });
+    cleanup();
+    montar(store, "/home");
+    avancar(5000);
+    expect(screen.queryByTestId("missao-dica")).toBeNull();
+  });
+
+  it("dicaDoDiaDevida / conviteDoDiaDevido (puras): menos de 2 vistas sem decisão; a que já está NA TELA não sai pela própria vista; decidir tira na hora", () => {
+    ligarUmPorDia("on");
+    const base = { ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "A"), boasVindas: true, feitos: { 1: { dia: "2026-10-03", rotulo: "x" }, 2: { dia: "2026-10-04", rotulo: "y" } } };
+    expect(MAX_VISTAS_SEM_DECISAO).toBe(2);
+    expect(dicaDoDiaDevida(base, "2026-10-04")).toBe(2);
+    expect(dicaDoDiaDevida({ ...base, dicasVistas: { 2: 1 } }, "2026-10-04")).toBe(2);
+    expect(dicaDoDiaDevida({ ...base, dicasVistas: { 2: 2 } }, "2026-10-04")).toBeNull();
+    expect(dicaDoDiaDevida({ ...base, dicasVistas: { 2: 2 } }, "2026-10-04", 2)).toBe(2); // a 2ª vista, já na tela
+    expect(dicaDoDiaDevida({ ...base, dicasVistas: { 2: 3 } }, "2026-10-04", 2)).toBeNull();
+    expect(dicaDoDiaDevida({ ...base, dicas: { 2: "2026-10-04" } }, "2026-10-04", 2)).toBeNull(); // "Entendi"
+    expect(dicaDoDiaDevida(base, "2026-10-05")).toBeNull(); // o dia da dose passou
+    expect(dicaDoDiaDevida({ ...base, explorou: true }, "2026-10-04")).toBeNull();
+    expect(dicaDoDiaDevida({ ...base, braco: "B" }, "2026-10-04")).toBeNull();
+    const dia3 = { ...base, feitos: { ...base.feitos, 3: { dia: "2026-10-05", rotulo: "z" } } };
+    expect(dicaDoDiaDevida(dia3, "2026-10-05")).toBeNull(); // antes de "O que você construiu"
+    expect(dicaDoDiaDevida({ ...dia3, fimVisto: true }, "2026-10-05")).toBe(3);
+    expect(dicaDoDiaDevida({ ...dia3, fimVisto: true, dicasVistas: { 3: 2 } }, "2026-10-05")).toBeNull();
+    const convite = { ...base, feitos: { 1: base.feitos[1] } };
+    expect(conviteDoDiaDevido({ ...convite, convitesVistos: { "2026-10-04": 1 } }, "2026-10-04")).toBe(true);
+    expect(conviteDoDiaDevido({ ...convite, convitesVistos: { "2026-10-04": 2 } }, "2026-10-04")).toBe(false);
+    expect(conviteDoDiaDevido({ ...convite, convitesVistos: { "2026-10-04": 2 } }, "2026-10-04", true)).toBe(true); // a 2ª, já na tela
+    expect(conviteDoDiaDevido({ ...convite, convitesVistos: { "2026-10-04": 2 }, convites: { "2026-10-04": "depois" } }, "2026-10-04", true)).toBe(false);
+  });
+
+  it("convite do dia: fechou o app com ele aberto → a 2ª chance APARECE de verdade e fica (o 'visto' conta 1 vez, vez=2) → de novo sem decidir: a 3ª abertura não mostra nem conta", () => {
+    ligarUmPorDia("on");
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { lembrete: "12h" });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    const store = montarStore({});
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-doses-convite")).toBeInTheDocument();
+    expect(lerMissao()?.convitesVistos).toEqual({ "2026-10-04": 1 });
+    expect(vistasDoConvite()).toHaveLength(1);
+    cleanup(); // fechou o app sem decidir
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-doses-convite")).toBeInTheDocument(); // a 2ª chance aparece...
+    avancar(5000);
+    expect(screen.getByTestId("missao-doses-convite")).toBeInTheDocument(); // ...e FICA (antes ela sumia no mesmo instante)
+    expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 2 de 3 · 📅 Rotina · 20 s");
+    expect(lerMissao()?.convitesVistos).toEqual({ "2026-10-04": 2 });
+    expect(vistasDoConvite()).toEqual([expect.objectContaining({ dia: 2, vez: 1 }), expect.objectContaining({ dia: 2, vez: 2 })]); // cada vista de verdade, 1 vez
+    cleanup(); // de novo sem decidir
+    montar(store, "/home");
+    avancar(5000);
+    expect(screen.queryByTestId("missao-doses-convite")).toBeNull(); // chega por hoje
+    expect(vistasDoConvite()).toHaveLength(2); // o que não apareceu não conta como visto
+    expect(lerMissao()?.convitesVistos).toEqual({ "2026-10-04": 2 });
+    cleanup();
+    // amanhã o convite volta (é por dia) — a dose 2 continua sendo a de hoje
+    vi.setSystemTime(new Date(2026, 9, 5, 10, 0));
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("missao-doses-convite-titulo")).toHaveTextContent("Dia 2 de 3 · 📅 Rotina · 20 s");
+    expect(lerMissao()?.convitesVistos).toEqual({ "2026-10-04": 2, "2026-10-05": 1 });
+  });
+
+  it("convite do dia: na 2ª chance ela decide — 'Bora' leva pra dose; 'Agora não' fecha e nada volta (reabrir)", () => {
+    ligarUmPorDia("on");
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { lembrete: "12h", convitesVistos: { "2026-10-04": 1 } });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    const store = montarStore({});
+    montar(store, "/home");
+    avancar(1500);
+    fireEvent.click(screen.getByTestId("missao-doses-convite-ir"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
+    expect(lerMissao()?.convites).toEqual({ "2026-10-04": "foi" });
+    expect(eventos).toContainEqual(["missao_convite", expect.objectContaining({ acao: "bora", dia: 2 })]);
+    cleanup();
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { lembrete: "12h", convitesVistos: { "2026-10-04": 1 } });
+    montar(store, "/home");
+    avancar(1500);
+    fireEvent.click(screen.getByTestId("missao-doses-convite-depois"));
+    expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
+    expect(lerMissao()?.convites).toEqual({ "2026-10-04": "depois" });
+    cleanup();
+    montar(store, "/home");
+    avancar(5000);
+    expect(screen.queryByTestId("missao-doses-convite")).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------ 20: as boas-vindas (revisão pré-build, 17/10) */
+
+describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só com o teste da loja de verdade", () => {
+  const vistasDasBoasVindas = () => eventos.filter(([n, d]) => n === "missao_doses_boas_vindas" && d.acao === "view").map(([, d]) => d);
+  const pedidoDoTeste = (dias: number) =>
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: Date.now() + dias * 864e5, precoAno: "R$ 97,90", inicioMs: Date.now() }));
+
+  it("boas-vindas: o braço A também manda o 'view' (com o braço) — 1 por abertura em que a tela aparece, então o funil A×B tem o 'viu' e o alarme de telas que voltam enxerga o A", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    const store = montarStore({});
+    montar(store, "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1, variante: "A", braco: "um_por_dia" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-trocar"));
+    fireEvent.click(screen.getByTestId("missao-doses-pronto")); // voltar da escolha dos módulos não é outra vista
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+    expect(vistasDasBoasVindas()).toHaveLength(1);
+    cleanup(); // fechou o app na tela, sem decidir
+    montar(store, "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
+    expect(vistasDasBoasVindas()).toHaveLength(2); // a tela voltou noutra abertura: é isso que o alarme (telas-repetidas) lê
+  });
+
+  it("boas-vindas do braço B: o 'view' segue por tela, agora também com o braço legível", () => {
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "B");
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1, variante: "B", braco: "dia1_cheio" })]);
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
+    expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1 }), expect.objectContaining({ tela: 2, braco: "dia1_cheio" })]);
+  });
+
+  it("boas-vindas do A: 'Seus N dias grátis começaram' só com teste da loja de verdade — 3 dias (comprou o teste no paywall), 7 dias (o código da App Store); quem pagou no site ou assinou o mensal lê 'Seu acesso começou'", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    const abrirBoasVindas = () => {
+      cleanup();
+      localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+      montar(montarStore({}), "/home");
+      expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
+      return screen.getByTestId("missao-doses-subtitulo");
+    };
+    // 1) comprou o anual com 3 dias grátis no paywall (o pedido do aviso guarda o início e o fim do teste)
+    pedidoDoTeste(3);
+    expect(abrirBoasVindas()).toHaveTextContent("Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.");
+    localStorage.removeItem(CHAVE_LEMBRETE_TESTE);
+    // 2) o código de 7 dias da App Store (afiliados): nenhuma compra no app — a loja confirmou o teste no boot
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + 7 * 864e5 - 60_000));
+    expect(abrirBoasVindas()).toHaveTextContent("Seus 7 dias grátis começaram. Os 16 módulos já estão abertos.");
+    localStorage.removeItem(CHAVE_TRIAL_CARTAO);
+    // 3) pagou no site (Pix/cartão) ou assinou o mensal no app (cobra hoje): teste nenhum
+    expect(abrirBoasVindas()).toHaveTextContent("Seu acesso começou. Os 16 módulos já estão abertos.");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).not.toHaveTextContent(/dias? grátis/);
+    // 4) um teste que já acabou não conta
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() - 1));
+    expect(abrirBoasVindas()).toHaveTextContent("Seu acesso começou.");
+  });
+
+  it("boas-vindas do B (já no ar): a mesma regra — sem teste, 'Seu acesso começou agora'; o boot que confirma o teste DEPOIS da 1ª tela troca a frase pra 'Seus 3 dias grátis começaram agora'", () => {
+    ligarUmPorDia("ab");
+    localStorage.setItem(CHAVE_BRACO_DIA1, "B");
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seu acesso começou agora. Dá pra usar tudo.");
+    act(() => { marcarTrialCartaoAte(Date.now() + 3 * 864e5 - 60_000); }); // revenuecat.conferirTrialCartao respondeu
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seus 3 dias grátis começaram agora. Dá pra usar tudo.");
+    cleanup();
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES);
+    localStorage.removeItem(CHAVE_TRIAL_CARTAO);
+    pedidoDoTeste(7);
+    montar(montarStore({}), "/home");
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent("Seus 7 dias grátis começaram agora. Dá pra usar tudo.");
+  });
+
+  it("diasDoTesteDaLoja / fraseDoAcesso (puras): o pedido da compra (início → fim) dá os dias exatos; sem início ou só com o marcador da loja, os que faltam (nunca menos que a reserva); acabou ou ilegível = sem teste", () => {
+    const agora = Date.now();
+    const DIA = 864e5;
+    expect(DIAS_DE_TESTE_PADRAO).toBe(3);
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 7 * DIA, precoAno: "R$ 97,90", inicioMs: agora }));
+    expect(diasDoTesteDaLoja(agora)).toBe(7);
+    expect(diasDoTesteDaLoja(agora + 2 * DIA)).toBe(7); // é o teste dela, não o que falta
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 3 * 60_000, precoAno: "R$ 97,90", inicioMs: agora })); // sandbox (3 min)
+    expect(diasDoTesteDaLoja(agora)).toBe(DIAS_DE_TESTE_PADRAO);
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, JSON.stringify({ fimMs: agora + 3 * DIA, precoAno: "R$ 97,90" })); // pedido de antes da 1.0.16
+    expect(diasDoTesteDaLoja(agora)).toBe(3);
+    expect(diasDoTesteDaLoja(agora + 2 * DIA)).toBe(3); // nunca "seu 1 dia grátis"
+    expect(diasDoTesteDaLoja(agora + 3 * DIA + 1)).toBeNull(); // acabou
+    localStorage.setItem(CHAVE_LEMBRETE_TESTE, "{lixo");
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(agora + 7 * DIA - 60_000));
+    expect(diasDoTesteDaLoja(agora)).toBe(7);
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(agora - 1));
+    expect(diasDoTesteDaLoja(agora)).toBeNull();
+    expect(fraseDoAcesso(3)).toBe("Seus 3 dias grátis começaram");
+    expect(fraseDoAcesso(7)).toBe("Seus 7 dias grátis começaram");
+    expect(fraseDoAcesso(1)).toBe("Seu 1 dia grátis começou");
+    expect(fraseDoAcesso(null)).toBe("Seu acesso começou");
   });
 });

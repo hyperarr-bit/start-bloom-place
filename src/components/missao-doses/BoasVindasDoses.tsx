@@ -5,6 +5,7 @@ import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
 import { doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
@@ -21,6 +22,27 @@ const PELO_MODULO: Partial<Record<ModuloDaMissao, string>> = {
 };
 
 type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
+
+/**
+ * "Seus 3 dias grátis começaram" só pra quem está num teste da loja de verdade (revisão pré-build, 17/10): todo mundo
+ * que entra na missão via esta tela — também quem pagou no site, assinou o mensal (cobra hoje) ou entrou com o código
+ * de 7 dias da App Store. Com teste: os dias dele; sem teste: o acesso, sem número.
+ */
+export function fraseDoAcesso(diasDeTeste: number | null): string {
+  if (!diasDeTeste) return "Seu acesso começou";
+  return diasDeTeste === 1 ? "Seu 1 dia grátis começou" : `Seus ${diasDeTeste} dias grátis começaram`;
+}
+const lerDiasDoTeste = (): number | null => { try { return diasDoTesteDaLoja(); } catch { return null; } };
+/** Os dias do teste da loja, relidos quando o boot confirma o teste DEPOIS da 1ª tela (revenuecat.conferirTrialCartao). */
+function useDiasDoTesteDaLoja(): number | null {
+  const [dias, setDias] = useState(lerDiasDoTeste);
+  useEffect(() => {
+    const reler = () => setDias(lerDiasDoTeste());
+    window.addEventListener(EVENTO_TRIAL_CARTAO, reler);
+    return () => window.removeEventListener(EVENTO_TRIAL_CARTAO, reler);
+  }, []);
+  return dias;
+}
 
 /**
  * O RODAPÉ COLADO (10/10, regra do dono pro funil inteiro): o botão principal fica
@@ -67,6 +89,15 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
     if (braco === "B") trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: telaB }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telaB]);
+  /* 1.0.16 (revisão pré-build): o braço A (uma tela só) também diz que VIU — 1 por montagem, ou seja, por abertura em
+     que a tela apareceu (voltar da escolha dos módulos não conta de novo). O funil A×B precisa do "viu" e o alarme de
+     telas que voltam (telas-repetidas) só enxerga a tela repetida com ele. O braço vem do eventoDaMissao. */
+  useEffect(() => {
+    if (braco === "A") trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const diasDeTeste = useDiasDoTesteDaLoja();
+  const acesso = fraseDoAcesso(diasDeTeste); // "Seus 3 dias grátis começaram" / "Seu acesso começou"
   const [modulos, setModulos] = useState<Tres>(missao.modulos);
   const [t0] = useState(() => Date.now());
   const B = braco === "B";
@@ -152,7 +183,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               <Check className="w-10 h-10 text-white" strokeWidth={3.5} />
             </motion.div>
             <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
-            <p className="text-[16px] text-[#4f5a64] mt-3 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram agora. Dá pra usar tudo.</p>
+            <p className="text-[16px] text-[#4f5a64] mt-3 leading-snug" data-testid="missao-doses-subtitulo">{acesso} agora. Dá pra usar tudo.</p>
           </div>
         </div>
         <RodapeColado>
@@ -222,7 +253,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               <Check className="w-8 h-8 text-white" strokeWidth={3.5} />
             </motion.div>
             <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
-            <p className="text-[15.5px] text-muted-foreground mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.</p>
+            <p className="text-[15.5px] text-muted-foreground mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{acesso}. Os 16 módulos já estão abertos.</p>
             <div className="mt-7 flex items-baseline justify-between gap-3">
               <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Seu plano de 3 dias</p>
               <button type="button" className="text-[13px] font-bold min-h-9 px-1 -mr-1" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>

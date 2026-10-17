@@ -70,7 +70,7 @@ const usarOApp = () => {
     ["core-montar-financas", JSON.stringify({ r: "pronto", em: "2026-10-12T15:00:00.000Z" })],
     ["missao-doses", JSON.stringify({
       v: 1, inicio: "2026-10-12", modulos: ["financas", "rotina", "saude"], feitos: { 1: { dia: "2026-10-12", rotulo: "Pode gastar R$ 61 por dia" } }, boasVindas: true, braco: "A",
-      convites: { "2026-10-13": "depois" }, convitesVistos: { "2026-10-13": 1 }, lembrete: "20h", dicas: { 2: "2026-10-13" }, adesivosMostrados: ["first-income"], scoreAntes: { 2: 20 },
+      convites: { "2026-10-13": "depois" }, convitesVistos: { "2026-10-13": 1 }, lembrete: "20h", dicas: { 2: "2026-10-13" }, dicasVistas: { 2: 1, 3: 2 }, adesivosMostrados: ["first-income"], scoreAntes: { 2: 20 },
     })],
     // 16/10: a força de QA da Conquistas 2 (sem prefixo varrido) e o toast que já apareceu (core-festas-mostradas)
     ["conquistas2-force", "on"], ["core-festas-mostradas", JSON.stringify(["first-expense", "sequencia-2"])],
@@ -98,7 +98,8 @@ const esperarTudoVisto = () => {
   }
   const missao = JSON.parse(localStorage.getItem("missao-doses")!);
   expect(missao.convites).toEqual({ "2026-10-13": "depois" });
-  expect(missao).toMatchObject({ boasVindas: true, lembrete: "20h", dicas: { 2: "2026-10-13" }, adesivosMostrados: ["first-income"], feitos: { 1: { dia: "2026-10-12" } } });
+  // 1.0.16 (revisão pré-build): as vistas das dicas sem "Entendi" (no máximo 2) moram na missão — fechar/reabrir e sair da conta não zeram
+  expect(missao).toMatchObject({ boasVindas: true, lembrete: "20h", dicas: { 2: "2026-10-13" }, dicasVistas: { 2: 1, 3: 2 }, convitesVistos: { "2026-10-13": 1 }, adesivosMostrados: ["first-income"], feitos: { 1: { dia: "2026-10-12" } } });
   expect(JSON.parse(localStorage.getItem("core-montar-financas")!).r).toBe("pronto");
 };
 

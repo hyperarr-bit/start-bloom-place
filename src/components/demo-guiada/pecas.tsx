@@ -271,7 +271,12 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
         if (!forcar && r.top >= topo && r.bottom <= topo + livre) return;
         // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
         const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
-        const delta = r.top - destino;
+        /* 17/10 (dono, Saúde no Simulador: "o app inteiro treme na hora de mostrar o tutorial"): o alvo já visível
+         * perto do topo pedia uma rolagem NEGATIVA com a página no 0 — no Chromium é um não-faz-nada, mas no WKWebView
+         * a rolagem suave pra fora do limite vira o quique (rubber band) da tela inteira, e o anel esperava a
+         * rolagem "assentar" no meio dele. A rolagem fica dentro do alcance real da página; sem alcance, não rola. */
+        const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const delta = Math.max(-window.scrollY, Math.min(maxY - window.scrollY, r.top - destino));
         if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
       } catch { /* noop */ }
     };

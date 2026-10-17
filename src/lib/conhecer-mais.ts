@@ -1,7 +1,7 @@
 /**
  * CONHECER MAIS DO MÓDULO (17/10) — o passeio OPCIONAL de 1 minuto pelas coisas mais usadas que a intro
  * curta não mostra: 3–5 "olhas" (anel + 1 frase natural cada), "Próxima"/"Sair" sempre à vista, nenhuma
- * ação obrigatória; se a parada mora em outra aba, a troca é feita por ela. Só Finanças, Rotina e Saúde.
+ * ação obrigatória; se a parada mora em outra aba, a troca é feita por ela. Finanças, Rotina, Saúde e Treino (17/10).
  *
  * REGRAS DO DONO (17/10):
  *   · nunca automático: a oferta é um controle SECUNDÁRIO (ghost) em cima do "Pronto" do fim da intro,
@@ -28,7 +28,7 @@
  */
 import type { Leitor, Escritor } from "@/lib/intro-modulo";
 
-export type ModuloComTour = "financas" | "rotina" | "saude";
+export type ModuloComTour = "financas" | "rotina" | "saude" | "treino";
 export type OrigemDoTour = "fim_tutorial" | "lembrete" | "menu" | "fim_dose";
 
 export interface ParadaDoTour {
@@ -92,6 +92,17 @@ export const TOURS: Record<ModuloComTour, TourDoModulo> = {
       { id: "sono", aba: "HOJE", nome: "sono", titulo: "Sono", texto: "Quantas horas você dormiu. Junto com a água, conta como foi o seu dia.", achar: () => cardPorTitulo(/^Sono$/i) },
     ],
   },
+  /* 17/10 (dono: "Treino podia ter um tutorial tipo Rotina, mais completo"): a intro monta o treino de hoje; o resto do
+   * módulo — o plano da semana, a constância e os recordes — fica no passeio opcional. */
+  treino: {
+    modulo: "treino", nome: "Treino",
+    paradas: [
+      { id: "plano", aba: "PLANO", nome: "plano da semana", titulo: "Meu plano da semana", texto: "Os 7 dias com os grupos de cada um. Toca num dia pra montar ou trocar os exercícios.", achar: porAncora('[data-testid="plano-semana"]') },
+      { id: "modelos", aba: "PLANO", nome: "modelos prontos", titulo: "Modelos prontos", texto: "Um toque monta a semana inteira com 5 exercícios por dia. Séries, repetições e carga você ajusta depois.", achar: porAncora('[data-testid="modelos-prontos"]') },
+      { id: "semana", aba: "SEMANA", nome: "constância", titulo: "Semana", texto: "Quantos treinos você fez na semana e a sua sequência. A meta é sua: 3, 4 ou 5 por semana.", achar: porAncora('[data-testid="treino-semana"]') },
+      { id: "recordes", aba: "EVOLUÇÃO", nome: "recordes", titulo: "Recordes do mês", texto: "A maior carga de cada exercício, anotada sozinha quando você marca as séries.", achar: porAncora('[data-testid="recordes-do-mes"]') },
+    ],
+  },
 };
 export const temTour = (modulo: string): modulo is ModuloComTour => modulo in TOURS;
 
@@ -115,6 +126,8 @@ export function ofertaDoTour(modulo: string): { titulo: string; linha: string } 
 export const chaveTourFeito = (modulo: string) => `core-conhecer-feito-${modulo}`;
 export const chaveLembreteVisto = (modulo: string) => `core-conhecer-lembrete-${modulo}`;
 export const chaveAberturas = (modulo: string) => `core-conhecer-aberturas-${modulo}`;
+/** 17/10: o passeio do módulo já foi ABERTO neste aparelho (qualquer origem) — a lâmpada do cabeçalho some depois disso. */
+export const chaveTourAberto = (modulo: string) => `core-conhecer-aberto-${modulo}`;
 /** Na CONTA: a lista de módulos cujo passeio foi feito (vale pro 2º aparelho). */
 export const CHAVE_TOURS_FEITOS_CONTA = "core-conhecer-feitos";
 /** A 3ª abertura do módulo ganha o lembrete (uma vez). */
@@ -133,6 +146,15 @@ export const marcarTourFeito = (modulo: string, get?: Leitor, set?: Escritor): v
   const arr = Array.isArray(lista) ? (lista as string[]) : [];
   if (!arr.includes(modulo)) set(CHAVE_TOURS_FEITOS_CONTA, [...arr, modulo]);
 };
+export const tourAberto = (modulo: string): boolean => !!ls.get(chaveTourAberto(modulo));
+export const marcarTourAberto = (modulo: string): void => ls.set(chaveTourAberto(modulo), new Date().toISOString());
+/**
+ * A LÂMPADA DO CABEÇALHO (dono, 17/10: "Dicas podia sair quando usado"): a regra mais simples — aparece até a pessoa
+ * USAR o passeio uma vez (abriu, por qualquer caminho: o fim da intro, o lembrete, a própria lâmpada, a missão) ou
+ * até ele constar como feito na conta (2º aparelho). Depois disso, some; o lembrete da 3ª abertura continua valendo
+ * enquanto o passeio não foi feito, e a oferta no fim da intro também.
+ */
+export const lampadaVisivel = (modulo: string, get?: Leitor): boolean => temTour(modulo) && !tourAberto(modulo) && !tourFeito(modulo, get);
 /** Conta mais uma abertura do módulo neste aparelho e devolve o total. */
 export const registrarAbertura = (modulo: string): number => {
   const n = (Number(ls.get(chaveAberturas(modulo))) || 0) + 1;

@@ -38,6 +38,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { trackEvent } from "@/lib/analytics";
@@ -791,7 +792,7 @@ const Treino = () => {
               </span>
             )}
             <MesDoCabecalho />
-            <ThemeToggle />
+            <AcessoConhecerMais moduleId="treino" /><ThemeToggle />
           </div>
         </div>
         {/* 27/09 (dono): a barra do Treino tinha classes próprias (cantos mais redondos,

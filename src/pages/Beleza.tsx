@@ -23,6 +23,7 @@ import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
 import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
 import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { isNativeShell } from "@/lib/native-shell";
 
 /*
@@ -71,9 +72,12 @@ const Beleza = () => {
   const { pathname } = useLocation();
   guardarForcasDaUrl(); // a força do link (`?cartoes=on`) tem que estar guardada ANTES de perguntar se está ligado
   guardarForcaDaIntro();
-  // 16/10 (1.0.16): com a intro do módulo ligada os cartões saem do fluxo em todos os módulos; a Beleza não tem intro
-  // (a tela vazia dela — as 3 perguntas — já é o primeiro passo) e fica com as DicasDaBeleza de sempre.
-  const comCartoes = !pathname.startsWith("/preview") && !introLigada() && cartoesLigados();
+  // 16/10 (1.0.16): com a intro do módulo ligada os cartões saem do fluxo em todos os módulos. 17/10 (dono: "nenhum
+  // módulo abre sem tutorial na 1ª abertura"): a Beleza ganhou a intro de 1 toque ("Como é a sua pele?" → o skincare
+  // nasce), montada aqui em cima; as DicasDaBeleza de sempre continuam embaixo.
+  const demo = pathname.startsWith("/preview");
+  const comIntro = !demo && introLigada();
+  const comCartoes = !demo && !comIntro && cartoesLigados();
 
   // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
   useEffect(() => {
@@ -129,6 +133,7 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {comIntro && <IntroDoModulo moduleId="beleza" />}
         {comCartoes && <CartoesDoModulo config={cartoesBeleza({ irParaSkincare: () => handleTabChange("routine") })} />}
         {activeTab === "routine" && (
           <>

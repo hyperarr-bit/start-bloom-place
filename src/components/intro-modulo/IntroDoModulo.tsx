@@ -5,7 +5,7 @@ import {
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { IntroGuiada } from "./IntroGuiada";
-import { EstadoVazio } from "./EstadoVazio";
+import { IntroDeUmToque } from "./IntroDeUmToque";
 import { ConhecerMaisHost } from "./ConhecerMais";
 import { temTour } from "@/lib/conhecer-mais";
 
@@ -32,7 +32,7 @@ function outraGuiaAtiva(moduleId: string, get: Leitor): boolean {
 
 /**
  * A PORTA DA INTRO (16/10): decide UMA vez, quando a conta está CARREGADA, se este módulo mostra a
- * intro guiada (Finanças/Rotina/Saúde) ou o estado vazio (os outros), e grava "vista" no aparelho E
+ * intro guiada (Finanças/Rotina/Saúde) ou a intro de 1 toque (os outros 13, 17/10), e grava "vista" no aparelho E
  * na conta ao terminar (feita ou pulada — e "feita" na lista de feitas, que a missão lê). As regras
  * moram em lib/intro-modulo (porQueNaoMostrar):
  *   · chave desligada · módulo sem intro · já vista (aparelho ou conta) · módulo já apresentado de
@@ -122,7 +122,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
       {host}
       {config.formato === "guiada"
         ? <IntroGuiada config={config} aoTerminar={terminar} depoisDoMontar={depoisDoMontar.current} />
-        : <EstadoVazio config={config} aoTerminar={terminar} />}
+        : <IntroDeUmToque config={config} aoTerminar={terminar} />}
     </>
   );
 }

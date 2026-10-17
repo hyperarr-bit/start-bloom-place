@@ -90,8 +90,9 @@ export const SETUPS_ENCAIXADOS: Partial<Record<Exclude<SetupDaDose, "montar-fina
 export function metaGuiadaDaIntro(): { pergunta: string; chips: ChipDaMissao[]; detalhe: string } | null {
   try {
     const c = INTROS.desenvolvimento;
-    if (!c || c.formato !== "vazio" || c.acao.tipo !== "chips") return null;
-    return { pergunta: c.acao.pergunta, chips: c.acao.opcoes.map((o) => ({ emoji: o.emoji, nome: o.rotulo })), detalhe: c.acao.detalhe };
+    const passo = c && c.formato === "toque" ? c.passos[0] : null;
+    if (!passo) return null;
+    return { pergunta: passo.pergunta, chips: passo.opcoes.map((o) => ({ emoji: o.emoji, nome: o.rotulo })), detalhe: passo.descricao ?? "A meta nasce com duas etapas pra você preencher." };
   } catch { return null; }
 }
 

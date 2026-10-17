@@ -59,7 +59,8 @@ import { fraseDoAcesso } from "@/components/missao-doses/BoasVindasDoses";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS } from "@/components/missao-doses/encaixes";
 import { ConhecerMaisHost } from "@/components/intro-modulo/ConhecerMais";
 import { EVENTO_FIM_TOUR } from "@/lib/conhecer-mais";
-import { _zerarIntroRemota, registrarIntroRemota } from "@/lib/intro-modulo";
+import { CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, _zerarIntroRemota, chaveIntroVista, porQueNaoMostrar, registrarIntroRemota } from "@/lib/intro-modulo";
+import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { PASSAGEM_B_MS, rotuloConhecerMais } from "@/components/missao-doses/PassoDoDia";
 import { _novaAberturaDoTour, marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
@@ -589,6 +590,25 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     avancar(4000);
     expect(screen.queryByTestId("montar-financas")).toBeNull();
     expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    /* 17/10 (regra do dono: tutorial é UMA vez por módulo — ele viu Finanças repetir no Simulador): a dose feita É o
+     * tutorial de Finanças. Ficou gravada como intro feita no aparelho E na conta; a introdução do módulo não monta
+     * nada ao entrar de novo, nem depois de fechar/reabrir o app (acima), nem com a missão sumida do aparelho (reinstalou). */
+    expect(localStorage.getItem(chaveIntroVista("financas"))).toMatch(/^dose@/);
+    expect(store.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["financas"]);
+    expect(store.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined(); // "feita" é só da intro por curiosidade (a missão vira continuação por ela)
+    localStorage.setItem(CHAVE_FORCA_INTRO, "on");
+    expect(porQueNaoMostrar("financas", store.get)).not.toBeNull();
+    const intro = render(<Provedor store={store}><IntroDoModulo moduleId="financas" /></Provedor>);
+    avancar(1000);
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
+    intro.unmount();
+    const missaoGuardada = localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)!;
+    localStorage.removeItem(CHAVE_ESTADO_MISSAO_DOSES); // reinstalou: sem a missão no aparelho
+    expect(porQueNaoMostrar("financas", store.get)).toBe("ja_vista"); // a conta lembra
+    localStorage.removeItem(chaveIntroVista("financas")); // e sem a marca do aparelho também
+    expect(porQueNaoMostrar("financas", store.get)).toBe("ja_vista");
+    localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, missaoGuardada);
+    localStorage.removeItem(CHAVE_FORCA_INTRO);
     // ela entra sozinha na Rotina no MESMO dia: uso livre, nada de dose 2
     cleanup();
     montar(store, "/rotina");

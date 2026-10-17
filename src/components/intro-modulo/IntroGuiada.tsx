@@ -66,7 +66,8 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
   const [rotulo, setRotulo] = useState("");
   const [numero, setNumero] = useState<Numero | null>(null);
   const [olharEm, setOlharEm] = useState<Element | null>(null);
-  const [pularVisivel, setPularVisivel] = useState(false);
+  // 17/10 (regra do dono): "Pular" SEMPRE à vista, desde o 1º segundo — nunca escondido atrás de tempo ou 2º toque
+  const [pularVisivel, setPularVisivel] = useState(true);
   const toquesNaFaixa = useRef(0);
   const chipTocado = useRef<ChipDaMissao | null>(null);
   const viaRef = useRef<"chip" | null>(null);

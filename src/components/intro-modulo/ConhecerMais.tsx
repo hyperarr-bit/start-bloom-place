@@ -6,7 +6,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { introLigada } from "@/lib/intro-modulo";
 import {
-  EVENTO_ABRIR_TOUR, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, lembreteDevido, marcarLembreteVisto, marcarTourFeito, registrarAbertura, temTour, tourFeito,
+  EVENTO_ABRIR_TOUR, EVENTO_FIM_TOUR, TOURS, abrirConhecerMais, lampadaVisivel, lembreteDevido, marcarLembreteVisto, marcarTourAberto, marcarTourFeito, registrarAbertura, temTour, tourFeito,
   type FimDoTour, type ModuloComTour, type OrigemDoTour, type PedidoDeTour,
 } from "@/lib/conhecer-mais";
 import { Anel } from "@/components/demo-guiada/pecas";
@@ -41,6 +41,7 @@ export function ConhecerMais({ modulo, origem, aoFim }: { modulo: ModuloComTour;
   useEffect(() => {
     vivo.current = true;
     trackEvent("conhecer_mais_abrir", { modulo, origem });
+    marcarTourAberto(modulo); // 17/10: usado uma vez → a lâmpada do cabeçalho some
     document.documentElement.setAttribute("data-conhecer-mais", "1");
     return () => { vivo.current = false; document.documentElement.removeAttribute("data-conhecer-mais"); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,13 +168,23 @@ export function ConhecerMaisHost({ moduleId }: { moduleId: string }) {
 }
 
 /**
- * O acesso permanente: o botão "Dicas" no cabeçalho do módulo (só nos módulos com passeio, com a chave da intro
- * ligada). Só o ícone (17/10, print do dono a 390 px: com a palavra "Dicas" o cabeçalho de Finanças não cabia e o
+ * O acesso no cabeçalho: o botão "Dicas" (só nos módulos com passeio, com a chave da intro ligada; some depois de
+ * usado — dono 17/10). Só o ícone (17/10, print do dono a 390 px: com a palavra "Dicas" o cabeçalho de Finanças não cabia e o
  * ✨ ficava achatado) — a mesma forma e tamanho do botão do tema, ao lado dele; o nome fica no aria-label e no
  * `title` (o leitor de tela e o toque longo dizem "Dicas").
  */
 export function AcessoConhecerMais({ moduleId }: { moduleId: string }) {
-  if (!temTour(moduleId) || !introLigada()) return null;
+  const { get } = useUserData();
+  /* 17/10 (dono: "Dicas podia sair quando usado"): some depois que o passeio foi aberto uma vez (lampadaVisivel). O
+   * estado acompanha o pedido de abrir na hora (o evento), pra sumir sem esperar um re-render do cabeçalho. */
+  const [usada, setUsada] = useState(() => !lampadaVisivel(moduleId, get));
+  useEffect(() => {
+    if (!temTour(moduleId)) return;
+    const ouvir = (e: Event) => { const d = (e as CustomEvent<PedidoDeTour>).detail; if (d?.modulo === moduleId) setUsada(true); };
+    window.addEventListener(EVENTO_ABRIR_TOUR, ouvir);
+    return () => window.removeEventListener(EVENTO_ABRIR_TOUR, ouvir);
+  }, [moduleId]);
+  if (!temTour(moduleId) || !introLigada() || usada || !lampadaVisivel(moduleId, get)) return null;
   return (
     <button
       type="button"

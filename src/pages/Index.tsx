@@ -72,7 +72,7 @@ import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 import { MontarFinancas, useMontarFinancasNoModulo } from "@/components/finance/montar/MontarFinancas";
-import { MONTAR_FINANCAS_NO_MODULO } from "@/lib/montar-financas";
+import { MONTAR_FINANCAS_NO_MODULO, gastoDoDia } from "@/lib/montar-financas";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -391,10 +391,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
   const totalVariableExpenses = variaveisMes.total;
-  /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do
-     painel limpo (Dashboard `gastoDeHoje`). */
-  const hojeKey = localDayKey();
-  const gastoDeHoje = variaveisMes.noMes.reduce((t: number, e: any) => t + (e?.date === hojeKey ? Number(e?.value) || 0 : 0), 0);
+  /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
+     QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
+  const gastoDeHoje = gastoDoDia(variaveisMes.noMes);
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
   const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
@@ -669,6 +668,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 incomes={incomes}
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
+                gastoDeHoje={gastoDeHoje}
             />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">

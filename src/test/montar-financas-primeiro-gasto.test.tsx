@@ -368,13 +368,18 @@ const responderOMontar = async () => {
 };
 const numeroDoMontar = () => Number(screen.getByTestId("montar-por-dia").getAttribute("data-valor"));
 const postItDoTutorial = () => screen.queryAllByTestId("demo-guia-postit").at(-1) ?? null;
-/** O número do card QUANTO POSSO GASTAR HOJE do Dashboard de sempre (a aba DASHBOARD do módulo de verdade). */
-const numeroDoDashboard = async () => {
+/** O card QUANTO POSSO GASTAR HOJE do Dashboard de sempre (a aba DASHBOARD do módulo de verdade): o número grande e a
+ *  linha discreta "Sobram R$ X pra hoje" (17/10, opção 3: só com gasto HOJE; sem gasto, `linha` = null). */
+const cardDoDashboard = async () => {
   await tocar(screen.getByRole("button", { name: /DASHBOARD/ }));
   await avancar(300);
-  expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // a linha "Sobram R$ X pra hoje" era do painel limpo
-  return Number((screen.getByTestId("pode-gastar-valor").textContent ?? "").replace(/\D/g, ""));
+  const linha = screen.queryByTestId("sobram-pra-hoje");
+  return {
+    numero: Number((screen.getByTestId("pode-gastar-valor").textContent ?? "").replace(/\D/g, "")),
+    linha: linha ? lido(linha) : null,
+  };
 };
+const linhaEsperada = (sobra: number, gasto: number, doDia: number) => `Sobram R$ ${sobra} pra hoje já saiu R$ ${gasto} dos R$ ${doDia} do dia`;
 
 describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formulário → 1 toque → o balão do MEU MÊS → a festa", () => {
   beforeEach(() => {
@@ -426,21 +431,25 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Olha o seu mês");
     expect(screen.getByTestId("missao-doses-olhar-saiu")).toHaveTextContent("Saiu no mês");
     expect(lido(screen.getByTestId("missao-doses-olhar-saiu"))).toContain("R$ 1.150"); // o de antes, riscado → R$ 1.162
+    // (17/10, opção 3) com gasto: "Sobra pra hoje ~~R$ 116~~ R$ 104" — o que dava no começo do dia − o Café (a linha do card)
     const pode = screen.getByTestId("missao-doses-olhar-pode");
-    expect(pode).toHaveTextContent("Hoje ainda dá pra gastar");
+    expect(pode).toHaveTextContent("Sobra pra hoje");
+    expect(pode).not.toHaveTextContent("Hoje ainda dá pra gastar");
     const noBalao = Number(pode.getAttribute("data-valor"));
-    expect(noBalao).toBe(Math.round(porDiaExato(<T,>(k: string, f: T): T => (k in controle.dados() ? (controle.dados()[k] as T) : f))!));
-    // 16 dias pela frente: R$ 12 tiram R$ 0,75 por dia — o número arredondado CAI 1 (~~R$ 116~~ R$ 115); quando não cai, fica sem risco
-    expect(noBalao).toBe(doMontar - 1);
+    expect(noBalao).toBe(doMontar - 12);
     expect(lido(pode.querySelector("s")!)).toBe(`R$ ${doMontar}`);
+    const leitor = <T,>(k: string, f: T): T => (k in controle.dados() ? (controle.dados()[k] as T) : f);
+    // o número grande do card (a média do mês refeita): 16 dias pela frente, R$ 12 tiram R$ 0,75 por dia
+    const numeroGrande = Math.round(porDiaExato(leitor)!);
+    expect(numeroGrande).toBe(doMontar - 1);
     expect(screen.queryByTestId("missao-doses-pular-passo")).toBeNull(); // curto: só o "Entendi"
     expect(screen.queryByTestId("missao-doses-olhar-tempo")).toBeNull(); // sem "Olha · 1 de 2"
     // a festa entra sozinha
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
     expect(screen.getByTestId("missao-doses-gasto-extra")).toHaveTextContent("E o gasto de hoje (Café, R$ 12) já entrou no seu mês.");
-    // o número do balão É o do card QUANTO POSSO GASTAR HOJE do Dashboard de sempre
-    expect(await numeroDoDashboard()).toBe(noBalao);
+    // o card QUANTO POSSO GASTAR HOJE do Dashboard de sempre: o número grande de sempre + a linha com a MESMA sobra do balão
+    expect(await cardDoDashboard()).toEqual({ numero: numeroGrande, linha: linhaEsperada(noBalao, 12, doMontar) });
     // os eventos do passo 1, na ordem, sem reais
     expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "tutorial", "chip", "gasto", "olha"]);
     expect(doPasso1().find((e) => e.acao === "chip")).toMatchObject({ chip: "Café" });
@@ -476,7 +485,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
-    expect(await numeroDoDashboard()).toBe(doMontar);
+    expect(await cardDoDashboard()).toEqual({ numero: doMontar, linha: null }); // sem gasto hoje: o card de sempre, sem a linha
     expect(lerMissao()?.feitos[1]).toBeDefined();
     expect(lerMissao()?.pulados).toBeUndefined(); // não é dose pulada
     expect(lerMissao()?.gastoGuiado).toBeUndefined(); // reabrir não volta no tutorial
@@ -499,10 +508,12 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(controle.dados()["finance-expenses"]).toEqual([expect.objectContaining({ description: "Almoço", value: 35 })]);
     expect(await ate(() => !!screen.queryByTestId("missao-doses-olhar"))).toBe(true);
     const noBalao = Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"));
+    expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent("Sobra pra hoje");
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Primeira dose feita!");
     expect(screen.getByTestId("missao-doses-agora-o")).toHaveTextContent("Agora a Rotina");
-    expect(await numeroDoDashboard()).toBe(noBalao);
+    const card = await cardDoDashboard();
+    expect(card.linha).toBe(linhaEsperada(noBalao, 35, noBalao + 35)); // a MESMA sobra do balão (o que dava − R$ 35)
   });
 
   it("fechar o app no MEIO do tutorial (o post-it na tela) e reabrir: volta NO TUTORIAL — o Montar não se repete, a renda não duplica; o gasto entra e fecha a dose", { timeout: 40_000 }, async () => {

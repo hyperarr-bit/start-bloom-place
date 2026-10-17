@@ -71,7 +71,7 @@ import {
   CHAVE_BRACO_DIA1, CHAVE_UM_POR_DIA_APARELHO, _zerarUmPorDiaRemoto, bracoDia1, idDoAparelho, lerUmPorDiaRemoto, modoDia1Cheio, modoUmPorDia, registrarUmPorDiaRemoto, sortearBraco,
 } from "@/lib/dia1-cheio";
 import { CHAVES_FUNIL_W, guardarChave, lerChave, limparProgresso } from "@/pages/funis/w/retomada";
-import { conteudoDoLembrete, porDiaExato } from "@/lib/lembrete-dia2";
+import { conteudoDoLembrete, porDiaExato, praHojeDasFinancas } from "@/lib/lembrete-dia2";
 import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CHAVE_DIAS_ANOTADOS, contaComoAnotacao, registrarDia, temConteudo } from "@/lib/sequencia";
 import { CHAVE_SEM_GASTO } from "@/lib/acao-do-dia";
@@ -521,16 +521,19 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     const saiuAgora = Number((screen.getByTestId("meu-mes-saiu").textContent ?? "").replace(/\D/g, ""));
     expect(screen.getByTestId("missao-doses-olhar-saiu")).toHaveTextContent("Saiu no mês");
     expect(screen.getByTestId("missao-doses-olhar-saiu")).toHaveTextContent(`R$ ${(saiuAgora - 12).toLocaleString("pt-BR")}`);
-    // "Hoje ainda dá pra gastar": o número do card QUANTO POSSO GASTAR HOJE do Dashboard (29 dias no mês: R$ 12 não mexem no
-    // arredondado — o balão mostra o número, sem fingir uma queda)
+    // (17/10, opção 3) "Sobra pra hoje ~~R$ X~~ R$ X − 12": a linha "Sobram R$ X pra hoje" do card QUANTO POSSO GASTAR HOJE
+    // (29 dias no mês: R$ 12 não mexem no número grande arredondado — mexem na sobra de HOJE)
     const porDiaDoCard = Math.round(porDiaExato(store.get)!);
     expect(porDiaDoCard).toBe(doMontar);
+    expect(praHojeDasFinancas(store.get)).toEqual({ doDia: doMontar, sobra: doMontar - 12, gasto: 12 });
     const pode = screen.getByTestId("missao-doses-olhar-pode");
-    expect(pode).toHaveTextContent("Hoje ainda dá pra gastar");
-    expect(pode).toHaveAttribute("data-valor", String(porDiaDoCard));
-    expect(pode.querySelector("s")).toBeNull();
+    expect(pode).toHaveTextContent("Sobra pra hoje");
+    expect(pode).not.toHaveTextContent("Hoje ainda dá pra gastar");
+    expect(pode).toHaveAttribute("data-sobra");
+    expect(pode).toHaveAttribute("data-valor", String(doMontar - 12));
+    expect(pode.querySelector("s")).toHaveTextContent(`R$ ${doMontar}`);
     const olhar = eventos.find(([nome, d]) => nome === "missao_doses_passo" && d.passo === "olhar" && d.acao === "view")?.[1];
-    expect(olhar).toMatchObject({ alvo: "meu_mes", contou: true, caiu: false });
+    expect(olhar).toMatchObject({ alvo: "meu_mes", contou: true, caiu: true });
     expect(olhar).not.toHaveProperty("antes"); // (17/10) nunca valor em reais em evento
     // ... e a festa entra SOZINHA (o balão segura 2,4 s desde que o anel apareceu)
     andar(1500);
@@ -1347,7 +1350,7 @@ describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º ga
     fireEvent.click(mf().getByRole("button", { name: "Continuar →" }));
   };
 
-  it("fim do mês (28/10, 4 dias): o número CAI no balão — ~~R$ 375~~ R$ 372 —, a aba fica no MEU FINANCEIRO e o card do Dashboard mostra o MESMO R$ 372", () => {
+  it("fim do mês (28/10, 4 dias): o balão mostra a SOBRA de hoje — ~~R$ 375~~ R$ 363 —, a aba fica no MEU FINANCEIRO e o card do Dashboard mostra R$ 372 + a MESMA linha 'Sobram R$ 363 pra hoje' (a mesma conta)", () => {
     ligarUmPorDia("on");
     localStorage.removeItem("core-montar-financas");
     vi.setSystemTime(new Date(2026, 9, 28, 10, 0));
@@ -1360,9 +1363,9 @@ describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º ga
     const tToque = Date.now();
     andar(1300);
     const pode = screen.getByTestId("missao-doses-olhar-pode");
-    expect(pode).toHaveTextContent("Hoje ainda dá pra gastar");
-    expect(pode.querySelector("s")).toHaveTextContent("R$ 375"); // o de antes, riscado
-    expect(pode).toHaveAttribute("data-valor", "372");
+    expect(pode).toHaveTextContent("Sobra pra hoje");
+    expect(pode.querySelector("s")).toHaveTextContent("R$ 375"); // o do começo do dia, riscado
+    expect(pode).toHaveAttribute("data-valor", "363"); // 375 − 12
     expect(screen.getByText("MEU FINANCEIRO")).toHaveAttribute("data-active", "true"); // sem trocar de aba
     expect(screen.getByTestId("missao-doses-olhar-saiu")).toHaveTextContent("Saiu no mês");
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "view", alvo: "meu_mes", contou: true, caiu: true })]);
@@ -1376,6 +1379,8 @@ describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º ga
     // o card QUANTO POSSO GASTAR HOJE do Dashboard: o MESMO número do balão
     fireEvent.click(screen.getByText("DASHBOARD"));
     expect(screen.getByTestId("pode-gastar-valor")).toHaveTextContent("R$ 372");
+    // ... e a conta da linha "Sobram R$ X pra hoje" do card (a de verdade: montar-financas-primeiro-gasto) = a do balão
+    expect(praHojeDasFinancas(store.get)).toEqual({ doDia: 375, sobra: 363, gasto: 12 });
   });
 
   it("pulou o Montar e não tem renda: o tutorial do 1º gasto direto; sem número de 'pode gastar', o balão é SÓ o 'Saiu' do MEU MÊS e a festa entra sozinha", () => {

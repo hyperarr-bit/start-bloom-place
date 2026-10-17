@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -14,12 +14,13 @@ import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  definirDonoDaMissao, missaoDaConta, missaoValida, precisaPlanoA,
+  definirDonoDaMissao, missaoDaConta, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { BoasVindasDoses } from "./BoasVindasDoses";
 import { LerScoreDoDia, PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
+import { CONHECER_MAIS } from "./encaixes";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
 import { ConviteDoDia } from "./ConviteDoDia";
@@ -144,22 +145,46 @@ function Ligada() {
    * sair do módulo): no instante em que o dia é gravado, o "pendente" já é o
    * próximo módulo — sem isto a comemoração desmontava junto.
    */
-  const [emCurso, setEmCurso] = useState<{ n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar" } | null>(null);
+  const [emCurso, setEmCurso] = useState<{ n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar"; retomar?: boolean } | null>(null);
   useEffect(() => {
     if (emCurso && !pathname.startsWith(MODULOS[emCurso.modulo].rota)) setEmCurso(null);
   }, [pathname, emCurso]);
   const pendenteAgora = missao ? passoPendente(missao) : null;
   const aprofundar = missao && missao.boasVindas ? aprofundarPendente(missao, pathname, hoje) : null;
-  type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar" };
+  type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar"; retomar?: boolean };
+  /* 1.0.16 (dono, 17/10): fechou o app DEPOIS do Montar e antes do 1º gasto → a dose volta no passo do gasto (chips
+     prontos, nunca o Montar). Na 1ª abertura do app ela é levada pra Finanças; depois, entrar em Finanças retoma. */
+  const retomada = missao?.boasVindas ? retomadaDoGasto(missao, hoje) : null;
+  const levouPraRetomar = useRef(false);
+  useEffect(() => {
+    if (!retomada || !loaded || emCurso || levouPraRetomar.current) return;
+    levouPraRetomar.current = true; // uma vez por abertura do app (sair de Finanças no meio não puxa de volta)
+    // só de quem abriu o app na Home: um link/aviso que abriu outra tela manda (a retomada fica pra quando ela entrar
+    // em Finanças)
+    if (pathname === "/home" || pathname === "/") navigate(MODULOS.financas.rota);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!retomada, loaded]);
   // 1.0.16 (braço A, uma dose por dia): a dose de amanhã NÃO abre hoje, nem entrando no módulo dela (nem depois do 7º dia)
-  const candidato: Passo | null = missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje)
+  const candidato: Passo | null = retomada && pathname.startsWith(MODULOS.financas.rota)
+    ? { n: retomada.n, modulo: "financas", chave: passoAberto, retomar: true }
+    : missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje)
     ? { n: pendenteAgora.n, modulo: pendenteAgora.modulo, chave: passoAberto }
     : aprofundar ? { n: aprofundar.n, modulo: aprofundar.modulo, chave: passoAberto, modo: "aprofundar" }
     : null;
   useEffect(() => {
-    if (!emCurso && candidato) setEmCurso(candidato);
+    if (emCurso || !candidato) return;
+    setEmCurso(candidato);
+    if (candidato.retomar) {
+      // conta a retomada (a 3ª abertura sem o gasto já é a Home de sempre)
+      const m = lerMissao();
+      if (m?.gastoGuiado) {
+        const novo = { ...m, gastoGuiado: { ...m.gastoGuiado, retomadas: (m.gastoGuiado.retomadas ?? 0) + 1 } };
+        gravarMissao(novo); setMissao(novo);
+        trackEvent("missao_doses_retomada", eventoDaMissao({ dia: candidato.n, modulo: "financas", passo: "gasto_depois_do_montar", vez: novo.gastoGuiado.retomadas }));
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emCurso, candidato?.n, candidato?.modulo, candidato?.chave, candidato?.modo]);
+  }, [emCurso, candidato?.n, candidato?.modulo, candidato?.chave, candidato?.modo, candidato?.retomar]);
 
   useEffect(() => {
     const reler = () => setMissao(lerMissao());
@@ -458,7 +483,7 @@ function Ligada() {
   const passo: Passo | null = emCurso ?? candidato;
   // (1.0.16) a dose só monta com o dado da conta carregado: ela decide no mount o que a conta tem (Finanças vazia →
   // Montar; Rotina sem hábito → criar; Saúde sem meta → a meta no chip) — com o cache vazio decidiria errado
-  if (loaded && passo && (passo.modo === "aprofundar" || !missao.feitos[passo.n] || emCurso)) {
+  if (loaded && passo && (passo.modo === "aprofundar" || !missao.feitos[passo.n] || emCurso || passo.retomar)) {
     const n = passo.n;
     const fechar = () => setEmCurso(null);
     const irParaProxima = () => {
@@ -478,6 +503,18 @@ function Ligada() {
         hoje={hoje}
         braco={B ? "B" : ehUmPorDia(missao) ? "A" : null}
         modo={passo.modo ?? "dose"}
+        retomarGasto={!!passo.retomar}
+        aoGastoGuiado={(estado) => {
+          const m = lerMissao() ?? missao;
+          if (estado === "pendente") {
+            if (!m.braco) return; // sem braço (chave desligada) a missão é a 1.0.15, campo a campo
+            salvar({ ...m, gastoGuiado: { n, dia: hoje, retomadas: m.gastoGuiado?.n === n && m.gastoGuiado.dia === hoje ? (m.gastoGuiado.retomadas ?? 0) : 0 } });
+            return;
+          }
+          if (!m.gastoGuiado) return;
+          const { gastoGuiado: _feito, ...sem } = m;
+          salvar(sem);
+        }}
         aoFeito={(rotulo, segundos) => {
           const m = lerMissao() ?? missao;
           if (passo.modo === "aprofundar") {
@@ -540,8 +577,8 @@ function Ligada() {
         }}
         aoVerFim={() => { fechar(); setVerFim(true); }}
         /* ── braço B ── */
-        aoBoraProxima={() => {
-          trackEvent("missao_bora_proxima", eventoDaMissao({ indice: n }));
+        aoBoraProxima={(via) => {
+          trackEvent("missao_bora_proxima", eventoDaMissao({ indice: n, via: via ?? "botao" }));
           irParaProxima();
         }}
         aoAgoraNao={() => {
@@ -563,6 +600,12 @@ function Ligada() {
           fechar();
           navigate("/home"); // B: "Arrumar minha Home" → o tour é o 4º passo
         }}
+        /* 1.0.16: "Conhecer mais do <módulo> (1 min)" — fecha a comemoração AQUI no módulo e abre o tour do outro ramo */
+        aoConhecerMais={CONHECER_MAIS.abrir ? () => {
+          trackEvent("missao_doses_conhecer_mais", eventoDaMissao({ dia: n, modulo: passo.modulo }));
+          fechar();
+          try { CONHECER_MAIS.abrir?.(passo.modulo); } catch { /* o tour é de outro ramo: nunca derruba a missão */ }
+        } : undefined}
         /* ── braço A (1.0.16) ── */
         aoMostrarAdesivo={(ids) => {
           const m = lerMissao() ?? missao;

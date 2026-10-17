@@ -219,6 +219,25 @@ export function modulosPadrao(area: string | null | undefined): [ModuloDaMissao,
   return out as [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
 }
 
+/**
+ * O "MONTE O SEU MÓDULO" (1.0.16, regra final do dono, 17/10). O quiz curto que já deixa o módulo com a cara dela
+ * só nasce como a 1ª DOSE da missão — e a 1ª dose é sempre a área que ela escolheu no funil (`modulosPadrao` põe a
+ * área primeiro; "Tudo, sinceramente" já mora em dinheiro). Vale igual nos dois braços (A: dia 1; B: a 1ª das 3).
+ * Abrir um módulo por conta própria NUNCA abre o quiz, e as outras doses (2ª e 3ª) são a dose guiada simples — ou
+ * a continuação, se a introdução daquele módulo já foi feita.
+ *   financas        → "Vamos montar suas Finanças" → 1º gasto guiado → o número cai → o MEU MÊS
+ *   rotina          → "Rotina pronta em 3 toques" (ramo v1016-rotina) → "marca o primeiro"
+ *   treino (corpo)  → "Escolher treino" (ramo v1016-cartoes): 2 perguntas → modelo → marca o 1º exercício
+ *   desenvolvimento → a meta guiada de 1 toque da introdução do módulo (ramo v1016-cartoes)
+ * Saúde (e qualquer outro) não tem quiz: a 1ª dose é a guiada simples. Quem encaixa cada um é o PassoDoDia.
+ */
+export type SetupDaDose = "montar-financas" | "montar-rotina" | "escolher-treino" | "meta-guiada";
+export const SETUP_DO_MODULO: Partial<Record<ModuloDaMissao, SetupDaDose>> = {
+  financas: "montar-financas", rotina: "montar-rotina", treino: "escolher-treino", desenvolvimento: "meta-guiada",
+};
+export const setupDaDose = (n: number, modulo: ModuloDaMissao, modo: "dose" | "aprofundar" = "dose"): SetupDaDose | null =>
+  n === 1 && modo === "dose" ? SETUP_DO_MODULO[modulo] ?? null : null;
+
 /* ------------------------------------------------------------------ o estado */
 
 export type DiaDaMissao = 1 | 2 | 3;
@@ -262,6 +281,10 @@ export interface EstadoMissaoDoses {
   convitesVistos?: Record<string, number>;
   /** 1.0.16 (4.8): o DONO da missão — hash do id da conta (nunca o id). Outra conta no mesmo aparelho não herda. */
   dono?: string;
+  /** 1.0.16 (17/10): o 1º gasto guiado depois do Montar está PENDENTE (a dose `n` já está gravada) — fechou o app no
+   *  meio, a dose volta no passo do gasto ao reabrir no mesmo dia (retomadaDoGasto). Sai quando o gasto entra, ela
+   *  pula, ou a comemoração aparece. */
+  gastoGuiado?: { n: DiaDaMissao; dia: string; retomadas?: number };
   /** 1.0.16, braço A: "Sem lembrete" na folha do plano de amanhã (o dia) — não insiste */
   planoAPulado?: string;
   /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets), já mostradas (o dia) */
@@ -374,9 +397,22 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
   const variante = varianteDia1();
   if (!variante) return base;
   let diaCal: number | null = null;
-  try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; } catch { diaCal = null; }
-  return { dia_cal: diaCal, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() };
+  let missaoId: string | null = null;
+  try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; missaoId = m ? idDaMissao(m) : null; } catch { diaCal = null; }
+  return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() };
 };
+/** 1.0.16: um id estável da missão nos eventos (o hash da conta que já mora no estado + o dia em que ela nasceu) —
+ *  junta o funil Montar → 1º gasto → olha → festa (montar_financas_* com origem "missao" e missao_doses_*). Sem
+ *  e-mail nem id da conta: o `dono` é o hash FNV que a missão já guarda. */
+export const idDaMissao = (m: EstadoMissaoDoses): string => `${m.dono ?? "anon"}-${m.inicio}`;
+/** Os campos da missão pra quem é chamado POR ela (o Montar com origem "missao"): o braço, o id, o dia. */
+export function camposDaMissaoNosEventos(): Record<string, unknown> {
+  try {
+    const e = eventoDaMissao();
+    const m = lerMissao();
+    return { ...(e.variante ? { variante: e.variante, braco: e.braco, missao_id: e.missao_id, dia_cal: e.dia_cal } : {}), ...(m ? { missao_modulo_1: m.modulos[0] } : {}) };
+  } catch { return {}; }
+}
 
 /** O braço desta pessoa pros eventos (só com a chave DIA1_CHEIO ligada), ou null. */
 export function varianteDia1(): BracoDia1 | null {
@@ -578,9 +614,24 @@ export function aprofundarPendente(m: EstadoMissaoDoses, rota: string, hoje: str
  * missão (ou a folha do plano de amanhã, ou "O que você construiu") ainda tem tela pra
  * mostrar — o tour deve ESPERAR. Reler ao evento EVENTO_MISSAO_DOSES (e ao `missao_completa`).
  */
+/**
+ * 1.0.16 (dono, 17/10 — "foca no primeiro passo de Finanças"; 67 saíram do app no meio do "anota 1 gasto"): o app
+ * foi fechado/morto DEPOIS do Montar e ANTES do 1º gasto → reabrindo no MESMO dia, a dose volta direto no passo do
+ * gasto, com os chips prontos. O Montar nunca recomeça (já está decidido e a dose, gravada). No máximo 2 retomadas
+ * (a 3ª abertura sem o gasto é a Home de sempre); num dia novo, nada.
+ */
+export const MAX_RETOMADAS_DO_GASTO = 2;
+export function retomadaDoGasto(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): { n: DiaDaMissao; retomadas: number } | null {
+  const g = m?.gastoGuiado;
+  if (!m || !g || g.dia !== hoje || !m.feitos[g.n] || m.modulos[g.n - 1] !== "financas") return null;
+  const retomadas = g.retomadas ?? 0;
+  return retomadas < MAX_RETOMADAS_DO_GASTO ? { n: g.n, retomadas } : null;
+}
 export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
   if (!m) return false;
   if (!m.boasVindas) return true;
+  // o 1º gasto depois do Montar ficou no meio: a missão volta nele antes de qualquer tour/folha
+  if (retomadaDoGasto(m, hoje)) return true;
   if (precisaPlanoAmanha(m, hoje)) return true;
   const dia = diaDaMissao(m, hoje);
   // 1.0.16, braço A: a dose de hoje já foi → a missão volta amanhã (o tour e os adesivos podem entrar);

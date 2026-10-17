@@ -57,6 +57,7 @@ import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { reais } from "@/lib/dinheiro";
 import { marcarCartoesVistos } from "@/lib/tour-home";
+import { camposDaMissaoNosEventos } from "@/lib/missao-doses";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { CHAVE_FATURAS_PAGAS, chaveDaFatura } from "@/lib/finance-faturas";
 import {
@@ -163,6 +164,8 @@ function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
 }
 
 export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200 }: PropsMontarFinancas) {
+  // 1.0.16: chamada PELA missão, os eventos levam o braço e o id dela (o funil Montar → 1º gasto → olha se lê junto)
+  const ev = (dados: Record<string, unknown>) => (origem === "missao" ? { ...dados, ...camposDaMissaoNosEventos() } : dados);
   const { get, set } = useUserData();
   const { custom: cartoesPersonalizados, addCustom, configOf, setConfig } = useFinanceCards();
   const hoje = useMemo(() => agora ?? new Date(), [agora]);
@@ -200,8 +203,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
       if (origem === "modulo" && montarAbertoPelaMissao()) { setCedeu(true); return; }
       inicio.current = true;
       registrarVistaMontar();
-      trackEvent(EV_VIEW, { origem, retomou: !!rascunho });
-      trackEvent(EV_PASSO, { n: PASSO_DA_ETAPA[etapa], origem });
+      trackEvent(EV_VIEW, ev({ origem, retomou: !!rascunho }));
+      trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[etapa], origem }));
     };
     if (origem !== "modulo") { contar(); return; }
     const t = window.setTimeout(contar, 0);
@@ -228,7 +231,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
 
   const irPara = (e: Etapa) => {
     setEtapa(e);
-    if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, { n: PASSO_DA_ETAPA[e], origem });
+    if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[e], origem }));
   };
 
   const decidir = (r: Resultado, nContas = 0, comCartao = false) => {
@@ -238,7 +241,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   };
 
   const pular = () => {
-    trackEvent(EV_PULAR, { passo: PASSO_DA_ETAPA[etapa], origem });
+    trackEvent(EV_PULAR, ev({ passo: PASSO_DA_ETAPA[etapa], origem }));
     decidir("pulou");
     onPular?.();
   };
@@ -281,10 +284,10 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     juntar("finance-fixed-expenses", fixosDaTela);
     decidir("pronto", fixos.length, comCartao);
     const final = calcularMontar(renda, contas, hoje, resposta);
-    trackEvent(EV_PRONTO, {
+    trackEvent(EV_PRONTO, ev({
       contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, origem, cartao: comCartao,
       ...(pulouCartao ? { cartao_pulou: true } : {}),
-    });
+    }));
   };
 
   const montar = (resposta: RespostaCartao = cartao, pulouCartao = false) => {

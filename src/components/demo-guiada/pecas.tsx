@@ -196,7 +196,7 @@ export function useDigitando(): boolean {
 /** Quanto tempo o anel espera a âncora voltar (re-render/troca do nó) antes de desistir — só com `reachar`. */
 export const TOLERANCIA_ANCORA_MS = 2500;
 
-export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar }: {
+export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar, rapido = false, aoAparecer }: {
   alvo: Element;
   /**
    * 16/10 (1.0.16 — "o anel do passo 1 some antes do toque", ~24% das pessoas; no ar:
@@ -217,6 +217,10 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   testid?: string;
   /** o balão prefere ficar EMBAIXO do anel (se couber) */
   abaixo?: boolean;
+  /** 17/10: quem chamou JÁ rolou e assentou a tela — o anel desenha no 1º quadro estável (~50 ms, não ~700 ms) */
+  rapido?: boolean;
+  /** 17/10: o anel acabou de aparecer de verdade (o relógio de quem segura um tempo de leitura começa aqui) */
+  aoAparecer?: () => void;
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
@@ -229,6 +233,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   aoSairRef.current = aoSair;
   const reacharRef = useRef(reachar);
   reacharRef.current = reachar;
+  const aoAparecerRef = useRef(aoAparecer);
+  aoAparecerRef.current = aoAparecer;
 
   useEffect(() => {
     let vivo = true;
@@ -299,13 +305,14 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     const assentar = () => {
       if (!vivo) return;
       const y = window.scrollY;
-      if (y === ultimoY && ++estaveis >= 2) {
+      if (y === ultimoY && ++estaveis >= (rapido ? 1 : 2)) {
         if (!ancoraOk()) {
           // com `reachar`: a âncora pode estar remontando — tenta de novo até a tolerância (ancoraOk sai sozinho)
           if (!saiuRef.current) timers.push(window.setTimeout(assentar, 250));
           return;
         }
         setRect(medir());
+        try { aoAparecerRef.current?.(); } catch { /* quem chamou nunca derruba o anel */ }
         window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
         // fixo: a tela muda de tamanho sem rolar (ela abriu a edição de outra conta, um
         // formulário cresceu, o teclado fechou) — o anel segue o alvo onde ele estiver
@@ -324,7 +331,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       if (y !== ultimoY) { estaveis = 0; ultimoY = y; }
       timers.push(window.setTimeout(assentar, 200));
     };
-    timers.push(window.setTimeout(assentar, 300));
+    timers.push(window.setTimeout(assentar, rapido ? 40 : 300));
     if (duracao != null) timers.push(window.setTimeout(() => sair("timeout"), duracao));
 
     // Saídas passivas — NUNCA preventDefault: a demo continua 100% tocável.

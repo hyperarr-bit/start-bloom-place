@@ -102,13 +102,17 @@ describe("quandoAvisarDia2 — sempre no dia 2 da Missão, em hora decente", () 
 });
 
 describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de sempre", () => {
-  const INICIO = new Date(2026, 8, 28, 10, 0).getTime();
+  // Lido no beforeEach, depois do beforeAll pôr o processo em São Paulo.
+  // No corpo do describe o fuso ainda é o do processo (UTC nesta máquina) e
+  // 28/09 10:00 viraria outro instante — o aviso caía em 08:30 em vez de 10:05.
+  let INICIO = 0;
   const avisoAgendado = () => {
     const pedido = ln.schedule.mock.calls[0]?.[0] as { notifications: { id: number; title: string; body: string; schedule: { at: Date } }[] };
     return pedido.notifications;
   };
 
   beforeEach(() => {
+    INICIO = new Date(2026, 8, 28, 10, 0).getTime();
     (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
     localStorage.clear();
     localStorage.setItem("core-missao", JSON.stringify(missao(INICIO)));

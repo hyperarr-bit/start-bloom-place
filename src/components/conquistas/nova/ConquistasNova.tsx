@@ -7,6 +7,7 @@ import { trackEvent } from "@/lib/analytics";
 import { mesAtualExtenso } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { diaDaMissao, missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
+import { diaDaMissao as diaDaMissaoDoses, lerMissao as lerMissaoDoses } from "@/lib/missao-doses";
 import { semanaDaSequencia } from "@/lib/sequencia-semana";
 import { raridadeDe, type Badge } from "@/components/gamification/types";
 import { AdesivoRaro } from "../adesivos-raridade";
@@ -68,7 +69,12 @@ export const diaDoTeste = (): 1 | 2 | 3 | null => {
   try {
     if (!isNativeShell() || !trialCartaoAtivo()) return null;
     const m = missaoAtual();
-    return m ? diaDaMissao(m) : null;
+    if (m) return diaDaMissao(m);
+    // 1.0.16: quem é novo tem a missão em doses (lib/missao-doses), não a antiga — o dia do calendário do teste
+    const nova = lerMissaoDoses();
+    if (!nova || nova.explorou) return null;
+    const d = diaDaMissaoDoses(nova);
+    return d >= 1 && d <= 3 ? (d as 1 | 2 | 3) : null;
   } catch { return null; }
 };
 

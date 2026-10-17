@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
-import { lerMissao, missaoCumprida, missaoDosesLigada, passoPendente } from "@/lib/missao-doses";
+import { doseNaTela, lerMissao, missaoCumprida, missaoDosesLigada, passoPendente } from "@/lib/missao-doses";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { cartoesLigados, cartoesVistosNesteAparelho, guardarForcasDaUrl, marcarCartoesVistos } from "@/lib/tour-home";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -113,6 +113,8 @@ const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="cartoes-modulo"])'
 export function guiaDoModuloAtiva(moduleId: string, get: <T>(k: string, f: T) => T): boolean {
   try {
     if (typeof document !== "undefined" && document.querySelector(OUTRA_GUIA)) return true;
+    // 1.0.16: uma dose da missão na tela (`<html data-missao-dose>`) — a dose É a apresentação do módulo
+    if (doseNaTela()) return true;
     const forceNew = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     if (forceNew) return true;
     const replay = get<string[]>("tutorial-replay-modules", []);

@@ -160,4 +160,23 @@ describe("ConviteDeValor (escuta as ações salvas)", () => {
     await new Promise((r) => setTimeout(r, 1800));
     expect(screen.queryByText(/DIAS USANDO O CORE/)).not.toBeInTheDocument();
   });
+  it("1.0.16: no meio de uma dose da missão (<html data-missao-dose>) ou com uma guia na tela, a folha NÃO abre — e a reserva fica pra próxima ação", async () => {
+    doisDias();
+    render(<ConviteDeValor />);
+    document.documentElement.setAttribute("data-missao-dose", "1");
+    act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_habit", key: "rotina-habits-checked" } })); });
+    await new Promise((r) => setTimeout(r, 1800));
+    expect(screen.queryByText("Hábito marcado")).not.toBeInTheDocument();
+    document.documentElement.removeAttribute("data-missao-dose");
+    const guia = document.createElement("div");
+    guia.setAttribute("data-camada-guia", "tour-home");
+    document.body.appendChild(guia);
+    act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_habit", key: "rotina-habits-checked" } })); });
+    await new Promise((r) => setTimeout(r, 1800));
+    expect(screen.queryByText("Hábito marcado")).not.toBeInTheDocument();
+    guia.remove();
+    // a dose fechou e não há guia: a próxima ação de valor abre a folha (a reserva não foi gasta)
+    act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_habit", key: "rotina-habits-checked" } })); });
+    await waitFor(() => expect(screen.getByText("Hábito marcado")).toBeInTheDocument(), { timeout: 4000 });
+  });
 });

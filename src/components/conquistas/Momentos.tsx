@@ -15,7 +15,7 @@ import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
 import { CHAVE_CAPAS_VISTAS, capasNovas, diasPraCapa, lerCapasVistas } from "@/lib/fogo-sequencia";
 import { isNativeShell } from "@/lib/native-shell";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
-import { EVENTO_MISSAO_DOSES, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
+import { EVENTO_MISSAO_DOSES, ehUmPorDia, lerMissao, missaoDoDiaEmCena } from "@/lib/missao-doses";
 import { conquistas2Ligada } from "@/lib/conquistas2";
 import { ehMarcoDeFesta, festaDoMarcoNovo, formatoDoAviso } from "./nova/recompensas";
 import { CelebracaoMarco, ToastAdesivo } from "./nova/camadas";
@@ -751,7 +751,8 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
       // no teste com a Missão valendo: NADA por cima dela (regra de 28/09) — o adesivo cola quieto e fica
       // esperando no álbum; quem avisa é a própria tela de Conquistas ("Seu adesivo está esperando no álbum")
       if (emTesteComMissao()) return { fila: itens, semFesta: [...silenciosos, ...novos.map((b) => b.id)] };
-      if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO);
+      // (1.0.16: no braço A o "Casa arrumada" também espera o plano de amanhã — como no caminho de sempre, abaixo)
+      if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO && !ehUmPorDia(lerMissao()));
       const cheia = novos.filter((b) => formatoDoAviso(b) === "tela_cheia");
       const toast = novos.filter((b) => formatoDoAviso(b) === "toast");
       const maxCheia = contaNova ? MAX_FESTAS_CONTA_NOVA : MAX_FESTAS_DE_UMA_VEZ;
@@ -761,7 +762,8 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     }
     if (emTesteComMissao()) return { fila: itens, semFesta: novos.map((b) => b.id) };
     // missão do dia em cena (B): só o "Casa arrumada" passa; o resto espera na fila SEM virar visto
-    if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO);
+    // (1.0.16: no braço A o tour curto não "fecha a missão" — o "Casa arrumada" também espera o plano de amanhã)
+    if (esperaMissao) novos = novos.filter((b) => b.id === ADESIVO_QUE_FECHA_A_MISSAO && !ehUmPorDia(lerMissao()));
     // os adesivos ganhos DURANTE a missão chegam juntos, num popup só ("Você ganhou N adesivos")
     const agrupar = !esperaMissao && !!lerMissao();
     const raros = novos.filter((b) => formatoDaFesta(b) === "tela_cheia");

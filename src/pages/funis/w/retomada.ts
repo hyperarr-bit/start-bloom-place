@@ -59,8 +59,21 @@ export const lerChave = <T,>(chave: string): T | null => {
   } catch { return null; }
 };
 
+/**
+ * A conta nasceu ("liberando"): o progresso do funil sai — MENOS A ÁREA (16/10, 1.0.16).
+ *
+ * Bug medido no ar (build 40): `missao_doses_inicio` chegava com `area: null` e a missão
+ * sempre em Finanças → Rotina → Saúde, mesmo pra quem escolheu Rotina ou Treino na porta. A
+ * causa era esta limpeza: ela apagava `core-funil-w-area` no passo "liberando", ANTES de a
+ * missão nascer na 1ª Home. A área é do aparelho (chaves-do-aparelho: Missão em doses, ação
+ * do dia, lembrete do dia 2) e vale 30 dias pelo carimbo — o resto (passo, respostas,
+ * pós-compra, coluna do paywall) é só do funil e sai.
+ */
+export const CHAVES_QUE_FICAM_NA_LIMPEZA: ReadonlySet<string> = new Set([CHAVES_FUNIL_W.area]);
 export const limparProgresso = (): void => {
-  try { for (const k of Object.values(CHAVES_FUNIL_W)) localStorage.removeItem(k); } catch { /* noop */ }
+  try {
+    for (const k of Object.values(CHAVES_FUNIL_W)) if (!CHAVES_QUE_FICAM_NA_LIMPEZA.has(k)) localStorage.removeItem(k);
+  } catch { /* noop */ }
 };
 
 /**

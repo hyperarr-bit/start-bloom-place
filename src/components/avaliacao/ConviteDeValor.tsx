@@ -43,6 +43,10 @@ export const ConviteDeValor = () => {
         // 26/09: o 1º ✓ do Treino (first_workout) abria a folha de avaliação no
         // meio da série. No Treino não pede; a reserva fica pra próxima ação.
         if (window.location.pathname.startsWith("/treino")) return;
+        // 1.0.16: no meio de uma dose da missão (<html data-missao-dose>) ou com qualquer guia na tela (tour,
+        // cartões, convite, festa da dose), a folha não abre por cima — a reserva fica pra próxima ação. Visto
+        // no harness: criar o 1º hábito na dose do dia 2 abria a folha da nota no "2 de 2 · marcar".
+        if (document.documentElement.hasAttribute("data-missao-dose") || document.querySelector("[data-camada-guia]")) return;
         if (reservarConviteDeValor(acao, { pagante: isSubscribed, emTrial: trialCartaoAtivo() })) {
           setMomento({ rotulo: ACOES_DE_VALOR[acao], dias: diasDeUso() });
         }

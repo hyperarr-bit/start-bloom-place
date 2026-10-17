@@ -37,7 +37,7 @@ export interface ChallengeCtx {
  * `lerDesafios` dele só exige `key`/`weekStart` string) e as insígnias só contam
  * `result === "win"`. `active` SEM `nivel` = escolhido pelo app antigo → vale a
  * regra antiga (catálogo CHALLENGES abaixo); COM `nivel` = catálogo novo
- * (catalogo.ts), com a trava de registro. Ver scratchpad/definitiva/12-desafios.md.
+ * (catalogo.ts), com níveis, motivo e calendário. Ver scratchpad/definitiva/12-desafios.md.
  */
 export type MotivoDoFechamento = "cumpriu" | "regra" | "sem-registro" | "nao-cumpriu";
 export type OrigemDaOferta = "variacao" | "revanche" | "calendario" | "nova";

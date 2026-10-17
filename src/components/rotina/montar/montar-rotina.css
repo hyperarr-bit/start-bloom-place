@@ -1,0 +1,148 @@
+/* "ROTINA PRONTA EM 3 TOQUES" (1.0.16) — a cara do módulo Rotina: o verde dos HÁBITOS DIÁRIOS nos
+   acentos (chips marcados, contador, orbe), a faixa rosa da ROTINA SEMANAL no "Seu dia" (é a prévia da
+   agenda que ela vai ver), grade de planner na tabela, botão grafite da casa (--primary). Tokens de
+   escopo `.mrt` (claro + escuro), nenhum token global muda. Seletores `button.mrt-…` de propósito: o
+   index.css zera o fundo de [type="button"] com a mesma especificidade de uma classe sozinha. */
+.mrt {
+  --mrt-verde: #16a34a;
+  --mrt-verde-texto: #14532d;
+  --mrt-verde-suave: rgba(34, 197, 94, .12);
+  --mrt-rosa: linear-gradient(90deg, #f9a8d4 0%, #f472b6 100%);
+  --mrt-rosa-texto: #fff;
+  --mrt-rosa-celula: #fce7f3;
+  --mrt-rosa-celula-texto: #831843;
+  --mrt-orbe: conic-gradient(#4ade80, #16a34a, #bbf7d0, #4ade80);
+  --mrt-orbe-luz: rgba(74, 222, 128, .4);
+  --mrt-ok: #16a34a;
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  font-family: Inter, -apple-system, sans-serif; -webkit-font-smoothing: antialiased;
+  padding-top: var(--app-safe-top, 0px);
+  padding-bottom: var(--app-safe-bottom, 0px);
+}
+.dark .mrt {
+  --mrt-verde: #34d399;
+  --mrt-verde-texto: #a7f3d0;
+  --mrt-verde-suave: rgba(42, 163, 121, .18);
+  --mrt-rosa: linear-gradient(90deg, hsl(330, 40%, 22%) 0%, hsl(330, 40%, 28%) 100%);
+  --mrt-rosa-texto: hsl(330, 55%, 88%);
+  --mrt-rosa-celula: hsl(330, 40%, 20%);
+  --mrt-rosa-celula-texto: hsl(330, 55%, 82%);
+  --mrt-orbe: conic-gradient(#2aa379, #15803d, #34d399, #2aa379);
+  --mrt-orbe-luz: rgba(42, 163, 121, .25);
+  --mrt-ok: #22c55e;
+}
+/* A faixa da missão (fixa no topo, z 210) continua visível por cima: a tela começa abaixo dela. */
+html[data-missao-doses-faixa] .mrt { top: var(--missao-doses-faixa-h, 40px); }
+html[data-montar-rotina-fase="folha"] body { overflow: hidden; }
+
+.mrt-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0; }
+.mrt-cab-icone { color: #059669; width: 22px; height: 22px; }
+.dark .mrt-cab-icone { color: #34d399; }
+.mrt-cab-nome { font-size: 17px; font-weight: 800; letter-spacing: .02em; }
+.mrt-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); }
+
+.mrt-corpo { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.mrt-corpo > * { flex-shrink: 0; }
+.mrt-barra { display: flex; gap: 6px; padding: 16px 22px 0; }
+.mrt-barra i { flex: 1; height: 4px; border-radius: 4px; background: hsl(var(--muted)); }
+.mrt-barra i[data-on] { background: var(--mrt-verde); }
+
+.mrt-q { padding: 20px 22px 0; }
+.mrt-kicker { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 11.5px; letter-spacing: .1em; font-weight: 800; color: var(--mrt-verde); text-transform: uppercase; }
+button.mrt-voltar { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding: 4px 0 4px 8px; background: none; border: 0; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.mrt-q h2 { font-size: 25px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 8px; }
+.mrt-q p { font-size: 14.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; line-height: 1.4; }
+
+.mrt-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 22px 0; }
+.mrt-chips[data-grade] { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button.mrt-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 46px; padding: 0 14px; border-radius: 14px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 15px; font-weight: 650; text-align: left; transition: border-color .15s, background-color .15s, transform .1s; }
+button.mrt-chip:active { transform: scale(.97); }
+button.mrt-chip:disabled { opacity: .6; }
+button.mrt-chip[aria-pressed="true"] { border-color: var(--mrt-verde); background: var(--mrt-verde-suave); color: var(--mrt-verde-texto); }
+/* 1ª pergunta: as horas são o conteúdo — grandes, no meio */
+button.mrt-chip[data-hora] { justify-content: center; min-height: 66px; font-size: 24px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+button.mrt-chip[data-hora][data-outro] { font-size: 16px; font-weight: 700; gap: 6px; }
+button.mrt-chip[data-escolha] { justify-content: center; min-height: 56px; font-size: 15.5px; font-weight: 700; }
+
+/* tabela de planner: faixa da seção + linhas de grade */
+.mrt-folha { margin: 18px 18px 0; border: 1px solid hsl(var(--border)); border-radius: 12px; overflow: hidden; background: hsl(var(--card)); }
+.mrt-faixa { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; background: var(--mrt-rosa); color: var(--mrt-rosa-texto); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.mrt-faixa b { font-weight: 700; letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+.mrt-linha { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; min-height: 40px; border-top: 1px solid hsl(var(--border)); }
+.mrt-faixa + .mrt-linha { border-top: 0; }
+.mrt-linha-hora { width: 58px; flex-shrink: 0; align-self: stretch; display: flex; align-items: center; padding-left: 12px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); border-right: 1px solid hsl(var(--border)); }
+.mrt-linha-texto { flex: 1; min-width: 0; display: inline-block; padding: 3px 8px; border-radius: 4px; background: var(--mrt-rosa-celula); color: var(--mrt-rosa-celula-texto); font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrt-linha-dias { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.mrt-linha[data-vazia] .mrt-linha-texto { background: transparent; color: hsl(var(--muted-foreground)); font-weight: 500; font-style: italic; padding-left: 0; white-space: normal; }
+
+/* "Outro": a hora numa linha pautada, grande */
+.mrt-hora { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px 14px; }
+/* !important: o index.css força 16px em todo input no celular (anti-zoom do Safari). Largura inteira: num
+   aparelho de 12 h o valor vira "6:30 AM" e não pode cortar. */
+.mrt-hora input { width: 100%; min-width: 0; height: 54px; padding: 0 16px; border-radius: 12px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--background)); color: inherit; font-family: inherit; font-size: 24px !important; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; text-align: left; outline: none; }
+.mrt-hora input:focus { border-color: var(--mrt-verde); }
+.mrt-hora small { font-size: 12.5px; color: hsl(var(--muted-foreground)); line-height: 1.3; }
+
+/* a prévia do aviso (3ª pergunta): papel do planner, como a pré-folha do lembrete da missão */
+.mrt-aviso { margin: 18px 22px 0; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(0, 0, 0, .08); background: #fff8d6; color: #16121c; text-align: left; }
+.mrt-aviso-quando { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #8a4b12; }
+.mrt-aviso-quando b { font-weight: 800; text-transform: none; letter-spacing: .04em; font-size: 11px; }
+.mrt-aviso strong { display: block; font-size: 14.5px; font-weight: 800; line-height: 1.3; margin-top: 2px; }
+.mrt-aviso > span:last-child { display: block; font-size: 13px; line-height: 1.35; margin-top: 2px; color: #4f5a64; }
+.dark .mrt-aviso { background: hsl(45 40% 14%); border-color: hsl(45 30% 24%); color: hsl(45 30% 92%); }
+.dark .mrt-aviso-quando { color: hsl(38 80% 68%); }
+.dark .mrt-aviso > span:last-child { color: hsl(45 12% 72%); }
+.mrt-nota { display: flex; align-items: flex-start; gap: 8px; margin: 14px 22px 0; font-size: 13.5px; line-height: 1.4; color: var(--mrt-verde-texto); }
+.mrt-nota svg { flex-shrink: 0; margin-top: 2px; color: var(--mrt-ok); }
+.mrt-nota[data-aviso] { color: hsl(var(--muted-foreground)); }
+
+/* rodapé grudado embaixo: o botão nunca some atrás da prévia */
+.mrt-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 18px 22px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 18px); }
+button.mrt-cta { width: 100%; min-height: 56px; border-radius: 16px; border: 0; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .15s, transform .1s; }
+button.mrt-cta:active { transform: scale(.985); }
+button.mrt-cta:disabled { opacity: .35; }
+button.mrt-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0; font-size: 13.5px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+
+/* montando */
+.mrt-montando { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 30px 40px; }
+.mrt-orbe { width: 120px; height: 120px; border-radius: 50%; background: var(--mrt-orbe); display: grid; place-items: center; box-shadow: 0 0 60px var(--mrt-orbe-luz); animation: mrt-gira 2.4s linear infinite; }
+.mrt-orbe > div { width: 92px; height: 92px; border-radius: 50%; background: hsl(var(--background)); display: grid; place-items: center; color: var(--mrt-verde); animation: mrt-gira 2.4s linear infinite reverse; }
+.mrt-montando h2 { font-size: 22px; font-weight: 800; margin-top: 30px; text-align: center; letter-spacing: -.01em; }
+.mrt-passos { margin-top: 22px; width: 100%; max-width: 300px; }
+.mrt-passo { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 15px; opacity: 0; transform: translateY(6px); animation: mrt-entra .35s ease-out forwards; }
+.mrt-passo i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--mrt-ok); color: #fff; }
+.mrt-passo[data-esperando] { color: hsl(var(--muted-foreground)); }
+.mrt-passo[data-esperando] i { background: transparent; border: 2px solid var(--mrt-verde); }
+
+/* o post-it do 1º quadradinho: papel amarelo com fita magenta (o post-it do planner, o mesmo da missão) —
+   igual nos dois temas, é papel */
+/* margem em cima: a fita do post-it nunca encosta no anel justo do quadradinho (o anel põe o balão 16 px abaixo) */
+.mrt-postit { position: relative; margin-top: 10px; }
+.mrt-postit-fita { position: absolute; top: -8px; left: 50%; width: 76px; height: 16px; border-radius: 2px; transform: translateX(-50%) rotate(2deg); background: hsl(330 65% 50% / .55); z-index: 1; }
+.mrt-postit-papel { border-radius: 6px; padding: 14px 16px 12px; background: #fff3b0; color: #262626; box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .7); transform: rotate(-.6deg); text-align: left; }
+.mrt-postit-rotulo { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(38, 38, 38, .6); margin-bottom: 4px; }
+.mrt-postit-titulo { display: block; font-size: 16px; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; }
+.mrt-postit-texto { display: block; font-size: 13px; line-height: 1.4; margin-top: 3px; color: rgba(38, 38, 38, .8); }
+.mrt-postit-item { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; min-height: 36px; padding: 0 13px 0 11px; border-radius: 999px; background: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 rgba(0, 0, 0, .12); }
+.mrt-postit-item em { font-style: normal; font-weight: 600; color: rgba(38, 38, 38, .55); }
+.mrt-postit-dica { display: block; font-size: 12px; line-height: 1.35; margin-top: 8px; color: rgba(38, 38, 38, .62); }
+.mrt-postit-dica[data-segurou] { color: #9a3412; font-weight: 700; }
+.mrt-postit-acoes { display: flex; justify-content: flex-end; margin-top: 8px; }
+button.mrt-postit-ok { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #16121c; color: #fff; font-size: 14px; font-weight: 700; }
+.mrt-postit[data-feito] .mrt-postit-titulo { color: #15803d; }
+
+/* sem a tabela na tela (fail-open): o post-it fica solto, no alto, sem escurecer nada */
+.mrt-solto { position: fixed; left: 0; right: 0; z-index: 200; display: flex; justify-content: center; pointer-events: none; top: calc(var(--app-safe-top, 0px) + 72px); }
+html[data-missao-doses-faixa] .mrt-solto { top: calc(var(--missao-doses-faixa-h, 40px) + var(--app-safe-top, 0px) + 64px); }
+.mrt-solto > div { width: 92%; max-width: 360px; pointer-events: auto; }
+
+@keyframes mrt-gira { to { transform: rotate(360deg); } }
+@keyframes mrt-entra { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mrt-orbe, .mrt-orbe > div { animation: none; }
+  .mrt-passo { animation-duration: .01s; }
+}
+/* "← Voltar"/"Outro": o texto mora num <span> — com o svg como único filho, a regra global
+   `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */

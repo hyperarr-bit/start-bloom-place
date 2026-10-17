@@ -213,7 +213,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Hoje · 💰 Finanças");
     expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Domingo · ❤️ Saúde");
-    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", origem_area: "funil", prototipo: "web" }]);
+    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", area_lida: "dinheiro", area_respondida: null, origem_area: "funil", prototipo: "web" }]);
     // o card ainda não aparece por baixo das boas-vindas? aparece (a Home é a mesma) — mas a missão manda na tela
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     const escolha = screen.getByTestId("missao-doses-escolha");
@@ -318,7 +318,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/saude");
     const postIt = esperarPostIt();
-    fireEvent.click(within(postIt).getByTestId("demo-guia-chip"));
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]); // 1.0.16: sem meta de água, o chip é a meta (6/8/10) + o 1º copo
     expect((store.dados["core-saude-water"] as Record<string, number>)["2026-10-02"]).toBe(1);
     passarPeloOlhar();
     const festa3 = screen.getByTestId("missao-doses-festa");

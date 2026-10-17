@@ -13,7 +13,8 @@ import { bracoDia1, guardarForcaDia1Cheio, modoUmPorDia, type PlanoAmanha } from
 import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
 import { EVENTO_TOUR_HOME_FIM, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 import {
-  EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, conviteDoDiaDevido, diaDaMissao, doseLiberadaHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
+  missaoDaConta, missaoValida, precisaPlanoA, sequenciaDaMissao,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -22,6 +23,11 @@ import { PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
 import { ConstruiuEm3Dias } from "./ConstruiuEm3Dias";
 import { PlanoDeAmanha } from "./PlanoDeAmanha";
 import { ConviteDoDia } from "./ConviteDoDia";
+import { PlanoDeAmanhaA } from "./PlanoDeAmanhaA";
+import { DicaDoDia } from "./DicaDoDia";
+import { adesivoDaDose } from "./PassoDoDia";
+import { missaoAtual } from "@/lib/teste-gratis";
+import { deveMostrarTourHome } from "@/lib/tour-home";
 import "./missao-doses.css";
 
 /**
@@ -114,11 +120,13 @@ function Ligada() {
    * teste/assinatura: no app ela só nasce e só aparece com acesso (isSubscribed; antes da 1ª resposta do
    * check-subscription é false, então nada pisca). A web segue como estava. */
   const semAcessoNoApp = isNativeShell() && !isSubscribed;
-  const { loaded } = useUserData();
+  const { loaded, get, set: gravarNaConta } = useUserData();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hoje = localDayKey();
-  const [missao, setMissao] = useState<EstadoMissaoDoses | null>(() => lerMissao());
+  const [missaoBruta, setMissao] = useState<EstadoMissaoDoses | null>(() => lerMissao());
+  // 1.0.16 (4.8): a missão do aparelho só vale pra conta DONA dela — outra conta no mesmo celular não herda
+  const missao = missaoBruta && missaoDaConta(missaoBruta, user?.id) ? missaoBruta : null;
   const [verFim, setVerFim] = useState(false);
   const [passoAberto, setPassoAberto] = useState(0);
   /**
@@ -133,8 +141,8 @@ function Ligada() {
   const pendenteAgora = missao ? passoPendente(missao) : null;
   const aprofundar = missao && missao.boasVindas ? aprofundarPendente(missao, pathname, hoje) : null;
   type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar" };
-  // 1.0.16 (braço A, uma dose por dia): a dose de amanhã NÃO abre hoje, nem entrando no módulo dela
-  const candidato: Passo | null = missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseLiberadaHoje(missao, hoje)
+  // 1.0.16 (braço A, uma dose por dia): a dose de amanhã NÃO abre hoje, nem entrando no módulo dela (nem depois do 7º dia)
+  const candidato: Passo | null = missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje)
     ? { n: pendenteAgora.n, modulo: pendenteAgora.modulo, chave: passoAberto }
     : aprofundar ? { n: aprofundar.n, modulo: aprofundar.modulo, chave: passoAberto, modo: "aprofundar" }
     : null;
@@ -152,17 +160,48 @@ function Ligada() {
   // nasce na 1ª entrada logada: a área da porta primeiro
   useEffect(() => {
     if (!user || !loaded || missao || semAcessoNoApp) return;
-    // no app: só pra quem é novo nesta versão (a Missão antiga em andamento termina a dela)
-    if (isNativeShell() && !missaoDosesMandaNoApp(user.created_at)) return;
+    // 1.0.16 (4.8): reinstalou / trocou de aparelho / a missão local é de outra conta → a CÓPIA DA CONTA volta
+    // (boas-vindas, convites e doses feitas não se repetem)
+    const copia = missaoValida(get<unknown>(CHAVE_MISSAO_NA_CONTA, null));
+    if (copia && missaoDaConta(copia, user.id)) {
+      const m = gravarMissao(copia);
+      setMissao(m);
+      trackEvent("missao_restaurada", eventoDaMissao({ doses: dosesFeitas(m), boas_vindas: m.boasVindas }));
+      return;
+    }
+    // no app: só pra quem é novo nesta versão (a Missão antiga em andamento termina a dela). Uma missão local
+    // de OUTRA conta não conta como "já nasceu aqui" (missaoDosesMandaNoApp diria sim por ela).
+    if (isNativeShell()) {
+      const local = lerMissao();
+      const outraConta = !!local && !missaoDaConta(local, user.id);
+      if (outraConta ? (MISSAO_DOSES_APP !== "on" || !!missaoAtual() || !contaNova(user.created_at)) : !missaoDosesMandaNoApp(user.created_at)) return;
+    }
+    const areaLida = areaEscolhidaNoFunil();
     const area = areaDaMissao(user.user_metadata);
     const modulos = modulosPadrao(area);
     // 10/10: o braço do teste "dia 1 cheio" (null com a chave desligada = a missão de hoje)
     // 1.0.16: com a metadata `missao_1_por_dia` = "ab"/"on", o sorteio é A (uma por dia) × B (dia 1 cheio)
     const braco = bracoDia1();
-    const m = iniciarMissao(modulos, hoje, undefined, braco);
+    let m = iniciarMissao(modulos, hoje, undefined, braco);
+    // o dono só entra com o braço (build de loja): sem braço, o JSON é o de sempre, campo a campo
+    if (braco) m = gravarMissao({ ...m, dono: donoDaConta(user.id) });
     setMissao(m);
-    trackEvent("missao_doses_inicio", eventoDaMissao({ modulos, area: area ?? null, origem_area: areaEscolhidaNoFunil() ? "funil" : area ? "porta" : "padrao", ...(braco ? { missao_1_por_dia: modoUmPorDia() } : {}) }));
-  }, [user, loaded, missao, hoje, semAcessoNoApp]);
+    const portaArea = (() => { try { const a = (user.user_metadata as { porta?: { respostas?: { area?: unknown } } } | undefined)?.porta?.respostas?.area; return typeof a === "string" ? a : null; } catch { return null; } })();
+    trackEvent("missao_doses_inicio", eventoDaMissao({
+      modulos, area: area ?? null, area_lida: areaLida ?? null, area_respondida: portaArea,
+      origem_area: areaLida && areaLida in AREAS ? "funil" : area ? "porta" : "padrao", ...(braco ? { missao_1_por_dia: modoUmPorDia() } : {}),
+    }));
+  }, [user, loaded, missao, hoje, semAcessoNoApp]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 1.0.16 (4.8): a cópia da missão na conta acompanha cada mudança (sobe pro user_data) */
+  const missaoJson = missao ? JSON.stringify(missao) : null;
+  useEffect(() => {
+    if (!loaded || !missao || !missao.dono) return;
+    try {
+      const atual = get<unknown>(CHAVE_MISSAO_NA_CONTA, null);
+      if (JSON.stringify(atual ?? null) !== missaoJson) gravarNaConta(CHAVE_MISSAO_NA_CONTA, missao);
+    } catch { /* nunca derruba a missão */ }
+  }, [loaded, missaoJson]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── O 4º PASSO (B): o tour da Home. Quando ele termina (EVENTO_TOUR_HOME_FIM) a missão fecha:
      `missao_dose_concluida indice=4 modulo=home` + `missao_completa`. Se o tour não existe pra esta
@@ -191,7 +230,6 @@ function Ligada() {
   /* ── A folha do plano espera a festa "Casa arrumada" (ou qualquer outra festa) sair da tela.
      Depois do tour, a festa leva ~2 s pra entrar (os Momentos esperam a tela assentar): a folha segura
      até o "Casa arrumada" ter sido VISTO (conquistas-vistas) — ou 8 s, se a festa não vier. ── */
-  const { get } = useUserData();
   const [festaAberta, setFestaAberta] = useState(() => festaNaTela());
   const [esperouFesta, setEsperouFesta] = useState(false);
   const planoDevendo = !!missao && B && precisaPlanoAmanha(missao, hoje);
@@ -199,6 +237,37 @@ function Ligada() {
      1,2 s (a Home assentar) e qualquer outra festa/folha sair da tela — nunca duas folhas juntas. */
   const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje);
   const [conviteLivre, setConviteLivre] = useState(false);
+  /* 1.0.16, braço A — a folha "Plano de amanhã" (dia 1): depois da dose, da comemoração e do tour curto */
+  const tourPendente = (() => { try { return deveMostrarTourHome(user?.created_at); } catch { return false; } })();
+  const planoADevido = !!missao && pathname === "/home" && !emCurso && precisaPlanoA(missao, hoje) && !tourPendente;
+  const [planoALivre, setPlanoALivre] = useState(false);
+  useEffect(() => {
+    if (!planoADevido) { setPlanoALivre(false); return; }
+    let estaveis = 0;
+    const t = window.setInterval(() => {
+      estaveis = festaNaTela() || document.querySelector('[data-camada-guia]:not([data-camada-guia="missao-doses-plano"])') ? 0 : estaveis + 1;
+      if (estaveis >= 3) { setPlanoALivre(true); window.clearInterval(t); }
+    }, 400);
+    return () => window.clearInterval(t);
+  }, [planoADevido]);
+  /* 1.0.16, braço A — as dicas de 1 balão: dia 2 (score) e dia 3 (widgets), depois da dose do dia, na Home */
+  const diaDaDica = (() => {
+    if (!missao || !ehUmPorDia(missao) || pathname !== "/home" || emCurso || missao.explorou) return null;
+    const d = ([2, 3] as const).find((n) => missao.feitos[n]?.dia === hoje && !missao.dicas?.[n]);
+    if (!d) return null;
+    if (d === 3 && !missao.fimVisto) return null; // dia 3: depois de "O que você construiu"
+    return d;
+  })();
+  const [dicaLivre, setDicaLivre] = useState(false);
+  useEffect(() => {
+    if (!diaDaDica) { setDicaLivre(false); return; }
+    let estaveis = 0;
+    const t = window.setInterval(() => {
+      estaveis = festaNaTela() || document.querySelector('[data-camada-guia]:not([data-camada-guia="missao-dica"])') ? 0 : estaveis + 1;
+      if (estaveis >= 3) { setDicaLivre(true); window.clearInterval(t); }
+    }, 400);
+    return () => window.clearInterval(t);
+  }, [diaDaDica]);
   useEffect(() => {
     if (!conviteDevido) { setConviteLivre(false); return; }
     let estaveis = 0;
@@ -245,7 +314,7 @@ function Ligada() {
         nome=""
         areaNome={areaNome}
         hoje={hoje}
-        braco={B ? "B" : null} /* 10/10: no braço B a copy é "3 toques hoje + arrumar sua Home"; A = a tela de hoje */
+        braco={B ? "B" : ehUmPorDia(missao) ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela */
         aoComecar={(modulos) => {
           const m = comModulos(modulos);
           salvar(m);
@@ -298,10 +367,46 @@ function Ligada() {
       const m = lerMissao() ?? missao;
       const p = passoPendente(m);
       salvar({ ...m, convites: { ...m.convites, [hoje]: acao } });
-      trackEvent("missao_convite_dia", eventoDaMissao({ acao, dia_relogio: diaDaMissao(m, hoje), indice: p?.n ?? null, modulo: p?.modulo ?? null }));
+      trackEvent("missao_convite", eventoDaMissao({ acao: acao === "foi" ? "bora" : "depois", dia: p?.n ?? null, modulo: p?.modulo ?? null }));
       if (acao === "foi" && p) navigate(MODULOS[p.modulo].rota);
     };
-    return <ConviteDoDia missao={missao} hoje={hoje} aoIr={() => decidir("foi")} aoDepois={() => decidir("depois")} />;
+    const aoVer = () => {
+      const m = lerMissao() ?? missao;
+      gravarMissao({ ...m, convitesVistos: { ...m.convitesVistos, [hoje]: (m.convitesVistos?.[hoje] ?? 0) + 1 } }); // sem setMissao: o convite fica na tela
+      const p = passoPendente(m);
+      trackEvent("missao_convite", eventoDaMissao({ acao: "visto", dia: p?.n ?? null, modulo: p?.modulo ?? null }));
+    };
+    return <ConviteDoDia missao={missao} hoje={hoje} aoVer={aoVer} aoIr={() => decidir("foi")} aoDepois={() => decidir("depois")} />;
+  }
+
+  /* 1.0.16, braço A — o "Plano de amanhã" (a última coisa do dia 1) */
+  if (planoADevido && planoALivre) {
+    return (
+      <PlanoDeAmanhaA
+        missao={missao}
+        aoCombinar={(l) => {
+          const m = lerMissao() ?? missao;
+          salvar({ ...m, lembrete: l });
+          trackEvent("missao_doses_lembrete", eventoDaMissao({ hora: l, origem: "plano_amanha" }));
+          if (isNativeShell()) {
+            combinarHora(l);
+            const reagendar = () => { try { window.dispatchEvent(new Event(EVENTO_DIA2)); } catch { /* noop */ } };
+            Promise.resolve().then(() => pedirPermissaoDia2("missao")).catch(() => "indisponivel").finally(reagendar);
+          }
+        }}
+        aoSemLembrete={() => {
+          const m = lerMissao() ?? missao;
+          salvar({ ...m, lembrete: "sem", planoAPulado: hoje });
+          trackEvent("missao_doses_lembrete", eventoDaMissao({ hora: "sem", origem: "plano_amanha" }));
+          if (isNativeShell()) { combinarHora("sem"); try { window.dispatchEvent(new Event(EVENTO_DIA2)); } catch { /* noop */ } }
+        }}
+      />
+    );
+  }
+
+  /* 1.0.16, braço A — a dica de 1 balão do dia */
+  if (diaDaDica && dicaLivre) {
+    return <DicaDoDia dia={diaDaDica} aoFechar={() => { const m = lerMissao() ?? missao; salvar({ ...m, dicas: { ...m.dicas, [diaDaDica]: hoje } }); }} />;
   }
 
   /* D8 — no braço B só a partir do dia 3 (as 3 doses foram no dia 1; "em 3 dias" só faz sentido no 3º) */
@@ -357,7 +462,18 @@ function Ligada() {
           const feitos = { ...m.feitos, [n]: { dia: hoje, rotulo } };
           const tresDoses = !!(feitos[1] && feitos[2] && feitos[3]);
           // A: 3 doses = missão completa. B: falta o 4º passo (a Home) — `completaEm` só depois dele.
-          salvar({ ...m, feitos, ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
+          // 1.0.16, braço A: o adesivo do dia (só dado/evento; a tela de Conquistas mora em outro lugar)
+          let adesivos = m.adesivos;
+          if (ehUmPorDia(m)) {
+            const seguidos = sequenciaDaMissao({ ...m, feitos }, hoje);
+            const ad = adesivoDaDose(n, seguidos);
+            if (!(m.adesivos ?? []).includes(ad.id)) {
+              adesivos = [...(m.adesivos ?? []), ad.id];
+              trackEvent("adesivo_desbloqueado", eventoDaMissao({ id: ad.id, origem: `missao_dia_${n}` }));
+            }
+            if (seguidos >= 2) trackEvent("sequencia_marco", eventoDaMissao({ dias: seguidos, origem: "missao" }));
+          }
+          salvar({ ...m, feitos, ...(adesivos ? { adesivos } : {}), ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
           trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: n, dia_relogio: dia, modulo: passo.modulo, segundos, rotulo }));
           // 10/10 (DIA1_CHEIO): os eventos do teste, só com a chave ligada (eventoDaMissao põe `variante`)
           if (m.braco && eventoDaMissao().variante) {

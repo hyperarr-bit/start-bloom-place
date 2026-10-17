@@ -28,7 +28,7 @@ import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
-import { guardarForcasDaUrl } from "@/lib/tour-home";
+import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 
 // One-time reset key — bump version to replay onboarding for everyone
@@ -431,7 +431,7 @@ const HomePage = () => {
       {/* 10/10 — "Sua Home em 5 passos" (TOUR_HOME, lib/tour-home): só pra conta nova sem missão
           ativa/pendente, 1x por aparelho — ver deveMostrarTourHome. Desligada, não existe o nó. */}
       {mostrarTour && (
-        <TourDaHome lifeData={lifeData} widgetsAtivos={activeWidgets.map((w) => w.id)} adicionarWidget={addWidget} onFim={() => setDataTrigger((d) => d + 1)} />
+        <TourDaHome lifeData={lifeData} widgetsAtivos={activeWidgets.map((w) => w.id)} adicionarWidget={addWidget} onFim={() => setDataTrigger((d) => d + 1)} variante={varianteDoTour() ?? "longo"} />
       )}
 
       <WidgetPicker

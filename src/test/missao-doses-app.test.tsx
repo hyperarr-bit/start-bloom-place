@@ -91,6 +91,8 @@ const missaoAntiga = (inicio: number): Missao => ({ inicio, area: "dinheiro", d1
 
 beforeEach(() => {
   localStorage.clear();
+  // 1.0.16: a dose de Finanças virou o "Vamos montar suas Finanças" — aqui, o caminho de quem PULOU (o 1º gasto pelo chip)
+  localStorage.setItem("core-montar-financas", JSON.stringify({ r: "pulou" }));
   eventos.length = 0;
   notif.pedirDia2.mockClear(); notif.regua.mockClear(); notif.pedir.mockClear();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString(); // a conta nasceu hoje de manhã (compra → cadastro)

@@ -35,7 +35,7 @@ import { computeDailyBudget, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import {
-  MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, missaoCumprida, passoPendente,
+  DOSE_CURTA, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
   type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
 import type { QuandoAmanha } from "./dia1-cheio";
@@ -204,6 +204,21 @@ export function moduloMaisUsado(get: Leitor): ModuloDaMissao | null {
   return melhor;
 }
 
+/**
+ * 1.0.16: "quanto dá pra gastar por dia" com as Finanças DELA (a mesma conta do card do Dashboard e do
+ * Montar Finanças), ou null sem renda / sem folga. Usado no aviso do teste (920001) e nos lembretes do braço A.
+ */
+export function porDiaDasFinancas(get: Leitor, dia: Date = new Date()): number | null {
+  try {
+    const receitas = soma(get<unknown>("finance-incomes", []));
+    if (!(receitas > 0)) return null;
+    const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
+    const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(get<unknown>("finance-fixed-expenses", [])), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]));
+    const orc = computeDailyBudget(receitas, saida, dueDays, lista(get<unknown>("finance-fixed-expenses", [])), dia);
+    return !orc.cantSpend && orc.perDay > 0 ? Math.floor(orc.perDay) : null;
+  } catch { return null; }
+}
+
 /** O texto genérico (bom) de cada módulo, pra quando não há número da pessoa. */
 const FALLBACK: Record<ModuloDaMissao, { title: string; body: string }> = {
   financas: { title: "Anota o gasto de hoje", body: "O mês soma sozinho e mostra quanto sobra — leva 10 segundos." },
@@ -296,10 +311,35 @@ export function conteudoDoModulo(get: Leitor, modulo: ModuloDaMissao, amanha: Da
 }
 
 /** O passo de AMANHÃ da Missão em doses, se há um pendente (uma notificação só: missão e dia 2 não duplicam). */
-export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string = localDayKey()): ConteudoDia2 | null {
+export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string = localDayKey(), get?: Leitor): ConteudoDia2 | null {
   if (!missao || !missao.boasVindas || missaoCumprida(missao)) return null;
   const pendente = passoPendente(missao);
   if (!pendente) return null;
+  // 1.0.16, braço A (desenho 8 seção 4.6): a missão anda até o 7º dia; quem escolheu "Explorar" fica com o
+  // texto do módulo mais usado (com o número dela)
+  if (ehUmPorDia(missao)) {
+    if (missao.explorou || diaDaMissao(missao, somarDias(hoje, 1)) > 7) return null;
+    const cfgA = MODULOS[pendente.modulo];
+    const dose = DOSE_CURTA[pendente.modulo];
+    const porDia = get ? porDiaDasFinancas(get) : null;
+    const toque = cfgA.toque;
+    const vivo = sequenciaDaMissao(missao, hoje) >= 2; // fez ontem e hoje: amanhã fecha 3 seguidos
+    if (pendente.n === 3 && vivo) {
+      return { title: "Dia 3: feche seus 3 dias seguidos 🔥", body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} e o adesivo dos 3 dias é seu. ${dose.seg} segundos.`, modulo: "missao", temNumero: false, rota: cfgA.rota };
+    }
+    if (pendente.n === 2) {
+      return {
+        title: porDia ? `Hoje dá pra gastar até R$ ${reais(porDia)}` : `Dia 2 do seu plano: ${cfgA.emoji} ${cfgA.nome}`,
+        body: `E hoje é ${toque} ${cfgA.onde} — ${dose.seg} s. O adesivo do dia 2 te espera.`,
+        modulo: "missao", temNumero: !!porDia, rota: cfgA.rota,
+      };
+    }
+    return {
+      title: `Seu plano de hoje: ${cfgA.emoji} ${cfgA.nome}`,
+      body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} — ${dose.seg} s.${porDia && cfgA.modulo !== "financas" ? ` Suas Finanças continuam lá: hoje dá pra gastar R$ ${reais(porDia)}.` : ""}`,
+      modulo: "missao", temNumero: !!porDia, rota: cfgA.rota,
+    };
+  }
   // missão abandonada há dias: volta ao texto do módulo (o "dia N da missão" já não faz sentido)
   if (diaDaMissao(missao, somarDias(hoje, 1)) > 5) return null;
   const cfg = MODULOS[pendente.modulo];
@@ -354,7 +394,7 @@ export function conteudoDoAprofundar(missao: EstadoMissaoDoses | null, hoje: str
  */
 export function conteudoDoLembrete(get: Leitor, p: { missao: EstadoMissaoDoses | null; amanha: Date; area?: string | null; hoje?: string }): ConteudoDia2 {
   const hoje = p.hoje ?? localDayKey();
-  const daMissao = conteudoDaMissao(p.missao, hoje) ?? conteudoDoAprofundar(p.missao, hoje);
+  const daMissao = conteudoDaMissao(p.missao, hoje, get) ?? conteudoDoAprofundar(p.missao, hoje);
   if (daMissao) return daMissao;
   const modulo = moduloMaisUsado(get) ?? (p.area && p.area in MODULO_DA_AREA ? MODULO_DA_AREA[p.area as AreaKey] : "financas");
   return conteudoDoModulo(get, modulo, p.amanha, hoje);

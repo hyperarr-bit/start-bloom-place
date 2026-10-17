@@ -211,7 +211,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   balao: ReactNode;
   interativo?: boolean;
   duracao?: number | null;
-  aoSair: (motivo: string) => void;
+  /** `info` (1.0.16): `voltou` = a âncora foi re-achada antes (com `reachar`); `ms` = quanto o anel ficou na tela */
+  aoSair: (motivo: string, info?: { voltou: boolean; ms: number }) => void;
   fixo?: boolean;
   testid?: string;
   /** o balão prefere ficar EMBAIXO do anel (se couber) */
@@ -232,10 +233,12 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   useEffect(() => {
     let vivo = true;
     const timers: number[] = [];
+    const nasceu = Date.now();
+    let voltou = false;
     const sair = (motivo: string) => {
       if (saiuRef.current) return;
       saiuRef.current = true;
-      aoSairRef.current(motivo);
+      aoSairRef.current(motivo, { voltou, ms: Date.now() - nasceu });
     };
     // o nó que o anel abraça AGORA (com `reachar`, troca quando o módulo redesenha)
     let atual: Element = alvo;
@@ -270,7 +273,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       let novo: Element | null = null;
       try { novo = buscar(); } catch { novo = null; }
       if (novo && novo !== atual && vale(novo)) {
-        atual = novo; perdidaDesde = 0;
+        atual = novo; perdidaDesde = 0; voltou = true;
         rolarPraVer(false);
         return true;
       }

@@ -186,6 +186,8 @@ beforeAll(() => {
 });
 beforeEach(() => {
   localStorage.clear();
+  // 1.0.16: a dose de Finanças virou o "Vamos montar suas Finanças" — aqui, o caminho de quem PULOU (o 1º gasto pelo chip)
+  localStorage.setItem("core-montar-financas", JSON.stringify({ r: "pulou" }));
   eventos.length = 0;
   nota.pedir.mockClear();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();

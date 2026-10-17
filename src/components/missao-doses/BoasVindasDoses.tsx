@@ -4,7 +4,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { DOSE_CURTA, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
 const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
@@ -193,6 +193,51 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
           <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
             Explorar por conta própria
           </button>
+        </RodapeColado>
+      </div>
+    );
+  }
+
+  /* ── 1.0.16, BRAÇO A ("uma dose por dia", desenho 8 seção 4.2): UMA tela, tela cheia, 1x ──
+     "Tá dentro! 🎉" + "Seu plano de 3 dias" (Hoje · Amanhã · Dia 3, com o tempo de cada dose) + "Começar (30 s)",
+     e os links "Explorar por conta própria" e "Trocar os módulos". */
+  if (braco === "A") {
+    const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
+    const seg1 = DOSE_CURTA[modulos[0]].seg;
+    return (
+      <div className="fixed inset-0 z-[240] flex flex-col text-[#16121c]" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)", paddingTop: "var(--app-safe-top)" }}>
+        <Confete />
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[9vh] pb-4">
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 17, delay: 0.1 }} className="w-16 h-16 rounded-full bg-emerald-500 grid place-items-center mb-4 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
+              <Check className="w-8 h-8 text-white" strokeWidth={3.5} />
+            </motion.div>
+            <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
+            <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64] mt-7">Seu plano de 3 dias</p>
+            <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
+              {linhas.map(({ n, cfg }) => (
+                <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
+                  <Quadradinho marcado={false} tam={18} />
+                  <span className="md-linha-texto"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome} · {DOSE_CURTA[cfg.modulo].texto}</span>
+                </div>
+              ))}
+            </div>
+            {areaNome && <p className="text-[12.5px] text-[#4f5a64] mt-3">Você escolheu <b className="text-[#16121c]">{areaNome}</b> — ela vem primeiro.</p>}
+          </div>
+        </div>
+        <RodapeColado>
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
+            Começar ({seg1} s) <ArrowRight className="w-4 h-4" />
+          </button>
+          <div className="flex items-center justify-center gap-5 mt-1">
+            <button type="button" className="md-link" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
+              Explorar por conta própria
+            </button>
+            <button type="button" className="md-link" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>
+              Trocar os módulos
+            </button>
+          </div>
         </RodapeColado>
       </div>
     );

@@ -28,6 +28,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { v14Ligada } from "@/lib/v14-qa";
+import { modoTourHomeRemoto } from "@/lib/dia1-cheio";
 
 export type ModoChave = "off" | "on";
 /** Cartões de boas-vindas (Finanças e Beleza). ROLLBACK/LIGAR = trocar aqui. */
@@ -131,8 +132,22 @@ export const marcarCartoesVistos = (moduleId: string): void => ls.set(chaveCarto
  * (hook useTourDaHome em components/home/TourDaHome): o fluxo esperado é missão
  * (3 doses) → plano de amanhã → tour da Home → festa "Casa arrumada".
  */
+/**
+ * 1.0.16 (desenho 8 seção 7c) — QUAL tour: metadata `tour_home` ("curto" | "longo" | "off") manda; sem ela,
+ * segue o braço da missão: A (uma dose por dia) = o CURTO de 3 passos "faz isso", logo depois da dose 1;
+ * B / sem braço = o LONGO de 5 passos de hoje, depois das 3 doses. null = nenhum tour.
+ */
+export type VarianteDoTour = "curto" | "longo";
+export function varianteDoTour(m = lerMissao()): VarianteDoTour | null {
+  const r = modoTourHomeRemoto();
+  if (r === "off") return null;
+  if (r) return r;
+  return ehUmPorDia(m) ? "curto" : "longo";
+}
+
 export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: number = Date.now()): boolean {
   if (!tourHomeLigado()) return false;
+  if (!varianteDoTour()) return false;
   if (tourFeitoNesteAparelho()) return false;
   if (!tourForcadoPorQa() && !contaNova(criadoEm, agora)) return false;
   // 10/10: a trava do teste grátis era da Missão de 3 dias do iPhone (1.0.8). Com a missão em doses ligada o

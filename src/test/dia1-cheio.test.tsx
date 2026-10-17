@@ -5,7 +5,7 @@
  *     com "Combinado, me lembra às…" e sem "Bora a próxima?";
  *   · ligada: sorteio 50/50 determinístico por id do aparelho, gravado em core-dia1-braco; o braço vai
  *     em TODO evento da missão (`variante`); `?dia1-cheio=a|b` força;
- *   · braço A = a missão de hoje + `variante: "A"`;
+ *   · braço A = (1.0.16) uma dose por dia — o fluxo completo mora em src/test/v1016-missao-1-por-dia.test.tsx;
  *   · braço B: dose 1 feita → "Bora a próxima? 20 s" + "Agora não"; `missao_dose_concluida`; "Agora não"
  *     → `missao_agora_nao`, notificação de +3 h (faixa da missão, não depois das 21:30) e a Home mostra
  *     a folha "Quando você abre o CORE amanhã?"; a folha grava o plano, emite `plano_amanha_definido
@@ -141,6 +141,8 @@ const ligarA = () => guardarForcaDia1Cheio("?dia1-cheio=a");
 
 beforeEach(() => {
   localStorage.clear();
+  // 1.0.16: a dose de Finanças virou o "Vamos montar suas Finanças" — aqui, o caminho de quem PULOU (o 1º gasto pelo chip)
+  localStorage.setItem("core-montar-financas", JSON.stringify({ r: "pulou" }));
   eventos.length = 0;
   notif.pedirDia2.mockClear(); notif.proximaDose.mockClear(); nota.pedir.mockClear();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString();
@@ -250,19 +252,20 @@ describe("DESLIGADA: a missão do app é a de hoje, byte a byte", () => {
 
 /* ------------------------------------------------------------ braço A */
 
-describe("braço A: a missão de hoje + `variante: 'A'`", () => {
-  it("nasce com braco A, a festa é a de hoje, e todo evento leva variante A (inclusive missao_dose_concluida)", () => {
+describe("braço A (1.0.16: uma dose por dia) + `variante: 'A'`", () => {
+  it("nasce com braco A, boas-vindas de 1 tela ('Seu plano de 3 dias'), festa pequena 'Dia 1 de 3 feito ✅' sem 'Bora a próxima?' nem adiantar, e todo evento leva variante A", () => {
     ligarA();
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("A");
-    expect(screen.queryByTestId("missao-doses-vamos-la")).toBeNull(); // o A é a tela de hoje, uma só
-    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("1 toque por dia");
+    expect(screen.queryByTestId("missao-doses-vamos-la")).toBeNull(); // uma tela só
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Seu plano de 3 dias");
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "A", prototipo: "app" })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Primeiro registro feito!");
-    expect(screen.getByTestId("missao-doses-combinado")).toBeInTheDocument();
+    expect(festa).toHaveTextContent("Dia 1 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-continuar")).toBeInTheDocument();
     expect(screen.queryByTestId("missao-doses-bora-proxima")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
     expect(eventos).toContainEqual(["missao_dose_concluida", expect.objectContaining({ indice: 1, modulo: "financas", variante: "A" })]);
     expect(eventos).toContainEqual(["missao_doses_dia_feito", expect.objectContaining({ dia: 1, modulo: "financas", variante: "A" })]);
   });

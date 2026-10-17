@@ -1,12 +1,17 @@
 /**
- * LEMBRETE "ACABA AMANHÃ" do teste grátis do iPhone (01/10, de volta).
- * A Apple não avisa antes de cobrar e exige cancelar 24 h antes do fim — o
- * aviso tem que cair DEPOIS de 24 h do começo e ANTES de 48 h do fim, numa
- * hora acordada, no fuso do aparelho. E a promessa do paywall só vale se o
- * pedido guardado na compra for armado quando a permissão chega (Missão B1),
- * reagendado com o fim real da loja e DESARMADO se a pessoa cancelar/assinar.
- * 16/10 (1.0.16): mesmo horário, mas o TEXTO virou aviso de uso — nada de
- * cancelar, cobrança, preço ou "acaba amanhã" (decisão do dono).
+ * O AVISO DO TESTE GRÁTIS DO iPHONE (920001) — 1.0.16 (desenho 8, seção 4.6; defeitos 11 e 12).
+ *
+ * O paywall promete "Dia 2 (DD/MM) · a gente te avisa" e "Nada é cobrado sem aviso". ESTE é o aviso:
+ *   · cai NO DIA que o paywall mostrou (PaywallIOS.diaDoAviso = o dia de fim − 48 h), na hora DELA
+ *     (a combinada no "Plano de amanhã", senão a 1ª abertura de hoje), entre 09:00 e 20:30, nunca menos
+ *     de 6 h depois do início nem menos de 24 h antes do fim;
+ *   · texto: "Seu teste grátis termina amanhã" + "Seu plano anual começa sozinho e tudo que você montou
+ *     fica com você." + a dose de hoje da missão nova (ou "Hoje dá pra gastar até R$ X") — sem cancelar,
+ *     sem cobrança, sem preço do plano, sem "24 h", sem "sem cartão" (regra do dono: o problema nunca foi
+ *     falar do teste, e sim empurrar a saída);
+ *   · o toque abre o módulo da dose (ou a Home), NUNCA /planos;
+ *   · armado quando a permissão chega, reagendado com o fim real da loja, DESARMADO se cancelar/assinar;
+ *   · no dia em que ele sai, o lembrete diário (930001) cede: 1 notificação de teste por dia.
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -38,12 +43,18 @@ const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>)
 vi.mock("@/lib/analytics", () => ({ trackEvent: (n: string, d: Record<string, unknown>) => { eventos.push([n, d]); } }));
 
 import {
-  quandoLembrarDoTeste, copyDoLembreteDoTeste, pedirLembreteDoTeste, armarLembreteDoTesteSePuder,
-  sincronizarLembreteDoTeste, cancelarLembreteDoTeste, pedidoDeLembreteDoTeste, FAIXAS_AVULSAS, BASES_LEMBRETES,
+  quandoLembrarDoTeste, copyDoLembreteDoTeste, pedirLembreteDoTeste, armarLembreteDoTesteSePuder, diaDoAvisoDoTeste,
+  sincronizarLembreteDoTeste, cancelarLembreteDoTeste, pedidoDeLembreteDoTeste, FAIXAS_AVULSAS, BASES_LEMBRETES, sincronizarLembreteDia2,
 } from "@/lib/notificacoes";
+import { diaDoAviso } from "@/pages/funis/ios/PaywallIOS";
+import { combinarHora } from "@/lib/lembrete-dia2";
+import { localDayKey } from "@/lib/utils";
 
 const H = 3600e3;
-const h = (a: Date, b: Date) => (b.getTime() - a.getTime()) / H;
+const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const PROIBIDO = /cancel|cobr|R\$ ?97|pre[cç]o|24 ?h|sem cart[aã]o|vitalíc|pra sempre/i;
+const missaoA = (feitos: Record<number, { dia: string; rotulo: string }>, extra: Record<string, unknown> = {}) =>
+  localStorage.setItem("missao-doses", JSON.stringify({ v: 1, inicio: "2026-10-01", modulos: ["financas", "rotina", "saude"], feitos, boasVindas: true, braco: "A", ...extra }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -53,96 +64,90 @@ beforeEach(() => {
   ln.cancel.mockClear();
   eventos.length = 0;
   (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+  vi.stubEnv("VITE_V14_LOJA", "1");
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 9, 1, 15, 0, 0));
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   delete (window as { Capacitor?: unknown }).Capacitor;
 });
 
-describe("quandoLembrarDoTeste — hora do aviso", () => {
-  it("compra às 15h, teste de 3 dias: avisa no dia 3 às 9h — 42 h depois, 30 h antes de cobrar", () => {
-    const inicio = new Date(2026, 8, 21, 15, 0, 0);
-    const alvo = quandoLembrarDoTeste(inicio.getTime() + 3 * 24 * H, inicio.getTime())!;
-    expect(alvo.getDate()).toBe(23);
-    expect(alvo.getHours()).toBe(9);
-    expect(h(inicio, alvo)).toBe(42);
+describe("quandoLembrarDoTeste — o dia que o paywall prometeu", () => {
+  it("início às 08h, 14h, 20h e 23h30 (teste de 3 dias): o aviso cai em diaDoAviso() do paywall, ≥ 6 h depois do início e ≥ 24 h antes do fim", () => {
+    for (const [hh, mm] of [[8, 0], [14, 0], [20, 0], [23, 30]]) {
+      const inicio = new Date(2026, 9, 1, hh, mm, 0);
+      const fim = inicio.getTime() + 3 * 24 * H;
+      const alvo = quandoLembrarDoTeste(fim, inicio.getTime(), { inicioMs: inicio.getTime() })!;
+      expect(alvo, `${hh}:${mm}`).not.toBeNull();
+      expect(ddmm(localDayKey(alvo)), `${hh}:${mm}`).toBe(diaDoAviso(3, inicio));
+      expect(alvo.getTime() - inicio.getTime(), `${hh}:${mm}`).toBeGreaterThanOrEqual(6 * H);
+      expect(fim - alvo.getTime(), `${hh}:${mm}`).toBeGreaterThanOrEqual(24 * H);
+    }
   });
 
-  it("compra às 22h: 36 h antes do fim cai às 10h, fica como está", () => {
-    const inicio = new Date(2026, 8, 21, 22, 0, 0);
-    const alvo = quandoLembrarDoTeste(inicio.getTime() + 3 * 24 * H, inicio.getTime())!;
-    expect(alvo.getDate()).toBe(23);
-    expect(alvo.getHours()).toBe(10);
-    expect(h(inicio, alvo)).toBe(36);
-  });
-
-  it("compra às 9h30: 36 h antes seria 21h30 — recua pra 20h30 do mesmo dia (nunca de madrugada)", () => {
-    const inicio = new Date(2026, 8, 21, 9, 30, 0);
-    const alvo = quandoLembrarDoTeste(inicio.getTime() + 3 * 24 * H, inicio.getTime())!;
-    expect(alvo.getDate()).toBe(22);
-    expect(alvo.getHours()).toBe(20);
-    expect(alvo.getMinutes()).toBe(30);
-  });
-
-  it("qualquer hora de compra, 3 ou 7 dias: aviso entre 24 h e 48 h antes do fim, das 9h às 20h30", () => {
+  it("qualquer hora de início, 3 ou 7 dias, qualquer hora dela: sempre no dia prometido, das 9h às 20h30", () => {
     for (const dias of [3, 7]) {
       for (let hora = 0; hora < 24; hora++) {
-        for (const min of [0, 17, 31, 59]) {
-          const inicio = new Date(2026, 8, 21, hora, min, 0);
-          const fim = new Date(inicio.getTime() + dias * 24 * H);
-          const alvo = quandoLembrarDoTeste(fim.getTime(), inicio.getTime());
-          expect(alvo, `dias=${dias} hora=${hora}:${min}`).not.toBeNull();
-          const antesDoFim = h(alvo!, fim);
-          expect(antesDoFim, `dias=${dias} hora=${hora}:${min}`).toBeGreaterThanOrEqual(24);
-          expect(antesDoFim, `dias=${dias} hora=${hora}:${min}`).toBeLessThanOrEqual(48);
-          const minutos = alvo!.getHours() * 60 + alvo!.getMinutes();
-          expect(minutos, `dias=${dias} hora=${hora}:${min}`).toBeGreaterThanOrEqual(9 * 60);
-          expect(minutos, `dias=${dias} hora=${hora}:${min}`).toBeLessThanOrEqual(20 * 60 + 30);
-          expect(alvo!.getTime()).toBeGreaterThan(inicio.getTime());
+        for (const pessoa of [null, 7 * 60, 12 * 60, 22 * 60]) {
+          const inicio = new Date(2026, 9, 1, hora, 17, 0);
+          const fim = inicio.getTime() + dias * 24 * H;
+          const alvo = quandoLembrarDoTeste(fim, inicio.getTime(), { horaMin: pessoa, inicioMs: inicio.getTime() });
+          const rotulo = `dias=${dias} hora=${hora} pessoa=${pessoa}`;
+          expect(alvo, rotulo).not.toBeNull();
+          expect(ddmm(localDayKey(alvo!)), rotulo).toBe(diaDoAviso(dias, inicio));
+          const min = alvo!.getHours() * 60 + alvo!.getMinutes();
+          expect(min, rotulo).toBeGreaterThanOrEqual(9 * 60);
+          expect(min, rotulo).toBeLessThanOrEqual(20 * 60 + 30);
+          expect(fim - alvo!.getTime(), rotulo).toBeGreaterThanOrEqual(24 * H);
         }
       }
     }
   });
 
-  it("armado tarde (permissão só no dia 2 à tarde): sai em 10 min se ainda faltam ≥ 24 h; com < 24 h, nenhum aviso (não promete 'amanhã' mentindo)", () => {
-    const fim = new Date(2026, 9, 4, 15, 0, 0).getTime(); // compra 01/10 15h
-    // dia 3 às 11h (fim − 28 h): já passou das 9h do dia 3 → 10 min depois
-    const tarde = new Date(2026, 9, 3, 11, 0, 0).getTime();
-    const alvo = quandoLembrarDoTeste(fim, tarde)!;
-    expect(alvo.getTime()).toBe(tarde + 10 * 60e3);
-    // dia 3 às 16h (fim − 23 h): tarde demais
-    expect(quandoLembrarDoTeste(fim, new Date(2026, 9, 3, 16, 0, 0).getTime())).toBeNull();
-    // de madrugada do dia 3 (fim − 36 h já passou? não: 3h da manhã é fim − 36 h exato → 9h do mesmo dia)
-    const madrugada = new Date(2026, 9, 3, 3, 0, 0).getTime();
-    expect(quandoLembrarDoTeste(fim, madrugada)!.getHours()).toBe(9);
+  it("a hora é a DELA: combinou 20h → 20h; 8h → puxado pras 9h; sem hora → 12h", () => {
+    const inicio = new Date(2026, 9, 1, 15, 0, 0);
+    const fim = inicio.getTime() + 3 * 24 * H;
+    expect(quandoLembrarDoTeste(fim, inicio.getTime(), { horaMin: 20 * 60, inicioMs: inicio.getTime() })).toEqual(new Date(2026, 9, 2, 20, 0));
+    expect(quandoLembrarDoTeste(fim, inicio.getTime(), { horaMin: 8 * 60, inicioMs: inicio.getTime() })).toEqual(new Date(2026, 9, 2, 9, 0));
+    expect(quandoLembrarDoTeste(fim, inicio.getTime(), { inicioMs: inicio.getTime() })).toEqual(new Date(2026, 9, 2, 12, 0));
+    expect(diaDoAvisoDoTeste(fim)).toBe("2026-10-02");
   });
 
-  it("16/10: copy é de USO — o que montou + o plano de hoje; sem cancelar, sem cobrança, sem preço, sem 'acaba'", () => {
-    const geral = copyDoLembreteDoTeste();
-    expect(geral.title).toBe("Seu plano de hoje no CORE está pronto");
-    expect(geral.body).toBe("Tudo o que você montou nesses dias está te esperando. Abre e continua de onde parou — leva 1 minuto.");
-    expect(copyDoLembreteDoTeste("dinheiro").title).toBe("Seu plano de hoje em Finanças está pronto");
-    expect(copyDoLembreteDoTeste("rotina").title).toBe("Seu plano de hoje em Rotina está pronto");
-    expect(copyDoLembreteDoTeste("area-que-nao-existe").title).toBe("Seu plano de hoje no CORE está pronto");
-    for (const area of [null, "dinheiro", "rotina", "corpo", "saude", "metas"]) {
-      const c = copyDoLembreteDoTeste(area);
+  it("armado tarde: ainda no dia prometido → em 10 min; passou o dia (ou a faixa) → nenhum aviso (não promete 'amanhã' mentindo)", () => {
+    const fim = new Date(2026, 9, 4, 15, 0, 0).getTime(); // início 01/10 15h → aviso 02/10
+    const tarde = new Date(2026, 9, 2, 16, 0, 0).getTime();
+    expect(quandoLembrarDoTeste(fim, tarde, { horaMin: 9 * 60 })!.getTime()).toBe(tarde + 10 * 60e3);
+    expect(quandoLembrarDoTeste(fim, new Date(2026, 9, 2, 20, 45).getTime())).toBeNull();
+    expect(quandoLembrarDoTeste(fim, new Date(2026, 9, 3, 10, 0).getTime())).toBeNull();
+    expect(quandoLembrarDoTeste(fim, new Date(2026, 9, 2, 3, 0).getTime(), { horaMin: 7 * 60 })!.getHours()).toBe(9);
+  });
+});
+
+describe("o texto do aviso", () => {
+  it("'Seu teste grátis termina amanhã' + o plano começa sozinho e o que montou fica; com a dose de hoje, ou o R$/dia, ou nada", () => {
+    expect(copyDoLembreteDoTeste()).toEqual({ title: "Seu teste grátis termina amanhã", body: "Seu plano anual começa sozinho e tudo que você montou fica com você." });
+    expect(copyDoLembreteDoTeste({ modulo: "rotina" }).body).toBe("Seu plano anual começa sozinho e tudo que você montou fica com você. Hoje: 📅 Rotina — 1 hábito, 20 s.");
+    expect(copyDoLembreteDoTeste({ porDia: 46 }).body).toBe("Seu plano anual começa sozinho e tudo que você montou fica com você. Hoje dá pra gastar até R$ 46.");
+    for (const c of [copyDoLembreteDoTeste(), copyDoLembreteDoTeste({ modulo: "saude" }), copyDoLembreteDoTeste({ modulo: "financas" }), copyDoLembreteDoTeste({ porDia: 1234 })]) {
       const tudo = `${c.title} ${c.body}`;
-      expect(tudo).not.toMatch(/cancel|cobran|cobra|cart[aã]o|R\$|pre[cç]o|acaba|teste|Apple|App Store|Ajustes|assinatura/i);
-      expect(tudo).not.toMatch(/vitalíc|pra sempre/i);
-      expect(tudo).toMatch(/montou/);
+      expect(tudo).toMatch(/termina amanhã/);
+      expect(tudo).not.toMatch(PROIBIDO);
     }
   });
 });
 
 describe("faixa de ids", () => {
-  it("o lembrete mora em 920000 (910000 segue reservada) e nenhum tipo de lembrete invade", () => {
+  it("o aviso mora em 920000; nenhuma faixa (avulsas + lembretes) se sobrepõe a outra", () => {
     expect(FAIXAS_AVULSAS.lembreteTeste).toBe(920000);
     expect(FAIXAS_AVULSAS.missaoAntiga).toBe(910000);
-    for (const [tipo, base] of Object.entries(BASES_LEMBRETES)) {
-      expect(base < 920000 && base + 10000 > 920000, tipo).toBe(false);
-      expect(base >= 920000 && base < 930000, tipo).toBe(false);
+    const todas = [...Object.entries(FAIXAS_AVULSAS), ...Object.entries(BASES_LEMBRETES)] as Array<[string, number]>;
+    for (let i = 0; i < todas.length; i++) {
+      for (let j = i + 1; j < todas.length; j++) {
+        const [na, a] = todas[i]; const [nb, b] = todas[j];
+        expect(a < b + 10000 && b < a + 10000, `${na}=${a} × ${nb}=${b}`).toBe(false);
+      }
     }
   });
 });
@@ -150,59 +155,94 @@ describe("faixa de ids", () => {
 describe("pedido na compra → armado quando a permissão chega", () => {
   const pedido = { fimMs: new Date(2026, 9, 4, 15, 0, 0).getTime(), precoAno: "R$ 97,90" };
 
-  it("permissão já dada: arma na hora, no id 920001, pra 03/10 às 9h, tocando abre a Home (nunca /planos)", async () => {
+  it("permissão já dada: arma na hora, no id 920001, pra 02/10 (o dia do paywall) ao meio-dia, tocando abre a Home (nunca /planos)", async () => {
     expect(await pedirLembreteDoTeste(pedido)).toBe("armado");
     expect(ln.schedule).toHaveBeenCalledTimes(1);
     const n = ln.schedule.mock.calls[0][0].notifications[0];
     expect(n.id).toBe(920001);
-    expect(n.title).toBe("Seu plano de hoje no CORE está pronto");
-    expect(n.body).not.toMatch(/cancel|cobran/i);
-    expect(n.schedule.at).toEqual(new Date(2026, 9, 3, 9, 0, 0));
+    expect(n.title).toBe("Seu teste grátis termina amanhã");
+    expect(`${n.title} ${n.body}`).not.toMatch(PROIBIDO);
+    expect(n.schedule.at).toEqual(new Date(2026, 9, 2, 12, 0, 0));
     expect(n.extra?.rota).toBe("/home");
     expect(eventos).toContainEqual(["trial_aviso", { acao: "ja_permitido" }]);
-    expect(eventos.find((e) => e[0] === "notif_lembrete_teste_armada")?.[1]).toMatchObject({ ok: true, em_h: 42, antes_do_fim_h: 30 });
-    expect(pedidoDeLembreteDoTeste()).toEqual(pedido);
+    expect(eventos.find((e) => e[0] === "notif_lembrete_teste_armada")?.[1]).toMatchObject({ ok: true, dia_cal: 2 });
+    expect(pedidoDeLembreteDoTeste()).toMatchObject({ ...pedido, inicioMs: Date.now() });
   });
 
-  it("com missão em Finanças: o título fala de Finanças e o toque abre /financas", async () => {
-    localStorage.setItem("core-missao", JSON.stringify({ inicio: Date.now(), area: "dinheiro", d1: false, d2: false, d3: false, vista: false, holofote: "pendente" }));
+  it("missão NOVA no braço A com a dose 2 pra amanhã: 'Hoje: 📅 Rotina — 1 hábito, 20 s' e o toque abre /rotina", async () => {
+    missaoA({ 1: { dia: "2026-10-01", rotulo: "Café · R$ 12" } });
     await pedirLembreteDoTeste(pedido);
     const n = ln.schedule.mock.calls[0][0].notifications[0];
-    expect(n.title).toBe("Seu plano de hoje em Finanças está pronto");
-    expect(n.extra?.rota).toBe("/financas");
+    expect(n.body).toBe("Seu plano anual começa sozinho e tudo que você montou fica com você. Hoje: 📅 Rotina — 1 hábito, 20 s.");
+    expect(n.extra?.rota).toBe("/rotina");
   });
 
-  it("permissão nunca pedida: guarda o pedido SEM abrir diálogo; a Missão arma depois", async () => {
+  it("a Missão ANTIGA (core-missao) não manda mais no toque; sem dose, com Finanças montada (get): 'Hoje dá pra gastar até R$ X'", async () => {
+    localStorage.setItem("core-missao", JSON.stringify({ inicio: Date.now(), area: "dinheiro", d1: false, d2: false, d3: false, vista: false, holofote: "pendente" }));
+    ln.permissao = "prompt";
+    await pedirLembreteDoTeste(pedido);
+    ln.permissao = "granted";
+    const dados: Record<string, unknown> = { "finance-incomes": [{ id: 1, value: 3100, date: "2026-10-01" }] };
+    await armarLembreteDoTesteSePuder(<T,>(k: string, f: T) => (k in dados ? (dados[k] as T) : f));
+    const n = ln.schedule.mock.calls[0][0].notifications[0];
+    expect(n.body).toMatch(/^Seu plano anual começa sozinho e tudo que você montou fica com você\. Hoje dá pra gastar até R\$ \d/);
+    expect(n.extra?.rota).toBe("/home");
+  });
+
+  it("a hora combinada no Plano de amanhã (20h) vale pro aviso", async () => {
+    combinarHora("20h", new Date(2026, 9, 1, 15, 0));
+    await pedirLembreteDoTeste(pedido);
+    expect(ln.schedule.mock.calls[0][0].notifications[0].schedule.at).toEqual(new Date(2026, 9, 2, 20, 0, 0));
+  });
+
+  it("permissão nunca pedida: guarda o pedido SEM abrir diálogo; arma quando a permissão chega", async () => {
     ln.permissao = "prompt";
     expect(await pedirLembreteDoTeste(pedido)).toBe("pendente");
     expect(ln.schedule).not.toHaveBeenCalled();
-    expect(pedidoDeLembreteDoTeste()).toEqual(pedido);
-    // ... a pessoa aceita a permissão no B1 da Missão
     ln.permissao = "granted";
     expect(await armarLembreteDoTesteSePuder()).toBe(true);
     expect(ln.schedule).toHaveBeenCalledTimes(1);
     expect(ln.schedule.mock.calls[0][0].notifications[0].id).toBe(920001);
   });
 
-  it("permissão negada: nada agendado, evento diz sem_permissao, e armar depois não força", async () => {
+  it("permissão negada: nada agendado, e armar depois não força", async () => {
     ln.permissao = "denied";
     expect(await pedirLembreteDoTeste(pedido)).toBe("sem_permissao");
     expect(await armarLembreteDoTesteSePuder()).toBe(false);
     expect(ln.schedule).not.toHaveBeenCalled();
-    expect(eventos).toContainEqual(["trial_aviso", { acao: "sem_permissao" }]);
   });
 
-  it("rearmar substitui (nunca duplica): só um 920001 pendente", async () => {
+  it("rearmar a cada abertura não duplica nem re-agenda igual: um 920001 só, um schedule só", async () => {
     await pedirLembreteDoTeste(pedido);
     await armarLembreteDoTesteSePuder();
     await armarLembreteDoTesteSePuder();
     expect(ln.pendentes.filter((n) => n.id === 920001)).toHaveLength(1);
+    expect(ln.schedule).toHaveBeenCalledTimes(1);
   });
 
   it("sem pedido guardado (compra numa build antiga), nada é inventado", async () => {
     expect(await armarLembreteDoTesteSePuder()).toBe(false);
     await sincronizarLembreteDoTeste({ emTeste: true, vaiRenovar: true, fimMs: pedido.fimMs });
     expect(ln.schedule).not.toHaveBeenCalled();
+  });
+});
+
+describe("1 notificação de teste por dia", () => {
+  it("o lembrete diário (930001) cede o dia do 920001 — e volta no dia seguinte", async () => {
+    const pedido = { fimMs: new Date(2026, 9, 4, 15, 0, 0).getTime(), precoAno: "R$ 97,90" };
+    await pedirLembreteDoTeste(pedido);
+    const get = <T,>(_k: string, f: T) => f;
+    const r = await sincronizarLembreteDia2(get, { criadoEm: new Date(2026, 9, 1, 14, 0).toISOString(), agora: new Date(2026, 9, 1, 15, 0) });
+    expect(r).toEqual({ ok: false, motivo: "pulado_por_920" });
+    expect(ln.pendentes.filter((n) => n.id >= 930000 && n.id < 940000)).toHaveLength(0);
+    expect(eventos).toContainEqual(["lembrete_dia2_agendado", expect.objectContaining({ ok: false, motivo: "pulado_por_920", pulado_por_920: true })]);
+    // no dia 2 (abriu), o de amanhã (dia 3) sai normal
+    vi.setSystemTime(new Date(2026, 9, 2, 10, 0, 0));
+    const r2 = await sincronizarLembreteDia2(get, { criadoEm: new Date(2026, 9, 1, 14, 0).toISOString(), agora: new Date(2026, 9, 2, 10, 0) });
+    expect(r2.ok).toBe(true);
+    const porDia = new Map<string, number>();
+    for (const n of ln.pendentes) { const d = localDayKey(new Date(n.schedule!.at!)); porDia.set(d, (porDia.get(d) ?? 0) + 1); }
+    for (const [d, q] of porDia) expect(q, d).toBe(1);
   });
 });
 
@@ -215,7 +255,7 @@ describe("sincronização com a loja (boot)", () => {
     await sincronizarLembreteDoTeste({ emTeste: true, vaiRenovar: true, fimMs: fimReal });
     expect(pedidoDeLembreteDoTeste()?.fimMs).toBe(fimReal);
     expect(ln.pendentes.filter((n) => n.id === 920001)).toHaveLength(1);
-    expect(ln.schedule).toHaveBeenCalledTimes(2);
+    expect(ln.schedule).toHaveBeenCalledTimes(2); // data nova = aviso refeito
   });
 
   it("cancelou o teste (willRenew false): o aviso é DESARMADO e o pedido some", async () => {

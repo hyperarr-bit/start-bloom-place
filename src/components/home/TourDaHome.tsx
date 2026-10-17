@@ -9,6 +9,8 @@ import { CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, ocultar, typ
 import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES } from "@/lib/missao-doses";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { abrirAcaoRapida } from "@/components/home/QuickActions";
+import { gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/components/demo-guiada/alvos";
+import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, EVENTO_TOUR_HOME_FIM, avisar, deveMostrarTourHome, marcarTourFeito, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 
 /**
@@ -83,24 +85,42 @@ interface Rect { top: number; left: number; width: number; height: number }
 /* 10/10, dono: o passo do SCORE é só de LEITURA (tocar no anel abre Conquistas — não é o caminho); o botão
  * primário de TODOS os passos é "Continuar" e sempre avança (ninguém fica preso); fazer a ação de verdade
  * também avança, com "✓ Pronto!"; no último, "Concluir missão". */
-const PASSOS = [
+const PASSOS_LONGO = [
   { alvo: "score", titulo: "Seu score do dia", texto: "O anel soma o que você já fez hoje. Cada registro conta ponto — e 100 é dia fechado.", faca: "" },
   { alvo: "pendencias", titulo: "Pendências de hoje", texto: "É a lista do que falta — e o score só cobra o que está nela.", faca: "Toque no ⋯ de uma linha e esconda o que não usa" },
   { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Um toque registra água, humor, gasto, sono… sem entrar no módulo.", faca: "Toque em +1 copo d'água" },
   { alvo: "adicionar-widget", titulo: "Widgets", texto: "Mostre na Home o que você olha todo dia (saldo, hábitos, água).", faca: "Toque em + Adicionar widget e escolha um" },
   { alvo: "modulos", titulo: "Módulos", texto: "Na engrenagem você esconde o que não usa. Módulo escondido não cobra pendência.", faca: "Toque na engrenagem e esconda um módulo" },
 ] as const;
+/**
+ * 1.0.16 — O TOUR CURTO (braço A, desenho 8 seção 7c): 3 passos, ~30 s, logo depois da dose 1. 2 de 3 são
+ * "faz isso": o gasto pelo chip das ações rápidas é um registro de verdade; esconder módulos ataca o
+ * "informação demais". Cada passo tem "Deixar como está"; sem "pular tudo". Score e widgets viram as dicas
+ * de 1 balão dos dias 2 e 3 (components/missao-doses/DicaDoDia).
+ */
+const PASSOS_CURTO = [
+  { alvo: "pendencias", titulo: "Pendências de hoje", texto: "Tudo de hoje aparece aqui — o que você montou já está aí.", faca: "" },
+  { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Anota um gasto daqui, sem abrir Finanças.", faca: "Toque no ☕ Café" },
+  { alvo: "modulos", titulo: "Seus módulos", texto: "Esconde o que não vai usar agora — dá pra trazer de volta.", faca: "Esconda um, ou deixe todos" },
+] as const;
+type PassoDoTour = { alvo: string; titulo: string; texto: string; faca: string };
+const CHIP_CAFE: ChipDaMissao = { emoji: "☕", nome: "Café", valor: 12, categoria: "alimentacao" };
 /** "✓ Pronto!" fica na tela por isto depois de uma ação feita (o passo já avançou). */
 export const PRONTO_MS = 600;
-export const TOTAL_PASSOS = PASSOS.length;
+export const TOTAL_PASSOS = PASSOS_LONGO.length;
+export const TOTAL_PASSOS_CURTO = PASSOS_CURTO.length;
 const PADDING = 8;
 
-export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: {
+export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, variante = "longo" }: {
   lifeData: LifeHubData;
   widgetsAtivos: WidgetId[];
   adicionarWidget: (id: WidgetId) => void;
   onFim?: () => void;
+  /** 1.0.16: "curto" = 3 passos (braço A); "longo" = os 5 de sempre */
+  variante?: "curto" | "longo";
 }) => {
+  const PASSOS: readonly PassoDoTour[] = variante === "curto" ? PASSOS_CURTO : PASSOS_LONGO;
+  const TOTAL = PASSOS.length;
   const { get, set } = useUserData();
   const reduzir = useReducedMotion();
   const [passo, setPasso] = useState(0);
@@ -117,7 +137,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
   const prefsRef = useRef<string | null>(null);
   const ocultosRef = useRef<number | null>(null);
 
-  useEffect(() => { trackEvent("home_tour_visto", { total: TOTAL_PASSOS }); }, []);
+  /* 1.0.16 (defeito 13): `home_tour_visto` disparava no mount, antes de o tour aparecer (135 "viram" × 44
+     começaram). Agora sai só quando a camada está VISÍVEL de fato: o alvo medido e nenhuma folha por cima. */
+  const vistoRef = useRef(false);
   useEffect(() => { widgetsAoEntrar.current = widgetsAtivos.length; }, [passo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // a ação feita NO APP (pelo ⋯ real, pela engrenagem real) avança o passo como se fosse pelo balão
@@ -193,23 +215,30 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
     avisar(EVENTO_MODULOS_EDITAR, { editar: false });
     marcarTourFeito();
     set(CHAVE_TOUR_FEITO, new Date().toISOString());
-    trackEvent("home_tour_concluido", { total: TOTAL_PASSOS });
+    trackEvent("home_tour_concluido", { total: TOTAL, variante });
     setAtivo(false);
     onFim?.();
     // 10/10: a missão em doses (braço B) fecha o 4º passo dela com isto
-    avisar(EVENTO_TOUR_HOME_FIM, { total: TOTAL_PASSOS });
+    avisar(EVENTO_TOUR_HOME_FIM, { total: TOTAL });
   }, [set, onFim]);
 
   const avancar = useCallback((acao: string) => {
-    trackEvent("home_tour_passo", { indice: passo, total: TOTAL_PASSOS, acao });
+    trackEvent("home_tour_passo", { indice: passo, total: TOTAL, acao, variante });
     setVerPontos(false);
     // ação feita (não "Continuar"/"Concluir"): ✓ Pronto! por 600 ms — o passo avança JÁ, o selo só confirma
     if (acao !== "continuar" && acao !== "concluir" && acao !== "deixar") { setPronto(true); window.setTimeout(() => setPronto(false), PRONTO_MS); }
-    if (passo >= TOTAL_PASSOS - 1) terminar();
+    if (passo >= TOTAL - 1) terminar();
     else setPasso((p) => p + 1);
   }, [passo, terminar]);
   const avancarRef = useRef(avancar);
   avancarRef.current = avancar;
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (vistoRef.current || !ativo || !rect || folhaAberta) return;
+    vistoRef.current = true;
+    trackEvent("home_tour_visto", { total: TOTAL, variante });
+  }, [ativo, rect, folhaAberta, TOTAL, variante]);
 
   if (!ativo) return null;
   const atual = PASSOS[passo];
@@ -229,7 +258,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
 
   const chip = "h-8 px-2.5 rounded-full text-[11.5px] font-semibold bg-white/15 border border-white/30 active:scale-95 transition whitespace-nowrap";
   const principal = "h-10 px-4 rounded-full text-[13px] font-bold bg-white text-accent active:scale-95 transition";
-  const ultimo = passo >= TOTAL_PASSOS - 1;
+  const ultimo = passo >= TOTAL - 1;
 
   const acao = (() => {
     switch (atual.alvo) {
@@ -250,6 +279,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
           <button type="button" onClick={() => setVerPontos(true)} className={principal} data-testid="tour-ver-pontos">O que conta ponto</button>
         );
       case "pendencias":
+        if (variante === "curto") return null;
         return pendentes.length ? (
           <div className="flex flex-wrap gap-1.5">
             {pendentes.map((t) => {
@@ -264,6 +294,23 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
           </div>
         ) : <p className="text-[12px] opacity-85">Nada pendente agora — a lista fica aqui quando precisar.</p>;
       case "acoes-rapidas":
+        if (variante === "curto") {
+          return (
+            <button type="button" className={principal} data-testid="tour-cafe" onClick={() => {
+              try {
+                const item = itemDoChip("gasto", CHIP_CAFE);
+                if (item) for (const g of gravacoesDoChip(item, CHIP_CAFE)) {
+                  const prox = g.proximo(get<unknown>(g.chave, undefined));
+                  if (prox === undefined) continue;
+                  set(g.chave, prox); avisarEscritaDeFora(g.chave, prox);
+                }
+              } catch { /* o tour nunca derruba a Home */ }
+              avancar("gasto");
+            }}>
+              ☕ Café · R$ 12
+            </button>
+          );
+        }
         return (
           <button type="button" className={principal} data-testid="tour-agua" onClick={() => { abrirAcaoRapida("water"); avancar("agua"); }}>
             💧 +1 copo d'água agora
@@ -290,7 +337,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-[10.5px] opacity-80">Os outros: no 👁 de cada módulo, ali na grade.</p>
+            {variante === "curto"
+              ? <button type="button" className={`${chip} mt-1.5`} data-testid="tour-deixar-todos" onClick={() => avancar("deixar")}>Deixar todos</button>
+              : <p className="mt-1.5 text-[10.5px] opacity-80">Os outros: no 👁 de cada módulo, ali na grade.</p>}
           </div>
         );
     }
@@ -368,18 +417,18 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
           )}
           <div
             role="dialog"
-            aria-label={`Sua Home em 5 passos — ${passo + 1} de ${TOTAL_PASSOS}: ${atual.titulo}`}
+            aria-label={`Sua Home em ${TOTAL} passos — ${passo + 1} de ${TOTAL}: ${atual.titulo}`}
             data-testid="tour-balao"
             className="relative rounded-2xl bg-accent text-accent-foreground px-4 pt-3.5 pb-3 shadow-[0_14px_40px_-14px_rgba(0,0,0,0.45)]"
           >
             <div className="absolute -top-3 -right-2 rotate-6 ct-financas [--ct-faixa:rgba(255,255,255,.95)] [--ct-acento:hsl(var(--accent))]">
               <FigurinhaPlaceholder tamanho={40} />
             </div>
-            <p className="text-[10.5px] font-extrabold tracking-[.16em] uppercase opacity-85" data-testid="tour-contador">Passo {passo + 1} de {TOTAL_PASSOS}{ultimo ? " · último" : ` · falta ${TOTAL_PASSOS - passo - 1}`}</p>
+            <p className="text-[10.5px] font-extrabold tracking-[.16em] uppercase opacity-85" data-testid="tour-contador">Passo {passo + 1} de {TOTAL}{ultimo ? " · último" : ` · falta ${TOTAL - passo - 1}`}</p>
             <h3 className="mt-0.5 text-[17px] font-bold leading-tight tracking-tight pr-8">{atual.titulo}</h3>
             <p className="mt-1 text-[12.5px] leading-snug opacity-90">{atual.texto}{atual.faca ? <> <b className="font-extrabold" data-testid="tour-faca">{atual.faca}.</b></> : null}</p>
             <div className="mt-3">{acao}</div>
-            <div className="mt-3 flex items-center gap-1.5" aria-label={`${passo + 1} de ${TOTAL_PASSOS}`}>
+            <div className="mt-3 flex items-center gap-1.5" aria-label={`${passo + 1} de ${TOTAL}`}>
               {PASSOS.map((p, i) => (
                 <i key={p.alvo} className="block h-1.5 rounded-full bg-white transition-all" style={{ width: i === passo ? 16 : 6, opacity: i === passo ? 1 : 0.45 }} data-ativo={i === passo ? "" : undefined} />
               ))}
@@ -391,7 +440,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim }: 
               className="mt-2.5 w-full h-11 rounded-full text-[14px] font-extrabold bg-white text-accent active:scale-[0.98] transition"
               data-testid={ultimo ? "tour-concluir" : "tour-continuar"}
             >
-              {ultimo ? "Concluir missão" : "Continuar"}
+              {variante === "curto" ? (ultimo ? "Pronto" : atual.faca ? "Deixar como está" : "Continuar") : ultimo ? "Concluir missão" : "Continuar"}
             </button>
           </div>
         </motion.div>

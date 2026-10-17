@@ -13,6 +13,7 @@ import {
 } from "@/lib/home-pendencias";
 import { PersonalizarPendencias } from "@/components/home/PersonalizarPendencias";
 import { EVENTO_PENDENCIAS_ABRIR } from "@/lib/tour-home";
+import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -292,6 +293,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const { get, set } = useUserData();
   const { pending, done, avisoTreino, avisoConta } = pendenciasDeHoje(data, get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date(), normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
   const prefs: PendenciasPrefs = data.pendenciasPrefs ?? PREFS_PADRAO;
+  // 1.0.16 (braço A): a dose de hoje da missão — uma linha na lista, fora do score
+  const dose = useDoseDeHoje();
+  const totalPendentes = pending.length + (dose ? 1 : 0);
   const gravar = (p: PendenciasPrefs) => { set(CHAVE_PENDENCIAS_PREFS, p); setMenuAberto(null); };
   // 10/10 — o tour da Home pede pra lista abrir (acende o "⋯"); sem o evento, nada muda
   useEffect(() => {
@@ -305,7 +309,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
     <div>
       <div className="w-full flex items-center justify-between mb-2.5 gap-2">
         <button
-          onClick={() => { if (!isOpen) trackEvent("home_pendencias_abrir", { pendentes: pending.length }); setIsOpen(!isOpen); }}
+          onClick={() => { if (!isOpen) trackEvent("home_pendencias_abrir", { pendentes: totalPendentes }); setIsOpen(!isOpen); }}
           className="flex-1 flex items-center justify-between"
         >
           <div className="flex items-center gap-1.5">
@@ -315,9 +319,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            {pending.length > 0 && (
+            {totalPendentes > 0 && (
               <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                {pending.length} pendente{pending.length > 1 ? "s" : ""}
+                {totalPendentes} pendente{totalPendentes > 1 ? "s" : ""}
               </span>
             )}
             <ChevronDown
@@ -347,6 +351,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
             className="overflow-hidden"
           >
             <div className="space-y-1.5">
+              {dose && <LinhaDoseDeHoje dose={dose} />}
               {pending.map((item, i) => (
                 <motion.div
                   key={`p-${item.tipo ?? i}`}

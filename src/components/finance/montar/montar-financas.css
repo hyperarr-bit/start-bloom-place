@@ -40,7 +40,7 @@ html[data-montar-financas] body { overflow: hidden; }
 .mf-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0; }
 .mf-cab-icone { color: var(--mf-ambar); width: 22px; height: 22px; }
 .mf-cab-nome { font-size: 17px; font-weight: 800; letter-spacing: .02em; }
-.mf-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); text-transform: capitalize; }
+.mf-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); }
 
 .mf-corpo { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
 .mf-corpo > * { flex-shrink: 0; } /* senão a tabela de contas encolhe (overflow hidden) em vez de a tela rolar */

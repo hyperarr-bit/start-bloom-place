@@ -63,6 +63,7 @@ export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover 
       key={id}
       onClick={() => setAtivo(id)}
       aria-pressed={ativo === id}
+      data-track={id === PERFIL_PESSOAL ? "perfil:pessoal" : id === PERFIL_TODOS ? "perfil:tudo" : "perfil:empresa"}
       className={`h-8 px-3 rounded-full border text-[11px] font-bold flex items-center gap-1.5 whitespace-nowrap transition-colors ${
         ativo === id
           ? "bg-primary text-primary-foreground border-transparent"

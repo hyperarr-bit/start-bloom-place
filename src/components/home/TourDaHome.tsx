@@ -6,12 +6,12 @@ import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { WIDGET_CATALOG, type WidgetId } from "@/hooks/use-home-widgets";
 import { MODULOS } from "@/lib/modulos";
 import { CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, ocultar, type TipoPendencia } from "@/lib/home-pendencias";
-import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES } from "@/lib/missao-doses";
+import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS as MODULOS_DA_MISSAO, ehUmPorDia, lerMissao, passoPendente, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { abrirAcaoRapida } from "@/components/home/QuickActions";
-import { gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/components/demo-guiada/alvos";
+import { alvoDaMissao, gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
-import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, EVENTO_TOUR_HOME_FIM, avisar, deveMostrarTourHome, marcarTourFeito, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
+import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, EVENTO_TOUR_HOME_FIM, avisar, deveMostrarTourHome, marcarTourFeito, registrarTourVisto, tourFeito, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
 
 /**
  * O ENCAIXE DO TOUR (1.0.14): a Home pergunta "mostro o tour agora?" e a resposta
@@ -27,8 +27,14 @@ import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO
 const OUTRA_CAMADA = '[data-camada-guia]:not([data-camada-guia="tour-home"])';
 export function useTourDaHome(criadoEm: string | null | undefined, ligado = true): boolean {
   const [tick, setTick] = useState(0);
-  // com a chave desligada (ou o tour já feito aqui) o hook não escuta nada: custo zero pra quem não vai ver o tour
-  const pertinente = ligado && tourHomeLigado() && !tourFeitoNesteAparelho();
+  const { get, loaded } = useUserData();
+  // 1.0.16 (4.8): a marca da CONTA também vale — reinstalou ou trocou de aparelho, o tour não volta. Vista a marca
+  // da conta, o aparelho guarda a dele (a próxima abertura nem precisa esperar o dado da conta).
+  const feitoNaConta = loaded && tourFeito(get) && !tourFeitoNesteAparelho();
+  useEffect(() => { if (feitoNaConta) marcarTourFeito(); }, [feitoNaConta]);
+  // com a chave desligada (ou o tour já feito aqui) o hook não escuta nada: custo zero pra quem não vai ver o tour.
+  // Sem o dado da conta carregado ainda, espera (a marca da conta pode estar a caminho)
+  const pertinente = ligado && tourHomeLigado() && !tourFeitoNesteAparelho() && !feitoNaConta && loaded;
   useEffect(() => {
     if (!pertinente) return;
     const reler = () => setTick((t) => t + 1);
@@ -94,21 +100,37 @@ const PASSOS_LONGO = [
 ] as const;
 /**
  * 1.0.16 — O TOUR CURTO (braço A, desenho 8 seção 7c): 3 passos, ~30 s, logo depois da dose 1. 2 de 3 são
- * "faz isso": o gasto pelo chip das ações rápidas é um registro de verdade; esconder módulos ataca o
- * "informação demais". Cada passo tem "Deixar como está"; sem "pular tudo". Score e widgets viram as dicas
- * de 1 balão dos dias 2 e 3 (components/missao-doses/DicaDoDia).
+ * "faz isso": o gasto pelo chip das ações rápidas é um registro de verdade (ou pelo botão real "Registrar
+ * Gasto" — conta igual); esconder módulos ataca o "informação demais". Cada passo tem a saída de texto
+ * ("Deixar como está" / "Deixar todos"); sem "pular tudo". Score e widgets viram as dicas de 1 balão dos
+ * dias 2 e 3 (components/missao-doses/DicaDoDia).
+ *
+ * Passo 1 com a VERDADE: o que o Montar grava (renda, contas fixas) não vira pendência — então o balão não diz
+ * "o que você montou já está aí". Ele mostra a lista e conta o que vem: a dose de amanhã aparece NESSA lista.
  */
-const PASSOS_CURTO = [
-  { alvo: "pendencias", titulo: "Pendências de hoje", texto: "Tudo de hoje aparece aqui — o que você montou já está aí.", faca: "" },
-  { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Anota um gasto daqui, sem abrir Finanças.", faca: "Toque no ☕ Café" },
-  { alvo: "modulos", titulo: "Seus módulos", texto: "Esconde o que não vai usar agora — dá pra trazer de volta.", faca: "Esconda um, ou deixe todos" },
-] as const;
+export function passosDoTourCurto(m: EstadoMissaoDoses | null): PassoDoTour[] {
+  const prox = m && ehUmPorDia(m) && !m.explorou ? passoPendente(m) : null;
+  const cfg = prox ? MODULOS_DA_MISSAO[prox.modulo] : null;
+  return [
+    {
+      alvo: "pendencias",
+      titulo: "Pendências de hoje",
+      texto: cfg
+        ? `Aqui fica o que falta fazer hoje. Amanhã, a sua dose de ${cfg.emoji} ${cfg.nome} vai aparecer nessa lista.`
+        : "Aqui fica o que falta fazer hoje: água, hábitos, refeições. Tocou, resolveu.",
+      faca: "",
+    },
+    { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Da próxima vez, anota o gasto daqui mesmo, sem abrir Finanças.", faca: "Toca no gasto de agora" },
+    { alvo: "modulos", titulo: "Seus módulos", texto: "São 16. Esconde o que não vai usar agora; dá pra trazer de volta quando quiser.", faca: "Toca nos que quer esconder" },
+  ];
+}
 type PassoDoTour = { alvo: string; titulo: string; texto: string; faca: string };
-const CHIP_CAFE: ChipDaMissao = { emoji: "☕", nome: "Café", valor: 12, categoria: "alimentacao" };
+/** Os mesmos 3 gastos prontos da dose de Finanças (alvos.ts). */
+const CHIPS_DO_TOUR: ChipDaMissao[] = alvoDaMissao("gasto").chips;
 /** "✓ Pronto!" fica na tela por isto depois de uma ação feita (o passo já avançou). */
 export const PRONTO_MS = 600;
 export const TOTAL_PASSOS = PASSOS_LONGO.length;
-export const TOTAL_PASSOS_CURTO = PASSOS_CURTO.length;
+export const TOTAL_PASSOS_CURTO = 3;
 const PADDING = 8;
 
 export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, variante = "longo" }: {
@@ -119,7 +141,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   /** 1.0.16: "curto" = 3 passos (braço A); "longo" = os 5 de sempre */
   variante?: "curto" | "longo";
 }) => {
-  const PASSOS: readonly PassoDoTour[] = variante === "curto" ? PASSOS_CURTO : PASSOS_LONGO;
+  // o curto lê a missão UMA vez (o texto do passo 1 não muda no meio do tour)
+  const [passosCurto] = useState(() => passosDoTourCurto((() => { try { return lerMissao(); } catch { return null; } })()));
+  const PASSOS: readonly PassoDoTour[] = variante === "curto" ? passosCurto : PASSOS_LONGO;
   const TOTAL = PASSOS.length;
   const { get, set } = useUserData();
   const reduzir = useReducedMotion();
@@ -145,17 +169,22 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   // a ação feita NO APP (pelo ⋯ real, pela engrenagem real) avança o passo como se fosse pelo balão
   const prefsTxt = JSON.stringify(lifeData.pendenciasPrefs ?? null);
   const ocultosN = ((get<{ hidden?: unknown } | null>("core-module-prefs", null)?.hidden ?? []) as unknown[]).length;
+  // 1.0.16 (curto): o gasto pelo botão REAL "Registrar Gasto" conta como o passo feito (a folha fecha → avança)
+  const gastosN = (() => { const g = get<unknown>("finance-expenses", []); return Array.isArray(g) ? g.length : 0; })();
+  const gastosRef = useRef<number | null>(null);
   useEffect(() => {
     if (!ativo) return;
     const alvo = PASSOS[passo].alvo;
     if (alvo === "pendencias" && prefsRef.current !== null && prefsRef.current !== prefsTxt) avancarRef.current("ocultar:app");
     if (alvo === "modulos" && ocultosRef.current !== null && ocultosN > ocultosRef.current) avancarRef.current("modulo:app");
     if (alvo === "adicionar-widget" && widgetsAtivos.length > widgetsAoEntrar.current && !folhaAberta) avancarRef.current("widget:app");
+    if (variante === "curto" && alvo === "acoes-rapidas" && gastosRef.current !== null && gastosN > gastosRef.current && !folhaAberta) avancarRef.current("gasto:app");
     prefsRef.current = prefsTxt;
     ocultosRef.current = ocultosN;
+    if (!(variante === "curto" && alvo === "acoes-rapidas" && folhaAberta)) gastosRef.current = gastosN;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ativo, passo, prefsTxt, ocultosN, widgetsAtivos.length, folhaAberta]);
-  useEffect(() => { prefsRef.current = prefsTxt; ocultosRef.current = ocultosN; }, [passo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ativo, passo, prefsTxt, ocultosN, widgetsAtivos.length, folhaAberta, gastosN]);
+  useEffect(() => { prefsRef.current = prefsTxt; ocultosRef.current = ocultosN; gastosRef.current = gastosN; }, [passo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // o tour NUNCA fica por cima de uma folha/modal do app (Radix/vaul abertos): some enquanto ela estiver
   // aberta e volta ao fechar — já no passo seguinte se ela fez a ação lá dentro (adicionou um widget)
@@ -233,10 +262,10 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   const avancarRef = useRef(avancar);
   avancarRef.current = avancar;
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (vistoRef.current || !ativo || !rect || folhaAberta) return;
     vistoRef.current = true;
+    registrarTourVisto(); // fechou o app no meio: volta no máximo em 2 aberturas
     trackEvent("home_tour_visto", { total: TOTAL, variante });
   }, [ativo, rect, folhaAberta, TOTAL, variante]);
 
@@ -295,20 +324,25 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
         ) : <p className="text-[12px] opacity-85">Nada pendente agora — a lista fica aqui quando precisar.</p>;
       case "acoes-rapidas":
         if (variante === "curto") {
+          // os 3 gastos prontos da dose (registro de verdade, pelo mesmo caminho dos chips da missão)
           return (
-            <button type="button" className={principal} data-testid="tour-cafe" onClick={() => {
-              try {
-                const item = itemDoChip("gasto", CHIP_CAFE);
-                if (item) for (const g of gravacoesDoChip(item, CHIP_CAFE)) {
-                  const prox = g.proximo(get<unknown>(g.chave, undefined));
-                  if (prox === undefined) continue;
-                  set(g.chave, prox); avisarEscritaDeFora(g.chave, prox);
-                }
-              } catch { /* o tour nunca derruba a Home */ }
-              avancar("gasto");
-            }}>
-              ☕ Café · R$ 12
-            </button>
+            <div className="flex flex-wrap gap-1.5" data-testid="tour-gastos">
+              {CHIPS_DO_TOUR.map((c) => (
+                <button key={c.nome} type="button" className={chip} data-testid={`tour-gasto-${c.nome}`} onClick={() => {
+                  try {
+                    const item = itemDoChip("gasto", c);
+                    if (item) for (const g of gravacoesDoChip(item, c)) {
+                      const prox = g.proximo(get<unknown>(g.chave, undefined));
+                      if (prox === undefined) continue;
+                      set(g.chave, prox); avisarEscritaDeFora(g.chave, prox);
+                    }
+                  } catch { /* o tour nunca derruba a Home */ }
+                  avancar(`gasto:${c.nome}`);
+                }}>
+                  {c.emoji} {c.nome} · R$ {c.valor}
+                </button>
+              ))}
+            </div>
           );
         }
         return (
@@ -337,9 +371,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
                 </button>
               ))}
             </div>
-            {variante === "curto"
-              ? <button type="button" className={`${chip} mt-1.5`} data-testid="tour-deixar-todos" onClick={() => avancar("deixar")}>Deixar todos</button>
-              : <p className="mt-1.5 text-[10.5px] opacity-80">Os outros: no 👁 de cada módulo, ali na grade.</p>}
+            <p className="mt-1.5 text-[10.5px] opacity-80">Os outros: no 👁 de cada módulo, ali na grade.</p>
           </div>
         );
     }
@@ -436,11 +468,12 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
             {/* o botão primário SEMPRE visível e SEMPRE avança: "Continuar"; no último passo, "Concluir missão" */}
             <button
               type="button"
-              onClick={() => avancar(ultimo ? "concluir" : "continuar")}
+              onClick={() => avancar(variante === "curto" && atual.faca ? "deixar" : ultimo ? "concluir" : "continuar")}
               className="mt-2.5 w-full h-11 rounded-full text-[14px] font-extrabold bg-white text-accent active:scale-[0.98] transition"
               data-testid={ultimo ? "tour-concluir" : "tour-continuar"}
             >
-              {variante === "curto" ? (ultimo ? "Pronto" : atual.faca ? "Deixar como está" : "Continuar") : ultimo ? "Concluir missão" : "Continuar"}
+              {/* curto: o passo de "faz isso" sempre tem a saída sem fazer — "Deixar como está" / "Deixar todos" */}
+              {variante === "curto" ? (ultimo ? "Deixar todos" : atual.faca ? "Deixar como está" : "Continuar") : ultimo ? "Concluir missão" : "Continuar"}
             </button>
           </div>
         </motion.div>

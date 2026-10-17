@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
-import { DOSE_CURTA, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete } from "@/lib/missao-doses";
+import { DOSE_CURTA, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import "./missao-doses.css";
 
 /**
@@ -12,8 +11,31 @@ import "./missao-doses.css";
  * "Amanhã a gente monta sua Rotina em 20 s. Que horas te lembro?" · 8h · 12h · 20h (já marcado o
  * mais perto da hora de agora) · "Combinado" · link "Sem lembrete". A hora vira a do Lembrete do
  * dia 2 (combinarHora, em quem chama) e é AQUI que a permissão de notificação é pedida (1x).
+ * Segue o tema do app (claro/escuro).
  */
 const HORAS: Array<Exclude<Lembrete, "sem">> = ["8h", "12h", "20h"];
+const MINUTOS: Record<Exclude<Lembrete, "sem">, number> = { "8h": 8 * 60, "12h": 12 * 60, "20h": 20 * 60 };
+
+/** O chip que começa marcado: o mais perto da hora de AGORA (quem abre à noite costuma abrir à noite). */
+export function horaMaisPerto(agora: Date = new Date()): Exclude<Lembrete, "sem"> {
+  const min = agora.getHours() * 60 + agora.getMinutes();
+  return HORAS.reduce((melhor, h) => (Math.abs(MINUTOS[h] - min) < Math.abs(MINUTOS[melhor] - min) ? h : melhor));
+}
+
+/** "Amanhã a gente monta sua Rotina em 20 s." — a frase da dose de amanhã, do jeito que se fala. */
+export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined): string {
+  if (!modulo) return "Amanhã tem mais um passo do seu plano.";
+  const cfg = MODULOS[modulo];
+  const seg = DOSE_CURTA[modulo].seg;
+  switch (modulo) {
+    case "financas": return `Amanhã a gente monta suas Finanças em ${seg} s.`;
+    case "rotina": return `Amanhã a gente monta sua Rotina em ${seg} s.`;
+    case "saude": return `Amanhã é a vez da sua Saúde: 1 copo d'água, ${seg} s.`;
+    case "treino": return `Amanhã a gente escolhe o seu treino em ${seg} s.`;
+    case "desenvolvimento": return `Amanhã a gente escolhe a sua primeira meta em ${seg} s.`;
+    default: return `Amanhã é a vez de ${cfg.emoji} ${cfg.nome}: ${seg} s.`;
+  }
+}
 
 export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   missao: EstadoMissaoDoses;
@@ -21,24 +43,21 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   aoSemLembrete: () => void;
 }) {
   const reduzir = !!useReducedMotion();
-  const sugerida = horaSugeridaDaMissao();
-  const [hora, setHora] = useState<Exclude<Lembrete, "sem">>(sugerida === "sem" ? "20h" : sugerida);
+  const [hora, setHora] = useState<Exclude<Lembrete, "sem">>(() => horaMaisPerto());
   const proxima = passoPendente(missao);
-  const cfg = proxima ? MODULOS[proxima.modulo] : null;
   useEffect(() => {
-    trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null }));
+    trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null, sugerida: hora }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const verbo = cfg?.modulo === "financas" ? "monta suas Finanças" : cfg?.modulo === "saude" ? "marca sua água" : cfg ? `monta sua ${cfg.nome}` : "continua";
   return createPortal(
-    <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 24px)" }}
+    <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       role="dialog" aria-modal="true" aria-label="Plano de amanhã" data-camada-guia="missao-doses-plano" data-testid="plano-amanha-a"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}
-        className="w-full max-w-[380px] rounded-3xl bg-white p-5 text-[#16121c] shadow-2xl">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-black/55">Plano de amanhã</p>
+        className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Plano de amanhã</p>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-1.5" data-testid="plano-amanha-a-titulo">
-          Amanhã a gente {verbo}{cfg ? ` em ${DOSE_CURTA[cfg.modulo].seg} s` : ""}. Que horas te lembro?
+          {fraseDeAmanha(proxima?.modulo)} Que horas te lembro?
         </p>
         <div className="flex gap-2 mt-4" role="radiogroup" aria-label="Hora do lembrete">
           {HORAS.map((h) => (

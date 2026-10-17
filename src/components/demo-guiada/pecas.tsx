@@ -422,7 +422,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
  * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
  * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
  */
-export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao }: {
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria }: {
   pergunta: string;
   chips: ChipDaMissao[];
   /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
@@ -435,6 +435,8 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
   rotulo?: string;
   /** uma frase explicando o toque, entre a pergunta e os chips */
   descricao?: string;
+  /** 1.0.16: uma saída de texto no pé do post-it (o gasto de carona depois do Montar: "Agora não") */
+  secundaria?: { texto: string; aoTocar: () => void; testid?: string };
 }) {
   const reduzir = useReducedMotion();
   return (
@@ -484,6 +486,12 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
           </div>
         )}
         {dica && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
+        {secundaria && (
+          <button type="button" onClick={secundaria.aoTocar} data-testid={secundaria.testid ?? "demo-guia-secundaria"}
+            className="mt-2 -mb-1 min-h-10 px-1 text-[13px] font-bold underline underline-offset-2" style={{ color: "rgba(38,38,38,.7)" }}>
+            {secundaria.texto}
+          </button>
+        )}
       </motion.div>
     </div>
   );

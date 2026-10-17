@@ -35,7 +35,7 @@ import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/test
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
-import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
+import { DonoDaMissaoNaSessao, MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
@@ -767,6 +767,8 @@ const App = () => {
                 {/* 10/10 (1.0.14): a folha nativa de cobrança do StoreKit só na Home — ver lib/cobranca-nativa. Só iPhone. */}
                 <PonteDaFolhaDeCobranca />
                 <TrilhoLateral />
+                {/* 1.0.16: o dono da missão em doses na sessão, antes das rotas (lerMissao filtra pela conta) */}
+                <DonoDaMissaoNaSessao />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").

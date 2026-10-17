@@ -266,9 +266,24 @@ export interface EstadoMissaoDoses {
   planoAPulado?: string;
   /** 1.0.16, braço A: as dicas de 1 balão dos dias 2 (score) e 3 (widgets), já mostradas (o dia) */
   dicas?: Partial<Record<2 | 3, string>>;
-  /** 1.0.16: adesivos da missão já ganhos ("missao_dia_1", "missao_dia_2", "missao_3_seguidos"…) — só dado/evento */
-  adesivos?: string[];
+  /** 1.0.16: os adesivos que as comemorações das doses MOSTRARAM — ids REAIS do registro de Conquistas
+   *  ("first-expense", "sequencia-2"…) ou a marca sem id ("marca:dia-1"). Só dado: quem dá o adesivo é o
+   *  registro (a regra do próprio adesivo); a comemoração só mostra e marca como visto. */
+  adesivosMostrados?: string[];
+  /** 1.0.16, braço A: o score do dia quando a dose N abriu — a dica do dia 2 diz "foi de X pra Y" */
+  scoreAntes?: Partial<Record<DiaDaMissao, number>>;
+  /** 1.0.16, braço A: quem tocou "Explorar por conta própria" já saiu da Home uma vez (o tour curto entra na volta) */
+  saiuDaHome?: boolean;
 }
+
+/**
+ * 1.0.16 (4.8): o DONO da sessão — o hash da conta logada. Com ele definido, `lerMissao()` ignora a missão de
+ * OUTRA conta deste aparelho, pra TODO mundo que lê a missão (Home, tour, Momentos, cartões, lembretes), não só
+ * a orquestra. Quem define é a orquestra, a cada render com a conta (MissaoDosesNaWeb). Missão sem dono (a
+ * de antes da 1.0.16) vale pra qualquer conta, como sempre.
+ */
+let donoDaSessao: string | undefined;
+export function definirDonoDaMissao(userId: string | null | undefined): void { donoDaSessao = donoDaConta(userId); }
 
 export function lerMissao(): EstadoMissaoDoses | null {
   try {
@@ -276,6 +291,7 @@ export function lerMissao(): EstadoMissaoDoses | null {
     if (!raw) return null;
     const m = JSON.parse(raw) as EstadoMissaoDoses;
     if (!m || m.v !== 1 || typeof m.inicio !== "string" || !Array.isArray(m.modulos) || m.modulos.length !== 3 || !m.modulos.every(ehModulo)) return null;
+    if (m.dono && donoDaSessao && m.dono !== donoDaSessao) return null; // a missão é de outra conta deste aparelho
     return { feitos: {}, boasVindas: false, ...m };
   } catch { return null; }
 }
@@ -462,14 +478,65 @@ export function precisaPlanoAmanha(m: EstadoMissaoDoses, hoje: string = localDay
 }
 
 /**
- * A MISSÃO DO DIA 1 ESTÁ EM CENA? (braço B) — os adesivos dos Momentos esperam: do começo até a
- * folha do plano de amanhã decidida (ela é o fim do dia 1). Quem pulou ("Explorar") libera na hora.
+ * A MISSÃO DO DIA 1 ESTÁ EM CENA? — os adesivos dos Momentos esperam (ficam na fila, sem virar "vistos").
+ *   · braço B: do começo até a folha do plano de amanhã decidida (ela é o fim do dia 1);
+ *   · braço A (1.0.16): as boas-vindas; e, com a dose de hoje feita, até o "Plano de amanhã" decidido — a
+ *     sequência do dia 1 é dose → comemoração → tour curto → plano, e uma comemoração só por dose (desenho 8,
+ *     4.4). Dose de hoje ainda não feita e nada da missão na tela (ela foi explorar): não segura nada. A dose
+ *     na tela já segura sozinha (o atributo da faixa / da dose — Momentos.outraTelaAberta).
+ * Quem pulou ("Explorar") libera na hora.
  */
 export function missaoDoDiaEmCena(m: EstadoMissaoDoses | null, hoje: string = localDayKey()): boolean {
-  if (!m || !ehBracoB(m) || m.explorou) return false;
+  if (!m || m.explorou) return false;
+  if (ehUmPorDia(m)) {
+    if (!m.boasVindas) return true;
+    if (diaDaMissao(m, hoje) !== 1) return false;
+    const fezHoje = ([1, 2, 3] as DiaDaMissao[]).some((n) => m.feitos[n]?.dia === hoje);
+    return fezHoje && m.lembrete === undefined && !m.planoAPulado;
+  }
+  if (!ehBracoB(m)) return false;
   if (diaDaMissao(m, hoje) !== 1) return false;
   return !(m.planoAmanha || m.planoAmanhaPulado === hoje);
 }
+
+/**
+ * 1.0.16 — O MÓDULO DA DOSE DE HOJE (contrato com Conquistas e com os cartões dos módulos): a dose que
+ * pode abrir hoje e ainda não foi feita; senão a que foi feita HOJE; senão null (sem missão, boas-vindas
+ * ainda na tela, "Explorar por conta própria", depois do 7º dia no braço A, ou nada pra hoje).
+ * Estável: só lê a missão do aparelho (`missao-doses`), nunca grava.
+ */
+export function moduloDaMissaoHoje(hoje: string = localDayKey()): ModuloDaMissao | null {
+  try {
+    const m = lerMissao();
+    if (!m || !m.boasVindas || m.explorou) return null;
+    const pendente = passoPendente(m);
+    if (pendente && doseAbreHoje(m, hoje) && m.pulados?.[pendente.n] !== hoje) return pendente.modulo;
+    const feitaHoje = ([3, 2, 1] as DiaDaMissao[]).find((n) => m.feitos[n]?.dia === hoje);
+    return feitaHoje ? m.modulos[feitaHoje - 1] : null;
+  } catch { return null; }
+}
+
+/**
+ * 1.0.16 — DOSE NA TELA (contrato com Conquistas e com os cartões dos módulos): enquanto QUALQUER peça da
+ * dose está montada (a faixa, o "Vamos montar suas Finanças" da missão, o anel/post-it, a comemoração),
+ * `<html data-missao-dose="1">`. Toast, popup de adesivo e cartão de boas-vindas do módulo ficam quietos.
+ */
+export const ATRIBUTO_DOSE_NA_TELA = "data-missao-dose";
+let dosesNaTela = 0;
+/** A peça da dose montou; devolve o "desmontou" (contagem: duas peças juntas não apagam o atributo uma da outra). */
+export function marcarDoseNaTela(): () => void {
+  dosesNaTela += 1;
+  try { document.documentElement.setAttribute(ATRIBUTO_DOSE_NA_TELA, "1"); } catch { /* sem document */ }
+  let feito = false;
+  return () => {
+    if (feito) return;
+    feito = true;
+    dosesNaTela = Math.max(0, dosesNaTela - 1);
+    if (!dosesNaTela) { try { document.documentElement.removeAttribute(ATRIBUTO_DOSE_NA_TELA); } catch { /* sem document */ } }
+  };
+}
+/** Alguma peça da dose está na tela agora? */
+export const doseNaTela = (): boolean => { try { return document.documentElement.getAttribute(ATRIBUTO_DOSE_NA_TELA) === "1"; } catch { return false; } };
 
 /**
  * Braço B, dias 2 e 3 ("aprofundar"): o módulo da missão em que ainda não houve 1 uso real

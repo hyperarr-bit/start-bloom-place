@@ -4,16 +4,23 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Crosshair } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
-import { MontarFinancas, deveMostrarMontarFinancas, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
+import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO_MONTAR_NA_TELA, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MODELOS as MODELOS_DE_TREINO, aplicarModelo } from "@/lib/treino-plano";
 import { trackEvent } from "@/lib/analytics";
+import { marcarCartoesVistos } from "@/lib/tour-home";
+import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type AlvoDaMissao, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
-import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, sequenciaDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { DOSE_CURTA, HORAS_DO_LEMBRETE, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
 import { horaSugeridaDaMissao } from "@/lib/lembrete-dia2";
+import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
+import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
+import { temArte } from "@/components/conquistas/adesivos-arte";
+import { Fogo } from "@/components/conquistas/Fogo";
+import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
 
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
@@ -119,7 +126,7 @@ const metaDoChip = (c: ChipDaMissao): number => Number(/(\d+)/.exec(c.nome)?.[1]
 export type BracoDoPasso = "A" | "B" | null | undefined;
 export type ModoDoPasso = "dose" | "aprofundar";
 
-export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
+export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia, aoMostrarAdesivo, aoScoreAntes }: {
   missao: EstadoMissaoDoses;
   n: DiaDaMissao;
   modulo: ModuloDaMissao;
@@ -137,6 +144,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   aoAgoraNao?: () => void;
   /** braço B: a 3ª dose feita (ou um "aprofundar" feito) — fecha a festa */
   aoFecharDia?: () => void;
+  /** 1.0.16, braço A: a comemoração mostrou estes adesivos (ids do registro) — a missão guarda */
+  aoMostrarAdesivo?: (ids: string[]) => void;
+  /** 1.0.16, braço A (dose 2+): o score do dia quando a dose abriu — a dica do dia 2 ("foi de X pra Y") */
+  aoScoreAntes?: (score: number) => void;
 }) {
   const cfg = MODULOS[modulo];
   const alvoCfg: AlvoDaMissao | null = cfg.tipo ? alvoDaMissao(cfg.tipo) : null;
@@ -158,10 +169,18 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (modulo !== "financas" || modo !== "dose") return false;
     try { return deveMostrarMontarFinancas({ criadoEm: (user as { created_at?: string } | null)?.created_at, get, isGuest: !!isGuest }); } catch { return false; }
   });
+  /* Depois do "Pronto" do Montar a dose JÁ está feita (o número dela está no módulo). O 1º gasto pelo chip vem
+   * em seguida como um extra OPCIONAL (~5 s, desenho 8 4.2 passo 3): "Agora não" e o "Pular" da faixa vão direto
+   * pra comemoração (nunca contam como dose pulada), e a comemoração fala do número — o gasto entra de carona. */
+  const [montarFeito, setMontarFeito] = useState(false);
+  const montarFeitoRef = useRef(false);
+  const rotuloDoMontar = useRef("");
+  const [gastoExtra, setGastoExtra] = useState<string | null>(null);
   const subPassoRef = useRef(subPasso);
   subPassoRef.current = subPasso;
   const chips: ChipDaMissao[] = subPasso === "criar" ? CHIPS_DE_HABITO : subPasso === "marcar" ? [] : treinoPronto ? CHIPS_DE_TREINO : semMetaAgua ? CHIPS_DE_META_AGUA : (alvoCfg?.chips ?? []);
   const pergunta = subPasso === "criar" ? PERGUNTA_HABITO_VAZIO : subPasso === "marcar" ? PERGUNTA_HABITO_MARCAR
+    : montarFeito ? "E o gasto de hoje? Toca num:"
     : treinoPronto ? "Escolhe um treino pronto" : semMetaAgua ? "Quantos copos por dia?" : (alvoCfg?.pergunta ?? cfg.pedido);
   const chipTocado = useRef<ChipDaMissao | null>(null);
   const reduzir = !!useReducedMotion();
@@ -182,11 +201,13 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const t0 = useRef(Date.now());
   const segundos = () => Math.round((Date.now() - t0.current) / 1000);
 
-  // a página desce a altura da faixa enquanto o passo está na tela
+  // a página desce a altura da faixa enquanto o passo está na tela; `data-missao-dose` avisa quem precisa ficar
+  // quieto (toast/popup de adesivo, cartões de boas-vindas do módulo) — da faixa até a comemoração fechar
   useEffect(() => {
     document.documentElement.setAttribute("data-missao-doses-faixa", "1");
+    const soltarDose = marcarDoseNaTela();
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "view" }));
-    return () => { document.documentElement.removeAttribute("data-missao-doses-faixa"); };
+    return () => { document.documentElement.removeAttribute("data-missao-doses-faixa"); soltarDose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -208,6 +229,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     let abriuCampo = false;
     const procurar = () => {
       if (!vivo || faseRef.current !== "achar") return;
+      // o "Vamos montar suas Finanças" (da missão ou do módulo) ainda na tela: espera ele sair — sem gastar tentativa
+      if (document.documentElement.hasAttribute(ATRIBUTO_MONTAR_NA_TELA)) { timers.push(window.setTimeout(procurar, 300)); return; }
       const [principal, ...reservas] = passos;
       const el = principal ? document.querySelector(principal.seletor) : null;
       // passo A da Rotina: o alvo é a LINHA DO CAMPO "Nome do hábito..." — abre pelo botão "+ Hábito" (uma vez)
@@ -297,10 +320,17 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         via = "modulo";
       }
       faseRef.current = "registrou";
-      setRotulo(rot);
-      setNumero(num);
+      if (montarFeitoRef.current) {
+        // o gasto de carona depois do Montar: a dose continua sendo o número dela (o rótulo do Montar fica)
+        setGastoExtra(rot);
+        setRotulo(rotuloDoMontar.current);
+        setNumero(null);
+      } else {
+        setRotulo(rot);
+        setNumero(num);
+      }
       setFase("registrou");
-      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "feito", via, segundos: segundos() }));
+      trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: montarFeitoRef.current ? "gasto_extra" : "toque", acao: "feito", via, segundos: segundos() }));
       return;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,6 +343,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     timers.push(window.setTimeout(() => {
       if (faseRef.current !== "registrou") return;
       setAnelVivo(false);
+      // depois do Montar o número já foi mostrado: o gasto de carona vai direto pra comemoração (sem o "olhar").
+      // 1.0.16, braço A: a dose é curta (10–30 s, desenho 8 4.0) — sem o "olhar explicado" da 1.0.10 por cima
+      if (montarFeitoRef.current || (braco === "A" && modo === "dose")) { setFase("festa"); return; }
       const el = alvoCfg?.olhar?.achar() ?? null;
       if (el && visivel(el)) {
         // 10/10: rolagem VISÍVEL até o card (metade de baixo) → pausa → o anel acende e o balão entra → o número
@@ -422,7 +455,38 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pularPelaFaixa = () => aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos());
+  /* 1.0.16 (defeito 5): a âncora sumiu e o post-it ficou solto — o app continua procurando o alvo (o módulo
+   * pode estar remontando, ou montou tarde) e, achou, o anel volta sozinho: nada de depender do ⌖. */
+  useEffect(() => {
+    if (fase !== "anotar" || alvo || montarAberto) return;
+    let tentativas = 0;
+    const t = window.setInterval(() => {
+      tentativas += 1;
+      const el = reacharAlvo();
+      if (el) {
+        window.clearInterval(t);
+        setPerdeuAlvo(false); setAlvo(el); setAcende((x) => x + 1); setAnelVivo(true);
+        trackEvent("missao_doses_anel_voltou", eventoDaMissao({ dia: n, modulo, tentativas }));
+        return;
+      }
+      if (tentativas >= 40) window.clearInterval(t); // ~30 s: o post-it solto segue gravando pelos chips
+    }, 750);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, alvo, montarAberto, subPasso]);
+
+  /** Depois do Montar, "Agora não" (ou o "Pular" da faixa) = a dose está feita, sem o gasto de carona. */
+  const fecharSemGasto = () => {
+    if (faseRef.current !== "achar" && faseRef.current !== "anotar") return;
+    trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "gasto_extra", acao: "agora_nao", segundos: segundos() }));
+    faseRef.current = "festa";
+    setAnelVivo(false);
+    setFase("festa");
+  };
+  const pularPelaFaixa = () => {
+    if (montarFeitoRef.current) { fecharSemGasto(); return; }
+    aoPular("faixa_20s", faseRef.current === "olhar" ? "olhar" : "toque", segundos());
+  };
   const toqueNaFaixa = () => {
     toquesNaFaixa.current += 1;
     if (toquesNaFaixa.current >= 2) setPularVisivel(true);
@@ -471,9 +535,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
 
   const postIt = (
     <PostItDaMissao
-      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
+      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : montarFeito ? "Último toque · se quiser" : "Agora · 1 toque"}
       pergunta={pergunta}
-      descricao={cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
+      descricao={montarFeito ? "Ele entra no seu mês e o quanto dá pra gastar hoje já se ajusta."
+        : cfg.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
         : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
         : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
         : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
@@ -482,18 +547,27 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       aoChip={tocarChip}
       aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
       dica={chips.length && alvoCfg?.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+      secundaria={montarFeito ? { texto: "Agora não", aoTocar: fecharSemGasto, testid: "missao-doses-gasto-agora-nao" } : undefined}
     />
   );
 
   /* 1.0.16 — a dose de Finanças = "Vamos montar suas Finanças" (folha fixa abaixo da faixa da missão) */
   const montarPronto = (r: ResumoMontar) => {
-    setMontarAberto(false);
     const rot = r.semFolga || !(r.porDia > 0) ? `Renda e ${r.contas} ${r.contas === 1 ? "conta" : "contas"} do mês` : `Pode gastar R$ ${reais(Math.floor(r.porDia))} por dia`;
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos() }));
-    faseRef.current = "registrou";
+    // a tela substitui os cartões de Finanças (como no caminho do módulo, useMontarFinancasNoModulo.aoPronto)
+    try { marcarCartoesVistos("financas"); } catch { /* storage bloqueado */ }
+    rotuloDoMontar.current = rot;
+    montarFeitoRef.current = true;
     setRotulo(rot);
     setNumero(null);
-    setFase("festa");
+    setMontarFeito(true);
+    // a dose conta JÁ (fechar o app no gasto de carona não pode desfazer o Montar); a comemoração chama de
+    // novo no fim e a missão ignora a 2ª vez (o dia já está gravado)
+    aoFeito(rot, segundos());
+    // a dose está feita; o 1º gasto vem de carona (opcional): o "achar" volta a procurar o "+ Novo gasto"
+    // assim que o Montar sair da tela (o atributo <html data-montar-financas> some no desmontar)
+    setMontarAberto(false);
   };
   const montarPulou = () => {
     setMontarAberto(false);
@@ -503,6 +577,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   return (
     <>
       {createPortal(faixa, document.body)}
+      {/* braço A, dose 2+: o score de ANTES da dose (a dica do dia 2 conta "foi de X pra Y") */}
+      {braco === "A" && modo === "dose" && n >= 2 && missao.scoreAntes?.[n] === undefined && aoScoreAntes && <LerScoreDoDia aoLer={aoScoreAntes} />}
       {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onPular={montarPulou} />}
       {/* fora do AnimatePresence (um portal ali dentro era descartado: o post-it solto NUNCA montava) */}
       {!alvo && fase === "anotar" && !montarAberto && createPortal(
@@ -570,11 +646,27 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
             aoBoraProxima={aoBoraProxima}
             aoAgoraNao={aoAgoraNao}
             aoFecharDia={aoFecharDia}
+            aoMostrarAdesivo={aoMostrarAdesivo}
+            gastoExtra={gastoExtra}
           />
         )}
       </AnimatePresence>
     </>
   );
+}
+
+/** Lê o score do dia UMA vez (no instante em que a dose abre) e devolve pra missão. */
+function LerScoreDoDia({ aoLer }: { aoLer: (score: number) => void }) {
+  const dados = useLifeHubData();
+  const leu = useRef(false);
+  useEffect(() => {
+    if (leu.current) return;
+    leu.current = true;
+    const s = Number(dados.dayScore);
+    if (Number.isFinite(s)) aoLer(Math.round(s));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
 }
 
 /**
@@ -584,10 +676,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
  * fazer o toque de amanhã agora" leva pro próximo módulo. No dia 3: "Ver o que
  * você construiu".
  */
-export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia }: {
+export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoAmanhaAgora, aoVerFim, braco, modo = "dose", aoBoraProxima, aoAgoraNao, aoFecharDia, aoMostrarAdesivo, gastoExtra }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoAmanhaAgora: () => void; aoVerFim: () => void;
   braco?: BracoDoPasso; modo?: ModoDoPasso; aoBoraProxima?: () => void; aoAgoraNao?: () => void; aoFecharDia?: () => void;
+  /** braço A: os ids dos adesivos que esta comemoração mostrou */
+  aoMostrarAdesivo?: (ids: string[]) => void;
+  /** braço A, Finanças: o gasto que entrou de carona depois do Montar ("Café · R$ 12") */
+  gastoExtra?: string | null;
 }) {
   const reduzir = !!useReducedMotion();
   const cfg = MODULOS[modulo];
@@ -600,11 +696,11 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
     : B ? (n === 1 ? "Primeira dose feita!" : n === 2 ? "Segunda dose feita!" : "Terceira dose feita!")
     : n === 1 ? "Primeiro registro feito!" : n === 2 ? "Dia 2 feito!" : "Missão cumprida!";
 
-  /* 1.0.16 — BRAÇO A ("uma dose por dia", desenho 8 seção 4.2): comemoração PEQUENA nos dias 1 e 2 (cartão
-     de baixo, sem confete), com o adesivo do dia num aviso pequeno e o de amanhã TRANCADO; no dia 3, a ÚNICA
-     festa em tela cheia do teste — o adesivo "3 dias seguidos" (ou "Missão completa", se pulou um dia). */
+  /* 1.0.16 — BRAÇO A ("uma dose por dia", desenho 8 seção 4.2/4.4): comemoração PEQUENA (folha de baixo,
+     sem confete) com o adesivo REAL que a dose abriu e o de amanhã TRANCADO; a ÚNICA festa em tela cheia do
+     teste é a do adesivo "3 dias seguidos" (adesivo-da-dose.tsx). */
   if (braco === "A" && modo === "dose") {
-    return <ComemoracaoUmPorDia n={n} missao={missao} modulo={modulo} rotulo={rotulo} hoje={hoje} aoCombinar={aoCombinar} aoVerFim={aoVerFim} aoFecharDia={aoFecharDia} />;
+    return <ComemoracaoUmPorDia n={n} missao={missao} modulo={modulo} rotulo={rotulo} hoje={hoje} aoCombinar={aoCombinar} aoVerFim={aoVerFim} aoFecharDia={aoFecharDia} aoMostrarAdesivo={aoMostrarAdesivo} gastoExtra={gastoExtra} />;
   }
 
   /* APROFUNDAR (B, dias 2–3): festa curta — o que ela fez já está no módulo; "Fechar". */
@@ -635,7 +731,10 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
         <span className="inline-block rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${TOTAL_PASSOS_B} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
         <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
-          {cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}
+          {/* 1.0.16: a dose de Finanças virou o Montar (nos dois braços) — o texto do "olhar" fala de um gasto que talvez não exista */}
+          {modulo === "financas" && /^(Pode gastar|Renda e )/.test(rotulo)
+            ? <>{cfg.emoji} {fraseDoFeito(modulo, rotulo)}</>
+            : <>{cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}. {cfg.olhar.texto}</>}
         </p>
         <div className="h-2 rounded-full bg-black/10 overflow-hidden mt-3.5">
           <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
@@ -696,38 +795,83 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
   );
 }
 
-/** O adesivo que a dose n do braço A dá (só dado/evento — a tela de Conquistas mora em outro lugar). */
-export const adesivoDaDose = (n: DiaDaMissao, seguidos: number): { id: string; nome: string } =>
-  n === 3 && seguidos >= 3 ? { id: "missao_3_seguidos", nome: "3 dias seguidos" } : { id: `missao_dia_${n}`, nome: `Dia ${n}` };
+/**
+ * A frase do que a dose deixou feito, do jeito que se fala ("Você pode gastar R$ 61 por dia — e isso já está
+ * nas suas Finanças."). `rotulo` é o que a missão grava no dia (o da Rotina é o nome do hábito; o da Saúde
+ * sem meta traz a meta escolhida; o do Montar, o número dela).
+ */
+export function fraseDoFeito(modulo: ModuloDaMissao, rotulo: string): string {
+  const cfg = MODULOS[modulo];
+  const r = rotulo.trim();
+  if (modulo === "financas") {
+    const porDia = /^Pode gastar (R\$ [\d.,]+) por dia$/.exec(r);
+    if (porDia) return `Você pode gastar ${porDia[1]} por dia — e isso já está nas suas Finanças.`;
+    if (/^Renda e /.test(r)) return `${r} — tudo já está nas suas Finanças.`;
+    return `${r} já está nas suas Finanças.`;
+  }
+  if (modulo === "rotina") return `“${r}” já está na sua Rotina, com o quadradinho de hoje marcado.`;
+  if (modulo === "saude") {
+    const meta = /meta (\d+)/.exec(r);
+    return meta ? `1 copo d'água marcado. Sua meta agora é de ${meta[1]} copos por dia.` : "1 copo d'água marcado na sua Saúde.";
+  }
+  if (modulo === "treino") return `O treino “${r}” já está montado na sua semana.`;
+  return `“${r}” já está ${cfg.onde}.`;
+}
 
-/** A sequência da missão contando a dose que acabou de sair (o estado pode ainda não ter gravado). */
-const seguidosCom = (missao: EstadoMissaoDoses, n: DiaDaMissao, hoje: string, rotulo: string): number =>
-  sequenciaDaMissao({ ...missao, feitos: { ...missao.feitos, [n]: missao.feitos[n] ?? { dia: hoje, rotulo } } }, hoje);
+/** O gasto de carona depois do Montar ("Café · R$ 12") numa frase. */
+export const fraseDoGastoExtra = (g: string): string => {
+  const m = /^(.+?) · (R\$ .+)$/.exec(g.trim());
+  return m ? `E o gasto de hoje (${m[1]}, ${m[2]}) já entrou no seu mês.` : `E “${g.trim()}” já entrou no seu mês.`;
+};
 
-function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia }: {
+/** O próximo adesivo da sequência, TRANCADO (a silhueta do de amanhã): o do registro, se tiver arte; senão o fogo apagado. */
+function AdesivoDeAmanha({ dias, tamanho }: { dias: 2 | 3; tamanho: number }) {
+  const conq = useConquistas();
+  const id = `sequencia-${dias}`;
+  const b = conq.adesivos.find((x) => x.id === id);
+  if (b && temArte(id)) return <span aria-hidden data-testid="missao-doses-adesivo-amanha" data-adesivo={id}><AdesivoRaro id={id} raridade={b.raridade ?? "comum"} tamanho={tamanho} trancado /></span>;
+  return <span aria-hidden className="md-adesivo-fogo" data-trancado="" style={{ width: tamanho, height: tamanho }} data-testid="missao-doses-adesivo-amanha" data-adesivo={id}><Fogo dias={0} tamanho={Math.round(tamanho * 0.62)} /></span>;
+}
+
+/** A legenda do adesivo na comemoração pequena. */
+const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: number): string | null => {
+  if (!a) return null;
+  if (a.tipo === "recomeca") return "Voltou! A sequência recomeça hoje.";
+  if (a.tipo === "marca") return "Seu dia 1 ficou marcado.";
+  return `Adesivo novo: ${a.nome}${extras ? ` e mais ${extras}` : ""}`;
+};
+
+function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, gastoExtra }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoVerFim: () => void; aoFecharDia?: () => void;
+  aoMostrarAdesivo?: (ids: string[]) => void; gastoExtra?: string | null;
 }) {
   const reduzir = !!useReducedMotion();
   const cfg = MODULOS[modulo];
   const proximo = n === 1 ? MODULOS[missao.modulos[1]] : n === 2 ? MODULOS[missao.modulos[2]] : null;
-  const seguidos = seguidosCom(missao, n, hoje, rotulo);
-  const adesivo = adesivoDaDose(n, seguidos);
+  const escolha = useAdesivoDaDose(n, modulo, missao.adesivosMostrados, aoMostrarAdesivo);
+  const seq = useSequencia();
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
+  const frase = fraseDoFeito(modulo, rotulo);
+  void hoje;
 
-  if (n === 3) {
+  /* A ÚNICA festa em tela cheia do teste: o adesivo "3 dias seguidos" */
+  if (escolha.telaCheia && escolha.principal && escolha.principal.tipo !== "recomeca") {
+    const a = escolha.principal;
     return createPortal(
-      <motion.div className="fixed inset-0 z-[230] flex flex-col items-center justify-center px-6 text-center text-white" style={{ background: "linear-gradient(180deg,#2a1840 0%,#16121c 100%)", paddingTop: "var(--app-safe-top)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={3} data-braco="A" data-tela-cheia="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="fixed inset-0 z-[230] flex flex-col items-center justify-center px-6 text-center text-white" style={{ background: "linear-gradient(180deg,#2a1840 0%,#16121c 100%)", paddingTop: "var(--app-safe-top)", paddingBottom: "var(--app-safe-bottom, 0px)" }}
+        role="dialog" aria-modal="true" aria-label="3 dias seguidos"
+        data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-tela-cheia="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <Confete />
-        <motion.div initial={reduzir ? false : { scale: 0.6, rotate: -8, opacity: 0 }} animate={{ scale: 1, rotate: -3, opacity: 1 }} transition={{ type: "spring", stiffness: 220, damping: 14, delay: 0.1 }}
-          className="w-40 h-40 rounded-[28px] grid place-items-center text-[64px] shadow-[0_24px_60px_-20px_rgba(0,0,0,.8)]" style={{ background: "#FFF4C2" }} data-testid="missao-doses-adesivo" data-adesivo={adesivo.id}>
-          {adesivo.id === "missao_3_seguidos" ? "🔥" : "🏆"}
+        <motion.div initial={reduzir ? false : { scale: 0.6, rotate: -10, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 220, damping: 14, delay: 0.1 }}
+          data-testid="missao-doses-adesivo" data-adesivo={a.id}>
+          <ArteDoAdesivo adesivo={a} tamanho={156} />
         </motion.div>
         <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white/60 mt-6">Adesivo novo</p>
-        <p className="text-[30px] font-black tracking-[-0.02em] leading-tight mt-1">{adesivo.id === "missao_3_seguidos" ? "3 dias seguidos!" : "Missão completa!"}</p>
-        <p className="text-[14px] text-white/80 leading-snug mt-2 max-w-[320px]" data-testid="missao-doses-festa-texto">
-          {cfg.emoji} <b className="text-white">{rotulo}</b> já está {cfg.onde}. {adesivo.id === "missao_3_seguidos" ? "Você usou o CORE 3 dias seguidos — é isso que faz o hábito pegar." : "Os 3 passos estão feitos. A sequência recomeça a cada dia que você volta."}
-        </p>
+        <p className="text-[30px] font-black tracking-[-0.02em] leading-tight mt-1">3 dias seguidos!</p>
+        <p className="text-[15px] text-white/85 leading-snug mt-2 max-w-[320px]">Você usou o CORE três dias seguidos. É assim que um hábito pega.</p>
+        <p className="text-[13px] text-white/60 leading-snug mt-3 max-w-[320px]" data-testid="missao-doses-festa-texto">{cfg.emoji} {frase}</p>
+        {escolha.extras.length > 0 && <p className="text-[12.5px] text-white/60 mt-2" data-testid="missao-doses-adesivo-extras">E mais {escolha.extras.length} {escolha.extras.length === 1 ? "adesivo" : "adesivos"} na sua coleção.</p>}
         <button type="button" className="md-botao mt-7 max-w-[320px]" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>
           Ver o que você construiu <ArrowRight className="w-4 h-4" />
         </button>
@@ -736,44 +880,59 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
     );
   }
 
+  const a = escolha.principal;
+  const legenda = legendaDoAdesivo(a, escolha.extras.length);
+  const comArte = !!a && a.tipo !== "recomeca";
+  const fechaMissao = n === 3 || !proximo;
   return createPortal(
-    <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pb-6 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.45)" }} data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+    <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
+      role="dialog" aria-modal="true" aria-label={`Dia ${n} de 3 feito`}
+      data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
       <motion.div initial={reduzir ? false : { y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
-        className="relative w-full max-w-[360px] rounded-3xl bg-white p-5 text-left text-[#16121c] shadow-2xl">
-        <motion.div initial={reduzir ? false : { y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.35 }}
-          className="absolute -top-4 right-4 rounded-full bg-[#16121c] text-white text-[12px] font-extrabold px-3 py-1.5 shadow-lg" data-testid="missao-doses-adesivo" data-adesivo={adesivo.id}>
-          🏷️ Adesivo · {adesivo.nome}
-        </motion.div>
-        <div className="flex items-center gap-1.5">
+        className="md-tema relative w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-left shadow-2xl">
+        {comArte && a && (
+          <motion.div initial={reduzir ? false : { y: -10, rotate: -14, scale: 0.7, opacity: 0 }} animate={{ y: 0, rotate: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 15, delay: 0.25 }}
+            className="absolute -top-7 right-4" data-testid="missao-doses-adesivo" data-adesivo={a.id}>
+            <ArteDoAdesivo adesivo={a} tamanho={68} />
+          </motion.div>
+        )}
+        <div className="flex items-center gap-1.5" role="img" aria-label={`${n} de 3 dias feitos`}>
           {[1, 2, 3].map((i) => <Quadradinho key={i} marcado={i <= n} tam={16} />)}
         </div>
-        <p className="text-[22px] font-black tracking-[-0.02em] leading-tight mt-2">Dia {n} de 3 feito ✅</p>
-        {n === 2 && seguidos >= 2 && <p className="text-[14px] font-extrabold mt-0.5" data-testid="missao-doses-sequencia">Sequência: {seguidos} dias 🔥</p>}
-        <p className="text-[13.5px] text-[#4f5a64] leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
-          {cfg.emoji} <b className="text-[#16121c]">{rotulo}</b> já está {cfg.onde}.
-        </p>
+        <p className="text-[22px] font-black tracking-[-0.02em] leading-tight mt-2 pr-16">Dia {n} de 3 feito ✅</p>
+        {legenda && <p className="text-[13.5px] font-bold leading-snug mt-1 pr-16" data-testid="missao-doses-adesivo-legenda">{legenda}</p>}
+        {n >= 2 && seq.dias >= 2 && <p className="text-[13.5px] font-extrabold mt-1" data-testid="missao-doses-sequencia">Sequência: {seq.dias} dias 🔥</p>}
+        <p className="text-[13.5px] text-muted-foreground leading-snug mt-2" data-testid="missao-doses-festa-texto">{cfg.emoji} {frase}</p>
+        {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra)}</p>}
         {proximo && (
-          <div className="mt-3.5 rounded-2xl px-4 py-3" style={{ background: "#FFF8D6" }} data-testid="missao-doses-amanha">
-            <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {DOSE_CURTA[proximo.modulo].seg} s</span>
-            <span className="block text-[12px] text-[#4f5a64] mt-0.5">{n === 1 ? "e o adesivo do dia 2 🔒" : "e o adesivo 3 dias seguidos é seu 🔒"}</span>
-            {n === 2 && (
-              <>
-                <span className="block text-[12px] text-[#4f5a64] mt-2">Te lembro às:</span>
-                <div className="flex flex-wrap gap-2 mt-1.5" role="radiogroup" aria-label="Hora do lembrete">
-                  {HORAS_DO_LEMBRETE.map((h) => (
-                    <button key={h.id} type="button" role="radio" aria-checked={hora === h.id} className="md-hora" data-marcada={hora === h.id ? "" : undefined} data-sem={h.id === "sem" ? "" : undefined} data-testid={`missao-doses-hora-${h.id}`} onClick={() => setHora(h.id)}>{h.rotulo}</button>
-                  ))}
-                </div>
-              </>
-            )}
+          <div className="mt-3.5 rounded-2xl px-4 py-3 flex items-center gap-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {DOSE_CURTA[proximo.modulo].seg} s</span>
+              <span className="block text-[12px] opacity-75 mt-0.5">{n === 1 ? "E o adesivo do dia 2 fica te esperando 🔒" : "E o adesivo dos 3 dias seguidos é seu 🔒"}</span>
+            </span>
+            <AdesivoDeAmanha dias={n === 1 ? 2 : 3} tamanho={40} />
           </div>
         )}
-        {n === 2 ? (
-          <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
+        {n === 2 && proximo && (
+          <>
+            <span className="block text-[12px] text-muted-foreground mt-3">Te lembro às:</span>
+            <div className="flex flex-wrap gap-2 mt-1.5" role="radiogroup" aria-label="Hora do lembrete">
+              {HORAS_DO_LEMBRETE.map((h) => (
+                <button key={h.id} type="button" role="radio" aria-checked={hora === h.id} className="md-hora" data-marcada={hora === h.id ? "" : undefined} data-sem={h.id === "sem" ? "" : undefined} data-testid={`missao-doses-hora-${h.id}`} onClick={() => setHora(h.id)}>{h.rotulo}</button>
+              ))}
+            </div>
+          </>
+        )}
+        {fechaMissao ? (
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>
+            Ver o que você construiu <ArrowRight className="w-4 h-4" />
+          </button>
+        ) : n === 2 ? (
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
             {hora === "sem" ? "Combinado, até amanhã" : `Combinado, me lembra às ${hora}`}
           </button>
         ) : (
-          <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-continuar" onClick={aoFecharDia}>
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-continuar" onClick={aoFecharDia}>
             Continuar <ArrowRight className="w-4 h-4" />
           </button>
         )}

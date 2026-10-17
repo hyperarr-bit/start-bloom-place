@@ -4,7 +4,8 @@ import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { DOSE_CURTA, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { DOSE_CURTA, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { AREAS, type AreaKey } from "@/lib/funnel";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
 const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
@@ -13,6 +14,11 @@ const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
   viagens: "um destino", relacionamentos: "uma pessoa", pet: "o seu pet", detox: "um hábito de detox",
 };
 import "./missao-doses.css";
+
+/** "pelas Finanças", "pela Rotina", "pelo Treino" — o artigo certo de cada módulo da 1ª dose. */
+const PELO_MODULO: Partial<Record<ModuloDaMissao, string>> = {
+  financas: "pelas Finanças", rotina: "pela Rotina", treino: "pelo Treino", saude: "pela Saúde", desenvolvimento: "pelas Metas", dieta: "pela Dieta",
+};
 
 type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
 
@@ -23,9 +29,9 @@ type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
  * link de texto logo ACIMA dele. Fora do fluxo que rola: o conteúdo rola, o
  * botão não sai do lugar. Vale pros dois braços (é só posição).
  */
-function RodapeColado({ children }: { children: ReactNode }) {
+function RodapeColado({ children, tema = false }: { children: ReactNode; tema?: boolean }) {
   return (
-    <div className="shrink-0 px-6 pt-3 bg-white/95 backdrop-blur-sm" style={{ paddingBottom: "calc(var(--app-safe-bottom, 0px) + 24px)" }} data-testid="missao-doses-rodape">
+    <div className={`shrink-0 px-6 pt-3 backdrop-blur-sm ${tema ? "bg-background/95" : "bg-white/95"}`} style={{ paddingBottom: "calc(var(--app-safe-bottom, 0px) + 24px)" }} data-testid="missao-doses-rodape">
       <div className="max-w-[420px] mx-auto">{children}</div>
     </div>
   );
@@ -204,18 +210,21 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   if (braco === "A") {
     const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
     const seg1 = DOSE_CURTA[modulos[0]].seg;
+    // "A gente começa pelas Finanças, que foi o que você escolheu." — só se a 1ª dose ainda é a da área escolhida
+    const areaDaPorta = areaNome ? (Object.keys(AREAS) as AreaKey[]).find((k) => AREAS[k].nome === areaNome) : undefined;
+    const comecaPelaArea = !!areaDaPorta && MODULO_DA_AREA[areaDaPorta] === modulos[0];
     return (
-      <div className="fixed inset-0 z-[240] flex flex-col text-[#16121c]" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ background: "linear-gradient(180deg,#eaf5fd 0%,#ffffff 55%)", paddingTop: "var(--app-safe-top)" }}>
+      <div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}>
         <Confete />
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[9vh] pb-4">
+          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[8vh] pb-4">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 17, delay: 0.1 }} className="w-16 h-16 rounded-full bg-emerald-500 grid place-items-center mb-4 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
               <Check className="w-8 h-8 text-white" strokeWidth={3.5} />
             </motion.div>
             <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
-            <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.</p>
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64] mt-7">Seu plano de 3 dias</p>
-            <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
+            <p className="text-[15.5px] text-muted-foreground mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">Seus 3 dias grátis começaram. Os 16 módulos já estão abertos.</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-7">Seu plano de 3 dias</p>
+            <div className="mt-2 rounded-2xl bg-card border border-border/60 shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
               {linhas.map(({ n, cfg }) => (
                 <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
                   <Quadradinho marcado={false} tam={18} />
@@ -223,10 +232,13 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                 </div>
               ))}
             </div>
-            {areaNome && <p className="text-[12.5px] text-[#4f5a64] mt-3">Você escolheu <b className="text-[#16121c]">{areaNome}</b> — ela vem primeiro.</p>}
+            <p className="text-[12.5px] text-muted-foreground mt-3 leading-snug" data-testid="missao-doses-boas-vindas-nota">
+              {comecaPelaArea ? <>A gente começa {PELO_MODULO[modulos[0]] ?? `por ${MODULOS[modulos[0]].nome}`}, que foi o que você escolheu. </> : null}
+              Um passo por dia. O resto do app fica livre pra você mexer quando quiser.
+            </p>
           </div>
         </div>
-        <RodapeColado>
+        <RodapeColado tema>
           <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
             Começar ({seg1} s) <ArrowRight className="w-4 h-4" />
           </button>

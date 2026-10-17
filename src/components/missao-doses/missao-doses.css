@@ -48,3 +48,22 @@ button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 5
 .md-hora[data-marcada] { background: #16121c; color: #fff; }
 .md-hora[data-sem] { border-color: rgba(22,18,28,.35); color: rgba(22,18,28,.55); }
 .md-hora[data-sem][data-marcada] { background: rgba(22,18,28,.75); color: #fff; }
+
+/* 1.0.16, braço A — as folhas da missão seguem o tema do app (claro/escuro): `.md-tema` no cartão. As horas do
+   lembrete viram pílulas da cor do papel (no escuro, branco no branco sumia). O braço B não usa `.md-tema`. */
+.dark .md-tema .md-hora { background: transparent; border-color: hsl(var(--foreground) / .7); color: hsl(var(--foreground)); }
+.dark .md-tema .md-hora[data-marcada] { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.dark .md-tema .md-hora[data-sem] { border-color: hsl(var(--foreground) / .3); color: hsl(var(--foreground) / .6); }
+.dark .md-tema .md-hora[data-sem][data-marcada] { background: hsl(var(--foreground) / .75); color: hsl(var(--background)); }
+.dark .md-tema button.md-botao:not([data-tom]), .dark .md-tema .md-botao:not([data-tom]) { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+
+/* A marca "Dia 1" (o dia 1 sem adesivo de 1º registro): um carimbo de planner, sem id de adesivo nenhum. */
+.md-marca-dia { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: .9; font-weight: 900; letter-spacing: -.02em; color: #16121c; background: #FFF4C2; border: 2.5px solid #16121c; border-radius: 22%; box-shadow: 0 0 0 3px #fff, 0 8px 18px -8px rgba(0,0,0,.45); transform: rotate(-6deg); }
+.md-marca-dia small { display: block; font-weight: 800; letter-spacing: .14em; margin-bottom: 2px; }
+/* O adesivo da sequência sem arte própria (reserva até o ramo das Conquistas): o fogo genérico num recorte de adesivo. */
+.md-adesivo-fogo { position: relative; display: inline-grid; place-items: center; border-radius: 50%; background: #fff6e6; box-shadow: 0 0 0 3px #fff, 0 8px 18px -8px rgba(0,0,0,.45); transform: rotate(-6deg); }
+.md-adesivo-fogo b { position: absolute; right: 8%; bottom: 4%; min-width: 1.6em; height: 1.6em; padding: 0 .3em; border-radius: 999px; background: #16121c; color: #fff; display: grid; place-items: center; font-weight: 900; line-height: 1; }
+.md-adesivo-fogo[data-trancado] { background: hsl(var(--muted)); box-shadow: 0 0 0 2px hsl(var(--background)); transform: none; opacity: .85; }
+/* O fundo das boas-vindas do braço A: o azul-céu de sempre no claro; no escuro, o papel do tema (sem tela branca à noite). */
+.md-fundo-boas { background: linear-gradient(180deg, #eaf5fd 0%, #ffffff 55%); }
+.dark .md-fundo-boas { background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 60%); }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
@@ -11,10 +11,10 @@ import { EVENTO_DIA2, LEMBRETE_DO_PLANO, combinarHora } from "@/lib/lembrete-dia
 import { agendarProximaDose, pedirPermissaoDia2 } from "@/lib/notificacoes";
 import { bracoDia1, guardarForcaDia1Cheio, modoUmPorDia, type PlanoAmanha } from "@/lib/dia1-cheio";
 import { pedirAvaliacaoPorMissao, type MotivoDaMissao } from "@/lib/avaliacao";
-import { EVENTO_TOUR_HOME_FIM, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
+import { EVENTO_TOUR_HOME_FIM, deveMostrarTourHome, tourFeito, tourHomeLigado, tourSemMaisAberturas } from "@/lib/tour-home";
 import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
-  missaoDaConta, missaoValida, precisaPlanoA, sequenciaDaMissao,
+  definirDonoDaMissao, missaoDaConta, missaoValida, precisaPlanoA,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "@/lib/missao-doses";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -25,9 +25,7 @@ import { PlanoDeAmanha } from "./PlanoDeAmanha";
 import { ConviteDoDia } from "./ConviteDoDia";
 import { PlanoDeAmanhaA } from "./PlanoDeAmanhaA";
 import { DicaDoDia } from "./DicaDoDia";
-import { adesivoDaDose } from "./PassoDoDia";
 import { missaoAtual } from "@/lib/teste-gratis";
-import { deveMostrarTourHome } from "@/lib/tour-home";
 import "./missao-doses.css";
 
 /**
@@ -65,6 +63,16 @@ const pedirNotaDepois = (motivo: MotivoDaMissao): void => {
     try { void pedirAvaliacaoPorMissao(motivo).catch(() => false); } catch { /* a avaliação nunca derruba a missão */ }
   }, ESPERA_AVALIACAO_MS);
 };
+/**
+ * 1.0.16 (4.8): define o DONO da missão pra sessão ANTES das rotas renderizarem (App monta isto antes do
+ * <Routes>) — assim a Home, o tour e os Momentos já leem a missão filtrada pela conta logada no 1º render.
+ */
+export function DonoDaMissaoNaSessao() {
+  const auth = useAuthOpcional();
+  definirDonoDaMissao(auth?.user?.id);
+  return null;
+}
+
 export function MissaoDosesNaWeb() {
   const { search } = useLocation();
   // a força de QA pelo link, em qualquer rota (o link do dono pode cair em qualquer página)
@@ -114,6 +122,8 @@ function FaixaDoPasso4() {
 
 function Ligada() {
   const { user, isSubscribed } = useAuth();
+  // 1.0.16 (4.8): a missão de OUTRA conta deste aparelho some pra todo mundo que lê (lerMissao filtra pelo dono)
+  definirDonoDaMissao(user?.id);
   /* 10/10 (build 38, achado na prova da Porta no Simulador): no APP, conta nova SEM assinatura (entrou pelo
    * "Entrar" ou pelo link da Porta, antes de pagar) caía no gate do paywall com o "Tá dentro! Seus 3 dias
    * grátis começaram agora" piscando por cima — e a missão nascia antes do teste existir. A missão é do
@@ -193,15 +203,24 @@ function Ligada() {
     }));
   }, [user, loaded, missao, hoje, semAcessoNoApp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* 1.0.16 (4.8): a cópia da missão na conta acompanha cada mudança (sobe pro user_data) */
+  /* 1.0.16 (4.8): a cópia da missão na conta acompanha cada mudança (sobe pro user_data). Escrita de SISTEMA:
+     mexer na missão (ver as boas-vindas, o convite) não é registro da pessoa — não conta dia na sequência. */
   const missaoJson = missao ? JSON.stringify(missao) : null;
   useEffect(() => {
     if (!loaded || !missao || !missao.dono) return;
     try {
       const atual = get<unknown>(CHAVE_MISSAO_NA_CONTA, null);
-      if (JSON.stringify(atual ?? null) !== missaoJson) gravarNaConta(CHAVE_MISSAO_NA_CONTA, missao);
+      if (JSON.stringify(atual ?? null) !== missaoJson) gravarNaConta(CHAVE_MISSAO_NA_CONTA, missao, { system: true });
     } catch { /* nunca derruba a missão */ }
   }, [loaded, missaoJson]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 1.0.16, braço A: quem tocou "Explorar por conta própria" ganha o tour curto na 1ª VOLTA à Home (desenho 8,
+     7c) — não no mesmo segundo do "Explorar". Aqui só se marca que ela saiu da Home uma vez. */
+  useEffect(() => {
+    if (!missao || !ehUmPorDia(missao) || !missao.explorou || missao.saiuDaHome || pathname === "/home") return;
+    const m = lerMissao();
+    if (m && !m.saiuDaHome) { const novo = { ...m, saiuDaHome: true }; gravarMissao(novo); setMissao(novo); }
+  }, [pathname, missao]);
 
   /* ── O 4º PASSO (B): o tour da Home. Quando ele termina (EVENTO_TOUR_HOME_FIM) a missão fecha:
      `missao_dose_concluida indice=4 modulo=home` + `missao_completa`. Se o tour não existe pra esta
@@ -220,7 +239,8 @@ function Ligada() {
       try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_COMPLETA, { detail: { variante: m.braco } })); } catch { /* noop */ }
       if (via === "tour") pedirNotaDepois("missao_completa");
     };
-    if (!tourHomeLigado() || tourFeitoNesteAparelho()) { concluir("sem_tour"); return; }
+    // (1.0.16) feito neste aparelho OU na conta (reinstalou): o tour não volta — o 4º passo fecha em silêncio
+    if (!tourHomeLigado() || tourFeito(get) || tourSemMaisAberturas()) { concluir("sem_tour"); return; }
     const aoFim = () => concluir("tour");
     window.addEventListener(EVENTO_TOUR_HOME_FIM, aoFim);
     return () => window.removeEventListener(EVENTO_TOUR_HOME_FIM, aoFim);
@@ -238,7 +258,7 @@ function Ligada() {
   const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje);
   const [conviteLivre, setConviteLivre] = useState(false);
   /* 1.0.16, braço A — a folha "Plano de amanhã" (dia 1): depois da dose, da comemoração e do tour curto */
-  const tourPendente = (() => { try { return deveMostrarTourHome(user?.created_at); } catch { return false; } })();
+  const tourPendente = (() => { try { return !tourFeito(get) && deveMostrarTourHome(user?.created_at); } catch { return false; } })();
   const planoADevido = !!missao && pathname === "/home" && !emCurso && precisaPlanoA(missao, hoje) && !tourPendente;
   const [planoALivre, setPlanoALivre] = useState(false);
   useEffect(() => {
@@ -406,7 +426,7 @@ function Ligada() {
 
   /* 1.0.16, braço A — a dica de 1 balão do dia */
   if (diaDaDica && dicaLivre) {
-    return <DicaDoDia dia={diaDaDica} aoFechar={() => { const m = lerMissao() ?? missao; salvar({ ...m, dicas: { ...m.dicas, [diaDaDica]: hoje } }); }} />;
+    return <DicaDoDia dia={diaDaDica} scoreAntes={missao.scoreAntes?.[diaDaDica]} aoFechar={() => { const m = lerMissao() ?? missao; salvar({ ...m, dicas: { ...m.dicas, [diaDaDica]: hoje } }); }} />;
   }
 
   /* D8 — no braço B só a partir do dia 3 (as 3 doses foram no dia 1; "em 3 dias" só faz sentido no 3º) */
@@ -429,7 +449,9 @@ function Ligada() {
 
   /* D3/D4/D7: o passo do dia, dentro do módulo dele */
   const passo: Passo | null = emCurso ?? candidato;
-  if (passo && (passo.modo === "aprofundar" || !missao.feitos[passo.n] || emCurso)) {
+  // (1.0.16) a dose só monta com o dado da conta carregado: ela decide no mount o que a conta tem (Finanças vazia →
+  // Montar; Rotina sem hábito → criar; Saúde sem meta → a meta no chip) — com o cache vazio decidiria errado
+  if (loaded && passo && (passo.modo === "aprofundar" || !missao.feitos[passo.n] || emCurso)) {
     const n = passo.n;
     const fechar = () => setEmCurso(null);
     const irParaProxima = () => {
@@ -462,18 +484,9 @@ function Ligada() {
           const feitos = { ...m.feitos, [n]: { dia: hoje, rotulo } };
           const tresDoses = !!(feitos[1] && feitos[2] && feitos[3]);
           // A: 3 doses = missão completa. B: falta o 4º passo (a Home) — `completaEm` só depois dele.
-          // 1.0.16, braço A: o adesivo do dia (só dado/evento; a tela de Conquistas mora em outro lugar)
-          let adesivos = m.adesivos;
-          if (ehUmPorDia(m)) {
-            const seguidos = sequenciaDaMissao({ ...m, feitos }, hoje);
-            const ad = adesivoDaDose(n, seguidos);
-            if (!(m.adesivos ?? []).includes(ad.id)) {
-              adesivos = [...(m.adesivos ?? []), ad.id];
-              trackEvent("adesivo_desbloqueado", eventoDaMissao({ id: ad.id, origem: `missao_dia_${n}` }));
-            }
-            if (seguidos >= 2) trackEvent("sequencia_marco", eventoDaMissao({ dias: seguidos, origem: "missao" }));
-          }
-          salvar({ ...m, feitos, ...(adesivos ? { adesivos } : {}), ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
+          // (1.0.16: o adesivo NÃO é dado aqui — quem dá é o registro de Conquistas, pela regra do adesivo; a
+          // comemoração só mostra o que abriu: adesivo-da-dose.tsx, evento `missao_adesivo_mostrado`)
+          salvar({ ...m, feitos, ...(tresDoses && m.braco && !ehBracoB(m) ? { completaEm: hoje } : {}) });
           trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: n, dia_relogio: dia, modulo: passo.modulo, segundos, rotulo }));
           // 10/10 (DIA1_CHEIO): os eventos do teste, só com a chave ligada (eventoDaMissao põe `variante`)
           if (m.braco && eventoDaMissao().variante) {
@@ -528,9 +541,10 @@ function Ligada() {
           const m = lerMissao() ?? missao;
           salvar({ ...m, agoraNao: { dia: hoje, indice: n } });
           trackEvent("missao_agora_nao", eventoDaMissao({ indice: n }));
-          // a próxima dose volta em 3 h, na faixa da missão (não pede permissão; sem ela, fica só o Lembrete do dia 2)
+          // a próxima dose volta em 3 h, na faixa da missão (não pede permissão; sem ela, fica só o Lembrete do dia 2).
+          // SÓ no braço B (o "Agora não" nem existe no A — desenho 8 4.6: o 900002 sai do braço A; a guarda é explícita)
           const prox = passoPendente(m);
-          if (prox && isNativeShell()) {
+          if (prox && isNativeShell() && !ehUmPorDia(m)) {
             const cfg = MODULOS[prox.modulo];
             void agendarProximaDose({ indice: prox.n, nome: cfg.nome, emoji: cfg.emoji, pedido: cfg.pedido, rota: cfg.rota })
               .then((r) => trackEvent("missao_proxima_dose_armada", eventoDaMissao(r.ok === true ? { ok: true, indice: prox.n, em: r.quando.toISOString() } : { ok: false, indice: prox.n, motivo: r.motivo })))
@@ -541,6 +555,18 @@ function Ligada() {
         aoFecharDia={() => {
           fechar();
           navigate("/home"); // B: "Arrumar minha Home" → o tour é o 4º passo
+        }}
+        /* ── braço A (1.0.16) ── */
+        aoMostrarAdesivo={(ids) => {
+          const m = lerMissao() ?? missao;
+          const ja = m.adesivosMostrados ?? [];
+          const novos = ids.filter((id) => !ja.includes(id));
+          if (novos.length) salvar({ ...m, adesivosMostrados: [...ja, ...novos] });
+        }}
+        aoScoreAntes={(score) => {
+          const m = lerMissao() ?? missao;
+          if (m.scoreAntes?.[n] !== undefined) return;
+          salvar({ ...m, scoreAntes: { ...m.scoreAntes, [n]: score } });
         }}
       />
     );

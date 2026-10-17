@@ -341,6 +341,9 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
         </button>
       </div>
 
+      {/* 1.0.16 (braço A): a dose de hoje fica à vista mesmo com a lista fechada — é a ÚNICA presença da missão
+          na Home (nenhum card novo); aberta, ela é a 1ª linha da lista */}
+      {dose && !isOpen && <LinhaDoseDeHoje dose={dose} />}
       <AnimatePresence initial={false}>
         {isOpen && (
           <motion.div

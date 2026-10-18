@@ -40,6 +40,7 @@ import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
 import { PreFolhaLembrete } from "@/components/missao-doses/PreFolhaLembrete";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
+import { useDesafioDoKit } from "@/hooks/use-kit-primeiro-mes";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -317,6 +318,8 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
+// /dev/kit: Finanças com o Kit Primeiro Mês em memória (18/10)
+const DevKit = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevKit")) : null;
 // 02/10: "Ficou de ontem" e "Esqueceu de marcar?" nas telas de verdade (modo visitante) — só no dev, pra fotografar
 const DevOntem = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevOntem")) : null;
 // 29/09: o Pet refeito (RG, carteirinha, começo pronto) com dados de exemplo — só no dev
@@ -571,6 +574,8 @@ const AnimatedRoutes = () => {
   // O desafio da semana que passou fecha AVALIADO na abertura do app, sem
   // depender do Painel de Finanças aberto no domingo (29/09).
   useFechamentoDoDesafio();
+  // 18/10: quem comprou o Kit Primeiro Mês recebe o desafio da semana já escolhido (4 semanas).
+  useDesafioDoKit();
   // Uma vez só, com navigate por ref (mesmo padrão do DeepLinks abaixo): com
   // [navigate] nas deps o ouvinte era reinstalado a cada navegação e o toque
   // na notificação navegava — e contava — N vezes (revisão 02/09).
@@ -636,6 +641,9 @@ const AnimatedRoutes = () => {
         )}
         {import.meta.env.DEV && DevConquistas && (
           <Route path="/dev/conquistas" element={<Suspense fallback={null}><DevConquistas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevKit && (
+          <Route path="/dev/kit" element={<Suspense fallback={null}><DevKit /></Suspense>} />
         )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />

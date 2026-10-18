@@ -9,7 +9,7 @@ import {
 } from "@/lib/sequencia";
 import { acaoDoDia, type AcaoDoDia } from "@/lib/acao-do-dia";
 import { faixaDoFogo, type Faixa } from "@/lib/fogo-sequencia";
-import { CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
+import { CHAVE_ALBUM_VISTO, CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
 import {
@@ -152,21 +152,37 @@ export function useConquistas(): EstadoConquistas {
     return mesclarDesbloqueios(calculadas, gravadas, hoje);
   }, [get, gravadas, seq, hoje]);
 
-  // Grava o que abriu agora. Na 1ª vez (sem registro) grava tudo em silêncio:
-  // é a linha de base, não "desbloqueio novo".
+  /*
+   * Grava o que abriu agora. Na 1ª vez (sem registro) grava tudo em silêncio:
+   * é a linha de base, não "desbloqueio novo".
+   *
+   * 17/10 (revisão tela a tela, #95): a linha de base do ÁLBUM (`conquistas-album-visto`) nasce JUNTO,
+   * no mesmo instante. Antes o registro só era gravado quando algo abria — a conta VAZIA ficava sem
+   * registro, o álbum esperava o "registro pronto" pra gravar a base dele e, quando a pessoa abria as
+   * Conquistas depois do 1º gasto, a 1ª figurinha entrava na base como "vista": sem "1 nova pra colar"
+   * e sem o momento de colar (da 2ª em diante funcionava). Agora a conta vazia grava `{}` e `[]` assim
+   * que a conta chega (os Momentos montam em toda tela de módulo): a 1ª figurinha chega como a 2ª.
+   * Quem já tinha registro e nunca abriu o álbum segue como antes (a base do álbum na 1ª abertura dele).
+   * A festa não muda (outra chave, `conquistas-vistas`, e no teste com a Missão ela continua quieta).
+   */
   const novasTxt = r.novas.join(",");
+  const primeiraVez = gravadas === undefined;
   useEffect(() => {
-    if (!loaded || !novasTxt) return;
-    const primeiraVez = gravadas === undefined;
+    if (!loaded || (!novasTxt && !primeiraVez)) return;
     set(CHAVE_DESBLOQUEADAS, r.desbloqueadas, { system: true });
-    if (primeiraVez) return;
+    if (primeiraVez) {
+      if (get<unknown>(CHAVE_ALBUM_VISTO, undefined) === undefined) {
+        set(CHAVE_ALBUM_VISTO, r.adesivos.filter((b) => b.unlocked).map((b) => b.id), { system: true });
+      }
+      return;
+    }
     for (const id of novasTxt.split(",")) {
       if (eventosDeAdesivo.has(id)) continue;
       eventosDeAdesivo.add(id);
       trackEvent("adesivo_desbloqueado", { id });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, novasTxt]);
+  }, [loaded, novasTxt, primeiraVez]);
 
   /*
    * PISO DE NÍVEL (27/09): a escada nova é mais alta (Prata 300, Ouro 800…) e

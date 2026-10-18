@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
 import { BotoesDasLojas } from "@/components/LojasCard";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, getFunnelArea } from "@/lib/funnel";
+import { useAuthOpcional } from "@/hooks/use-auth";
+import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 
 /** Marca de DISPOSITIVO — de propósito fora do useUserData.
  *
@@ -68,6 +70,15 @@ const CONFETE = Array.from({ length: 22 }, (_, i) => ({
  *     funil — a mesma régua que ele já tinha imposto pro resto: se a tela não
  *     mostra nada computado das respostas dela, não está pronta.
  */
+/**
+ * 10/10 (dono: "duas telas de 'pronto' seguidas"): quando a MISSÃO EM DOSES vai aparecer (conta nova no app,
+ * missaoDosesMandaNoApp), esta tela é PULADA — a boas-vindas da missão ("Seu CORE tá pronto.") é a única.
+ * Os eventos saem com `pulada: true` (a série não quebra) e a marca de "já viu" é gravada (ela não volta).
+ */
+export const pulaPelaMissao = (criadoEm?: string | null): boolean => {
+  try { return isNativeShell() && missaoDosesMandaNoApp(criadoEm); } catch { return false; }
+};
+
 export const BoasVindasPago = ({ nome, onComecar, imediato }: {
   nome?: string;
   onComecar: () => void;
@@ -75,14 +86,28 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
   imediato?: boolean;
 }) => {
   const { loaded } = useUserData();
-  const [visivel, setVisivel] = useState(!!imediato);
+  const user = useAuthOpcional()?.user;
+  const [visivel, setVisivel] = useState(!!imediato && !pulaPelaMissao(user?.created_at));
+  const pulou = useRef(false);
 
   useEffect(() => {
+    if (pulou.current) return;
+    const origem = imediato ? "compra" : "abertura";
+    if (!imediato && (!loaded || jaViu())) return;
+    if (pulaPelaMissao(user?.created_at)) {
+      pulou.current = true;
+      marcarVisto();
+      trackEvent("boas_vindas_pago_visto", { origem, pulada: true });
+      trackEvent("boas_vindas_pago_seguiu", { pulada: true });
+      setVisivel(false);
+      onComecar();
+      return;
+    }
     if (imediato) { trackEvent("boas_vindas_pago_visto", { origem: "compra" }); return; }
-    if (!loaded || jaViu()) return;
     setVisivel(true);
     trackEvent("boas_vindas_pago_visto", { origem: "abertura" });
-  }, [loaded, imediato]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, imediato, user?.created_at]);
 
   const area = useMemo(() => {
     const a = getFunnelArea();

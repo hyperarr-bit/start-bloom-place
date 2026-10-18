@@ -82,6 +82,10 @@ const FOLHAS_LOURO = [120, 140, 160, 180, 200, 220, 240];
 /** id da insígnia → desenho (o conteúdo do grupo com contorno e recorte). */
 const ARTES: Record<string, ReactNode> = {
   /* ---------------- Sequência ---------------- */
+  // (16/10, Conquistas 2 — protótipo) os marcos novos de 2, 3 e 14 dias, na mesma chama
+  "sequencia-2": chama("DIA 2", "#fb7185"),
+  "sequencia-3": chama("3 DIAS", "#3b82f6"),
+  "sequencia-14": chama("14 DIAS", "#0d9488"),
   "sequencia-7": chama("7 DIAS", "#d22d80"),
   "sequencia-30": chama("30 DIAS", "#7c3aed", "#fff", <><Brilho x={80} y={26} r={7} /><Brilho x={21} y={38} r={5} /></>),
   "sequencia-100": chama("100 DIAS", "#facc15", TRACO, <><Brilho x={80} y={24} r={8} /><Brilho x={20} y={30} r={6} /><Brilho x={84} y={52} r={4.5} cor="#fb923c" /></>),
@@ -854,6 +858,19 @@ const ARTES: Record<string, ReactNode> = {
       <text x="43" y="54" textAnchor="middle" fontFamily={FONTE} fontSize="26" fontWeight={900} fill="#7c3aed" stroke="none">?</text>
       <circle cx="74" cy="70" r="14" fill="#4ade80" />
       <Check x={75} y={70} s={0.85} />
+    </>
+  ),
+
+  // casa arrumada (10/10, tour da Home) — PLACEHOLDER: casinha com estrela; a ilustração final o dono gera
+  "casa-arrumada": (
+    <>
+      <path d="M50,20 L18,48 H28 V80 H72 V48 H82 Z" fill="#fbcfe8" />
+      <path d="M50,20 L18,48 H82 Z" fill="#d22d80" />
+      <rect x="42" y="58" width="16" height="22" rx="3" fill="#7c3aed" />
+      <rect x="31" y="54" width="9" height="9" rx="2" fill="#fde68a" />
+      <rect x="60" y="54" width="9" height="9" rx="2" fill="#fde68a" />
+      <Brilho x={80} y={24} r={7} />
+      <Brilho x={22} y={30} r={4.5} cor="#f9a8d4" />
     </>
   ),
 

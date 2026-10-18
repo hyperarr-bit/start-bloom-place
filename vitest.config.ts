@@ -1,9 +1,11 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { medicaoTextos } from "./vite-plugin-medicao-textos";
 
 export default defineConfig({
-  plugins: [react()],
+  // o mesmo dicionário do build (virtual:medicao-textos) — o teste de privacidade da medição total usa o de verdade
+  plugins: [react(), medicaoTextos(path.resolve(__dirname))],
   test: {
     environment: "jsdom",
     globals: true,

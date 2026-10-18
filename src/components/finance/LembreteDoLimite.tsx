@@ -15,7 +15,10 @@ import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
  * pessoa). O melhor lugar pra pedir esse sim é aqui, com o número na frente
  * dela — na central de notificações ninguém procura. Ligou, some o convite.
  */
-export const LembreteDoLimite = () => {
+export const LembreteDoLimite = ({ compacto = false }: {
+  /** Cards simples (desenho 17/10): o convite vira um botão pequeno e discreto, sem borda, no pé do card. */
+  compacto?: boolean;
+} = {}) => {
   const { get, set, loaded } = useUserData();
   const [ligando, setLigando] = useState(false);
   const [ligadoAgora, setLigadoAgora] = useState(false);
@@ -52,6 +55,20 @@ export const LembreteDoLimite = () => {
     setLigando(false);
     setLigadoAgora(true);
   };
+
+  if (compacto) {
+    return (
+      <button
+        type="button"
+        onClick={() => void ligar()}
+        disabled={ligando}
+        data-testid="limite-lembrete-compacto"
+        className="mt-3 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-60"
+      >
+        <Bell className="w-3.5 h-3.5" /> Me avisar todo dia às {rotuloHora(prefs.horaLimite)}
+      </button>
+    );
+  }
 
   return (
     <button

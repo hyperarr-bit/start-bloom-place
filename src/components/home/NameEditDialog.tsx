@@ -34,7 +34,7 @@ export const NameEditDialog = ({ open, onOpenChange, currentName, onSave }: Name
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* z acima da gaveta (300): se abrirem o dialog com a gaveta ainda na
           tela, o toque tem que chegar NELE — ver print de 18/08. */}
-      <DialogContent className="max-w-sm z-[320]">
+      <DialogContent className="max-w-sm z-[320]" data-folha="nome-editar">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <User className="w-4 h-4" />

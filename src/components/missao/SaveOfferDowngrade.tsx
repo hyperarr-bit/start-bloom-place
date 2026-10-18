@@ -17,6 +17,19 @@
  * `core_anual_69` (Presente69.tsx). Se o presente estiver desligado no
  * RevenueCat (ou a loja não responder), cai na save-offer do mensal de
  * sempre. O Android não muda.
+ *
+ * ESCADA (10/10, chave SAIDA_TESTE_ESCADA, lib/ofertas-saida): recusou o 69,90
+ * ("Agora não") → 2º degrau, o MENSAL DE 19,90 (OfertaMensal19.tsx, lugar
+ * "cancelou_teste"), se a offering `mensal_19` existir. Regra da Apple: anual →
+ * mensal_19 é downgrade no grupo, entra no FIM do teste — "você continua no
+ * teste e só paga 19,90 quando ele acabar". Nunca os dois ao mesmo tempo; cada
+ * um 1x por aparelho. Quem já tinha recusado o presente antes desta versão (e o
+ * app morreu antes do 2º degrau) vê só o 19,90, se o teste cancelado seguir vivo.
+ *
+ * DIRETO NO 19,90 (16/10, chave SAIDA_DIRETO_19 / metadata `saida_direto_19`): o 69,90
+ * converteu 0 de 53 — ligada e com a offering `mensal_19` existindo, o teste cancelado vê
+ * SÓ o 19,90 (mesmo texto honesto: continua no teste, paga quando ele acabar). Sem a
+ * offering, o presente de sempre.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -26,7 +39,9 @@ import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { ehApple } from "@/lib/loja";
-import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
+import { Presente69Folha, prepararDireto19, prepararPresente, presenteJaVisto, type OfertaDoPresente } from "@/components/app/Presente69";
+import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { ofertaLigada } from "@/lib/ofertas-saida";
 
 const CHAVE_VISTO = "core-save-offer-visto"; // nas 2 allowlists (regra eterna)
 
@@ -34,6 +49,7 @@ export function SaveOfferDowngrade() {
   const { user, isSubscribed, billingPeriod } = useAuth();
   const [mostrar, setMostrar] = useState(false);
   const [presente, setPresente] = useState<OfertaDoPresente | null>(null);
+  const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   const [comprando, setComprando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [precoAno, setPrecoAno] = useState<string | null>(null);
@@ -42,14 +58,41 @@ export function SaveOfferDowngrade() {
   const elegivel =
     isNativeShell() && !!user && isSubscribed && trialCartaoAtivo() && billingPeriod === "annual";
 
+  /** O 2º degrau da escada (só iPhone, só com a chave): o mensal 19 no fim do teste. */
+  const segundoDegrau = async (fimMs: number | null): Promise<boolean> => {
+    if (!ehApple() || !ofertaLigada("escada")) return false;
+    try {
+      const m = await prepararMensal19("cancelou_teste", fimMs);
+      if (m) { setMensal19(m); return true; }
+    } catch { /* sem o degrau */ }
+    return false;
+  };
+
   useEffect(() => {
     if (!elegivel || checou.current) return;
     checou.current = true;
-    try { if (localStorage.getItem(CHAVE_VISTO)) return; } catch { /* noop */ }
+    let jaViu = false;
+    try { jaViu = !!localStorage.getItem(CHAVE_VISTO); } catch { /* noop */ }
     void (async () => {
       const rc = await import("@/lib/revenuecat");
+      if (jaViu) {
+        // 10/10: recusou o presente numa abertura anterior e o 2º degrau ainda não apareceu
+        if (ehApple() && ofertaLigada("escada") && presenteJaVisto("cancelou_teste") && (await rc.estadoTrialCancelado())) {
+          try {
+            const s = await rc.situacaoDoPresente();
+            if (s?.lugar === "cancelou_teste") await segundoDegrau(s.fimMs);
+          } catch { /* sem o degrau */ }
+        }
+        return;
+      }
       if (await rc.estadoTrialCancelado()) {
         if (ehApple()) {
+          // 16/10 (chave SAIDA_DIRETO_19): o 69,90 converteu 0 de 53 aqui — ligada e com a
+          // offering `mensal_19` na loja, vai direto pro 19,90 (que só cobra no fim do teste)
+          try {
+            const direto = await prepararDireto19("cancelou_teste");
+            if (direto) { if (direto.mensal19) setMensal19(direto.mensal19); return; }
+          } catch { /* segue pro presente */ }
           try {
             const oferta = await prepararPresente("cancelou_teste");
             if (oferta) { setPresente(oferta); return; }
@@ -68,15 +111,33 @@ export function SaveOfferDowngrade() {
     })();
   }, [elegivel]);
 
+  // o presente (e o 2º degrau) são as ÚNICAS ofertas desta pessoa: no desfecho a
+  // save-offer do mensal de 24,90 também fica marcada como vista (nunca em fila)
+  const marcar = () => { try { localStorage.setItem(CHAVE_VISTO, String(Date.now())); } catch { /* noop */ } };
+
+  if (mensal19) {
+    return (
+      <Mensal19Folha
+        lugar="cancelou_teste"
+        oferta={mensal19}
+        onFechar={() => { marcar(); setMensal19(null); }}
+        onSucesso={() => { marcar(); setMensal19(null); window.location.href = "/"; }}
+      />
+    );
+  }
+
   if (presente) {
-    // o presente é a ÚNICA oferta desta pessoa: no desfecho dele a save-offer
-    // do mensal também fica marcada como vista (nunca duas ofertas em fila)
-    const marcar = () => { try { localStorage.setItem(CHAVE_VISTO, String(Date.now())); } catch { /* noop */ } };
+    const fimMs = presente.fimMs;
     return (
       <Presente69Folha
         lugar="cancelou_teste"
         oferta={presente}
-        onFechar={() => { marcar(); setPresente(null); }}
+        onFechar={() => {
+          marcar();
+          setPresente(null);
+          // 10/10: recusou o 69,90 → o 19,90 (chave SAIDA_TESTE_ESCADA), nunca os dois juntos
+          void segundoDegrau(fimMs);
+        }}
         onSucesso={() => { marcar(); setPresente(null); window.location.href = "/"; }}
       />
     );

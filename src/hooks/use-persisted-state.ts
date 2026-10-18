@@ -19,7 +19,8 @@ import { normalizeForKey } from "@/lib/data-normalizers";
  * escrita avisa as outras instâncias DA MESMA CHAVE (evento na window, fora do
  * render); quem escreveu ignora o próprio aviso e nada é regravado no store.
  */
-const EVENTO_MESMA_CHAVE = "core:persisted-state";
+/** O mesmo texto de EVENTO_TELAS_DA_CHAVE (use-user-data) — o teste dados-offline-guard confere. */
+export const EVENTO_MESMA_CHAVE = "core:persisted-state";
 type AvisoDeEscrita = { key: string; json: string; value: unknown; origem: symbol };
 
 /**
@@ -32,8 +33,26 @@ export const avisarEscritaDeFora = (key: string, value: unknown) => {
   const aviso: AvisoDeEscrita = { key, json: JSON.stringify(value), value, origem: Symbol("fora") };
   queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));
 };
+/*
+ * 17/10 (desempenho): desde 08/08 a leitura da conta traz TODAS as chaves, as pesadas também (ver
+ * use-user-data, "CHAVE PESADA VAI PRA MEMÓRIA"), e ela só libera `loaded` quando chegou do servidor.
+ * Então, numa abertura em que o app ainda não foi pro 2º plano, chave que não está no store não existe
+ * no servidor — e a busca por chave lá embaixo virava 1 pedido por chave AUSENTE a cada módulo aberto:
+ * conta nova abrindo Finanças = 26 pedidos que voltam vazios (Rotina 16, Saúde 17), no meio da missão.
+ * Depois do 1º 2º plano (outro aparelho pode ter criado a chave nesse meio-tempo), a busca volta a
+ * acontecer exatamente como antes.
+ * Revisão S1 (17/10): e só quando o provider diz que a última leitura da conta veio INTEIRA
+ * (`contaCompleta`, todas as páginas — o servidor corta cada resposta em 1000 linhas). Leitura que
+ * falhou, ou provider que não diz, = a busca por chave acontece como antes.
+ */
+let saiuDaTela = false;
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saiuDaTela = true; });
+}
+const contaFrescaNestaAbertura = () => !saiuDaTela && (typeof document === "undefined" || document.visibilityState !== "hidden");
+
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
-  const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
+  const { get, set: setData, loaded, isGuest, fetchKey, contaCompleta } = useUserData();
 
   const [state, setState] = useState<T>(() => normalizeForKey(key, get(key, initial)));
   const lastWrittenJson = useRef<string>(JSON.stringify(state));
@@ -77,7 +96,10 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     // aparelho/sessão sem cache local a aba abria vazia e a PRÓXIMA escrita
     // sobrescrevia o histórico inteiro. Aqui: se o store não tem a chave,
     // busca no servidor; só aplica se o usuário não escreveu nesse meio-tempo.
-    if (!isGuest && get(key, undefined as unknown as T) === undefined) {
+    // 17/10: menos enquanto o app não saiu da tela desde que abriu, com a conta lida INTEIRA — ver
+    // contaFrescaNestaAbertura.
+    const ausenteNoServidor = contaCompleta === true && contaFrescaNestaAbertura();
+    if (!isGuest && !ausenteNoServidor && get(key, undefined as unknown as T) === undefined) {
       const baseline = lastWrittenJson.current;
       fetchKey<T>(key).then((remote) => {
         if (remote == null) return;
@@ -93,12 +115,18 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   }, [loaded]);
 
   const setPersistedState = useCallback((v: T | ((prev: T) => T)) => {
-    const next = typeof v === "function" ? (v as (prev: T) => T)(latestRef.current) : v;
+    // 16/10 (revisão 17/10): escrita feita antes de esta tela hidratar vai com o estado DE ONDE
+    // ela partiu — é a base que o use-user-data usa pra juntar a escrita segurada com o servidor
+    // (o vazio/padrão da abertura, ou o valor velho que a tela ainda mostrava quando a conta
+    // acabou de chegar). Depois de hidratada, a escrita sai como sempre.
+    const anterior = latestRef.current;
+    const next = typeof v === "function" ? (v as (prev: T) => T)(anterior) : v;
     const json = JSON.stringify(next);
     latestRef.current = next;
     lastWrittenJson.current = json;
     setState(next);
-    setData(key, next);
+    if (hydratedRef.current) setData(key, next);
+    else setData(key, next, { base: anterior });
     // fora da pilha atual: quem escreve pode estar no meio de um updater/render
     const aviso: AvisoDeEscrita = { key, json, value: next, origem: origem.current };
     queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));

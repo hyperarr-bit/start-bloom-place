@@ -290,6 +290,8 @@
 .dica-titulo { font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; font-style: italic; font-size: 20px; line-height: 1.05; letter-spacing: -.01em; }
 .dica-texto { font-size: 12px; color: #6f665a; margin-top: 4px; line-height: 1.35; }
 .dica-abrir { height: 38px; padding: 0 16px; border-radius: 999px; border: 0; background: #2b2b2f; color: #fff; font-weight: 800; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+/* reforço (17/10): esta folha entra antes do index.css e o preflight `[type="button"]` zerava este fundo — mesma cor, especificidade de elemento+classe */
+button.dica-abrir { background: #2b2b2f; }
 .dica-entendi { height: 38px; padding: 0 8px; border: 0; background: none; color: #6f665a; font-weight: 700; font-size: 12px; }
 
 /* ============================== A CAPA DO ÁLBUM (02/10: herda a capa premium do planner) ============================== */
@@ -316,12 +318,16 @@
 .alb-card-barra { flex: 1; height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .alb-card-barra > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a81f62, #e0438f); }
 .alb-pacote { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 10px 6px 6px; border-radius: 12px; border: 1px dashed #e0438f; background: linear-gradient(90deg, rgba(210,45,128,.08), rgba(255,211,110,.12)); text-align: left; width: 100%; }
+/* reforço (17/10): esta folha entra antes do index.css e o preflight `[type="button"]` zerava este fundo — mesma cor, especificidade de elemento+classe */
+button.alb-pacote { background: linear-gradient(90deg, rgba(210,45,128,.08), rgba(255,211,110,.12)); }
 .alb-pacote-fig { width: 28px; height: 36px; border-radius: 4px; background: repeating-linear-gradient(135deg, #e0438f 0 4px, #ffd36e 4px 8px, #6ec8ff 8px 12px, #b98bff 12px 16px); box-shadow: inset 0 0 0 2px rgba(255,255,255,.6), 0 2px 4px rgba(0,0,0,.2); transform: rotate(-8deg); flex-shrink: 0; }
 
 /* ============================== O ÁLBUM 3D EM TELA CHEIA (02/10) ============================== */
 .alb-tela { position: fixed; inset: 0; z-index: 290; display: flex; flex-direction: column; background: #221d1f; background-image: radial-gradient(120% 70% at 50% 38%, #352b2e 0%, #221d1f 60%, #171314 100%); color: #fff; font-family: Inter, -apple-system, sans-serif; }
 .alb-topo { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px; flex-shrink: 0; }
 .alb-redondo { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+/* reforço (17/10): esta folha entra antes do index.css e o preflight `[type="button"]` zerava este fundo — mesma cor, especificidade de elemento+classe */
+button.alb-redondo { background: rgba(255,255,255,.08); }
 /* a MESA (sem perspectiva própria: uma perspectiva aqui SOMAVA com a da cena das folhas e esticava a folha que gira) */
 .alb-mesa { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px 16px 6px; overflow-y: auto; }
 /* o LIVRO: um objeto com volume — a pilha de páginas na lateral e embaixo, a lombada, a sombra na mesa */
@@ -432,6 +438,8 @@
 .alb-dica mark { background: #fef3c7; color: #7c5a0a; padding: 0 3px; border-radius: 3px; }
 .alb-pe { position: relative; z-index: 1; margin-top: auto; padding-top: 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 9.5px; color: #6f665a; line-height: 1.3; }
 .alb-pe-perto { min-width: 0; }
+.alb-pe-proxima { text-align: left; color: #b4245f; padding: 0; background: none; border: 0; }
+.alb-pe-proxima b { color: #b4245f; }
 .alb-pe-perto b { color: #2b2b2f; }
 .alb-pag-num { font-size: 9px; font-weight: 700; color: #a39a8a; letter-spacing: .08em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -448,6 +456,8 @@
 .alb-aba[data-rar="comum"] { background: linear-gradient(180deg, #8a8580, #57534e); }
 .alb-nav2 { display: flex; align-items: center; gap: 10px; }
 .alb-seta { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: #fff; display: grid; place-items: center; }
+/* reforço (17/10): esta folha entra antes do index.css e o preflight `[type="button"]` zerava este fundo — mesma cor, especificidade de elemento+classe */
+button.alb-seta { background: rgba(255,255,255,.1); }
 .alb-seta:disabled { opacity: .25; }
 .alb-dots2 { display: flex; gap: 5px; }
 .alb-dots2 > i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.28); transition: transform .2s; will-change: transform; }
@@ -478,7 +488,8 @@
 .vaga-n small { font-size: 6px; font-weight: 800; letter-spacing: .08em; vertical-align: top; margin-right: 1px; }
 .vaga[data-aberta="true"] .vaga-n { color: rgba(140,130,114,.55); }
 .vaga-fig { position: relative; z-index: 2; line-height: 0; }
-.vaga-nome { font-size: 8.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; text-align: center; color: #2b2b2f; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* (17/10) padding em cima + margem negativa: o overflow do line-clamp cortava o acento das maiúsculas — "MÊS FECHADO" saía "MES FECHADO" */
+.vaga-nome { font-size: 8.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; text-align: center; color: #2b2b2f; max-width: 100%; padding-top: .22em; margin-top: -.22em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .vaga-nome[data-falta] { color: #8c8272; }
 /* a barrinha fina de progresso (sai a pílula preta) — cresce por transform, nunca por width */
 .vaga-barra { display: block; width: 72%; height: 3px; border-radius: 999px; background: rgba(120,100,70,.16); overflow: hidden; margin-top: 1px; }
@@ -559,3 +570,23 @@ html[data-album-aberto] [data-testid="tela-conquistas"] *, html[data-album-abert
 /* (02/10, dono: "arrastando fica travado") durante o arrasto o dedo é da folha (pointer capture): o que está dentro dela sai do
    teste de toque — uma troca só, no começo do gesto — e o WebKit não refaz a geometria das figurinhas a cada movimento */
 .alb-folha[data-arrastando] > * { pointer-events: none; }
+
+/* ============================== CONQUISTAS 2 (16/10): o álbum POR MÓDULO, a figurinha esperando pra COLAR ============================== */
+/* a placa do capítulo na cor do módulo (--mod vem do componente: CAPITULO_MODULO) */
+.alb-pag[data-rar="modulo"] .alb-cap { background: linear-gradient(100deg, color-mix(in srgb, var(--mod, #2b2b2f) 82%, #000) 0%, var(--mod, #2b2b2f) 48%, color-mix(in srgb, var(--mod, #2b2b2f) 78%, #fff) 64%, color-mix(in srgb, var(--mod, #2b2b2f) 86%, #000) 100%); }
+.alb-pag[data-rar="modulo"] .alb-cap-linha, .alb-pag[data-rar="modulo"] .alb-cap-titulo h3, .alb-pag[data-rar="modulo"] .alb-cap-titulo b { color: #fff; }
+.alb-pag[data-rar="modulo"] .alb-cap-frase { color: rgba(255,255,255,.82); }
+.alb-pag[data-rar="modulo"] { background-color: #fbf6ea; }
+.alb-aba[data-rar="modulo"] { background: linear-gradient(180deg, color-mix(in srgb, var(--mod, #2b2b2f) 70%, #fff), var(--mod, #2b2b2f)); padding: 6px 0 7px; }
+.alb-aba[data-rar="modulo"] > i { font-size: 11px; }
+/* a figurinha NOVA, solta por cima da vaga (toque pra colar): levantada, torta, sombra maior — nada em loop */
+.vaga[data-pendente] .vaga-caixa { background: rgba(255,255,255,.42); box-shadow: inset 0 0 0 1px rgba(120,100,70,.28), inset 0 0 0 3px #fbf6ea, inset 0 0 0 4px rgba(120,100,70,.14), inset 0 2px 4px rgba(60,40,10,.10); }
+.vaga[data-pendente] .vaga-n { visibility: visible; color: rgba(140,130,114,.55); }
+.vaga-fig-solta { transform: translate(5px, -7px); filter: drop-shadow(0 10px 10px rgba(0,0,0,.28)); }
+.vaga-fig-solta > .fig { filter: drop-shadow(0 1px 1px rgba(0,0,0,.2)); }
+.vaga-colar { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); z-index: 4; height: 15px; padding: 0 7px; border-radius: 999px; background: #d22d80; color: #fff; font-size: 8px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; line-height: 15px; white-space: nowrap; box-shadow: 0 2px 5px rgba(210,45,128,.45); }
+/* a pílula do próximo prêmio ("AMANHÃ") numa vaga vazia */
+.vaga-destaque { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); z-index: 3; height: 14px; padding: 0 6px; border-radius: 999px; background: #d22d80; color: #fff; font-size: 7.5px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; line-height: 14px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.vaga[data-destaque] .vaga-caixa { box-shadow: inset 0 0 0 1.5px #d22d80, inset 0 0 0 3.5px #fff5fa, inset 0 0 0 4.5px rgba(210,45,128,.22), inset 0 2px 5px rgba(120,20,70,.10); background: rgba(255,240,247,.8); }
+/* com o álbum aberto, a tela nova de trás também para de animar */
+html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *, html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *::before, html[data-album-aberto] [data-testid="conquistas-nova"] .cn-main *::after { animation-play-state: paused !important; }

@@ -38,6 +38,7 @@ vi.mock("@/lib/notificacoes", () => ({
   pedirPermissao: vi.fn(async () => true),
   agendarLembreteDoTeste: vi.fn(async () => true),
   agendarResgateDoPlano: vi.fn(), cancelarResgateDoPlano: vi.fn(), cancelarReguaDoTeste: vi.fn(),
+  agendarRecuperacaoDoPaywall: vi.fn(async () => ({ ok: false, motivo: "teste" })), cancelarRecuperacaoDoPaywall: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/teste-gratis", async (orig) => ({
   ...(await orig<typeof import("@/lib/teste-gratis")>()),

@@ -16,6 +16,7 @@ import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { PortaoBoasVindas } from "@/components/onboarding/PortaoBoasVindas";
 import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { AvisoCobrancaRecusada } from "@/components/app/AvisoCobrancaRecusada";
+import { PonteDaFolhaDeCobranca } from "@/components/app/PonteDaFolhaDeCobranca";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
@@ -29,11 +30,12 @@ import { ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
+import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
-import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
+import { DonoDaMissaoNaSessao, MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
@@ -41,6 +43,7 @@ import { PreFolhaLembrete } from "@/components/missao-doses/PreFolhaLembrete";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 import { useFechamentoDoDesafio } from "@/hooks/use-fechamento-desafio";
 import { useDesafioDoKit } from "@/hooks/use-kit-primeiro-mes";
+import { anotarTela } from "@/lib/medicao-total";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -188,7 +191,9 @@ const RootGate = () => {
     // recomeçar a venda pra quem está no meio do teste. Expirado, o
     // ProtectedRoute manda pro paywall do dia 3.
     if (testeLiberado()) return <Navigate to="/home" replace />;
-    return <Navigate to={ENTRADA_APP} replace />;
+    // 10/10 (build 38): no iPhone, antes da welcome, o "abrir já logado" da Porta (o app abriu por
+    // core://entrar?h=<código>). Sem link é o mesmo Navigate de sempre. Nunca lê o clipboard.
+    return <PortaPrimeiraAbertura semPorta={ENTRADA_APP} />;
   }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
@@ -316,6 +321,10 @@ const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 // Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
 // (some do build — a condição é substituída por `false` e o import cai fora).
 const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
+// 16/10: a CONQUISTAS 2 (só sequência + adesivos, 3 direções) — protótipo, só no dev
+const DevConquistasNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistasNova")) : null;
+// 17/10: o card DESAFIO DA SEMANA em rodízio, cena a cena (segunda, meio, vitória, derrota) — só no dev, pra fotografar
+const DevDesafios = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDesafios")) : null;
 // 28/09: a Home e a Carreira com tarefas de exemplo (horário, aviso, detalhes) — só no dev, pra fotografar o desenho
 const DevTarefas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevTarefas")) : null;
 // /dev/kit: Finanças com o Kit Primeiro Mês em memória (18/10)
@@ -336,10 +345,20 @@ const DevHomeLanding = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevH
 const DevPaywallIos = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevPaywallIos")) : null;
 // 03/10: os textos do Lembrete do dia 2 em cada cenário + a pré-folha da permissão, pra fotografar — só no dev
 const DevDia2 = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevDia2")) : null;
+// 16/10: "Vamos montar suas Finanças" (1.0.16) solta, pra o dono aprovar e fotografar — só no dev
+const DevMontarFinancas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMontarFinancas")) : null;
+// 16/10: Finanças no modo convidado (o que o /dev/montar-financas gravou), pra ver o painel limpo com ?painel-limpo=on — só no dev
+const DevFinancas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevFinancas")) : null;
+// 17/10: "Rotina pronta em 3 toques" (1.0.16) por cima da Rotina de verdade, conta vazia em memória — só no dev
+const DevMontarRotina = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMontarRotina")) : null;
 // 09/10: painel da afiliada e aba Afiliados do /admin com dados de exemplo, pra fotografar — só no dev
 const DevAfiliados = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevAfiliados")) : null;
 // 18/10: DESENHO do funil web novo (renda → contas → número → oferta → Pix → e-mail), dados falsos — só no dev
 const DevFunilNovo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevFunilNovo")) : null;
+// 16/10: o braço A da 1.0.16 ("uma dose por dia") tela a tela, pra fotografar — só no dev
+const DevMissao1PorDia = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMissao1PorDia")) : null;
+// 16/10: a intro do módulo (1ª ação guiada em Finanças/Rotina/Saúde + estado vazio da Casa) numa conta vazia em memória — só no dev
+const DevIntroModulo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevIntroModulo")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -528,6 +547,17 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
  */
 const jaReportouWebView = { atual: false };
 const TelemetriaWebView = () => {
+  // 10/10 (build 38): conta da Porta (user_metadata.porta) não vê o ATT — o aviso pro nativo
+  // (que segura a reserva de 10 s) sai já na abertura e de novo quando a sessão da Porta aparece.
+  const { user: usuarioDaSessao } = useAuth();
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    void import("@/lib/att-ios").then((m) => {
+      const porta = (usuarioDaSessao?.user_metadata as { porta?: unknown } | undefined)?.porta;
+      if (porta && typeof porta === "object") m.marcarPortaSemATT();
+      else m.reavisarPortaSemATT();
+    }).catch(() => { /* noop */ });
+  }, [usuarioDaSessao?.id]);
   useEffect(() => {
     if (!isNativeShell() || jaReportouWebView.atual) return;
     jaReportouWebView.atual = true;
@@ -537,6 +567,14 @@ const TelemetriaWebView = () => {
     void captureInstallReferrer();
     void capturarDispositivoApp();
   }, []);
+  return null;
+};
+
+/** 1.0.16 — medição total (lib/medicao-total): a rota atual vira a "tela" do resumo de uso da
+ *  sessão. Fora das telas do app (funil, site, login) a medição não conta nada. */
+const MedicaoDeTelas = () => {
+  const { pathname } = useLocation();
+  useEffect(() => { anotarTela(pathname); }, [pathname]);
   return null;
 };
 
@@ -652,6 +690,12 @@ const AnimatedRoutes = () => {
         {import.meta.env.DEV && DevKit && (
           <Route path="/dev/kit" element={<Suspense fallback={null}><DevKit /></Suspense>} />
         )}
+        {import.meta.env.DEV && DevConquistasNova && (
+          <Route path="/dev/conquistas-nova" element={<Suspense fallback={null}><DevConquistasNova /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevDesafios && (
+          <Route path="/dev/desafios" element={<Suspense fallback={null}><DevDesafios /></Suspense>} />
+        )}
         {import.meta.env.DEV && DevTarefas && (
           <Route path="/dev/tarefas" element={<Suspense fallback={null}><DevTarefas /></Suspense>} />
         )}
@@ -679,11 +723,26 @@ const AnimatedRoutes = () => {
         {import.meta.env.DEV && DevDia2 && (
           <Route path="/dev/dia2" element={<Suspense fallback={null}><DevDia2 /></Suspense>} />
         )}
+        {import.meta.env.DEV && DevMontarFinancas && (
+          <Route path="/dev/montar-financas" element={<Suspense fallback={null}><DevMontarFinancas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevFinancas && (
+          <Route path="/dev/financas" element={<Suspense fallback={null}><DevFinancas /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevMontarRotina && (
+          <Route path="/dev/montar-rotina" element={<Suspense fallback={null}><DevMontarRotina /></Suspense>} />
+        )}
         {import.meta.env.DEV && DevAfiliados && (
           <Route path="/dev/afiliados" element={<Suspense fallback={null}><DevAfiliados /></Suspense>} />
         )}
         {import.meta.env.DEV && DevFunilNovo && (
           <Route path="/dev/funil-novo" element={<Suspense fallback={null}><DevFunilNovo /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevMissao1PorDia && (
+          <Route path="/dev/missao-1-por-dia" element={<Suspense fallback={null}><DevMissao1PorDia /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevIntroModulo && (
+          <Route path="/dev/intro-modulo" element={<Suspense fallback={null}><DevIntroModulo /></Suspense>} />
         )}
         <Route path="/direto" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/comecar-v2" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />} />
@@ -780,10 +839,15 @@ const App = () => {
                 <DeepLinks />
                 <GuardaDemoShell />
                 <TelemetriaWebView />
+                <MedicaoDeTelas />
                 <GracePeriodBanner />
                 {/* 26/09: cartão recusado na App Store/Google Play (só no app). */}
                 <AvisoCobrancaRecusada />
+                {/* 10/10 (1.0.14): a folha nativa de cobrança do StoreKit só na Home — ver lib/cobranca-nativa. Só iPhone. */}
+                <PonteDaFolhaDeCobranca />
                 <TrilhoLateral />
+                {/* 1.0.16: o dono da missão em doses na sessão, antes das rotas (lerMissao filtra pela conta) */}
+                <DonoDaMissaoNaSessao />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").

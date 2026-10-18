@@ -69,3 +69,40 @@ describe("PaywallAssinatura no iPhone", () => {
     });
   }
 });
+
+/* ───────────── PAYWALL_ENXUTO (1.0.14, lib/ofertas-saida) ───────────── */
+describe("PAYWALL_ENXUTO", () => {
+  afterEach(() => localStorage.clear());
+
+  it("desligado (padrão): o paywall de hoje — fileira dos módulos, 'Restaurar compras' do rodapé completo, sem a linha enxuta", async () => {
+    montar("gate");
+    expect(await screen.findByText("3 DIAS GRÁTIS")).toBeInTheDocument();
+    expect(screen.getByText("+9")).toBeInTheDocument();
+    expect(screen.queryByTestId("rodape-enxuto")).toBeNull();
+    expect(screen.queryByTestId("recap-enxuto")).toBeNull();
+    expect(screen.getByText("Restaurar compras")).toBeInTheDocument();
+    expect(screen.getByText("Privacidade")).toBeInTheDocument();
+    expect(screen.getByText("Termos")).toBeInTheDocument();
+  });
+
+  for (const contexto of ["gate", "planos"] as const) {
+    it(`${contexto} ligado: acima da dobra só título, colunas, prova social e botão; restaurar/termos/privacidade numa linha discreta; o legal de renovação continua`, async () => {
+      localStorage.setItem("ofertas-saida-force", "enxuto");
+      montar(contexto);
+      expect(await screen.findByText("3 DIAS GRÁTIS")).toBeInTheDocument();
+      expect(screen.queryByText("+9")).toBeNull(); // a fileira dos módulos saiu
+      expect(screen.queryByText(/O que você construiu/)).toBeNull(); // sem itens reais, nem a linha colapsada
+      expect(screen.queryByTestId("recap-enxuto")).toBeNull();
+      const rodape = screen.getByTestId("rodape-enxuto");
+      expect(rodape).toHaveTextContent("Restaurar compras");
+      expect(rodape).toHaveTextContent("Termos");
+      expect(rodape).toHaveTextContent("Privacidade");
+      expect(rodape.querySelector('a[href="/termos"]')).not.toBeNull();
+      expect(rodape.querySelector('a[href="/privacidade"]')).not.toBeNull();
+      expect(screen.getAllByText("Restaurar compras")).toHaveLength(1); // só no rodapé enxuto
+      expect(screen.getByRole("button", { name: /Começar 3 dias grátis/ })).toBeInTheDocument();
+      expect(document.body.textContent).toMatch(/renova automaticamente/);
+      expect(document.body.textContent).not.toMatch(/Você está na conta|Entrar com outra conta/);
+    });
+  }
+});

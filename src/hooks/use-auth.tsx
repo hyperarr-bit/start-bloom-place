@@ -5,47 +5,23 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { vincularOrigem } from "@/lib/analytics";
 import { vincularCompraAnonima } from "@/lib/sessao-anonima";
+import { assinaturaDoMock, diasDoTesteDoMock } from "@/lib/rc-mock";
+import { vassouraLeva } from "@/lib/chaves-do-aparelho";
 
 // Purge cached user data on sign-out so nothing leaks across accounts on the
-// same browser. Kept inline (no import from use-user-data) to avoid a circular
-// hook dependency.
-const purgeLocalUserCache = () => {
+// same browser. No import from use-user-data (circular hook dependency): the
+// device-key list comes from src/lib/chaves-do-aparelho.ts, which imports nothing.
+// 10/10: exportada pro porta-handoff (troca de conta sem assinatura por um link da Porta).
+export const purgeLocalUserCache = () => {
   try {
-    // core-pwa é marca do APARELHO (app instalado), não da conta: deslogar do
-    // PWA não pode mandar a pessoa de volta pro funil de vendas.
-    // core-gw-arm é o braço do A/B de gateway: se a vassoura levar, a mesma
-    // pessoa cai em gateways diferentes entre sessões e o teste vira lixo.
-    // core-boas-vindas-visto: marca de dispositivo da comemoração pós-compra.
-    // Tem que estar nas DUAS listas (esta e a de use-user-data) — chave nova
-    // que começa com "core-" e fica fora some na primeira troca de conta.
-    // core-trial-cartao-fim + core-missao (v61): o trial do cartão COMEÇA
-    // anônimo (compra antes do cadastro) e a pessoa loga em seguida — a
-    // vassoura levava a flag e a Missão junto, no exato segundo em que elas
-    // passam a importar. Pego no emulador em 19/08, mesmo caso do core-pwa.
-    // core-theme-mode/palette (20/08, reviews da Monik ★4 e Isabela ★3): o
-    // tema escuro e a paleta moram nessas chaves — a vassoura levava os dois
-    // no logout e a pessoa reconfigurava a cada volta. Mesmo caso core-pwa.
-    // core-dia2 (03/10): o Lembrete do dia 2 / 1ª semana é do APARELHO (1º uso,
-    // hora da abertura, permissão já pedida) — fora da lista, deslogar e entrar
-    // de novo zeraria "a 1ª semana" e pediria permissão outra vez.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto", "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-dia2", "core-notif-entregues"]);
+    // As chaves do APARELHO (core-pwa, braços de A/B, tema, "já vi" do tour e dos cartões,
+    // travas da avaliação…) ficam: a lista única mora em src/lib/chaves-do-aparelho.ts e vale
+    // pras DUAS vassouras (esta e a de use-user-data). Chave nova que começa com "core-" e
+    // fica fora some no primeiro logout — o teste chaves-do-aparelho-guarda cobra.
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k || KEEP.has(k)) continue;
-      if (
-        k.startsWith("u:") ||
-        k.startsWith("finance-") ||
-        k.startsWith("home-") ||
-        k.startsWith("core-") ||
-        k.startsWith("life-") ||
-        k.startsWith("module-") ||
-        k.startsWith("daily-") ||
-        k.startsWith("offline-") ||
-        k.startsWith("nudge-")
-      ) {
-        toRemove.push(k);
-      }
+      if (k && vassouraLeva(k)) toRemove.push(k);
     }
     toRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
   } catch {}
@@ -201,6 +177,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const checkSubscriptionStatus = async () => {
+    /* 10/10 — BUILD DE TESTE (RC_MOCK=1) só: a compra do mock da loja vale como assinatura
+     * (o servidor nunca recebe webhook do RevenueCat no Simulador — sem isto a pessoa pagava
+     * no mock e caía no gate). Fora do build de mock, assinaturaDoMock() é sempre null. */
+    const mock = assinaturaDoMock();
+    if (mock) {
+      const { trialDay: diaDoTeste, trialHoursLeft: horasDoTeste } = diasDoTesteDoMock(mock);
+      setIsSubscribed(true);
+      setTrialExpired(false);
+      setNoTrial(false);
+      setInGracePeriod(false);
+      setGraceDaysLeft(null);
+      setPaymentMethod(isNativeShell() ? "app_store" : "mock");
+      setBillingPeriod(mock.billingPeriod);
+      setSubscriptionEnd(new Date(mock.fimMs).toISOString());
+      if (mock.emTeste) { setTrialDay(diaDoTeste); setTrialHoursLeft(horasDoTeste); }
+      setSubLoaded(true);
+      return;
+    }
     try {
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) {
@@ -292,6 +286,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
+/** O contexto sem exigir o provider (undefined fora dele) — pra peças que também montam soltas. */
+export const useAuthOpcional = () => useContext(AuthContext);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

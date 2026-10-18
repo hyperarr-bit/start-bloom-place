@@ -66,6 +66,25 @@ const ASSINATURAS = [
 ];
 
 const sh = (cmd) => execSync(cmd, { stdio: "inherit" });
+
+// TRAVA (14/10, bug do tutorial que voltava a cada abertura na 1.0.14): nenhum binário de loja sai sem os testes
+// de "usar → fechar → reabrir" e a guarda das chaves do aparelho. Falhou = não builda. (pular só com --sem-trava)
+if (!process.argv.includes("--sem-trava")) {
+  console.log("\n▶ trava de reabrir o app (chaves do aparelho, tour, cartões, festa)…");
+  try {
+    // 14/10 (revisor, build 39): a trava rodava só 4 arquivos e um teste quebrado escapou → roda a SUÍTE INTEIRA
+    // (só as 4 instáveis conhecidas de fora). Os testes de reabrir continuam dentro dela.
+    execSync("npx vitest run --exclude '**/aviso-cobranca*' --exclude '**/cancelar-assinatura-da-loja*' --exclude '**/resize-observer-fallback*' --exclude '**/demo-guiada-missao*' --exclude '**/node_modules/**' --exclude '**/.claude/**'", {
+      stdio: "inherit",
+      // os testes rodam SEM as variáveis do build de loja (VITE_V14_LOJA=1 etc. ligariam tudo e quebrariam testes
+      // que esperam as chaves no padrão) — é o mesmo ambiente do pre-push
+      env: Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(VITE_|RC_MOCK$)/.test(k))),
+    });
+  } catch {
+    console.error("\n✗ TRAVA: algum teste de reabrir o app falhou — o binário NÃO foi gerado. Conserta antes de subir pra loja.");
+    process.exit(1);
+  }
+}
 const tamanho = (p) => {
   if (!existsSync(p)) return 0;
   const s = statSync(p);
@@ -88,6 +107,18 @@ if (!teste && !chave.startsWith(LOJA.prefixo)) {
   process.exit(1);
 }
 console.log(`✓ loja: ${LOJA.nome}`);
+/* 1.0.14 — BUILD DE QA (lib/v14-qa): `VITE_V14_QA=1 npm run loja:ios` liga TODAS as chaves da
+ * versão só nessa build (tour, cartões, ofertas de saída, onboarding 1 tela, dia 1 cheio, cartão
+ * recusado, avaliações, módulo oculta pendências, paywall enxuto, recuperação do paywall). Sem a
+ * env, a build é a de LOJA, com as chaves no padrão. O aviso é pra essa build nunca subir por engano. */
+if (process.env.VITE_V14_LOJA === "1") {
+  console.log("\n✓ VITE_V14_LOJA=1 — 1.0.14 de LOJA: novidades da 1.0.14 ligadas no app (menos o mensal 19,90).\n");
+}
+if (process.env.VITE_V14_QA === "1") {
+  console.log("\n⚠️  VITE_V14_QA=1 — BUILD DE QA: todas as chaves da 1.0.14 LIGADAS. NÃO é build de loja.\n");
+} else {
+  console.log("✓ chaves da 1.0.14 no padrão (build de loja)");
+}
 console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build de TESTE)" : "(produção)"}`);
 
 // SDK da Meta (12/08): a MainActivity só liga o SDK se o client token estiver
@@ -136,6 +167,14 @@ if (!teste && process.env.RC_MOCK === "1") {
   process.exit(1);
 }
 
+// 10/10 (build 38): o falso do "abrir já logado" da Porta (lib/porta-handoff, VITE_PORTA_QA=1) entra SÓ
+// no build de teste do Simulador — num binário de loja ele trocaria o resgate do código por um login fixo.
+if (!teste && (process.env.VITE_PORTA_QA === "1" || process.env.VITE_PORTA_QA_EMAIL || process.env.VITE_PORTA_QA_SENHA)) {
+  console.error("\n✗ VITE_PORTA_QA* no ambiente de um build de PRODUÇÃO — o resgate da Porta sairia falso.");
+  console.error("  Rode sem essas variáveis, ou use `npm run loja -- --teste` se é build de teste.\n");
+  process.exit(1);
+}
+
 // 2. build + sync
 sh(teste ? "RC_MOCK=1 npm run build" : "npm run build");
 sh(`npx cap sync ${LOJA.plataforma}`);
@@ -176,6 +215,31 @@ if (escaparam.length) {
   console.error(`\n✗ rastreador sobrou no binário: ${escaparam.join(", ")}`);
   console.error("  Ajuste ASSINATURAS em scripts/preparar-loja.mjs antes de publicar.\n");
   process.exit(1);
+}
+
+// 3b. (10/10) build de PRODUÇÃO não pode carregar o caminho do "assinante do mock" (lib/rc-mock):
+// com __RC_MOCK__ false o esbuild elimina o código morto; se a marca sobrou, algo mudou — para.
+if (!teste) {
+  const dirJs = join(ASSETS, "assets");
+  const comMarca = existsSync(dirJs)
+    ? readdirSync(dirJs).filter((f) => f.endsWith(".js") && readFileSync(join(dirJs, f), "utf8").includes("__rc_mock_assinante"))
+    : [];
+  if (comMarca.length) {
+    console.error(`\n✗ o JS do binário de produção carrega a marca do assinante do MOCK (${comMarca.join(", ")}).`);
+    console.error("  Veja src/lib/rc-mock.ts: __RC_MOCK__ tem que ser false e o caminho tem que morrer no build.\n");
+    process.exit(1);
+  }
+  console.log("  ✓ sem o assinante do mock no JS");
+  // 10/10: idem pro falso do resgate da Porta (some junto com __RC_MOCK__ false)
+  const comPortaQa = existsSync(dirJs)
+    ? readdirSync(dirJs).filter((f) => f.endsWith(".js") && readFileSync(join(dirJs, f), "utf8").includes("__porta_qa_mock"))
+    : [];
+  if (comPortaQa.length) {
+    console.error(`\n✗ o JS do binário de produção carrega o resgate FALSO da Porta (${comPortaQa.join(", ")}).`);
+    console.error("  Veja src/lib/porta-handoff.ts: o ramo de QA tem que morrer com __RC_MOCK__ false.\n");
+    process.exit(1);
+  }
+  console.log("  ✓ sem o resgate falso da Porta no JS");
 }
 
 // 4. tira o peso morto

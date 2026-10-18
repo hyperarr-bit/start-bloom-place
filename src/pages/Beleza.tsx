@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { mesAtualExtenso } from "@/lib/utils";
 import { useSearchParams } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -17,7 +16,15 @@ import type { PerfilDaPele } from "@/lib/beleza-rotina";
 import { DicasDaBeleza, TEMA_BELEZA } from "@/components/beleza/kit";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useLocation } from "react-router-dom";
+import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
+import { cartoesBeleza } from "@/components/cartoes-modulo/cartoes-beleza";
+import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
+import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
+import { isNativeShell } from "@/lib/native-shell";
 
 /*
  * AS ABAS DA BELEZA (28/09, dono). "ROTINA" virou SKINCARE ("rotina não tem a ver
@@ -53,7 +60,6 @@ const Beleza = () => {
   const [activeTab, setActiveTab] = useState<Aba>(pedida && pedida !== "fotos" ? pedida : "routine");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
   /* ROTINA VAZIA VAI PRO TOPO (28/09, protótipo): quem ainda não tem rotina vê as
      3 perguntas antes das dicas e do Espelho — é a ação da tela. Depois de montar,
      a Rotina volta pro lugar de sempre (abaixo do Espelho); o "rotina pronta"
@@ -62,6 +68,16 @@ const Beleza = () => {
   const [recemGerada, setRecemGerada] = useState<PerfilDaPele | null>(null);
   const rotinaNoTopo = activeTab === "routine" && vazia;
   const rotina = <SkincareRoutine recemGerada={recemGerada} onGerada={setRecemGerada} />;
+  // 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home) no lugar do "Dicas pra começar"; nunca na demo
+  const { pathname } = useLocation();
+  guardarForcasDaUrl(); // a força do link (`?cartoes=on`) tem que estar guardada ANTES de perguntar se está ligado
+  guardarForcaDaIntro();
+  // 16/10 (1.0.16): com a intro do módulo ligada os cartões saem do fluxo em todos os módulos. 17/10 (dono: "nenhum
+  // módulo abre sem tutorial na 1ª abertura"): a Beleza ganhou a intro de 1 toque ("Como é a sua pele?" → o skincare
+  // nasce), montada aqui em cima; as DicasDaBeleza de sempre continuam embaixo.
+  const demo = pathname.startsWith("/preview");
+  const comIntro = !demo && introLigada();
+  const comCartoes = !demo && !comIntro && cartoesLigados();
 
   // o link antigo do DIÁRIO abre SKINCARE já nas fotos da pele
   useEffect(() => {
@@ -95,8 +111,8 @@ const Beleza = () => {
           </Button>
           <Droplets className="w-5 h-5 text-bz-acento" />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>
@@ -117,17 +133,20 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        {comIntro && <IntroDoModulo moduleId="beleza" />}
+        {comCartoes && <CartoesDoModulo config={cartoesBeleza({ irParaSkincare: () => handleTabChange("routine") })} />}
         {activeTab === "routine" && (
           <>
             {rotinaNoTopo && rotina}
-            <DicasDaBeleza
+            {!comCartoes && <DicasDaBeleza
               dicas={[
                 "3 perguntas e a sua rotina sai pronta, de manhã e de noite",
                 "Toque num passo pra escolher o produto e os dias da semana",
-                "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
+                // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado — lá a dica é só o que fazer
+                isNativeShell() ? "Ligue o lembrete da manhã e da noite — ele diz o passo do dia" : "No app do celular, ligue o lembrete da manhã e da noite — ele diz o passo do dia",
                 "Cadastre seus produtos para rastrear validade e custo por dose",
               ]}
-            />
+            />}
             <DailyMirror />
             {!rotinaNoTopo && rotina}
             <SkinDiary />

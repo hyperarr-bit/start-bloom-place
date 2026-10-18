@@ -718,13 +718,13 @@ function LevaCard({ area }: { area: AreaKey }) {
 
 /** "É confiável?": SÓ fatos verificáveis — o app está nas duas lojas, a
  *  liberação é automática (webhook + check), o suporte existe (chamado no app
- *  e suporte@coreaplicativo.com.br) e a garantia de 7 dias é honrada (a linha
+ *  e contato@coreaplicativo.com.br) e a garantia de 7 dias é honrada (a linha
  *  do tempo e o legal do CTA já a prometiam). Nada de nota, quantidade de
  *  avaliações ou depoimento inventado. */
 const FATOS_CONFIAVEL = [
   { Icon: Smartphone, titulo: "É o mesmo app das lojas.", sub: "Publicado na App Store e no Google Play — entra com o e-mail da compra." },
   { Icon: Zap, titulo: "Pix confirmado = acesso na hora.", sub: "Liberação automática, sem esperar ninguém." },
-  { Icon: MessageCircle, titulo: "Suporte dentro do app e por e-mail.", sub: "suporte@coreaplicativo.com.br — gente de verdade respondendo." },
+  { Icon: MessageCircle, titulo: "Suporte dentro do app e por e-mail.", sub: "contato@coreaplicativo.com.br — gente de verdade respondendo." },
 ];
 
 function ConfiavelCard() {

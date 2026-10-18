@@ -39,6 +39,9 @@ type Props = {
   logado?: boolean;
   className?: string;
   classeAcao?: string;
+  /** O que vem ANTES da linha (" · " no rodapé legal do paywall) — só entra quando a linha entra (17/10: no site,
+   *  onde a linha não existe, o "·" ficava sobrando depois de "Tenho um código"). */
+  separador?: string;
 };
 
 /** Na web (e pra quem já entrou) não monta nada — nem o hook do roteador. */
@@ -47,10 +50,12 @@ export function JaPagouPeloSite(props: Props) {
   return <LinhaJaPagou {...props} />;
 }
 
-function LinhaJaPagou({ origem, onEntrar, className, classeAcao = "underline underline-offset-2" }: Props) {
+function LinhaJaPagou({ origem, onEntrar, className, classeAcao = "underline underline-offset-2", separador }: Props) {
   const navigate = useNavigate();
   const pergunta = ehApple() ? PERGUNTA_JA_PAGOU_IOS : PERGUNTA_JA_PAGOU;
   return (
+    <>
+    {separador}
     <button
       type="button"
       data-testid="ja-pagou-site"
@@ -65,5 +70,6 @@ function LinhaJaPagou({ origem, onEntrar, className, classeAcao = "underline und
     >
       {pergunta} <span className={classeAcao}>{ACAO_JA_PAGOU}</span>
     </button>
+    </>
   );
 }

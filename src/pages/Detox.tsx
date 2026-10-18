@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { mesAtualExtenso } from "@/lib/utils";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -10,8 +9,9 @@ import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
@@ -30,7 +30,6 @@ const Detox = () => {
   const [activeTab, setActiveTab] = useState("rastreador");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -54,8 +53,8 @@ const Detox = () => {
           </button>
           <Leaf className="w-5 h-5 text-lime-600" />
           <h1 className="text-base font-bold tracking-tight">DETOX</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>
@@ -75,7 +74,7 @@ const Detox = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="detox"
           tips={[
             "Adicione hábitos que quer largar",

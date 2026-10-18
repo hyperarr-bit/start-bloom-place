@@ -59,8 +59,21 @@ export const lerChave = <T,>(chave: string): T | null => {
   } catch { return null; }
 };
 
+/**
+ * A conta nasceu ("liberando"): o progresso do funil sai — MENOS A ÁREA (16/10, 1.0.16).
+ *
+ * Bug medido no ar (build 40): `missao_doses_inicio` chegava com `area: null` e a missão
+ * sempre em Finanças → Rotina → Saúde, mesmo pra quem escolheu Rotina ou Treino na porta. A
+ * causa era esta limpeza: ela apagava `core-funil-w-area` no passo "liberando", ANTES de a
+ * missão nascer na 1ª Home. A área é do aparelho (chaves-do-aparelho: Missão em doses, ação
+ * do dia, lembrete do dia 2) e vale 30 dias pelo carimbo — o resto (passo, respostas,
+ * pós-compra, coluna do paywall) é só do funil e sai.
+ */
+export const CHAVES_QUE_FICAM_NA_LIMPEZA: ReadonlySet<string> = new Set([CHAVES_FUNIL_W.area]);
 export const limparProgresso = (): void => {
-  try { for (const k of Object.values(CHAVES_FUNIL_W)) localStorage.removeItem(k); } catch { /* noop */ }
+  try {
+    for (const k of Object.values(CHAVES_FUNIL_W)) if (!CHAVES_QUE_FICAM_NA_LIMPEZA.has(k)) localStorage.removeItem(k);
+  } catch { /* noop */ }
 };
 
 /**
@@ -74,6 +87,12 @@ const RETOMAVEIS: Record<string, string> = {
   quiz: "quiz", prova: "central", progress: "central", result: "central", central: "central",
   compromissos: "compromissos", contrato: "contrato", notif: "notif", offer: "offer",
   signup: "signup", confirm: "signup", liberando: "signup",
+  // 10/10 (ONBOARDING_1TELA): a tela única retoma nela mesma; se a chave desligou
+  // no meio, o ComecarW traduz pra "compromissos" (passoDoOnboarding).
+  plano_3_dias: "plano_3_dias",
+  // 10/10 (FUNIL_CALAI): o gráfico retoma nele mesmo (as respostas estão guardadas);
+  // com a chave desligada, o ComecarW traduz pra "quiz" (passoDoFunilCalai).
+  grafico_com_sem: "grafico_com_sem",
 };
 export const passoDeRetomada = (salvo: string | null, noShell: boolean): string | null =>
   noShell && salvo ? (RETOMAVEIS[salvo] ?? null) : null;
@@ -157,8 +176,18 @@ export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => 
 const PASSO_ANTERIOR: Record<string, string> = {
   promessas: "welcome", porta: "welcome", quiz: "porta", prova: "quiz", progress: "prova", result: "quiz",
   central: "result", compromissos: "central", contrato: "compromissos", notif: "contrato",
+  // 10/10 (ONBOARDING_1TELA): a tela única fica no lugar dos compromissos+contrato — o Voltar cai na central
+  plano_3_dias: "central",
 };
-export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;
+/* 10/10 (FUNIL_CALAI, lib/funil-calai): a sequência enxuta não tem promessas, central
+ * nem demo — welcome → porta → quiz → gráfico → notificação → prova → progress →
+ * result → plano (ou compromissos → contrato) → offer. O Voltar anda por ESTA fila. */
+const PASSO_ANTERIOR_CALAI: Record<string, string> = {
+  porta: "welcome", quiz: "porta", grafico_com_sem: "quiz", notif: "grafico_com_sem", prova: "notif",
+  progress: "prova", result: "quiz", plano_3_dias: "result", compromissos: "result", contrato: "compromissos",
+};
+export const passoAnteriorDe = (passo: string, calai = false): string | null =>
+  (calai ? PASSO_ANTERIOR_CALAI[passo] : PASSO_ANTERIOR[passo]) ?? null;
 
 /**
  * Pra onde o 2º Voltar leva quem está NO PAYWALL (03/09).
@@ -176,6 +205,8 @@ export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[
  * quer sair vira cárcere e nota 1 na loja.
  */
 export const RECUO_DO_PAYWALL = "contrato";
+/** 10/10 (ONBOARDING_1TELA): com a tela única ligada, o contrato É "Seu plano de 3 dias" — o recuo cai nela. */
+export const recuoDoPaywall = (telaUnica: boolean): string => (telaUnica ? "plano_3_dias" : RECUO_DO_PAYWALL);
 
 /** Quem pediu "Topo, se for bem simples" no quiz (24% de quem vê o paywall)
  *  toca 23,5% contra 39,7% de quem pediu "Sim, topo" — e some em <10s. O

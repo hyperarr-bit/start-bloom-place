@@ -92,7 +92,7 @@ describe("tela de Conquistas", () => {
     expect(screen.getByRole("button", { name: "anote o gasto de hoje" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /não gastei nada hoje/ })).toBeInTheDocument();
     expect(screen.getByText("MEUS ADESIVOS")).toBeInTheDocument();
-    expect(screen.getAllByText(/de 65/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/de 68/).length).toBeGreaterThan(0);
     // a semana: 12 dias até ontem (sexta) → SEG…SEX feitos, SÁB (hoje) em aberto, DOM futuro
     const semana = Array.from(document.querySelectorAll('[data-testid="card-sequencia"] .seq-dia')).map((d) => d.getAttribute("data-estado"));
     expect(semana).toEqual(["feito", "feito", "feito", "feito", "feito", "hoje", "futuro"]);
@@ -137,7 +137,7 @@ describe("linha da sequência na Home", () => {
   const seq = (p: Partial<Sequencia>): Sequencia => ({ dias: 12, hojeFeito: false, saldo: 1, usados: [], recorde: 12, hoje: HOJE, lista: [], acao: ACAO_PADRAO, faixa: faixaDoFogo(12), protegidoOntem: false, ...p });
   const Onde = () => { const l = useLocation(); return <p data-testid="onde">{l.pathname}|{JSON.stringify(l.state)}</p>; };
 
-  it("'12 dias · falta 1 coisa hoje' e abre as Conquistas com origem home", () => {
+  it("'12 dias · hoje: …' e abre as Conquistas com origem home", () => {
     render(
       <MemoryRouter initialEntries={["/home"]}>
         <Routes>
@@ -148,7 +148,7 @@ describe("linha da sequência na Home", () => {
     );
     const linha = screen.getByTestId("linha-sequencia");
     expect(linha).toHaveTextContent("12 dias");
-    expect(linha).toHaveTextContent("falta 1 coisa hoje");
+    expect(linha).toHaveTextContent("hoje:");
     fireEvent.click(linha);
     expect(screen.getByTestId("onde")).toHaveTextContent('/conquistas|{"origem":"home"}');
   });

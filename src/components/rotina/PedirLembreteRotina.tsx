@@ -115,7 +115,7 @@ export const PedirLembreteRotina = ({ sequencia }: { sequencia: number }) => {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold leading-tight">
-                    {sequencia} dias seguidos. Quer ajuda pra não quebrar?
+                    {sequencia} {sequencia === 1 ? "dia seguido" : "dias seguidos"}. Quer ajuda pra não quebrar?
                   </p>
                   <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
                     Um toque às 21h, só nos dias em que você ainda não marcou nada.

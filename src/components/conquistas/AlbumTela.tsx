@@ -3,7 +3,7 @@ import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight, Instagram, X } from "lucide-react";
-import { RARIDADE_PLURAL, categoriaDe, fracaoDe, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
+import { RARIDADE_PLURAL, categoriaDe, fracaoDe, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
 import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
 import { parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
@@ -13,6 +13,7 @@ import { CapaAlbum } from "./CapaAlbum";
 import { FigurinhaColada, FigurinhaVazia, soltarFoils, useGiroscopioDoFoil } from "./FigurinhaAlbum";
 import { Destacar } from "./GradeAdesivos";
 import { ORDEM_RARIDADE, RARIDADE_FEM, contagemDaPagina, proximosDoAlbum, resumoRaridades, tituloDaPagina, type PaginaAlbum } from "./album-paginas";
+import { fraseDaPagina } from "./nova/recompensas";
 import "./conquistas.css";
 
 /**
@@ -66,6 +67,22 @@ export const CAPITULO: Record<Raridade, { titulo: string; material: string; fras
   comum: { titulo: "Comuns", material: "Grafite", frase: "Os primeiros passos de cada área.", icone: "●", aba: "COMUNS", emblema: "first-income" },
 };
 
+/**
+ * (16/10, Conquistas 2) O capítulo de cada MÓDULO, quando o álbum é por módulo
+ * (album-paginas.montarAlbumPorModulo): a frase do módulo e a cor da placa.
+ */
+export const CAPITULO_MODULO: Record<BadgeCategoria, { frase: string; cor: string }> = {
+  sequencia: { frase: "Dias seguidos anotando — qualquer módulo conta.", cor: "#d22d80" },
+  finance: { frase: "Cada gasto anotado é uma figurinha a caminho.", cor: "#b7791f" },
+  rotina: { frase: "Hábitos marcados, dia após dia.", cor: "#0f9d6a" },
+  leitura: { frase: "Páginas e livros que você leu.", cor: "#7c3aed" },
+  treino: { frase: "Treinos marcados na semana.", cor: "#2563eb" },
+  dieta: { frase: "Refeições e água no lugar.", cor: "#16a34a" },
+  saude: { frase: "Cuidar de você, todo dia.", cor: "#dc2626" },
+  vida: { frase: "Casa, pet, humor, detox — a vida inteira.", cor: "#0d9488" },
+  geral: { frase: "O álbum inteiro do CORE.", cor: "#2b2b2f" },
+};
+
 /* ------------------------------------------------------------ a vaga */
 
 /**
@@ -83,10 +100,15 @@ interface VagaProps {
   indice: number;
   /** Atraso (ms) pra colar com o peel; undefined = já colada. */
   cola?: number;
+  /** (16/10) Figurinha nova ESPERANDO pra ser colada: solta por cima da vaga, com "COLAR"; o toque cola (peel). */
+  pendente?: boolean;
+  /** (16/10) A pílula "AMANHÃ"/"HOJE"/"EM 2 DIAS" numa vaga vazia: o próximo prêmio da sequência. */
+  destaque?: string;
   onSelecionar: (b: Badge) => void;
+  onColar?: (b: Badge) => void;
 }
 
-const Vaga = memo(({ b, n, tam, indice, cola, onSelecionar }: VagaProps) => {
+const Vaga = memo(({ b, n, tam, indice, cola, pendente, destaque, onSelecionar, onColar }: VagaProps) => {
   const raridade = raridadeDe(b);
   const cx = tam + 14;
   // o "colar" é de UMA vez: quem já recebeu o atraso fica com ele (uma troca de papel da folha não descola a figurinha)
@@ -96,10 +118,16 @@ const Vaga = memo(({ b, n, tam, indice, cola, onSelecionar }: VagaProps) => {
   const rotulo = b.unlocked ? null : rotuloProgresso(b);
   const comProgresso = !b.unlocked && !!b.progresso && b.progresso.atual > 0;
   return (
-    <button type="button" className="vaga" data-id={b.id} data-vaga={b.id} data-aberta={b.unlocked ? "true" : "false"} data-rar={raridade} onClick={(e) => { if (ehFundo(e.currentTarget)) onSelecionar(b); }} style={{ width: cx }}>
+    <button type="button" className="vaga" data-id={b.id} data-vaga={b.id} data-aberta={b.unlocked ? "true" : "false"} data-rar={raridade} data-pendente={pendente ? "" : undefined} data-destaque={destaque ? "" : undefined} onClick={(e) => { if (!ehFundo(e.currentTarget)) return; if (pendente && onColar) onColar(b); else onSelecionar(b); }} style={{ width: cx }} aria-label={pendente ? `Colar ${b.name}` : undefined}>
       <span className="vaga-caixa" style={{ width: cx, height: cx }}>
         <span className="vaga-n"><small>Nº</small> {nDeDois(n)}</span>
-        {b.unlocked ? (
+        {destaque && !b.unlocked && <span className="vaga-destaque" data-testid="vaga-destaque">{destaque}</span>}
+        {pendente ? (
+          <span className="vaga-fig vaga-fig-solta" data-testid="vaga-pendente">
+            <FigurinhaColada id={b.id} raridade={raridade} tamanho={tam} giro={giroDoAdesivo(indice) - 7} />
+            <span className="vaga-colar" aria-hidden>Colar</span>
+          </span>
+        ) : b.unlocked ? (
           <span className="vaga-fig" data-cola={atraso !== undefined ? "" : undefined} style={{ "--d": `${atraso ?? 0}ms` } as CSSProperties}>
             <FigurinhaColada id={b.id} raridade={raridade} tamanho={tam} giro={giroDoAdesivo(indice)} peel={atraso !== undefined} />
           </span>
@@ -136,10 +164,19 @@ interface PaginaProps {
   colar: Set<string>;
   atrasoBase: number;
   diasDeSequencia: number;
+  /** (16/10) As que esperam pra ser coladas (toque) e as vagas com a pílula do próximo prêmio. */
+  pendentes: ReadonlySet<string>;
+  destaques: Readonly<Record<string, string>>;
+  /** (16/10, Conquistas 2) o rodapé das páginas de seção diz "Faltam N figurinhas nesta página". */
+  rodapeFaltam: boolean;
+  /** (17/10) Colou a desta página e tem mais figurinha nova em OUTRA página: o rodapé leva até lá. */
+  proximaNova: { indice: number; titulo: string; quantas: number } | null;
+  onIrPara: (indice: number) => void;
   onSelecionar: (b: Badge) => void;
+  onColar?: (b: Badge) => void;
 }
 
-const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, onSelecionar }: PaginaProps) => {
+const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, proximaNova, onIrPara, onSelecionar, onColar }: PaginaProps) => {
   const grande = p.tipo === "mais-raros";
   const col = grande ? 3 : 4;
   const gapX = grande ? 10 : 6;
@@ -151,22 +188,27 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
   const proximas = useMemo(() => (vazia ? (p.proximos.length ? p.proximos : proximosDoAlbum(adesivos)) : []), [vazia, p.proximos, adesivos]);
   const proximo = proximas[0];
   const cap = p.raridade ? CAPITULO[p.raridade] : null;
-  const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && (abertura || colar.has(b.id)) ? atrasoBase + j * 90 : undefined);
+  const mod = p.modulo ? { ...categoriaDe(p.modulo), ...CAPITULO_MODULO[p.modulo] } : null;
+  // a pendente não cola na abertura: ela espera o toque (e então cola com o peel, atraso 0)
+  const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && !pendentes.has(b.id) && (abertura || colar.has(b.id)) ? (colar.has(b.id) && !abertura ? 0 : atrasoBase + j * 90) : undefined);
   // nas páginas de seção: a vaga vazia mais perto de colar (o rodapé convida)
   const perto = useMemo(() => (grande ? null : p.vagas.filter((b) => !b.unlocked && b.progresso && b.progresso.atual > 0).sort((a, b) => fracaoDe(b) - fracaoDe(a))[0] ?? null), [grande, p.vagas]);
-  const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : cap!.titulo;
+  const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : mod ? mod.label : cap!.titulo;
   const contagem = grande ? `${p.abertos} de ${p.total}` : p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`;
-  const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : `${cap!.material} · ${cap!.frase}`;
+  const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : mod ? mod.frase : `${cap!.material} · ${cap!.frase}`;
+  // (16/10) as figurinhas novas desta página (esperando o toque) e as vagas vazias DESTA página (uma seção pode ter 2 páginas)
+  const pendentesAqui = p.vagas.filter((b) => pendentes.has(b.id)).length;
+  const coladasAqui = p.vagas.filter((b) => b.unlocked).length;
   return (
-    <div className="alb-pag" data-pagina={p.id} data-rar={p.raridade ?? "destaque"} data-testid={`album-tela-pagina-${indice}`}>
-      <span className="alb-marca" aria-hidden><Adesivo id={cap ? cap.emblema : "sequencia-100"} tamanho={Math.round(largura * 0.5)} /></span>
+    <div className="alb-pag" data-pagina={p.id} data-rar={p.raridade ?? (mod ? "modulo" : "destaque")} data-modulo={p.modulo} style={mod ? ({ "--mod": mod.cor } as CSSProperties) : undefined} data-testid={`album-tela-pagina-${indice}`}>
+      <span className="alb-marca" aria-hidden><Adesivo id={cap ? cap.emblema : mod ? (p.vagas[p.vagas.length - 1]?.id ?? "sequencia-100") : "sequencia-100"} tamanho={Math.round(largura * 0.5)} /></span>
       <header className="alb-cap">
         <div className="alb-cap-linha"><span>Capítulo {nDeDois(indice + 1)} · {grande ? p.titulo : tituloDaPagina(p)}</span><i /></div>
         <div className="alb-cap-titulo"><h3>{titulo}</h3><b className="tabular-nums">{contagem}</b></div>
         <p className="alb-cap-frase">{frase}</p>
       </header>
       <div className="alb-grade" data-raros-no-meio={grande && !vazia ? "" : undefined} style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${grande ? (vazia ? 8 : 22) : 5}px ${gapX}px`, marginBlock: grande && !vazia ? "auto" : undefined }}>
-        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} onSelecionar={onSelecionar} />)}
+        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} pendente={pendentes.has(b.id)} destaque={destaques[b.id]} onSelecionar={onSelecionar} onColar={onColar} />)}
       </div>
       {grande && proximas.length > 0 && (
         <>
@@ -182,7 +224,15 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
         </p>
       )}
       <footer className="alb-pe">
-        {perto ? (
+        {pendentesAqui > 0 ? (
+          <span className="alb-pe-perto" data-testid="album-pe-colar"><b>{pendentesAqui === 1 ? "1 figurinha nova" : `${pendentesAqui} figurinhas novas`}</b> · toque pra colar</span>
+        ) : proximaNova ? (
+          <button type="button" className="alb-pe-perto alb-pe-proxima" onClick={() => onIrPara(proximaNova.indice)} data-testid="album-pe-proxima">
+            <b>{proximaNova.quantas === 1 ? "Mais 1 figurinha nova" : `Mais ${proximaNova.quantas} figurinhas novas`}</b> em {proximaNova.titulo} <ChevronRight className="inline w-3 h-3 -mt-0.5" aria-hidden />
+          </button>
+        ) : (mod || rodapeFaltam) && !grande ? (
+          <span className="alb-pe-perto" data-testid="album-pe-pagina">{p.vagas.length > coladasAqui ? <><b>{fraseDaPagina(coladasAqui, p.vagas.length)}</b>{perto ? <> · a mais perto: {perto.name}</> : null}</> : "Página completa — todas coladas."}</span>
+        ) : perto ? (
           <span className="alb-pe-perto">A mais perto: <b>{perto.name}</b> · <Destacar texto={textoFalta(perto, diasDeSequencia)} /></span>
         ) : !grande && p.abertos >= p.total ? (
           <span className="alb-pe-perto">Página completa — todas coladas.</span>
@@ -475,19 +525,35 @@ export interface AlbumTelaProps {
   total: number;
   porRaridade: Record<Raridade, { abertos: number; total: number }>;
   nome: string;
-  nivel: string;
+  /** (16/10) opcional: a Conquistas 2 não tem nível. */
+  nivel?: string;
   ano: number;
   diasDeSequencia: number;
   /** Abre direto nesta página (o pacotinho abre na página da figurinha nova). */
   paginaInicial?: number;
   /** De onde veio a abertura (vai no evento `album_abrir`). */
-  via?: "card" | "pacotinho";
+  via?: "card" | "pacotinho" | "toast" | "missao" | "capa" | "vaga" | "colecao";
+  /**
+   * (16/10, Conquistas 2) Figurinhas novas ESPERANDO pra ser coladas: ficam
+   * soltas por cima da vaga com "COLAR"; o toque cola com o peel e chama
+   * `onColar` (quem grava o "visto" é a tela).
+   */
+  pendentes?: string[];
+  onColar?: (b: Badge) => void;
+  /** (16/10) Pílula numa vaga vazia: { "sequencia-14": "AMANHÃ" } — o próximo prêmio da sequência. */
+  destaques?: Record<string, string>;
+  /** (16/10) Rodapé "Faltam N figurinhas nesta página" nas páginas de seção (a tela nova liga; a de hoje fica igual). */
+  rodapeFaltam?: boolean;
   onFechar: () => void;
-  onCompartilhar: () => void;
+  /** (16/10) opcional: sem ele, os botões de compartilhar o álbum somem. */
+  onCompartilhar?: () => void;
   onCompartilharFigurinha: (b: Badge) => void;
 }
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+const SEM_PENDENTES: string[] = [];
+const SEM_DESTAQUES: Record<string, string> = {};
+
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
@@ -518,6 +584,25 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
    */
   const colar = useRef<Set<string>>(new Set(novas));
   const [abertura, setAbertura] = useState(!reduzir);
+  /** (16/10) As pendentes que a pessoa JÁ tocou: saem de "soltas" e colam com o peel (atraso 0), mesmo antes de a tela gravar o visto. */
+  const [coladasAgora, setColadasAgora] = useState<ReadonlySet<string>>(() => new Set());
+  const pendentesTxt = pendentes.join(",");
+  const pendentesEfetivas = useMemo(() => new Set(pendentesTxt.split(",").filter((id) => id && !coladasAgora.has(id))), [pendentesTxt, coladasAgora]);
+  const colarPendente = useCallback((b: Badge) => {
+    colar.current.add(b.id);
+    setColadasAgora((s) => new Set([...s, b.id]));
+    onColar?.(b);
+  }, [onColar]);
+  /** (17/10) Depois de colar as desta página (só então — não em qualquer página): a próxima página de seção que ainda tem figurinha nova. */
+  const proximaNovaDe = useCallback((daqui: number): { indice: number; titulo: string; quantas: number } | null => {
+    if (!pendentesEfetivas.size || !coladasAgora.size || !paginas[daqui]?.vagas.some((b) => coladasAgora.has(b.id))) return null;
+    const ordem = paginas.map((_, i) => i).filter((i) => i > 0 && i !== daqui).sort((a, b) => ((a > daqui ? 0 : 1) - (b > daqui ? 0 : 1)) || a - b);
+    for (const i of ordem) {
+      const quantas = paginas[i].vagas.filter((b) => pendentesEfetivas.has(b.id)).length;
+      if (quantas) return { indice: i, titulo: paginas[i].modulo ? categoriaDe(paginas[i].modulo!).label : paginas[i].raridade ? CAPITULO[paginas[i].raridade!].titulo : paginas[i].titulo, quantas };
+    }
+    return null;
+  }, [paginas, pendentesEfetivas, coladasAgora]);
   /** O ângulo da folha que está virando (0 → −180 pra frente; −180 → 0 pra trás). */
   const rot = useMotionValue(0);
   const rotCapa = useMotionValue(0);
@@ -532,12 +617,16 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   // a base das vizinhas acompanha a página atual, mas só com a folha parada
   useEffect(() => { if (!virando) setBase(atual); }, [virando, atual]);
   // depois da abertura, as outras páginas montam uma a uma — e nunca no meio de uma virada (o relógio para e volta com a folha parada)
+  // 17/10 (desempenho): nem no meio das figurinhas colando na abertura (`abertura`, até ~4,3 s). Começavam aos ~3,1 s: cada
+  // página montada (e pintada com as figurinhas, os filtros e o foil) dava um quadro de 120–250 ms no WebKit bem no fim do
+  // "colar" (5 quadros assim por abertura). Agora a 1ª entra 300 ms depois que a abertura assenta; as vizinhas da página
+  // aberta continuam montadas desde o início, então virar pra frente/pra trás não muda nada.
   const extrasComecaram = useRef(false);
   useEffect(() => {
-    if (!aberto || extras >= n || virando) return;
-    const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : reduzir ? 300 : CAPA_SAI_MS + 900);
+    if (!aberto || extras >= n || virando || abertura) return;
+    const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : 300);
     return () => clearTimeout(t);
-  }, [aberto, extras, n, reduzir, virando]);
+  }, [aberto, extras, n, virando, abertura]);
 
   // abrir: a capa vira na lombada e as figurinhas da página de abertura colam uma a uma
   useEffect(() => {
@@ -696,11 +785,18 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
 
   if (!aberto) return null;
   const pagina = paginas[Math.min(atual, n - 1)];
-  const abas = [
-    { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" as const },
-    ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", icone: CAPITULO[r].icone, nome: CAPITULO[r].aba, rar: r })).filter((s) => s.id),
-  ];
-  const ativaAba = (s: { id: string; rar: string }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar);
+  // (16/10) álbum por módulo: uma aba por módulo (só o emoji — 10 abas cabem na borda); por raridade, as de sempre
+  const porModulo = paginas.some((p) => p.modulo);
+  const abas: { id: string; icone: string; nome: string; rar: string; modulo?: BadgeCategoria; cor?: string }[] = porModulo
+    ? [
+        { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" },
+        ...paginas.filter((p) => p.modulo && !(p.parte && p.parte[0] > 1)).map((p) => ({ id: p.id, icone: categoriaDe(p.modulo!).emoji, nome: categoriaDe(p.modulo!).label.toUpperCase(), rar: "modulo", modulo: p.modulo, cor: CAPITULO_MODULO[p.modulo!].cor })),
+      ]
+    : [
+        { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" },
+        ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", icone: CAPITULO[r].icone, nome: CAPITULO[r].aba, rar: r })).filter((s) => s.id),
+      ];
+  const ativaAba = (s: { id: string; rar: string; modulo?: BadgeCategoria }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar) || (!!s.modulo && pagina.modulo === s.modulo);
   const alturaLivro = Math.round(largura * 1.42);
   /**
    * As folhas montadas: as vizinhas da página atual (pré-rasterizadas) e as
@@ -730,9 +826,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
         <button type="button" className="alb-redondo border-0" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">
           <b className="block text-[14px] font-black truncate">Álbum CORE {ano}</b>
-          <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total} · faltam {total - abertos}</span>
+          <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total} · faltam {total - abertos}{pendentesEfetivas.size > 0 ? ` · ${pendentesEfetivas.size} pra colar` : ""}</span>
         </div>
-        <button type="button" className="alb-redondo border-0" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>
+        {onCompartilhar && <button type="button" className="alb-redondo border-0" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>}
       </div>
       </div>
 
@@ -763,7 +859,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     dir={papel === "sobre" ? virando?.dir : undefined}
                     pagina={p.id}
                     testid={papel === "sobre" ? "album-virando" : undefined}
-                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} onSelecionar={setDetalhe} />}
+                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} proximaNova={papel === "fundo" ? proximaNovaDe(i) : null} onIrPara={irPara} onSelecionar={setDetalhe} onColar={colarPendente} />}
                     verso={<VersoDaPagina ano={ano} />}
                   />
                   {/* a sombra que a folha projeta na página de baixo: logo DEPOIS dela no DOM (por cima dela, por baixo da que gira) */}
@@ -790,8 +886,8 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           </div>
           <div className="alb-abas" role="tablist" aria-label="Seções do álbum">
             {abas.map((s) => (
-              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-ativa={ativaAba(s) ? "" : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.rar}`} aria-label={s.nome}>
-                <i aria-hidden>{s.icone}</i><span>{s.nome}</span>
+              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-modulo={s.modulo} data-ativa={ativaAba(s) ? "" : undefined} style={s.cor ? ({ "--mod": s.cor } as CSSProperties) : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.modulo ?? s.rar}`} aria-label={s.nome}>
+                <i aria-hidden>{s.icone}</i>{!porModulo && <span>{s.nome}</span>}
               </button>
             ))}
           </div>
@@ -806,10 +902,12 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       </div>
 
       <div className="alb-rodape2">
-        <button type="button" onClick={onCompartilhar} className="w-full h-11 rounded-xl font-bold text-[13.5px] inline-flex items-center justify-center gap-2" style={{ background: "#fff", color: "#2b2b2f" }} data-testid="album-tela-compartilhar">
-          Compartilhar meu álbum
-        </button>
-        <div className="alb-rodape2-linha"><span>{resumoRaridades(porRaridade)}</span><span>Nível {nivel}</span></div>
+        {onCompartilhar && (
+          <button type="button" onClick={onCompartilhar} className="w-full h-11 rounded-xl font-bold text-[13.5px] inline-flex items-center justify-center gap-2" style={{ background: "#fff", color: "#2b2b2f" }} data-testid="album-tela-compartilhar">
+            Compartilhar meu álbum
+          </button>
+        )}
+        <div className="alb-rodape2-linha"><span>{resumoRaridades(porRaridade)}</span>{nivel ? <span>Nível {nivel}</span> : <span>{abertos} de {total}</span>}</div>
       </div>
 
       <AnimatePresence>

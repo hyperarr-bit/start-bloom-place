@@ -123,6 +123,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
                 <button
                   type="button"
                   aria-label={`Ocultar aba ${rotulo}`}
+                  data-track={`aba-ocultar:${tab.id}`}
                   onClick={() => ocultar(tab.id)}
                   className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-foreground text-background grid place-items-center ring-2 ring-background shadow"
                 >
@@ -139,6 +140,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
             type="button"
             onClick={() => setFolha(true)}
             aria-label={`${ocultas.length} ${ocultas.length === 1 ? "aba oculta" : "abas ocultas"}`}
+            data-track="abas-ocultas"
             className="notion-tab whitespace-nowrap text-[11px] text-muted-foreground border-transparent hover:bg-muted shrink-0 px-2"
           >
             +{ocultas.length} {ocultas.length === 1 ? "oculta" : "ocultas"}
@@ -186,6 +188,7 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
                     checked={visivel}
                     disabled={ultima}
                     aria-label={`${visivel ? "Ocultar" : "Mostrar"} ${tab.icon ? `${tab.icon} ` : ""}${tab.label}`}
+                    data-track={`aba-mostrar:${tab.id}`}
                     onCheckedChange={(on) => { if (on) mostrar(tab.id); else ocultar(tab.id); }}
                   />
                 </li>

@@ -520,7 +520,7 @@ export function FolhaNovaTarefa({
   const hoje = localDayKey();
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="folha-nova-tarefa">
+      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="folha-nova-tarefa" data-folha="tarefa-nova">
         <FaixaDaFolha titulo={`${nomeDoDiaDeHoje()} · NOVA TAREFA`} sub={`Tarefa de hoje, ${diaCurto(hoje)} · ${onde}`} onFechar={onFechar} />
         <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {/* o conteúdo da folha só existe aberta (o Radix desmonta ao fechar): cada abertura é um formulário novo */}
@@ -579,7 +579,7 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="ficha-tarefa">
+      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="ficha-tarefa" data-folha="tarefa-ficha">
         {ficha && (
           <>
             <FaixaDaFolha

@@ -30,14 +30,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Dumbbell, Flame } from "lucide-react";
 import { toast } from "sonner";
-import { localDayKey, mesAtualExtenso, parseLocalDay, semanaAtualId } from "@/lib/utils";
+import { localDayKey, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProximoPasso } from "@/components/modules/ProximoPasso";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { trackEvent } from "@/lib/analytics";
 import { avisarApagado } from "@/lib/desfazer";
@@ -176,7 +178,6 @@ const Treino = () => {
   const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = mesAtualExtenso();
   const today = localDayKey();
   const hojeData = useMemo(() => parseLocalDay(today), [today]);
   const todayDayName = DIAS[indiceDoDia(hojeData)];
@@ -790,8 +791,8 @@ const Treino = () => {
                 {sequencia} sem
               </span>
             )}
-            <span className="hidden min-[425px]:inline text-muted-foreground text-xs whitespace-nowrap">{currentMonth}</span>
-            <ThemeToggle />
+            <MesDoCabecalho />
+            <AcessoConhecerMais moduleId="treino" /><ThemeToggle />
           </div>
         </div>
         {/* 27/09 (dono): a barra do Treino tinha classes próprias (cantos mais redondos,
@@ -822,7 +823,7 @@ const Treino = () => {
         className="max-w-5xl mx-auto px-4 py-4"
         style={{ paddingBottom: mostraRodape ? `calc(${alturaRodape + 20}px + var(--teste-banner-h, 0px))` : "calc(2rem + var(--teste-banner-h, 0px))" }}
       >
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="treino"
           tips={[
             "No 📋 PLANO você monta a semana: modelo pronto, exercícios, séries e carga",

@@ -14,6 +14,8 @@
  */
 process.env.TZ = "America/Sao_Paulo";
 
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, cleanup, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -32,6 +34,7 @@ vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@
 import { UserDataContext } from "@/hooks/use-user-data";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
+import { ConstruiuEm3Dias } from "@/components/missao-doses/ConstruiuEm3Dias";
 import { PULAR_DEPOIS_DE_MS } from "@/components/missao-doses/PassoDoDia";
 import { CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MISSAO_DOSES, MISSAO_DOSES_APP, lerMissao, missaoDosesLigada, guardarForcaDaUrl, diaDaMissao, modulosPadrao, rotuloDoPasso, iniciarMissao } from "@/lib/missao-doses";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -103,7 +106,7 @@ const rota = () => screen.getByTestId("rota").textContent;
  */
 const esperarPostIt = () => { avancar(400); avancar(3000); return screen.getByTestId("demo-guia-postit"); };
 /** Depois do registro: 550 ms → o olhar (anel assenta em ~700 ms) ou direto a comemoração. */
-const esperarOlharOuFesta = () => { avancar(700); avancar(1000); };
+const esperarOlharOuFesta = () => { avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */ };
 const passarPeloOlhar = () => { esperarOlharOuFesta(); const b = screen.queryByTestId("missao-doses-entendi"); if (b) fireEvent.click(b); };
 
 beforeEach(() => {
@@ -112,7 +115,12 @@ beforeEach(() => {
   eventos.length = 0;
   nativo.v = false;
   // o jsdom não tem tamanho: o anel/olhar se posicionam por getBoundingClientRect
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) } as DOMRect);
+  // o cabeçalho fixo do módulo fica no TOPO (0–56); o resto, em 100–148 (o post-it "colado embaixo da faixa" decide por aí)
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top: 100, left: 10, width: 300, height: 48, bottom: 148, right: 310, x: 10, y: 100, toJSON: () => ({}) }) as DOMRect;
+  });
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
   vi.setSystemTime(new Date(2026, 9, 2, 10, 0)); // sexta, 02/10/2026
 });
@@ -189,7 +197,7 @@ describe("a chave desligada = o app de hoje, byte a byte", () => {
 
   it("os 3 padrão: a área da porta primeiro, depois Finanças → Rotina → Saúde sem repetir; os rótulos HOJE/AMANHÃ/DIA 3", () => {
     expect(modulosPadrao("rotina")).toEqual(["rotina", "financas", "saude"]);
-    expect(modulosPadrao("corpo")).toEqual(["treino", "financas", "rotina"]);
+    expect(modulosPadrao("corpo")).toEqual(["treino", "saude", "financas"]); // 1.0.16: corpo puxa a Saúde pra 2ª
     expect(modulosPadrao(null)).toEqual(["financas", "rotina", "saude"]);
     const m = iniciarMissao(["financas", "rotina", "saude"], "2026-10-02");
     expect([1, 2, 3].map((n) => rotuloDoPasso(n as 1 | 2 | 3, m, "2026-10-02"))).toEqual(["HOJE", "AMANHÃ", "DIA 3"]);
@@ -213,7 +221,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent("Hoje · 💰 Finanças");
     expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent("Domingo · ❤️ Saúde");
-    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", prototipo: "web" }]);
+    expect(eventos).toContainEqual(["missao_doses_inicio", { modulos: ["financas", "rotina", "saude"], area: "dinheiro", area_lida: "dinheiro", area_respondida: null, origem_area: "funil", prototipo: "web" }]);
     // o card ainda não aparece por baixo das boas-vindas? aparece (a Home é a mesma) — mas a missão manda na tela
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     const escolha = screen.getByTestId("missao-doses-escolha");
@@ -240,7 +248,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     const m = lerMissao()!; m.boasVindas = true; localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify(m));
     montar(store, "/financas");
     const faixa = screen.getByTestId("missao-doses-faixa");
-    expect(faixa).toHaveTextContent("Missão · dia 1 de 3 · Finanças");
+    expect(faixa).toHaveTextContent("Missão · dia 1 de 3");
     expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("1");
     expect(screen.queryByTestId("missao-doses-pular")).toBeNull(); // sem "pular tudo" nos primeiros 20 s
     const postIt = esperarPostIt();
@@ -257,7 +265,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     // o olhar: o "Meu mês" explicado, com Entendi e Pular este passo
     esperarOlharOuFesta();
     const olhar = screen.getByTestId("missao-doses-olhar");
-    expect(olhar).toHaveTextContent("Esse painel soma sozinho");
+    expect(olhar).toHaveTextContent("Olha o seu mês");
     expect(within(olhar).getByTestId("missao-doses-pular-passo")).toBeInTheDocument();
     fireEvent.click(within(olhar).getByTestId("missao-doses-entendi"));
     // a comemoração
@@ -268,7 +276,8 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã · 📅 Rotina");
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Marca 1 hábito no quadradinho");
     expect(lerMissao()?.feitos[1]).toEqual({ dia: "2026-10-02", rotulo: "Café · R$ 12" });
-    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ 12", prototipo: "web" }]);
+    // (17/10: nunca valor em reais em evento — o rótulo vai sem o número)
+    expect(eventos).toContainEqual(["missao_doses_dia_feito", { dia: 1, dia_relogio: 1, modulo: "financas", segundos: expect.any(Number), rotulo: "Café · R$ x", prototipo: "web" }]);
     // a faixa agora marca 1 de 3
     expect(screen.getByTestId("missao-doses-faixa").querySelector("[role=img]")).toHaveAttribute("aria-label", "1 de 3 feitos");
     fireEvent.click(screen.getByTestId("missao-doses-hora-20h"));
@@ -300,7 +309,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.getByTestId("seu-dia-fazer")).toHaveTextContent("Fazer");
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/rotina");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3 · Rotina");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
     esperarPostIt();
     // ela marca o quadradinho de hoje (o módulo grava a chave de sempre)
     act(() => { store.valor().set("rotina-habits-checked", { [diaDeHoje()]: [true, false] }); });
@@ -318,7 +327,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     fireEvent.click(screen.getByTestId("seu-dia-fazer"));
     expect(rota()).toBe("/saude");
     const postIt = esperarPostIt();
-    fireEvent.click(within(postIt).getByTestId("demo-guia-chip"));
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]); // 1.0.16: sem meta de água, o chip é a meta (6/8/10) + o 1º copo
     expect((store.dados["core-saude-water"] as Record<string, number>)["2026-10-02"]).toBe(1);
     passarPeloOlhar();
     const festa3 = screen.getByTestId("missao-doses-festa");
@@ -351,7 +360,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     passarPeloOlhar();
     fireEvent.click(screen.getByTestId("missao-doses-amanha-agora"));
     expect(rota()).toBe("/rotina");
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3 · Rotina");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
     expect(eventos).toContainEqual(["missao_doses_amanha_agora", { dia: 1, prototipo: "web" }]);
   });
 });
@@ -418,5 +427,49 @@ describe("pular, sem trava dura", () => {
     expect(eventos).toContainEqual(["missao_pular", { dia: 1, passo: "olhar", segundos: expect.any(Number), via: "passo", prototipo: "web" }]);
     expect(screen.getByTestId("missao-doses-festa")).toBeInTheDocument();
     expect(lerMissao()?.feitos[1]?.rotulo).toBe("Café · R$ 12");
+  });
+});
+
+/* ------------------------------------------------------------ 17/10, revisão tela a tela #39 */
+
+describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a tela, #39)", () => {
+  const missaoCumprida = () => ({
+    ...iniciarMissao(["financas", "rotina", "saude"], "2026-09-30"), boasVindas: true,
+    feitos: { 1: { dia: "2026-09-30", rotulo: "Café · R$ 12" }, 2: { dia: "2026-10-01", rotulo: "Beber água ao acordar" }, 3: { dia: "2026-10-02", rotulo: "1 copo d'água · meta 8" } },
+  });
+
+  it("o 'Continuar com o meu CORE' fica COLADO embaixo (sticky no que rola, com degradê e a área segura) — rolado até o fim, nada fica atrás dele", () => {
+    const aoContinuar = vi.fn();
+    render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} aoContinuar={aoContinuar} /></Provedor></MemoryRouter>);
+    const fim = screen.getByTestId("missao-doses-fim");
+    expect(fim.className).toContain("overflow-y-auto"); // a folha inteira rola
+    const rodape = screen.getByTestId("missao-doses-fim-rodape");
+    // o botão mora no rodapé colado — e o rodapé é a ÚLTIMA coisa da coluna que rola (no fluxo: rolado até o fim, as
+    // pendências ficam inteiras acima dele)
+    expect(within(rodape).getByTestId("missao-doses-continuar")).toHaveTextContent("Continuar com o meu CORE");
+    expect(rodape.parentElement!.lastElementChild).toBe(rodape);
+    expect(fim.contains(rodape)).toBe(true);
+    // a regra do rodapé (missao-doses.css): colado no fluxo, empurrado pro fim quando sobra espaço, degradê, área segura
+    expect(rodape.className).toBe("md-fim-rodape");
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/missao-doses/missao-doses.css"), "utf8");
+    const regra = /(?:^|\n)\.md-fim-rodape\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    const prop = (nome: string) => new RegExp(`(?:^|;|\\s)${nome}\\s*:\\s*([^;]+)`).exec(regra)?.[1].trim() ?? "";
+    expect(prop("position")).toBe("sticky");
+    expect(prop("bottom")).toBe("0");
+    expect(prop("margin").split(/\s+/)[0]).toBe("auto");
+    expect(prop("padding")).toContain("--app-safe-bottom"); // por cima da barra do iPhone
+    expect(prop("background")).toMatch(/^linear-gradient\(to bottom, hsl\(var\(--background\) \/ 0\)/); // o que rola por baixo some no degradê
+    // a ordem não mudou: pendências de amanhã e, por último, o botão
+    expect(rodape.previousElementSibling).toBe(screen.getByTestId("missao-doses-fim-pendencias"));
+    fireEvent.click(screen.getByTestId("missao-doses-continuar"));
+    expect(aoContinuar).toHaveBeenCalledTimes(1);
+  });
+
+  it("o título equilibra as 2 linhas (text-balance) e o '3 dias' não se separa — nunca 'dias' sozinho na 2ª linha", () => {
+    render(<MemoryRouter><Provedor store={montarStore(conta())}><ConstruiuEm3Dias missao={missaoCumprida()} aoContinuar={() => {}} /></Provedor></MemoryRouter>);
+    const titulo = screen.getByTestId("missao-doses-fim-titulo");
+    expect(titulo.tagName).toBe("H1");
+    expect(titulo.className.split(/\s+/)).toContain("text-balance");
+    expect(titulo.textContent).toBe("O que você construiu em 3\u00a0dias");
   });
 });

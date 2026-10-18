@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { plataformaApp } from "@/lib/native-shell";
+import { iniciarFichaDoAparelho, propriedadesComuns } from "@/lib/aparelho";
+import { anotarPeloEvento } from "@/lib/momento-ruim";
 
 // Persistent session id for the tab
 const SESSION_KEY = "core_session_id";
@@ -297,6 +299,8 @@ export const capturarDispositivoApp = async () => {
       tela_a: window.screen?.height ?? 0,
       densidade: window.devicePixelRatio ?? 1,
       nucleos: navigator.hardwareConcurrency ?? 0,
+      // 17/10 (relatório 11 §7): o corte por modo escuro não existia
+      tema: document.documentElement.classList.contains("dark") ? "escuro" : "claro",
     });
   } catch {
     // telemetria nunca derruba o app
@@ -363,10 +367,17 @@ export const trackEvent = (
 ) => {
   try {
     const meta = getStoredMeta();
-    const payload = { ...meta, ...data };
+    // 10/10: a ficha do aparelho (device_id, versão, plataforma, turma, att) vai em
+    // TODO evento — ver lib/aparelho. Só soma: o `data` do evento vence.
+    const payload = { ...meta, ...propriedadesComuns(), ...data };
+    anotarPeloEvento(eventName);
 
-    supabase.auth.getUser().then(({ data: u }) => {
-      const userId = u?.user?.id ?? null;
+    // 17/10 (desempenho): getSession (a sessão do aparelho) e não getUser — o getUser vai ao servidor
+    // (/auth/v1/user) a CADA evento: cada evento eram 2 pedidos em fila (abrir Finanças numa conta nova
+    // = 6 idas ao /auth/v1/user só pra telemetria). O insert sai com o token da mesma sessão e a RLS
+    // confere o dono do mesmo jeito; a renovação do token vencido acontece igual nos dois.
+    supabase.auth.getSession().then(({ data: s }) => {
+      const userId = s?.session?.user?.id ?? null;
       (supabase as any)
         .from("analytics_events")
         .insert({
@@ -399,7 +410,7 @@ export const trackEventBeacon = (eventName: string, data: Record<string, unknown
     const corpo = (userId: string | null) => JSON.stringify({
       user_id: userId,
       event_name: eventName,
-      event_data: { ...meta, ...data },
+      event_data: { ...meta, ...propriedadesComuns(), ...data },
       trial_day: null,
       session_id: getSessionId(),
     });
@@ -426,6 +437,13 @@ export const trackEventBeacon = (eventName: string, data: Record<string, unknown
     setTimeout(() => { if (!mandou) { mandou = true; manda(null); } }, 60);
   } catch { /* swallow */ }
 };
+
+/**
+ * Boot da ficha do aparelho (10/10): garante device_id/turma, carrega a versão
+ * e emite `app_primeira_abertura` 1× por aparelho (só no app das lojas).
+ * Chamado no main.tsx antes do React montar. Nunca lança.
+ */
+export const iniciarMedicaoDoAparelho = (): Promise<void> => iniciarFichaDoAparelho(trackEvent);
 
 /**
  * Marks a one-time activation action for the current user.

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { reais } from "@/lib/dinheiro";
-import { mesAtualExtenso, localDayKey } from "@/lib/utils";
+import { localDayKey } from "@/lib/utils";
 import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -8,11 +8,18 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLocation } from "react-router-dom";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ModuleTip } from "@/components/ModuleTip";
+import { CartoesDoModulo } from "@/components/cartoes-modulo/CartoesDoModulo";
+import { cartoesFinancas } from "@/components/cartoes-modulo/cartoes-financas";
+import { cartoesLigados, guardarForcasDaUrl } from "@/lib/tour-home";
+import { guardarForcaDaIntro, introLigada } from "@/lib/intro-modulo";
+import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { ArrowLeft, DollarSign, Sparkles } from "lucide-react";
 import { AskCore } from "@/components/ask/AskCore";
 
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { ConviteAvaliacao, type GastoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
@@ -51,7 +58,9 @@ import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
-import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import { CHAVE_FATURAS_PAGAS, chaveDaFatura, ehEstimativaDaFatura, extrairFaturas, faturasAVencer, injetarFaturas, mesDeFechamento, parcelasDoMesPassado } from "@/lib/finance-faturas";
+import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
+import { usePainelLimpo } from "@/hooks/use-painel-limpo";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
@@ -67,6 +76,8 @@ import { useKitPrimeiroMes } from "@/hooks/use-kit-primeiro-mes";
 import type { DestinoDoKit } from "@/lib/kit-primeiro-mes";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
+import { MontarFinancas, useMontarFinancasNoModulo } from "@/components/finance/montar/MontarFinancas";
+import { MONTAR_FINANCAS_NO_MODULO, gastoDoDia } from "@/lib/montar-financas";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -86,12 +97,26 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const demoDoFunil = useDemoDoFunil();
   const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
+  /* 1.0.16 — "Vamos montar suas Finanças" (lib/montar-financas). REGRA DO DONO (17/10): entrar em
+     Finanças NÃO abre o quiz — "não quero que a pessoa clique em um módulo e apareça um quiz, é só se a
+     pessoa escolher primeiro". Quem abre a tela é a MISSÃO do teste (1ª dose de quem escolheu
+     dinheiro/"tudo", origem "missao"); a curiosidade ganha o tutorial do 1º gasto (outro ramo).
+     `MONTAR_FINANCAS_NO_MODULO` = false: o hook responde "nao" na hora (sem tela em branco esperando o
+     dado da conta) e os dois retornos lá embaixo ficam travados. O hook continua lendo o QA da URL. */
+  const montar = useMontarFinancasNoModulo(isPreview, MONTAR_FINANCAS_NO_MODULO);
+  /* 1.0.16 — PAINEL LIMPO do Dashboard (conta nova; lib/financas-painel-limpo). Decidido AQUI, na
+     abertura do módulo (antes do 1º lançamento; não depende do Montar — quem passou por ele PELA MISSÃO
+     entra pela marca da conta); cliente antigo: sempre o de hoje. */
+  const painelLimpo = usePainelLimpo(isPreview);
   /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma
      por aparelho, só se nunca lançou nada, só se a cota permite) acontece
      AQUI, na hora do toque; a folha entra 1,2s depois, com a linha nova já
      visível na tabela — mesma coreografia do ✓ da conta paga. */
   const [convite, setConvite] = useState<GastoDoConvite | null>(null);
   const aoPrimeiroGasto = (gasto: GastoDoConvite) => {
+    // 17/10 (teste sem rede no Android 132): antes de a conta chegar do servidor a lista de gastos
+    // está vazia na tela — um gasto feito nesse meio-tempo NÃO é o 1º da vida de quem já tem histórico
+    if (!userDataLoaded) return;
     if (!reservarConvitePrimeiroGasto(user?.id ?? null, gasto.id)) return;
     window.setTimeout(() => setConvite(gasto), 1200);
   };
@@ -228,10 +253,49 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     });
   }, [mesAgora, mesAnterior, expenses, expensesAnterior, fixedExpenses, installments, cartoes, configOf, labelDoCartao, faturasPagas, getUserData, perfilValido]);
   const dueDaysComFaturas = useMemo(() => injetarFaturas(dueDays as any[], faturas), [dueDays, faturas]);
+  /* 1.0.16 — A FATURA DO MONTAR É UMA SÓ NOS DOIS LUGARES. A estimativa ("Fatura do cartão", custo
+     fixo marcado — lib/finance-faturas `ehEstimativaDaFatura`) não tem conta própria no MEU MÊS: a
+     linha da fatura é a conta dela. Então o ✓ dela nos custos fixos (carimbo `pagoEm` do mês) e o
+     "paguei" da linha andam juntos — marcou num, marca no outro. Fixo sem a marca: nada muda. */
+  const cartaoTemVencimento = (card: unknown) => typeof card === "string" && !!configOf(card)?.dueDay;
+  const comEstimativasMarcadas = (lista: any[], marcadas: { card: string; paga: boolean }[]): any[] => {
+    if (!marcadas.length) return lista;
+    let mudou = false;
+    const nova = lista.map((f) => {
+      const m = ehEstimativaDaFatura(f) ? marcadas.find((x) => x.card === f.cardName) : undefined;
+      if (!m) return f;
+      if (m.paga && f.pagoEm !== mesAgora) { mudou = true; return { ...f, pagoEm: mesAgora }; }
+      if (!m.paga && f.pagoEm === mesAgora) { mudou = true; const { pagoEm: _p, ...resto } = f; return resto; }
+      return f;
+    });
+    return mudou ? nova : lista;
+  };
+  /** O ✓ de um custo fixo mudou: se for a estimativa de um cartão com vencimento, a fatura acompanha. */
+  const setFixedExpensesComFatura = (lista: any[]) => {
+    const antes = new Map((fixedExpenses as any[]).map((f) => [f?.id, f]));
+    const mudaram: { card: string; paga: boolean }[] = [];
+    for (const f of Array.isArray(lista) ? lista : []) {
+      if (!ehEstimativaDaFatura(f) || !cartaoTemVencimento(f.cardName)) continue;
+      const a = antes.get(f.id);
+      if (!a) continue;
+      const pagaAgora = f.pagoEm === mesAgora;
+      if ((a.pagoEm === mesAgora) !== pagaAgora && !mudaram.some((m) => m.card === f.cardName)) mudaram.push({ card: f.cardName, paga: pagaAgora });
+    }
+    setFixedExpenses(comEstimativasMarcadas(lista, mudaram));
+    if (mudaram.length) marcarFaturas(mudaram);
+  };
   const setDueDaysComFaturas = (lista: any[]) => {
     const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
     setDueDays(reais as any[]);
     if (!marcadas.length) return;
+    // a estimativa só segue a fatura que MUDOU (tocar outra conta devolve todas as faturas de novo)
+    const mudaram = marcadas.filter((m) => (faturas.find((f) => f.card === m.card)?.paga ?? false) !== m.paga);
+    const fixosNovos = comEstimativasMarcadas(fixedExpenses as any[], mudaram);
+    if (fixosNovos !== fixedExpenses) setFixedExpenses(fixosNovos as any[]);
+    marcarFaturas(marcadas);
+  };
+  /** "Paguei" das faturas: o `finance-faturas-pagas` + as parcelas daquele cartão no mês (22/09). */
+  const marcarFaturas = (marcadas: { card: string; paga: boolean }[]) => {
     const pagas = { ...(faturasPagas ?? {}) };
     let parcelasNovas = installments as Parcela[];
     let mudouParcela = false;
@@ -287,6 +351,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userDataLoaded]);
 
+  // muda quando uma estimativa da fatura ganha/perde o vencimento do cartão (o sync abaixo depende disso)
+  const chaveDasEstimativas = (fixedExpensesTodos as any[]).filter(ehEstimativaDaFatura).map((f) => `${f.id}:${configOf(f.cardName)?.dueDay ?? ""}`).join("|");
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
   // O sync devolve null quando nada mudou — sem loop de render.
@@ -295,10 +361,14 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     /* LISTA COMPLETA de propósito. O sync apaga toda conta cujo custo fixo
        não esteja na lista (finance-sync.ts): com a lista filtrada por perfil,
        trocar pra "Empresa X" apagaria as contas do Pessoal do calendário. */
-    const synced = syncFixedExpensesToBills(fixedExpensesTodos, dueDaysTodos);
+    /* 1.0.16: a estimativa da fatura do Montar (num cartão com vencimento) NÃO vira conta própria,
+       nem se a pessoa puser um "Dia" nela — a linha "Fatura Nubank · R$ X" é a conta dela; as duas no
+       mesmo dia eram a mesma fatura duas vezes no MEU MÊS e nos alertas. */
+    const fixosQueViramConta = (fixedExpensesTodos as any[]).filter((f) => !(ehEstimativaDaFatura(f) && cartaoTemVencimento(f.cardName)));
+    const synced = syncFixedExpensesToBills(fixosQueViramConta, dueDaysTodos);
     if (synced) setDueDaysTodos(synced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userDataLoaded, fixedExpensesTodos, dueDaysTodos]);
+  }, [userDataLoaded, fixedExpensesTodos, dueDaysTodos, chaveDasEstimativas]);
 
   const [annualData, setAnnualData] = usePersistedState("finance-annual", 
     months.map((m) => ({
@@ -328,6 +398,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // conta é a de sempre (lib/finance-fatura).
   const variaveisMes = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf);
   const totalVariableExpenses = variaveisMes.total;
+  /* 17/10 — o que ela gastou HOJE (variáveis que contam neste mês): a linha "Sobram R$ X pra hoje" do card
+     QUANTO POSSO GASTAR HOJE (Dashboard `gastoDeHoje`; no de sempre só aparece com gasto hoje). */
+  const gastoDeHoje = gastoDoDia(variaveisMes.noMes);
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
   const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
@@ -363,17 +436,6 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     ? goals.reduce((sum: number, g: any) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100), 0) / goals.length
     : 0;
 
-  const currentMonth = mesAtualExtenso();
-  /* Versão curta pra tela estreita (05/08). Medido no motor do aparelho do
-     dono (Chromium 77, 360px): "agosto de 2026" ocupa 87px e o cabeçalho
-     precisa de 329px num espaço de 328 — por isso ele via "Agosto De 2..."
-     cortado. Abaixo de 400px entra "Ago 2026" (~50px) e o rótulo cabe
-     inteiro; daí pra cima nada muda. */
-  const mesCurto = new Date()
-    .toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
-    .replace(/\.?\s*de\s*/i, " ")
-    .replace(".", "");
-
   /* KIT PRIMEIRO MÊS (18/10): a aba só existe pra quem comprou o kit (chave
      core-kit-primeiro-mes) — sem cadeado nem anúncio pra quem não comprou. */
   const { kit: kitPrimeiroMes } = useKitPrimeiroMes();
@@ -398,6 +460,19 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     { id: "relatorios", label: "📋 RELATÓRIOS" },
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
   ];
+
+  // travado por MONTAR_FINANCAS_NO_MODULO (17/10, ver lá em cima): o módulo não abre o quiz sozinho
+  if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "decidindo") return <div className="min-h-screen bg-background" />;
+  if (MONTAR_FINANCAS_NO_MODULO && montar.estado === "mostrar") {
+    return (
+      <MontarFinancas
+        origem="modulo"
+        onPronto={() => { montar.aoPronto(); setActiveTab("financeiro"); window.scrollTo?.(0, 0); }}
+        onPular={montar.aoPular}
+        onCeder={montar.aoCeder}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -445,24 +520,23 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          <DollarSign className="w-5 h-5 text-amber-600" />
+          <DollarSign className="w-5 h-5 text-amber-600 shrink-0" />
           <h1 className="text-base font-bold tracking-tight shrink-0">FINANÇAS</h1>
-          <div className="flex items-center gap-2 ml-auto min-w-0">
-            {/* truncate + nowrap (04/08): sem isto "agosto de 2026" QUEBRAVA em
-                duas linhas no aperto e caía por cima do título/chips (foto do
-                dono no aparelho de tela estreita). Mês é rótulo — ou cabe numa
-                linha, ou encurta. */}
-            <span className="text-muted-foreground text-xs whitespace-nowrap truncate max-[399px]:hidden">{currentMonth}</span>
-            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap min-[400px]:hidden">{mesCurto}</span>
-            {/* Pergunte ao CORE — disponível em qualquer aba */}
+          {/* O mês numa linha só (MesDoCabecalho: "Out 2026" no celular, por extenso de 460 px pra cima; some a
+              375 px — Finanças tem 3 botões). 17/10, print do dono a 390 px: o ✨ "completamente achatado" e
+              "Outubro muito junto de Finanças" — os botões e o mês não encolhem mais (shrink-0) e o "Dicas" virou
+              só o ícone, do tamanho do botão do tema. */}
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho compacto />
+            {/* Pergunte ao CORE — disponível em qualquer aba (a área de toque de 44 px é o ::before invisível) */}
             <button
               onClick={() => setAskOpen(true)}
               aria-label="Pergunte ao CORE"
-              className="grid place-items-center w-9 h-9 rounded-xl transition-colors" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
+              className="relative shrink-0 grid place-items-center w-9 h-9 rounded-xl transition-colors before:absolute before:-inset-1 before:content-['']" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
             >
               <Sparkles className="w-4 h-4" />
             </button>
-            <ThemeToggle />
+            <AcessoConhecerMais moduleId="financas" /><ThemeToggle />
           </div>
         </div>
         {/* Tabs */}
@@ -481,6 +555,14 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
+        {/* 10/10 — CARTÕES DE BOAS-VINDAS (CARTOES_MODULO, lib/tour-home): 1ª visita, fora da missão e do
+            holofote; nunca na demo. Desligada, não existe o nó. */}
+        {/* 16/10 — INTRO DO MÓDULO (INTRO_MODULO, lib/intro-modulo; ligada no app na 1.0.16): com ela ligada, a 1ª ação
+            guiada substitui os cartões, que saem do fluxo (a porta única dos outros módulos é o BoasVindasDoModulo;
+            Finanças monta os dois à mão). */}
+        {!isPreview && (guardarForcaDaIntro(), introLigada())
+          ? <IntroDoModulo moduleId="financas" />
+          : !isPreview && (guardarForcasDaUrl(), cartoesLigados()) && <CartoesDoModulo config={cartoesFinancas({ irParaFinanceiro: () => setActiveTab("financeiro") })} />}
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && activeTab !== "kit" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que
@@ -510,7 +592,81 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           </div>
         )}
 
-        {activeTab === "dashboard" && (
+        {/* 1.0.16 — PAINEL LIMPO (conta nova, lib/financas-painel-limpo): os mais usados no topo, na
+            ordem do dono, o Desafio da semana à vista e o resto no "Mais gráficos". Os pedaços que
+            moram em outras abas (MEU MÊS, TOTAL POR CARTÃO) entram com os MESMOS dados e setters da aba
+            MEU FINANCEIRO. O convite dos lembretes conta a fatura do cartão como conta a lembrar (é
+            ela que o aviso de véspera traz). Cliente antigo: o bloco de baixo, idêntico ao de antes. */}
+        {activeTab === "dashboard" && painelLimpo && (
+          <>
+            <WrappedBanner />
+            <PedirLembretes dueDays={dueDaysComFaturas as never} />
+            <TrackedCard cardKey="dashboard" tab="dashboard">
+              <Dashboard
+                totalIncome={totalIncome}
+                totalExpenses={monthlyOutflow}
+                monthlyInstallments={monthlyInstallments}
+                totalDebts={totalDebts}
+                totalInvestments={totalInvestments}
+                expenses={expenses}
+                fixedExpenses={fixedExpenses}
+                dueDays={dueDaysComFaturas as any[]}
+                savingsRate={savingsRate}
+                incomes={incomes}
+                onNavigate={(tab) => setActiveTab(tab)}
+                perfil={perfilValido}
+                limpo
+                gastoDeHoje={gastoDeHoje}
+                meuMes={
+                  <TrackedCard cardKey="month-calendar" tab="dashboard">
+                    <MonthCalendar
+                      incomes={incomes}
+                      expenses={expenses}
+                      fixedExpenses={fixedExpenses}
+                      dueDays={dueDaysComFaturas as any[]}
+                      setDueDays={setDueDaysComFaturas}
+                      installments={installments}
+                      totalIncome={totalIncome}
+                      monthlyOutflow={monthlyOutflow}
+                      reserva={{
+                        guardado: reservaEmergencia.guardado,
+                        meta: metaDaReserva(monthlyOutflow, reservaEmergencia.meses),
+                        registrada: reservaEmergencia.registrada,
+                      }}
+                      onAbrirReserva={() => { setActiveTab("financeiro"); window.setTimeout(irParaReserva, 250); }}
+                    />
+                  </TrackedCard>
+                }
+                totalPorCartao={
+                  <TotalPorCartao
+                    parcelas={installments as Parcela[]}
+                    variableExpenses={expenses}
+                    variableExpensesAnterior={expensesAnterior}
+                    fixos={fixedExpenses}
+                    mes={mesAgora}
+                  />
+                }
+                depoisDoTopo={
+                  <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+                    <WeeklyChallenge expenses={expenses} />
+                  </TrackedCard>
+                }
+                maisGraficos={
+                  <>
+                    <TrackedCard cardKey="month-comparison" tab="dashboard">
+                      <MonthComparison perfil={perfilValido} />
+                    </TrackedCard>
+                    <TrackedCard cardKey="year-comparison" tab="dashboard">
+                      <YearComparison perfil={perfilValido} />
+                    </TrackedCard>
+                  </>
+                }
+              />
+            </TrackedCard>
+          </>
+        )}
+
+        {activeTab === "dashboard" && !painelLimpo && (
           <>
             {!demoDoFunil && <WrappedBanner />}
             {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
@@ -537,6 +693,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 incomes={incomes}
                 onNavigate={(tab) => setActiveTab(tab)}
                 perfil={perfilValido}
+                gastoDeHoje={gastoDeHoje}
             />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
@@ -615,7 +772,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 <div className="min-w-0">
                   <TrackedCard cardKey="fixed-expenses" tab="financeiro">
                     {/* 08/10: ✓ de paga direto na lista (a conta fx-<id> do MEU MÊS; sem Dia, o carimbo pagoEm do mês) */}
-                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesAgora} />
+                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpensesComFatura} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesAgora} />
                   </TrackedCard>
                 </div>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
@@ -668,6 +825,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                       setInstallments={setInstallments}
                       variableExpenses={expenses}
                       variableExpensesAnterior={expensesAnterior}
+                      fixos={fixedExpenses}
                       mes={mesAgora}
                     />
                   </div>

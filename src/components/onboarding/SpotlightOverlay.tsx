@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import { tutorialAntigoPodeMarcarVisto } from "@/lib/intro-modulo";
 
 export interface SpotlightStep {
   selector: string;
@@ -95,7 +96,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     } else {
       setActive(false);
       // Para usuários logados (sem flag de tutorial), marca como concluído para não reaparecer.
-      if (!isGuest && !forceNewUser && !done) {
+      // …menos quando a missão segura a intro nova deste módulo hoje (a dose é dele): aí a marca faria o módulo
+      // perder o tutorial pra sempre se a dose não for feita (rev3, 17/10)
+      if (!isGuest && !forceNewUser && !done && tutorialAntigoPodeMarcarVisto(moduleKey, get)) {
         set(`spotlight-done-${moduleKey}`, "true");
       }
     }

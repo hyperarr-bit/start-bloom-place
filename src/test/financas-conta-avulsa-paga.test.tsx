@@ -70,6 +70,7 @@ import { PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 import Index from "@/pages/Index";
+import { porDiaExato } from "@/lib/lembrete-dia2";
 
 const dia17 = new Date(2026, 9, 17, 10); // outubro tem 31 dias → 15 dias contando hoje
 const fixos = [
@@ -248,14 +249,19 @@ describe("MEU MÊS: marcar a Netflix como paga não mexe no número", () => {
     const c = {} as Controle;
     render(<MemoryRouter initialEntries={["/financas"]}><Provedor inicial={inicial} controle={c}><App /></Provedor></MemoryRouter>);
 
+    // cards simples (padrão desde 17/10): o herói "R$ X por dia" e a conta atrás de "Como chegamos nesse número ›"
     const limite = async () => {
       const titulo = await screen.findByText("QUANTO POSSO GASTAR HOJE");
-      return titulo.closest("div")!.textContent!.replace(/\s+/g, " ");
+      const card = titulo.closest("div")!;
+      const verConta = card.querySelector<HTMLButtonElement>("[data-testid=pode-gastar-ver-conta]");
+      if (verConta && verConta.getAttribute("aria-expanded") !== "true") await act(async () => { fireEvent.click(verConta); });
+      return card.textContent!.replace(/\s+/g, " ");
     };
     // DASHBOARD antes: 3.000 − 1.150 − 45 = 1.805 livres ÷ 15 dias = R$ 120/dia
     const antes = await limite();
-    expect(antes).toContain("R$ 120");
-    expect(antes).toContain("Disponível livreR$ 1.805");
+    expect(antes).toContain("R$ 120 por dia");
+    expect(antes).toMatch(/Livre ?= R\$ 1\.805/);
+    expect(antes).toMatch(/Sai ?−R\$ 1\.195/);
     expect(antes).not.toContain("Contas sem valor");
 
     fireEvent.click(screen.getByRole("button", { name: /MEU FINANCEIRO/ }));
@@ -274,4 +280,20 @@ describe("MEU MÊS: marcar a Netflix como paga não mexe no número", () => {
     fireEvent.click(screen.getByRole("button", { name: /DASHBOARD/ }));
     expect(await limite()).toBe(antes);
   }, 30_000);
+});
+
+/* ── 1.0.16: o número da missão (porDiaExato, lib/lembrete-dia2) = o do card ── */
+describe("missão (1.0.16): porDiaExato conta a avulsa paga ou não", () => {
+  it("3.000 − 1.150 − 45 = 1.805 ÷ 15 dias, antes e depois do ✓", () => {
+    const leitor = (netflix: { paid: boolean; value?: number }) => {
+      const dados: Record<string, unknown> = {
+        "finance-incomes": [{ id: "r", value: 3000 }],
+        "finance-fixed-expenses": fixos,
+        "finance-dueDays": contasDoMes(netflix),
+      };
+      return <T,>(k: string, fb: T): T => (k in dados ? (dados[k] as T) : fb);
+    };
+    expect(porDiaExato(leitor({ paid: false, value: 45 }), dia17)).toBeCloseTo(1805 / 15, 6);
+    expect(porDiaExato(leitor({ paid: true, value: 45 }), dia17)).toBeCloseTo(1805 / 15, 6);
+  });
 });

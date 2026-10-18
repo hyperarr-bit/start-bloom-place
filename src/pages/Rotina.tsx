@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { alternarHabitoNoDia, marcaDoDia, nivelDoHeatmap, type LogDoHeatmap } from "@/lib/rotina-habitos";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
-import { semanaAtualId, mesAtualExtenso, localDayKey, dataSegura } from "@/lib/utils";
+import { semanaAtualId, localDayKey, dataSegura } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { TarefasDeHoje } from "@/components/tarefas/tarefas-do-dia";
@@ -30,11 +30,18 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
+import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
+import { useMontarRotinaNoModulo, useVigiaDoPrimeiroMarcado } from "@/components/rotina/montar/use-montar-rotina";
+
+/* 1.0.16 — "Rotina pronta em 3 toques" (components/rotina/montar). Só desce se o caminho do módulo for
+   religado (MONTAR_ROTINA_NO_MODULO, hoje false): o quiz é da missão, não da 1ª abertura da Rotina. */
+const MontarRotinaNoModulo = lazy(() => import("@/components/rotina/montar/MontarRotina").then((m) => ({ default: m.MontarRotina })));
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 
@@ -687,7 +694,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog, streakL
         </div>
         <div className="flex items-center gap-1 text-white">
           <Flame className="w-3 h-3" />
-          <span className="text-xs font-bold">{streak} dias seguidos</span>
+          <span className="text-xs font-bold">{streak} {streak === 1 ? "dia seguido" : "dias seguidos"}</span>
         </div>
       </div>
       <div className="p-4">
@@ -1210,7 +1217,11 @@ const Rotina = () => {
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const fasesUsadas = useFasesEmUso();
-  const currentMonth = mesAtualExtenso();
+  /* 1.0.16 — "Rotina pronta em 3 toques". Dono, 17/10: o quiz NÃO abre por entrar na Rotina — só pela missão
+     (dose 1 de quem escolheu Rotina). Aqui: o vigia do 1º quadradinho marcado depois do guia (evento
+     montar_rotina_primeiro_marcado, uma vez) e o caminho do módulo, fechado (estado sempre "nao"). */
+  useVigiaDoPrimeiroMarcado();
+  const montarNoModulo = useMontarRotinaNoModulo();
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);
@@ -1347,6 +1358,12 @@ const Rotina = () => {
   return (
     <div className="min-h-screen bg-background">
       {RotinaCompletionDialog}
+      {montarNoModulo.estado === "decidindo" && <div className="fixed inset-0 z-[200] bg-background" aria-hidden />}
+      {montarNoModulo.estado === "mostrar" && (
+        <Suspense fallback={<div className="fixed inset-0 z-[200] bg-background" aria-hidden />}>
+          <MontarRotinaNoModulo origem="modulo" onPronto={montarNoModulo.aoPronto} onPular={montarNoModulo.aoPular} onCeder={montarNoModulo.aoCeder} />
+        </Suspense>
+      )}
       <SpotlightOverlay
         moduleKey="rotina"
         onComplete={onRotinaComplete}
@@ -1362,11 +1379,11 @@ const Rotina = () => {
           <button onClick={voltarDoModulo} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Calendar className="w-5 h-5 text-emerald-600" />
-          <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
-            <ThemeToggle />
+          <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />
+          <h1 className="text-base font-bold tracking-tight shrink-0">ROTINA</h1>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
+            <AcessoConhecerMais moduleId="rotina" /><ThemeToggle />
           </div>
         </div>
         {/* Barra de abas com "ocultar" (segurar a aba ou o ⋯ no fim) — mesma
@@ -1375,7 +1392,7 @@ const Rotina = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <ModuleTip
+        <BoasVindasDoModulo
           moduleId="rotina"
           tips={[
             "Adicione seus hábitos diários e marque conforme concluir cada um",

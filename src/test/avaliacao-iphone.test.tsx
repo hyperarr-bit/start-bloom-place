@@ -39,13 +39,13 @@ beforeEach(() => {
 });
 afterEach(() => { delete (window as unknown as { Capacitor?: unknown }).Capacitor; });
 
-const base = { iphone: true, acao: "first_workout", pagante: true, emTrial: false, dias: 2, podePedir: true, conviteRecente: false, recusas: 0 };
+const base = { iphone: true, acao: "first_workout", pagante: true, emTrial: false, dias: 2, podePedir: true, conviteRecente: false };
 
 describe("regra do convite de valor (pura)", () => {
   it("paga, fora do trial, 2 dias de uso, ação de valor, sem convite recente: convida", () => {
     expect(deveConvidarNoMomentoDeValor(base)).toBe(true);
   });
-  it("não convida: Android, ação que não é de valor, não pagante, no trial, 1 dia só, convite recente, cota fechada, 2 recusas", () => {
+  it("não convida: Android, ação que não é de valor, não pagante, no trial, 1 dia só, convite recente, cota fechada", () => {
     expect(deveConvidarNoMomentoDeValor({ ...base, iphone: false })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, acao: "first_note" })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, acao: null })).toBe(false);
@@ -54,7 +54,6 @@ describe("regra do convite de valor (pura)", () => {
     expect(deveConvidarNoMomentoDeValor({ ...base, dias: 1 })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, conviteRecente: true })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, podePedir: false })).toBe(false);
-    expect(deveConvidarNoMomentoDeValor({ ...base, recusas: 2 })).toBe(false);
   });
 });
 
@@ -77,10 +76,10 @@ describe("reservarConviteDeValor (iPhone)", () => {
     expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(true);
     expect(reservarConviteDeValor("first_transaction", { pagante: true, emTrial: false })).toBe(false); // mesma semana
   });
-  it("depois de 2 'Agora não', nunca mais", () => {
+  it("1.0.16: 2 'Agora não' da folha antiga NÃO barram mais (a recusa era da folha, não da Apple)", () => {
     doisDias();
     registrarRecusaDeValor(); registrarRecusaDeValor();
-    expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(false);
+    expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(true);
   });
   it("no trial não convida (espera virar pagamento)", () => {
     doisDias();
@@ -146,18 +145,67 @@ describe("folha no iPhone", () => {
   });
 });
 
-describe("ConviteDeValor (escuta as ações salvas)", () => {
-  it("pagante com 2 dias de uso registra um treino → a folha abre com 'Treino registrado'", async () => {
+describe("ConviteDeValor (escuta as ações salvas) — 1.0.16: caixinha da Apple direto, sem folha", () => {
+  const acao = (action: string) => act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action, key: "k" } })); });
+  const esperar = () => new Promise((r) => setTimeout(r, 1800));
+  it("pagante com 2 dias de uso registra um treino → pede a caixinha (momento_valor), sem folha nem app_avaliacao_convite", async () => {
     doisDias();
     render(<ConviteDeValor />);
-    act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_workout", key: "treino-semana-dos-checks" } })); });
-    await waitFor(() => expect(screen.getByText("Treino registrado")).toBeInTheDocument(), { timeout: 4000 });
-  });
-  it("ação que não é de valor não abre nada", async () => {
-    doisDias();
-    render(<ConviteDeValor />);
-    act(() => { window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_note", key: "notes" } })); });
-    await new Promise((r) => setTimeout(r, 1800));
+    acao("first_workout");
+    await waitFor(() => expect(m.requestReview).toHaveBeenCalledTimes(1), { timeout: 4000 });
+    expect(m.track).toHaveBeenCalledWith("app_avaliacao_pedida", expect.objectContaining({ motivo: "momento_valor", pagante: true }));
+    expect(m.track).not.toHaveBeenCalledWith("app_avaliacao_convite", expect.anything());
+    expect(screen.queryByText("Treino registrado")).not.toBeInTheDocument();
     expect(screen.queryByText(/DIAS USANDO O CORE/)).not.toBeInTheDocument();
+    // 90 dias depois de um pedido real: a próxima ação não pede
+    acao("first_transaction");
+    await esperar();
+    expect(m.requestReview).toHaveBeenCalledTimes(1);
+  });
+  it("quem acabou de instalar (1 dia de uso) não é pedido", async () => {
+    registrarDiaDeUso(); // só hoje (o componente também marca hoje ao montar)
+    render(<ConviteDeValor />);
+    acao("first_workout");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+  });
+  it("no teste grátis não pede", async () => {
+    doisDias(); m.trial = true;
+    render(<ConviteDeValor />);
+    acao("first_workout");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+  });
+  it("Android: o ConviteDeValor não faz nada", async () => {
+    plataforma("android"); doisDias();
+    render(<ConviteDeValor />);
+    acao("first_workout");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+  });
+  it("ação que não é de valor não pede", async () => {
+    doisDias();
+    render(<ConviteDeValor />);
+    acao("first_note");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+  });
+  it("1.0.16: no meio de uma dose da missão (<html data-missao-dose>) ou com uma guia na tela, NÃO pede — e a reserva fica pra próxima ação", async () => {
+    doisDias();
+    render(<ConviteDeValor />);
+    document.documentElement.setAttribute("data-missao-dose", "1");
+    acao("first_habit");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+    document.documentElement.removeAttribute("data-missao-dose");
+    const guia = document.createElement("div");
+    guia.setAttribute("data-camada-guia", "tour-home");
+    document.body.appendChild(guia);
+    acao("first_habit");
+    await esperar();
+    expect(m.requestReview).not.toHaveBeenCalled();
+    guia.remove();
+    acao("first_habit");
+    await waitFor(() => expect(m.requestReview).toHaveBeenCalledTimes(1), { timeout: 4000 });
   });
 });

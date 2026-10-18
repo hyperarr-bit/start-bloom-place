@@ -86,6 +86,11 @@ describe("plano dos avisos", () => {
     expect(antes).toMatchObject({ id: BASE + 1, title: "🩺 Daqui a 2 h: consulta com Dr. Hélio" });
     expect(antes.body).toContain("Às 14:30 · Rua A, 10");
   });
+  it("14/10: data ou hora impossível não derruba o plano — a consulta inválida só fica de fora", () => {
+    expect(() => planejarAvisosConsulta([c({ id: "ruim", time: "25:00" }), c({ id: "ruim2", date: "2026-02-31" }), c()], BASE, agora)).not.toThrow();
+    const avisos = planejarAvisosConsulta([c({ id: "ruim", time: "25:00" }), c({ id: "ruim2", date: "2026-02-31" }), c()], BASE, agora);
+    expect(avisos.length).toBeGreaterThanOrEqual(2);
+  });
   it("consulta do dependente leva o nome dele", () => {
     const [a] = planejarAvisosConsulta([c({ quem: "Mãe" })], BASE, agora);
     expect(a.title).toBe("🩺 Amanhã: consulta com Dr. Hélio (Mãe)");

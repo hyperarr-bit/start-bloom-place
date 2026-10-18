@@ -46,7 +46,9 @@ export const LinhaSequencia = ({ seq }: { seq: Sequencia }) => {
               garantido hoje <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden />
             </span>
           ) : (
-            <span className="text-muted-foreground truncate" data-testid="linha-sequencia-acao">falta 1 coisa hoje: {seq.acao.texto}</span>
+            // 17/10 (dono: "faz o que achar melhor"): "falta 1 coisa hoje: anote 1 coisa d…" cortava em 390 px —
+            // fica curto como o chip das Conquistas 2 ("Hoje: marque um hábito"), sem repetir o "hoje" do fim da ação
+            <span className="text-muted-foreground truncate" data-testid="linha-sequencia-acao">hoje: {seq.acao.texto.replace(/\s+(de\s+)?hoje\b\.?$/i, "")}</span>
           )}
         </>
       ) : (

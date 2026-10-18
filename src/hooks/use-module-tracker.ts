@@ -36,15 +36,17 @@ export const useModuleTracker = (moduleId: string) => {
     const seconds = Math.round((Date.now() - enteredAt.current.getTime()) / 1000);
     if (seconds < 2) return;
 
-    await (supabase as any)
-      .from("module_analytics")
-      .insert({
-        user_id: user.id,
-        module_id: moduleId,
-        entered_at: enteredAt.current.toISOString(),
-        duration_seconds: Math.min(seconds, TETO_VISITA_S),
-        tab_id: currentTab.current,
-      });
+    try {
+      await (supabase as any)
+        .from("module_analytics")
+        .insert({
+          user_id: user.id,
+          module_id: moduleId,
+          entered_at: enteredAt.current.toISOString(),
+          duration_seconds: Math.min(seconds, TETO_VISITA_S),
+          tab_id: currentTab.current,
+        });
+    } catch { /* o flush roda solto (saída da tela, segundo plano): erro não pode virar rejeição solta */ }
   }, [user, moduleId]);
 
   const reportTab: TabReporter = useCallback((tabId: string) => {
@@ -53,15 +55,23 @@ export const useModuleTracker = (moduleId: string) => {
     if (user && currentTab.current !== null) {
       const seconds = Math.round((Date.now() - enteredAt.current.getTime()) / 1000);
       if (seconds >= 2) {
-        (supabase as any)
-          .from("module_analytics")
-          .insert({
-            user_id: user.id,
-            module_id: moduleId,
-            entered_at: enteredAt.current.toISOString(),
-            duration_seconds: Math.min(seconds, TETO_VISITA_S),
-            tab_id: currentTab.current,
-          });
+        /* 16/10: sem `.then` o construtor do Supabase NUNCA dispara a requisição
+         * (o insert é preguiçoso: só roda quando alguém espera por ele) — toda
+         * troca de aba se perdia e o module_analytics só via a última aba de
+         * cada visita (a do flush). O `.then` executa; erro é engolido: medir
+         * nunca pode derrubar a tela. */
+        try {
+          void (supabase as any)
+            .from("module_analytics")
+            .insert({
+              user_id: user.id,
+              module_id: moduleId,
+              entered_at: enteredAt.current.toISOString(),
+              duration_seconds: Math.min(seconds, TETO_VISITA_S),
+              tab_id: currentTab.current,
+            })
+            .then(() => { /* ok */ }, () => { /* sem rede: perde a medição, nunca a tela */ });
+        } catch { /* idem */ }
       }
     }
     currentTab.current = tabId;

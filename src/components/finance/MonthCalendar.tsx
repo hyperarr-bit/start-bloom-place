@@ -155,8 +155,11 @@ export const MonthCalendar = ({
       const unpaid = (Array.isArray(d?.bills) ? d.bills : []).filter((b) => !b?.paid);
       totalBills += Array.isArray(d?.bills) ? d.bills.length : 0;
       if (!unpaid.length) continue;
-      if (d.day < today) { overdue += unpaid.length; continue; }
-      const inDays = d.day - today;
+      // "dia 31" em mês de 30 dias é o último dia — o mesmo do grid aqui embaixo (16/10)
+      const dia = Math.min(Number(d.day), daysInMonth);
+      if (!Number.isFinite(dia)) continue;
+      if (dia < today) { overdue += unpaid.length; continue; }
+      const inDays = dia - today;
       if (!next || inDays < next.inDays) next = { name: unpaid[0].name, inDays };
     }
     if (overdue > 0) return { tone: "alert" as const, text: `⚠ ${overdue} conta${overdue > 1 ? "s" : ""} atrasada${overdue > 1 ? "s" : ""}` };
@@ -166,7 +169,7 @@ export const MonthCalendar = ({
     };
     if (totalBills > 0) return { tone: "ok" as const, text: "✓ contas em dia" };
     return null;
-  }, [dueDays, today]);
+  }, [dueDays, today, daysInMonth]);
 
   // escreve no MESMO shape DueDay[] — cria o dia se ainda não existir
   const setBillsForDay = (day: number, mutate: (bills: Bill[]) => Bill[]) => {
@@ -269,6 +272,7 @@ export const MonthCalendar = ({
   return (
     <div
       data-spotlight="add-bill"
+      data-missao="meu-mes" /* 10/10: o "olhar" da missão em doses mira ESTE card (há outro add-bill: VENCIMENTOS DAS CONTAS) */
       className="rounded-2xl border border-sky-100 dark:border-sky-900/40 overflow-hidden animate-fade-in bg-gradient-to-b from-sky-50 via-white to-white dark:from-sky-950/60 dark:via-slate-950 dark:to-slate-950"
     >
       {/* céu do header: azul bebê + nuvens (chá revelação ☁️) */}

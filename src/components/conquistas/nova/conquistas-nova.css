@@ -1,0 +1,145 @@
+/* CONQUISTAS 2 (16/10) — direção B "Fogo & trilha" + o ÁLBUM como herói.
+   Tokens de escopo (claro + escuro); nada global muda. */
+
+.cn { --cn-papel: #fbf6ea; --cn-ponto: rgba(60, 50, 40, .16); --cn-tinta: #2b2b2f; --cn-grafite: #1c1c22; }
+.dark .cn { --cn-papel: hsl(var(--card)); --cn-ponto: rgba(255, 255, 255, .10); --cn-tinta: hsl(var(--foreground)); --cn-grafite: #14161c; }
+
+.cn-pontilhado { background-image: radial-gradient(circle, var(--cn-ponto) 1.1px, transparent 1.4px); background-size: 14px 14px; }
+.cn-serif { font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; letter-spacing: -.01em; }
+.cn-caps { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.cn-card { border-radius: 18px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); overflow: hidden; }
+.cn-pill { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; border-radius: 999px; font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+.cn-pill-tinta { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.cn-pill-acento { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.cn-pill-suave { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.cn-barra { display: block; height: 5px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+.cn-barra > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a81f62, #e0438f); }
+.cn-prog { position: absolute; right: -4px; bottom: 0; z-index: 4; height: 16px; padding: 0 5px; border-radius: 999px; background: hsl(var(--foreground)); color: hsl(var(--background)); font-size: 9px; font-weight: 800; display: inline-flex; align-items: center; white-space: nowrap; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); font-variant-numeric: tabular-nums; line-height: 1; }
+
+/* ---------- o cartão da SEQUÊNCIA na linguagem dos cards do app (16/10, dono: o grafite com brilho "parecia fora do app"):
+   faixa colorida do fogo com o título em caixa alta (igual ao card da sequência de hoje), superfície do card, tokens do escuro ---------- */
+.cn-seq { border-color: var(--fg-borda, hsl(var(--border))); }
+.dark .cn-seq { border-color: var(--fg-borda-escuro, hsl(var(--border))); }
+.cn-seq-cab { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; background: linear-gradient(90deg, var(--fg-a, #fb923c), var(--fg-b, #f43f5e)); color: var(--fg-texto, #fff); }
+.cn-seq[data-faixa="apagado"] .cn-seq-cab { background: linear-gradient(90deg, #a8a29e, #78716c); color: #fff; }
+/* a linha compacta: fogo + número + "dias seguidos" | os 7 pontos da semana */
+.cn-seq-linha { display: flex; align-items: center; gap: 10px; }
+.cn-seq-dias { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.cn-seq-num { font-size: 34px; font-weight: 900; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
+.cn-seq-rot { font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.cn-seq-semana { margin-left: auto; display: grid; grid-template-columns: repeat(7, 16px); gap: 3px; flex-shrink: 0; }
+.cn-seq-resumo { margin-top: 8px; font-size: 11.5px; font-weight: 600; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+/* o anel de 7 arcos (só no detalhe da sequência) */
+.cn-b-anel { position: relative; width: 172px; height: 172px; margin: 0 auto; }
+.cn-b-anel > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.cn-b-anel .cn-b-seg { fill: none; stroke: hsl(var(--muted)); stroke-width: 9; stroke-linecap: round; }
+.dark .cn-b-anel .cn-b-seg { stroke: hsl(var(--muted) / .9); }
+.cn-b-anel .cn-b-seg[data-estado="feito"] { stroke: var(--fg-meio, #f97316); }
+.cn-b-anel .cn-b-seg[data-estado="gelo"] { stroke: #7dd3fc; }
+.cn-b-anel .cn-b-seg[data-estado="hoje"] { stroke: var(--fg-meio, #f97316); stroke-dasharray: 3 5; opacity: .8; animation: cn-pulsa 1.6s ease-in-out infinite; }
+.cn-b-centro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+.cn-b-num { font-size: 46px; font-weight: 900; letter-spacing: -.05em; line-height: .95; font-variant-numeric: tabular-nums; margin-top: 2px; color: hsl(var(--foreground)); }
+.cn-b-rot { font-size: 10px; font-weight: 800; letter-spacing: .22em; color: hsl(var(--muted-foreground)); margin-top: 4px; }
+.cn-b-letras { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cn-b-letra { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; color: hsl(var(--muted-foreground) / .7); }
+.cn-b-letra[data-estado="feito"], .cn-b-letra[data-estado="hoje"], .cn-b-letra[data-estado="gelo"] { color: hsl(var(--foreground)); }
+.cn-b-letra i { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+.cn-b-letra[data-estado="feito"] i { background: var(--fg-meio, #f97316); box-shadow: none; }
+.cn-b-letra[data-estado="gelo"] i { background: #7dd3fc; box-shadow: none; }
+.cn-b-letra[data-estado="hoje"] i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--fg-meio, #f97316); }
+.cn-b-stat { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cn-b-stat b { font-size: 15px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: hsl(var(--foreground)); }
+.cn-b-stat span { font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.cn-acao { white-space: nowrap; border-radius: 6px; background: #fef3c7; color: #713f12; font-weight: 700; padding: 1px 7px; }
+.dark .cn-acao { background: #3a3214; color: #f3dc9a; }
+/* (17/10) a ação do dia num chip só: "Hoje: marque um hábito"; feito: "Hoje garantido ✓" */
+.cn-acao-chip { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cn-seq-feito { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; font-weight: 700; background: hsl(var(--success) / .12); color: hsl(var(--success)); margin: 0; }
+/* o link discreto da grade (no lugar do card "PÁGINAS DO ÁLBUM") */
+.cn-ver-todos { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 36px; font-size: 12px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+
+/* ---------- o ÁLBUM (herói): capa grande, pacotinho, "faltam N pra completar a página" ---------- */
+.cn-album { padding: 14px 14px 12px; }
+/* o eyebrow do álbum cabe numa linha ao lado da capa até no iPhone SE (375) */
+.cn-album .cn-caps { font-size: 10.5px; letter-spacing: .1em; }
+/* (17/10) com menos texto à direita, o bloco "19 de 68 + barra + pacotinho" fica centralizado na altura da capa */
+.cn-album-corpo { display: grid; grid-template-columns: 142px 1fr; gap: 0 14px; align-items: center; }
+.cn-album-capa { position: relative; display: block; text-align: left; transform: rotate(-3deg); transform-origin: 50% 60%; transition: transform .22s cubic-bezier(.34, 1.4, .64, 1), filter .22s; -webkit-tap-highlight-color: transparent; }
+.cn-album-capa:active { transform: rotate(-1deg) scale(.985); }
+/* o toque LEVANTA a capa da mesa (260 ms) antes de o livro abrir */
+.cn-album-capa[data-levantando] { transform: rotate(0deg) translateY(-8px) scale(1.07); filter: drop-shadow(0 18px 18px rgba(0, 0, 0, .35)); z-index: 2; }
+.cn-album-selo { position: absolute; right: -10px; top: -8px; z-index: 5; height: 24px; padding: 0 9px; border-radius: 999px; background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 3px; box-shadow: 0 4px 10px rgba(210, 45, 128, .45), 0 0 0 2.5px hsl(var(--card)); transform: rotate(6deg); }
+.cn-album-selo b { font-size: 12px; }
+.cn-album-pacote { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 6px 10px 6px 6px; border-radius: 12px; border: 1px dashed #e0438f; background: linear-gradient(90deg, rgba(210, 45, 128, .08), rgba(255, 211, 110, .12)); width: 100%; }
+.cn-album-pacote-fig { width: 26px; height: 34px; border-radius: 4px; background: repeating-linear-gradient(135deg, #e0438f 0 4px, #ffd36e 4px 8px, #6ec8ff 8px 12px, #b98bff 12px 16px); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6), 0 2px 4px rgba(0, 0, 0, .2); transform: rotate(-8deg); flex-shrink: 0; }
+.cn-album-abrir { margin-top: 12px; width: 100%; height: 44px; border-radius: 12px; background: hsl(var(--foreground)); color: hsl(var(--background)); font-weight: 800; font-size: 13.5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: transform .12s; }
+.cn-album-abrir:active { transform: scale(.99); }
+
+/* ---------- a trilha ---------- */
+.cn-trilha { position: relative; display: flex; align-items: flex-start; gap: 0; padding: 14px 10px 6px; overflow-x: auto; scrollbar-width: none; }
+.cn-trilha::-webkit-scrollbar { display: none; }
+.cn-trilha-no { position: relative; flex: 1 0 auto; min-width: 74px; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+.cn-trilha-no::before { content: ""; position: absolute; top: 24px; left: -50%; width: 100%; height: 3px; border-radius: 2px; background: hsl(var(--border)); z-index: 0; }
+.cn-trilha-no:first-child::before { display: none; }
+.cn-trilha-no[data-feito]::before { background: var(--fg-meio, #f97316); }
+.cn-trilha-no[data-proximo]::before { background: linear-gradient(90deg, var(--fg-meio, #f97316), hsl(var(--border))); }
+.cn-trilha-disco { position: relative; z-index: 1; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: hsl(var(--card)); box-shadow: 0 0 0 3px hsl(var(--border)); }
+.cn-trilha-no[data-feito] .cn-trilha-disco { box-shadow: 0 0 0 3px var(--fg-meio, #f97316); }
+.cn-trilha-no[data-proximo] .cn-trilha-disco { width: 62px; height: 62px; margin-top: -7px; box-shadow: 0 0 0 3px hsl(var(--accent)), 0 10px 22px -10px hsl(var(--accent) / .7); }
+.cn-trilha-nome { font-size: 10px; font-weight: 800; line-height: 1.15; color: hsl(var(--foreground)); max-width: 78px; }
+.cn-trilha-no[data-trancado] .cn-trilha-nome { color: hsl(var(--muted-foreground)); }
+.cn-trilha-quando { font-size: 8.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.cn-trilha-no[data-proximo] .cn-trilha-quando { color: hsl(var(--accent)); }
+
+/* ---------- chips + grade (ver todos, secundário) ---------- */
+.cn-b-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 10px; }
+.cn-b-chips::-webkit-scrollbar { display: none; }
+.cn-b-chip { flex-shrink: 0; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.cn-b-chip[data-ativo] { background: hsl(var(--foreground)); color: hsl(var(--background)); border-color: hsl(var(--foreground)); }
+.cn-b-chip .n { opacity: .6; font-variant-numeric: tabular-nums; }
+.cn-tela { position: fixed; inset: 0; z-index: 300; background: hsl(var(--background)); color: hsl(var(--foreground)); overflow-y: auto; }
+.cn-tela-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); }
+.cn-grade4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 4px; }
+.cn-celula { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px 0 4px; border-radius: 12px; }
+/* padding em cima + margem negativa: o overflow do line-clamp cortava o acento das maiúsculas ("ÉPICAS" virava "EPICAS") */
+.cn-celula-nome { font-size: 10px; font-weight: 800; line-height: 1.1; text-align: center; padding: .2em 2px 0; margin-top: -.2em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---------- toast + celebração do marco + detalhe ---------- */
+.cn-toast { position: fixed; left: 12px; right: 12px; top: calc(10px + var(--app-safe-top, env(safe-area-inset-top, 0px))); z-index: 450; margin: 0 auto; max-width: 366px; display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 10px; border-radius: 16px; background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); box-shadow: 0 16px 36px -16px rgba(0, 0, 0, .55), 0 2px 8px -4px rgba(0, 0, 0, .25); animation: cn-toast-entra .5s cubic-bezier(.34, 1.4, .64, 1) both; text-align: left; }
+.cn-toast[data-rar="raro"] { box-shadow: 0 16px 36px -16px rgba(0, 0, 0, .55), 0 0 0 1.5px #3b82f6 inset; }
+/* no teste com a Missão valendo: mais baixo e mais quieto (não briga com a faixa da missão no topo) */
+.cn-toast[data-suave] { top: auto; bottom: calc(18px + env(safe-area-inset-bottom)); animation-name: cn-toast-sobe; }
+.cn-toast-eyebrow { font-size: 9.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: hsl(var(--accent)); }
+.cn-toast-nome { font-size: 14px; font-weight: 800; letter-spacing: -.01em; line-height: 1.15; }
+.cn-toast-sub { font-size: 11.5px; color: hsl(var(--muted-foreground)); line-height: 1.25; }
+.cn-toast-barra { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 2px; background: hsl(var(--accent) / .55); transform-origin: left; animation: cn-toast-tempo 3.5s linear both; }
+
+.cn-festa { position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column; background: var(--cn-grafite, #1c1c22); color: #fff; overflow: hidden; }
+.cn-festa-raios { position: absolute; left: 50%; top: 40%; width: 640px; height: 640px; margin: -320px 0 0 -320px; border-radius: 50%; pointer-events: none; background: repeating-conic-gradient(from 0deg, var(--fg-brilho, rgba(249, 115, 22, .22)) 0 9deg, transparent 9deg 18deg); -webkit-mask: radial-gradient(circle, #000 18%, transparent 66%); mask: radial-gradient(circle, #000 18%, transparent 66%); animation: cn-gira 22s linear infinite; opacity: .8; }
+.cn-confete { position: absolute; top: -12px; border-radius: 2px; animation: cn-cai var(--dur, 2.4s) ease-in var(--atraso, .3s) both; }
+.cn-festa-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; background: rgba(125, 211, 252, .18); color: #bae6fd; }
+.cn-btn { height: 48px; border-radius: 14px; font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.cn-btn-1 { background: #fff; color: #1c1c22; }
+.cn-btn-2 { background: rgba(255, 255, 255, .1); color: #fff; border: 1px solid rgba(255, 255, 255, .18); }
+
+.cn-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cn-cal-dia { height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); background: hsl(var(--muted) / .6); }
+.cn-cal-dia[data-estado="feito"] { background: var(--fg-meio, #f97316); color: #fff; }
+.cn-cal-dia[data-estado="gelo"] { background: #e0f2fe; color: #0369a1; }
+.dark .cn-cal-dia[data-estado="gelo"] { background: #10324a; color: #7dd3fc; }
+.cn-cal-dia[data-estado="hoje"] { box-shadow: inset 0 0 0 1.5px hsl(var(--accent)); color: hsl(var(--foreground)); background: transparent; }
+.cn-cal-dia[data-estado="futuro"] { opacity: .35; }
+.cn-premio-linha { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.cn-premio-linha + .cn-premio-linha { border-top: 1px dashed hsl(var(--border)); }
+
+@keyframes cn-pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes cn-toast-entra { 0% { transform: translateY(-120%); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+@keyframes cn-toast-sobe { 0% { transform: translateY(120%); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+@keyframes cn-toast-tempo { 0% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+@keyframes cn-gira { to { transform: rotate(360deg); } }
+@keyframes cn-cai { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(105vh) rotate(var(--giro, 200deg)); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .cn-b-seg, .cn-toast, .cn-festa-raios, .cn-confete, .cn-album-capa { animation: none !important; transition: none !important; } }
+
+/* área de toque de 44 px nos chips de filtro da coleção (28 px de altura) — ::before invisível (polimento 17/10) */
+.cn-b-chip { position: relative; }
+.cn-b-chip::before { content: ""; position: absolute; inset: -8px -3px; }

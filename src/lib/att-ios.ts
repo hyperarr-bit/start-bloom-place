@@ -20,13 +20,64 @@ import { capturarDispositivoApp, trackEvent } from "@/lib/analytics";
 
 const CHAVE = "core-att-status";
 
-export type StatusATT = "authorized" | "denied" | "restricted" | "notDetermined" | "nao_ios" | "ja_pedido" | "sem_plugin";
+export type StatusATT = "authorized" | "denied" | "restricted" | "notDetermined" | "nao_ios" | "ja_pedido" | "sem_plugin" | "pulado_porta";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * QUEM VEIO DA PORTA NÃO VÊ O ATT (10/10, build 38 — dono: "não quero 2 avisos do sistema
+ * na 1ª abertura"). A conta nasceu no site com a campanha gravada (fbc/utm em
+ * user_metadata.porta): o ATT não acrescenta atribuição e é mais um diálogo laranja entre
+ * ela e o paywall. Quem é da Porta:
+ *   · o app abriu por `core://entrar?h=…` (deep-link.ts / PortaPrimeiraAbertura marcam
+ *     ANTES do resgate — e no arranque frio a welcome nem monta, então o timer de 3 s dela
+ *     não existe); ou
+ *   · a sessão é de uma conta com `user_metadata.porta` (entrou pelo "Entrar" normal).
+ * A marca é do APARELHO (`porta-sem-att`, fora da vassoura do logout) e vai pro nativo
+ * (`CoreNativo.pularATT()`), que segura a RESERVA de 10 s do AppDelegate. O nativo também
+ * marca sozinho quando recebe `core://entrar` (application(_:open:)) — não depende do JS
+ * chegar antes dos 10 s. Todo mundo que não é da Porta: ATT exatamente como hoje.
+ * ───────────────────────────────────────────────────────────────────────────── */
+export const CHAVE_PORTA_SEM_ATT = "porta-sem-att";
+
+const avisarNativo = async (): Promise<void> => {
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "ios") return;
+    // objeto embrulhado não precisa aqui: a promise resolve com o retorno do método, não com o plugin
+    await registerPlugin<{ pularATT(): Promise<void> }>("CoreNativo").pularATT();
+  } catch { /* build sem o método: a reserva nativa segue como antes */ }
+};
+
+/** Marca o aparelho como "veio da Porta" e segura o ATT (JS e reserva nativa). Nunca lança. */
+export function marcarPortaSemATT(): void {
+  try { localStorage.setItem(CHAVE_PORTA_SEM_ATT, "1"); } catch { /* noop */ }
+  void avisarNativo();
+}
+
+/** Na abertura do app: se o aparelho já é da Porta, repete o aviso pro nativo (a marca nativa é por processo). */
+export function reavisarPortaSemATT(): void {
+  let marcado = false;
+  try { marcado = localStorage.getItem(CHAVE_PORTA_SEM_ATT) === "1"; } catch { /* noop */ }
+  if (marcado) void avisarNativo();
+}
+
+/** É da Porta? (marca do aparelho, ou a sessão atual é de uma conta com user_metadata.porta) */
+async function ehDaPorta(): Promise<boolean> {
+  try { if (localStorage.getItem(CHAVE_PORTA_SEM_ATT) === "1") return true; } catch { /* noop */ }
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.auth.getSession();
+    const porta = (data?.session?.user?.user_metadata as { porta?: unknown } | undefined)?.porta;
+    if (porta && typeof porta === "object") { marcarPortaSemATT(); return true; }
+  } catch { /* sem sessão legível: segue como hoje */ }
+  return false;
+}
 
 export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.getPlatform() !== "ios") return "nao_ios";
     try { if (localStorage.getItem(CHAVE)) return "ja_pedido"; } catch { /* modo privado */ }
+    if (await ehDaPorta()) return "pulado_porta";
     const MetaAds = registerPlugin<{ pedirRastreamento(): Promise<{ status: string }> }>("MetaAds");
     // 20 s de teto: se o diálogo não vier (build sem o método), o funil segue.
     const r = await Promise.race([

@@ -3,12 +3,20 @@ import { trackEvent } from "./analytics";
 import { planejarCompromissos, type Compromisso } from "./compromissos";
 import { planejarTarefas, type TarefaAgendavel } from "./tarefas";
 import { missaoAtual } from "./teste-gratis";
+import { CHAVE_LEMBRETE_TESTE } from "./teste-da-loja";
 import {
-  BASE_DIA2, ID_DIA2, assinaturaDoPlano, diaDaSemana1a7, gravarDia2, lerDia2, planejarLembreteDia2, registrarAbertura, rotuloDeMinutos,
+  BASE_DIA2, ID_DIA2, assinaturaDoPlano, diaDaSemana1a7, gravarDia2, lerDia2, planejarLembreteDia2, porDiaDasFinancas, registrarAbertura, rotuloDeMinutos,
   type Leitor as LeitorDia2,
 } from "./lembrete-dia2";
-import { lerMissao } from "./missao-doses";
+import {
+  DIA_FIM_DA_MISSAO, doseCurta, MODULOS as MODULOS_DA_MISSAO, diaDaMissao as diaDaMissaoDoses, doseDeHojeDevida, ehUmPorDia, lerMissao,
+  missaoCumprida as missaoCumpridaDoses, passoPendente, type ModuloDaMissao,
+} from "./missao-doses";
+import {
+  BASE_SEMANA_PAGANTE, assinaturaDaSemana, diasCobertos, gravarSemanaDoPagante, lerSemanaDoPagante, planejarSemanaDoPagante,
+} from "./semana-do-pagante";
 import { localDayKey } from "./utils";
+import { CHAVE_PREFS, lerPrefs } from "./prefs-notificacoes";
 /* Os planejadores de Pet, Relações e Beleza descem SÓ quando o app da loja agenda (30/09):
    este arquivo mora no pedaço principal do site (a Missão do teste importa daqui) e o
    funil da web não precisa carregar a conta de avisos de três módulos. Aqui só os TIPOS. */
@@ -19,6 +27,7 @@ import type { DadosDoSkincare } from "./beleza-lembrete";
 import type { DadosDoCabelo } from "./beleza-cabelo";
 import type { Cuidado } from "./beleza-cuidados";
 import type { LembreteValidade, ProdutoMeu } from "./beleza-produtos";
+import { CHAVE_LEMBRETE_ROTINA_MANHA, lerLembreteRotinaManha, type DadosRotinaManha } from "./rotina-manha";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -48,7 +57,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "consulta" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "limite" | "sequencia" | "tarefa" | "pet" | "relacoes" | "beleza" | "cabelo" | "cuidados" | "validade" | "consulta" | "rotinaManha" | "outro";
 
 /*
  * FAIXAS QUE SE ATROPELAVAM (26/09). 700000/800000/900000/910000 são das
@@ -77,6 +86,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   tarefa: 1600000, // 28/09: tarefa de hoje com horário (Rotina/Carreira, lib/tarefas)
   pet: 1800000, // 29/09: vacina/vermífugo/antipulgas/consulta e remédio do pet (lib/pet-avisos)
   consulta: 1810000, // 13/10: consulta médica de Saúde — véspera 19h e 2 h antes (lib/consulta-avisos)
+  rotinaManha: 1820000, // 17/10: "Rotina pronta em 3 toques" — 1 aviso de manhã com os hábitos do dia (lib/rotina-manha)
   relacoes: 1900000, // 29/09: aniversário NO DIA + "faz tempo que não fala com…" (Relações, lib/relacoes-lembrete)
   beleza: 1700000, // 28/09: skincare de manhã e de noite (Beleza, lib/beleza-lembrete)
   cabelo: 1710000, // 28/09 (Onda 1): dia de lavar do cronograma capilar + véspera (lib/beleza-cabelo)
@@ -553,6 +563,16 @@ export async function agendarRotina(
   return agendarSerie("rotina", "/rotina", avisos);
 }
 
+/* ─── Rotina de MANHÃ (17/10, 1.0.16 — "Rotina pronta em 3 toques", 3ª pergunta) ─────────
+   A conta mora em lib/rotina-manha (pura): 1 aviso por dia, 15 min depois da hora de acordar, com os
+   hábitos do dia (o que já foi marcado hoje sai; tudo marcado = sem aviso hoje). Nasce desligado: liga
+   no "Sim" da pergunta (chave `rotina-lembrete-manha-prefs`) ou na central. O toque abre a Rotina. */
+export async function agendarRotinaManha(dados: DadosRotinaManha): Promise<number> {
+  if (!dados.prefs.ligado) { await limparFaixa(BASES.rotinaManha); return 0; }
+  const { planejarRotinaManha } = await import("./rotina-manha");
+  return agendarSerie("rotinaManha", "/rotina", planejarRotinaManha(dados, BASES.rotinaManha));
+}
+
 /**
  * TREINO — só nos dias que a pessoa marcou como dia de treino.
  *
@@ -672,6 +692,8 @@ export function planejarLembreteSequencia(
   dados: { dias: number; anotouHoje: boolean; acao: string; avisos?: Array<{ title: string; body: string }> },
   hora = 20,
   agora = new Date(),
+  /** 1.0.16: o dia já tem um aviso de teste (920001/930001) — a sequência cede (no máximo 1 aviso de teste por dia) */
+  pularDia?: (dia: string) => boolean,
 ): Planejado[] {
   if (dados.dias <= 0) return [];
   const hoje = localDia(agora);
@@ -679,6 +701,7 @@ export function planejarLembreteSequencia(
   for (let i = 0; i <= HORIZONTE_DIAS; i++) {
     const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, hora, 0, 0, 0);
     if (d.getTime() <= agora.getTime()) continue;
+    try { if (pularDia?.(localDayKey(d))) continue; } catch { /* na dúvida, agenda */ }
     // (02/10) a frase é a da PESSOA: hoje com a ação de hoje; os dias seguintes com a prevista pelo
     // dia da semana dela (lib/acao-do-dia.ts) — "Terça é dia de treino 🔥", não um texto fixo
     const previsto = dados.avisos?.[i];
@@ -701,7 +724,7 @@ export async function agendarLembreteSequencia(
   opcoes: { hora: number; ligado: boolean },
 ): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.sequencia); return 0; }
-  return agendarSerie("sequencia", "/conquistas", planejarLembreteSequencia(dados, opcoes.hora));
+  return agendarSerie("sequencia", "/conquistas", planejarLembreteSequencia(dados, opcoes.hora, new Date(), (dia) => diaComAvisoDoTeste(dia)));
 }
 
 /* ------------------------------------------------------ remédios (07/09) */
@@ -1144,33 +1167,162 @@ export async function cancelarResgateDoPlano(): Promise<void> {
  *  - Horário: 36 h antes do fim, puxado pra 9h–20h30 do MESMO dia (sempre
  *    entre 24 h e 48 h antes do fim — a Apple exige cancelar com 24 h de
  *    antecedência; depois das 48 h "amanhã" seria mentira). Fuso do aparelho.
+ *  - 16/10 (1.0.16): o TEXTO deixou de falar do fim do teste — virou aviso de
+ *    uso (ver copyDoLembreteDoTeste). Horário e armar/desarmar ficam iguais.
  */
 const BASE_LEMBRETE_TESTE = 920000;
-const CHAVE_LEMBRETE_TESTE = "core-lembrete-teste";
+// a chave (`core-lembrete-teste`) mora em lib/teste-da-loja: as boas-vindas da missão leem os dias do teste dela
 
-export type PedidoDeLembreteDoTeste = { fimMs: number; precoAno: string };
+/** O pedido do aviso (guardado no aparelho, `core-lembrete-teste`):
+ *  · `inicioMs` (1.0.16): quando o teste começou (a compra) — é dele que sai o dia prometido no paywall;
+ *  · `hora`: a hora (min desde 0h) que valeu no 1º agendamento — reabrir o app no dia seguinte não muda a hora;
+ *  · `agendadoPara`: quando o aviso foi marcado pra tocar (ISO). Passou dessa hora = o aviso já saiu: nunca
+ *    mais é refeito (antes, reabrir o app no dia prometido re-agendava pra "daqui a 10 min" — um 2º aviso);
+ *  · `seq`: o lembrete da sequência (central de avisos) no último agendamento com o dado da conta — quem rearma
+ *    sem a conta (o boot da loja) não desfaz a regra de não empilhar à noite;
+ *  · `ass`: a assinatura do último agendamento (hora + texto + destino) — reabrir não re-agenda igual. */
+export type PedidoDeLembreteDoTeste = { fimMs: number; precoAno: string; inicioMs?: number; hora?: number; agendadoPara?: string; seq?: { ligada: boolean; hora: number; manha?: number | null }; ass?: string };
 
-/** Quando o aviso sai: fim − 36 h, puxado pra 9h–20h30 do mesmo dia. Devolve
- *  null se já é tarde demais pra prometer "amanhã" com honestidade (< 24 h). */
-export function quandoLembrarDoTeste(fimMs: number, agora = Date.now()): Date | null {
-  const alvo = new Date(fimMs - 36 * 3600e3);
-  if (alvo.getHours() < 9) alvo.setHours(9, 0, 0, 0);
-  else if (alvo.getHours() >= 21 || (alvo.getHours() === 20 && alvo.getMinutes() > 30)) alvo.setHours(20, 30, 0, 0);
-  if (alvo.getTime() > agora + 60e3) return alvo;
-  // armado tarde (app morto entre a folha e o cadastro, permissão dada no dia 2):
-  // ainda dá se faltarem ≥ 24 h — sai em 10 min, numa hora decente
-  const logo = new Date(agora + 10 * 60e3);
-  if (fimMs - logo.getTime() < 24 * 3600e3) return null;
-  if (logo.getHours() < 9) { logo.setHours(9, 0, 0, 0); if (fimMs - logo.getTime() < 24 * 3600e3) return null; }
-  else if (logo.getHours() >= 21 || (logo.getHours() === 20 && logo.getMinutes() > 30)) return null;
-  return logo;
+/*
+ * 1.0.16 (desenho 8, seção 4.6 — e defeitos 11 e 12): O AVISO CUMPRE A PROMESSA DO PAYWALL.
+ *  - DIA: o paywall diz "Dia 2 (DD/MM) · a gente te avisa" (PaywallIOS.diaDoAviso = o dia da compra + N−2,
+ *    N = dias do teste). O aviso sai NESSE dia do calendário — contado do início do teste e dos dias inteiros
+ *    do teste (não de fim − 36 h: quem começava à tarde recebia na manhã do dia 3, 1 dia depois do prometido;
+ *    nem de fim − 48 h cru: um fim da loja uns segundos antes das 72 h jogava o aviso pro dia 1).
+ *  - HORA: a dela — a combinada no "Plano de amanhã"; senão a hora da 1ª abertura do dia em que o aviso foi
+ *    armado (fica guardada: abrir o app no dia 2 de manhã não puxa o aviso pra "agora"), entre 09:00 e 20:30;
+ *    nunca menos de 6 h depois do início nem menos de 24 h antes do fim. Com o lembrete da SEQUÊNCIA ligado
+ *    (opt-in, à noite), o aviso não vai pra noite junto dele: vai pra hora de uso dela (ver horaSemEmpilhar).
+ *  - Armado tarde (a permissão veio depois, e o aviso nunca tinha sido marcado): ainda vale se ainda é o dia
+ *    prometido e falta ≥ 24 h — sai em 10 min, numa hora decente. Já marcado uma vez: nunca "em 10 min".
+ */
+export const DIA_MS = 24 * 3600e3;
+export const HORA_MIN_AVISO = 9 * 60;
+export const HORA_MAX_AVISO = 20 * 60 + 30;
+const somarDiasLocal = (dia: string, n: number): string => {
+  const [y, m, d] = dia.split("-").map(Number);
+  return localDayKey(new Date(y, m - 1, d + n, 12, 0, 0, 0));
+};
+/** O dia (local, YYYY-MM-DD) que o paywall prometeu: o dia do início + (dias do teste − 2). Sem início
+ *  (pedido de build antiga) ou teste < 3 dias: o dia de (fim − 48 h). */
+export function diaDoAvisoDoTeste(fimMs: number, inicioMs?: number | null): string {
+  if (inicioMs && fimMs > inicioMs) {
+    const dias = Math.round((fimMs - inicioMs) / DIA_MS);
+    if (dias >= 3) return somarDiasLocal(localDayKey(new Date(inicioMs)), dias - 2);
+  }
+  return localDayKey(new Date(fimMs - 2 * DIA_MS));
 }
 
-export function copyDoLembreteDoTeste(precoAno: string) {
-  return {
-    title: "Seu teste grátis do CORE acaba amanhã",
-    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro, e tudo que você montou fica. Se não, cancele hoje em Ajustes › Assinaturas e não paga nada.`,
-  };
+export function quandoLembrarDoTeste(fimMs: number, agora = Date.now(), opts: { horaMin?: number | null; inicioMs?: number | null; semAtraso?: boolean } = {}): Date | null {
+  const dia = diaDoAvisoDoTeste(fimMs, opts.inicioMs);
+  const [y, m, d] = dia.split("-").map(Number);
+  const hora = Math.min(HORA_MAX_AVISO, Math.max(HORA_MIN_AVISO, Math.round(opts.horaMin ?? 12 * 60)));
+  const alvo = new Date(y, m - 1, d, Math.floor(hora / 60), hora % 60, 0, 0);
+  const cedo = (opts.inicioMs ?? 0) + 6 * 3600e3;
+  const tarde = fimMs - DIA_MS;
+  const valeNoDia = (t: Date) => localDayKey(t) === dia && t.getTime() >= cedo && t.getTime() <= tarde
+    && t.getHours() * 60 + t.getMinutes() >= HORA_MIN_AVISO && t.getHours() * 60 + t.getMinutes() <= HORA_MAX_AVISO;
+  // o início cedo demais empurra pra 6 h depois (ainda no dia prometido, ainda na faixa)
+  if (alvo.getTime() < cedo) alvo.setTime(cedo);
+  if (alvo.getTime() > agora + 60e3 && valeNoDia(alvo)) return alvo;
+  if (opts.semAtraso) return null;
+  // armado tarde: ainda no dia prometido, dentro da faixa e com ≥ 24 h até o fim → em 10 min
+  const logo = new Date(agora + 10 * 60e3);
+  if (valeNoDia(logo)) return logo;
+  if (logo.getTime() < new Date(y, m - 1, d, 9, 0).getTime()) {
+    const nove = new Date(y, m - 1, d, 9, 0, 0, 0);
+    if (nove.getTime() >= cedo && valeNoDia(nove)) return nove;
+  }
+  return null;
+}
+
+/**
+ * 1 AVISO POR VEZ À NOITE (contrato com as Conquistas, 16/10): o lembrete da SEQUÊNCIA ("sua sequência acaba
+ * hoje", opt-in, `prefs.sequencia`, 20h por padrão) já toca à noite. Com ele ligado, o aviso de teste do dia
+ * (920001 / 930001) que cairia à noite (18h+) junto dele, ou a menos de 2 h dele, vai pra HORA DE USO dela (a
+ * 1ª abertura do dia) — e, se ela também for à noite ou colada no da sequência, pro meio-dia. Sem o lembrete
+ * da sequência ligado: a hora de sempre. Pura.
+ */
+export const NOITE_MIN = 18 * 60;
+/* 17/10 (1.0.16, regra do dono): o aviso de teste também NÃO EMPILHA com o lembrete de manhã da Rotina (opt-in do
+ * "Rotina pronta em 3 toques", faixa 1820000, 15 min depois de acordar): a menos de 2 h dele, vai pra hora de uso
+ * dela, senão meio-dia (ou 15h, se o de manhã for perto do meio-dia). `manha` = minutos desde 0h, ou null (desligado). */
+export function horaSemEmpilhar(hora: number | null, s: { ligada: boolean; hora: number; horaDeUso: number | null; manha?: number | null }): number | null {
+  const manha = typeof s.manha === "number" ? s.manha : null;
+  if (!s.ligada && manha === null) return hora;
+  const seq = s.hora * 60;
+  const comSequencia = (h: number) => s.ligada && (Math.abs(h - seq) < 120 || (h >= NOITE_MIN && seq >= NOITE_MIN));
+  const comManha = (h: number) => manha !== null && Math.abs(h - manha) < 120;
+  const empilha = (h: number) => comSequencia(h) || comManha(h);
+  const h = hora ?? 12 * 60;
+  if (!empilha(h)) return hora;
+  for (const c of [s.horaDeUso, 12 * 60, 15 * 60]) if (c !== null && c !== undefined && !empilha(c)) return c;
+  return 12 * 60;
+}
+/** O lembrete da sequência (prefs da central), o de manhã da Rotina (se ligado) e a hora de uso de hoje, prontos
+ *  pro `horaSemEmpilhar`. */
+export function sequenciaDosAvisos(get?: LeitorDia2): { ligada: boolean; hora: number; horaDeUso: number | null; manha: number | null } {
+  let prefs = lerPrefs(null);
+  try { prefs = lerPrefs(get?.(CHAVE_PREFS, null)); } catch { /* sem conta: o padrão (desligado) */ }
+  let manha: number | null = null;
+  try {
+    const r = lerLembreteRotinaManha(get?.(CHAVE_LEMBRETE_ROTINA_MANHA, null));
+    if (r.ligado) { const [hh, mm] = r.hora.split(":").map(Number); manha = hh * 60 + mm; }
+  } catch { manha = null; }
+  return { ligada: prefs.sequencia, hora: prefs.horaSequencia, horaDeUso: lerDia2()?.abertura?.min ?? null, manha };
+}
+
+/* 17/10 (1.0.16, regra do dono): NO MÁXIMO 1 AVISO DE TESTE POR DIA, CONTANDO O DA SEQUÊNCIA. O lembrete da sequência
+ * (opt-in, à noite) cede o dia em que o aviso do teste (920001) ou o lembrete diário (930001) tocam — quem chega
+ * primeiro no agendador não importa: o planejamento da sequência pula esses dias, e marcar um aviso de teste num dia
+ * tira dali o da sequência que já estava marcado. */
+export function diaComAvisoDoTeste(dia: string, agora = Date.now()): boolean {
+  try {
+    if (avisoDoTesteNoDia(dia, agora)) return true;
+    const q = lerDia2()?.ultimo?.quando;
+    return !!q && Date.parse(q) > agora && localDayKey(new Date(q)) === dia;
+  } catch { return false; }
+}
+/** Tira o lembrete da sequência já marcado NESTE dia (o aviso de teste acabou de ficar com ele). */
+async function cederSequenciaNoDia(dia: string): Promise<void> {
+  const plug = await plugin();
+  if (!plug) return;
+  try {
+    const pendentes = (await plug.LN.getPending()).notifications ?? [];
+    const doDia = pendentes.filter((n) => {
+      if (n.id < BASES.sequencia || n.id >= BASES.sequencia + 10000) return false;
+      const at = (n.schedule as { at?: Date | string } | undefined)?.at;
+      return !!at && localDayKey(new Date(at)) === dia;
+    });
+    if (doDia.length) await plug.LN.cancel({ notifications: doDia.map((n) => ({ id: n.id })) });
+  } catch { /* sem lista de pendentes: o próximo planejamento da sequência resolve */ }
+}
+
+/*
+ * O TEXTO (dono 16/10: nada de cancelar, preço nem "a Apple cobra antes"; o paywall promete "a gente te
+ * avisa" e "Nada é cobrado sem aviso" — ESTE é o aviso, então ele diz que o teste termina e que o plano
+ * começa, e em vez de empurrar a saída lembra o que a pessoa montou e chama pra dose do dia):
+ *   "Seu teste grátis termina amanhã" · "Seu plano anual começa sozinho e tudo que você montou fica com
+ *   você. Hoje: 📅 Rotina — 1 hábito, 20 s." (sem dose: "…Hoje dá pra gastar até R$ X." ou só "…com você.")
+ * O toque abre o módulo da dose de hoje (ou a Home) — NUNCA /planos.
+ */
+export interface ContextoDoAviso { modulo?: ModuloDaMissao | null; porDia?: number | null; /** a dose de hoje (1..3): a 1ª é o quiz; as outras, a guiada simples */ n?: number }
+export function copyDoLembreteDoTeste(c: ContextoDoAviso = {}) {
+  const base = "Seu plano anual começa sozinho e tudo que você montou fica com você.";
+  let resto = "";
+  if (c.modulo) { const cfg = MODULOS_DA_MISSAO[c.modulo]; resto = ` Hoje: ${cfg.emoji} ${cfg.nome} — ${doseCurta(c.modulo, c.n ?? 2).texto}.`; }
+  else if (c.porDia && c.porDia > 0) resto = ` Hoje dá pra gastar até R$ ${reaisInteiros(c.porDia)}.`;
+  return { title: "Seu teste grátis termina amanhã", body: base + resto };
+}
+const reaisInteiros = (n: number): string => Math.floor(n).toLocaleString("pt-BR");
+
+/** A dose da missão (braço A) no dia do aviso, se houver — lida da missão NOVA (missao-doses), não da antiga. */
+export function doseNoDiaDoAviso(dia: string, hojeDia: string = localDayKey()): ModuloDaMissao | null {
+  const m = lerMissao();
+  if (!m || !ehUmPorDia(m)) return null;
+  if (dia === hojeDia) return doseDeHojeDevida(m, hojeDia) ? passoPendente(m)?.modulo ?? null : null;
+  if (!m.boasVindas || m.explorou || missaoCumpridaDoses(m) || diaDaMissaoDoses(m, dia) > DIA_FIM_DA_MISSAO) return null;
+  return passoPendente(m)?.modulo ?? null;
 }
 
 const lerPedidoDeLembrete = (): PedidoDeLembreteDoTeste | null => {
@@ -1185,17 +1337,64 @@ const guardarPedidoDeLembrete = (p: PedidoDeLembreteDoTeste | null): void => {
 /** Pra teste e pro Meu acesso: o pedido pendente/armado, se houver. */
 export const pedidoDeLembreteDoTeste = (): PedidoDeLembreteDoTeste | null => lerPedidoDeLembrete();
 
-/** Agenda de fato (exige permissão já dada). Substitui o anterior. */
-export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promise<boolean> {
+/** A hora do aviso: a combinada no "Plano de amanhã" (vale a escolha mais nova); senão a do 1º agendamento;
+ *  senão a 1ª abertura de hoje; e sem empilhar com o lembrete da sequência à noite. */
+function horaDoAviso(p: PedidoDeLembreteDoTeste, get?: LeitorDia2): number | null {
+  const e = lerDia2();
+  const escolhida = typeof e?.horaEscolhida === "number" ? e.horaEscolhida : null;
+  const s = get || !p.seq ? sequenciaDosAvisos(get) : { ...p.seq, horaDeUso: e?.abertura?.min ?? null };
+  return horaSemEmpilhar(escolhida ?? p.hora ?? e?.abertura?.min ?? null, s);
+}
+
+/** O aviso já tocou? (foi marcado pra uma hora que já passou) */
+const avisoJaSaiu = (p: PedidoDeLembreteDoTeste, agora: number): boolean => !!p.agendadoPara && Date.parse(p.agendadoPara) <= agora;
+
+/** Quando o aviso deste pedido toca (ou null): já marcado → nunca "em 10 min" (e, sem hora válida nova, fica a marcada). */
+function quandoDoPedido(p: PedidoDeLembreteDoTeste, agora: number, get?: LeitorDia2): Date | null {
+  const horaMin = horaDoAviso(p, get);
+  if (p.agendadoPara) {
+    const novo = quandoLembrarDoTeste(p.fimMs, agora, { horaMin, inicioMs: p.inicioMs, semAtraso: true });
+    return novo ?? new Date(p.agendadoPara);
+  }
+  return quandoLembrarDoTeste(p.fimMs, agora, { horaMin, inicioMs: p.inicioMs });
+}
+
+/** O 920001 vai sair neste dia? (o lembrete diário 930001 cede o dia: 1 notificação de teste por dia) */
+export function avisoDoTesteNoDia(dia: string, agora = Date.now(), get?: LeitorDia2): boolean {
+  const p = lerPedidoDeLembrete();
+  if (!p || p.fimMs <= agora) return false;
+  if (p.agendadoPara) return localDayKey(new Date(p.agendadoPara)) === dia;
+  const q = quandoDoPedido(p, agora, get);
+  return !!q && localDayKey(q) === dia;
+}
+
+/** Agenda de fato (exige permissão já dada). Substitui o anterior. `get` (opcional, 1.0.16): os dados
+ *  da conta — dão o "Hoje dá pra gastar até R$ X" quando não há dose da missão no dia, e as prefs da
+ *  central (o lembrete da sequência). */
+export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste, get?: LeitorDia2): Promise<boolean> {
   const plug = await plugin();
   if (!plug) return false;
   if (!(await temPermissao())) return false;
+  const agora = Date.now();
+  // já tocou: nada a refazer (nem um 2º aviso "em 10 min" pra quem reabre o app no dia prometido)
+  if (avisoJaSaiu(p, agora)) return true;
+  const at = quandoDoPedido(p, agora, get);
+  if (!at) {
+    await limparFaixa(BASE_LEMBRETE_TESTE);
+    trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "tarde_demais", antes_do_fim_h: Math.round((p.fimMs - agora) / 3600e3) });
+    return false;
+  }
+  const dia = localDayKey(at);
+  const modulo = doseNoDiaDoAviso(dia);
+  const nDaDose = modulo ? (() => { try { const m = lerMissao(); return m ? passoPendente(m)?.n ?? 2 : 2; } catch { return 2; } })() : undefined;
+  const porDia = !modulo && get ? porDiaDasFinancas(get, at) : null;
+  const copy = copyDoLembreteDoTeste({ modulo, porDia, n: nDaDose });
+  const rota = modulo ? MODULOS_DA_MISSAO[modulo].rota : "/home";
+  const ass = `${at.toISOString()}|${copy.title}|${copy.body}|${rota}`;
+  if (p.ass === ass) return true; // o mesmo aviso já está no sistema
   await garantirCanal();
   await limparFaixa(BASE_LEMBRETE_TESTE);
-  const at = quandoLembrarDoTeste(p.fimMs);
-  if (!at) { trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "tarde_demais", antes_do_fim_h: Math.round((p.fimMs - Date.now()) / 3600e3) }); return false; }
   const { LN } = plug;
-  const copy = copyDoLembreteDoTeste(p.precoAno);
   try {
     await LN.schedule({
       notifications: [{
@@ -1206,10 +1405,14 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
         channelId: CANAL,
         smallIcon: ICONE,
         iconColor: COR_MARCA,
-        extra: { rota: "/planos" },
+        extra: { rota, tipo: "lembreteTeste" },
       }],
     });
-    trackEvent("notif_lembrete_teste_armada", { ok: true, em_h: Math.round((at.getTime() - Date.now()) / 3600e3), antes_do_fim_h: Math.round((p.fimMs - at.getTime()) / 3600e3) });
+    const seq = get ? (({ ligada, hora, manha }) => ({ ligada, hora, manha }))(sequenciaDosAvisos(get)) : p.seq;
+    guardarPedidoDeLembrete({ ...p, ass, agendadoPara: at.toISOString(), hora: p.hora ?? at.getHours() * 60 + at.getMinutes(), ...(seq ? { seq } : {}) });
+    await cederSequenciaNoDia(dia); // 1 aviso de teste por dia, contando o da sequência
+    const diaCal = p.inicioMs ? Math.round((new Date(`${dia}T12:00:00`).getTime() - new Date(`${localDayKey(new Date(p.inicioMs))}T12:00:00`).getTime()) / DIA_MS) + 1 : null;
+    trackEvent("notif_lembrete_teste_armada", { ok: true, em_h: Math.round((at.getTime() - agora) / 3600e3), antes_do_fim_h: Math.round((p.fimMs - at.getTime()) / 3600e3), dia_cal: diaCal, dose: modulo ?? null, tem_numero: !!porDia, refeito: !!p.agendadoPara });
     return true;
   } catch {
     trackEvent("notif_lembrete_teste_armada", { ok: false, motivo: "erro_agendar" });
@@ -1222,6 +1425,9 @@ export async function agendarLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promis
  * abre diálogo (quem pede a permissão é a Missão B1, no momento certo).
  */
 export async function pedirLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promise<"armado" | "pendente" | "sem_permissao" | "indisponivel"> {
+  // 1.0.16: uma compra NOVA começa um pedido novo — o início é agora (é dele que sai o dia prometido) e nada do
+  // agendamento de um pedido velho vale (hora, marcação, assinatura)
+  p = { fimMs: p.fimMs, precoAno: p.precoAno, inicioMs: p.inicioMs ?? Date.now() };
   guardarPedidoDeLembrete(p);
   const estado = await estadoPermissao();
   if (estado === "indisponivel") { trackEvent("trial_aviso", { acao: "indisponivel" }); return "indisponivel"; }
@@ -1235,11 +1441,11 @@ export async function pedirLembreteDoTeste(p: PedidoDeLembreteDoTeste): Promise<
 }
 
 /** Depois de a permissão ser decidida (Missão B1, central de avisos): arma o
- *  pedido que ficou pendente. Idempotente — reagendar substitui. */
-export async function armarLembreteDoTesteSePuder(): Promise<boolean> {
+ *  pedido que ficou pendente. Idempotente — reagendar substitui; o que já tocou não volta. */
+export async function armarLembreteDoTesteSePuder(get?: LeitorDia2): Promise<boolean> {
   const p = lerPedidoDeLembrete();
   if (!p || p.fimMs <= Date.now()) return false;
-  return agendarLembreteDoTeste(p);
+  return agendarLembreteDoTeste(p, get);
 }
 
 /**
@@ -1251,13 +1457,125 @@ export async function sincronizarLembreteDoTeste(estado: { emTeste: boolean; vai
   const p = lerPedidoDeLembrete();
   if (!p) return; // nunca prometeu (compra em build antiga): não inventa aviso
   const fimMs = estado.fimMs && estado.fimMs > Date.now() ? estado.fimMs : p.fimMs;
-  if (fimMs !== p.fimMs) guardarPedidoDeLembrete({ ...p, fimMs });
+  if (fimMs !== p.fimMs) guardarPedidoDeLembrete({ ...p, fimMs, ass: undefined });
   await armarLembreteDoTesteSePuder();
 }
 
 export async function cancelarLembreteDoTeste(): Promise<void> {
   guardarPedidoDeLembrete(null);
   await limparFaixa(BASE_LEMBRETE_TESTE);
+}
+
+/* ------------------------------------- cartão recusado: +24 h e +72 h (10/10) */
+
+/*
+ * CARTÃO RECUSADO NA LOJA (1.0.14, atrás de COBRANCA_V14 — ver lib/cobranca-
+ * recusada). Quem tem o cartão recusado só fica sabendo se ABRIR o app e ver a
+ * faixa; 59% das cobranças falham e ~5% recuperam. Dois avisos locais, armados
+ * quando o app detecta o problema (ids 940001 e 940002): 24 h e 72 h depois.
+ * Cancelados quando a loja diz que a cobrança entrou (ou a pessoa cancelou).
+ * `extra.tipo = "cobranca"` pros eventos notif_entregue/notif_toque, como os outros.
+ */
+const BASE_COBRANCA = 940000;
+export const HORAS_DOS_AVISOS_DE_COBRANCA = [24, 72] as const;
+
+export function copyDoAvisoDeCobranca(loja: string = isAndroid() ? "Google Play" : "App Store") {
+  return {
+    title: "Seu pagamento do CORE não passou",
+    body: `Atualize o cartão na ${loja} pra não perder o acesso.`,
+  };
+}
+
+/** Arma os dois avisos (substitui os anteriores). `marca` = billingIssueDetectedAt, pro evento. */
+export async function agendarAvisosDeCobranca(marca: string, agora: number = Date.now()): Promise<boolean> {
+  const plug = await plugin();
+  if (!plug) return false;
+  if (!(await temPermissao())) { trackEvent("notif_cobranca_armada", { ok: false, motivo: "sem_permissao" }); return false; }
+  await garantirCanal();
+  await limparFaixa(BASE_COBRANCA);
+  const { LN } = plug;
+  const copy = copyDoAvisoDeCobranca();
+  try {
+    await LN.schedule({
+      notifications: HORAS_DOS_AVISOS_DE_COBRANCA.map((h, i) => ({
+        id: BASE_COBRANCA + 1 + i,
+        title: copy.title,
+        body: copy.body,
+        schedule: { at: new Date(agora + h * 3600e3), allowWhileIdle: true },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { tipo: "cobranca", rota: "/home", em: marca },
+      })),
+    });
+    trackEvent("notif_cobranca_armada", { ok: true, em_h: [...HORAS_DOS_AVISOS_DE_COBRANCA] });
+    return true;
+  } catch {
+    trackEvent("notif_cobranca_armada", { ok: false, motivo: "erro_agendar" });
+    return false;
+  }
+}
+
+export async function cancelarAvisosDeCobranca(): Promise<void> {
+  await limparFaixa(BASE_COBRANCA);
+}
+
+/*
+ * RECUPERAÇÃO DO PAYWALL (1.0.14, atrás de RECUPERACAO_PAYWALL — lib/ofertas-saida;
+ * estilo Enxovaly). Quem SAIU do paywall do funil sem iniciar o teste (o Voltar do
+ * ComecarW, evento `paywall_saiu`) recebe dois avisos locais: +3 h ("Seu plano de
+ * {área} ficou salvo — 3 dias grátis te esperando") e às 9h da manhã seguinte, com
+ * texto diferente. Só se a permissão de notificação JÁ existir — aqui não se pede
+ * nada. Cancelados quando o teste começa (qualquer compra no paywall). Na volta, a
+ * retomada do funil já cai direto no paywall (pages/funis/w/retomada.ts).
+ * `extra.tipo = "recuperacao_paywall"` → notif_toque tipo=recuperacao_paywall.
+ */
+const BASE_RECUPERACAO = 950000;
+export const HORAS_ATE_A_RECUPERACAO = 3;
+export const HORA_DA_MANHA_DA_RECUPERACAO = 9;
+
+/** Os dois horários: +3 h e a próxima 9h da manhã DEPOIS do primeiro aviso. */
+export function quandoRecuperacaoDoPaywall(agora: Date = new Date()): { tresHoras: Date; manha: Date } {
+  const tresHoras = new Date(agora.getTime() + HORAS_ATE_A_RECUPERACAO * 3600e3);
+  const manha = new Date(tresHoras.getFullYear(), tresHoras.getMonth(), tresHoras.getDate(), HORA_DA_MANHA_DA_RECUPERACAO, 0, 0, 0);
+  if (manha.getTime() <= tresHoras.getTime()) manha.setDate(manha.getDate() + 1);
+  return { tresHoras, manha };
+}
+
+export function copyDaRecuperacaoDoPaywall(area: string | null | undefined) {
+  const plano = area ? `Seu plano de ${area}` : "Seu plano";
+  return {
+    tresHoras: { title: `${plano} ficou salvo`, body: "3 dias grátis te esperando — é só abrir e começar. Nada é cobrado hoje." },
+    manha: { title: "Bom dia! Que tal começar hoje?", body: `${plano} está pronto do jeito que você deixou. 3 dias grátis, cancela quando quiser.` },
+  };
+}
+
+export type ResultadoRecuperacao = { ok: true; quando: { tresHoras: Date; manha: Date } } | { ok: false; motivo: string };
+
+/** Arma os dois avisos (substitui os anteriores). Nunca pede permissão. Emite recuperacao_paywall_armada {ok, motivo}. */
+export async function agendarRecuperacaoDoPaywall(area: string | null | undefined, agora: Date = new Date()): Promise<ResultadoRecuperacao> {
+  const falhou = (motivo: string): ResultadoRecuperacao => { trackEvent("recuperacao_paywall_armada", { ok: false, motivo }); return { ok: false, motivo }; };
+  const plug = await plugin();
+  if (!plug) return falhou("sem_plugin");
+  if (!(await temPermissao())) return falhou("sem_permissao");
+  await garantirCanal();
+  await limparFaixa(BASE_RECUPERACAO);
+  const quando = quandoRecuperacaoDoPaywall(agora);
+  const copy = copyDaRecuperacaoDoPaywall(area);
+  try {
+    await plug.LN.schedule({
+      notifications: [
+        { id: BASE_RECUPERACAO + 1, ...copy.tresHoras, schedule: { at: quando.tresHoras, allowWhileIdle: true }, channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA, extra: { tipo: "recuperacao_paywall", rota: "/app", em: quando.tresHoras.toISOString() } },
+        { id: BASE_RECUPERACAO + 2, ...copy.manha, schedule: { at: quando.manha, allowWhileIdle: true }, channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA, extra: { tipo: "recuperacao_paywall", rota: "/app", em: quando.manha.toISOString() } },
+      ],
+    });
+  } catch { return falhou("erro_agendar"); }
+  trackEvent("recuperacao_paywall_armada", { ok: true, em: [quando.tresHoras.toISOString(), quando.manha.toISOString()] });
+  return { ok: true, quando };
+}
+
+export async function cancelarRecuperacaoDoPaywall(): Promise<void> {
+  await limparFaixa(BASE_RECUPERACAO);
 }
 
 /* ------------------------------------------------------- régua do teste 3d */
@@ -1456,10 +1774,59 @@ export async function cancelarReguaDaMissao(): Promise<void> {
   await limparFaixa(BASE_MISSAO);
 }
 
+/* ─── PRÓXIMA DOSE EM 3 H (10/10, chave DIA1_CHEIO, braço B — lib/dia1-cheio) ─────
+   "Agora não" no meio das 3 doses do dia 1: UMA notificação local, 3 h depois,
+   na faixa da missão (id próprio, 900002 — a régua antiga usa 900001). Não sai
+   se cair depois das 21:30 (o Lembrete do dia 2 cobre a manhã seguinte) e não
+   PEDE permissão (quem pede é a folha do plano de amanhã). */
+export const ID_PROXIMA_DOSE = BASE_MISSAO + 2;
+export const PROXIMA_DOSE_EM_MS = 3 * 3600_000;
+const PROXIMA_DOSE_ATE_MIN = 21 * 60 + 30;
+
+/** Quando a próxima dose toca (ou null = tarde demais pra hoje). Pura, pra teste. */
+export function quandoProximaDose(agora: Date = new Date(), emMs: number = PROXIMA_DOSE_EM_MS): Date | null {
+  const alvo = new Date(agora.getTime() + emMs);
+  if (alvo.getDate() !== agora.getDate() || alvo.getHours() * 60 + alvo.getMinutes() > PROXIMA_DOSE_ATE_MIN) return null;
+  return alvo;
+}
+
+export type ResultadoProximaDose = { ok: true; quando: Date } | { ok: false; motivo: "sem_plugin" | "sem_permissao" | "tarde" | "erro_agendar" };
+
+export async function agendarProximaDose(dose: { indice: number; nome: string; emoji: string; pedido: string; rota: string }, agora: Date = new Date()): Promise<ResultadoProximaDose> {
+  const p = await plugin();
+  if (!p) return { ok: false, motivo: "sem_plugin" };
+  await cancelarProximaDose();
+  if (!(await temPermissao())) return { ok: false, motivo: "sem_permissao" };
+  const alvo = quandoProximaDose(agora);
+  if (!alvo) return { ok: false, motivo: "tarde" };
+  await garantirCanal();
+  try {
+    await p.LN.schedule({
+      notifications: [{
+        id: ID_PROXIMA_DOSE,
+        title: "Sua próxima dose de 20 s está pronta",
+        body: `${dose.emoji} ${dose.nome}: ${dose.pedido.toLowerCase()} — e a dose ${dose.indice} de 3 fica feita.`,
+        schedule: { at: alvo, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: dose.rota, tipo: "proxima_dose", em: alvo.toISOString() },
+      }],
+    });
+  } catch { return { ok: false, motivo: "erro_agendar" }; }
+  return { ok: true, quando: alvo };
+}
+
+export async function cancelarProximaDose(): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  try { await p.LN.cancel({ notifications: [{ id: ID_PROXIMA_DOSE }] }); } catch { /* nada pendente */ }
+}
+
 /** Pra teste: as faixas avulsas (régua) que nenhum tipo pode invadir. 910000
  *  é a faixa antiga do lembrete do teste, ainda reservada; 920000 é a nova (01/10);
- *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2). */
-export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2 } as const;
+ *  930000 é o Lembrete do dia 2 / 1ª semana (03/10, lib/lembrete-dia2); 940000 é
+ *  o cartão recusado (10/10, +24 h/+72 h); 950000 é a recuperação do paywall (1.0.14);
+ *  960000 é a semana do pagante (16/10, lib/semana-do-pagante). */
+export const FAIXAS_AVULSAS = { resgate: BASE_RESGATE, teste: BASE_TESTE, missao: BASE_MISSAO, missaoAntiga: 910000, lembreteTeste: BASE_LEMBRETE_TESTE, dia2: BASE_DIA2, cobranca: BASE_COBRANCA, recuperacaoPaywall: BASE_RECUPERACAO, semanaPagante: BASE_SEMANA_PAGANTE } as const;
 
 /** O tipo de QUALQUER aviso nosso (os tipos da central + as faixas avulsas), pros eventos de toque/entrega. */
 export function tipoDoAviso(id: number, extra?: { tipo?: string } | null): string {
@@ -1481,6 +1848,15 @@ export type ResultadoDia2 =
   | { ok: true; quando: Date; title: string; body: string; repetido: boolean }
   | { ok: false; motivo: string };
 
+/** 1.0.16: o braço e o dia do CALENDÁRIO da missão no dia do aviso — pros eventos dos lembretes ("1 por dia, no dia prometido"). */
+function camposDaMissao(dia: string): { dia_cal: number | null; braco: string | null } {
+  try {
+    const m = lerMissao();
+    if (!m) return { dia_cal: null, braco: null };
+    return { dia_cal: diaDaMissaoDoses(m, dia), braco: m.braco === "A" ? "um_por_dia" : m.braco === "B" ? "dia1_cheio" : null };
+  } catch { return { dia_cal: null, braco: null }; }
+}
+
 export async function sincronizarLembreteDia2(
   get: LeitorDia2,
   p: { criadoEm?: string | null; area?: string | null; ligado?: boolean; agora?: Date } = {},
@@ -1489,7 +1865,9 @@ export async function sincronizarLembreteDia2(
   if (!plug) return { ok: false, motivo: "sem_plugin" };
   const agora = p.agora ?? new Date();
   const e = registrarAbertura(agora, p.criadoEm);
-  const plano = planejarLembreteDia2(get, e, { ligado: p.ligado !== false, missao: lerMissao(), area: p.area, agora });
+  // 1.0.16: com o lembrete da sequência ligado (à noite), o do dia não vai pra noite junto dele
+  const seqAvisos = sequenciaDosAvisos(get);
+  const plano = planejarLembreteDia2(get, e, { ligado: p.ligado !== false, missao: lerMissao(), area: p.area, agora, ajustarHora: (h) => horaSemEmpilhar(h, seqAvisos) ?? h });
   const estado = await estadoPermissao();
   if (estado !== "granted") {
     // sem permissão nada toca (no iPhone nem agenda) — o motivo fica guardado uma vez, sem inundar o banco
@@ -1499,6 +1877,31 @@ export async function sincronizarLembreteDia2(
       trackEvent("lembrete_dia2_agendado", { ok: false, motivo: `sem_permissao_${estado}`, dia_do_uso: plano.ok === true ? plano.diaDoUso : null });
     }
     return { ok: false, motivo: `sem_permissao_${estado}` };
+  }
+  // 16/10: a semana do pagante anda junto (mesma abertura, mesma chave "Primeira semana") e
+  // ganha o dia que cobre — uma notificação por dia, nunca duas.
+  let cobertos: string[] = [];
+  try { cobertos = await sincronizarSemanaDoPagante(get, { ligado: p.ligado !== false, agora }); } catch { /* nunca segura o dia 2 */ }
+  // 1.0.16 (desenho 8, 4.6): o aviso do teste (920001) é refeito a cada abertura (texto com a dose do dia e o
+  // número dela) e, no dia em que ele sai, o lembrete diário CEDE — 1 notificação de teste por dia
+  try { await armarLembreteDoTesteSePuder(get); } catch { /* nunca segura o dia 2 */ }
+  if (plano.ok === true && avisoDoTesteNoDia(localDayKey(plano.quando), agora.getTime(), get)) {
+    const assinatura920 = `motivo:pulado_por_920:${localDayKey(plano.quando)}`;
+    if (e.ultimo?.assinatura !== assinatura920) {
+      await limparFaixa(BASE_DIA2);
+      gravarDia2({ ...e, ultimo: { assinatura: assinatura920, motivo: "pulado_por_920" } });
+      trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "pulado_por_920", pulado_por_920: true, dia_do_uso: plano.diaDoUso, ...camposDaMissao(localDayKey(plano.quando)) });
+    }
+    return { ok: false, motivo: "pulado_por_920" };
+  }
+  if (plano.ok === true && cobertos.includes(localDayKey(plano.quando))) {
+    const assinaturaCedida = "motivo:semana_do_pagante";
+    if (e.ultimo?.assinatura !== assinaturaCedida) {
+      await limparFaixa(BASE_DIA2);
+      gravarDia2({ ...e, ultimo: { assinatura: assinaturaCedida, motivo: "semana_do_pagante" } });
+      trackEvent("lembrete_dia2_agendado", { ok: false, motivo: "semana_do_pagante", dia_do_uso: plano.diaDoUso });
+    }
+    return { ok: false, motivo: "semana_do_pagante" };
   }
   const assinatura = assinaturaDoPlano(plano);
   // o mesmo plano já está no sistema (e ainda no futuro): nada a refazer
@@ -1547,6 +1950,7 @@ export async function sincronizarLembreteDia2(
     return { ok: false, motivo: "erro_agendar" };
   }
   gravarDia2({ ...e, ultimo: { assinatura, quando: plano.quando.toISOString(), title, body } });
+  await cederSequenciaNoDia(localDayKey(plano.quando)); // 1 aviso de teste por dia, contando o da sequência
   trackEvent("lembrete_dia2_agendado", {
     ok: true,
     dia_da_semana_1a7: diaDaSemana1a7(plano.quando),
@@ -1556,13 +1960,79 @@ export async function sincronizarLembreteDia2(
     dia_do_uso: plano.diaDoUso,
     missao: modulo === "missao",
     origem_hora: plano.origemHora,
+    pulado_por_920: false,
+    ...camposDaMissao(localDayKey(plano.quando)),
   });
   return { ok: true, quando: plano.quando, title, body, repetido: false };
 }
 
-/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta). */
+/** Cancela o lembrete da semana (a central desligou / a pessoa saiu da conta) — e a semana do
+ *  pagante junto: as duas obedecem à mesma chave "Primeira semana". */
 export async function cancelarLembreteDia2(): Promise<void> {
   await limparFaixa(BASE_DIA2);
+  await cancelarSemanaDoPagante();
+}
+
+/* ─── SEMANA DO PAGANTE (16/10, lib/semana-do-pagante) ──────────────────────────
+   Os 7 avisos depois do pagamento, de uma vez (chegam mesmo pra quem não abre de novo).
+   Chamada de dentro do sincronizarLembreteDia2 (cada abertura, a central de avisos) — só
+   com a permissão JÁ dada; nada aqui pede permissão. Devolve os dias cobertos, que o
+   lembrete do dia 2 cede. O estado nasce no boot pela verdade da loja
+   (revenuecat.conferirTrialCartao → conferirSemanaDoPagante). */
+export async function sincronizarSemanaDoPagante(
+  get: LeitorDia2,
+  p: { ligado?: boolean; agora?: Date } = {},
+): Promise<string[]> {
+  const plug = await plugin();
+  if (!plug) return [];
+  const agora = p.agora ?? new Date();
+  const e = lerSemanaDoPagante();
+  const plano = planejarSemanaDoPagante(get, e, { ligado: p.ligado !== false, agora });
+  if (!e) { await limparFaixa(BASE_SEMANA_PAGANTE); return []; }
+  const assinatura = assinaturaDaSemana(plano);
+  // o mesmo plano já está no sistema: nada a refazer (o 1º aviso ainda é futuro, ou não há aviso)
+  if (e.ultimo?.assinatura === assinatura) return diasCobertos(plano);
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  if (plano.ok === false) {
+    gravarSemanaDoPagante({ ...e, ultimo: { assinatura } });
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: plano.motivo, confirmado: !!e.confirmado, origem: e.origem });
+    return [];
+  }
+  await garantirCanal();
+  const { LN } = plug;
+  try {
+    await LN.schedule({
+      notifications: plano.avisos.map((a) => ({
+        id: a.id, title: a.title, body: a.body,
+        schedule: { at: a.quando, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: a.rota, tipo: "semana_pagante", em: a.quando.toISOString(), dia: a.dia, modulo: a.modulo },
+      })),
+    });
+  } catch {
+    trackEvent("semana_pagante_agendada", { ok: false, motivo: "erro_agendar" });
+    return [];
+  }
+  const dias = diasCobertos(plano);
+  gravarSemanaDoPagante({ ...e, ultimo: { assinatura, dias } });
+  trackEvent("semana_pagante_agendada", {
+    ok: true,
+    avisos: plano.avisos.length,
+    dias: plano.avisos.map((a) => a.dia),
+    modulos: plano.avisos.map((a) => a.modulo),
+    hora: rotuloDeMinutos(plano.avisos[0].quando.getHours() * 60 + plano.avisos[0].quando.getMinutes()),
+    tem_numero: plano.avisos.some((a) => a.temNumero),
+    confirmado: !!e.confirmado,
+    origem: e.origem,
+  });
+  return dias;
+}
+
+/** Desarma os avisos (o estado fica: religar a chave volta a armar o que ainda cabe). */
+export async function cancelarSemanaDoPagante(): Promise<void> {
+  await limparFaixa(BASE_SEMANA_PAGANTE);
+  const e = lerSemanaDoPagante();
+  if (e?.ultimo) gravarSemanaDoPagante({ ...e, ultimo: undefined });
 }
 
 /**

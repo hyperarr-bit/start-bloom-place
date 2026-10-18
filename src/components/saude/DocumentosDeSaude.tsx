@@ -144,7 +144,7 @@ export const DocumentosDeSaude = ({ documentos, setDocumentos, conhecidos, onApa
       <div className="p-4 space-y-3">
         <button onClick={() => setFormAberto(!formAberto)}
           className="w-full h-10 rounded-xl border border-dashed border-border text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5 hover:bg-muted/40 transition-colors">
-          <Plus className="w-3.5 h-3.5" /> {formAberto ? "Fechar" : "Guardar exame, laudo, receita ou atestado"}
+          {formAberto ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />} {formAberto ? "Fechar" : "Guardar exame, laudo, receita ou atestado"}
         </button>
         {formAberto && (
           <FormDocumento valor={novo} onChange={setNovo} conhecidos={conhecidos} idBase="documento-novo"

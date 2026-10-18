@@ -28,6 +28,8 @@ vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => false, isIOS: () => 
 vi.mock("@/integrations/supabase/client", () => {
   const selecao: Record<string, (...a: unknown[]) => unknown> = {
     eq: () => selecao,
+    order: () => selecao,
+    range: () => selecao,
     in: () => Promise.resolve({ data: [], error: null }),
     abortSignal: async () => ({ data: linhasDoServidor, error: null }),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),

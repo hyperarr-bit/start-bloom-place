@@ -76,7 +76,7 @@
 	<key>FacebookAppID</key>
 	<string>1693551238598114</string>
 	<key>FacebookClientToken</key>
-	<string></string>
+	<string>1025cab8d23389fb604b95b9cfb6d97d</string>
 	<key>FacebookDisplayName</key>
 	<string>CORE</string>
 	<key>FacebookAutoLogAppEventsEnabled</key>
@@ -90,6 +90,12 @@
 	     "Salvar vídeo" na folha FECHA o app (o iOS mata por falta do texto de permissão). -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Pra salvar na sua galeria as artes e os vídeos das suas conquistas e retrospectivas.</string>
+	<!-- 14/10 (revisor de bugs, build 39): o anexo da Saúde abre "Tirar foto / Fototeca / Escolher arquivo";
+	     sem estas chaves o iOS FECHA o app ao tocar em "Tirar foto" (e a revisão da Apple testa a função nova). -->
+	<key>NSCameraUsageDescription</key>
+	<string>Pra tirar foto de exames, receitas e documentos e guardar no CORE.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pra anexar no CORE fotos de exames, receitas e documentos que já estão na sua galeria.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

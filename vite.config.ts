@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
 import { componentTagger } from "lovable-tagger";
+import { medicaoTextos } from "./vite-plugin-medicao-textos";
 
 /**
  * A versão do app, lida do build.gradle no momento do build (29/07).
@@ -31,6 +32,9 @@ export default defineConfig(({ mode }) => ({
   // outras (VITE_SUPABASE_URL etc). Foi o que quebrou o smoke agora há pouco.
   define: {
     __APP_VERSION__: JSON.stringify(versaoDoApp),
+    // 10/10: true SÓ no build de TESTE (RC_MOCK=1, do `npm run loja -- --teste`) — é o que deixa
+    // o use-auth tratar a compra do mock como assinatura (lib/rc-mock). Produção: false.
+    __RC_MOCK__: JSON.stringify(process.env.RC_MOCK === "1"),
   },
   server: {
     host: "::",
@@ -79,7 +83,9 @@ export default defineConfig(({ mode }) => ({
      */
     cssTarget: "chrome61",
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  // medicaoTextos (1.0.16): o dicionário de textos do código que a medição total usa como peneira de
+  // privacidade — ver vite-plugin-medicao-textos.ts. Sai num pedaço próprio, carregado só nas telas do app.
+  plugins: [react(), medicaoTextos(path.resolve(__dirname)), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

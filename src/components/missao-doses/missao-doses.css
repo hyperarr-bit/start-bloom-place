@@ -11,7 +11,10 @@ html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px)
 .md-faixa-titulo { font-size: 12.5px; font-weight: 800; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .md-faixa-titulo b { color: rgba(255,255,255,.6); font-weight: 700; }
 .md-faixa-pular { margin-left: auto; min-height: 36px; padding: 0 10px; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.7); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; }
-.md-faixa-onde { font-size: 12px; font-weight: 700; color: #ffd36e; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0 4px; }
+/* 10/10: o "mostrar onde" virou um alvo ⌖ (ícone, 36 px de toque) — texto quebrava em 2 linhas e cobria o cabeçalho */
+.md-faixa-onde { margin-left: auto; width: 36px; height: 36px; display: inline-grid; place-items: center; color: #ffd36e; background: rgba(255,255,255,.08); border: 0; border-radius: 999px; padding: 0; flex-shrink: 0; }
+.md-faixa-onde + .md-faixa-pular { margin-left: 0; }
+.md-faixa-pular { flex-shrink: 0; white-space: nowrap; }
 
 /* a faixa colorida com título em caixa alta — a gramática das seções do planner */
 .md-secao { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #fff; }
@@ -38,8 +41,40 @@ html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px)
    branco no branco (os prints de 02/10 já saíam sem o "Fazer o toque de hoje"). Um nível a mais e ele sempre ganha. */
 button.md-botao, .md-botao { width: 100%; min-height: 54px; border-radius: 999px; background: #16121c; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; }
 button.md-botao[data-tom="magenta"], .md-botao[data-tom="magenta"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+/* 10/10 (regra do dono pro funil): o botão principal colado embaixo tem 56 px, como nas outras telas do funil */
+button.md-botao.md-botao-56, .md-botao.md-botao-56 { min-height: 56px; height: 56px; }
 .md-link { display: block; width: 100%; text-align: center; font-size: 13px; font-weight: 600; color: hsl(var(--muted-foreground)); padding: 10px 0; background: none; border: 0; }
-.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
+/* `button.md-hora` (17/10): como o md-botao — esta folha entra antes do index.css e o preflight `[type="button"]` zerava o fundo branco */
+button.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #16121c; background: #fff; color: #16121c; font-size: 14px; font-weight: 800; }
 .md-hora[data-marcada] { background: #16121c; color: #fff; }
 .md-hora[data-sem] { border-color: rgba(22,18,28,.35); color: rgba(22,18,28,.55); }
 .md-hora[data-sem][data-marcada] { background: rgba(22,18,28,.75); color: #fff; }
+
+/* 1.0.16, braço A — as folhas da missão seguem o tema do app (claro/escuro): `.md-tema` no cartão. As horas do
+   lembrete viram pílulas da cor do papel (no escuro, branco no branco sumia). O braço B não usa `.md-tema`. */
+.dark .md-tema .md-hora { background: transparent; border-color: hsl(var(--foreground) / .7); color: hsl(var(--foreground)); }
+.dark .md-tema .md-hora[data-marcada] { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.dark .md-tema .md-hora[data-sem] { border-color: hsl(var(--foreground) / .3); color: hsl(var(--foreground) / .6); }
+.dark .md-tema .md-hora[data-sem][data-marcada] { background: hsl(var(--foreground) / .75); color: hsl(var(--background)); }
+.dark .md-tema button.md-botao:not([data-tom]), .dark .md-tema .md-botao:not([data-tom]) { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+
+/* A marca "Dia 1" (o dia 1 sem adesivo de 1º registro): um carimbo de planner, sem id de adesivo nenhum. */
+.md-marca-dia { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: .9; font-weight: 900; letter-spacing: -.02em; color: #16121c; background: #FFF4C2; border: 2.5px solid #16121c; border-radius: 22%; box-shadow: 0 0 0 3px #fff, 0 8px 18px -8px rgba(0,0,0,.45); transform: rotate(-6deg); }
+.md-marca-dia small { display: block; font-weight: 800; letter-spacing: .14em; margin-bottom: 2px; }
+/* O adesivo da sequência sem arte própria (reserva até o ramo das Conquistas): o fogo genérico num recorte de adesivo. */
+.md-adesivo-fogo { position: relative; display: inline-grid; place-items: center; border-radius: 50%; background: #fff6e6; box-shadow: 0 0 0 3px #fff, 0 8px 18px -8px rgba(0,0,0,.45); transform: rotate(-6deg); }
+.md-adesivo-fogo b { position: absolute; right: 8%; bottom: 4%; min-width: 1.6em; height: 1.6em; padding: 0 .3em; border-radius: 999px; background: #16121c; color: #fff; display: grid; place-items: center; font-weight: 900; line-height: 1; }
+.md-adesivo-fogo[data-trancado] { background: hsl(var(--muted)); box-shadow: 0 0 0 2px hsl(var(--background)); transform: none; opacity: .85; }
+/* O fundo das boas-vindas do braço A: o azul-céu de sempre no claro; no escuro, o papel do tema (sem tela branca à noite). */
+.md-fundo-boas { background: linear-gradient(180deg, #eaf5fd 0%, #ffffff 55%); }
+.dark .md-fundo-boas { background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 60%); }
+
+/* "O QUE VOCÊ CONSTRUIU EM 3 DIAS" (17/10, revisão tela a tela #39): a tela é mais alta que um iPhone de 390×844 e o
+   botão saía cortado embaixo. Agora ele fica colado: sticky no fim da coluna que rola (no fluxo — rolado até o fim, nada
+   fica atrás dele), as margens negativas levam o degradê de borda a borda da coluna (px-4) e o padding de baixo leva
+   a área segura do iPhone. O degradê (28 px) apaga o que passa por baixo do botão. */
+.md-fim-rodape { position: sticky; bottom: 0; z-index: 1; margin: auto -16px 0; padding: 28px 16px calc(var(--app-safe-bottom, 0px) + 16px); background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 28px); }
+
+/* área de toque de 44 px no "Pular" da faixa (36 px) — ::before invisível (polimento 17/10) */
+.md-faixa-pular { position: relative; }
+.md-faixa-pular::before { content: ""; position: absolute; inset: -4px; }

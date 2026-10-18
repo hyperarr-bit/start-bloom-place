@@ -34,10 +34,12 @@ import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, diasEfetivos,
 import { computeDailyBudget, computeLooseBillsOutflow, computeMonthlyOutflow } from "./finance-totals";
 import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
+import { gastoDoDia, praHojeDoDia, type PraHoje } from "./montar-financas";
 import {
-  MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, missaoCumprida, passoPendente,
+  doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
   type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
+import type { QuandoAmanha } from "./dia1-cheio";
 import type { AreaKey } from "./funnel";
 
 export const CHAVE_DIA2 = "core-dia2";
@@ -116,6 +118,9 @@ export function registrarAbertura(agora: Date = new Date(), criadoEm?: string | 
 export const diaDoUso = (e: EstadoDia2, dia: string): number => diasEntre(e.primeiroUso, dia) + 1;
 
 export const HORA_DA_MISSAO: Record<Lembrete, number | "sem"> = { "8h": 8 * 60, "12h": 12 * 60, "20h": 20 * 60, sem: "sem" };
+
+/** 10/10 (DIA1_CHEIO, braço B): o chip do plano de amanhã ("manhã/almoço/noite") na hora do lembrete. */
+export const LEMBRETE_DO_PLANO: Record<QuandoAmanha, Lembrete> = { manha: "8h", almoco: "12h", noite: "20h" };
 
 /** A comemoração da missão combinou a hora: vale a semana toda (escolha explícita > inferência). */
 export function combinarHora(l: Lembrete, agora: Date = new Date()): EstadoDia2 {
@@ -198,6 +203,43 @@ export function moduloMaisUsado(get: Leitor): ModuloDaMissao | null {
   let melhor: ModuloDaMissao | null = null;
   for (const m of ORDEM_MODULOS) if (n[m] > 0 && (melhor === null || n[m] > n[melhor])) melhor = m;
   return melhor;
+}
+
+/**
+ * 1.0.16: "quanto dá pra gastar por dia" com as Finanças DELA (a mesma conta do card do Dashboard e do
+ * Montar Finanças), ou null sem renda / sem folga. Usado no aviso do teste (920001) e nos lembretes do braço A.
+ */
+export function porDiaDasFinancas(get: Leitor, dia: Date = new Date()): number | null {
+  const v = porDiaExato(get, dia);
+  return v === null ? null : Math.floor(v);
+}
+/** As entradas do card QUANTO POSSO GASTAR HOJE lidas das Finanças dela (null sem renda). */
+function entradasDoCard(get: Leitor) {
+  const receitas = soma(get<unknown>("finance-incomes", []));
+  if (!(receitas > 0)) return null;
+  const dueDays = lista(get<unknown>("finance-dueDays", [])) as Array<{ day?: number; bills?: Array<{ name?: string; paid?: boolean }> }>;
+  const fixos = lista(get<unknown>("finance-fixed-expenses", []));
+  // (17/10) + contas avulsas do MEU MÊS, como no card do Dashboard
+  const saida = computeMonthlyOutflow(soma(get<unknown>("finance-expenses", [])), soma(fixos), somaParcelasDoMes(lista(get<unknown>("finance-installments", [])) as Parcela[]), computeLooseBillsOutflow(dueDays, fixos));
+  return { receitas, saida, dueDays, fixos };
+}
+/** O "quanto posso gastar por dia" SEM arredondar (o card do Dashboard mostra Math.round disto), ou null sem renda/folga. */
+export function porDiaExato(get: Leitor, dia: Date = new Date()): number | null {
+  try {
+    const e = entradasDoCard(get);
+    if (!e) return null;
+    const orc = computeDailyBudget(e.receitas, e.saida, e.dueDays, e.fixos, dia);
+    return !orc.cantSpend && orc.perDay > 0 ? orc.perDay : null;
+  } catch { return null; }
+}
+/** 17/10 — a linha "Sobram R$ X pra hoje" do card do Dashboard, com as Finanças DELA (a MESMA conta: montar-financas
+ *  `praHojeDoDia`; o gasto de hoje = os gastos com a data de hoje). null sem renda / sem folga no começo do dia. */
+export function praHojeDasFinancas(get: Leitor, dia: Date = new Date()): PraHoje | null {
+  try {
+    const e = entradasDoCard(get);
+    if (!e) return null;
+    return praHojeDoDia(e.receitas, e.saida, gastoDoDia(get<unknown>("finance-expenses", []), localDayKey(dia)), e.dueDays, e.fixos, dia);
+  } catch { return null; }
 }
 
 /** O texto genérico (bom) de cada módulo, pra quando não há número da pessoa. */
@@ -293,14 +335,60 @@ export function conteudoDoModulo(get: Leitor, modulo: ModuloDaMissao, amanha: Da
 }
 
 /** O passo de AMANHÃ da Missão em doses, se há um pendente (uma notificação só: missão e dia 2 não duplicam). */
-export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string = localDayKey()): ConteudoDia2 | null {
+export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string = localDayKey(), get?: Leitor): ConteudoDia2 | null {
   if (!missao || !missao.boasVindas || missaoCumprida(missao)) return null;
   const pendente = passoPendente(missao);
   if (!pendente) return null;
+  // 1.0.16, braço A (desenho 8 seção 4.6): a missão anda até o 7º dia; quem escolheu "Explorar" fica com o
+  // texto do módulo mais usado (com o número dela)
+  if (ehUmPorDia(missao)) {
+    if (missao.explorou || diaDaMissao(missao, somarDias(hoje, 1)) > 7) return null;
+    const cfgA = MODULOS[pendente.modulo];
+    const dose = doseCurta(pendente.modulo, pendente.n);
+    const porDia = get ? porDiaDasFinancas(get) : null;
+    // o pedido curto, do jeito que se fala ("1 copo d'água", "1 hábito", "1 gasto")
+    const toque = pendente.modulo === "saude" ? "1 copo d'água" : cfgA.toque;
+    // a sequência viva: hoje e ontem com registro (a do app, dias com QUALQUER registro — a régua do adesivo;
+    // sem o dado da conta, a das doses) → amanhã fecha 3 dias seguidos
+    let vivo = sequenciaDaMissao(missao, hoje) >= 2;
+    if (get) {
+      try {
+        const seq = calcularSequencia(diasEfetivos(get<unknown>(CHAVE_DIAS_ANOTADOS, undefined), get<unknown>(CHAVE_HUB_STREAK, null), hoje), hoje);
+        vivo = seq.hojeFeito && seq.dias >= 2;
+      } catch { /* fica a das doses */ }
+    }
+    if (pendente.n === 3 && vivo) {
+      return { title: "Dia 3: feche seus 3 dias seguidos 🔥", body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} e o adesivo dos 3 dias é seu. ${dose.seg} segundos.`, modulo: "missao", temNumero: false, rota: cfgA.rota };
+    }
+    if (pendente.n === 2) {
+      return {
+        title: porDia ? `Hoje dá pra gastar até R$ ${reais(porDia)}` : `Dia 2 do seu plano: ${cfgA.emoji} ${cfgA.nome}`,
+        body: `E hoje é ${toque} ${cfgA.onde} — ${dose.seg} s. O adesivo do dia 2 te espera.`,
+        modulo: "missao", temNumero: !!porDia, rota: cfgA.rota,
+      };
+    }
+    return {
+      title: `Seu plano de hoje: ${cfgA.emoji} ${cfgA.nome}`,
+      body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} — ${dose.seg} s.${porDia && cfgA.modulo !== "financas" ? ` Suas Finanças continuam lá: hoje dá pra gastar R$ ${reais(porDia)}.` : ""}`,
+      modulo: "missao", temNumero: !!porDia, rota: cfgA.rota,
+    };
+  }
   // missão abandonada há dias: volta ao texto do módulo (o "dia N da missão" já não faz sentido)
   if (diaDaMissao(missao, somarDias(hoje, 1)) > 5) return null;
   const cfg = MODULOS[pendente.modulo];
   const feitos = ([1, 2, 3] as const).filter((n) => missao.feitos[n]).length;
+  // 10/10 (DIA1_CHEIO, braço B): parou no meio das doses ("Agora não") — a de amanhã é a PRÓXIMA DOSE, com o que já fez
+  if (ehBracoB(missao)) {
+    const ultimo = feitos ? missao.feitos[feitos as 1 | 2 | 3] : undefined;
+    const ultimoCfg = feitos ? MODULOS[missao.modulos[feitos - 1]] : null;
+    return {
+      title: ultimo && ultimoCfg ? `Ontem você anotou ${ultimoCfg.toque} — bora a próxima dose?` : `Sua próxima dose de 20 s: ${cfg.emoji} ${cfg.nome}`,
+      body: `${cfg.pedido} — 20 segundos e a dose ${pendente.n} de 3 fica feita${feitos ? ` (${feitos} de 3 já ${feitos === 1 ? "foi" : "foram"})` : ""}.`,
+      modulo: "missao",
+      temNumero: false,
+      rota: cfg.rota,
+    };
+  }
   return {
     title: `🔥 Dia ${pendente.n} da missão: ${cfg.emoji} ${cfg.nome}`,
     body: `${cfg.pedido} — 40 segundos e o passo ${pendente.n} de 3 fica feito${feitos ? ` (${feitos} de 3 já foram)` : ""}.`,
@@ -311,12 +399,35 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
 }
 
 /**
+ * 10/10 (DIA1_CHEIO, braço B) — "APROFUNDAR": as 3 doses foram feitas no dia 1; amanhã (dia 2) e
+ * depois (dia 3) o lembrete pede 1 uso REAL num módulo já visto, com o que a pessoa fez de concreto:
+ * "Ontem você anotou 1 gasto — 20 s pra anotar o de hoje". Dia 2 → o 1º módulo da missão; dia 3 → o 2º.
+ * Fora dos dias 2–3 (ou missão incompleta), null.
+ */
+export function conteudoDoAprofundar(missao: EstadoMissaoDoses | null, hoje: string = localDayKey()): ConteudoDia2 | null {
+  if (!missao || !ehBracoB(missao) || !missao.boasVindas || !missaoCumprida(missao)) return null;
+  const diaAmanha = diaDaMissao(missao, somarDias(hoje, 1));
+  if (diaAmanha < 2 || diaAmanha > 3) return null;
+  const n = (diaAmanha - 1) as 1 | 2;
+  const cfg = MODULOS[missao.modulos[n - 1]];
+  const feito = missao.feitos[n];
+  const quando = missao.completaEm === hoje || !missao.completaEm ? "Ontem" : "Esses dias";
+  return {
+    title: `${quando} você anotou ${cfg.toque} — 20 s pra anotar ${cfg.toque === "1 gasto" ? "o" : "mais um"} de hoje`,
+    body: `${feito?.rotulo ? `${feito.rotulo} já está ${cfg.onde}. ` : ""}${cfg.pedido} de novo e a missão continua.`,
+    modulo: "missao",
+    temNumero: !!feito?.rotulo,
+    rota: cfg.rota,
+  };
+}
+
+/**
  * O conteúdo do lembrete que toca em `amanha`: o passo da missão, senão o módulo
  * mais usado com o número da pessoa, senão o módulo da área da porta, senão Finanças.
  */
 export function conteudoDoLembrete(get: Leitor, p: { missao: EstadoMissaoDoses | null; amanha: Date; area?: string | null; hoje?: string }): ConteudoDia2 {
   const hoje = p.hoje ?? localDayKey();
-  const daMissao = conteudoDaMissao(p.missao, hoje);
+  const daMissao = conteudoDaMissao(p.missao, hoje, get) ?? conteudoDoAprofundar(p.missao, hoje);
   if (daMissao) return daMissao;
   const modulo = moduloMaisUsado(get) ?? (p.area && p.area in MODULO_DA_AREA ? MODULO_DA_AREA[p.area as AreaKey] : "financas");
   return conteudoDoModulo(get, modulo, p.amanha, hoje);
@@ -328,14 +439,20 @@ export type PlanoDia2 =
   | { ok: true; quando: Date; origemHora: "missao" | "abertura"; conteudo: ConteudoDia2; diaDoUso: number }
   | { ok: false; motivo: "desligado" | "sem_aviso" | "fim_da_semana" };
 
-/** Tudo o que o agendador precisa, sem tocar no plugin. */
-export function planejarLembreteDia2(get: Leitor, e: EstadoDia2, p: { ligado: boolean; missao: EstadoMissaoDoses | null; area?: string | null; agora?: Date }): PlanoDia2 {
+/** Tudo o que o agendador precisa, sem tocar no plugin. `ajustarHora` (1.0.16): quem agenda pode mover a hora
+ *  (ex.: não empilhar com o lembrete da sequência à noite — notificacoes.horaSemEmpilhar); o dia não muda. */
+export function planejarLembreteDia2(get: Leitor, e: EstadoDia2, p: { ligado: boolean; missao: EstadoMissaoDoses | null; area?: string | null; agora?: Date; ajustarHora?: (min: number) => number }): PlanoDia2 {
   if (!p.ligado) return { ok: false, motivo: "desligado" };
   const agora = p.agora ?? new Date();
   const q = quandoLembrar(e, agora);
   if ("motivo" in q) return { ok: false, motivo: q.motivo };
+  let quando = q.quando;
+  if (p.ajustarHora) {
+    const min = clampHora(p.ajustarHora(quando.getHours() * 60 + quando.getMinutes()));
+    quando = new Date(quando.getFullYear(), quando.getMonth(), quando.getDate(), Math.floor(min / 60), min % 60, 0, 0);
+  }
   const hoje = localDayKey(agora);
-  return { ok: true, quando: q.quando, origemHora: q.origemHora, conteudo: conteudoDoLembrete(get, { missao: p.missao, amanha: q.quando, area: p.area, hoje }), diaDoUso: diaDoUso(e, localDayKey(q.quando)) };
+  return { ok: true, quando, origemHora: q.origemHora, conteudo: conteudoDoLembrete(get, { missao: p.missao, amanha: quando, area: p.area, hoje }), diaDoUso: diaDoUso(e, localDayKey(quando)) };
 }
 
 /** A assinatura do plano: igual à última → nada a refazer no sistema. */

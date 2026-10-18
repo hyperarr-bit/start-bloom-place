@@ -41,7 +41,7 @@ import {
   BASE_DIA2, CHAVE_DIA2, DIAS_DE_LEMBRETE, ID_DIA2, HORA_MAX, HORA_MIN, clampHora, combinarHora, conteudoDaMissao, conteudoDoLembrete, conteudoDoModulo,
   diaDoUso, horaDoLembrete, horaSugeridaDaMissao, lerDia2, moduloMaisUsado, planejarLembreteDia2, quandoLembrar, registrarAbertura, type Leitor,
 } from "@/lib/lembrete-dia2";
-import { FAIXAS_AVULSAS, BASES_LEMBRETES, adiarPermissaoDia2, pedirPermissaoDia2, registrarEntregues, sincronizarLembreteDia2, tipoDoAviso } from "@/lib/notificacoes";
+import { FAIXAS_AVULSAS, BASES_LEMBRETES, ID_PROXIMA_DOSE, adiarPermissaoDia2, agendarProximaDose, cancelarProximaDose, pedirPermissaoDia2, quandoProximaDose, registrarEntregues, sincronizarLembreteDia2, tipoDoAviso } from "@/lib/notificacoes";
 import { CHAVE_ESTADO_MISSAO_DOSES, iniciarMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
 
 const leitor = (dados: Record<string, unknown>): Leitor => <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
@@ -235,7 +235,8 @@ describe("sincronizarLembreteDia2 — a cada abertura, no app", () => {
     expect(n.schedule.at).toEqual(as(2026, 10, 4, 19, 17));
     expect(n.title).toMatch(/^Hoje dá pra gastar até R\$ /);
     expect(n.extra).toMatchObject({ tipo: "dia2", rota: "/financas", em: as(2026, 10, 4, 19, 17).toISOString() });
-    expect(eventos).toContainEqual(["lembrete_dia2_agendado", { ok: true, dia_da_semana_1a7: 7, modulo: "financas", hora: "19:17", tem_numero: true, dia_do_uso: 2, missao: false, origem_hora: "abertura" }]);
+    // (16/10: o evento ganhou dia_cal, braco e pulado_por_920 — sem missão, vazios)
+    expect(eventos).toContainEqual(["lembrete_dia2_agendado", { ok: true, dia_da_semana_1a7: 7, modulo: "financas", hora: "19:17", tem_numero: true, dia_do_uso: 2, missao: false, origem_hora: "abertura", dia_cal: null, braco: null, pulado_por_920: false }]);
     // a 2ª abertura no mesmo dia, sem nada novo: não refaz (nem cancela, nem agenda, nem mede de novo)
     ln.schedule.mockClear(); ln.cancel.mockClear(); eventos.length = 0;
     vi.setSystemTime(as(2026, 10, 3, 21, 0));
@@ -368,5 +369,40 @@ describe("registrarEntregues — o que está na bandeja vira notif_entregue, uma
     // o lembrete do dia seguinte (mesmo id, outro `em`) conta de novo
     ln.entregues.push({ id: ID_DIA2, title: "3 hábitos te esperando hoje", extra: { tipo: "dia2", em: "2026-10-05T22:00:00.000Z", rota: "/rotina" } });
     expect(await registrarEntregues()).toBe(1);
+  });
+});
+
+/* ------------------------------------------------------------ a próxima dose em 3 h (10/10, DIA1_CHEIO braço B) */
+
+describe("agendarProximaDose — 'Agora não' no meio das doses (braço B)", () => {
+  const dose = { indice: 2, nome: "Rotina", emoji: "📅", pedido: "Marca 1 hábito no quadradinho", rota: "/rotina" };
+  it("toca 3 h depois, na faixa da missão (900002), com extra {tipo: proxima_dose}; não sai depois das 21:30 nem vira o dia", () => {
+    expect(ID_PROXIMA_DOSE).toBe(FAIXAS_AVULSAS.missao + 2);
+    expect(quandoProximaDose(as(2026, 10, 3, 15, 10))).toEqual(as(2026, 10, 3, 18, 10));
+    expect(quandoProximaDose(as(2026, 10, 3, 18, 31))).toBeNull(); // 21:31
+    expect(quandoProximaDose(as(2026, 10, 3, 23, 0))).toBeNull();  // viraria o dia
+    expect(tipoDoAviso(ID_PROXIMA_DOSE, { tipo: "proxima_dose" })).toBe("proxima_dose");
+    expect(tipoDoAviso(ID_PROXIMA_DOSE)).toBe("missao");
+  });
+
+  it("agenda com permissão; sem permissão não agenda e não PEDE; cancela só o próprio id; tarde = motivo 'tarde'", async () => {
+    ligarShell();
+    const r = await agendarProximaDose(dose, as(2026, 10, 3, 15, 10));
+    expect(r).toEqual({ ok: true, quando: as(2026, 10, 3, 18, 10) });
+    const n = agendado();
+    expect(n.id).toBe(ID_PROXIMA_DOSE);
+    expect(n.title).toBe("Sua próxima dose de 20 s está pronta");
+    expect(n.body).toBe("📅 Rotina: marca 1 hábito no quadradinho — e a dose 2 de 3 fica feita.");
+    expect(n.extra).toEqual({ rota: "/rotina", tipo: "proxima_dose", em: as(2026, 10, 3, 18, 10).toISOString() });
+    expect(ln.cancel).toHaveBeenCalledWith({ notifications: [{ id: ID_PROXIMA_DOSE }] });
+    ln.schedule.mockClear();
+    expect(await agendarProximaDose(dose, as(2026, 10, 3, 19, 0))).toEqual({ ok: false, motivo: "tarde" });
+    expect(ln.schedule).not.toHaveBeenCalled();
+    ln.permissao = "prompt";
+    expect(await agendarProximaDose(dose, as(2026, 10, 3, 15, 10))).toEqual({ ok: false, motivo: "sem_permissao" });
+    expect(ln.pedidos).toBe(0);
+    ln.cancel.mockClear();
+    await cancelarProximaDose();
+    expect(ln.cancel).toHaveBeenCalledWith({ notifications: [{ id: ID_PROXIMA_DOSE }] });
   });
 });

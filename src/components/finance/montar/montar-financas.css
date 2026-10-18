@@ -1,0 +1,177 @@
+/* "VAMOS MONTAR SUAS FINANÇAS" (1.0.16) — a cara do módulo Finanças: âmbar do ícone, faixas
+   das seções no tom do RECEITAS/CUSTOS FIXOS (--income), grade de planner nas tabelas, botão
+   grafite da casa (--primary). Tokens de escopo `.mf` (claro + escuro), nenhum token global muda.
+   Seletores `button.mf-…` de propósito: o index.css zera o fundo de [type="button"] com a mesma
+   especificidade de uma classe sozinha (o botão grafite branco-no-branco da missão, 03/10). */
+.mf {
+  --mf-ambar: #d97706;
+  --mf-ambar-texto: #92400e;
+  --mf-ambar-valor: #b45309;
+  --mf-ambar-suave: rgba(251, 191, 36, .16);
+  --mf-ambar-borda: #fcd34d;
+  --mf-cartao: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  --mf-cartao-borda: #fde68a;
+  --mf-orbe: conic-gradient(#fbbf24, #f59e0b, #fde68a, #fbbf24);
+  --mf-orbe-luz: rgba(251, 191, 36, .45);
+  --mf-ok: #16a34a;
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  font-family: Inter, -apple-system, sans-serif; -webkit-font-smoothing: antialiased;
+  padding-top: var(--app-safe-top, 0px);
+  padding-bottom: var(--app-safe-bottom, 0px);
+}
+.dark .mf {
+  --mf-ambar: #fbbf24;
+  --mf-ambar-texto: #fde68a;
+  --mf-ambar-valor: #fcd34d;
+  --mf-ambar-suave: rgba(251, 191, 36, .12);
+  --mf-ambar-borda: rgba(251, 191, 36, .55);
+  --mf-cartao: linear-gradient(135deg, rgba(251, 191, 36, .16) 0%, rgba(217, 119, 6, .08) 100%);
+  --mf-cartao-borda: rgba(251, 191, 36, .28);
+  --mf-orbe: conic-gradient(#f59e0b, #d97706, #fbbf24, #f59e0b);
+  --mf-orbe-luz: rgba(251, 191, 36, .25);
+  --mf-ok: #22c55e;
+}
+/* A faixa da missão (fixa no topo, z 210) continua visível por cima: a tela começa abaixo dela. */
+html[data-missao-doses-faixa] .mf { top: var(--missao-doses-faixa-h, 40px); }
+html[data-montar-financas] body { overflow: hidden; }
+
+.mf-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px 12px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0; }
+.mf-cab-icone { color: var(--mf-ambar); width: 22px; height: 22px; }
+.mf-cab-nome { font-size: 17px; font-weight: 800; letter-spacing: .02em; }
+.mf-cab-mes { margin-left: auto; font-size: 13px; color: hsl(var(--muted-foreground)); }
+
+.mf-corpo { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+.mf-corpo > * { flex-shrink: 0; } /* senão a tabela de contas encolhe (overflow hidden) em vez de a tela rolar */
+.mf-barra { display: flex; gap: 6px; padding: 16px 22px 0; }
+.mf-barra i { flex: 1; height: 4px; border-radius: 4px; background: hsl(var(--muted)); }
+.mf-barra i[data-on] { background: var(--mf-ambar); }
+
+.mf-q { padding: 20px 22px 0; }
+.mf-kicker { display: flex; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .1em; font-weight: 800; color: var(--mf-ambar); text-transform: uppercase; }
+button.mf-voltar { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; padding: 4px 0 4px 8px; background: none; border: 0; color: hsl(var(--muted-foreground)); font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.mf-q h2 { font-size: 25px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 8px; }
+.mf-q p { font-size: 14.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; line-height: 1.4; }
+
+.mf-chips { display: flex; flex-wrap: wrap; gap: 10px; padding: 18px 22px 0; }
+.mf-chips[data-grade] { display: grid; grid-template-columns: 1fr 1fr; }
+button.mf-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 48px; padding: 0 14px; border-radius: 14px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 15px; font-weight: 650; text-align: left; transition: border-color .15s, background-color .15s, transform .1s; }
+button.mf-chip:active { transform: scale(.97); }
+button.mf-chip[aria-pressed="true"] { border-color: var(--mf-ambar); background: var(--mf-ambar-suave); color: var(--mf-ambar-texto); }
+button.mf-chip[data-outra] { border-style: dashed; }
+.mf-chips[data-compacto] { gap: 8px; }
+.mf-chips[data-compacto] button.mf-chip { min-height: 44px; height: 44px; padding: 0 12px; border-radius: 12px; font-size: 14.5px; gap: 6px; }
+
+/* tabela de planner: faixa da seção no tom do módulo + linhas de grade */
+.mf-folha { margin: 20px 18px 0; border: 1px solid hsl(var(--border)); border-radius: 12px; overflow: hidden; background: hsl(var(--card)); }
+.mf-faixa { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 14px; background: hsl(var(--income)); color: hsl(var(--income-foreground)); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.mf-faixa b { font-weight: 800; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+.mf-linha { display: flex; align-items: center; gap: 10px; padding: 0 8px 0 14px; min-height: 50px; border-top: 1px solid hsl(var(--border)); }
+.mf-linha:first-of-type { border-top: 0; }
+.mf-linha-emoji { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
+.mf-linha-nome { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+input.mf-linha-nome { background: transparent; border: 0; outline: none; padding: 12px 0; color: inherit; font-family: inherit; }
+input.mf-linha-nome::placeholder { color: hsl(var(--muted-foreground)); font-weight: 500; }
+.mf-valor { display: inline-flex; align-items: baseline; gap: 4px; padding: 6px 10px; border-radius: 10px; background: hsl(var(--muted) / .6); font-variant-numeric: tabular-nums; }
+.mf-valor small { font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 600; }
+.mf-valor input { width: 64px; background: transparent; border: 0; outline: none; text-align: right; font-size: 16px; font-weight: 700; color: inherit; font-family: inherit; padding: 0; }
+button.mf-tirar { width: 34px; height: 34px; display: grid; place-items: center; background: none; border: 0; color: hsl(var(--muted-foreground)); border-radius: 999px; flex-shrink: 0; }
+.mf-total { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; border-top: 1.5px solid hsl(var(--border)); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mf-total span { color: hsl(var(--muted-foreground)); font-weight: 600; }
+
+/* renda: o valor grande numa linha pautada */
+.mf-renda { padding: 16px 16px 14px; }
+.mf-renda label { display: flex; align-items: baseline; gap: 8px; border-bottom: 2px solid hsl(var(--border)); padding-bottom: 6px; transition: border-color .15s; }
+.mf-renda label:focus-within { border-color: var(--mf-ambar); }
+.mf-renda small { font-size: 22px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+/* !important: o index.css força 16px em todo input no celular (anti-zoom do Safari) */
+.mf-renda input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-size: 34px !important; font-weight: 800; letter-spacing: -.02em; color: inherit; font-family: inherit; font-variant-numeric: tabular-nums; padding: 0; }
+.mf-renda input::placeholder { color: hsl(var(--muted-foreground) / .45); }
+.mf-renda p { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; }
+
+/* passo do cartão (16/10): campos em linhas da mesma folha de planner */
+.mf-campo { padding: 12px 14px 14px; border-top: 1px solid hsl(var(--border)); }
+.mf-faixa + .mf-campo { border-top: 0; }
+.mf-rotulo { display: block; font-size: 12.5px; font-weight: 700; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
+/* fileira que rola pro lado (bancos, dias): sem barra; a ponta direita esmaece pra mostrar que tem mais */
+.mf-rolo { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -14px; padding: 2px 36px 4px 14px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.mf-rolo::-webkit-scrollbar { display: none; }
+button.mf-banco { flex-shrink: 0; height: 40px; padding: 0 13px; border-radius: 12px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 14.5px; font-weight: 650; white-space: nowrap; transition: border-color .15s, background-color .15s; }
+button.mf-banco[aria-pressed="true"] { border-color: var(--mf-ambar); background: var(--mf-ambar-suave); color: var(--mf-ambar-texto); }
+button.mf-dia { flex-shrink: 0; width: 42px; height: 42px; padding: 0; display: grid; place-items: center; border-radius: 999px; border: 1.5px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; transition: border-color .15s, background-color .15s; }
+button.mf-dia[aria-pressed="true"] { border-color: var(--mf-ambar); background: var(--mf-ambar); color: #fff; }
+.dark button.mf-dia[aria-pressed="true"] { color: #1c1917; }
+.mf-dica { font-size: 12.5px; color: hsl(var(--muted-foreground)); margin-top: 8px; line-height: 1.35; }
+.mf-valor-grande { display: flex; align-items: baseline; gap: 8px; border-bottom: 2px solid hsl(var(--border)); padding-bottom: 6px; transition: border-color .15s; }
+.mf-valor-grande:focus-within { border-color: var(--mf-ambar); }
+.mf-valor-grande small { font-size: 18px; font-weight: 700; color: hsl(var(--muted-foreground)); }
+/* !important: o index.css força 16px em todo input no celular (anti-zoom do Safari) */
+.mf-valor-grande input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; font-size: 28px !important; font-weight: 800; letter-spacing: -.02em; color: inherit; font-family: inherit; font-variant-numeric: tabular-nums; padding: 0; }
+.mf-valor-grande input::placeholder { color: hsl(var(--muted-foreground) / .45); }
+.mf-conta span small { font-size: 12.5px; }
+
+/* teclado do iPhone aberto: a folha cabe na área visível (useFolhaAcimaDoTeclado) — sai o
+   cabeçalho e o "Pular" enquanto se digita, o botão fica logo acima do teclado */
+.mf[data-teclado] .mf-cab, .mf[data-teclado] button.mf-pular { display: none; }
+.mf[data-teclado] .mf-rodape { padding-top: 10px; padding-bottom: 10px; }
+
+/* rodapé grudado embaixo: o botão nunca some atrás da lista de contas */
+.mf-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 18px 22px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 18px); }
+button.mf-cta { width: 100%; min-height: 56px; border-radius: 16px; border: 0; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .15s, transform .1s; }
+button.mf-cta:active { transform: scale(.985); }
+button.mf-cta:disabled { opacity: .35; }
+button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0; font-size: 13.5px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+
+/* montando */
+.mf-montando { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 30px 40px; }
+.mf-orbe { width: 120px; height: 120px; border-radius: 50%; background: var(--mf-orbe); display: grid; place-items: center; box-shadow: 0 0 60px var(--mf-orbe-luz); animation: mf-gira 2.4s linear infinite; }
+.mf-orbe > div { width: 92px; height: 92px; border-radius: 50%; background: hsl(var(--background)); display: grid; place-items: center; color: var(--mf-ambar); animation: mf-gira 2.4s linear infinite reverse; }
+.mf-montando h2 { font-size: 22px; font-weight: 800; margin-top: 30px; text-align: center; letter-spacing: -.01em; }
+.mf-passos { margin-top: 22px; width: 100%; max-width: 300px; }
+.mf-passo { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 15px; opacity: 0; transform: translateY(6px); animation: mf-entra .35s ease-out forwards; }
+.mf-passo i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--mf-ok); color: #fff; }
+.mf-passo[data-esperando] { color: hsl(var(--muted-foreground)); }
+.mf-passo[data-esperando] i { background: transparent; border: 2px solid var(--mf-ambar); }
+
+/* pronto. O RESPIRO no fim (17/10, revisão tela a tela #15): o botão é colado (sticky, no fluxo) e o degradê dele
+   cobre 18 px acima do botão — sem nada depois da última linha ("✓ Já está tudo nas suas Finanças…"), ela ficava
+   encostada no degradê mesmo rolando até o fim. 24 px embaixo = rolado até o fim, ela fica inteira acima do degradê
+   (a área segura de baixo já é o padding do .mf). */
+.mf-pronto { padding: 14px 18px 24px; animation: mf-sobe .4s ease-out both; }
+.mf-grande { border-radius: 18px; background: var(--mf-cartao); border: 1px solid var(--mf-cartao-borda); padding: 18px 18px 16px; }
+.mf-grande small { font-size: 11.5px; letter-spacing: .1em; font-weight: 800; color: var(--mf-ambar-valor); }
+.mf-grande strong { display: block; font-size: 46px; font-weight: 800; letter-spacing: -.03em; margin-top: 4px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.mf-grande strong em { font-style: normal; font-size: 17px; font-weight: 700; letter-spacing: 0; color: var(--mf-ambar-texto); margin-left: 4px; }
+.mf-grande p { font-size: 14px; color: var(--mf-ambar-texto); margin-top: 6px; line-height: 1.35; }
+.mf-pronto .mf-folha { margin: 12px 0 0; }
+.mf-conta { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 11px 14px; border-top: 1px solid hsl(var(--border)); font-size: 14px; font-variant-numeric: tabular-nums; }
+.mf-conta:first-of-type { border-top: 0; }
+.mf-conta span { color: hsl(var(--muted-foreground)); }
+.mf-conta[data-total] { font-weight: 800; border-top-width: 1.5px; }
+.mf-conta[data-total] span { color: hsl(var(--foreground)); }
+.mf-salvo { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 0 2px; font-size: 13px; color: hsl(var(--muted-foreground)); line-height: 1.4; }
+.mf-salvo i { color: var(--mf-ok); flex-shrink: 0; margin-top: 1px; }
+/* a tela do número pela MISSÃO (17/10, revisão do dono: "o 'quanto posso gastar hoje' deveria ser o foco"): o número
+   é o herói — maior e com mais ar; o 1º gasto não mora mais aqui (é o tutorial no formulário de verdade, depois do
+   "Continuar →"). Sem a linha "✓ Já está tudo…": a conta do mês é a última coisa antes do botão. */
+.mf-pronto[data-heroi] { padding-top: 22px; }
+.mf-pronto[data-heroi] .mf-grande { padding: 24px 20px 20px; }
+.mf-pronto[data-heroi] .mf-grande strong { font-size: 58px; margin-top: 8px; }
+.mf-pronto[data-heroi] .mf-grande strong em { font-size: 19px; margin-left: 6px; }
+.mf-pronto[data-heroi] .mf-grande p { font-size: 14.5px; margin-top: 8px; }
+.mf-pronto[data-heroi] .mf-folha { margin-top: 16px; }
+
+@keyframes mf-gira { to { transform: rotate(360deg); } }
+@keyframes mf-entra { to { opacity: 1; transform: none; } }
+@keyframes mf-sobe { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) {
+  .mf-orbe, .mf-orbe > div { animation: none; }
+  .mf-passo, .mf-pronto { animation-duration: .01s; }
+}
+/* "＋ Outra"/"← Voltar": o texto mora num <span> — com o svg como único filho, a regra global
+   `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */
+
+/* área de toque de 44 px no "Tirar" da conta (34 px) — ::before invisível (polimento 17/10) */
+button.mf-tirar { position: relative; }
+button.mf-tirar::before { content: ""; position: absolute; inset: -5px; }

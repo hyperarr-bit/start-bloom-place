@@ -28,7 +28,33 @@ const compras = (): string[] => {
   try { return JSON.parse(localStorage.getItem(CHAVE) || "[]"); } catch { return []; }
 };
 const gravarCompra = (id: string) => {
-  try { localStorage.setItem(CHAVE, JSON.stringify([...compras(), id])); } catch { /* noop */ }
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify([...compras(), id]));
+    // 10/10 (lib/rc-mock): o use-auth do build de TESTE lê isto como assinatura — o servidor
+    // nunca recebe webhook do RevenueCat no Simulador, e sem a marca a pessoa caía no gate.
+    localStorage.setItem("__rc_mock_assinante", "1");
+    localStorage.setItem("__rc_mock_produto", id);
+    if (!localStorage.getItem("__rc_mock_compra_em")) localStorage.setItem("__rc_mock_compra_em", String(Date.now()));
+  } catch { /* noop */ }
+};
+// 10/10: o entitlement da compra simulada, como o RevenueCat devolveria — TRIAL de 3 dias no
+// anual do iPhone (oferta introdutória), NORMAL no resto. É o que conferirTrialCartao,
+// anotarTrialDaCompra, compraNaLojaSemConta e reconciliarSePreciso leem.
+const entitlementDaCompra = () => {
+  const ids = compras();
+  const id = ids[ids.length - 1];
+  if (!id || ehVitalicio(id)) return {};
+  let compraEm = Date.now();
+  try { compraEm = Number(localStorage.getItem("__rc_mock_compra_em")) || compraEm; } catch { /* noop */ }
+  const trial = /^core_anual(_\d+)?$/.test(id);
+  const fim = compraEm + (trial ? 3 : /^core_anual/.test(id) ? 365 : 30) * 86_400_000;
+  return {
+    pro: {
+      identifier: "pro", isActive: true, willRenew: true, periodType: trial ? "TRIAL" : "NORMAL",
+      productIdentifier: id, store: "APP_STORE", latestPurchaseDateMillis: compraEm, expirationDateMillis: fim,
+      originalPurchaseDateMillis: compraEm, billingIssueDetectedAt: null, unsubscribeDetectedAt: null,
+    },
+  };
 };
 
 const modo = (): string => (window as any).__rcModo || "compra";
@@ -45,9 +71,10 @@ const info = () => {
     const forcado = JSON.parse(localStorage.getItem("__rc_mock_customer") || "null");
     if (forcado) return { customerInfo: forcado };
   } catch { /* noop */ }
+  const ent = entitlementDaCompra();
   return {
     customerInfo: {
-      entitlements: { active: {} },
+      entitlements: { active: ent, all: ent },
       nonSubscriptionTransactions: compras().filter(ehVitalicio).map((id) => ({ productIdentifier: id })),
       activeSubscriptions: compras().filter((id) => !ehVitalicio(id)),
     },
@@ -61,6 +88,7 @@ const PRECOS_BASE: Record<string, string> = {
   core_anual_97: "R$ 97,90",
   core_anual_69: "R$ 69,90", // 01/10: braço B do teste de preço do iPhone
   core_mensal: "R$ 24,90",
+  core_mensal_19: "R$ 19,90", // 10/10: mensal de saída (offering mensal_19), produto a criar pelo dono
   core_vitalicio_97: "R$ 97,90",
   core_vitalicio: "R$ 27,90",
   core_vitalicio_19: "R$ 19,90",
@@ -82,9 +110,17 @@ const INTRO: Record<string, unknown> = {
   core_anual_97: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
   core_anual_69: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
 };
+// 17/10: `localStorage.__rc_mock_intro_dias` = "7" ensaia outra duração do teste grátis (o paywall lê da loja).
+const introDe = (id: string): Record<string, unknown> | undefined => {
+  const base = INTRO[id] as Record<string, unknown> | undefined;
+  if (!base) return undefined;
+  let dias = 0;
+  try { dias = Number(localStorage.getItem("__rc_mock_intro_dias")) || 0; } catch { /* noop */ }
+  return dias > 0 ? { ...base, period: `P${dias}D`, periodNumberOfUnits: dias } : base;
+};
 // 01/10: no iPhone a offering ATUAL decide o braço do teste de preço. `localStorage.__rc_mock_offering`
 // = "anual_69" ensaia o braço B (produto core_anual_69); o padrão é "default" (core_anual_97).
-const produtoMock = (id: string) => ({ identifier: id, priceString: PRECOS[id] ?? "R$ 0,00", ...VALOR(PRECOS[id] ?? "R$ 0,00"), title: `CORE ${id} (mock)`, ...(INTRO[id] ? { introPrice: INTRO[id] } : {}) });
+const produtoMock = (id: string) => ({ identifier: id, priceString: PRECOS[id] ?? "R$ 0,00", ...VALOR(PRECOS[id] ?? "R$ 0,00"), title: `CORE ${id} (mock)`, ...(introDe(id) ? { introPrice: introDe(id) } : {}) });
 const ehIos = () => { try { return (window as any).Capacitor?.getPlatform?.() === "ios"; } catch { return false; } };
 const offeringIos = () => {
   let nome = "default";
@@ -121,7 +157,11 @@ export const Purchases: any = {
       // `localStorage.__rc_mock_presente_off` = "1" ensaia o metadata `presente: "off"`.
       let off = false;
       try { off = localStorage.getItem("__rc_mock_presente_off") === "1"; } catch { /* noop */ }
-      const atual = offeringIos();
+      // 10/10: as chaves remotas das ofertas de saída (ofertas-saida.ts) — `localStorage.__rc_mock_metadata`
+      // (JSON) vira o metadata da offering ATUAL, como se fosse o painel do RevenueCat.
+      let metadata: Record<string, unknown> = {};
+      try { metadata = JSON.parse(localStorage.getItem("__rc_mock_metadata") || "{}"); } catch { /* noop */ }
+      const atual = { ...offeringIos(), metadata };
       const anual69 = {
         identifier: "anual_69", metadata: off ? { presente: "off" } : {},
         availablePackages: [
@@ -129,7 +169,17 @@ export const Purchases: any = {
           { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal") },
         ],
       };
-      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69 } };
+      // 10/10: a offering `mensal_19` (core_mensal_19 em $rc_monthly). `__rc_mock_mensal19_off` = "1"
+      // ensaia a offering AUSENTE no painel (a chave ligada não pode inventar oferta).
+      let semMensal19 = false;
+      try { semMensal19 = localStorage.getItem("__rc_mock_mensal19_off") === "1"; } catch { /* noop */ }
+      const mensal19 = {
+        identifier: "mensal_19", metadata: {},
+        availablePackages: [
+          { identifier: "$rc_monthly", packageType: "MONTHLY", product: produtoMock("core_mensal_19") },
+        ],
+      };
+      return { current: atual, all: { [atual.identifier]: atual, anual_69: anual69, ...(semMensal19 ? {} : { mensal_19: mensal19 }) } };
     }
     // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
     return {
@@ -152,7 +202,7 @@ export const Purchases: any = {
         priceString: PRECOS[id] ?? "R$ 0,00",
         ...VALOR(PRECOS[id] ?? "R$ 0,00"),
         title: `CORE ${id} (mock)`,
-        ...(INTRO[id] ? { introPrice: INTRO[id] } : {}),
+        ...(introDe(id) ? { introPrice: introDe(id) } : {}),
       })),
     };
   },
@@ -180,4 +230,6 @@ export const Purchases: any = {
   },
   async getCustomerInfo() { return info(); },
   async restorePurchases() { return info(); },
+  // 10/10: o init chama syncPurchases no boot (01/09); sem o método o mock só gerava um aviso no console
+  async syncPurchases() { return info(); },
 };

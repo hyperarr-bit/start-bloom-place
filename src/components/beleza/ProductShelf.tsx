@@ -273,7 +273,8 @@ export const ProductShelf = () => {
           <Bell className="w-4 h-4 text-bz-acento shrink-0" aria-hidden="true" />
           <span className="flex-1 min-w-0">
             <span className="block text-[13px] font-semibold text-bz-tinta">Avisar {lembrete.diasAntes} dias antes de vencer</span>
-            <span className="block text-[11.5px] text-bz-suave">às {lembrete.hora}, no app do celular</span>
+            {/* só existe no app (avisosNoApp): "no app do celular" ali dentro soava errado (17/10, #86) */}
+            <span className="block text-[11.5px] text-bz-suave">às {lembrete.hora}</span>
           </span>
           <Switch checked={lembrete.ligado} onCheckedChange={(v) => { gravarLembrete({ ...lembrete, ligado: v }, v); trackEvent("validade_lembrete", { ligado: v }); }} aria-label="Avisar antes de vencer" />
         </div>}

@@ -4,7 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useVoltarDoModulo } from "@/lib/volta-da-demo";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
-import { localDayKey, parseLocalDay, mesAtualExtenso, dataSegura } from "@/lib/utils";
+import { localDayKey, parseLocalDay, dataSegura } from "@/lib/utils";
 import { uploadFromInput } from "@/lib/image-upload";
 import { limparLivros } from "@/lib/biblioteca-limpeza";
 import { avisarApagado } from "@/lib/desfazer";
@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
+import { introLigada } from "@/lib/intro-modulo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, differenceInCalendarDays, addDays, format } from "date-fns";
@@ -221,7 +223,6 @@ const Biblioteca = () => {
   const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);
   const [tab, setTab] = useState("lendo");
   useSetTrackedTab(tab);
-  const currentMonth = mesAtualExtenso();
 
   // ── Form State ──
   const [showForm, setShowForm] = useState(false);
@@ -563,8 +564,8 @@ const Biblioteca = () => {
           <Button variant="ghost" size="icon" onClick={voltarDoModulo} aria-label="Voltar"><ArrowLeft className="w-5 h-5" /></Button>
           <BookOpen className="w-5 h-5 text-orange-600" />
           <h1 className="text-base font-bold tracking-tight">BIBLIOTECA</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs">{currentMonth}</span>
+          <div className="flex items-center gap-2 ml-auto pl-3 shrink-0">
+            <MesDoCabecalho />
             <ThemeToggle />
           </div>
         </div>
@@ -583,7 +584,10 @@ const Biblioteca = () => {
         </div>
       </header>
 
-      <ModuleTip moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
+      {/* 16/10: a intro do módulo fica dentro da calha da página (o "Dicas" antigo segue como era, colado na borda) */}
+      <div className={introLigada() ? "px-4 pt-4 [&:empty]:hidden" : undefined}>
+      <BoasVindasDoModulo moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
+      </div>
 
       {/* Stats */}
       <div className="px-4 py-2">

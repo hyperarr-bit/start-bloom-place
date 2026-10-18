@@ -9,6 +9,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { trackEvent } from "@/lib/analytics";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { lancarGasto } from "@/lib/finance-lancar";
 import { numeroBR } from "@/lib/data-normalizers";
@@ -154,9 +155,18 @@ export const QuickActions = () => {
     return () => window.removeEventListener(EVENTO_ACAO_RAPIDA, aoPedir);
   }, []);
 
+  // o "✓" some sozinho em 1,5 s — e o relógio morre com o componente (sair da Home antes disso disparava
+  // setState num componente desmontado; nos testes, "window is not defined" depois do fim do arquivo)
+  const timerSucesso = useRef<number | null>(null);
+  const timerAgua = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
+    if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
+  }, []);
   const showSuccess = (id: ActionId) => {
     setSuccessId(id);
-    setTimeout(() => setSuccessId(null), 1500);
+    if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
+    timerSucesso.current = window.setTimeout(() => { timerSucesso.current = null; setSuccessId(null); }, 1500);
   };
 
   const addWater = () => {
@@ -179,7 +189,8 @@ export const QuickActions = () => {
     vibrate();
     showSuccess("water");
     setWaterSplash(true);
-    setTimeout(() => setWaterSplash(false), 800);
+    if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
+    timerAgua.current = window.setTimeout(() => { timerAgua.current = null; setWaterSplash(false); }, 800);
     const faltam = lifeData.waterGoal - proximo;
     toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`);
   };
@@ -381,7 +392,9 @@ export const QuickActions = () => {
         {actions.map((a, i) => (
           <motion.button
             key={a.id}
-            onClick={() => handleAction(a.id)}
+            data-acao-rapida={a.id}
+            onClick={() => { trackEvent("home_acao_rapida", { acao: a.id }); handleAction(a.id); }}
+            data-track={`acao:${a.id}`}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
               successId === a.id 
                 ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
@@ -420,7 +433,7 @@ export const QuickActions = () => {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="bg-card rounded-2xl border border-border/50 p-3 shadow-sm">
+            <div className="bg-card rounded-2xl border border-border/50 p-3 shadow-sm" data-track-bloco={`acao:${activeAction}`}>
               {/* Close button */}
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">

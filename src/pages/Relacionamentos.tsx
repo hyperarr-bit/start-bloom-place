@@ -5,7 +5,8 @@ import { ArrowLeft, Mail } from "lucide-react";
 import { mesAtualExtenso } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ModuleTip } from "@/components/ModuleTip";
+import { BoasVindasDoModulo } from "@/components/cartoes-modulo/BoasVindasDoModulo";
+import { isNativeShell } from "@/lib/native-shell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import type { SugestaoDeInicio } from "@/lib/relacoes";
@@ -126,13 +127,14 @@ const Relacionamentos = () => {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-          <ModuleTip
+          <BoasVindasDoModulo
             moduleId="relacionamentos"
             tips={[
               "Guarde suas pessoas com o dia do aniversário — o ano é opcional",
               "Na ficha de cada pessoa: o que lembrar, ideias de presente e momentos",
               "Peça pra lembrar de falar com alguém de tempos em tempos",
-              "No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”",
+              // 17/10 (revisão tela a tela #86): dentro do app "No app do celular" soa errado
+              isNativeShell() ? "Ligue os avisos: na véspera, no dia e o “faz tempo que…”" : "No app do celular, ligue os avisos: na véspera, no dia e o “faz tempo que…”",
             ]}
           />
           {aba === "pessoas" && <AbaPessoas avisos={avisos} />}

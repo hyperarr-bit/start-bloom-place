@@ -22,7 +22,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const enviados: { nome: string; dados: Record<string, unknown> }[] = [];
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
+    // 17/10: o trackEvent pega o dono do evento pela sessão do aparelho (getSession), sem ir ao servidor
+    auth: { getUser: () => Promise.resolve({ data: { user: null } }), getSession: () => Promise.resolve({ data: { session: null } }) },
     from: () => ({ insert: (linha: Record<string, unknown>) => {
       enviados.push({ nome: String(linha.event_name), dados: (linha.event_data ?? {}) as Record<string, unknown> });
       return { then: (f: () => void) => { f(); return Promise.resolve(); } };

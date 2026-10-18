@@ -140,8 +140,15 @@ export const lerReais = (texto: string | null | undefined): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** O card MEU MÊS (10/10: há DOIS `add-bill` no app — VENCIMENTOS DAS CONTAS vem primeiro no DOM e o
+ *  querySelector pegava ele; o MonthCalendar agora leva `data-missao="meu-mes"`). */
+export const cardMeuMes = (): Element | null =>
+  document.querySelector('[data-missao="meu-mes"]')
+  ?? Array.from(document.querySelectorAll('[data-spotlight="add-bill"]')).find((c) => /MEU M[ÊE]S/.test(c.textContent ?? ""))
+  ?? null;
+
 const saiuDoMes = (): number | null => {
-  const card = document.querySelector('[data-spotlight="add-bill"]');
+  const card = cardMeuMes();
   const chip = card && Array.from(card.querySelectorAll("span")).find((s) => /^\s*↓?\s*Saiu\b/.test(s.textContent ?? ""));
   return chip ? lerReais(chip.textContent) : null;
 };
@@ -159,7 +166,7 @@ export const linhaDeHoje = (el: Element): Element => {
   return linha ?? el;
 };
 
-const nomesDosHabitos = (v: unknown): string[] =>
+export const nomesDosHabitos = (v: unknown): string[] =>
   lista(v).map((h) => (typeof h === "string" ? h : String(mapa(h).name ?? ""))).map((n) => n.trim());
 const feitosNoDia = (grade: unknown, dia: string) => lista(mapa(grade)[dia]).filter((x) => x === true).length;
 const feitosNaSemana = (grade: unknown) => Object.values(mapa(grade)).reduce<number>((s, d) => s + lista(d).filter((x) => x === true).length, 0);
@@ -177,6 +184,28 @@ const quadradinhoMarcado = (valor: unknown, anterior: unknown): [string, number]
 };
 
 /* ------------------------------------------------------------ a tabela */
+
+/**
+ * 10/10 — HÁBITOS SUGERIDOS pra conta VAZIA (bug do dono: "a missão da Rotina diz 'toca no
+ * quadradinho' sendo que o usuário não escolheu nenhum hábito"). Na missão em doses, sem hábito, o
+ * post-it ENSINA o caminho real em 2 passos: (A) os 3 prontos só PREENCHEM o campo "+ Hábito" da
+ * Rotina (a pessoa toca em Adicionar e o hábito nasce pelo código normal do módulo); (B) o anel vai
+ * pro quadradinho de HOJE da linha nova. Nada é gravado por fora. (A demo da web tem hábitos nos
+ * seeds e não usa isto.)
+ */
+export const CHIPS_DE_HABITO: ChipDaMissao[] = [
+  { emoji: "💧", nome: "Beber água ao acordar" },
+  { emoji: "🧘", nome: "Alongar 5 min" },
+  { emoji: "🛏️", nome: "Arrumar a cama" },
+];
+export const PERGUNTA_HABITO_VAZIO = "Qual hábito você quer começar hoje?";
+export const PERGUNTA_HABITO_MARCAR = "Agora marca o quadradinho de hoje";
+
+/** Passo A da Rotina: a linha do campo "Nome do hábito..." + Adicionar (abre pelo botão "+ Hábito"). */
+export const linhaDoNovoHabito = (): Element | null => {
+  const input = document.querySelector<HTMLInputElement>('input[placeholder="Nome do hábito..."]');
+  return input?.parentElement ?? null;
+};
 
 const CHIPS_DE_GASTO: ChipDaMissao[] = [
   { emoji: "☕", nome: "Café", valor: 12, categoria: "alimentacao" },
@@ -208,7 +237,7 @@ const ALVOS: Record<TipoDoItem, AlvoDaMissao> = {
       const soma = (v: unknown) => lista(v).reduce<number>((s, e) => s + (Number(mapa(e).value) || 0), 0);
       return { titulo: "Custos variáveis do mês", antes: soma(anterior), depois: soma(valor), formatar: reaisInteiros };
     },
-    olhar: { achar: porSeletor('[data-spotlight="add-bill"]'), recorte: juntarFilhos(2) },
+    olhar: { achar: cardMeuMes, recorte: juntarFilhos(2) },
     cumprida: (item) => ({
       feito: `${item.nome} · R$ ${reais(item.valor ?? 0)} anotado`,
       titulo: "já está anotado.",

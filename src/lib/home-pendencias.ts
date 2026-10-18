@@ -118,11 +118,46 @@ export function pesoCobradoHoje(prefs: PendenciasPrefs | undefined, datasDePeso:
   return !pesouAntesNaSemana;
 }
 
-/** Quais tipos o score e a lista cobram HOJE (os não ocultos; peso só quando a frequência manda). */
-export function tiposCobradosHoje(prefs: PendenciasPrefs | undefined, pesoHoje: boolean): Set<TipoPendencia> {
+/**
+ * MÓDULO OCULTO ⇒ PENDÊNCIAS DELE NÃO COBRADAS (10/10, tour da Home, passo 5).
+ * O mapa real: cada tipo automático nasce num módulo (a rota da linha e a chave
+ * que o hub lê). Humor e gratidão ficam de fora de propósito: são registros da
+ * própria Home (ações rápidas, `core-mood-log`/`core-gratitude-log`), gravados em
+ * três módulos diferentes — não pertencem a um só.
+ * É regra DERIVADA de `core-module-prefs.hidden` (use-module-preferences): nada é
+ * copiado pra `ocultos`, então religar o módulo volta ao estado anterior sozinho.
+ * Ligada por `MODULO_OCULTA_PENDENCIAS` (lib/tour-home) — quem liga é o hub.
+ */
+export const TIPOS_DO_MODULO: Record<string, TipoPendencia[]> = {
+  financas: ["gasto"],
+  treino: ["treino"],
+  dieta: ["refeicoes"],
+  rotina: ["habitos"],
+  saude: ["agua", "peso", "sono", "suplementos"],
+  biblioteca: ["leitura"],
+  hiperfoco: ["ideia"],
+};
+
+/** Os tipos que os módulos ocultos levam junto (ids desconhecidos são ignorados). */
+export const tiposDosModulosOcultos = (modulosOcultos: unknown): TipoPendencia[] => {
+  const out: TipoPendencia[] = [];
+  if (!Array.isArray(modulosOcultos)) return out;
+  for (const id of modulosOcultos) {
+    for (const t of TIPOS_DO_MODULO[String(id)] ?? []) if (!out.includes(t)) out.push(t);
+  }
+  return out;
+};
+
+/**
+ * Quais tipos o score e a lista cobram HOJE (os não ocultos; peso só quando a
+ * frequência manda). `ocultosDerivados` (opcional, 10/10): os tipos que um módulo
+ * oculto leva junto — sem ele, a conta é a de sempre.
+ */
+export function tiposCobradosHoje(prefs: PendenciasPrefs | undefined, pesoHoje: boolean, ocultosDerivados: Iterable<TipoPendencia> = []): Set<TipoPendencia> {
+  const derivados = new Set(ocultosDerivados);
   const out = new Set<TipoPendencia>();
   for (const t of TIPOS_PENDENCIA) {
-    if (estaOculto(prefs, t)) continue;
+    if (estaOculto(prefs, t) || derivados.has(t)) continue;
     if (t === "peso" && !pesoHoje) continue;
     out.add(t);
   }

@@ -28,9 +28,45 @@ export interface ChallengeCtx {
   elapsedDays: number;      // 1..7 (segunda = 1)
 }
 
+/* ═══ RODÍZIO (17/10, ramo v1016-desafios) ═══
+ *
+ * A chave `finance-challenges` SINCRONIZA e o app antigo vive semanas (memória
+ * 28/09: chave sincronizada nunca muda de tipo). Por isso o formato só GANHA
+ * campos opcionais: `active.nivel`/`active.meta`, `history[].nivel`/`.motivo` e
+ * o `ofertas` da semana. O app antigo lê `{active, history}` como sempre (o
+ * `lerDesafios` dele só exige `key`/`weekStart` string) e as insígnias só contam
+ * `result === "win"`. `active` SEM `nivel` = escolhido pelo app antigo → vale a
+ * regra antiga (catálogo CHALLENGES abaixo); COM `nivel` = catálogo novo
+ * (catalogo.ts), com níveis, motivo e calendário. Ver scratchpad/definitiva/12-desafios.md.
+ */
+export type MotivoDoFechamento = "cumpriu" | "regra" | "sem-registro" | "nao-cumpriu";
+export type OrigemDaOferta = "variacao" | "revanche" | "calendario" | "nova";
+
+export interface DesafioAtivo {
+  key: string;
+  weekStart: string;
+  /** Nível do catálogo novo (1..n). Ausente = escolhido pelo app antigo. */
+  nivel?: number;
+  /** Retrato de segunda (reserva guardada, assinaturas…) e confirmações da pessoa. */
+  meta?: Record<string, unknown>;
+}
+
+export interface RegistroDesafio {
+  key: string;
+  weekStart: string;
+  result: "win" | "loss";
+  nivel?: number;
+  motivo?: MotivoDoFechamento;
+}
+
+export interface OfertaDaSemana { key: string; nivel: number; origem?: OrigemDaOferta }
+export interface OfertasDaSemana { weekStart: string; itens: OfertaDaSemana[] }
+
 export interface ChallengesState {
-  active: { key: string; weekStart: string } | null;
-  history: { key: string; weekStart: string; result: "win" | "loss" }[];
+  active: DesafioAtivo | null;
+  history: RegistroDesafio[];
+  /** As 4 opções da segunda-feira (fixas até domingo). Campo novo, opcional. */
+  ofertas?: OfertasDaSemana;
 }
 
 export const EMPTY_CHALLENGES: ChallengesState = { active: null, history: [] };
@@ -163,13 +199,39 @@ export const segundaAnterior = (weekStart: string): string => {
   return mondayOf(base);
 };
 
-/** Estado gravado tolerante a formato velho/estranho. */
+const nivelValido = (n: unknown): number | undefined => (typeof n === "number" && Number.isInteger(n) && n >= 1 ? n : undefined);
+const objeto = (v: unknown): Record<string, unknown> | undefined => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
+
+/** Estado gravado tolerante a formato velho/estranho. Os campos novos (nivel, meta, motivo, ofertas) só entram bem formados. */
 export const lerDesafios = (v: unknown): ChallengesState => {
   const o = v && typeof v === "object" ? (v as Partial<ChallengesState>) : {};
-  const a = o.active as ChallengesState["active"] | undefined;
-  const active = a && typeof a.key === "string" && typeof a.weekStart === "string" ? { key: a.key, weekStart: a.weekStart } : null;
-  const history = Array.isArray(o.history) ? o.history.filter((h) => h && typeof h.key === "string" && typeof h.weekStart === "string") : [];
-  return { active, history };
+  const a = o.active as Partial<DesafioAtivo> | null | undefined;
+  let active: DesafioAtivo | null = null;
+  if (a && typeof a.key === "string" && typeof a.weekStart === "string") {
+    active = { key: a.key, weekStart: a.weekStart };
+    const nivel = nivelValido(a.nivel);
+    if (nivel) active.nivel = nivel;
+    const meta = objeto(a.meta);
+    if (meta) active.meta = meta;
+  }
+  const history: RegistroDesafio[] = Array.isArray(o.history)
+    ? (o.history as Partial<RegistroDesafio>[])
+        .filter((h) => h && typeof h.key === "string" && typeof h.weekStart === "string")
+        .map((h) => {
+          const r: RegistroDesafio = { key: h.key!, weekStart: h.weekStart!, result: h.result === "win" ? "win" : "loss" };
+          const nivel = nivelValido(h.nivel);
+          if (nivel) r.nivel = nivel;
+          if (typeof h.motivo === "string") r.motivo = h.motivo as MotivoDoFechamento;
+          return r;
+        })
+    : [];
+  const of = objeto(o.ofertas);
+  const itens = Array.isArray(of?.itens)
+    ? (of!.itens as Partial<OfertaDaSemana>[]).filter((i) => i && typeof i.key === "string" && nivelValido(i.nivel)).map((i) => ({ key: i.key!, nivel: i.nivel!, ...(typeof i.origem === "string" ? { origem: i.origem as OrigemDaOferta } : {}) }))
+    : null;
+  const estado: ChallengesState = { active, history };
+  if (of && typeof of.weekStart === "string" && itens) estado.ofertas = { weekStart: of.weekStart, itens };
+  return estado;
 };
 
 /**
@@ -180,15 +242,22 @@ export const lerDesafios = (v: unknown): ChallengesState => {
  * id só conta uma vez (na virada o mesmo gasto pode estar nos dois baldes).
  */
 /** O que o desafio lê de um gasto variável (o resto do registro passa intacto). */
-export type GastoDoDesafio = { id?: string; date?: string; value?: unknown; category?: string; description?: string; perfil?: string };
+export type GastoDoDesafio = { id?: string; date?: string; value?: unknown; category?: string; description?: string; perfil?: string; paymentMethod?: string };
 
+/** `semanasAntes` (17/10): o catálogo novo olha até 8 semanas pra trás pra saber o que a pessoa tem de hábito. */
 export const gastosParaDesafio = (
   ler: (chave: string) => unknown,
   weekStart: string,
   perfil: string,
   extras: GastoDoDesafio[] = [],
+  semanasAntes = 1,
 ): GastoDoDesafio[] => {
-  const datas = [...weekDates(segundaAnterior(weekStart)), ...weekDates(weekStart)];
+  const datas = [...weekDates(weekStart)];
+  let seg = weekStart;
+  for (let i = 0; i < Math.max(1, semanasAntes); i++) {
+    seg = segundaAnterior(seg);
+    datas.push(...weekDates(seg));
+  }
   const meses = [...new Set(datas.map((d) => d.slice(0, 7)))];
   const chaves = ["finance-expenses", ...meses.map((m) => chaveArquivada(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, "expenses"))];
   const vistos = new Set<string>();

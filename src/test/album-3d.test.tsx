@@ -28,7 +28,7 @@ vi.mock("framer-motion", async (importOriginal) => {
   return { ...real, useReducedMotion: () => movimento.reduzido };
 });
 
-import { AlbumTela, CAPA_SAI_MS, DURACAO_VIRADA_MS, CAPITULO, OPACIDADE_ESCONDIDA, pintarFolha, partesDaFolha } from "@/components/conquistas/AlbumTela";
+import { AlbumTela, CAPA_REVELA_MS, CAPA_SAI_MS, DURACAO_VIRADA_MS, CAPITULO, OPACIDADE_ESCONDIDA, pintarFolha, partesDaFolha } from "@/components/conquistas/AlbumTela";
 import { CardAlbum } from "@/components/conquistas/CardAlbum";
 import { CapaAlbum } from "@/components/conquistas/CapaAlbum";
 import { montarAlbum } from "@/components/conquistas/album-paginas";
@@ -88,7 +88,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("as folhas pré-montadas", () => {
-  it("ao abrir: a página de abertura é o FUNDO e a vizinha já está montada em ESPERA; depois da capa, as outras montam uma a uma (nunca no meio de uma virada) até o livro inteiro", () => {
+  it("ao abrir: a página de abertura é o FUNDO e a vizinha já está montada em ESPERA; depois da abertura, as outras montam uma a uma (nunca no meio de uma virada nem das figurinhas colando) até o livro inteiro", () => {
     const { paginas } = montar();
     expect(paginas).toHaveLength(6);
     expect(papeis()).toEqual({ "mais-raros": "fundo", "lendario-1": "espera" });
@@ -96,8 +96,14 @@ describe("as folhas pré-montadas", () => {
     expect(screen.getByTestId("album-capa-3d").querySelector("[data-capa-album]")).toBeInTheDocument();
     avancar(CAPA_SAI_MS + 400);
     expect(screen.queryByTestId("album-capa-3d")).toBeNull();
-    // as extras começam ~0,9 s depois da capa sair, uma a cada 160 ms (um act por relógio: o React agenda o próximo no fim do act)
-    avancar(600);
+    // 17/10 (desempenho): enquanto as figurinhas da abertura colam (a `abertura`: 2,6 s depois de a capa revelar a página)
+    // nenhuma página extra monta — cada uma pintando no meio do "colar" engasgava a animação no WebKit
+    const fimDaAbertura = 2600 + CAPA_REVELA_MS;
+    avancar(fimDaAbertura - (CAPA_SAI_MS + 400) - 100);
+    expect(folhas()).toHaveLength(2);
+    avancar(200); // a abertura assentou (o relógio da 1ª extra é agendado no fim deste act)
+    // as extras começam 300 ms depois, uma a cada 160 ms (um act por relógio: o React agenda o próximo no fim do act)
+    avancar(310);
     expect(folhas()).toHaveLength(3);
     for (let i = 0; i < 3; i++) avancar(170);
     expect(folhas()).toHaveLength(6);

@@ -332,3 +332,32 @@ describe("Hoje: sono e IMC", () => {
     expect(store.dados["saude-bmi-weight"]).toBe("76.4");
   });
 });
+
+/* ── 17/10 (revisão tela a tela #105): o botão que FECHA o formulário não leva "+" ── */
+describe("abrir/fechar formulário: '+' só pra abrir, 'X' pra fechar", () => {
+  const icones = (botao: HTMLElement) => ({ mais: !!botao.querySelector("svg.lucide-plus"), x: !!botao.querySelector("svg.lucide-x") });
+  const confere = (abrir: string, fechar: string) => {
+    const botao = screen.getByRole("button", { name: abrir });
+    expect(icones(botao)).toEqual({ mais: true, x: false });
+    fireEvent.click(botao);
+    const aberto = screen.getByRole("button", { name: fechar });
+    expect(aberto).toBe(botao);
+    expect(icones(aberto)).toEqual({ mais: false, x: true });
+    expect(aberto.textContent).not.toMatch(/^\+/);
+    fireEvent.click(aberto);
+    expect(icones(screen.getByRole("button", { name: abrir }))).toEqual({ mais: true, x: false });
+  };
+
+  it("Log médico: Nova Consulta ↔ Cancelar, Novo Exame ↔ Cancelar, Novo Biomarcador ↔ Cancelar, Documentos ↔ Fechar", () => {
+    montar(<MedicalLog />, criarStore());
+    confere("Nova Consulta", "Cancelar");
+    confere("Novo Exame", "Cancelar");
+    confere("Novo Biomarcador", "Cancelar");
+    confere("Guardar exame, laudo, receita ou atestado", "Fechar");
+  });
+
+  it("Evolução: Registrar Medidas ↔ Cancelar", () => {
+    montar(<BodyEvolution />, criarStore());
+    confere("Registrar Medidas", "Cancelar");
+  });
+});

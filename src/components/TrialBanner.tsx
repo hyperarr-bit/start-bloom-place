@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -15,6 +15,13 @@ import { VagaDoAvisoCobranca } from "@/components/app/AvisoCobrancaRecusada";
 import { PresenteNoBloqueio } from "@/components/app/Presente69";
 import { AssineNoApp } from "@/components/site/AssineNoApp";
 import { VENDA_NA_WEB } from "@/lib/rotas-web";
+import { ehApple } from "@/lib/loja";
+import { ofertaLigada } from "@/lib/ofertas-saida";
+import { getFunnelArea } from "@/lib/funnel";
+import { ParabensPorta, contaDaPorta, parabensJaVisto, type PortaNaConta } from "@/components/porta/ParabensPorta";
+import { entrouPeloLinkDaPorta } from "@/lib/porta-sessao";
+// lazy: o paywall do iPhone (e o que ele puxa do PaywallDia14) não entra no bundle principal do site
+const PaywallIOS = lazy(() => import("@/pages/funis/ios/PaywallIOS").then((m) => ({ default: m.PaywallIOS })));
 
 /** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
  *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
@@ -107,6 +114,13 @@ export const TrialBanner = () => {
     (get<string>("core-onboarding-done", "") === "true" ||
       get<string>("spotlight-done-financas", "") === "true");
   const viewedRef = useRef<string | null>(null);
+  /* 10/10 (build 38, dono): no iPhone, com o paywall curto ligado (a mesma chave do funil), a conta
+   * logada sem assinatura vê o PaywallIOS curto (Cal AI) em vez do PaywallAssinatura do gate. Se a
+   * metadata do RevenueCat desligar a chave, o PaywallIOS avisa e volta o gate antigo. */
+  const [gateCurto, setGateCurto] = useState(() => ehApple() && ofertaLigada("curto"));
+  /* 10/10 (brief da Porta, seção 3): conta criada no site (user_metadata.porta), no iPhone, sem
+   * assinatura → "Você ganhou 3 dias grátis" antes do paywall, 1x por sessão do app. */
+  const [parabensFeito, setParabensFeito] = useState(() => parabensJaVisto());
 
   // Rescue do Purchase: quem paga o Pix sai do app pra abrir o banco e volta
   // já liberado (webhook gravou a assinatura) — a tela de confirmação não
@@ -200,7 +214,29 @@ export const TrialBanner = () => {
                     não passou" é desenhado nesta vaga (antes ficava atrás do
                     bloqueio e a pessoa só via "compre de novo"). */}
                 <VagaDoAvisoCobranca />
-                <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
+                {ehApple() && !parabensFeito && (contaDaPorta(user.user_metadata) || entrouPeloLinkDaPorta())
+                  ? <ParabensPorta porta={(user.user_metadata as { porta?: PortaNaConta }).porta} onContinuar={() => setParabensFeito(true)} />
+                  : gateCurto
+                  ? (
+                    /* a mesma moldura do passo "offer" do funil (px-5 + pt-4, que o herói desfaz pra
+                       sangrar), descontando a faixa do status bar (.app-safe-top-guard) */
+                    <div
+                      className="flex flex-col px-5 bg-white min-h-[100dvh]"
+                      style={{ paddingTop: "calc(var(--app-safe-top, 0px) + 1rem)", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+                      data-testid="gate-ios-curto"
+                    >
+                      <Suspense fallback={<div className="flex-1" />}>
+                      <PaywallIOS
+                        modo="gate"
+                        area={getFunnelArea() ?? "dinheiro"}
+                        answers={{}}
+                        onPagoSemConta={() => { window.location.href = "/"; }}
+                        onChaveDesligada={() => setGateCurto(false)}
+                      />
+                      </Suspense>
+                    </div>
+                  )
+                  : <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>}
                 {/* 07/10 (iPhone): quem perdeu o acesso depois de já ter testado vê o
                     presente de 69,90 por cima deste paywall; "Agora não" devolve o
                     paywall de sempre. Nunca junto com o aviso de cartão recusado. */}

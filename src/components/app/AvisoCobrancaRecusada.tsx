@@ -3,8 +3,12 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { problemaDeCobranca, type ProblemaDeCobranca } from "@/lib/revenuecat";
-import { donoDaFolha, nomeLoja, urlGerenciarAssinatura } from "@/lib/loja";
+import { donoDaFolha, nomeLoja } from "@/lib/loja";
 import { trackEvent } from "@/lib/analytics";
+import {
+  avisoFechadoNestaAbertura, cobrancaV14Ligada, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
+  registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento,
+} from "@/lib/cobranca-recusada";
 
 /**
  * COBRANÇA RECUSADA NA LOJA (26/09) — o irmão do GracePeriodBanner pro app.
@@ -14,14 +18,22 @@ import { trackEvent } from "@/lib/analytics";
  * troca o cartão, a cobrança entra (R$ 97,90 cada). Sem aviso ela só via o
  * acesso sumir e achava que o app tinha travado.
  *
- * Fala só da LOJA (Apple/Google) e leva pra tela de assinaturas dela — nada
+ * Fala só da LOJA (Apple/Google) e leva pra tela de pagamento dela — nada
  * de Pix ou cartão nosso, que dentro do app é pagamento fora da loja.
- * "Agora não" esconde por 24 h (preferência do aparelho).
+ *
+ * 10/10 (1.0.14, ver lib/cobranca-recusada):
+ *  · LIGADO: no iPhone o botão abre a página da FORMA DE PAGAMENTO da Apple
+ *    (apps.apple.com/account/billing) — a tela de assinaturas, pra onde ia,
+ *    não tem cartão nenhum. Android segue na Play. O aviso_cobranca_view leva
+ *    `dias_restantes` da carência de 28 dias.
+ *  · COBRANCA_V14 (desligada): contador "você tem N dias pra atualizar" e
+ *    "Agora não" só até a próxima abertura do app (antes: 24 h em disco —
+ *    quem fechava no dia 1 só revia no dia 2, com a carência andando).
  */
-const CHAVE_FECHADO = "core-aviso-cobranca-fechado-ate";
-const PACOTE_ANDROID = "br.com.coreaplicativo.app";
+const CHAVE_FECHADO = "core-aviso-cobranca-fechado-ate"; // o modo antigo (chave desligada)
 
 const fechadoAgora = () => {
+  if (cobrancaV14Ligada()) return avisoFechadoNestaAbertura();
   try { return Number(localStorage.getItem(CHAVE_FECHADO) || 0) > Date.now(); } catch { return false; }
 };
 
@@ -54,23 +66,33 @@ export const AvisoCobrancaRecusada = () => {
     let vivo = true;
     const conferir = () => { void problemaDeCobranca().then((r) => { if (vivo) setP(r); }); };
     conferir();
-    // Trocou o cartão na loja e voltou pro app: confere de novo.
-    const aoVoltar = () => { if (document.visibilityState === "visible") conferir(); };
+    // Trocou o cartão na loja e voltou pro app: confere de novo. E, com a chave
+    // ligada, voltar depois de 30 min no fundo conta como abertura nova.
+    const aoVoltar = () => {
+      registrarVisibilidadeDoAviso(document.visibilityState === "visible");
+      if (document.visibilityState === "visible") { setFechado(fechadoAgora()); conferir(); }
+    };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => { vivo = false; document.removeEventListener("visibilitychange", aoVoltar); };
   }, []);
 
   const visivel = isNativeShell() && !!p?.temProblema && !fechado;
-  useEffect(() => { if (visivel) trackEvent("aviso_cobranca_view", { com_acesso: p!.comAcesso }); }, [visivel]);
+  const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
+  useEffect(() => {
+    if (visivel) trackEvent("aviso_cobranca_view", { com_acesso: p!.comAcesso, dias_restantes: diasRestantes });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visivel]);
   if (!visivel || !p) return null;
 
   const dono = donoDaFolha();
   const quem = dono.charAt(0).toUpperCase() + dono.slice(1);
+  const contador = cobrancaV14Ligada() ? textoDaCarencia(diasRestantes) : null;
 
   const fechar = () => {
-    try { localStorage.setItem(CHAVE_FECHADO, String(Date.now() + 24 * 3600_000)); } catch { /* noop */ }
+    if (cobrancaV14Ligada()) fecharAvisoNestaAbertura();
+    else { try { localStorage.setItem(CHAVE_FECHADO, String(Date.now() + 24 * 3600_000)); } catch { /* noop */ } }
     setFechado(true);
-    trackEvent("aviso_cobranca_fechar", {});
+    trackEvent("aviso_cobranca_fechar", { dias_restantes: diasRestantes });
   };
 
   const faixa = (
@@ -83,11 +105,12 @@ export const AvisoCobrancaRecusada = () => {
             {quem} não conseguiu cobrar o seu plano. Atualize a forma de pagamento na {nomeLoja()} pra{" "}
             {p.comAcesso ? "não perder o acesso." : "voltar a usar o CORE."}
           </span>
+          {contador && <span data-testid="carencia-dias" className="block mt-1 font-medium">{contador}</span>}
           <a
-            href={p.url ?? urlGerenciarAssinatura(PACOTE_ANDROID)}
+            href={urlAtualizarPagamento(p)}
             target="_blank"
             rel="noreferrer"
-            onClick={() => trackEvent("aviso_cobranca_click", {})}
+            onClick={() => trackEvent("aviso_cobranca_click", { dias_restantes: diasRestantes })}
             className="mt-2 inline-flex items-center rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
           >
             Atualizar pagamento

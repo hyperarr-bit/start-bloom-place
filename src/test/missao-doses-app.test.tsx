@@ -23,8 +23,8 @@ vi.mock("@/lib/analytics", async (orig) => ({
   ...(await orig<typeof import("@/lib/analytics")>()),
   trackEvent: (n: string, d: Record<string, unknown> = {}) => { eventos.push([n, d]); },
 }));
-const conta = vi.hoisted(() => ({ created_at: new Date(2026, 9, 3, 9, 0).toISOString() }));
-vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1", created_at: conta.created_at, email: "ana@x.com" }, isSubscribed: true }) }));
+const conta = vi.hoisted(() => ({ created_at: new Date(2026, 9, 3, 9, 0).toISOString(), assina: true }));
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1", created_at: conta.created_at, email: "ana@x.com" }, isSubscribed: conta.assina }) }));
 const notif = vi.hoisted(() => ({ pedirDia2: vi.fn(async (_o: string) => "concedeu" as const), regua: vi.fn(async () => {}), pedir: vi.fn(async () => true) }));
 vi.mock("@/lib/notificacoes", () => ({
   agendarReguaDaMissao: (...a: unknown[]) => notif.regua(...(a as [])),
@@ -91,9 +91,12 @@ const missaoAntiga = (inicio: number): Missao => ({ inicio, area: "dinheiro", d1
 
 beforeEach(() => {
   localStorage.clear();
+  // 1.0.16: a dose de Finanças virou o "Vamos montar suas Finanças" — aqui, o caminho de quem PULOU (o 1º gasto pelo chip)
+  localStorage.setItem("core-montar-financas", JSON.stringify({ r: "pulou" }));
   eventos.length = 0;
   notif.pedirDia2.mockClear(); notif.regua.mockClear(); notif.pedir.mockClear();
   conta.created_at = new Date(2026, 9, 3, 9, 0).toISOString(); // a conta nasceu hoje de manhã (compra → cadastro)
+  conta.assina = true;
   (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
   (globalThis as { __QA_MISSAO_DOSES__?: boolean }).__QA_MISSAO_DOSES__ = false;
   localStorage.setItem("core-funnel-area", "dinheiro");
@@ -141,6 +144,23 @@ describe("quem é novo no app vê a missão em doses", () => {
     expect(screen.queryByTestId("seu-dia")).toBeNull();
   });
 
+  it("10/10: conta nova SEM assinatura (entrou pelo Entrar/link da Porta, no gate do paywall): nada de 'Tá dentro', a missão não nasce — nasce quando o teste existir", () => {
+    conta.assina = false;
+    const store = montarStore(dados());
+    const { rerender } = montar(store, "/home");
+    expect(screen.queryByTestId("missao-doses-boas-vindas")).toBeNull();
+    expect(localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)).toBeNull();
+    expect(eventos.filter(([n]) => /missao/.test(n))).toEqual([]);
+    conta.assina = true; // começou o teste de 3 dias
+    rerender(
+      <MemoryRouter initialEntries={["/home"]}>
+        <Provedor store={store}><MissaoDosesNaWeb /><Routes><Route path="/home" element={<HomeFalsa />} /></Routes></Provedor>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
+    expect(lerMissao()?.modulos).toEqual(["financas", "rotina", "saude"]);
+  });
+
   it("cliente antigo (conta de setembro) no app: nada — nenhum card, nenhum evento, nada gravado", () => {
     conta.created_at = "2026-09-01T12:00:00Z";
     montar(montarStore(dados()), "/home");
@@ -185,7 +205,7 @@ describe("a comemoração combina a hora — e essa hora é a do Lembrete do dia
     montar(store, "/financas");
     const postIt = esperarPostIt();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-    avancar(700); avancar(1000);
+    avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     const festa = screen.getByTestId("missao-doses-festa");
@@ -214,7 +234,7 @@ describe("a comemoração combina a hora — e essa hora é a do Lembrete do dia
     montar(store, "/financas");
     const postIt = esperarPostIt();
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
-    avancar(700); avancar(1000);
+    avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     const entendi = screen.queryByTestId("missao-doses-entendi");
     if (entendi) fireEvent.click(entendi);
     fireEvent.click(screen.getByTestId("missao-doses-hora-sem"));

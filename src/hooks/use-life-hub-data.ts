@@ -7,9 +7,10 @@ import { computeLooseBillsOutflow, computeMonthlyBalance, computeMonthlyOutflow 
 import { CHAVE_KCAL, CHAVE_META_KCAL_ANTIGA, CHAVE_META_KCAL_MODO, META_KCAL_PADRAO, consumoDoDia, nomeDoDiaDieta } from "@/lib/dieta-consumo";
 import { CHAVE_MACROS, type MacrosPlano } from "@/lib/dieta-macros";
 import {
-  CHAVE_PENDENCIAS_PREFS, normalizarPrefs, pesoCobradoHoje, scoreDosBlocos, tiposCobradosHoje,
+  CHAVE_PENDENCIAS_PREFS, normalizarPrefs, pesoCobradoHoje, scoreDosBlocos, tiposCobradosHoje, tiposDosModulosOcultos,
   type BlocoDoScore, type PendenciasPrefs, type TipoPendencia,
 } from "@/lib/home-pendencias";
+import { moduloOcultaPendenciasLigado } from "@/lib/tour-home";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -68,6 +69,8 @@ export interface LifeHubData {
    *  só quando a frequência manda). Ausente (fixtures antigas) = cobra tudo. */
   pendenciasPrefs?: PendenciasPrefs;
   pendenciasCobradas?: TipoPendencia[];
+  /** 10/10 — os tipos que um MÓDULO OCULTO na Home levou junto (só com MODULO_OCULTA_PENDENCIAS ligada). */
+  pendenciasPorModulo?: TipoPendencia[];
 }
 
 const NADA_REGISTRADO: RegistrosHoje = { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
@@ -423,7 +426,15 @@ export function useLifeHubData(): LifeHubData {
     const gastoHoje = todayExpenses.length > 0;
     bloco("gasto", gastoHoje ? 5 : 0, 5);
 
-    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado);
+    /* 10/10 — MÓDULO OCULTO ⇒ PENDÊNCIAS DELE NÃO COBRADAS (lib/tour-home, chave
+     * MODULO_OCULTA_PENDENCIAS). Lê a preferência que a grade da Home já grava
+     * (`core-module-prefs.hidden`) — nada é copiado pra `ocultos`. Desligada,
+     * a lista é vazia e a conta é a de sempre. */
+    const modulosOcultos = moduloOcultaPendenciasLigado()
+      ? (get<{ hidden?: unknown } | null>("core-module-prefs", null)?.hidden ?? [])
+      : [];
+    const pendenciasPorModulo = tiposDosModulosOcultos(modulosOcultos);
+    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, pendenciasPorModulo);
     const dayScore = scoreDosBlocos(blocos, cobrados);
     const userName = get<string>("core-user-name", "");
 
@@ -439,7 +450,7 @@ export function useLifeHubData(): LifeHubData {
       booksReadThisYear: booksRead,
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
       registrosHoje: { humor: humorHoje, gasto: gastoHoje, peso: pesoHoje, sono: sonoHoje, gratidao: gratidaoHoje, ideia: hasThoughtToday },
-      pendenciasPrefs, pendenciasCobradas: Array.from(cobrados),
+      pendenciasPrefs, pendenciasCobradas: Array.from(cobrados), pendenciasPorModulo,
     };
   }, [get, loaded]);
 }

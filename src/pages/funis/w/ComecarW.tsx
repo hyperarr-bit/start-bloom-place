@@ -12,6 +12,9 @@
  *   central     → 16 módulos → abre a DEMO REAL (/preview do módulo da rota)
  *   compromissos→ volta da demo: Claro!×3 POR ROTA (app/Me+, perguntas novas)
  *   contrato    → assinatura no dedo (app/Me+)
+ *   plano_3_dias→ (10/10, chave ONBOARDING_1TELA, DESLIGADA) os dois acima numa
+ *                 tela só: "Seu plano de 3 dias" — chips marcados + 1 linha de
+ *                 contrato + "Fechado" (lib/onboarding-1tela, ./PlanoDe3Dias)
  *   notif       → UMA tela só, copy premissa-dia14, pós-contrato
  *   offer       → PaywallW (layout web @ 97,90 vitalício, motor RC do app)
  *   signup      → cadastro DEPOIS de pagar (v48) → liberando
@@ -19,6 +22,13 @@
  * O que a web tinha e MORREU aqui de propósito: criar-conta pré-paywall (no
  * app a conta nasce depois do pagamento) e a prova social no meio do quiz
  * (a web que dava ROI rodava com ela desligada; a prova mora no mural).
+ *
+ * 10/10 — FUNIL_CALAI (lib/funil-calai, DESLIGADA; VITE_V14_QA=1 liga): a mesma
+ * máquina de passos com a fila enxuta do Cal AI —
+ *   welcome (WelcomeCalai: iPhone com vídeo do app) → porta → quiz (2 perguntas:
+ *   a dor + o número da rota) → grafico_com_sem (GraficoComSem) → notif (passo
+ *   próprio) → prova → progress → result → plano_3_dias (ou compromissos →
+ *   contrato) → offer. Sem promessas, central e demo. Desligada = o de cima.
  */
 import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -26,13 +36,24 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, RECUO_DO_PAYWALL } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, recuoDoPaywall } from "@/pages/funis/w/retomada";
+import { COMPROMISSOS_POR_AREA } from "@/pages/funis/w/compromissos";
+import { PlanoDe3Dias } from "@/pages/funis/w/PlanoDe3Dias";
+import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding, STEP_PLANO_3_DIAS } from "@/lib/onboarding-1tela";
+import { ofertaLigada } from "@/lib/ofertas-saida";
+/* 10/10 (FUNIL_CALAI, lib/funil-calai, DESLIGADA): o funil enxuto — welcome com vídeo,
+   2 perguntas, gráfico "sem × com", notificação como passo, sem central nem demo. */
+import { STEP_GRAFICO_COM_SEM, funilCalaiLigado, guardarForcaFunilCalai, passoDoFunilCalai } from "@/lib/funil-calai";
+import { ABERTURA_TUDO, numeroDaRotaDe, portaTudo } from "@/lib/funil-numeros";
+import { WelcomeCalai } from "@/pages/funis/w/WelcomeCalai";
+import { GraficoComSem } from "@/pages/funis/w/GraficoComSem";
+import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
-  QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
+  QuizScreen, slide as deslizeDoQuiz, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
@@ -53,7 +74,13 @@ const FUNIL = "w";
 type Step =
   | "welcome" | "promessas" | "porta" | "quiz" | "prova" | "progress" | "result"
   | "central" | "compromissos" | "contrato" | "notif" | "offer"
-  | "signup" | "confirm" | "liberando";
+  | "signup" | "confirm" | "liberando"
+  /* 10/10 (chave ONBOARDING_1TELA, desligada): "Seu plano de 3 dias" — os 3
+     Claro! + o contrato numa tela só. Só existe com a chave ligada. */
+  | "plano_3_dias"
+  /* 10/10 (chave FUNIL_CALAI, desligada): o gráfico "sem o CORE × com o CORE" com o
+     número dela. Só existe com a chave ligada ("notif" vira passo próprio com ela). */
+  | "grafico_com_sem";
 
 // Tema claro fixo (o funil da web roda claro, doa o que doer o tema do sistema).
 const LIGHT_VARS = {
@@ -80,36 +107,15 @@ const fade = {
   exit: { opacity: 0, y: -16 },
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
+/* 17/10 (dono: "a 1ª pergunta some pra cima e a 2ª aparece de lado; parecem 2 coisas
+ * diferentes"): a SEQUÊNCIA DE PERGUNTAS (porta → quiz, ida e volta) é UM passo pra
+ * animação — o QuizScreen hospeda a porta como slide 0 (`inicio`), o cabeçalho fica
+ * parado e tudo desliza na horizontal com o deslize das perguntas. Os outros passos
+ * continuam com o `fade`. */
+const passoDaSequencia = (s: string) => s === "porta" || s === "quiz";
 
-/** Claro!×3 POR ROTA (pedido do dono: "elas têm que mudar de acordo com a
- *  escolha da rota"). A pergunta 1 é a dor da área; 2 e 3 sobem o degrau. */
-const COMPROMISSOS_POR_AREA: Record<AreaKey, Array<{ emoji: string; p: string }>> = {
-  dinheiro: [
-    { emoji: "💸", p: "Você quer saber pra onde seu dinheiro vai?" },
-    { emoji: "📅", p: "Quer parar de esquecer conta e pagar juros?" },
-    { emoji: "🚀", p: "Topa fechar o mês no azul?" },
-  ],
-  rotina: [
-    { emoji: "🗓️", p: "Você quer um dia que se organiza sozinho?" },
-    { emoji: "🔁", p: "Quer construir hábitos que ficam?" },
-    { emoji: "🚀", p: "Topa manter a constância por 30 dias?" },
-  ],
-  corpo: [
-    { emoji: "💪", p: "Você quer treinar com progresso de verdade?" },
-    { emoji: "🥗", p: "Quer dieta e treino no mesmo lugar?" },
-    { emoji: "🚀", p: "Topa cuidar do corpo sem depender de motivação?" },
-  ],
-  saude: [
-    { emoji: "❤️", p: "Você quer cuidar da sua saúde todo dia?" },
-    { emoji: "😴", p: "Quer dormir e beber água como gente grande?" },
-    { emoji: "🚀", p: "Topa virar sua versão mais saudável?" },
-  ],
-  metas: [
-    { emoji: "🎯", p: "Você quer tirar suas metas do papel?" },
-    { emoji: "🧭", p: "Quer ver seu progresso toda semana?" },
-    { emoji: "🚀", p: "Topa virar sua melhor versão?" },
-  ],
-};
+// Claro!×3 POR ROTA: mora em ./compromissos.ts (10/10) — a tela única "Seu
+// plano de 3 dias" (ONBOARDING_1TELA) usa as mesmas perguntas como chips.
 
 /** Porta como PERGUNTA de quiz (30/08, dono): na web esta tela era a ENTRADA
  *  do funil (headline hero, grade de 16 ícones, "5 perguntas rápidas · sem
@@ -136,7 +142,7 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
  * volta a ser só a pergunta 1, no uniforme do quiz. Medido em 2 dias de
  * sorteio (77 sessões): B segurava mais gente por 4 s (58% × 32%), mas os dois
  * levavam 9% ao paywall. */
-function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number }) {
+function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
   /* MEDIÇÃO DA PORTA (16/09). A régua mora AQUI, no mount da tela, e vale pra
    * todo caminho: `porta_vista`, e `porta_viva` 4 s depois se a aba continua
    * visível (separa humano de pré-carga). */
@@ -148,17 +154,10 @@ function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, 
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* 17/10: o cabeçalho (voltar + barra no 1º degrau) é o do QuizScreen, que hospeda esta
+   * pergunta como slide 0 — ele fica parado e só a pergunta desliza. */
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-          <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${(1 / totalPassos) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
-        </div>
-      </div>
+    <>
       <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
         Qual área da sua vida tá mais fora de controle hoje?
       </h2>
@@ -177,7 +176,7 @@ function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, 
           </button>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -229,7 +228,7 @@ const LEMBRETES_W: Record<AreaKey, { titulo: string; itens: Array<{ emoji: strin
   },
 };
 
-function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
+function NotifW({ area, onDone, rodapeFixo = false }: { area: AreaKey; onDone: () => void; /** 10/10 (FUNIL_CALAI): o botão no rodapé fixo padrão do funil (BotaoDoFunil) */ rodapeFixo?: boolean }) {
   const [indo, setIndo] = useState(false);
   const conf = LEMBRETES_W[area] ?? LEMBRETES_W.dinheiro;
   const seguir = async (pedir: boolean) => {
@@ -273,6 +272,10 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
           </div>
         ))}
       </div>
+      {rodapeFixo ? (
+        <BotaoDoFunil texto="Quero ser lembrado" seta={false} onClick={() => void seguir(true)} disabled={indo} testid="notif-ativar"
+          secundario={{ texto: "Agora não", onClick: () => void seguir(false), disabled: indo, testid: "notif-pular" }} />
+      ) : (
       <div className="space-y-2.5 pb-2">
         <button
           onClick={() => void seguir(true)}
@@ -286,6 +289,7 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
           Agora não
         </button>
       </div>
+      )}
     </div>
   );
 }
@@ -346,10 +350,21 @@ export default function ComecarW() {
   // Init preguiçoso DIRETO da URL (bug do dono 30/08: a volta da demo pintava
   // 1 frame da welcome azul antes do efeito trocar o passo — o estado já
   // nasce no passo certo e o azul nunca pinta).
+  /* 10/10 (FUNIL_CALAI): decidida UMA vez, no mount — a força de QA pelo link
+     (`?funil-calai=on|off|auto`) é lida antes do passo. Desligada, nada abaixo muda. */
+  const [calai] = useState<boolean>(() => {
+    try { guardarForcaFunilCalai(window.location.search); } catch { /* noop */ }
+    return funilCalaiLigado();
+  });
+  /** Um passo guardado/pedido → o passo da sequência em vigor (as duas chaves). */
+  const traduzir = (s: string): Step => passoDoOnboarding(passoDoFunilCalai(s, calai)) as Step;
   const [step, setStepCru] = useState<Step>(() => {
+    // 10/10: a força de QA da tela única (`?onboarding-1tela=on|off|auto`) é lida
+    // ANTES do passo — a volta da demo (`?step=compromissos`) cai na tela certa.
+    try { guardarForcaOnboarding1Tela(window.location.search); } catch { /* noop */ }
     try {
       const s = new URLSearchParams(window.location.search).get("step");
-      if (s === "compromissos" || s === "offer" || s === "signup") return s as Step;
+      if (s === "compromissos" || s === "offer" || s === "signup") return traduzir(s);
     } catch { /* noop */ }
     // ANÚNCIO NA WEB → PORTA (02/09): o clique pago cai na primeira pergunta,
     // sem welcome nem promessas (ver retomada.ts — 69% morriam no splash).
@@ -357,7 +372,7 @@ export default function ComecarW() {
     // RETOMADA (02/09): o app morreu com a folha do Google aberta e voltou?
     // Cai onde parou (paywall, cadastro…), não na welcome. Só no shell.
     const retomar = passoDeRetomada(lerChave<string>(CHAVES.passo), isNativeShell());
-    if (retomar) return retomar as Step;
+    if (retomar) return traduzir(retomar);
     return "welcome";
   });
   const [area, setArea] = useState<AreaKey | null>(() => {
@@ -381,7 +396,7 @@ export default function ComecarW() {
   const naWeb = !isNativeShell();
   const montou = useRef(false);
 
-  const setStep = (s: Step) => {
+  const setStep = (s: Step, extra: Record<string, unknown> = {}) => {
     setStepCru(s);
     // "liberando" = a conta nasceu; a partir daqui o RootGate manda pro app,
     // e progresso guardado só serviria pra prender alguém no funil.
@@ -392,7 +407,8 @@ export default function ComecarW() {
     if (naWeb && !voltandoRef.current) { try { window.history.pushState({ w: s }, ""); } catch { /* noop */ } }
     // "offer" é emitido pelo PaywallW no mount (com braço e área) — emitir
     // aqui também contava 2 paywalls por sessão (varredura 02/09).
-    if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
+    // 10/10 (PLANO_CADEADO): a tela do plano diz se nasceu com o cadeado — a série fica comparável
+    if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}), ...extra, ...(s === STEP_PLANO_3_DIAS && ofertaLigada("cadeado") ? { cadeado: true } : {}) });
     window.scrollTo(0, 0);
   };
 
@@ -416,7 +432,8 @@ export default function ComecarW() {
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       // "offer" já sai do PaywallW no mount — aqui só o registro da retomada
-      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: s, funil: FUNIL, retomada: true });
+      const passoRetomado = traduzir(s);
+      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: passoRetomado, funil: FUNIL, retomada: true, ...(passoRetomado === STEP_PLANO_3_DIAS && ofertaLigada("cadeado") ? { cadeado: true } : {}) });
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
       const visivel = typeof document !== "undefined" ? document.visibilityState : "?";
@@ -432,7 +449,8 @@ export default function ComecarW() {
       // 17/09: a welcome recebe o clique pago também — `entrada: "anuncio"` é
       // o que separa a régua entrada→paywall do pago (WEB_ENTRA_NA_WELCOME).
       const pago = naWeb && veioDeAnuncio(window.location.search, getAttributionParams());
-      trackEvent("funnel_view", { step: "welcome", funil: FUNIL, ...(pago ? { entrada: "anuncio" } : {}) });
+      // 10/10 (FUNIL_CALAI): `video: true` separa a welcome com vídeo da de hoje na mesma série
+      trackEvent("funnel_view", { step: "welcome", funil: FUNIL, ...(pago ? { entrada: "anuncio" } : {}), ...(calai ? { video: true } : {}) });
     }
     /* COMPRA FEITA COM O APP MORTO (02/09): a Play concluiu, o app não viu.
      * Pergunta pra loja no boot; se ela diz "tem compra", pula pro cadastro
@@ -472,9 +490,10 @@ export default function ComecarW() {
           if (agora - ultimoVoltarRef.current < 3000) {
             if (s === "offer" && !recuouRef.current) {
               recuouRef.current = true;
-              trackEvent("funnel_click", { cta: "w_back_recuou", funil: FUNIL, step: s, para: RECUO_DO_PAYWALL });
-              setStepCru(RECUO_DO_PAYWALL as Step);
-              guardarChave(CHAVES.passo, RECUO_DO_PAYWALL);
+              const recuo = recuoDoPaywall(onboarding1TelaLigado());
+              trackEvent("funnel_click", { cta: "w_back_recuou", funil: FUNIL, step: s, para: recuo });
+              setStepCru(recuo as Step);
+              guardarChave(CHAVES.passo, recuo);
               window.scrollTo(0, 0);
               return;
             }
@@ -497,7 +516,7 @@ export default function ComecarW() {
           daTela.click();
           return;
         }
-        const anterior = passoAnteriorDe(s);
+        const anterior = passoAnteriorDe(s, calai);
         trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: s, para: anterior ?? "minimizar" });
         if (!anterior) { void App.minimizeApp(); return; }
         // volta de PASSO, sem contar como view nova do passo anterior
@@ -509,7 +528,7 @@ export default function ComecarW() {
       handle = h;
     }).catch(() => { /* plugin ausente: fica o comportamento padrão */ });
     return () => { vivo = false; if (handle) void handle.remove(); };
-  }, [naWeb]);
+  }, [naWeb, calai]);
 
   /* ── VOLTAR DO NAVEGADOR (web, 02/09). Medido: "sumiu sem nenhum evento"
      no start 21% (app 7%) e no offer 51% (app 19%) — o Voltar do navegador do
@@ -582,13 +601,16 @@ export default function ComecarW() {
     try {
       if (localStorage.getItem(POS_COMPRA_OAUTH_KEY) === "1") { localStorage.removeItem(POS_COMPRA_OAUTH_KEY); oauthPosCompra = true; }
     } catch { /* noop */ }
-    const alvo = alvoDoDeepLink(params.get("step"), stepRef.current, oauthPosCompra);
-    if (!alvo) return;
+    const alvoCru = alvoDoDeepLink(params.get("step"), stepRef.current, oauthPosCompra);
+    if (!alvoCru) return;
+    const alvo = traduzir(alvoCru);
+    if (alvo === stepRef.current) return;
     if (alvo === "liberando") { setPosCompra(true); setStepCru("liberando"); limparProgresso(); return; }
     trackEvent(alvo === "offer" ? "funnel_retomada" : "funnel_view", { step: alvo, funil: FUNIL, retomada: true, motivo: "deeplink" });
     setStepCru(alvo as Step);
     guardarChave(CHAVES.passo, alvo);
     window.scrollTo(0, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
   /* ── CONVITE DE AVALIAÇÃO NO FIM DO FUNIL (03/09) ──────────────────────
@@ -617,8 +639,10 @@ export default function ComecarW() {
    * semana. Uma vez por aparelho; as travas comuns (shell, /preview, 3 na
    * vida, 90 dias) continuam valendo dentro de pedirAvaliacaoPlanoPronto. */
   const [planoDoConvite, setPlanoDoConvite] = useState<PlanoDoConvite | null>(null);
+  /* 10/10 (FUNIL_CALAI): sem central, o "plano pronto" é o RESULTADO (o radar) — o pedido
+   * direto da Apple/Google sai lá, no mesmo ponto da jornada (antes de qualquer preço). */
   useEffect(() => {
-    if (naWeb || step !== "central") return;
+    if (naWeb || step !== (calai ? "result" : "central")) return;
     const t = window.setTimeout(() => {
       void import("@/lib/avaliacao").then((m) => { void m.pedirAvaliacaoPlanoPronto(); }).catch(() => { /* avaliação nunca pode quebrar o funil */ });
     }, 2500);
@@ -640,6 +664,16 @@ export default function ComecarW() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naWeb, step, posCompra, usuarioLogado, jaAssina]);
 
+  /** O recuo de um passo a partir do paywall (botão Voltar do paywall curto): o mesmo destino do Voltar do Android. */
+  const recuarDoPaywall = () => {
+    const recuo = recuoDoPaywall(onboarding1TelaLigado());
+    trackEvent("funnel_click", { cta: "paywall_voltar_recuou", funil: FUNIL, step: "offer", para: recuo });
+    setStepCru(recuo as Step);
+    guardarChave(CHAVES.passo, recuo);
+    window.scrollTo(0, 0);
+  };
+  const propsDoPaywallIOS = { area: areaOuPadrao, answers, onPagoSemConta: () => pagoSemConta(), onVoltar: recuarDoPaywall };
+
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
     if (a) guardarChave(CHAVES.area, a);
     guardarChave(CHAVES.respostas, r);
@@ -657,6 +691,14 @@ export default function ComecarW() {
   // pergunta de consistência.
   const perguntas = areaOuPadrao === "dinheiro" ? QUIZ : AREA_TRACKS[areaOuPadrao as Exclude<AreaKey, "dinheiro">];
   const itensQuiz = (() => {
+    /* 10/10 (FUNIL_CALAI): só a DOR e o NÚMERO da rota — dinheiro: pergunta 1 + 3
+     * ("quanto some por mês"); outras rotas: pergunta 1 + 2 (consistência). Os
+     * índices são os de hoje, então os eventos continuam `quiz_1`/`quiz_3` (e
+     * `quiz_1`/`quiz_2` nas rotas de vida). Nada de prova nem notificação aqui: o
+     * gráfico e o convite viram passos próprios depois do quiz. */
+    if (calai) return areaOuPadrao === "dinheiro"
+      ? [{ kind: "q" as const, qIdx: 0 }, { kind: "q" as const, qIdx: 2 }]
+      : [{ kind: "q" as const, qIdx: 0 }, { kind: "q" as const, qIdx: 1 }];
     const base = areaOuPadrao === "dinheiro" ? buildQuizItems(QUIZ, "gasto") : buildQuizItems(perguntas, "consistencia");
     // Notificação ENTRE as perguntas (30/08, dono: "igual o Cal AI, que mete
     // um gráfico no meio do quiz") — entra logo depois da 2ª pergunta.
@@ -667,13 +709,15 @@ export default function ComecarW() {
   })();
   const prepSteps = ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[areaOuPadrao].nome}`, "Finalizando seu plano personalizado"];
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
+  // 10/10: a tela única é um pouco mais alta que um passo curto — ela ROLA em celular pequeno (como a central)
+  const telaComprida = step === "result" || step === "central" || step === "plano_3_dias" || step === "grafico_com_sem";
 
-  // Faixa da status bar veste o funil (regra v83.4).
+  // Faixa da status bar veste o funil (regra v83.4). A welcome Cal AI é branca.
   useEffect(() => {
-    const cor = step === "welcome" ? "#7ec6f6" : "#ffffff";
+    const cor = step === "welcome" && !calai ? "#7ec6f6" : "#ffffff";
     try { document.documentElement.style.setProperty("--safe-top-cor", cor); } catch { /* noop */ }
     return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
-  }, [step]);
+  }, [step, calai]);
 
   const abrirDemo = () => {
     // Cerca da demo (v83.4): a volta converge em /funil-w?step=compromissos.
@@ -691,6 +735,11 @@ export default function ComecarW() {
       <AnimatePresence>
         {step === "welcome" && (
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
+            {calai ? (
+              /* 10/10 (FUNIL_CALAI): iPhone com vídeo do app real + 1 frase; o Começar pede o
+                 ATT como hoje e cai DIRETO na porta (os 3 quadros de promessa saem). */
+              <WelcomeCalai area={area} onComecar={() => setStep("porta")} onEntrar={() => navigate("/entrar")} />
+            ) : (
             <AppWelcome
               onComecar={() => setStep("promessas")}
               onEntrar={() => navigate("/entrar")} /* 24/09: /entrar é o login completo do app —
@@ -700,6 +749,7 @@ export default function ComecarW() {
                  "Entrar": 80 nunca logaram e outras 80 acabaram no "Crie agora"
                  do /auth → conta nova sem compra → paywall. */
             />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -728,26 +778,34 @@ export default function ComecarW() {
            topo; só resultado/central/paywall — compridos de verdade — rolam. */
         <div
           style={{ ["--util" as string]: "calc(100dvh - var(--app-safe-top, 0px))" }}
-          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : step === "result" || step === "central" ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
+          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : telaComprida ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
         >
           <AnimatePresence mode="wait">
-            <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
-              {step === "porta" && (
-                <PortaW
-                  onBack={() => setStep("promessas")}
-                  totalPassos={itensQuiz.length + 1}
-                  onPickArea={(a, label) => {
-                    setArea(a);
-                    const r = { ...answers, area: a, area_label: label };
-                    setAnswers(r);
-                    guardar(a, r);
-                    trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL });
-                    setStep("quiz");
-                  }}
-                />
+            <motion.div key={passoDaSequencia(step) ? "perguntas" : step} {...(passoDaSequencia(step) ? deslizeDoQuiz : fade)} className="w-full flex-1 flex flex-col">
+              {/* 10/10 (FUNIL_CALAI): quem entrou por "Tudo, sinceramente" começa pelo dinheiro — a linha diz isso em cima do quiz */}
+              {step === "quiz" && calai && portaTudo(answers) && (
+                <p className="text-[13px] text-muted-foreground leading-snug mb-4 -mt-1 rounded-xl px-3 py-2" style={{ background: "#FFF8D6" }} data-testid="abertura-tudo">{ABERTURA_TUDO}</p>
               )}
-              {step === "quiz" && (
+              {passoDaSequencia(step) && (
                 <QuizScreen
+                  /* a porta é o slide 0: mesmo cabeçalho parado, mesmo deslize (17/10) */
+                  inicio={{
+                    ativo: step === "porta",
+                    chave: "porta",
+                    onBack: () => setStep(calai ? "welcome" : "promessas"),
+                    conteudo: (
+                      <PortaW
+                        onPickArea={(a, label) => {
+                          setArea(a);
+                          const r = { ...answers, area: a, area_label: label };
+                          setAnswers(r);
+                          guardar(a, r);
+                          trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL });
+                          setStep("quiz");
+                        }}
+                      />
+                    ),
+                  }}
                   questions={perguntas}
                   items={itensQuiz}
                   initialAnswers={answers}
@@ -760,6 +818,14 @@ export default function ComecarW() {
                     const todas = { ...answers, ...r };
                     setAnswers(todas);
                     guardar(area, todas);
+                    /* 10/10 (FUNIL_CALAI): depois das 2 perguntas vem o gráfico com o número
+                     * dela — `funnel_view step=grafico_com_sem {rota, numero}`. */
+                    if (calai) {
+                      const n = numeroDaRotaDe(area, todas);
+                      // a porta "Tudo" segue o caminho de Finanças (rota dinheiro), mas o evento diz de onde veio (area: "tudo")
+                      setStep(STEP_GRAFICO_COM_SEM as Step, { rota: n.rota, formato: n.formato, numero: n.valor, estimado: n.estimado, ...(portaTudo(todas) ? { area: "tudo" } : {}) });
+                      return;
+                    }
                     /* 03/09: tela de prova entre o quiz e o plano (BitePal/Cal
                      * AI). Já rodou em 30–31/07 no /inicio — os 2 melhores dias
                      * de sessão→venda do mês (3,3%), e a passagem do quiz ficou
@@ -769,13 +835,44 @@ export default function ComecarW() {
                   }}
                 />
               )}
-              {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} />}
+              {/* 10/10 (FUNIL_CALAI): gráfico "sem × com" → convite de notificação (passo
+                  próprio, a mesma tela de hoje) → prova social. Só com a chave ligada. */}
+              {step === "grafico_com_sem" && (
+                <GraficoComSem numero={numeroDaRotaDe(area, answers)} onNext={() => setStep("notif")} />
+              )}
+              {step === "notif" && <NotifW area={areaOuPadrao} onDone={() => setStep("prova")} rodapeFixo />}
+              {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} botaoFixo={calai} />}
               {step === "progress" && <div className="flex-1 grid place-items-center"><ProgressScreen steps={prepSteps} onDone={() => setStep("result")} /></div>}
               {step === "result" && (
-                <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
+                calai ? (
+                  /* 10/10 (FUNIL_CALAI): sem central nem demo — do radar direto pro plano
+                     (a tela única com ONBOARDING_1TELA; senão os compromissos de hoje). */
+                  <RadarResultScreen answers={answers} area={areaOuPadrao} cta="Montar meu plano" rodape={null} botaoFixo onDone={() => setStep(passoDoOnboarding("compromissos") as Step)} />
+                ) : (
+                  <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
+                )
               )}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
+              {/* 10/10 (ONBOARDING_1TELA, desligada): os 3 Claro! + o contrato numa tela só.
+                  A demo termina AQUI; depois vem o paywall exatamente como no contrato de hoje. */}
+              {step === "plano_3_dias" && (
+                /* 10/10 (FUNIL_CALAI): o "Fechado" vai pro rodapé fixo padrão (BotaoDoFunil) SEM mexer no
+                   PlanoDe3Dias (arquivo do outro ramo): o botão da tela some pelo CSS e o do rodapé toca nele —
+                   a lógica e os eventos continuam os da tela. Com a chave desligada, a tela de hoje. */
+                <div className={calai ? "flex-1 flex flex-col" : "contents"} data-plano-rodape-fixo={calai ? "" : undefined}>
+                  {calai && <style>{`[data-plano-rodape-fixo] [data-testid="plano-3-dias-fechado"] { display: none; }`}</style>}
+                  <PlanoDe3Dias
+                    area={areaOuPadrao}
+                    nome={(usuarioLogado?.user_metadata as { name?: string; full_name?: string } | undefined)?.name ?? (usuarioLogado?.user_metadata as { full_name?: string } | undefined)?.full_name ?? null}
+                    onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")}
+                  />
+                  {calai && (
+                    <BotaoDoFunil texto="Fechado" seta={false} testid="plano-3-dias-fechado-rodape"
+                      onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="plano-3-dias-fechado"]')?.click()} />
+                  )}
+                </div>
+              )}
               {/* MESMA ORDEM NAS DUAS PONTAS (01/09): vende primeiro, cadastra
                   depois. Até ontem a web era obrigada a cadastrar ANTES do
                   paywall porque a função do Pix exige usuário autenticado pra
@@ -804,11 +901,12 @@ export default function ComecarW() {
                   depende de ninguém lembrar de uma condicional. */}
               {step === "offer" && (
                 ehApple() ? (
-                  <PaywallIOS
-                    area={areaOuPadrao}
-                    answers={answers}
-                    onPagoSemConta={pagoSemConta}
-                  />
+                  /* 10/10 (PAYWALL_CURTO, ramo v14-paywall-curto): o paywall curto tem um botão Voltar
+                     redondo e chama `onVoltar` quando nenhuma oferta de saída abre — aqui ele recua um
+                     passo, o MESMO recuo do Voltar do Android (recuoDoPaywall: plano_3_dias ou contrato).
+                     Passado por spread pra compilar nos dois lados da junção (antes dela o PaywallIOS
+                     ainda não conhece a prop e só a ignora). */
+                  <PaywallIOS {...propsDoPaywallIOS} />
                 ) : (
                   /* 07/09 10h20–10h40: a web rodou o PaywallDia14 (27,90, Cakto)
                    * por vinte minutos e voltou pro PaywallW a 24,90/97,90 na

@@ -106,7 +106,7 @@ export function BotaoSeguir({ children, onClick, claro = false, testid, cheio = 
 /* ------------------------------------------------------------ passo 1 */
 
 /** Onde acaba o que gruda no topo (barra de módulos + cabeçalho do módulo). */
-const fundoDoTopoFixo = (): number => {
+export const fundoDoTopoFixo = (): number => {
   let fundo = 0;
   document.querySelectorAll(".demo-tour-nav, header.sticky").forEach((el) => {
     const r = el.getBoundingClientRect();
@@ -118,6 +118,14 @@ const fundoDoTopoFixo = (): number => {
 const alturaDoRodapeFixo = (): number => {
   const v = getComputedStyle(document.documentElement).getPropertyValue("--teste-banner-h");
   return parseFloat(v) || 0;
+};
+
+/** 17/10: onde o Anel quer o TOPO do que ele abraça (a mesma conta do `rolarPraVer` dele) — quem rola a tela ANTES de
+ *  montar o anel pousa direto ali, e o anel não precisa de uma 2ª rolagem (nem de esperar ela assentar). */
+export const topoPreferidoDoAnel = (altura: number, abaixo = false): number => {
+  const topo = fundoDoTopoFixo();
+  const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
+  return altura > livre - 40 ? topo + 20 : topo + (livre - altura) * (abaixo ? 0.22 : 0.62);
 };
 
 /**
@@ -193,17 +201,37 @@ export function useDigitando(): boolean {
  * `balao` é a peça que acompanha o anel (o post-it dos chips, o número do
  * passo 3) — com `interativo`, ela recebe toque (chips, botão de seguir).
  */
-export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false }: {
+/** Quanto tempo o anel espera a âncora voltar (re-render/troca do nó) antes de desistir — só com `reachar`. */
+export const TOLERANCIA_ANCORA_MS = 2500;
+
+export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_000, aoSair, fixo = false, testid, abaixo = false, reachar, rapido = false, aoAparecer, recolhido = false }: {
   alvo: Element;
+  /**
+   * 16/10 (1.0.16 — "o anel do passo 1 some antes do toque", ~24% das pessoas; no ar:
+   * `missao_doses_anel_saiu motivo=ancora_invisivel`): o módulo REDESENHA e troca o nó que o anel
+   * abraçava (a hidratação da conta, a tabela da Rotina que se refaz depois do hábito novo, um botão
+   * que remonta) — o nó velho sai do DOM e o anel desistia na hora. Com `reachar`, o anel procura a
+   * âncora de novo (mesmo seletor) e segue nela; se ela sumiu de verdade, espera até
+   * TOLERANCIA_ANCORA_MS (o post-it fica na tela) e só então sai. Sem `reachar`: como sempre.
+   */
+  reachar?: () => Element | null;
   recorte?: (el: Element) => Retangulo | null;
   balao: ReactNode;
   interativo?: boolean;
   duracao?: number | null;
-  aoSair: (motivo: string) => void;
+  /** `info` (1.0.16): `voltou` = a âncora foi re-achada antes (com `reachar`); `ms` = quanto o anel ficou na tela */
+  aoSair: (motivo: string, info?: { voltou: boolean; ms: number }) => void;
   fixo?: boolean;
   testid?: string;
   /** o balão prefere ficar EMBAIXO do anel (se couber) */
   abaixo?: boolean;
+  /** 17/10: quem chamou JÁ rolou e assentou a tela — o anel desenha no 1º quadro estável (~50 ms, não ~700 ms) */
+  rapido?: boolean;
+  /** 17/10: o anel acabou de aparecer de verdade (o relógio de quem segura um tempo de leitura começa aqui) */
+  aoAparecer?: () => void;
+  /** 17/10 (relatório 11, D4): o alvo saiu da área visível — o anel não desenha nada (nem o escuro) e segue
+   *  acompanhando o alvo; quem chamou mostra o post-it colado embaixo da faixa. Voltou: desenha de novo, sem rolar. */
+  recolhido?: boolean;
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
@@ -214,27 +242,67 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
   const saiuRef = useRef(false);
   const aoSairRef = useRef(aoSair);
   aoSairRef.current = aoSair;
+  const reacharRef = useRef(reachar);
+  reacharRef.current = reachar;
+  const aoAparecerRef = useRef(aoAparecer);
+  aoAparecerRef.current = aoAparecer;
 
   useEffect(() => {
     let vivo = true;
     const timers: number[] = [];
+    const nasceu = Date.now();
+    let voltou = false;
     const sair = (motivo: string) => {
       if (saiuRef.current) return;
       saiuRef.current = true;
-      aoSairRef.current(motivo);
+      aoSairRef.current(motivo, { voltou, ms: Date.now() - nasceu });
     };
-    const medir = () => (recorte ? recorte(alvo) : null) ?? alvo.getBoundingClientRect();
+    // o nó que o anel abraça AGORA (com `reachar`, troca quando o módulo redesenha)
+    let atual: Element = alvo;
+    const medir = () => (recorte ? recorte(atual) : null) ?? atual.getBoundingClientRect();
     // rola até o que o anel abraça ficar no meio da área LIVRE (entre o que gruda
     // no topo e o CTA de baixo) — um pouco abaixo do meio, pra caber o balão em cima
-    try {
-      const r = medir();
-      const topo = fundoDoTopoFixo();
-      const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
-      // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
-      const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
-      const delta = r.top - destino;
-      if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
-    } catch { /* noop */ }
+    const rolarPraVer = (forcar: boolean) => {
+      try {
+        const r = medir();
+        const topo = fundoDoTopoFixo();
+        const livre = alturaVisivel() - alturaDoRodapeFixo() - topo;
+        // re-achado: só rola se o nó novo ficou fora da área livre
+        if (!forcar && r.top >= topo && r.bottom <= topo + livre) return;
+        // (balão embaixo: o anel sobe pra perto do topo, e o balão cabe abaixo dele)
+        const destino = r.height > livre - 40 ? topo + 20 : topo + (livre - r.height) * (abaixo ? 0.22 : 0.62);
+        /* 17/10 (dono, Saúde no Simulador: "o app inteiro treme na hora de mostrar o tutorial"): o alvo já visível
+         * perto do topo pedia uma rolagem NEGATIVA com a página no 0 — no Chromium é um não-faz-nada, mas no WKWebView
+         * a rolagem suave pra fora do limite vira o quique (rubber band) da tela inteira, e o anel esperava a
+         * rolagem "assentar" no meio dele. A rolagem fica dentro do alcance real da página; sem alcance, não rola. */
+        const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const delta = Math.max(-window.scrollY, Math.min(maxY - window.scrollY, r.top - destino));
+        if (Math.abs(delta) > 4) window.scrollBy({ top: delta, behavior: reduzir ? "auto" : "smooth" });
+      } catch { /* noop */ }
+    };
+    rolarPraVer(true);
+    const vale = (el: Element): boolean => {
+      if (!el.isConnected) return false;
+      const r = (recorte ? recorte(el) : null) ?? el.getBoundingClientRect();
+      return r.width >= 8 && r.height >= 8;
+    };
+    /* A âncora ainda vale? Senão tenta re-achar (com `reachar`) e, sem ela, espera a tolerância. true = pode medir. */
+    let perdidaDesde = 0;
+    const ancoraOk = (): boolean => {
+      if (vale(atual)) { perdidaDesde = 0; return true; }
+      const buscar = reacharRef.current;
+      if (!buscar) { sair("ancora_invisivel"); return false; }
+      let novo: Element | null = null;
+      try { novo = buscar(); } catch { novo = null; }
+      if (novo && novo !== atual && vale(novo)) {
+        atual = novo; perdidaDesde = 0; voltou = true;
+        rolarPraVer(false);
+        return true;
+      }
+      if (!perdidaDesde) perdidaDesde = Date.now();
+      if (Date.now() - perdidaDesde >= TOLERANCIA_ANCORA_MS) { sair("ancora_invisivel"); return false; }
+      return false;
+    };
     let quadro = 0;
     const aoRolar = () => {
       if (!fixo) { sair("rolagem"); return; }
@@ -243,9 +311,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       quadro = window.requestAnimationFrame(() => {
         quadro = 0;
         if (!vivo) return;
-        const r = medir();
-        if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
-        setRect(r);
+        if (!ancoraOk()) return;
+        setRect(medir());
       });
     };
     // O anel só aparece com a rolagem ASSENTADA (2 leituras iguais): rolagem
@@ -254,18 +321,22 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     const assentar = () => {
       if (!vivo) return;
       const y = window.scrollY;
-      if (y === ultimoY && ++estaveis >= 2) {
-        const r = medir();
-        if (!alvo.isConnected || r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
-        setRect(r);
+      if (y === ultimoY && ++estaveis >= (rapido ? 1 : 2)) {
+        if (!ancoraOk()) {
+          // com `reachar`: a âncora pode estar remontando — tenta de novo até a tolerância (ancoraOk sai sozinho)
+          if (!saiuRef.current) timers.push(window.setTimeout(assentar, 250));
+          return;
+        }
+        setRect(medir());
+        try { aoAparecerRef.current?.(); } catch { /* quem chamou nunca derruba o anel */ }
         window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
         // fixo: a tela muda de tamanho sem rolar (ela abriu a edição de outra conta, um
         // formulário cresceu, o teclado fechou) — o anel segue o alvo onde ele estiver
         if (fixo) {
           const seguir = window.setInterval(() => {
             if (!vivo) return;
+            if (!ancoraOk()) return; // perdida: o anel fica onde estava (o post-it não pisca) até re-achar ou desistir
             const n = medir();
-            if (!alvo.isConnected || n.width < 8 || n.height < 8) { sair("ancora_invisivel"); return; }
             setRect((ant) => (ant && Math.abs(ant.top - n.top) < 1 && Math.abs(ant.left - n.left) < 1
               && Math.abs(ant.width - n.width) < 1 && Math.abs(ant.height - n.height) < 1 ? ant : n));
           }, 250);
@@ -276,13 +347,18 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       if (y !== ultimoY) { estaveis = 0; ultimoY = y; }
       timers.push(window.setTimeout(assentar, 200));
     };
-    timers.push(window.setTimeout(assentar, 300));
+    timers.push(window.setTimeout(assentar, rapido ? 40 : 300));
     if (duracao != null) timers.push(window.setTimeout(() => sair("timeout"), duracao));
 
     // Saídas passivas — NUNCA preventDefault: a demo continua 100% tocável.
     const aoTocar = (e: Event) => {
+      /* 10/10 (bug do dono no Simulador: "clico no Café e não vai, só sai da missão"): o toque NO
+       * BALÃO (post-it, chips, "Entendi") é parte do guia — nunca é "toque fora". Antes, o pointerdown
+       * no chip derrubava o anel ANTES do click; no Chromium o chip ainda recebia o click durante a
+       * animação de saída, no WKWebView não — o post-it sumia sem registrar nada. */
+      if (e.target instanceof Node && balaoRef.current?.contains(e.target)) return;
       if (fixo) { setLeve(true); return; } // fixo: o passo continua na tela, só o escuro clareia
-      if (e.target instanceof Node && alvo.contains(e.target)) {
+      if (e.target instanceof Node && atual.contains(e.target)) {
         // tocou o alvo: a ação segue e o anel se despede sozinho
         window.setTimeout(() => sair("alvo_tocado"), 450);
         return;
@@ -326,7 +402,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rect, digitando]);
 
-  if (!rect || digitando) return null;
+  if (!rect || digitando || recolhido) return null;
   const pad = 8;
   const largura = Math.min(window.innerWidth - 12, rect.width + pad * 2);
   const esquerda = Math.max(6, Math.min(rect.left - pad, window.innerWidth - 6 - largura));
@@ -369,7 +445,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
  * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
  * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
  */
-export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao }: {
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria, rotuloEscrever = "✎ escrever o meu", compacto = false }: {
   pergunta: string;
   chips: ChipDaMissao[];
   /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
@@ -382,21 +458,27 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
   rotulo?: string;
   /** uma frase explicando o toque, entre a pergunta e os chips */
   descricao?: string;
+  /** 1.0.16: uma saída de texto no pé do post-it (o gasto de carona depois do Montar: "Agora não") */
+  secundaria?: { texto: string; aoTocar: () => void; testid?: string };
+  /** 17/10 (relatório 11): o rótulo do "escrever" (a missão diz "✎ outro") */
+  rotuloEscrever?: string;
+  /** 17/10 (D4): colado embaixo da faixa — só a pergunta e os chips */
+  compacto?: boolean;
 }) {
   const reduzir = useReducedMotion();
   return (
     <div className="relative" data-testid="demo-guia-postit">
       <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
       <motion.div
-        className="rounded-md px-4 pt-3.5 pb-3.5 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)]"
+        className={`rounded-md px-4 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)] ${compacto ? "pt-2.5 pb-2.5" : "pt-3.5 pb-3.5"}`}
         style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
         initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
       >
         <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{rotulo}</span>
         <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
-        {descricao && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
+        {descricao && !compacto && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
         {chips.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className={`${compacto ? "mt-2" : "mt-3"} flex flex-wrap gap-2`}>
             {chips.map((c, i) => {
               const marcado = tocado === c.nome;
               return (
@@ -425,12 +507,18 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
                 style={{ borderColor: "rgba(38,38,38,.45)", color: "rgba(38,38,38,.85)" }}
                 initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduzir ? 0 : 0.12 + chips.length * 0.07, duration: 0.3 }}
               >
-                ✎ escrever o meu
+                {rotuloEscrever}
               </motion.button>
             )}
           </div>
         )}
-        {dica && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
+        {dica && !compacto && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
+        {secundaria && !compacto && (
+          <button type="button" onClick={secundaria.aoTocar} data-testid={secundaria.testid ?? "demo-guia-secundaria"}
+            className="mt-2 -mb-1 min-h-10 px-1 text-[13px] font-bold underline underline-offset-2" style={{ color: "rgba(38,38,38,.7)" }}>
+            {secundaria.texto}
+          </button>
+        )}
       </motion.div>
     </div>
   );

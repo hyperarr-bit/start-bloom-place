@@ -3,6 +3,7 @@ import Capacitor
 import FacebookCore
 import AppTrackingTransparency
 import AdSupport
+import StoreKit
 
 /*
  * SDK DA META NO iPHONE (06/09, refeito 07/09 SEM ATT) — espelho da v49 do
@@ -92,7 +93,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
      * mesmo assim não mostrar (app foi pro fundo no meio), fica armado pra
      * próxima ativação; o JS (welcome/Home) continua como segunda chance. */
     static var attEmAndamento = false
+    /// 10/10 (build 38): quem veio da Porta não vê o ATT. Ligado pelo link core://entrar (open url)
+    /// ou pelo JS (CoreNativo.pularATT, conta com user_metadata.porta). Vale pro processo.
+    static var pularATT = false
     static func pedirATTSePrecisar() {
+        #if targetEnvironment(simulator)
+        return // no simulador o diálogo de ATT só atrapalha os prints
+        #endif
         guard #available(iOS 14, *), !attEmAndamento else { return }
         guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
         attEmAndamento = true
@@ -102,6 +109,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
          * passe pela welcome; se o JS já pediu, encontra o status decidido e
          * não faz nada. */
         DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            guard !AppDelegate.pularATT else { AppDelegate.attEmAndamento = false; return }
             guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { AppDelegate.attEmAndamento = false; return }
             ATTrackingManager.requestTrackingAuthorization { status in
                 AppDelegate.aplicarStatusATT()
@@ -118,6 +126,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Login do Facebook, e este caminho é o do `core://auth` (Sign in with
         // Apple / Supabase). Enfiar outro handler aqui é arriscar o deep link
         // que já custou um bug no Android em 28/07.
+        // 10/10 (build 38): o "Abrir o CORE" da Porta (core://entrar?h=…) — a conta veio do site,
+        // sem o diálogo de ATT. Marcado aqui, antes de o JS existir, pra a reserva de 10 s respeitar.
+        if url.scheme == "core", url.host == "entrar" { AppDelegate.pularATT = true }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
@@ -141,6 +152,155 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class CoreViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(MetaAdsPlugin())
+        bridge?.registerPluginInstance(CoreNativoPlugin())
+    }
+}
+
+/*
+ * A FOLHA "PROBLEMA DE COBRANÇA" DO STOREKIT (10/10, versão 1.0.14).
+ *
+ * O dinheiro parado: 59% das cobranças do iPhone falham no cartão e ~5%
+ * recuperam. No iOS 16.4+ o StoreKit entrega uma `Message` de `.billingIssue`
+ * — a folha do PRÓPRIO sistema que leva direto à troca do cartão. Sem ninguém
+ * observar `Message.messages`, o iOS mostra ela sozinho na primeira vez que o
+ * app vem pra frente — em qualquer tela, inclusive no meio do funil ou de um
+ * passo da missão, por cima do que a pessoa estava fazendo.
+ *
+ * CUIDADO que não é detalhe: OBSERVAR a fila SUPRIME a exibição automática. Se
+ * a gente ouvir e nunca chamar `display(in:)`, a folha nunca aparece — e a
+ * pessoa perde o acesso sem aviso do sistema. Por isso:
+ *   1. a observação só começa quando o JS pede (`ativarFolhaDeCobranca`, atrás
+ *      da chave COBRANCA_V14 do app). Com a chave desligada este código não
+ *      toca na fila e o iOS segue como sempre;
+ *   2. billingIssue vai pra uma FILA e é exibida quando o JS diz que a rota é
+ *      a Home (`telaAtual`). Se a Home não vier em 60 s, exibe mesmo assim;
+ *   3. qualquer outra razão (aumento de preço, win-back…) é exibida na hora,
+ *      como o sistema faria;
+ *   4. sem cena ativa pra exibir, volta pra fila e tenta de novo.
+ * Cada exibição avisa o JS (`billingSheetExibida` → evento billing_sheet_exibida).
+ *
+ * Não dá pra ensaiar no simulador sem conta sandbox com cartão recusado — ver
+ * o teste manual no relatório da versão. Em iOS < 16.4 nada disto existe.
+ */
+@available(iOS 16.4, *)
+@MainActor
+final class FolhaDeCobranca {
+    static let compartilhada = FolhaDeCobranca()
+
+    private var observacao: Task<Void, Never>?
+    private var fila: [(mensagem: Message, desde: Date)] = []
+    private var naHome = false
+    private var reserva: Timer?
+    /// Avisa o plugin de cada exibição (motivo, espera em ms, forçada pela reserva?).
+    var aoExibir: ((String, Int, Bool) -> Void)?
+
+    static let ESPERA_MAXIMA: TimeInterval = 60
+
+    var ativa: Bool { observacao != nil }
+
+    func ativar() {
+        guard observacao == nil else { return }
+        observacao = Task { @MainActor [weak self] in
+            for await mensagem in Message.messages {
+                self?.receber(mensagem)
+            }
+        }
+    }
+
+    func telaAtual(rota: String) {
+        naHome = rota == "/home" || rota == "/"
+        if naHome { exibirPendentes(forcado: false) }
+    }
+
+    private func receber(_ m: Message) {
+        if m.reason == .billingIssue {
+            fila.append((m, Date()))
+            if naHome { exibirPendentes(forcado: false) } else { armarReserva() }
+        } else {
+            exibir(m, desde: Date(), forcado: false)
+        }
+    }
+
+    private func armarReserva() {
+        guard reserva == nil else { return }
+        reserva = Timer.scheduledTimer(withTimeInterval: FolhaDeCobranca.ESPERA_MAXIMA, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.exibirPendentes(forcado: true) }
+        }
+    }
+
+    private func exibirPendentes(forcado: Bool) {
+        reserva?.invalidate(); reserva = nil
+        guard !fila.isEmpty else { return }
+        let pendentes = fila
+        fila.removeAll()
+        for item in pendentes { exibir(item.mensagem, desde: item.desde, forcado: forcado) }
+    }
+
+    private func cenaAtiva() -> UIWindowScene? {
+        let cenas = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return cenas.first { $0.activationState == .foregroundActive } ?? cenas.first
+    }
+
+    private func exibir(_ m: Message, desde: Date, forcado: Bool) {
+        guard let cena = cenaAtiva() else {
+            // app no fundo: volta pra fila e tenta na próxima tela/reserva
+            fila.append((m, desde)); armarReserva(); return
+        }
+        do {
+            try m.display(in: cena)
+            let esperou = Int(Date().timeIntervalSince(desde) * 1000)
+            aoExibir?(m.reason == .billingIssue ? "billingIssue" : "outro", esperou, forcado)
+            print("[Cobranca] folha do StoreKit exibida (\(m.reason == .billingIssue ? "billingIssue" : "outro"), esperou \(esperou) ms, forçada: \(forcado))")
+        } catch {
+            print("[Cobranca] display(in:) falhou: \(error)")
+        }
+    }
+}
+
+/*
+ * Plugin `CoreNativo` — o que o JS (src/lib/cobranca-nativa.ts) chama:
+ *   telaAtual({ rota })        a rota do React a cada navegação;
+ *   ativarFolhaDeCobranca()    começa a observar a fila (só com a chave ligada);
+ *   evento billingSheetExibida { motivo, esperou_ms, forcada };
+ *   pularATT()                 (10/10, build 38) conta da Porta: segura a reserva de ATT de 10 s.
+ * Registrado à mão no CoreViewController, como o MetaAds (plugin de dentro do
+ * app não entra no packageClassList).
+ */
+@objc(CoreNativoPlugin)
+public class CoreNativoPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "CoreNativoPlugin"
+    public let jsName = "CoreNativo"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "telaAtual", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pularATT", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func pularATT(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            AppDelegate.pularATT = true
+            call.resolve()
+        }
+    }
+
+    @objc func telaAtual(_ call: CAPPluginCall) {
+        let rota = call.getString("rota") ?? ""
+        if #available(iOS 16.4, *) {
+            Task { @MainActor in FolhaDeCobranca.compartilhada.telaAtual(rota: rota) }
+        }
+        call.resolve()
+    }
+
+    @objc func ativarFolhaDeCobranca(_ call: CAPPluginCall) {
+        guard #available(iOS 16.4, *) else { call.resolve(["ativo": false, "suportado": false]); return }
+        Task { @MainActor [weak self] in
+            let folha = FolhaDeCobranca.compartilhada
+            folha.aoExibir = { [weak self] motivo, esperou, forcada in
+                self?.notifyListeners("billingSheetExibida", data: ["motivo": motivo, "esperou_ms": esperou, "forcada": forcada])
+            }
+            folha.ativar()
+            call.resolve(["ativo": folha.ativa, "suportado": true])
+        }
     }
 }
 
@@ -168,6 +328,9 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
      * nada) e espelha o resultado no SDK. Sempre na thread principal — a
      * Apple exige e, fora dela, o diálogo simplesmente não aparece. */
     @objc func pedirRastreamento(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        call.resolve(["status": "denied"]); return // simulador: sem diálogo
+        #endif
         guard #available(iOS 14, *) else { call.resolve(["status": "restricted"]); return }
         DispatchQueue.main.async {
             ATTrackingManager.requestTrackingAuthorization { status in

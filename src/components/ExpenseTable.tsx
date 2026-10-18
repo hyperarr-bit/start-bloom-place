@@ -329,7 +329,8 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
 
       {/* Form sempre visível */}
       <div className="p-3 border-b border-border bg-muted/20 space-y-2">
-        <div className="flex items-center gap-2">
+        {/* data-cartao-alvo (10/10): o "Fazer agora" dos cartões de boas-vindas acende a LINHA do formulário, não só o "+" */}
+        <div className="flex items-center gap-2" data-cartao-alvo="novo-gasto">
           <Input
             placeholder="+ Novo gasto"
             value={newExpense.description}
@@ -456,18 +457,20 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
           </div>
         )}
 
+        {/* grid-flow-dense + o campo de data na linha inteira no celular (17/10, print do dono: a meia coluna
+            cortava o "dd/mm/aaaa" — "dd/mm/aa" a 375 px); o Pagamento sobe pra ficar ao lado da Categoria */}
         {showMore && (
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-2 grid-flow-row-dense gap-2 pt-1">
             <div className="min-w-0">
               <CategorySelect kind="variable" value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })} />
             </div>
-            <label className="min-w-0 h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background">
+            <label className="min-w-0 max-sm:col-span-2 h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background">
               <span className="text-muted-foreground flex-shrink-0">Data:</span>
               <input
                 type="date"
                 value={newExpense.date}
                 onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
+                className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs appearance-none [&::-webkit-date-and-time-value]:text-left"
               />
             </label>
             <div className="min-w-0">
@@ -550,17 +553,17 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
                   placeholder="Valor"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 grid-flow-row-dense gap-2">
                 <div className="min-w-0">
                   <CategorySelect kind="variable" value={rascunho.category} onValueChange={(v) => setRascunho({ ...rascunho, category: v })} />
                 </div>
-                <label className="min-w-0 h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background">
+                <label className="min-w-0 max-sm:col-span-2 h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background">
                   <span className="text-muted-foreground flex-shrink-0">Data:</span>
                   <input
                     type="date"
                     value={rascunho.date}
                     onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
-                    className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
+                    className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs appearance-none [&::-webkit-date-and-time-value]:text-left"
                   />
                 </label>
                 <div className="min-w-0">

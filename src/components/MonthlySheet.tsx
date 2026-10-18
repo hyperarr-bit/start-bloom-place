@@ -193,6 +193,7 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
           variableExpensesAnterior={expensesAnterior}
           mes={mesId}
           projetadas={projetadas}
+          fixos={[...fixedExpenses, ...fixosProjetados]}
         />
       </div>
       <Notes notes={notes} setNotes={setNotes} />

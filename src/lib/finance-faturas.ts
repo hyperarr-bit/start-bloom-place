@@ -35,14 +35,34 @@ export interface FaturaDoMes {
   variaveis: number;
   parcelas: number;
   fixos: number;
+  /** Parte de `fixos` que é a ESTIMATIVA da fatura do Montar (`ehEstimativaDaFatura`): não tem conta
+   *  própria no MEU MÊS, então entra no valor da linha da fatura. Ausente = 0. */
+  estimativa?: number;
   paga: boolean;
 }
+
+/**
+ * A FATURA DO MÊS, MAIS OU MENOS (1.0.16) — o custo fixo que o "Vamos montar suas Finanças" cria
+ * quando a pessoa diz que usa cartão: "Fatura do cartão", no crédito do cartão dela, com o valor
+ * que ela chutou e o vencimento no próprio cartão (`finance-card-config`). Ele É a conta da fatura:
+ *   · não vira conta própria no MEU MÊS enquanto o cartão tiver vencimento (Index tira ele do sync
+ *     de fixo → conta), nem se a pessoa puser um "Dia" nele — a linha "Fatura Nubank · R$ X" no dia
+ *     do vencimento é a conta;
+ *   · por isso entra no `value` dessa linha (o "a vencer"), que só leva o que não tem conta própria;
+ *   · o "paguei" da linha e o ✓ dele na lista de custos fixos são o mesmo (Index liga os dois);
+ *   · aparece no TOTAL POR CARTÃO NO MÊS, na coluna de gastos do cartão.
+ * Cliente antigo não tem esse campo em fixo nenhum: nada disso muda pra ele.
+ */
+export const ehEstimativaDaFatura = (f: unknown): boolean => {
+  const x = f as { faturaDoCartao?: unknown; paymentMethod?: unknown; cardName?: unknown } | null | undefined;
+  return !!x && x.faturaDoCartao === true && x.paymentMethod === "credito" && typeof x.cardName === "string" && x.cardName.length > 0;
+};
 
 export interface EntradaFatura {
   mes: string;
   variaveis: GastoDeCartao[];
   variaveisAnterior: GastoDeCartao[];
-  fixos: { paymentMethod?: string; cardName?: string; value?: number }[];
+  fixos: { paymentMethod?: string; cardName?: string; value?: number; faturaDoCartao?: boolean }[];
   parcelas: Parcela[];
   cards: string[];
   configOf: (card: string) => CardConfig | undefined;
@@ -62,10 +82,10 @@ export const brl = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDig
 /** As faturas do mês: só de cartão com dia de vencimento cadastrado, e só quando tem valor. */
 export function faturasDoMes(e: EntradaFatura): FaturaDoMes[] {
   const mesAnterior = somarMeses(e.mes, -1);
-  const porCartao = new Map<string, { variaveis: number; parcelas: number; fixos: number }>();
+  const porCartao = new Map<string, { variaveis: number; parcelas: number; fixos: number; estimativa: number }>();
   const conta = (card: unknown) => {
     const c = String(card ?? "");
-    if (!porCartao.has(c)) porCartao.set(c, { variaveis: 0, parcelas: 0, fixos: 0 });
+    if (!porCartao.has(c)) porCartao.set(c, { variaveis: 0, parcelas: 0, fixos: 0, estimativa: 0 });
     return porCartao.get(c)!;
   };
 
@@ -80,7 +100,11 @@ export function faturasDoMes(e: EntradaFatura): FaturaDoMes[] {
     if (v > 0 && p.cardName) conta(p.cardName).parcelas += v;
   }
   for (const f of arr<EntradaFatura["fixos"][number]>(e.fixos)) {
-    if (f?.paymentMethod === "credito" && f.cardName) conta(f.cardName).fixos += Number(f.value) || 0;
+    if (f?.paymentMethod === "credito" && f.cardName) {
+      const v = Number(f.value) || 0;
+      conta(f.cardName).fixos += v;
+      if (ehEstimativaDaFatura(f)) conta(f.cardName).estimativa += v;
+    }
   }
 
   const out: FaturaDoMes[] = [];
@@ -94,6 +118,7 @@ export function faturasDoMes(e: EntradaFatura): FaturaDoMes[] {
       card, label: e.labelOf(card), dueDay,
       total: Math.round(total * 100) / 100,
       variaveis: t?.variaveis ?? 0, parcelas: t?.parcelas ?? 0, fixos: t?.fixos ?? 0,
+      ...(t?.estimativa ? { estimativa: t.estimativa } : {}),
       paga: e.pagas?.[chaveDaFatura(e.mes, card)] === true,
     });
   }
@@ -197,8 +222,9 @@ export function injetarFaturas(dueDays: DueDay[], faturas: FaturaDoMes[], semVal
   const dias = arr<DueDay>(dueDays).map((d) => ({ ...d, bills: arr<Bill>(d?.bills).filter((b) => !cartaoDoId(b?.id)) }));
   for (const f of faturas) {
     // `value` = só o que NÃO tem conta própria (gasto + parcela): o custo fixo
-    // no cartão já vira conta do mês pelo sync, e contaria duas vezes no "a vencer"
-    const bill: Bill = { id: idDaFaturaNoDia(f.card), name: nomeDaFatura(f, !semValor), paid: f.paga, value: Math.round((f.variaveis + f.parcelas) * 100) / 100 };
+    // no cartão já vira conta do mês pelo sync, e contaria duas vezes no "a vencer".
+    // A estimativa da fatura do Montar (1.0.16) não vira conta própria nunca — entra aqui.
+    const bill: Bill = { id: idDaFaturaNoDia(f.card), name: nomeDaFatura(f, !semValor), paid: f.paga, value: Math.round((f.variaveis + f.parcelas + (f.estimativa ?? 0)) * 100) / 100 };
     const existente = dias.find((d) => Number(d?.day) === f.dueDay);
     if (existente) existente.bills = [...existente.bills, bill];
     else dias.push({ day: f.dueDay, color: CORES[dias.length % CORES.length], bills: [bill] });

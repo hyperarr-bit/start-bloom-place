@@ -760,7 +760,7 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "criar_habito")).toBeTruthy();
     // passo 2: o anel abraça o QUADRADINHO de hoje (a célula com o checkbox), não a linha inteira
     await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marca o quadradinho de hoje"), { timeout: 4000 });
-    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 2");
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 4 · marcar");
     medir.mockRestore();
   });
 

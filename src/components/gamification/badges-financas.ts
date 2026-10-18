@@ -34,7 +34,7 @@ const booleana = (b: Base, ok: boolean): Badge => ({ ...comXp(b), unlocked: ok }
 
 const num = (v: unknown) => Number(v) || 0;
 
-/** Taxa de poupança só abre com o mês anotado (5+ gastos): senão a 1ª receita já era "100% poupado".
+/** Taxa de poupança só abre com o mês anotado (5+ gastos) e 1 mês de dado: senão a 1ª receita já era "100% poupado".
  *  Travada assim, o círculo mostra a taxa de VERDADE (93%), não o alvo cortado (40%). */
 const poupanca = (b: Badge, mesAnotado: boolean, taxa: number): Badge =>
   mesAnotado || !b.unlocked ? b : { ...b, unlocked: false, progresso: b.progresso ? { atual: Math.max(0, taxa), alvo: b.progresso.alvo } : undefined };
@@ -44,6 +44,15 @@ type Item = Record<string, unknown>;
 
 /** Mês anotado = pelo menos 5 gastos (variáveis + fixos) e saída > 0 — a trava das insígnias de poupança. */
 export const MIN_GASTOS_POUPANCA = 5;
+/**
+ * POUPADOR SÓ COM 1 MÊS DE DADO (17/10, dono). O "Montar Finanças" grava no dia 1 a renda + as contas
+ * fixas: com 5 contas o mês já contava como "anotado" e a ESTIMATIVA (renda − contas) abria Poupador,
+ * Super Poupador e Formiguinha no 1º dia — prêmio de poupança sem ninguém ter poupado nada. Agora a
+ * taxa só vale quando o dado de Finanças mais antigo (receita ou gasto DATADO, no balde ou num mês
+ * arquivado) tem pelo menos 28 dias. Por que 28 dias e não "1 mês fechado na virada": quem começa dia
+ * 30 fecharia o mês dia 1º com 2 dias de dado. Quem já ganhou não perde (conquistas-registro).
+ */
+export const DIAS_MINIMOS_POUPADOR = 28;
 /** "3 Meses no Azul": quantos meses arquivados seguidos com saldo positivo. */
 export const ALVO_MESES_NO_AZUL = 3;
 
@@ -106,6 +115,27 @@ export const mesesSeguidosNoAzul = (arquivados: MesArquivado[]): number => {
   return n;
 };
 
+const DIA_RE = /^(\d{4})-(\d{2})-(\d{2})/;
+/** Dias desde o lançamento de Finanças DATADO mais antigo (receitas e gastos, de hoje e dos meses
+ *  arquivados; os fixos não têm data). Sem nenhum datado: 0. */
+export const diasDeDadoFinancas = (get: Leitor, hoje = new Date()): number => {
+  const itens = [...lista(get, "finance-incomes"), ...lista(get, "finance-expenses")];
+  for (let i = 1; i <= MESES_OLHADOS; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    itens.push(...lista(get, chaveArquivada(d.getFullYear(), d.getMonth(), "incomes")), ...lista(get, chaveArquivada(d.getFullYear(), d.getMonth(), "expenses")));
+  }
+  let maisAntigo: number | null = null;
+  for (const it of itens) {
+    const m = typeof it.date === "string" ? DIA_RE.exec(it.date) : null;
+    if (!m) continue;
+    const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+    if (!Number.isNaN(t) && (maisAntigo === null || t < maisAntigo)) maisAntigo = t;
+  }
+  if (maisAntigo === null) return 0;
+  const hojeT = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+  return Math.max(0, Math.round((hojeT - maisAntigo) / 86400e3));
+};
+
 /** "AAAA-MM" do mês de `hoje`. */
 const idDoMes = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 /** Só os lançamentos datados NO mês (os sem data ficam — na dúvida não se tira nada de ninguém). */
@@ -163,6 +193,9 @@ export function medirFinancas(get: Leitor, hoje = new Date()) {
    * de uma vez — pra sempre. Antes ela trancava de novo no 1º gasto.
    */
   const mesAnotado = expensesDoMes.length + fixosDoPerfil.length >= MIN_GASTOS_POUPANCA && saidaDoMes > 0;
+  /* E com 1 mês de dado (17/10): o Montar do dia 1 não abre Poupador (ver DIAS_MINIMOS_POUPADOR). */
+  const diasDeDado = diasDeDadoFinancas(get, hoje);
+  const umMesDeDado = diasDeDado >= DIAS_MINIMOS_POUPADOR;
   const totalInvestments = investments.reduce((s, i) => s + (num(i.currentValue) || num(i.value)), 0);
   const uniqueAssets = new Set(investments.map((i) => i.type || i.name)).size;
 
@@ -201,14 +234,15 @@ export function medirFinancas(get: Leitor, hoje = new Date()) {
 
   return {
     incomes, expenses, fixedExpenses, investments, installments, wishlist, perfil,
-    totalIncome, monthlyExpenses, saidaDoMes, savingsRate, mesAnotado, totalInvestments, uniqueAssets,
+    totalIncome, monthlyExpenses, saidaDoMes, savingsRate, mesAnotado, diasDeDado, umMesDeDado, totalInvestments, uniqueAssets,
     billsPaid, hasActiveDebt, hasQuitado, uniqueIncomes, categorizedExpenses, monthLaunches,
     reservaAlvo, acquiredWish, challengeWins, mesesFechados, mesesNoAzul, sobrouNoMes, taxaDoMes,
   };
 }
 
-export function buildBadgesFinancas(get: Leitor): Badge[] {
-  const m = medirFinancas(get);
+export function buildBadgesFinancas(get: Leitor, hoje = new Date()): Badge[] {
+  const m = medirFinancas(get, hoje);
+  const taxaVale = m.mesAnotado && m.umMesDeDado;
   const base = { category: "finance" as const, color: "green" };
   const reais = { formato: "reais" as const };
   const porcento = { formato: "porcento" as const };
@@ -221,10 +255,10 @@ export function buildBadgesFinancas(get: Leitor): Badge[] {
     comProgresso({ ...base, id: "organizer", name: "Organizador", description: "10+ despesas categorizadas", icon: "🗂️", raridade: "comum", unidade: ["despesa categorizada", "despesas categorizadas"] }, m.categorizedExpenses, 10),
     comProgresso({ ...base, id: "budget-master", name: "Mestre do Orçamento", description: "50+ lançamentos no mês", icon: "📊", raridade: "raro", unidade: ["lançamento no mês", "lançamentos no mês"] }, m.monthLaunches, 50),
 
-    // Poupança (só com o mês anotado — ver mesAnotado)
-    poupanca(comProgresso({ ...base, ...porcento, id: "saver-20", name: "Poupador", description: "Taxa de poupança ≥ 20%", icon: "🐷", raridade: "comum" }, m.savingsRate, 20), m.mesAnotado, m.savingsRate),
-    poupanca(comProgresso({ ...base, ...porcento, id: "saver-40", name: "Super Poupador", description: "Taxa de poupança ≥ 40%", icon: "💰", raridade: "raro" }, m.savingsRate, 40), m.mesAnotado, m.savingsRate),
-    poupanca(comProgresso({ ...base, ...porcento, id: "saver-60", name: "Formiguinha", description: "Taxa de poupança ≥ 60%", icon: "🐜", raridade: "epico" }, m.savingsRate, 60), m.mesAnotado, m.savingsRate),
+    // Poupança (só com o mês anotado E 1 mês de dado — ver mesAnotado e DIAS_MINIMOS_POUPADOR)
+    poupanca(comProgresso({ ...base, ...porcento, id: "saver-20", name: "Poupador", description: "Taxa de poupança ≥ 20% (com 1 mês de Finanças)", icon: "🐷", raridade: "comum" }, m.savingsRate, 20), taxaVale, m.savingsRate),
+    poupanca(comProgresso({ ...base, ...porcento, id: "saver-40", name: "Super Poupador", description: "Taxa de poupança ≥ 40% (com 1 mês de Finanças)", icon: "💰", raridade: "raro" }, m.savingsRate, 40), taxaVale, m.savingsRate),
+    poupanca(comProgresso({ ...base, ...porcento, id: "saver-60", name: "Formiguinha", description: "Taxa de poupança ≥ 60% (com 1 mês de Finanças)", icon: "🐜", raridade: "epico" }, m.savingsRate, 60), taxaVale, m.savingsRate),
 
     // Investimentos
     comProgresso({ ...base, ...reais, id: "investor-1k", name: "Investidor", description: "R$ 1.000+ investidos", icon: "📈", raridade: "comum" }, m.totalInvestments, 1000),

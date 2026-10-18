@@ -373,7 +373,8 @@ describe("os 4 consertos da auditoria no medirFinancas (adesivos)", () => {
   it("3. a taxa de poupança inclui as PARCELAS do mês (como o Painel)", () => {
     const base = {
       "finance-incomes": [{ id: 1, description: "Salário", value: 1000, date: dia(5) }],
-      "finance-expenses": [1, 2, 3, 4, 5].map((i) => ({ id: i, value: 100, date: dia(i) })),
+      // + 1 gasto de julho (fora do mês): Finanças com mais de 1 mês de dado — a régua do Poupador (17/10)
+      "finance-expenses": [...[1, 2, 3, 4, 5].map((i) => ({ id: i, value: 100, date: dia(i) })), { id: "jul", value: 50, date: "2026-07-20" }],
     };
     expect(medirFinancas(leitor(base)).savingsRate).toBeCloseTo(50, 5);
     const comParcela = { ...base, "finance-installments": [{ id: "p", installmentValue: 300, paidInstallments: 0, totalInstallments: 3, startMonth: "2026-09", parcelaDoMes: 1 }] };

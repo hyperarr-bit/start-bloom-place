@@ -18,7 +18,8 @@ import { useConquistas, membroDesdeTexto } from "@/components/conquistas/use-con
 import {
   CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, rotuloProgresso, textoFalta, brlCurto,
 } from "@/lib/conquistas-registro";
-import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
+import { buildBadgesFinancas, diasDeDadoFinancas, medirFinancas } from "@/components/gamification/badges-financas";
+import { chaveArquivada } from "@/lib/virada-do-mes";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
 import { IDS_COM_ARTE } from "@/components/conquistas/adesivos-arte";
 import type { Badge } from "@/components/gamification/types";
@@ -73,8 +74,45 @@ describe("mesclarDesbloqueios (puro)", () => {
     // dias do mês CORRENTE (as datas fixas em setembro quebraram o teste em 01/10: a meta é do mês)
     const agora = new Date(); const mes = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
     const gastos = Array.from({ length: 5 }, (_, i) => ({ value: 100, date: `${mes}-0${i + 1}` }));
-    const mesAnotado = buildBadgesFinancas(leitor({ "finance-incomes": [{ value: 3000 }], "finance-expenses": gastos }));
+    // + 1 receita datada há 40 dias: Finanças com 1 mês de dado (régua do Poupador, 17/10)
+    const antiga = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - 40);
+    const diaAntigo = `${antiga.getFullYear()}-${String(antiga.getMonth() + 1).padStart(2, "0")}-${String(antiga.getDate()).padStart(2, "0")}`;
+    const mesAnotado = buildBadgesFinancas(leitor({ "finance-incomes": [{ value: 3000 }, { value: 10, date: diaAntigo }], "finance-expenses": gastos }));
     expect(mesAnotado.filter((b) => b.id.startsWith("saver-") && b.unlocked).map((b) => b.id)).toEqual(["saver-20", "saver-40", "saver-60"]);
+  });
+
+  describe("Poupador só com 1 mês de dado de Finanças (17/10)", () => {
+    // o que o Montar Finanças grava no dia 1 (lib/montar-financas itensParaGravar): renda de hoje + contas fixas sem data
+    const montar = (diaDaRenda: string) => ({
+      "finance-incomes": [{ id: "mf-1", description: "Renda do mês", value: 5000, date: diaDaRenda }],
+      "finance-fixed-expenses": ["Aluguel", "Luz", "Água", "Internet", "Celular"].map((n, i) => ({ id: `mf-1-${i + 1}`, description: n, category: "moradia", value: 200, paymentMethod: "boleto" })),
+    });
+    const poupadores = (b: Badge[]) => b.filter((x) => x.id.startsWith("saver-") && x.unlocked).map((x) => x.id);
+    const hojeD = new Date(2026, 9, 17); // 17/10/2026
+
+    it("conta nova que faz o Montar no dia 1 (renda 5.000 − contas 1.000 = 80% 'poupado'): nenhum Poupador", () => {
+      const b = buildBadgesFinancas(leitor(montar("2026-10-17")), hojeD);
+      expect(medirFinancas(leitor(montar("2026-10-17")), hojeD).mesAnotado).toBe(true); // a estimativa bateria
+      expect(poupadores(b)).toEqual([]);
+      // o círculo mostra a taxa de verdade, trancado
+      expect(b.find((x) => x.id === "saver-20")!.progresso).toEqual({ atual: 80, alvo: 20 });
+      // nem 27 dias depois
+      expect(poupadores(buildBadgesFinancas(leitor(montar("2026-09-20")), hojeD))).toEqual([]);
+    });
+
+    it("com 1 mês de dado (receita/gasto datado há ≥ 28 dias, no balde ou num mês arquivado) ganha", () => {
+      expect(poupadores(buildBadgesFinancas(leitor({ ...montar("2026-10-17"), "finance-expenses": [{ id: "v", value: 10, date: "2026-09-19" }] }), hojeD))).toEqual(["saver-20", "saver-40", "saver-60"]);
+      const arquivado = { ...montar("2026-10-01"), [chaveArquivada(2026, 8, "incomes")]: [{ id: "s", description: "Salário", value: 5000, date: "2026-09-05" }] };
+      expect(diasDeDadoFinancas(leitor(arquivado), hojeD)).toBe(42);
+      expect(poupadores(buildBadgesFinancas(leitor(arquivado), hojeD))).toEqual(["saver-20", "saver-40", "saver-60"]);
+    });
+
+    it("quem JÁ tinha o Poupador continua com ele (o gravado vence a régua nova)", () => {
+      const calculadas = buildBadgesFinancas(leitor(montar("2026-10-17")), hojeD);
+      const r = mesclarDesbloqueios(calculadas, { "saver-20": "2026-10-16", "saver-40": "2026-10-16", "saver-60": "2026-10-16" }, "2026-10-17");
+      expect(poupadores(r.adesivos)).toEqual(["saver-20", "saver-40", "saver-60"]);
+      expect(r.novas.filter((id) => id.startsWith("saver-"))).toEqual([]);
+    });
   });
 
   it("lixo no storage não abre adesivo", () => {

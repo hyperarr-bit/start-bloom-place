@@ -29,6 +29,8 @@ import { trackEvent } from "@/lib/analytics";
 
 const H = 3600_000;
 const TZ_ANTES = process.env.TZ;
+// No topo, não só no beforeAll: o INICIO do describe da régua é calculado na coleta, antes dos hooks.
+process.env.TZ = "America/Sao_Paulo";
 beforeAll(() => { process.env.TZ = "America/Sao_Paulo"; });
 afterAll(() => { if (TZ_ANTES === undefined) delete process.env.TZ; else process.env.TZ = TZ_ANTES; });
 

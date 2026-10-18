@@ -20,7 +20,7 @@ import { localDayKey } from "@/lib/utils";
 export type ModoChave = "on" | "off";
 /** O funil inteiro. Padrão OFF no build até o dono ligar (ROLLBACK = "off" + push). Desligado, /hoje leva pra landing
  *  "/" com a mesma query (utm/fbclid). QA: `?funil-hoje=on` (fica neste navegador; `?funil-hoje=off` tira). */
-export const FUNIL_HOJE: ModoChave = "off";
+export const FUNIL_HOJE: ModoChave = "on";
 export const PARAM_QA_HOJE = "funil-hoje";
 export const CHAVE_FORCA_HOJE = "funil-hoje-force";
 

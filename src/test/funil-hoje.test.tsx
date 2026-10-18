@@ -150,9 +150,9 @@ afterEach(() => { cleanup(); irPara("/"); });
 
 /* ---------------------------------------------------------------- chave e rota */
 describe("a chave e a rota", () => {
-  it("padrão OFF no build: /hoje leva pra landing levando a query (utm/fbclid)", () => {
-    expect(FUNIL_HOJE).toBe("off");
-    montar("/hoje?utm_source=meta&fbclid=IwAR_y");
+  it("LIGADO (dono 18/10): /hoje abre o funil; ?funil-hoje=off leva pra landing levando a query (utm/fbclid)", () => {
+    expect(FUNIL_HOJE).toBe("on");
+    montar("/hoje?funil-hoje=off&utm_source=meta&fbclid=IwAR_y");
     expect(screen.getByTestId("landing")).toBeTruthy();
   });
   it("?funil-hoje=on liga e fica no navegador; ?funil-hoje=off desliga", () => {

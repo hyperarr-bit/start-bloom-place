@@ -393,6 +393,9 @@ const Liberar = lazyPage(() => import("./pages/liberar/Liberar"));
 // sem × com → lembretes → prova → resultado → plano de 3 dias) e o paywall da WEB no Pix com a escada: anual 97,90 →
 // presente anual 69,90 → mensal 24,90 (30 dias, sem renovação). Só na WEB (SoNaWeb), noindex. O app não muda.
 const AssinaturaApp = lazyPage(() => import("./pages/funis/app-web/AssinaturaApp"));
+// 18/10: funil "Raio-X do Mês" (/raio-x). Quiz de 5 toques, Pix a97. Chave em src/lib/raiox.ts.
+// Com RAIOX="off" a rota redireciona pra "/" e preserva a query. Não mexe em /assinar, /comece, /experimente, /liberar, /assinatura.
+const RaioX = lazyPage(() => import("./pages/raiox/RaioX"));
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
@@ -619,6 +622,7 @@ const AnimatedRoutes = () => {
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/raio-x" element={<SoNaWeb><RouteErrorBoundary routeName="raio-x"><RaioX /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

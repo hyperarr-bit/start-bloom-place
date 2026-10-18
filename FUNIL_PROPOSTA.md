@@ -104,7 +104,7 @@ Regra de ouro do rastreio (igual à do raio-x): **o Meta nunca vê os valores do
 
 **Leituras secundárias (já instrumentadas):** `funile_toque` por serviço (o que o Brasil paga), `funile_nao_usada` (o que o Brasil não usa — insumo de produto/copy), `funile_economia` (tamanho da dor resgatável), faixa do somatório × conversão (qualificação do público), `funile_email` (lista → recuperação).
 
-**Pendências operacionais (não bloqueiam o protótipo):** confirmar preços da grade na semana do voo; `VITE_VENDA_CAKTO_ANUAL` na Vercel do preview (sem ele o cartão some por desenho); secrets Asaas/Meta já existem nas funções; e-mail da lista hoje é captura client-side (envio servidor-side fica para a iteração 2); o app ler `funile_meta` exige build de loja (não necessário para medir venda).
+**Pendências operacionais (não bloqueiam o protótipo):** confirmar preços da grade na semana do voo; `VITE_VENDA_CAKTO_ANUAL` na Vercel do preview (sem ele o cartão some por desenho); secrets Asaas/Meta já existem nas funções; e-mail da lista hoje é captura client-side (envio servidor-side fica para a iteração 2); Lead hoje é só pixel client-side (CAPI server-side com `event_id` de dedup entra na iteração 2 — Purchase já é CAPI via Asaas); o app ler `funile_meta` exige build de loja (não necessário para medir venda).
 
 ---
 

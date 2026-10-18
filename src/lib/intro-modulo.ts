@@ -47,7 +47,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
-import { diaDaMissao, ehBracoB, lerMissao, missaoDosesLigada, passoPendente, type DiaDaMissao } from "@/lib/missao-doses";
+import { lerMissao, missaoDosesLigada, type DiaDaMissao } from "@/lib/missao-doses";
 import {
   CAFE_DA_MANHA, DESTINOS_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE, adicionarCurso, adicionarLivro, adicionarPessoaDoComeco, anotarCafeDaManha, anotarDestino,
   COMODOS_DA_INTRO, DESTINOS_PLANEJANDO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, adicionarCursoDesejado, anotarContaFixa, anotarItemDoMercado, anotarEspelhoDoDia, anotarHumor, anotarMetaDeCurtoPrazo,
@@ -186,9 +186,15 @@ export const moduloJaApresentado = (moduleId: string, get: Leitor): boolean => {
   if (!!ls.get(`core-cartoes-vistos-${moduleId}`)) return true;
   const tip = get<unknown>(`core-tip-seen-${moduleId}`, "");
   if (tip === "true" || tip === true) return true;
-  const spot = get<unknown>(`spotlight-done-${moduleId}`, "");
-  return spot === "true" || spot === true;
+  return chavesDoTutorialAntigo(moduleId).some((k) => {
+    const spot = get<unknown>(k, "");
+    return spot === "true" || spot === true;
+  });
 };
+/** O tutorial antigo grava com a chave DELE: Metas é `metas` lá e `desenvolvimento` aqui — vale qualquer uma das duas. */
+const APELIDOS_DO_TUTORIAL_ANTIGO: Record<string, string[]> = { desenvolvimento: ["metas"] };
+export const chavesDoTutorialAntigo = (moduleId: string): string[] =>
+  [moduleId, ...(APELIDOS_DO_TUTORIAL_ANTIGO[moduleId] ?? [])].map((m) => `spotlight-done-${m}`);
 
 /* ───── o módulo está vazio? ───── */
 const lista = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -871,17 +877,10 @@ const moduloDaMissaoHoje = (): string | null => {
 /** Uma dose da missão está na tela agora (marca do ramo da missão)? */
 export const doseNaTela = (): boolean => { try { return document.documentElement.dataset.missaoDose === "1"; } catch { return false; } };
 
-/**
- * ANTES do merge do ramo da missão, "o módulo da dose de HOJE" sai do estado da missão: o próximo passo por
- * fazer, se ele é de hoje (ou atrasado) no calendário da missão — no braço B (dia 1 cheio) as 3 doses são de hoje.
- */
-const moduloDaDoseDeHojeLocal = (): string | null => {
-  const m = lerMissao();
-  if (!m || m.explorou) return null;
-  const p = passoPendente(m);
-  if (!p) return null;
-  return ehBracoB(m) || p.n <= diaDaMissao(m) ? p.modulo : null;
-};
+/* 17/10 (revisor, rev3): o plano B local ("o próximo passo pendente, se é de hoje ou atrasado") saiu. Ele não
+ * conferia boas-vindas / doseAbreHoje / o fim da janela da missão — no braço A depois do dia 7 (ou antes das
+ * boas-vindas) o módulo da dose pendente ficava SEM dose e SEM tutorial. Só vale `moduloDaMissaoHoje()`, que é a
+ * mesma régua da faixa da dose (MissaoDosesNaWeb). */
 
 /**
  * A missão em doses bloqueia a intro deste módulo? SÓ nestes 3 casos (dono, 17/10: "ele vai querer ver Rotina na
@@ -896,7 +895,7 @@ export function introBloqueadaPelaMissao(moduleId: string): boolean {
   if (doseNaTela()) return true;
   try {
     if (!missaoDosesLigada()) return false;
-    const hoje = moduloDaMissaoHoje() ?? moduloDaDoseDeHojeLocal();
+    const hoje = moduloDaMissaoHoje();
     if (hoje === moduleId) return true;
     const m = lerMissao();
     if (!m) return false;
@@ -904,6 +903,21 @@ export function introBloqueadaPelaMissao(moduleId: string): boolean {
     if (([1, 2, 3] as DiaDaMissao[]).some((n) => !!m.feitos[n] && modulos[n - 1] === moduleId)) return true;
   } catch { /* sem storage: segue */ }
   return false;
+}
+
+/**
+ * O tutorial antigo (SpotlightOverlay) marca `spotlight-done-<módulo>` pra toda conta logada na 1ª abertura. Se
+ * NESTA abertura a intro só não aparece porque a missão segura o módulo (a dose de hoje é dele), essa marca não pode
+ * ser gravada: senão, se a dose não for feita, o módulo vira "já apresentado" e perde o tutorial pra sempre (rev3).
+ * `moduleKey` é a chave do tutorial antigo (Metas = "metas").
+ */
+export function tutorialAntigoPodeMarcarVisto(moduleKey: string, get: Leitor): boolean {
+  try {
+    const id = Object.entries(APELIDOS_DO_TUTORIAL_ANTIGO).find(([, apelidos]) => apelidos.includes(moduleKey))?.[0] ?? moduleKey;
+    if (!INTROS[id] || !introLigada()) return true;
+    if (introVistaNesteAparelho(id) || introVistaNaConta(id, get)) return true;
+    return !introBloqueadaPelaMissao(id);
+  } catch { return true; }
 }
 
 /* ───── a decisão ───── */

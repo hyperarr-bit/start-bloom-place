@@ -21,6 +21,9 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { MemoryRouter } from "react-router-dom";
+import { somarDias } from "@/lib/sequencia";
 import { CHAVE_FORCA_INTRO, INTROS, MODULOS_COM_INTRO, chaveIntroVista, marcarIntroVista, porQueNaoMostrar, type Leitor } from "@/lib/intro-modulo";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MODULOS as MODULOS_DA_MISSAO, apagarMissao, definirDonoDaMissao, donoDaConta, gravarMissao, iniciarMissao, lerMissao, moduloDaMissaoHoje,
@@ -184,6 +187,76 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     expect(porQueNaoMostrar("financas", criarStore().get)).toBeNull();
     expect(localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)).toBeTruthy();
     expect(Object.keys(MODULOS_DA_MISSAO)).toHaveLength(16);
+  });
+
+  /* ───────────── rev3 (revisor, 17/10): nenhum módulo fica SEM dose E SEM tutorial ───────────── */
+  /** A dose abre ao entrar? (a mesma régua da faixa da dose: moduloDaMissaoHoje) */
+  const doseAbre = (m: string) => moduloDaMissaoHoje() === m;
+  /** Monta o tutorial antigo do módulo (que marca spotlight-done pra conta logada) + a intro nova, na ordem do app. */
+  const abrirModulo = (s: ReturnType<typeof criarStore>, m: string, chaveAntiga = m) =>
+    render(<MemoryRouter><s.Provedor><SpotlightOverlay moduleKey={chaveAntiga as never} steps={[]} /><IntroDoModulo moduleId={m} /></s.Provedor></MemoryRouter>);
+
+  it("braço A, dia 10, só a dose 1 feita: abrir Rotina dá o tutorial (a janela da dose 2 passou)", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], somarDias(hoje, -9), undefined, "A"), boasVindas: true, feitos: { 1: { dia: somarDias(hoje, -9), rotulo: "x" } } });
+    const s = criarStore();
+    expect(doseAbre("rotina")).toBe(false);
+    expect(porQueNaoMostrar("rotina", s.get)).toBeNull();
+    const r = abrirModulo(s, "rotina");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("braço A, dia 9, nada feito: abrir Finanças dá o tutorial", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], somarDias(hoje, -8), undefined, "A"), boasVindas: true, feitos: {} });
+    const s = criarStore();
+    expect(doseAbre("financas")).toBe(false);
+    expect(porQueNaoMostrar("financas", s.get)).toBeNull();
+    const r = abrirModulo(s, "financas");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("braço A, antes das boas-vindas: o módulo da dose 1 não fica sem nada (sem dose ainda → o tutorial)", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], hoje, undefined, "A"), boasVindas: false, feitos: {} });
+    const s = criarStore();
+    const motivo = porQueNaoMostrar("financas", s.get);
+    expect(motivo === null || doseAbre("financas")).toBe(true);
+    expect(motivo).toBeNull();
+    const r = abrirModulo(s, "financas");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("a dose de HOJE segura a intro → o tutorial antigo NÃO grava spotlight-done (senão o módulo perde o tutorial se a dose não for feita)", () => {
+    armarMissao("A", ["rotina", "financas", "saude"]);
+    const s = criarStore();
+    expect(porQueNaoMostrar("rotina", s.get)).toBe("missao");
+    const r = abrirModulo(s, "rotina");
+    expect(faixa()).toBeNull();
+    expect(s.estado.dados["spotlight-done-rotina"]).toBeUndefined();
+    r.unmount();
+    // a dose não foi feita e a janela passou (dia 10): o tutorial ainda está lá
+    gravarMissao({ ...lerMissao()!, inicio: somarDias(hoje, -9) } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("rotina", s.get)).toBeNull();
+    // sem a missão segurando, a marca do tutorial antigo segue como sempre (e a intro já decidiu antes dela)
+    const r2 = abrirModulo(s, "rotina");
+    expect(faixa()).toBeTruthy();
+    expect(s.estado.dados["spotlight-done-rotina"]).toBe("true");
+    r2.unmount();
+  });
+
+  it("Metas: o tutorial antigo grava spotlight-done-metas — vale como 'já apresentado' (e a 1ª abertura ainda ganha a intro)", () => {
+    apagarMissao();
+    expect(porQueNaoMostrar("desenvolvimento", criarStore({ "spotlight-done-metas": "true" }).get)).toBe("ja_apresentado");
+    expect(porQueNaoMostrar("desenvolvimento", criarStore({ "spotlight-done-desenvolvimento": "true" }).get)).toBe("ja_apresentado");
+    const s = criarStore();
+    const r = abrirModulo(s, "desenvolvimento", "metas");
+    expect(faixa()).toBeTruthy();
+    expect(s.estado.dados["spotlight-done-metas"]).toBe("true");
+    r.unmount();
   });
 
   /* ───────────── 17/10 (dono: "tipo Finanças, que tem vários"): cada tutorial tem 3–4 passos e CHEGA NO FIM ───────────── */

@@ -278,21 +278,6 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
             </button>
             <div className="fn-copiado-dica">{copiado ? "Agora é só colar no app do seu banco." : ""}</div>
           </div>
-          {onEmailSalvo && (emailSalvo ? (
-            <div className="fn-email-opc fn-email-opc-ok" data-testid="hoje-email-pix-ok"><Check size={14} strokeWidth={3} /><span>O acesso vai pra <b>{emailSalvo}</b> quando o Pix cair.</span></div>
-          ) : (
-            <div className="fn-email-opc" data-testid="hoje-email-pix">
-              <label htmlFor="hoje-email-pix-campo">Quer receber o acesso por e-mail? <span>(opcional)</span></label>
-              <div className="fn-email-opc-linha">
-                <input id="hoje-email-pix-campo" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="voce@email.com"
-                  value={emailOpc} onChange={(ev) => { setEmailOpc(ev.target.value); setErroEmail(null); }} data-testid="hoje-email-pix-campo" />
-                <button type="button" className="fn-email-opc-btn" disabled={!EMAIL_OK.test(emailOpc.trim()) || salvandoEmail} onClick={() => { void salvarEmailOpcional(); }} data-testid="hoje-email-pix-salvar">
-                  {salvandoEmail ? "…" : "Salvar"}
-                </button>
-              </div>
-              {erroEmail && <p className="fn-erro" role="alert">{erroEmail}</p>}
-            </div>
-          ))}
           <div className="fn-codigo" data-testid="hoje-pix-codigo">{pixAtual.qrCode}</div>
           <div className="fn-cnpj" data-testid="hoje-cnpj"><ShieldCheck size={15} strokeWidth={2.4} /><span>CORE · CNPJ {EMPRESA.cnpj}</span></div>
           <div className="fn-validade">Este código vale por <b>{mmss(resta)}</b></div>
@@ -310,6 +295,22 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
               {conferindo ? "Conferindo seu Pix…" : "Já paguei"}
             </button>
           </div>
+          {/* 18/10 (dono: 'confuso; o e-mail deveria estar embaixo'): o campo opcional fica no FIM, depois do Já paguei — não fica entre o copiar e o código */}
+          {onEmailSalvo && (emailSalvo ? (
+            <div className="fn-email-opc fn-email-opc-ok" data-testid="hoje-email-pix-ok"><Check size={14} strokeWidth={3} /><span>O acesso vai pra <b>{emailSalvo}</b> quando o Pix cair.</span></div>
+          ) : (
+            <div className="fn-email-opc" data-testid="hoje-email-pix">
+              <label htmlFor="hoje-email-pix-campo">Quer receber o acesso por e-mail? <span>(opcional)</span></label>
+              <div className="fn-email-opc-linha">
+                <input id="hoje-email-pix-campo" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="voce@email.com"
+                  value={emailOpc} onChange={(ev) => { setEmailOpc(ev.target.value); setErroEmail(null); }} data-testid="hoje-email-pix-campo" />
+                <button type="button" className="fn-email-opc-btn" disabled={!EMAIL_OK.test(emailOpc.trim()) || salvandoEmail} onClick={() => { void salvarEmailOpcional(); }} data-testid="hoje-email-pix-salvar">
+                  {salvandoEmail ? "…" : "Salvar"}
+                </button>
+              </div>
+              {erroEmail && <p className="fn-erro" role="alert">{erroEmail}</p>}
+            </div>
+          ))}
         </>
       )}
     </div>

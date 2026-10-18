@@ -11,14 +11,17 @@
 export const EVENTOS_VENDA = ["ViewContent", "InitiateCheckout"] as const;
 export type EventoVenda = (typeof EVENTOS_VENDA)[number];
 const PREFIXO: Record<EventoVenda, string> = { ViewContent: "venda_vc_", InitiateCheckout: "venda_ic_" };
-const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web", "core_anual69_web", "core_mensal_pix_web"]);
+const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web", "core_anual69_web", "core_mensal_pix_web",
+  // 18/10: o funil web novo (/hoje)
+  "hoje", "core_anual_hoje", "core_mensal_hoje", "core_anual_kit_hoje", "core_mensal_kit_hoje"]);
 /** 15/10 (revisão): os ÚNICOS valores aceitos — os preços da venda (anual 97,90; mensal 24,90). Qualquer outro
  *  número recusa o pedido inteiro (ninguém infla o valor que a Meta vê). ViewContent vai sem valor.
  *  16/10: + 69,90 (o presente anual do funil do app na web, /assinatura). */
-export const VALORES_VENDA = [97.9, 69.9, 24.9] as const;
+// 18/10: + 27,90 / 14,90 (o 1º ano e o mês do /hoje) e 37,80 / 24,80 (os dois com o Kit do order bump).
+export const VALORES_VENDA = [97.9, 69.9, 24.9, 27.9, 14.9, 37.8, 24.8] as const;
 const SITE = "https://coreaplicativo.com.br";
 /** As páginas da venda que podem ser a `event_source_url` (o resto vira a /assinar). 16/10: + /assinatura e /liberar. */
-const PAGINAS_VENDA = ["/assinar", "/assinatura", "/liberar"];
+const PAGINAS_VENDA = ["/assinar", "/assinatura", "/liberar", "/hoje"];
 const daVenda = (url: string): boolean =>
   [SITE, "https://www.coreaplicativo.com.br"].some((base) => PAGINAS_VENDA.some((p) => url === `${base}${p}` || url.startsWith(`${base}${p}?`) || url.startsWith(`${base}${p}/`)));
 

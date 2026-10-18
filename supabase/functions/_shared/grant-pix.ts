@@ -39,6 +39,11 @@ export async function creditarPedido(admin: ClienteMin, args: {
   agora: Date;
   /** o payload da linha; recebe o fim decidido (o reconcile usa o próprio, contado da criação do QR) */
   montarPayload: (fim: string) => Record<string, unknown>;
+  /** 18/10 (upsells do /hoje): o pedido ganha uma linha SÓ DELE (insere em vez de atualizar a linha própria vigente).
+   *  Sem isso o upsell reescrevia a linha do plano: o valor (amount_cents) e o id do pedido do plano sumiam do banco
+   *  (a receita do dia ficava menor) e um webhook atrasado do plano creditava de novo (o pedido não estava mais em
+   *  linha nenhuma). O fim continua o decidido (vitalício +100 anos; prazo empilha sobre o vigente). */
+  linhaNova?: boolean;
 }): Promise<ResultadoGrant> {
   const ler = async (): Promise<LinhaAssinatura[]> => {
     const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", args.userId);
@@ -52,12 +57,13 @@ export async function creditarPedido(admin: ClienteMin, args: {
   if (trava === "ocupada") return pedidoJaCreditado(await ler(), args.orderId) ? { r: "ja_creditado" } : { r: "em_andamento" };
 
   const payload = args.montarPayload(decisao.fim);
-  const { error } = decisao.acao === "atualizar"
+  const acao: "atualizar" | "inserir" = args.linhaNova ? "inserir" : decisao.acao;
+  const { error } = decisao.acao === "atualizar" && acao === "atualizar"
     ? await admin.from("subscriptions").update(payload).eq("id", decisao.linhaId)
     : await admin.from("subscriptions").insert(payload);
   if (error) {
     if (trava === "pegou") await soltarTrava(admin, args.gateway, args.orderId);
     return { r: "erro", msg: String((error as { message?: string }).message ?? error).slice(0, 200) };
   }
-  return { r: "creditado", acao: decisao.acao, jaLiberado: decisao.jaLiberado, fim: decisao.fim };
+  return { r: "creditado", acao, jaLiberado: decisao.jaLiberado, fim: decisao.fim };
 }

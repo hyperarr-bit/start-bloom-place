@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ChevronLeft, ChevronRight, Copy, Info, Lock, Pencil, QrCode, ShieldCheck, Smartphone, X } from "lucide-react";
 import { computeDailyBudget } from "@/lib/finance-totals";
-import "./funil-novo/funil-novo.css";
+import "../hoje/funil-hoje.css";
 
 /**
  * /dev/funil-novo — DESENHO do funil web novo (18/10). SÓ NO SERVIDOR DE DESENVOLVIMENTO (some do

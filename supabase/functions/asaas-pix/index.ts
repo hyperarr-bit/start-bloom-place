@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
+import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
+import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
+import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -51,13 +54,15 @@ const ASAAS_API = "https://api.asaas.com/v3";
 // 06/09: `w47` = vitalício da web a R$ 47,90 (ordem do dono). Chave nova, w97 fica pra QR antigo.
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
+// 18/10: as ofertas do funil web novo (/hoje: h279, h149, h279k, h149k, hv47, hv27, hc199) vêm de _shared/ofertas-hoje.ts —
+// a MESMA fonte nas 3 funções. Pix gerado SEM e-mail (sessão anônima); o e-mail vem depois de pagar.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
 /* O que cada oferta CONCEDE (04/09). A primeira venda da w25 (07:42) recebeu
  * VITALÍCIO por este caminho: a página faz `check` enquanto o QR está aberto,
  * o check liberava com plan "lifetime" chumbado, e o webhook — que já sabia
  * dar 30 dias — chegou depois, viu vitalício e preservou. Agora os dois usam
  * a mesma tabela. `dias: null` = vitalício. */
-const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null; linhaNova?: boolean }> = {
   lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
   downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
   w97: { plano: "lifetime", periodo: "lifetime", dias: null },
@@ -66,9 +71,10 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   w27: { plano: "lifetime", periodo: "lifetime", dias: null }, // 07/09: vitalício web 27,90
   a97: { plano: "core-pro", periodo: "annual", dias: 365 }, // 15/10: anual da venda da web (/assinar)
   a69: { plano: "core-pro", periodo: "annual", dias: 365 }, // 16/10: presente anual 69,90 do funil do app na web (/assinatura)
+  ...CONCESSAO_HOJE, // 18/10: o /hoje (o hc199 fica de fora: quem ganha é a outra conta, pela ação `parceiro`)
 };
 const DESCRICAO_PIX: Record<string, string> = {
-  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual",
+  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual", ...DESCRICAO_HOJE,
 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
@@ -262,6 +268,21 @@ async function buscarPagamento(key: string, qrCodeId: string) {
   return { ok: true as const, pago: pago ?? null, total: out?.totalCount ?? 0, body: out };
 }
 
+/** As linhas da conta (pra saber o acesso FINAL depois dos upsells do /hoje). */
+async function linhasDaConta(admin: ReturnType<typeof createClient>, userId: string): Promise<LinhaAssinatura[]> {
+  const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", userId);
+  return (data ?? []) as LinhaAssinatura[];
+}
+/** O acesso PRÓPRIO mais longo e vivo da conta (a linha da loja não conta): vitalício ou o fim mais distante. */
+function acessoFinal(linhas: LinhaAssinatura[]): { vitalicio: boolean; fim: string } | null {
+  const vivas = linhasProprias(linhas).filter((l) => l.status === "active" && l.current_period_end);
+  if (!vivas.length) return null;
+  const vit = vivas.find((l) => l.billing_period === "lifetime" || l.plan === "lifetime");
+  if (vit) return { vitalicio: true, fim: String(vit.current_period_end) };
+  const maior = vivas.sort((a, b) => Date.parse(String(b.current_period_end)) - Date.parse(String(a.current_period_end)))[0];
+  return { vitalicio: false, fim: String(maior.current_period_end) };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -427,6 +448,20 @@ serve(async (req) => {
        * tocada: o Pix escreve na própria ou insere uma nova. */
       /* 15/10: a decisão + a trava de "1 pedido = 1 crédito" moram em _shared/grant-pix.ts (os 3 caminhos da Asaas
        * — este check, o asaas-webhook e o pix-reconcile — passam por lá). */
+      /* 18/10 (/hoje, "vida a dois"): o hc199 não credita quem pagou — a página pede o e-mail da(o) parceira(o) e chama
+       * `parceiro`. Aqui só confirma o pagamento e manda o Purchase (1x por pedido, a trava é própria). */
+      if (ehOfertaCasal(offer)) {
+        const { error: travaCapi } = await supabaseAdmin.from("webhook_events").insert({ id: chaveCapiCasal(id), source: "hoje", event: "casal_capi" });
+        if (!travaCapi) {
+          await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+          await sendMetaCapi(supabaseAdmin, {
+            userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
+            fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+          });
+        }
+        logStep("Casal pago — esperando o e-mail da(o) parceira(o)", { id });
+        return jsonResponse({ paid: true, status: "PAID", casal: true });
+      }
       const concessao = CONCESSAO[offer];
       if (!concessao) {
         logStep("Oferta sem concessão — não libera", { id, offer });
@@ -434,7 +469,7 @@ serve(async (req) => {
       }
       const vitalicio = concessao.dias === null;
       const g = await creditarPedido(supabaseAdmin, {
-        userId: user.id, orderId: id, gateway: "asaas", concessao, agora: now,
+        userId: user.id, orderId: id, gateway: "asaas", concessao, agora: now, linhaNova: concessao.linhaNova === true,
         montarPayload: (fim) => ({
           user_id: user.id, status: "active",
           plan: vitalicio ? "lifetime" : concessao.plano,
@@ -484,7 +519,20 @@ serve(async (req) => {
         try {
           const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
           const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
-          if (resendKey && user.email) {
+          /* 18/10 (/hoje): a conta quase sempre ainda não tem e-mail aqui (Pix anônimo) — quem manda é a ação
+           * `boas_vindas`, depois que a pessoa salva o e-mail. Com e-mail já na conta, manda agora, com a reserva única. */
+          if (ehOfertaHoje(offer)) {
+            if (resendKey && user.email && await reservarBoasVindas(supabaseAdmin, id)) {
+              const r = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodoDoEmailVenda(offer)!), html: htmlVenda({ email: user.email, nome: displayName, periodo: periodoDoEmailVenda(offer)!, fim: g.fim, hoje: true }) }),
+              }).catch(() => null);
+              if (!r?.ok) await soltarBoasVindas(supabaseAdmin, id);
+            }
+          } else if (ehUpsellHoje(offer)) {
+            /* upsell do /hoje: sem e-mail próprio (as boas-vindas do plano já dizem o acesso final) */
+          } else if (resendKey && user.email) {
             const firstName = displayName ? displayName.split(" ")[0] : null;
             const periodoVenda = periodoDoEmailVenda(offer);
             await fetch("https://api.resend.com/emails", {
@@ -502,6 +550,130 @@ serve(async (req) => {
         }
       }
       return jsonResponse({ paid: true, status: "PAID" });
+    }
+
+    // --------------------------------------------------------- BOAS_VINDAS
+    /* 18/10 (/hoje): a pessoa pagou SEM e-mail e acabou de salvar o e-mail (ou entrou na conta que já existia, e o
+     * pix-vincular trouxe a compra). Manda as boas-vindas UMA vez por pedido e grava o e-mail na linha da assinatura.
+     * Só pra pedido do /hoje, só pra linha ATIVA desta conta com esse pedido (a mesma prova do firePixPurchaseOnce). */
+    if (action === "boas_vindas") {
+      const id = String(body.id ?? "");
+      if (!id) return jsonResponse({ error: "id_required" }, 400);
+      if (!user.email) return jsonResponse({ ok: false, motivo: "sem_email" });
+      const { data: linha } = await supabaseAdmin.from("subscriptions")
+        .select("id, status, current_period_end, customer_email")
+        .eq("user_id", user.id).eq("abacatepay_billing_id", id).limit(1).maybeSingle();
+      if (!linha || linha.status !== "active") return jsonResponse({ ok: false, motivo: "sem_linha" });
+      const { data: reg } = await supabaseAdmin.from("analytics_events")
+        .select("event_data").eq("event_name", "pix_order_created")
+        .contains("event_data", { order_id: id }).limit(1);
+      const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
+      if (!ehOfertaHoje(offer)) return jsonResponse({ ok: false, motivo: "oferta" });
+      if (!linha.customer_email) {
+        await supabaseAdmin.from("subscriptions").update({ customer_email: user.email }).eq("id", linha.id);
+      }
+      const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+      if (!resendKey) return jsonResponse({ ok: false, motivo: "sem_resend" });
+      if (!(await reservarBoasVindas(supabaseAdmin, id))) return jsonResponse({ ok: true, enviado: false, jaEnviado: true });
+      const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+      const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      /* o e-mail diz o acesso FINAL da conta (com o upsell "pra sempre" ou os "+2 anos", não o do plano sozinho) */
+      const acesso = acessoFinal(await linhasDaConta(supabaseAdmin, user.id));
+      const periodo = acesso?.vitalicio ? "lifetime" : periodoDoEmailVenda(offer)!;
+      const fimEmail = acesso?.fim ?? (linha.current_period_end as string | null);
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [user.email], subject: assuntoVenda(periodo), html: htmlVenda({ email: user.email, nome: (p?.display_name as string | undefined) ?? null, periodo, fim: fimEmail, hoje: true }) }),
+      }).catch(() => null);
+      if (!r?.ok) {
+        await soltarBoasVindas(supabaseAdmin, id);
+        logStep("Boas-vindas do /hoje falhou", { id, status: r?.status ?? null });
+        return jsonResponse({ ok: false, motivo: "envio" });
+      }
+      logStep("Boas-vindas do /hoje enviada", { id });
+      return jsonResponse({ ok: true, enviado: true });
+    }
+
+    // ------------------------------------------------------------- PARCEIRO
+    /* 18/10 (/hoje, "Organize a vida a dois" +R$ 19,90): quem pagou o hc199 manda o e-mail da(o) parceira(o); a conta
+     * dela(e) é criada (ou achada, se já existe — nunca 2ª conta) e ganha acesso até o MESMO fim do plano de quem
+     * comprou (vitalício se comprou o "pra sempre"). Travas: o pedido é DESTA conta (pix_order_created), está PAGO na
+     * Asaas com o valor certo, e libera UMA conta só (webhook_events `hoje-casal:<pedido>`). */
+    if (action === "parceiro") {
+      const id = String(body.id ?? "");
+      const emailParceiro = String(body.email ?? "").trim().toLowerCase();
+      if (!id) return jsonResponse({ error: "id_required" }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailParceiro)) return jsonResponse({ ok: false, motivo: "email_invalido" });
+      if (user.email && user.email.toLowerCase() === emailParceiro) return jsonResponse({ ok: false, motivo: "mesmo_email" });
+      const { data: reg } = await supabaseAdmin.from("analytics_events")
+        .select("user_id, event_data").eq("event_name", "pix_order_created")
+        .contains("event_data", { order_id: id }).limit(1);
+      const dono = reg?.[0]?.user_id as string | undefined;
+      const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
+      if (!dono || dono !== user.id || !ehOfertaCasal(offer)) return jsonResponse({ ok: false, motivo: "pedido" });
+      const r = await buscarPagamento(apiKey, id);
+      if (!r.ok || !r.pago) return jsonResponse({ ok: false, motivo: "nao_pago" });
+      if (!valorCobre((r.pago as { value?: unknown }).value, PRECOS_CENTAVOS[offer])) return jsonResponse({ ok: false, motivo: "valor_menor" });
+      const acesso = acessoFinal(await linhasDaConta(supabaseAdmin, user.id));
+      if (!acesso) return jsonResponse({ ok: false, motivo: "sem_plano" });
+
+      const { error: trava } = await supabaseAdmin.from("webhook_events").insert({ id: chaveParceiro(id), source: "hoje", event: "casal" });
+      if (trava) return jsonResponse({ ok: false, motivo: "ja_liberado" });
+      const soltar = () => supabaseAdmin.from("webhook_events").delete().eq("id", chaveParceiro(id)).then(() => {}, () => {});
+
+      // a conta da(o) parceira(o): cria já confirmada (entra pelo código do e-mail); se o e-mail já existe, usa ESSA
+      let parceiroId: string | null = null;
+      const criado = await supabaseAdmin.auth.admin.createUser({ email: emailParceiro, email_confirm: true, user_metadata: { hoje_casal: { de: user.id, pedido: id } } });
+      if (criado.data?.user?.id) parceiroId = criado.data.user.id;
+      else {
+        for (let page = 1; page <= 30 && !parceiroId; page++) {
+          const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+          if (error) break;
+          const achado = (data?.users ?? []).find((u: { email?: string | null }) => (u.email ?? "").toLowerCase() === emailParceiro);
+          if (achado) parceiroId = achado.id;
+          if ((data?.users ?? []).length < 1000) break;
+        }
+      }
+      if (!parceiroId) { await soltar(); return jsonResponse({ ok: false, motivo: "conta" }); }
+      if (parceiroId === user.id) { await soltar(); return jsonResponse({ ok: false, motivo: "mesmo_email" }); }
+
+      const now = new Date();
+      // nunca encurta: se a conta dela(e) já tinha acesso próprio mais longo, fica o mais longo
+      const jaTinha = acessoFinal(await linhasDaConta(supabaseAdmin, parceiroId));
+      const fimParceiro = new Date(Math.max(Date.parse(acesso.fim), jaTinha ? Date.parse(jaTinha.fim) : 0)).toISOString();
+      const g = await creditarPedido(supabaseAdmin, {
+        userId: parceiroId, orderId: id, gateway: "asaas-casal", agora: now,
+        concessao: { dias: acesso.vitalicio ? null : Math.max(1, Math.ceil((Date.parse(acesso.fim) - now.getTime()) / 86_400_000)) },
+        montarPayload: (fim) => ({
+          user_id: parceiroId, status: "active",
+          plan: acesso.vitalicio ? "lifetime" : "core-pro",
+          billing_period: acesso.vitalicio ? "lifetime" : "annual",
+          payment_method: "pix", abacatepay_billing_id: id, customer_email: emailParceiro,
+          current_period_start: now.toISOString(),
+          // o MESMO fim de quem comprou (o fim decidido só vale se a conta dela já tinha prazo maior)
+          current_period_end: acesso.vitalicio ? fim : fimParceiro,
+          amount_cents: PRECOS_CENTAVOS[offer],
+        }),
+      });
+      if (g.r === "erro" || g.r === "em_andamento") { await soltar(); return jsonResponse({ ok: false, motivo: "grant" }); }
+      try {
+        const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+        const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+        if (resendKey) {
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from, to: [emailParceiro], subject: assuntoParceiro(), html: htmlParceiro({ email: emailParceiro, fim: acesso.fim, vitalicio: acesso.vitalicio }) }),
+          });
+        }
+      } catch (e) { logStep("E-mail da(o) parceira(o) falhou (não bloqueia)", { message: String(e).slice(0, 120) }); }
+      await supabaseAdmin.from("analytics_events").insert({
+        user_id: user.id, event_name: "hoje_casal_liberado",
+        event_data: { order_id: id, parceiro: parceiroId, nova: !!criado.data?.user?.id, vitalicio: acesso.vitalicio, fim: acesso.fim },
+      }).then(() => {}, () => {});
+      logStep("Parceira(o) liberada(o)", { id, nova: !!criado.data?.user?.id });
+      return jsonResponse({ ok: true, fim: acesso.fim, vitalicio: acesso.vitalicio, contaNova: !!criado.data?.user?.id });
     }
 
     return jsonResponse({ error: "unknown_action" }, 400);

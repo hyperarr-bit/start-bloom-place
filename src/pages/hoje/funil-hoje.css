@@ -1,4 +1,4 @@
-/* FUNIL WEB NOVO (desenho 18/10, só /dev) — a cara do app CORE: Inter, grafite (botão), magenta
+/* FUNIL WEB NOVO (/hoje, 18/10; o desenho em /dev/funil-novo usa o mesmo arquivo) — a cara do app CORE: Inter, grafite (botão), magenta
    (marca/escolha), âmbar de Finanças (o número), cards com faixa em CAPS e post-it.
    Tokens de escopo `.fn`; nenhum token global muda. Seletores `button.fn-…` de propósito: o
    index.css zera o fundo de [type="button"] com a especificidade de uma classe sozinha. */
@@ -213,6 +213,46 @@ details.fn-qr summary span { margin-left: auto; color: var(--fn-suave); font-wei
 .fn-aviso { position: fixed; left: 16px; right: 16px; bottom: 96px; z-index: 320; padding: 12px 14px; border-radius: 14px; background: #1f1f1f; color: #fff; font-size: 13.5px; line-height: 1.4; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: fn-sobe .25s ease-out both; }
 @keyframes fn-sobe { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .fn-prototipo { position: fixed; top: 4px; left: 50%; transform: translateX(-50%); z-index: 330; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,.06); color: #8a8a8a; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; pointer-events: none; }
+
+/* ── /hoje (18/10): oferta enxuta, Pix com CNPJ, upsells, pós-compra com as lojas ── */
+.fn-garantia-linha { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--fn-suave); margin-bottom: 8px; }
+.fn-garantia-linha svg { color: var(--fn-ok); flex-shrink: 0; }
+.fn-renova { margin: 6px 4px 0; font-size: 12px; line-height: 1.4; color: var(--fn-suave); text-align: center; }
+.fn-ja-tem { margin: 0 0 8px; font-size: 14px; text-align: center; color: var(--fn-texto); font-weight: 600; }
+.fn-pix-rotulo { font-size: 13.5px; color: var(--fn-suave); font-weight: 600; margin-top: 2px; }
+.fn-status[data-vencido] { background: #fff1f2; color: #9f1239; }
+.fn-gira { animation: fn-gira 1s linear infinite; }
+@keyframes fn-gira { to { transform: rotate(360deg); } }
+.fn-erro { margin: 10px 0 0; font-size: 13.5px; color: #b91c1c; line-height: 1.4; }
+.fn-cnpj { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 20px 0; font-size: 12.5px; font-weight: 600; color: var(--fn-suave); font-variant-numeric: tabular-nums; }
+.fn-cnpj svg { color: var(--fn-ok); }
+.fn-ainda { margin: 0 0 8px; font-size: 13px; line-height: 1.4; text-align: center; color: var(--fn-ambar-texto); background: #fffbeb; border-radius: 12px; padding: 9px 12px; }
+.fn-confirmado { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 20px 0; padding: 8px 12px; border-radius: 999px; background: #f0fdf4; color: #166534; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fn-up { padding: 18px 20px 0; }
+.fn-up h1 { font-size: 28px; font-weight: 800; letter-spacing: -.025em; line-height: 1.12; margin: 6px 0 0; }
+.fn-up > p { font-size: 15px; color: var(--fn-suave); margin: 10px 0 0; line-height: 1.42; }
+.fn-up > p b { color: var(--fn-texto); }
+.fn-up .fn-kicker { color: var(--fn-magenta); }
+.fn-up-card { margin-top: 18px; padding: 16px; border-radius: 18px; border: 2px solid var(--fn-magenta); box-shadow: 0 8px 22px rgba(214, 51, 138, .12); display: grid; grid-template-columns: 1fr auto; row-gap: 2px; align-items: baseline; }
+.fn-up-nome { font-size: 15px; font-weight: 750; }
+.fn-up-preco { font-size: 26px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.fn-up-preco s { font-size: 15px; font-weight: 600; color: var(--fn-suave); margin-right: 8px; letter-spacing: 0; }
+.fn-up-sub { grid-column: 1 / -1; font-size: 12.5px; color: var(--fn-suave); font-weight: 600; }
+.fn-up .fn-inclui { margin: 14px 0 0; }
+.fn-email-solto { margin-top: 16px; padding: 0; border-top: 0; }
+.fn-pago-curto { padding-top: 26px; }
+.fn-pago-curto .fn-pago-ok { width: 54px; height: 54px; box-shadow: 0 0 0 8px #dcfce7; }
+.fn-pago-curto h1 { font-size: 25px; margin-top: 14px; }
+.fn-pago p b { color: var(--fn-texto); word-break: break-all; }
+.fn-lojas { margin: 18px 20px 0; padding: 16px 16px 14px; border-radius: 18px; background: var(--fn-papel); border: 1px solid #efe9e1; }
+.fn-lojas-titulo { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.fn-lojas p { font-size: 13.5px; line-height: 1.42; color: var(--fn-suave); margin: 6px 0 0; }
+.fn-lojas p b { color: var(--fn-texto); }
+.fn-email-chip { display: inline-block; max-width: 100%; margin-top: 10px; padding: 7px 12px; border-radius: 10px; background: #fff; border: 1px solid var(--fn-borda); font-size: 15px; font-weight: 750; word-break: break-all; }
+.fn-selos { margin-top: 12px; }
+.fn-lojas .fn-lojas-dica { font-size: 12.5px; margin-top: 10px; }
+.fn-aviso-fixo { margin: 14px 20px 0; padding: 10px 12px; border-radius: 12px; background: #fffbeb; color: var(--fn-ambar-texto); font-size: 13px; line-height: 1.4; }
+.fn-codigo-email { margin-top: 10px; }
 
 /* celular baixinho (375×667): aperta o respiro, nada some */
 @media (max-height: 700px) {

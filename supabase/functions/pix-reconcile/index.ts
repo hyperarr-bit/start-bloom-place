@@ -4,6 +4,7 @@ import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
+import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -42,18 +43,21 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // errado credita/reporta valor errado no dia em que for usado.
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
+// 18/10: as ofertas do funil web novo (/hoje) vêm de _shared/ofertas-hoje.ts — a MESMA fonte nas 3 funções.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
 const DIAS_DA_OFERTA: Record<string, number | null> = {
   lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null, a97: 365, a69: 365,
+  ...Object.fromEntries(Object.entries(CONCESSAO_HOJE).map(([k, c]) => [k, c.dias])),
 };
 /** O plano/período gravado na assinatura de cada oferta com prazo (o resto, `dias: null`, é vitalício). */
 const PERIODO_DA_OFERTA: Record<string, { plano: string; periodo: string }> = {
   w25: { plano: "web", periodo: "monthly_prepaid" },
   a97: { plano: "core-pro", periodo: "annual" },
   a69: { plano: "core-pro", periodo: "annual" },
+  ...Object.fromEntries(Object.entries(CONCESSAO_HOJE).filter(([, c]) => c.dias !== null).map(([k, c]) => [k, { plano: c.plano, periodo: c.periodo }])),
 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -244,6 +248,9 @@ serve(async (req) => {
       // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
       // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.
       const ofertaCrua = String(q.event_data?.offer ?? "");
+      /* 18/10 (/hoje): o hc199 ("vida a dois") não credita quem pagou — quem libera a outra conta é a página (ação
+       * `parceiro` do asaas-pix); o Purchase sai do check/webhook. Fora da varredura, e fora da conta de desconhecidas. */
+      if (ehOfertaCasal(ofertaCrua)) continue;
       /* 16/10: oferta desconhecida NUNCA vira vitalício (antes caía em "lifetime" — um a69 pago antes do deploy que o
        * conhece ganharia acesso pra sempre). Fica fora desta passada; o próximo cron, com a oferta na tabela, credita. */
       if (!(ofertaCrua in DIAS_DA_OFERTA)) { ofertasDesconhecidas++; continue; }
@@ -290,8 +297,11 @@ serve(async (req) => {
     const falhas: Array<Record<string, unknown>> = [];
 
     for (const [uid, ordens] of porUser) {
-      if (jaTem.has(uid)) continue;
+      /* 18/10 (/hoje): os upsells (hv47/hv27) são pagos por quem JÁ tem o plano ativo — a regra "já tem assinatura
+       * sai da fila" deixaria esses fora da rede. Eles passam (1 pedido = 1 crédito segura a repetição). */
+      if (jaTem.has(uid) && !ordens.some((o) => ehUpsellHoje(o.offer))) continue;
       for (const o of ordens) {
+        if (jaTem.has(uid) && !ehUpsellHoje(o.offer)) continue;
         sondadas++;
         let v: Veredito;
         try {
@@ -340,9 +350,12 @@ serve(async (req) => {
          * em qual linha escrever. */
         // 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do webhook e do check da
         // página). `fim` segue sendo o daqui (contado da criação do QR): o payload ignora o fim decidido.
+        /* 18/10: upsell do /hoje (hv47/hv27, vitalício) ganha LINHA NOVA — o plano comprado antes fica na linha dele
+         * (valor e pedido preservados). O fim é o decidido (vitalício = +100 anos). */
+        const linhaNova = CONCESSAO_HOJE[o.offer]?.linhaNova === true;
         const g = await creditarPedido(admin, {
-          userId: uid, orderId: o.orderId, gateway: gw, concessao: { dias }, agora: inicio,
-          montarPayload: () => payload,
+          userId: uid, orderId: o.orderId, gateway: gw, concessao: { dias }, agora: inicio, linhaNova,
+          montarPayload: (fimDecidido) => (linhaNova ? { ...payload, current_period_end: fimDecidido } : payload),
         });
         if (g.r === "preservado") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
         // revisor 15/10: `continue` (não `break`) — um pedido antigo já creditado não pode impedir o pedido NOVO da
@@ -406,6 +419,7 @@ serve(async (req) => {
           event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer], meta_capi: capi },
         });
         creditados.push({ uid, email, orderId: o.orderId, offer: o.offer, criadoEm: o.criadoEm, status: v.status, capi });
+        if (ehUpsellHoje(o.offer)) continue; // 18/10: upsell não encerra a pessoa (pode haver o plano e outro upsell)
         jaTem.add(uid);
         break; // 1 grant por usuário basta (vitalício)
       }

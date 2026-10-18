@@ -199,8 +199,8 @@ describe("valor pago × preço da oferta", () => {
 });
 
 describe("venda-capi: só os valores da venda", () => {
-  it("InitiateCheckout só com 97,90, 69,90 (16/10: o presente do /assinatura) ou 24,90; ViewContent sem valor; o resto recusa", () => {
-    expect(VALORES_VENDA).toEqual([97.9, 69.9, 24.9]);
+  it("InitiateCheckout só com 97,90, 69,90 (16/10: o presente do /assinatura) ou 24,90 — e 18/10 os do /hoje (27,90 · 14,90 · 37,80 · 24,80); ViewContent sem valor; o resto recusa", () => {
+    expect(VALORES_VENDA).toEqual([97.9, 69.9, 24.9, 27.9, 14.9, 37.8, 24.8]);
     expect(validarPedido({ evento: "InitiateCheckout", event_id: "venda_ic_1b2c3d4e-aaaa", valor: 69.9 })).not.toBeNull();
     expect(validarPedido({ evento: "InitiateCheckout", event_id: "venda_ic_1b2c3d4e-aaaa", valor: 69.91 })).toBeNull();
     const base = { evento: "InitiateCheckout", event_id: "venda_ic_1b2c3d4e-aaaa" };

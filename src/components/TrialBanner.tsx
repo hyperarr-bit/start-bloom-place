@@ -92,6 +92,8 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/liberar") ||
     // /assinatura (16/10): o funil do app na web (paywall da web no Pix com a escada) — mesma regra do /assinar.
     location.pathname.startsWith("/assinatura") ||
+    // /hoje (18/10): o funil web novo — o Pix nasce numa sessão anônima SEM assinatura; o paywall é DELE.
+    location.pathname.startsWith("/hoje") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

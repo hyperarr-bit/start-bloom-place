@@ -44,7 +44,8 @@ import { trackEvent } from "@/lib/analytics";
 
 const KEY = "pix-purchase-pending";
 
-type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a97" | "a69";
+type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a97" | "a69"
+  | "h279" | "h149" | "h279k" | "h149k" | "hv47" | "hv27" | "hc199";
 
 /* O VALOR VEM DAQUI, NÃO DE UM TERNÁRIO (31/08). O cabeçalho deste arquivo
  * conta o estrago de disparar o preço errado: R$47,80 de pixel onde entraram
@@ -62,6 +63,14 @@ const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
   w27: 27.9,      // 07/09: vitalício da web a 27,90 no paywall do dia 14 (ordem do dono)
   a97: 97.9,      // 15/10: ANUAL da web no Pix (/assinar) — 1 ano de acesso, não vitalício
   a69: 69.9,      // 16/10: o PRESENTE do funil do app na web (/assinatura) — anual a 69,90, 1 ano de acesso
+  // 18/10: o funil web novo (/hoje) — supabase/functions/_shared/ofertas-hoje.ts (o mesmo valor em centavos)
+  h279: 27.9,     // 1º ano no Pix (365 dias, não renova)
+  h149: 14.9,     // 30 dias no Pix
+  h279k: 37.8,    // 1º ano + Kit Primeiro Mês (order bump +9,90) num Pix só
+  h149k: 24.8,    // 30 dias + Kit
+  hv47: 47,       // upsell: CORE pra sempre
+  hv27: 27,       // downsell: CORE pra sempre por 27 (quem recusou o de 47)
+  hc199: 19.9,    // upsell: vida a dois (a 2ª conta)
 };
 type Pending = { offer: PendingOffer; orderId: string | null; at: number; uid?: string | null };
 

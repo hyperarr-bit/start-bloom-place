@@ -69,10 +69,15 @@ serve(async (req) => {
     const origemAnonima = de?.user?.is_anonymous === true || !de?.user?.email;
     if (!origemAnonima) return json({ ok: false, motivo: "origem_tem_email" });
 
-    const { data: subDe } = await admin.from("subscriptions")
+    /* 18/10 (/hoje): a sessão anônima pode ter MAIS de uma linha de Pix — o plano + os upsells (o "pra sempre" e o
+     * "+2 anos" ganham linha própria, ver _shared/grant-pix.ts `linhaNova`). Todas vão juntas; a de fim mais distante
+     * é a que responde (como antes). */
+    const { data: subsDe } = await admin.from("subscriptions")
       .select("id, plan, billing_period, amount_cents, status, created_at")
       .eq("user_id", origem.id).eq("payment_method", "pix").eq("status", "active")
-      .order("current_period_end", { ascending: false }).limit(1).maybeSingle();
+      .order("current_period_end", { ascending: false }).limit(10);
+    const todasDe = (subsDe ?? []) as Array<{ id: string; plan: string; billing_period: string; amount_cents: number | null; status: string; created_at: string }>;
+    const subDe = todasDe[0];
     if (!subDe || subDe.status !== "active") return json({ ok: false, motivo: "origem_sem_pix" });
     /* 01/10: no destino só as linhas PRÓPRIAS contam — a da App Store/Play é do
      * RevenueCat: nem barra o vínculo (carência da Apple + Pix pago) nem pode
@@ -83,12 +88,12 @@ serve(async (req) => {
     for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca expirada dá lugar à paga
 
     const { error } = await admin.from("subscriptions")
-      .update({ user_id: destino.id, customer_email: destino.email ?? null }).eq("id", subDe.id);
+      .update({ user_id: destino.id, customer_email: destino.email ?? null }).in("id", todasDe.map((l) => l.id));
     if (error) return json({ error: `update: ${error.message}` }, 500);
 
     await admin.from("analytics_events").insert({
       user_id: destino.id, event_name: "compra_vinculada",
-      event_data: { de: origem.id, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, via: "funil" },
+      event_data: { de: origem.id, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, via: "funil", linhas: todasDe.length },
     }).then(() => {}, () => {});
     console.log(`[PIX-VINCULAR] ${origem.id} -> ${destino.id} (${subDe.plan}, ${subDe.amount_cents})`);
     return json({ ok: true, plan: subDe.plan, billing_period: subDe.billing_period, amount_cents: subDe.amount_cents });

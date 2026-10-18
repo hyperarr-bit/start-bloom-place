@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
+import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
+import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -36,12 +38,13 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990 };
+// 18/10: as ofertas do funil web novo (/hoje) vêm de _shared/ofertas-hoje.ts — a MESMA fonte nas 3 funções.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
 /* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
  * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
  * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
  * `dias: null` = vitalício. */
-const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null; linhaNova?: boolean }> = {
   lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
   downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
   w97: { plano: "lifetime", periodo: "lifetime", dias: null },
@@ -50,6 +53,7 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   w27: { plano: "lifetime", periodo: "lifetime", dias: null }, // 07/09: vitalício web 27,90
   a97: { plano: "core-pro", periodo: "annual", dias: 365 }, // 15/10: anual da venda da web (/assinar)
   a69: { plano: "core-pro", periodo: "annual", dias: 365 }, // 16/10: presente anual 69,90 do funil do app na web (/assinatura)
+  ...CONCESSAO_HOJE, // 18/10: o /hoje (o hc199 fica de fora: quem ganha é a outra conta, pela ação `parceiro` do asaas-pix)
 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
@@ -221,6 +225,17 @@ serve(async (req) => {
     const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
+    /* 18/10 (/hoje, "vida a dois"): o hc199 não credita quem pagou (a página libera a outra conta pela ação `parceiro`).
+     * Aqui só o Purchase, 1x por pedido — cobre quem pagou e fechou a aba antes do check da página. */
+    if (ehOfertaCasal(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
+      const { error: travaCapi } = await admin.from("webhook_events").insert({ id: chaveCapiCasal(qrCodeId), source: "hoje", event: "casal_capi" });
+      if (!travaCapi) {
+        const { data: uc } = await admin.auth.admin.getUserById(userId);
+        await sendToUtmify(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+        await sendMetaCapi(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null });
+      }
+      return jsonResponse({ received: true, granted: false, casal: true });
+    }
     /* 16/10: oferta desconhecida NUNCA vira vitalício (antes: `offer = "lifetime"`) — sem ela na tabela, não credita;
      * o pix-reconcile tenta de novo depois do deploy que a conhece. 200 sempre (a fila da Asaas não pode pausar). */
     if (!(offer in PRECOS_CENTAVOS) || !CONCESSAO[offer]) {
@@ -249,7 +264,7 @@ serve(async (req) => {
     const vitalicio = concessao.dias === null;
     /* 15/10: decisão + trava "1 pedido = 1 crédito" em _shared/grant-pix.ts (o mesmo do check da página e do reconcile). */
     const g = await creditarPedido(admin, {
-      userId, orderId: qrCodeId, gateway: "asaas", concessao, agora: now,
+      userId, orderId: qrCodeId, gateway: "asaas", concessao, agora: now, linhaNova: concessao.linhaNova === true,
       montarPayload: (fim) => ({
         user_id: userId, status: "active",
         plan: vitalicio ? "lifetime" : concessao.plano,
@@ -286,7 +301,20 @@ serve(async (req) => {
       try {
         const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
         const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
-        if (resendKey && email) {
+        /* 18/10 (/hoje): plano → boas-vindas com a reserva única (quase sempre sem e-mail aqui: a página manda depois);
+         * upsell → nada (as boas-vindas do plano dizem o acesso final) */
+        if (ehPlanoHoje(offer)) {
+          if (resendKey && email && await reservarBoasVindas(admin, qrCodeId)) {
+            const pv = periodoDoEmailVenda(offer)!;
+            const r = await fetch("https://api.resend.com/emails", {
+              method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ from, to: [email], subject: assuntoVenda(pv), html: htmlVenda({ email, nome: displayName, periodo: pv, fim: g.fim, hoje: true }) }),
+            }).catch(() => null);
+            if (!r?.ok) await soltarBoasVindas(admin, qrCodeId);
+          }
+        } else if (ehUpsellHoje(offer)) {
+          /* sem e-mail próprio */
+        } else if (resendKey && email) {
           const firstName = (displayName ?? "").split(" ")[0] || null;
           const periodoVenda = periodoDoEmailVenda(offer);
           await fetch("https://api.resend.com/emails", {

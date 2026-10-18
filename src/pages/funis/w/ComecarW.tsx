@@ -51,9 +51,9 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
-  QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
+  QuizScreen, slide as deslizeDoQuiz, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
@@ -107,6 +107,12 @@ const fade = {
   exit: { opacity: 0, y: -16 },
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
+/* 17/10 (dono: "a 1ª pergunta some pra cima e a 2ª aparece de lado; parecem 2 coisas
+ * diferentes"): a SEQUÊNCIA DE PERGUNTAS (porta → quiz, ida e volta) é UM passo pra
+ * animação — o QuizScreen hospeda a porta como slide 0 (`inicio`), o cabeçalho fica
+ * parado e tudo desliza na horizontal com o deslize das perguntas. Os outros passos
+ * continuam com o `fade`. */
+const passoDaSequencia = (s: string) => s === "porta" || s === "quiz";
 
 // Claro!×3 POR ROTA: mora em ./compromissos.ts (10/10) — a tela única "Seu
 // plano de 3 dias" (ONBOARDING_1TELA) usa as mesmas perguntas como chips.
@@ -136,7 +142,7 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
  * volta a ser só a pergunta 1, no uniforme do quiz. Medido em 2 dias de
  * sorteio (77 sessões): B segurava mais gente por 4 s (58% × 32%), mas os dois
  * levavam 9% ao paywall. */
-function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number }) {
+function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
   /* MEDIÇÃO DA PORTA (16/09). A régua mora AQUI, no mount da tela, e vale pra
    * todo caminho: `porta_vista`, e `porta_viva` 4 s depois se a aba continua
    * visível (separa humano de pré-carga). */
@@ -148,17 +154,10 @@ function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, 
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /* 17/10: o cabeçalho (voltar + barra no 1º degrau) é o do QuizScreen, que hospeda esta
+   * pergunta como slide 0 — ele fica parado e só a pergunta desliza. */
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-          <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${(1 / totalPassos) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
-        </div>
-      </div>
+    <>
       <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
         Qual área da sua vida tá mais fora de controle hoje?
       </h2>
@@ -177,7 +176,7 @@ function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, 
           </button>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -782,27 +781,31 @@ export default function ComecarW() {
           className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : telaComprida ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
         >
           <AnimatePresence mode="wait">
-            <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
-              {step === "porta" && (
-                <PortaW
-                  onBack={() => setStep(calai ? "welcome" : "promessas")}
-                  totalPassos={itensQuiz.length + 1}
-                  onPickArea={(a, label) => {
-                    setArea(a);
-                    const r = { ...answers, area: a, area_label: label };
-                    setAnswers(r);
-                    guardar(a, r);
-                    trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL });
-                    setStep("quiz");
-                  }}
-                />
-              )}
+            <motion.div key={passoDaSequencia(step) ? "perguntas" : step} {...(passoDaSequencia(step) ? deslizeDoQuiz : fade)} className="w-full flex-1 flex flex-col">
               {/* 10/10 (FUNIL_CALAI): quem entrou por "Tudo, sinceramente" começa pelo dinheiro — a linha diz isso em cima do quiz */}
               {step === "quiz" && calai && portaTudo(answers) && (
                 <p className="text-[13px] text-muted-foreground leading-snug mb-4 -mt-1 rounded-xl px-3 py-2" style={{ background: "#FFF8D6" }} data-testid="abertura-tudo">{ABERTURA_TUDO}</p>
               )}
-              {step === "quiz" && (
+              {passoDaSequencia(step) && (
                 <QuizScreen
+                  /* a porta é o slide 0: mesmo cabeçalho parado, mesmo deslize (17/10) */
+                  inicio={{
+                    ativo: step === "porta",
+                    chave: "porta",
+                    onBack: () => setStep(calai ? "welcome" : "promessas"),
+                    conteudo: (
+                      <PortaW
+                        onPickArea={(a, label) => {
+                          setArea(a);
+                          const r = { ...answers, area: a, area_label: label };
+                          setAnswers(r);
+                          guardar(a, r);
+                          trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL });
+                          setStep("quiz");
+                        }}
+                      />
+                    ),
+                  }}
                   questions={perguntas}
                   items={itensQuiz}
                   initialAnswers={answers}

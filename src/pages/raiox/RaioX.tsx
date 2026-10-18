@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { RAIOX } from "@/lib/raiox";
+import { RAIOX, raioxAberto } from "@/lib/raiox";
 import { ENTRADA_APP, destinoNaLanding } from "@/lib/rotas-web";
 import { parseExtrato } from "@/lib/extrato-parser";
 import { useAuth } from "@/hooks/use-auth";
@@ -51,7 +51,8 @@ const FUNDO_CLARO = new Set(["q1", "q2", "q3", "q4", "q5", "calculando", "extrat
 export default function RaioXRota() {
   if (isNativeShell()) return <Navigate to={ENTRADA_APP} replace />;
   const search = typeof window !== "undefined" ? window.location.search : "";
-  if (RAIOX !== "on") return <Navigate to={destinoNaLanding(search)} replace />;
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  if (!raioxAberto(RAIOX, host)) return <Navigate to={destinoNaLanding(search)} replace />;
   return <RaioX />;
 }
 

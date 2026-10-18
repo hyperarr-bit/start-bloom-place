@@ -7,7 +7,10 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-vi.mock("@/lib/raiox", () => ({ RAIOX: "on", RAIOX_DEMO: "ab" }));
+vi.mock("@/lib/raiox", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/raiox")>();
+  return { ...real, RAIOX: "on" as const, RAIOX_DEMO: "ab" as const };
+});
 
 const authState: { user: { id: string; email: string | null } | null; loading: boolean; isSubscribed: boolean } = {
   user: null, loading: false, isSubscribed: false,

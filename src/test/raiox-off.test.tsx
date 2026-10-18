@@ -8,10 +8,30 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-vi.mock("@/lib/raiox", () => ({ RAIOX: "off", RAIOX_DEMO: "ab" }));
+vi.mock("@/lib/raiox", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/raiox")>();
+  return { ...real, RAIOX: "off" as const };
+});
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null, loading: false, isSubscribed: false }) }));
 
 import RaioXRota from "@/pages/raiox/RaioX";
+import { raioxAberto } from "@/lib/raiox";
+
+const QUERY = "?utm_source=meta&utm_campaign=120&fbclid=abc&step=lixo";
+
+function noHost(hostname: string, search = QUERY) {
+  const atual = window.location;
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: {
+      ...atual,
+      hostname,
+      search,
+      href: `https://${hostname}/raio-x${search}`,
+      pathname: "/raio-x",
+    },
+  });
+}
 
 function Destino() {
   const loc = useLocation();
@@ -24,10 +44,10 @@ describe("RAIOX off", () => {
     expect(src).toMatch(/export const RAIOX: "off" \| "on" = "off"/);
   });
 
-  it("redireciona pra / e preserva utm e fbclid", () => {
-    window.history.replaceState({}, "", "/raio-x?utm_source=meta&utm_campaign=120&fbclid=abc&step=lixo");
+  it("no domínio principal, desligado, redireciona pra / e preserva utm e fbclid", () => {
+    noHost("www.coreaplicativo.com.br");
     render(
-      <MemoryRouter initialEntries={["/raio-x?utm_source=meta&utm_campaign=120&fbclid=abc&step=lixo"]}>
+      <MemoryRouter initialEntries={[`/raio-x${QUERY}`]}>
         <Routes>
           <Route path="/raio-x" element={<RaioXRota />} />
           <Route path="/" element={<Destino />} />
@@ -35,6 +55,29 @@ describe("RAIOX off", () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId("destino").textContent).toBe("/?utm_source=meta&utm_campaign=120&fbclid=abc");
+  });
+
+  it("preview da Vercel abre o funil com a chave desligada", () => {
+    noHost("start-bloom-place-git-cursor-raiox-quiz-v2-573b-hyperarr.vercel.app");
+    render(
+      <MemoryRouter initialEntries={[`/raio-x${QUERY}`]}>
+        <Routes>
+          <Route path="/raio-x" element={<RaioXRota />} />
+          <Route path="/" element={<Destino />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("raiox").getAttribute("data-passo")).toBe("q1");
+    expect(screen.queryByTestId("destino")).toBeNull();
+  });
+
+  it("a chave liga produção, e qualquer host fora do domínio principal conta como preview", () => {
+    expect(raioxAberto("off", "coreaplicativo.com.br")).toBe(false);
+    expect(raioxAberto("off", "www.coreaplicativo.com.br")).toBe(false);
+    expect(raioxAberto("off", "WWW.CoreAplicativo.com.br.")).toBe(false);
+    expect(raioxAberto("on", "www.coreaplicativo.com.br")).toBe(true);
+    expect(raioxAberto("off", "app-git-cursor-raiox-quiz-v2-573b-team.vercel.app")).toBe(true);
+    expect(raioxAberto("off", "localhost")).toBe(true);
   });
 
   it("a rota nova está no SoNaWeb e as rotas antigas seguem iguais", () => {

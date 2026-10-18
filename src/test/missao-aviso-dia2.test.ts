@@ -27,6 +27,12 @@ import { quandoAvisarDia2, agendarReguaDaMissao } from "@/lib/notificacoes";
 import { diaDaMissao, type Missao } from "@/lib/teste-gratis";
 import { trackEvent } from "@/lib/analytics";
 
+/* O fuso tem que valer já na CARGA do módulo (convenção dos outros 90+ testes
+ * da casa): o INICIO do describe de baixo é montado em hora LOCAL no nível do
+ * módulo — se o TZ só for fixado no beforeAll, uma máquina fora de SP (CI,
+ * hook de push) calcula o INICIO em UTC e os dois últimos testes quebram. */
+process.env.TZ = "America/Sao_Paulo";
+
 const H = 3600_000;
 const TZ_ANTES = process.env.TZ;
 beforeAll(() => { process.env.TZ = "America/Sao_Paulo"; });

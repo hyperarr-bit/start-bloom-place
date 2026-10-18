@@ -57,6 +57,7 @@ import {
   contaElegivelAoPainelLimpo, guardarForcaPainelDaUrl, lembrarPainelLimpo, lerChaveRemotaPainel, mostrarPainelLimpo,
   painelLimpoLigado, registrarChavePainelLimpo,
 } from "@/lib/financas-painel-limpo";
+import { CHAVE_FORCA_CARDS_SIMPLES } from "@/lib/financas-cards-simples";
 import Index from "@/pages/Index";
 import { Dashboard } from "@/components/Dashboard";
 import { gastoDoDia, praHojeDoDia } from "@/lib/montar-financas";
@@ -121,7 +122,7 @@ const abrirDashboard = async () => {
 /** As seções que aparecem, na ordem da tela. */
 const SECOES = [
   "DESAFIO DA SEMANA", "QUANTO POSSO GASTAR HOJE", "ALERTAS INTELIGENTES", "MEU MÊS —", "GASTOS POR CATEGORIA", "TOTAL POR CARTÃO NO MÊS",
-  "MAIS GRÁFICOS", "Saldo do Mês", "RECEITAS VS DESPESAS", "PREVISÃO FIM DO MÊS", "EVOLUÇÃO DO PATRIMÔNIO", "PROGRESSO DO MÊS",
+  "MAIS GRÁFICOS", "Saldo do Mês", "RECEITAS VS DESPESAS", "PREVISÃO FIM DO MÊS", "PREVISÃO DO FIM DO MÊS", "EVOLUÇÃO DO PATRIMÔNIO", "PROGRESSO DO MÊS",
   "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
 ];
 const secoesNaTela = (): string[] => {
@@ -262,8 +263,9 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     await abrirDashboard();
     expect(secoesNaTela()).toEqual([
       "DESAFIO DA SEMANA", "Saldo do Mês", "ALERTAS INTELIGENTES", "GASTOS POR CATEGORIA", "RECEITAS VS DESPESAS", "EVOLUÇÃO DO PATRIMÔNIO",
-      "PROGRESSO DO MÊS", "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES", "PREVISÃO FIM DO MÊS",
-      "QUANTO POSSO GASTAR HOJE", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
+      "PROGRESSO DO MÊS", "GASTO POR MÉTODO", "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES",
+      // 17/10 (dono): os CARDS SIMPLES são o padrão pra todo mundo (lib/financas-cards-simples) — o gastar sobe pra antes da previsão
+      "QUANTO POSSO GASTAR HOJE", "PREVISÃO DO FIM DO MÊS", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     expect(document.querySelector('[data-painel="limpo"]')).toBeNull();
     expect(screen.queryByTestId("sobram-pra-hoje")).toBeNull(); // sem gasto HOJE: o card de sempre, sem a linha "pra hoje"
@@ -280,9 +282,10 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
     expect(card).toBeTruthy();
     // renda 4.200 − (Mercado 380 + Farmácia 72 + Aluguel 1.300) = 2.448 no começo do dia ÷ 16 dias = R$ 153; − Café 12 = 141
     const linha = within(card).getByTestId("sobram-pra-hoje");
-    expect(linha.textContent!.replace(/\u00a0/g, " ")).toBe("Sobram R$ 141 pra hoje já saiu R$ 12 dos R$ 153 do dia");
+    expect(linha.querySelector(".font-semibold")!.textContent!.replace(/\u00a0/g, " ")).toBe("Sobram R$ 141 pra hoje");
+    expect(within(linha).getByTestId("sobram-pra-hoje-detalhe").textContent!.replace(/\u00a0/g, " ")).toBe("já saiu R$ 12 dos R$ 153 do dia");
     expect(within(card).getByTestId("pode-gastar-valor")).toHaveTextContent("R$ 152"); // o número grande de sempre: (2.448 − 12) ÷ 16
-    expect(card.textContent).toMatch(/dias restantes no mês, contando hoje/);
+    expect(card.textContent).toMatch(/dias até o fim do mês/); // o card simples (17/10)
   });
   it("gasto só de ONTEM (virou o dia): a linha some — o card é o de sempre", { timeout: 40_000 }, async () => {
     contaAntiga();
@@ -304,6 +307,8 @@ describe("pages/Index — cliente antigo fica com o painel de hoje", () => {
 
 /* ───────────── a linha "Sobram R$ X pra hoje" no card de SEMPRE (17/10, dono, opção 3) ───────────── */
 describe("Dashboard de sempre — a linha 'Sobram R$ X pra hoje' (só com gasto hoje; não muda mais nada no card)", () => {
+  // 17/10: o card de ANTES só existe com a força de QA "off" (lib/financas-cards-simples); o simples tem teste próprio
+  beforeEach(() => localStorage.setItem(CHAVE_FORCA_CARDS_SIMPLES, "off"));
   const props = {
     totalIncome: 4200, totalExpenses: 1764, totalDebts: 0, totalInvestments: 0, expenses: [], fixedExpenses: [], dueDays: [],
     savingsRate: 0, incomes: [],
@@ -390,7 +395,7 @@ describe("pages/Index — conta nova abre com o painel limpo QUANDO a chave é l
     expect(eventos.filter(([n]) => n === EV_MAIS_GRAFICOS)).toEqual([[EV_MAIS_GRAFICOS, {}]]);
     expect(secoesNaTela()).toEqual([
       "QUANTO POSSO GASTAR HOJE", "ALERTAS INTELIGENTES", "MEU MÊS —", "GASTOS POR CATEGORIA", "DESAFIO DA SEMANA", "MAIS GRÁFICOS",
-      "Saldo do Mês", "RECEITAS VS DESPESAS", "PREVISÃO FIM DO MÊS", "EVOLUÇÃO DO PATRIMÔNIO", "PROGRESSO DO MÊS", "GASTO POR MÉTODO",
+      "Saldo do Mês", "RECEITAS VS DESPESAS", "PREVISÃO DO FIM DO MÊS", "EVOLUÇÃO DO PATRIMÔNIO", "PROGRESSO DO MÊS", "GASTO POR MÉTODO",
       "FIXOS VS VARIÁVEIS", "TOP 5 MAIORES GASTOS", "ÚLTIMAS TRANSAÇÕES", "COMPARAÇÃO MENSAL", "COMPARAÇÃO ANUAL",
     ]);
     fireEvent.click(botao); // fecha de novo

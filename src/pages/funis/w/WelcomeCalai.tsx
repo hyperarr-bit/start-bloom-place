@@ -11,17 +11,16 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  * app quando a chave está ligada. Substitui a welcome da grade azul (AppWelcome) E
  * os 3 quadros de promessa (PromessasScreen).
  *
- *   · o VÍDEO em loop do app real (~8 s, mudo, inline), ocupando o bloco inteiro, SEM a
- *     moldura de iPhone (17/10, dono: "legível, bonito" — com o celular desenhado o app
- *     ficava com meia tela e o texto ilegível). São 3 momentos, cada um com a tela
- *     recortada/ampliada e uma legenda curta: (1) "Quanto dá pra gastar hoje" — o
- *     VOCÊ PODE GASTAR HOJE R$ 123 por dia do Montar Finanças; (2) "1 toque e anotou"
- *     — o tutorial "Já gastou com alguma coisa hoje?" → Café → "Sobra pra hoje ~~123~~
- *     111"; (3) "Seu dia organizado" — o hábito marcado na Rotina e o score da Home
- *     subindo. O 1º quadro (e o pôster) é o número grande com a legenda 1; o loop
- *     emenda (o fim é o número subindo até 123 = o 1º quadro). Gerado do app de
- *     verdade (conta vazia pelo próprio fluxo; receita em scratchpad/video-welcome/),
- *     1170×1500 H.264 ≤ 1,5 MB em public/funil/, com pôster JPEG pra antes do 1º quadro;
+ *   · o VÍDEO em loop do app real (~15 s, mudo, inline), no estilo do Cal AI (dono 17/10: "tem que
+ *     mostrar o app mesmo, de forma fluida… o iPhone entra"): fundo branco, um iPhone ENTRA pela
+ *     direita girado e assenta no centro (0,7 s); dentro dele, uma gravação de tela CONTÍNUA do app
+ *     de verdade — montar Finanças em 3 toques (renda, contas, cartão) → "Montando…" → VOCÊ PODE
+ *     GASTAR HOJE R$ 123 (a câmera chega perto) → o post-it "Já gastou com alguma coisa hoje?" →
+ *     toque no Café → ZOOM no "Olha o seu mês" com o "Sobra pra hoje" caindo 123 → 111 → volta,
+ *     "Dia 1 de 3 feito" → o iPhone sai pela esquerda e o loop recomeça com ele entrando. Sem
+ *     legendas. Gerado do app (conta vazia montada pelo próprio fluxo, Supabase falso, loja mock;
+ *     receita em scratchpad/video-welcome2/work), 1080×1386 H.264 ≤ 2 MB em public/funil/, com
+ *     pôster JPEG (o iPhone assentado no R$ 123) pra antes do 1º quadro / autoplay negado;
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
@@ -77,7 +76,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
    * 488 welcome_video_erro NotAllowedError — Modo Pouca Energia e afins) e ficava no pôster parado;
    * e o WebKit do Playwright nega o play() chamado na montagem (vídeo sem dado, bloco entrando) mas
    * aceita o MESMO play() mais tarde. Então o play() é tentado VÁRIAS vezes: na montagem, no
-   * `loadeddata`, 1,5 s e 3,5 s depois (a entrada do bloco dura 0,6 s) e no 1º toque na tela (um
+   * `loadeddata`, 1,5 s e 3,5 s depois e no 1º toque na tela (um
    * gesto libera o vídeo até no Modo Pouca Energia). Só a tentativa dos 3,5 s conta welcome_video_erro;
    * tocar depois disso conta welcome_video_play como sempre (o `onPlaying`). */
   const tentarTocar = (quando: "montou" | "carregou" | "depois" | "ultima" | "toque") => {
@@ -123,8 +122,8 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   const promessa = area && area in AREAS ? PROMESSA_DA_ROTA[area] : PROMESSA_PADRAO;
 
   /* O quadro do vídeo cabe no palco pelos DOIS lados (largura e altura) mantendo 39:50 — só com CSS
-   * (height 100% + max-width) a largura era cortada e o object-fit cover ampliava o vídeo, comendo a
-   * legenda. Medido pelo ResizeObserver; sem ele (jsdom), o CSS de reserva (width 100%, aspect-ratio). */
+   * (height 100% + max-width) a largura era cortada e o object-fit cover ampliava o vídeo, cortando o
+   * iPhone. Medido pelo ResizeObserver; sem ele (jsdom), o CSS de reserva (width 100%, aspect-ratio). */
   const palcoRef = useRef<HTMLDivElement | null>(null);
   const [quadro, setQuadro] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
@@ -146,14 +145,15 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
     <div className="wca" data-testid="welcome-calai">
       <style>{CSS_WCA}</style>
       <div className="wca-col">
-        {/* O bloco do vídeo entra deslizando de baixo com leve escala, UMA vez ao montar (Cal AI).
-            O loop do vídeo não re-anima nada. Com prefers-reduced-motion, nada se move. */}
+        {/* A ENTRADA do iPhone já está no vídeo (ele vem da direita e assenta), então o bloco só
+            aparece num fade curto — deslizar o bloco por cima da entrada do vídeo dava dois movimentos.
+            Com prefers-reduced-motion, nada se move. */}
         <motion.div
           ref={palcoRef}
           className="wca-palco"
-          initial={semMovimento ? false : { opacity: 0, y: 40, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          initial={semMovimento ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
         >
           <div className="wca-quadro" aria-hidden style={quadro ?? undefined}>
             <video
@@ -229,18 +229,18 @@ const CSS_WCA = `
 /* O palco do vídeo ENCOLHE antes do texto e do botão (min-height 0) — num
    iPhone SE o vídeo fica menor, o Começar nunca sai da tela. */
 .wca-palco { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4px 16px 2px; }
-/* O quadro = o vídeo inteiro (1170×1500, proporção 39:50), sem moldura: cantos redondos e uma
-   sombra leve, como um cartão do planner. Cabe pela ALTURA (o que sobrar entre o topo e o
-   texto) e nunca passa da largura. O fundo é o mesmo papel lavanda do 1º quadro, pra não
-   piscar antes do pôster carregar. */
+/* O quadro = o vídeo inteiro (1080×1386, proporção ~39:50). O vídeo já traz o iPhone (com a
+   sombra) sobre fundo BRANCO, igual ao da tela — então o quadro não tem borda, canto nem sombra:
+   o celular parece solto na página, como no Cal AI. O canto de 20 px só aparece no ZOOM (o fundo
+   do app escurecido encosta na borda do quadro). Cabe pela ALTURA (o que sobrar entre o topo
+   e o texto) e nunca passa da largura. */
 .wca-quadro {
   position: relative; width: 100%; max-width: 100%; max-height: 100%; flex: 0 0 auto;
   aspect-ratio: 39 / 50;
-  border-radius: 24px; overflow: hidden; background: #f6f4fa;
-  box-shadow: 0 26px 50px -26px rgba(22,18,28,.42), 0 6px 16px -10px rgba(22,18,28,.2);
+  border-radius: 20px; overflow: hidden; background: #ffffff;
 }
 /* contain + o mesmo fundo do vídeo: se a caixa sair um pixel da proporção, nada é cortado nem ampliado */
-.wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #f6f4fa; }
+.wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
 .wca-corpo { flex: 0 0 auto; text-align: center; padding: 14px 22px 0; }
 .wca h1 {
   margin: 0; font-weight: 900; letter-spacing: -.03em; line-height: 1.08;

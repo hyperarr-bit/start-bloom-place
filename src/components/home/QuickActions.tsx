@@ -158,7 +158,11 @@ export const QuickActions = () => {
   // o "✓" some sozinho em 1,5 s — e o relógio morre com o componente (sair da Home antes disso disparava
   // setState num componente desmontado; nos testes, "window is not defined" depois do fim do arquivo)
   const timerSucesso = useRef<number | null>(null);
-  useEffect(() => () => { if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current); }, []);
+  const timerAgua = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
+    if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
+  }, []);
   const showSuccess = (id: ActionId) => {
     setSuccessId(id);
     if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
@@ -185,7 +189,8 @@ export const QuickActions = () => {
     vibrate();
     showSuccess("water");
     setWaterSplash(true);
-    setTimeout(() => setWaterSplash(false), 800);
+    if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
+    timerAgua.current = window.setTimeout(() => { timerAgua.current = null; setWaterSplash(false); }, 800);
     const faltam = lifeData.waterGoal - proximo;
     toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`);
   };

@@ -6,9 +6,9 @@
  * "Como chegamos nesse número ›", e PREVISÃO DO FIM DO MÊS vira a frase "Se continuar assim, sobra
  * R$ X no fim do mês" com as linhas em "Ver a conta ›". O desenho mora no Dashboard (`simples`).
  *
- * DESLIGADO por padrão — o Dashboard continua idêntico ao de hoje até o dono aprovar.
- * QA só no navegador: `?cards-simples=on|off|auto` — "on" mostra os cards simples neste navegador
- * (prints/teste), "off" os de sempre, "auto" volta à constante. A URL só é lida FORA do app das
+ * LIGADO pra todo mundo desde 17/10 (dono aprovou o desenho nos prints de scratchpad/definitiva/cards-simples).
+ * QA só no navegador: `?cards-simples=on|off|auto` — "off" mostra os cards de sempre (antes/depois nos
+ * prints), "on" força os simples, "auto" volta à constante. A URL só é lida FORA do app das
  * lojas; a força já guardada no storage vale em qualquer shell (o app da loja não tem barra de
  * endereço nem devtools pra gravá-la, e o Safari do iPhone é outra origem — por isso o harness de
  * prints, que finge o shell do iPhone, consegue ligar gravando a chave antes de abrir).
@@ -16,8 +16,8 @@
 import { isNativeShell } from "@/lib/native-shell";
 
 export type ModoCards = "on" | "off";
-/** A constante (app e site). Ligar só com ok do dono. */
-export const CARDS_SIMPLES: ModoCards = "off";
+/** A constante (app e site). "on" desde 17/10 (dono aprovou); "off" = o Dashboard de antes, byte a byte. */
+export const CARDS_SIMPLES: ModoCards = "on";
 
 /** Força de QA (só navegador) — sem prefixo varrido, sobrevive às vassouras. */
 export const CHAVE_FORCA_CARDS_SIMPLES = "cards-simples-force";

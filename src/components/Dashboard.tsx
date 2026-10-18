@@ -214,8 +214,8 @@ export const Dashboard = ({
   const versaoDaVirada = useVersaoDaVirada();
   const currentYear = Number(mesCorrente.slice(0, 4)) || getCurrentYear();
   /* CARDS SIMPLES (desenho 17/10, lib/financas-cards-simples): QUANTO POSSO GASTAR HOJE e PREVISÃO DO FIM DO MÊS
-     com as mesmas contas e apresentação mais simples. Desligado por padrão (`?cards-simples=on` só no navegador);
-     sem a chave, o DOM dos dois cards e a ordem são exatamente os de hoje. */
+     com as mesmas contas e apresentação mais simples. Ligado pra todo mundo (dono aprovou 17/10); `?cards-simples=off`
+     (só no navegador) devolve o DOM e a ordem de antes, byte a byte. */
   const [simples] = useState(() => { guardarForcaCardsDaUrl(); return cardsSimplesLigados(); });
   const [contaPodeGastarAberta, setContaPodeGastarAberta] = useState(false);
   const [contaPrevisaoAberta, setContaPrevisaoAberta] = useState(false);
@@ -829,6 +829,7 @@ export const Dashboard = ({
   /* CARDS SIMPLES (desenho 17/10): a mesma conta do `forecast`, apresentada como uma frase. As linhas ficam
      em "Ver a conta ›", com rótulo simples e sem explicação cinza. Não diz "contas pagas": a conta fixa entra
      mesmo sem pagar. */
+  const RITMO_MINIMO = 5;
   const ritmoDia = Math.round(forecast.dailyVariableRate);
   const sobraNoFim = forecast.projectedBalance >= 0;
   const valorFim = reais(Math.abs(Math.round(forecast.projectedBalance)));
@@ -844,16 +845,20 @@ export const Dashboard = ({
         <TrendingUp className="w-4 h-4" />
         PREVISÃO DO FIM DO MÊS
       </h3>
-      <p className="text-[15px] leading-snug" data-testid="previsao-frase">
-        Se continuar assim,{" "}
-        <span className={`text-lg font-bold tabular-nums whitespace-nowrap ${sobraNoFim ? "text-green-400" : "text-red-400"}`}>
+      {/* dono 17/10: herói como no outro card (rótulo → número grande → detalhe) — a frase numa linha só deixava um
+          vazio à direita quando "no fim do mês" descia sozinho */}
+      <div data-testid="previsao-frase">
+        <p className="text-xs text-muted-foreground" data-testid="previsao-rotulo">Se continuar assim, no fim do mês</p>
+        <p className={`text-3xl font-bold tabular-nums leading-none mt-1 ${sobraNoFim ? "text-green-400" : "text-red-400"}`} data-testid="previsao-valor">
           {sobraNoFim ? "sobra" : "falta"} R$ {valorFim}
-        </span>{" "}
-        <span className="whitespace-nowrap">no fim do mês</span>
-      </p>
-      <p className="text-[11px] text-muted-foreground mt-1">
-        {ritmoDia > 0 ? <>no seu ritmo de <span className="tabular-nums whitespace-nowrap">R$ {reais(ritmoDia)}</span> por dia</> : "sem gasto do dia a dia até agora"}
-      </p>
+        </p>
+      </div>
+      {/* dono 17/10: o ritmo só aparece a partir de R$ 5/dia (com um café só, "R$ 1 por dia" confunde) */}
+      {ritmoDia >= RITMO_MINIMO && (
+        <p className="text-[11px] text-muted-foreground mt-2" data-testid="previsao-ritmo">
+          no seu ritmo de <span className="tabular-nums whitespace-nowrap">R$ {reais(ritmoDia)}</span> por dia
+        </p>
+      )}
       <button
         type="button"
         aria-expanded={contaPrevisaoAberta}
@@ -987,6 +992,10 @@ export const Dashboard = ({
               <div className={`h-full rounded-full ${praHoje.sobra >= 0 ? corBarra : "bg-red-400"}`} style={{ width: `${pctDoDia}%` }} />
             </div>
           )}
+          {/* dono 17/10: a frase miúda volta embaixo da barrinha */}
+          <p className="text-[11px] text-muted-foreground mt-1" data-testid="sobram-pra-hoje-detalhe">
+            {praHoje.gasto > 0 ? `já saiu R$\u00a0${reais(praHoje.gasto)} dos R$\u00a0${reais(praHoje.doDia)} do dia` : "nada gasto hoje ainda"}
+          </p>
         </div>
       )}
       <p className="text-[11px] text-muted-foreground mt-1.5">

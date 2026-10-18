@@ -1,11 +1,11 @@
 /**
  * CARDS SIMPLES do Dashboard de Finanças (desenho 17/10, lib/financas-cards-simples) — o que este arquivo trava:
- *   · PADRÃO = HOJE: sem a força de QA, o DOM dos dois cards (QUANTO POSSO GASTAR HOJE e PREVISÃO FIM DO MÊS) e a
- *     ordem (previsão antes) são exatamente os de antes — nenhum marcador do desenho novo aparece;
- *   · COM A FORÇA: os NÚMEROS são os mesmos (R$ 123 por dia, sobram R$ 111, +R$ 1.828), o card de gastar sobe pra
+ *   · PADRÃO = SIMPLES (dono aprovou 17/10); com a força de QA "off" o DOM dos dois cards (QUANTO POSSO GASTAR
+ *     HOJE e PREVISÃO FIM DO MÊS) e a ordem (previsão antes) são exatamente os de antes — nenhum marcador novo;
+ *   · NO SIMPLES: os NÚMEROS são os mesmos (R$ 123 por dia, sobram R$ 111, +R$ 1.828), o card de gastar sobe pra
  *     antes da previsão, a conta fica atrás de "Como chegamos nesse número" / "Ver a conta", "Disponível livre" só
  *     com conta reservada, nada de "contas pagas", e o caso "falta" fica vermelho com a conta certa;
- *   · a chave: constante desligada; `?cards-simples=on|off|auto` só é lido fora do app; a força guardada vale.
+ *   · a chave: constante ligada; `?cards-simples=on|off|auto` só é lido fora do app; a força guardada vale.
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -86,7 +86,7 @@ const texto = (el: Element | null) => {
 };
 const corpo = () => texto(document.body);
 const antesDe = (a: string, b: string) => { const t = corpo(); expect(t.indexOf(a)).toBeGreaterThanOrEqual(0); expect(t.indexOf(b)).toBeGreaterThanOrEqual(0); expect(t.indexOf(a)).toBeLessThan(t.indexOf(b)); };
-const ligar = () => localStorage.setItem(CHAVE_FORCA_CARDS_SIMPLES, "on");
+const desligar = () => localStorage.setItem(CHAVE_FORCA_CARDS_SIMPLES, "off");
 const virarApp = () => { (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" }; };
 const virarSite = () => { delete (window as any).Capacitor; };
 
@@ -109,32 +109,42 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); virarSite(); vi.useRealTimers(); });
 
-describe("padrão = hoje (a chave desligada)", () => {
-  it("a constante nasce desligada e o Dashboard não muda nada: cards de sempre, previsão ANTES do gastar", () => {
-    expect(CARDS_SIMPLES).toBe("off");
-    expect(cardsSimplesLigados()).toBe(false);
+describe("padrão = simples; força 'off' = o Dashboard de antes", () => {
+  it("a constante nasce LIGADA (dono 17/10) e o Dashboard abre com os cards simples", () => {
+    expect(CARDS_SIMPLES).toBe("on");
+    expect(cardsSimplesLigados()).toBe(true);
+    montar();
+    expect(document.querySelector('[data-testid="pode-gastar-simples"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="previsao-simples"]')).not.toBeNull();
+  });
+  it("força 'off': os cards de sempre, com todas as linhas e explicações de antes, previsão ANTES do gastar", () => {
+    desligar();
     montar();
     expect(document.querySelector('[data-testid="pode-gastar-simples"]')).toBeNull();
     expect(document.querySelector('[data-testid="previsao-simples"]')).toBeNull();
+    expect(document.querySelector('[data-testid="pode-gastar-ver-conta"]')).toBeNull();
+    expect(document.querySelector('[data-testid="limite-lembrete-compacto"]')).toBeNull();
     const t = corpo();
-    for (const s of ["Saldo atual", "Disponível livre", "÷ 15 dias", "= R$ 123/dia", "Receita total", "Já gasto (fixos + variáveis)", "Projeção variável (14d × R$ 1)", "Saldo projetado", "já saiu R$ 12 dos R$ 123 do dia", "15 dias restantes no mês, contando hoje"]) {
+    for (const s of ["Saldo atual", "Receita menos tudo que sai no mês, contas pagas ou não", "Disponível livre", "O que sobra depois de reservar para contas futuras", "÷ 15 dias", "= R$ 123/dia", "Disponível livre dividido pelos dias que faltam no mês", "Receita total", "Soma de todos os ganhos registrados no mês", "Já gasto (fixos + variáveis)", "Projeção variável (14d × R$ 1)", "Saldo projetado", "O que deve sobrar (ou faltar) no fim do mês", "já saiu R$ 12 dos R$ 123 do dia", "15 dias restantes no mês, contando hoje"]) {
       expect(t).toContain(s);
     }
     antesDe("PREVISÃO FIM DO MÊS", "QUANTO POSSO GASTAR HOJE");
+    expect(t).not.toContain("PREVISÃO DO FIM DO MÊS");
+    expect(t).not.toContain("Como chegamos nesse número");
   });
-  it("com a força 'off' guardada o DOM é byte a byte o mesmo do padrão", () => {
+  it("a força 'off' não deixa rastro no DOM de antes: duas montagens iguais byte a byte, e o card de sempre guarda a âncora da missão", () => {
+    desligar();
     const { container, unmount } = montar();
-    const padrao = container.innerHTML;
+    const antes = container.innerHTML;
+    expect(container.querySelector('[data-spotlight="pode-gastar"][data-missao="posso-gastar"]')).not.toBeNull();
     unmount();
-    localStorage.setItem(CHAVE_FORCA_CARDS_SIMPLES, "off");
     const { container: c2 } = montar();
-    expect(c2.innerHTML).toBe(padrao);
+    expect(c2.innerHTML).toBe(antes);
   });
 });
 
-describe("com a força: as mesmas contas, apresentação simples", () => {
+describe("os cards simples: as mesmas contas, apresentação simples", () => {
   it("QUANTO POSSO GASTAR HOJE sobe pra antes da previsão; herói 'R$ 123 por dia', 'Sobram R$ 111 pra hoje' com a barrinha, '15 dias até o fim do mês'", () => {
-    ligar();
     montar();
     const card = document.querySelector('[data-testid="pode-gastar-simples"]')!;
     expect(card).not.toBeNull();
@@ -142,7 +152,8 @@ describe("com a força: as mesmas contas, apresentação simples", () => {
     expect(card.getAttribute("data-missao")).toBe("posso-gastar");
     antesDe("QUANTO POSSO GASTAR HOJE", "PREVISÃO DO FIM DO MÊS");
     expect(texto(card.querySelector('[data-testid="pode-gastar-valor"]'))).toBe("R$ 123");
-    expect(texto(card.querySelector('[data-testid="sobram-pra-hoje"]'))).toBe("Sobram R$ 111 pra hoje");
+    expect(texto(card.querySelector('[data-testid="sobram-pra-hoje"] .font-semibold'))).toBe("Sobram R$ 111 pra hoje");
+    expect(texto(card.querySelector('[data-testid="sobram-pra-hoje-detalhe"]'))).toBe("já saiu R$ 12 dos R$ 123 do dia"); // a frase miúda (dono 17/10)
     const barra = card.querySelector('[data-testid="sobram-pra-hoje-barra"]')!;
     expect(barra.getAttribute("aria-valuenow")).toBe("10"); // 12 de 123
     expect(barra.getAttribute("aria-label")).toBe("Já saiu R$ 12 dos R$ 123 do dia");
@@ -156,14 +167,12 @@ describe("com a força: as mesmas contas, apresentação simples", () => {
     expect(eventos).toContainEqual([EV_CARD_CONTA_ABRIR, { card: "pode_gastar" }]);
   });
   it("sem gasto hoje: sem a linha e sem a barrinha (como no card de sempre)", () => {
-    ligar();
     montar({ gastoDeHoje: 0, expenses: [], totalExpenses: 1150 });
     const card = document.querySelector('[data-testid="pode-gastar-simples"]')!;
     expect(card.querySelector('[data-testid="sobram-pra-hoje"]')).toBeNull();
     expect(texto(card.querySelector('[data-testid="pode-gastar-valor"]'))).toBe("R$ 123");
   });
   it("'Disponível livre' só quando há conta reservada (avulsa sem valor)", () => {
-    ligar();
     montar({ dueDays: [{ day: 25, bills: [{ id: "b1", name: "Seguro", paid: false }] }] });
     const card = document.querySelector('[data-testid="pode-gastar-simples"]')!;
     fireEvent.click(card.querySelector('[data-testid="pode-gastar-ver-conta"]')!);
@@ -171,12 +180,13 @@ describe("com a força: as mesmas contas, apresentação simples", () => {
     expect(texto(card.querySelector('[data-testid="pode-gastar-conta"]'))).toBe("Entra R$ 3.000 Sai −R$ 1.162 Saldo = R$ 1.838 Contas sem valor (reserva) −R$ 383 Disponível livre = R$ 1.455 ÷ 15 dias = R$ 97 por dia");
     expect(texto(card.querySelector('[data-testid="pode-gastar-valor"]'))).toBe("R$ 97");
   });
-  it("PREVISÃO vira a frase 'sobra R$ 1.828 no fim do mês' + ritmo; 'Ver a conta' com rótulos simples, sem explicação cinza e sem 'contas pagas'", () => {
-    ligar();
+  it("PREVISÃO vira herói: 'Se continuar assim, no fim do mês' → 'sobra R$ 1.828' grande; ritmo escondido < R$ 5; 'Ver a conta' com rótulos simples, sem explicação cinza e sem 'contas pagas'", () => {
     montar();
     const card = document.querySelector('[data-testid="previsao-simples"]')!;
-    expect(texto(card.querySelector('[data-testid="previsao-frase"]'))).toBe("Se continuar assim, sobra R$ 1.828 no fim do mês");
-    expect(texto(card)).toContain("no seu ritmo de R$ 1 por dia");
+    expect(texto(card.querySelector('[data-testid="previsao-rotulo"]'))).toBe("Se continuar assim, no fim do mês");
+    expect(texto(card.querySelector('[data-testid="previsao-valor"]'))).toBe("sobra R$ 1.828");
+    expect(card.querySelector('[data-testid="previsao-ritmo"]')).toBeNull(); // ritmo < R$ 5/dia (um café só) fica escondido (dono 17/10)
+    expect(texto(card)).not.toContain("ritmo");
     expect(card.className).toContain("green");
     expect(card.querySelector('[data-testid="previsao-conta"]')).toBeNull();
     fireEvent.click(card.querySelector('[data-testid="previsao-ver-conta"]')!);
@@ -185,11 +195,11 @@ describe("com a força: as mesmas contas, apresentação simples", () => {
     expect(eventos).toContainEqual([EV_CARD_CONTA_ABRIR, { card: "previsao" }]);
   });
   it("caso 'falta' (conserto do carro de R$ 1.500 no dia 10): vermelho, 'falta R$ 907', ritmo R$ 89, conta com 'Falta no fim do mês'", () => {
-    ligar();
     montar({ totalExpenses: 2662, expenses: [CAFE, { id: "e2", description: "Conserto do carro", category: "transporte", value: 1500, date: "2026-10-10" }] });
     const card = document.querySelector('[data-testid="previsao-simples"]')!;
-    expect(texto(card.querySelector('[data-testid="previsao-frase"]'))).toBe("Se continuar assim, falta R$ 907 no fim do mês");
-    expect(texto(card)).toContain("no seu ritmo de R$ 89 por dia");
+    expect(texto(card.querySelector('[data-testid="previsao-rotulo"]'))).toBe("Se continuar assim, no fim do mês");
+    expect(texto(card.querySelector('[data-testid="previsao-valor"]'))).toBe("falta R$ 907");
+    expect(texto(card.querySelector('[data-testid="previsao-ritmo"]'))).toBe("no seu ritmo de R$ 89 por dia");
     expect(card.className).toContain("red");
     fireEvent.click(card.querySelector('[data-testid="previsao-ver-conta"]')!);
     expect(texto(card.querySelector('[data-testid="previsao-conta"]'))).toBe("Entrou R$ 3.000 Já saiu −R$ 2.662 Gastos até o fim do mês (estimativa) −R$ 1.245 Falta no fim do mês −R$ 907");
@@ -199,40 +209,43 @@ describe("com a força: as mesmas contas, apresentação simples", () => {
     expect(texto(gastar)).toContain("Atenção: ritmo de gastos acima do ideal");
   });
   it("os números do simples são os do card de sempre (mesma conta)", () => {
+    desligar();
     const { unmount } = montar();
     const valorSempre = texto(document.querySelector('[data-testid="pode-gastar-valor"]'));
     const sobraSempre = texto(document.querySelector('[data-testid="sobram-pra-hoje"] .font-semibold'));
-    const temPrevisaoSempre = corpo().includes("+R$ 1.828");
+    const detalheSempre = texto(document.querySelector('[data-testid="sobram-pra-hoje-detalhe"]'));
+    expect(corpo()).toContain("+R$ 1.828");
     unmount();
-    ligar();
+    localStorage.removeItem(CHAVE_FORCA_CARDS_SIMPLES);
     montar();
     expect(texto(document.querySelector('[data-testid="pode-gastar-valor"]'))).toBe(valorSempre);
-    expect(texto(document.querySelector('[data-testid="sobram-pra-hoje"]'))).toBe(sobraSempre);
-    expect(temPrevisaoSempre).toBe(true);
-    expect(texto(document.querySelector('[data-testid="previsao-frase"]'))).toContain("R$ 1.828");
+    expect(texto(document.querySelector('[data-testid="sobram-pra-hoje"] .font-semibold'))).toBe(sobraSempre);
+    expect(texto(document.querySelector('[data-testid="sobram-pra-hoje-detalhe"]'))).toBe(detalheSempre);
+    expect(texto(document.querySelector('[data-testid="previsao-valor"]'))).toBe("sobra R$ 1.828");
   });
 });
 
 describe("a chave", () => {
   it("?cards-simples=on|off|auto só é lido fora do app; a força guardada vale em qualquer shell", () => {
-    guardarForcaCardsDaUrl("?cards-simples=on");
-    expect(localStorage.getItem(CHAVE_FORCA_CARDS_SIMPLES)).toBe("on");
-    expect(cardsSimplesLigados()).toBe(true);
+    guardarForcaCardsDaUrl("?cards-simples=off");
+    expect(localStorage.getItem(CHAVE_FORCA_CARDS_SIMPLES)).toBe("off");
+    expect(cardsSimplesLigados()).toBe(false);
     virarApp();
-    expect(cardsSimplesLigados()).toBe(true); // o harness de prints finge o iPhone e liga por aqui
+    expect(cardsSimplesLigados()).toBe(false); // o harness de prints finge o iPhone e desliga por aqui (o "antes")
     guardarForcaCardsDaUrl("?cards-simples=auto"); // no app a URL é ignorada
-    expect(localStorage.getItem(CHAVE_FORCA_CARDS_SIMPLES)).toBe("on");
+    expect(localStorage.getItem(CHAVE_FORCA_CARDS_SIMPLES)).toBe("off");
     virarSite();
     guardarForcaCardsDaUrl("?cards-simples=auto");
     expect(localStorage.getItem(CHAVE_FORCA_CARDS_SIMPLES)).toBeNull();
-    expect(cardsSimplesLigados()).toBe(false);
-    guardarForcaCardsDaUrl("?cards-simples=off");
-    expect(cardsSimplesLigados()).toBe(false);
+    expect(cardsSimplesLigados()).toBe(true); // a constante
+    guardarForcaCardsDaUrl("?cards-simples=on");
+    expect(cardsSimplesLigados()).toBe(true);
   });
-  it("o Dashboard lê a URL uma vez ao montar (só navegador)", () => {
-    window.history.replaceState({}, "", "/financas?cards-simples=on");
+  it("o Dashboard lê a URL uma vez ao montar (só navegador): ?cards-simples=off devolve o de antes", () => {
+    window.history.replaceState({}, "", "/financas?cards-simples=off");
     montar();
-    expect(document.querySelector('[data-testid="pode-gastar-simples"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="pode-gastar-simples"]')).toBeNull();
+    expect(corpo()).toContain("Saldo atual");
     window.history.replaceState({}, "", "/");
   });
 });

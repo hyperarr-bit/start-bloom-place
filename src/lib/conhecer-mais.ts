@@ -50,7 +50,7 @@ const ls = {
 };
 
 /** O card cujo TÍTULO (em caixa alta na tela, ou pela CSS) casa com a regex — o mesmo que a pessoa lê. */
-const cardPorTitulo = (re: RegExp): Element | null => {
+export const cardPorTitulo = (re: RegExp): Element | null => {
   try {
     for (const el of Array.from(document.querySelectorAll("h2, h3, h4, span, p"))) {
       const t = (el.textContent ?? "").trim();

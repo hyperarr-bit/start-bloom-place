@@ -239,7 +239,7 @@ describe("o passeio na tela", () => {
 });
 
 describe("o cartão do fim da intro guiada", () => {
-  it("oferece o passeio como controle secundário acima do 'Pronto' (evento de oferta), e não oferece quando já foi feito", async () => {
+  it("oferece o passeio como controle secundário acima do 'Pronto' (evento de oferta), e não oferece quando já foi feito", { timeout: 60_000 }, async () => {
     medirTudo();
     const Modulo = () => (
       <div>
@@ -249,9 +249,15 @@ describe("o cartão do fim da intro guiada", () => {
       </div>
     );
     montar(<Modulo />);
-    const chip = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
-    fireEvent.click(chip[0]);
-    await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 4000 });
+    // 17/10: a guiada continua nos passos 3–4 (a conta fixa, o olha dela) antes do cartão do fim
+    for (let i = 0; i < 8 && !screen.queryByTestId("intro-modulo-pronto"); i++) {
+      await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto") || screen.queryByTestId("intro-modulo-entendi") || screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
+      const entendi = screen.queryByTestId("intro-modulo-entendi");
+      if (entendi) { fireEvent.click(entendi); await act(async () => { await new Promise((r) => setTimeout(r, 50)); }); continue; }
+      const chip = screen.queryAllByTestId("demo-guia-chip")[0];
+      if (chip) { fireEvent.click(chip); await waitFor(() => expect(document.contains(chip)).toBe(false), { timeout: 9000 }); }
+    }
+    await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
     const pronto = screen.getByTestId("intro-modulo-pronto");
     const botoes = Array.from(pronto.querySelectorAll("button"));
     expect(botoes.map((b) => b.getAttribute("data-testid"))).toEqual(["intro-modulo-conhecer-mais", "intro-modulo-fechar"]); // a oferta ACIMA, o Pronto por último
@@ -273,9 +279,14 @@ describe("o cartão do fim da intro guiada", () => {
     cleanup(); localStorage.clear(); localStorage.setItem(CHAVE_FORCA_INTRO, "on"); eventos.length = 0;
     marcarTourFeito("financas");
     montar(<Modulo />);
-    const chip2 = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
-    fireEvent.click(chip2[0]);
-    await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 4000 });
+    for (let i = 0; i < 8 && !screen.queryByTestId("intro-modulo-pronto"); i++) {
+      await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto") || screen.queryByTestId("intro-modulo-entendi") || screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
+      const entendi = screen.queryByTestId("intro-modulo-entendi");
+      if (entendi) { fireEvent.click(entendi); await act(async () => { await new Promise((r) => setTimeout(r, 50)); }); continue; }
+      const chip = screen.queryAllByTestId("demo-guia-chip")[0];
+      if (chip) { fireEvent.click(chip); await waitFor(() => expect(document.contains(chip)).toBe(false), { timeout: 9000 }); }
+    }
+    await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
     expect(screen.queryByTestId("intro-modulo-conhecer-mais")).toBeNull();
     expect(nomes()).not.toContain("conhecer_mais_oferta");
   });

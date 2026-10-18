@@ -53,6 +53,8 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   const { get, set, loaded } = useUserData();
   const config = INTROS[moduleId];
   const [estado, setEstado] = useState<"decidindo" | "visivel" | "nada">("decidindo");
+  /** a guiada terminou o "olha" e passou o bastão pros passos de 1 toque (com o rótulo do que entrou) */
+  const [continuacao, setContinuacao] = useState<{ rotulos: string[] } | null>(null);
   const [tentativa, setTentativa] = useState(0);
   const getRef = useRef(get); getRef.current = get;
   const setRef = useRef(set); setRef.current = set;
@@ -117,11 +119,16 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   const host = temTour(moduleId) ? <ConhecerMaisHost moduleId={moduleId} /> : null;
   if (estado !== "visivel" || !config) return host;
   const terminar = (como: FimDaIntro) => { marcarIntroVista(moduleId, getRef.current, setRef.current, como); setEstado("nada"); };
+  // 17/10 (dono: "tipo Finanças, que tem vários"): a guiada faz a 1ª ação e o "olha"; os passos seguintes (config.maisPassos)
+  // rodam no motor de 1 toque, que mostra o cartão do fim com tudo o que entrou
+  const maisPassos = config.formato === "guiada" ? config.maisPassos : undefined;
   return (
     <>
       {host}
       {config.formato === "guiada"
-        ? <IntroGuiada config={config} aoTerminar={terminar} depoisDoMontar={depoisDoMontar.current} />
+        ? (continuacao
+          ? <IntroDeUmToque config={{ ...config, formato: "toque", passos: maisPassos ?? [] }} aoTerminar={terminar} passoInicial={config.tipo === "habito" ? 3 : 2} rotulosIniciais={continuacao.rotulos} />
+          : <IntroGuiada config={config} aoTerminar={terminar} depoisDoMontar={depoisDoMontar.current} aoContinuar={maisPassos?.length ? (rotulo) => setContinuacao({ rotulos: rotulo ? [rotulo] : [] }) : undefined} />)
         : <IntroDeUmToque config={config} aoTerminar={terminar} />}
     </>
   );

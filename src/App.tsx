@@ -27,6 +27,7 @@ import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
+import { CercaFunilD } from "@/pages/funil-d/CercaFunilD";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
@@ -393,6 +394,9 @@ const Liberar = lazyPage(() => import("./pages/liberar/Liberar"));
 // sem × com → lembretes → prova → resultado → plano de 3 dias) e o paywall da WEB no Pix com a escada: anual 97,90 →
 // presente anual 69,90 → mensal 24,90 (30 dias, sem renovação). Só na WEB (SoNaWeb), noindex. O app não muda.
 const AssinaturaApp = lazyPage(() => import("./pages/funis/app-web/AssinaturaApp"));
+// 18/10: protótipo /funil-d (o preço da hora). Fora de coreaplicativo.com.br.
+// A cerca redireciona produção pra "/" antes de carregar o chunk.
+const FunilD = lazyPage(() => import("./pages/funil-d/FunilD"));
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
@@ -619,6 +623,7 @@ const AnimatedRoutes = () => {
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/funil-d" element={<CercaFunilD><SoNaWeb><RouteErrorBoundary routeName="funil-d"><FunilD /></RouteErrorBoundary></SoNaWeb></CercaFunilD>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

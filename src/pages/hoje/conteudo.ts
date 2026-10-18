@@ -28,7 +28,10 @@ export const CHAVE_FORCA_HOJE = "funil-hoje-force";
 export const BUMP_KIT: boolean = true;
 export const UPSELL_PRA_SEMPRE: boolean = true;
 export const DOWNSELL_PRA_SEMPRE_27: boolean = true;
-export const UPSELL_CASAL: boolean = true;
+/** "Organize a vida a dois" (hc199): DESLIGADO no lançamento (dono, 18/10) — ele quer um espaço COMPARTILHADO de
+ *  verdade (finanças da casa, mercado, metas do casal, quem pagou o quê e acerto no fim do mês), que ainda não existe;
+ *  não vender o que não existe. O código, a oferta e a ação `parceiro` continuam; `true` religa. */
+export const UPSELL_A_DOIS: boolean = false;
 
 let forcaNaMemoria: ModoChave | null = null;
 /** Só testes. */

@@ -68,7 +68,7 @@ import { markPixPurchasePending } from "@/lib/purchase-tracking";
 import FunilHojeRota, { _zerarEstadoHoje, proximoPosCompra } from "@/pages/hoje/FunilHoje";
 import { _zerarCopiaSessao } from "@/pages/hoje/conta";
 import {
-  CONTAS, FUNIL_HOJE, LINHA_RENOVACAO, VALOR_OFERTA, _zerarForcaHoje, calcular, contasEscolhidas, funilHojeLigado, itensParaGravar, ofertaDoPlano,
+  CONTAS, FUNIL_HOJE, LINHA_RENOVACAO, UPSELL_A_DOIS, VALOR_OFERTA, _zerarForcaHoje, calcular, contasEscolhidas, funilHojeLigado, itensParaGravar, ofertaDoPlano,
 } from "@/pages/hoje/conteudo";
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { computeDailyBudget } from "@/lib/finance-totals";
@@ -320,16 +320,19 @@ describe("o Pix (mock da asaas-pix)", () => {
 
 /* ---------------------------------------------------------------- upsells */
 describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
-  it("proximoPosCompra: 47 → (recusou) 27 → casal → parceiro → pago; cada um 1 vez", () => {
+  it("proximoPosCompra: 47 → (recusou) 27 → [vida a dois, desligada no lançamento] → e-mail; cada um 1 vez", () => {
+    expect(UPSELL_A_DOIS).toBe(false);
     expect(proximoPosCompra({ pagos: [], recusou: [], parceiro: null })).toBe("up1");
     expect(proximoPosCompra({ pagos: [], recusou: ["hv47"], parceiro: null })).toBe("down");
-    expect(proximoPosCompra({ pagos: [], recusou: ["hv47", "hv27"], parceiro: null })).toBe("up2");
-    expect(proximoPosCompra({ pagos: [{ oferta: "hv47", orderId: "x", em: 0 }], recusou: [], parceiro: null })).toBe("up2");
-    expect(proximoPosCompra({ pagos: [{ oferta: "hc199", orderId: "y", em: 0 }], recusou: ["hv47", "hv27"], parceiro: null })).toBe("parceiro");
-    expect(proximoPosCompra({ pagos: [{ oferta: "hc199", orderId: "y", em: 0 }], recusou: ["hv47", "hv27"], parceiro: "p@x.com" })).toBe("pago");
-    expect(proximoPosCompra({ pagos: [], recusou: ["hv47", "hv27", "hc199"], parceiro: null })).toBe("pago");
+    expect(proximoPosCompra({ pagos: [], recusou: ["hv47", "hv27"], parceiro: null })).toBe("pago");
+    expect(proximoPosCompra({ pagos: [{ oferta: "hv47", orderId: "x", em: 0 }], recusou: [], parceiro: null })).toBe("pago");
+    // religada (UPSELL_A_DOIS = true): casal → e-mail da(o) parceira(o) → pago
+    expect(proximoPosCompra({ pagos: [], recusou: ["hv47", "hv27"], parceiro: null }, true)).toBe("up2");
+    expect(proximoPosCompra({ pagos: [{ oferta: "hc199", orderId: "y", em: 0 }], recusou: ["hv47", "hv27"], parceiro: null }, true)).toBe("parceiro");
+    expect(proximoPosCompra({ pagos: [{ oferta: "hc199", orderId: "y", em: 0 }], recusou: ["hv47", "hv27"], parceiro: "p@x.com" }, true)).toBe("pago");
+    expect(proximoPosCompra({ pagos: [], recusou: ["hv47", "hv27", "hc199"], parceiro: null }, true)).toBe("pago");
   });
-  it("pagou o plano → 47 (Não) → 27 (Sim, paga) → casal (Sim, paga) → e-mail da(o) parceira(o) → pós-compra; eventos de cada um", async () => {
+  it("pagou o plano → 47 (Não) → 27 (Sim, paga) → direto pro e-mail (sem vida a dois); eventos de cada um", async () => {
     await ateOferta();
     fireEvent.click(screen.getByTestId("hoje-pagar"));
     await pagarEConferir("h279");
@@ -342,23 +345,24 @@ describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
     expect(screen.getByTestId("hoje-down").textContent).toContain("O CORE pra sempre por R$ 27");
     fireEvent.click(screen.getByTestId("hoje-down-sim"));
     await pagarEConferir("hv27");
-    await waitFor(() => expect(etapa()).toBe("up2"));
-    expect(screen.getByTestId("hoje-up2").textContent).toContain("pra sempre");
-    fireEvent.click(screen.getByTestId("hoje-up2-sim"));
-    await pagarEConferir("hc199");
-    await waitFor(() => expect(etapa()).toBe("parceiro"));
-    fireEvent.change(screen.getByTestId("hoje-email-parceiro"), { target: { value: "Rafa@Exemplo.com " } });
-    fireEvent.click(screen.getByTestId("hoje-liberar-parceiro"));
-    await waitFor(() => expect(screen.getByTestId("hoje-parceiro-continuar")).toBeTruthy());
-    expect(invocacoes("asaas-pix", "parceiro")[0]).toMatchObject({ id: "qr_3_hc199", email: "rafa@exemplo.com" });
-    fireEvent.click(screen.getByTestId("hoje-parceiro-continuar"));
     await waitFor(() => expect(etapa()).toBe("pago"));
     const up = eventos("hoje_upsell").map((x) => `${x.oferta}:${x.acao}`);
-    expect(up).toEqual(["hv47:vista", "hv47:recusou", "hv27:vista", "hv27:aceitou", "hv27:pago", "hc199:vista", "hc199:aceitou", "hc199:pago"]);
-    expect(eventos("hoje_pago").map((x) => `${x.oferta}:${x.valor}`)).toEqual(["h279:27.9", "hv27:27", "hc199:19.9"]);
-    expect(texto()).toContain("R$ 74,80 recebido · acesso pra sempre");
+    expect(up).toEqual(["hv47:vista", "hv47:recusou", "hv27:vista", "hv27:aceitou", "hv27:pago"]);
+    expect(eventos("hoje_pago").map((x) => `${x.oferta}:${x.valor}`)).toEqual(["h279:27.9", "hv27:27"]);
+    expect(texto()).toContain("R$ 54,90 recebido · acesso pra sempre");
+    expect(texto()).not.toMatch(/vida a dois|2ª conta/i);
   });
-  it("recusou os três: vai direto pro e-mail, sem o downsell repetir", async () => {
+  it("aceitou o de 47: o de 27 não aparece; vai pro e-mail", async () => {
+    await ateOferta();
+    fireEvent.click(screen.getByTestId("hoje-pagar"));
+    await pagarEConferir("h279");
+    await waitFor(() => expect(etapa()).toBe("up1"));
+    fireEvent.click(screen.getByTestId("hoje-up1-sim"));
+    await pagarEConferir("hv47");
+    await waitFor(() => expect(etapa()).toBe("pago"));
+    expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["h279", "hv47"]);
+  });
+  it("recusou os dois: vai direto pro e-mail, sem o downsell repetir", async () => {
     await ateOferta();
     fireEvent.click(screen.getByTestId("hoje-plano-mensal"));
     fireEvent.click(screen.getByTestId("hoje-pagar"));
@@ -368,8 +372,6 @@ describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
     fireEvent.click(screen.getByTestId("hoje-up1-nao"));
     await waitFor(() => expect(etapa()).toBe("down"));
     fireEvent.click(screen.getByTestId("hoje-down-nao"));
-    await waitFor(() => expect(etapa()).toBe("up2"));
-    fireEvent.click(screen.getByTestId("hoje-up2-nao"));
     await waitFor(() => expect(etapa()).toBe("pago"));
     expect(invocacoes("asaas-pix", "create")).toHaveLength(1);
   });
@@ -385,8 +387,6 @@ const atePosCompra = async (kit = false) => {
   fireEvent.click(screen.getByTestId("hoje-up1-nao"));
   await waitFor(() => expect(etapa()).toBe("down"));
   fireEvent.click(screen.getByTestId("hoje-down-nao"));
-  await waitFor(() => expect(etapa()).toBe("up2"));
-  fireEvent.click(screen.getByTestId("hoje-up2-nao"));
   await waitFor(() => expect(screen.getByTestId("hoje-email")).toBeTruthy());
 };
 describe("pós-compra: 1 campo de e-mail", () => {
@@ -440,5 +440,54 @@ describe("pós-compra: 1 campo de e-mail", () => {
     await atePosCompra();
     fireEvent.change(screen.getByTestId("hoje-email"), { target: { value: "mari@" } });
     expect((screen.getByTestId("hoje-salvar-email") as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+/* ---------------------------------------------------------------- e-mail opcional na tela do Pix */
+describe("e-mail OPCIONAL na tela do Pix (não bloqueia; só aparece com o código)", () => {
+  const atePix = async () => {
+    await ateOferta();
+    expect(screen.queryByTestId("hoje-email-pix")).toBeNull();
+    fireEvent.click(screen.getByTestId("hoje-pagar"));
+    await waitFor(() => expect(screen.getByTestId("hoje-email-pix")).toBeTruthy());
+  };
+  it("e-mail livre: entra na própria conta anônima; o pós-compra não pede de novo (a conta já tem e-mail)", async () => {
+    await atePix();
+    expect(texto()).toContain("Quer receber o acesso por e-mail? (opcional)");
+    fireEvent.change(screen.getByTestId("hoje-email-pix-campo"), { target: { value: "Mari@Exemplo.com" } });
+    fireEvent.click(screen.getByTestId("hoje-email-pix-salvar"));
+    await waitFor(() => expect(screen.getByTestId("hoje-email-pix-ok")).toBeTruthy());
+    expect(definirEmailDaCompra).toHaveBeenCalledWith("mari@exemplo.com");
+    expect(invocacoes("asaas-pix", "email_pedido")).toHaveLength(0);
+    expect(eventos("hoje_email_pix")[0]).toMatchObject({ ok: true, via: "conta" });
+    // a conta agora tem e-mail: depois do pagamento e dos upsells, o pós-compra vai direto pras lojas
+    getUser.mockImplementation(async () => ({ data: { user: { id: "anon-1", email: "mari@exemplo.com", user_metadata: {} } } }));
+    await pagarEConferir("h279");
+    await waitFor(() => expect(etapa()).toBe("up1"));
+    fireEvent.click(screen.getByTestId("hoje-up1-nao"));
+    await waitFor(() => expect(etapa()).toBe("down"));
+    fireEvent.click(screen.getByTestId("hoje-down-nao"));
+    await waitFor(() => expect(screen.getByTestId("hoje-lojas")).toBeTruthy());
+    expect(eventos("hoje_email_salvo")[0]).toMatchObject({ via: "ja_logada" });
+  });
+  it("e-mail que já tem conta: vira o DESTINO do pedido no servidor; o pós-compra vem preenchido", async () => {
+    definirEmailDaCompra.mockResolvedValue({ erro: "email_em_uso" });
+    await atePix();
+    fireEvent.change(screen.getByTestId("hoje-email-pix-campo"), { target: { value: "ana@exemplo.com" } });
+    fireEvent.click(screen.getByTestId("hoje-email-pix-salvar"));
+    await waitFor(() => expect(screen.getByTestId("hoje-email-pix-ok")).toBeTruthy());
+    expect(invocacoes("asaas-pix", "email_pedido")[0]).toMatchObject({ id: "qr_1_h279", email: "ana@exemplo.com" });
+    expect(eventos("hoje_email_pix")[0]).toMatchObject({ ok: true, via: "destino" });
+    await pagarEConferir("h279");
+    await waitFor(() => expect(etapa()).toBe("up1"));
+    fireEvent.click(screen.getByTestId("hoje-up1-nao"));
+    fireEvent.click(await screen.findByTestId("hoje-down-nao"));
+    await waitFor(() => expect((screen.getByTestId("hoje-email") as HTMLInputElement).value).toBe("ana@exemplo.com"));
+  });
+  it("sem preencher nada: o Pix segue normal", async () => {
+    await atePix();
+    await pagarEConferir("h279");
+    await waitFor(() => expect(etapa()).toBe("up1"));
+    expect(invocacoes("asaas-pix", "email_pedido")).toHaveLength(0);
   });
 });

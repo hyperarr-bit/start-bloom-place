@@ -49,6 +49,13 @@ export async function creditarPedido(admin: ClienteMin, args: {
     const { data } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", args.userId);
     return (data ?? []) as LinhaAssinatura[];
   };
+  /* 18/10 (/hoje): o pedido pode já ter sido creditado e a linha MOVIDA pra outra conta (pix-vincular, ou o e-mail de
+   * destino da tela do Pix — _shared/destino-hoje.ts). Sem isto, um webhook atrasado acharia a anônima vazia e
+   * creditaria de novo (2 linhas do mesmo pedido = receita em dobro). */
+  try {
+    const { data: emOutra } = await admin.from("subscriptions").select("id, user_id").eq("abacatepay_billing_id", args.orderId);
+    if (Array.isArray(emOutra) && emOutra.some((l: { user_id?: string }) => l.user_id && l.user_id !== args.userId)) return { r: "ja_creditado" };
+  } catch { /* sem a consulta, segue a regra de sempre */ }
   const decisao = decidirGrantPix(await ler(), args.concessao, args.agora, args.orderId);
   if (decisao.acao === "preservar") return { r: "preservado" };
   if (decisao.acao === "ja_creditado") return { r: "ja_creditado" };

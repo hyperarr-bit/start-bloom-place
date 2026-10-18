@@ -11,7 +11,7 @@ import { SelosDasLojas } from "@/components/site/SelosDasLojas";
 import { capturarAtribuicao, idsDoAnuncio, lerAtribuicao, type AtribuicaoPorta } from "@/pages/porta/atribuicao";
 import { eventoMeta, novoEventId } from "@/pages/venda/rastreio";
 import {
-  AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PRECO_KIT, UPSELL_CASAL, UPSELL_PRA_SEMPRE, BUMP_KIT,
+  AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PRECO_KIT, UPSELL_A_DOIS, UPSELL_PRA_SEMPRE, BUMP_KIT,
   VALOR_OFERTA, calcular, contasEscolhidas, dataCurta, fimDoAcesso, funilHojeLigado, ofertaDoPlano, preco, reais, reaisDigitados, temKit,
   type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
 } from "./conteudo";
@@ -69,6 +69,9 @@ export type EstadoHoje = {
   recusou: OfertaHoje[];
   parceiro: string | null;
   email: string | null;
+  /** 18/10: o e-mail OPCIONAL salvo na tela do Pix (via "conta" = já é o e-mail da conta; "destino" = já tinha conta,
+   *  o servidor leva a compra pra ela) — o pós-compra vem com ele preenchido */
+  emailPix?: { email: string; via: "conta" | "destino" } | null;
   /** a tela logo depois de um pagamento mostra "Pagamento confirmado · R$ X" (a seguinte, depois de um "Não", não) */
   banner?: boolean;
 };
@@ -112,13 +115,13 @@ function sessaoDoHoje(): { id: string; nova: boolean } {
 }
 
 /** O próximo passo DEPOIS de um pagamento (o plano ou um upsell): cada oferta aparece no máximo 1 vez. */
-export function proximoPosCompra(e: Pick<EstadoHoje, "pagos" | "recusou" | "parceiro">): EtapaHoje {
+export function proximoPosCompra(e: Pick<EstadoHoje, "pagos" | "recusou" | "parceiro">, aDois: boolean = UPSELL_A_DOIS): EtapaHoje {
   const pagou = (o: OfertaHoje) => e.pagos.some((p) => p.oferta === o);
   const recusou = (o: OfertaHoje) => e.recusou.includes(o);
   const praSempre = pagou("hv47") || pagou("hv27");
   if (UPSELL_PRA_SEMPRE && !praSempre && !recusou("hv47")) return "up1";
   if (UPSELL_PRA_SEMPRE && DOWNSELL_PRA_SEMPRE_27 && !praSempre && recusou("hv47") && !recusou("hv27")) return "down";
-  if (UPSELL_CASAL && !pagou("hc199") && !recusou("hc199")) return "up2";
+  if (aDois && !pagou("hc199") && !recusou("hc199")) return "up2";
   if (pagou("hc199") && !e.parceiro) return "parceiro";
   return "pago";
 }
@@ -396,7 +399,8 @@ export function FunilHoje() {
 
         {e.etapa === "pix" && (
           <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit ? " + Kit Primeiro Mês" : ""}`}
-            pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids} />
+            pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
+            emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => setEstado((x) => ({ ...x, emailPix: { email, via } }))} />
         )}
 
         {e.etapa === "up1" && (
@@ -677,7 +681,7 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
   estado: EstadoHoje; r: Resultado; acessoTxt: string; totalPago: number; ids: () => Record<string, unknown>;
   onEmail: (email: string) => void; onAbrir: () => void;
 }) {
-  const [email, setEmail] = useState(estado.email ?? "");
+  const [email, setEmail] = useState(estado.email ?? estado.emailPix?.email ?? "");
   const [fase, setFase] = useState<"form" | "salvando" | "existe" | "pronto">(estado.email ? "pronto" : "form");
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -728,7 +732,9 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
   const entrouComCodigo = async () => {
     const t = await trazerCompraParaConta();
     trackEvent("hoje_vincular", { r: t, ...ids() });
-    if (t === "nao_moveu") setAviso("Sua conta já tinha o CORE ativo, então a compra de agora ficou guardada à parte. Fale com o suporte pra devolvermos o valor.");
+    // a compra já tinha ido pra esta conta pelo e-mail salvo na tela do Pix: não há o que mover, e está tudo certo
+    const jaVeio = estado.emailPix?.via === "destino" && estado.emailPix.email === email.trim().toLowerCase();
+    if (t === "nao_moveu" && !jaVeio) setAviso("Sua conta já tinha o CORE ativo, então a compra de agora ficou guardada à parte. Fale com o suporte pra devolvermos o valor.");
     await finalizar(email.trim().toLowerCase(), "codigo");
   };
 

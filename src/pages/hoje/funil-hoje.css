@@ -254,6 +254,18 @@ details.fn-qr summary span { margin-left: auto; color: var(--fn-suave); font-wei
 .fn-aviso-fixo { margin: 14px 20px 0; padding: 10px 12px; border-radius: 12px; background: #fffbeb; color: var(--fn-ambar-texto); font-size: 13px; line-height: 1.4; }
 .fn-codigo-email { margin-top: 10px; }
 
+/* o e-mail OPCIONAL da tela do Pix: discreto, nunca bloqueia */
+.fn-email-opc { margin: 12px 20px 0; }
+.fn-email-opc label { display: block; font-size: 13px; font-weight: 650; color: var(--fn-texto); margin-bottom: 6px; }
+.fn-email-opc label span { color: var(--fn-suave); font-weight: 500; }
+.fn-email-opc-linha { display: flex; gap: 8px; }
+.fn-email-opc-linha input { flex: 1; min-width: 0; height: 42px; border-radius: 12px; border: 1.5px solid var(--fn-borda); padding: 0 12px; font-size: 16px !important; font-family: inherit; color: var(--fn-texto); outline: none; background: #fff; }
+.fn-email-opc-linha input:focus { border-color: var(--fn-magenta); }
+button.fn-email-opc-btn { height: 42px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--fn-grafite); background: #fff; color: var(--fn-grafite); font-size: 14px; font-weight: 750; font-family: inherit; }
+button.fn-email-opc-btn:disabled { opacity: .35; }
+.fn-email-opc-ok { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #166534; font-weight: 600; }
+.fn-email-opc-ok b { word-break: break-all; }
+
 /* celular baixinho (375×667): aperta o respiro, nada some */
 @media (max-height: 700px) {
   .fn-q h1 { font-size: 26px; }

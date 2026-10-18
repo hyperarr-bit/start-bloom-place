@@ -4,7 +4,8 @@ import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
-import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -141,6 +142,18 @@ async function statusCakto(token: string, id: string): Promise<Veredito> {
   const ordem = (out?.results ?? []).find((o: { id?: string }) => String(o?.id) === id) ?? out?.results?.[0];
   const st = String(ordem?.status ?? `nao_encontrado_${out?.count ?? 0}`).toLowerCase();
   return { pago: st === "paid", status: st };
+}
+
+/** Resend (o mesmo remetente das boas-vindas). true = saiu. */
+async function enviarResend(para: string, assunto: string, html: string): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [para], subject: assunto, html }),
+  }).catch(() => null);
+  return !!r?.ok;
 }
 
 serve(async (req) => {
@@ -419,6 +432,10 @@ serve(async (req) => {
           event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer], meta_capi: capi },
         });
         creditados.push({ uid, email, orderId: o.orderId, offer: o.offer, criadoEm: o.criadoEm, status: v.status, capi });
+        // 18/10 (/hoje): o e-mail de destino da tela do Pix (quem pagou e sumiu) — a compra vai pra essa conta
+        if (ehPlanoHoje(o.offer) || ehUpsellHoje(o.offer)) {
+          await encaminharParaDestino(admin as never, { uidAnonimo: uid, orderId: o.orderId, offer: o.offer, enviar: enviarResend }).catch(() => null);
+        }
         if (ehUpsellHoje(o.offer)) continue; // 18/10: upsell não encerra a pessoa (pode haver o plano e outro upsell)
         jaTem.add(uid);
         break; // 1 grant por usuário basta (vitalício)

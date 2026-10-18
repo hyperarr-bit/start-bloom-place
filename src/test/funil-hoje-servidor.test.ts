@@ -233,3 +233,87 @@ describe("venda-capi e pix-vincular", () => {
     expect(s).not.toContain(".limit(1).maybeSingle();\n    if (!subDe");
   });
 });
+
+/* ───────── o e-mail OPCIONAL da tela do Pix (destino) ───────── */
+import { encaminharParaDestino, lerDestino, salvarDestino } from "../../supabase/functions/_shared/destino-hoje";
+
+/** banco falso com webhook_events (insert/update/select), subscriptions (select/update/insert) e auth.admin */
+function bancoComAuth(usuarios: Array<{ id: string; email: string | null }>) {
+  const { db, admin } = bancoFalso();
+  const eventos = new Map<string, string>();
+  const analytics: unknown[] = [];
+  const from = (tabela: string) => {
+    if (tabela === "analytics_events") return { insert: (d: unknown) => { analytics.push(d); return Promise.resolve({ error: null }); } };
+    if (tabela !== "webhook_events" || !destinoLigado) return admin.from(tabela);
+    const filtros: Array<[string, unknown]> = [];
+    let op: { tipo: string; dados?: Record<string, unknown> } = { tipo: "select" };
+    const q: Record<string, unknown> = {
+      select: () => { op = { tipo: "select" }; return q; },
+      insert: (d: Record<string, unknown>) => { op = { tipo: "insert", dados: d }; return q; },
+      update: (d: Record<string, unknown>) => { op = { tipo: "update", dados: d }; return q; },
+      delete: () => { op = { tipo: "delete" }; return q; },
+      eq: (k: string, v: unknown) => { filtros.push([k, v]); return q; },
+      then: (ok: (v: unknown) => unknown) => {
+        const id = String(op.dados?.id ?? filtros.find(([k]) => k === "id")?.[1] ?? "");
+        if (op.tipo === "insert") { if (eventos.has(id)) return Promise.resolve({ error: { code: "23505" } }).then(ok); eventos.set(id, String(op.dados?.event ?? "")); return Promise.resolve({ error: null }).then(ok); }
+        if (op.tipo === "update") { eventos.set(id, String(op.dados?.event ?? "")); return Promise.resolve({ error: null }).then(ok); }
+        if (op.tipo === "delete") { eventos.delete(id); return Promise.resolve({ error: null }).then(ok); }
+        return Promise.resolve({ data: eventos.has(id) ? [{ id, event: eventos.get(id) }] : [], error: null }).then(ok);
+      },
+    };
+    return q;
+  };
+  const destinoLigado = true;
+  const auth = { admin: {
+    getUserById: async (id: string) => ({ data: { user: usuarios.find((u) => u.id === id) ?? null } }),
+    listUsers: async () => ({ data: { users: usuarios }, error: null }),
+  } };
+  return { db, eventos, analytics, admin: { from, auth } };
+}
+
+describe("e-mail opcional da tela do Pix: pagou e fechou a aba → a compra vai pra conta do e-mail", () => {
+  it("destino salvo + e-mail que já tem conta: no crédito, as linhas da anônima vão pra essa conta e o acesso sai por e-mail (1x)", async () => {
+    const b = bancoComAuth([{ id: "anon", email: null }, { id: "conta-ana", email: "ana@exemplo.com" }]);
+    expect(await salvarDestino(b.admin as never, "anon", " Ana@Exemplo.com ")).toBe(true);
+    expect(await lerDestino(b.admin as never, "anon")).toBe("ana@exemplo.com");
+    // o plano é creditado na anônima (sem e-mail, ela nunca abriu o pós-compra)
+    b.db.subscriptions.push({ id: "l1", user_id: "anon", status: "active", payment_method: "pix", abacatepay_billing_id: "qr_plano", billing_period: "annual", plan: "core-pro", current_period_end: "2027-10-18T12:00:00Z", amount_cents: 2790 });
+    const enviados: Array<{ para: string; html: string }> = [];
+    const enviar = async (para: string, _a: string, html: string) => { enviados.push({ para, html }); return true; };
+    const r = await encaminharParaDestino(b.admin as never, { uidAnonimo: "anon", orderId: "qr_plano", offer: "h279", enviar });
+    expect(r).toMatchObject({ r: "movido", para: "conta-ana", linhas: 1, email: true });
+    expect(b.db.subscriptions[0]).toMatchObject({ user_id: "conta-ana", customer_email: "ana@exemplo.com", amount_cents: 2790 });
+    expect(enviados).toHaveLength(1);
+    expect(enviados[0].para).toBe("ana@exemplo.com");
+    expect(enviados[0].html).toContain("Seu CORE também no celular");
+    // o webhook atrasado do MESMO pedido não credita de novo na anônima (a linha está em outra conta)
+    const tarde = await creditar(b.admin as never, "qr_plano", "h279");
+    expect(tarde.r).toBe("ja_creditado");
+    expect(b.db.subscriptions).toHaveLength(1);
+    // um 2º caminho encaminhando o mesmo pedido não manda 2º e-mail
+    b.db.subscriptions.push({ id: "l2", user_id: "anon", status: "active", payment_method: "pix", abacatepay_billing_id: "qr_up", billing_period: "lifetime", plan: "lifetime", current_period_end: "2126-10-18T12:00:00Z", amount_cents: 2700 });
+    const up = await encaminharParaDestino(b.admin as never, { uidAnonimo: "anon", orderId: "qr_up", offer: "hv27", enviar });
+    expect(up).toMatchObject({ r: "movido", email: false }); // upsell vai junto, sem e-mail próprio
+    expect(b.db.subscriptions.every((l) => l.user_id === "conta-ana")).toBe(true);
+    await encaminharParaDestino(b.admin as never, { uidAnonimo: "anon", orderId: "qr_plano", offer: "h279", enviar });
+    expect(enviados).toHaveLength(1);
+  });
+  it("sem destino, ou a anônima já ganhou o e-mail dela (caminho normal), ou o e-mail não tem conta: nada se move", async () => {
+    const enviar = async () => true;
+    const b1 = bancoComAuth([{ id: "anon", email: null }]);
+    expect((await encaminharParaDestino(b1.admin as never, { uidAnonimo: "anon", orderId: "q", offer: "h279", enviar })).r).toBe("sem_destino");
+    const b2 = bancoComAuth([{ id: "anon", email: "mari@exemplo.com" }, { id: "x", email: "ana@exemplo.com" }]);
+    await salvarDestino(b2.admin as never, "anon", "ana@exemplo.com");
+    expect((await encaminharParaDestino(b2.admin as never, { uidAnonimo: "anon", orderId: "q", offer: "h279", enviar })).r).toBe("anonima_tem_email");
+    const b3 = bancoComAuth([{ id: "anon", email: null }]);
+    await salvarDestino(b3.admin as never, "anon", "ninguem@exemplo.com");
+    expect((await encaminharParaDestino(b3.admin as never, { uidAnonimo: "anon", orderId: "q", offer: "h279", enviar })).r).toBe("sem_conta");
+    expect(await salvarDestino(b3.admin as never, "anon", "nao-e-email")).toBe(false);
+  });
+  it("os 3 caminhos de crédito encaminham; a ação email_pedido existe e encaminha se já foi pago", () => {
+    for (const f of ["asaas-pix/index.ts", "asaas-webhook/index.ts", "pix-reconcile/index.ts"]) expect(fonte(f)).toContain("encaminharParaDestino(");
+    const pix = fonte("asaas-pix/index.ts");
+    expect(pix).toContain('action === "email_pedido"');
+    expect(pix).toContain("if (user.email) return jsonResponse({ ok: false, motivo: \"conta_tem_email\" });");
+  });
+});

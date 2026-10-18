@@ -5,6 +5,7 @@ import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -177,6 +178,18 @@ const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html
   </td></tr></table>
 </body></html>`;
 
+/** Resend (o mesmo remetente das boas-vindas). true = saiu. */
+async function enviarResend(para: string, assunto: string, html: string): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [para], subject: assunto, html }),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
 serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
@@ -333,6 +346,11 @@ serve(async (req) => {
           logStep("Welcome email sent", { to: email.slice(0, 3) + "***" });
         }
       } catch (e) { logStep("Welcome email failed", { message: String(e).slice(0, 120) }); }
+    }
+    // 18/10 (/hoje): pagou e fechou a aba com o e-mail de destino salvo na tela do Pix → a compra vai pra essa conta
+    if (ehPlanoHoje(offer) || ehUpsellHoje(offer)) {
+      const d = await encaminharParaDestino(admin as never, { uidAnonimo: userId, orderId: qrCodeId, offer, enviar: enviarResend }).catch(() => null);
+      if (d && d.r === "movido") logStep("Compra levada pro e-mail de destino", { linhas: d.linhas, email: d.email });
     }
     return jsonResponse({ received: true, granted: true });
   } catch (error) {

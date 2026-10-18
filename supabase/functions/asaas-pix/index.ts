@@ -4,7 +4,8 @@ import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, n
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
-import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
+import { EMAIL_DESTINO_OK, acharConta, encaminharParaDestino, lerDestino, salvarDestino } from "../_shared/destino-hoje.ts";
 import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 
 /**
@@ -283,6 +284,18 @@ function acessoFinal(linhas: LinhaAssinatura[]): { vitalicio: boolean; fim: stri
   return { vitalicio: false, fim: String(maior.current_period_end) };
 }
 
+/** Resend (o mesmo remetente das boas-vindas). true = saiu. */
+async function enviarResend(para: string, assunto: string, html: string): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [para], subject: assunto, html }),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -549,6 +562,12 @@ serve(async (req) => {
           logStep("Welcome email failed (non-blocking)", { message: String(e).slice(0, 150) });
         }
       }
+      /* 18/10 (/hoje): e-mail de destino salvo na tela do Pix (e-mail que já tinha conta) → a compra vai pra essa conta
+       * e o acesso sai por e-mail — cobre quem paga e fecha a aba antes do pós-compra (_shared/destino-hoje.ts). */
+      if (ehPlanoHoje(offer) || ehUpsellHoje(offer)) {
+        const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
+        if (d && d.r === "movido") logStep("Compra levada pro e-mail de destino", { id, linhas: d.linhas, email: d.email });
+      }
       return jsonResponse({ paid: true, status: "PAID" });
     }
 
@@ -595,6 +614,28 @@ serve(async (req) => {
       return jsonResponse({ ok: true, enviado: true });
     }
 
+    // ---------------------------------------------------------- EMAIL_PEDIDO
+    /* 18/10 (/hoje): o campo OPCIONAL da tela do Pix, quando o e-mail já tem conta (o e-mail livre a página põe na
+     * própria anônima). Guarda o destino; se o pedido JÁ foi creditado (pagou antes de salvar), encaminha agora. */
+    if (action === "email_pedido") {
+      const id = String(body.id ?? "");
+      const email = String(body.email ?? "").trim().toLowerCase();
+      if (!EMAIL_DESTINO_OK.test(email)) return jsonResponse({ ok: false, motivo: "email_invalido" });
+      if (user.email) return jsonResponse({ ok: false, motivo: "conta_tem_email" });
+      if (!(await salvarDestino(supabaseAdmin as never, user.id, email))) return jsonResponse({ ok: false, motivo: "gravar" });
+      let encaminhado = false;
+      if (id) {
+        const { data: reg } = await supabaseAdmin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: id }).limit(1);
+        const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
+        if (reg?.[0]?.user_id === user.id && (ehPlanoHoje(offer) || ehUpsellHoje(offer))) {
+          const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
+          encaminhado = d?.r === "movido";
+        }
+      }
+      logStep("E-mail de destino salvo", { encaminhado });
+      return jsonResponse({ ok: true, encaminhado });
+    }
+
     // ------------------------------------------------------------- PARCEIRO
     /* 18/10 (/hoje, "Organize a vida a dois" +R$ 19,90): quem pagou o hc199 manda o e-mail da(o) parceira(o); a conta
      * dela(e) é criada (ou achada, se já existe — nunca 2ª conta) e ganha acesso até o MESMO fim do plano de quem
@@ -615,7 +656,13 @@ serve(async (req) => {
       const r = await buscarPagamento(apiKey, id);
       if (!r.ok || !r.pago) return jsonResponse({ ok: false, motivo: "nao_pago" });
       if (!valorCobre((r.pago as { value?: unknown }).value, PRECOS_CENTAVOS[offer])) return jsonResponse({ ok: false, motivo: "valor_menor" });
-      const acesso = acessoFinal(await linhasDaConta(supabaseAdmin, user.id));
+      let acesso = acessoFinal(await linhasDaConta(supabaseAdmin, user.id));
+      if (!acesso) {
+        // a compra já foi levada pro e-mail de destino da tela do Pix: o período é o daquela conta
+        const destino = await lerDestino(supabaseAdmin as never, user.id);
+        const conta = destino ? await acharConta(supabaseAdmin as never, destino) : null;
+        if (conta) acesso = acessoFinal(await linhasDaConta(supabaseAdmin, conta));
+      }
       if (!acesso) return jsonResponse({ ok: false, motivo: "sem_plano" });
 
       const { error: trava } = await supabaseAdmin.from("webhook_events").insert({ id: chaveParceiro(id), source: "hoje", event: "casal" });

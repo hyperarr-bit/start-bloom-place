@@ -6,7 +6,7 @@ import { trackEvent } from "@/lib/analytics";
 import { EMPRESA } from "@/lib/empresa";
 import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-tracking";
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
-import { abrirSessaoParaPagar, sessaoViva } from "./conta";
+import { EMAIL_OK, abrirSessaoParaPagar, salvarEmailDaCompra, sessaoViva } from "./conta";
 import { preco, type OfertaHoje } from "./conteudo";
 
 /**
@@ -49,7 +49,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], onPix, onPago, onVoltar, ids }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -63,6 +63,9 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], onPix, on
   onPago: (p: PixSalvo) => void;
   onVoltar: (() => void) | null;
   ids: () => Record<string, unknown>;
+  /** o e-mail OPCIONAL já salvo nesta compra (some o campo) */
+  emailSalvo?: string | null;
+  onEmailSalvo?: (email: string, via: "conta" | "destino") => void;
 }) {
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -187,6 +190,34 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], onPix, on
     if (!ok) setAindaNao(true);
   };
 
+  /* 18/10: o e-mail OPCIONAL (a rede de quem paga e fecha a aba). Não bloqueia nada; só aparece com o código na tela.
+   *   e-mail livre → entra NA PRÓPRIA conta anônima (a compra já é dela; as boas-vindas saem quando o Pix cair);
+   *   e-mail com conta → `email_pedido`: o servidor guarda como destino e, quando creditar, leva a compra pra essa
+   *   conta e manda o acesso por e-mail (_shared/destino-hoje.ts). */
+  const [emailOpc, setEmailOpc] = useState("");
+  const [salvandoEmail, setSalvandoEmail] = useState(false);
+  const [erroEmail, setErroEmail] = useState<string | null>(null);
+  const salvarEmailOpcional = async () => {
+    if (!pixAtual) return;
+    setSalvandoEmail(true); setErroEmail(null);
+    const limpo = emailOpc.trim().toLowerCase();
+    let via: "conta" | "destino" | null = null;
+    let erro: string | null = null;
+    try {
+      const r = await salvarEmailDaCompra(limpo);
+      if (r.ok === true) via = "conta";
+      else if ("existe" in r) {
+        await sessaoViva();
+        const { data } = await supabase.functions.invoke("asaas-pix", { body: { action: "email_pedido", id: pixAtual.orderId, email: limpo } });
+        if ((data as { ok?: boolean } | null)?.ok) via = "destino";
+      } else erro = r.erro;
+    } catch { /* cai no erro abaixo */ }
+    setSalvandoEmail(false);
+    trackEvent("hoje_email_pix", { ok: !!via, via, oferta, ...ids() });
+    if (via) onEmailSalvo?.(limpo, via);
+    else setErroEmail(erro ?? "Não consegui salvar agora. Pode seguir — o e-mail também pode ir depois do pagamento.");
+  };
+
   const resta = pixAtual ? venceEm(pixAtual) - agora : 0;
   const vencido = !!pixAtual && resta <= 0;
 
@@ -247,6 +278,21 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], onPix, on
             </button>
             <div className="fn-copiado-dica">{copiado ? "Agora é só colar no app do seu banco." : ""}</div>
           </div>
+          {onEmailSalvo && (emailSalvo ? (
+            <div className="fn-email-opc fn-email-opc-ok" data-testid="hoje-email-pix-ok"><Check size={14} strokeWidth={3} /><span>O acesso vai pra <b>{emailSalvo}</b> quando o Pix cair.</span></div>
+          ) : (
+            <div className="fn-email-opc" data-testid="hoje-email-pix">
+              <label htmlFor="hoje-email-pix-campo">Quer receber o acesso por e-mail? <span>(opcional)</span></label>
+              <div className="fn-email-opc-linha">
+                <input id="hoje-email-pix-campo" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="voce@email.com"
+                  value={emailOpc} onChange={(ev) => { setEmailOpc(ev.target.value); setErroEmail(null); }} data-testid="hoje-email-pix-campo" />
+                <button type="button" className="fn-email-opc-btn" disabled={!EMAIL_OK.test(emailOpc.trim()) || salvandoEmail} onClick={() => { void salvarEmailOpcional(); }} data-testid="hoje-email-pix-salvar">
+                  {salvandoEmail ? "…" : "Salvar"}
+                </button>
+              </div>
+              {erroEmail && <p className="fn-erro" role="alert">{erroEmail}</p>}
+            </div>
+          ))}
           <div className="fn-codigo" data-testid="hoje-pix-codigo">{pixAtual.qrCode}</div>
           <div className="fn-cnpj" data-testid="hoje-cnpj"><ShieldCheck size={15} strokeWidth={2.4} /><span>CORE · CNPJ {EMPRESA.cnpj}</span></div>
           <div className="fn-validade">Este código vale por <b>{mmss(resta)}</b></div>

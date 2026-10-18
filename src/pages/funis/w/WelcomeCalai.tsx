@@ -11,16 +11,18 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  * app quando a chave está ligada. Substitui a welcome da grade azul (AppWelcome) E
  * os 3 quadros de promessa (PromessasScreen).
  *
- *   · o VÍDEO em loop do app real (~15 s, mudo, inline), no estilo do Cal AI (dono 17/10: "tem que
- *     mostrar o app mesmo, de forma fluida… o iPhone entra"): fundo branco, um iPhone ENTRA pela
- *     direita girado e assenta no centro (0,7 s); dentro dele, uma gravação de tela CONTÍNUA do app
- *     de verdade — montar Finanças em 3 toques (renda, contas, cartão) → "Montando…" → VOCÊ PODE
- *     GASTAR HOJE R$ 123 (a câmera chega perto) → o post-it "Já gastou com alguma coisa hoje?" →
- *     toque no Café → ZOOM no "Olha o seu mês" com o "Sobra pra hoje" caindo 123 → 111 → volta,
- *     "Dia 1 de 3 feito" → o iPhone sai pela esquerda e o loop recomeça com ele entrando. Sem
- *     legendas. Gerado do app (conta vazia montada pelo próprio fluxo, Supabase falso, loja mock;
- *     receita em scratchpad/video-welcome2/work), 1080×1386 H.264 ≤ 2 MB em public/funil/, com
- *     pôster JPEG (o iPhone assentado no R$ 123) pra antes do 1º quadro / autoplay negado;
+ *   · o VÍDEO em loop do app real (~12 s, mudo, inline), no estilo do Cal AI (dono 17/10: "tem que
+ *     mostrar o app mesmo, de forma fluida… o iPhone entra" e "o usuário quer ver primeiro o app"):
+ *     fundo branco, um iPhone ENTRA pela direita girado e assenta no centro (0,7 s) já na HOME CHEIA
+ *     de uma conta usada (Bom dia, score 37, 🔥 12 dias, widgets, módulos); dentro dele, uma gravação
+ *     de tela CONTÍNUA: arrasta as ações rápidas → Registrar Gasto → 12 → Alimentação → ✓ (score
+ *     37 → 42, 🔥 13 dias "garantido hoje") → rola a Home até os módulos → Finanças → rola até o
+ *     QUANTO POSSO GASTAR HOJE → ZOOM só no card, limpo sobre o branco ("R$ 123 por dia · Sobram
+ *     R$ 111 pra hoje") → volta → o iPhone sai pela esquerda e o loop recomeça com ele entrando.
+ *     Sem legendas. Gerado do app (conta montada pelo fluxo + seeds da demo /preview, Supabase
+ *     falso, loja mock; receita em scratchpad/video-welcome2/work), 1080×1386 H.264 ≤ 2 MB em
+ *     public/funil/, com pôster JPEG (o iPhone assentado na Home cheia) pra antes do 1º quadro /
+ *     autoplay negado;
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
@@ -231,8 +233,8 @@ const CSS_WCA = `
 .wca-palco { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4px 16px 2px; }
 /* O quadro = o vídeo inteiro (1080×1386, proporção ~39:50). O vídeo já traz o iPhone (com a
    sombra) sobre fundo BRANCO, igual ao da tela — então o quadro não tem borda, canto nem sombra:
-   o celular parece solto na página, como no Cal AI. O canto de 20 px só aparece no ZOOM (o fundo
-   do app escurecido encosta na borda do quadro). Cabe pela ALTURA (o que sobrar entre o topo
+   o celular parece solto na página, como no Cal AI. O canto de 20 px é só reserva (no zoom o card
+   fica sozinho sobre o branco). Cabe pela ALTURA (o que sobrar entre o topo
    e o texto) e nunca passa da largura. */
 .wca-quadro {
   position: relative; width: 100%; max-width: 100%; max-height: 100%; flex: 0 0 auto;

@@ -107,15 +107,19 @@ export const noIPhone = (): boolean => {
  * caiu no paywall.
  *
  * Regra nova, SÓ no iPhone (o Android segue como estava):
- *   - nada de pedido no funil nem da caixinha automática da Apple;
- *   - o único caminho é a NOSSA folha (ConviteAvaliacao, motivo
- *     "momento_valor"), e o toque em "Deixar minha nota" abre a tela de
- *     avaliar da App Store (sempre abre; a caixinha só quando a Apple quer);
- *   - só aparece pra quem PAGA (fora do trial), usou o app em 2+ dias
- *     diferentes, e ACABOU de concluir uma ação de valor (lançar gasto,
- *     treino, hábito, conta, água…);
- *   - uma semana entre convites, 90 dias depois de um pedido real, e depois
- *     de 2 "Agora não" nunca mais.
+ *   - nada de pedido no funil;
+ *   - o momento de valor (motivo "momento_valor") só vale pra quem PAGA
+ *     (fora do trial), usou o app em 2+ dias diferentes, e ACABOU de
+ *     concluir uma ação de valor (lançar gasto, treino, hábito, conta, água…);
+ *   - uma semana entre reservas, 90 dias depois de um pedido real, e quem
+ *     já tinha dado 2 "Agora não" na folha antiga não é pedido.
+ *
+ * 1.0.16 (17/10, dono): a NOSSA folha "Deixar minha nota / Agora não" saiu do
+ * iPhone — 13–17/10: 43 vistas, 41 "Agora não", 2 aceites. No lugar, com as
+ * MESMAS regras de quem e quando, o pedido é a caixinha nativa da Apple
+ * (SKStoreReviewController, o mesmo dos motivos diretos). Ver
+ * `pedirAvaliacaoDeValor`. O evento app_avaliacao_convite deixa de existir
+ * no iPhone; fica o app_avaliacao_pedida com motivo "momento_valor".
  * ───────────────────────────────────────────────────────────────────────── */
 const CHAVE_DIAS_DE_USO = "core-dias-de-uso";
 const CHAVE_RECUSAS_VALOR = "core-avaliacao-valor-recusas";
@@ -127,6 +131,8 @@ export const DIAS_MINIMOS_PRA_CONVIDAR = 2;
 export const MOTIVOS_DIRETOS_NO_IPHONE = new Set<MotivoAvaliacao>([
   "sequencia_habito", "conta_paga", "retrospectiva", "extrato_importado", "meta_batida", "desafio_concluido",
   "missao_dose_concluida", "missao_completa", "plano_amanha_definido",
+  // 1.0.16: o momento de valor (pagante + 2 dias) — só chega aqui por `pedirAvaliacaoDeValor`.
+  "momento_valor",
 ]);
 
 /** Ações que contam como "acabei de conseguir algo" → rótulo da folha. */
@@ -191,6 +197,17 @@ export function reservarConviteDeValor(acao: string | null | undefined, { pagant
   });
   if (ok) marcarConvite("core-avaliacao-convite-valor");
   return ok;
+}
+
+/**
+ * 1.0.16 (iPhone): o momento de valor pede a CAIXINHA da Apple direto — sem a
+ * folha nossa na frente. Mesmas regras (`reservarConviteDeValor`: pagante,
+ * fora do trial, 2+ dias de uso, ação de valor, semana entre reservas, 90
+ * dias/3 na vida). Devolve se a caixinha foi pedida.
+ */
+export async function pedirAvaliacaoDeValor(acao: string | null | undefined, o: { pagante: boolean; emTrial: boolean }): Promise<boolean> {
+  if (!reservarConviteDeValor(acao, o)) return false;
+  return pedirAvaliacaoSePuder("momento_valor", { pagante: true });
 }
 
 /** "Agora não" no convite de valor — depois de 2, não convida mais. */

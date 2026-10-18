@@ -37,8 +37,15 @@ export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
     if (status !== "sem_plugin") {
       try { localStorage.setItem(CHAVE, status); } catch { /* noop */ }
       trackEvent("att_resposta", { status, origem });
-      // Aceitou: regrava a ficha do aparelho, agora com o IDFA dentro.
-      if (status === "authorized") void capturarDispositivoApp();
+      // Aceitou: regrava a ficha (agora com o IDFA) e manda $idfa pro
+      // RevenueCat. O collectDeviceIdentifiers do boot rodou ANTES deste
+      // diálogo — sem esta segunda passada o teste anônimo sai sem madid.
+      if (status === "authorized") {
+        void capturarDispositivoApp();
+        void import("@/lib/revenuecat")
+          .then((m) => m.enviarIdentificadoresDeAnuncio())
+          .catch(() => {});
+      }
     }
     return status;
   } catch {

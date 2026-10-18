@@ -111,8 +111,8 @@ export const noIPhone = (): boolean => {
  *   - o momento de valor (motivo "momento_valor") só vale pra quem PAGA
  *     (fora do trial), usou o app em 2+ dias diferentes, e ACABOU de
  *     concluir uma ação de valor (lançar gasto, treino, hábito, conta, água…);
- *   - uma semana entre reservas, 90 dias depois de um pedido real, e quem
- *     já tinha dado 2 "Agora não" na folha antiga não é pedido.
+ *   - uma semana entre reservas e 90 dias depois de um pedido real (o
+ *     "Agora não" da folha antiga não conta mais: era recusa da folha, não da Apple).
  *
  * 1.0.16 (17/10, dono): a NOSSA folha "Deixar minha nota / Agora não" saiu do
  * iPhone — 13–17/10: 43 vistas, 41 "Agora não", 2 aceites. No lugar, com as
@@ -123,7 +123,6 @@ export const noIPhone = (): boolean => {
  * ───────────────────────────────────────────────────────────────────────── */
 const CHAVE_DIAS_DE_USO = "core-dias-de-uso";
 const CHAVE_RECUSAS_VALOR = "core-avaliacao-valor-recusas";
-const MAX_RECUSAS_VALOR = 2;
 export const DIAS_MINIMOS_PRA_CONVIDAR = 2;
 
 /** Os momentos em que o iPhone pede a caixinha direto (03/10): os de uso do Android — nunca o funil nem o 1º gasto.
@@ -179,21 +178,22 @@ export const diasDeUso = (): number => lerDias().length;
 /** A regra pura — sem efeito colateral, testável. */
 export function deveConvidarNoMomentoDeValor(o: {
   iphone: boolean; acao: string | null | undefined; pagante: boolean; emTrial: boolean; dias: number;
-  podePedir: boolean; conviteRecente: boolean; recusas: number;
+  podePedir: boolean; conviteRecente: boolean;
 }): boolean {
   if (!o.iphone) return false;
   if (!o.acao || !(o.acao in ACOES_DE_VALOR)) return false;
   if (!o.pagante || o.emTrial) return false;
   if (o.dias < DIAS_MINIMOS_PRA_CONVIDAR) return false;
-  if (!o.podePedir || o.conviteRecente) return false;
-  return o.recusas < MAX_RECUSAS_VALOR;
+  // 1.0.16: sem a trava de 2 "Agora não" — era da NOSSA folha, que saiu; quem recusou a folha nunca recusou a
+  // Apple, e a caixinha já é limitada (3/ano pela Apple; 90 dias e 3 na vida por nós).
+  return o.podePedir && !o.conviteRecente;
 }
 
 /** Reserva o convite de momento de valor (marca a semana ANTES de a folha abrir). */
 export function reservarConviteDeValor(acao: string | null | undefined, { pagante, emTrial }: { pagante: boolean; emTrial: boolean }): boolean {
   const ok = deveConvidarNoMomentoDeValor({
     iphone: noIPhone(), acao, pagante, emTrial, dias: diasDeUso(),
-    podePedir: podePedirAvaliacao(), conviteRecente: conviteRecente(), recusas: lerNumero(CHAVE_RECUSAS_VALOR),
+    podePedir: podePedirAvaliacao(), conviteRecente: conviteRecente(),
   });
   if (ok) marcarConvite("core-avaliacao-convite-valor");
   return ok;
@@ -210,7 +210,8 @@ export async function pedirAvaliacaoDeValor(acao: string | null | undefined, o: 
   return pedirAvaliacaoSePuder("momento_valor", { pagante: true });
 }
 
-/** "Agora não" no convite de valor — depois de 2, não convida mais. */
+/** "Agora não" da folha antiga de valor. 1.0.16: a folha saiu do iPhone e a contagem não barra mais nada
+ *  (a chave fica só pra não quebrar quem lê/limpa o aparelho). */
 export function registrarRecusaDeValor(): void {
   try { localStorage.setItem(CHAVE_RECUSAS_VALOR, String(lerNumero(CHAVE_RECUSAS_VALOR) + 1)); } catch { /* noop */ }
 }

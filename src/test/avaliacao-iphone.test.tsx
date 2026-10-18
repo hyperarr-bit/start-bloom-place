@@ -39,13 +39,13 @@ beforeEach(() => {
 });
 afterEach(() => { delete (window as unknown as { Capacitor?: unknown }).Capacitor; });
 
-const base = { iphone: true, acao: "first_workout", pagante: true, emTrial: false, dias: 2, podePedir: true, conviteRecente: false, recusas: 0 };
+const base = { iphone: true, acao: "first_workout", pagante: true, emTrial: false, dias: 2, podePedir: true, conviteRecente: false };
 
 describe("regra do convite de valor (pura)", () => {
   it("paga, fora do trial, 2 dias de uso, ação de valor, sem convite recente: convida", () => {
     expect(deveConvidarNoMomentoDeValor(base)).toBe(true);
   });
-  it("não convida: Android, ação que não é de valor, não pagante, no trial, 1 dia só, convite recente, cota fechada, 2 recusas", () => {
+  it("não convida: Android, ação que não é de valor, não pagante, no trial, 1 dia só, convite recente, cota fechada", () => {
     expect(deveConvidarNoMomentoDeValor({ ...base, iphone: false })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, acao: "first_note" })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, acao: null })).toBe(false);
@@ -54,7 +54,6 @@ describe("regra do convite de valor (pura)", () => {
     expect(deveConvidarNoMomentoDeValor({ ...base, dias: 1 })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, conviteRecente: true })).toBe(false);
     expect(deveConvidarNoMomentoDeValor({ ...base, podePedir: false })).toBe(false);
-    expect(deveConvidarNoMomentoDeValor({ ...base, recusas: 2 })).toBe(false);
   });
 });
 
@@ -77,10 +76,10 @@ describe("reservarConviteDeValor (iPhone)", () => {
     expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(true);
     expect(reservarConviteDeValor("first_transaction", { pagante: true, emTrial: false })).toBe(false); // mesma semana
   });
-  it("depois de 2 'Agora não', nunca mais", () => {
+  it("1.0.16: 2 'Agora não' da folha antiga NÃO barram mais (a recusa era da folha, não da Apple)", () => {
     doisDias();
     registrarRecusaDeValor(); registrarRecusaDeValor();
-    expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(false);
+    expect(reservarConviteDeValor("first_workout", { pagante: true, emTrial: false })).toBe(true);
   });
   it("no trial não convida (espera virar pagamento)", () => {
     doisDias();

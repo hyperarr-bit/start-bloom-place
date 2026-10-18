@@ -138,6 +138,8 @@ describe("deep link core://porta (deep-link.ts)", () => {
   it("app aberto (appUrlOpen, na welcome): mesma coisa; os atalhos de módulo seguem funcionando", async () => {
     const navegar = await ligar();
     expect(navegar).not.toHaveBeenCalled();
+    // o ouvinte do appUrlOpen entra depois de um await (App.addListener): com a máquina carregada ele ainda não está lá
+    await waitFor(() => expect(typeof app.ouvintes[0]).toBe("function"));
     app.ouvintes[0]({ url: `core://entrar?h=${CODIGO}` });
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"));
     app.ouvintes[0]({ url: "core://financas" });

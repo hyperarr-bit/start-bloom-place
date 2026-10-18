@@ -25,6 +25,19 @@ const versaoDoApp = (() => {
   }
 })();
 
+/** /missao → /missao.html no servidor de desenvolvimento e no `vite preview` (a Vercel faz pelo vercel.json). */
+const rotaDaMissao = () => {
+  const reescrever = (req: { url?: string }, _res: unknown, next: () => void) => {
+    if (req.url === "/missao" || req.url?.startsWith("/missao?")) req.url = req.url.replace("/missao", "/missao.html");
+    next();
+  };
+  return {
+    name: "rota-da-missao",
+    configureServer(server: { middlewares: { use: (f: typeof reescrever) => void } }) { server.middlewares.use(reescrever); },
+    configurePreviewServer(server: { middlewares: { use: (f: typeof reescrever) => void } }) { server.middlewares.use(reescrever); },
+  };
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   // Constante global, NÃO "import.meta.env.X": definir uma chave isolada de
@@ -82,10 +95,21 @@ export default defineConfig(({ mode }) => ({
      * idêntico ao de antes do es2015.
      */
     cssTarget: "chrome61",
+    /*
+     * FUNIL DA MISSÃO (protótipo 18/10): uma 2ª página, missao.html — a 1ª tela em HTML puro (sem esperar o
+     * bundle); o app carrega por trás e monta no mesmo documento (src/missao/leve.ts). Na Vercel: /missao →
+     * /missao.html (vercel.json). O index.html continua igual.
+     */
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        missao: path.resolve(__dirname, "missao.html"),
+      },
+    },
   },
   // medicaoTextos (1.0.16): o dicionário de textos do código que a medição total usa como peneira de
   // privacidade — ver vite-plugin-medicao-textos.ts. Sai num pedaço próprio, carregado só nas telas do app.
-  plugins: [react(), medicaoTextos(path.resolve(__dirname)), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [react(), medicaoTextos(path.resolve(__dirname)), mode === "development" && componentTagger(), rotaDaMissao()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { EVENTO_MISSAO_WEB, missaoWebConvidada } from "@/lib/missao-web";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -421,6 +422,20 @@ const AssinaturaApp = lazyPage(() => import("./pages/funis/app-web/AssinaturaApp
 // os dois no Pix da Asaas SEM conta antes → upsells → e-mail → o app web logado com as Finanças montadas. Só na WEB
 // (SoNaWeb), noindex, sem link no site, atrás da chave FUNIL_HOJE (padrão OFF; QA ?funil-hoje=on — pages/hoje/conteudo).
 const FunilHoje = lazyPage(() => import("./pages/hoje/FunilHoje"));
+// 18/10: o FUNIL DA MISSÃO (protótipo, chave FUNIL_MISSAO off): /missao é o missao.html leve; o app monta no módulo
+// da área, sem cadastro, direto no tutorial da missão. /missao/app = entrada direta. A camada (oferta depois da
+// dose 1) só carrega com o convidado da missão ativo. Ver lib/missao-web.
+const EntradaMissao = lazyPage(() => import("./missao/EntradaDireta"));
+const FunilMissaoCamadaLazy = lazy(() => import("./missao/FunilMissaoCamada"));
+function CamadaDaMissao() {
+  const [ativa, setAtiva] = useState(() => missaoWebConvidada());
+  useEffect(() => {
+    const reler = () => setAtiva(missaoWebConvidada());
+    window.addEventListener(EVENTO_MISSAO_WEB, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_WEB, reler);
+  }, []);
+  return ativa ? <Suspense fallback={null}><FunilMissaoCamadaLazy /></Suspense> : null;
+}
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
@@ -668,6 +683,7 @@ const AnimatedRoutes = () => {
         <Route path="/assinar" element={<SoNaWeb><RouteErrorBoundary routeName="venda-web"><VendaWeb /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/missao/app" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/hoje" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
@@ -881,6 +897,7 @@ const App = () => {
                 {/* 02/10: a missão em doses + card SEU DIA — na web atrás da chave MISSAO_DOSES ("off");
                     03/10: LIGADA no app das lojas pra quem é novo (MISSAO_DOSES_APP, lib/missao-doses) */}
                 <MissaoDosesNaWeb />
+                <CamadaDaMissao />
                 {/* 03/10: "Quer que eu te lembre amanhã às 19h?" — a permissão de notificação pedida
                     uma vez, depois do 1º registro do dia 1 (só no app; a comemoração da missão cobre o resto) */}
                 <PreFolhaLembrete />

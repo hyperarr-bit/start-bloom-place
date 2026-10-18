@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { missaoWebConvidada } from "@/lib/missao-web";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
@@ -261,7 +262,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * (Rotina, Treino, Metas) entram por encaixes.ts — sem eles, a dose guiada simples. Lido no mount. */
   const setup = setupDaDose(n, modulo, modo);
   const { user } = useAuth();
-  const { isGuest } = useUserData();
+  // funil da missão na web (protótipo 18/10): a convidada do /missao conta como conta nova (os quizzes abrem; os dados vão pro guest:*)
+  const isGuest = useUserData().isGuest && !missaoWebConvidada();
   const criadoEm = (user as { created_at?: string } | null)?.created_at;
   const [montarAberto, setMontarAberto] = useState(() => {
     /* B11: o app morreu no "Montando…" (já decidido) ANTES de o número aparecer — o Montar reabre direto no número

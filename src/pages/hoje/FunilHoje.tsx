@@ -596,7 +596,7 @@ function TelaResultado({ r, onSeguir, onVoltar, onVisto }: { r: Resultado; onSeg
  * gráfico "quanto você paga" renovando × pra sempre se desenhando + a faixa do preço; visual="etiqueta" (down, 27) põe
  * a etiqueta de ingresso com o 47 riscado. Textos, valores, botões e eventos iguais; o vida a dois (up2) fica no cartão.
  */
-function TelaUpsell({ testid, confirmado, kicker, titulo, texto, nome, valor, prefixo, riscado, itens, cta, onSim, onNao, visual, plano = "anual" }: {
+export function TelaUpsell({ testid, confirmado, kicker, titulo, texto, nome, valor, prefixo, riscado, itens, cta, onSim, onNao, visual, plano = "anual" }: {
   testid: string; confirmado: ReactNode; kicker: string; titulo: string; texto: string; nome: string; valor: number; prefixo: string;
   riscado?: number; itens: string[]; cta: string; onSim: () => void; onNao: () => void; visual?: "grafico" | "etiqueta"; plano?: PlanoHoje;
 }) {

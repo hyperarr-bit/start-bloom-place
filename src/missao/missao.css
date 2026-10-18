@@ -1,0 +1,39 @@
+/* FUNIL DA MISSÃO (protótipo 18/10) — a MESMA animação de troca de tela do HTML leve (missao.html, .mt-tela) e do
+   /hoje (fn-entra): 14 px da direita + fade, 280 ms, ease-out. Usada na entrada do app (#root.mt-entrando), em
+   cada tela da oferta (.fn-tela, que já é essa animação no funil-hoje.css) e na faixa minimizada. */
+@keyframes mt-entra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes mt-entra-op { from { opacity: 0; } to { opacity: 1; } }
+/* O #root só ganha a parte de OPACIDADE: transform no #root vira o "bloco de contenção" dos position:fixed do app
+   (a folha do Montar ia parar no fim da página). O movimento de 14 px fica na folha do tutorial, logo abaixo. */
+#root.mt-entrando { animation: mt-entra-op .28s ease-out backwards; }
+/* DENTRO do app, com o funil ativo (html[data-funil-missao], posto pela camada): a folha do tutorial entra com a
+   MESMA animação, e cada passo dela também (a camada reinicia a animação quando o data-etapa muda). `backwards`:
+   terminado, nada fica aplicado (sem bloco de contenção pros fixed lá dentro). */
+html[data-funil-missao] .mf-corpo, html[data-funil-missao] .mrt-corpo, html[data-funil-missao] [data-testid="escolher-treino"] { animation: mt-entra .28s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { #root.mt-entrando, html[data-funil-missao] .mf-corpo, html[data-funil-missao] .mrt-corpo, html[data-funil-missao] [data-testid="escolher-treino"] { animation: none; } }
+
+/* a oferta cobre TUDO do app (tour da Home, plano de amanhã, folhas) até ela decidir */
+.mo-camada { position: fixed; inset: 0; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147482000; }
+.mo-camada .fn { z-index: 2147482000; }
+
+/* o recibo do que ela fez no dia 1 */
+.mo-recibo { margin: 14px 20px 0; padding: 14px 16px; border-radius: 16px; background: #f6fbf7; border: 1.5px solid #cdebd6; }
+.mo-recibo-tit { display: flex; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .1em; font-weight: 800; color: #15803d; text-transform: uppercase; }
+.mo-recibo ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mo-recibo li { display: flex; align-items: flex-start; gap: 8px; font-size: 14.5px; font-weight: 600; line-height: 1.35; color: #262626; }
+.mo-recibo li svg { color: #16a34a; flex-shrink: 0; margin-top: 2px; }
+.mo-amanha { margin: 12px 20px 0; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; background: #faf8f5; font-size: 14px; font-weight: 600; color: #404040; }
+.mo-amanha b { font-weight: 800; }
+.mo-amanha-dias { display: flex; gap: 4px; margin-left: auto; }
+.mo-amanha-dias i { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid #d4d4d4; }
+.mo-amanha-dias i[data-on] { background: #16a34a; border-color: #16a34a; }
+.mo-oferta-h1 { padding: 16px 20px 0; }
+.mo-oferta-h1 h1 { font-size: 27px; font-weight: 800; letter-spacing: -.025em; line-height: 1.1; margin: 0; }
+.mo-oferta-h1 p { font-size: 14.5px; color: #6b6b6b; margin: 6px 0 0; line-height: 1.4; }
+button.mo-ver { margin-left: auto; padding: 6px 0 6px 8px; background: none; border: 0; color: #6b6b6b; font: 600 13.5px/1 Inter, -apple-system, sans-serif; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #cfcfcf; }
+
+/* minimizada: a faixa fixa por cima do app ("Ver o que fiz") */
+.mo-faixa { position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 2147482000; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 18px; background: #262626; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.25); font-family: Inter, -apple-system, sans-serif; animation: mt-entra .28s ease-out both; }
+.mo-faixa span { font-size: 14px; font-weight: 650; line-height: 1.25; }
+.mo-faixa span small { display: block; font-size: 12px; font-weight: 500; opacity: .75; }
+button.mo-faixa-btn { margin-left: auto; min-height: 42px; padding: 0 16px; border-radius: 12px; border: 0; background: #fff; color: #262626; font: 750 14.5px/1 Inter, -apple-system, sans-serif; white-space: nowrap; }

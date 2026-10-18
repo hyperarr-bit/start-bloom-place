@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Navigate } from "react-router-dom";
 import { isNativeShell } from "@/lib/native-shell";
 import { estadoTeste } from "@/lib/teste-gratis";
+import { missaoWebConvidada } from "@/lib/missao-web";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -42,6 +43,9 @@ export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteP
       if (t.fase === "ativo") return <>{children}</>;
       if (t.fase === "expirado") return <Navigate to="/app?step=offer&d3=1" replace />;
     }
+    /* FUNIL DA MISSÃO NA WEB (protótipo 18/10, chave FUNIL_MISSAO off): a convidada que veio do /missao usa o app
+     de verdade sem conta (guest:*), até pagar — lib/missao-web. */
+    if (missaoWebConvidada()) return <>{children}</>;
     return <Navigate to="/auth" replace />;
   }
 

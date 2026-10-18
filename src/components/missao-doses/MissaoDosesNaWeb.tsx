@@ -8,6 +8,7 @@ import { localDayKey } from "@/lib/utils";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { areaEscolhidaNoFunil } from "@/components/missao/MissaoDoTrial";
 import { isNativeShell } from "@/lib/native-shell";
+import { missaoWebConvidada } from "@/lib/missao-web";
 import { EVENTO_DIA2, LEMBRETE_DO_PLANO, combinarHora } from "@/lib/lembrete-dia2";
 import { agendarProximaDose, pedirPermissaoDia2 } from "@/lib/notificacoes";
 import { bracoDia1, guardarForcaDia1Cheio, modoUmPorDia, type PlanoAmanha } from "@/lib/dia1-cheio";
@@ -379,11 +380,12 @@ function Ligada() {
     return () => { window.clearInterval(t); window.clearTimeout(limite); };
   }, [planoDevendo]);
 
-  if (!user || !missao || semAcessoNoApp) return null;
+  // funil da missão na web (protótipo 18/10): a convidada do /missao vê a missão sem conta (a missão nasce no funil)
+  if ((!user && !missaoWebConvidada()) || !missao || semAcessoNoApp) return null;
 
   const salvar = (m: EstadoMissaoDoses) => { gravarMissao(m); setMissao(m); };
   const areaNome = (() => {
-    const a = areaDaMissao(user.user_metadata);
+    const a = areaDaMissao(user?.user_metadata);
     return a && a in AREAS ? AREAS[a as AreaKey].nome : null;
   })();
   const pendente = passoPendente(missao);

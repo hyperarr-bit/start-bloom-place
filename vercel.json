@@ -5,6 +5,10 @@
       "destination": "/api/baixar"
     },
     {
+      "source": "/missao",
+      "destination": "/missao.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

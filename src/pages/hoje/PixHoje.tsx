@@ -49,7 +49,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -66,6 +66,9 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** o e-mail OPCIONAL já salvo nesta compra (some o campo) */
   emailSalvo?: string | null;
   onEmailSalvo?: (email: string, via: "conta" | "destino") => void;
+  /** PROTÓTIPO (funil da missão, 18/10): nada vai pra Asaas nem pro banco — QR de mentira, "Já paguei" confirma na
+   *  hora, o e-mail opcional só fica na tela. Padrão false: o /hoje não muda. */
+  simular?: boolean;
 }) {
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -85,6 +88,11 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     setGerando(true);
     setErro(null);
     try {
+      if (simular) {
+        await new Promise((ok) => window.setTimeout(ok, 700));
+        onPix({ orderId: `simulado-${Date.now().toString(36)}`, qrCode: "00020101021226870014br.gov.bcb.pix2565pix.exemplo.com/qr/v2/PROTOTIPO-SEM-COBRANCA5204000053039865802BR5904CORE6009SAO PAULO62070503***6304ABCD", qrCodeBase64: null, expiresAt: null, criadoEm: Date.now(), oferta });
+        return;
+      }
       const s = await abrirSessaoParaPagar();
       if (s === "indisponivel") {
         trackEvent("hoje_erro", { onde: "sessao", oferta, ...ids() });
@@ -112,7 +120,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       pedindo.current = false;
       setGerando(false);
     }
-  }, [ids, onPix, oferta, valor]);
+  }, [ids, onPix, oferta, valor, simular]);
 
   /* sem QR desta oferta (ou o salvo venceu) → gera na montagem */
   useEffect(() => {
@@ -131,6 +139,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** Uma conferência (o atual; com anteriores vivos, reveza: atual, anterior 1, atual, anterior 2…). true = pago. */
   const conferirUmaVez = useCallback(async (): Promise<boolean> => {
     if (!pixAtual || pago.current) return pago.current;
+    if (simular) return false; // protótipo: só o "Já paguei" confirma
     const vivos = anterioresRef.current.filter((a) => a.orderId !== pixAtual.orderId && venceEm(a) > Date.now());
     const fila: PixSalvo[] = vivos.length ? vivos.flatMap((v) => [pixAtual, v]) : [pixAtual];
     const alvo = fila[vez.current++ % fila.length];
@@ -146,7 +155,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       return true;
     }
     return false;
-  }, [pixAtual]);
+  }, [pixAtual, simular]);
 
   /* confirmação: check a cada 3 s + na volta da aba */
   useEffect(() => {
@@ -185,7 +194,13 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     setAindaNao(false);
     trackEvent("funnel_click", { funil: "hoje", cta: "ja_paguei", oferta, ...ids() });
     let ok = false;
-    try { ok = await conferirUmaVez(); } catch { ok = false; }
+    if (simular && pixAtual && !pago.current) {
+      await new Promise((r) => window.setTimeout(r, 600));
+      pago.current = true;
+      onPagoRef.current(pixAtual);
+      ok = true;
+    }
+    try { if (!ok) ok = await conferirUmaVez(); } catch { ok = false; }
     setConferindo(false);
     if (!ok) setAindaNao(true);
   };
@@ -204,6 +219,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     let via: "conta" | "destino" | null = null;
     let erro: string | null = null;
     try {
+      if (simular) { via = "conta"; throw new Error("simulado"); }
       const r = await salvarEmailDaCompra(limpo);
       if (r.ok === true) via = "conta";
       else if ("existe" in r) {

@@ -45,6 +45,7 @@
  * chips gravam — esses são dados de verdade da conta, pelo mesmo `set` que o
  * módulo usa.
  */
+import { missaoWebConvidada } from "@/lib/missao-web";
 import { montarFinancasLigado } from "@/lib/montar-financas";
 import { montarRotinaLigado } from "@/lib/montar-rotina";
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
@@ -140,6 +141,7 @@ export const diaDeQa = (): 1 | 2 | 3 | null => {
  */
 export function missaoDosesLigada(modo: ModoMissaoDoses = MISSAO_DOSES, modoApp: ModoMissaoDoses = MISSAO_DOSES_APP): boolean {
   if (isNativeShell()) return modoApp === "on";
+  if (missaoWebConvidada()) return true; // funil da missão na web (protótipo 18/10) — lib/missao-web
   if (!qaHabilitado()) return modo === "on";
   const f = forcaDaMissaoDoses();
   if (f === "on") return true;

@@ -102,7 +102,9 @@ describe("quandoAvisarDia2 — sempre no dia 2 da Missão, em hora decente", () 
 });
 
 describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de sempre", () => {
-  const INICIO = new Date(2026, 8, 28, 10, 0).getTime();
+  // O módulo é avaliado antes do beforeAll trocar o TZ. Offset explícito
+  // mantém a fixture em 10h de São Paulo também em agentes/CI iniciados em UTC.
+  const INICIO = Date.parse("2026-09-28T10:00:00-03:00");
   const avisoAgendado = () => {
     const pedido = ln.schedule.mock.calls[0]?.[0] as { notifications: { id: number; title: string; body: string; schedule: { at: Date } }[] };
     return pedido.notifications;

@@ -22,6 +22,8 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { MontarRotina } from "@/components/beleza/montar-rotina";
+import { gerarRotina } from "@/lib/beleza-rotina";
 import { MemoryRouter } from "react-router-dom";
 import { somarDias } from "@/lib/sequencia";
 import { CHAVE_FORCA_INTRO, INTROS, MODULOS_COM_INTRO, chaveIntroVista, marcarIntroVista, porQueNaoMostrar, type Leitor } from "@/lib/intro-modulo";
@@ -306,6 +308,37 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
       expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");
     });
   }
+
+  it("Beleza (rev3): com o quiz 'Monte sua rotina' na tela, o passo 1 USA o quiz — anel nele, post-it sem chips (nada de pergunta dobrada), espera a rotina nascer e segue pro 'olha'", { timeout: 40_000 }, async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 400, right: 310, bottom: 600, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const s = criarStore();
+    const Quiz = () => {
+      const [pronta, setPronta] = useState(false);
+      return pronta ? <div data-testid="rotina-pronta">rotina</div> : (
+        <MontarRotina onDoZero={() => {}} onPronto={(perfil) => {
+          const r = gerarRotina(perfil, []);
+          s.set("skincare-am-steps", r.manha); s.set("skincare-pm-steps", r.noite); s.set("skincare-perfil", perfil); setPronta(true);
+        }} />
+      );
+    };
+    render(<s.Provedor><div><Quiz /><IntroDoModulo moduleId="beleza" /></div></s.Provedor>);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 9000 });
+    // o post-it é só a instrução: nenhum chip, e a pergunta da pele aparece UMA vez (a do quiz)
+    expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Responde aqui as 3 perguntas");
+    expect(screen.getAllByText("Como é a sua pele?")).toHaveLength(1);
+    expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeNull();
+    // as 5 opções do quiz (inclusive Sensível) e o "Prefiro montar do zero" estão lá, tocáveis
+    expect(screen.getByTestId("opcao-sensivel")).toBeTruthy();
+    expect(screen.getByTestId("do-zero")).toBeTruthy();
+    // ela responde as 3 perguntas no quiz → a rotina nasce → o passo segue sozinho
+    fireEvent.click(screen.getByTestId("opcao-sensivel"));
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
+    expect((s.estado.dados["skincare-am-steps"] as unknown[]).length).toBeGreaterThan(0);
+    await waitFor(() => expect(faixa()!.textContent).toContain("2 de 3 · olha a sua rotina"), { timeout: 9000 });
+    medir.mockRestore();
+  });
 
   it("Saúde (guiada): água → olha → continua no sono (3 de 4) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);

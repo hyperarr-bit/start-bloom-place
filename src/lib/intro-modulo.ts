@@ -57,7 +57,7 @@ import {
 import { planoVazio } from "@/lib/treino-plano";
 import { cardPorTitulo } from "@/lib/conhecer-mais";
 import { localDayKey } from "@/lib/utils";
-import { CHAVE_PASSOS as CHAVE_PASSOS_BELEZA, type TipoDePele } from "@/lib/beleza-rotina";
+import { CHAVE_PASSOS as CHAVE_PASSOS_BELEZA, CHAVE_PERFIL as CHAVE_PERFIL_BELEZA, OPCOES_PELE, type TipoDePele } from "@/lib/beleza-rotina";
 
 export type ModoIntro = "off" | "on";
 /** Web (Vercel): fica desligada — a intro é do app. ROLLBACK/LIGAR na web = trocar aqui. */
@@ -335,6 +335,12 @@ export interface PassoDaIntro {
   escutar?: { chaves: string[]; rotulo: (valor: unknown, anterior: unknown, chave: string) => string | null };
   /** o controle real que o anel abraça (a aba dele, se mora em outra) */
   alvo?: { aba?: string; achar: () => Element | null; abaixo?: boolean };
+  /**
+   * O módulo JÁ faz essa pergunta (Beleza: o quiz "Monte sua rotina"): achado o `alvo`, o passo USA o controle do
+   * módulo — o anel nele, o post-it só com esta instrução e SEM chips (nada de pergunta dobrada), e o passo espera o
+   * `escutar`. Sem o alvo (módulo não montou), valem a `pergunta` e os chips de sempre.
+   */
+  quandoNoModulo?: { pergunta: string; descricao?: string; rotulo?: string };
   /** depois de gravar: um toque no DOM do módulo (abrir a aba HOJE, rolar até a lista…) */
   depois?: () => void;
 }
@@ -758,11 +764,25 @@ export const INTROS: Record<string, IntroConfig> = {
     pedido: "monta o seu skincare",
     pronto: "Beleza é isso: a rotina da manhã e da noite, um toque por passo.",
     passos: [{
+      // 1) o quiz do PRÓPRIO módulo ("Monte sua rotina", 3 perguntas): o anel nele e o passo espera a rotina nascer
+      //    (rev3, 17/10: o post-it com Oleosa/Mista/Seca cobria o quiz com a mesma pergunta). Sem o quiz na tela, os chips.
       pergunta: "Como é a sua pele?",
       descricao: "Toca num e a rotina de manhã e de noite nasce pra ela. Depois você ajusta.",
       opcoes: [op("💧", "Oleosa", "oleosa"), op("🌗", "Mista", "mista"), op("🍃", "Seca", "seca")],
       executar: (ctx, o) => { montarSkincare(ctx, o.id as TipoDePele); return `Skincare pra pele ${o.rotulo.toLowerCase()}`; },
-      alvo: { aba: "SKINCARE", achar: porSeletor('[data-testid="montar-rotina"], [data-testid="skincare-perguntas"], [data-testid="rotina-vazia"]') },
+      quandoNoModulo: { pergunta: "Responde aqui as 3 perguntas", descricao: "A rotina de manhã e de noite nasce pra sua pele. Depois você ajusta.", rotulo: "3 toques" },
+      escutar: {
+        chaves: [CHAVE_PERFIL_BELEZA, CHAVE_PASSOS_BELEZA.manha, CHAVE_PASSOS_BELEZA.noite],
+        rotulo: (valor, _anterior, chave) => {
+          if (chave === CHAVE_PERFIL_BELEZA) {
+            const pele = (valor as { pele?: string } | null)?.pele;
+            const rotulo = OPCOES_PELE.find((o) => o.id === pele)?.rotulo;
+            return rotulo ? `Skincare pra pele ${rotulo.toLowerCase()}` : null;
+          }
+          return Array.isArray(valor) && valor.length ? "Sua rotina de manhã e de noite" : null;
+        },
+      },
+      alvo: { aba: "SKINCARE", achar: porSeletor('[data-testid="montar-rotina"]') },
     }, {
       // 2) olha a rotina pronta (rotina da manhã: 9%)
       pedido: "olha a sua rotina", pergunta: "", opcoes: [],

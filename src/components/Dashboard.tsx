@@ -4,13 +4,14 @@ import { usePaletaGrafico } from "@/lib/paleta-grafico";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { EV_MAIS_GRAFICOS } from "@/lib/financas-painel-limpo";
+import { EV_CARD_CONTA_ABRIR, cardsSimplesLigados, guardarForcaCardsDaUrl } from "@/lib/financas-cards-simples";
 import { praHojeDoDia } from "@/lib/montar-financas";
 import { localDayKey } from "@/lib/utils";
 // Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
 const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
 const GraficoReceitasDespesas = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoReceitasDespesas })));
 const GraficoPatrimonio = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoPatrimonio })));
-import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet, ChevronDown } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet, ChevronDown, ChevronRight } from "lucide-react";
 import { getCurrentYear } from "@/components/finance/storage-keys";
 import { totaisDoMes } from "@/components/finance/MonthComparison";
 import { perfilAtivoLocal } from "@/lib/finance-perfil";
@@ -212,6 +213,12 @@ export const Dashboard = ({
   const mesCorrente = useMesCorrente();
   const versaoDaVirada = useVersaoDaVirada();
   const currentYear = Number(mesCorrente.slice(0, 4)) || getCurrentYear();
+  /* CARDS SIMPLES (desenho 17/10, lib/financas-cards-simples): QUANTO POSSO GASTAR HOJE e PREVISÃO DO FIM DO MÊS
+     com as mesmas contas e apresentação mais simples. Desligado por padrão (`?cards-simples=on` só no navegador);
+     sem a chave, o DOM dos dois cards e a ordem são exatamente os de hoje. */
+  const [simples] = useState(() => { guardarForcaCardsDaUrl(); return cardsSimplesLigados(); });
+  const [contaPodeGastarAberta, setContaPodeGastarAberta] = useState(false);
+  const [contaPrevisaoAberta, setContaPrevisaoAberta] = useState(false);
 
   // Compute annual data from actual monthly records (current year only)
   // Com as parcelas do mês (26/09): o gráfico somava só fixos + variáveis e o
@@ -819,7 +826,55 @@ export const Dashboard = ({
       </div>
     </>
   );
-  const blocoPrevisao = (
+  /* CARDS SIMPLES (desenho 17/10): a mesma conta do `forecast`, apresentada como uma frase. As linhas ficam
+     em "Ver a conta ›", com rótulo simples e sem explicação cinza. Não diz "contas pagas": a conta fixa entra
+     mesmo sem pagar. */
+  const ritmoDia = Math.round(forecast.dailyVariableRate);
+  const sobraNoFim = forecast.projectedBalance >= 0;
+  const valorFim = reais(Math.abs(Math.round(forecast.projectedBalance)));
+  const linhaConta = (rotulo: string, valor: ReactNode, opts: { classe?: string; total?: boolean } = {}) => (
+    <div className={`flex justify-between gap-3 ${opts.total ? "border-t border-border pt-1.5 mt-1.5 font-semibold" : ""}`}>
+      <span className={opts.total ? "" : "text-muted-foreground"}>{rotulo}</span>
+      <span className={`tabular-nums whitespace-nowrap ${opts.classe ?? ""}`}>{valor}</span>
+    </div>
+  );
+  const blocoPrevisaoSimples = (
+    <div data-testid="previsao-simples" className={`rounded-lg border p-4 ${sobraNoFim ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
+      <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+        <TrendingUp className="w-4 h-4" />
+        PREVISÃO DO FIM DO MÊS
+      </h3>
+      <p className="text-[15px] leading-snug" data-testid="previsao-frase">
+        Se continuar assim,{" "}
+        <span className={`text-lg font-bold tabular-nums whitespace-nowrap ${sobraNoFim ? "text-green-400" : "text-red-400"}`}>
+          {sobraNoFim ? "sobra" : "falta"} R$ {valorFim}
+        </span>{" "}
+        <span className="whitespace-nowrap">no fim do mês</span>
+      </p>
+      <p className="text-[11px] text-muted-foreground mt-1">
+        {ritmoDia > 0 ? <>no seu ritmo de <span className="tabular-nums whitespace-nowrap">R$ {reais(ritmoDia)}</span> por dia</> : "sem gasto do dia a dia até agora"}
+      </p>
+      <button
+        type="button"
+        aria-expanded={contaPrevisaoAberta}
+        data-testid="previsao-ver-conta"
+        onClick={() => { if (!contaPrevisaoAberta) trackEvent(EV_CARD_CONTA_ABRIR, { card: "previsao" }); setContaPrevisaoAberta(!contaPrevisaoAberta); }}
+        className="mt-3 flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        Ver a conta <ChevronRight className={`w-3.5 h-3.5 transition-transform ${contaPrevisaoAberta ? "rotate-90" : ""}`} />
+      </button>
+      {contaPrevisaoAberta && (
+        <div className="mt-2 space-y-1.5 text-[11px]" data-testid="previsao-conta">
+          {linhaConta("Entrou", <>R$ {reais(totalIncome)}</>, { classe: "text-green-400" })}
+          {linhaConta("Já saiu", <>−R$ {reais(Math.round(forecast.totalAlreadySpent))}</>, { classe: "text-red-400" })}
+          {forecast.unpaidBillsEstimate > 0 && linhaConta("Contas a vencer", <>−R$ {reais(Math.round(forecast.unpaidBillsEstimate))}</>, { classe: "text-orange-400" })}
+          {linhaConta("Gastos até o fim do mês (estimativa)", <>−R$ {reais(Math.round(forecast.projectedVariableRemaining))}</>, { classe: "text-yellow-400" })}
+          {linhaConta(sobraNoFim ? "Sobra no fim do mês" : "Falta no fim do mês", <>{sobraNoFim ? "+" : "−"}R$ {valorFim}</>, { total: true, classe: sobraNoFim ? "text-green-400" : "text-red-400" })}
+        </div>
+      )}
+    </div>
+  );
+  const blocoPrevisaoDeSempre = (
     <>
         {/* Previsão de Saldo */}
         <div className={`rounded-lg border p-4 ${forecast.projectedBalance >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
@@ -877,6 +932,101 @@ export const Dashboard = ({
         </div>
     </>
   );
+  const blocoPrevisao = simples ? blocoPrevisaoSimples : blocoPrevisaoDeSempre;
+
+  /* CARDS SIMPLES (desenho 17/10): a mesma conta do `dailyBudget`/`praHoje`, com o herói "R$ X por dia", a linha
+     "Sobram R$ X pra hoje" com uma barrinha de quanto do dia já foi (só com gasto hoje), e a conta escondida em
+     "Como chegamos nesse número ›" (Entra − Sai = Livre ÷ dias; "Disponível livre" só com conta reservada). */
+  const corStatus = dailyBudget.status === "good" ? "text-green-400" : dailyBudget.status === "warning" ? "text-orange-400" : "text-red-400";
+  const corBarra = dailyBudget.status === "good" ? "bg-green-400" : dailyBudget.status === "warning" ? "bg-orange-400" : "bg-red-400";
+  const pctDoDia = praHoje && praHoje.doDia > 0 ? Math.min(100, Math.max(0, Math.round((praHoje.gasto / praHoje.doDia) * 100))) : 0;
+  const temReserva = dailyBudget.unpaidBillsEstimate > 0;
+  const blocoPodeGastarSimples = (
+    <div data-spotlight="pode-gastar" data-missao="posso-gastar" data-testid="pode-gastar-simples" className={`rounded-lg border p-4 ${
+      dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
+      dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
+      "bg-red-500/5 border-red-500/20"
+    }`}>
+      <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+        <Wallet className="w-4 h-4" />
+        QUANTO POSSO GASTAR HOJE
+      </h3>
+      {dailyBudget.cantSpend ? (
+        <>
+          <p className="text-3xl font-bold tabular-nums text-red-400 leading-none">R$ 0</p>
+          <p className="text-[11px] text-red-400 mt-2 flex items-start gap-1">
+            <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+            <span>Você não pode gastar — suas contas futuras consomem todo o saldo restante. Guarde o que puder.</span>
+          </p>
+        </>
+      ) : (
+        <p className="flex items-baseline gap-1.5">
+          <span data-testid="pode-gastar-valor" className={`text-3xl font-bold tabular-nums leading-none ${corStatus}`}>
+            R$ {reais(Math.round(dailyBudget.perDay))}
+          </span>
+          <span className="text-sm text-muted-foreground">por dia</span>
+        </p>
+      )}
+      {praHoje && (
+        <div className="mt-2.5" data-testid="sobram-pra-hoje">
+          <p className="text-sm font-semibold leading-snug">
+            {praHoje.sobra >= 0
+              ? <>Sobram <span className="tabular-nums whitespace-nowrap">R$ {reais(praHoje.sobra)}</span> pra hoje</>
+              : <>Hoje já passou <span className="tabular-nums whitespace-nowrap">R$ {reais(-praHoje.sobra)}</span> do que dava</>}
+          </p>
+          {praHoje.gasto > 0 && (
+            <div
+              className="mt-1.5 h-1.5 rounded-full bg-secondary overflow-hidden"
+              role="progressbar"
+              aria-label={`Já saiu R$ ${reais(praHoje.gasto)} dos R$ ${reais(praHoje.doDia)} do dia`}
+              aria-valuenow={pctDoDia}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              data-testid="sobram-pra-hoje-barra"
+            >
+              <div className={`h-full rounded-full ${praHoje.sobra >= 0 ? corBarra : "bg-red-400"}`} style={{ width: `${pctDoDia}%` }} />
+            </div>
+          )}
+        </div>
+      )}
+      <p className="text-[11px] text-muted-foreground mt-1.5">
+        {dailyBudget.remainingDays === 1 ? "Último dia do mês" : `${dailyBudget.remainingDays} dias até o fim do mês`}
+      </p>
+      {!dailyBudget.cantSpend && dailyBudget.status === "warning" && (
+        <p className="text-[11px] text-orange-400 mt-1.5 flex items-center gap-1">
+          <Lightbulb className="w-3 h-3" />
+          Atenção: ritmo de gastos acima do ideal
+        </p>
+      )}
+      <button
+        type="button"
+        aria-expanded={contaPodeGastarAberta}
+        data-testid="pode-gastar-ver-conta"
+        onClick={() => { if (!contaPodeGastarAberta) trackEvent(EV_CARD_CONTA_ABRIR, { card: "pode_gastar" }); setContaPodeGastarAberta(!contaPodeGastarAberta); }}
+        className="mt-3 flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        Como chegamos nesse número <ChevronRight className={`w-3.5 h-3.5 transition-transform ${contaPodeGastarAberta ? "rotate-90" : ""}`} />
+      </button>
+      {contaPodeGastarAberta && (
+        <div className="mt-2 space-y-1.5 text-[11px]" data-testid="pode-gastar-conta">
+          {linhaConta("Entra", <>R$ {reais(totalIncome)}</>, { classe: "text-green-400" })}
+          {linhaConta("Sai", <>−R$ {reais(Math.round(totalExpenses))}</>, { classe: "text-red-400" })}
+          {temReserva ? (
+            <>
+              {linhaConta("Saldo", <>= R$ {reais(Math.round(dailyBudget.currentBalance))}</>)}
+              {linhaConta("Contas sem valor (reserva)", <>−R$ {reais(Math.round(dailyBudget.unpaidBillsEstimate))}</>, { classe: "text-orange-400" })}
+              {linhaConta("Disponível livre", <>= R$ {reais(Math.round(Math.max(0, dailyBudget.availableReal)))}</>, { total: true, classe: dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400" })}
+            </>
+          ) : (
+            linhaConta("Livre", <>= R$ {reais(Math.round(Math.max(0, dailyBudget.availableReal)))}</>, { total: true, classe: dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400" })
+          )}
+          {!dailyBudget.cantSpend && linhaConta(`÷ ${dailyBudget.remainingDays} ${dailyBudget.remainingDays === 1 ? "dia" : "dias"}`, <>= R$ {reais(Math.round(dailyBudget.perDay))} por dia</>)}
+        </div>
+      )}
+      {/* o convite pro aviso diário, pequeno e discreto */}
+      <LembreteDoLimite compacto />
+    </div>
+  );
   /* Painel limpo, conta sem nada lançado (pulou o Montar): o card não pode abrir dizendo "Você não
      pode gastar" pra quem ainda não contou quanto ganha — mostra o caminho. O de sempre não muda. */
   const semNadaAinda = limpo && totalIncome <= 0 && totalExpenses <= 0;
@@ -899,7 +1049,7 @@ export const Dashboard = ({
         </button>
       )}
     </div>
-  ) : (
+  ) : simples ? blocoPodeGastarSimples : (
     <>
         {/* Quanto Posso Gastar Hoje — `data-spotlight` é a âncora do "olha" da dose de Finanças da missão (1.0.16);
             `data-missao`, o do "olha" da intro do módulo (lib/intro-modulo) */}
@@ -1035,9 +1185,10 @@ export const Dashboard = ({
       {blocoFixosVariaveis}
       {blocoTop5}
       {blocoUltimas}
+      {/* cards simples (desenho 17/10): QUANTO POSSO GASTAR HOJE sobe pra ANTES da previsão */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {blocoPrevisao}
-        {blocoPodeGastar}
+        {simples ? blocoPodeGastar : blocoPrevisao}
+        {simples ? blocoPrevisao : blocoPodeGastar}
       </div>
     </div>
   );

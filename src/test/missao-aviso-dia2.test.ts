@@ -102,7 +102,10 @@ describe("quandoAvisarDia2 — sempre no dia 2 da Missão, em hora decente", () 
 });
 
 describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de sempre", () => {
-  const INICIO = new Date(2026, 8, 28, 10, 0).getTime();
+  // Dentro do teste, não no describe: o callback do describe roda na coleta,
+  // antes do beforeAll trocar o TZ pra São Paulo. Num processo em UTC o
+  // início virava 10h UTC e o aviso caía nas 8h30 em vez das 10h05.
+  const inicioDaMissao = () => new Date(2026, 8, 28, 10, 0).getTime();
   const avisoAgendado = () => {
     const pedido = ln.schedule.mock.calls[0]?.[0] as { notifications: { id: number; title: string; body: string; schedule: { at: Date } }[] };
     return pedido.notifications;
@@ -111,7 +114,7 @@ describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de semp
   beforeEach(() => {
     (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
     localStorage.clear();
-    localStorage.setItem("core-missao", JSON.stringify(missao(INICIO)));
+    localStorage.setItem("core-missao", JSON.stringify(missao(inicioDaMissao())));
     ln.permissao = "granted";
     ln.schedule.mockClear();
     vi.mocked(trackEvent).mockClear();
@@ -123,6 +126,7 @@ describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de semp
   });
 
   it("um aviso só (a véspera da cobrança não volta), no dia 2, com o texto de sempre", async () => {
+    const INICIO = inicioDaMissao();
     vi.setSystemTime(INICIO + 30_000); // tocou 30 s depois das boas-vindas
     await agendarReguaDaMissao("dinheiro", "Dinheiro", null);
     const avisos = avisoAgendado();
@@ -136,6 +140,7 @@ describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de semp
   });
 
   it("conta do início da MISSÃO, não do toque: boas-vindas abertas 5 h depois seguem no dia 2 dela", async () => {
+    const INICIO = inicioDaMissao();
     vi.setSystemTime(INICIO + 5 * H);
     await agendarReguaDaMissao("rotina", "Rotina", "noite");
     expect(avisoAgendado()[0].schedule.at).toEqual(quandoAvisarDia2(INICIO, 19.5));
@@ -151,7 +156,7 @@ describe("agendarReguaDaMissao — agenda o aviso calculado, com o texto de semp
 
   it("sem permissão continua como antes: nada agendado, desfecho vira evento", async () => {
     ln.permissao = "denied";
-    vi.setSystemTime(INICIO + 30_000);
+    vi.setSystemTime(inicioDaMissao() + 30_000);
     await agendarReguaDaMissao("dinheiro", "Dinheiro", null);
     expect(ln.schedule).not.toHaveBeenCalled();
     expect(trackEvent).toHaveBeenCalledWith("regua_missao_armada", expect.objectContaining({ ok: false, motivo: "sem_permissao" }));

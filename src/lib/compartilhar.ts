@@ -2,7 +2,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 
 export type ResultadoCompartilhar = "shared" | "downloaded" | "failed" | "cancelled";
-type TipoArquivo = "image/png" | "video/mp4";
+type TipoArquivo = "image/png" | "video/mp4" | "text/csv";
 
 const blobParaBase64 = (blob: Blob) =>
   new Promise<string>((ok, erro) => {
@@ -64,3 +64,7 @@ export const compartilharImagem = (blob: Blob, nome: string, titulo: string, ori
 
 /** O vídeo dos Stories (MP4 H.264): os mesmos caminhos da imagem — nativo, Web Share, download no PC. */
 export const compartilharVideo = (blob: Blob, nome: string, titulo: string, origem: string) => compartilharArquivo(blob, nome, titulo, origem, "video/mp4");
+
+/** Planilha CSV (kit primeiro mês, 18/10): os mesmos caminhos — no app abre a folha nativa (Arquivos, WhatsApp, e-mail). */
+export const compartilharPlanilha = (csv: string, nome: string, titulo: string, origem: string) =>
+  compartilharArquivo(new Blob([csv], { type: "text/csv;charset=utf-8" }), nome, titulo, origem, "text/csv");

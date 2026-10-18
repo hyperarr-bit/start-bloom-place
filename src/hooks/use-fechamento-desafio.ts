@@ -10,7 +10,7 @@ export const CHAVE_DESAFIOS = "finance-challenges";
 
 /** A segunda-feira de agora como ESTADO: muda na volta ao app e num relógio de 1 min
  *  (o app passa dias vivo em segundo plano — ver useMesCorrente). */
-const useSemanaCorrente = () => {
+export const useSemanaCorrente = () => {
   const [semana, setSemana] = useState(() => mondayOf(new Date()));
   useEffect(() => {
     const conferir = () => setSemana(mondayOf(new Date()));

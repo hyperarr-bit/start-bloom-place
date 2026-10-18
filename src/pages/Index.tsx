@@ -62,6 +62,9 @@ import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelc
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
+import { KitPrimeiroMes, KitHojeNoPainel } from "@/components/kit/KitPrimeiroMes";
+import { useKitPrimeiroMes } from "@/hooks/use-kit-primeiro-mes";
+import type { DestinoDoKit } from "@/lib/kit-primeiro-mes";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
 
@@ -371,8 +374,20 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
     .replace(/\.?\s*de\s*/i, " ")
     .replace(".", "");
 
+  /* KIT PRIMEIRO MÊS (18/10): a aba só existe pra quem comprou o kit (chave
+     core-kit-primeiro-mes) — sem cadeado nem anúncio pra quem não comprou. */
+  const { kit: kitPrimeiroMes } = useKitPrimeiroMes();
+  const temKit = !!kitPrimeiroMes && !isPreview;
+  const irParaDoKit = (d: DestinoDoKit) => {
+    setOpenMonth(null);
+    setActiveTab(d.aba);
+    window.scrollTo({ top: 0 });
+    if (d.alvo) window.setTimeout(() => document.querySelector(d.alvo!)?.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
+  };
+
   const tabs = [
     { id: "dashboard", label: "📊 DASHBOARD" },
+    ...(temKit ? [{ id: "kit", label: "📒 KIT 30 DIAS" }] : []),
     { id: "financeiro", label: "💰 MEU FINANCEIRO" },
     { id: "investimentos", label: "📈 INVESTIMENTOS" },
     { id: "itens", label: "❤️ DESEJOS" },
@@ -467,7 +482,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
-        {activeTab !== "dashboard" && activeTab !== "financeiro" && (
+        {activeTab !== "dashboard" && activeTab !== "financeiro" && activeTab !== "kit" && (
           /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que
              fala receitas, despesas, investimentos tá meio estranha").
              Eram 4 colunas com valores de 5 dígitos numa tela de 360px: cabia
@@ -502,6 +517,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                 existe conta cadastrada — pedir permissão antes de haver o que
                 lembrar queima a única chance no Android 13+. */}
             <PedirLembretes dueDays={dueDaysTodos as never} />
+            {temKit && <KitHojeNoPainel abrirKit={() => { setActiveTab("kit"); window.scrollTo({ top: 0 }); }} />}
             {!demoDoFunil && (
               <TrackedCard cardKey="weekly-challenge" tab="dashboard">
                 <WeeklyChallenge expenses={expenses} />
@@ -645,13 +661,16 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
                   </div>
                 </TrackedCard>
                 <TrackedCard cardKey="installments" tab="financeiro">
-                  <InstallmentTracker
-                    installments={installments}
-                    setInstallments={setInstallments}
-                    variableExpenses={expenses}
-                    variableExpensesAnterior={expensesAnterior}
-                    mes={mesAgora}
-                  />
+                  {/* id: alvo do dia 22 do Kit Primeiro Mês ("veja as parcelas do mês que vem") */}
+                  <div id="parcelamentos" className="scroll-mt-20">
+                    <InstallmentTracker
+                      installments={installments}
+                      setInstallments={setInstallments}
+                      variableExpenses={expenses}
+                      variableExpensesAnterior={expensesAnterior}
+                      mes={mesAgora}
+                    />
+                  </div>
                 </TrackedCard>
                 {/* Logo abaixo do parcelamento porque é a dúvida que nasce ali
                     ("e a dívida que não é do cartão?"), e longe o bastante do
@@ -675,6 +694,10 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
               </>
             )}
           </>
+        )}
+
+        {activeTab === "kit" && temKit && (
+          <KitPrimeiroMes irPara={irParaDoKit} parcelamentos={installments} />
         )}
 
         {activeTab === "investimentos" && (

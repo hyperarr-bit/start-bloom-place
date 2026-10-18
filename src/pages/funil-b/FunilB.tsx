@@ -246,7 +246,10 @@ function FunilBConteudo() {
   const onDados = async (n: string, e: string) => {
     if (isSubscribed && user?.email?.toLowerCase() === e.toLowerCase()) { await seguirPagamento(n, e); return { ok: true } as const; }
     const r = await prepararConta({ nome: n, email: e, venda: venda() });
-    if (!r.ok) return "existe" in r ? { ok: false, existe: true } as const : { ok: false, erro: r.erro } as const;
+    if (r.ok === false) {
+      if ("existe" in r) return { ok: false, existe: true } as const;
+      return { ok: false, erro: (r as { erro: string }).erro } as const;
+    }
     await seguirPagamento(n, e);
     return { ok: true } as const;
   };

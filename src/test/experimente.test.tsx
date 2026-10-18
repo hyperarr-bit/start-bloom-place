@@ -377,7 +377,12 @@ describe("conta (a da Porta) + o que vai pra conta", () => {
     expect(upsert).toHaveBeenCalledTimes(1);
     const linhas = upsert.mock.calls[0][0] as Array<{ user_id: string; key: string; value: unknown }>;
     const porChave = Object.fromEntries(linhas.map((l) => [l.key, l.value]));
-    expect(Object.keys(porChave).sort()).toEqual(["finance-expenses", "rotina-habits", "saude-workouts-v2"]);
+    // exercício em sábado/domingo também liga o dia no plano (treino-active-days = padrão seg–sex + hoje,
+    // mesma regra do adicionarExercicio em demo-guiada-registro) — é dela, não exemplo. Seg–sex: só as 3.
+    const hojeSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"][new Date().getDay()];
+    const fimDeSemana = hojeSemana === "SÁBADO" || hojeSemana === "DOMINGO";
+    expect(Object.keys(porChave).sort()).toEqual(["finance-expenses", "rotina-habits", "saude-workouts-v2", ...(fimDeSemana ? ["treino-active-days"] : [])]);
+    if (fimDeSemana) expect(porChave["treino-active-days"]).toEqual(["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", hojeSemana]);
     expect(porChave["finance-expenses"]).toEqual([expect.objectContaining({ description: "Pizza", value: 45 })]);
     expect(porChave["rotina-habits"]).toEqual(["Tomar vitamina"]);
     expect(JSON.stringify(porChave["saude-workouts-v2"])).toContain("Burpee");

@@ -13,7 +13,7 @@
 process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
-import { render, cleanup, fireEvent, screen, act } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen, act, waitFor } from "@testing-library/react";
 import { useCallback, useMemo, useReducer, useState, type ReactNode } from "react";
 
 vi.mock("@/lib/analytics", async (orig) => ({ ...(await orig<typeof import("@/lib/analytics")>()), trackEvent: vi.fn(), trackEventBeacon: vi.fn(), markActivation: vi.fn(async () => {}) }));
@@ -21,7 +21,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
-import { CHAVE_FORCA_INTRO, INTROS, MODULOS_COM_INTRO, marcarIntroVista, porQueNaoMostrar, type Leitor } from "@/lib/intro-modulo";
+import { CHAVE_FORCA_INTRO, INTROS, MODULOS_COM_INTRO, chaveIntroVista, marcarIntroVista, porQueNaoMostrar, type Leitor } from "@/lib/intro-modulo";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MODULOS as MODULOS_DA_MISSAO, apagarMissao, definirDonoDaMissao, donoDaConta, gravarMissao, iniciarMissao, lerMissao, moduloDaMissaoHoje,
   type EstadoMissaoDoses, type ModuloDaMissao,
@@ -184,5 +184,75 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     expect(porQueNaoMostrar("financas", criarStore().get)).toBeNull();
     expect(localStorage.getItem(CHAVE_ESTADO_MISSAO_DOSES)).toBeTruthy();
     expect(Object.keys(MODULOS_DA_MISSAO)).toHaveLength(16);
+  });
+
+  /* ───────────── 17/10 (dono: "tipo Finanças, que tem vários"): cada tutorial tem 3–4 passos e CHEGA NO FIM ───────────── */
+  const guiadaPassos = (m: string) => (m === "rotina" ? 3 : m === "financas" || m === "saude" ? 2 : 0);
+  it("cada um dos 16 tutoriais tem de 3 a 4 passos (ação real → olha → ação), e o 1º passo é sempre uma ação", () => {
+    for (const m of TODOS) {
+      const c = INTROS[m];
+      const n = c.formato === "guiada" ? guiadaPassos(m) + (c.maisPassos?.length ?? 0) : c.passos.length;
+      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(3);
+      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(4);
+      if (c.formato === "toque") { expect(c.passos[0].olhar, m).toBeUndefined(); expect(c.passos[0].opcoes.length, m).toBeGreaterThanOrEqual(2); }
+    }
+  });
+
+  /** o que a pessoa faz NO MÓDULO nos passos que escutam (jsdom não tem o módulo: a conta recebe a escrita) */
+  const acaoNoModulo: Record<string, (s: ReturnType<typeof criarStore>) => void> = {
+    treino: (s) => { const plano = s.get<Record<string, { exercises: Array<Record<string, unknown>> }>>("saude-workouts-v2", {}); const dia = Object.keys(plano).find((d) => plano[d]?.exercises?.length) ?? "SEGUNDA"; s.set("saude-workouts-v2", { ...plano, [dia]: { ...plano[dia], exercises: plano[dia].exercises.map((e, i) => (i === 0 ? { ...e, done: true } : e)) } }); },
+    detox: (s) => { const h = s.get<Array<Record<string, unknown>>>("detox-habits", []); s.set("detox-habits", h.map((x, i) => (i === 0 ? { ...x, checkins: [hoje] } : x))); },
+    pet: (s) => { const pets = s.get<Array<{ id: string }>>("pet-list", []); s.set(`pet-routine-${hoje}`, { [pets[0]?.id ?? "p"]: { food: true } }); },
+  };
+  for (const m of TODOS.filter((x) => INTROS[x].formato === "toque")) {
+    it(`${m}: o tutorial anda do 1º passo ao cartão do fim (chips, olhares pulados sem o card, ações no módulo) e 'Pronto' marca feito`, { timeout: 60_000 }, async () => {
+      const s = criarStore();
+      render(<s.Provedor><IntroDoModulo moduleId={m} /></s.Provedor>);
+      expect(faixa()!.textContent).toContain("1 de ");
+      const c = INTROS[m];
+      const total = c.formato === "toque" ? c.passos.length : 0;
+      let acoes = 0;
+      for (let i = 0; i < 12 && !screen.queryByTestId("intro-modulo-pronto"); i++) {
+        await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto") || screen.queryByTestId("intro-modulo-entendi") || screen.queryAllByTestId("demo-guia-chip")[0] || screen.queryByTestId("demo-guia-postit")).toBeTruthy(), { timeout: 9000 });
+        if (screen.queryByTestId("intro-modulo-pronto")) break;
+        const entendi = screen.queryByTestId("intro-modulo-entendi");
+        if (entendi) { fireEvent.click(entendi); continue; }
+        const chip = screen.queryAllByTestId("demo-guia-chip")[0];
+        if (chip) { fireEvent.click(chip); acoes++; await waitFor(() => expect(document.contains(chip)).toBe(false), { timeout: 9000 }); continue; }
+        // passo que escuta o módulo: a pessoa fez a ação lá
+        act(() => { acaoNoModulo[m]?.(s); }); acoes++;
+        await act(async () => { await new Promise((r) => setTimeout(r, 700)); });
+      }
+      await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
+      expect(faixa()!.textContent).toContain("pronto ✓");
+      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(2);
+      expect(screen.getByTestId("intro-modulo-pronto").textContent).toMatch(/já est(á|ão) aqui/);
+      expect(total).toBeGreaterThanOrEqual(3);
+      fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+      expect(localStorage.getItem(chaveIntroVista(m))).toMatch(/^feita@/);
+      expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");
+    });
+  }
+
+  it("Saúde (guiada): água → olha → continua no sono (3 de 4) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const s = criarStore();
+    render(<s.Provedor><div><button type="button" data-spotlight="add-water">+250ml</button><IntroDoModulo moduleId="saude" /></div></s.Provedor>);
+    expect(faixa()!.textContent).toContain("marca 1 copo d'água");
+    await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
+    fireEvent.click(screen.getAllByTestId("demo-guia-chip")[0]); // 1 copo
+    expect(Object.values(s.estado.dados["core-saude-water"] as Record<string, number>)[0]).toBe(1);
+    // o "olha" da guiada (o card da água, com tamanho de mentira) → "Entendi" → os passos 3 e 4 no motor de 1 toque
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-entendi")).toBeTruthy(), { timeout: 9000 });
+    fireEvent.click(screen.getByTestId("intro-modulo-entendi"));
+    await waitFor(() => expect(faixa()!.textContent).toContain("3 de 4 · anota o sono"), { timeout: 9000 });
+    await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
+    fireEvent.click(screen.getAllByTestId("demo-guia-chip")[1]); // 7 h
+    expect(Object.values(s.estado.dados["core-saude-sleep"] as Record<string, number>)[0]).toBe(7);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("1 copo d'água e 7 h de sono já estão aqui. Saúde é isso");
+    fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+    expect(localStorage.getItem(chaveIntroVista("saude"))).toMatch(/^feita@/);
+    medir.mockRestore();
   });
 });

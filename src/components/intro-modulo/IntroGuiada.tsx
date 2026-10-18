@@ -41,7 +41,7 @@ const celulaDeHoje = (linha: Element, qual: "primeira" | "ultima"): Element => {
   return (qual === "ultima" ? celulas.at(-1) : celulas[0]) ?? linha;
 };
 
-export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { config: IntroGuiadaConfig; aoTerminar: (como: "feita" | "pulada") => void; /** a intro começou logo depois do montar do módulo ("pronto"): Rotina pede "marca o primeiro quando fizer" */ depoisDoMontar?: boolean }) {
+export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoContinuar }: { config: IntroGuiadaConfig; aoTerminar: (como: "feita" | "pulada") => void; /** a intro começou logo depois do montar do módulo ("pronto"): Rotina pede "marca o primeiro quando fizer" */ depoisDoMontar?: boolean; /** 17/10 (dono: "tipo Finanças, que tem vários"): depois do "olha", em vez do cartão do fim, continua nos passos de 1 toque (config.maisPassos) — recebe o rótulo do que entrou */ aoContinuar?: (rotulo: string) => void }) {
   const alvoCfg = alvoDaMissao(config.tipo);
   const { get, set } = useUserData();
   const reduzir = !!useReducedMotion();
@@ -219,6 +219,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
   const oferta = podeOferecerTour(m, get) ? ofertaDoTour(m) : null;
   useEffect(() => {
     if (fase !== "pronto") return;
+    if (aoContinuar) { aoContinuar(rotulo); return; } // os passos seguintes mostram o fim
     trackEvent("modulo_intro_concluida", { modulo: m, segundos: segundos() });
     if (oferta) trackEvent("conhecer_mais_oferta", { modulo: m, origem: "fim_tutorial" });
     const t = window.setTimeout(() => aoTerminar("feita"), oferta ? TEMPOS_DA_INTRO.prontoComOferta : TEMPOS_DA_INTRO.pronto);
@@ -299,7 +300,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
         <motion.div className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--intro-modulo-faixa-h) + var(--app-safe-top, 0px) + 64px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="intro-modulo-postit-solto">
           <div className="w-[92%] max-w-[360px] pointer-events-auto">{postIt}</div>
         </motion.div>, document.body)}
-      {fase === "pronto" && createPortal(
+      {fase === "pronto" && !aoContinuar && createPortal(
         <motion.div className="im-pronto" data-testid="intro-modulo-pronto" initial={reduzir ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
           <div className="im-pronto-linha">
             <span className="im-pronto-check"><Check className="w-4 h-4" strokeWidth={3} /></span>

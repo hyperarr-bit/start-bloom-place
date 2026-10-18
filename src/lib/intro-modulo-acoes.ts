@@ -142,12 +142,14 @@ export function montarTreinoDeHoje({ get, gravar, hoje }: ContextoDaAcao, id: Tr
 /* ───── Dieta: o café da manhã de hoje, no cardápio ───── */
 export const CAFE_DA_MANHA = "Café da Manhã";
 const REFEICOES_PADRAO = ["Café da Manhã", "Almoço", "Lanche", "Janta"];
-export function anotarCafeDaManha({ get, gravar, hoje }: ContextoDaAcao, texto: string): void {
+export function anotarCafeDaManha(ctx: ContextoDaAcao, texto: string): void { anotarRefeicao(ctx, CAFE_DA_MANHA, texto); }
+/** Qualquer refeição de HOJE no cardápio (o 3º passo da Dieta anota o almoço). */
+export function anotarRefeicao({ get, gravar, hoje }: ContextoDaAcao, refeicao: string, texto: string): void {
   const dia = diaDaSemana(hoje);
   const refeicoes = lista(get<unknown>("dieta-meals-config", REFEICOES_PADRAO)).filter((r): r is string => typeof r === "string");
   const plano = mapa(get<unknown>("saude-meals", {}));
   const doDia = { ...Object.fromEntries((refeicoes.length ? refeicoes : REFEICOES_PADRAO).map((r) => [r, ""])), ...mapa(plano[dia]) };
-  gravar("saude-meals", { ...plano, [dia]: { ...doDia, [CAFE_DA_MANHA]: texto } });
+  gravar("saude-meals", { ...plano, [dia]: { ...doDia, [refeicao]: texto } });
 }
 
 /* ───── Estudos: um curso em andamento ───── */
@@ -211,11 +213,16 @@ export const DESTINOS_DA_INTRO: Record<string, { name: string; country: string; 
   gramado: { name: "Gramado", country: "Brasil", continent: "América do Sul" },
   europa: { name: "Europa", country: "", continent: "Europa" },
 };
-export function anotarDestino({ get, gravar }: ContextoDaAcao, destino: { name: string; country: string; continent: string }): void {
+export function anotarDestino({ get, gravar }: ContextoDaAcao, destino: { name: string; country: string; continent: string }, priority: "sonho" | "planejando" | "próximo" = "sonho"): void {
   const lista_ = lista(get<unknown>("travel-bucket", []));
   if (lista_.some((d) => String(mapa(d).name ?? "").trim().toLowerCase() === destino.name.toLowerCase())) return;
-  gravar("travel-bucket", [...lista_, { id: id("destino"), name: destino.name, country: destino.country, continent: destino.continent, notes: "", visited: false, rating: 0, photoUrl: "", priority: "sonho" }]);
+  gravar("travel-bucket", [...lista_, { id: id("destino"), name: destino.name, country: destino.country, continent: destino.continent, notes: "", visited: false, rating: 0, photoUrl: "", priority }]);
 }
+export const DESTINOS_PLANEJANDO: Record<string, { name: string; country: string; continent: string }> = {
+  chapada: { name: "Chapada dos Veadeiros", country: "Brasil", continent: "América do Sul" },
+  noronha: { name: "Fernando de Noronha", country: "Brasil", continent: "América do Sul" },
+  buenos_aires: { name: "Buenos Aires", country: "Argentina", continent: "América do Sul" },
+};
 
 /* ───── Beleza: o skincare nasce pro tipo de pele dela (o mesmo gerador das 3 perguntas; objetivo básico, nível iniciante) ───── */
 export function montarSkincare({ get, gravar }: ContextoDaAcao, pele: TipoDePele): { passos: number } {
@@ -254,4 +261,90 @@ export function cadastrarPet({ get, gravar }: ContextoDaAcao, especie: "cao" | "
   gravar(CHAVE_PETS, [{ id: petId, name: p.nome, species: p.species, breed: "", weight: "", birthday: "", faixa: "adulto", criadoEm: new Date().toISOString() }]);
   gravar(chaveTarefasDoPet(petId), rotinaPadraoDe(especie));
   return p.nome;
+}
+
+/* ───── os passos seguintes (17/10, "tipo Finanças, que tem vários"): as outras ações mais usadas de cada módulo ───── */
+
+/** Finanças › uma conta fixa (custos fixos: 57% dos pagantes na 1ª semana). O formato da FixedExpensesTable. */
+export const CONTAS_FIXAS_DA_INTRO: Record<string, { descricao: string; valor: number; categoria: string }> = {
+  aluguel: { descricao: "Aluguel", valor: 1200, categoria: "moradia" },
+  luz: { descricao: "Luz", valor: 150, categoria: "contas" },
+  internet: { descricao: "Internet", valor: 100, categoria: "contas" },
+};
+export function anotarContaFixa({ get, gravar }: ContextoDaAcao, idConta: string): string {
+  const c = CONTAS_FIXAS_DA_INTRO[idConta] ?? CONTAS_FIXAS_DA_INTRO.luz;
+  const atuais = lista(get<unknown>("finance-fixed-expenses", []));
+  if (atuais.some((x) => String(mapa(x).description ?? "").trim().toLowerCase() === c.descricao.toLowerCase())) return c.descricao;
+  gravar("finance-fixed-expenses", [...atuais, { id: id("fixa"), description: c.descricao, category: c.categoria, value: c.valor, paymentMethod: "pix", day: 10 }]);
+  return `${c.descricao} · R$ ${c.valor.toLocaleString("pt-BR")}`;
+}
+
+/** Rotina › "Como você está hoje?" (24%): mood-log[dia] = { mood, note }. Metas › humor (8%): dp-mood-log[dia] = nota. */
+export const HUMORES_DA_INTRO: Array<{ id: string; emoji: string; rotulo: string; valor: number }> = [
+  { id: "otimo", emoji: "😄", rotulo: "Ótimo", valor: 5 }, { id: "bem", emoji: "🙂", rotulo: "Bem", valor: 4 }, { id: "neutro", emoji: "😐", rotulo: "Neutro", valor: 3 },
+];
+export function anotarHumor({ get, gravar, hoje }: ContextoDaAcao, chave: "mood-log" | "dp-mood-log", idHumor: string): string {
+  const h = HUMORES_DA_INTRO.find((x) => x.id === idHumor) ?? HUMORES_DA_INTRO[1];
+  const dia = localDayKey(hoje ?? new Date());
+  const atual = mapa(get<unknown>(chave, {}));
+  gravar(chave, { ...atual, [dia]: chave === "mood-log" ? { ...mapa(atual[dia]), mood: h.valor, note: String(mapa(atual[dia]).note ?? "") } : h.valor });
+  return `humor ${h.rotulo.toLowerCase()}`;
+}
+
+/** Saúde › sono (21%): core-saude-sleep[dia] = horas. */
+export function anotarSono({ get, gravar, hoje }: ContextoDaAcao, horas: number): string {
+  const dia = localDayKey(hoje ?? new Date());
+  gravar("core-saude-sleep", { ...mapa(get<unknown>("core-saude-sleep", {})), [dia]: horas });
+  return `${horas} h de sono`;
+}
+
+/** Metas › "O que me motiva" (16%): dp-motivations (lista de frases). */
+export function anotarMotivacao({ get, gravar }: ContextoDaAcao, texto: string): void {
+  const atual = lista(get<unknown>("dp-motivations", [])).filter((x): x is string => typeof x === "string");
+  if (atual.some((x) => x.trim().toLowerCase() === texto.toLowerCase())) return;
+  gravar("dp-motivations", [...atual, texto]);
+}
+
+/** Estudos › um curso que ela quer fazer (estudos-cursos-desejo, o mesmo formato dos em andamento). */
+export function adicionarCursoDesejado({ get, gravar }: ContextoDaAcao, nome: string): void {
+  const cursos = lista(get<unknown>("estudos-cursos-desejo", []));
+  if (cursos.some((c) => String(mapa(c).name ?? "").trim().toLowerCase() === nome.trim().toLowerCase())) return;
+  gravar("estudos-cursos-desejo", [...cursos, { id: id("desejo"), name: nome.trim() }]);
+}
+
+/** Biblioteca › a página atual do livro que está lendo (a barra do livro anda). */
+export function marcarPaginaDoLivro({ get, gravar }: ContextoDaAcao, pagina: number): string {
+  const livros = lista(get<unknown>("lib-books", [])) as Array<Record<string, unknown>>;
+  const i = livros.findIndex((l) => l.status === "lendo");
+  if (i < 0) return `página ${pagina}`;
+  const l = livros[i];
+  const total = Number(l.pages) || Math.max(300, pagina);
+  const novo = [...livros]; novo[i] = { ...l, pages: total, currentPage: Math.min(pagina, total) };
+  gravar("lib-books", novo);
+  return `página ${pagina} de ${String(l.title ?? "")}`.trim();
+}
+
+/** Beleza › o Espelho do dia (11%, a ação #1): skincare-daily-checkin[dia] = como a pele está. */
+export const ESPELHO_DA_INTRO: Array<{ id: string; emoji: string; rotulo: string }> = [
+  { id: "boa", emoji: "✨", rotulo: "Boa" }, { id: "seca", emoji: "🌵", rotulo: "Seca" }, { id: "oleosa", emoji: "🛢️", rotulo: "Oleosa" },
+];
+export function anotarEspelhoDoDia({ get, gravar, hoje }: ContextoDaAcao, idPele: string): string {
+  const e = ESPELHO_DA_INTRO.find((x) => x.id === idPele) ?? ESPELHO_DA_INTRO[0];
+  const dia = localDayKey(hoje ?? new Date());
+  gravar("skincare-daily-checkin", { ...mapa(get<unknown>("skincare-daily-checkin", {})), [dia]: e.id });
+  return `pele ${e.rotulo.toLowerCase()} hoje`;
+}
+
+/** Mente › uma meta de curto prazo (hiperfoco-goals, a aba METAS). */
+export function anotarMetaDeCurtoPrazo({ get, gravar }: ContextoDaAcao, titulo: string): void {
+  const metas = lista(get<unknown>("hiperfoco-goals", []));
+  if (metas.some((g) => String(mapa(g).title ?? "").trim().toLowerCase() === titulo.toLowerCase())) return;
+  gravar("hiperfoco-goals", [...metas, { id: id("meta"), title: titulo, type: "pessoal", timeframe: "curto", pnl: {}, objectives: [] }]);
+}
+
+/** Carreira › uma skill pra evoluir (career-skills). */
+export function anotarSkill({ get, gravar }: ContextoDaAcao, nome: string): void {
+  const skills = lista(get<unknown>("career-skills", []));
+  if (skills.some((s) => String(mapa(s).name ?? "").trim().toLowerCase() === nome.toLowerCase())) return;
+  gravar("career-skills", [...skills, { id: id("skill"), name: nome, category: "técnica", level: 2, targetLevel: 4, notes: "" }]);
 }

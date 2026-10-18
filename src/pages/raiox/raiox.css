@@ -1,0 +1,21 @@
+.raiox-entra { animation: raiox-in 280ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes raiox-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.raiox-sai { animation: raiox-out 180ms ease; }
+@keyframes raiox-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.raiox-opcao { transition: transform 120ms ease, border-color 120ms ease; }
+.raiox-opcao:active { transform: scale(.97); }
+.raiox-check { animation: raiox-pop 280ms cubic-bezier(.23, 1, .32, 1); }
+@keyframes raiox-pop {
+  from { transform: scale(.6); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .raiox-entra, .raiox-sai, .raiox-check { animation: none; }
+  .raiox-opcao:active { transform: none; }
+}

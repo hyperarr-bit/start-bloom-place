@@ -83,12 +83,14 @@ export const PRECO_SUB = "O CORE é o app que vigia o seu dinheiro — e te avis
  *  2. Teto de gasto por categoria: src/components/CategoryBudgets.tsx (+ desafio "Gastar menos que
  *     semana passada" usa o teto da semana anterior, src/components/challenges/challenges.ts);
  *  3. Desafio da semana: src/components/challenges/WeeklyChallenge.tsx — "Semana sem delivery",
- *     "3 dias sem gastar", "Gastar menos que semana passada" (challenges.ts).
+ *     "3 dias sem gastar", "Gastar menos que semana passada" (challenges.ts). O card mostra
+ *     progresso ao vivo e grava a vitória no histórico (alimenta insígnias) — NÃO mostra R$
+ *     economizado, então a copy não promete economia em reais aqui.
  */
 export const PASSOS_PRECO = [
   { titulo: "Contas a vencer, sem susto", texto: "Cadastre a Netflix e cia. com o dia do vencimento: o app te avisa na véspera de cada cobrança." },
   { titulo: "Teto por categoria", texto: "Defina um teto pra delivery, mercado, transporte… e veja na hora onde o mês está estourando." },
-  { titulo: "Desafio da semana", texto: "“Semana sem delivery”, “3 dias sem gastar”: um vazamento fechado por vez, com o quanto você já economizou." },
+  { titulo: "Desafio da semana", texto: "“Semana sem delivery”, “3 dias sem gastar”: um vazamento fechado por vez, com progresso ao vivo e cada vitória virando insígnia." },
 ] as const;
 export const MODULOS_LINHA = "16 módulos inclusos";
 export const MODULOS_CHIPS = ["Finanças", "Rotina", "Treino", "Dieta", "Metas", "+11"] as const;

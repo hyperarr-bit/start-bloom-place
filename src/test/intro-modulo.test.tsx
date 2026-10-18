@@ -30,7 +30,11 @@ vi.mock("@/lib/analytics", async (orig) => ({
 }));
 vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => nativo.v }));
 // o ramo da missão (merge depois) exporta `moduloDaMissaoHoje`; aqui ele existe só quando o teste quer
-vi.mock("@/lib/missao-doses", async (orig) => ({ ...(await orig<typeof import("@/lib/missao-doses")>()), moduloDaMissaoHoje: () => missaoHoje.v }));
+vi.mock("@/lib/missao-doses", async (orig) => {
+  const real = await orig<typeof import("@/lib/missao-doses")>();
+  // missaoHoje.v manda quando posto; senão a régua real (rev3: a intro só lê moduloDaMissaoHoje, sem plano B local)
+  return { ...real, moduloDaMissaoHoje: (...a: Parameters<typeof real.moduloDaMissaoHoje>) => missaoHoje.v ?? real.moduloDaMissaoHoje(...a) };
+});
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }), Toaster: () => null }));
 
 import { UserDataContext, _regrasDeAtivacao, useUserData, type UserDataContextType } from "@/hooks/use-user-data";
@@ -157,11 +161,13 @@ describe("chave, constantes e classificação", () => {
     expect(MODULOS_COM_INTRO).toHaveLength(16);
     expect(MODULOS_SEM_INTRO).toEqual([]);
     expect(MODULOS_SEM_NADA).toEqual([]);
-    const conferirPasso = (m: string, p: { pergunta: string; opcoes: unknown[]; olhar?: { titulo: string; texto: string }; escutar?: unknown; executar?: unknown; foco?: unknown }) => {
+    const conferirPasso = (m: string, p: { pergunta: string; opcoes: unknown[]; olhar?: { titulo: string; texto: string }; escutar?: unknown; executar?: unknown; foco?: unknown; quandoNoModulo?: { pergunta: string } }) => {
       if (p.olhar) { expect(p.opcoes.length, m).toBe(0); expect(p.olhar.titulo.length, m).toBeLessThanOrEqual(40); expect(p.olhar.texto.length, m).toBeLessThanOrEqual(170); return; }
       expect(p.pergunta.length, m).toBeGreaterThan(8);
       expect(p.pergunta.length, m).toBeLessThanOrEqual(60);
-      if (p.escutar) expect(p.opcoes.length, m).toBe(0);
+      // quandoNoModulo (Beleza): usa o controle do módulo e escuta; os chips são só o plano B sem ele na tela
+      if (p.quandoNoModulo) { expect(p.quandoNoModulo.pergunta.length, m).toBeLessThanOrEqual(60); expect(p.escutar, m).toBeTruthy(); expect(p.opcoes.length, m).toBeLessThanOrEqual(5); }
+      else if (p.escutar) expect(p.opcoes.length, m).toBe(0);
       else { expect(p.opcoes.length, m).toBeGreaterThanOrEqual(2); expect(p.opcoes.length, m).toBeLessThanOrEqual(5); expect(!!p.executar || !!p.foco, m).toBe(true); }
     };
     for (const m of ["financas", "rotina", "saude"]) {
@@ -375,8 +381,9 @@ describe("ligada: a porta do módulo", () => {
     expect(porQueNaoMostrar("casa", get as never)).toBe("missao");
     expect(porQueNaoMostrar("dieta", get as never)).toBeNull();
     missaoHoje.v = null;
-    // (b) sem o export: o próximo passo por fazer, se é de hoje no calendário da missão
-    const m = iniciarMissao(["financas", "rotina", "saude"]); // nasceu hoje, braço A (1 dose por dia), dose 1 por fazer
+    // (b) a régua real da missão (moduloDaMissaoHoje: boas-vindas vistas, a dose abre hoje, não pulada)
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    const m = { ...iniciarMissao(["financas", "rotina", "saude"], undefined, undefined, "A"), boasVindas: true }; // nasceu hoje, braço A (1 dose por dia), dose 1 por fazer
     gravarMissao(m);
     expect(porQueNaoMostrar("financas", get as never)).toBe("missao"); // a dose de hoje É a intro de Finanças
     expect(porQueNaoMostrar("rotina", get as never)).toBeNull(); // abriu Rotina por curiosidade no dia 1: intro normal
@@ -388,7 +395,7 @@ describe("ligada: a porta do módulo", () => {
     expect(porQueNaoMostrar("financas", get as never)).toBe("missao");
     expect(porQueNaoMostrar("rotina", get as never)).toBeNull();
     // dia 2 (a missão nasceu ontem): a dose 2 (Rotina) é a de hoje → bloqueada enquanto estiver por fazer; Saúde (dia 3) livre
-    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], ontem()), feitos: { 1: { dia: ontem(), rotulo: "x" } } } as EstadoMissaoDoses);
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], ontem()), boasVindas: true, feitos: { 1: { dia: ontem(), rotulo: "x" } } } as EstadoMissaoDoses);
     expect(porQueNaoMostrar("rotina", get as never)).toBe("missao");
     expect(porQueNaoMostrar("saude", get as never)).toBeNull();
     // braço B (as 3 doses no dia 1, só com a chave do dia 1 cheio ligada): o próximo passo por fazer é sempre de hoje

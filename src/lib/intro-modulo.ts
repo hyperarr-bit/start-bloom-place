@@ -47,7 +47,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
-import { diaDaMissao, ehBracoB, lerMissao, missaoDosesLigada, passoPendente, type DiaDaMissao } from "@/lib/missao-doses";
+import { lerMissao, missaoDosesLigada, type DiaDaMissao } from "@/lib/missao-doses";
 import {
   CAFE_DA_MANHA, DESTINOS_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE, adicionarCurso, adicionarLivro, adicionarPessoaDoComeco, anotarCafeDaManha, anotarDestino,
   COMODOS_DA_INTRO, DESTINOS_PLANEJANDO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, adicionarCursoDesejado, anotarContaFixa, anotarItemDoMercado, anotarEspelhoDoDia, anotarHumor, anotarMetaDeCurtoPrazo,
@@ -57,7 +57,7 @@ import {
 import { planoVazio } from "@/lib/treino-plano";
 import { cardPorTitulo } from "@/lib/conhecer-mais";
 import { localDayKey } from "@/lib/utils";
-import { CHAVE_PASSOS as CHAVE_PASSOS_BELEZA, type TipoDePele } from "@/lib/beleza-rotina";
+import { CHAVE_PASSOS as CHAVE_PASSOS_BELEZA, CHAVE_PERFIL as CHAVE_PERFIL_BELEZA, OPCOES_PELE, type TipoDePele } from "@/lib/beleza-rotina";
 
 export type ModoIntro = "off" | "on";
 /** Web (Vercel): fica desligada — a intro é do app. ROLLBACK/LIGAR na web = trocar aqui. */
@@ -186,9 +186,15 @@ export const moduloJaApresentado = (moduleId: string, get: Leitor): boolean => {
   if (!!ls.get(`core-cartoes-vistos-${moduleId}`)) return true;
   const tip = get<unknown>(`core-tip-seen-${moduleId}`, "");
   if (tip === "true" || tip === true) return true;
-  const spot = get<unknown>(`spotlight-done-${moduleId}`, "");
-  return spot === "true" || spot === true;
+  return chavesDoTutorialAntigo(moduleId).some((k) => {
+    const spot = get<unknown>(k, "");
+    return spot === "true" || spot === true;
+  });
 };
+/** O tutorial antigo grava com a chave DELE: Metas é `metas` lá e `desenvolvimento` aqui — vale qualquer uma das duas. */
+const APELIDOS_DO_TUTORIAL_ANTIGO: Record<string, string[]> = { desenvolvimento: ["metas"] };
+export const chavesDoTutorialAntigo = (moduleId: string): string[] =>
+  [moduleId, ...(APELIDOS_DO_TUTORIAL_ANTIGO[moduleId] ?? [])].map((m) => `spotlight-done-${m}`);
 
 /* ───── o módulo está vazio? ───── */
 const lista = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
@@ -329,6 +335,12 @@ export interface PassoDaIntro {
   escutar?: { chaves: string[]; rotulo: (valor: unknown, anterior: unknown, chave: string) => string | null };
   /** o controle real que o anel abraça (a aba dele, se mora em outra) */
   alvo?: { aba?: string; achar: () => Element | null; abaixo?: boolean };
+  /**
+   * O módulo JÁ faz essa pergunta (Beleza: o quiz "Monte sua rotina"): achado o `alvo`, o passo USA o controle do
+   * módulo — o anel nele, o post-it só com esta instrução e SEM chips (nada de pergunta dobrada), e o passo espera o
+   * `escutar`. Sem o alvo (módulo não montou), valem a `pergunta` e os chips de sempre.
+   */
+  quandoNoModulo?: { pergunta: string; descricao?: string; rotulo?: string };
   /** depois de gravar: um toque no DOM do módulo (abrir a aba HOJE, rolar até a lista…) */
   depois?: () => void;
 }
@@ -752,11 +764,25 @@ export const INTROS: Record<string, IntroConfig> = {
     pedido: "monta o seu skincare",
     pronto: "Beleza é isso: a rotina da manhã e da noite, um toque por passo.",
     passos: [{
+      // 1) o quiz do PRÓPRIO módulo ("Monte sua rotina", 3 perguntas): o anel nele e o passo espera a rotina nascer
+      //    (rev3, 17/10: o post-it com Oleosa/Mista/Seca cobria o quiz com a mesma pergunta). Sem o quiz na tela, os chips.
       pergunta: "Como é a sua pele?",
       descricao: "Toca num e a rotina de manhã e de noite nasce pra ela. Depois você ajusta.",
       opcoes: [op("💧", "Oleosa", "oleosa"), op("🌗", "Mista", "mista"), op("🍃", "Seca", "seca")],
       executar: (ctx, o) => { montarSkincare(ctx, o.id as TipoDePele); return `Skincare pra pele ${o.rotulo.toLowerCase()}`; },
-      alvo: { aba: "SKINCARE", achar: porSeletor('[data-testid="montar-rotina"], [data-testid="skincare-perguntas"], [data-testid="rotina-vazia"]') },
+      quandoNoModulo: { pergunta: "Responde aqui as 3 perguntas", descricao: "A rotina de manhã e de noite nasce pra sua pele. Depois você ajusta.", rotulo: "3 toques" },
+      escutar: {
+        chaves: [CHAVE_PERFIL_BELEZA, CHAVE_PASSOS_BELEZA.manha, CHAVE_PASSOS_BELEZA.noite],
+        rotulo: (valor, _anterior, chave) => {
+          if (chave === CHAVE_PERFIL_BELEZA) {
+            const pele = (valor as { pele?: string } | null)?.pele;
+            const rotulo = OPCOES_PELE.find((o) => o.id === pele)?.rotulo;
+            return rotulo ? `Skincare pra pele ${rotulo.toLowerCase()}` : null;
+          }
+          return Array.isArray(valor) && valor.length ? "Sua rotina de manhã e de noite" : null;
+        },
+      },
+      alvo: { aba: "SKINCARE", achar: porSeletor('[data-testid="montar-rotina"]') },
     }, {
       // 2) olha a rotina pronta (rotina da manhã: 9%)
       pedido: "olha a sua rotina", pergunta: "", opcoes: [],
@@ -871,17 +897,10 @@ const moduloDaMissaoHoje = (): string | null => {
 /** Uma dose da missão está na tela agora (marca do ramo da missão)? */
 export const doseNaTela = (): boolean => { try { return document.documentElement.dataset.missaoDose === "1"; } catch { return false; } };
 
-/**
- * ANTES do merge do ramo da missão, "o módulo da dose de HOJE" sai do estado da missão: o próximo passo por
- * fazer, se ele é de hoje (ou atrasado) no calendário da missão — no braço B (dia 1 cheio) as 3 doses são de hoje.
- */
-const moduloDaDoseDeHojeLocal = (): string | null => {
-  const m = lerMissao();
-  if (!m || m.explorou) return null;
-  const p = passoPendente(m);
-  if (!p) return null;
-  return ehBracoB(m) || p.n <= diaDaMissao(m) ? p.modulo : null;
-};
+/* 17/10 (revisor, rev3): o plano B local ("o próximo passo pendente, se é de hoje ou atrasado") saiu. Ele não
+ * conferia boas-vindas / doseAbreHoje / o fim da janela da missão — no braço A depois do dia 7 (ou antes das
+ * boas-vindas) o módulo da dose pendente ficava SEM dose e SEM tutorial. Só vale `moduloDaMissaoHoje()`, que é a
+ * mesma régua da faixa da dose (MissaoDosesNaWeb). */
 
 /**
  * A missão em doses bloqueia a intro deste módulo? SÓ nestes 3 casos (dono, 17/10: "ele vai querer ver Rotina na
@@ -896,7 +915,7 @@ export function introBloqueadaPelaMissao(moduleId: string): boolean {
   if (doseNaTela()) return true;
   try {
     if (!missaoDosesLigada()) return false;
-    const hoje = moduloDaMissaoHoje() ?? moduloDaDoseDeHojeLocal();
+    const hoje = moduloDaMissaoHoje();
     if (hoje === moduleId) return true;
     const m = lerMissao();
     if (!m) return false;
@@ -904,6 +923,21 @@ export function introBloqueadaPelaMissao(moduleId: string): boolean {
     if (([1, 2, 3] as DiaDaMissao[]).some((n) => !!m.feitos[n] && modulos[n - 1] === moduleId)) return true;
   } catch { /* sem storage: segue */ }
   return false;
+}
+
+/**
+ * O tutorial antigo (SpotlightOverlay) marca `spotlight-done-<módulo>` pra toda conta logada na 1ª abertura. Se
+ * NESTA abertura a intro só não aparece porque a missão segura o módulo (a dose de hoje é dele), essa marca não pode
+ * ser gravada: senão, se a dose não for feita, o módulo vira "já apresentado" e perde o tutorial pra sempre (rev3).
+ * `moduleKey` é a chave do tutorial antigo (Metas = "metas").
+ */
+export function tutorialAntigoPodeMarcarVisto(moduleKey: string, get: Leitor): boolean {
+  try {
+    const id = Object.entries(APELIDOS_DO_TUTORIAL_ANTIGO).find(([, apelidos]) => apelidos.includes(moduleKey))?.[0] ?? moduleKey;
+    if (!INTROS[id] || !introLigada()) return true;
+    if (introVistaNesteAparelho(id) || introVistaNaConta(id, get)) return true;
+    return !introBloqueadaPelaMissao(id);
+  } catch { return true; }
 }
 
 /* ───── a decisão ───── */

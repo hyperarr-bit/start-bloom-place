@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import {
-  INTROS, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, type FimDaIntro, type Leitor,
+  INTROS, chavesDoTutorialAntigo, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, type FimDaIntro, type Leitor,
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { IntroGuiada } from "./IntroGuiada";
@@ -68,13 +68,17 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
    * pra conta nova logada (Casa, Saúde, Rotina…). O "tutorial antigo" vale pelo que estava gravado ANTES desta
    * abertura: a leitura fica congelada no 1º render com a conta carregada (antes de qualquer efeito). E se a intro já
    * APARECEU neste aparelho (fechou o app no meio), a marca veio dessa visita: não conta (a intro volta 1 vez). */
-  const chaveDoTutorial = `spotlight-done-${moduleId}`;
-  const tutorialAntes = useRef<{ v: unknown } | null>(null);
+  // Metas: o tutorial antigo grava `spotlight-done-metas` — as duas chaves ficam congeladas
+  const chavesDoTutorial = chavesDoTutorialAntigo(moduleId);
+  const tutorialAntes = useRef<Record<string, unknown> | null>(null);
   if (loaded && tutorialAntes.current === null) {
-    try { tutorialAntes.current = { v: introAbertaNesteAparelho(moduleId) ? "" : get<unknown>(chaveDoTutorial, "") }; } catch { tutorialAntes.current = { v: "" }; }
+    const abertaAntes = introAbertaNesteAparelho(moduleId);
+    const congelado: Record<string, unknown> = {};
+    for (const k of chavesDoTutorial) { try { congelado[k] = abertaAntes ? "" : get<unknown>(k, ""); } catch { congelado[k] = ""; } }
+    tutorialAntes.current = congelado;
   }
   const leitorDaDecisao: Leitor = <T,>(k: string, f: T): T =>
-    (k === chaveDoTutorial && tutorialAntes.current ? ((tutorialAntes.current.v ?? f) as T) : getRef.current(k, f));
+    (tutorialAntes.current && k in tutorialAntes.current ? ((tutorialAntes.current[k] ?? f) as T) : getRef.current(k, f));
 
   useEffect(() => {
     if (!loaded || estado !== "decidindo") return;

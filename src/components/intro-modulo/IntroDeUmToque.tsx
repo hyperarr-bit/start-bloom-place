@@ -183,6 +183,8 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const verMais = () => { aoTerminar("feita"); window.setTimeout(() => abrirConhecerMais(m, "fim_tutorial"), 0); };
 
   const pedido = passo?.pedido ?? config.pedido;
+  /** o passo está usando o controle do próprio módulo (achou o alvo): sem chips, sem pergunta dobrada */
+  const noModulo = passo?.quandoNoModulo && alvo ? passo.quandoNoModulo : null;
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-formato="toque" data-passo={numero} style={{ background: config.cor.faixa, color: config.cor.tinta }} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : total > 1 ? `${numero} de ${total} · ${pedido}` : pedido}</span>
@@ -200,6 +202,15 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
         <BotaoSeguir claro onClick={entendi} testid="intro-modulo-entendi">Entendi</BotaoSeguir>
       </div>
     </div>
+  ) : passo && noModulo ? (
+    // o módulo já faz a pergunta (Beleza): só a instrução, sem chips — a resposta é no controle dele
+    <PostItDaMissao
+      rotulo={total > 1 ? `${numero} de ${total} · ${noModulo.rotulo ?? "aqui"}` : `Agora · ${noModulo.rotulo ?? "aqui"}`}
+      pergunta={noModulo.pergunta}
+      descricao={noModulo.descricao}
+      chips={[]}
+      aoChip={() => {}}
+    />
   ) : passo ? (
     <PostItDaMissao
       rotulo={total > 1 ? `${numero} de ${total} · 1 toque` : "Agora · 1 toque"}
@@ -216,7 +227,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     <>
       {createPortal(faixa, document.body)}
       {/* portais ficam FORA do AnimatePresence (um portal não é um elemento válido pra ele) */}
-      {(!alvo || !anelVivo) && fase === "anotar" && balao && !passo?.olhar && createPortal(
+      {(!alvo || !anelVivo) && fase === "anotar" && balao && !passo?.olhar && !noModulo && createPortal(
         <motion.div className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--intro-modulo-faixa-h) + var(--app-safe-top, 0px) + 64px)" }} initial={reduzir ? false : { opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="intro-modulo-postit-solto">
           <div className="w-[92%] max-w-[360px] pointer-events-auto">{balao}</div>
         </motion.div>, document.body)}

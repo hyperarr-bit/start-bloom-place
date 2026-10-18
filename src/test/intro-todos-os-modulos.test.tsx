@@ -21,6 +21,11 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { MontarRotina } from "@/components/beleza/montar-rotina";
+import { gerarRotina } from "@/lib/beleza-rotina";
+import { MemoryRouter } from "react-router-dom";
+import { somarDias } from "@/lib/sequencia";
 import { CHAVE_FORCA_INTRO, INTROS, MODULOS_COM_INTRO, chaveIntroVista, marcarIntroVista, porQueNaoMostrar, type Leitor } from "@/lib/intro-modulo";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, MODULOS as MODULOS_DA_MISSAO, apagarMissao, definirDonoDaMissao, donoDaConta, gravarMissao, iniciarMissao, lerMissao, moduloDaMissaoHoje,
@@ -186,6 +191,76 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     expect(Object.keys(MODULOS_DA_MISSAO)).toHaveLength(16);
   });
 
+  /* ───────────── rev3 (revisor, 17/10): nenhum módulo fica SEM dose E SEM tutorial ───────────── */
+  /** A dose abre ao entrar? (a mesma régua da faixa da dose: moduloDaMissaoHoje) */
+  const doseAbre = (m: string) => moduloDaMissaoHoje() === m;
+  /** Monta o tutorial antigo do módulo (que marca spotlight-done pra conta logada) + a intro nova, na ordem do app. */
+  const abrirModulo = (s: ReturnType<typeof criarStore>, m: string, chaveAntiga = m) =>
+    render(<MemoryRouter><s.Provedor><SpotlightOverlay moduleKey={chaveAntiga as never} steps={[]} /><IntroDoModulo moduleId={m} /></s.Provedor></MemoryRouter>);
+
+  it("braço A, dia 10, só a dose 1 feita: abrir Rotina dá o tutorial (a janela da dose 2 passou)", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], somarDias(hoje, -9), undefined, "A"), boasVindas: true, feitos: { 1: { dia: somarDias(hoje, -9), rotulo: "x" } } });
+    const s = criarStore();
+    expect(doseAbre("rotina")).toBe(false);
+    expect(porQueNaoMostrar("rotina", s.get)).toBeNull();
+    const r = abrirModulo(s, "rotina");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("braço A, dia 9, nada feito: abrir Finanças dá o tutorial", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], somarDias(hoje, -8), undefined, "A"), boasVindas: true, feitos: {} });
+    const s = criarStore();
+    expect(doseAbre("financas")).toBe(false);
+    expect(porQueNaoMostrar("financas", s.get)).toBeNull();
+    const r = abrirModulo(s, "financas");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("braço A, antes das boas-vindas: o módulo da dose 1 não fica sem nada (sem dose ainda → o tutorial)", () => {
+    guardarForcaDia1Cheio("?dia1-cheio=on"); // braço A = 1 dose por dia (o 1-por-dia ligado)
+    gravarMissao({ ...iniciarMissao(["financas", "rotina", "saude"], hoje, undefined, "A"), boasVindas: false, feitos: {} });
+    const s = criarStore();
+    const motivo = porQueNaoMostrar("financas", s.get);
+    expect(motivo === null || doseAbre("financas")).toBe(true);
+    expect(motivo).toBeNull();
+    const r = abrirModulo(s, "financas");
+    expect(faixa()).toBeTruthy();
+    r.unmount();
+  });
+
+  it("a dose de HOJE segura a intro → o tutorial antigo NÃO grava spotlight-done (senão o módulo perde o tutorial se a dose não for feita)", () => {
+    armarMissao("A", ["rotina", "financas", "saude"]);
+    const s = criarStore();
+    expect(porQueNaoMostrar("rotina", s.get)).toBe("missao");
+    const r = abrirModulo(s, "rotina");
+    expect(faixa()).toBeNull();
+    expect(s.estado.dados["spotlight-done-rotina"]).toBeUndefined();
+    r.unmount();
+    // a dose não foi feita e a janela passou (dia 10): o tutorial ainda está lá
+    gravarMissao({ ...lerMissao()!, inicio: somarDias(hoje, -9) } as EstadoMissaoDoses);
+    expect(porQueNaoMostrar("rotina", s.get)).toBeNull();
+    // sem a missão segurando, a marca do tutorial antigo segue como sempre (e a intro já decidiu antes dela)
+    const r2 = abrirModulo(s, "rotina");
+    expect(faixa()).toBeTruthy();
+    expect(s.estado.dados["spotlight-done-rotina"]).toBe("true");
+    r2.unmount();
+  });
+
+  it("Metas: o tutorial antigo grava spotlight-done-metas — vale como 'já apresentado' (e a 1ª abertura ainda ganha a intro)", () => {
+    apagarMissao();
+    expect(porQueNaoMostrar("desenvolvimento", criarStore({ "spotlight-done-metas": "true" }).get)).toBe("ja_apresentado");
+    expect(porQueNaoMostrar("desenvolvimento", criarStore({ "spotlight-done-desenvolvimento": "true" }).get)).toBe("ja_apresentado");
+    const s = criarStore();
+    const r = abrirModulo(s, "desenvolvimento", "metas");
+    expect(faixa()).toBeTruthy();
+    expect(s.estado.dados["spotlight-done-metas"]).toBe("true");
+    r.unmount();
+  });
+
   /* ───────────── 17/10 (dono: "tipo Finanças, que tem vários"): cada tutorial tem 3–4 passos e CHEGA NO FIM ───────────── */
   const guiadaPassos = (m: string) => (m === "rotina" ? 3 : m === "financas" || m === "saude" ? 2 : 0);
   it("cada um dos 16 tutoriais tem de 3 a 4 passos (ação real → olha → ação), e o 1º passo é sempre uma ação", () => {
@@ -233,6 +308,37 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
       expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");
     });
   }
+
+  it("Beleza (rev3): com o quiz 'Monte sua rotina' na tela, o passo 1 USA o quiz — anel nele, post-it sem chips (nada de pergunta dobrada), espera a rotina nascer e segue pro 'olha'", { timeout: 40_000 }, async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 400, right: 310, bottom: 600, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    const s = criarStore();
+    const Quiz = () => {
+      const [pronta, setPronta] = useState(false);
+      return pronta ? <div data-testid="rotina-pronta">rotina</div> : (
+        <MontarRotina onDoZero={() => {}} onPronto={(perfil) => {
+          const r = gerarRotina(perfil, []);
+          s.set("skincare-am-steps", r.manha); s.set("skincare-pm-steps", r.noite); s.set("skincare-perfil", perfil); setPronta(true);
+        }} />
+      );
+    };
+    render(<s.Provedor><div><Quiz /><IntroDoModulo moduleId="beleza" /></div></s.Provedor>);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 9000 });
+    // o post-it é só a instrução: nenhum chip, e a pergunta da pele aparece UMA vez (a do quiz)
+    expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Responde aqui as 3 perguntas");
+    expect(screen.getAllByText("Como é a sua pele?")).toHaveLength(1);
+    expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeNull();
+    // as 5 opções do quiz (inclusive Sensível) e o "Prefiro montar do zero" estão lá, tocáveis
+    expect(screen.getByTestId("opcao-sensivel")).toBeTruthy();
+    expect(screen.getByTestId("do-zero")).toBeTruthy();
+    // ela responde as 3 perguntas no quiz → a rotina nasce → o passo segue sozinho
+    fireEvent.click(screen.getByTestId("opcao-sensivel"));
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
+    expect((s.estado.dados["skincare-am-steps"] as unknown[]).length).toBeGreaterThan(0);
+    await waitFor(() => expect(faixa()!.textContent).toContain("2 de 3 · olha a sua rotina"), { timeout: 9000 });
+    medir.mockRestore();
+  });
 
   it("Saúde (guiada): água → olha → continua no sono (3 de 4) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);

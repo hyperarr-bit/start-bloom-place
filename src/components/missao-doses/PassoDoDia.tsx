@@ -28,6 +28,8 @@ import { temArte } from "@/components/conquistas/adesivos-arte";
 import { Fogo } from "@/components/conquistas/Fogo";
 import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
+import { lembretesSoNoApp } from "@/lib/missao-web";
+import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
 
 /** 17/10 (relatório 11, D2; revisão do dono — o 1º gasto é o tutorial no formulário, não a tela do número) — a copy
  *  do 1º gasto: curta (o dono odeia texto demais). */
@@ -1511,6 +1513,10 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
   const frase = fraseDoFeito(modulo, rotulo, porDiaAgora);
   void hoje;
+  // 18/10 (funil da missão na WEB): o "Te lembro às" do dia 2 sai — o "Combinado" abre o pop-up "Baixe o app pra
+  // receber os lembretes" e o "Agora não" combina "sem lembrete" (o navegador não manda notificação)
+  const [soNoApp] = useState(lembretesSoNoApp);
+  const [popupApp, setPopupApp] = useState(false);
 
   /* A ÚNICA festa em tela cheia do teste: o adesivo "3 dias seguidos" */
   if (escolha.telaCheia && escolha.principal && escolha.principal.tipo !== "recomeca") {
@@ -1570,7 +1576,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
             <AdesivoDeAmanha dias={n === 1 ? 2 : 3} tamanho={40} />
           </div>
         )}
-        {n === 2 && proximo && (
+        {n === 2 && proximo && !soNoApp && (
           <>
             <span className="block text-[12px] text-muted-foreground mt-3">Te lembro às:</span>
             <div className="flex flex-wrap gap-2 mt-1.5" role="radiogroup" aria-label="Hora do lembrete">
@@ -1584,6 +1590,10 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
           <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>
             Ver o que você construiu <ArrowRight className="w-4 h-4" />
           </button>
+        ) : n === 2 && soNoApp ? (
+          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-combinado" data-hora="sem" onClick={() => setPopupApp(true)}>
+            Combinado, até amanhã
+          </button>
         ) : n === 2 ? (
           <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
             {hora === "sem" ? "Combinado, até amanhã" : `Combinado, me lembra às ${hora}`}
@@ -1595,6 +1605,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
         )}
         <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />
       </motion.div>
+      {popupApp && <BaixarAppPopup contexto="festa_dia2" onAgoraNao={() => { setPopupApp(false); aoCombinar("sem"); }} />}
     </motion.div>,
     document.body,
   );

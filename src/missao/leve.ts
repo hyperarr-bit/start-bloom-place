@@ -2,8 +2,8 @@
  * O SCRIPT DO HTML LEVE DO /missao (protótipo 18/10). Vanilla, sem React — a tela 1 já veio pintada no HTML.
  *
  *  1. mede (missao_html: quando o HTML chegou e a tela 1 apareceu) e guarda a sessão do funil;
- *  2. PRÉ-CARREGA o app em segundo plano: no 1º frame ocioso depois da pintura (ou no 1º toque, o que vier antes)
- *     importa ./app-entry (React + App + CSS, sem montar). No toque numa área, pede também o módulo dela;
+ *  2. PRÉ-CARREGA o app em segundo plano: o download de ./app-entry (React + App + CSS, sem montar) começa assim que
+ *     este script roda (a tela 1 já está pintada pelo HTML). No toque numa área, pede o módulo dela EM PARALELO;
  *  3. tela 1 → tela 2 (a dor da área, honesta, sem número inventado) → botão → o App monta no MESMO documento,
  *     já no módulo da área com o tutorial da missão aberto. Se o app ainda não chegou, "Abrindo seu CORE…".
  *  4. o #mt (as telas leves) só sai quando o tutorial está na tela (html[data-missao-tutorial]) — nunca tela branca.
@@ -110,13 +110,35 @@ function carregarApp(): Promise<AppEntry> {
   }
   return app;
 }
-const ocioso = (cb: () => void) => {
-  const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-  if (ric) ric(cb, { timeout: 600 }); else setTimeout(cb, 200);
-};
-// depois da 1ª pintura (2 frames), no ocioso — a tela 1 nunca espera o app
-requestAnimationFrame(() => requestAnimationFrame(() => ocioso(() => { void carregarApp(); })));
-addEventListener("pointerdown", () => { void carregarApp(); }, { once: true, passive: true });
+// 18/10 (versão de verdade, "quem toca rápido"): o download do app começa JÁ — o import() só pede os arquivos (a rede
+// trabalha enquanto ela lê a tela 1, que já está pintada pelo HTML); a avaliação do JS acontece quando chegam. Antes
+// esperava 2 frames + o ocioso (até ~0,6 s de rede parada no 4G lento).
+void carregarApp();
+
+/* O MÓDULO da área: pedido assim que o app chega (app-entry.preaquecer — o mesmo pedaço do React.lazy do App.tsx).
+   18/10: pedir o módulo direto daqui (em paralelo) fazia o Rollup picar o app em ~50 pedaços (+45 KB comprimidos e o
+   app pronto ~1 s DEPOIS no 4G lento) — medido, desfeito. */
+let areaPreaquecida: Area | null = null;
+function preaquecerArea(area: Area): void {
+  if (areaPreaquecida === area) return;
+  areaPreaquecida = area;
+  void carregarApp().then((m) => m.preaquecer(area)).catch(() => { areaPreaquecida = null; });
+}
+
+/* "O tutorial está na tela": a marca que tira as telas leves (sem tela branca) e que a camada da oferta espera pra
+   carregar (ela não disputa a rede com o módulo). Os mesmos alvos da camada (src/missao/FunilMissaoCamada). */
+const TUTORIAL_NA_TELA = "html[data-montar-financas], html[data-montar-rotina], html[data-missao-dose], [data-testid='missao-doses-festa'], [data-testid='missao-doses-passo']";
+function vigiarTutorial(): void {
+  const marcar = () => {
+    if (document.documentElement.hasAttribute("data-missao-tutorial")) return true;
+    if (!document.querySelector(TUTORIAL_NA_TELA)) return false;
+    document.documentElement.setAttribute("data-missao-tutorial", "1");
+    return true;
+  };
+  if (marcar()) return;
+  const obs = new MutationObserver(() => { if (marcar()) obs.disconnect(); });
+  obs.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
+}
 
 /* pixels de anúncio: só em produção, depois da tela 1 (fila fbq igual à do index.html) */
 if (PRODUCAO) {
@@ -135,8 +157,9 @@ if (PRODUCAO) {
 
 /* ───────── as telas ───────── */
 let areaEscolhida: Area | null = null;
-function mostrar(id: "mt-t1" | "mt-t2" | "mt-t3") {
-  for (const t of ["mt-t1", "mt-t2", "mt-t3"]) {
+type IdTela = "mt-t1" | "mt-t2" | "mt-t3" | "mt-t4" | "mt-t5";
+function mostrar(id: IdTela) {
+  for (const t of ["mt-t1", "mt-t2", "mt-t3", "mt-t4", "mt-t5"] as IdTela[]) {
     const el = $(t);
     if (t === id) { el.hidden = false; el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; } // reinicia a MESMA entrada
     else el.hidden = true;
@@ -170,7 +193,7 @@ document.querySelectorAll<HTMLButtonElement>("button.mt-op").forEach((b) => {
     document.querySelectorAll("button.mt-op.on").forEach((x) => x.classList.remove("on"));
     b.classList.add("on");
     evento("missao_area", { area, app_pronto: !!appPronto });
-    void carregarApp().then((m) => m.preaquecer(area)).catch(() => {});
+    preaquecerArea(area);
     preencherTela2(area);
     setTimeout(() => {
       try { history.pushState({ missaoTela: 2 }, "", location.href); } catch { /* noop */ }
@@ -192,9 +215,20 @@ $("mt-cta").addEventListener("click", () => {
   evento("missao_cta", { area, app_pronto: !!appPronto });
   const ctaTxt = $("mt-cta-txt");
   ctaTxt.textContent = "Abrindo…";
+  preaquecerArea(area);
+  // o app ainda não chegou e a área é Finanças: o PASSO 1 do tutorial já aparece aqui, em HTML (ela responde enquanto
+  // o app termina de chegar); o app monta por trás e a resposta vai pra tela de verdade (passo1.ts)
+  if (passo1Cabe(area)) {
+    mostrar(area === "rotina" ? "mt-t5" : "mt-t4");
+    evento("missao_tutorial_na_tela", { area, ms_desde_toque: Math.round(performance.now() - t0), via: "passo1_html" });
+    if (area === "rotina") abrirPasso1Rotina(area, t0); else abrirPasso1(area, t0);
+    carregarApp().then((m) => { vigiarTutorial(); m.montar(area, sessao, t0); }).catch(() => { location.href = `/missao/app?area=${area}`; });
+    return;
+  }
   // só mostra "Abrindo seu CORE…" se demorar (app ainda baixando): quem tem o app pronto vai direto
   const avisar = setTimeout(() => { mostrar("mt-t3"); evento("missao_abrindo_view", { area }); }, appPronto ? 900 : 120);
   carregarApp().then((m) => {
+    vigiarTutorial();
     m.montar(area, sessao, t0);
     revelarQuandoPronto(avisar, t0, area);
   }).catch(() => {
@@ -220,4 +254,155 @@ function revelarQuandoPronto(avisar: ReturnType<typeof setTimeout>, t0: number, 
   obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-missao-tutorial"] });
   if (document.documentElement.hasAttribute("data-missao-tutorial")) revelar("tutorial");
   setTimeout(() => revelar("tempo"), 6000);
+}
+
+/* ───────── o PASSO 1 DE FINANÇAS em HTML (quem toca antes de o app chegar) ─────────
+   A MESMA tela 1 do "Vamos montar suas Finanças" (src/components/finance/montar/MontarFinancas, passo "renda"). Ela
+   responde aqui; o app monta por trás (o #mt fica por cima); no "Continuar", a resposta vai pra tela de verdade pelos
+   MESMOS toques (o chip da faixa, ou o valor digitado no campo) e o "Continuar" de lá é tocado — o passo 2 entra com a
+   animação de sempre e o #mt sai. "Pular" toca o "Pular" de verdade. Nada de dado gravado por fora do app. */
+const FAIXAS_DE_RENDA: { id: string; rotulo: string; valor: number }[] = [ // = lib/montar-financas FAIXAS_DE_RENDA (o teste confere)
+  { id: "ate2", rotulo: "Até R$ 2 mil", valor: 1500 },
+  { id: "2a4", rotulo: "R$ 2 a 4 mil", valor: 3000 },
+  { id: "4a7", rotulo: "R$ 4 a 7 mil", valor: 5500 },
+  { id: "7mais", rotulo: "Mais de R$ 7 mil", valor: 8000 },
+];
+const DICA_SEM_FAIXA = "Salário, freela, pensão… o que entra no mês.";
+const DICA_COM_FAIXA = "Um valor de partida — ajusta pro número certo se quiser.";
+const reaisDigitados = (t: string): number => { const so = String(t ?? "").split(",")[0].replace(/\D/g, "").slice(0, 7); return so ? parseInt(so, 10) : 0; };
+const reaisTexto = (v: number): string => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
+/** Cabe o passo 1 em HTML? Finanças (dinheiro/tudo) e Rotina, só com o app ainda chegando, e só se ela ainda não
+ *  passou do passo 1 (missão sem dose feita; o "Vamos montar" sem decisão nem rascunho além da 1ª pergunta). */
+function passo1Cabe(area: Area): boolean {
+  if (area !== "dinheiro" && area !== "tudo" && area !== "rotina") return false;
+  if (appPronto) return false; // o app chegou: o tutorial de verdade abre em ~0,2 s
+  try {
+    const w = JSON.parse(localStorage.getItem("core-missao-web") || "null") as { dose1?: number; festa?: unknown; pago?: unknown } | null;
+    if (w && (w.dose1 || w.festa || w.pago)) return false;
+    const chave = area === "rotina" ? "core-montar-rotina" : "core-montar-financas";
+    const primeira = area === "rotina" ? "acordar" : "renda";
+    const m = JSON.parse(localStorage.getItem(chave) || "null") as { r?: string; rascunho?: { etapa?: string } } | null;
+    if (m && (m.r || (m.rascunho && m.rascunho.etapa && m.rascunho.etapa !== primeira))) return false;
+  } catch { return false; }
+  return true;
+}
+
+/** "Out 2026" (celular) / "Outubro de 2026" (≥ 460 px) — o MesDoCabecalho do app. */
+function mesDoCabecalho(): string {
+  try {
+    const d = new Date();
+    const abrev = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+    return innerWidth >= 460
+      ? d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }).replace(/^./, (c) => c.toUpperCase())
+      : `${abrev.charAt(0).toUpperCase()}${abrev.slice(1)} ${d.getFullYear()}`;
+  } catch { return ""; }
+}
+
+/** Tira as telas leves (o passo 2 de verdade já está na tela) — com a MESMA entrada do app. */
+function sairDoPasso1(area: Area, acao: string, t0: number, t1: number, achou: boolean) {
+  const raiz = $("root");
+  raiz.classList.remove("mt-entrando"); void raiz.offsetWidth; raiz.classList.add("mt-entrando");
+  document.getElementById("mt")?.remove();
+  evento("missao_passo1_entregue", { area, acao, ms_espera: Math.round(performance.now() - t1), ms_desde_toque: Math.round(performance.now() - t0), achou });
+}
+
+/* O passo 1 da ROTINA (MontarRotina "Que horas você acorda?"): 6h/7h/8h = 1 toque é a resposta (segue sozinho, como no
+   app); "Outro horário" e "Pular" passam o toque pra tela de verdade (o relógio do sistema abre lá). */
+function abrirPasso1Rotina(area: Area, t0: number) {
+  $("mtr-mes").textContent = mesDoCabecalho();
+  let entregando = false;
+  evento("missao_passo1_html", { area, acao: "view" });
+  const entregar = async (opcao: string | null) => {
+    if (entregando) return;
+    entregando = true;
+    const t1 = performance.now();
+    document.querySelectorAll<HTMLButtonElement>("#mtr-chips button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.opcao === opcao)));
+    evento("missao_passo1_html", { area, acao: opcao ? "hora" : "pular", opcao, app_pronto: !!appPronto });
+    const mrt = await esperar(() => document.querySelector<HTMLElement>('.mrt[data-etapa="acordar"]'), 20000);
+    if (mrt) {
+      if (!opcao) mrt.querySelector<HTMLButtonElement>("button.mrt-pular")?.click();
+      else {
+        const chips = [...mrt.querySelectorAll<HTMLButtonElement>("button.mrt-chip[data-hora]")];
+        const chip = opcao === "outro" ? chips.find((b) => b.hasAttribute("data-outro")) : chips.find((b) => (b.textContent || "").trim() === opcao);
+        chip?.click();
+        if (opcao !== "outro") await esperar(() => document.querySelector('.mrt[data-etapa="itens"]'), 3000);
+        else await doisFrames();
+      }
+    }
+    sairDoPasso1(area, opcao ? "hora" : "pular", t0, t1, !!mrt);
+  };
+  document.querySelectorAll<HTMLButtonElement>("#mtr-chips button").forEach((b) => b.addEventListener("click", () => { void entregar(b.dataset.opcao || null); }));
+  $("mtr-pular").addEventListener("click", () => { void entregar(null); });
+}
+
+function esperar<T>(achar: () => T | null, ms: number): Promise<T | null> {
+  return new Promise((ok) => {
+    const ja = achar(); if (ja) { ok(ja); return; }
+    const fim = setTimeout(() => { obs.disconnect(); ok(achar()); }, ms);
+    const obs = new MutationObserver(() => { const a = achar(); if (a) { clearTimeout(fim); obs.disconnect(); ok(a); } });
+    obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+  });
+}
+const doisFrames = () => new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
+
+function abrirPasso1(area: Area, t0: number) {
+  let faixa: string | null = null;
+  let renda = 0;
+  let entregando = false;
+  $("mtf-mes").textContent = mesDoCabecalho();
+  const chips = $("mtf-chips");
+  const input = $("mtf-renda") as HTMLInputElement;
+  const cta = $("mtf-cta") as HTMLButtonElement;
+  const dica = $("mtf-dica");
+  const pintar = () => {
+    chips.querySelectorAll<HTMLButtonElement>("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.faixa === faixa)));
+    input.value = renda ? reaisTexto(renda) : "";
+    dica.textContent = faixa ? DICA_COM_FAIXA : DICA_SEM_FAIXA;
+    cta.disabled = renda <= 0 || entregando;
+  };
+  chips.textContent = "";
+  for (const f of FAIXAS_DE_RENDA) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "mtf-chip"; b.dataset.faixa = f.id; b.textContent = f.rotulo;
+    b.addEventListener("click", () => { if (entregando) return; faixa = f.id; renda = f.valor; pintar(); });
+    chips.appendChild(b);
+  }
+  input.addEventListener("input", () => { if (entregando) return; renda = reaisDigitados(input.value); faixa = null; pintar(); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+  pintar();
+  evento("missao_passo1_html", { area, acao: "view" });
+
+  const entregar = async (acao: "continuar" | "pular") => {
+    if (entregando) return;
+    entregando = true;
+    const t1 = performance.now();
+    cta.disabled = true;
+    if (acao === "continuar") { cta.innerHTML = '<i class="mtf-gira" aria-hidden="true"></i><span>Continuar</span>'; }
+    evento("missao_passo1_html", { area, acao, faixa: faixa ?? (renda ? "digitou" : null), app_pronto: !!appPronto });
+    // a tela de verdade, no passo da renda (o app pode ainda estar chegando: espera até 20 s)
+    const mf = await esperar(() => document.querySelector<HTMLElement>('.mf[data-etapa="renda"]'), 20000);
+    if (mf) {
+      if (acao === "pular") {
+        mf.querySelector<HTMLButtonElement>("button.mf-pular")?.click();
+      } else {
+        const rotulo = FAIXAS_DE_RENDA.find((f) => f.id === faixa)?.rotulo;
+        const chip = rotulo ? [...mf.querySelectorAll<HTMLButtonElement>("button.mf-chip")].find((b) => (b.textContent || "").trim() === rotulo) : null;
+        if (chip) chip.click();
+        else {
+          const campo = mf.querySelector<HTMLInputElement>(".mf-renda input");
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+          if (campo && setter) { setter.call(campo, String(renda)); campo.dispatchEvent(new Event("input", { bubbles: true })); }
+        }
+        // o "Continuar" de verdade liga quando o React pintar a renda
+        const botao = await esperar(() => { const b = mf.querySelector<HTMLButtonElement>("button.mf-cta"); return b && !b.disabled ? b : null; }, 3000);
+        await doisFrames();
+        botao?.click();
+        await esperar(() => document.querySelector('.mf[data-etapa="contas"]'), 3000);
+      }
+    }
+    sairDoPasso1(area, acao, t0, t1, !!mf);
+  };
+  cta.addEventListener("click", () => { void entregar("continuar"); });
+  $("mtf-pular").addEventListener("click", () => { void entregar("pular"); });
 }

@@ -8,7 +8,11 @@ export function prepararMissao(area: AreaMissaoWeb, sessao: string): string {
   const areaApp = AREA_DO_APP[area];
   try { localStorage.setItem("core-funnel-area", areaApp); } catch { /* storage bloqueado: a missão cai em Finanças */ }
   const web = lerMissaoWeb();
-  if (!web || web.area !== area) gravarMissaoWeb({ v: 1, area, em: Date.now(), sessao, pago: null, email: null });
+  // a URL do anúncio, enquanto ainda é a do /missao (o source_url do Pix e da CAPI separa a venda deste funil)
+  let landing: string | null = null;
+  try { if (window.location.pathname.startsWith("/missao")) landing = window.location.href.slice(0, 300); } catch { /* noop */ }
+  if (!web || web.area !== area) gravarMissaoWeb({ v: 1, area, em: Date.now(), sessao, pago: null, email: null, landing });
+  else if (!web.landing && landing) gravarMissaoWeb({ ...web, landing });
   let m = lerMissao();
   if (!m || (!m.feitos[1] && m.modulos[0] !== modulosPadrao(areaApp)[0])) {
     m = iniciarMissao(modulosPadrao(areaApp), localDayKey(), undefined, "A");

@@ -49,7 +49,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -69,7 +69,11 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** PROTÓTIPO (funil da missão, 18/10): nada vai pra Asaas nem pro banco — QR de mentira, "Já paguei" confirma na
    *  hora, o e-mail opcional só fica na tela. Padrão false: o /hoje não muda. */
   simular?: boolean;
+  /** 18/10 (funil da missão): a URL que vai como source_url do Pix e da CAPI no lugar da atual (o /missao?utm… do
+   *  anúncio — a página já está no módulo). Padrão null: a URL atual, como o /hoje sempre fez. */
+  fonteUrl?: string | null;
 }) {
+  const urlFonte = () => (fonteUrl || window.location.href).slice(0, 300);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -101,7 +105,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       }
       const c = cookiesDaMeta();
       const { data, error } = await supabase.functions.invoke("asaas-pix", {
-        body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
+        body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: urlFonte() },
       });
       const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null } | null;
       if (error || !d?.orderId || !d?.qrCode) {
@@ -120,7 +124,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       pedindo.current = false;
       setGerando(false);
     }
-  }, [ids, onPix, oferta, valor, simular]);
+  }, [ids, onPix, oferta, valor, simular, fonteUrl]);
 
   /* sem QR desta oferta (ou o salvo venceu) → gera na montagem */
   useEffect(() => {
@@ -146,7 +150,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     await sessaoViva();
     const c = cookiesDaMeta();
     const { data } = await supabase.functions.invoke("asaas-pix", {
-      body: { action: "check", id: alvo.orderId, offer: alvo.oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: window.location.href.slice(0, 300) },
+      body: { action: "check", id: alvo.orderId, offer: alvo.oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: urlFonte() },
     });
     if ((data as { paid?: boolean } | null)?.paid && !pago.current) {
       pago.current = true;
@@ -155,7 +159,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       return true;
     }
     return false;
-  }, [pixAtual, simular]);
+  }, [pixAtual, simular, fonteUrl]);
 
   /* confirmação: check a cada 3 s + na volta da aba */
   useEffect(() => {

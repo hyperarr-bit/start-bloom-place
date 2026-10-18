@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { copiarDadosDaAnonima } from "../_shared/copiar-dados-anonima.ts";
 
 /**
  * VINCULAR COMPRA ANÔNIMA À CONTA DE VERDADE (17/09).
@@ -25,6 +26,11 @@ import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_share
  *   → { ok: false, motivo }                    nada a fazer (sem erro)
  * Motivos: mesma_conta · token_invalido · origem_tem_email · origem_sem_pix ·
  *          destino_ja_tem_assinatura
+ *
+ * 18/10 (funil da missão): com a anônima provada (o token), os DADOS dela (user_data — o dia 1 que a convidada montou
+ * antes de pagar) vão junto pra conta de destino, só as chaves que o destino não tem ou tem vazias
+ * (_shared/copiar-dados-anonima.ts). Acontece em todo veredito depois da prova, até sem Pix pra mover; a resposta
+ * leva `dados` (quantas chaves copiou; -1 = falhou).
  */
 
 const corsHeaders = {
@@ -69,6 +75,9 @@ serve(async (req) => {
     const origemAnonima = de?.user?.is_anonymous === true || !de?.user?.email;
     if (!origemAnonima) return json({ ok: false, motivo: "origem_tem_email" });
 
+    const dados = await copiarDadosDaAnonima(admin, origem.id, destino.id);
+    if (dados !== 0) console.log(`[PIX-VINCULAR] dados ${origem.id} -> ${destino.id}: ${dados}`);
+
     /* 18/10 (/hoje): a sessão anônima pode ter MAIS de uma linha de Pix — o plano + os upsells (o "pra sempre" e o
      * "+2 anos" ganham linha própria, ver _shared/grant-pix.ts `linhaNova`). Todas vão juntas; a de fim mais distante
      * é a que responde (como antes). */
@@ -78,13 +87,13 @@ serve(async (req) => {
       .order("current_period_end", { ascending: false }).limit(10);
     const todasDe = (subsDe ?? []) as Array<{ id: string; plan: string; billing_period: string; amount_cents: number | null; status: string; created_at: string }>;
     const subDe = todasDe[0];
-    if (!subDe || subDe.status !== "active") return json({ ok: false, motivo: "origem_sem_pix" });
+    if (!subDe || subDe.status !== "active") return json({ ok: false, motivo: "origem_sem_pix", dados });
     /* 01/10: no destino só as linhas PRÓPRIAS contam — a da App Store/Play é do
      * RevenueCat: nem barra o vínculo (carência da Apple + Pix pago) nem pode
      * ser apagada (ver _shared/linha-pix.ts). */
     const { data: todasPara } = await admin.from("subscriptions").select(COLUNAS_DECISAO).eq("user_id", destino.id);
     const propriasPara = linhasProprias((todasPara ?? []) as LinhaAssinatura[]);
-    if (propriasPara.some((l) => l.status === "active")) return json({ ok: false, motivo: "destino_ja_tem_assinatura" });
+    if (propriasPara.some((l) => l.status === "active")) return json({ ok: false, motivo: "destino_ja_tem_assinatura", dados });
     for (const casca of propriasPara) await admin.from("subscriptions").delete().eq("id", casca.id); // casca expirada dá lugar à paga
 
     const { error } = await admin.from("subscriptions")
@@ -93,10 +102,10 @@ serve(async (req) => {
 
     await admin.from("analytics_events").insert({
       user_id: destino.id, event_name: "compra_vinculada",
-      event_data: { de: origem.id, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, via: "funil", linhas: todasDe.length },
+      event_data: { de: origem.id, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, via: "funil", linhas: todasDe.length, dados },
     }).then(() => {}, () => {});
     console.log(`[PIX-VINCULAR] ${origem.id} -> ${destino.id} (${subDe.plan}, ${subDe.amount_cents})`);
-    return json({ ok: true, plan: subDe.plan, billing_period: subDe.billing_period, amount_cents: subDe.amount_cents });
+    return json({ ok: true, plan: subDe.plan, billing_period: subDe.billing_period, amount_cents: subDe.amount_cents, dados });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

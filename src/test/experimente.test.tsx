@@ -526,7 +526,8 @@ describe("só aparece o que a pessoa tocar; o que ela toca fica no funil", () =>
 
   it("Finanças: Retrospectiva e Desafio da semana fora do topo do Dashboard SÓ no funil-demo", () => {
     const index = readFileSync(join(process.cwd(), "src/pages/Index.tsx"), "utf8");
-    expect(index).toContain("{!demoDoFunil && <WrappedBanner />}");
+    // 18/10: o banner da retrospectiva virou lazy (velocidade do funil da missão) — a regra é a mesma: fora do funil-demo
+    expect(index).toContain("{!demoDoFunil && <Suspense fallback={null}><WrappedBanner /></Suspense>}");
     expect(index).toMatch(/\{!demoDoFunil && \(\s*<TrackedCard cardKey="weekly-challenge"/);
     expect(index).toContain("const demoDoFunil = useDemoDoFunil();");
   });

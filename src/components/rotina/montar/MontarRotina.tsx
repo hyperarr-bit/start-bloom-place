@@ -70,6 +70,8 @@ import {
   type ItemId, type OpcaoAcordar, type OrigemMontar, type PerguntaDoLembrete, type Resultado,
 } from "@/lib/montar-rotina";
 import "./montar-rotina.css";
+import { lembretesSoNoApp } from "@/lib/missao-web";
+import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
 
 export {
   deveMostrarMontarRotina, montarRotinaAbertoPelaMissao, EVENTO_MONTAR_ROTINA_FIM, ATRIBUTO_NA_TELA, ATRIBUTO_FASE,
@@ -184,7 +186,11 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
 
   const acordar = horaDaResposta(opcao, outro);
   const pergunta: PerguntaDoLembrete = permissaoInicial === "denied" ? "negado" : onb.lembrete === "sem_aviso" ? "sem_aviso" : "perguntar";
-  const comPergunta3 = pergunta === "perguntar";
+  // 18/10 (funil da missão na WEB): o navegador não manda notificação — a 3ª pergunta vira o pop-up "Baixe o app pra
+  // receber os lembretes" (missao/BaixarAppPopup) e a rotina monta do mesmo jeito, sem lembrete
+  const [soNoApp] = useState(lembretesSoNoApp);
+  const [popupApp, setPopupApp] = useState(false);
+  const comPergunta3 = pergunta === "perguntar" && !soNoApp;
   const total = comPergunta3 ? 3 : 2;
   const escolhidos = useMemo(() => itensValidos(itens), [itens]);
   const linhas = useMemo(() => (acordar ? linhasDoDia(acordar, escolhidos) : []), [acordar, escolhidos]);
@@ -328,7 +334,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
     ];
     trackEvent(EV_PRONTO, {
       itens: escolhidos.length, lembrete: comAviso, acordar: escolha, origem,
-      ...(comPergunta3 ? {} : { lembrete_pulado: pergunta }),
+      ...(comPergunta3 ? {} : { lembrete_pulado: soNoApp ? "web" : pergunta }),
       ...(reaproveitou.length ? { reaproveitou } : {}),
     });
     setEtapa("montando");
@@ -436,7 +442,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
               </div>
             )}
             <div className="mrt-rodape">
-              <button type="button" className="mrt-cta" disabled={nItens === 0} onClick={() => (comPergunta3 ? irPara("lembrete") : montar())}>
+              <button type="button" className="mrt-cta" disabled={nItens === 0} onClick={() => (comPergunta3 ? irPara("lembrete") : soNoApp ? setPopupApp(true) : montar())}>
                 {nItens === 0 ? "Escolhe pelo menos um" : comPergunta3 ? "Continuar" : "Montar minha rotina"}
               </button>
               <button type="button" className="mrt-pular" onClick={pular}>Pular</button>
@@ -498,6 +504,9 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
           </div>
         )}
       </div>
+      {popupApp && etapa === "itens" && (
+        <BaixarAppPopup contexto="rotina" onAgoraNao={() => { setPopupApp(false); montar(); }} />
+      )}
     </div>
   );
 }

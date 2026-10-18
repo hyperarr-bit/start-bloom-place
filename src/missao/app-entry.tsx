@@ -20,9 +20,14 @@ import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback"
 import { recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { funilMissaoLigado, type AreaMissaoWeb } from "@/lib/missao-web";
 import { prepararMissao } from "./preparar";
+import { capturarAtribuicao } from "@/pages/porta/atribuicao";
+import { restaurarDaCopia } from "./seguranca";
 
 instalarResizeObserverSePreciso();
 captureLandingMeta(); // AGORA: a URL ainda é a do anúncio (/missao?utm_…&fbclid=…)
+try { capturarAtribuicao(); } catch { /* a atribuição (fbc/utm em cookie) nunca impede o funil */ }
+// o Instagram zerou o storage e recarregou? a cópia do IndexedDB volta antes de montar (missao/seguranca)
+const restaurado: Promise<unknown> = restaurarDaCopia().catch(() => false);
 const ligado = funilMissaoLigado(); // idem: guarda a força de QA (?funil-missao=on) antes de a URL virar /financas
 window.addEventListener("vite:preloadError", () => { recarregarPorChunkNovo(); });
 
@@ -32,6 +37,9 @@ export function montar(area: AreaMissaoWeb, sessao: string, t0: number): void {
   if (montado) return;
   montado = true;
   if (!ligado) { window.location.replace("/"); return; } // chave FUNIL_MISSAO desligada e sem QA: o site de sempre
+  void restaurado.finally(() => montarAgora(area, sessao, t0));
+}
+function montarAgora(area: AreaMissaoWeb, sessao: string, t0: number): void {
   const rota = prepararMissao(area, sessao);
   try { history.replaceState({ missao: area }, "", rota + window.location.hash); } catch { /* noop */ }
   const raiz = document.getElementById("root")!;
@@ -41,7 +49,7 @@ export function montar(area: AreaMissaoWeb, sessao: string, t0: number): void {
   requestAnimationFrame(() => { setTimeout(() => { try { window.dispatchEvent(new Event("core:montou")); } catch { /* noop */ } }, 0); });
 }
 
-/** O módulo da 1ª dose em segundo plano (o mesmo chunk do lazy do App.tsx: o React.lazy acha o módulo pronto). */
+/** O módulo da 1ª dose (o mesmo pedaço do React.lazy do App.tsx: quando o App monta, o módulo já está pronto). */
 const PAGINA_DA_AREA: Record<AreaMissaoWeb, () => Promise<unknown>> = {
   dinheiro: () => import("../pages/Index"),
   tudo: () => import("../pages/Index"),
@@ -50,5 +58,5 @@ const PAGINA_DA_AREA: Record<AreaMissaoWeb, () => Promise<unknown>> = {
   metas: () => import("../pages/DesenvolvimentoPessoal"),
 };
 export function preaquecer(area: AreaMissaoWeb): Promise<unknown> {
-  return Promise.all([PAGINA_DA_AREA[area]().catch(() => null), import("./FunilMissaoCamada").catch(() => null)]);
+  return PAGINA_DA_AREA[area]().catch(() => null);
 }

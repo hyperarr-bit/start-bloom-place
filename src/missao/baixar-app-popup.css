@@ -1,0 +1,17 @@
+/* O pop-up "Baixe o app pra receber os lembretes" (funil da missão, 18/10) — a cara do funil: branco, Inter, grafite.
+   Por cima das folhas do tutorial (Montar Rotina z 200, plano de amanhã z 230) e abaixo da oferta. */
+.bap-fundo { position: fixed; inset: 0; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147481900; display: flex; align-items: flex-end; justify-content: center; padding: 40px 12px max(12px, env(safe-area-inset-bottom)); background: rgba(20, 16, 24, .48); animation: bap-fundo .2s ease-out both; font-family: Inter, -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.bap-folha { width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto; background: #fff; color: #262626; border-radius: 26px; padding: 22px 20px 14px; box-shadow: 0 20px 50px rgba(0, 0, 0, .28); text-align: center; animation: bap-entra .28s ease-out both; }
+.bap-icone { width: 52px; height: 52px; margin: 0 auto; border-radius: 16px; display: grid; place-items: center; background: #faf8f5; color: #262626; }
+.bap-folha h2 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin: 14px 0 0; text-wrap: balance; }
+.bap-folha > p { font-size: 14.5px; line-height: 1.42; color: #6b6b6b; margin: 8px 0 0; }
+.bap-selos { justify-content: center; margin-top: 16px; }
+.bap-email { margin: 14px auto 0; padding: 10px 12px; border-radius: 14px; background: #faf8f5; border: 1px solid #efe9e1; display: flex; flex-direction: column; gap: 2px; }
+.bap-email span { font-size: 12.5px; color: #6b6b6b; font-weight: 600; }
+.bap-email b { font-size: 15px; font-weight: 750; word-break: break-all; }
+.bap-folha > p.bap-depois { font-size: 13.5px; margin-top: 12px; color: #404040; font-weight: 600; }
+button.bap-agora-nao { width: 100%; min-height: 50px; margin-top: 14px; border-radius: 16px; border: 1.5px solid #e6e6e6; background: #fff; color: #262626; font-size: 15.5px; font-weight: 700; font-family: inherit; }
+button.bap-agora-nao:active { transform: scale(.985); }
+@keyframes bap-fundo { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bap-entra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } } /* a MESMA entrada do funil inteiro (mt-entra) */
+@media (prefers-reduced-motion: reduce) { .bap-fundo, .bap-folha { animation: none; } }

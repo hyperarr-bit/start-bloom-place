@@ -12,6 +12,8 @@
  *   1. lê o destino; sem destino, ou a anônima já tem e-mail próprio → nada (caminho normal);
  *   2. acha a conta do e-mail (nunca cria 2ª conta; sem conta, nada — a página teria posto o e-mail na anônima);
  *   3. MOVE todas as linhas de Pix ativas da anônima pra essa conta (a anônima é descartável: só tem esta compra);
+ *   3b. (18/10, funil da missão) copia os DADOS da anônima (o dia 1 que ela montou antes de pagar) pra essa conta — só
+ *      as chaves que a conta não tem ou tem vazias (_shared/copiar-dados-anonima.ts);
  *   4. manda as boas-vindas do /hoje pro e-mail (1x por pedido do plano, a mesma reserva das boas-vindas), com as
  *      lojas e "entre com este e-mail → Entrar sem senha (código)".
  * Dar acesso a um e-mail que não é seu não tira nada de ninguém (é presente), então o e-mail não precisa de prova
@@ -22,6 +24,7 @@
 import { reservarBoasVindas, soltarBoasVindas } from "./boas-vindas-hoje.ts";
 import { assuntoVenda, htmlVenda, periodoDoEmailVenda } from "./email-venda.ts";
 import { ehPlanoHoje } from "./ofertas-hoje.ts";
+import { copiarDadosDaAnonima } from "./copiar-dados-anonima.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,7 +64,7 @@ export async function acharConta(admin: Admin, email: string): Promise<string | 
 
 export type ResultadoDestino =
   | { r: "sem_destino" } | { r: "anonima_tem_email" } | { r: "sem_conta" } | { r: "sem_linha" }
-  | { r: "movido"; para: string; linhas: number; email: boolean };
+  | { r: "movido"; para: string; linhas: number; email: boolean; dados?: number };
 
 /**
  * Leva a compra da sessão anônima pra conta do e-mail de destino (se houver) e manda o acesso por e-mail.
@@ -85,9 +88,10 @@ export async function encaminharParaDestino(admin: Admin, args: {
   const todas = (linhas ?? []) as Array<{ id: string; current_period_end: string | null; billing_period: string | null; plan: string | null }>;
   if (!todas.length) return { r: "sem_linha" };
   for (const l of todas) await admin.from("subscriptions").update({ user_id: para, customer_email: destino }).eq("id", l.id);
+  const dados = await copiarDadosDaAnonima(admin, args.uidAnonimo, para);
   await admin.from("analytics_events").insert({
     user_id: para, event_name: "compra_vinculada",
-    event_data: { de: args.uidAnonimo, via: "hoje_email_pix", linhas: todas.length, order_id: args.orderId },
+    event_data: { de: args.uidAnonimo, via: "hoje_email_pix", linhas: todas.length, order_id: args.orderId, dados },
   }).then(() => {}, () => {});
 
   let mandou = false;
@@ -98,5 +102,5 @@ export async function encaminharParaDestino(admin: Admin, args: {
     mandou = await args.enviar(destino, assuntoVenda(periodo), htmlVenda({ email: destino, periodo, fim: maior?.current_period_end ?? null, hoje: true }));
     if (!mandou) await soltarBoasVindas(admin, args.orderId);
   }
-  return { r: "movido", para, linhas: todas.length, email: mandou };
+  return { r: "movido", para, linhas: todas.length, email: mandou, dados };
 }

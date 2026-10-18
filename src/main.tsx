@@ -14,6 +14,7 @@ import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
 import { guardarForcaDesafiosRodizio } from "@/lib/desafios-rodizio";
 import { guardarForcaMedicaoTotal, instalarMedicaoTotal } from "@/lib/medicao-total";
+import { precisaRestaurar, restaurarDaCopia } from "@/missao/seguranca";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -150,7 +151,13 @@ try {
   if (gw && /^(asaas|cakto|pagarme|abacate)$/.test(gw)) sessionStorage.setItem("pix-gw-teste", gw);
 } catch { /* noop */ }
 
-createRoot(document.getElementById("root")!).render(<App />);
-// 02/09: os pixels de anúncio (index.html) só carregam depois da 1ª pintura —
-// o aviso sai no frame seguinte ao mount, quando a porta já está na tela.
-requestAnimationFrame(() => { setTimeout(() => { try { window.dispatchEvent(new Event("core:montou")); } catch { /* noop */ } }, 0); });
+const montarApp = () => {
+  createRoot(document.getElementById("root")!).render(<App />);
+  // 02/09: os pixels de anúncio (index.html) só carregam depois da 1ª pintura —
+  // o aviso sai no frame seguinte ao mount, quando a porta já está na tela.
+  requestAnimationFrame(() => { setTimeout(() => { try { window.dispatchEvent(new Event("core:montou")); } catch { /* noop */ } }, 0); });
+};
+// 18/10 (funil da missão): o navegador do Instagram zerou o storage e recarregou no meio do dia 1 da convidada →
+// a cópia do IndexedDB volta ANTES do React (missao/seguranca). Só com o cookie do funil; senão, monta direto.
+if (!isNativeShell() && precisaRestaurar()) void restaurarDaCopia().catch(() => false).finally(montarApp);
+else montarApp();

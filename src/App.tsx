@@ -434,7 +434,19 @@ function CamadaDaMissao() {
     window.addEventListener(EVENTO_MISSAO_WEB, reler);
     return () => window.removeEventListener(EVENTO_MISSAO_WEB, reler);
   }, []);
-  return ativa ? <Suspense fallback={null}><FunilMissaoCamadaLazy /></Suspense> : null;
+  // 18/10 (velocidade): vindo do HTML leve (window.__missao), a camada só baixa DEPOIS de o tutorial estar na tela —
+  // não disputa a rede com o módulo da área. Recarregou no meio (main.tsx, sem o HTML leve): carrega na hora.
+  const [pode, setPode] = useState(() => !(window as unknown as { __missao?: unknown }).__missao || document.documentElement.hasAttribute("data-missao-tutorial"));
+  useEffect(() => {
+    if (pode || !ativa) return;
+    const olhar = () => { if (document.documentElement.hasAttribute("data-missao-tutorial")) setPode(true); };
+    const obs = new MutationObserver(olhar);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-missao-tutorial"] });
+    const t = window.setTimeout(() => setPode(true), 8000);
+    olhar();
+    return () => { obs.disconnect(); window.clearTimeout(t); };
+  }, [pode, ativa]);
+  return ativa && pode ? <Suspense fallback={null}><FunilMissaoCamadaLazy /></Suspense> : null;
 }
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).
 const AbrirPorta = lazyPage(() => import("./pages/porta/AbrirPorta"));
@@ -684,6 +696,9 @@ const AnimatedRoutes = () => {
         <Route path="/liberar" element={<SoNaWeb><RouteErrorBoundary routeName="liberar"><Liberar /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/assinatura" element={<SoNaWeb><RouteErrorBoundary routeName="assinatura-app"><AssinaturaApp /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/missao/app" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
+        {/* "voltar" do navegador no meio do tutorial cai no /missao DENTRO do SPA (a tela 2 foi trocada pelo módulo com
+            replaceState): devolve pro módulo — a camada vê a saída e mostra a oferta */}
+        <Route path="/missao" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/hoje" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />

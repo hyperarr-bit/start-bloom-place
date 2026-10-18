@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -6,7 +6,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { construirRetroMes, mesAnterior, nomeDaPessoa, type Leitor } from "@/lib/retrospectiva";
-import { MonthlyWrapped } from "./MonthlyWrapped";
+// 18/10 (funil da missão, velocidade): a retrospectiva em tela cheia só baixa quando ela toca no banner — saiu do
+// pedaço de Finanças (~29 KB comprimidos a menos antes do tutorial abrir)
+const MonthlyWrapped = lazy(() => import("./MonthlyWrapped").then((m) => ({ default: m.MonthlyWrapped })));
 import { CHAVE_DO_TEMA, lerTema } from "./temas";
 import { foilCss } from "./prancheta";
 import { Espiral, P3, creme, kicker, linho, serif, vinheta } from "./pecas-planner";
@@ -78,7 +80,7 @@ export const WrappedBanner = () => {
         </div>
       </motion.div>
 
-      {open && <MonthlyWrapped retro={retro} nome={nomeDaPessoa((chave) => get<unknown>(chave, undefined), user?.user_metadata)} onClose={() => setOpen(false)} />}
+      {open && <Suspense fallback={null}><MonthlyWrapped retro={retro} nome={nomeDaPessoa((chave) => get<unknown>(chave, undefined), user?.user_metadata)} onClose={() => setOpen(false)} /></Suspense>}
     </>
   );
 };

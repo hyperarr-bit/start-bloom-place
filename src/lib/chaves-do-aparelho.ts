@@ -39,6 +39,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-theme-mode", // tema escuro e paleta (reviews ★4/★3 de 20/08)
   "core-theme-palette",
   "core-funnel-area", // área escolhida no funil antigo
+  // 18/10 (funil da missão na web): o estado do funil da convidada (área, sessão, festa, pagou, e-mail). PRECISA sobreviver
+  // à troca de conta — o "Pagar com Pix" cria a sessão anônima (a vassoura roda) e a camada da oferta lê esta chave
+  "core-missao-web",
   // ofertas de saída: 1x por lugar, por aparelho (07–10/10)
   "core-save-offer-visto",
   "core-presente69-cancelou-visto",
@@ -141,6 +144,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-perfis", "finance-sem-gasto",
     "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
     "core-financas-painel", // 1.0.16: { limpo: true } do painel limpo (a cópia do aparelho é a família core-financas-painel-<id>)
+    "core-kit-primeiro-mes", // o kit do /hoje: a página grava no user_data da conta (pages/hoje/conta gravarKit); o app lê pelo useUserData
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [

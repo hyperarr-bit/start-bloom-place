@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { reais } from "@/lib/dinheiro";
 import { localDayKey } from "@/lib/utils";
 import { CHAVE_FINANCAS_VISTO } from "@/lib/reagendar";
@@ -22,7 +22,7 @@ import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { AcessoConhecerMais } from "@/components/intro-modulo/ConhecerMais";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
-import { ConviteAvaliacao, type GastoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
+import type { GastoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
 import { reservarConvitePrimeiroGasto } from "@/lib/avaliacao";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
 import { MonthCalendar } from "@/components/finance/MonthCalendar";
@@ -66,7 +66,10 @@ import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
 import { useVersaoDaVirada } from "@/hooks/use-virada-do-mes";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
-import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
+// 18/10 (velocidade do funil da missão): o convite de avaliação (só no 1º gasto de quem paga) e o banner da
+// retrospectiva (só nos dias dela) baixam sob demanda — ~26 KB comprimidos a menos antes de Finanças abrir
+const ConviteAvaliacao = lazy(() => import("@/components/avaliacao/ConviteAvaliacao").then((m) => ({ default: m.ConviteAvaliacao })));
+const WrappedBanner = lazy(() => import("@/components/wrapped/WrappedBanner").then((m) => ({ default: m.WrappedBanner })));
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
@@ -113,6 +116,9 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
      AQUI, na hora do toque; a folha entra 1,2s depois, com a linha nova já
      visível na tabela — mesma coreografia do ✓ da conta paga. */
   const [convite, setConvite] = useState<GastoDoConvite | null>(null);
+  // o convite (lazy) fica montado depois da 1ª vez: a folha fecha com a animação dela
+  const [conviteMontado, setConviteMontado] = useState(false);
+  useEffect(() => { if (convite) setConviteMontado(true); }, [convite]);
   const aoPrimeiroGasto = (gasto: GastoDoConvite) => {
     // 17/10 (teste sem rede no Android 132): antes de a conta chegar do servidor a lista de gastos
     // está vazia na tela — um gasto feito nesse meio-tempo NÃO é o 1º da vida de quem já tem histórico
@@ -599,7 +605,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
             ela que o aviso de véspera traz). Cliente antigo: o bloco de baixo, idêntico ao de antes. */}
         {activeTab === "dashboard" && painelLimpo && (
           <>
-            <WrappedBanner />
+            <Suspense fallback={null}><WrappedBanner /></Suspense>
             <PedirLembretes dueDays={dueDaysComFaturas as never} />
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
@@ -668,7 +674,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
 
         {activeTab === "dashboard" && !painelLimpo && (
           <>
-            {!demoDoFunil && <WrappedBanner />}
+            {!demoDoFunil && <Suspense fallback={null}><WrappedBanner /></Suspense>}
             {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
                 existe conta cadastrada — pedir permissão antes de haver o que
                 lembrar queima a única chance no Android 13+. */}
@@ -954,7 +960,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
           investments,
         }}
       />
-      <ConviteAvaliacao gasto={convite} pagante={isSubscribed} onFechar={() => setConvite(null)} />
+      {(convite || conviteMontado) && <Suspense fallback={null}><ConviteAvaliacao gasto={convite} pagante={isSubscribed} onFechar={() => setConvite(null)} /></Suspense>}
     </div>
   );
 };

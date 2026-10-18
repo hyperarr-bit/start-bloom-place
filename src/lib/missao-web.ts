@@ -14,6 +14,11 @@
  * Nunca no app da loja (isNativeShell) — lá a missão já é a do teste grátis.
  *
  * Chave: FUNIL_MISSAO (padrão OFF). QA: `?funil-missao=on`. No servidor de desenvolvimento, sempre ligado.
+ *
+ * VERSÃO DE VERDADE (18/10, depois da aprovação do protótipo): Pix real da Asaas (as ofertas do /hoje: h279/h149 +
+ * kit + upsells — a venda se separa pelo source_url = a URL do /missao), Purchase pela CAPI, cópia de segurança do
+ * storage (missao/seguranca), lembretes → pop-up "Baixe o app" (a web não manda notificação) e tempo-limite (3 min
+ * parada no tutorial ou "voltar" → a oferta).
  */
 import { isNativeShell } from "@/lib/native-shell";
 
@@ -33,6 +38,8 @@ export type EstadoMissaoWeb = {
   em: number;
   /** a sessão do funil (a mesma do HTML leve) */
   sessao: string;
+  /** o tutorial apareceu (ms) — o missao_web_tutorial sai 1x por funil, mesmo recarregando */
+  tutorial?: number;
   /** a dose 1 foi contada (o app conta no número do Montar) */
   dose1?: number;
   /** a festa "Dia 1 de 3 feito" apareceu (o "aha") e o texto dela (o recibo da oferta usa) */
@@ -41,6 +48,13 @@ export type EstadoMissaoWeb = {
   pago?: { em: number; ofertas: string[] } | null;
   /** o e-mail salvo depois de pagar */
   email?: string | null;
+  /** a URL do anúncio (/missao?utm_…&fbclid=…), guardada ANTES de a URL virar o módulo — vai como source_url do
+   *  Pix (pix_order_created) e da CAPI: é por ela que a venda do funil da missão se separa da do /hoje no banco */
+  landing?: string | null;
+  /** parou no tutorial sem chegar na festa (3 min sem tocar em nada, ou tocou em "voltar") → a oferta entrou assim */
+  parou?: { em: number; via: "tempo" | "saida" } | null;
+  /** tocou em "Continuar minha missão" depois de pagar (a camada sai de vez) */
+  continuou?: number | null;
 };
 
 const ls = {
@@ -103,3 +117,15 @@ export function ligarForcasDaMissao(): void {
 export const AREA_DO_APP: Record<AreaMissaoWeb, string> = {
   dinheiro: "dinheiro", rotina: "rotina", corpo: "corpo", metas: "metas", tudo: "dinheiro",
 };
+
+/** O e-mail que ela salvou depois de pagar (o pop-up dos lembretes mostra "entre com este e-mail"). */
+export const emailDaMissaoWeb = (): string | null => lerMissaoWeb()?.email ?? null;
+
+/**
+ * Na WEB do funil da missão, toda pergunta de lembrete/notificação vira o pop-up "Baixe o app pra receber os
+ * lembretes" (dono, 18/10): a web não manda notificação; o app manda. Nunca no app da loja.
+ */
+export function lembretesSoNoApp(): boolean {
+  if (isNativeShell()) return false;
+  return !!lerMissaoWeb() && funilMissaoLigado();
+}

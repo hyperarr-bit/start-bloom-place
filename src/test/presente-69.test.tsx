@@ -129,7 +129,7 @@ describe("presente 69 — no bloqueio (gate do TrialBanner)", () => {
     expect(screen.getByText("Seu teste acabou.", { exact: false })).toBeInTheDocument();
     expect(screen.getByTestId("presente69-cartao").textContent).toMatch(/R\$ 97,90.*R\$ 69,90\/ano.*R\$ 5,82 por mês/);
     expect(screen.getByTestId("presente69-regra").textContent).toMatch(/Cobrado hoje pela App Store: R\$ 69,90, sem teste grátis/);
-    expect(eventos("presente69_view")).toEqual([{ lugar: "bloqueio", preco: "R$ 69,90", de: "R$ 97,90", trial: false }]);
+    await waitFor(() => expect(eventos("presente69_view")).toEqual([{ lugar: "bloqueio", preco: "R$ 69,90", de: "R$ 97,90", trial: false }])); // o evento sai logo depois de a tela montar: sob carga, esperar
   });
 
   it("'Agora não': some, o paywall de sempre fica, marca o aparelho e não volta mais", async () => {

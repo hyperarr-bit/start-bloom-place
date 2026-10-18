@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Check, ChevronLeft, ChevronRight, Lock, Pencil, ShieldCheck, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 import { isInAppBrowser } from "@/lib/funnel";
@@ -21,6 +21,7 @@ import {
 import { PixHoje, PixIcone, venceEm, type PixSalvo } from "./PixHoje";
 import { supabase } from "@/integrations/supabase/client";
 import "./funil-hoje.css";
+import { Confete, Etiqueta, GraficoPraSempre, SeloPago } from "./UpsellAnimado";
 
 /**
  * FUNIL WEB NOVO — coreaplicativo.com.br/hoje (18/10). Só na WEB (SoNaWeb no App.tsx), noindex, sem link no site.
@@ -259,7 +260,7 @@ export function FunilHoje() {
 
   const e = estado;
   return (
-    <div className="fn" data-etapa={e.etapa} data-testid="hoje">
+    <div className={e.etapa === "up1" || e.etapa === "down" || e.etapa === "pago" ? "fn ua" : "fn"} data-etapa={e.etapa} data-testid="hoje">
       <div className="fn-corpo" ref={corpo}>
         {e.etapa === "renda" && (
           <TelaRenda
@@ -410,6 +411,7 @@ export function FunilHoje() {
             texto="Pague uma vez e nunca mais renove. Tudo que o CORE ganhar daqui pra frente já é seu."
             nome="CORE pra sempre" valor={VALOR_OFERTA.hv47} prefixo="+ "
             itens={["Acesso vitalício às 16 áreas", "No iPhone, no Android e no computador"]}
+            visual="grafico" plano={planoPago}
             cta={`Quero o CORE pra sempre · ${preco(VALOR_OFERTA.hv47)}`}
             onSim={() => upsell("hv47", true)} onNao={() => upsell("hv47", false)} />
         )}
@@ -420,6 +422,7 @@ export function FunilHoje() {
             texto={`Em vez de ${preco(VALOR_OFERTA.hv47)}, o mesmo acesso pra sempre por ${preco(VALOR_OFERTA.hv27)}. Esta oferta não aparece de novo depois desta tela.`}
             nome="CORE pra sempre" valor={VALOR_OFERTA.hv27} prefixo="+ " riscado={VALOR_OFERTA.hv47}
             itens={["Acesso vitalício às 16 áreas", "Nunca mais renova, nunca mais paga"]}
+            visual="etiqueta"
             cta={`Quero por ${preco(VALOR_OFERTA.hv27)}`}
             onSim={() => upsell("hv27", true)} onNao={() => upsell("hv27", false)} />
         )}
@@ -588,27 +591,61 @@ function TelaResultado({ r, onSeguir, onVoltar, onVisto }: { r: Resultado; onSeg
 
 /* ───────────────────────── upsells ───────────────────────── */
 
-function TelaUpsell({ testid, confirmado, kicker, titulo, texto, nome, valor, prefixo, riscado, itens, cta, onSim, onNao }: {
+/**
+ * Upsell de 1 tela. 18/10 (dono aprovou o desenho): visual="grafico" (up1, pra sempre 47) troca o cartão de preço pelo
+ * gráfico "quanto você paga" renovando × pra sempre se desenhando + a faixa do preço; visual="etiqueta" (down, 27) põe
+ * a etiqueta de ingresso com o 47 riscado. Textos, valores, botões e eventos iguais; o vida a dois (up2) fica no cartão.
+ */
+function TelaUpsell({ testid, confirmado, kicker, titulo, texto, nome, valor, prefixo, riscado, itens, cta, onSim, onNao, visual, plano = "anual" }: {
   testid: string; confirmado: ReactNode; kicker: string; titulo: string; texto: string; nome: string; valor: number; prefixo: string;
-  riscado?: number; itens: string[]; cta: string; onSim: () => void; onNao: () => void;
+  riscado?: number; itens: string[]; cta: string; onSim: () => void; onNao: () => void; visual?: "grafico" | "etiqueta"; plano?: PlanoHoje;
 }) {
+  const inclui = (atraso?: string) => (
+    <ul className={atraso ? "fn-inclui ua-entra" : "fn-inclui"} style={atraso ? { animationDelay: atraso } : undefined}>
+      {itens.map((t) => <li key={t}><Check size={17} strokeWidth={2.8} /><span>{t}</span></li>)}
+    </ul>
+  );
   return (
     <div className="fn-tela" key={testid} data-testid={testid}>
       <div className="fn-topo"><span className="fn-marca"><i />CORE</span></div>
       {confirmado}
-      <div className="fn-up">
-        <div className="fn-kicker">{kicker}</div>
-        <h1>{titulo}</h1>
-        <p>{texto}</p>
-        <div className="fn-up-card">
-          <span className="fn-up-nome">{nome}</span>
-          <span className="fn-up-preco">{riscado ? <s>{preco(riscado)}</s> : null}{prefixo}{preco(valor)}</span>
-          <span className="fn-up-sub">pagamento único no Pix</span>
+      {visual === "grafico" ? (
+        <div className="fn-up">
+          <div className="fn-kicker ua-entra">{kicker}</div>
+          <h1 className="ua-entra">{titulo}</h1>
+          <GraficoPraSempre plano={plano} />
+          <div className="ua-preco ua-entra" style={{ animationDelay: "2.4s" }}>
+            <div><b>{nome}</b><small>pagamento único no Pix</small></div>
+            <strong>{riscado ? <s>{preco(riscado)}</s> : null}{prefixo}{preco(valor)}</strong>
+          </div>
+          <p className="ua-entra ua-texto" style={{ animationDelay: "2.5s" }}>{texto}</p>
+          {inclui("2.6s")}
         </div>
-        <ul className="fn-inclui">
-          {itens.map((t) => <li key={t}><Check size={17} strokeWidth={2.8} /><span>{t}</span></li>)}
-        </ul>
-      </div>
+      ) : visual === "etiqueta" ? (
+        <>
+          <div className="fn-up">
+            <div className="fn-kicker ua-entra">{kicker}</div>
+            <h1 className="ua-entra">{titulo}</h1>
+          </div>
+          <Etiqueta de={riscado ?? valor} por={valor} nome={nome} />
+          <div className="fn-up" style={{ paddingTop: 14 }}>
+            <p className="ua-entra" style={{ animationDelay: "1.9s" }}>{texto}</p>
+            {inclui("2s")}
+          </div>
+        </>
+      ) : (
+        <div className="fn-up">
+          <div className="fn-kicker">{kicker}</div>
+          <h1>{titulo}</h1>
+          <p>{texto}</p>
+          <div className="fn-up-card">
+            <span className="fn-up-nome">{nome}</span>
+            <span className="fn-up-preco">{riscado ? <s>{preco(riscado)}</s> : null}{prefixo}{preco(valor)}</span>
+            <span className="fn-up-sub">pagamento único no Pix</span>
+          </div>
+          {inclui()}
+        </div>
+      )}
       <div className="fn-rodape">
         <button type="button" className="fn-cta" onClick={onSim} data-testid={`${testid}-sim`}><PixIcone /><span>{cta}</span></button>
         <button type="button" className="fn-link" onClick={onNao} data-testid={`${testid}-nao`}><u>Não, obrigado</u></button>
@@ -688,6 +725,7 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
   const finalizou = useRef(false);
   const pedidoPlano = estado.pagos.find((p) => !["hv47", "hv27", "hc199"].includes(p.oferta)) ?? null;
   const pedidoKit = estado.pagos.find((p) => temKit(p.oferta)) ?? null;
+  const praSempre = estado.pagos.some((p) => p.oferta === "hv47" || p.oferta === "hv27");
 
   /** a conta final está pronta: Finanças, kit, atribuição, boas-vindas */
   const finalizar = async (emailFinal: string, via: string) => {
@@ -765,12 +803,15 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
 
   return (
     <div className="fn-tela" key="pago" data-testid="hoje-pago" data-fase={fase}>
+      {/* 18/10 (dono aprovou): check que se desenha + 1 chuva de confete leve (só CSS; some com prefers-reduced-motion) */}
+      <Confete />
       <div className="fn-pago">
-        <div className="fn-pago-ok"><Check size={34} strokeWidth={3.2} /></div>
-        <h1>Pronto! Seu CORE é seu.</h1>
-        <p>{preco(Math.round(totalPago * 100) / 100)} recebido · acesso {acessoTxt}</p>
+        <SeloPago />
+        <h1 className="ua-entra" style={{ animationDelay: ".5s" }}>Pronto! Seu CORE é seu.</h1>
+        <p className="ua-entra" style={{ animationDelay: ".65s" }}>{preco(Math.round(totalPago * 100) / 100)} recebido · acesso {acessoTxt}</p>
+        {praSempre && <span className="ua-pra-sempre" data-testid="hoje-pago-pra-sempre"><Sparkles size={13} strokeWidth={2.6} />CORE pra sempre · nunca mais renova</span>}
       </div>
-      <div className="fn-folha fn-salvo">
+      <div className="fn-folha fn-salvo ua-entra" style={{ animationDelay: ".85s" }}>
         <div className="fn-faixa-sec">💰 Suas Finanças, montadas <b>{r.aperto ? "" : `${reais(r.porDia)}/dia`}</b></div>
         <div className="fn-conta"><span>Entra no mês</span>{reais(r.renda)}</div>
         <div className="fn-conta"><span>Contas fixas ({r.n})</span>{r.fixos ? `− ${reais(r.fixos)}` : reais(0)}</div>

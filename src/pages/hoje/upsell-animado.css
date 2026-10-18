@@ -1,0 +1,84 @@
+/* Upsells animados do /hoje (aprovados pelo dono 18/10; desenho em /dev/upsell-animado, ramo prototipos-funil2).
+   Estilo BitePal: fundo degradê suave, card inclinado, linha se desenhando, estrelinhas. Só CSS + SVG (leve no
+   navegador do Instagram). Com prefers-reduced-motion tudo para no estado final e o confete some. */
+.fn.ua { background: radial-gradient(120% 60% at 50% -10%, #fde7f2 0%, rgba(253,231,242,0) 60%), radial-gradient(90% 40% at 100% 100%, #fff4dc 0%, rgba(255,244,220,0) 70%), #fffdfb; }
+.fn.ua .fn-rodape { background: linear-gradient(to bottom, rgba(255,253,251,0) 0, #fffdfb 18px); }
+.ua .fn-up { padding-top: 12px; }
+.ua .fn-up h1 { font-size: 27px; }
+.ua-entra { animation: ua-sobe .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ua-sobe { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ── up1: o gráfico "renovando × pra sempre" ── */
+.ua-graf { position: relative; margin: 16px 2px 0; padding: 14px 14px 10px; border-radius: 22px; background: #fff; border: 1px solid #f1e6ec; box-shadow: 0 14px 34px rgba(214,51,138,.12), 0 2px 0 rgba(0,0,0,.02); transform: rotate(-1.6deg); animation: ua-card .6s .05s cubic-bezier(.2,1.2,.3,1) both; }
+@keyframes ua-card { from { opacity: 0; transform: rotate(-5deg) translateY(18px) scale(.96); } to { opacity: 1; transform: rotate(-1.6deg); } }
+.ua-graf-topo { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: #8a8a8a; }
+.ua-leg { display: flex; gap: 10px; font-size: 11.5px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.ua-leg i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.ua-graf svg { display: block; width: 100%; height: auto; margin-top: 4px; overflow: visible; }
+.ua-l-cinza { fill: none; stroke: #c4c4c4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 400; stroke-dashoffset: 400; animation: ua-traca 1.3s .45s cubic-bezier(.45,0,.3,1) forwards; }
+.ua-l-mag { fill: none; stroke: #d6338a; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; animation: ua-traca 1s 1.55s cubic-bezier(.45,0,.3,1) forwards; }
+.ua-area { fill: url(#ua-grad); opacity: 0; animation: ua-aparece .6s 2.2s forwards; }
+@keyframes ua-traca { to { stroke-dashoffset: 0; } }
+@keyframes ua-aparece { to { opacity: 1; } }
+.ua-ponto { transform-box: fill-box; transform-origin: center; opacity: 0; animation: ua-pop .45s cubic-bezier(.2,1.6,.4,1) forwards; }
+@keyframes ua-pop { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+.ua-rot { opacity: 0; animation: ua-aparece .4s forwards; font-family: Inter, system-ui, sans-serif; }
+.ua-eixo { font-size: 10.5px; fill: #a3a3a3; font-weight: 600; font-family: Inter, system-ui, sans-serif; }
+.ua-grade { stroke: #f2efec; stroke-width: 1; }
+.ua-estrela { transform-box: fill-box; transform-origin: center; opacity: 0; animation: ua-brilha 1.6s ease-out forwards; }
+@keyframes ua-brilha { 0% { opacity: 0; transform: scale(0) rotate(0); } 30% { opacity: 1; transform: scale(1.15) rotate(45deg); } 100% { opacity: .9; transform: scale(1) rotate(90deg); } }
+
+/* o adesivo inclinado ("nunca mais renova") */
+.ua-adesivo { position: absolute; right: -6px; top: -14px; padding: 6px 10px; border-radius: 10px; background: #fef3a8; color: #6b4e00; font-size: 12px; font-weight: 800; box-shadow: 0 6px 14px rgba(0,0,0,.1); transform: rotate(5deg); opacity: 0; animation: ua-cola .5s 2.6s cubic-bezier(.2,1.6,.4,1) forwards; }
+@keyframes ua-cola { from { opacity: 0; transform: rotate(18deg) scale(.5); } to { opacity: 1; transform: rotate(5deg) scale(1); } }
+
+/* faixa de preço embaixo do gráfico */
+.ua-preco { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; padding: 12px 14px; border-radius: 16px; background: #fff; border: 2px solid #d6338a; box-shadow: 0 8px 22px rgba(214,51,138,.12); }
+.ua-preco b { display: block; font-size: 15px; font-weight: 750; }
+.ua-preco small { display: block; font-size: 12.5px; color: #6b6b6b; font-weight: 600; margin-top: 1px; }
+.ua-preco strong { font-size: 26px; font-weight: 800; letter-spacing: -.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ua-preco strong s { font-size: 15px; font-weight: 600; color: #8a8a8a; margin-right: 8px; letter-spacing: 0; }
+
+/* ── down: a etiqueta 47 → 27 ── */
+.ua-ticket { position: relative; margin: 20px 18px 0; padding: 22px 18px 18px; border-radius: 22px; background: #fff; border: 1px solid #f1e6ec; box-shadow: 0 16px 36px rgba(214,51,138,.14); text-align: center; transform: rotate(1.8deg); animation: ua-card2 .6s .05s cubic-bezier(.2,1.2,.3,1) both; }
+@keyframes ua-card2 { from { opacity: 0; transform: rotate(6deg) translateY(18px) scale(.95); } to { opacity: 1; transform: rotate(1.8deg); } }
+.ua-ticket::before, .ua-ticket::after { content: ""; position: absolute; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: #fffdfb; border: 1px solid #f1e6ec; }
+.ua-ticket::before { left: -10px; } .ua-ticket::after { right: -10px; }
+.ua-ticket-nome { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8a8a8a; }
+.ua-velho { position: relative; display: inline-block; margin-top: 8px; font-size: 30px; font-weight: 800; color: #b5b5b5; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.ua-velho svg { position: absolute; left: -6px; top: 50%; width: calc(100% + 12px); height: 20px; margin-top: -10px; overflow: visible; }
+.ua-velho path { fill: none; stroke: #d6338a; stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 120; stroke-dashoffset: 120; animation: ua-traca .5s .7s ease-out forwards; }
+.ua-novo { display: block; font-size: 64px; line-height: 1; font-weight: 850; letter-spacing: -.045em; color: #262626; margin-top: 2px; font-variant-numeric: tabular-nums; opacity: 0; animation: ua-cai .6s 1.15s cubic-bezier(.2,1.5,.4,1) forwards; }
+.ua-novo small { font-size: 28px; letter-spacing: -.02em; margin-right: 4px; }
+@keyframes ua-cai { from { opacity: 0; transform: translateY(-26px) scale(1.25); } to { opacity: 1; transform: none; } }
+.ua-economia { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 5px 11px; border-radius: 999px; background: #fdf0f6; color: #b0236f; font-size: 13px; font-weight: 800; opacity: 0; animation: ua-pop .45s 1.7s cubic-bezier(.2,1.6,.4,1) forwards; }
+.ua-ticket-sub { margin-top: 10px; font-size: 12.5px; color: #6b6b6b; font-weight: 600; }
+.ua-estrelas { position: absolute; inset: 0; pointer-events: none; }
+.ua-estrelas svg { position: absolute; }
+
+/* ── pago: confete leve + selo ── */
+.ua-confete { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 310; }
+.ua-confete i { position: absolute; top: -16px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: ua-chove var(--d, 2.4s) var(--a, 0s) cubic-bezier(.25,.6,.45,1) forwards; }
+@keyframes ua-chove { 0% { opacity: 1; transform: translate3d(0,0,0) rotate(0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate3d(var(--x, 0px), 105vh, 0) rotate(var(--r, 540deg)); } }
+.ua .fn-pago { padding-top: 34px; }
+.ua-selo { position: relative; width: 78px; height: 78px; margin: 0 auto; }
+.ua-selo .fn-pago-ok { width: 78px; height: 78px; box-shadow: none; animation: fn-pop .5s .1s cubic-bezier(.2,1.4,.4,1) both; }
+.ua-selo::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; border: 3px solid #bbf7d0; opacity: 0; animation: ua-onda 1.2s .35s ease-out 2; }
+@keyframes ua-onda { from { opacity: .9; transform: scale(.7); } to { opacity: 0; transform: scale(1.35); } }
+.ua-check path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: ua-traca .4s .45s ease-out forwards; }
+.ua-pra-sempre { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 6px 12px; border-radius: 999px; background: #fdf0f6; color: #b0236f; font-size: 13px; font-weight: 800; animation: ua-pop .45s 1s cubic-bezier(.2,1.6,.4,1) both; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ua *, .ua *::before, .ua *::after { animation-duration: 1ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+  .ua-confete { display: none; }
+}
+@media (max-height: 700px) {
+  .ua .fn-up h1 { font-size: 24px; }
+  .ua-graf { margin-top: 10px; }
+  .ua-novo { font-size: 54px; }
+}
+
+/* letra pequena do gráfico: a renovação não é automática */
+.ua-nota { margin: 4px 2px 0; font-size: 11px; line-height: 1.35; color: #8a8a8a; font-weight: 550; }
+.fn-up > p.ua-texto { font-size: 14px; margin: 12px 2px 0; line-height: 1.42; }

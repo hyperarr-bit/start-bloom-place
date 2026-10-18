@@ -340,9 +340,15 @@ describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
     expect(screen.getByTestId("hoje-confirmado").textContent).toContain("R$ 27,90");
     expect(screen.getByTestId("hoje-up1").textContent).toContain("Troque o 1º ano pelo CORE pra sempre");
     expect(screen.getByTestId("hoje-up1-nao").textContent).toBe("Não, obrigado");
+    // 18/10 (desenho animado aprovado): o gráfico renovando × pra sempre diz em letra pequena que a renovação é escolha
+    expect(screen.getByTestId("hoje-up1-nota").textContent).toContain("se você renovar todo ano por R$ 97,90");
+    expect(screen.getByTestId("hoje-up1-grafico").textContent).toContain("R$ 74,90");
+    expect(screen.getByTestId("hoje").className).toContain("ua");
     fireEvent.click(screen.getByTestId("hoje-up1-nao"));
     await waitFor(() => expect(etapa()).toBe("down"));
     expect(screen.getByTestId("hoje-down").textContent).toContain("O CORE pra sempre por R$ 27");
+    expect(screen.getByTestId("hoje-down-etiqueta").getAttribute("aria-label")).toBe("De R$ 47 por R$ 27");
+    expect(screen.getByTestId("hoje-down-nao").textContent).toBe("Não, obrigado");
     fireEvent.click(screen.getByTestId("hoje-down-sim"));
     await pagarEConferir("hv27");
     await waitFor(() => expect(etapa()).toBe("pago"));
@@ -350,6 +356,8 @@ describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
     expect(up).toEqual(["hv47:vista", "hv47:recusou", "hv27:vista", "hv27:aceitou", "hv27:pago"]);
     expect(eventos("hoje_pago").map((x) => `${x.oferta}:${x.valor}`)).toEqual(["h279:27.9", "hv27:27"]);
     expect(texto()).toContain("R$ 54,90 recebido · acesso pra sempre");
+    expect(screen.getByTestId("hoje-pago-pra-sempre")).toBeTruthy();
+    expect(screen.getByTestId("hoje-confete")).toBeTruthy();
     expect(texto()).not.toMatch(/vida a dois|2ª conta/i);
   });
   it("aceitou o de 47: o de 27 não aparece; vai pro e-mail", async () => {
@@ -369,11 +377,13 @@ describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
     await pagarEConferir("h149");
     await waitFor(() => expect(etapa()).toBe("up1"));
     expect(screen.getByTestId("hoje-up1").textContent).toContain("Troque os 30 dias pelo CORE pra sempre");
+    expect(screen.getByTestId("hoje-up1-nota").textContent).toContain("se você renovar todo mês por R$ 14,90");
     fireEvent.click(screen.getByTestId("hoje-up1-nao"));
     await waitFor(() => expect(etapa()).toBe("down"));
     fireEvent.click(screen.getByTestId("hoje-down-nao"));
     await waitFor(() => expect(etapa()).toBe("pago"));
     expect(invocacoes("asaas-pix", "create")).toHaveLength(1);
+    expect(screen.queryByTestId("hoje-pago-pra-sempre")).toBeNull();
   });
 });
 

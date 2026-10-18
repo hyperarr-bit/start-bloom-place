@@ -6,7 +6,7 @@ import { itemDaDemo } from "@/lib/demo-guiada";
 import { STEP_GUARDANDO, STEP_PRONTO, abrirUrl, comFunilB, decidirFunilB, ehFunilB, marcaDoFunilB, respostasDaUrl } from "@/lib/funil-b";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { varianteCadastro } from "@/lib/cadastro-ab";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
@@ -97,12 +97,21 @@ const fade = {
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-const slide = {
+/** O deslize das perguntas do quiz (exportado: o funil W usa o MESMO na sequência porta → quiz). */
+export const slide = {
   initial: { opacity: 0, x: 28 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -28 },
   transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const },
 };
+/* 17/10 (dono: "a 1ª pergunta some pra cima e a 2ª aparece de lado"): o mesmo deslize,
+ * com DIREÇÃO — avançar entra pela direita e sai pela esquerda; voltar, o contrário.
+ * Com "reduzir movimento" fica só o esmaecer. */
+const deslizeComDirecao = (dx: number) => ({
+  entra: (dir: number) => ({ opacity: 0, x: dir * dx }),
+  fica: { opacity: 1, x: 0 },
+  sai: (dir: number) => ({ opacity: 0, x: -dir * dx }),
+});
 
 const PREP_STEPS = [
   "Identificando seu perfil financeiro",
@@ -606,7 +615,7 @@ export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string, comEc
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, pilula, braco = null }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, pilula, braco = null, inicio }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -633,12 +642,29 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   /** QUIZ CURTO (30/09, src/lib/quiz-curto.ts): o braço do A/B vai nos eventos
    *  de cada tela do quiz. `null` = fora do experimento: evento igual ao de hoje. */
   braco?: BracoQuiz | null;
+  /** Funil W (17/10): a pergunta da PORTA como slide 0 deste quiz — o cabeçalho (voltar +
+   *  barra) fica parado e porta → pergunta 1 desliza igual às outras perguntas. Com
+   *  `ativo`, mostra `conteudo` (a barra no degrau `counterBase`) e o voltar chama
+   *  `onBack` daqui; ao sair dela o quiz recomeça das `initialAnswers`, como se montasse. */
+  inicio?: { ativo: boolean; chave: string; conteudo: React.ReactNode; onBack: () => void };
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
     : 0;
   const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
+  const naInicio = !!inicio?.ativo;
+  const [dir, setDir] = useState(1);
+  const [inicioVisto, setInicioVisto] = useState(naInicio);
+  if (inicioVisto !== naInicio) {
+    // entrou na porta (voltou) ou saiu dela (avançou): direção do deslize e, ao sair, o
+    // estado de um quiz recém-montado — a área escolhida agora vale, não a de antes
+    setInicioVisto(naInicio);
+    setDir(naInicio ? -1 : 1);
+    if (!naInicio) { setAnswers(initialAnswers ?? {}); setIdx(startIdx < 0 ? 0 : startIdx); }
+  }
+  const reduzir = useReducedMotion();
+  const variantes = deslizeComDirecao(reduzir ? 0 : slide.initial.x);
   /* MESMO CRASH DO FUNIL DO APP (27/07) — e aqui é o funil que está em
      escala. Dois toques no mesmo quadro liam o mesmo `idx`, os dois
      incrementavam, o índice passava do fim e `item.kind` estourava: a pessoa
@@ -650,14 +676,16 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   const item = items[Math.min(idx, items.length - 1)] ?? items[0];
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
+    if (naInicio) return; // na porta: ela tem a própria medição
     const it = items[idx];
     trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : it.kind === "eco" ? `quiz_eco_${it.qIdx + 1}` : "quiz_proof", ...(braco ? { quiz: braco } : {}) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, items]);
-  const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
+  }, [idx, items, naInicio]);
+  const back = () => { setDir(-1); if (naInicio) inicio!.onBack(); else if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
     if (travaRef.current) return;
     travaRef.current = true;
+    setDir(1);
     if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
@@ -677,18 +705,24 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
         </button>
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${((idx + 1 + counterBase) / (items.length + counterBase)) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+            animate={{ width: `${((naInicio ? counterBase : idx + 1 + counterBase) / (items.length + counterBase)) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
         {pilula ? (
           <span data-testid="quiz-pilula" className="shrink-0 rounded-full bg-accent/10 text-accent text-[10px] font-bold px-2.5 py-1 whitespace-nowrap">{pilula}</span>
         ) : (
-          !semContador && <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>
+          !semContador && <span className="text-xs text-muted-foreground tabular-nums">{naInicio ? counterBase : idx + 1 + counterBase}/{items.length + counterBase}</span>
         )}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div key={item.kind === "q" ? q!.key : item.kind === "eco" ? `eco${item.qIdx}` : item.kind} {...slide}>
-          {item.kind === "extra" ? (
+      {/* com `inicio` quem entra deslizando na 1ª vez é o passo inteiro (funil W): aqui não desliza de novo */}
+      <AnimatePresence mode="wait" custom={dir} initial={!inicio}>
+        <motion.div
+          key={naInicio ? `inicio:${inicio!.chave}` : item.kind === "q" ? q!.key : item.kind === "eco" ? `eco${item.qIdx}` : item.kind}
+          custom={dir} variants={variantes} initial="entra" animate="fica" exit="sai" transition={slide.transition}
+        >
+          {naInicio ? (
+            inicio!.conteudo
+          ) : item.kind === "extra" ? (
             extraSlide?.(() => advance(answers)) ?? null
           ) : item.kind === "eco" ? (
             ecoSlide?.(item.qIdx, answers, () => advance(answers)) ?? null

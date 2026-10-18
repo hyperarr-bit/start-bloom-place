@@ -249,14 +249,19 @@ describe("MEU MÊS: marcar a Netflix como paga não mexe no número", () => {
     const c = {} as Controle;
     render(<MemoryRouter initialEntries={["/financas"]}><Provedor inicial={inicial} controle={c}><App /></Provedor></MemoryRouter>);
 
+    // cards simples (padrão desde 17/10): o herói "R$ X por dia" e a conta atrás de "Como chegamos nesse número ›"
     const limite = async () => {
       const titulo = await screen.findByText("QUANTO POSSO GASTAR HOJE");
-      return titulo.closest("div")!.textContent!.replace(/\s+/g, " ");
+      const card = titulo.closest("div")!;
+      const verConta = card.querySelector<HTMLButtonElement>("[data-testid=pode-gastar-ver-conta]");
+      if (verConta && verConta.getAttribute("aria-expanded") !== "true") await act(async () => { fireEvent.click(verConta); });
+      return card.textContent!.replace(/\s+/g, " ");
     };
     // DASHBOARD antes: 3.000 − 1.150 − 45 = 1.805 livres ÷ 15 dias = R$ 120/dia
     const antes = await limite();
-    expect(antes).toContain("R$ 120");
-    expect(antes).toContain("Disponível livreR$ 1.805");
+    expect(antes).toContain("R$ 120 por dia");
+    expect(antes).toMatch(/Livre ?= R\$ 1\.805/);
+    expect(antes).toMatch(/Sai ?−R\$ 1\.195/);
     expect(antes).not.toContain("Contas sem valor");
 
     fireEvent.click(screen.getByRole("button", { name: /MEU FINANCEIRO/ }));

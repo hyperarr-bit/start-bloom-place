@@ -376,7 +376,8 @@ const cardDoDashboard = async () => {
   const linha = screen.queryByTestId("sobram-pra-hoje");
   return {
     numero: Number((screen.getByTestId("pode-gastar-valor").textContent ?? "").replace(/\D/g, "")),
-    linha: linha ? lido(linha) : null,
+    // 17/10: no card simples (lib/financas-cards-simples) a frase e o detalhe são elementos irmãos (barrinha no meio)
+    linha: linha ? [linha.querySelector(".font-semibold"), linha.querySelector('[data-testid="sobram-pra-hoje-detalhe"]')].map((e) => lido(e!)).join(" ") : null,
   };
 };
 const linhaEsperada = (sobra: number, gasto: number, doDia: number) => `Sobram R$ ${sobra} pra hoje já saiu R$ ${gasto} dos R$ ${doDia} do dia`;

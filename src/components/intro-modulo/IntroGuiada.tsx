@@ -41,7 +41,7 @@ const celulaDeHoje = (linha: Element, qual: "primeira" | "ultima"): Element => {
   return (qual === "ultima" ? celulas.at(-1) : celulas[0]) ?? linha;
 };
 
-export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { config: IntroGuiadaConfig; aoTerminar: (como: "feita" | "pulada") => void; /** a intro começou logo depois do montar do módulo ("pronto"): Rotina pede "marca o primeiro quando fizer" */ depoisDoMontar?: boolean }) {
+export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoContinuar }: { config: IntroGuiadaConfig; aoTerminar: (como: "feita" | "pulada") => void; /** a intro começou logo depois do montar do módulo ("pronto"): Rotina pede "marca o primeiro quando fizer" */ depoisDoMontar?: boolean; /** 17/10 (dono: "tipo Finanças, que tem vários"): depois do "olha", em vez do cartão do fim, continua nos passos de 1 toque (config.maisPassos) — recebe o rótulo do que entrou */ aoContinuar?: (rotulo: string) => void }) {
   const alvoCfg = alvoDaMissao(config.tipo);
   const { get, set } = useUserData();
   const reduzir = !!useReducedMotion();
@@ -219,6 +219,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
   const oferta = podeOferecerTour(m, get) ? ofertaDoTour(m) : null;
   useEffect(() => {
     if (fase !== "pronto") return;
+    if (aoContinuar) { aoContinuar(rotulo); return; } // os passos seguintes mostram o fim
     trackEvent("modulo_intro_concluida", { modulo: m, segundos: segundos() });
     if (oferta) trackEvent("conhecer_mais_oferta", { modulo: m, origem: "fim_tutorial" });
     const t = window.setTimeout(() => aoTerminar("feita"), oferta ? TEMPOS_DA_INTRO.prontoComOferta : TEMPOS_DA_INTRO.pronto);
@@ -263,9 +264,15 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
   const mostrarOnde = () => { setPerdeuAlvo(false); setAcende((x) => x + 1); setAnelVivo(true); };
   const entendi = useCallback((via: "botao" | "auto") => { if (faseRef.current !== "olhar") return; trackEvent("modulo_intro_olhar", { modulo: m, via }); setFase("pronto"); }, [m]);
 
+  /* 17/10 (uma voz só em todos os tutoriais): a faixa conta "1 de 4 · toca em 1 gasto seu", "2 de 4 · agora olha" — os passos da
+   * guiada (ação[+marcar na Rotina] → olha) mais os de 1 toque que vêm depois (config.maisPassos) */
+  const passosDaGuiada = config.tipo === "habito" ? 3 : 2;
+  const totalDePassos = passosDaGuiada + (config.maisPassos?.length ?? 0);
+  const passoAtual = fase === "olhar" ? passosDaGuiada : subPasso === "marcar" ? 2 : 1;
+  const numeroDoPasso = totalDePassos > passosDaGuiada ? `${passoAtual} de ${totalDePassos} · ` : "";
   const faixa = (
-    <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
-      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "agora olha" : config.pedido}</span>
+    <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-passo={passoAtual} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
+      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : `${numeroDoPasso}${fase === "olhar" ? "agora olha" : config.pedido}`}</span>
       {perdeuAlvo && !reancorando && fase === "anotar" && (
         <button type="button" className="im-faixa-onde bg-faixa" data-testid="intro-modulo-onde" aria-label="Mostrar onde tocar" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
       )}
@@ -277,7 +284,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
 
   const postIt = (
     <PostItDaMissao
-      rotulo={subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
+      rotulo={totalDePassos > passosDaGuiada ? `${passoAtual} de ${totalDePassos} · ${subPasso === "criar" ? "criar" : subPasso === "marcar" ? "marcar" : "1 toque"}` : subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
       pergunta={pergunta}
       descricao={copiaDoMontar?.descricao ?? (config.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
         : subPasso === "criar" ? "Toca num deles e ele já entra. Ou escreve o seu e toca em Adicionar."
@@ -299,7 +306,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
         <motion.div className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--intro-modulo-faixa-h) + var(--app-safe-top, 0px) + 64px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="intro-modulo-postit-solto">
           <div className="w-[92%] max-w-[360px] pointer-events-auto">{postIt}</div>
         </motion.div>, document.body)}
-      {fase === "pronto" && createPortal(
+      {fase === "pronto" && !aoContinuar && createPortal(
         <motion.div className="im-pronto" data-testid="intro-modulo-pronto" initial={reduzir ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
           <div className="im-pronto-linha">
             <span className="im-pronto-check"><Check className="w-4 h-4" strokeWidth={3} /></span>
@@ -329,7 +336,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false }: { co
           <Anel key="olhar" fixo interativo alvo={olharEm} recorte={olharAlt ? undefined : alvoCfg.olhar?.recorte} duracao={TEMPOS_DA_INTRO.olhar} testid="intro-modulo-anel-olhar" aoSair={() => entendi("auto")}
             balao={(
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="intro-modulo-olhar">
-                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Olha · 1 de 1</span>
+                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{totalDePassos > passosDaGuiada ? `Olha · ${passosDaGuiada} de ${totalDePassos}` : "Olha · 1 de 1"}</span>
                 <span className="block text-[15px] font-extrabold leading-snug">{olharAlt && config.olharNoResumo ? config.olharNoResumo.titulo : config.olhar.titulo}</span>
                 <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olharAlt && config.olharNoResumo ? config.olharNoResumo.texto : config.olhar.texto}</span>
                 {numero && (

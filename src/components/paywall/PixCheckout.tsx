@@ -169,7 +169,8 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  * pessoa sai pela Asaas na hora; (2) DISJUNTOR na cakto-pix: 3 falhas em 24 h →
  * a Cakto desliga sozinha, a Asaas volta a ser a principal e o dono recebe
  * e-mail. Só a w27 vai pra Cakto (ver OFERTAS_NA_CAKTO). */
-const FORCE_GATEWAY: Gateway | null = "cakto";
+// 19/10 (dono: "o pix tem que ser na asaas, a cakto deu problema"): ASAAS em 100% no /inicio religado. Volta = "cakto".
+export const FORCE_GATEWAY: Gateway | null = "asaas";
 const forceGateway = (): Gateway | null => FORCE_GATEWAY;
 export const gatewayDaWebAgora = forceGateway;
 const AB_BRACOS: Gateway[] = ["asaas", "cakto"];

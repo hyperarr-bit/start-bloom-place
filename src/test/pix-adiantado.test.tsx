@@ -45,7 +45,9 @@ vi.mock("@/lib/funnel", async (orig) => ({ ...(await orig()), isInAppBrowser: ()
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: m.sessao?.user ?? null }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ markPixPurchasePending: m.mark, firePixPurchaseOnce: vi.fn() }));
 
-import { PixCheckout, aquecerCheckoutPix, prepararPixAdiantado } from "@/components/paywall/PixCheckout";
+import { FORCE_GATEWAY, PixCheckout, aquecerCheckoutPix, prepararPixAdiantado } from "@/components/paywall/PixCheckout";
+// 19/10: o Pix adiantado é da Cakto — com a Asaas em 100% (FORCE_GATEWAY) estas suítes ficam paradas até a Cakto voltar
+const naCakto = FORCE_GATEWAY === "cakto" ? describe : describe.skip;
 
 const MIN = 60_000;
 const qr = (id: string, restaMs: number | null = 30 * MIN): Resp => ({
@@ -96,7 +98,7 @@ beforeEach(() => {
   });
 });
 
-describe("Pix adiantado no paywall da web", () => {
+naCakto("Pix adiantado no paywall da web", () => {
   it("pronto: o QR aparece na hora, sem 2º pedido — e nada de evento de venda antes do toque", async () => {
     noAdiantado = () => qr("uuid-adiantado-1");
     const paywall = abrirPaywall();
@@ -286,7 +288,7 @@ describe("quando NÃO adianta", () => {
   });
 });
 
-describe("sessão no mount do checkout (26/09)", () => {
+naCakto("sessão no mount do checkout (26/09)", () => {
   it("a sessão começa a nascer no toque, junto da checagem de e-mail, e o 1º Pix usa ESSA", async () => {
     m.sessao = null;
     m.garantir.mockResolvedValue("anonima");

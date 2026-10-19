@@ -32,7 +32,7 @@ vi.mock("@/lib/funnel", async (orig) => ({ ...(await orig()), isInAppBrowser: ()
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ markPixPurchasePending: vi.fn(), firePixPurchaseOnce: vi.fn() }));
 
-import { PixCheckout, bracoPorSemente, aquecerCheckoutPix } from "@/components/paywall/PixCheckout";
+import { FORCE_GATEWAY, PixCheckout, bracoPorSemente, aquecerCheckoutPix } from "@/components/paywall/PixCheckout";
 
 const qr = (id: string) => ({ data: { orderId: id, qrCode: `000201${id}`, amount: "27.9", expiresAt: new Date(Date.now() + 30 * 60e3).toISOString() }, error: null });
 const chamadas = (fn: string, action?: string) =>
@@ -117,7 +117,7 @@ describe("sorteio do braço", () => {
 /* 25/09 00h30 — Cakto em 100% na web (dono: "faz 100% a cakto logo"). Estes
  * testes valem enquanto FORCE_GATEWAY = "cakto". O do disjuntor fica por
  * ÚLTIMO: o estado "Cakto desligada" é do módulo e vale pro resto do arquivo. */
-describe("Cakto em 100% (sem link de teste)", () => {
+(FORCE_GATEWAY === "cakto" ? describe : describe.skip)("Cakto em 100% (sem link de teste)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
@@ -160,5 +160,11 @@ describe("Cakto em 100% (sem link de teste)", () => {
     expect(m.invoke.mock.calls.some((c) => c[0] === "cakto-pix" && !c[1]?.body?.warm)).toBe(false);
     expect(m.track).toHaveBeenCalledWith("pix_fallback", expect.objectContaining({ de: "cakto", para: "asaas", motivo: "cakto_desligada" }));
     expect(m.track).toHaveBeenCalledWith("pix_generated", expect.objectContaining({ gateway: "asaas", braco: "cakto" }));
+  });
+});
+
+describe("Asaas em 100% (19/10, dono: a Cakto deu problema)", () => {
+  it("a chave do gateway está na Asaas", () => {
+    expect(FORCE_GATEWAY).toBe("asaas");
   });
 });

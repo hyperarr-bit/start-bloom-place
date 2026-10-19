@@ -70,6 +70,8 @@ import { _zerarCopiaSessao } from "@/pages/hoje/conta";
 import {
   CONTAS, FUNIL_HOJE, LINHA_RENOVACAO, UPSELL_A_DOIS, VALOR_OFERTA, _zerarForcaHoje, calcular, contasEscolhidas, funilHojeLigado, itensParaGravar, ofertaDoPlano,
 } from "@/pages/hoje/conteudo";
+import { BUMP_KIT } from "@/pages/hoje/conteudo";
+const comKit = it.skipIf(!BUMP_KIT); // 19/10: bump desligado pelo dono — os testes do kit voltam quando ligar
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { computeDailyBudget } from "@/lib/finance-totals";
 import { PRECOS_HOJE, CONCESSAO_HOJE } from "../../supabase/functions/_shared/ofertas-hoje";
@@ -227,7 +229,7 @@ describe("as ofertas batem com o servidor", () => {
     for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(pt).toMatch(new RegExp(`\\b${o}: ${String(v).replace(".", "\\.")},`));
     for (const v of [27.9, 14.9, 37.8, 24.8]) expect((VALORES_VENDA as readonly number[]).includes(v)).toBe(true);
   });
-  it("ofertaDoPlano: o bump vai no MESMO Pix", () => {
+  comKit("ofertaDoPlano: o bump vai no MESMO Pix", () => {
     expect(ofertaDoPlano("anual", false)).toBe("h279");
     expect(ofertaDoPlano("anual", true)).toBe("h279k");
     expect(ofertaDoPlano("mensal", false)).toBe("h149");
@@ -265,7 +267,7 @@ describe("os passos até a oferta", () => {
     expect(screen.getByTestId("hoje-renovacao").textContent).toBe(LINHA_RENOVACAO.mensal);
     expect(screen.getByTestId("hoje-pagar").textContent).toContain("R$ 14,90");
   });
-  it("o bump soma no botão (37,80) e é desmarcado por padrão", async () => {
+  comKit("o bump soma no botão (37,80) e é desmarcado por padrão", async () => {
     await ateOferta();
     expect(screen.getByTestId("hoje-bump").getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId("hoje-pagar").textContent).toContain("R$ 27,90");
@@ -294,7 +296,7 @@ describe("o Pix (mock da asaas-pix)", () => {
     await waitFor(() => expect(clip).toHaveBeenCalledWith("000201PIXqr_1_h279"));
     await waitFor(() => expect(eventos("hoje_pix_copiado")[0]).toMatchObject({ ok: true, oferta: "h279" }));
   });
-  it("com o kit, o Pix é o h279k de R$ 37,80", async () => {
+  comKit("com o kit, o Pix é o h279k de R$ 37,80", async () => {
     await ateOferta();
     fireEvent.click(screen.getByTestId("hoje-bump"));
     fireEvent.click(screen.getByTestId("hoje-pagar"));
@@ -401,7 +403,8 @@ const atePosCompra = async (kit = false) => {
 };
 describe("pós-compra: 1 campo de e-mail", () => {
   it("e-mail livre → MESMA conta; Finanças nas chaves do app; kit; boas-vindas; lojas + e-mail; abre o app web", async () => {
-    await atePosCompra(true);
+    await atePosCompra(BUMP_KIT);
+    const ped = BUMP_KIT ? "qr_1_h279k" : "qr_1_h279";
     fireEvent.change(screen.getByTestId("hoje-email"), { target: { value: "Mari@Exemplo.com" } });
     fireEvent.click(screen.getByTestId("hoje-salvar-email"));
     await waitFor(() => expect(screen.getByTestId("hoje-lojas")).toBeTruthy());
@@ -410,8 +413,9 @@ describe("pós-compra: 1 campo de e-mail", () => {
     expect(fin.map((l) => l.key)).toEqual(["finance-incomes", "finance-fixed-expenses"]);
     expect(fin[0].value).toEqual([expect.objectContaining({ description: "Renda do mês", value: 3000 })]);
     expect((fin[1].value as Array<{ description: string }>).map((x) => x.description)).toEqual(["Aluguel", "Luz", "Internet"]);
-    expect(upserts).toContainEqual(expect.objectContaining({ key: "core-kit-primeiro-mes", value: expect.objectContaining({ comprado: true, pedido: "qr_1_h279k" }) }));
-    expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: "qr_1_h279k" });
+    if (BUMP_KIT) expect(upserts).toContainEqual(expect.objectContaining({ key: "core-kit-primeiro-mes", value: expect.objectContaining({ comprado: true, pedido: ped }) }));
+    else expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
+    expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: ped });
     expect(updateUser).toHaveBeenCalledWith({ data: { hoje: expect.objectContaining({ v: 1, plano: "anual" }) } });
     expect(screen.getByTestId("hoje-lojas").textContent).toContain("mari@exemplo.com");
     expect(screen.getByTestId("selo-app-store")).toBeTruthy();
@@ -499,5 +503,12 @@ describe("e-mail OPCIONAL na tela do Pix (não bloqueia; só aparece com o códi
     await pagarEConferir("h279");
     await waitFor(() => expect(etapa()).toBe("up1"));
     expect(invocacoes("asaas-pix", "email_pedido")).toHaveLength(0);
+  });
+});
+
+describe("bump desligado (19/10)", () => {
+  it.skipIf(BUMP_KIT)("sem o post-it do kit na oferta e o anual é o h279 de R$ 27,90", () => {
+    expect(ofertaDoPlano("anual", true)).toBe("h279");
+    expect(ofertaDoPlano("mensal", true)).toBe("h149");
   });
 });

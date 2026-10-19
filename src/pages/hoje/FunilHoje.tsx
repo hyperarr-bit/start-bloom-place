@@ -222,7 +222,7 @@ export function FunilHoje() {
   const pagar = () => {
     clique("pagar_pix", { plano: estado.plano, kit: estado.kit, valor: valorPlano });
     eventoMeta("InitiateCheckout", novoEventId("ic"), {
-      value: valorPlano, currency: "BRL", content_name: estado.kit ? PLANOS[estado.plano].conteudoKit : PLANOS[estado.plano].conteudo,
+      value: valorPlano, currency: "BRL", content_name: estado.kit && BUMP_KIT ? PLANOS[estado.plano].conteudoKit : PLANOS[estado.plano].conteudo,
     }, inicio.current?.attr.fbc || null);
     // trocou de plano/kit depois de gerar um QR: o QR antigo (vivo) entra nos anteriores — pode ser pago ainda
     setEstado((e) => {
@@ -399,7 +399,7 @@ export function FunilHoje() {
         )}
 
         {e.etapa === "pix" && (
-          <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit ? " + Kit Primeiro Mês" : ""}`}
+          <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
             pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
             emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => setEstado((x) => ({ ...x, emailPix: { email, via } }))} />
         )}

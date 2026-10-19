@@ -298,7 +298,7 @@ function OfertaMissao({ missao, variante, onFim }: { missao: EstadoMissaoDoses; 
   const pagar = () => {
     evento("missao_web_pagar", { plano: e.plano, kit: e.kit, valor, variante });
     eventoMeta("InitiateCheckout", novoEventId("ic"), {
-      value: valor, currency: "BRL", content_name: e.kit ? PLANOS[e.plano].conteudoKit : PLANOS[e.plano].conteudo,
+      value: valor, currency: "BRL", content_name: e.kit && BUMP_KIT ? PLANOS[e.plano].conteudoKit : PLANOS[e.plano].conteudo,
     }, lerAtribuicao()?.fbc || null);
     // trocou de plano/kit depois de gerar um QR: o QR antigo (vivo) entra nos anteriores — ainda pode ser pago
     set((x) => {
@@ -392,7 +392,7 @@ function OfertaMissao({ missao, variante, onFim }: { missao: EstadoMissaoDoses; 
 
         {e.etapa === "pix" && (
           <PixHoje simular={simular} fonteUrl={fonteUrl} oferta={oferta} valor={valor}
-            rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit ? " + Kit Primeiro Mês" : ""}`}
+            rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
             pix={e.pix} anteriores={e.anteriores} onPix={(p) => set((x) => ({ ...x, pix: p }))} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
             emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => set((x) => ({ ...x, emailPix: { email, via } }))} />
         )}

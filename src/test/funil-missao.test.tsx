@@ -72,6 +72,7 @@ import { FunilMissaoCamada, PARADA_MS, _zerarOferta, reciboDoDia } from "@/missa
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
 import { _zerarCopiaSessao } from "@/pages/hoje/conta";
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
+import { BUMP_KIT } from "@/pages/hoje/conteudo";
 import { CHAVE_MISSAO_WEB, FUNIL_MISSAO, apagarMissaoWeb, lembretesSoNoApp } from "@/lib/missao-web";
 import { CHAVE_ESTADO_MISSAO_DOSES } from "@/lib/missao-doses";
 import { localDayKey } from "@/lib/utils";
@@ -228,16 +229,18 @@ describe("Pix REAL (Asaas) e a compra", () => {
   });
   it("kit no mesmo Pix (h279k); pago → pra sempre 47 → 'Não' → 27 → 'Não' → e-mail livre → 'Seu CORE está salvo' com as LOJAS + boas-vindas", async () => {
     await ateOferta();
-    fireEvent.click(screen.getByTestId("missao-bump"));
-    expect(screen.getByTestId("missao-pagar").textContent).toMatch(/37,80/);
+    const of = BUMP_KIT ? "h279k" : "h279";
+    if (BUMP_KIT) fireEvent.click(screen.getByTestId("missao-bump"));
+    else expect(screen.queryByTestId("missao-bump")).toBeNull(); // 19/10: bump desligado
+    expect(screen.getByTestId("missao-pagar").textContent).toMatch(BUMP_KIT ? /37,80/ : /27,90/);
     fireEvent.click(screen.getByTestId("missao-pagar"));
     await waitFor(() => expect(screen.getByTestId("hoje-copiar")).toBeTruthy());
-    expect(invocacoes("asaas-pix", "create")[0]).toMatchObject({ offer: "h279k" });
-    pagos.add(`qr_${pedidos}_h279k`);
+    expect(invocacoes("asaas-pix", "create")[0]).toMatchObject({ offer: of });
+    pagos.add(`qr_${pedidos}_${of}`);
     fireEvent.click(screen.getByTestId("hoje-ja-paguei"));
     await waitFor(() => expect(screen.getByTestId("missao-up1")).toBeTruthy());
-    expect(eventos("missao_web_pago")[0]).toMatchObject({ oferta: "h279k", valor: 37.8, simulado: false });
-    expect(JSON.parse(localStorage.getItem(CHAVE_MISSAO_WEB)!).pago.ofertas).toEqual(["h279k"]);
+    expect(eventos("missao_web_pago")[0]).toMatchObject({ oferta: of, valor: BUMP_KIT ? 37.8 : 27.9, simulado: false });
+    expect(JSON.parse(localStorage.getItem(CHAVE_MISSAO_WEB)!).pago.ofertas).toEqual([of]);
     fireEvent.click(screen.getByTestId("missao-up1-nao"));
     await waitFor(() => expect(screen.getByTestId("missao-down")).toBeTruthy());
     fireEvent.click(screen.getByTestId("missao-down-nao"));
@@ -246,7 +249,7 @@ describe("Pix REAL (Asaas) e a compra", () => {
     fireEvent.click(screen.getByTestId("missao-salvar-email"));
     await waitFor(() => expect(screen.getByTestId("missao-pronto")).toBeTruthy());
     expect(definirEmailDaCompra).toHaveBeenCalledWith("maria@exemplo.com");
-    expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: "qr_1_h279k" });
+    expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: `qr_1_${of}` });
     // as lojas: os selos oficiais + "entre com este e-mail"
     expect(screen.getByTestId("missao-lojas").textContent).toMatch(/App Store.*Google Play/);
     expect(screen.getByTestId("missao-lojas").textContent).toMatch(/maria@exemplo\.com/);

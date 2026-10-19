@@ -25,7 +25,7 @@ export const PARAM_QA_HOJE = "funil-hoje";
 export const CHAVE_FORCA_HOJE = "funil-hoje-force";
 
 /** Cada oferta extra tem a SUA chave (o dono pode tirar uma sem mexer nas outras). */
-export const BUMP_KIT: boolean = true;
+export const BUMP_KIT: boolean = false; // 19/10: dono tirou ("tá confundindo"); vira upsell depois
 export const UPSELL_PRA_SEMPRE: boolean = true;
 export const DOWNSELL_PRA_SEMPRE_27: boolean = true;
 /** "Organize a vida a dois" (hc199): DESLIGADO no lançamento (dono, 18/10) — ele quer um espaço COMPARTILHADO de

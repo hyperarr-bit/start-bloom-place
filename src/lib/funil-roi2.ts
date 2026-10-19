@@ -20,7 +20,7 @@
  * `funil-roi2-force` = "on" | "off". Serve pra tirar print do "antes" no mesmo
  * build e pra conferir o rollback ao vivo.
  */
-export const FUNIL_ROI2 = true;
+export const FUNIL_ROI2 = false; // 19/10 (dono): /inicio volta à porta de 21–22/09 (os 2 melhores dias da Kenny G: 1,65× e 1,82×)
 
 const CHAVE_FORCA = "funil-roi2-force";
 

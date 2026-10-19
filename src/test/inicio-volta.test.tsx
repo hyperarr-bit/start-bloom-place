@@ -112,7 +112,7 @@ describe("/inicio na WEB com INICIO_VENDE", () => {
   it("renderiza a porta do funil do dia 14 (kenny g com utm) — sem redirecionar e sem 'funil_redirecionado'", () => {
     montarInicio(`/inicio?utm_source=ig&utm_medium=paid&utm_campaign=${CAMPANHA_KENNY_G}&fbclid=abc`);
     expect(screen.queryByTestId("onde")).toBeNull();
-    expect(document.body.textContent).toContain("16 módulos");
+    expect(document.body.textContent).toContain("Qual área tá mais fora de controle hoje?"); // 19/10: porta de 21–22/09 (FUNIL_ROI2 off)
     expect(m.track).not.toHaveBeenCalledWith("funil_redirecionado", expect.anything());
     // a 1ª tela do funil é a porta, sem a marca do B
     const start = m.track.mock.calls.find(([n, d]) => n === "funnel_view" && d?.step === "start");

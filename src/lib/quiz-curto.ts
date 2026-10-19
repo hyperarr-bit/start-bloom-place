@@ -30,7 +30,7 @@ export type BracoQuiz = "curto" | "cheio";
 // 30/09 (dono: "sobe pra todo mundo… comparar hoje com amanhã, não temos tráfego
 // pra 50/50"): Dia 1 do plano ROI 2 em 7 dias, ligado pra TODOS. A leitura é
 // antes × depois na mesma janela de horas. Voltar atrás = "off" + push.
-export const QUIZ_CURTO: ModoQuizCurto = "on";
+export const QUIZ_CURTO: ModoQuizCurto = "off"; // 19/10: quiz de 21–29/09 (o curto entrou 29/09 23h)
 /** Fatia que cai no quiz curto quando QUIZ_CURTO = "ab". */
 export const QUIZ_CURTO_FATIA = 0.5;
 

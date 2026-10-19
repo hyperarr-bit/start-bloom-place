@@ -143,10 +143,54 @@ export function rodada(): "restaurou" | "copiou" | "nada" {
   return "copiou";
 }
 
+/* ESCRITA ESPELHADA: cada setItem/removeItem do localStorage (com a sentinela no storage) atualiza a cópia em
+   memória NA HORA — sem isto, o que ela fez nos últimos segundos antes do Instagram zerar (o passo do Montar que acabou
+   de responder) voltava velho. O IndexedDB vai junto, agrupado (300 ms). O clear() NÃO é espelhado (é o "zerou"). */
+let espelhando = false;
+let timerBanco: number | null = null;
+function gravarBancoLogo() {
+  if (timerBanco) window.clearTimeout(timerBanco);
+  timerBanco = window.setTimeout(() => {
+    timerBanco = null;
+    if (!memoria?.[SENTINELA]) return;
+    const json = JSON.stringify(memoria);
+    if (json === ultimoGravado) return;
+    ultimoGravado = json;
+    marcarCookie();
+    void gravarNoBanco({ em: Date.now(), dados: { ...memoria } });
+  }, 300);
+}
+function espelharEscritas(): void {
+  if (espelhando || typeof Storage === "undefined") return;
+  espelhando = true;
+  try {
+    const proto = Storage.prototype;
+    const setOriginal = proto.setItem;
+    const delOriginal = proto.removeItem;
+    proto.setItem = function (this: Storage, k: string, v: string) {
+      setOriginal.call(this, k, v);
+      try {
+        if (vigias > 0 && this === window.localStorage && fica(k)) {
+          if (k === SENTINELA || memoria?.[SENTINELA]) { memoria = { ...(memoria ?? {}), [k]: String(v) }; gravarBancoLogo(); }
+        }
+      } catch { /* a cópia nunca derruba a escrita */ }
+    };
+    proto.removeItem = function (this: Storage, k: string) {
+      delOriginal.call(this, k);
+      try {
+        if (vigias > 0 && this === window.localStorage && memoria && k in memoria && k !== SENTINELA) {
+          const { [k]: _fora, ...resto } = memoria; memoria = resto; gravarBancoLogo();
+        }
+      } catch { /* noop */ }
+    };
+  } catch { /* navegador sem Storage.prototype mexível: fica o vigia de 1,5 s */ }
+}
+
 /** Liga o vigia (idempotente; devolve o desligar). */
 export function vigiarStorage(intervaloMs = 1500): () => void {
   vigias++;
   if (vigias === 1) {
+    espelharEscritas();
     rodada();
     timer = window.setInterval(rodada, intervaloMs);
     document.addEventListener("visibilitychange", rodada);

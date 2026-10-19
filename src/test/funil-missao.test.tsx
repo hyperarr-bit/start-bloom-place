@@ -75,7 +75,7 @@ import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { CHAVE_MISSAO_WEB, FUNIL_MISSAO, apagarMissaoWeb, lembretesSoNoApp } from "@/lib/missao-web";
 import { CHAVE_ESTADO_MISSAO_DOSES } from "@/lib/missao-doses";
 import { localDayKey } from "@/lib/utils";
-import { SENTINELA, _zerarSeguranca, rodada } from "@/missao/seguranca";
+import { SENTINELA, _zerarSeguranca, rodada, vigiarStorage } from "@/missao/seguranca";
 import { copiarDadosDaAnonima, vazio } from "../../supabase/functions/_shared/copiar-dados-anonima";
 import { FAIXAS_DE_RENDA } from "@/lib/montar-financas";
 import { OPCOES_ACORDAR } from "@/lib/montar-rotina";
@@ -164,6 +164,7 @@ describe("a oferta (paywall enxuto)", () => {
     expect(texto()).toMatch(/Ative seu CORE pra continuar/);
     expect(screen.getByTestId("missao-oferta-sub").textContent).toMatch(/Amanhã vem o dia 2: .*Rotina/);
     expect(screen.queryByTestId("missao-ver")).toBeNull();
+    expect(screen.queryByTestId("missao-terminar-dia1")).toBeNull(); // só no "parou" (antes do aha)
     expect(texto()).not.toMatch(/Ver o que fiz/);
     expect(texto()).not.toMatch(/sem baixar nada/i);
     expect(document.querySelector(".mo-oferta .fn-marca")).toBeNull();
@@ -193,6 +194,12 @@ describe("a oferta (paywall enxuto)", () => {
     expect(screen.queryByTestId("missao-recibo")).toBeNull();
     expect(screen.getByTestId("missao-oferta-sub").textContent).toMatch(/Continue de onde parou/);
     expect(eventos("missao_web_parou")[0]).toMatchObject({ via: "tempo" });
+    // a saída quieta: "Terminar o dia 1 primeiro" tira a oferta e o relógio não volta
+    fireEvent.click(screen.getByTestId("missao-terminar-dia1"));
+    await waitFor(() => expect(screen.queryByTestId("missao-oferta")).toBeNull());
+    await act(async () => { vi.advanceTimersByTime(PARADA_MS * 2); });
+    expect(screen.queryByTestId("missao-oferta")).toBeNull();
+    expect(JSON.parse(localStorage.getItem(CHAVE_MISSAO_WEB)!).parouDispensou).toBeTruthy();
   });
   it("PAROU por 'voltar': o histórico cai no /missao → a oferta entra", async () => {
     estadoWeb(); missao(false);
@@ -304,6 +311,16 @@ describe("cópia de segurança do storage (navegador do Instagram)", () => {
     localStorage.removeItem(SENTINELA);
     rodada();
     expect(localStorage.getItem("guest:x")).toBeNull();
+  });
+  it("escrita espelhada: o que ela respondeu 1 instante antes de o storage sumir volta ATUALIZADO (não a foto de 1,5 s atrás)", () => {
+    localStorage.setItem(SENTINELA, "1");
+    const parar = vigiarStorage(60_000);
+    localStorage.setItem("core-montar-financas", '{"rascunho":{"etapa":"renda"}}');
+    localStorage.setItem("core-montar-financas", '{"rascunho":{"etapa":"contas"}}'); // a resposta de agora
+    localStorage.clear();
+    expect(rodada()).toBe("restaurou");
+    expect(localStorage.getItem("core-montar-financas")).toBe('{"rascunho":{"etapa":"contas"}}');
+    parar();
   });
   it("sessão do Supabase (sb-*) e cache por conta (u:*) ficam fora da cópia", () => {
     localStorage.setItem(SENTINELA, "1"); localStorage.setItem("sb-x-auth-token", "t"); localStorage.setItem("u:1:k", "v");

@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bell } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
-import { emailDaMissaoWeb, lerMissaoWeb } from "@/lib/missao-web";
+import { EVENTO_MISSAO_WEB, lerMissaoWeb, type EstadoMissaoWeb } from "@/lib/missao-web";
 import "./baixar-app-popup.css";
 
 /**
@@ -15,12 +15,27 @@ import "./baixar-app-popup.css";
  *   · "Agora não" segue o tutorial sem travar (quem chama decide o que "seguir" quer dizer ali).
  * Mesma cara do resto do funil: branco, Inter, grafite, sem o ponto rosa.
  */
-export function BaixarAppPopup({ contexto, onAgoraNao }: { contexto: "rotina" | "plano_amanha" | "festa_dia2"; onAgoraNao: () => void }) {
-  const email = emailDaMissaoWeb();
+export function BaixarAppPopup({ contexto, onAgoraNao, depoisDaOferta = false }: {
+  contexto: "rotina" | "plano_amanha" | "festa_dia2";
+  onAgoraNao: () => void;
+  /** só aparece depois que ela pagou e tocou "Continuar minha missão" (o plano de amanhã monta por baixo da oferta) */
+  depoisDaOferta?: boolean;
+}) {
+  // o estado do funil muda com o pop-up já montado (o e-mail entra depois de pagar): relê a cada mudança
+  const [web, setWeb] = useState<EstadoMissaoWeb | null>(() => lerMissaoWeb());
   useEffect(() => {
+    const reler = () => setWeb(lerMissaoWeb());
+    window.addEventListener(EVENTO_MISSAO_WEB, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_WEB, reler);
+  }, []);
+  const email = web?.email ?? null;
+  const visivel = !depoisDaOferta || !!web?.continuou;
+  useEffect(() => {
+    if (!visivel) return;
     trackEvent("missao_web_lembrete_popup", { acao: "view", contexto, com_email: !!email, missao_session_id: lerMissaoWeb()?.sessao ?? null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [visivel]);
+  if (!visivel) return null;
   return createPortal(
     <div className="bap-fundo" role="dialog" aria-modal="true" aria-labelledby="bap-titulo" data-testid="baixar-app-popup" data-contexto={contexto} data-camada-guia="missao-lembrete-app">
       <div className="bap-folha">

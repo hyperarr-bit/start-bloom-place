@@ -53,6 +53,8 @@ export type EstadoMissaoWeb = {
   landing?: string | null;
   /** parou no tutorial sem chegar na festa (3 min sem tocar em nada, ou tocou em "voltar") → a oferta entrou assim */
   parou?: { em: number; via: "tempo" | "saida" } | null;
+  /** viu a oferta do "parou" e escolheu terminar o dia 1 primeiro (o tempo-limite não volta; o "voltar" sim) */
+  parouDispensou?: number | null;
   /** tocou em "Continuar minha missão" depois de pagar (a camada sai de vez) */
   continuou?: number | null;
 };

@@ -180,7 +180,8 @@ function Camada() {
       gravarMissaoWeb({ ...w, parou: { em: Date.now(), via } });
       evento("missao_web_parou", { via, segundos: Math.round((Date.now() - w.em) / 1000), rota: window.location.pathname });
     };
-    const armar = () => { window.clearTimeout(timer); timer = window.setTimeout(() => parar("tempo"), PARADA_MS); };
+    const jaDispensou = !!lerMissaoWeb()?.parouDispensou; // escolheu terminar o dia 1: o relógio não volta (o "voltar" sim)
+    const armar = () => { if (jaDispensou) return; window.clearTimeout(timer); timer = window.setTimeout(() => parar("tempo"), PARADA_MS); };
     const mexeu = () => armar();
     // "voltar" (botão/gesto do navegador): a entrada anterior do histórico é o /missao (o app montou com replaceState
     // em cima da tela 2) — voltar pra lá é sair do tutorial: a oferta entra e a rota /missao devolve pro módulo
@@ -375,6 +376,14 @@ function OfertaMissao({ missao, variante, onFim }: { missao: EstadoMissaoDoses; 
                     <PixIcone /><span>Pagar {preco(valor)} com Pix</span>
                   </button>
                   <p className="fn-renova" data-testid="missao-renovacao">{LINHA_RENOVACAO[e.plano]}</p>
+                  {variante === "parou" && (
+                    /* parou ANTES do aha: a saída quieta pra terminar o dia 1 (quem chega na festa vê a oferta de novo) */
+                    <button type="button" className="fn-link mo-terminar" data-testid="missao-terminar-dia1" onClick={() => {
+                      evento("missao_web_parou_voltou");
+                      const w = lerMissaoWeb();
+                      if (w) gravarMissaoWeb({ ...w, parou: null, parouDispensou: Date.now() });
+                    }}><u>Terminar o dia 1 primeiro</u></button>
+                  )}
                 </>
               )}
             </div>

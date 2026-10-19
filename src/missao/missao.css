@@ -35,6 +35,7 @@ html[data-funil-missao] .mf-corpo, html[data-funil-missao] .mrt-corpo, html[data
 .mo-planos { padding-top: 18px; }
 .mo-postit { margin-top: 18px; }
 .mo-rodape { margin-top: auto; padding-top: 18px; }
+button.mo-terminar { padding: 8px 0 0; font-size: 13px; }
 
 /* a garantia: o texto inteiro, e uma versão curta pra tela estreita (não quebra em 2 linhas no SE 1ª) */
 .mo-garantia-curta { display: none; }

@@ -52,10 +52,11 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   // o navegador não manda notificação. "Agora não" = "Sem lembrete" (a missão segue)
   const [soNoApp] = useState(lembretesSoNoApp);
   useEffect(() => {
-    trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null, sugerida: hora, ...(soNoApp ? { web: true } : {}) }));
+    // na web quem conta a vista é o pop-up (missao_web_lembrete_popup) — ele espera a oferta sair
+    if (!soNoApp) trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null, sugerida: hora }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (soNoApp) return <BaixarAppPopup contexto="plano_amanha" onAgoraNao={aoSemLembrete} />;
+  if (soNoApp) return <BaixarAppPopup contexto="plano_amanha" depoisDaOferta onAgoraNao={aoSemLembrete} />;
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       role="dialog" aria-modal="true" aria-label="Plano de amanhã" data-camada-guia="missao-doses-plano" data-testid="plano-amanha-a"

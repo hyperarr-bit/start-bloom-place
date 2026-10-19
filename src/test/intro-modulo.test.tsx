@@ -50,6 +50,8 @@ import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
 import { IntroDeUmToque } from "@/components/intro-modulo/IntroDeUmToque";
 import { modeloPara } from "@/lib/intro-modulo-acoes";
 import { TREINOS_DE_HOJE, adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, montarTreinoDeHoje, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
+// 19/10: "outro dia" nunca pode ser hoje (numa segunda o SEGUNDA fixo era o próprio dia e o teste quebrava)
+const OUTRO_DIA = diaDaSemana() === "SEGUNDA" ? "TERÇA" : "SEGUNDA";
 import type { IntroDeUmToqueConfig } from "@/lib/intro-modulo";
 import { ehChaveDoAparelho, vassouraLeva } from "@/lib/chaves-do-aparelho";
 import { CATEGORIAS_PADRAO_MERCADO } from "@/lib/mercado";
@@ -548,7 +550,8 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(plano[dia].muscles).toEqual(["Peito", "Tríceps"]);
     expect(plano[dia].exercises).toHaveLength(5);
     expect(plano[dia].exercises[0]).toMatchObject({ name: "Supino reto", sets: "4", done: false });
-    expect(estado.dados["treino-active-days"]).toContain(dia);
+    // dia útil já é ativo no padrão (seg–sex) e não se grava nada; fim de semana entra na lista
+    expect((estado.dados["treino-active-days"] as string[] | undefined) ?? ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"]).toContain(dia);
     // passo 2: o anel vai pro quadradinho do 1º exercício de HOJE e espera a pessoa marcar (nenhum chip)
     await waitFor(() => expect(card()?.textContent).toContain("2 de 4 · marca a 1ª série"), { timeout: 2500 });
     await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Fez o primeiro? Marca ali"), { timeout: 3000 });
@@ -600,7 +603,7 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
   });
 
   it("Dieta: o chip grava o café da manhã de HOJE no cardápio, sem mexer no resto", async () => {
-    const plano = { SEGUNDA: { "Café da Manhã": "", Almoço: "" }, [diaDaSemana()]: { "Café da Manhã": "", Almoço: "" } };
+    const plano = { [OUTRO_DIA]: { "Café da Manhã": "", Almoço: "" }, [diaDaSemana()]: { "Café da Manhã": "", Almoço: "" } };
     const { estado } = montar(<IntroDoModulo moduleId="dieta" />, { "saude-meals": plano });
     expect(card()?.textContent).toContain("anota o café de hoje");
     await chip(0);
@@ -610,7 +613,7 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     const meals = estado.dados["saude-meals"] as Record<string, Record<string, string>>;
     expect(meals[diaDaSemana()]["Café da Manhã"]).toBe("Ovos mexidos");
     expect(meals[diaDaSemana()].Almoço).toBe("");
-    expect(meals.SEGUNDA["Café da Manhã"]).toBe("");
+    expect(meals[OUTRO_DIA]["Café da Manhã"]).toBe("");
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "ovos")).toBeTruthy();
   }, 12_000);
 
@@ -806,10 +809,10 @@ describe("as ações de 1 toque são idempotentes e respeitam o que já existe",
     expect(c.dados["estudos-cursos-andamento"]).toHaveLength(1);
   });
   it("o café da manhã respeita as refeições configuradas e os outros dias", () => {
-    const c = ctx({ "dieta-meals-config": ["Café da Manhã", "Almoço", "Janta", "Ceia"], "saude-meals": { SEGUNDA: { Almoço: "arroz" } } });
+    const c = ctx({ "dieta-meals-config": ["Café da Manhã", "Almoço", "Janta", "Ceia"], "saude-meals": { [OUTRO_DIA]: { Almoço: "arroz" } } });
     anotarCafeDaManha(c, "Pão com café", );
     const meals = c.dados["saude-meals"] as Record<string, Record<string, string>>;
-    expect(meals.SEGUNDA).toEqual({ Almoço: "arroz" });
+    expect(meals[OUTRO_DIA]).toEqual({ Almoço: "arroz" });
     expect(Object.keys(meals[diaDaSemana()])).toEqual(expect.arrayContaining(["Café da Manhã", "Almoço", "Janta", "Ceia"]));
     expect(meals[diaDaSemana()]["Café da Manhã"]).toBe("Pão com café");
   });

@@ -192,7 +192,7 @@ export const YearComparison = ({ perfil }: Props) => {
   );
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4 animate-fade-in">
+    <div data-card="comparacao-anual" className="bg-card rounded-lg border border-border p-4 animate-fade-in">
       <div className="flex items-center justify-between gap-2 mb-3">
         <h3 className="text-xs font-bold">📊 COMPARAÇÃO ANUAL</h3>
         {toggleAplicavel && (

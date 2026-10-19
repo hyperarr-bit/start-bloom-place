@@ -50,6 +50,35 @@ export function DemoHoje({ renda, contas, ids, onQuero }: {
   const demo = useMemo(() => demoDoHoje({}, renda, contas), [renda, contas]);
   const semente = useCallback((s: Record<string, unknown>) => demoDoHoje(s, renda, contas).sementes, [renda, contas]);
 
+  /* 19/10 (dono: "faz o que achar melhor"): o número DELA fica no meio do Dashboard (~2.200 px) — a demo abre no topo e,
+   * quando o card "QUANTO POSSO GASTAR HOJE" aparece, rola até ele (suave, 1x; se ela já rolou sozinha, não mexe). */
+  useEffect(() => {
+    let feito = false;
+    const inicio = Date.now();
+    const id = window.setInterval(() => {
+      if (feito || Date.now() - inicio > 6000) { window.clearInterval(id); return; }
+      if (window.scrollY > 40) { feito = true; window.clearInterval(id); return; }
+      const card = document.querySelector<HTMLElement>('[data-testid="hoje-demo"] [data-missao="posso-gastar"]');
+      if (!card) return;
+      feito = true;
+      window.clearInterval(id);
+      window.setTimeout(() => {
+        try {
+          // o cabeçalho do módulo (título + abas) gruda no topo: desconta a altura dele pra o título do card aparecer
+          let fixo = 0;
+          for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-testid="hoje-demo"] *'))) {
+            const cs = getComputedStyle(el);
+            if ((cs.position === "sticky" || cs.position === "fixed") && el.getBoundingClientRect().top <= 1 && el.offsetHeight < 300) fixo = Math.max(fixo, el.getBoundingClientRect().bottom);
+          }
+          const y = card.getBoundingClientRect().top + window.scrollY - (fixo || 120) - 12;
+          window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+          trackEvent("hoje_demo_rolou", { ...idsRef.current() });
+        } catch { /* jsdom */ }
+      }, 700);
+    }, 150);
+    return () => window.clearInterval(id);
+  }, []);
+
   /* hoje_demo_view + topo da página + o tempo na demo (1x: saída da tela ou da página) */
   useEffect(() => {
     try { window.scrollTo({ top: 0 }); } catch { /* jsdom */ }
@@ -102,6 +131,8 @@ export function DemoHoje({ renda, contas, ids, onQuero }: {
   const Modulo = COMPONENTES.financas;
   return (
     <div className="min-h-[100dvh] bg-background text-foreground [overflow-x:clip]" data-testid="hoje-demo">
+      {/* as Comparações da demo mostrariam "−97%" (setembro cheio × outubro só com hoje) e "Nenhum lançamento em 2025": fora só aqui */}
+      <style>{'[data-testid="hoje-demo"] [data-card="comparacao-mensal"],[data-testid="hoje-demo"] [data-card="comparacao-anual"]{display:none}'}</style>
       <div className="bg-secondary text-[12.5px] font-medium text-muted-foreground border-b border-border px-4 py-1.5 text-center" data-testid="hoje-demo-topo"
         style={{ paddingTop: "calc(6px + env(safe-area-inset-top))" }}>
         Esse é o seu CORE, com os seus números

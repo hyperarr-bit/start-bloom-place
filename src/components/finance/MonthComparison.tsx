@@ -282,7 +282,7 @@ export const MonthComparison = ({ perfil }: Props) => {
   const larguraRotulo = mesmoAno ? "w-7" : "w-11";
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4 animate-fade-in">
+    <div data-card="comparacao-mensal" className="bg-card rounded-lg border border-border p-4 animate-fade-in">
       <h3 className="text-xs font-bold mb-3">📈 COMPARAÇÃO MENSAL</h3>
 
       {/* Month selectors */}

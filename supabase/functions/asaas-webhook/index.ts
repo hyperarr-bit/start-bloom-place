@@ -6,6 +6,7 @@ import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
+import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -146,7 +147,7 @@ async function sendMetaCapi(admin: Admin, args: { userId: string; email: string 
         custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: nomeDoProduto({ offer: args.offer, downsell: args.offer === "downsell" }) },
       }],
     };
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+    const res = await fetchNosPixels({
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     const out = await res.json().catch(() => ({}));

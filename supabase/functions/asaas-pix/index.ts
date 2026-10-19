@@ -7,6 +7,7 @@ import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoj
 import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { EMAIL_DESTINO_OK, acharConta, encaminharParaDestino, lerDestino, salvarDestino } from "../_shared/destino-hoje.ts";
 import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -215,7 +216,7 @@ async function sendMetaCapi(
         custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: nomeDoProduto({ offer: args.offer, downsell: args.offer === "downsell" }) },
       }],
     };
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+    const res = await fetchNosPixels({
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
     });
     const out = await res.json().catch(() => ({}));

@@ -6,6 +6,7 @@ import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
+import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -415,7 +416,7 @@ serve(async (req) => {
                 },
               }],
             };
-            const capiRes = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${capiToken}`, {
+            const capiRes = await fetchNosPixels({
               method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(capiPayload),
             });
             const capiOut = await capiRes.json().catch(() => ({}));

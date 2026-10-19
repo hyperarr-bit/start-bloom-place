@@ -9,6 +9,7 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { montarEventoVenda, validarPedido } from "../_shared/venda-capi.ts";
+import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,7 @@ serve(async (req) => {
     const pedido = validarPedido(await req.json().catch(() => null));
     if (!pedido) return json({ ok: false });
     const evento = montarEventoVenda(pedido, req.headers.get("user-agent"));
-    const r = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+    const r = await fetchNosPixels({
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: [evento] }),
     });
     if (!r.ok) console.log(`[VENDA-CAPI] meta recusou - ${JSON.stringify({ status: r.status, corpo: (await r.text()).slice(0, 160) })}`);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Lock, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
@@ -22,6 +22,7 @@ import { PixHoje, PixIcone, venceEm, type PixSalvo } from "./PixHoje";
 import { supabase } from "@/integrations/supabase/client";
 import "./funil-hoje.css";
 import { Confete, Etiqueta, GraficoPraSempre, SeloPago } from "./UpsellAnimado";
+import { DemoHoje, type ViaDemo } from "./DemoHoje";
 
 /**
  * FUNIL WEB NOVO — coreaplicativo.com.br/hoje (18/10). Só na WEB (SoNaWeb no App.tsx), noindex, sem link no site.
@@ -35,7 +36,11 @@ import { Confete, Etiqueta, GraficoPraSempre, SeloPago } from "./UpsellAnimado";
  *   e-mail (ou entra na que já existe com código) → "Abrir meu CORE" (o app web logado, Finanças montada) + o bloco
  *   "Seu CORE também no celular" com os selos das lojas e o e-mail.
  *
- * Eventos (analytics_events; todos com hoje_session_id + ids do anúncio; utm_* o trackEvent junta):
+ * VARIANTE "demo" (19/10, link `/hoje?v=demo`, salva no estado): o "Ver meu CORE" abre /hoje/demo (DemoHoje: Finanças de
+ * verdade com os números dela) e de lá "Quero o meu CORE" → a oferta; o "Voltar" da oferta volta pra demo. Sem `?v=demo`
+ * o funil é exatamente o de antes (controle). Todo evento leva `variante: "demo" | "controle"`.
+ *
+ * Eventos (analytics_events; todos com hoje_session_id + variante + ids do anúncio; utm_* o trackEvent junta):
  *   hoje_view {attr…, plataforma, in_app, retomou}            1ª carga da sessão
  *   funnel_view {funil:"hoje", step}                           cada tela
  *   funnel_click {funil:"hoje", cta}                           faixa · digitar · ver_numero · ver_core · plano · bump ·
@@ -75,6 +80,16 @@ export type EstadoHoje = {
   emailPix?: { email: string; via: "conta" | "destino" } | null;
   /** a tela logo depois de um pagamento mostra "Pagamento confirmado · R$ X" (a seguinte, depois de um "Não", não) */
   banner?: boolean;
+  /** 19/10: a VARIANTE do teste. "demo" = chegou por `/hoje?v=demo` (fica salva: sobrevive ao recarregar e à volta do
+   *  app do banco); sem ela = controle. Na demo, o "Ver meu CORE" abre Finanças com os números dela (/hoje/demo). */
+  variante?: "demo";
+};
+
+/** O link da campanha da variante: `/hoje?v=demo`. */
+export const PARAM_VARIANTE_HOJE = "v";
+export const CAMINHO_DEMO_HOJE = "/hoje/demo";
+const pediuDemo = (busca: string): boolean => {
+  try { return new URLSearchParams(busca).get(PARAM_VARIANTE_HOJE) === "demo"; } catch { return false; }
 };
 
 export const CHAVE_ESTADO_HOJE = "hoje-estado-v1";
@@ -144,6 +159,8 @@ export default function FunilHojeRota() {
 export function FunilHoje() {
   const { user, isSubscribed } = useAuth();
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const naDemo = pathname.replace(/\/+$/, "") === CAMINHO_DEMO_HOJE;
 
   const inicio = useRef<{ attr: AtribuicaoPorta; sessao: string; nova: boolean } | null>(null);
   if (!inicio.current) {
@@ -152,20 +169,44 @@ export function FunilHoje() {
     inicio.current = { attr, sessao: s.id, nova: s.nova };
   }
   const sessao = inicio.current.sessao;
+  /** "demo" | "controle" em TODO evento do /hoje (ids) — atualizado a cada render, pelo estado */
+  const varianteRef = useRef<"demo" | "controle">("controle");
   const ids = useCallback((): Record<string, unknown> => {
     const { porta_session_id: _p, ...resto } = idsDoAnuncio(lerAtribuicao() ?? inicio.current!.attr, sessao);
-    return { hoje_session_id: sessao, ...resto };
+    return { hoje_session_id: sessao, variante: varianteRef.current, ...resto };
   }, [sessao]);
   const clique = (cta: string, extra: Record<string, unknown> = {}) => trackEvent("funnel_click", { funil: "hoje", cta, ...extra, ...ids() });
 
-  const [estado, setEstadoCru] = useState<EstadoHoje>(() => lerEstado() ?? novoEstado());
+  const [estado, setEstadoCru] = useState<EstadoHoje>(() => {
+    const e = lerEstado() ?? novoEstado();
+    // `?v=demo` no link: a variante fica salva (o resto do estado não muda)
+    if (e.variante !== "demo" && (pediuDemo(search) || pediuDemo(typeof window === "undefined" ? "" : window.location.search))) {
+      const n: EstadoHoje = { ...e, variante: "demo" };
+      gravarEstado(n);
+      return n;
+    }
+    return e;
+  });
   const setEstado = useCallback((f: (e: EstadoHoje) => EstadoHoje) => {
     setEstadoCru((e) => { const n = f(e); gravarEstado(n); return n; });
   }, []);
   const estadoRef = useRef(estado);
   estadoRef.current = estado;
+  varianteRef.current = estado.variante === "demo" ? "demo" : "controle";
+  const ehDemo = estado.variante === "demo";
   const corpo = useRef<HTMLDivElement>(null);
   const ir = (etapa: EtapaHoje, extra: Partial<EstadoHoje> = {}) => setEstado((e) => ({ ...e, ...extra, etapa }));
+  /** Variante demo: trocar de etapa E de endereço (/hoje ↔ /hoje/demo). Grava JÁ — a tela pode desmontar antes de o
+   *  setState rodar. A query (utm, fbclid, v=demo) vai junto. */
+  const irPraOfertaDaDemo = useCallback((via: ViaDemo) => {
+    const n: EstadoHoje = { ...estadoRef.current, etapa: "oferta" };
+    gravarEstado(n);
+    setEstadoCru(n);
+    clique("demo_cta", { via });
+    navigate({ pathname: "/hoje", search });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, search]);
+  const irPraDemo = () => navigate({ pathname: CAMINHO_DEMO_HOJE, search });
 
   const plataforma = useMemo(plataformaDaWeb, []);
   const emInApp = useMemo(isInAppBrowser, []);
@@ -186,17 +227,17 @@ export function FunilHoje() {
   useEffect(() => {
     if (!inicio.current?.nova) return;
     const { origem, ...a } = inicio.current.attr;
-    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" ? estado.etapa : null });
+    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, variante: varianteRef.current, plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" ? estado.etapa : null });
     eventoMeta("ViewContent", novoEventId("vc"), { content_name: "hoje", content_category: "venda" }, inicio.current.attr.fbc || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* funnel_view por tela + volta pro topo */
+  /* funnel_view por tela + volta pro topo (a demo da variante é o step "demo") */
   useEffect(() => {
-    trackEvent("funnel_view", { funil: "hoje", step: estado.etapa, ...ids() });
+    trackEvent("funnel_view", { funil: "hoje", step: naDemo ? "demo" : estado.etapa, ...ids() });
     try { corpo.current?.scrollTo({ top: 0 }); } catch { /* jsdom */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado.etapa]);
+  }, [estado.etapa, naDemo]);
 
   const escolhidas: Conta[] = contasEscolhidas(estado.contas);
   const r = calcular(estado.renda, escolhidas);
@@ -257,6 +298,13 @@ export function FunilHoje() {
   const confirmado = ultimoPago && estado.banner ? (
     <div className="fn-confirmado" data-testid="hoje-confirmado"><Check size={15} strokeWidth={3} />Pagamento confirmado · {preco(VALOR_OFERTA[ultimoPago.oferta])}</div>
   ) : null;
+
+  /* /hoje/demo (variante demo): Finanças com os números dela. Sem o /hoje antes (recarregou em outro aparelho,
+     link solto), sem a variante ou depois de pagar → o /hoje. */
+  if (naDemo) {
+    if (!ehDemo || !(estado.renda > 0) || estado.pagos.length > 0) return <Navigate to={{ pathname: "/hoje", search }} replace />;
+    return <DemoHoje renda={estado.renda} contas={escolhidas} ids={ids} onQuero={irPraOfertaDaDemo} />;
+  }
 
   const e = estado;
   return (
@@ -334,13 +382,13 @@ export function FunilHoje() {
 
         {e.etapa === "resultado" && (
           <TelaResultado r={r} onVisto={() => trackEvent("hoje_resultado", { aperto: r.aperto, por_dia: r.porDia, n: r.n, faixa: e.faixa, ...ids() })}
-            onSeguir={() => { clique("ver_core"); ir("oferta"); }} onVoltar={() => ir("contas")} />
+            onSeguir={() => { clique("ver_core"); if (ehDemo) irPraDemo(); else ir("oferta"); }} onVoltar={() => ir("contas")} />
         )}
 
         {e.etapa === "oferta" && (
           <div className="fn-tela" key="oferta">
             <div className="fn-topo">
-              <button type="button" className="fn-voltar" onClick={() => ir("resultado")}><ChevronLeft size={18} /><span>Voltar</span></button>
+              <button type="button" className="fn-voltar" data-testid="hoje-oferta-voltar" onClick={() => (ehDemo ? irPraDemo() : ir("resultado"))}><ChevronLeft size={18} /><span>Voltar</span></button>
               <span className="fn-topo-dir"><span className="fn-marca" style={{ fontSize: 12 }}><i />CORE</span></span>
             </div>
             <div className="fn-oferta-topo">

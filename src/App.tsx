@@ -700,6 +700,8 @@ const AnimatedRoutes = () => {
             replaceState): devolve pro módulo — a camada vê a saída e mostra a oferta */}
         <Route path="/missao" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/hoje" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
+        {/* 19/10: a variante "demo" do /hoje (?v=demo) — Finanças com os números da pessoa; o mesmo componente decide */}
+        <Route path="/hoje/demo" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
         <Route path="/afiliado/:token" element={<SoNaWeb><RouteErrorBoundary routeName="afiliado"><Afiliado /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />

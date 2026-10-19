@@ -433,3 +433,11 @@ describe("o passo 1 do tutorial em HTML (Finanças e Rotina) é a MESMA tela do 
     expect(leve).not.toMatch(/localStorage\.setItem\("core-montar/);
   });
 });
+
+describe("eventos do HTML leve (19/10)", () => {
+  it("o insert só usa colunas que existem (user_id, session_id, event_name, event_data) — `page` derrubava as telas 1–2", () => {
+    const leve = readFileSync(join(process.cwd(), "src/missao/leve.ts"), "utf8");
+    expect(leve).not.toMatch(/page: location\.pathname/);
+    expect(leve).toContain("path: location.pathname");
+  });
+});

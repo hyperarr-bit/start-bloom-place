@@ -81,7 +81,8 @@ function evento(nome: string, dados: Record<string, unknown> = {}) {
     fetch(URL_EV, {
       method: "POST", keepalive: true,
       headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: "return=minimal" },
-      body: JSON.stringify({ user_id: null, session_id: coreSid, event_name: nome, page: location.pathname, event_data: { ...corpo, utm_source: q.get("utm_source"), utm_campaign: q.get("utm_campaign"), utm_content: q.get("utm_content") } }),
+      // 19/10: sem coluna `page` na tabela (o insert inteiro voltava 400 e as telas 1–2 sumiam) → o caminho vai em event_data.path
+      body: JSON.stringify({ user_id: null, session_id: coreSid, event_name: nome, event_data: { ...corpo, path: location.pathname, utm_source: q.get("utm_source"), utm_campaign: q.get("utm_campaign"), utm_content: q.get("utm_content"), fbclid: q.get("fbclid") } }),
     }).catch(() => {});
   } catch { /* nunca derruba a tela */ }
 }

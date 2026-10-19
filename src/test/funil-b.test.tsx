@@ -167,9 +167,9 @@ afterEach(cleanup);
 /* ------------------------------------------------------------ a chave */
 
 describe("a chave", () => {
-  it("é uma das três e está em 'kenny' desde 01/10 00h (dono 30/09: \"sobe o b à meia-noite pra ter a comparação com hoje\")", () => {
+  it("é uma das três e está DESLIGADA de novo (19/10: o /inicio volta como era antes do B, 30/09 até 23:33)", () => {
     expect(["off", "kenny", "on"]).toContain(FUNIL_B);
-    expect(FUNIL_B).toBe("kenny");
+    expect(FUNIL_B).toBe("off");
   });
   it("'kenny' = só a campanha kenny g (o id em utm_campaign); 'on' = todo mundo; 'off' = ninguém", () => {
     expect(decidirFunilB(KENNY, "kenny")).toBe(true);

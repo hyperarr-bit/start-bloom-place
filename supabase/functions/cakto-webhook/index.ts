@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
 import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
+import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 
 // ============================================================================
 // Webhook da Cakto — substitui o abacatepay-webhook para novas assinaturas.
@@ -771,7 +772,8 @@ serve(async (req) => {
         logStep("Meta CAPI match signals", {
           em: !!customerEmail, ph: !!phoneHash, fbc: !!fbc, fbp: !!fbp, ip_ua: !!(ip && ua),
         });
-        const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+        // 19/10: o MESMO evento (mesmo event_id) vai pro pixel de sempre e pro 2º (iris), quando configurado
+        const res = await fetchNosPixels({
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });
         const out = await res.json().catch(() => ({}));

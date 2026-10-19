@@ -40,7 +40,9 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREA_PROOF, type AreaKey } from "@/lib/fu
 
 export type ModoFunilB = "off" | "kenny" | "on";
 
-export const FUNIL_B: ModoFunilB = "kenny";
+/* 19/10: DESLIGADO de novo — o /inicio volta como rodava ANTES do B (30/09 até 23:33, aca89c38), o período da
+ * kenny g que deu ROAS 1,33. O B ficou no ar de 30/09 23:33 até a web sair do ar em 01/10 (0 pagos na 1ª noite). */
+export const FUNIL_B: ModoFunilB = "off";
 
 /** A campanha kenny g (Meta, id da campanha — é o que vem em utm_campaign). */
 export const CAMPANHA_KENNY_G = "120250474048320041";

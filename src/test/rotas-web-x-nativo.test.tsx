@@ -17,7 +17,7 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
-import { destinoNaLanding, ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
+import { destinoNaLanding, ENTRADA_APP, INICIO_VENDE, VENDA_NA_WEB } from "@/lib/rotas-web";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn() }));
 import { trackEvent } from "@/lib/analytics";
@@ -46,6 +46,9 @@ describe("a chave", () => {
     expect(VENDA_NA_WEB).toBe(false);
     expect(ENTRADA_APP).toBe("/app");
   });
+  it("19/10: só o /inicio volta a vender (chave própria INICIO_VENDE) — ver src/test/inicio-volta.test.tsx", () => {
+    expect(INICIO_VENDE).toBe(true);
+  });
 });
 
 describe("destinoNaLanding — a landing recebe a atribuição, não o lixo do funil", () => {
@@ -61,7 +64,7 @@ describe("destinoNaLanding — a landing recebe a atribuição, não o lixo do f
 });
 
 describe("FunilAposentado na WEB", () => {
-  it("/inicio com utm → landing com os mesmos utm (e registra de onde veio)", () => {
+  it("rota aposentada SEM chave própria (ex.: /inicio com INICIO_VENDE desligada) → landing com os mesmos utm (e registra de onde veio)", () => {
     montar("/inicio?utm_source=ig&utm_campaign=kenny&fbclid=xyz&step=offer", "/inicio", { web: <p>funil dia14</p> });
     expect(screen.getByTestId("onde").textContent).toBe("/?utm_source=ig&utm_campaign=kenny&fbclid=xyz");
     expect(screen.queryByText("funil dia14")).toBeNull();
@@ -119,8 +122,8 @@ describe("App.tsx está ligado do jeito certo (fonte)", () => {
     expect(src).toContain("return <Landing />;");
     expect(src).toContain("if (VENDA_NA_WEB && temMarcaDeAnuncio())");
     expect(src).not.toContain("<SiteHome />");
-    // o volta-da-demo pro /inicio?step=analise só vale no app (ou com a venda ligada)
-    expect(src).toContain("if (!user && (isNativeShell() || VENDA_NA_WEB)) {");
+    // o volta-da-demo pro /inicio?step=analise só vale no app (ou com a venda ligada, ou com o /inicio vendendo — 19/10)
+    expect(src).toContain("if (!user && (isNativeShell() || VENDA_NA_WEB || INICIO_VENDE)) {");
   });
 
   it("suporte, como-entrar e as legais continuam públicas na web; /planos da web passa pelo PlanosWeb", () => {
@@ -134,8 +137,9 @@ describe("App.tsx está ligado do jeito certo (fonte)", () => {
     expect(src).toContain("{isNativeShell() ? <PlanosApp /> : <PlanosWeb />}");
   });
 
-  it("o funil do dia 14 saiu do bundle inicial (não há mais import eager dele)", () => {
-    expect(src).not.toContain('import ComecarDia14Eager');
+  it("19/10: o import EAGER do dia 14 voltou (só pro /inicio, com INICIO_VENDE); a LP antiga continua fora", () => {
+    expect(src).toContain('import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";');
+    expect(src.match(/<ComecarDia14Eager \/>/g)?.length).toBe(1);
     expect(src).not.toContain('import LandingPage from "./pages/lp/LpFinancas"');
   });
 });

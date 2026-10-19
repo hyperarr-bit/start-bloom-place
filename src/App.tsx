@@ -27,7 +27,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
-import { ENTRADA_APP, VENDA_NA_WEB } from "@/lib/rotas-web";
+import { ENTRADA_APP, INICIO_VENDE, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
@@ -198,7 +198,8 @@ const RootGate = () => {
   }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
-  if (!user && (isNativeShell() || VENDA_NA_WEB)) {
+  // 19/10: com o /inicio vendendo de novo (INICIO_VENDE), a cerca volta a valer na web, como em setembro.
+  if (!user && (isNativeShell() || VENDA_NA_WEB || INICIO_VENDE)) {
     try {
       const t = Number(sessionStorage.getItem("core-demo-tour") ?? 0);
       // no app o retorno da demo tem que voltar pra porta do shell, não pro
@@ -318,6 +319,10 @@ const MomentosNoApp = () => {
 // Suspense). O W segue lazy: vende no app (/app) e fica de teste em /funil-w.
 // 01/10: o /inicio deixou de ser a porta do tráfego pago (venda só nas lojas) —
 // o dia14 saiu do bundle inicial e segue como chunk próprio (ComecarDia14, abaixo).
+// 19/10: o /inicio volta a vender (INICIO_VENDE, src/lib/rotas-web.ts) e o
+// import EAGER de setembro volta junto — a URL do anúncio sem flash de loading.
+// As outras rotas do dia14 (/funil-dia14) seguem no chunk lazy.
+import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
 const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 // Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
 // (some do build — a condição é substituída por `false` e o import cai fora).
@@ -896,7 +901,7 @@ const App = () => {
                       desistência. SoNaWeb continua obrigatório: sem ele, um
                       link no histórico ou deep link recoloca pagamento
                       externo dentro do app, que é violação de política da Play. */}
-                  <Route path="/inicio" element={<FunilAposentado web={<Suspense fallback={<div className="min-h-screen bg-background" />}><RouteErrorBoundary routeName="funil"><ComecarDia14 /></RouteErrorBoundary></Suspense>} />} />
+                  <Route path="/inicio" element={<FunilAposentado vende={INICIO_VENDE} web={INICIO_VENDE ? <RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary> : <Suspense fallback={<div className="min-h-screen bg-background" />}><RouteErrorBoundary routeName="funil"><ComecarDia14 /></RouteErrorBoundary></Suspense>} />} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

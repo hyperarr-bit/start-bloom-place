@@ -14,6 +14,7 @@ import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, ent
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
+import { SelosDasLojas } from "@/components/site/SelosDasLojas";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -1158,6 +1159,14 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   };
 
   const enterApp = () => { window.location.href = "/"; };
+  /* SELOS DAS LOJAS NO PAGAMENTO CONFIRMADO (19/10, regra do dono pra todo funil web: na época do vitalício a maioria
+   * dos reembolsos era "pensei que não era app da App Store/Play"). Só no checkout de FUNIL (o /inicio) — o gate e o
+   * /planos ficam como estão. O e-mail é o da conta (o /inicio cria a conta antes do preço); apelido anônimo não aparece. */
+  const selosNoConfirmado = context === "funnel" && !funilB;
+  const emailDoAcesso = (() => {
+    const e = (abUser?.email ?? (emailSalvo ? emailCompra.trim() : "")).trim();
+    return e && !/^pix-[0-9a-f]+@coreaplicativo\.com\.br$/i.test(e) ? e : null;
+  })();
   // Funil ROI 2 (27/09): só muda TEXTO (título do QR, recibo, "pronto") e só
   // pro vitalício — a lógica do Pix é a mesma. Ver src/lib/funil-roi2.ts.
   const roi2Vitalicio = OFERTA_VITALICIA[offer] && ehFunilRoi2();
@@ -1720,6 +1729,15 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
               >
                 {v2?.onConfirmado ? "Ativar minha central →" : "Entrar no meu app"}
               </Button>
+              {selosNoConfirmado && (
+                <div className="mt-6 rounded-2xl border border-border bg-card p-4 text-center" data-testid="pix-confirmado-lojas">
+                  <p className="text-[14px] font-bold leading-snug">O CORE também é app: baixe e entre com {emailDoAcesso ? "este e-mail" : "o e-mail da compra"}</p>
+                  {emailDoAcesso && (
+                    <p className="mt-2 inline-block max-w-full truncate rounded-full bg-muted px-3 py-1 text-[13px] font-semibold" data-testid="pix-confirmado-email">{emailDoAcesso}</p>
+                  )}
+                  <SelosDasLojas onde="inicio_pos_compra" prefixo="web" altura={44} className="mt-3 justify-center" />
+                </div>
+              )}
             </motion.div>
           )}
 

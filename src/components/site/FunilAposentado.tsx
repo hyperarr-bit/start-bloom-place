@@ -12,15 +12,22 @@ import { ENTRADA_APP, VENDA_NA_WEB, destinoNaLanding } from "@/lib/rotas-web";
  *     renderizam o ComecarW); senão a porta do app (ENTRADA_APP) — é
  *     exatamente o que o SoNaWeb fazia, byte a byte.
  *  2. WEB com VENDA_NA_WEB ligada → `web`, o funil de sempre (rollback).
+ *     Também quando a ROTA tem chave própria ligada (`vende`): 19/10, só o
+ *     /inicio volta a vender (INICIO_VENDE em src/lib/rotas-web.ts).
  *  3. WEB com a venda desligada → a landing "/", com utm/fbclid preservados.
  *
  * O evento `funil_redirecionado` diz de qual rota antiga a visita veio —
  * é como a gente vê quanto tráfego ainda chega por anúncio/link antigo.
  */
-export function FunilAposentado({ web, nativo }: { web?: ReactNode; nativo?: ReactNode }) {
+export function FunilAposentado({ web, nativo, vende = false }: {
+  web?: ReactNode;
+  nativo?: ReactNode;
+  /** Chave desta rota (19/10: só o /inicio, com INICIO_VENDE): na web, renderiza `web` mesmo com VENDA_NA_WEB desligada. */
+  vende?: boolean;
+}) {
   const { pathname, search } = useLocation();
   const noApp = isNativeShell();
-  const redireciona = !noApp && (!VENDA_NA_WEB || !web);
+  const redireciona = !noApp && (!(VENDA_NA_WEB || vende) || !web);
   useEffect(() => {
     if (redireciona) trackEvent("funil_redirecionado", { de: pathname });
     // uma vez por montagem: a rota some logo em seguida

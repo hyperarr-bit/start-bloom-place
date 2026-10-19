@@ -112,6 +112,8 @@ const deslizeComDirecao = (dx: number) => ({
   fica: { opacity: 1, x: 0 },
   sai: (dir: number) => ({ opacity: 0, x: -dir * dx }),
 });
+/** O `{...slide}` de antes de 17/10, em forma de variantes (o funil do dia 14 / /inicio usa este). */
+const DESLIZE_DE_SETEMBRO = { entra: slide.initial, fica: slide.animate, sai: slide.exit };
 
 const PREP_STEPS = [
   "Identificando seu perfil financeiro",
@@ -664,7 +666,10 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
     if (!naInicio) { setAnswers(initialAnswers ?? {}); setIdx(startIdx < 0 ? 0 : startIdx); }
   }
   const reduzir = useReducedMotion();
-  const variantes = deslizeComDirecao(reduzir ? 0 : slide.initial.x);
+  /* 19/10 (o /inicio volta como em setembro, INICIO_VENDE): SEM `inicio` (o funil do dia 14) o deslize é o de
+   * setembro — sempre entra pela direita e sai pela esquerda, também no voltar e com "reduzir movimento". O
+   * deslize com direção (17/10) fica só no funil W, que passa `inicio`. */
+  const variantes = inicio ? deslizeComDirecao(reduzir ? 0 : slide.initial.x) : DESLIZE_DE_SETEMBRO;
   /* MESMO CRASH DO FUNIL DO APP (27/07) — e aqui é o funil que está em
      escala. Dois toques no mesmo quadro liam o mesmo `idx`, os dois
      incrementavam, o índice passava do fim e `item.kind` estourava: a pessoa

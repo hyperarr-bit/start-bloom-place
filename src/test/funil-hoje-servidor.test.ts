@@ -317,3 +317,20 @@ describe("e-mail opcional da tela do Pix: pagou e fechou a aba → a compra vai 
     expect(pix).toContain("if (user.email) return jsonResponse({ ok: false, motivo: \"conta_tem_email\" });");
   });
 });
+
+describe("Purchase do upsell pago com a aba fechada chega na Meta (19/10)", () => {
+  it("o create guarda IP + user-agent do comprador no pix_order_created (juntos)", () => {
+    const s = fonte("asaas-pix/index.ts");
+    expect(s).toMatch(/clientIp && userAgent \? \{ client_ip: clientIp, user_agent: userAgent\.slice\(0, 400\) \}/);
+  });
+  it("o webhook manda client_ip_address + client_user_agent do registro (sem o UA a Meta descarta evento de site)", () => {
+    const s = fonte("asaas-webhook/index.ts");
+    expect(s).toMatch(/args\.ip && args\.ua \? \{ client_ip_address: args\.ip, client_user_agent: args\.ua \}/);
+    expect(s.match(/ip: regData\.client_ip \?\? null, ua: regData\.user_agent \?\? null/g)?.length).toBe(2);
+  });
+  it("o pix-reconcile lê os mesmos campos", () => {
+    const s = fonte("pix-reconcile/index.ts");
+    expect(s).toContain("q.event_data?.client_ip");
+    expect(s).toContain("q.event_data?.user_agent");
+  });
+});

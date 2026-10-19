@@ -111,7 +111,7 @@ async function sendToUtmify(admin: Admin, args: { userId: string; email: string 
   } catch (e) { logStep("UTMify send failed", { message: (e as Error).message }); }
 }
 
-async function sendMetaCapi(admin: Admin, args: { userId: string; email: string | null; orderId: string; offer: string; amountCents: number; fbp?: string | null; fbc?: string | null; sourceUrl?: string | null }) {
+async function sendMetaCapi(admin: Admin, args: { userId: string; email: string | null; orderId: string; offer: string; amountCents: number; fbp?: string | null; fbc?: string | null; sourceUrl?: string | null; ip?: string | null; ua?: string | null }) {
   const pixelId = Deno.env.get("META_PIXEL_ID");
   const token = Deno.env.get("META_CAPI_TOKEN");
   if (!pixelId || !token) return;
@@ -139,6 +139,9 @@ async function sendMetaCapi(admin: Admin, args: { userId: string; email: string 
           external_id: [await sha(args.userId)],
           ...(fbc ? { fbc } : {}),
           ...(args.fbp ? { fbp: args.fbp } : {}),
+          /* 19/10: sem client_user_agent a Meta descarta o Purchase de site (o upsell de 47 do /hoje pago com a aba
+           * fechada nunca chegou). Vêm do pix_order_created (gravados no create); a Meta exige os dois juntos. */
+          ...(args.ip && args.ua ? { client_ip_address: args.ip, client_user_agent: args.ua } : {}),
         },
         custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: nomeDoProduto({ offer: args.offer, downsell: args.offer === "downsell" }) },
       }],
@@ -245,7 +248,7 @@ serve(async (req) => {
       if (!travaCapi) {
         const { data: uc } = await admin.auth.admin.getUserById(userId);
         await sendToUtmify(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
-        await sendMetaCapi(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null });
+        await sendMetaCapi(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ip: regData.client_ip ?? null, ua: regData.user_agent ?? null });
       }
       return jsonResponse({ received: true, granted: false, casal: true });
     }
@@ -309,7 +312,7 @@ serve(async (req) => {
       await sendToUtmify(admin, { userId, email, orderId: qrCodeId, offer, amountCents, name: displayName });
       await sendMetaCapi(admin, {
         userId, email, orderId: qrCodeId, offer, amountCents,
-        fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null,
+        fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ip: regData.client_ip ?? null, ua: regData.user_agent ?? null,
       });
       try {
         const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";

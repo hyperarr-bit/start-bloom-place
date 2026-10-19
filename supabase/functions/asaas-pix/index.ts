@@ -365,6 +365,8 @@ serve(async (req) => {
       // não sabe de quem é o pagamento. fbp/fbc/source_url (22/07): sinal do
       // NAVEGADOR capturado na criação — o webhook usa no CAPI pra quem paga
       // no banco e nunca volta (metade das vendas só tinha e-mail no match).
+      const clientIp = (req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "").split(",")[0]?.trim() || null;
+      const userAgent = req.headers.get("user-agent") || null;
       const { error: pontErr } = await supabaseAdmin.from("analytics_events").insert({
         event_name: "pix_order_created",
         user_id: user.id,
@@ -373,6 +375,9 @@ serve(async (req) => {
           ...(body.fbp ? { fbp: String(body.fbp).slice(0, 120) } : {}),
           ...(body.fbc ? { fbc: String(body.fbc).slice(0, 400) } : {}),
           ...(body.sourceUrl ? { source_url: String(body.sourceUrl).slice(0, 300) } : {}),
+          /* 19/10: IP + user-agent do comprador SÓ existem aqui (o webhook é chamado pela Asaas). Sem o user-agent a Meta
+           * DESCARTA o Purchase de site — o upsell pago com a aba já fechada (crédito pelo webhook/reconcile) sumia. */
+          ...(clientIp && userAgent ? { client_ip: clientIp, user_agent: userAgent.slice(0, 400) } : {}),
         },
       });
       /* Sem a ponte, o QR vira um buraco: o webhook não sabe de quem é o

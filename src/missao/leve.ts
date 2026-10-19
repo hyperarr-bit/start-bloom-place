@@ -150,6 +150,7 @@ if (PRODUCAO) {
     f.fbq = n;
   }
   f.fbq!("init", "998037194527241");
+  f.fbq!("init", "1104688251942954"); // 19/10: pixel iris (conta nova) — mesmos eventos, mesmo eventID
   f.fbq!("track", "PageView");
   addEventListener("load", () => setTimeout(() => {
     const s = document.createElement("script"); s.async = true; s.src = "https://connect.facebook.net/en_US/fbevents.js"; document.head.appendChild(s);

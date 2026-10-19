@@ -23,7 +23,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 
 export type ModoChave = "on" | "off";
-export const FUNIL_MISSAO: ModoChave = "off";
+export const FUNIL_MISSAO: ModoChave = "on"; // 19/10: ligado pelo dono ("sobe esse funil"); rollback = "off"
 export const PARAM_QA_MISSAO = "funil-missao";
 export const CHAVE_FORCA_MISSAO = "funil-missao-force";
 export const CHAVE_MISSAO_WEB = "core-missao-web";

@@ -147,8 +147,8 @@ const ateOferta = async () => {
 
 /* ---------------------------------------------------------------- chave */
 describe("a chave", () => {
-  it("FUNIL_MISSAO continua OFF no código (nada sobe ligado); /missao e /missao/app só na web", () => {
-    expect(FUNIL_MISSAO).toBe("off");
+  it("FUNIL_MISSAO LIGADO (19/10, dono); /missao e /missao/app só na web", () => {
+    expect(FUNIL_MISSAO).toBe("on");
     const app = readFileSync(join(process.cwd(), "src/App.tsx"), "utf8");
     expect(app).toContain('<Route path="/missao/app" element={<SoNaWeb>');
     expect(app).toContain('<Route path="/missao" element={<SoNaWeb>');

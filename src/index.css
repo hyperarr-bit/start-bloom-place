@@ -1112,6 +1112,13 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
   body.com-trilho .fixed.left-0.right-0 { left: 232px; }
 }
 
+/* Barra de abas (1.0.17, components/nav/BarraDeAbas.tsx): nas 3 raízes o fim do conteúdo não pode morar
+   embaixo da barra. A área segura de baixo já está no .app-safe-shell; aqui entra a altura da barra
+   (52 px + o respiro mínimo de 0,5rem da regra `.fixed.bottom-0`). No computador a barra não existe. */
+@media (max-width: 1023px) {
+  body.com-abas { padding-bottom: calc(52px + 0.5rem) !important; }
+}
+
 /*
  * ALVO DE TOQUE DOS BOTÕES SÓ-ÍCONE "NUS" (22/09, varredura de usabilidade).
  *

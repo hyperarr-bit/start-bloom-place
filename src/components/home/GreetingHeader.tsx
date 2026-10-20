@@ -10,6 +10,7 @@ import { NameEditDialog } from "./NameEditDialog";
 import { AccountDrawer } from "./AccountDrawer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, aguaQueFalta, normalizarCopoMl } from "@/lib/saude-copo";
+import { navAbasLigada } from "@/lib/nav-abas";
 
 interface GreetingHeaderProps {
   data: LifeHubData;
@@ -88,6 +89,8 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  // 1.0.17: com a barra de abas, avatar (folha da conta), sol e paleta moram no Você — o topo fica só a saudação
+  const comAbas = navAbasLigada() && !!user;
 
   const contextMessage = getContextualMessage(data, normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
   const nomeCompleto = data.userName || user?.email?.split("@")[0] || "";
@@ -136,7 +139,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           </div>
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        {!comAbas && <div className="flex items-center gap-1 flex-shrink-0">
           {/* Avatar-badge (22/07, escolha do dono após ▾ e ☰): o próprio
               avatar É o menu — anel degradê + mini-badge ⌄ no canto, padrão
               Google/Instagram. Um elemento só, nada solto do lado.
@@ -159,7 +162,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
             </span>
           </motion.button>
           <ThemeToggle showPalette />
-        </div>
+        </div>}
       </motion.div>
 
       {!hasSetName && (
@@ -175,13 +178,13 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           nome (corte visual da saudação). Passar ele pro drawer/dialog fazia
           "alterar nome" abrir com "João" pra quem é "João Victor" — e salvar
           dali comia o sobrenome em silêncio. */}
-      <AccountDrawer
+      {!comAbas && <AccountDrawer
         open={showAccount}
         onOpenChange={setShowAccount}
         displayName={nomeCompleto}
         onNameChange={onNameChange}
         onReplayTutorial={onReplayTutorial}
-      />
+      />}
     </>
   );
 };

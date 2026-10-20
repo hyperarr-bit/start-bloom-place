@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, CircleUserRound } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
+import { navAbasLigada } from "@/lib/nav-abas";
 
 /**
  * Trilho lateral do COMPUTADOR (11/09, "melhorar a experiência da web").
@@ -21,6 +22,10 @@ import { isNativeShell } from "@/lib/native-shell";
  * admin e demonstração seguem como estão.
  */
 const ROTAS_COM_TRILHO = new Set(["/home", ...MODULOS.map((m) => m.path)]);
+/* 1.0.17 (barra de abas): no computador a barra de baixo não existe — o trilho faz o papel dela. Ganha as
+   rotas das abas novas, "Hoje" no lugar de "Início", "Organizar" (a aba Módulos) e "Você" no pé (a conta
+   saiu do avatar da Home). Com a chave desligada, o trilho de sempre. */
+const ROTAS_DAS_ABAS = ["/modulos", "/voce", "/voce/aparencia"];
 const LARGURA_MINIMA = "(min-width: 1024px)";
 
 interface Prefs { hidden?: unknown; order?: unknown; favorites?: unknown }
@@ -30,7 +35,8 @@ export const TrilhoLateral = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { get } = useUserData();
-  const visivel = !isNativeShell() && ROTAS_COM_TRILHO.has(pathname);
+  const comAbas = navAbasLigada();
+  const visivel = !isNativeShell() && (ROTAS_COM_TRILHO.has(pathname) || (comAbas && ROTAS_DAS_ABAS.includes(pathname)));
 
   // Leitura pura das preferências (sem o hook, que grava): o trilho nunca
   // escreve, então não pode disputar a chave com a grade da Home.
@@ -86,10 +92,16 @@ export const TrilhoLateral = () => {
           <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
             <LayoutGrid className="w-4 h-4" />
           </span>
-          Início
+          {comAbas ? "Hoje" : "Início"}
         </button>
 
-        <p className="px-2.5 pt-4 pb-1 text-[10px] font-bold tracking-[0.14em] uppercase text-muted-foreground">Módulos</p>
+        <div className="flex items-center justify-between px-2.5 pt-4 pb-1">
+          <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-muted-foreground">Módulos</p>
+          {comAbas && (
+            <button type="button" onClick={() => navigate("/modulos")} aria-current={pathname === "/modulos" ? "page" : undefined}
+              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground">Organizar</button>
+          )}
+        </div>
         {modulos.map((m) => {
           const ativo = pathname === m.path;
           return (
@@ -110,6 +122,23 @@ export const TrilhoLateral = () => {
           );
         })}
       </nav>
+
+      {comAbas && (
+        <button
+          type="button"
+          onClick={() => navigate("/voce")}
+          aria-current={pathname.startsWith("/voce") ? "page" : undefined}
+          data-testid="trilho-voce"
+          className={`flex items-center gap-3 mx-3 mb-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+            pathname.startsWith("/voce") ? "bg-muted font-semibold" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+          }`}
+        >
+          <span className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+            <CircleUserRound className="w-4 h-4" />
+          </span>
+          Você
+        </button>
+      )}
     </aside>
   );
 };

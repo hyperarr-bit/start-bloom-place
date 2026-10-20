@@ -31,6 +31,8 @@ import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 import { contarUso } from "@/lib/medicao-total";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -279,6 +281,15 @@ const HomePage = () => {
     setShowReplayTutorial(true);
     setData("tutorial-replay-pelo-menu", "true");
   }, [setData]);
+  // 1.0.17: o "Rever tutorial" mora na aba Você — chega aqui como estado da navegação (consumido 1x)
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pedeReverTutorial = !!(location.state as { reverTutorial?: boolean } | null)?.reverTutorial;
+  useEffect(() => {
+    if (!pedeReverTutorial || !loaded) return;
+    handleReplayTutorial();
+    navigate(location.pathname, { replace: true, state: null });
+  }, [pedeReverTutorial, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleWidgetToggle = (id: WidgetId) => {
     if (isActive(id)) removeWidget(id);
@@ -331,7 +342,8 @@ const HomePage = () => {
       <DailyNudge />
       {/* Adesivo novo / marco de sequência (26/09): um de cada vez, uma vez cada */}
 
-      <div className="min-h-dvh bg-background flex flex-col" onClick={() => editingWidgets && setEditingWidgets(false)}>
+      {/* ATRIBUTO_RAIZ: a Home de verdade está na tela (sem tutorial/carregamento) — é o que deixa a barra de abas aparecer */}
+      <div className="min-h-dvh bg-background flex flex-col" onClick={() => editingWidgets && setEditingWidgets(false)} {...{ [ATRIBUTO_RAIZ]: "hoje" }}>
         <header className="sticky top-0 z-40 border-b border-border bg-card flex-shrink-0">
           <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
             <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={handleReplayTutorial} />

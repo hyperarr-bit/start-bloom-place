@@ -53,5 +53,16 @@ export async function lerAcessoAnteriorDaConta(userId: string): Promise<TipoDeAc
   }
 }
 
+/** A conta da sessão atual (o aviso de cobrança não tem o usuário à mão). Nunca lança. */
+export async function acessoAnteriorDaSessao(): Promise<TipoDeAcessoAnterior | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user?.id;
+    return uid ? await lerAcessoAnteriorDaConta(uid) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** A tela de assinaturas da Apple (onde se cancela o teste). */
 export const URL_ASSINATURAS_APPLE = "itms-apps://apps.apple.com/account/subscriptions";

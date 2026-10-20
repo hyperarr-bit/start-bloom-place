@@ -7,8 +7,11 @@ import { problemaDeCobranca, type ProblemaDeCobranca } from "@/lib/revenuecat";
 import { donoDaFolha, nomeLoja } from "@/lib/loja";
 import { trackEvent } from "@/lib/analytics";
 import { segurarFolhaNativa } from "@/lib/cobranca-nativa";
+import { acessoAnteriorDaSessao, URL_ASSINATURAS_APPLE, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
+import { AvisoJaTinhaAcesso } from "@/components/app/AvisoJaTinhaAcesso";
 import {
-  avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
+  avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, conflitoFechadoAgora, conflitoVistoAgora,
+  fecharConflitoNestaAbertura, marcarConflitoVisto, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
   fecharTelaNestaAbertura, guiaNaTela, marcarAvisoVistoNestaAbertura, marcarTelaVista, registrarVisibilidadeDoAviso,
   telaFechadaAgora, telaVistaAgora, textoDaCarencia, urlAtualizarPagamento,
 } from "@/lib/cobranca-recusada";
@@ -70,16 +73,23 @@ export const AvisoCobrancaRecusada = () => {
   const [p, setP] = useState<ProblemaDeCobranca | null>(null);
   const [fechado, setFechado] = useState(fechadoAgora);
   const [telaFechada, setTelaFechada] = useState(telaFechadaAgora);
+  /** 1.0.17: a conta tem acesso fora da loja (vitalício da web…) — a assinatura da loja com cartão recusado não serve pra nada. */
+  const [jaTinha, setJaTinha] = useState<TipoDeAcessoAnterior | null>(null);
+  const [conflitoFechado, setConflitoFechado] = useState(conflitoFechadoAgora);
   const vaga = useSyncExternalStore(assinarVaga, lerVaga, () => null);
 
   useEffect(() => {
     if (!isNativeShell()) return;
     let vivo = true;
     const conferir = () => {
-      void problemaDeCobranca().then((r) => {
-        // 1.0.17: a tela cheia do app ganha da folha do StoreKit (lib/cobranca-nativa) — no iPhone, só com ela ligada
-        if (plataformaApp() === "ios" && cobrancaV14Ligada()) void segurarFolhaNativa(telaCheiaPossivel() && !!r.temProblema);
-        if (vivo) setP(r);
+      void problemaDeCobranca().then(async (r) => {
+        // 1.0.17 (caso do suporte 20/10): vitalício da web + teste da App Store em carência. Mandar "atualizar
+        // pagamento" seria empurrar a pessoa a pagar o que ela não precisa → no lugar, "cancele a assinatura".
+        const tipo = r.temProblema ? await acessoAnteriorDaSessao() : null;
+        // a tela cheia do app ganha da folha do StoreKit (lib/cobranca-nativa) — no iPhone, só com ela ligada. Com a
+        // conta que já tinha acesso a folha nativa também fica segurada: ela mandaria atualizar o cartão.
+        if (plataformaApp() === "ios" && cobrancaV14Ligada()) void segurarFolhaNativa((telaCheiaPossivel() || !!tipo) && !!r.temProblema);
+        if (vivo) { setJaTinha(tipo); setP(r); }
       });
     };
     conferir();
@@ -87,7 +97,7 @@ export const AvisoCobrancaRecusada = () => {
     // ligada, voltar depois de 30 min no fundo conta como abertura nova.
     const aoVoltar = () => {
       registrarVisibilidadeDoAviso(document.visibilityState === "visible");
-      if (document.visibilityState === "visible") { setFechado(fechadoAgora()); setTelaFechada(telaFechadaAgora()); conferir(); }
+      if (document.visibilityState === "visible") { setFechado(fechadoAgora()); setTelaFechada(telaFechadaAgora()); setConflitoFechado(conflitoFechadoAgora()); conferir(); }
     };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => { vivo = false; document.removeEventListener("visibilitychange", aoVoltar); };
@@ -96,7 +106,7 @@ export const AvisoCobrancaRecusada = () => {
   /* 1.0.17: com acesso, nunca por cima de uma guia (missão, Montar, festa, tour, folha) — lib/cobranca-recusada.
      O relógio só roda pra quem tem o cartão recusado. */
   const [guia, setGuia] = useState(false);
-  const esperaGuia = !!p?.temProblema && !!p?.comAcesso;
+  const esperaGuia = !!p?.temProblema && (!!p?.comAcesso || !!jaTinha);
   useEffect(() => {
     if (!esperaGuia) { setGuia(false); return; }
     const ver = () => setGuia(guiaNaTela());
@@ -110,8 +120,16 @@ export const AvisoCobrancaRecusada = () => {
   /* 1.0.17 (dono, 20/10 — a faixa: 42 viram, 3 tocaram, 21 fecharam e 0 desses recuperou; 54% nem reabrem depois
      da recusa): a cada abertura, com a tela livre, uma TELA CHEIA calma. "Agora não" esconde até a próxima abertura
      (ou 30 min no fundo) e aí, só nesta abertura, fica a faixa pequena de reserva. */
-  const temProblema = isNativeShell() && !!p?.temProblema;
+  const conflito = isNativeShell() && !!p?.temProblema && !!jaTinha;
+  const temProblema = isNativeShell() && !!p?.temProblema && !jaTinha;
   const telaLivre = !(esperaGuia && guiaNaTela());
+  const visivelConflito = conflito && !conflitoFechado && telaLivre;
+  useEffect(() => {
+    if (!visivelConflito || conflitoVistoAgora()) return;
+    marcarConflitoVisto();
+    trackEvent("conta_ja_tinha_acesso", { tipo: jaTinha, via: "cobranca", com_acesso_loja: !!p?.comAcesso });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visivelConflito]);
   const visivelTela = temProblema && telaCheiaPossivel() && !telaFechada && telaLivre;
   const visivel = temProblema && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
   const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
@@ -128,6 +146,19 @@ export const AvisoCobrancaRecusada = () => {
     trackEvent("aviso_cobranca_view", { com_acesso: p!.comAcesso, dias_restantes: diasRestantes, formato: "faixa" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visivel]);
+  if (visivelConflito && jaTinha && p) {
+    const ios = plataformaApp() === "ios";
+    return (
+      <AvisoJaTinhaAcesso
+        tipo={jaTinha}
+        oQue="assinatura"
+        via="cobranca"
+        loja={ios ? "App Store" : "Google Play"}
+        href={ios ? URL_ASSINATURAS_APPLE : urlAtualizarPagamento(p, "android")}
+        onEntendi={() => { fecharConflitoNestaAbertura(); setConflitoFechado(true); }}
+      />
+    );
+  }
   if (visivelTela && p) {
     const fecharTela = () => {
       fecharTelaNestaAbertura();

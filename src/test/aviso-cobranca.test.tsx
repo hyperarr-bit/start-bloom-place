@@ -9,6 +9,7 @@ import { MemoryRouter, useNavigate } from "react-router-dom";
 const estado = vi.hoisted(() => ({
   problema: { temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" } as { temProblema: boolean; comAcesso: boolean; url: string | null; detectadoEm?: string | null },
   auth: {} as Record<string, unknown>,
+  jaTinha: null as null | "vitalicio" | "assinatura",
 }));
 vi.mock("@/lib/revenuecat", async (original) => ({
   ...(await original<typeof import("@/lib/revenuecat")>()),
@@ -19,6 +20,11 @@ vi.mock("@/lib/revenuecat", async (original) => ({
   situacaoDoPresente: vi.fn(async () => null),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn(), getAttributionParams: () => ({}) }));
+// 1.0.17: a conta já tinha acesso fora da loja? (lido em `subscriptions` — aqui, de mentira)
+vi.mock("@/lib/conta-ja-tinha-acesso", async (original) => ({
+  ...(await original<typeof import("@/lib/conta-ja-tinha-acesso")>()),
+  acessoAnteriorDaSessao: vi.fn(async () => estado.jaTinha),
+}));
 // 1.0.17: a ponte que segura a folha do StoreKit (o nativo não existe no jsdom)
 vi.mock("@/lib/cobranca-nativa", async (original) => ({
   ...(await original<typeof import("@/lib/cobranca-nativa")>()),
@@ -574,4 +580,97 @@ describe("Cobrança recusada — 1.0.17: tela cheia a cada abertura", () => {
     document.body.appendChild(d);
     return d;
   };
+});
+
+/* 1.0.17 (caso do suporte 20/10): vitalício da web (Pix, ativo) + teste anual da App Store em carência (cartão
+   recusado). "Atualize o pagamento" empurraria a pessoa a pagar o que não precisa. */
+describe("Cobrança recusada — 1.0.17: conta que já tem o CORE fora da loja", () => {
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const ev = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1]);
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "on");
+    zerarAvisoDaAbertura();
+    vi.mocked(trackEvent).mockClear();
+    vi.mocked(segurarFolhaNativa).mockClear();
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: new Date(Date.now() - 2 * 86400e3).toISOString() };
+    estado.jaTinha = "vitalicio";
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.querySelectorAll("[data-guia-de-teste]").forEach((e) => e.remove());
+    zerarAvisoDaAbertura();
+    estado.jaTinha = null;
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+
+  it("no lugar da cobrança: 'Você já tem o CORE vitalício. Pra não ser cobrado, cancele a assinatura na App Store.'", async () => {
+    render(<AvisoCobrancaRecusada />);
+    const folha = await screen.findByTestId("conta-ja-tinha-acesso");
+    expect(folha.textContent).toMatch(/Você já tem o CORE vitalício\./);
+    expect(folha.textContent).toMatch(/Pra não ser cobrado, cancele a assinatura na App Store\./);
+    expect(screen.getByRole("link", { name: "Gerenciar assinatura" })).toHaveAttribute("href", "itms-apps://apps.apple.com/account/subscriptions");
+    // nada de "atualizar pagamento": nem tela cheia, nem faixa
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Atualizar pagamento" })).toBeNull();
+    await waitFor(() => expect(ev("conta_ja_tinha_acesso")).toEqual([{ tipo: "vitalicio", via: "cobranca", com_acesso_loja: true }]));
+    expect(ev("aviso_cobranca_view")).toHaveLength(0);
+    // a folha do StoreKit (que mandaria atualizar o cartão) fica segurada
+    expect(vi.mocked(segurarFolhaNativa).mock.calls).toEqual([[true]]);
+  });
+
+  it("'Entendi' fecha até a próxima abertura (sem virar faixa de cobrança); abertura nova → de novo, 1 evento por abertura", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("conta-ja-tinha-acesso");
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    cleanup();
+    render(<AvisoCobrancaRecusada />); // mesma abertura
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    cleanup();
+    zerarAvisoDaAbertura(); // nova abertura
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("conta-ja-tinha-acesso")).toBeInTheDocument();
+    expect(ev("conta_ja_tinha_acesso")).toHaveLength(2);
+  });
+
+  it("espera a tela ficar livre (missão / folha) antes de aparecer", async () => {
+    const g = document.createElement("div");
+    g.setAttribute("data-guia-de-teste", "");
+    g.setAttribute("data-camada-guia", "missao-doses-boas-vindas");
+    document.body.appendChild(g);
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    g.remove();
+    expect(await screen.findByTestId("conta-ja-tinha-acesso", {}, { timeout: 2000 })).toBeInTheDocument();
+  });
+
+  it("sem acesso pela loja (retry) também: o vitalício manda, nada de bloqueio de cobrança", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null };
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("conta-ja-tinha-acesso")).toBeInTheDocument();
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+  });
+
+  it("Android: 'cancele a assinatura no Google Play' com o link da Play", async () => {
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "android" };
+    estado.problema = { temProblema: true, comAcesso: true, url: "https://play.google.com/store/account/subscriptions?package=br.com.coreaplicativo.app" };
+    render(<AvisoCobrancaRecusada />);
+    const folha = await screen.findByTestId("conta-ja-tinha-acesso");
+    expect(folha.textContent).toMatch(/cancele a assinatura no Google Play\./);
+    expect(screen.getByRole("link", { name: "Gerenciar assinatura" })).toHaveAttribute("href", estado.problema.url);
+  });
+
+  it("sem cartão recusado não consulta nem mostra nada", async () => {
+    estado.problema = { temProblema: false, comAcesso: true, url: null };
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+  });
 });

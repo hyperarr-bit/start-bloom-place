@@ -46,7 +46,8 @@ import { BoasVindasPago, pulaPelaMissao } from "@/components/onboarding/BoasVind
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
 import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
-import { URL_ASSINATURAS_APPLE, lerAcessoAnteriorDaConta, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
+import { lerAcessoAnteriorDaConta, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
+import { AvisoJaTinhaAcesso } from "@/components/app/AvisoJaTinhaAcesso";
 
 
 /* Glifo oficial da Apple: as diretrizes de marca não aceitam emoji nem ícone
@@ -363,36 +364,11 @@ export function SignupIOS({
       </form>
 
       <div className="mt-4"><SelosIOS /></div>
-      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
+      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue="teste" via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
     </div>
   );
 }
 
-/** 1.0.17: "você já tem o CORE" — calmo, nunca bloqueia (o "Entendi" segue pro app igual). */
-function AvisoJaTinhaAcesso({ tipo, onEntendi }: { tipo: TipoDeAcessoAnterior; onEntendi: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/40" role="dialog" aria-modal="true" aria-labelledby="ja-tinha-titulo" data-testid="conta-ja-tinha-acesso">
-      <div className="bg-background rounded-t-3xl px-6 pt-6 text-center" style={{ paddingBottom: "calc(var(--app-safe-bottom, 0px) + 1.25rem)" }}>
-        <h2 id="ja-tinha-titulo" className="text-[22px] font-bold tracking-tight leading-tight">
-          {tipo === "vitalicio" ? "Você já tem o CORE vitalício." : "Você já tem acesso ao CORE nesta conta."}
-        </h2>
-        <p className="text-muted-foreground text-[15px] leading-relaxed mt-2">
-          {tipo === "vitalicio" ? "Pra não ser cobrado, cancele o teste na App Store." : "Pra não ser cobrado duas vezes, cancele o teste na App Store."}
-        </p>
-        <a
-          href={URL_ASSINATURAS_APPLE}
-          onClick={() => trackEvent("conta_ja_tinha_acesso_gerenciar", { tipo, funil: "ios" })}
-          className="mt-5 h-12 rounded-2xl bg-foreground text-background text-[15px] font-semibold flex items-center justify-center"
-        >
-          Gerenciar assinatura
-        </a>
-        <button type="button" onClick={onEntendi} className="mt-1 h-12 w-full text-[14px] font-medium text-muted-foreground">
-          Entendi
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * LIBERANDO — a ponte entre "criou a conta" e "app aberto" pra quem pagou

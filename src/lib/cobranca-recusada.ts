@@ -98,6 +98,14 @@ let vistoNestaAbertura = false;
 /* 1.0.17 (dono, 20/10): a TELA CHEIA — "Agora não" esconde até a próxima abertura; o view sai 1x por abertura. */
 let telaFechadaNestaAbertura = false;
 let telaVistaNestaAbertura = false;
+/* 1.0.17: conta com acesso FORA da loja (vitalício da web…) e cartão recusado na loja → no lugar do aviso de
+   cobrança, 1x por abertura, "você já tem o CORE, cancele a assinatura" (components/app/AvisoJaTinhaAcesso). */
+let conflitoFechadoNestaAbertura = false;
+let conflitoVistoNestaAbertura = false;
+export const fecharConflitoNestaAbertura = (): void => { conflitoFechadoNestaAbertura = true; };
+export const conflitoFechadoAgora = (): boolean => conflitoFechadoNestaAbertura;
+export const conflitoVistoAgora = (): boolean => conflitoVistoNestaAbertura;
+export const marcarConflitoVisto = (): void => { conflitoVistoNestaAbertura = true; };
 export const fecharTelaNestaAbertura = (): void => { telaFechadaNestaAbertura = true; };
 export const telaFechadaAgora = (): boolean => telaFechadaNestaAbertura;
 export const telaVistaAgora = (): boolean => telaVistaNestaAbertura;
@@ -111,12 +119,13 @@ export const avisoFechadoNestaAbertura = (): boolean => fechadoNestaAbertura;
 /** O aviso chama a cada mudança de visibilidade; voltar depois de 30 min = abertura nova. */
 export function registrarVisibilidadeDoAviso(visivel: boolean, agora: number = Date.now()): void {
   if (!visivel) { escondidoDesde = escondidoDesde ?? agora; return; }
-  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) { fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false; }
+  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) { fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false; conflitoFechadoNestaAbertura = false; conflitoVistoNestaAbertura = false; }
   escondidoDesde = null;
 }
 /** Pra teste. */
 export const zerarAvisoDaAbertura = (): void => {
-  fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false; escondidoDesde = null;
+  fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false;
+  conflitoFechadoNestaAbertura = false; conflitoVistoNestaAbertura = false; escondidoDesde = null;
 };
 
 /* ─── 1.0.17: nunca por cima de uma guia ──────────────────────────────────────

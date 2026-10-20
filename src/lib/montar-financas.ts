@@ -532,6 +532,14 @@ export function calcularMontar(renda: number, contas: ContaEscolhida[], agora: D
   };
 }
 
+/**
+ * 1.0.17 — MÊS APERTADO (dado 1.0.16: 18% terminam o Montar com "R$ 0 por dia"). Um número minúsculo como herói
+ * ("Você pode gastar R$ 0") desanima justo quem mais precisa do app. Abaixo desta régua (ou sem folga nenhuma) a
+ * tela troca o herói por "Seu mês tá apertado. Vamos achar folga juntos." — o número continua na conta do mês.
+ */
+export const POR_DIA_APERTADO = 15;
+export const mesApertado = (r: { porDia: number; semFolga: boolean }): boolean => r.semFolga || r.porDia < POR_DIA_APERTADO;
+
 /** Os itens exatamente no formato que IncomeTable/FixedExpensesTable gravam. */
 export function itensParaGravar(renda: number, contas: ContaEscolhida[], agora: Date = new Date()) {
   const base = agora.getTime();

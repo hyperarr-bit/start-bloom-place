@@ -79,7 +79,7 @@ import {
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
   faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
-  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado,
+  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
   type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado, type TelaDoNumero,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
@@ -339,7 +339,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     if (origem === "missao") guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao: resposta });
     const final = calcularMontar(renda, contas, hoje, resposta);
     trackEvent(EV_PRONTO, ev({
-      contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, origem, cartao: comCartao,
+      contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, apertado: mesApertado(final), origem, cartao: comCartao,
       ...(pulouCartao ? { cartao_pulou: true } : {}),
     }));
   };
@@ -400,6 +400,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
   };
   const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto");
+  const apertado = mesApertado(resultado);
+  const contaDoMes = useRef<HTMLDivElement>(null);
   /** "R$ 123" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */
   const rs = (v: number) => `R$\u00a0${reais(v)}`;
 
@@ -596,7 +598,19 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {/* 17/10 (revisão do dono): SÓ o número — o herói da tela. O 1º gasto é o tutorial no formulário de verdade
                 (a missão abre depois do "Continuar →"); nada de post-it aqui. */}
-            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined}>
+            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined} data-apertado={apertado ? "" : undefined}>
+              {apertado ? (
+                /* 1.0.17: mês apertado (R$ 0 ou < R$ 15/dia) — o herói é o acolhimento, não o número pequeno. O número
+                   segue logo abaixo, na conta do mês ("Por dia"). */
+                <div className="mf-grande mf-apertado" data-testid="montar-apertado">
+                  <small>SEU MÊS</small>
+                  <h2>Seu mês tá apertado.</h2>
+                  <p>Vamos achar folga juntos. Anotar o que sai é o primeiro passo.</p>
+                  <button type="button" className="mf-ver-conta" onClick={() => { try { contaDoMes.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* noop */ } }}>
+                    Ver a conta do mês
+                  </button>
+                </div>
+              ) : (
               <div className="mf-grande">
                 <small>VOCÊ PODE GASTAR HOJE</small>
                 <strong data-testid="montar-por-dia" data-valor={resultado.porDia}>
@@ -614,7 +628,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                       : `até o fim do mês (${resultado.dias} dias, contando hoje), já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`}
                 </p>
               </div>
-              <div className="mf-folha">
+              )}
+              <div className="mf-folha" ref={contaDoMes}>
                 <div className="mf-faixa">🧾 A conta do seu mês</div>
                 <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
                 <div className="mf-conta"><span>Contas fixas ({resultado.contas})</span>− R$ {reais(resultado.fixos)}</div>
@@ -626,6 +641,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                 <div className="mf-conta" data-total=""><span>Livre pro mês</span>R$ {reais(Math.max(0, resultado.livre))}</div>
                 {!resultado.semFolga && resultado.dias > 1 && (
                   <div className="mf-conta"><span>÷ {resultado.dias} dias</span>R$ {reais(resultado.porDia)} por dia</div>
+                )}
+                {apertado && (resultado.semFolga || resultado.dias <= 1) && (
+                  <div className="mf-conta" data-testid="montar-por-dia-apertado"><span>Por dia</span>R$ {reais(resultado.porDia)}</div>
                 )}
               </div>
               {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está tudo nas suas Finanças. Dá pra mudar quando quiser.</p>}

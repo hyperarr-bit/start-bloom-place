@@ -175,3 +175,8 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 /* área de toque de 44 px no "Tirar" da conta (34 px) — ::before invisível (polimento 17/10) */
 button.mf-tirar { position: relative; }
 button.mf-tirar::before { content: ""; position: absolute; inset: -5px; }
+
+/* 1.0.17 — mês apertado (R$ 0 ou < R$ 15/dia): o acolhimento no lugar do número pequeno */
+.mf-apertado h2 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 6px; }
+.mf-pronto[data-heroi] .mf-apertado h2 { font-size: 30px; margin-top: 8px; }
+button.mf-ver-conta { margin-top: 12px; padding: 0; background: none; border: 0; font-size: 14px; font-weight: 700; color: var(--mf-ambar-valor); text-decoration: underline; text-underline-offset: 3px; }

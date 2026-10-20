@@ -444,3 +444,11 @@ describe("eventos do HTML leve (19/10)", () => {
     expect(leve).toContain("path: location.pathname");
   });
 });
+
+describe("a camada da missão não cobre outras páginas (20/10)", () => {
+  it("admin, Entrar, conta e outros funis ficam livres; /missao, módulos e Home continuam", async () => {
+    const { rotaSemCamadaDaMissao } = await import("@/lib/missao-web");
+    for (const r of ["/admin", "/admin/funil", "/entrar", "/auth", "/planos", "/hoje", "/inicio", "/"]) expect(rotaSemCamadaDaMissao(r)).toBe(true);
+    for (const r of ["/missao", "/home", "/financas", "/rotina"]) expect(rotaSemCamadaDaMissao(r)).toBe(false);
+  });
+});

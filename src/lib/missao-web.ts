@@ -131,3 +131,11 @@ export function lembretesSoNoApp(): boolean {
   if (isNativeShell()) return false;
   return !!lerMissaoWeb() && funilMissaoLigado();
 }
+
+// 20/10 (dono): com a missão guardada no navegador, a camada cobria QUALQUER página — admin, Entrar, conta, outros
+// funis. Ela só faz sentido no /missao e dentro dos módulos/Home; nessas rotas não aparece nunca.
+export const ROTAS_SEM_CAMADA_DA_MISSAO = ["/admin", "/auth", "/entrar", "/login", "/cadastro", "/reset", "/planos", "/assinatura", "/conta",
+  "/ajuda", "/suporte", "/privacidade", "/termos", "/hoje", "/inicio", "/assinar", "/liberar", "/comece", "/experimente", "/preview",
+  "/abrir", "/baixar", "/como-entrar", "/lp"];
+export const rotaSemCamadaDaMissao = (pathname: string): boolean =>
+  pathname === "/" || ROTAS_SEM_CAMADA_DA_MISSAO.some((r) => pathname === r || pathname.startsWith(`${r}/`));

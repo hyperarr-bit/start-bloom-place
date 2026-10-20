@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { EVENTO_MISSAO_WEB, missaoWebConvidada } from "@/lib/missao-web";
+import { rotaSemCamadaDaMissao, EVENTO_MISSAO_WEB, missaoWebConvidada } from "@/lib/missao-web";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -433,6 +433,7 @@ const FunilHoje = lazyPage(() => import("./pages/hoje/FunilHoje"));
 const EntradaMissao = lazyPage(() => import("./missao/EntradaDireta"));
 const FunilMissaoCamadaLazy = lazy(() => import("./missao/FunilMissaoCamada"));
 function CamadaDaMissao() {
+  const { pathname } = useLocation();
   const [ativa, setAtiva] = useState(() => missaoWebConvidada());
   useEffect(() => {
     const reler = () => setAtiva(missaoWebConvidada());
@@ -451,6 +452,7 @@ function CamadaDaMissao() {
     olhar();
     return () => { obs.disconnect(); window.clearTimeout(t); };
   }, [pode, ativa]);
+  if (rotaSemCamadaDaMissao(pathname)) return null;
   return ativa && pode ? <Suspense fallback={null}><FunilMissaoCamadaLazy /></Suspense> : null;
 }
 // 10/10: /abrir?h=<código> — a reserva https do "Abrir o CORE" da Porta (o link do e-mail).

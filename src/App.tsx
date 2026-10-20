@@ -30,6 +30,8 @@ import { isNativeShell } from "@/lib/native-shell";
 import { ENTRADA_APP, INICIO_VENDE, VENDA_NA_WEB } from "@/lib/rotas-web";
 import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
+import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
+import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
@@ -48,6 +50,8 @@ import { anotarTela } from "@/lib/medicao-total";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
+// 1.0.17: `?nav-abas=on|off|auto` (QA, só no navegador) antes da 1ª tela ler a chave
+guardarForcaNavDaUrl();
 
 
 
@@ -479,6 +483,12 @@ const Detox = lazyPage(() => import("./pages/Detox"));
 const Conquistas = lazyPage(() => import("./pages/Conquistas"));
 const Retrospectiva = lazyPage(() => import("./pages/Retrospectiva"));
 const Notificacoes = lazyPage(() => import("./pages/Notificacoes"));
+// 1.0.17 (parte 3): as abas Módulos e Você (lib/nav-abas, chave NAV_ABAS — DESLIGADA: fica pra depois da 1.0.17,
+// decisão do dono 19/10). Com a chave desligada as rotas viram /home (o app não muda em nada).
+const SoComAbas = ({ children }: { children: ReactNode }) => (navAbasLigada() ? <>{children}</> : <Navigate to="/home" replace />);
+const Modulos = lazyPage(() => import("./pages/Modulos"));
+const Voce = lazyPage(() => import("./pages/Voce"));
+const Aparencia = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.Aparencia })));
 const Preview = lazyPage(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazyPage(() => import("./pages/v2/ComecarV2"));
@@ -826,6 +836,9 @@ const AnimatedRoutes = () => {
         {/* Destino da notificação mensal e do item do menu. Fora do TrackedModule:
             não é módulo, é uma tela transversal que lê todos eles. */}
         <Route path="/retrospectiva" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="retrospectiva"><Retrospectiva /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        <Route path="/modulos" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="modulos"><Modulos /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
+        <Route path="/voce" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="voce"><Voce /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
+        <Route path="/voce/aparencia" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="aparencia"><Aparencia /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/notificacoes" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="notificacoes"><Notificacoes /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         {/* allowGuest: o convidado do teste grátis também trava, e mandar
             ele pro /auth quando ele foi pedir socorro é o pior desfecho. */}
@@ -908,6 +921,8 @@ const App = () => {
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="*" element={<AnimatedRoutes />} />
                 </Routes>
+                {/* 1.0.17: Hoje · Módulos · Você — só nas 3 raízes, logado, sem camada guiada por cima (lib/nav-abas) */}
+                <BarraDeAbas />
                 <TrialBanner />
                 {/* v53: as duas superfícies do teste grátis do shell — a faixa
                     "Dia X de 3" (comprador quente) e a semente guiada por cima

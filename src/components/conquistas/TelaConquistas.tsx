@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Instagram, Lock, Trophy } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +63,7 @@ const lerVisto = (v: unknown): string[] | null => (Array.isArray(v) ? v.filter((
  */
 export const TelaConquistas = () => {
   const navigate = useNavigate();
+  const voltar = useVoltarDaSubpagina("/home");
   const location = useLocation();
   const reduzir = useReducedMotion();
   const { get, set, loaded } = useUserData();
@@ -224,7 +226,7 @@ export const TelaConquistas = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/home")} className="hover:bg-muted rounded-md p-1 transition-colors" aria-label="Voltar">
+          <button onClick={voltar} className="hover:bg-muted rounded-md p-1 transition-colors" aria-label="Voltar">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Trophy className="w-5 h-5 text-amber-500" aria-hidden />

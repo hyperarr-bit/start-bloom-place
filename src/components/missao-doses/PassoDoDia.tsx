@@ -13,7 +13,7 @@ import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
@@ -705,24 +705,21 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // (17/10: sem `valor` — nada de reais em evento, nem o do chip)
     // 1.0.17: a opção que ELA escreveu vai como "outro" (o texto dela nunca sai do aparelho em evento)
     const nomeNoEvento = chip.proprio ? "outro" : chip.nome;
-    trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: nomeNoEvento, ok: !!item, ...(chip.proprio ? { proprio: true } : {}), ...ondeDoChip() }));
+    const evChip = (ok: boolean) => trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: nomeNoEvento, ok, ...(chip.proprio ? { proprio: true } : {}), ...ondeDoChip() }));
+    // passo A da Rotina (1.0.17, bug da 1.0.16): o chip CRIA o hábito em 1 toque — abre o campo se estiver fechado,
+    // preenche e toca no Adicionar da Rotina (o hábito nasce pelo código do módulo); o evento diz se deu de verdade
+    if (subPassoRef.current === "criar") {
+      if (!item) { evChip(false); return; }
+      chipTocado.current = chip;
+      setTocado(chip.nome);
+      criarHabitoPeloCampo(chip.nome, (ok) => { evChip(ok); if (!ok) setTocado(null); });
+      return;
+    }
+    evChip(!!item);
     if (cfg.tipo === "gasto") evPrimeiroGasto("chip", { chip: nomeNoEvento });
     if (!item) return;
     chipTocado.current = chip;
     setTocado(chip.nome);
-    // passo A da Rotina: o chip só PREENCHE o campo real (e dá foco) — quem cria é o Adicionar da Rotina
-    if (subPassoRef.current === "criar") {
-      const campo = (alvo?.querySelector("input") ?? document.querySelector('input[placeholder="Nome do hábito..."]')) as HTMLInputElement | null;
-      if (campo) {
-        try {
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-          setter ? setter.call(campo, chip.nome) : (campo.value = chip.nome);
-          campo.dispatchEvent(new Event("input", { bubbles: true }));
-          // sem focar: o teclado esconderia o post-it (o ✓ no chip + "toca em Adicionar" ficam na tela)
-        } catch { /* noop */ }
-      }
-      return;
-    }
     viaRef.current = "chip";
     try {
       for (const g of gravacoesDoChip(item, chip)) {
@@ -1001,7 +998,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
           : fraseDoSetup && cfg.tipo === "habito" ? fraseDoQuadradinhoDoSetup()
           : semMetaAgua ? "O 1º copo já entra junto."
           : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: o quadradinho de hoje.` : "Toque no quadradinho de hoje.")
-          : subPasso === "criar" ? "Depois, toque em Adicionar."
           : subPasso === "marcar" || cfg.tipo === "habito" ? "Toque no quadradinho de hoje." : undefined}
         chips={chips}
         tocado={tocado}

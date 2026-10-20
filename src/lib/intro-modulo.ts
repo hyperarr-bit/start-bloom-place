@@ -128,6 +128,11 @@ export function introLigada(modo: ModoIntro = INTRO_MODULO, modoApp: ModoIntro =
   return modo === "on";
 }
 
+/* ───── 1.0.17: o passo da intro NA TELA (pro `modulo_intro_saiu`: a intro saiu sem "Pronto" nem "Agora não") ───── */
+let passoNaTela: { modulo: string; passo: number } | null = null;
+export const marcarPassoDaIntro = (modulo: string, passo: number): void => { passoNaTela = { modulo, passo }; };
+export const passoDaIntroNaTela = (modulo: string): number | null => (passoNaTela?.modulo === modulo ? passoNaTela.passo : null);
+
 /* ───── marcas: aparelho e conta ───── */
 export type Leitor = <T>(k: string, f: T) => T;
 export type Escritor = (k: string, v: unknown) => void;

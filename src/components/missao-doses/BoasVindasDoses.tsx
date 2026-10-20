@@ -38,6 +38,13 @@ export function primeiroNome(nome: string | null | undefined): string {
   const p = t.split(/\s+/)[0] ?? "";
   return p.length > 20 ? "" : p.charAt(0).toUpperCase() + p.slice(1);
 }
+/** A troca dos módulos (pura): tocar num escolhido tira (a vaga fica aberta, nada volta sozinho); tocar num novo ocupa a
+ *  vaga — com 3 já escolhidos, entra no lugar do último. */
+export function alternarModulo(atual: readonly ModuloDaMissao[], m: ModuloDaMissao): ModuloDaMissao[] {
+  if (atual.includes(m)) return atual.filter((x) => x !== m);
+  if (atual.length < 3) return [...atual, m];
+  return [atual[0], atual[1], m];
+}
 const lerDiasDoTeste = (): number | null => { try { return diasDoTesteDaLoja(); } catch { return null; } };
 /** Os dias do teste da loja, relidos quando o boot confirma o teste DEPOIS da 1ª tela (revenuecat.conferirTrialCartao). */
 function useDiasDoTesteDaLoja(): number | null {
@@ -109,19 +116,12 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   const [t0] = useState(() => Date.now());
   const B = braco === "B";
 
-  const alternar = (m: ModuloDaMissao) => {
-    setModulos((atual) => {
-      const i = atual.indexOf(m);
-      if (i >= 0) {
-        // tirar o escolhido: os de trás sobem; o 3º vira o primeiro padrão que não está na lista
-        const resto = atual.filter((x) => x !== m);
-        const reposicao = ORDEM_MODULOS.find((x) => !resto.includes(x))!;
-        return [...resto, reposicao] as Tres;
-      }
-      // já tem 3: o novo entra no lugar do último
-      return [atual[0], atual[1], m] as Tres;
-    });
-  };
+  /* "Trocar" (1.0.17, bug da 1.0.16: tirar Finanças/Rotina/Saúde não tirava — a reposição era o 1º padrão que faltava,
+     o mesmo que acabou de sair; e todo toque novo trocava o 3º — uma pessoa tocou 57 vezes). Agora a escolha tem a lista
+     DELA (`escolhidos`): tirar deixa a vaga aberta (pode ficar com 2 enquanto escolhe), o próximo toque ocupa a vaga, e só
+     com 3 já escolhidos o novo entra no lugar do último. "Pronto" só com 3. */
+  const [escolhidos, setEscolhidos] = useState<ModuloDaMissao[]>(missao.modulos);
+  const alternar = (m: ModuloDaMissao) => setEscolhidos((atual) => alternarModulo(atual, m));
 
   const linhas = ([1, 2, 3] as DiaDaMissao[]).map((n) => {
     const cfg = MODULOS[modulos[n - 1]];
@@ -132,6 +132,10 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   const pill = (n: DiaDaMissao) => (B ? (n === 1 ? "Agora" : "depois") : n === 1 ? "Hoje" : `Dia ${n}`);
 
   if (tela === "escolha") {
+    const linhasDaEscolha = ([1, 2, 3] as DiaDaMissao[]).map((n) => ({
+      n, cfg: escolhidos[n - 1] ? MODULOS[escolhidos[n - 1]] : null,
+      quando: B ? `Dose ${n}` : n === 1 ? "Hoje" : n === 2 ? "Amanhã" : diaDaSemanaDoPasso(n, missao, hoje),
+    }));
     return (
       <div className="fixed inset-0 z-[240] flex flex-col bg-background text-foreground" data-camada-guia="missao-doses-escolha" data-testid="missao-doses-escolha" style={{ paddingTop: "var(--app-safe-top)" }}>
         <div className="flex-1 overflow-y-auto">
@@ -144,7 +148,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             <div className="grid grid-cols-4 gap-3 mt-5" role="group" aria-label="Módulos da missão">
               {ORDEM_MODULOS.map((m) => {
                 const cfg = MODULOS[m];
-                const pos = modulos.indexOf(m);
+                const pos = escolhidos.indexOf(m);
                 return (
                   <button key={m} type="button" className="md-tile" style={{ background: cfg.cor }} data-marcado={pos >= 0 ? "" : undefined} data-modulo={m} data-testid={`missao-doses-tile-${m}`} onClick={() => alternar(m)} aria-pressed={pos >= 0}>
                     {pos >= 0 && <span className="md-tile-n" aria-label={`${pos + 1}º`}>{pos + 1}</span>}
@@ -155,12 +159,12 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               })}
             </div>
             <div className="rounded-2xl border border-border bg-card mt-5 divide-y divide-border" data-testid="missao-doses-escolha-lista">
-              {linhas.map(({ n, cfg, quando }) => (
-                <div key={n} className="md-linha">
+              {linhasDaEscolha.map(({ n, cfg, quando }) => (
+                <div key={n} className="md-linha" data-vaga={cfg ? undefined : ""}>
                   <span className="w-6 h-6 rounded-md grid place-items-center text-[12px] font-extrabold text-white shrink-0" style={{ background: "#16121c" }}>{n}</span>
                   <span className="min-w-0 flex-1">
                     <span className="md-linha-rotulo">{quando}</span>
-                    <span className="md-linha-texto">{cfg.emoji} {cfg.nome} · {cfg.pedido.toLowerCase()}</span>
+                    <span className="md-linha-texto">{cfg ? <>{cfg.emoji} {cfg.nome} · {cfg.pedido.toLowerCase()}</> : <span className="text-muted-foreground">Toque num módulo</span>}</span>
                   </span>
                   <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"}>{pill(n)}</span>
                 </div>
@@ -170,7 +174,8 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
           </div>
         </div>
         <RodapeColado>
-          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" onClick={() => { setTela("boas"); setTelaB(2); }}>
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" disabled={escolhidos.length !== 3}
+            onClick={() => { if (escolhidos.length !== 3) return; setModulos(escolhidos as Tres); setTela("boas"); setTelaB(2); }}>
             {B ? <>Pronto, começar <ArrowRight className="w-4 h-4" /></> : "Pronto"}
           </button>
         </RodapeColado>
@@ -216,7 +221,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{resumo.charAt(0).toUpperCase() + resumo.slice(1)}. Uns 20 segundos cada.</p>
             <div className="mt-6 flex items-baseline justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64]">Hoje</span>
-              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>Trocar os 3</button>
+              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); setTela("escolha"); }}>Trocar os 3</button>
             </div>
             <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
               {modulos.map((m, i) => (
@@ -274,7 +279,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                   </div>
                 ))}
               </div>
-              <button type="button" className="text-[13px] font-semibold text-muted-foreground mt-2 min-h-10 underline underline-offset-2" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>
+              <button type="button" className="text-[13px] font-semibold text-muted-foreground mt-2 min-h-10 underline underline-offset-2" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setEscolhidos(modulos); setTela("escolha"); }}>
                 Trocar
               </button>
             </motion.div>
@@ -334,7 +339,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                 {areaNome ? <>Você escolheu <b className="text-[#16121c]">{areaNome}</b> na porta — ela vem primeiro. </> : null}
                 Só esses 3 entram na missão; <b className="text-[#16121c]">os outros 13 seguem abertos</b>.
               </p>
-              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>
+              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); setTela("escolha"); }}>
                 Trocar os 3 módulos →
               </button>
             </div>

@@ -6,9 +6,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
-import type { IntroGuiadaConfig } from "@/lib/intro-modulo";
+import { marcarPassoDaIntro, type IntroGuiadaConfig } from "@/lib/intro-modulo";
 import { Anel, BotaoSeguir, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
 import { abrirConhecerMais, ofertaDoTour } from "@/lib/conhecer-mais";
 import { podeOferecerTour } from "./ConhecerMais";
@@ -62,6 +62,9 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
   const [perdeuAlvo, setPerdeuAlvo] = useState(false);
   /** Rotina, criar → marcar: o anel troca de alvo em ~350 ms; nesse intervalo o post-it não vai pro topo */
   const [reancorando, setReancorando] = useState(false);
+  /** 1.0.17 (telemetria): criar → marcar troca a âncora (o campo some, a linha nova nasce) — o anel que sai nesse meio NÃO
+   *  é "âncora perdida" (não vai como modulo_intro_anel_saiu nem acende o ⌖) */
+  const reancorandoRef = useRef(false);
   const [tocado, setTocado] = useState<string | null>(null);
   const [rotulo, setRotulo] = useState("");
   const [numero, setNumero] = useState<Numero | null>(null);
@@ -142,9 +145,10 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
         // o hábito NASCEU: passa pro (B) — o anel vai pro quadradinho de HOJE da linha nova
         if (subPassoRef.current === "criar") {
           trackEvent("modulo_intro_registrou", { modulo: m, via: "criar_habito", segundos: segundos() });
+          reancorandoRef.current = true;
           setSubPasso("marcar"); setTocado(null); setAnelVivo(false); setReancorando(true);
           window.setTimeout(() => {
-            setReancorando(false);
+            setReancorando(false); reancorandoRef.current = false;
             if (faseRef.current !== "anotar") return;
             const btn = document.querySelector('[data-spotlight="add-habit"]');
             const linha = btn ? linhaDeHoje(btn) : null;
@@ -234,18 +238,10 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
     if (!item) return;
     chipTocado.current = chip; setTocado(chip.nome);
     if (subPassoRef.current === "criar") {
-      // 1 TOQUE: preenche o campo real da Rotina e toca no "Adicionar" dela — o hábito nasce pelo código do módulo
-      // (17/10: nas doses, só 63% completavam o 1º passo quando precisava de 2 toques; o chip resolve sozinho)
-      const campo = (alvo?.querySelector("input") ?? document.querySelector('input[placeholder="Nome do hábito..."]')) as HTMLInputElement | null;
-      if (campo) {
-        try {
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-          setter ? setter.call(campo, chip.nome) : (campo.value = chip.nome);
-          campo.dispatchEvent(new Event("input", { bubbles: true }));
-          const adicionar = Array.from(campo.parentElement?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((b) => /adicionar/i.test(b.textContent ?? ""));
-          if (adicionar) window.setTimeout(() => adicionar.click(), 60); // depois que o React viu o valor
-        } catch { /* noop */ }
-      }
+      // 1 TOQUE: abre o campo da Rotina se estiver fechado, preenche e toca no "Adicionar" dela — o hábito nasce pelo
+      // código do módulo (1.0.17: antes, com o campo fechado, o chip não fazia nada)
+      reancorandoRef.current = true;
+      criarHabitoPeloCampo(chip.nome, (ok) => { if (ok) window.setTimeout(() => { if (subPassoRef.current === "criar") reancorandoRef.current = false; }, 2000); if (!ok) { reancorandoRef.current = false; setTocado(null); trackEvent("modulo_intro_chip", { modulo: m, nome: chip.proprio ? "outro" : chip.nome, ok: false, motivo: "sem_campo" }); } });
       return;
     }
     viaRef.current = "chip";
@@ -272,6 +268,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
   const passosDaGuiada = config.tipo === "habito" ? 3 : 2;
   const totalDePassos = passosDaGuiada + (config.maisPassos?.length ?? 0);
   const passoAtual = fase === "olhar" ? passosDaGuiada : subPasso === "marcar" ? 2 : 1;
+  useEffect(() => { marcarPassoDaIntro(m, passoAtual); }, [m, passoAtual]);
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-passo={passoAtual} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "olhe aqui" : config.pedido}</span>
@@ -331,7 +328,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
       <AnimatePresence>
         {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
           <Anel key={`anotar-${acende}`} fixo interativo duracao={60_000} alvo={alvo} testid="intro-modulo-anel" abaixo={false}
-            aoSair={(motivo) => { setAnelVivo(false); if (faseRef.current !== "anotar") return; setPerdeuAlvo(true); trackEvent("modulo_intro_anel_saiu", { modulo: m, motivo }); }}
+            aoSair={(motivo) => { setAnelVivo(false); if (faseRef.current !== "anotar" || reancorandoRef.current) return; setPerdeuAlvo(true); trackEvent("modulo_intro_anel_saiu", { modulo: m, motivo }); }}
             balao={postIt} />
         )}
         {fase === "olhar" && olharEm && (

@@ -5,7 +5,7 @@ import { Check, ChevronRight, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import { ID_OUTRO_DA_INTRO, type IntroDeUmToqueConfig, type OpcaoDaIntro, type PassoDaIntro } from "@/lib/intro-modulo";
+import { ID_OUTRO_DA_INTRO, marcarPassoDaIntro, type IntroDeUmToqueConfig, type OpcaoDaIntro, type PassoDaIntro } from "@/lib/intro-modulo";
 import { abrirAba } from "@/components/cartoes-modulo/registro";
 import { Anel, BotaoSeguir, PostItDaMissao } from "@/components/demo-guiada/pecas";
 import type { ChipDaMissao } from "@/components/demo-guiada/alvos";
@@ -68,6 +68,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const depois = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)); };
   const total = passoInicial + config.passos.length;
   const numero = passoInicial + n + 1;
+  useEffect(() => { marcarPassoDaIntro(m, numero); }, [m, numero]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-intro-modulo-faixa", "1");

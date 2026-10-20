@@ -203,6 +203,42 @@ export const CHIPS_DE_HABITO: ChipDaMissao[] = [
 export const PERGUNTA_HABITO_VAZIO = "Qual hábito você quer começar?";
 export const PERGUNTA_HABITO_MARCAR = "Agora marque o de hoje";
 
+/**
+ * 1.0.17 (bug da 1.0.16: 9 chips tocados, 4 precisaram de 3–4 toques, 1 desistiu) — o chip CRIA o hábito em 1 toque:
+ * sem o campo aberto, abre pelo "+ Hábito" (com uma guia na tela ele só abre, nunca fecha — Rotina.tsx); preenche o campo
+ * real pelo setter nativo (o React vê) e toca no "Adicionar" da Rotina — o hábito nasce pelo código do módulo. Tenta por
+ * ~1 s (o campo monta depois do toque); `aoFim(false)` se não deu mesmo (quem chama registra ok:false).
+ */
+export const CAMPO_DO_HABITO = 'input[placeholder="Nome do hábito..."]';
+export function criarHabitoPeloCampo(nome: string, aoFim?: (ok: boolean) => void): void {
+  let tentativas = 0;
+  let abriu = false;
+  const fim = (ok: boolean) => { try { aoFim?.(ok); } catch { /* noop */ } };
+  const tentar = () => {
+    let campo: HTMLInputElement | null = null;
+    try { campo = document.querySelector<HTMLInputElement>(CAMPO_DO_HABITO); } catch { campo = null; }
+    if (!campo) {
+      if (!abriu) { abriu = true; try { document.querySelector<HTMLElement>('[data-spotlight="add-habit"]')?.click(); } catch { /* noop */ } }
+      if (++tentativas > 12) { fim(false); return; }
+      window.setTimeout(tentar, 80);
+      return;
+    }
+    try {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      if (setter) setter.call(campo, nome); else campo.value = nome;
+      campo.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch { fim(false); return; }
+    const linha = campo.parentElement;
+    window.setTimeout(() => { // depois que o React viu o valor
+      const adicionar = Array.from(linha?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((b) => /adicionar/i.test(b.textContent ?? ""));
+      if (!adicionar) { fim(false); return; }
+      adicionar.click();
+      fim(true);
+    }, 60);
+  };
+  tentar();
+}
+
 /** Passo A da Rotina: a linha do campo "Nome do hábito..." + Adicionar (abre pelo botão "+ Hábito"). */
 export const linhaDoNovoHabito = (): Element | null => {
   const input = document.querySelector<HTMLInputElement>('input[placeholder="Nome do hábito..."]');

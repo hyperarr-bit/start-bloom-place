@@ -131,6 +131,9 @@ describe("controle (sem ?v=demo)", () => {
     await waitFor(() => expect(etapa()).toBe("oferta"));
     expect(onde()).toBe("/hoje?utm_source=meta");
     expect(screen.queryByTestId("hoje-demo")).toBeNull();
+    // 20/10 (OFERTA_HOJE = "vitalicio"): o controle vende o vitalício 27,90 em 1 opção
+    expect(screen.getByTestId("hoje-oferta-vitalicio").textContent).toContain("Pague 1x. Seu pra sempre.");
+    expect(screen.queryByTestId("hoje-plano-mensal")).toBeNull();
     fireEvent.click(screen.getByTestId("hoje-oferta-voltar"));
     await waitFor(() => expect(etapa()).toBe("resultado"));
     expect(JSON.parse(localStorage.getItem(CHAVE_ESTADO_HOJE) as string).variante).toBeUndefined();
@@ -161,6 +164,10 @@ describe("variante demo (?v=demo)", () => {
     await waitFor(() => expect(etapa()).toBe("oferta"));
     expect(onde()).toBe("/hoje?v=demo&utm_source=meta");
     expect(eventos("hoje_demo_cta")).toHaveLength(1);
+    // 20/10: a variante demo cai na MESMA oferta (vitalício 27,90, 1 opção, sem "renova")
+    expect(screen.getByTestId("hoje-oferta-vitalicio").textContent).toContain("R$ 27,90");
+    expect(screen.getByTestId("hoje-pagar").textContent).toBe("Pagar R$ 27,90 com Pix");
+    expect(screen.queryByTestId("hoje-renovacao")).toBeNull();
     expect(eventos("hoje_demo_cta")[0]).toMatchObject({ via: "botao", variante: "demo" });
     expect(typeof eventos("hoje_demo_cta")[0].segundos).toBe("number");
     expect(cliques("demo_cta")).toHaveLength(1);

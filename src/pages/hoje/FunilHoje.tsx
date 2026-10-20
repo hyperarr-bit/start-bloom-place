@@ -11,9 +11,9 @@ import { SelosDasLojas } from "@/components/site/SelosDasLojas";
 import { capturarAtribuicao, idsDoAnuncio, lerAtribuicao, type AtribuicaoPorta } from "@/pages/porta/atribuicao";
 import { eventoMeta, novoEventId } from "@/pages/venda/rastreio";
 import {
-  AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PRECO_KIT, UPSELL_A_DOIS, UPSELL_PRA_SEMPRE, BUMP_KIT,
-  VALOR_OFERTA, calcular, contasEscolhidas, dataCurta, fimDoAcesso, funilHojeLigado, ofertaDoPlano, preco, reais, reaisDigitados, temKit,
-  type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
+  AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PLANO_VITALICIO, PRECO_KIT, UPSELL_A_DOIS, UPSELL_PRA_SEMPRE, BUMP_KIT,
+  VALOR_OFERTA, calcular, contasEscolhidas, dataCurta, ehPlanoDoHoje, ehPraSempre, fimDoAcesso, funilHojeLigado, modoOfertaHoje, ofertaDoPlano, preco, reais,
+  reaisDigitados, temKit, type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
 } from "./conteudo";
 import {
   EMAIL_OK, emailAtual, gravarAtribuicao, gravarFinancas, gravarKit, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
@@ -36,6 +36,10 @@ import { DemoHoje, type ViaDemo } from "./DemoHoje";
  *   e-mail (ou entra na que já existe com código) → "Abrir meu CORE" (o app web logado, Finanças montada) + o bloco
  *   "Seu CORE também no celular" com os selos das lojas e o e-mail.
  *
+ * OFERTA (20/10, chave OFERTA_HOJE em ./conteudo.ts): padrão "vitalicio" = a MESMA oferta do /inicio — UMA opção,
+ * "CORE pra sempre" R$ 27,90 num Pix (hv279), sem upsell/downsell depois (vai direto pro pós-compra). "anual" = o
+ * desenho abaixo (1º ano × mensal + upsells). Todo evento leva `oferta_hoje`.
+ *
  * VARIANTE "demo" (19/10, link `/hoje?v=demo`, salva no estado): o "Ver meu CORE" abre /hoje/demo (DemoHoje: Finanças de
  * verdade com os números dela) e de lá "Quero o meu CORE" → a oferta; o "Voltar" da oferta volta pra demo. Sem `?v=demo`
  * o funil é exatamente o de antes (controle). Todo evento leva `variante: "demo" | "controle"`.
@@ -48,6 +52,7 @@ import { DemoHoje, type ViaDemo } from "./DemoHoje";
  *                                                              salvar_email · abrir_app
  *   hoje_faixa {faixa} · hoje_contas {n, contas} · hoje_resultado {aperto, por_dia, n, faixa}
  *   hoje_plano {plano} · hoje_bump {marcado} · hoje_pix_gerado {order_id, oferta, valor} · hoje_pix_copiado {ok}
+ *   (20/10: todo evento + oferta_hoje "vitalicio"|"anual"; no vitalício o plano é "vitalicio" e a oferta hv279)
  *   hoje_pago {oferta, order_id, valor} · hoje_upsell {oferta, acao: vista|aceitou|recusou|pago}
  *   hoje_parceiro {ok, motivo} · hoje_email_salvo {via} · hoje_financas {r} · hoje_app_aberto {} · hoje_erro {onde}
  * Meta: ViewContent (1ª carga) e InitiateCheckout (Pagar com Pix, com o valor) no pixel + CAPI (venda-capi), mesmo
@@ -134,7 +139,8 @@ function sessaoDoHoje(): { id: string; nova: boolean } {
 export function proximoPosCompra(e: Pick<EstadoHoje, "pagos" | "recusou" | "parceiro">, aDois: boolean = UPSELL_A_DOIS): EtapaHoje {
   const pagou = (o: OfertaHoje) => e.pagos.some((p) => p.oferta === o);
   const recusou = (o: OfertaHoje) => e.recusou.includes(o);
-  const praSempre = pagou("hv47") || pagou("hv27");
+  // 20/10: o plano vitalício (hv279) também — quem já é pra sempre não vê o upsell pra sempre nem o downsell
+  const praSempre = e.pagos.some((p) => ehPraSempre(p.oferta));
   if (UPSELL_PRA_SEMPRE && !praSempre && !recusou("hv47")) return "up1";
   if (UPSELL_PRA_SEMPRE && DOWNSELL_PRA_SEMPRE_27 && !praSempre && recusou("hv47") && !recusou("hv27")) return "down";
   if (aDois && !pagou("hc199") && !recusou("hc199")) return "up2";
@@ -173,7 +179,7 @@ export function FunilHoje() {
   const varianteRef = useRef<"demo" | "controle">("controle");
   const ids = useCallback((): Record<string, unknown> => {
     const { porta_session_id: _p, ...resto } = idsDoAnuncio(lerAtribuicao() ?? inicio.current!.attr, sessao);
-    return { hoje_session_id: sessao, variante: varianteRef.current, ...resto };
+    return { hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), ...resto };
   }, [sessao]);
   const clique = (cta: string, extra: Record<string, unknown> = {}) => trackEvent("funnel_click", { funil: "hoje", cta, ...extra, ...ids() });
 
@@ -227,7 +233,7 @@ export function FunilHoje() {
   useEffect(() => {
     if (!inicio.current?.nova) return;
     const { origem, ...a } = inicio.current.attr;
-    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, variante: varianteRef.current, plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" ? estado.etapa : null });
+    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" ? estado.etapa : null });
     eventoMeta("ViewContent", novoEventId("vc"), { content_name: "hoje", content_category: "venda" }, inicio.current.attr.fbc || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -241,10 +247,13 @@ export function FunilHoje() {
 
   const escolhidas: Conta[] = contasEscolhidas(estado.contas);
   const r = calcular(estado.renda, escolhidas);
-  const ofertaPlano = ofertaDoPlano(estado.plano, estado.kit);
+  /** 20/10: "vitalicio" (padrão) = 1 opção, o hv279; "anual" = a escolha 1º ano × mensal de antes */
+  const vitalicio = modoOfertaHoje() === "vitalicio";
+  const ofertaPlano: OfertaHoje = vitalicio ? PLANO_VITALICIO.oferta : ofertaDoPlano(estado.plano, estado.kit);
   const valorPlano = VALOR_OFERTA[ofertaPlano];
-  const pagoPlano = estado.pagos.find((p) => p.oferta === "h279" || p.oferta === "h149" || p.oferta === "h279k" || p.oferta === "h149k") ?? null;
-  const planoPago: PlanoHoje = pagoPlano ? (pagoPlano.oferta.startsWith("h279") ? "anual" : "mensal") : estado.plano;
+  const planoEvento = vitalicio ? "vitalicio" : estado.plano;
+  const pagoPlano = estado.pagos.find((p) => ehPlanoDoHoje(p.oferta)) ?? null;
+  const planoPago: PlanoHoje = pagoPlano && pagoPlano.oferta !== "hv279" ? (pagoPlano.oferta.startsWith("h279") ? "anual" : "mensal") : estado.plano;
   const acesso = fimDoAcesso(planoPago, estado.pagos.map((p) => p.oferta), new Date(pagoPlano?.em ?? Date.now()));
   const acessoTxt = acesso.vitalicio ? "pra sempre" : `até ${dataCurta(acesso.fim)}`;
 
@@ -253,7 +262,7 @@ export function FunilHoje() {
     const s = estadoRef.current;
     if (s.pagos.some((x) => x.orderId === p.orderId)) return;
     const pagos = [...s.pagos, { oferta: p.oferta, orderId: p.orderId, em: Date.now() }];
-    trackEvent("hoje_pago", { oferta: p.oferta, order_id: p.orderId, valor: VALOR_OFERTA[p.oferta], ...ids() });
+    trackEvent("hoje_pago", { oferta: p.oferta, plano: ehPlanoDoHoje(p.oferta) ? planoEvento : null, order_id: p.orderId, valor: VALOR_OFERTA[p.oferta], ...ids() });
     if (p.oferta === "hv47" || p.oferta === "hv27" || p.oferta === "hc199") trackEvent("hoje_upsell", { oferta: p.oferta, acao: "pago", ...ids() });
     const proximo = proximoPosCompra({ pagos, recusou: s.recusou, parceiro: s.parceiro });
     setEstado((e) => ({ ...e, pagos, pix: null, anteriores: [], etapa: proximo, banner: true }));
@@ -261,9 +270,10 @@ export function FunilHoje() {
   const onPix = (p: PixSalvo | null) => setEstado((e) => ({ ...e, pix: p }));
 
   const pagar = () => {
-    clique("pagar_pix", { plano: estado.plano, kit: estado.kit, valor: valorPlano });
+    clique("pagar_pix", { plano: planoEvento, oferta: ofertaPlano, kit: !vitalicio && estado.kit, valor: valorPlano });
     eventoMeta("InitiateCheckout", novoEventId("ic"), {
-      value: valorPlano, currency: "BRL", content_name: estado.kit && BUMP_KIT ? PLANOS[estado.plano].conteudoKit : PLANOS[estado.plano].conteudo,
+      value: valorPlano, currency: "BRL",
+      content_name: vitalicio ? PLANO_VITALICIO.conteudo : estado.kit && BUMP_KIT ? PLANOS[estado.plano].conteudoKit : PLANOS[estado.plano].conteudo,
     }, inicio.current?.attr.fbc || null);
     // trocou de plano/kit depois de gerar um QR: o QR antigo (vivo) entra nos anteriores — pode ser pago ainda
     setEstado((e) => {
@@ -395,28 +405,37 @@ export function FunilHoje() {
               <h1>Seu CORE está pronto</h1>
               <span className="fn-recibo"><Check size={14} strokeWidth={3} />Finanças montada · {r.aperto ? "plano de corte" : `${reais(r.porDia)}/dia`} · {r.n} {r.n === 1 ? "conta" : "contas"}</span>
             </div>
-            <div className="fn-planos" role="radiogroup" aria-label="Plano">
-              <button type="button" className="fn-plano" aria-pressed={e.plano === "anual"} data-testid="hoje-plano-anual"
-                onClick={() => { clique("plano", { plano: "anual" }); trackEvent("hoje_plano", { plano: "anual", ...ids() }); setEstado((x) => ({ ...x, plano: "anual" })); }}>
-                <span className="fn-plano-selo">MELHOR PREÇO</span>
-                <span className="fn-plano-nome">ANUAL<i>{e.plano === "anual" && <Check size={13} strokeWidth={3.2} />}</i></span>
+            {vitalicio ? (
+              /* 20/10 (dono): a MESMA oferta do /inicio, enxuta — 1 opção, sem escolha de plano e sem "renova por" */
+              <div className="fn-vitalicio" data-testid="hoje-oferta-vitalicio">
+                <span className="fn-vitalicio-nome">CORE pra sempre</span>
                 <span className="fn-plano-preco"><small>R$ </small>27,90</span>
-                <span className="fn-plano-sub">1º ano, no Pix</span>
-                <span className="fn-plano-mes">R$ 2,33/mês</span>
-              </button>
-              <button type="button" className="fn-plano" aria-pressed={e.plano === "mensal"} data-testid="hoje-plano-mensal"
-                onClick={() => { clique("plano", { plano: "mensal" }); trackEvent("hoje_plano", { plano: "mensal", ...ids() }); setEstado((x) => ({ ...x, plano: "mensal" })); }}>
-                <span className="fn-plano-nome">MENSAL<i>{e.plano === "mensal" && <Check size={13} strokeWidth={3.2} />}</i></span>
-                <span className="fn-plano-preco"><small>R$ </small>14,90</span>
-                <span className="fn-plano-sub">30 dias, no Pix</span>
-                <span className="fn-plano-mes" data-cinza="">= R$ 178,80/ano</span>
-              </button>
-            </div>
+                <span className="fn-vitalicio-sub">Pague 1x. Seu pra sempre.</span>
+              </div>
+            ) : (
+              <div className="fn-planos" role="radiogroup" aria-label="Plano">
+                <button type="button" className="fn-plano" aria-pressed={e.plano === "anual"} data-testid="hoje-plano-anual"
+                  onClick={() => { clique("plano", { plano: "anual" }); trackEvent("hoje_plano", { plano: "anual", ...ids() }); setEstado((x) => ({ ...x, plano: "anual" })); }}>
+                  <span className="fn-plano-selo">MELHOR PREÇO</span>
+                  <span className="fn-plano-nome">ANUAL<i>{e.plano === "anual" && <Check size={13} strokeWidth={3.2} />}</i></span>
+                  <span className="fn-plano-preco"><small>R$ </small>27,90</span>
+                  <span className="fn-plano-sub">1º ano, no Pix</span>
+                  <span className="fn-plano-mes">R$ 2,33/mês</span>
+                </button>
+                <button type="button" className="fn-plano" aria-pressed={e.plano === "mensal"} data-testid="hoje-plano-mensal"
+                  onClick={() => { clique("plano", { plano: "mensal" }); trackEvent("hoje_plano", { plano: "mensal", ...ids() }); setEstado((x) => ({ ...x, plano: "mensal" })); }}>
+                  <span className="fn-plano-nome">MENSAL<i>{e.plano === "mensal" && <Check size={13} strokeWidth={3.2} />}</i></span>
+                  <span className="fn-plano-preco"><small>R$ </small>14,90</span>
+                  <span className="fn-plano-sub">30 dias, no Pix</span>
+                  <span className="fn-plano-mes" data-cinza="">= R$ 178,80/ano</span>
+                </button>
+              </div>
+            )}
             <ul className="fn-inclui">
               <li><Check size={17} strokeWidth={2.8} /><span>Finanças montada + 15 áreas da vida</span></li>
               <li><Check size={17} strokeWidth={2.8} /><span>No iPhone, no Android e no computador</span></li>
             </ul>
-            {BUMP_KIT && (
+            {BUMP_KIT && !vitalicio && (
               <button type="button" className="fn-postit" aria-pressed={e.kit} data-testid="hoje-bump"
                 onClick={() => { const marcado = !e.kit; clique("bump", { marcado }); trackEvent("hoje_bump", { marcado, ...ids() }); setEstado((x) => ({ ...x, kit: marcado })); }}>
                 <span className="fn-caixa">{e.kit && <Check size={15} strokeWidth={3.2} />}</span>
@@ -439,7 +458,7 @@ export function FunilHoje() {
                   <button type="button" className="fn-cta" onClick={pagar} data-testid="hoje-pagar">
                     <PixIcone /><span>Pagar {preco(valorPlano)} com Pix</span>
                   </button>
-                  <p className="fn-renova" data-testid="hoje-renovacao">{LINHA_RENOVACAO[e.plano]}</p>
+                  {!vitalicio && <p className="fn-renova" data-testid="hoje-renovacao">{LINHA_RENOVACAO[e.plano]}</p>}
                 </>
               )}
             </div>
@@ -447,7 +466,7 @@ export function FunilHoje() {
         )}
 
         {e.etapa === "pix" && (
-          <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={`${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
+          <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={vitalicio ? "CORE pra sempre" : `${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
             pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
             emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => setEstado((x) => ({ ...x, emailPix: { email, via } }))} />
         )}
@@ -500,7 +519,7 @@ export function FunilHoje() {
 
         {e.etapa === "pago" && (
           <TelaPago
-            estado={e} r={r} acessoTxt={acessoTxt} ids={ids}
+            estado={e} r={r} acessoTxt={acessoTxt} ids={ids} planoAtrib={planoEvento}
             totalPago={e.pagos.reduce((s, p) => s + VALOR_OFERTA[p.oferta], 0)}
             onEmail={(email) => setEstado((x) => ({ ...x, email }))}
             onAbrir={() => { clique("abrir_app"); trackEvent("hoje_app_aberto", { ...ids() }); navigate("/financas"); }}
@@ -762,8 +781,8 @@ function TelaParceiro({ acessoTxt, pedido, ids, onPronto }: { acessoTxt: string;
 
 /* ───────────────────────── 6: pós-compra ───────────────────────── */
 
-function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
-  estado: EstadoHoje; r: Resultado; acessoTxt: string; totalPago: number; ids: () => Record<string, unknown>;
+function TelaPago({ estado, r, acessoTxt, totalPago, ids, planoAtrib, onEmail, onAbrir }: {
+  estado: EstadoHoje; r: Resultado; acessoTxt: string; totalPago: number; ids: () => Record<string, unknown>; planoAtrib: string;
   onEmail: (email: string) => void; onAbrir: () => void;
 }) {
   const [email, setEmail] = useState(estado.email ?? estado.emailPix?.email ?? "");
@@ -771,9 +790,9 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const finalizou = useRef(false);
-  const pedidoPlano = estado.pagos.find((p) => !["hv47", "hv27", "hc199"].includes(p.oferta)) ?? null;
+  const pedidoPlano = estado.pagos.find((p) => ehPlanoDoHoje(p.oferta)) ?? null;
   const pedidoKit = estado.pagos.find((p) => temKit(p.oferta)) ?? null;
-  const praSempre = estado.pagos.some((p) => p.oferta === "hv47" || p.oferta === "hv27");
+  const praSempre = estado.pagos.some((p) => ehPraSempre(p.oferta));
 
   /** a conta final está pronta: Finanças, kit, atribuição, boas-vindas */
   const finalizar = async (emailFinal: string, via: string) => {
@@ -783,7 +802,7 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, onEmail, onAbrir }: {
     trackEvent("hoje_financas", { r: fin, ...ids() });
     if (pedidoKit) await gravarKit(pedidoKit.orderId);
     await gravarAtribuicao({
-      v: 1, attr: lerAtribuicao(), faixa: estado.faixa, contas: Object.keys(estado.contas).length, plano: estado.plano,
+      v: 1, attr: lerAtribuicao(), faixa: estado.faixa, contas: Object.keys(estado.contas).length, plano: planoAtrib,
       pagos: estado.pagos.map((p) => p.oferta), hoje_session_id: ids().hoje_session_id, em: new Date().toISOString(),
     });
     if (pedidoPlano) void pedirBoasVindas(pedidoPlano.orderId);

@@ -137,6 +137,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
     "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
     "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
+    "core-intro-acao-rapida", // 1.0.17: módulos cujo único dado veio da ação rápida da Home (a intro ainda aparece)
     "core-conhecer-feitos", // lista de módulos com o passeio "Conhecer mais" feito nesta conta (lib/conhecer-mais)
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",

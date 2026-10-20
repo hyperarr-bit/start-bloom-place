@@ -44,7 +44,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import {
   ATRIBUTO_MONTAR_FINANCAS, CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, EVENTO_MONTAR_FINANCAS_FIM, INTRO_MODULO, INTRO_MODULO_APP, INTROS,
   ATRIBUTO_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_FIM, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, MODULOS_SEM_NADA, MONTAR_ROTINA, OLHAR_POSSO_GASTAR, _zerarIntroRemota,
-  chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
+  anotarAcaoRapida, CHAVE_INTRO_ACAO_RAPIDA, chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
 } from "@/lib/intro-modulo";
 import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
 import { IntroDeUmToque } from "@/components/intro-modulo/IntroDeUmToque";
@@ -277,6 +277,35 @@ describe("ligada: a porta do módulo", () => {
     act(() => s.carregar());
     await waitFor(() => expect(card()).toBeTruthy());
     expect(localStorage.getItem(chaveIntroAberta("casa"))).toBeTruthy();
+  });
+
+  it("1.0.17: ação rápida da Home num módulo vazio NÃO tira o tutorial; veterano com dado continua sem", () => {
+    // conta nova: toca "Beber água" e "Registrar sono" na Home antes de abrir Saúde
+    const dados: Record<string, unknown> = {};
+    const get = <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
+    const set = (k: string, v: unknown) => { dados[k] = v; };
+    anotarAcaoRapida("water", get, set);
+    dados["core-saude-water"] = { "2026-10-19": 1 }; dados["water-log"] = { "2026-10-19": 1 };
+    anotarAcaoRapida("sleep", get, set); // de novo no mesmo módulo: não duplica
+    dados["core-saude-sleep"] = { "2026-10-19": 7 };
+    expect(dados[CHAVE_INTRO_ACAO_RAPIDA]).toEqual(["saude"]);
+    expect(porQueNaoMostrar("saude", get)).toBeNull();
+    // treino e finanças pelo mesmo caminho
+    anotarAcaoRapida("workout", get, set); dados["saude-workout-log"] = ["2026-10-19"];
+    anotarAcaoRapida("expense", get, set); dados["finance-expenses"] = [{ id: "1", value: 10 }];
+    expect(porQueNaoMostrar("treino", get)).toBeNull();
+    expect(porQueNaoMostrar("financas", get)).toBeNull();
+    // veterano: já tinha água no módulo ANTES do toque → não anota → segue "com_dado"
+    const vet: Record<string, unknown> = { "core-saude-water": { "2026-10-01": 3 } };
+    const gv = <T,>(k: string, f: T): T => (k in vet ? (vet[k] as T) : f);
+    anotarAcaoRapida("water", gv, (k, v) => { vet[k] = v; });
+    expect(vet[CHAVE_INTRO_ACAO_RAPIDA]).toBeUndefined();
+    expect(porQueNaoMostrar("saude", gv)).toBe("com_dado");
+    // intro já vista: não anota (e a decisão segue "ja_vista")
+    const vista: Record<string, unknown> = { [CHAVE_INTRO_VISTAS_CONTA]: ["mente", "hiperfoco"] };
+    const g3 = <T,>(k: string, f: T): T => (k in vista ? (vista[k] as T) : f);
+    anotarAcaoRapida("idea", g3, (k, v) => { vista[k] = v; });
+    expect(vista[CHAVE_INTRO_ACAO_RAPIDA]).toBeUndefined();
   });
 
   it("quem já tem dado no módulo nunca vê a intro (conta de antes)", () => {

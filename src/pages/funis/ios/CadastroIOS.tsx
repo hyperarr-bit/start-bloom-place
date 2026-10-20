@@ -30,11 +30,11 @@
  * Coberto por `cadastro-pos-compra-ios.test.tsx`.
  */
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, EVENTO_RELER_ASSINATURA } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
@@ -42,9 +42,10 @@ import { entrarComApple } from "@/lib/auth-nativo";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
-import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
+import { BoasVindasPago, pulaPelaMissao } from "@/components/onboarding/BoasVindasPago";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
+import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 
 
 /* Glifo oficial da Apple: as diretrizes de marca não aceitam emoji nem ícone
@@ -188,8 +189,7 @@ export function SignupIOS({
         return;
       }
       trackEvent("funnel_click", { cta: "signup_success", via: "existing_login", funil: "ios" });
-      setLoading(false);
-      onSession();
+      onSession(); // 1.0.17: o spinner fica até a tela sair (sem "voltar" ao texto do botão)
       return;
     }
 
@@ -202,7 +202,6 @@ export function SignupIOS({
         const { error: signInErr } = await signIn(email.trim().toLowerCase(), password);
         if (!signInErr) {
           trackEvent("funnel_click", { cta: "signup_success", via: "existing_login", funil: "ios" });
-          setLoading(false);
           onSession();
           return;
         }
@@ -216,12 +215,14 @@ export function SignupIOS({
       return;
     }
 
-    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
+    // 1.0.17: a Home lê "core-user-name" — só "user-name" fazia a saudação usar o começo do e-mail.
+    try { setUserData("user-name", name.trim()); setUserData("core-user-name", name.trim()); } catch { /* noop */ }
     ligarTutorial();
 
     trackEvent("funnel_click", { cta: "signup_success", funil: "ios", instant: !!session });
     fireMetaEvent("CompleteRegistration", { content_name: "signup" });
-    setLoading(false);
+    /* 1.0.17 (vídeo do dono, 19/10): o botão voltava a "Salvar meu acesso →" no instante antes de a tela sair —
+       parecia que tinha falhado. No sucesso o spinner fica até a troca de tela (o componente sai). */
     if (session) onSession();
     else onConfirm(email.trim().toLowerCase());
   };
@@ -291,7 +292,13 @@ export function SignupIOS({
           </p>
         )}
         {err && <p className="text-sm text-destructive">{err}</p>}
-        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
+        {/* 1.0.17: o toque no botão NÃO tira o foco do campo. Sem isto o teclado do iPhone fechava no toque, a
+            página (rolada pra cima pelo teclado) descia ~20 px e o selo "Teste ativado" "entrava" empurrando tudo
+            — um pulo de layout logo antes da troca de tela. O teclado fecha junto com a tela, quando ela sai. */}
+        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}
+          onMouseDown={(e) => { if (valid) e.preventDefault(); }}
+          onPointerDown={(e) => { if (valid && e.pointerType !== "mouse") e.preventDefault(); }}
+          aria-busy={loading || undefined}>
           {loading
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : existingAccount
@@ -323,9 +330,14 @@ export function SignupIOS({
  */
 export function LiberandoIOS() {
   const { get: getUserData } = useUserData();
+  const { user, isSubscribed } = useAuth();
+  const navigate = useNavigate();
   const nome = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   const [demorou, setDemorou] = useState(false);
-  const [pronto, setPronto] = useState(false);
+  /** null = conferindo na loja; true = o acesso foi gravado; false = não deu (cai no recarregamento de antes). */
+  const [sincronizado, setSincronizado] = useState<boolean | null>(null);
+  const [esperouDemais, setEsperouDemais] = useState(false);
+  const [missaoPronta, setMissaoPronta] = useState(() => !!lerMissao());
 
   useEffect(() => {
     let vivo = true;
@@ -341,13 +353,44 @@ export function LiberandoIOS() {
         ok = await rc.sincronizarAssinatura(3);
       }
       trackEvent("app_pos_compra_liberado", { ok, funil: "ios" });
-      if (vivo) setPronto(true);
+      if (!vivo) return;
+      setSincronizado(ok);
+      // 1.0.17: o acesso já está no servidor — o AuthProvider relê agora (sem esperar o ciclo de 60 s).
+      if (ok) window.dispatchEvent(new Event(EVENTO_RELER_ASSINATURA));
     })();
     return () => { vivo = false; clearTimeout(t); };
   }, []);
 
+  /* 1.0.17 — SEM RECARREGAR O APP (vídeo do dono, 19/10). O `location.href = "/"` de antes subia o WebView do
+   * zero: tela preta, branco, e a Home com o tour LONGO aparecia ~150 ms antes do "Tá dentro!" (a missão só
+   * nascia depois do 1º render). Agora a troca é pela rota (SPA), e só depois que: (1) o AuthProvider já vê a
+   * assinatura (senão a Home abriria o bloqueio por cima) e (2) a missão em doses, que nasce sozinha assim
+   * que há conta + acesso (MissaoDosesNaWeb, no App), já existe — a 1ª pintura da Home já sai com o
+   * "Tá dentro!" por cima. Rede: 6 s sem isso → o recarregamento de antes. */
+  const vaiTerMissao = (() => { try { return pulaPelaMissao(user?.created_at); } catch { return false; } })();
+  useEffect(() => {
+    if (!sincronizado) return;
+    const t = setTimeout(() => setEsperouDemais(true), 6000);
+    return () => clearTimeout(t);
+  }, [sincronizado]);
+  useEffect(() => {
+    if (missaoPronta || !vaiTerMissao) return;
+    const reler = () => { if (lerMissao()) setMissaoPronta(true); };
+    reler();
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, [missaoPronta, vaiTerMissao, isSubscribed]);
+
+  const spa = sincronizado === true && isSubscribed && (missaoPronta || !vaiTerMissao);
+  const pronto = sincronizado === false || spa || esperouDemais;
+  const irPraHome = () => {
+    if (spa) { trackEvent("app_pos_compra_home", { via: "rota", funil: "ios" }); navigate("/", { replace: true }); return; }
+    trackEvent("app_pos_compra_home", { via: "recarregar", funil: "ios", acesso: isSubscribed, missao: missaoPronta });
+    window.location.href = "/";
+  };
+
   if (pronto) {
-    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
+    return <BoasVindasPago imediato nome={nome} onComecar={irPraHome} />;
   }
   return (
     <div className="w-full max-w-sm mx-auto text-center py-16">

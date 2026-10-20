@@ -708,7 +708,7 @@ export const INTROS: Record<string, IntroConfig> = {
     pronto: "Mente é isso: cada pensamento fica na hora em que apareceu. Depois você acha tudo pela busca.",
     passos: [{
       pergunta: "O que está na sua cabeça agora?",
-      descricao: "Toca num pra ver como fica, ou escreve o seu.",
+      descricao: "Toca num pra ver como fica.",
       opcoes: [op("📝", "Uma pendência pra resolver", "pendencia"), op("💡", "Uma ideia pra não perder", "ideia"), op("😮‍💨", "Uma preocupação de hoje", "preocupacao")],
       executar: (ctx, o) => anotarPensamento(ctx, o.rotulo),
       // a linha do tempo abre o campo da HORA que a pessoa toca: toca na hora de agora e aponta pro campo

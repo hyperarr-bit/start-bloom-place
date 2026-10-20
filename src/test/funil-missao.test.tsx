@@ -418,16 +418,17 @@ describe("o passo 1 do tutorial em HTML (Finanças e Rotina) é a MESMA tela do 
   const leve = readFileSync(join(process.cwd(), "src/missao/leve.ts"), "utf8");
   it("Finanças: os textos do passo 'renda' do MontarFinancas e as MESMAS faixas (id, rótulo, valor)", () => {
     const mf = readFileSync(join(process.cwd(), "src/components/finance/montar/MontarFinancas.tsx"), "utf8");
-    for (const t of ["Vamos montar suas finanças · 1 de 3", "Quanto entra por mês, mais ou menos?", "Só pra calcular quanto dá pra gastar por dia. Dá pra mudar depois.", "💰 Renda do mês"]) {
+    // 1.0.17 (dono: "minimalista"): a pergunta + "Pode ser aproximado." — sem kicker, sem a dica embaixo do campo
+    for (const t of ["<h2>Quanto entra por mês?</h2>", "<p>Pode ser aproximado.</p>", "💰 Renda do mês"]) {
       expect(mf).toContain(t); expect(html).toContain(t);
     }
-    for (const t of ["Salário, freela, pensão… o que entra no mês.", "Um valor de partida — ajusta pro número certo se quiser."]) { expect(mf).toContain(t); expect(leve).toContain(t); }
+    for (const t of ["Vamos montar suas finanças · 1 de 3", "Só pra calcular quanto dá pra gastar", "Salário, freela, pensão"]) { expect(mf).not.toContain(t); expect(html).not.toContain(t); }
     for (const f of FAIXAS_DE_RENDA) expect(leve).toContain(`{ id: "${f.id}", rotulo: "${f.rotulo}", valor: ${f.valor} }`);
   });
   it("Rotina: os textos do passo 'acordar' do MontarRotina (na web são 2 perguntas) e as MESMAS horas", () => {
     const mr = readFileSync(join(process.cwd(), "src/components/rotina/montar/MontarRotina.tsx"), "utf8");
-    for (const t of ["Que horas você acorda?", "Seu dia começa daí. Dá pra mudar depois.", "Outro horário"]) { expect(mr).toContain(t); expect(html).toContain(t); }
-    expect(html).toContain("Vamos montar sua rotina · 1 de 2");
+    for (const t of ["<h2>Que horas você acorda?</h2>", "Outro horário"]) { expect(mr).toContain(t); expect(html).toContain(t); }
+    for (const t of ["Seu dia começa daí. Dá pra mudar depois.", "Vamos montar sua rotina · 1 de"]) { expect(mr).not.toContain(t); expect(html).not.toContain(t); }
     for (const o of OPCOES_ACORDAR) expect(html).toContain(`data-opcao="${o.id}"`);
   });
   it("a resposta vai pra tela de verdade pelos MESMOS toques (nada gravado por fora do app)", () => {

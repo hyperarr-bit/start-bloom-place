@@ -337,7 +337,7 @@ describe("reaproveita o que já foi respondido", () => {
     perm.estado = "denied";
     const controle = montarTela();
     await respirar();
-    expect(tela().getByText(/1 de 2/)).toBeTruthy();
+    expect(document.querySelectorAll(".mrt-barra i")).toHaveLength(2); // 2 perguntas (a barra; 1.0.17 sem o "1 de 2" escrito)
     await responder({ lembrete: null });
     expect(controle.dados()[CHAVE_LEMBRETE_ROTINA_MANHA]).toBeUndefined();
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toMatchObject({ lembrete: false, lembrete_pulado: "negado" });
@@ -416,13 +416,13 @@ describe("a tela, com a conta vazia", () => {
     await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
     fireEvent.click(tela().getByRole("button", { name: "Ler" }));
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
-    expect(tela().getByText(/Um aviso às 6h15/)).toBeTruthy();
+    expect(tela().getByText(/Às 6h15, uma vez por dia/)).toBeTruthy();
     expect(screen.getByTestId("montar-rotina-previa-aviso").textContent).toContain("Ler");
     fireEvent.click(tela().getByRole("button", { name: "Sim, quero" }));
     await respirar();
     expect(perm.pedidos).toBe(1);
     expect(dia2).toHaveBeenCalledTimes(1);
-    expect(tela().getByText(/Combinado: todo dia às 6h15/)).toBeTruthy();
+    expect(tela().getByText(/Todo dia às 6h15/)).toBeTruthy();
     window.removeEventListener(EVENTO_DIA2, dia2);
   });
 
@@ -468,7 +468,7 @@ describe("a tela, com a conta vazia", () => {
     await respirar();
     fireEvent.click(tela().getByRole("button", { name: "8h" }));
     await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
-    expect(tela().getByRole("button", { name: "Escolhe pelo menos um" })).toHaveProperty("disabled", true);
+    expect(tela().getByRole("button", { name: "Escolha pelo menos um" })).toHaveProperty("disabled", true);
     fireEvent.click(tela().getByRole("button", { name: "Estudar" }));
     fireEvent.click(tela().getByRole("button", { name: /Voltar/ }));
     expect(tela().getByRole("button", { name: "8h" }).getAttribute("aria-pressed")).toBe("true");

@@ -91,7 +91,7 @@ describe("as outras dicas com a frase", () => {
   it("Relações: no app (intro ligada, 17/10) a 1ª abertura mostra a INTRO, não as dicas — e nada diz 'no app do celular'; no site 'No app do celular, ligue os avisos: …'", () => {
     noApp();
     abrir(<Relacionamentos />, "/relacionamentos");
-    expect(document.querySelector("[data-testid=intro-modulo-faixa]")?.textContent).toContain("anota 1 pessoa");
+    expect(document.querySelector("[data-testid=intro-modulo-faixa]")?.textContent).toContain("anote 1 pessoa");
     expect(screen.queryByText("Ligue os avisos: na véspera, no dia e o “faz tempo que…”")).toBeNull();
     expect(texto()).not.toMatch(/no app do celular/i);
     cleanup(); document.body.innerHTML = ""; localStorage.clear();

@@ -128,7 +128,7 @@ const fazerOsTresToques = async () => {
   fireEvent.change(tela().getByLabelText("Nome da conta"), { target: { value: "Escola" } });
   fireEvent.change(tela().getByLabelText("Valor de Escola"), { target: { value: "700" } });
   fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
-  expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+  expect(tela().getByText("Usa cartão de crédito?")).toBeTruthy();
   fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
   await respirar();
 };
@@ -279,7 +279,7 @@ describe("a tela, com a conta vazia", () => {
     window.addEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
     const controle = montarTela({ onPronto, origem: "missao" });
 
-    expect(screen.getByText("Quanto entra por mês, mais ou menos?")).toBeTruthy();
+    expect(screen.getByText("Quanto entra por mês?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Continuar" })).toHaveProperty("disabled", true);
     expect(document.documentElement.hasAttribute("data-montar-financas")).toBe(true);
     await fazerOsTresToques();
@@ -291,19 +291,19 @@ describe("a tela, com a conta vazia", () => {
     ]);
     // 3000 − 1750 = 1250 ÷ 16 = 78,125 → R$ 78
     expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 78");
-    expect(screen.getByText(/até o fim do mês \(16 dias, contando hoje\)/)).toBeTruthy();
+    expect(screen.getByText("até o fim do mês.")).toBeTruthy();
     expect(screen.queryByText(/\bIA\b/)).toBeNull();
 
     expect(screen.queryByTestId("montar-fatura")).toBeNull(); // sem cartão, sem linha de fatura
     expect(controle.dados()["finance-card-config"]).toBeUndefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Continuar →" })); // pela missão: o 1º gasto é o tutorial, depois
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // pela missão: o 1º gasto é o tutorial, depois
     expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);
     expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
-    // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado") e o "Continuar →"
+    // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado") e o "Continuar"
     expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO]);
     expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, e]) => e.acao)).toEqual(["resultado", "continuar"]);
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
@@ -390,7 +390,7 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     expect(screen.getAllByTestId("montar-financas")).toHaveLength(1);
     await fazerOsTresToques();
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
-    fireEvent.click(screen.getByRole("button", { name: "Continuar →" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     await respirar();
 
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -473,7 +473,7 @@ describe("feito/pulado sobrevive a fechar e reabrir o app, ao logout e a outro a
     expect(deveMostrarMontarFinancas({ criadoEm: auth.user!.created_at, get: vazio, isGuest: false })).toBe(true);
     montarTela({ origem: "missao" });
     // volta onde parou, com o que já tinha respondido
-    expect(screen.getByText("Quais contas chegam todo mês?")).toBeTruthy();
+    expect(screen.getByText("Quais contas você paga todo mês?")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^🏠 Aluguel/ }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /Voltar/ }));
     expect((screen.getByLabelText("Renda do mês em reais") as HTMLInputElement).value).toBe("5.500");

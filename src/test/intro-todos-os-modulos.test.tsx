@@ -117,11 +117,11 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
           expect(motivo, `${m} ${caso}: abriu pela 1ª vez e NÃO ganhou intro`).toBeNull();
           expect(faixa(), `${m} ${caso}: a faixa da intro não montou`).toBeTruthy();
           expect(faixa()!.textContent).toContain("Primeira vez aqui");
-          // "Pular" à vista desde o 1º segundo (regra do dono)
-          expect(screen.getByTestId("intro-modulo-pular")).toBeTruthy();
+          // 1.0.17: o "Agora não" quieto à vista desde o 1º segundo (regra do dono) — fecha só este tutorial
+          expect(screen.getByTestId("intro-modulo-agora-nao")).toBeTruthy();
           registrar(m, caso, `intro ${INTROS[m].formato === "guiada" ? "guiada" : "de 1 toque"} ("${(INTROS[m] as { pedido: string }).pedido}")`);
           // 2ª abertura depois de PULAR: nada
-          fireEvent.click(screen.getByTestId("intro-modulo-pular"));
+          fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
           r.unmount();
           expect(porQueNaoMostrar(m, s.get), `${m} ${caso}: pulou e voltou`).toBe("ja_vista");
           const r2 = render(<s.Provedor><IntroDoModulo moduleId={m} /></s.Provedor>);
@@ -261,15 +261,21 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     r.unmount();
   });
 
-  /* ───────────── 17/10 (dono: "tipo Finanças, que tem vários"): cada tutorial tem 3–4 passos e CHEGA NO FIM ───────────── */
-  const guiadaPassos = (m: string) => (m === "rotina" ? 3 : m === "financas" || m === "saude" ? 2 : 0);
-  it("cada um dos 16 tutoriais tem de 3 a 4 passos (ação real → olha → ação), e o 1º passo é sempre uma ação", () => {
+  /* ───────────── 1.0.17 (dono 19/10: "muito confuso, faz minimalista"): no MÁXIMO 2 passos e CHEGA NO FIM ───────────── */
+  const guiadaPassos = (m: string) => (m === "financas" || m === "saude" || m === "rotina" ? 2 : 0);
+  it("cada um dos 16 tutoriais tem no máximo 2 passos (ação real → olha/ação), o 1º é sempre uma ação e toda lista de chips tem '+ Outro' (menos o tipo de pele)", () => {
     for (const m of TODOS) {
       const c = INTROS[m];
       const n = c.formato === "guiada" ? guiadaPassos(m) + (c.maisPassos?.length ?? 0) : c.passos.length;
-      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(3);
-      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(4);
-      if (c.formato === "toque") { expect(c.passos[0].olhar, m).toBeUndefined(); expect(c.passos[0].opcoes.length, m).toBeGreaterThanOrEqual(2); }
+      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(1);
+      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(2);
+      if (c.formato === "toque") {
+        expect(c.passos[0].olhar, m).toBeUndefined();
+        expect(c.passos[0].opcoes.length, m).toBeGreaterThanOrEqual(2);
+        for (const p of c.passos) if (p.opcoes.length && p.executar) expect(p.outro === false ? m === "beleza" : true, `${m}: lista sem "+ Outro"`).toBe(true);
+        // sem segundos e sem parágrafo: a pergunta é curta
+        for (const p of c.passos) { expect(p.pergunta.length, `${m}: "${p.pergunta}"`).toBeLessThanOrEqual(40); expect(`${p.pergunta} ${p.descricao ?? ""}`).not.toMatch(/\d+\s?s\b|segundos/); }
+      }
     }
   });
 
@@ -283,7 +289,7 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     it(`${m}: o tutorial anda do 1º passo ao cartão do fim (chips, olhares pulados sem o card, ações no módulo) e 'Pronto' marca feito`, { timeout: 60_000 }, async () => {
       const s = criarStore();
       render(<s.Provedor><IntroDoModulo moduleId={m} /></s.Provedor>);
-      expect(faixa()!.textContent).toContain("1 de ");
+      expect(faixa()!.textContent).toContain("Primeira vez aqui");
       const c = INTROS[m];
       const total = c.formato === "toque" ? c.passos.length : 0;
       let acoes = 0;
@@ -300,9 +306,9 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
       }
       await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
       expect(faixa()!.textContent).toContain("pronto ✓");
-      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(2);
-      expect(screen.getByTestId("intro-modulo-pronto").textContent).toMatch(/já est(á|ão) aqui/);
-      expect(total).toBeGreaterThanOrEqual(3);
+      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(1);
+      expect(screen.getByTestId("intro-modulo-pronto").textContent).toMatch(/entr(ou|aram)\./);
+      expect(total).toBeLessThanOrEqual(2);
       fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
       expect(localStorage.getItem(chaveIntroVista(m))).toMatch(/^feita@/);
       expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");
@@ -325,7 +331,7 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 9000 });
     // o post-it é só a instrução: nenhum chip, e a pergunta da pele aparece UMA vez (a do quiz)
     expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
-    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Responde aqui as 3 perguntas");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Responda aqui as 3 perguntas");
     expect(screen.getAllByText("Como é a sua pele?")).toHaveLength(1);
     expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeNull();
     // as 5 opções do quiz (inclusive Sensível) e o "Prefiro montar do zero" estão lá, tocáveis
@@ -336,27 +342,25 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
     fireEvent.click(screen.getAllByRole("button").find((b) => b.getAttribute("data-testid")?.startsWith("opcao-"))!);
     expect((s.estado.dados["skincare-am-steps"] as unknown[]).length).toBeGreaterThan(0);
-    await waitFor(() => expect(faixa()!.textContent).toContain("2 de 3 · olha a sua rotina"), { timeout: 9000 });
+    await waitFor(() => expect(faixa()!.textContent).toContain("olhe a sua rotina"), { timeout: 9000 });
     medir.mockRestore();
   });
 
-  it("Saúde (guiada): água → olha → continua no sono (3 de 4) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
+  it("Saúde (guiada, 1.0.17): água → olha → o cartão do fim (2 passos, sem o sono) e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const s = criarStore();
     render(<s.Provedor><div><button type="button" data-spotlight="add-water">+250ml</button><IntroDoModulo moduleId="saude" /></div></s.Provedor>);
-    expect(faixa()!.textContent).toContain("marca 1 copo d'água");
+    expect(faixa()!.textContent).toContain("marque 1 copo d'água");
     await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
+    // 1 copo d'água é 1 chip só: sem "+ Outro" (nada pra escrever)
+    expect(screen.queryByTestId("demo-guia-outro")).toBeNull();
     fireEvent.click(screen.getAllByTestId("demo-guia-chip")[0]); // 1 copo
     expect(Object.values(s.estado.dados["core-saude-water"] as Record<string, number>)[0]).toBe(1);
-    // o "olha" da guiada (o card da água, com tamanho de mentira) → "Entendi" → os passos 3 e 4 no motor de 1 toque
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-entendi")).toBeTruthy(), { timeout: 9000 });
     fireEvent.click(screen.getByTestId("intro-modulo-entendi"));
-    await waitFor(() => expect(faixa()!.textContent).toContain("3 de 4 · anota o sono"), { timeout: 9000 });
-    await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
-    fireEvent.click(screen.getAllByTestId("demo-guia-chip")[1]); // 7 h
-    expect(Object.values(s.estado.dados["core-saude-sleep"] as Record<string, number>)[0]).toBe(7);
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("1 copo d'água e 7 h de sono já estão aqui. Saúde é isso");
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("entrou.");
+    expect(s.estado.dados["core-saude-sleep"]).toBeUndefined();
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(localStorage.getItem(chaveIntroVista("saude"))).toMatch(/^feita@/);
     medir.mockRestore();

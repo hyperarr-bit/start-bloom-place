@@ -225,14 +225,14 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     expect(screen.getByTestId("rota")).toHaveTextContent("/rotina");
     // dose 2 — Rotina numa conta SEM hábito, em 2 passos: o chip preenche o campo real, "Adicionar" cria, o quadradinho de hoje marca
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("1 de 2 · criar");
+    expect(postIt).toHaveTextContent("1 de 2");
     fireEvent.pointerDown(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     expect((screen.getByPlaceholderText("Nome do hábito...") as HTMLInputElement).value).toBe("Beber água ao acordar");
     fireEvent.click(screen.getByText("Adicionar"));
     expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
     avancar(400); avancar(3000);
-    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("2 de 2 · marcar");
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("2 de 2");
     fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
     avancar(700); avancar(1000); avancar(1500); /* 10/10: o olhar rola o card por 1 s, pausa 500 ms e só então monta o anel */
     const entendi = screen.queryByTestId("missao-doses-entendi");
@@ -340,7 +340,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     montar(montarStore(dados()), "/casa");
     await respirar(4);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organiza 1 cômodo"); // a intro de 1 toque da Casa (17/10)
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organize 1 cômodo"); // a intro de 1 toque da Casa (17/10)
     expect(nomes()).toContain("modulo_intro_vista");
     expect(nomes()).not.toContain("modulo_cartoes_vistos");
   });
@@ -350,7 +350,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     montar(montarStore(dados()), "/financas");
     await respirar(4);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/toca em 1 gasto/);
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/anote 1 gasto/);
     expect(nomes()).toContain("modulo_intro_vista");
   });
 
@@ -361,7 +361,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     await respirar(4);
     expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marca 1 hábito/);
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marque 1 hábito/);
     cleanup();
     vi.setSystemTime(new Date(2026, 9, 4, 10, 0)); // dia 2
     montar(montarStore(dados()), "/financas"); // a dose do dia 1 já foi: continua sem nada por cima
@@ -371,7 +371,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     montar(montarStore(dados()), "/casa");
     await respirar(4);
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organiza 1 cômodo");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("organize 1 cômodo");
   });
 
   it("missão da 1.0.10 (sem braço / chave do dia 1 cheio desligada): a dose 2 abre na Rotina no mesmo dia, como sempre — e nada por cima dela (nem cartões, nem intro)", async () => {
@@ -392,7 +392,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
     const faixa = screen.getByTestId("intro-modulo-faixa");
     fireEvent.click(faixa); fireEvent.click(faixa); // 2 toques na faixa = o "Pular" aparece
-    fireEvent.click(screen.getByTestId("intro-modulo-pular"));
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
     expect(screen.queryByTestId("intro-modulo-faixa")).toBeNull();
     expect(localStorage.getItem("core-intro-vista-financas")).toBeTruthy();
     cleanup();
@@ -402,7 +402,7 @@ describe("boas-vindas do módulo × missão em doses (regra obrigatória) — 1.
     cleanup();
     montar(montarStore(dados()), "/rotina");
     await respirar(4);
-    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marca 1 hábito/); // outro módulo: 1ª visita
+    expect(screen.getByTestId("intro-modulo-faixa")).toHaveTextContent(/marque 1 hábito/); // outro módulo: 1ª visita
     expect(screen.queryByTestId("cartoes-modulo")).toBeNull();
   });
 });

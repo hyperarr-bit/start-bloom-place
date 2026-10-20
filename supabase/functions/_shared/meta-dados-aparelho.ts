@@ -20,6 +20,17 @@
  * Uma linha por (transação × mudança de status do ATT): o sync roda em toda
  * abertura, então sem isso seria uma linha por boot.
  *
+ * ATALHO DA BUILD ANTIGA (20/10, iOS ≤ 1.0.16 — `att_origem` "inferido_idfa"):
+ * a 1.0.16 não manda `aparelho` no corpo, mas o nativo dela SÓ preenche o
+ * IDFA (campo `gaid` da ficha app_device_info) com o ATT autorizado na hora
+ * da captura — sem aceite o sistema devolve zeros e a ficha vai sem. Então,
+ * sem `aparelho` no corpo: ficha de iPhone com IDFA válido (UUID, não
+ * zerado) = "authorized" inferido → guarda IP/UA dos headers + esse IDFA;
+ * ficha de iPhone sem IDFA = "unknown" sem nada (a linha nova também desfaz
+ * um "authorized" inferido antes, se a pessoa revogou); sem ficha ou ficha
+ * de Android = não grava (como antes). Corpo com `aparelho` (1.0.17+) = o
+ * que o app disse, `att_origem` "app".
+ *
  * QUEM LÊ: `meta-backfill-app` (ramo meta-capi-dados), na hora de montar o
  * evento. Vale a linha MAIS RECENTE da transação — se a pessoa revogou o ATT
  * nos Ajustes, a última linha diz "denied" e o IP não sai.
@@ -48,6 +59,9 @@ export const JANELA_GRAVAR_MS = 10 * 86_400_000;
 
 export const STATUS_ATT = ["authorized", "denied", "restricted", "notDetermined", "unknown"] as const;
 export type StatusAtt = typeof STATUS_ATT[number];
+/** Quem disse o status: o app (1.0.17+, corpo `aparelho`) ou o servidor pelo IDFA da ficha (build antiga). Mesmo CHECK na tabela. */
+export const ORIGENS_ATT = ["app", "inferido_idfa"] as const;
+export type OrigemAtt = typeof ORIGENS_ATT[number];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ZERADO = "00000000-0000-0000-0000-000000000000";
@@ -107,6 +121,7 @@ const versao = (v: unknown): string | null => {
 export interface DadosAparelhoPedido {
   plataforma: "ios";
   att: StatusAtt;
+  att_origem: OrigemAtt;
   app_versao: string | null;
   app_build: string | null;
   os_versao: string | null;
@@ -132,6 +147,7 @@ export const dadosDoPedido = (
   const base: DadosAparelhoPedido = {
     plataforma: "ios",
     att,
+    att_origem: "app",
     app_versao: versao(c.app_versao),
     app_build: versao(c.app_build),
     os_versao: versao(c.os_versao),
@@ -144,6 +160,41 @@ export const dadosDoPedido = (
   return {
     ...base,
     idfa: idfaValido(c.idfa),
+    client_ip: par?.client_ip_address ?? null,
+    user_agent: par?.client_user_agent ?? null,
+  };
+};
+
+/**
+ * Build antiga (corpo SEM `aparelho`): a ficha app_device_info mais recente
+ * da conta decide. Só iPhone. IDFA válido (a 1.0.16 só grava com ATT aceito)
+ * = "authorized" inferido, com IP/UA dos headers; sem IDFA (ou zerado) =
+ * "unknown", sem nada. Sem ficha / Android / web = null (não grava).
+ */
+export const dadosInferidosDaFicha = (
+  ficha: unknown,
+  cab: { xff?: string | null; cf?: string | null; ua?: string | null },
+): DadosAparelhoPedido | null => {
+  if (!ficha || typeof ficha !== "object" || Array.isArray(ficha)) return null;
+  const f = ficha as Record<string, unknown>;
+  if (f.plataforma !== "ios") return null;
+  const idfa = idfaValido(f.gaid) ?? idfaValido(f.idfa);
+  const base: DadosAparelhoPedido = {
+    plataforma: "ios",
+    att: idfa ? "authorized" : "unknown",
+    att_origem: "inferido_idfa",
+    app_versao: versao(f.versao),
+    app_build: versao(f.build),
+    os_versao: versao(f.os),
+    idfa: null,
+    client_ip: null,
+    user_agent: null,
+  };
+  if (!idfa) return base;
+  const par = parIpUa(ipDoCabecalho(cab.xff, cab.cf), cab.ua);
+  return {
+    ...base,
+    idfa,
     client_ip: par?.client_ip_address ?? null,
     user_agent: par?.client_user_agent ?? null,
   };
@@ -186,6 +237,7 @@ export const linhaDadosAparelho = (
     tx,
     plataforma: dados.plataforma,
     att: dados.att,
+    att_origem: dados.att_origem,
     idfa: autorizado ? dados.idfa : null,
     client_ip: autorizado ? dados.client_ip : null,
     user_agent: autorizado ? dados.user_agent : null,
@@ -201,6 +253,8 @@ export const linhaDadosAparelho = (
 export interface LinhaDadosAparelho {
   tx?: string | null;
   att?: string | null;
+  /** "app" | "inferido_idfa" — só pro log; o envio decide pelo `att`, qualquer origem. */
+  att_origem?: string | null;
   idfa?: string | null;
   client_ip?: string | null;
   user_agent?: string | null;
@@ -246,7 +300,8 @@ export interface SinaisPrivacidade {
  *
  * iPhone — o status do ATT vem da linha desta transação (`dados`) e, na
  * falta, da ficha app_device_info (`attFicha`, propriedade comum desde a 1.0.14):
- *   · authorized → ate 1; madid = IDFA da linha (ou o que já existia); IP/UA SÓ
+ *   · authorized (do app OU inferido pelo IDFA da ficha na build antiga —
+ *     a origem não muda nada aqui) → ate 1; madid = IDFA da linha (ou o que já existia); IP/UA SÓ
  *     da linha (não do app_capi_sinais, que é gravado sem olhar o ATT).
  *   · outro status conhecido → ate 0; sem madid, IP/UA e vendor_id.
  *   · nenhum status (build antiga, linha vencida) → o de hoje: madid só se a

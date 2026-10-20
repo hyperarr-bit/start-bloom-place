@@ -6,6 +6,12 @@
 -- O meta-backfill-app (ramo meta-capi-dados) lê a linha mais recente da
 -- transação e só manda IP/UA/madid + advertiser_tracking_enabled=1 com o aceite.
 --
+-- att_origem: 'app' = o app disse (1.0.17+, corpo `aparelho`);
+-- 'inferido_idfa' = build antiga (≤ 1.0.16, sem `aparelho`): o servidor
+-- infere pela ficha app_device_info — o nativo dessa build só grava o IDFA
+-- com o ATT aceito, então IDFA válido = 'authorized' e sem IDFA = 'unknown'.
+-- O CHECK de baixo vale igual pras duas origens.
+--
 -- Tabela própria e sem policy: anon/authenticated não leem nem escrevem
 -- (analytics_events aceita insert do próprio usuário — dava pra forjar um
 -- "authorized"). Retenção de 10 dias: a Meta aceita evento de até 7.
@@ -17,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.meta_dados_aparelho (
   tx text NOT NULL,
   plataforma text NOT NULL DEFAULT 'ios',
   att text NOT NULL,
+  att_origem text NOT NULL DEFAULT 'app',
   idfa text,
   client_ip text,
   user_agent text,
@@ -28,8 +35,14 @@ CREATE TABLE IF NOT EXISTS public.meta_dados_aparelho (
   -- Sem aceite do ATT, nada que identifique o aparelho fica guardado.
   CONSTRAINT meta_dados_aparelho_so_com_att CHECK (
     att = 'authorized' OR (idfa IS NULL AND client_ip IS NULL AND user_agent IS NULL)
-  )
+  ),
+  CONSTRAINT meta_dados_aparelho_att_origem CHECK (att_origem IN ('app', 'inferido_idfa'))
 );
+
+-- Idempotente pra quem já rodou a versão anterior deste arquivo (sem att_origem).
+ALTER TABLE public.meta_dados_aparelho
+  ADD COLUMN IF NOT EXISTS att_origem text NOT NULL DEFAULT 'app'
+  CONSTRAINT meta_dados_aparelho_att_origem CHECK (att_origem IN ('app', 'inferido_idfa'));
 
 CREATE INDEX IF NOT EXISTS meta_dados_aparelho_tx_idx ON public.meta_dados_aparelho (tx, created_at DESC);
 CREATE INDEX IF NOT EXISTS meta_dados_aparelho_expira_idx ON public.meta_dados_aparelho (expira_em);

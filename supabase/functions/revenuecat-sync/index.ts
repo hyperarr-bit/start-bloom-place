@@ -20,6 +20,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import {
   dadosDoPedido,
+  dadosInferidosDaFicha,
   dentroDaJanela,
   linhaDadosAparelho,
   precisaGravar,
@@ -58,16 +59,28 @@ serve(async (req) => {
     /* 20/10 (iOS 1.0.17): o app manda `aparelho` {plataforma, att, idfa?,
      * versões}. IP e UA saem dos HEADERS desta requisição — e só ficam
      * guardados com ATT autorizado (regra em _shared/meta-dados-aparelho.ts).
-     * Corpo ausente/estranho (Android, build antiga) = null = nada muda. */
+     * Corpo com `aparelho` estranho (Android) = null = nada muda.
+     *
+     * Build antiga (corpo SEM `aparelho`, iOS ≤ 1.0.16): o status é inferido
+     * pela ficha app_device_info — o nativo dela só grava o IDFA com o ATT
+     * aceito (dadosInferidosDaFicha). A ficha só é lida se houver transação
+     * dentro da janela pra gravar (o sync roda em toda abertura). */
     const corpo = await req.json().catch(() => null);
-    const dados = dadosDoPedido((corpo as { aparelho?: unknown } | null)?.aparelho, {
+    const aparelho = (corpo as { aparelho?: unknown } | null)?.aparelho;
+    const cab = {
       xff: req.headers.get("x-forwarded-for"),
       cf: req.headers.get("cf-connecting-ip"),
       ua: req.headers.get("user-agent"),
-    });
+    };
+    const dadosApp = dadosDoPedido(aparelho, cab);
+    let dadosLog: DadosAparelhoPedido | null = aparelho === undefined ? null : dadosApp;
+    let inferindo: Promise<DadosAparelhoPedido | null> | undefined;
+    const obterDados: ObterDados = aparelho === undefined
+      ? () => (inferindo ??= fichaDoAparelho(admin, user.id).then((f) => (dadosLog = dadosInferidosDaFicha(f, cab))))
+      : () => Promise.resolve(dadosApp);
 
-    const r = await reconciliarRevenueCat(admin, user.id, user.email ?? null, dados);
-    log("done", { userId: user.id, ...r, att: dados?.att ?? null });
+    const r = await reconciliarRevenueCat(admin, user.id, user.email ?? null, obterDados);
+    log("done", { userId: user.id, ...r, att: dadosLog?.att ?? null, att_origem: dadosLog?.att_origem ?? null });
     return json({ checked: true, ...r });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -613,15 +626,61 @@ async function storeIdDoProduto(prodId: string, secret: string): Promise<string>
  * Tabela ausente (migração não aplicada) ou erro: loga e segue — o acesso de
  * quem pagou nunca depende disto.
  */
+type ObterDados = () => Promise<DadosAparelhoPedido | null>;
+
+/**
+ * Ficha app_device_info mais recente da conta (build antiga). Mesma busca do
+ * meta-backfill-app: por user_id e, na falta, pelas sessões da conta (quem
+ * compra antes de ter conta tem a ficha com user_id nulo). Erro = null.
+ */
+async function fichaDoAparelho(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { data: dev } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "app_device_info")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const porConta = (dev as { event_data?: Record<string, unknown> } | null)?.event_data;
+    if (porConta && Object.keys(porConta).length) return porConta;
+    const { data: sess } = await admin
+      .from("analytics_events").select("session_id").eq("user_id", userId).limit(50);
+    const ids = [...new Set(((sess ?? []) as { session_id: string }[]).map((x) => x.session_id).filter(Boolean))];
+    if (!ids.length) return null;
+    const { data: porSessao } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "app_device_info")
+      .in("session_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (porSessao as { event_data?: Record<string, unknown> } | null)?.event_data ?? null;
+  } catch (e) {
+    log("ficha do aparelho ERRO", { msg: String(e).slice(0, 120) });
+    return null;
+  }
+}
+
 async function gravarDadosAparelho(
   admin: ReturnType<typeof createClient>,
   userId: string,
   tx: string,
   inicio: string | null,
-  dados: DadosAparelhoPedido | null,
+  obterDados: ObterDados,
+  loja: string | null = null,
 ): Promise<void> {
-  if (!dados || !tx || !dentroDaJanela(inicio)) return;
+  if (!tx || !dentroDaJanela(inicio)) return;
   try {
+    const dados = await obterDados();
+    if (!dados) return;
+    // O inferido vem da ficha do iPhone: não cola em compra de outra loja.
+    if (dados.att_origem === "inferido_idfa" && loja && loja !== "app_store") return;
     const { data: ult, error: erroLer } = await admin
       .from(TABELA_DADOS_APARELHO)
       .select("att,idfa,client_ip")
@@ -635,7 +694,7 @@ async function gravarDadosAparelho(
     if (!precisaGravar((ult ?? [])[0] ?? null, dados)) return;
     const { error } = await admin.from(TABELA_DADOS_APARELHO).insert(linhaDadosAparelho(userId, tx, dados));
     if (error) log("dados do aparelho: não gravou", { msg: String(error.message ?? "").slice(0, 120) });
-    else log("dados do aparelho gravados", { att: dados.att, com_ip: !!dados.client_ip, com_idfa: !!dados.idfa });
+    else log("dados do aparelho gravados", { att: dados.att, att_origem: dados.att_origem, com_ip: !!dados.client_ip, com_idfa: !!dados.idfa });
   } catch (e) {
     log("dados do aparelho ERRO", { msg: String(e).slice(0, 120) });
   }
@@ -645,7 +704,7 @@ async function reconciliarRevenueCat(
   admin: ReturnType<typeof createClient>,
   userId: string,
   email: string | null,
-  dados: DadosAparelhoPedido | null = null,
+  obterDados: ObterDados = () => Promise.resolve(null),
 ): Promise<{ subscribed: boolean; reason?: string; product?: string | null; expires?: string | null }> {
   const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
   if (!secret) throw new Error("REVENUECAT_SECRET_KEY não configurada");
@@ -663,7 +722,7 @@ async function reconciliarRevenueCat(
   const compras: any[] = (respCompras?.items ?? []).filter(
     (p: any) => !p?.revoked_at && p?.status !== "refunded"
   );
-  const vitalicias: { id: string; inicio: string | null; storeId: string }[] = [];
+  const vitalicias: { id: string; inicio: string | null; storeId: string; loja: string | null }[] = [];
   for (const p of compras) {
     const storeId = await storeIdDoProduto(p.product_id ?? "", secret);
     if (!storeId.startsWith("core_vitalicio")) continue;
@@ -673,6 +732,7 @@ async function reconciliarRevenueCat(
       // 09/08: existe vitalício de 27,90 e de 19,90 (downsell) — o valor da
       // linha sai do produto, não de constante.
       storeId,
+      loja: typeof p.store === "string" ? p.store : null,
     });
   }
 
@@ -710,7 +770,7 @@ async function reconciliarRevenueCat(
 
   for (const v of vitalicias) {
     idsVivos.push(v.id);
-    await gravarDadosAparelho(admin, userId, v.id, v.inicio, dados);
+    await gravarDadosAparelho(admin, userId, v.id, v.inicio, obterDados, v.loja);
     const { error } = await admin.from("subscriptions").upsert(
       {
         user_id: userId,
@@ -757,7 +817,7 @@ async function reconciliarRevenueCat(
     const { billing, cents } = infoProduto(storeId);
     const rcId = s.id || `rc:${userId}`;
     idsVivos.push(rcId);
-    await gravarDadosAparelho(admin, userId, rcId, s.starts_at ? new Date(s.starts_at).toISOString() : null, dados);
+    await gravarDadosAparelho(admin, userId, rcId, s.starts_at ? new Date(s.starts_at).toISOString() : null, obterDados, typeof s.store === "string" ? s.store : null);
 
     // UPSERT pela chave natural, não insert/update lido antes: o sync do app e
     // o webhook chegam quase juntos (no 1º teste real, 214 ms de diferença) e

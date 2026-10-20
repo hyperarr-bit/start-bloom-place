@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   dadosDaTransacao,
   dadosDoPedido,
+  dadosInferidosDaFicha,
   dentroDaJanela,
   ipDoCabecalho,
   linhaDadosAparelho,
@@ -30,7 +31,7 @@ describe("dadosDoPedido (revenuecat-sync)", () => {
   it("autorizado: IP do 1º salto do x-forwarded-for, UA do header e IDFA do corpo", () => {
     const d = dadosDoPedido({ plataforma: "ios", att: "authorized", idfa: IDFA, app_versao: "1.0.17", app_build: "44", os_versao: "18.6" }, CAB);
     expect(d).toEqual({
-      plataforma: "ios", att: "authorized", app_versao: "1.0.17", app_build: "44", os_versao: "18.6",
+      plataforma: "ios", att: "authorized", att_origem: "app", app_versao: "1.0.17", app_build: "44", os_versao: "18.6",
       idfa: IDFA, client_ip: "177.10.20.30", user_agent: UA,
     });
   });
@@ -175,6 +176,89 @@ describe("sinaisPrivacidade — o que vai pra Meta", () => {
       ate: 1, madid: "gaid-1", ipUa: parLegado, vendorId: null, fonte: "android",
     });
     expect(sinaisPrivacidade({ ios: false, dados: null, madidAtual: null }).ate).toBe(0);
+  });
+});
+
+describe("atalho da build antiga (≤ 1.0.16, corpo sem `aparelho`): ATT inferido pelo IDFA da ficha", () => {
+  // Ficha app_device_info como a 1.0.16 grava: no iPhone o IDFA vai no campo `gaid`, só com ATT aceito.
+  const ficha = (o: Record<string, unknown> = {}) => ({
+    plataforma: "ios", pacote: "br.com.coreaplicativo.app", versao: "1.0.16", build: "41", os: "18.6", modelo: "iPhone", ...o,
+  });
+
+  it("ficha com IDFA → authorized inferido, gravado com IP (1º salto) + UA + IDFA", () => {
+    const d = dadosInferidosDaFicha(ficha({ gaid: IDFA }), CAB);
+    expect(d).toEqual({
+      plataforma: "ios", att: "authorized", att_origem: "inferido_idfa", app_versao: "1.0.16", app_build: "41", os_versao: "18.6",
+      idfa: IDFA, client_ip: "177.10.20.30", user_agent: UA,
+    });
+    expect(linhaDadosAparelho("u1", "sub_1", d!, AGORA)).toMatchObject({
+      att: "authorized", att_origem: "inferido_idfa", idfa: IDFA, client_ip: "177.10.20.30", user_agent: UA,
+    });
+  });
+
+  it("ficha sem IDFA → unknown, sem IP/UA/IDFA na linha", () => {
+    const d = dadosInferidosDaFicha(ficha(), CAB)!;
+    expect(d).toMatchObject({ att: "unknown", att_origem: "inferido_idfa", idfa: null, client_ip: null, user_agent: null });
+    expect(linhaDadosAparelho("u1", "sub_1", d, AGORA)).toMatchObject({ att: "unknown", idfa: null, client_ip: null, user_agent: null });
+  });
+
+  it.each([
+    ["zerado", "00000000-0000-0000-0000-000000000000"],
+    ["vazio", ""],
+    ["malformado", "nao-e-uuid"],
+  ])("IDFA %s não conta como aceite", (_n, gaid) => {
+    const d = dadosInferidosDaFicha(ficha({ gaid }), CAB)!;
+    expect(d.att).toBe("unknown");
+    expect(d.client_ip).toBeNull();
+    expect(d.user_agent).toBeNull();
+    expect(d.idfa).toBeNull();
+  });
+
+  it("ficha de Android (GAID), sem ficha ou ficha estranha → null (não grava, como antes)", () => {
+    expect(dadosInferidosDaFicha({ plataforma: "android", gaid: IDFA }, CAB)).toBeNull();
+    expect(dadosInferidosDaFicha(null, CAB)).toBeNull();
+    expect(dadosInferidosDaFicha({ gaid: IDFA }, CAB)).toBeNull();
+    expect(dadosInferidosDaFicha([], CAB)).toBeNull();
+  });
+
+  it("revogou o ATT depois: a linha unknown nova é gravada e desfaz o authorized inferido", () => {
+    const antes = linhaDadosAparelho("u1", "sub_1", dadosInferidosDaFicha(ficha({ gaid: IDFA }), CAB)!, AGORA);
+    const depois = dadosInferidosDaFicha(ficha(), CAB)!;
+    expect(precisaGravar(antes, depois)).toBe(true);
+    expect(precisaGravar(antes, dadosInferidosDaFicha(ficha({ gaid: IDFA }), CAB)!)).toBe(false);
+  });
+
+  it("1.0.17 (corpo com `aparelho`) segue igual: authorized/denied do app, origem app", () => {
+    const aut = dadosDoPedido({ plataforma: "ios", att: "authorized", idfa: IDFA }, CAB)!;
+    const neg = dadosDoPedido({ plataforma: "ios", att: "denied", idfa: IDFA }, CAB)!;
+    expect(aut).toMatchObject({ att: "authorized", att_origem: "app", idfa: IDFA, client_ip: "177.10.20.30", user_agent: UA });
+    expect(neg).toMatchObject({ att: "denied", att_origem: "app", idfa: null, client_ip: null, user_agent: null });
+    expect(linhaDadosAparelho("u1", "sub_1", neg, AGORA)).toMatchObject({ att_origem: "app", client_ip: null });
+  });
+
+  it("meta-backfill-app: authorized inferido manda ate 1 + madid + IP/UA (a origem não muda nada)", () => {
+    const linha = {
+      ...linhaDadosAparelho("u1", "sub_1", dadosInferidosDaFicha(ficha({ gaid: IDFA }), CAB)!, AGORA),
+      created_at: new Date(AGORA).toISOString(),
+    } as LinhaDadosAparelho;
+    const dados = dadosDaTransacao([linha], ["sub_1"], AGORA);
+    expect(dados?.att_origem).toBe("inferido_idfa");
+    expect(sinaisPrivacidade({ ios: true, dados, madidAtual: null, vendorId: "v" })).toEqual({
+      ate: 1,
+      madid: IDFA.toLowerCase(),
+      ipUa: { client_ip_address: "177.10.20.30", client_user_agent: UA },
+      vendorId: "v",
+      fonte: "ios_autorizado",
+    });
+  });
+
+  it("meta-backfill-app: unknown inferido = como build antiga sem dados (sem IP/UA)", () => {
+    const linha = {
+      ...linhaDadosAparelho("u1", "sub_1", dadosInferidosDaFicha(ficha(), CAB)!, AGORA),
+      created_at: new Date(AGORA).toISOString(),
+    } as LinhaDadosAparelho;
+    const s = sinaisPrivacidade({ ios: true, dados: dadosDaTransacao([linha], ["sub_1"], AGORA), madidAtual: null, parSinal: { client_ip_address: "8.8.8.8", client_user_agent: UA } });
+    expect(s).toMatchObject({ ate: 0, madid: null, ipUa: null, fonte: "ios_sem_dados" });
   });
 });
 

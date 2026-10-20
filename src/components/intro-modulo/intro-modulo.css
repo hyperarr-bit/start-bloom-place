@@ -127,3 +127,7 @@ button.cm-lembrete-ver { flex: none; min-height: 34px; padding: 0 12px; border-r
 .im-pronto-fechar::before { content: ""; position: absolute; inset: -6px -4px; }
 .im-vazio-fechar::before { content: ""; position: absolute; inset: -8px -4px; }
 .im-vazio-chip::before { content: ""; position: absolute; inset: -5px -2px; }
+
+/* 1.0.17 (dono 19/10: "calmo"): o "Agora não" da faixa é QUIETO — texto sublinhado, sem pílula; fecha só este tutorial */
+button.im-faixa-pular[data-quieto] { background: transparent; font-size: 12px; font-weight: 650; letter-spacing: 0; text-decoration: underline; text-underline-offset: 2px; opacity: .75; padding: 0 4px; }
+.dark button.im-faixa-pular[data-quieto] { background: transparent; }

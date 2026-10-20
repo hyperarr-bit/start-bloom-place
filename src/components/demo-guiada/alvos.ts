@@ -60,6 +60,8 @@ export interface ChipDaMissao {
   valor?: number;
   /** gasto: categoria do módulo (pra linha nascer com a etiqueta certa na demo) */
   categoria?: string;
+  /** 1.0.17: a pessoa ESCREVEU esta opção ("+ Outro") — o texto dela nunca vai em evento (vai "outro") */
+  proprio?: boolean;
 }
 
 /** Como o item nasceu — vai no evento `demo_guia_registro`. */
@@ -198,8 +200,8 @@ export const CHIPS_DE_HABITO: ChipDaMissao[] = [
   { emoji: "🧘", nome: "Alongar 5 min" },
   { emoji: "🛏️", nome: "Arrumar a cama" },
 ];
-export const PERGUNTA_HABITO_VAZIO = "Qual hábito você quer começar hoje?";
-export const PERGUNTA_HABITO_MARCAR = "Agora marca o quadradinho de hoje";
+export const PERGUNTA_HABITO_VAZIO = "Qual hábito você quer começar?";
+export const PERGUNTA_HABITO_MARCAR = "Agora marque o de hoje";
 
 /** Passo A da Rotina: a linha do campo "Nome do hábito..." + Adicionar (abre pelo botão "+ Hábito"). */
 export const linhaDoNovoHabito = (): Element | null => {
@@ -218,7 +220,7 @@ const ALVOS: Record<TipoDoItem, AlvoDaMissao> = {
     passos: [{ seletor: '[data-spotlight="add-expense"]' }, { seletor: '[data-spotlight="financeiro"]', aba: true }],
     anel: linhaComCampo,
     pedido: "toca em 1 gasto seu",
-    pergunta: "Qual foi o seu último gasto?",
+    pergunta: "Gastou algo hoje?",
     chips: CHIPS_DE_GASTO,
     escrever: true,
     botaoOlhar: "Ver meu mês",

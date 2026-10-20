@@ -1137,3 +1137,27 @@ button:has(> svg:only-child):not(.md-botao):not([class*="bg-"]):not([style*="bac
   margin: -8px;
   box-sizing: content-box;
 }
+
+/*
+ * MOVIMENTO CALMO (1.0.17, dono 19/10: "os cortes são bruscos — agradável e lento"). Os mesmos tempos de
+ * src/lib/movimento.ts: rápido (toque), base (troca de passo / folha que sai), calmo (o que entra), respiro (a pausa
+ * antes de pedir algo novo). Com "reduzir movimento": tudo vira um fade curto, sem deslocamento.
+ */
+:root {
+  --mov-rapido: 150ms;
+  --mov-base: 280ms;
+  --mov-calmo: 420ms;
+  --mov-respiro: 500ms;
+  --mov-troca: 260ms;
+  --mov-ease-sai: cubic-bezier(0.22, 1, 0.36, 1);
+  --mov-ease-entra-saida: cubic-bezier(0.4, 0, 1, 1);
+  --mov-passo: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mov-base: 150ms;
+    --mov-calmo: 150ms;
+    --mov-troca: 150ms;
+    --mov-passo: 0px;
+  }
+}

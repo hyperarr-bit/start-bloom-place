@@ -247,7 +247,17 @@ export const MAX_VISTAS_DO_SETUP = 2;
 /* ------------------------------------------------------------------ o estado */
 
 export type DiaDaMissao = 1 | 2 | 3;
-export type Lembrete = "8h" | "12h" | "20h" | "sem";
+/** 1.0.17: além dos 3 chips, a hora DELA pelo "+ Outro" (hora cheia, 6h–22h: "21h"). */
+export type Lembrete = "8h" | "12h" | "20h" | "sem" | `${number}h`;
+/** "21h" → 21 * 60; "sem" → "sem"; lixo → null. */
+export function minutosDoLembrete(l: unknown): number | "sem" | null {
+  if (l === "sem") return "sem";
+  const m = typeof l === "string" ? /^(\d{1,2})h$/.exec(l) : null;
+  const h = m ? Number(m[1]) : NaN;
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h * 60 : null;
+}
+/** A hora do stepper do "+ Outro" (6h–22h). */
+export const HORA_PROPRIA = { min: 6, max: 22 } as const;
 
 export interface EstadoMissaoDoses {
   v: 1;
@@ -719,8 +729,13 @@ export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = lo
   // 1.0.16, braço A: a dose de hoje já foi → a missão volta amanhã (o tour e os adesivos podem entrar);
   // num dia novo, o convite "Dia N da missão" é a tela que falta
   if (ehUmPorDia(m) && !missaoCumprida(m)) {
+    /* 1.0.17 (dono 19/10: "joga informação na cara — faz com calma"): o DIA 1 termina limpo — a dose, a festa, a
+       Home assentando e só a folha do lembrete. Nada de tour no dia 1: ele vem num dia seguinte, DEPOIS da dose daquele
+       dia (a Home já é conhecida e o "amanhã" do tour fala da dose certa). Quem pulou a missão ("explorar") segue a regra
+       de sempre (na 1ª volta à Home); depois do 7º dia a missão não segura mais nada. */
+    if (!m.explorou && dia === 1) return true;
     if (!doseLiberadaHoje(m, hoje)) return false;
-    if (dia >= 2) return conviteDoDiaDevido(m, hoje);
+    if (dia >= 2) return (!m.explorou && dia <= DIA_FIM_DA_MISSAO) || conviteDoDiaDevido(m, hoje);
   }
   // dose por fazer no dia 1 (não pulada hoje; no B, "Agora não" encerra a sessão — a Home é da pessoa)
   if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje && !(ehBracoB(m) && m.agoraNao?.dia === hoje);

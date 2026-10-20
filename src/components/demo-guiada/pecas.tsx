@@ -37,6 +37,7 @@ import { VERDE_OK } from "@/pages/funis/dia14/pecas-roi2";
 import { reais } from "@/lib/demo-guiada";
 import type { ChipDaMissao, Retangulo } from "./alvos";
 import { Quadradinho } from "./Quadradinho";
+import { EscolhaRapida, type NumeroDaEscolha, type OpcaoRapida } from "@/components/ui/escolha-rapida";
 
 export const GRAFITE = "#16121c";
 const AMARELO_POST_IT = "#FFF3B0";
@@ -173,8 +174,11 @@ const ehCampo = (el: unknown) => el instanceof HTMLElement
 export function useDigitando(): boolean {
   const [digitando, setDigitando] = useState(false);
   useEffect(() => {
-    const conferir = () => setDigitando(ehCampo(document.activeElement) || tecladoAberto());
-    const entrou = (e: FocusEvent) => { if (ehCampo(e.target)) setDigitando(true); };
+    /* 1.0.17: o campo do "+ Outro" (EscolhaRapida) mora DENTRO do balão — escrever nele não é "digitando no módulo": o
+       post-it fica na tela (sumir com ele seria sumir com o próprio campo). */
+    const doBalao = (el: unknown) => el instanceof Element && !!el.closest("[data-escolha-campo]");
+    const conferir = () => { const el = document.activeElement; setDigitando(!doBalao(el) && (ehCampo(el) || tecladoAberto())); };
+    const entrou = (e: FocusEvent) => { if (ehCampo(e.target) && !doBalao(e.target)) setDigitando(true); };
     // o Safari demora um instante pra devolver a área visível depois do blur
     const saiu = () => { window.setTimeout(conferir, 80); window.setTimeout(conferir, 400); };
     conferir();
@@ -445,77 +449,89 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
  * meu" leva o foco pro campo do módulo (o teclado abre e o anel sai de cena).
  * Sem chips (Rotina, Saúde): só a instrução — a ação é no próprio módulo.
  */
-export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria, rotuloEscrever = "✎ escrever o meu", compacto = false }: {
+/**
+ * 1.0.17 (dono 19/10: "deixa a pessoa pôr a opção dela") — o "+ Outro" do post-it: abre um campo ali mesmo (com o R$ no
+ * gasto) e o que ela escreveu volta como chip "seu" da próxima vez (`lista` = a memória, na conta). `numero` troca o
+ * campo por um stepper (copos, sono…). Quem chama recebe a opção dela em `aoEscolher` e grava pelo caminho do chip.
+ */
+export interface OutroDoPostIt {
+  lista?: string;
+  placeholder?: string;
+  comValor?: boolean;
+  numero?: NumeroDaEscolha;
+  aoEscolher: (op: { nome: string; valor?: number }) => void;
+}
+
+export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, dica, rotulo = "Passo 2 de 3 · 1 toque", descricao, secundaria, rotuloEscrever = "✎ escrever o meu", compacto = false, outro }: {
   pergunta: string;
   chips: ChipDaMissao[];
   /** o chip que ela acabou de tocar (vira ✓ enquanto o registro aparece) */
   tocado?: string | null;
   aoChip: (chip: ChipDaMissao) => void;
+  /** (antes da 1.0.17) leva o foco pro campo do módulo — só quando não há `outro` */
   aoEscrever?: () => void;
   /** frase pequena embaixo (ex.: "ou escreve direto no campo") */
   dica?: string;
-  /** o rótulo pequeno em cima da pergunta (a missão em doses diz "Agora · 1 toque") */
+  /** o rótulo pequeno em cima da pergunta (a missão em doses diz "Agora · 1 toque"); "" = sem rótulo */
   rotulo?: string;
   /** uma frase explicando o toque, entre a pergunta e os chips */
   descricao?: string;
-  /** 1.0.16: uma saída de texto no pé do post-it (o gasto de carona depois do Montar: "Agora não") */
+  /** 1.0.16: uma saída de texto no pé do post-it ("Ainda não", "Agora não") */
   secundaria?: { texto: string; aoTocar: () => void; testid?: string };
   /** 17/10 (relatório 11): o rótulo do "escrever" (a missão diz "✎ outro") */
   rotuloEscrever?: string;
   /** 17/10 (D4): colado embaixo da faixa — só a pergunta e os chips */
   compacto?: boolean;
+  /** 1.0.17: o "+ Outro" com campo ali mesmo (EscolhaRapida) */
+  outro?: OutroDoPostIt;
 }) {
   const reduzir = useReducedMotion();
+  const opcoes: OpcaoRapida[] = chips.map((c) => ({ id: c.nome, rotulo: c.nome, emoji: c.emoji, valor: c.valor }));
+  const escolher = (op: OpcaoRapida) => {
+    if (op.sua) { outro?.aoEscolher({ nome: op.rotulo, valor: op.valor }); return; }
+    const c = chips.find((x) => x.nome === op.rotulo);
+    if (c) aoChip(c);
+  };
+  const comChips = chips.length > 0 || !!outro;
   return (
     <div className="relative" data-testid="demo-guia-postit">
       <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
       <motion.div
         className={`rounded-md px-4 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)] ${compacto ? "pt-2.5 pb-2.5" : "pt-3.5 pb-3.5"}`}
         style={{ background: AMARELO_POST_IT, color: TINTA_POST_IT, rotate: "-0.6deg" }}
-        initial={reduzir ? false : { y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
+        initial={reduzir ? false : { y: 8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: reduzir ? 0.15 : 0.42, ease: [0.22, 1, 0.36, 1] }}
       >
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{rotulo}</span>
-        <span className="block text-[15px] font-extrabold leading-snug tracking-[-0.01em]">{pergunta}</span>
+        {rotulo ? <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] mb-1" style={{ color: "rgba(38,38,38,.6)" }}>{rotulo}</span> : null}
+        <span className="block text-[16px] font-extrabold leading-snug tracking-[-0.01em]" data-testid="demo-guia-pergunta">{pergunta}</span>
         {descricao && !compacto && <span className="block text-[12.5px] leading-snug mt-1" style={{ color: "rgba(38,38,38,.75)" }}>{descricao}</span>}
-        {chips.length > 0 && (
-          <div className={`${compacto ? "mt-2" : "mt-3"} flex flex-wrap gap-2`}>
-            {chips.map((c, i) => {
-              const marcado = tocado === c.nome;
-              return (
-                <motion.button
-                  key={c.nome}
-                  type="button"
-                  onClick={() => aoChip(c)}
-                  data-testid="demo-guia-chip"
-                  className="min-h-11 pl-3 pr-3.5 rounded-full text-[13.5px] font-bold inline-flex items-center gap-1.5 shadow-[0_2px_0_rgba(0,0,0,.12)] active:scale-95 transition-[transform,background-color,color]"
-                  style={marcado ? { background: GRAFITE, color: "#fff" } : { background: "#fff", color: TINTA_POST_IT }}
-                  initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, scale: marcado ? [1, 1.08, 1] : 1 }}
-                  transition={{ delay: reduzir ? 0 : 0.12 + i * 0.07, duration: 0.3 }}
-                >
-                  {marcado ? <Check className="w-4 h-4" strokeWidth={3.5} /> : <span aria-hidden>{c.emoji}</span>}
-                  <span>{c.nome}</span>
-                  {c.valor != null && <span className={marcado ? "text-white/70 font-semibold" : "font-semibold"} style={marcado ? undefined : { color: "rgba(38,38,38,.55)" }}>· R$ {reais(c.valor)}</span>}
-                </motion.button>
-              );
-            })}
-            {aoEscrever && (
-              <motion.button
+        {comChips && (
+          <div className={compacto ? "mt-2" : "mt-3"}>
+            <EscolhaRapida
+              opcoes={opcoes}
+              aoEscolher={escolher}
+              marcado={tocado ?? null}
+              lista={outro?.lista}
+              outro={outro && !outro.numero ? { placeholder: outro.placeholder, comValor: outro.comValor } : false}
+              numero={outro?.numero}
+              testid="demo-guia"
+            />
+            {!outro && aoEscrever && chips.length > 0 && (
+              <button
                 type="button"
                 onClick={aoEscrever}
                 data-testid="demo-guia-escrever"
-                className="min-h-11 px-3.5 rounded-full text-[13px] font-semibold border border-dashed active:scale-95 transition-transform"
+                className="mt-2 min-h-11 px-3.5 rounded-full text-[13px] font-semibold border border-dashed active:scale-95 transition-transform"
                 style={{ borderColor: "rgba(38,38,38,.45)", color: "rgba(38,38,38,.85)" }}
-                initial={reduzir ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduzir ? 0 : 0.12 + chips.length * 0.07, duration: 0.3 }}
               >
                 {rotuloEscrever}
-              </motion.button>
+              </button>
             )}
           </div>
         )}
         {dica && !compacto && <span className="block mt-2 text-[11.5px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>{dica}</span>}
         {secundaria && !compacto && (
           <button type="button" onClick={secundaria.aoTocar} data-testid={secundaria.testid ?? "demo-guia-secundaria"}
-            className="mt-2 -mb-1 min-h-10 px-1 text-[13px] font-bold underline underline-offset-2" style={{ color: "rgba(38,38,38,.7)" }}>
+            className="mt-2 -mb-1 min-h-10 px-1 text-[13px] font-semibold" style={{ color: "rgba(38,38,38,.6)" }}>
             {secundaria.texto}
           </button>
         )}
@@ -667,7 +683,8 @@ export function ComemoracaoDaMissao({ titulo, chip, de, para, rodape, duracao, a
 const CORES_DO_CONFETE = [MAGENTA, "#FFD84D", VERDE_OK, "#3B82F6", GRAFITE];
 
 /** Uma chuva curta de quadradinhos de papel (planner), sem biblioteca: 22 pedaços, 1,8 s, nunca toca nada. */
-export function Confete({ pedacos = 22 }: { pedacos?: number }) {
+/** `atraso` (s, 1.0.17): o confete espera a coisa anterior terminar (uma coisa por vez — ex.: depois do ✓). */
+export function Confete({ pedacos = 22, atraso = 0 }: { pedacos?: number; atraso?: number }) {
   const reduzir = useReducedMotion();
   if (reduzir) return null;
   return (
@@ -683,7 +700,7 @@ export function Confete({ pedacos = 22 }: { pedacos?: number }) {
             style={{ left: `${x}%`, top: "-4%", width: largura, height: largura * 1.7, background: CORES_DO_CONFETE[i % CORES_DO_CONFETE.length] }}
             initial={{ y: 0, opacity: 0, rotate: 0, x: 0 }}
             animate={{ y: ["0vh", "110vh"], opacity: [0, 1, 1, 0.9, 0], rotate: lado * (240 + (i % 5) * 60), x: lado * (14 + (i % 4) * 10) }}
-            transition={{ duration: 1.9 + (i % 4) * 0.25, delay: 0.15 + (i % 6) * 0.06, ease: [0.3, 0.6, 0.6, 1] }}
+            transition={{ duration: 1.9 + (i % 4) * 0.25, delay: atraso + 0.15 + (i % 6) * 0.06, ease: [0.3, 0.6, 0.6, 1] }}
           />
         );
       })}

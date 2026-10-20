@@ -253,8 +253,10 @@ export const PETS_DA_INTRO: Array<{ id: "cao" | "gato" | "outro"; emoji: string;
   { id: "gato", emoji: "🐱", rotulo: "Gato", nome: "Meu gato", species: "Gato" },
   { id: "outro", emoji: "🐾", rotulo: "Outro bicho", nome: "Meu pet", species: "Pet" },
 ];
-export function cadastrarPet({ get, gravar }: ContextoDaAcao, especie: "cao" | "gato" | "outro"): string {
-  const p = PETS_DA_INTRO.find((x) => x.id === especie) ?? PETS_DA_INTRO[0];
+export function cadastrarPet({ get, gravar }: ContextoDaAcao, especie: "cao" | "gato" | "outro", especieDela?: string): string {
+  const achado = PETS_DA_INTRO.find((x) => x.id === especie) ?? PETS_DA_INTRO[0];
+  // 1.0.17: o bicho dela ("Calopsita", pelo "+ Outro") nasce como "outro" com a espécie que ela escreveu
+  const p = especieDela?.trim() ? { ...achado, species: especieDela.trim().slice(0, 30) } : achado;
   const pets = lista(get<unknown>(CHAVE_PETS, []));
   if (pets.length) return String(mapa(pets[0]).name ?? p.nome);
   const petId = id("pet");
@@ -347,4 +349,52 @@ export function anotarSkill({ get, gravar }: ContextoDaAcao, nome: string): void
   const skills = lista(get<unknown>("career-skills", []));
   if (skills.some((s) => String(mapa(s).name ?? "").trim().toLowerCase() === nome.toLowerCase())) return;
   gravar("career-skills", [...skills, { id: id("skill"), name: nome, category: "técnica", level: 2, targetLevel: 4, notes: "" }]);
+}
+
+/* ───── 1.0.17 — a opção DELA ("+ Outro" da EscolhaRapida, dono 19/10: "e se ela não comeu nenhuma daquelas?") ─────
+ * As listas que gravam por id (o treino de hoje, o cômodo, a pessoa, o pet) ganham a versão por TEXTO: o que ela
+ * escreveu entra no mesmo lugar e no mesmo formato do chip. */
+
+/** Treino › o treino de hoje com o nome dela ("Natação"): o dia de HOJE no plano real, com ele como 1º exercício. */
+export function montarTreinoProprio({ get, gravar, hoje }: ContextoDaAcao, nome: string): { rotulo: string; dia: string; exercicios: number } {
+  const t = nome.trim() || "Meu treino";
+  const dia = diaDaSemana(hoje);
+  const plano = mapa(get<unknown>("saude-workouts-v2", {}));
+  const atual = mapa(plano[dia]);
+  const existentes = lista(atual.exercises) as ExercicioDoPlano[];
+  const exercicios = existentes.length ? existentes : [exercicioNovo(t, { sets: "3", reps: "10" })];
+  gravar("saude-workouts-v2", { ...plano, [dia]: { ...atual, muscles: lista(atual.muscles).length ? atual.muscles : [t], exercises: exercicios } });
+  const ativos = lista(get<unknown>("treino-active-days", ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"])).filter((d): d is string => typeof d === "string");
+  if (!ativos.includes(dia)) gravar("treino-active-days", [...ativos, dia]);
+  return { rotulo: t, dia, exercicios: exercicios.length };
+}
+
+/** Casa › o cômodo dela ("Lavanderia"): entra nos cômodos (os padrão nascem junto) com a 1ª tarefa "Organizar". */
+export function anotarComodoProprio({ get, gravar }: ContextoDaAcao, nome: string): string {
+  const n = nome.trim().toUpperCase().slice(0, 30) || "MEU CÔMODO";
+  const atual = lista(get<unknown>("casa-rooms", []));
+  const rooms = (atual.length ? atual : COMODOS_PADRAO) as Array<{ id: string; name: string; color?: string; tasks: Array<{ id: string; text: string; done: boolean }> }>;
+  const tarefa = { id: `${Date.now()}`, text: "Organizar", done: false };
+  const ja = rooms.find((r) => String(r.name ?? "").toUpperCase() === n);
+  if (ja) {
+    const tarefas = lista(ja.tasks) as Array<{ id: string; text: string; done: boolean }>;
+    if (!tarefas.some((t) => t.text.toLowerCase() === "organizar")) gravar("casa-rooms", rooms.map((r) => (r === ja ? { ...r, tasks: [...tarefas, tarefa] } : r)));
+  } else {
+    gravar("casa-rooms", [...rooms, { id: id("comodo"), name: n, color: "bg-pink-200 dark:bg-pink-900/40", tasks: [tarefa] }]);
+  }
+  return `Organizar (${nome.trim()})`;
+}
+
+/** Relações › a pessoa dela ("Tia Rosa"): entra com o nome que ela escreveu (a relação ela completa na ficha). */
+export function adicionarPessoaPropria({ get, gravar }: ContextoDaAcao, nome: string): string {
+  const n = nome.trim().slice(0, 40) || "Pessoa";
+  const pessoas = lista(get<unknown>(CHAVE_PESSOAS, []));
+  if (pessoas.some((p) => String(mapa(p).name ?? "").trim().toLowerCase() === n.toLowerCase())) return n;
+  gravar(CHAVE_PESSOAS, [...pessoas, { id: id("pessoa"), name: n, relation: "", birthday: "", notes: "" }]);
+  return n;
+}
+
+/** Pet › o bicho dela ("Calopsita"): o pet nasce como "outro", com a espécie que ela escreveu. */
+export function cadastrarPetProprio(ctx: ContextoDaAcao, especie: string): string {
+  return cadastrarPet(ctx, "outro", especie);
 }

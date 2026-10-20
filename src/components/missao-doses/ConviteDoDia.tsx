@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { somarDias } from "@/lib/sequencia";
-import { doseCurta, emSegundos, MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { MODULOS, dosesFeitas, passoPendente, type DiaDaMissao, type EstadoMissaoDoses } from "@/lib/missao-doses";
+import { entrada, MOV } from "@/lib/movimento";
 import "./missao-doses.css";
 
 /** "Ontem" / "Na sexta" / "No sábado" — quando a dose anterior foi feita, do jeito que se fala. */
@@ -59,40 +59,35 @@ export function ConviteDoDia({ missao, hoje, aoIr, aoDepois, aoVer }: {
   if (!pendente) return null;
   const cfg = MODULOS[pendente.modulo];
   const dia = pendente.n;
-  const seg = doseCurta(pendente.modulo, pendente.n).seg;
   // a sequência (dias com QUALQUER registro) está viva em 2 dias e hoje ainda não tem registro: esta dose fecha os 3
   const fechaTres = dia === 3 && seq.dias === 2 && !seq.hojeFeito;
-  const anterior = linhaDaDoseAnterior(missao, hoje);
+  void hoje;
+  /* 1.0.17 (dono: "a copy da missão tem informação demais"): o quadradinho, "Dia 2: Rotina" e um botão. Sem segundos,
+     sem a linha de ontem; no dia que fecha os 3 seguidos, uma frase só. Entra devagar (o fundo, depois a folha). */
   return createPortal(
     <motion.div
       className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10"
       style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
-      role="dialog" aria-modal="true" aria-label={`Dia ${dia} de 3`}
+      role="dialog" aria-modal="true" aria-label={`Dia ${dia}: ${cfg.nome}`}
       data-camada-guia="missao-doses-convite" data-testid="missao-doses-convite" data-dia={dia}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}
     >
       <motion.div
         initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 26 }}
+        transition={entrada(reduzir, MOV.calmo, 0.08)}
         className="md-tema relative w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-left shadow-2xl"
       >
-        <div className="flex items-center gap-2">
-          <span className="flex gap-1" role="img" aria-label={`${feitas} de 3 feitos`}>
-            {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitas} tam={16} />)}
-          </span>
-          <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Seu plano de 3 dias</span>
-        </div>
-        <p className="text-[22px] font-black tracking-[-0.02em] leading-tight mt-2.5" data-testid="missao-doses-convite-titulo">
-          Dia {dia} de 3 · {cfg.emoji} {cfg.nome} · {emSegundos(seg)}
+        <span className="flex gap-1" role="img" aria-label={`${feitas} de 3 feitos`}>
+          {[0, 1, 2].map((i) => <Quadradinho key={i} marcado={i < feitas} tam={16} />)}
+        </span>
+        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight mt-3" data-testid="missao-doses-convite-titulo">
+          Dia {dia}: {cfg.nome}
         </p>
-        {(fechaTres || anterior) && (
-          <p className="text-[13.5px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-convite-texto">
-            {fechaTres ? <><b className="text-foreground">Faltam {emSegundos(seg)} pros seus 3 dias seguidos.</b> </> : null}
-            {anterior}
-          </p>
+        {fechaTres && (
+          <p className="text-[14px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-convite-texto">Falta um passo pros 3 dias seguidos.</p>
         )}
-        <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-convite-ir" onClick={aoIr}>
-          Bora <ArrowRight className="w-4 h-4" />
+        <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-convite-ir" onClick={aoIr}>
+          Começar
         </button>
         <button type="button" className="md-link" data-testid="missao-doses-convite-depois" onClick={aoDepois}>Agora não</button>
       </motion.div>

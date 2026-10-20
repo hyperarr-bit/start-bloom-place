@@ -60,7 +60,9 @@
  *          (a tela do número apareceu; ms_desde_abertura, retomou) | continuar (ms desde o número)}. Nunca valor em reais.
  */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, Check, DollarSign, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, DollarSign, Plus, X } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { trocaDePasso } from "@/lib/movimento";
 import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -211,7 +213,7 @@ function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
   }, [ref]);
 }
 
-export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200, contaCriadaEm }: PropsMontarFinancas) {
+export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 1400, contaCriadaEm }: PropsMontarFinancas) {
   // 1.0.16: chamada PELA missão, os eventos levam o braço e o id dela (o funil Montar → 1º gasto → olha se lê junto)
   const ev = (dados: Record<string, unknown>) => (origem === "missao" ? { ...dados, ...camposDaMissaoNosEventos() } : dados);
   const { get, set } = useUserData();
@@ -227,6 +229,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   const [retomada] = useState<TelaDoNumero | null>(() => (origem === "missao" ? lerTelaDoNumero(criadoEm, agora ?? new Date()) : null));
   const [rascunho] = useState(() => (retomada ? null : lerRascunhoMontar()));
   const [etapa, setEtapa] = useState<Etapa>(retomada ? "pronto" : rascunho?.etapa ?? "renda");
+  /** 1.0.17: a troca de passo desliza pro lado certo (avançar → da direita; Voltar → da esquerda) */
+  const direcao = useRef(1);
+  const voltarPara = (e: Etapa) => { direcao.current = -1; setEtapa(e); };
+  const reduzirMov = !!useReducedMotion();
+  const [verConta, setVerConta] = useState(false);
   const [faixa, setFaixa] = useState<string | null>(retomada?.faixa ?? rascunho?.faixa ?? null);
   const [renda, setRenda] = useState(retomada?.renda ?? rascunho?.renda ?? 0);
   const [contas, setContas] = useState<ContaEscolhida[]>(retomada?.contas ?? rascunho?.contas ?? []);
@@ -282,6 +289,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   }, [etapa, cartao.usa, cartao.dia]);
 
   const irPara = (e: Etapa) => {
+    direcao.current = PASSO_DA_ETAPA[e] >= PASSO_DA_ETAPA[etapa] ? 1 : -1;
     setEtapa(e);
     if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[e], origem }));
   };
@@ -418,14 +426,15 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   return (
     <div ref={folha} className="mf" role="dialog" aria-modal="true" aria-label="Vamos montar suas finanças" data-testid="montar-financas" data-etapa={etapa} data-folha={`montar-financas:${etapa}`}>
       {cabecalho}
-      <div className="mf-corpo">
+      {/* 1.0.17 (dono: "os cortes entre as telas são bruscos"): cada passo ENTRA deslizando 24 px + fade (260 ms); o de
+          antes sai na hora (nada de esperar uma saída animada pra responder ao toque) */}
+      <motion.div key={etapa} className="mf-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
         {etapa === "renda" && (
           <>
             {barra(1)}
             <div className="mf-q">
-              <div className="mf-kicker">Vamos montar suas finanças · 1 de 3</div>
-              <h2>Quanto entra por mês, mais ou menos?</h2>
-              <p>Só pra calcular quanto dá pra gastar por dia. Dá pra mudar depois.</p>
+              <h2>Quanto entra por mês?</h2>
+              <p>Pode ser aproximado.</p>
             </div>
             <div className="mf-chips" data-grade="">
               {FAIXAS_DE_RENDA.map((f) => (
@@ -448,7 +457,6 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                     onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                   />
                 </label>
-                <p>{faixa ? "Um valor de partida — ajusta pro número certo se quiser." : "Salário, freela, pensão… o que entra no mês."}</p>
               </div>
             </div>
             <div className="mf-rodape">
@@ -462,11 +470,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {barra(2)}
             <div className="mf-q">
-              <div className="mf-kicker">2 de 3
-                <button type="button" className="mf-voltar" onClick={() => setEtapa("renda")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
+              <div className="mf-kicker">
+                <button type="button" className="mf-voltar" onClick={() => voltarPara("renda")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
               </div>
-              <h2>Quais contas chegam todo mês?</h2>
-              <p>Toca nas que você tem. Cada uma já vem com um valor típico, que você ajusta. A fatura do cartão vem depois.</p>
+              <h2>Quais contas você paga todo mês?</h2>
+              <p>Toque para marcar.</p>
             </div>
             {/* chip = escolher (só o nome, cabe tudo na tela); o valor típico já entra na tabela, pra ajustar */}
             <div className="mf-chips" data-compacto="">
@@ -515,11 +523,10 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {barra(3)}
             <div className="mf-q">
-              <div className="mf-kicker">3 de 3
-                <button type="button" className="mf-voltar" onClick={() => setEtapa("contas")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
+              <div className="mf-kicker">
+                <button type="button" className="mf-voltar" onClick={() => voltarPara("contas")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
               </div>
-              <h2>Você usa cartão de crédito?</h2>
-              <p>Assim a fatura já entra na conta e o CORE te avisa antes de vencer.</p>
+              <h2>Usa cartão de crédito?</h2>
             </div>
             <div className="mf-chips" data-grade="">
               <button type="button" className="mf-chip" aria-pressed={cartao.usa === true} onClick={() => mudarCartao({ usa: true })}>💳 Uso cartão</button>
@@ -540,7 +547,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                   </div>
                 </div>
                 <div className="mf-campo">
-                  <span className="mf-rotulo" aria-hidden>Fatura deste mês, mais ou menos</span>
+                  <span className="mf-rotulo" aria-hidden>Fatura deste mês</span>
                   <label className="mf-valor-grande">
                     <small>R$</small>
                     <input
@@ -576,19 +583,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
         {etapa === "montando" && (
           <div className="mf-montando" aria-live="polite">
             <div className="mf-orbe" aria-hidden><div><DollarSign size={38} /></div></div>
-            <h2>Montando suas finanças…</h2>
-            <div className="mf-passos">
-              <div className="mf-passo" style={{ animationDelay: "150ms" }}><i><Check size={13} strokeWidth={3} /></i>Renda de R$ {reais(renda)} no mês</div>
-              <div className="mf-passo" style={{ animationDelay: "600ms" }}><i><Check size={13} strokeWidth={3} /></i>
-                {nValidas === 0 ? "Sem contas fixas por enquanto" : nValidas === 1 ? "1 conta fixa anotada" : `${nValidas} contas fixas anotadas`}
-              </div>
-              {resultado.cartao && cartao.dia && (
-                <div className="mf-passo" style={{ animationDelay: "1050ms" }}><i><Check size={13} strokeWidth={3} /></i>
-                  {faturaPaga ? `${faturaNaTela}: paga este mês` : `${faturaNaTela}: dia ${cartao.dia}`}
-                </div>
-              )}
-              <div className="mf-passo" data-esperando="" style={{ animationDelay: resultado.cartao ? "1500ms" : "1050ms" }}><i />Calculando quanto dá por dia</div>
-            </div>
+            <h2>Calculando…</h2>
           </div>
         )}
 
@@ -598,44 +593,47 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                 (a missão abre depois do "Continuar →"); nada de post-it aqui. */}
             <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined}>
               <div className="mf-grande">
-                <small>VOCÊ PODE GASTAR HOJE</small>
+                <small>Você pode gastar</small>
                 <strong data-testid="montar-por-dia" data-valor={resultado.porDia}>
                   {/* leitor de tela: o número final, sem a contagem (aria-label num <strong> não é lido no VoiceOver) */}
                   <span className="sr-only">{`R$ ${reais(resultado.porDia)} por dia`}</span>
                   <span aria-hidden>{rs(numeroNaTela)}</span><em aria-hidden>por dia</em>
                 </strong>
-                <p>
+                <p data-testid="montar-ate-quando">
                   {resultado.semFolga
-                    ? resultado.cartao
-                      ? "Suas contas fixas e a fatura já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
-                      : "Suas contas fixas já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
-                    : resultado.dias === 1
-                      ? `Hoje é o último dia do mês — já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`
-                      : `até o fim do mês (${resultado.dias} dias, contando hoje), já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`}
+                    ? "Suas contas já levam a renda do mês."
+                    : resultado.dias === 1 ? "Hoje é o último dia do mês." : "até o fim do mês."}
                 </p>
               </div>
-              <div className="mf-folha">
-                <div className="mf-faixa">🧾 A conta do seu mês</div>
-                <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
-                <div className="mf-conta"><span>Contas fixas ({resultado.contas})</span>− R$ {reais(resultado.fixos)}</div>
-                {resultado.cartao && cartao.dia && (
-                  <div className="mf-conta" data-testid="montar-fatura">
-                    <span>{faturaNaTela} <small>· {faturaPaga ? "já paga" : `vence dia ${cartao.dia}`}</small></span>− R$ {reais(resultado.fatura)}
+              {/* 1.0.17 (dono: "joga informação na cara"): a conta do mês fica FECHADA — quem quiser, abre */}
+              <div className="mf-folha" data-aberta={verConta ? "" : undefined}>
+                <button type="button" className="mf-ver-conta" aria-expanded={verConta} data-testid="montar-ver-conta" onClick={() => setVerConta((v) => !v)}>
+                  <span>Ver a conta</span><ChevronDown size={16} aria-hidden style={{ transform: verConta ? "rotate(180deg)" : undefined, transition: "transform var(--mov-base)" }} />
+                </button>
+                {verConta && (
+                  <div data-testid="montar-conta">
+                    <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
+                    <div className="mf-conta"><span>Contas fixas ({resultado.contas})</span>− R$ {reais(resultado.fixos)}</div>
+                    {resultado.cartao && cartao.dia && (
+                      <div className="mf-conta" data-testid="montar-fatura">
+                        <span>{faturaNaTela} <small>· {faturaPaga ? "já paga" : `vence dia ${cartao.dia}`}</small></span>− R$ {reais(resultado.fatura)}
+                      </div>
+                    )}
+                    <div className="mf-conta" data-total=""><span>Livre pro mês</span>R$ {reais(Math.max(0, resultado.livre))}</div>
+                    {!resultado.semFolga && resultado.dias > 1 && (
+                      <div className="mf-conta"><span>÷ {resultado.dias} dias</span>R$ {reais(resultado.porDia)} por dia</div>
+                    )}
                   </div>
                 )}
-                <div className="mf-conta" data-total=""><span>Livre pro mês</span>R$ {reais(Math.max(0, resultado.livre))}</div>
-                {!resultado.semFolga && resultado.dias > 1 && (
-                  <div className="mf-conta"><span>÷ {resultado.dias} dias</span>R$ {reais(resultado.porDia)} por dia</div>
-                )}
               </div>
-              {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está tudo nas suas Finanças. Dá pra mudar quando quiser.</p>}
+              {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está nas suas Finanças.</p>}
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={continuar}>{naMissao ? "Continuar →" : "Ver minhas Finanças"}</button>
+              <button type="button" className="mf-cta" onClick={continuar}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
             </div>
           </>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -49,10 +49,9 @@ import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
 import { lerMissao, missaoDosesLigada, type DiaDaMissao } from "@/lib/missao-doses";
 import {
-  CAFE_DA_MANHA, DESTINOS_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE, adicionarCurso, adicionarLivro, adicionarPessoaDoComeco, anotarCafeDaManha, anotarDestino,
-  COMODOS_DA_INTRO, DESTINOS_PLANEJANDO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, adicionarCursoDesejado, anotarContaFixa, anotarItemDoMercado, anotarEspelhoDoDia, anotarHumor, anotarMetaDeCurtoPrazo,
-  anotarMotivacao, anotarPensamento, anotarRefeicao, anotarSkill, anotarSono, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, comecarDetox, criarMeta,
-  diaDaSemana as diaDaSemanaDoTreino, marcarPaginaDoLivro, montarSkincare, montarTreinoDeHoje, type ContextoDaAcao, type TreinoDeHoje,
+  CAFE_DA_MANHA, COMODOS_DA_INTRO, DESTINOS_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE, adicionarCurso, adicionarLivro, adicionarPessoaDoComeco, adicionarPessoaPropria,
+  anotarCafeDaManha, anotarComodoProprio, anotarDestino, anotarPensamento, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, cadastrarPetProprio, comecarDetox, criarMeta,
+  diaDaSemana as diaDaSemanaDoTreino, montarSkincare, montarTreinoDeHoje, montarTreinoProprio, type ContextoDaAcao, type TreinoDeHoje,
 } from "@/lib/intro-modulo-acoes";
 import { planoVazio } from "@/lib/treino-plano";
 import { cardPorTitulo } from "@/lib/conhecer-mais";
@@ -308,11 +307,13 @@ export const OLHAR_POSSO_GASTAR: OlharNoResumo = {
   ler: (el) => lerReaisDoTexto(el.querySelector("p")?.textContent),
   // o por-dia cai exatamente valor ÷ dias restantes (computeDailyBudget): o de antes sai daí
   antes: (depois, valor) => Math.round(depois + valor / diasRestantesNoMes()),
-  numero: { titulo: "Hoje dá pra gastar", formatar: reaisInteiros },
-  titulo: "Esse número é o seu guia do dia",
-  texto: "O café já está descontado aqui. Cada gasto que você anota mexe nele na hora — é por ele que você decide o resto do dia.",
+  numero: { titulo: "Dá pra gastar hoje", formatar: reaisInteiros },
+  titulo: "Seu número do dia",
+  texto: "Cada gasto mexe nele na hora.",
 };
 export interface OpcaoDaIntro { emoji: string; rotulo: string; /** o que vai pro evento (sem acento/emoji) */ id: string }
+/** 1.0.17: o id da opção que a pessoa ESCREVEU no "+ Outro" (o rótulo é o texto dela) — o `executar` grava por texto. */
+export const ID_OUTRO_DA_INTRO = "outro";
 /**
  * UM PASSO da intro de 1 toque (17/10, o padrão da Saúde pra TODOS os módulos): o post-it com a pergunta e os
  * chips, ancorado no controle real do módulo (`alvo`; sem ele, o post-it fica solto embaixo da faixa) — 1 toque
@@ -325,6 +326,12 @@ export interface PassoDaIntro {
   pergunta: string;
   descricao?: string;
   opcoes: OpcaoDaIntro[];
+  /**
+   * 1.0.17 (dono 19/10: "e se ela não comeu nenhuma daquelas?"): o "+ Outro" dos chips — o campo abre ali mesmo e o
+   * `executar` recebe `{ id: ID_OUTRO_DA_INTRO, rotulo: <o texto dela> }`. Padrão: ligado em todo passo com chips e
+   * `executar`; `false` desliga (tipo de pele: a rotina nasce de um dos 3).
+   */
+  outro?: { placeholder?: string } | false;
   /** um passo de OLHAR: o anel num card real com um balão de 1 frase e "Entendi" — sem ação; card ausente = pulado */
   olhar?: { titulo: string; texto: string };
   /** grava o que ela escolheu; devolve o rótulo do que entrou (sem retorno = o rótulo do chip) */
@@ -364,7 +371,8 @@ const olharPorTitulo = (re: RegExp) => (): Element | null => cardPorTitulo(re);
 const linhaDeHojeDaRotina = (): Element | null => {
   try { const btn = document.querySelector('[data-spotlight="add-habit"]'); return btn ? btn.closest("section, .rounded-2xl, .rounded-xl, .rounded-lg") ?? btn : null; } catch { return null; }
 };
-const humores = HUMORES_DA_INTRO.map((h) => op(h.emoji, h.rotulo, h.id));
+/** 1.0.17: o nome do hábito de detox que a intro acabou de criar (o "+ Outro" dela também) — o passo do check-in acha o card dele. */
+let detoxDaIntro = "";
 
 /**
  * OS PASSOS DE CADA MÓDULO (17/10, dono: "tipo Finanças, que tem vários"): 3–4 passos, cada um a ação mais usada
@@ -376,33 +384,23 @@ export const INTROS: Record<string, IntroConfig> = {
   /* ───────── guiadas: a dose, sem a missão em volta ───────── */
   financas: {
     formato: "guiada", moduleId: "financas", nome: "Finanças", tipo: "gasto",
-    pedido: "toca em 1 gasto seu",
-    olhar: { titulo: "Olha o seu mês", texto: "O gasto entrou no dia de hoje e o 'Saiu' do mês somou sozinho. É daí que sai quanto dá pra gastar hoje." },
-    pronto: "Finanças é isso: você anota, o mês soma.",
+    pedido: "anote 1 gasto",
+    olhar: { titulo: "Seu mês", texto: "Cada gasto soma aqui." },
+    pronto: "Você anota, o mês soma.",
     // depois do Montar (renda + contas fixas), o "olha" vai no QUANTO POSSO GASTAR HOJE do Dashboard — o número que ela acabou de ver
     olharNoResumo: OLHAR_POSSO_GASTAR,
     cor: { faixa: "#FFF4C2", tinta: "#7a5a00", acento: "#d97706" },
     // elegível = nenhum gasto VARIÁVEL ainda; renda e contas fixas do Montar não contam (a intro ensina a anotar o gasto)
     vazio: (get) => vazias(get, ["finance-expenses"]),
     montar: MONTAR_FINANCAS,
-    // 3) custos fixos (57%) → 4) olha o card deles
-    maisPassos: [{
-      pedido: "anota 1 conta fixa", pergunta: "Uma conta que vem todo mês:",
-      opcoes: [op("🏠", "Aluguel", "aluguel"), op("💡", "Luz", "luz"), op("📶", "Internet", "internet")],
-      executar: (ctx, o) => anotarContaFixa(ctx, o.id),
-      alvo: { aba: "MEU FINANCEIRO", achar: olharPorTitulo(/^CUSTOS FIXOS$/i), abaixo: true },
-    }, {
-      pedido: "olha as contas fixas", pergunta: "", opcoes: [],
-      olhar: { titulo: "Custos fixos", texto: "As contas de todo mês ficam aqui. O ✓ marca como paga — e o Meu Mês já desconta." },
-      alvo: { aba: "MEU FINANCEIRO", achar: olharPorTitulo(/^CUSTOS FIXOS$/i) },
-    }],
+    // 1.0.17 (dono: "minimalista"): no máximo 2 passos — o gasto e o "olha"; as contas fixas ficam pro Montar
   },
   rotina: {
     formato: "guiada", moduleId: "rotina", nome: "Rotina", tipo: "habito",
-    pedido: "marca 1 hábito de hoje",
-    olhar: { titulo: "A linha da semana", texto: "Cada quadradinho marcado vira um dia na sua sequência. A semana inteira cabe num olhar." },
-    pronto: "Rotina é isso: um quadradinho por dia.",
-    depoisDoMontar: { pergunta: "Marca o primeiro quando fizer", descricao: "A linha de HOJE: toca no quadradinho do hábito que você já fez." },
+    pedido: "marque 1 hábito",
+    olhar: { titulo: "Sua semana", texto: "Cada quadradinho vira um dia seguido." },
+    pronto: "Um quadradinho por dia.",
+    depoisDoMontar: { pergunta: "Marque o primeiro quando fizer", descricao: "Toque no quadradinho de hoje." },
     cor: { faixa: "#DDF5E4", tinta: "#14532d", acento: "#059669" },
     // elegível = NENHUM quadradinho marcado ainda; os hábitos criados pelo montar não contam como dado
     vazio: (get) => {
@@ -411,51 +409,37 @@ export const INTROS: Record<string, IntroConfig> = {
       return !marcou && vazias(get, ["core-rotina-habit-log"]);
     },
     montar: MONTAR_ROTINA,
-    // (criar → marcar → olha a semana) + 4) "Como você está hoje?" (24%)
-    maisPassos: [{
-      pedido: "conta como você está", pergunta: "Como você está hoje?",
-      opcoes: humores,
-      executar: (ctx, o) => anotarHumor(ctx, "mood-log", o.id),
-      alvo: { aba: "MINHA SEMANA", achar: olharPorTitulo(/COMO VOC[ÊE] EST[ÁA] HOJE/i), abaixo: true },
-    }],
+    // 1.0.17: no máximo 2 passos — o hábito e o "olha"
   },
   saude: {
     formato: "guiada", moduleId: "saude", nome: "Saúde", tipo: "agua",
-    pedido: "marca 1 copo d'água",
-    olhar: { titulo: "O copo que contou", texto: "Cada copo entra na meta do dia. O CORE te lembra de bater ela." },
-    pronto: "Saúde é isso: água, sono e remédio, um toque cada.",
+    pedido: "marque 1 copo d'água",
+    olhar: { titulo: "O copo contou", texto: "Cada copo soma na meta do dia." },
+    pronto: "Água, sono e remédio: um toque cada.",
     cor: { faixa: "#FFE1E1", tinta: "#7f1d1d", acento: "#dc2626" },
     vazio: (get) => vazias(get, ["core-saude-water", "water-log", "core-saude-sleep", "core-saude-supplement-log"]),
-    // (água → olha) + 3) sono (21%) → 4) olha o IMC (28%)
-    maisPassos: [{
-      pedido: "anota o sono", pergunta: "Quantas horas você dormiu?",
-      opcoes: [op("😴", "6 h", "6"), op("😊", "7 h", "7"), op("🌙", "8 h", "8")],
-      executar: (ctx, o) => anotarSono(ctx, Number(o.id)),
-      alvo: { aba: "HOJE", achar: olharPorTitulo(/^Sono$/i), abaixo: true },
-    }, {
-      pedido: "olha o IMC", pergunta: "", opcoes: [],
-      olhar: { titulo: "Calculadora IMC", texto: "Altura e peso uma vez, e o IMC sai na hora. A Evolução guarda as medidas ao longo do tempo." },
-      alvo: { aba: "HOJE", achar: olharPorTitulo(/CALCULADORA IMC/i) },
-    }],
+    // 1.0.17: no máximo 2 passos — a água e o "olha"
   },
 
   /* ───────── de vários passos (o motor de 1 toque): ação → olha → ação ───────── */
   treino: {
     formato: "toque", moduleId: "treino", nome: "Treino",
-    pedido: "monta o treino de hoje",
-    pronto: "Marca cada série no HOJE quando fizer — o descanso começa sozinho.",
+    pedido: "monte o treino de hoje",
+    pronto: "Marque cada série quando fizer.",
     passos: [{
       pergunta: "Qual treino você faz hoje?",
-      descricao: "Toca num e o treino de hoje entra pronto, exercício por exercício.",
       opcoes: TREINOS_DE_HOJE.map((t) => op(t.emoji, t.rotulo, t.id)),
-      executar: (ctx, o) => { const r = montarTreinoDeHoje(ctx, o.id as TreinoDeHoje); return `${r.rotulo} (${r.exercicios} exercícios)`; },
+      outro: { placeholder: "Ex.: Natação" },
+      executar: (ctx, o) => {
+        if (o.id === ID_OUTRO_DA_INTRO) return montarTreinoProprio(ctx, o.rotulo).rotulo;
+        const r = montarTreinoDeHoje(ctx, o.id as TreinoDeHoje); return `${r.rotulo} (${r.exercicios} exercícios)`;
+      },
       // o plano vazio abre no PLANO: o post-it fica no cabeçalho do MEU PLANO DA SEMANA (a coluna de hoje é dali)
       alvo: { aba: "PLANO", achar: porSeletor('[data-testid="plano-semana"] h2'), abaixo: true },
       depois: () => abrirAbaDoModulo("HOJE"),
     }, {
       // 2º passo = a ação #1 do Treino na 1ª semana (marcar treino feito, 40%): o quadradinho da 1ª série de HOJE
-      pedido: "marca a 1ª série", pergunta: "Fez o primeiro? Marca ali",
-      descricao: "É o quadradinho do 1º exercício de hoje. Cada série marcada já conta o descanso.",
+      pedido: "marque a 1ª série", pergunta: "Fez o primeiro? Marque ali.",
       opcoes: [],
       // o módulo grava a série marcada na sessão do dia (treino-sessao: series[k][i].feito) e o exercício inteiro no plano (done)
       escutar: { chaves: ["treino-sessao", "saude-workouts-v2"], rotulo: (valor, _ant, chave) => {
@@ -468,16 +452,6 @@ export const INTROS: Record<string, IntroConfig> = {
         return feito ? `${String(mapa(feito).name ?? "o 1º exercício")} feito` : null;
       } },
       alvo: { aba: "HOJE", achar: porSeletor('[data-testid="treino-hoje"] button[aria-label^="Marcar "]') },
-    }, {
-      // 3) a semana (dias ativos / constância, 21%)
-      pedido: "olha a sua semana", pergunta: "", opcoes: [],
-      olhar: { titulo: "A sua semana", texto: "Quantos treinos você fez e a sua sequência. A meta é sua: 3, 4 ou 5 por semana." },
-      alvo: { aba: "SEMANA", achar: porSeletor('[data-testid="treino-semana"]') },
-    }, {
-      // 4) os modelos prontos (11%)
-      pedido: "olha os modelos", pergunta: "", opcoes: [],
-      olhar: { titulo: "Modelos prontos", texto: "Um toque monta a semana inteira com 5 exercícios por dia. Séries, repetições e carga você ajusta depois." },
-      alvo: { aba: "PLANO", achar: porSeletor('[data-testid="modelos-prontos"]') },
     }],
     cor: { faixa: "#DCEBFF", tinta: "#1e3a8a", acento: "#2563eb" },
     vazio: (get) => planoVazio(get<unknown>("saude-workouts-v2", null)) && vazias(get, ["saude-workout-log"]),
@@ -486,11 +460,12 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   dieta: {
     formato: "toque", moduleId: "dieta", nome: "Dieta",
-    pedido: "anota o café de hoje",
-    pronto: "Dieta é isso: cada refeição no dia dela. Dá pra copiar um dia pros outros.",
+    pedido: "anote o café de hoje",
+    pronto: "Cada refeição fica no dia dela.",
     passos: [{
-      pergunta: "O que foi o seu café da manhã hoje?",
+      pergunta: "O que você comeu no café?",
       opcoes: [op("☕", "Pão com café", "pao_com_cafe"), op("🥚", "Ovos mexidos", "ovos"), op("🍌", "Fruta com iogurte", "fruta_iogurte")],
+      outro: { placeholder: "Ex.: Tapioca" },
       executar: (ctx, o) => anotarCafeDaManha(ctx, o.rotulo),
       // o card de HOJE do cardápio (nasce recolhido no celular: abre antes de apontar — SÓ o botão "Abrir <dia>",
       // nunca o gatilho do "Limpar cardápio", que também tem aria-expanded; bug de 16/10)
@@ -502,15 +477,9 @@ export const INTROS: Record<string, IntroConfig> = {
       }, abaixo: true },
     }, {
       // 2) olha o dia no cardápio (o dia é a ação #1 da Dieta, 9%)
-      pedido: "olha o seu dia", pergunta: "", opcoes: [],
-      olhar: { titulo: "O seu dia no cardápio", texto: "O café entrou na refeição de hoje. As outras você preenche quando quiser — e dá pra copiar o dia inteiro pros outros." },
+      pedido: "olhe o seu dia", pergunta: "", opcoes: [],
+      olhar: { titulo: "Seu dia no cardápio", texto: "As outras refeições você põe quando quiser." },
       alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje) },
-    }, {
-      // 3) mais uma refeição de hoje
-      pedido: "anota o almoço", pergunta: "E o almoço de hoje?",
-      opcoes: [op("🍗", "Frango com arroz", "frango_arroz"), op("🥗", "Salada com proteína", "salada"), op("🍝", "Macarrão", "macarrao")],
-      executar: (ctx, o) => anotarRefeicao(ctx, "Almoço", o.rotulo),
-      alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje), abaixo: true },
     }],
     cor: { faixa: "#E3F6E0", tinta: "#14532d", acento: "#16a34a" },
     vazio: (get) => {
@@ -521,80 +490,57 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   estudos: {
     formato: "toque", moduleId: "estudos", nome: "Estudos",
-    pedido: "anota 1 curso",
-    pronto: "Estudos é isso: cada curso com as aulas feitas, o caderno e as provas.",
+    pedido: "anote 1 curso",
+    pronto: "Cada curso com suas aulas e provas.",
     passos: [{
       pergunta: "O que você está estudando?",
-      descricao: "Só o nome por enquanto. Link e aulas você completa depois.",
       opcoes: [op("🇬🇧", "Inglês", "ingles"), op("🎓", "Faculdade", "faculdade"), op("📚", "Concurso", "concurso")],
+      outro: { placeholder: "Ex.: Programação" },
       executar: (ctx, o) => adicionarCurso(ctx, o.rotulo),
       alvo: { achar: linhaDoCampo('input[placeholder="Adicionar curso..."]') },
     }, {
       // 2) olha o curso (cursos em andamento: 12%, a ação #1)
-      pedido: "olha o seu curso", pergunta: "", opcoes: [],
-      olhar: { titulo: "O curso entrou", texto: "Toca nele pra pôr o link, as aulas feitas e as anotações. A barra anda a cada aula." },
+      pedido: "olhe o seu curso", pergunta: "", opcoes: [],
+      olhar: { titulo: "Seu curso entrou", texto: "Toque nele pra pôr aulas e anotações." },
       alvo: { achar: olharPorTitulo(/CURSOS EM ANDAMENTO/i) },
-    }, {
-      // 3) um curso que ela quer (cursos que desejo)
-      pedido: "anota 1 que você quer", pergunta: "E um curso que você quer fazer?",
-      opcoes: [op("📊", "Excel", "excel"), op("🇪🇸", "Espanhol", "espanhol"), op("📣", "Marketing digital", "marketing")],
-      executar: (ctx, o) => adicionarCursoDesejado(ctx, o.rotulo),
-      alvo: { achar: olharPorTitulo(/CURSOS QUE DESEJO/i), abaixo: true },
     }],
     cor: { faixa: "#E4E6FF", tinta: "#312e81", acento: "#4f46e5" },
     vazio: (get) => vazias(get, ["estudos-cursos-andamento", "estudos-notebooks", "estudos-exams", "estudos-subjects"]),
   },
   biblioteca: {
     formato: "toque", moduleId: "biblioteca", nome: "Biblioteca",
-    pedido: "põe 1 livro na estante",
-    pronto: "Biblioteca é isso: capa, página atual e anotações. A meta do ano conta sozinha.",
+    pedido: "ponha 1 livro na estante",
+    pronto: "Capa, página e anotações de cada livro.",
     passos: [{
-      pergunta: "Qual você está lendo (ou quer começar)?",
-      descricao: "Entra como 'lendo'. O seu livro você adiciona pelo link ou pelo título.",
+      pergunta: "O que você está lendo?",
       opcoes: [op("📘", "Hábitos Atômicos", "habitos_atomicos"), op("📗", "O Poder do Hábito", "poder_do_habito"), op("📙", "Essencialismo", "essencialismo")],
+      outro: { placeholder: "Título do livro" },
       executar: (ctx, o) => adicionarLivro(ctx, { titulo: o.rotulo, autor: LIVROS[o.id]?.autor ?? "", capa: LIVROS[o.id]?.capa ?? "" }),
       alvo: { achar: porSeletor('button[aria-label="Adicionar livro"]') },
     }, {
       // 2) olha o "Lendo agora" (14%, a ação #1)
-      pedido: "olha o Lendo agora", pergunta: "", opcoes: [],
-      olhar: { titulo: "Lendo agora", texto: "O livro fica aqui com a capa e a barra de páginas. Toca nele pra anotar frases e a página." },
+      pedido: "olhe o Lendo agora", pergunta: "", opcoes: [],
+      olhar: { titulo: "Lendo agora", texto: "Toque no livro pra marcar a página." },
       alvo: { achar: olharPorTitulo(/LENDO AGORA/i) },
-    }, {
-      // 3) a página atual (a barra anda)
-      pedido: "marca a página", pergunta: "Em que página você está?",
-      opcoes: [op("📖", "Começando", "1"), op("📄", "Página 50", "50"), op("📑", "Página 120", "120")],
-      executar: (ctx, o) => marcarPaginaDoLivro(ctx, Number(o.id)),
-      alvo: { achar: olharPorTitulo(/LENDO AGORA/i), abaixo: true },
     }],
     cor: { faixa: "#FFE9D6", tinta: "#7c2d12", acento: "#ea580c" },
     vazio: (get) => vazias(get, ["lib-books"]),
   },
   casa: {
     formato: "toque", moduleId: "casa", nome: "Casa",
-    pedido: "organiza 1 cômodo",
-    pronto: "Casa é isso: cada cômodo com as tarefas dele; o mercado e a despensa ficam nas outras abas.",
+    pedido: "organize 1 cômodo",
+    pronto: "Cada cômodo com as tarefas dele.",
     passos: [{
-      pergunta: "Qual cômodo você quer organizar primeiro?",
-      descricao: "Toca num e a 1ª tarefa dele já entra.",
+      pergunta: "Qual cômodo primeiro?",
       opcoes: COMODOS_DA_INTRO.map((c) => op(c.emoji, c.rotulo, c.id)),
-      executar: (ctx, o) => anotarTarefaDoComodo(ctx, o.id),
+      outro: { placeholder: "Ex.: Lavanderia" },
+      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? anotarComodoProprio(ctx, o.rotulo) : anotarTarefaDoComodo(ctx, o.id)),
       alvo: { aba: "CÔMODOS", achar: linhaDoCampo('input[placeholder="Adicionar item..."]') },
     }, {
       // 2) olha o cômodo (cômodos: 9%, a ação #1)
-      pedido: "olha o cômodo", pergunta: "", opcoes: [],
-      olhar: { titulo: "O cômodo com a tarefa", texto: "Cada cômodo tem a lista dele. Toca no quadradinho quando fizer — e põe as suas." },
+      pedido: "olhe o cômodo", pergunta: "", opcoes: [],
+      olhar: { titulo: "Seu cômodo", texto: "Marque cada tarefa quando fizer." },
       alvo: { aba: "CÔMODOS", achar: olharPorTitulo(/^(COZINHA|QUARTO|BANHEIRO)$/i) },
-    }, {
-      // 3) o mercado (lista)
-      pedido: "anota 1 item do mercado", pergunta: "O que está faltando no mercado?",
-      opcoes: [op("🥛", "Leite", "leite"), op("🍞", "Pão", "pao"), op("☕", "Café", "cafe")],
-      executar: (ctx, o) => anotarItemDoMercado(ctx, o.rotulo),
-      alvo: { aba: "MERCADO", achar: linhaDoCampo('input[placeholder="Adicionar..."]') },
-    }, {
-      // 4) a limpeza (6%)
-      pedido: "olha a limpeza", pergunta: "", opcoes: [],
-      olhar: { titulo: "Rotina de limpeza", texto: "O que é de todo dia, da semana e do mês, pra marcar quando fizer. O app renova sozinho." },
-      alvo: { aba: "ROTINA", achar: olharPorTitulo(/LIMPEZA DI[ÁA]RIA/i) },
     }],
     cor: { faixa: "#DDF4F8", tinta: "#155e75", acento: "#0e7490" },
     vazio: (get) => {
@@ -607,55 +553,38 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   desenvolvimento: {
     formato: "toque", moduleId: "desenvolvimento", nome: "Metas",
-    pedido: "escolhe 1 meta sua",
-    pronto: "Metas é isso: cada meta vira um quadro com etapas pra marcar.",
+    pedido: "escolha 1 meta",
+    pronto: "Cada meta vira um quadro com etapas.",
     passos: [{
       pergunta: "Qual meta você quer tirar do papel?",
-      descricao: "A meta nasce com duas etapas pra você preencher.",
       opcoes: [op("🏃", "Correr 5 km", "correr_5km"), op("💰", "Guardar R$ 1.000", "guardar_1000"), op("📚", "Ler 12 livros", "ler_12_livros")],
+      outro: { placeholder: "Ex.: Aprender a nadar" },
       executar: (ctx, o) => criarMeta(ctx, o.rotulo),
       alvo: { aba: "METAS", achar: porSeletor('[data-spotlight="add-goal"]') },
     }, {
       // 2) olha a meta
-      pedido: "olha a sua meta", pergunta: "", opcoes: [],
-      olhar: { titulo: "A meta com etapas", texto: "Toca nela pra ver o quadro: cada etapa feita aparece aqui." },
+      pedido: "olhe a sua meta", pergunta: "", opcoes: [],
+      olhar: { titulo: "Sua meta", texto: "Toque nela pra ver as etapas." },
       alvo: { aba: "METAS", achar: porSeletor('[data-spotlight="add-goal"]') },
-    }, {
-      // 3) "O que me motiva" (16%, a ação #1 do módulo)
-      pedido: "conta o que te motiva", pergunta: "O que te motiva a acordar?",
-      opcoes: [op("👨‍👩‍👧", "Minha família", "familia"), op("💪", "Minha saúde", "saude"), op("🏡", "Minha independência", "independencia")],
-      executar: (ctx, o) => { anotarMotivacao(ctx, o.rotulo); },
-      alvo: { aba: "SOBRE MIM", achar: olharPorTitulo(/O QUE ME MOTIVA/i), abaixo: true },
-    }, {
-      // 4) o humor (8%)
-      pedido: "marca o humor", pergunta: "Como está o seu humor hoje?",
-      opcoes: humores,
-      executar: (ctx, o) => anotarHumor(ctx, "dp-mood-log", o.id),
-      alvo: { aba: "HUMOR & SCORE", achar: olharPorTitulo(/HUMOR/i), abaixo: true },
     }],
     cor: { faixa: "#EFE2FF", tinta: "#4c1d95", acento: "#7c3aed" },
     vazio: (get) => vazias(get, ["goals-board-v2", "dp-gratitude", "dp-mood-log", "dp-motivations"]),
   },
   carreira: {
     formato: "toque", moduleId: "carreira", nome: "Carreira",
-    pedido: "anota 1 tarefa de hoje",
-    pronto: "Carreira é isso: o Pomodoro, os contadores e as tarefas do dia numa folha só.",
+    pedido: "anote 1 tarefa de hoje",
+    pronto: "Foco e tarefas do dia numa folha só.",
     passos: [{
-      pergunta: "Uma tarefa do trabalho pra hoje:",
+      pergunta: "Uma tarefa do trabalho pra hoje?",
       opcoes: [op("📧", "Responder e-mails", "emails"), op("📊", "Fechar o relatório", "relatorio"), op("📞", "Ligar pro cliente", "cliente")],
+      outro: { placeholder: "Ex.: Revisar a proposta" },
       executar: (ctx, o) => anotarTarefaDoTrabalho(ctx, o.rotulo),
       alvo: { aba: "Meu Dia", achar: linhaDoCampo('input[placeholder="Nova tarefa do trabalho..."]') },
     }, {
       // 2) olha o Meu Dia (fases + pomodoro: as ações #1 e #3)
-      pedido: "olha o seu dia", pergunta: "", opcoes: [],
-      olhar: { titulo: "O seu dia de trabalho", texto: "A tarefa entrou na lista de hoje. Em cima ficam o Pomodoro pra focar e os contadores do que você faz todo dia." },
+      pedido: "olhe o seu dia", pergunta: "", opcoes: [],
+      olhar: { titulo: "Seu dia de trabalho", texto: "A tarefa está na lista de hoje." },
       alvo: { aba: "Meu Dia", achar: linhaDoCampo('input[placeholder="Nova tarefa do trabalho..."]') },
-    }, {
-      // 3) uma skill (a aba Skills)
-      pedido: "anota 1 skill", pergunta: "Uma skill que você quer evoluir:",
-      opcoes: [op("🇬🇧", "Inglês", "ingles"), op("📊", "Excel", "excel"), op("🗣️", "Falar em público", "falar")],
-      executar: (ctx, o) => { anotarSkill(ctx, o.rotulo); },
-      alvo: { aba: "Skills", achar: olharPorTitulo(/SKILL/i), abaixo: true },
     }],
     cor: { faixa: "#E6EAF0", tinta: "#1e293b", acento: "#475569" },
     vazio: (get) => {
@@ -666,18 +595,17 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   detox: {
     formato: "toque", moduleId: "detox", nome: "Detox",
-    pedido: "escolhe o que largar",
-    pronto: "Detox é isso: um check-in por dia vira a sua sequência. Se escorregar, recomeça sem drama.",
+    pedido: "escolha o que largar",
+    pronto: "Um check-in por dia vira sua sequência.",
     passos: [{
-      pergunta: "O que você quer parar?",
-      descricao: "Começa a contar hoje.",
+      pergunta: "O que você quer largar?",
       opcoes: [op("📱", "Redes sociais à noite", "redes_sociais"), op("🍬", "Açúcar", "acucar"), op("🚬", "Cigarro", "cigarro")],
-      executar: (ctx, o) => comecarDetox(ctx, { nome: o.rotulo, icone: o.emoji }),
+      outro: { placeholder: "Ex.: Refrigerante" },
+      executar: (ctx, o) => { detoxDaIntro = o.rotulo; comecarDetox(ctx, { nome: o.rotulo, icone: o.id === ID_OUTRO_DA_INTRO ? "✨" : o.emoji }); },
       alvo: { aba: "RASTREADOR", achar: linhaDoCampo('input[placeholder^="O que quer parar?"]') },
     }, {
       // 2) o check-in de hoje (registro do dia): a ação no módulo
-      pedido: "faz o check-in de hoje", pergunta: "Hoje você segurou? Marca o check-in",
-      descricao: "É o botão do dia, no card do hábito. Cada dia marcado soma na sequência.",
+      pedido: "faça o check-in de hoje", pergunta: "Hoje você segurou? Marque o check-in.",
       opcoes: [],
       escutar: { chaves: ["detox-habits"], rotulo: (valor) => {
         const hoje = localDayKey();
@@ -688,28 +616,24 @@ export const INTROS: Record<string, IntroConfig> = {
         try {
           const botao = Array.from(document.querySelectorAll("button")).find((b) => /estou limpo hoje|confirmado hoje/i.test(b.textContent ?? ""));
           if (botao) return botao;
-          const nome = Array.from(document.querySelectorAll<HTMLElement>("main h3, main h4, main p, main span")).find((e) => /redes sociais à noite|açúcar|cigarro/i.test((e.textContent ?? "").trim()) && (e.textContent ?? "").length < 40);
+          const nomes = ["redes sociais à noite", "açúcar", "cigarro", detoxDaIntro.toLowerCase()].filter(Boolean);
+          const nome = Array.from(document.querySelectorAll<HTMLElement>("main h3, main h4, main p, main span")).find((e) => nomes.includes((e.textContent ?? "").trim().toLowerCase()) && (e.textContent ?? "").length < 40);
           nome?.closest<HTMLElement>("[class*='rounded']")?.click();
           return null;
         } catch { return null; }
       } },
-    }, {
-      // 3) as stats
-      pedido: "olha a sequência", pergunta: "", opcoes: [],
-      olhar: { titulo: "A sua sequência", texto: "Dias seguidos, recorde e recaídas, num gráfico só. Recaiu? Marca e recomeça — sem drama." },
-      alvo: { aba: "STATS", achar: () => { try { return document.querySelector("main section, main .rounded-2xl, main .rounded-xl"); } catch { return null; } } },
     }],
     cor: { faixa: "#EAF7D2", tinta: "#365314", acento: "#65a30d" },
     vazio: (get) => vazias(get, ["detox-habits", "detox-diary"]),
   },
   hiperfoco: {
     formato: "toque", moduleId: "hiperfoco", nome: "Mente",
-    pedido: "tira 1 pensamento da cabeça",
-    pronto: "Mente é isso: cada pensamento fica na hora em que apareceu. Depois você acha tudo pela busca.",
+    pedido: "tire 1 pensamento da cabeça",
+    pronto: "Cada pensamento fica na hora em que apareceu.",
     passos: [{
       pergunta: "O que está na sua cabeça agora?",
-      descricao: "Toca num pra ver como fica, ou escreve o seu.",
       opcoes: [op("📝", "Uma pendência pra resolver", "pendencia"), op("💡", "Uma ideia pra não perder", "ideia"), op("😮‍💨", "Uma preocupação de hoje", "preocupacao")],
+      outro: { placeholder: "Escreva o que pensou" },
       executar: (ctx, o) => anotarPensamento(ctx, o.rotulo),
       // a linha do tempo abre o campo da HORA que a pessoa toca: toca na hora de agora e aponta pro campo
       alvo: { aba: "DIA", achar: () => {
@@ -722,55 +646,44 @@ export const INTROS: Record<string, IntroConfig> = {
       } },
     }, {
       // 2) olha a linha do dia
-      pedido: "olha o seu dia", pergunta: "", opcoes: [],
-      olhar: { titulo: "Ficou na hora de agora", texto: "Cada pensamento fica na hora em que apareceu. A BUSCA acha qualquer um depois." },
+      pedido: "olhe o seu dia", pergunta: "", opcoes: [],
+      olhar: { titulo: "Ficou na hora de agora", texto: "A busca acha qualquer um depois." },
       alvo: { aba: "DIA", achar: () => { try { const hora = `${String(new Date().getHours()).padStart(2, "0")}:00`; return Array.from(document.querySelectorAll<HTMLElement>("button, div")).find((b) => (b.textContent ?? "").trim().startsWith(hora) && b.getBoundingClientRect().height < 200) ?? null; } catch { return null; } } },
-    }, {
-      // 3) uma meta de curto prazo (a ação #1 da Mente: 4%)
-      pedido: "anota 1 meta de curto prazo", pergunta: "Uma meta pras próximas semanas:",
-      opcoes: [op("📵", "Menos tela à noite", "tela"), op("📖", "Terminar um livro", "livro"), op("🏃", "Treinar 3x na semana", "treino")],
-      executar: (ctx, o) => { anotarMetaDeCurtoPrazo(ctx, o.rotulo); },
-      alvo: { aba: "METAS", achar: olharPorTitulo(/CURTO PRAZO/i), abaixo: true },
     }],
     cor: { faixa: "#ECE4FF", tinta: "#4c1d95", acento: "#6d28d9" },
     vazio: (get) => vazias(get, ["hiperfoco-thoughts", "mente-dreams"]),
   },
   viagens: {
     formato: "toque", moduleId: "viagens", nome: "Viagens",
-    pedido: "anota 1 destino",
-    pronto: "Viagens é isso: primeiro o destino; roteiro, mala e orçamento vêm quando a viagem ficar de pé.",
+    pedido: "anote 1 destino",
+    pronto: "Primeiro o destino; o resto vem depois.",
     passos: [{
       pergunta: "Pra onde você quer ir?",
       opcoes: [op("🏖️", "Praia no Nordeste", "nordeste"), op("🏔️", "Gramado", "gramado"), op("✈️", "Europa", "europa")],
+      outro: { placeholder: "Ex.: Bonito" },
       executar: (ctx, o) => anotarDestino(ctx, DESTINOS_DA_INTRO[o.id] ?? { name: o.rotulo, country: "", continent: "" }),
       alvo: { achar: linhaDoCampo('input[placeholder="Destino..."], input[placeholder="Destino"]') },
     }, {
       // 2) olha a lista
-      pedido: "olha a sua lista", pergunta: "", opcoes: [],
-      olhar: { titulo: "O destino entrou como sonho", texto: "Sonho, planejando ou próximo: a etiqueta muda quando a viagem avança. Nota e foto você põe tocando nele." },
+      pedido: "olhe a sua lista", pergunta: "", opcoes: [],
+      olhar: { titulo: "O destino entrou", texto: "Roteiro e mala vêm depois." },
       alvo: { achar: () => { try { const el = document.querySelector('[aria-label^="Editar "]'); return el?.closest(".rounded-2xl, .rounded-xl, li, section") ?? el; } catch { return null; } } },
-    }, {
-      // 3) a próxima de verdade (planejando)
-      pedido: "anota a próxima", pergunta: "E a próxima viagem de verdade?",
-      opcoes: [op("🌵", "Chapada dos Veadeiros", "chapada"), op("🐠", "Fernando de Noronha", "noronha"), op("🥩", "Buenos Aires", "buenos_aires")],
-      executar: (ctx, o) => { anotarDestino(ctx, DESTINOS_PLANEJANDO[o.id] ?? { name: o.rotulo, country: "", continent: "" }, "planejando"); return `${o.rotulo} (planejando)`; },
-      alvo: { achar: linhaDoCampo('input[placeholder="Destino..."], input[placeholder="Destino"]') },
     }],
     cor: { faixa: "#D9F4F0", tinta: "#134e4a", acento: "#0d9488" },
     vazio: (get) => vazias(get, ["travel-bucket"]),
   },
   beleza: {
     formato: "toque", moduleId: "beleza", nome: "Beleza",
-    pedido: "monta o seu skincare",
-    pronto: "Beleza é isso: a rotina da manhã e da noite, um toque por passo.",
+    pedido: "monte o seu skincare",
+    pronto: "Manhã e noite, um toque por passo.",
     passos: [{
       // 1) o quiz do PRÓPRIO módulo ("Monte sua rotina", 3 perguntas): o anel nele e o passo espera a rotina nascer
       //    (rev3, 17/10: o post-it com Oleosa/Mista/Seca cobria o quiz com a mesma pergunta). Sem o quiz na tela, os chips.
       pergunta: "Como é a sua pele?",
-      descricao: "Toca num e a rotina de manhã e de noite nasce pra ela. Depois você ajusta.",
       opcoes: [op("💧", "Oleosa", "oleosa"), op("🌗", "Mista", "mista"), op("🍃", "Seca", "seca")],
+      outro: false, // tipo de pele não tem "outro": a rotina nasce de um dos 3
       executar: (ctx, o) => { montarSkincare(ctx, o.id as TipoDePele); return `Skincare pra pele ${o.rotulo.toLowerCase()}`; },
-      quandoNoModulo: { pergunta: "Responde aqui as 3 perguntas", descricao: "A rotina de manhã e de noite nasce pra sua pele. Depois você ajusta.", rotulo: "3 toques" },
+      quandoNoModulo: { pergunta: "Responda aqui as 3 perguntas", rotulo: "3 toques" },
       escutar: {
         chaves: [CHAVE_PERFIL_BELEZA, CHAVE_PASSOS_BELEZA.manha, CHAVE_PASSOS_BELEZA.noite],
         rotulo: (valor, _anterior, chave) => {
@@ -785,69 +698,48 @@ export const INTROS: Record<string, IntroConfig> = {
       alvo: { aba: "SKINCARE", achar: porSeletor('[data-testid="montar-rotina"]') },
     }, {
       // 2) olha a rotina pronta (rotina da manhã: 9%)
-      pedido: "olha a sua rotina", pergunta: "", opcoes: [],
-      olhar: { titulo: "A rotina nasceu", texto: "Manhã e noite, passo a passo. Toca num passo pra escolher o produto e os dias da semana." },
+      pedido: "olhe a sua rotina", pergunta: "", opcoes: [],
+      olhar: { titulo: "Sua rotina nasceu", texto: "Toque num passo pra escolher o produto." },
       alvo: { aba: "SKINCARE", achar: porSeletor('[data-card="skincare-de-hoje"], [data-testid="rotina-pronta"]') },
-    }, {
-      // 3) o Espelho do dia (11%, a ação #1 da Beleza)
-      pedido: "faz o espelho do dia", pergunta: "Como a sua pele está hoje?",
-      opcoes: ESPELHO_DA_INTRO.map((e) => op(e.emoji, e.rotulo, e.id)),
-      executar: (ctx, o) => anotarEspelhoDoDia(ctx, o.id),
-      alvo: { aba: "SKINCARE", achar: olharPorTitulo(/ESPELHO/i), abaixo: true },
     }],
     cor: { faixa: "#FFE4F1", tinta: "#831843", acento: "#db2777" },
     vazio: (get) => vazias(get, [CHAVE_PASSOS_BELEZA.manha, CHAVE_PASSOS_BELEZA.noite, "beauty-products", "skincare-daily-checkin"]),
   },
   relacionamentos: {
     formato: "toque", moduleId: "relacionamentos", nome: "Relações",
-    pedido: "anota 1 pessoa que importa",
-    pronto: "Relações é isso: datas e momentos ficam ligados à pessoa. O nome você completa na ficha.",
+    pedido: "anote 1 pessoa que importa",
+    pronto: "Datas e momentos ficam com a pessoa.",
     passos: [{
       pergunta: "Quem importa pra você?",
       opcoes: [op("🌷", "Mãe", "mae"), op("💛", "Meu amor", "amor"), op("✨", "Melhor amiga", "melhor-amiga")],
-      executar: (ctx, o) => adicionarPessoaDoComeco(ctx, o.id),
+      outro: { placeholder: "Nome ou apelido" },
+      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? adicionarPessoaPropria(ctx, o.rotulo) : adicionarPessoaDoComeco(ctx, o.id)),
       alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="pessoas-vazio"], [data-testid="adicionar-pessoa"]') },
     }, {
       // 2) olha a pessoa (pessoas: 11%, a ação #1)
-      pedido: "olha a ficha", pergunta: "", opcoes: [],
-      olhar: { titulo: "A pessoa entrou", texto: "Toca nela pra pôr o nome, o aniversário e o que lembrar (gostos, tamanho, alergias)." },
+      pedido: "olhe a ficha", pergunta: "", opcoes: [],
+      olhar: { titulo: "A pessoa entrou", texto: "Toque nela pra pôr o aniversário." },
       alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="lista-pessoas"]') },
-    }, {
-      // 3) mais uma pessoa
-      pedido: "anota mais 1", pergunta: "Mais alguém?",
-      opcoes: [op("☕", "Pai", "pai"), op("🌻", "Irmã", "irma"), op("🧶", "Avó", "avo")],
-      executar: (ctx, o) => adicionarPessoaDoComeco(ctx, o.id),
-      alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="lista-pessoas"]'), abaixo: true },
-    }, {
-      // 4) as datas
-      pedido: "olha as datas", pergunta: "", opcoes: [],
-      olhar: { titulo: "O ano em datas", texto: "Aniversários e datas especiais, mês a mês. O app avisa na véspera." },
-      alvo: { aba: "DATAS", achar: porSeletor('[data-testid="ano-em-datas"], [data-testid="lista-datas"]') },
     }],
     cor: { faixa: "#FFE1E7", tinta: "#881337", acento: "#e11d48" },
     vazio: (get) => vazias(get, ["rel-people", "rel-dates", "rel-moments", "relacoes-pessoas"]),
   },
   pet: {
     formato: "toque", moduleId: "pet", nome: "Pet",
-    pedido: "cadastra o seu pet",
-    pronto: "Pet é isso: com ele cadastrado, vacina, banho e remédio entram na agenda dele. O nome você troca na ficha.",
+    pedido: "cadastre o seu pet",
+    pronto: "Vacina, banho e remédio na agenda dele.",
     passos: [{
       pergunta: "Seu pet é…",
       opcoes: PETS_DA_INTRO.map((p) => op(p.emoji, p.rotulo, p.id)),
-      executar: (ctx, o) => cadastrarPet(ctx, o.id as "cao" | "gato" | "outro"),
+      outro: { placeholder: "Ex.: Calopsita" },
+      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? cadastrarPetProprio(ctx, o.rotulo) : cadastrarPet(ctx, o.id as "cao" | "gato" | "outro")),
       alvo: { achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="pet-vazio"]') },
     }, {
       // 2) a rotina de hoje: marca a comida (a ação no módulo)
-      pedido: "marca a comida de hoje", pergunta: "Já deu comida hoje? Marca ali",
-      descricao: "É a rotina do dia do seu pet. Cada item marcado conta o dia.",
+      pedido: "marque a comida de hoje", pergunta: "Já deu comida hoje? Marque ali.",
       opcoes: [],
       escutar: { chaves: [`pet-routine-${localDayKey()}`], rotulo: (valor) => (Object.values(mapa(valor)).some((t) => Object.values(mapa(t)).some((v) => v === true)) ? "a comida de hoje" : null) },
       alvo: { achar: () => { try { const c = document.querySelector('[data-card="PET DE HOJE"]'); return c?.querySelector("button, input, [role=checkbox]") ?? c; } catch { return null; } } },
-    }, {
-      // 3) a carteirinha
-      pedido: "olha a carteirinha", pergunta: "", opcoes: [],
-      olhar: { titulo: "A carteirinha", texto: "Vacina, vermífugo, banho e remédio com a data certa. O app avisa quando chegar a hora." },
-      alvo: { achar: porSeletor('[data-testid="montar-carteirinha"], [data-testid="novo-cuidado-abrir"], [data-testid="completar-carteirinha"]') },
     }],
     cor: { faixa: "#FFF4C2", tinta: "#78350f", acento: "#d97706" },
     vazio: (get) => vazias(get, ["pet-list", "pet-diary", "pet-cuidados", "pet-expenses"]),

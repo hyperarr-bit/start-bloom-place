@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { entrada, MOV, MOV_MS, saida } from "@/lib/movimento";
 import { marcarIntroVista } from "@/lib/intro-modulo";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -83,7 +85,57 @@ export function MissaoDosesNaWeb() {
   guardarForcaDaUrl(search);
   guardarForcaDia1Cheio(search);
   const ligada = missaoDosesLigada();
-  return ligada ? <Ligada /> : null;
+  return ligada ? <><Ligada /><VeuDaMissao /></> : null;
+}
+
+/* ── 1.0.17 — A PASSAGEM CALMA ENTRE TELAS (dono 19/10: "o corte entre Finanças e a Home é brusco — deixa agradável e
+   lento"). A comemoração já saiu descendo; aqui um véu da cor do app cobre a tela (280 ms), a rota troca por baixo,
+   e o véu abre devagar (420 ms) — a Home "assenta" sem ninguém ver o corte. O que vem depois (a folha do plano de
+   amanhã, a dica) já espera a tela ficar quieta por ≥ 1,2 s (o respiro). Com "reduzir movimento": fade de 150 ms. ── */
+const EVENTO_VEU = "missao-doses:veu";
+type PedidoDoVeu = { fase: "cobre" | "abre"; pronto?: () => void };
+const pedirVeu = (p: PedidoDoVeu) => { try { window.dispatchEvent(new CustomEvent<PedidoDoVeu>(EVENTO_VEU, { detail: p })); } catch { p.pronto?.(); } };
+/** Cobre a tela, troca (`trocar`) e abre de novo. Fail-open: sem o véu montado, a troca acontece em ≤ 600 ms. */
+export function trocarComCalma(trocar: () => void): void {
+  let feito = false;
+  const seguir = () => {
+    if (feito) return;
+    feito = true;
+    try { trocar(); } finally { window.setTimeout(() => pedirVeu({ fase: "abre" }), 40); }
+  };
+  pedirVeu({ fase: "cobre", pronto: seguir });
+  window.setTimeout(seguir, MOV_MS.base + 320);
+}
+function VeuDaMissao() {
+  const reduzir = !!useReducedMotion();
+  const [fase, setFase] = useState<"cobre" | "abre" | null>(null);
+  const pronto = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const ouvir = (e: Event) => {
+      const d = (e as CustomEvent<PedidoDoVeu>).detail;
+      if (!d) return;
+      if (d.fase === "cobre") { pronto.current = d.pronto ?? null; setFase("cobre"); return; }
+      setFase((f) => (f ? "abre" : null));
+    };
+    window.addEventListener(EVENTO_VEU, ouvir);
+    return () => window.removeEventListener(EVENTO_VEU, ouvir);
+  }, []);
+  useEffect(() => {
+    if (fase === "cobre") {
+      const t = window.setTimeout(() => { const p = pronto.current; pronto.current = null; p?.(); }, reduzir ? MOV_MS.rapido : MOV_MS.base);
+      return () => window.clearTimeout(t);
+    }
+    if (fase === "abre") {
+      const t = window.setTimeout(() => setFase(null), reduzir ? MOV_MS.rapido : MOV_MS.calmo);
+      return () => window.clearTimeout(t);
+    }
+  }, [fase, reduzir]);
+  if (!fase) return null;
+  return (
+    <motion.div className="fixed inset-0 z-[250] bg-background pointer-events-none" aria-hidden data-testid="missao-doses-veu" data-fase={fase}
+      initial={{ opacity: 0 }} animate={{ opacity: fase === "cobre" ? 1 : 0 }}
+      transition={fase === "cobre" ? saida(reduzir, MOV.base) : entrada(reduzir, MOV.calmo)} />
+  );
 }
 
 /**
@@ -99,6 +151,16 @@ export function areaDaMissao(userMetadata?: unknown): string | null {
     if (typeof a === "string" && a in AREAS) return a;
   } catch { /* metadata estranha */ }
   return local ?? null;
+}
+
+/**
+ * 1.0.17 — o nome do "Tá dentro, Lucas.": o da conta (`core-user-name`, ou o `user-name` que o cadastro grava), senão o
+ * dos metadados (full_name/name). Nunca o começo do e-mail. Vazio = "Tá dentro."
+ */
+export function nomeDaPessoa(daConta: unknown, userMetadata?: unknown): string {
+  const ok = (v: unknown): string => (typeof v === "string" && v.trim() && !v.includes("@") ? v.trim() : "");
+  const meta = (userMetadata ?? {}) as { full_name?: unknown; name?: unknown };
+  return ok(daConta) || ok(meta.full_name) || ok(meta.name);
 }
 
 /** O CustomEvent da janela quando a missão fica completa (o tour da Home escuta). Mora em lib/missao-doses. */
@@ -409,7 +471,7 @@ function Ligada() {
       )}
       <BoasVindasDoses
         missao={missao}
-        nome=""
+        nome={nomeDaPessoa(get<unknown>("core-user-name", "") || get<unknown>("user-name", ""), user?.user_metadata)}
         areaNome={areaNome}
         hoje={hoje}
         braco={B ? "B" : ehUmPorDia(missao) ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela */
@@ -640,6 +702,7 @@ function Ligada() {
             if (lembrete !== "sem") Promise.resolve().then(() => pedirPermissaoDia2("missao")).catch(() => "indisponivel").finally(reagendar);
             else reagendar();
           }
+          if (ehUmPorDia(missao)) { trocarComCalma(() => { fechar(); navigate("/home"); }); return; }
           fechar();
           navigate("/home");
         }}
@@ -669,6 +732,8 @@ function Ligada() {
           fechar(); // a folha do plano de amanhã entra AQUI, ainda no módulo (precisaPlanoAmanha) — e leva pra Home
         }}
         aoFecharDia={() => {
+          // 1.0.17: a festa já desceu; o véu cobre, a rota troca por baixo e abre devagar (nunca no mesmo tique)
+          if (ehUmPorDia(missao)) { trocarComCalma(() => { fechar(); navigate("/home"); }); return; }
           fechar();
           navigate("/home"); // B: "Arrumar minha Home" → o tour é o 4º passo
         }}

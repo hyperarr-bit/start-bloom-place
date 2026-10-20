@@ -269,8 +269,9 @@ const FAIXAS_DE_RENDA: { id: string; rotulo: string; valor: number }[] = [ // = 
   { id: "4a7", rotulo: "R$ 4 a 7 mil", valor: 5500 },
   { id: "7mais", rotulo: "Mais de R$ 7 mil", valor: 8000 },
 ];
-const DICA_SEM_FAIXA = "Salário, freela, pensão… o que entra no mês.";
-const DICA_COM_FAIXA = "Um valor de partida — ajusta pro número certo se quiser.";
+// 1.0.17 (dono: "minimalista"): o app tirou a dica embaixo do campo — a tela em HTML espelha (vazia = escondida)
+const DICA_SEM_FAIXA = "";
+const DICA_COM_FAIXA = "";
 const reaisDigitados = (t: string): number => { const so = String(t ?? "").split(",")[0].replace(/\D/g, "").slice(0, 7); return so ? parseInt(so, 10) : 0; };
 const reaisTexto = (v: number): string => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 
@@ -361,6 +362,7 @@ function abrirPasso1(area: Area, t0: number) {
     chips.querySelectorAll<HTMLButtonElement>("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.faixa === faixa)));
     input.value = renda ? reaisTexto(renda) : "";
     dica.textContent = faixa ? DICA_COM_FAIXA : DICA_SEM_FAIXA;
+    dica.hidden = !dica.textContent;
     cta.disabled = renda <= 0 || entregando;
   };
   chips.textContent = "";

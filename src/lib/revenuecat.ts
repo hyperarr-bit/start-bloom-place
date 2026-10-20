@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { deviceId, turma } from "@/lib/aparelho";
+import { lerCorpoAparelho } from "@/lib/meta-dados-aparelho";
 import { registrarChavesRemotas } from "@/lib/ofertas-saida";
 import { registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
@@ -209,9 +210,16 @@ export async function sincronizarAssinatura(tentativas = 3): Promise<boolean> {
   // a conta nasce. Retornar já evita 3 retries de 401 (~4s de espera morta
   // entre a folha do Google e a tela de cadastro).
   if (!(await idDoUsuario())) return false;
+  /* 20/10 (iOS 1.0.17): ATT atual + (SÓ com aceite) IDFA + versões, pro CAPI
+   * do teste/compra casar mais. IP/UA o servidor lê dos headers e só guarda
+   * com o aceite. Android/web: sem corpo, como sempre. */
+  let aparelho: Awaited<ReturnType<typeof lerCorpoAparelho>> = null;
+  try { aparelho = await lerCorpoAparelho(); } catch { /* nunca segura o sync */ }
   for (let i = 0; i < tentativas; i++) {
     try {
-      const { data, error } = await supabase.functions.invoke("revenuecat-sync");
+      const { data, error } = aparelho
+        ? await supabase.functions.invoke("revenuecat-sync", { body: { aparelho } })
+        : await supabase.functions.invoke("revenuecat-sync");
       if (!error && data?.subscribed) return true;
       if (!error && data?.checked && i === tentativas - 1) return false;
     } catch (e) {

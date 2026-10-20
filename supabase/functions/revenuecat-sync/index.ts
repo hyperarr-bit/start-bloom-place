@@ -18,6 +18,14 @@
  */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  dadosDoPedido,
+  dentroDaJanela,
+  linhaDadosAparelho,
+  precisaGravar,
+  TABELA_DADOS_APARELHO,
+  type DadosAparelhoPedido,
+} from "../_shared/meta-dados-aparelho.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,8 +55,19 @@ serve(async (req) => {
     const user = userData.user;
     if (!user) throw new Error("User not authenticated");
 
-    const r = await reconciliarRevenueCat(admin, user.id, user.email ?? null);
-    log("done", { userId: user.id, ...r });
+    /* 20/10 (iOS 1.0.17): o app manda `aparelho` {plataforma, att, idfa?,
+     * versões}. IP e UA saem dos HEADERS desta requisição — e só ficam
+     * guardados com ATT autorizado (regra em _shared/meta-dados-aparelho.ts).
+     * Corpo ausente/estranho (Android, build antiga) = null = nada muda. */
+    const corpo = await req.json().catch(() => null);
+    const dados = dadosDoPedido((corpo as { aparelho?: unknown } | null)?.aparelho, {
+      xff: req.headers.get("x-forwarded-for"),
+      cf: req.headers.get("cf-connecting-ip"),
+      ua: req.headers.get("user-agent"),
+    });
+
+    const r = await reconciliarRevenueCat(admin, user.id, user.email ?? null, dados);
+    log("done", { userId: user.id, ...r, att: dados?.att ?? null });
     return json({ checked: true, ...r });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -587,10 +606,46 @@ async function storeIdDoProduto(prodId: string, secret: string): Promise<string>
   return mapaProdutos[prodId] ?? "";
 }
 
+/**
+ * Guarda os dados do aparelho desta transação ANTES do upsert em
+ * `subscriptions` — assim o cron do meta-backfill-app nunca vê a linha da
+ * assinatura sem os dados do caminho do app. Uma linha por mudança do ATT.
+ * Tabela ausente (migração não aplicada) ou erro: loga e segue — o acesso de
+ * quem pagou nunca depende disto.
+ */
+async function gravarDadosAparelho(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  tx: string,
+  inicio: string | null,
+  dados: DadosAparelhoPedido | null,
+): Promise<void> {
+  if (!dados || !tx || !dentroDaJanela(inicio)) return;
+  try {
+    const { data: ult, error: erroLer } = await admin
+      .from(TABELA_DADOS_APARELHO)
+      .select("att,idfa,client_ip")
+      .eq("tx", tx)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (erroLer) {
+      log("dados do aparelho: leitura falhou", { msg: String(erroLer.message ?? "").slice(0, 120) });
+      return;
+    }
+    if (!precisaGravar((ult ?? [])[0] ?? null, dados)) return;
+    const { error } = await admin.from(TABELA_DADOS_APARELHO).insert(linhaDadosAparelho(userId, tx, dados));
+    if (error) log("dados do aparelho: não gravou", { msg: String(error.message ?? "").slice(0, 120) });
+    else log("dados do aparelho gravados", { att: dados.att, com_ip: !!dados.client_ip, com_idfa: !!dados.idfa });
+  } catch (e) {
+    log("dados do aparelho ERRO", { msg: String(e).slice(0, 120) });
+  }
+}
+
 async function reconciliarRevenueCat(
   admin: ReturnType<typeof createClient>,
   userId: string,
-  email: string | null
+  email: string | null,
+  dados: DadosAparelhoPedido | null = null,
 ): Promise<{ subscribed: boolean; reason?: string; product?: string | null; expires?: string | null }> {
   const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
   if (!secret) throw new Error("REVENUECAT_SECRET_KEY não configurada");
@@ -655,6 +710,7 @@ async function reconciliarRevenueCat(
 
   for (const v of vitalicias) {
     idsVivos.push(v.id);
+    await gravarDadosAparelho(admin, userId, v.id, v.inicio, dados);
     const { error } = await admin.from("subscriptions").upsert(
       {
         user_id: userId,
@@ -701,6 +757,7 @@ async function reconciliarRevenueCat(
     const { billing, cents } = infoProduto(storeId);
     const rcId = s.id || `rc:${userId}`;
     idsVivos.push(rcId);
+    await gravarDadosAparelho(admin, userId, rcId, s.starts_at ? new Date(s.starts_at).toISOString() : null, dados);
 
     // UPSERT pela chave natural, não insert/update lido antes: o sync do app e
     // o webhook chegam quase juntos (no 1º teste real, 214 ms de diferença) e

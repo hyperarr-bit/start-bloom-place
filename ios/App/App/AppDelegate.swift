@@ -405,6 +405,20 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
             let id = ASIdentifierManager.shared().advertisingIdentifier.uuidString
             if id != "00000000-0000-0000-0000-000000000000" { idfa = id }
         }
-        call.resolve(["gaid": idfa, "anonId": anonId])
+        // 20/10 (1.0.17): o status ATUAL do ATT, lido do sistema sem mostrar
+        // diálogo — a pessoa pode ter mudado nos Ajustes depois do pedido. O
+        // JS manda isto pro revenuecat-sync, e o servidor só guarda IP/UA/IDFA
+        // pro CAPI com "authorized" (src/lib/meta-dados-aparelho.ts).
+        var att = "restricted"
+        if #available(iOS 14, *) {
+            switch ATTrackingManager.trackingAuthorizationStatus {
+            case .authorized: att = "authorized"
+            case .denied: att = "denied"
+            case .restricted: att = "restricted"
+            case .notDetermined: att = "notDetermined"
+            @unknown default: att = "unknown"
+            }
+        }
+        call.resolve(["gaid": idfa, "anonId": anonId, "att": att])
     }
 }

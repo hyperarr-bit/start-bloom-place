@@ -177,8 +177,10 @@ describe("chave, constantes e classificação", () => {
       const c = INTROS[m];
       expect(c.formato).toBe("guiada");
       if (c.formato !== "guiada") continue;
-      // 1.0.17: no máximo 2 passos — a ação (criar+marcar na Rotina vazia contam como um) e o "olha"; nada depois
-      expect(c.maisPassos ?? [], m).toHaveLength(0);
+      const guiada = m === "rotina" ? 3 : 2; // criar → marcar → olha · ação → olha (os passos da 1.0.16 ficam)
+      expect(guiada + (c.maisPassos?.length ?? 0), m).toBeGreaterThanOrEqual(3);
+      expect(guiada + (c.maisPassos?.length ?? 0), m).toBeLessThanOrEqual(4);
+      for (const p of c.maisPassos ?? []) conferirPasso(m, p);
       expect(c.olhar.titulo.length, m).toBeLessThanOrEqual(30); expect(c.olhar.texto.length, m).toBeLessThanOrEqual(60);
       for (const p of c.maisPassos ?? []) conferirPasso(m, p);
     }
@@ -189,9 +191,10 @@ describe("chave, constantes e classificação", () => {
       expect(c.pedido.length, m).toBeGreaterThan(8);
       expect(c.pronto.length, m).toBeGreaterThan(12);
       expect(c.pronto.length, m).toBeLessThanOrEqual(45);
-      expect(c.passos.length, m).toBeGreaterThanOrEqual(1);
-      expect(c.passos.length, m).toBeLessThanOrEqual(2);
+      expect(c.passos.length, m).toBeGreaterThanOrEqual(3);
+      expect(c.passos.length, m).toBeLessThanOrEqual(4);
       expect(c.passos[0].olhar, `${m}: o 1º passo é uma ação`).toBeUndefined();
+      expect(c.passos.some((p) => !!p.olhar), `${m}: tem um "olha"`).toBe(true);
       for (const p of c.passos) conferirPasso(m, p);
       const texto = JSON.stringify(c).toLowerCase();
       for (const proibido of ["no app do celular", ".mp4", "gravado do app"]) expect(texto, m).not.toContain(proibido);
@@ -481,16 +484,16 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
   const hoje = localDayKey();
   const comodos = () => <div><header><button type="button">🚪 CÔMODOS</button></header><div><input placeholder="Adicionar item..." /><button type="button">+</button></div></div>;
 
-  it("Casa (1.0.17, 2 passos): faixa calma com 'Agora não' à vista, o anel no campo real, chip grava 1 tarefa no cômodo → olha → o cartão do fim e 'Pronto' marca vista (aparelho + conta)", { timeout: 40_000 }, async () => {
+  it("Casa (4 passos, os da 1.0.16): faixa calma com 'Agora não' à vista, o anel no campo real, chip grava 1 tarefa no cômodo → olha → mercado → olha → o cartão do fim junta o que entrou e 'Pronto' marca vista (aparelho + conta)", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const { estado } = montar(<>{comodos()}<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} /></>);
     expect(screen.queryByText("Dica antiga")).toBeNull();
     expect(card()?.textContent).toContain("Primeira vez aqui · organize 1 cômodo");
     expect(screen.getByTestId("intro-modulo-agora-nao").textContent).toBe("Agora não");
-    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "casa" && d.formato === "toque" && d.passos === 2)).toBeTruthy();
+    expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "casa" && d.formato === "toque" && d.passos === 4)).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 3000 });
     expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Qual cômodo primeiro?");
-    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 2");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 4");
     expect(screen.getAllByTestId("demo-guia-chip").map((c) => c.textContent)).toEqual(["🍳Cozinha", "🛏️Quarto", "🚿Banheiro"]);
     expect(screen.getByTestId("demo-guia-outro")).toBeTruthy(); // "+ Outro" (1.0.17)
     await tocar(0);
@@ -498,11 +501,16 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(rooms.map((r) => r.name)).toEqual(["COZINHA", "SALA", "QUARTO", "BANHEIRO", "ÁREA DE SERVIÇO", "ESCRITÓRIO"]); // os cômodos padrão nascem junto
     expect(rooms.flatMap((r) => r.tasks)).toEqual([{ id: expect.any(String), text: "Lavar a louça", done: false }]); // 1 toque = 1 tarefa, no cômodo certo
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "cozinha" && d.passo === 1)).toBeTruthy();
-    // 2) o "olha" do cômodo (sem o card no DOM de mentira: pulado sozinho) → o fim
-    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
+    // 2) o "olha" do cômodo (sem o card no DOM de mentira: pulado sozinho) → 3) o mercado (chips, com "+ Outro") → 4) olha a limpeza (pulado) → o fim
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 item do mercado"), { timeout: 9000 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.passo === 2 && d.via === "pulado")).toBeTruthy();
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Lavar a louça (Cozinha) entrou. Cada cômodo com as tarefas dele.");
-    expect(estado.dados["casa-grocery-categories"]).toBeUndefined(); // o mercado saiu do tutorial (no máximo 2 passos)
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("3 de 4"), { timeout: 9000 });
+    expect(screen.getByTestId("demo-guia-outro")).toBeTruthy();
+    await tocar(0); // Leite
+    const cats = estado.dados["casa-grocery-categories"] as typeof CATEGORIAS_PADRAO_MERCADO;
+    expect(cats.flatMap((c) => c.items.map((i) => i.text))).toEqual(["Leite"]);
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Lavar a louça (Cozinha) e Leite entraram. Cada cômodo com as tarefas dele.");
     expect(card()?.textContent).toContain("pronto ✓");
     expect(localStorage.getItem(chaveIntroVista("casa"))).toBeNull(); // só o "Pronto" (ou o tempo) marca
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
@@ -527,8 +535,11 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(rooms.find((r) => r.name === "LAVANDERIA")?.tasks.map((t) => t.text)).toEqual(["Organizar"]);
     expect(estado.dados["core-escolhas-proprias"]).toEqual({ "intro-casa-1": [{ nome: "Lavanderia" }] });
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.opcao === "outro")).toBeTruthy();
-    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Organizar (Lavanderia) entrou.");
+    // "Agora não" no meio: fecha SÓ este tutorial e, como ela já fez o passo 1, conta como feito
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 item do mercado"), { timeout: 9000 });
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
+    expect(card()).toBeNull();
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/);
     // a opção dela volta como chip "seu", na frente das sugestões (aqui na Escolha solta, com a mesma conta)
     cleanup(); document.body.innerHTML = "";
     const { EscolhaRapida } = await import("@/components/ui/escolha-rapida");
@@ -811,7 +822,7 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "criar_habito")).toBeTruthy();
     // passo 2: o anel abraça o QUADRADINHO de hoje (a célula com o checkbox), não a linha inteira
     await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marque o de hoje"), { timeout: 4000 });
-    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("1 de 2"); // criar+marcar = o passo 1 de 2
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 4"); // criar → marcar → olha → humor
     medir.mockRestore();
   });
 
@@ -869,7 +880,7 @@ describe("as ações de 1 toque são idempotentes e respeitam o que já existe",
 /* ───────────────────────────────── guiada ───────────────────────────────── */
 describe("ligada: a intro guiada de Finanças", () => {
   beforeEach(ligar);
-  it("a faixa sobe, o post-it acha o controle real e o chip grava o gasto na conta no formato do módulo; depois do 'olha' o fim (1.0.17: 2 passos, sem a conta fixa) e o 'pronto' marca vista", { timeout: 40_000 }, async () => {
+  it("a faixa sobe, o post-it acha o controle real e o chip grava o gasto na conta no formato do módulo; depois do 'olha' continua na conta fixa (passos 3–4, '+ Outro' com R$) e o 'pronto' marca vista", { timeout: 40_000 }, async () => {
     // o módulo de mentira: só o controle que a intro procura, com tamanho (jsdom não mede)
     const Modulo = () => (
       <div>
@@ -890,10 +901,18 @@ describe("ligada: a intro guiada de Finanças", () => {
     expect(gastos[0]).toMatchObject({ description: "Café", value: 12 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_chip" && d.nome === "Café")).toBeTruthy();
     await waitFor(() => expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "chip")).toBeTruthy(), { timeout: 3000 });
-    // sem o card MEU MÊS na tela, o "olha" é pulado (fail-open) e vem o fim — nada de conta fixa depois (1.0.17)
+    // sem o card MEU MÊS na tela, o "olha" é pulado (fail-open) e a intro CONTINUA nos passos 3 e 4 (os da 1.0.16): a conta fixa
+    // (com "+ Outro": nome + R$), o olha dela
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 conta fixa"), { timeout: 4000 });
+    expect(screen.queryByTestId("intro-modulo-pronto")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-outro")).toBeTruthy(), { timeout: 9000 });
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    fireEvent.change(screen.getByTestId("demo-guia-texto"), { target: { value: "Academia" } });
+    fireEvent.change(screen.getByTestId("demo-guia-reais"), { target: { value: "90" } });
+    fireEvent.click(screen.getByTestId("demo-guia-adicionar"));
+    expect(estado.dados["finance-fixed-expenses"]).toMatchObject([{ description: "Academia", value: 90, paymentMethod: "pix" }]);
     await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(estado.dados["finance-fixed-expenses"]).toBeUndefined();
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Café · R$ 12 entrou. Você anota, o mês soma.");
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Café · R$ 12 e Academia · R$ 90 entraram. Você anota, o mês soma.");
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(localStorage.getItem(chaveIntroVista("financas"))).toBeTruthy();
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["financas"]);

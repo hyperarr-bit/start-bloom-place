@@ -261,18 +261,22 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     r.unmount();
   });
 
-  /* ───────────── 1.0.17 (dono 19/10: "muito confuso, faz minimalista"): no MÁXIMO 2 passos e CHEGA NO FIM ───────────── */
-  const guiadaPassos = (m: string) => (m === "financas" || m === "saude" || m === "rotina" ? 2 : 0);
-  it("cada um dos 16 tutoriais tem no máximo 2 passos (ação real → olha/ação), o 1º é sempre uma ação e toda lista de chips tem '+ Outro' (menos o tipo de pele)", () => {
+  /* ───────────── 17/10 (dono: "tipo Finanças, que tem vários"): cada tutorial tem 3–4 passos e CHEGA NO FIM ─────────────
+     1.0.17 (dono, dado da 1.0.16: 41 de 50 pulos são no passo 1 — o tamanho não é o problema): os passos da 1.0.16 FICAM;
+     muda a copy (curta), o "Agora não" quieto e o "+ Outro" nas listas (menos as escalas: pele, humor, espelho). */
+  const guiadaPassos = (m: string) => (m === "rotina" ? 3 : m === "financas" || m === "saude" ? 2 : 0);
+  const ESCALAS = new Set(["Como é a sua pele?", "Como você está hoje?", "Como está o seu humor hoje?", "Como a sua pele está hoje?"]);
+  it("cada um dos 16 tutoriais tem de 3 a 4 passos (os da 1.0.16), o 1º é sempre uma ação e toda lista de chips tem '+ Outro' (menos as escalas)", () => {
     for (const m of TODOS) {
       const c = INTROS[m];
       const n = c.formato === "guiada" ? guiadaPassos(m) + (c.maisPassos?.length ?? 0) : c.passos.length;
-      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(1);
-      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(2);
+      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(3);
+      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(4);
+      for (const p of (c.formato === "guiada" ? c.maisPassos ?? [] : [])) if (p.opcoes.length && p.executar) expect(p.outro === false ? ESCALAS.has(p.pergunta) : true, `${m}: "${p.pergunta}" sem "+ Outro"`).toBe(true);
       if (c.formato === "toque") {
         expect(c.passos[0].olhar, m).toBeUndefined();
         expect(c.passos[0].opcoes.length, m).toBeGreaterThanOrEqual(2);
-        for (const p of c.passos) if (p.opcoes.length && p.executar) expect(p.outro === false ? m === "beleza" : true, `${m}: lista sem "+ Outro"`).toBe(true);
+        for (const p of c.passos) if (p.opcoes.length && p.executar) expect(p.outro === false ? ESCALAS.has(p.pergunta) : true, `${m}: "${p.pergunta}" sem "+ Outro"`).toBe(true);
         // sem segundos e sem parágrafo: a pergunta é curta
         for (const p of c.passos) { expect(p.pergunta.length, `${m}: "${p.pergunta}"`).toBeLessThanOrEqual(40); expect(`${p.pergunta} ${p.descricao ?? ""}`).not.toMatch(/\d+\s?s\b|segundos/); }
       }
@@ -306,9 +310,9 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
       }
       await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
       expect(faixa()!.textContent).toContain("pronto ✓");
-      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(1);
+      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(2);
       expect(screen.getByTestId("intro-modulo-pronto").textContent).toMatch(/entr(ou|aram)\./);
-      expect(total).toBeLessThanOrEqual(2);
+      expect(total).toBeGreaterThanOrEqual(3);
       fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
       expect(localStorage.getItem(chaveIntroVista(m))).toMatch(/^feita@/);
       expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");
@@ -346,21 +350,26 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     medir.mockRestore();
   });
 
-  it("Saúde (guiada, 1.0.17): água → olha → o cartão do fim (2 passos, sem o sono) e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
+  it("Saúde (guiada): água → olha → continua no sono (3 de 4, com '+ Outro' em stepper) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const s = criarStore();
     render(<s.Provedor><div><button type="button" data-spotlight="add-water">+250ml</button><IntroDoModulo moduleId="saude" /></div></s.Provedor>);
     expect(faixa()!.textContent).toContain("marque 1 copo d'água");
     await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip")[0]).toBeTruthy(), { timeout: 9000 });
-    // 1 copo d'água é 1 chip só: sem "+ Outro" (nada pra escrever)
-    expect(screen.queryByTestId("demo-guia-outro")).toBeNull();
+    expect(screen.queryByTestId("demo-guia-outro")).toBeNull(); // 1 copo é 1 chip: nada pra escrever
     fireEvent.click(screen.getAllByTestId("demo-guia-chip")[0]); // 1 copo
     expect(Object.values(s.estado.dados["core-saude-water"] as Record<string, number>)[0]).toBe(1);
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-entendi")).toBeTruthy(), { timeout: 9000 });
     fireEvent.click(screen.getByTestId("intro-modulo-entendi"));
+    await waitFor(() => expect(faixa()!.textContent).toContain("anote o sono"), { timeout: 9000 });
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("3 de 4"), { timeout: 9000 });
+    // "+ Outro" das horas de sono é um stepper: 9 h
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    fireEvent.click(screen.getByLabelText("Mais")); fireEvent.click(screen.getByLabelText("Mais"));
+    fireEvent.click(screen.getByTestId("demo-guia-adicionar"));
+    expect(Object.values(s.estado.dados["core-saude-sleep"] as Record<string, number>)[0]).toBe(9);
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("entrou.");
-    expect(s.estado.dados["core-saude-sleep"]).toBeUndefined();
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("entraram. Água, sono e remédio: um toque cada.");
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(localStorage.getItem(chaveIntroVista("saude"))).toMatch(/^feita@/);
     medir.mockRestore();

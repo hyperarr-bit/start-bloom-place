@@ -476,7 +476,8 @@ function Ligada() {
         hoje={hoje}
         braco={B ? "B" : ehUmPorDia(missao) ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela */
         aoComecar={(modulos) => {
-          saidaCalmaDe('[data-testid="missao-doses-boas-vindas"]');
+          // a rota troca embaixo (a Home some, o módulo entra): a cópia fica inteira até o módulo estar lá — sem a Home aparecendo
+          saidaCalmaDe('[data-testid="missao-doses-boas-vindas"]', MOV_MS.base, 420);
           const m = comModulos(modulos);
           salvar(m);
           trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "comecar", modulos, ...(B ? { tela: 2 } : {}) }));
@@ -530,7 +531,7 @@ function Ligada() {
   /* 1.0.16, braço A — o convite do dia (reabriu num dia novo, a dose de hoje está liberada) */
   if (conviteDevido && conviteLivre) {
     const decidir = (acao: "foi" | "depois") => {
-      saidaCalmaDe('[data-testid="missao-doses-convite"]');
+      saidaCalmaDe('[data-testid="missao-doses-convite"]', MOV_MS.base, acao === "foi" ? 420 : 0);
       const m = lerMissao() ?? missao;
       const p = passoPendente(m);
       salvar({ ...m, convites: { ...m.convites, [hoje]: acao } });
@@ -603,7 +604,7 @@ function Ligada() {
       <ConstruiuEm3Dias
         missao={missao}
         aoContinuar={() => {
-          saidaCalmaDe('[data-testid="missao-doses-fim"]');
+          saidaCalmaDe('[data-testid="missao-doses-fim"]', MOV_MS.base, noHome ? 0 : 420);
           salvar({ ...missao, fimVisto: true });
           setVerFim(false);
           trackEvent("missao_doses_fim_fechou", eventoDaMissao({}));

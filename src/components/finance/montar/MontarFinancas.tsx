@@ -302,7 +302,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
 
   const pular = () => {
     trackEvent(EV_PULAR, ev({ passo: PASSO_DA_ETAPA[etapa], origem }));
-    saidaCalma(folha.current, MOV_MS.calmo + 180);
+    saidaCalma(folha.current, MOV_MS.base, 480);
     decidir("pulou");
     onPular?.();
   };
@@ -406,7 +406,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     saiu.current = true;
     // 1.0.17 (Simulador): o Montar sumia num quadro e o módulo aparecia no meio da página, rolando às pressas até o gasto
     // — a cópia do Montar some devagar por cima enquanto o módulo se ajeita embaixo
-    saidaCalma(folha.current, MOV_MS.calmo + 180);
+    saidaCalma(folha.current, MOV_MS.base, 480); // inteira enquanto o módulo rola até o gasto; some com ele parado
     fecharTelaDoNumero();
     if (naMissao) trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
     onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });

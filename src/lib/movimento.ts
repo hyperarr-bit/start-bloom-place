@@ -76,7 +76,9 @@ export const reduzirMovimento = (): boolean => {
  * por trás dela. O estado e os callbacks seguem síncronos. Sem animação: "reduzir movimento" e jsdom (os testes).
  */
 const ATRIBUTOS_DA_COPIA = ["data-testid", "data-camada-guia", "role", "aria-modal", "data-momento", "id", "data-folha", "data-state", "data-missao-dose"];
-export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.calmo): void {
+/** `segura`: ms em que a cópia fica INTEIRA antes de sumir — quando o que vem embaixo ainda está se mexendo (troca de
+ *  rota, rolagem até o alvo), a cópia cobre isso e só some com a tela de baixo já parada (sem dupla exposição). */
+export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.calmo, segura = 0): void {
   try {
     if (!el || typeof document === "undefined" || !(el instanceof HTMLElement)) return;
     if (/jsdom/i.test(navigator.userAgent)) return;
@@ -93,10 +95,12 @@ export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.c
     if (cs.position !== "fixed") Object.assign(copia.style, { position: "fixed", top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0", zIndex: cs.zIndex && cs.zIndex !== "auto" ? cs.zIndex : "250" });
     document.body.appendChild(copia);
     const tirar = () => { try { copia.remove(); } catch { /* já saiu */ } };
-    const a = copia.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" });
+    const total = ms + Math.max(0, segura);
+    const quadros: Keyframe[] = segura > 0 ? [{ opacity: 1, offset: 0 }, { opacity: 1, offset: segura / total }, { opacity: 0, offset: 1 }] : [{ opacity: 1 }, { opacity: 0 }];
+    const a = copia.animate(quadros, { duration: total, easing: "ease-in-out", fill: "forwards" });
     a.onfinish = tirar;
-    window.setTimeout(tirar, ms + 400);
+    window.setTimeout(tirar, total + 400);
   } catch { /* a saída é enfeite: nunca derruba quem fecha */ }
 }
 /** Atalho: a saída calma do 1º elemento do seletor. */
-export const saidaCalmaDe = (seletor: string, ms?: number): void => { try { saidaCalma(document.querySelector(seletor), ms); } catch { /* noop */ } };
+export const saidaCalmaDe = (seletor: string, ms?: number, segura?: number): void => { try { saidaCalma(document.querySelector(seletor), ms, segura); } catch { /* noop */ } };

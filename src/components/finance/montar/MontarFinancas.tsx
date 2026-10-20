@@ -62,7 +62,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ArrowLeft, Check, ChevronDown, DollarSign, Plus, X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { trocaDePasso } from "@/lib/movimento";
+import { trocaDePasso, saidaCalma, MOV_MS } from "@/lib/movimento";
 import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -302,6 +302,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
 
   const pular = () => {
     trackEvent(EV_PULAR, ev({ passo: PASSO_DA_ETAPA[etapa], origem }));
+    saidaCalma(folha.current, MOV_MS.calmo + 180);
     decidir("pulou");
     onPular?.();
   };
@@ -403,6 +404,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   const continuar = () => {
     if (saiu.current) return;
     saiu.current = true;
+    // 1.0.17 (Simulador): o Montar sumia num quadro e o módulo aparecia no meio da página, rolando às pressas até o gasto
+    // — a cópia do Montar some devagar por cima enquanto o módulo se ajeita embaixo
+    saidaCalma(folha.current, MOV_MS.calmo + 180);
     fecharTelaDoNumero();
     if (naMissao) trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
     onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });

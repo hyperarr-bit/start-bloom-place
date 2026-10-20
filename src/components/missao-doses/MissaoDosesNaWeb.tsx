@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { entrada, MOV, MOV_MS, saida } from "@/lib/movimento";
+import { entrada, MOV, MOV_MS, saida, saidaCalmaDe } from "@/lib/movimento";
 import { marcarIntroVista } from "@/lib/intro-modulo";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -476,6 +476,7 @@ function Ligada() {
         hoje={hoje}
         braco={B ? "B" : ehUmPorDia(missao) ? "A" : null} /* B: "3 toques hoje"; A (1.0.16): "Tá dentro! + Seu plano de 3 dias", 1 tela */
         aoComecar={(modulos) => {
+          saidaCalmaDe('[data-testid="missao-doses-boas-vindas"]');
           const m = comModulos(modulos);
           salvar(m);
           trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "comecar", modulos, ...(B ? { tela: 2 } : {}) }));
@@ -483,6 +484,7 @@ function Ligada() {
           navigate(MODULOS[modulos[0]].rota);
         }}
         aoExplorar={(modulos) => {
+          saidaCalmaDe('[data-testid="missao-doses-boas-vindas"]');
           const m = { ...comModulos(modulos), explorou: true };
           salvar(m);
           trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "explorar", modulos, ...(B ? { tela: 2 } : {}) }));
@@ -501,6 +503,7 @@ function Ligada() {
         missao={missao}
         hoje={hoje}
         aoCombinar={(plano: PlanoAmanha, previa) => {
+          saidaCalmaDe('[data-testid="plano-amanha"]');
           const m = lerMissao() ?? missao;
           salvar({ ...m, planoAmanha: plano });
           trackEvent("plano_amanha_definido", eventoDaMissao({ quando: plano.quando, gatilho: plano.gatilho ?? null, doses: dosesFeitas(m), titulo: previa.title }));
@@ -514,6 +517,7 @@ function Ligada() {
           if (!noHome) navigate("/home");
         }}
         aoPular={() => {
+          saidaCalmaDe('[data-testid="plano-amanha"]');
           const m = lerMissao() ?? missao;
           salvar({ ...m, planoAmanhaPulado: hoje });
           trackEvent("plano_amanha_pulou", eventoDaMissao({ doses: dosesFeitas(m) }));
@@ -526,6 +530,7 @@ function Ligada() {
   /* 1.0.16, braço A — o convite do dia (reabriu num dia novo, a dose de hoje está liberada) */
   if (conviteDevido && conviteLivre) {
     const decidir = (acao: "foi" | "depois") => {
+      saidaCalmaDe('[data-testid="missao-doses-convite"]');
       const m = lerMissao() ?? missao;
       const p = passoPendente(m);
       salvar({ ...m, convites: { ...m.convites, [hoje]: acao } });
@@ -552,6 +557,7 @@ function Ligada() {
       <PlanoDeAmanhaA
         missao={missao}
         aoCombinar={(l) => {
+          saidaCalmaDe('[data-testid="plano-amanha-a"]');
           const m = lerMissao() ?? missao;
           salvar({ ...m, lembrete: l });
           trackEvent("missao_doses_lembrete", eventoDaMissao({ hora: l, origem: "plano_amanha" }));
@@ -562,6 +568,7 @@ function Ligada() {
           }
         }}
         aoSemLembrete={() => {
+          saidaCalmaDe('[data-testid="plano-amanha-a"]');
           const m = lerMissao() ?? missao;
           salvar({ ...m, lembrete: "sem", planoAPulado: hoje });
           trackEvent("missao_doses_lembrete", eventoDaMissao({ hora: "sem", origem: "plano_amanha" }));
@@ -585,7 +592,7 @@ function Ligada() {
           salvar({ ...m, dicasVistas: { ...m.dicasVistas, [n]: vez } });
           return vez;
         }}
-        aoFechar={() => { const m = lerMissao() ?? missao; setDicaNaTela(null); salvar({ ...m, dicas: { ...m.dicas, [n]: hoje } }); }}
+        aoFechar={() => { saidaCalmaDe('[data-testid="missao-dica"]'); const m = lerMissao() ?? missao; setDicaNaTela(null); salvar({ ...m, dicas: { ...m.dicas, [n]: hoje } }); }}
       />
     );
   }
@@ -596,6 +603,7 @@ function Ligada() {
       <ConstruiuEm3Dias
         missao={missao}
         aoContinuar={() => {
+          saidaCalmaDe('[data-testid="missao-doses-fim"]');
           salvar({ ...missao, fimVisto: true });
           setVerFim(false);
           trackEvent("missao_doses_fim_fechou", eventoDaMissao({}));

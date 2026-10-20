@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
-import { entrada, MOV } from "@/lib/movimento";
+import { entrada, MOV, saidaCalmaDe } from "@/lib/movimento";
 import { tourHomeQuando } from "@/lib/dia1-cheio";
 import { trackEvent } from "@/lib/analytics";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -287,6 +287,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   });
 
   const terminar = useCallback(() => {
+    saidaCalmaDe('[data-testid="tour-home"]'); // 1.0.17: o tour sumia num quadro
     avisar(EVENTO_MODULOS_EDITAR, { editar: false });
     marcarTourFeito();
     set(CHAVE_TOUR_FEITO, new Date().toISOString());

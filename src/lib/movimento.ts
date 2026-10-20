@@ -66,3 +66,37 @@ export function trocaDePasso(reduzir: boolean): Variants {
 export const reduzirMovimento = (): boolean => {
   try { return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
 };
+
+/**
+ * SAÍDA CALMA (1.0.17 QA, gravação no Simulador 20/10): as folhas da missão, os Montar e o tour da Home saíam da tela
+ * NUM QUADRO (eram desmontadas pelo estado, fora de um AnimatePresence) — "Combinado" no plano de amanhã, "Começar" no
+ * Tá dentro, "Continuar" no fim do Montar (o módulo aparecia no meio da página e rolava às pressas). Em vez de reescrever
+ * cada orquestração, quem fecha chama isto ANTES de mudar o estado: uma CÓPIA visual do elemento (sem testid, camada,
+ * role nem toque — nada do app a enxerga) fica por cima e some em `ms`; o que vem embaixo já está montado e se ajeita
+ * por trás dela. O estado e os callbacks seguem síncronos. Sem animação: "reduzir movimento" e jsdom (os testes).
+ */
+const ATRIBUTOS_DA_COPIA = ["data-testid", "data-camada-guia", "role", "aria-modal", "data-momento", "id", "data-folha", "data-state", "data-missao-dose"];
+export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.calmo): void {
+  try {
+    if (!el || typeof document === "undefined" || !(el instanceof HTMLElement)) return;
+    if (/jsdom/i.test(navigator.userAgent)) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    if (typeof el.animate !== "function") return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const copia = el.cloneNode(true) as HTMLElement;
+    for (const n of [copia, ...Array.from(copia.querySelectorAll<HTMLElement>("*"))]) for (const a of ATRIBUTOS_DA_COPIA) n.removeAttribute(a);
+    copia.setAttribute("aria-hidden", "true");
+    copia.setAttribute("data-saida-calma", "");
+    copia.style.pointerEvents = "none";
+    const cs = getComputedStyle(el);
+    if (cs.position !== "fixed") Object.assign(copia.style, { position: "fixed", top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0", zIndex: cs.zIndex && cs.zIndex !== "auto" ? cs.zIndex : "250" });
+    document.body.appendChild(copia);
+    const tirar = () => { try { copia.remove(); } catch { /* já saiu */ } };
+    const a = copia.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" });
+    a.onfinish = tirar;
+    window.setTimeout(tirar, ms + 400);
+  } catch { /* a saída é enfeite: nunca derruba quem fecha */ }
+}
+/** Atalho: a saída calma do 1º elemento do seletor. */
+export const saidaCalmaDe = (seletor: string, ms?: number): void => { try { saidaCalma(document.querySelector(seletor), ms); } catch { /* noop */ } };

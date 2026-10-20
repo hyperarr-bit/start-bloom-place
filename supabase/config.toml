@@ -33,7 +33,11 @@ verify_jwt = false
 verify_jwt = false
 
 # Chamada pelo revenuecat-webhook (service role) ou por admin logado — a função
-# confere as duas coisas por conta própria.
+# confere as duas coisas por conta própria. 20/10: também pelo cron da
+# sequência D2/D5/D10 (POST {"modo":"cron"}, chave anon — SQL em
+# functions/cobranca-recusada/cron-sequencia.sql, NÃO agendado; chave
+# COBRANCA_SEQUENCIA, padrão off) e pelo link "não quero mais receber"
+# (GET/POST ?sair=1, assinado com HMAC) — por isso continua sem verify_jwt.
 [functions.cobranca-recusada]
 verify_jwt = false
 

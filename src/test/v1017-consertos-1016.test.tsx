@@ -82,4 +82,15 @@ describe("2. 'Trocar' os módulos da missão", () => {
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(comecar).toHaveBeenCalledWith(["rotina", "saude", "treino"]);
   });
+  it("1.0.17 QA (nenhum corte seco): voltar da escolha NÃO refaz a entrada do Tá dentro — sem confete de novo, ✓ e texto já no lugar", () => {
+    const missao = { ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03"), boasVindas: false };
+    render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-03" braco="A" aoComecar={() => {}} aoExplorar={() => {}} />);
+    expect(document.querySelector("[data-testid=demo-guia-confete]")).not.toBeNull(); // a 1ª vez tem a festa
+    fireEvent.click(screen.getByTestId("missao-doses-trocar"));
+    expect(screen.getByTestId("missao-doses-escolha")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("missao-doses-pronto"));
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
+    expect(document.querySelector("[data-testid=demo-guia-confete]")).toBeNull();
+    expect((screen.getByTestId("missao-doses-check") as HTMLElement).style.opacity).not.toBe("0");
+  });
 });

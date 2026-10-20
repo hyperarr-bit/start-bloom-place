@@ -4,7 +4,7 @@
  * guia, role="dialog", data-momento: a festa, o tour e a intro procuram por eles) nem receber toque.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { saidaCalma } from "@/lib/movimento";
+import { saidaCalma, saidaCalmaDaTela } from "@/lib/movimento";
 
 const ua = navigator.userAgent;
 afterEach(() => { Object.defineProperty(navigator, "userAgent", { value: ua, configurable: true }); document.body.innerHTML = ""; vi.useRealTimers(); });
@@ -41,6 +41,27 @@ describe("saidaCalma", () => {
     }
     expect(document.querySelectorAll('[data-testid="plano-a-combinado"]').length).toBe(1); // só o original
     vi.advanceTimersByTime(800);
+    expect(document.querySelector("[data-saida-calma]")).toBeNull();
+    delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
+  });
+
+  it("a TELA inteira (troca de rota da missão): no jsdom devolve false (o véu antigo segue); no aparelho a foto entra por cima, sem testid/camada, e o original fica sem marcas", () => {
+    expect(saidaCalmaDaTela()).toBe(false);
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone)", configurable: true });
+    (HTMLElement.prototype as unknown as { animate: unknown }).animate = vi.fn(() => ({ onfinish: null }));
+    const raiz = document.createElement("div"); raiz.id = "root";
+    raiz.innerHTML = '<div data-testid="missao-doses-festa" data-camada-guia="missao-doses-festa" role="dialog"><input value="x" /></div>';
+    raiz.getBoundingClientRect = () => ({ top: -120, left: 0, width: 390, height: 2000, right: 390, bottom: 1880, x: 0, y: -120, toJSON: () => ({}) }) as DOMRect;
+    document.body.appendChild(raiz);
+    expect(saidaCalmaDaTela(300, 200)).toBe(true);
+    const foto = document.querySelector<HTMLElement>('[data-saida-calma="tela"]');
+    expect(foto).not.toBeNull();
+    expect(foto!.style.pointerEvents).toBe("none");
+    expect(foto!.querySelector("[data-testid], [data-camada-guia], [role]")).toBeNull();
+    expect(document.querySelectorAll('[data-testid="missao-doses-festa"]').length).toBe(1);
+    expect(document.querySelector("[data-sc-rolagem], [data-sc-fixo], [data-sc-valor]")).toBeNull();
+    vi.advanceTimersByTime(1000);
     expect(document.querySelector("[data-saida-calma]")).toBeNull();
     delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
   });

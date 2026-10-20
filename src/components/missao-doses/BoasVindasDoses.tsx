@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -6,7 +6,7 @@ import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
 import { emSegundos, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
-import { entrada, MOV } from "@/lib/movimento";
+import { entrada, MOV, MOV_MS, saidaCalmaDe } from "@/lib/movimento";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
 const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
@@ -96,6 +96,15 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   braco?: "A" | "B" | null;
 }) {
   const [tela, setTela] = useState<"boas" | "escolha">("boas");
+  /* 1.0.17 QA (dono: "nenhum corte seco"): Tá dentro ⇄ "Escolha 3 módulos" trocavam num quadro. Agora a tela que sai some
+     devagar por cima (cópia visual, MOV_MS.base) e a que entra já está parada embaixo — uma coisa se mexe por vez. Na volta
+     da escolha o Tá dentro NÃO refaz a entrada (✓ → texto → confete): ele já foi visto. */
+  const jaEntrou = useRef(false);
+  const trocarDeTela = (para: "boas" | "escolha") => {
+    saidaCalmaDe(para === "escolha" ? '[data-testid="missao-doses-boas-vindas"]' : '[data-testid="missao-doses-escolha"]', MOV_MS.base + 40);
+    if (para === "escolha") jaEntrou.current = true;
+    setTela(para);
+  };
   /** braço B: 1 = "Tá dentro!", 2 = as doses (a escolha dos 3 volta pra 2) */
   const [telaB, setTelaB] = useState<1 | 2>(1);
   useEffect(() => {
@@ -175,7 +184,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
         </div>
         <RodapeColado>
           <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" disabled={escolhidos.length !== 3}
-            onClick={() => { if (escolhidos.length !== 3) return; setModulos(escolhidos as Tres); setTela("boas"); setTelaB(2); }}>
+            onClick={() => { if (escolhidos.length !== 3) return; setModulos(escolhidos as Tres); trocarDeTela("boas"); setTelaB(2); }}>
             {B ? <>Pronto, começar <ArrowRight className="w-4 h-4" /></> : "Pronto"}
           </button>
         </RodapeColado>
@@ -221,7 +230,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{resumo.charAt(0).toUpperCase() + resumo.slice(1)}. Uns 20 segundos cada.</p>
             <div className="mt-6 flex items-baseline justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64]">Hoje</span>
-              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); setTela("escolha"); }}>Trocar os 3</button>
+              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); trocarDeTela("escolha"); }}>Trocar os 3</button>
             </div>
             <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
               {modulos.map((m, i) => (
@@ -253,6 +262,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
      segundos) / [Começar] e o link "Prefiro explorar sozinho". "Trocar" é um link pequeno embaixo do plano. ── */
   if (braco === "A") {
     const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
+    const parado = reduzir || jaEntrou.current; // voltou da escolha: tudo já no lugar, sem confete de novo
     const primeiro = primeiroNome(nome);
     return (
       <motion.div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}
@@ -260,14 +270,14 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
            apagada por ~0,1–0,2 s logo depois do cadastro (a "piscada" da 1.0.16, mais fraca). O fundo agora nasce opaco;
            a sequência calma continua nos filhos (✓ → texto → confete) — o cadastro já saiu em branco, então não há corte. */
         initial={false}>
-        <Confete atraso={reduzir ? 0 : ATRASO_DO_CONFETE_S} />
+        {!jaEntrou.current && <Confete atraso={reduzir ? 0 : ATRASO_DO_CONFETE_S} />}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[12vh] pb-4">
-            <motion.div initial={reduzir ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_CHECK_S)} data-testid="missao-doses-check"
+            <motion.div initial={parado ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_CHECK_S)} data-testid="missao-doses-check"
               className="w-14 h-14 rounded-full bg-emerald-500 grid place-items-center mb-5 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
               <Check className="w-7 h-7 text-white" strokeWidth={3.5} />
             </motion.div>
-            <motion.div initial={reduzir ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
+            <motion.div initial={parado ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
               <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}.` : "Tá dentro."}</h1>
               {/* dono 19/10 (fixes, sem apostas): a linha do teste volta — "Seus 3 dias grátis começaram." só com teste da loja
                   de verdade (fraseDoAcesso); sem teste, "Seu acesso começou." */}
@@ -282,13 +292,13 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                   </div>
                 ))}
               </div>
-              <button type="button" className="text-[13px] font-semibold text-muted-foreground mt-2 min-h-10 underline underline-offset-2" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setEscolhidos(modulos); setTela("escolha"); }}>
+              <button type="button" className="text-[13px] font-semibold text-muted-foreground mt-2 min-h-10 underline underline-offset-2" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setEscolhidos(modulos); trocarDeTela("escolha"); }}>
                 Trocar
               </button>
             </motion.div>
           </div>
         </div>
-        <motion.div initial={reduzir ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
+        <motion.div initial={parado ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
           <RodapeColado tema>
             <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
               Começar
@@ -342,7 +352,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                 {areaNome ? <>Você escolheu <b className="text-[#16121c]">{areaNome}</b> na porta — ela vem primeiro. </> : null}
                 Só esses 3 entram na missão; <b className="text-[#16121c]">os outros 13 seguem abertos</b>.
               </p>
-              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); setTela("escolha"); }}>
+              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); trocarDeTela("escolha"); }}>
                 Trocar os 3 módulos →
               </button>
             </div>

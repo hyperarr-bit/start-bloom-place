@@ -104,3 +104,68 @@ export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.c
 }
 /** Atalho: a saída calma do 1º elemento do seletor. */
 export const saidaCalmaDe = (seletor: string, ms?: number, segura?: number): void => { try { saidaCalma(document.querySelector(seletor), ms, segura); } catch { /* noop */ } };
+
+/**
+ * A TELA INTEIRA em saída calma (1.0.17 QA, pedido do dono: "nenhum corte seco"): a troca de rota da missão (festa →
+ * Home, plano do dia 2 → Home) passava por ~0,13 s de BRANCO — o véu da cor do app cobria, a rota trocava, o véu abria.
+ * Aqui a foto do que está na tela (o #root e as camadas fixas do body, com a rolagem, os cabeçalhos grudados e o que foi
+ * digitado) fica inteira por `segura` ms enquanto a rota troca e a página nova entra por baixo, e some em `ms` — um
+ * cross-fade direto, sem quadro em branco. Devolve false quando não anima (reduzir movimento, jsdom): quem chama usa o
+ * caminho antigo.
+ */
+export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boolean {
+  try {
+    if (typeof document === "undefined" || /jsdom/i.test(navigator.userAgent)) return false;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
+    if (typeof HTMLElement.prototype.animate !== "function") return false;
+    const marcados: HTMLElement[] = [];
+    const marcar = (el: HTMLElement, k: string, v: string) => { el.setAttribute(k, v); marcados.push(el); };
+    const filhos = Array.from(document.body.children).filter((c): c is HTMLElement => c instanceof HTMLElement && !/^(SCRIPT|STYLE|LINK|TEMPLATE|NOSCRIPT)$/.test(c.tagName) && !c.hasAttribute("data-saida-calma"));
+    for (const raiz of filhos) {
+      for (const el of Array.from(raiz.querySelectorAll<HTMLElement>("*"))) {
+        if (el.scrollTop > 0 || el.scrollLeft > 0) marcar(el, "data-sc-rolagem", `${el.scrollTop},${el.scrollLeft}`);
+        if (/sticky/.test(typeof el.className === "string" ? el.className : "") && getComputedStyle(el).position === "sticky") {
+          const r = el.getBoundingClientRect();
+          marcar(el, "data-sc-fixo", `${r.top},${r.left},${r.width},${r.height}`);
+        }
+        if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.value) marcar(el, "data-sc-valor", el.value);
+      }
+    }
+    const fundo = getComputedStyle(document.body).backgroundColor || "#fff";
+    const foto = document.createElement("div");
+    foto.setAttribute("aria-hidden", "true");
+    foto.setAttribute("data-saida-calma", "tela");
+    Object.assign(foto.style, { position: "fixed", inset: "0", zIndex: "2147483000", pointerEvents: "none", overflow: "hidden", background: fundo });
+    for (const raiz of filhos) {
+      const r = raiz.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      const cs = getComputedStyle(raiz);
+      const c = raiz.cloneNode(true) as HTMLElement;
+      if (cs.position !== "fixed") Object.assign(c.style, { position: "absolute", top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0" });
+      foto.appendChild(c);
+    }
+    for (const el of marcados) { el.removeAttribute("data-sc-rolagem"); el.removeAttribute("data-sc-fixo"); el.removeAttribute("data-sc-valor"); }
+    for (const n of Array.from(foto.querySelectorAll<HTMLElement>("*"))) {
+      for (const a of ATRIBUTOS_DA_COPIA) n.removeAttribute(a);
+      if (n.tagName === "CANVAS" || n.tagName === "VIDEO") n.style.visibility = "hidden";
+      const fixo = n.getAttribute("data-sc-fixo");
+      if (fixo) { const [t, l, w, h] = fixo.split(",").map(Number); Object.assign(n.style, { position: "fixed", top: `${t}px`, left: `${l}px`, width: `${w}px`, height: `${h}px`, margin: "0" }); n.removeAttribute("data-sc-fixo"); }
+      const valor = n.getAttribute("data-sc-valor");
+      if (valor !== null) { (n as HTMLInputElement).value = valor; n.removeAttribute("data-sc-valor"); }
+    }
+    document.body.appendChild(foto);
+    for (const n of Array.from(foto.querySelectorAll<HTMLElement>("[data-sc-rolagem]"))) {
+      const [t, l] = (n.getAttribute("data-sc-rolagem") ?? "0,0").split(",").map(Number);
+      n.scrollTop = t; n.scrollLeft = l; n.removeAttribute("data-sc-rolagem");
+    }
+    const total = ms + Math.max(0, segura);
+    const tirar = () => { try { foto.remove(); } catch { /* já saiu */ } };
+    const a = foto.animate([{ opacity: 1, offset: 0 }, { opacity: 1, offset: segura / total }, { opacity: 0, offset: 1 }], { duration: total, easing: "ease-in-out", fill: "forwards" });
+    a.onfinish = tirar;
+    window.setTimeout(tirar, total + 400);
+    return true;
+  } catch {
+    try { document.querySelectorAll("[data-sc-rolagem],[data-sc-fixo],[data-sc-valor]").forEach((e) => { e.removeAttribute("data-sc-rolagem"); e.removeAttribute("data-sc-fixo"); e.removeAttribute("data-sc-valor"); }); } catch { /* noop */ }
+    return false;
+  }
+}

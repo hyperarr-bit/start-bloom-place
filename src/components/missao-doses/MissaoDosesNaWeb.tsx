@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { entrada, MOV, MOV_MS, saida, saidaCalmaDe } from "@/lib/movimento";
+import { entrada, MOV, MOV_MS, saida, saidaCalmaDe, saidaCalmaDaTela } from "@/lib/movimento";
 import { marcarIntroVista } from "@/lib/intro-modulo";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -97,6 +97,9 @@ type PedidoDoVeu = { fase: "cobre" | "abre"; pronto?: () => void };
 const pedirVeu = (p: PedidoDoVeu) => { try { window.dispatchEvent(new CustomEvent<PedidoDoVeu>(EVENTO_VEU, { detail: p })); } catch { p.pronto?.(); } };
 /** Cobre a tela, troca (`trocar`) e abre de novo. Fail-open: sem o véu montado, a troca acontece em ≤ 600 ms. */
 export function trocarComCalma(trocar: () => void): void {
+  // 1.0.17 QA (dono: "nenhum corte seco"): no aparelho, cross-fade direto da tela de agora pra próxima — sem passar pelo
+  // branco do véu. O véu fica pra "reduzir movimento" (e pros testes, onde a foto não existe).
+  if (saidaCalmaDaTela(MOV_MS.calmo, 260)) { trocar(); return; }
   let feito = false;
   const seguir = () => {
     if (feito) return;

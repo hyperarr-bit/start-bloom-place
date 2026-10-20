@@ -398,3 +398,13 @@ export function adicionarPessoaPropria({ get, gravar }: ContextoDaAcao, nome: st
 export function cadastrarPetProprio(ctx: ContextoDaAcao, especie: string): string {
   return cadastrarPet(ctx, "outro", especie);
 }
+
+/** Finanças › a conta fixa DELA ("Academia", R$ 90): o formato da FixedExpensesTable, vence dia 10 (ela ajusta). */
+export function anotarContaFixaPropria({ get, gravar }: ContextoDaAcao, nome: string, valor: number): string {
+  const d = nome.trim().slice(0, 40) || "Conta";
+  const atuais = lista(get<unknown>("finance-fixed-expenses", []));
+  if (atuais.some((x) => String(mapa(x).description ?? "").trim().toLowerCase() === d.toLowerCase())) return d;
+  const v = Number.isFinite(valor) && valor > 0 ? Math.round(valor * 100) / 100 : 0;
+  gravar("finance-fixed-expenses", [...atuais, { id: id("fixa"), description: d, category: "outros", value: v, paymentMethod: "pix", day: 10 }]);
+  return v ? `${d} · R$ ${v.toLocaleString("pt-BR")}` : d;
+}

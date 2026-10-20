@@ -261,7 +261,10 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             </motion.div>
             <motion.div initial={reduzir ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
               <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}.` : "Tá dentro."}</h1>
-              <p className="text-[16px] text-muted-foreground mt-2 leading-snug" data-testid="missao-doses-subtitulo">Vamos com calma: um passo por dia.</p>
+              {/* dono 19/10 (fixes, sem apostas): a linha do teste volta — "Seus 3 dias grátis começaram." só com teste da loja
+                  de verdade (fraseDoAcesso); sem teste, "Seu acesso começou." */}
+              <p className="text-[17px] font-semibold text-foreground/80 mt-2 leading-snug" data-testid="missao-doses-subtitulo">{acesso}.</p>
+              <p className="text-[15px] text-muted-foreground mt-1 leading-snug" data-testid="missao-doses-calma">Vamos com calma: um passo por dia.</p>
               <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-9">Seu plano</p>
               <div className="mt-2 rounded-2xl bg-card border border-border/60 divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
                 {linhas.map(({ n, cfg }) => (

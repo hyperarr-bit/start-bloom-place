@@ -148,7 +148,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const tocarChip = (chip: ChipDaMissao, propria = false) => {
     if (!passo || tocado) return;
     // 1.0.17: a opção que ELA escreveu ("+ Outro", ou um chip "seu" de antes) vai pelo mesmo `executar`, por texto
-    const o = propria ? { emoji: chip.emoji, rotulo: chip.nome, id: ID_OUTRO_DA_INTRO } : passo.opcoes.find((x) => x.rotulo === chip.nome);
+    const o: OpcaoDaIntro | undefined = propria ? { emoji: chip.emoji, rotulo: chip.nome, id: ID_OUTRO_DA_INTRO, ...(chip.valor != null ? { valor: chip.valor } : {}) } : passo.opcoes.find((x) => x.rotulo === chip.nome);
     if (!o) return;
     setTocado(chip.nome);
     if (passo.foco) {
@@ -227,7 +227,8 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
       tocado={tocado}
       aoChip={(c) => tocarChip(c)}
       outro={passo.opcoes.length && passo.executar && passo.outro !== false && !passo.foco
-        ? { lista: `intro-${m}-${n + 1}`, placeholder: passo.outro?.placeholder ?? "Escreva aqui", aoEscolher: ({ nome }) => tocarChip({ emoji: "✎", nome }, true) }
+        ? { lista: passo.outro?.numero ? undefined : `intro-${m}-${passoInicial + n + 1}`, placeholder: passo.outro?.placeholder ?? "Escreva aqui", comValor: passo.outro?.comValor, numero: passo.outro?.numero,
+            aoEscolher: ({ nome, valor }) => tocarChip({ emoji: "✎", nome, valor, proprio: true }, true) }
         : undefined}
     />
   ) : null;

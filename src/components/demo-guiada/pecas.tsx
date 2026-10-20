@@ -511,7 +511,7 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
               aoEscolher={escolher}
               marcado={tocado ?? null}
               lista={outro?.lista}
-              outro={outro && !outro.numero ? { placeholder: outro.placeholder, comValor: outro.comValor } : false}
+              outro={!outro ? false : outro.numero ? undefined : { placeholder: outro.placeholder, comValor: outro.comValor }}
               numero={outro?.numero}
               testid="demo-guia"
             />

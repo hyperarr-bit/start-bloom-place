@@ -49,10 +49,14 @@ import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
 import { lerMissao, missaoDosesLigada, type DiaDaMissao } from "@/lib/missao-doses";
 import {
-  CAFE_DA_MANHA, COMODOS_DA_INTRO, DESTINOS_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE, adicionarCurso, adicionarLivro, adicionarPessoaDoComeco, adicionarPessoaPropria,
-  anotarCafeDaManha, anotarComodoProprio, anotarDestino, anotarPensamento, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, cadastrarPetProprio, comecarDetox, criarMeta,
-  diaDaSemana as diaDaSemanaDoTreino, montarSkincare, montarTreinoDeHoje, montarTreinoProprio, type ContextoDaAcao, type TreinoDeHoje,
+  CAFE_DA_MANHA, COMODOS_DA_INTRO, DESTINOS_DA_INTRO, DESTINOS_PLANEJANDO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE,
+  adicionarCurso, adicionarCursoDesejado, adicionarLivro, adicionarPessoaDoComeco, adicionarPessoaPropria, anotarCafeDaManha, anotarComodoProprio,
+  anotarContaFixa, anotarContaFixaPropria, anotarDestino, anotarEspelhoDoDia, anotarHumor, anotarItemDoMercado, anotarMetaDeCurtoPrazo, anotarMotivacao,
+  anotarPensamento, anotarRefeicao, anotarSkill, anotarSono, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, cadastrarPetProprio, comecarDetox,
+  criarMeta, diaDaSemana as diaDaSemanaDoTreino, marcarPaginaDoLivro, montarSkincare, montarTreinoDeHoje, montarTreinoProprio,
+  type ContextoDaAcao, type TreinoDeHoje,
 } from "@/lib/intro-modulo-acoes";
+import type { NumeroDaEscolha } from "@/components/ui/escolha-rapida";
 import { planoVazio } from "@/lib/treino-plano";
 import { cardPorTitulo } from "@/lib/conhecer-mais";
 import { localDayKey } from "@/lib/utils";
@@ -311,7 +315,7 @@ export const OLHAR_POSSO_GASTAR: OlharNoResumo = {
   titulo: "Seu número do dia",
   texto: "Cada gasto mexe nele na hora.",
 };
-export interface OpcaoDaIntro { emoji: string; rotulo: string; /** o que vai pro evento (sem acento/emoji) */ id: string }
+export interface OpcaoDaIntro { emoji: string; rotulo: string; /** o que vai pro evento (sem acento/emoji) */ id: string; /** 1.0.17: a opção dela com número (o R$ da conta, as horas de sono, a página) */ valor?: number }
 /** 1.0.17: o id da opção que a pessoa ESCREVEU no "+ Outro" (o rótulo é o texto dela) — o `executar` grava por texto. */
 export const ID_OUTRO_DA_INTRO = "outro";
 /**
@@ -331,7 +335,7 @@ export interface PassoDaIntro {
    * `executar` recebe `{ id: ID_OUTRO_DA_INTRO, rotulo: <o texto dela> }`. Padrão: ligado em todo passo com chips e
    * `executar`; `false` desliga (tipo de pele: a rotina nasce de um dos 3).
    */
-  outro?: { placeholder?: string } | false;
+  outro?: { placeholder?: string; comValor?: boolean; numero?: NumeroDaEscolha } | false;
   /** um passo de OLHAR: o anel num card real com um balão de 1 frase e "Entendi" — sem ação; card ausente = pulado */
   olhar?: { titulo: string; texto: string };
   /** grava o que ela escolheu; devolve o rótulo do que entrou (sem retorno = o rótulo do chip) */
@@ -371,6 +375,7 @@ const olharPorTitulo = (re: RegExp) => (): Element | null => cardPorTitulo(re);
 const linhaDeHojeDaRotina = (): Element | null => {
   try { const btn = document.querySelector('[data-spotlight="add-habit"]'); return btn ? btn.closest("section, .rounded-2xl, .rounded-xl, .rounded-lg") ?? btn : null; } catch { return null; }
 };
+const humores = HUMORES_DA_INTRO.map((h) => op(h.emoji, h.rotulo, h.id));
 /** 1.0.17: o nome do hábito de detox que a intro acabou de criar (o "+ Outro" dela também) — o passo do check-in acha o card dele. */
 let detoxDaIntro = "";
 
@@ -380,6 +385,8 @@ let detoxDaIntro = "";
  * ação → olha → ação. Os 3 guiados (Finanças/Rotina/Saúde) fazem a 1ª ação e o "olha" na IntroGuiada e seguem em
  * `maisPassos`; os outros 13 rodam inteiros na IntroDeUmToque.
  */
+/* 1.0.17 (dono, dado da 1.0.16: 41 de 50 pulos são no PASSO 1 — o tamanho não é o problema): os passos da 1.0.16
+ * ficam; muda a copy (curta, uma ideia por passo), o "Agora não" quieto e o "+ Outro" (EscolhaRapida) nas listas. */
 export const INTROS: Record<string, IntroConfig> = {
   /* ───────── guiadas: a dose, sem a missão em volta ───────── */
   financas: {
@@ -393,7 +400,18 @@ export const INTROS: Record<string, IntroConfig> = {
     // elegível = nenhum gasto VARIÁVEL ainda; renda e contas fixas do Montar não contam (a intro ensina a anotar o gasto)
     vazio: (get) => vazias(get, ["finance-expenses"]),
     montar: MONTAR_FINANCAS,
-    // 1.0.17 (dono: "minimalista"): no máximo 2 passos — o gasto e o "olha"; as contas fixas ficam pro Montar
+    // 3) custos fixos (57%) → 4) olha o card deles
+    maisPassos: [{
+      pedido: "anote 1 conta fixa", pergunta: "Uma conta que vem todo mês?",
+      opcoes: [op("🏠", "Aluguel", "aluguel"), op("💡", "Luz", "luz"), op("📶", "Internet", "internet")],
+      outro: { placeholder: "Ex.: Academia", comValor: true },
+      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? anotarContaFixaPropria(ctx, o.rotulo, o.valor ?? 0) : anotarContaFixa(ctx, o.id)),
+      alvo: { aba: "MEU FINANCEIRO", achar: olharPorTitulo(/^CUSTOS FIXOS$/i), abaixo: true },
+    }, {
+      pedido: "olhe as contas fixas", pergunta: "", opcoes: [],
+      olhar: { titulo: "Contas fixas", texto: "O ✓ marca como paga." },
+      alvo: { aba: "MEU FINANCEIRO", achar: olharPorTitulo(/^CUSTOS FIXOS$/i) },
+    }],
   },
   rotina: {
     formato: "guiada", moduleId: "rotina", nome: "Rotina", tipo: "habito",
@@ -409,7 +427,14 @@ export const INTROS: Record<string, IntroConfig> = {
       return !marcou && vazias(get, ["core-rotina-habit-log"]);
     },
     montar: MONTAR_ROTINA,
-    // 1.0.17: no máximo 2 passos — o hábito e o "olha"
+    // (criar → marcar → olha a semana) + 4) "Como você está hoje?" (24%)
+    maisPassos: [{
+      pedido: "conte como você está", pergunta: "Como você está hoje?",
+      opcoes: humores,
+      outro: false, // humor é uma escala (o módulo grava a nota)
+      executar: (ctx, o) => anotarHumor(ctx, "mood-log", o.id),
+      alvo: { aba: "MINHA SEMANA", achar: olharPorTitulo(/COMO VOC[ÊE] EST[ÁA] HOJE/i), abaixo: true },
+    }],
   },
   saude: {
     formato: "guiada", moduleId: "saude", nome: "Saúde", tipo: "agua",
@@ -418,7 +443,18 @@ export const INTROS: Record<string, IntroConfig> = {
     pronto: "Água, sono e remédio: um toque cada.",
     cor: { faixa: "#FFE1E1", tinta: "#7f1d1d", acento: "#dc2626" },
     vazio: (get) => vazias(get, ["core-saude-water", "water-log", "core-saude-sleep", "core-saude-supplement-log"]),
-    // 1.0.17: no máximo 2 passos — a água e o "olha"
+    // (água → olha) + 3) sono (21%) → 4) olha o IMC (28%)
+    maisPassos: [{
+      pedido: "anote o sono", pergunta: "Quantas horas você dormiu?",
+      opcoes: [op("😴", "6 h", "6"), op("😊", "7 h", "7"), op("🌙", "8 h", "8")],
+      outro: { numero: { min: 3, max: 12, inicial: 7, formatar: (n) => `${n} h`, rotulo: "Outro" } },
+      executar: (ctx, o) => anotarSono(ctx, o.id === ID_OUTRO_DA_INTRO ? Number(o.valor ?? 7) : Number(o.id)),
+      alvo: { aba: "HOJE", achar: olharPorTitulo(/^Sono$/i), abaixo: true },
+    }, {
+      pedido: "olhe o IMC", pergunta: "", opcoes: [],
+      olhar: { titulo: "Calculadora IMC", texto: "Altura e peso uma vez, o IMC sai na hora." },
+      alvo: { aba: "HOJE", achar: olharPorTitulo(/CALCULADORA IMC/i) },
+    }],
   },
 
   /* ───────── de vários passos (o motor de 1 toque): ação → olha → ação ───────── */
@@ -452,6 +488,16 @@ export const INTROS: Record<string, IntroConfig> = {
         return feito ? `${String(mapa(feito).name ?? "o 1º exercício")} feito` : null;
       } },
       alvo: { aba: "HOJE", achar: porSeletor('[data-testid="treino-hoje"] button[aria-label^="Marcar "]') },
+    }, {
+      // 3) a semana (dias ativos / constância, 21%)
+      pedido: "olhe a sua semana", pergunta: "", opcoes: [],
+      olhar: { titulo: "Sua semana", texto: "Treinos feitos e a sua sequência." },
+      alvo: { aba: "SEMANA", achar: porSeletor('[data-testid="treino-semana"]') },
+    }, {
+      // 4) os modelos prontos (11%)
+      pedido: "olhe os modelos", pergunta: "", opcoes: [],
+      olhar: { titulo: "Modelos prontos", texto: "Um toque monta a semana inteira." },
+      alvo: { aba: "PLANO", achar: porSeletor('[data-testid="modelos-prontos"]') },
     }],
     cor: { faixa: "#DCEBFF", tinta: "#1e3a8a", acento: "#2563eb" },
     vazio: (get) => planoVazio(get<unknown>("saude-workouts-v2", null)) && vazias(get, ["saude-workout-log"]),
@@ -480,6 +526,13 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe o seu dia", pergunta: "", opcoes: [],
       olhar: { titulo: "Seu dia no cardápio", texto: "As outras refeições você põe quando quiser." },
       alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje) },
+    }, {
+      // 3) mais uma refeição de hoje
+      pedido: "anote o almoço", pergunta: "E o almoço de hoje?",
+      opcoes: [op("🍗", "Frango com arroz", "frango_arroz"), op("🥗", "Salada com proteína", "salada"), op("🍝", "Macarrão", "macarrao")],
+      outro: { placeholder: "Ex.: Feijoada" },
+      executar: (ctx, o) => anotarRefeicao(ctx, "Almoço", o.rotulo),
+      alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje), abaixo: true },
     }],
     cor: { faixa: "#E3F6E0", tinta: "#14532d", acento: "#16a34a" },
     vazio: (get) => {
@@ -503,6 +556,13 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe o seu curso", pergunta: "", opcoes: [],
       olhar: { titulo: "Seu curso entrou", texto: "Toque nele pra pôr aulas e anotações." },
       alvo: { achar: olharPorTitulo(/CURSOS EM ANDAMENTO/i) },
+    }, {
+      // 3) um curso que ela quer (cursos que desejo)
+      pedido: "anote 1 que você quer", pergunta: "E um curso que você quer fazer?",
+      opcoes: [op("📊", "Excel", "excel"), op("🇪🇸", "Espanhol", "espanhol"), op("📣", "Marketing digital", "marketing")],
+      outro: { placeholder: "Ex.: Fotografia" },
+      executar: (ctx, o) => adicionarCursoDesejado(ctx, o.rotulo),
+      alvo: { achar: olharPorTitulo(/CURSOS QUE DESEJO/i), abaixo: true },
     }],
     cor: { faixa: "#E4E6FF", tinta: "#312e81", acento: "#4f46e5" },
     vazio: (get) => vazias(get, ["estudos-cursos-andamento", "estudos-notebooks", "estudos-exams", "estudos-subjects"]),
@@ -520,8 +580,15 @@ export const INTROS: Record<string, IntroConfig> = {
     }, {
       // 2) olha o "Lendo agora" (14%, a ação #1)
       pedido: "olhe o Lendo agora", pergunta: "", opcoes: [],
-      olhar: { titulo: "Lendo agora", texto: "Toque no livro pra marcar a página." },
+      olhar: { titulo: "Lendo agora", texto: "Toque no livro pra anotar frases." },
       alvo: { achar: olharPorTitulo(/LENDO AGORA/i) },
+    }, {
+      // 3) a página atual (a barra anda)
+      pedido: "marque a página", pergunta: "Em que página você está?",
+      opcoes: [op("📖", "Começando", "1"), op("📄", "Página 50", "50"), op("📑", "Página 120", "120")],
+      outro: { numero: { min: 1, max: 1500, passo: 10, inicial: 80, formatar: (n) => `Página ${n}`, rotulo: "Outra" } },
+      executar: (ctx, o) => marcarPaginaDoLivro(ctx, o.id === ID_OUTRO_DA_INTRO ? Number(o.valor ?? 1) : Number(o.id)),
+      alvo: { achar: olharPorTitulo(/LENDO AGORA/i), abaixo: true },
     }],
     cor: { faixa: "#FFE9D6", tinta: "#7c2d12", acento: "#ea580c" },
     vazio: (get) => vazias(get, ["lib-books"]),
@@ -541,6 +608,18 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe o cômodo", pergunta: "", opcoes: [],
       olhar: { titulo: "Seu cômodo", texto: "Marque cada tarefa quando fizer." },
       alvo: { aba: "CÔMODOS", achar: olharPorTitulo(/^(COZINHA|QUARTO|BANHEIRO)$/i) },
+    }, {
+      // 3) o mercado (lista)
+      pedido: "anote 1 item do mercado", pergunta: "O que falta no mercado?",
+      opcoes: [op("🥛", "Leite", "leite"), op("🍞", "Pão", "pao"), op("☕", "Café", "cafe")],
+      outro: { placeholder: "Ex.: Arroz" },
+      executar: (ctx, o) => anotarItemDoMercado(ctx, o.rotulo),
+      alvo: { aba: "MERCADO", achar: linhaDoCampo('input[placeholder="Adicionar..."]') },
+    }, {
+      // 4) a limpeza (6%)
+      pedido: "olhe a limpeza", pergunta: "", opcoes: [],
+      olhar: { titulo: "Rotina de limpeza", texto: "Dia, semana e mês. O app renova sozinho." },
+      alvo: { aba: "ROTINA", achar: olharPorTitulo(/LIMPEZA DI[ÁA]RIA/i) },
     }],
     cor: { faixa: "#DDF4F8", tinta: "#155e75", acento: "#0e7490" },
     vazio: (get) => {
@@ -566,6 +645,20 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe a sua meta", pergunta: "", opcoes: [],
       olhar: { titulo: "Sua meta", texto: "Toque nela pra ver as etapas." },
       alvo: { aba: "METAS", achar: porSeletor('[data-spotlight="add-goal"]') },
+    }, {
+      // 3) "O que me motiva" (16%, a ação #1 do módulo)
+      pedido: "conte o que te motiva", pergunta: "O que te motiva a acordar?",
+      opcoes: [op("👨‍👩‍👧", "Minha família", "familia"), op("💪", "Minha saúde", "saude"), op("🏡", "Minha independência", "independencia")],
+      outro: { placeholder: "Ex.: Meus filhos" },
+      executar: (ctx, o) => { anotarMotivacao(ctx, o.rotulo); },
+      alvo: { aba: "SOBRE MIM", achar: olharPorTitulo(/O QUE ME MOTIVA/i), abaixo: true },
+    }, {
+      // 4) o humor (8%)
+      pedido: "marque o humor", pergunta: "Como está o seu humor hoje?",
+      opcoes: humores,
+      outro: false, // humor é uma escala (o módulo grava a nota)
+      executar: (ctx, o) => anotarHumor(ctx, "dp-mood-log", o.id),
+      alvo: { aba: "HUMOR & SCORE", achar: olharPorTitulo(/HUMOR/i), abaixo: true },
     }],
     cor: { faixa: "#EFE2FF", tinta: "#4c1d95", acento: "#7c3aed" },
     vazio: (get) => vazias(get, ["goals-board-v2", "dp-gratitude", "dp-mood-log", "dp-motivations"]),
@@ -585,6 +678,13 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe o seu dia", pergunta: "", opcoes: [],
       olhar: { titulo: "Seu dia de trabalho", texto: "A tarefa está na lista de hoje." },
       alvo: { aba: "Meu Dia", achar: linhaDoCampo('input[placeholder="Nova tarefa do trabalho..."]') },
+    }, {
+      // 3) uma skill (a aba Skills)
+      pedido: "anote 1 skill", pergunta: "Uma skill pra evoluir?",
+      opcoes: [op("🇬🇧", "Inglês", "ingles"), op("📊", "Excel", "excel"), op("🗣️", "Falar em público", "falar")],
+      outro: { placeholder: "Ex.: Liderança" },
+      executar: (ctx, o) => { anotarSkill(ctx, o.rotulo); },
+      alvo: { aba: "Skills", achar: olharPorTitulo(/SKILL/i), abaixo: true },
     }],
     cor: { faixa: "#E6EAF0", tinta: "#1e293b", acento: "#475569" },
     vazio: (get) => {
@@ -622,6 +722,11 @@ export const INTROS: Record<string, IntroConfig> = {
           return null;
         } catch { return null; }
       } },
+    }, {
+      // 3) as stats
+      pedido: "olhe a sequência", pergunta: "", opcoes: [],
+      olhar: { titulo: "Sua sequência", texto: "Recaiu? Marque e recomece, sem drama." },
+      alvo: { aba: "STATS", achar: () => { try { return document.querySelector("main section, main .rounded-2xl, main .rounded-xl"); } catch { return null; } } },
     }],
     cor: { faixa: "#EAF7D2", tinta: "#365314", acento: "#65a30d" },
     vazio: (get) => vazias(get, ["detox-habits", "detox-diary"]),
@@ -649,6 +754,13 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe o seu dia", pergunta: "", opcoes: [],
       olhar: { titulo: "Ficou na hora de agora", texto: "A busca acha qualquer um depois." },
       alvo: { aba: "DIA", achar: () => { try { const hora = `${String(new Date().getHours()).padStart(2, "0")}:00`; return Array.from(document.querySelectorAll<HTMLElement>("button, div")).find((b) => (b.textContent ?? "").trim().startsWith(hora) && b.getBoundingClientRect().height < 200) ?? null; } catch { return null; } } },
+    }, {
+      // 3) uma meta de curto prazo (a ação #1 da Mente: 4%)
+      pedido: "anote 1 meta curta", pergunta: "Uma meta pras próximas semanas?",
+      opcoes: [op("📵", "Menos tela à noite", "tela"), op("📖", "Terminar um livro", "livro"), op("🏃", "Treinar 3x na semana", "treino")],
+      outro: { placeholder: "Ex.: Dormir antes das 23h" },
+      executar: (ctx, o) => { anotarMetaDeCurtoPrazo(ctx, o.rotulo); },
+      alvo: { aba: "METAS", achar: olharPorTitulo(/CURTO PRAZO/i), abaixo: true },
     }],
     cor: { faixa: "#ECE4FF", tinta: "#4c1d95", acento: "#6d28d9" },
     vazio: (get) => vazias(get, ["hiperfoco-thoughts", "mente-dreams"]),
@@ -666,8 +778,15 @@ export const INTROS: Record<string, IntroConfig> = {
     }, {
       // 2) olha a lista
       pedido: "olhe a sua lista", pergunta: "", opcoes: [],
-      olhar: { titulo: "O destino entrou", texto: "Roteiro e mala vêm depois." },
+      olhar: { titulo: "O destino entrou", texto: "A etiqueta muda quando a viagem avança." },
       alvo: { achar: () => { try { const el = document.querySelector('[aria-label^="Editar "]'); return el?.closest(".rounded-2xl, .rounded-xl, li, section") ?? el; } catch { return null; } } },
+    }, {
+      // 3) a próxima de verdade (planejando)
+      pedido: "anote a próxima", pergunta: "E a próxima viagem de verdade?",
+      opcoes: [op("🌵", "Chapada dos Veadeiros", "chapada"), op("🐠", "Fernando de Noronha", "noronha"), op("🥩", "Buenos Aires", "buenos_aires")],
+      outro: { placeholder: "Ex.: Salvador" },
+      executar: (ctx, o) => { anotarDestino(ctx, DESTINOS_PLANEJANDO[o.id] ?? { name: o.rotulo, country: "", continent: "" }, "planejando"); return `${o.rotulo} (planejando)`; },
+      alvo: { achar: linhaDoCampo('input[placeholder="Destino..."], input[placeholder="Destino"]') },
     }],
     cor: { faixa: "#D9F4F0", tinta: "#134e4a", acento: "#0d9488" },
     vazio: (get) => vazias(get, ["travel-bucket"]),
@@ -701,6 +820,13 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe a sua rotina", pergunta: "", opcoes: [],
       olhar: { titulo: "Sua rotina nasceu", texto: "Toque num passo pra escolher o produto." },
       alvo: { aba: "SKINCARE", achar: porSeletor('[data-card="skincare-de-hoje"], [data-testid="rotina-pronta"]') },
+    }, {
+      // 3) o Espelho do dia (11%, a ação #1 da Beleza)
+      pedido: "faça o espelho do dia", pergunta: "Como a sua pele está hoje?",
+      opcoes: ESPELHO_DA_INTRO.map((e) => op(e.emoji, e.rotulo, e.id)),
+      outro: false, // o espelho do dia é uma escala do módulo
+      executar: (ctx, o) => anotarEspelhoDoDia(ctx, o.id),
+      alvo: { aba: "SKINCARE", achar: olharPorTitulo(/ESPELHO/i), abaixo: true },
     }],
     cor: { faixa: "#FFE4F1", tinta: "#831843", acento: "#db2777" },
     vazio: (get) => vazias(get, [CHAVE_PASSOS_BELEZA.manha, CHAVE_PASSOS_BELEZA.noite, "beauty-products", "skincare-daily-checkin"]),
@@ -720,6 +846,18 @@ export const INTROS: Record<string, IntroConfig> = {
       pedido: "olhe a ficha", pergunta: "", opcoes: [],
       olhar: { titulo: "A pessoa entrou", texto: "Toque nela pra pôr o aniversário." },
       alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="lista-pessoas"]') },
+    }, {
+      // 3) mais uma pessoa
+      pedido: "anote mais 1", pergunta: "Mais alguém?",
+      opcoes: [op("☕", "Pai", "pai"), op("🌻", "Irmã", "irma"), op("🧶", "Avó", "avo")],
+      outro: { placeholder: "Nome ou apelido" },
+      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? adicionarPessoaPropria(ctx, o.rotulo) : adicionarPessoaDoComeco(ctx, o.id)),
+      alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="lista-pessoas"]'), abaixo: true },
+    }, {
+      // 4) as datas
+      pedido: "olhe as datas", pergunta: "", opcoes: [],
+      olhar: { titulo: "O ano em datas", texto: "O app avisa na véspera." },
+      alvo: { aba: "DATAS", achar: porSeletor('[data-testid="ano-em-datas"], [data-testid="lista-datas"]') },
     }],
     cor: { faixa: "#FFE1E7", tinta: "#881337", acento: "#e11d48" },
     vazio: (get) => vazias(get, ["rel-people", "rel-dates", "rel-moments", "relacoes-pessoas"]),
@@ -740,6 +878,11 @@ export const INTROS: Record<string, IntroConfig> = {
       opcoes: [],
       escutar: { chaves: [`pet-routine-${localDayKey()}`], rotulo: (valor) => (Object.values(mapa(valor)).some((t) => Object.values(mapa(t)).some((v) => v === true)) ? "a comida de hoje" : null) },
       alvo: { achar: () => { try { const c = document.querySelector('[data-card="PET DE HOJE"]'); return c?.querySelector("button, input, [role=checkbox]") ?? c; } catch { return null; } } },
+    }, {
+      // 3) a carteirinha
+      pedido: "olhe a carteirinha", pergunta: "", opcoes: [],
+      olhar: { titulo: "A carteirinha", texto: "O app avisa quando chegar a hora." },
+      alvo: { achar: porSeletor('[data-testid="montar-carteirinha"], [data-testid="novo-cuidado-abrir"], [data-testid="completar-carteirinha"]') },
     }],
     cor: { faixa: "#FFF4C2", tinta: "#78350f", acento: "#d97706" },
     vazio: (get) => vazias(get, ["pet-list", "pet-diary", "pet-cuidados", "pet-expenses"]),

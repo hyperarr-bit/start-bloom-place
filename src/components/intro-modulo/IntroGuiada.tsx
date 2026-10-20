@@ -268,10 +268,10 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
 
   /* 17/10 (uma voz só em todos os tutoriais): a faixa conta "1 de 4 · toca em 1 gasto seu", "2 de 4 · agora olha" — os passos da
    * guiada (ação[+marcar na Rotina] → olha) mais os de 1 toque que vêm depois (config.maisPassos) */
-  // 1.0.17 (dono: "no máximo 2 passos"): a ação (na Rotina vazia, criar+marcar contam como um) e o "olha"
-  const passosDaGuiada = 2;
+  // os passos da 1.0.16: ação [+ marcar na Rotina vazia] → olha → os de 1 toque (config.maisPassos)
+  const passosDaGuiada = config.tipo === "habito" ? 3 : 2;
   const totalDePassos = passosDaGuiada + (config.maisPassos?.length ?? 0);
-  const passoAtual = fase === "olhar" ? passosDaGuiada : 1;
+  const passoAtual = fase === "olhar" ? passosDaGuiada : subPasso === "marcar" ? 2 : 1;
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-passo={passoAtual} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "olhe aqui" : config.pedido}</span>

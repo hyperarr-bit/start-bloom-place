@@ -5,6 +5,7 @@ import "./styles/escuro.css"; // modo escuro como sistema (gerado por scripts/ge
 import { trackEvent, captureLandingMeta, iniciarMedicaoDoAparelho } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
+import { instalarTrocaDeRotaSemBranco } from "@/lib/troca-de-rota";
 import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
 import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
@@ -21,6 +22,8 @@ import { precisaRestaurar, restaurarDaCopia } from "@/missao/seguranca";
 // mudança de ordem, aqui garante antes do React montar. O CSS do shell
 // (ex.: matar outline de foco preso) depende só desta classe.
 if (isNativeShell()) document.documentElement.classList.add("core-shell");
+// 1.0.17 QA: troca de rota sem quadro em branco (foto da tela de antes por cima, cross-fade de 200 ms) — só no app
+if (isNativeShell()) instalarTrocaDeRotaSemBranco();
 
 // 10/10 (1.0.14): device_id, turma e versão em TODO evento + app_primeira_abertura
 // (1× por aparelho, só no app das lojas). Antes do React: os primeiros eventos

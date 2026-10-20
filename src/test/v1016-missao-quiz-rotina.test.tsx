@@ -4,8 +4,8 @@
  *   · o quiz "Rotina pronta em 3 toques" (ramo v1016-rotina) abre por cima, SÓ como 1ª dose — nada da missão por cima
  *     dele (nem post-it, nem o "Pular" da faixa), `<html data-montar-rotina="missao">` e `<html data-missao-dose="1">`;
  *   · marcou o 1º quadradinho no guia da própria tela → a dose está feita (a comemoração entra na hora, uma só);
- *   · "Entendi" sem marcar → o post-it da missão segue no mesmo quadradinho ("Sua rotina está pronta. Marca o
- *     primeiro quando fizer.") e marcar fecha a dose;
+ *   · "Entendi" sem marcar → a missão espera quieta (1.0.17 QA: um pedido só — nada repete "Sua rotina está pronta")
+ *     e marcar fecha a dose;
  *   · "Pular" no quiz → nunca mais (a missão guarda) e a dose guiada simples; fechar o app no meio → volta 1 vez só.
  */
 process.env.TZ = "America/Sao_Paulo";
@@ -192,7 +192,7 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     });
   }
 
-  it("'Entendi' no guia sem marcar: o post-it da MISSÃO segue no mesmo quadradinho (com o nome do 1º hábito) e marcar fecha a dose", { timeout: 60_000 }, async () => {
+  it("1.0.17 QA (um pedido só): 'Entendi' no guia sem marcar — a missão NÃO repete 'Sua rotina está pronta…' (nem post-it nem anel); a faixa segue e marcar o quadradinho fecha a dose", { timeout: 60_000 }, async () => {
     ligar("A");
     missaoNaRotina("A");
     montar({ atual: {} });
@@ -201,10 +201,12 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     await waitFor(() => expect(screen.getByRole("button", { name: "Entendi" })).toBeTruthy(), { timeout: 12_000 });
     fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
     await respirar();
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").length).toBeGreaterThan(0), { timeout: 12_000 });
-    const postIt = screen.getAllByTestId("demo-guia-postit").at(-1)!;
-    expect(postIt).toHaveTextContent("Sua rotina está pronta. Marca o primeiro quando fizer.");
-    expect(postIt).toHaveTextContent("É o quadradinho de hoje, na coluna de Beber água.");
+    await waitFor(() => expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "setup", setup: "montar-rotina", acao: "espera_quieta" })]), { timeout: 12_000 });
+    await act(() => new Promise<void>((r) => setTimeout(r, 2500))); // o tempo em que o post-it repetido aparecia (~2 s)
+    expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0);
+    expect(screen.queryByTestId("missao-doses-anel")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-postit-solto")).toBeNull();
+    expect(document.body.textContent ?? "").not.toContain("Sua rotina está pronta");
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
     await respirar();

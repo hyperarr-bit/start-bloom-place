@@ -54,6 +54,10 @@ export interface EncaixeDoSetup {
    *  (segue o passo guiado). Rotina: marcou o 1º quadradinho no guia da própria tela; Treino: a semana montada
    *  com um modelo pronto (a dose de Treino é escolher o treino — desenho 8, 4.1). */
   prontoEhADose?: (resumo: unknown) => string | null;
+  /** 1.0.17 QA (dono: "um pedido só"): o quiz JÁ mostrou o pedido do passo seguinte e ela respondeu "Entendi" (ou o
+   *  guia ficou o tempo dele na tela) — a dose espera o registro QUIETA (sem post-it nem anel repetindo a frase); a faixa
+   *  da missão e o "Pular" seguem lá. */
+  pedidoJaFeito?: (resumo: unknown) => boolean;
 }
 
 export const SETUPS_ENCAIXADOS: Partial<Record<Exclude<SetupDaDose, "montar-financas">, EncaixeDoSetup>> = {
@@ -71,6 +75,10 @@ export const SETUPS_ENCAIXADOS: Partial<Record<Exclude<SetupDaDose, "montar-fina
     prontoEhADose: (r) => {
       const resumo = r as Partial<ResumoMontarRotina> | null | undefined;
       return resumo?.primeiroMarcado ? (resumo.primeiro?.nome || "Seu primeiro hábito") : null;
+    },
+    pedidoJaFeito: (r) => {
+      const fimDoGuia = (r as Partial<ResumoMontarRotina> | null | undefined)?.guiaFim;
+      return fimDoGuia === "entendi" || fimDoGuia === "tempo";
     },
   },
   /* TREINO (área "corpo") — o EscolherTreino da introdução dos módulos (2 perguntas → modelo pronto aplicado na

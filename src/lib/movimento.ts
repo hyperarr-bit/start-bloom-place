@@ -144,10 +144,20 @@ export const saidaCalmaDe = (seletor: string, ms?: number, segura?: number): voi
  * caminho antigo.
  */
 export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boolean {
+  const foto = fotoDaTela();
+  if (!foto) return false;
+  window.setTimeout(() => foto.soltar(ms), Math.max(0, segura));
+  return true;
+}
+
+/** A foto da tela inteira, parada por cima até `soltar(ms)` (some em `ms`); solta sozinha depois de `teto` ms. null quando
+ *  não anima (reduzir movimento, jsdom). Usada pela troca de rota da missão e pela troca de rota comum (lib/troca-de-rota). */
+export interface FotoDaTela { soltar: (ms?: number) => void }
+export function fotoDaTela(teto = 1200): FotoDaTela | null {
   try {
-    if (typeof document === "undefined" || /jsdom/i.test(navigator.userAgent)) return false;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
-    if (typeof HTMLElement.prototype.animate !== "function") return false;
+    if (typeof document === "undefined" || /jsdom/i.test(navigator.userAgent)) return null;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return null;
+    if (typeof HTMLElement.prototype.animate !== "function") return null;
     const marcados: HTMLElement[] = [];
     const marcar = (el: HTMLElement, k: string, v: string) => { el.setAttribute(k, v); marcados.push(el); };
     const filhos = Array.from(document.body.children).filter((c): c is HTMLElement => c instanceof HTMLElement && !/^(SCRIPT|STYLE|LINK|TEMPLATE|NOSCRIPT)$/.test(c.tagName) && !c.hasAttribute("data-saida-calma"));
@@ -199,14 +209,21 @@ export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boole
       const [t, l] = (n.getAttribute("data-sc-rolagem") ?? "0,0").split(",").map(Number);
       n.scrollTop = t; n.scrollLeft = l; n.removeAttribute("data-sc-rolagem");
     }
-    const total = ms + Math.max(0, segura);
     const tirar = () => { try { foto.remove(); } catch { /* já saiu */ } };
-    const a = foto.animate([{ opacity: 1, offset: 0 }, { opacity: 1, offset: segura / total }, { opacity: 0, offset: 1 }], { duration: total, easing: "ease-in-out", fill: "forwards" });
-    a.onfinish = tirar;
-    window.setTimeout(tirar, total + 400);
-    return true;
+    let solta = false;
+    const soltar = (ms: number = MOV_MS.base) => {
+      if (solta) return;
+      solta = true;
+      try {
+        const a = foto.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-out", fill: "forwards" });
+        a.onfinish = tirar;
+      } catch { tirar(); return; }
+      window.setTimeout(tirar, ms + 400);
+    };
+    window.setTimeout(() => soltar(), teto); // nunca fica presa por cima
+    return { soltar };
   } catch {
     try { document.querySelectorAll("[data-sc-rolagem],[data-sc-fixo],[data-sc-valor],[data-sc-estilo]").forEach((e) => { e.removeAttribute("data-sc-rolagem"); e.removeAttribute("data-sc-fixo"); e.removeAttribute("data-sc-valor"); e.removeAttribute("data-sc-estilo"); }); } catch { /* noop */ }
-    return false;
+    return null;
   }
 }

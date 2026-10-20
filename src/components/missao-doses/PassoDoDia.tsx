@@ -289,6 +289,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   const [metaGuiada] = useState(() => (setup === "meta-guiada" && !introFeita ? metaGuiadaDaIntro() : null));
   /** depois do "pronto" de um quiz encaixado: a frase do post-it no passo que conta como a dose */
   const [fraseDoSetup, setFraseDoSetup] = useState<string | null>(null);
+  /** 1.0.17 QA: o quiz encaixado já fez o pedido (Rotina: "Sua rotina está pronta. Marca o primeiro" + "Entendi") — a dose
+   *  espera o registro sem post-it/anel (um pedido só); a faixa da missão segue */
+  const [quieto, setQuieto] = useState(false);
   const fraseDoSetupRef = useRef(fraseDoSetup);
   fraseDoSetupRef.current = fraseDoSetup;
   /** depois do "pronto" de um quiz encaixado: o alvo que ele indicou (o 1º item), se indicou */
@@ -1087,6 +1090,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     }
     setFraseDoSetup(encaixe.depoisDoPronto);
     if (cfg.tipo === "habito") setSubPasso("marcar");
+    let jaPediu = false;
+    try { jaPediu = !!encaixe.pedidoJaFeito?.(resumo); } catch { jaPediu = false; }
+    if (jaPediu) { setQuieto(true); trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "setup", setup, acao: "espera_quieta", segundos: segundos() })); }
   };
   const setupPulou = () => {
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "setup", setup, acao: "pulou", segundos: segundos() }));
@@ -1102,21 +1108,21 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onPular={montarPulou} />}
       {setupAberto && encaixe && <encaixe.Componente origem="missao" onPronto={setupPronto} onPular={setupPulou} />}
       {/* fora do AnimatePresence (um portal ali dentro era descartado: o post-it solto NUNCA montava) */}
-      {!alvo && fase === "anotar" && !montarAberto && !setupAberto && createPortal(
+      {!alvo && fase === "anotar" && !montarAberto && !setupAberto && !quieto && createPortal(
           <motion.div key="postit-solto" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 64px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} data-testid="missao-doses-postit-solto">
             <div className="w-[92%] max-w-[360px] pointer-events-auto">{doseDeGasto ? postItDe(true) : postIt}</div>
           </motion.div>,
           document.body,
         )}
       {/* D4: o alvo saiu da área visível — o post-it fica colado embaixo da faixa (o anel recolhido segue o alvo) */}
-      {anelFora && anelVivo && alvo && fase === "anotar" && createPortal(
+      {anelFora && anelVivo && alvo && fase === "anotar" && !quieto && createPortal(
           <motion.div key="postit-doca" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 10px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="missao-doses-postit-doca">
             <div className="w-[92%] max-w-[360px] pointer-events-auto">{postItDe(true)}</div>
           </motion.div>,
           document.body,
         )}
       <AnimatePresence>
-        {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
+        {anelVivo && alvo && !quieto && (fase === "anotar" || fase === "registrou") && (
           <Anel
             /* 10/10 (dono): toque FORA e rolagem NÃO fecham o post-it (`fixo`: o anel segue o alvo e o toque só
                clareia o escuro); só "Pular"/o tempo (60 s)/a âncora sumir soltam — e aí a faixa mostra ⌖ pra reabrir. */

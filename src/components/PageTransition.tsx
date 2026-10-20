@@ -1,19 +1,26 @@
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, useLayoutEffect, useState } from "react";
+import { rotaComFoto, rotaMontou } from "@/lib/troca-de-rota";
 
 // Sem animação de exit de propósito: animar a saída de uma página grande
 // (Finanças tem milhares de nós) segura o AnimatePresence mode="wait" por
 // 300ms desmontando uma árvore pesada — era a "travada" ao navegar pelo menu.
 // Entrada só com opacidade, curta: barata de compor na GPU.
-export const PageTransition = ({ children }: { children: ReactNode }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.18, ease: "easeOut" }}
-  >
-    {children}
-  </motion.div>
-);
+// 1.0.17 QA (lib/troca-de-rota): no app, a tela de antes fica numa foto por cima durante a troca — a página nova entra
+// já inteira embaixo (sem o fade a partir do fundo, que era o quadro em branco) e a foto some quando ela pinta.
+export const PageTransition = ({ children }: { children: ReactNode }) => {
+  const [comFoto] = useState(rotaComFoto);
+  useLayoutEffect(() => { rotaMontou(); }, []);
+  return (
+    <motion.div
+      initial={comFoto ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 export const StaggerContainer = ({ children, className }: { children: ReactNode; className?: string }) => (
   <motion.div

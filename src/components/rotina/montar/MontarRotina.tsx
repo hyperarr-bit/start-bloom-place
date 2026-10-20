@@ -90,6 +90,9 @@ export interface ResumoMontarRotina {
   primeiro: { id: ItemId; nome: string; hora: string } | null;
   /** marcou um quadradinho de hoje durante o guia (com `guiarPrimeiro={false}`, sempre false) */
   primeiroMarcado: boolean;
+  /** 1.0.17 QA: como o guia "marca o primeiro" saiu da tela (ausente = o guia não apareceu). "entendi"/"tempo" = ela JÁ
+   *  viu o pedido — quem vem depois (a dose da missão) não repete a mesma frase. */
+  guiaFim?: "marcou" | "entendi" | "tempo" | "segundo_plano";
 }
 export interface PropsMontarRotina {
   /** De onde abriu (vai nos eventos): a missão (o caminho de verdade) ou o módulo (desligado, MONTAR_ROTINA_NO_MODULO). */
@@ -348,10 +351,11 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
     setEtapa("montando");
   };
 
-  const terminar = (marcou: boolean) => {
+  /** `acao` ausente = o guia não apareceu (guiarPrimeiro desligado) */
+  const terminar = (acao?: "marcou" | "entendi" | "tempo" | "segundo_plano") => {
     setFase("fim");
     const r = resumoRef.current;
-    if (r) onPronto?.({ ...r, primeiroMarcado: marcou });
+    if (r) onPronto?.({ ...r, primeiroMarcado: acao === "marcou", ...(acao ? { guiaFim: acao } : {}) });
   };
 
   useEffect(() => {
@@ -359,7 +363,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
     const t = window.setTimeout(() => {
       trackEvent(EV_PASSO, { n: 4, origem });
       if (guiarPrimeiro) setFase("guia");
-      else terminar(false);
+      else terminar();
     }, Math.max(0, esperaMs));
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -533,7 +537,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
 function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
   origem: OrigemMontar;
   primeiro: ResumoMontarRotina["primeiro"];
-  onFim: (marcou: boolean) => void;
+  onFim: (acao: "marcou" | "entendi" | "tempo" | "segundo_plano") => void;
 }) {
   const { get, set } = useUserData();
   const [alvo, setAlvo] = useState<Element | null>(null);
@@ -555,7 +559,7 @@ function GuiaDoPrimeiro({ origem, primeiro, onFim }: {
     if (acabou.current) return;
     acabou.current = true;
     trackEvent(EV_GUIA, { acao, achou_alvo: achou.current, origem });
-    onFim(acao === "marcou");
+    onFim(acao);
   };
 
   // o alvo: a tabela redesenha logo depois da gravação (a Rotina adota o dado no microtask seguinte)

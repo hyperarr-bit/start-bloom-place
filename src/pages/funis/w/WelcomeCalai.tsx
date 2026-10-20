@@ -42,6 +42,8 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  */
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
+/** As 6 telas do passeio (as mesmas da Porta/web), quando o iPhone nega o vídeo. */
+export const TELAS_PASSEIO_APP = [1, 2, 3, 4, 5, 6].map((n) => `/porta/tour/${n}.jpg`);
 
 const PROMESSA_PADRAO = "Sua vida inteira organizada num app só.";
 const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
@@ -58,6 +60,18 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);
+  /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
+   * Agora a tela do app (pôster) cobre o vídeo até ele rodar de verdade; sem rodar em 1,2 s, as 6 telas do passeio
+   * passam sozinhas (2 s cada, troca suave) — o toque segue tentando o vídeo e, rodando, as imagens saem. */
+  const [rodando, setRodando] = useState(false);
+  const [passeio, setPasseio] = useState(false);
+  const [quadroPasseio, setQuadroPasseio] = useState(0);
+  useEffect(() => { const t = window.setTimeout(() => { if (!rodouRef.current) setPasseio(true); }, 1200); return () => window.clearTimeout(t); }, []);
+  useEffect(() => {
+    if (!passeio || rodando) return;
+    const t = window.setInterval(() => setQuadroPasseio((q) => (q + 1) % TELAS_PASSEIO_APP.length), 2000);
+    return () => window.clearInterval(t);
+  }, [passeio, rodando]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
 
@@ -112,6 +126,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
     if (rodouRef.current) return;
     rodouRef.current = true;
     setVideoFalhou(false);
+    setRodando(true);
     trackEvent("welcome_video_play", {});
   };
   const aoFalhar = () => {
@@ -175,6 +190,18 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
               data-testid="welcome-video"
               data-falhou={videoFalhou ? "" : undefined}
             />
+            {!rodando && (
+              <div className="wca-cobre" data-testid="welcome-cobre" data-passeio={passeio ? quadroPasseio : undefined}>
+                <img className="wca-cobre-img" src={POSTER_WELCOME} alt="" draggable={false} />
+                {passeio && (
+                  <div className="wca-cobre-tela">
+                    <img key={quadroPasseio} src={TELAS_PASSEIO_APP[quadroPasseio]} alt="" draggable={false} />
+                  </div>
+                )}
+                {/* pré-carrega as telas pra troca não piscar */}
+                <div style={{ display: "none" }}>{TELAS_PASSEIO_APP.map((u) => <img key={u} src={u} alt="" />)}</div>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -243,6 +270,17 @@ const CSS_WCA = `
 }
 /* contain + o mesmo fundo do vídeo: se a caixa sair um pixel da proporção, nada é cortado nem ampliado */
 .wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
+/* a capa = o pôster (o 1º quadro do vídeo, com o iPhone) por cima do vídeo até ele rodar; no passeio, as telas
+   entram DENTRO da tela do iPhone do pôster (abaixo da barra de status, 9:41 e a ilha continuam do pôster) */
+.wca-cobre { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; pointer-events: none; }
+.wca-cobre-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.wca-cobre-tela { position: absolute; left: 23.4%; right: 23.4%; top: 11%; bottom: 4.7%; overflow: hidden; background: #ffffff; border-radius: 0 0 12% 12% / 0 0 6% 6%; }
+.wca-cobre-tela img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; animation: wca-entra .45s ease-out both; }
+@keyframes wca-entra { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wca-cobre-tela img { animation: none; } }
+.wca-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
+.wca-video::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; }
+.wca-video::-webkit-media-controls { display: none !important; }
 .wca-corpo { flex: 0 0 auto; text-align: center; padding: 14px 22px 0; }
 .wca h1 {
   margin: 0; font-weight: 900; letter-spacing: -.03em; line-height: 1.08;

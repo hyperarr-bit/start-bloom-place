@@ -421,4 +421,24 @@ describe("LIGADA: a sequência enxuta", () => {
     expect(eventos).toContainEqual(["welcome_video_erro", expect.objectContaining({ motivo: "carregar" })]);
     expect(screen.getByTestId("welcome-video")).toHaveAttribute("data-falhou");
   });
+
+  it("20/10 (Modo Pouca Energia): a capa cobre o vídeo desde o início (sem o play do iOS); sem rodar em 1,2 s o passeio troca as telas; rodando, a capa sai", async () => {
+    vi.useFakeTimers();
+    try {
+      montar("/funil-w");
+      await tick();
+      const capa = screen.getByTestId("welcome-cobre");
+      expect(capa.querySelector("img")).toHaveAttribute("src", "/funil/welcome-app.jpg");
+      expect(capa).not.toHaveAttribute("data-passeio");
+      await act(async () => { vi.advanceTimersByTime(1300); });
+      expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-passeio", "0");
+      expect(screen.getByTestId("welcome-cobre").querySelector(".wca-cobre-tela img")).toHaveAttribute("src", "/porta/tour/1.jpg");
+      await act(async () => { vi.advanceTimersByTime(2000); });
+      expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-passeio", "1");
+      fireEvent.playing(screen.getByTestId("welcome-video"));
+      expect(screen.queryByTestId("welcome-cobre")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

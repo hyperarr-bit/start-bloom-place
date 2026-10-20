@@ -18,6 +18,12 @@ const estado = vi.hoisted(() => ({
   },
   sets: [] as Array<[string, unknown]>,
   sync: true,
+  // 1.0.17 (conta que já tinha acesso / Apple sem sessão)
+  signUpErro: null as null | { message: string },
+  sessao: { user: { id: "u-velha", created_at: "2026-03-01T10:00:00Z" } } as unknown,
+  linhas: [] as Array<Record<string, unknown>>,
+  rcAtivo: true,
+  trial: true,
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -25,7 +31,7 @@ vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
     ...estado.auth,
     loading: false,
-    signUp: vi.fn(async () => ({ error: null, session: { user: { id: "u-nova" } } })),
+    signUp: vi.fn(async () => (estado.signUpErro ? { error: estado.signUpErro, session: null } : { error: null, session: { user: { id: "u-nova" } } })),
     signIn: vi.fn(async () => ({ error: null })),
   }),
   useAuthOpcional: () => estado.auth,
@@ -39,10 +45,27 @@ vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   sincronizarAssinatura: vi.fn(async () => estado.sync),
   restaurar: vi.fn().mockResolvedValue(false),
-  ultimaCompraAnualFoiTrial: () => true,
+  ultimaCompraAnualFoiTrial: () => estado.trial,
+  compraAssinaturaLocal: vi.fn(async () => estado.rcAtivo),
 }));
+vi.mock("@/lib/auth-nativo", () => ({ entrarComApple: vi.fn(async () => ({ error: null })) }));
+vi.mock("@/integrations/supabase/client", () => {
+  const consulta = () => {
+    const q = { select: () => q, eq: () => q, in: () => Promise.resolve({ data: estado.linhas, error: null }) };
+    return q;
+  };
+  return {
+    supabase: {
+      auth: { getSession: vi.fn(async () => ({ data: { session: estado.sessao } })), resetPasswordForEmail: vi.fn(async () => ({ error: null })) },
+      from: vi.fn(() => consulta()),
+      functions: { invoke: vi.fn(async () => ({ data: null, error: null })) },
+    },
+  };
+});
 
 import { SignupIOS, LiberandoIOS } from "./CadastroIOS";
+import { trackEvent } from "@/lib/analytics";
+import { acessoAnteriorDaConta, URL_ASSINATURAS_APPLE } from "@/lib/conta-ja-tinha-acesso";
 import { iniciarMissao, CHAVE_ESTADO_MISSAO_DOSES } from "@/lib/missao-doses";
 
 const fingirIPhone = () => {
@@ -53,6 +76,12 @@ beforeEach(() => {
   localStorage.clear();
   estado.sets = [];
   estado.sync = true;
+  estado.signUpErro = null;
+  estado.sessao = { user: { id: "u-velha", created_at: "2026-03-01T10:00:00Z" } };
+  estado.linhas = [];
+  estado.rcAtivo = true;
+  estado.trial = true;
+  vi.mocked(trackEvent).mockClear();
   estado.auth.isSubscribed = false;
   fingirIPhone();
 });
@@ -149,5 +178,111 @@ describe("Guardando seu acesso… → Home pela rota, sem recarregar (1.0.17)", 
     fireEvent.click(comecar);
     expect(await screen.findByTestId("raiz")).toBeInTheDocument();
     estado.auth.user = { id: "u-nova", created_at: new Date().toISOString(), email: "lucas@exemplo.com" };
+  });
+});
+
+/* ------------------------------------------------------------------ 1.0.17: bugs de produção 20/10 */
+describe("conta que JÁ tinha acesso comprando o teste do iPhone (1.0.17)", () => {
+  const preencher = () => {
+    fireEvent.change(screen.getByPlaceholderText("Seu nome"), { target: { value: "Ana" } });
+    fireEvent.change(screen.getByPlaceholderText(/melhor e-mail/i), { target: { value: "ana@exemplo.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/Crie uma senha/), { target: { value: "segredo123" } });
+  };
+  const enviar = async () => {
+    await act(async () => { fireEvent.submit(screen.getByRole("button", { name: /Salvar meu acesso/ }).closest("form")!); });
+  };
+  const eventos = (n: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === n).map((c) => c[1]);
+
+  it("acessoAnteriorDaConta: vitalício da web conta; App Store não; assinatura vencida não", () => {
+    const agora = Date.parse("2026-10-20T12:00:00Z");
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "lifetime", payment_method: "pix", current_period_end: null }], agora)).toBe("vitalicio");
+    expect(acessoAnteriorDaConta([{ status: "active", plan: "lifetime", payment_method: "asaas" }], agora)).toBe("vitalicio");
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "monthly", payment_method: "cakto", current_period_end: "2026-11-01T00:00:00Z" }], agora)).toBe("assinatura");
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "monthly", payment_method: "cakto", current_period_end: "2026-10-01T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([{ status: "active", billing_period: "annual", payment_method: "app_store", current_period_end: "2026-10-23T00:00:00Z" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta([{ status: "canceled", billing_period: "lifetime", payment_method: "pix" }], agora)).toBeNull();
+    expect(acessoAnteriorDaConta(null, agora)).toBeNull();
+  });
+
+  it("vitalício da web + teste desta compra na loja → avisa 'cancele o teste na App Store' (sem bloquear: Entendi segue)", async () => {
+    estado.signUpErro = { message: "User already registered" };
+    estado.linhas = [{ status: "active", billing_period: "lifetime", payment_method: "pix", current_period_end: null }];
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    preencher();
+    await enviar();
+    const aviso = await screen.findByTestId("conta-ja-tinha-acesso");
+    expect(aviso.textContent).toMatch(/Você já tem o CORE vitalício\./);
+    expect(aviso.textContent).toMatch(/Pra não ser cobrado, cancele o teste na App Store\./);
+    expect(screen.getByRole("link", { name: "Gerenciar assinatura" })).toHaveAttribute("href", URL_ASSINATURAS_APPLE);
+    expect(URL_ASSINATURAS_APPLE).toBe("itms-apps://apps.apple.com/account/subscriptions");
+    expect(eventos("conta_ja_tinha_acesso")).toEqual([{ tipo: "vitalicio", via: "ja_registrado", funil: "ios" }]);
+    expect(onSession).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("link", { name: "Gerenciar assinatura" }));
+    expect(eventos("conta_ja_tinha_acesso_gerenciar")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+    expect(onSession).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+  });
+
+  it("conta antiga SEM acesso (ou só a App Store) → segue direto, sem aviso", async () => {
+    estado.signUpErro = { message: "User already registered" };
+    for (const linhas of [[], [{ status: "active", billing_period: "annual", payment_method: "app_store", current_period_end: "2099-01-01T00:00:00Z" }]]) {
+      estado.linhas = linhas;
+      const onSession = vi.fn();
+      render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+      preencher();
+      await enviar();
+      await waitFor(() => expect(onSession).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+      cleanup();
+    }
+    expect(eventos("conta_ja_tinha_acesso")).toHaveLength(0);
+  });
+
+  it("a loja não mostra assinatura/teste desta compra → não avisa", async () => {
+    estado.signUpErro = { message: "User already registered" };
+    estado.linhas = [{ status: "active", billing_period: "lifetime", payment_method: "pix" }];
+    estado.rcAtivo = false;
+    estado.trial = false;
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    preencher();
+    await enviar();
+    await waitFor(() => expect(onSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+  });
+
+  it("conta NOVA (cadastro normal) nem consulta", async () => {
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    preencher();
+    await enviar();
+    expect(onSession).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+  });
+});
+
+describe("Entrar com a Apple sem sessão (1.0.17)", () => {
+  it("cancelou/falhou sem erro: registra funnel_error e diz o que fazer, na mesma tela", async () => {
+    estado.sessao = null;
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Continuar com a Apple/ })); });
+    expect(await screen.findByText("Não deu certo com a Apple. Tente de novo ou use o e-mail.")).toBeInTheDocument();
+    expect(vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === "funnel_error").map((c) => (c[1] as { where: string }).where)).toEqual(["signup_apple_sem_sessao"]);
+    expect(onSession).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Continuar com a Apple/ })).not.toBeDisabled();
+    expect(screen.getByPlaceholderText(/melhor e-mail/i)).toBeInTheDocument();
+  });
+
+  it("Apple entrou numa conta antiga com vitalício: o mesmo aviso", async () => {
+    estado.linhas = [{ status: "active", billing_period: "lifetime", payment_method: "cakto" }];
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Continuar com a Apple/ })); });
+    expect(await screen.findByTestId("conta-ja-tinha-acesso")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+    expect(onSession).toHaveBeenCalledTimes(1);
   });
 });

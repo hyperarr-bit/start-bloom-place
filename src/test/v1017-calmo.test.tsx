@@ -227,3 +227,26 @@ describe("acessibilidade do campo", () => {
     expect(escolher).not.toHaveBeenCalled();
   });
 });
+
+describe("tour_home_quando (RevenueCat): QUANDO o tour curto entra — dia1 (padrão) | dia2", () => {
+  it("ausente = dia1; a current vence; a última resposta fica no aparelho e vale até o RevenueCat responder de novo", async () => {
+    const { lerTourQuandoRemoto, registrarUmPorDiaRemoto, tourHomeQuando, _zerarUmPorDiaRemoto, CHAVE_TOUR_QUANDO_APARELHO } = await import("@/lib/dia1-cheio");
+    const { RESPIRO_ANTES_DO_TOUR_MS } = await import("@/components/home/TourDaHome");
+    _zerarUmPorDiaRemoto();
+    expect(tourHomeQuando()).toBe("dia1"); // nunca respondeu
+    expect(lerTourQuandoRemoto({ current: { metadata: {} } })).toBeNull();
+    expect(lerTourQuandoRemoto({ current: { metadata: { tour_home_quando: "DIA2" } } })).toBe("dia2");
+    expect(lerTourQuandoRemoto({ current: { metadata: { tour_home_quando: "dia1" } }, all: { x: { metadata: { tour_home_quando: "dia2" } } } })).toBe("dia1");
+    expect(lerTourQuandoRemoto({ current: { metadata: { tour_home_quando: "lixo" } } })).toBeNull();
+    registrarUmPorDiaRemoto({ current: { metadata: { missao_1_por_dia: "on", tour_home_quando: "dia2" } } });
+    expect(tourHomeQuando()).toBe("dia2");
+    expect(localStorage.getItem(CHAVE_TOUR_QUANDO_APARELHO)).toBe("dia2");
+    _zerarUmPorDiaRemoto(); // nova abertura, RevenueCat ainda não respondeu: vale a do aparelho
+    expect(tourHomeQuando()).toBe("dia2");
+    registrarUmPorDiaRemoto({ current: { metadata: { missao_1_por_dia: "on" } } }); // a chave saiu = volta ao padrão
+    expect(tourHomeQuando()).toBe("dia1");
+    expect(localStorage.getItem(CHAVE_TOUR_QUANDO_APARELHO)).toBeNull();
+    expect(vassouraLeva(CHAVE_TOUR_QUANDO_APARELHO)).toBe(false); // chave do aparelho
+    expect(RESPIRO_ANTES_DO_TOUR_MS).toBeGreaterThanOrEqual(1500);
+  });
+});

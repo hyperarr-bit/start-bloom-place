@@ -68,7 +68,7 @@ import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 import { escolherAdesivoDaDose } from "@/components/missao-doses/adesivo-da-dose";
 import {
-  CHAVE_BRACO_DIA1, CHAVE_UM_POR_DIA_APARELHO, _zerarUmPorDiaRemoto, bracoDia1, idDoAparelho, lerUmPorDiaRemoto, modoDia1Cheio, modoUmPorDia, registrarUmPorDiaRemoto, sortearBraco,
+  CHAVE_BRACO_DIA1, CHAVE_UM_POR_DIA_APARELHO, _zerarUmPorDiaRemoto, bracoDia1, idDoAparelho, lerUmPorDiaRemoto, modoDia1Cheio, modoUmPorDia, registrarUmPorDiaRemoto, sortearBraco, tourHomeQuando, lerTourQuandoRemoto,
 } from "@/lib/dia1-cheio";
 import { CHAVES_FUNIL_W, guardarChave, lerChave, limparProgresso } from "@/pages/funis/w/retomada";
 import { conteudoDoLembrete, porDiaExato, praHojeDasFinancas } from "@/lib/lembrete-dia2";
@@ -246,7 +246,8 @@ const offerings = (meta: Record<string, unknown> | null, outra?: Record<string, 
   const current = { identifier: "default", metadata: meta ?? {} };
   return { current, all: { default: current, ...(outra ? { anual_69: { identifier: "anual_69", metadata: outra } } : {}) } };
 };
-const ligarUmPorDia = (modo: "on" | "ab" | "off") => registrarUmPorDiaRemoto(offerings({ missao_1_por_dia: modo }));
+/** `quando` = a chave remota `tour_home_quando` (1.0.17): ausente = "dia1" (o padrão) */
+const ligarUmPorDia = (modo: "on" | "ab" | "off", quando?: "dia1" | "dia2") => registrarUmPorDiaRemoto(offerings({ missao_1_por_dia: modo, ...(quando ? { tour_home_quando: quando } : {}) }));
 /** Uma missão do braço A nascida em 03/10 (o dia 1), com as boas-vindas vistas. */
 const missaoA = (feitos: Record<number, { dia: string; rotulo: string }>, extra: Record<string, unknown> = {}) =>
   localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03", undefined, "A"), boasVindas: true, feitos, ...extra }));
@@ -579,17 +580,17 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(m.adesivosMostrados).toEqual(["first-expense"]);
     expect(doseLiberadaHoje(m)).toBe(false);
     expect(moduloDaMissaoHoje()).toBe("financas"); // a dose de hoje foi Finanças
-    // 1.0.17: o DIA 1 termina limpo — NADA de tour logo depois da festa (ele espera o dia 2)
-    expect(missaoEmAndamento(m)).toBe(true);
+    // 1.0.17 (tour_home_quando "dia1", o padrão): a Home é dela — o tour curto pode vir (depois do respiro, bloco 9),
+    // e a folha do plano ESPERA ele (uma camada por vez)
+    expect(missaoEmAndamento(m)).toBe(false);
     expect(missaoDoDiaEmCena(m)).toBe(true); // os popups de adesivo esperam o plano de amanhã
     expect(varianteDoTour(m)).toBe("curto");
     expect(precisaPlanoA(m)).toBe(true);
-    expect(screen.queryByTestId("tour-balao")).toBeNull();
-    // o respiro: a folha do plano só entra com a Home quieta (≥ 1,2 s), nunca colada na festa
-    avancar(500);
+    avancar(3000);
     expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
-    avancar(1500);
-    expect(screen.queryByTestId("tour-balao")).toBeNull();
+    marcarTourFeito(); // ... o tour curto acabou
+    act(() => { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_DOSES)); });
+    avancar(2000);
     expect(screen.getByTestId("plano-amanha-a-titulo")).toHaveTextContent(/^Amanhã: Rotina\.$/);
     expect(screen.getByTestId("plano-amanha-a")).toHaveTextContent("Que horas te lembro?");
     expect(screen.getByTestId("plano-a-hora-12h")).toHaveAttribute("aria-checked", "true"); // 15:10 → o mais perto é 12h
@@ -759,7 +760,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     avancar(300); avancar(400); // 1.0.17: a folha desce, o véu cobre e a rota troca por baixo
     expect(screen.getByTestId("rota")).toHaveTextContent("/home");
     expect(lerMissao()?.scoreAntes?.[2]).toEqual(expect.any(Number)); // o score de ANTES da dose (a dica conta "de X pra Y")
-    avancar(1500);
+    for (let k = 0; k < 6; k++) avancar(500); // o véu abre e a Home fica quieta (o véu também é camada) antes da dica
     expect(screen.getByTestId("missao-dica")).toHaveAttribute("data-dia", "2"); // 1 balão no score
     expect(screen.getByTestId("missao-dica-titulo")).toHaveTextContent(/score/);
     fireEvent.click(screen.getByTestId("missao-dica-entendi"));
@@ -857,11 +858,16 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(missaoEmAndamento(base, "2026-10-04")).toBe(true); // o tour espera o convite
     expect(conviteDoDiaDevido({ ...base, explorou: true }, "2026-10-04")).toBe(false);
     expect(conviteDoDiaDevido({ ...base, convites: { "2026-10-04": "depois" } }, "2026-10-04")).toBe(false);
-    // 1.0.17: o tour espera a dose do dia (num dia seguinte) — "Agora não" no convite não solta o tour antes da dose
+    // 1.0.17, tour_home_quando ausente = "dia1" (padrão): dia 1 com a dose feita já solta o tour (a Home espera o respiro)
+    expect(missaoEmAndamento({ ...base, convites: { "2026-10-04": "depois" } }, "2026-10-04")).toBe(false);
+    expect(missaoEmAndamento(base, "2026-10-03")).toBe(false);
+    // "dia2": o tour espera a dose de um dia seguinte — "Agora não" no convite não solta o tour antes dela
+    ligarUmPorDia("on", "dia2");
     expect(missaoEmAndamento({ ...base, convites: { "2026-10-04": "depois" } }, "2026-10-04")).toBe(true);
     expect(missaoEmAndamento({ ...base, feitos: { ...base.feitos, 2: { dia: "2026-10-04", rotulo: "y" } } }, "2026-10-04")).toBe(false); // dose 2 feita: o tour pode vir
     expect(missaoEmAndamento({ ...base, explorou: true }, "2026-10-04")).toBe(false); // quem explorou: a regra de sempre
     expect(missaoEmAndamento(base, "2026-10-03")).toBe(true); // dia 1 com a dose feita: limpo, sem tour
+    ligarUmPorDia("on");
     expect(conviteDoDiaDevido({ ...base, braco: "B" }, "2026-10-04")).toBe(false);
     expect(doseLiberadaHoje({ ...base, braco: "B" }, "2026-10-03")).toBe(true); // B: as 3 no dia 1, como hoje
   });
@@ -1056,17 +1062,61 @@ describe("8. o adesivo da dose é o REAL do registro (contrato com as Conquistas
 
 /* ------------------------------------------------------------ 9: o tour curto */
 
-describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: NUNCA no dia 1; num dia seguinte, depois da dose daquele dia", () => {
-  /* 1.0.17 (dono 19/10: "joga informação na cara — faz com calma"): o dia 1 termina limpo (festa → Home → só o lembrete).
-     O tour vem no dia 2, depois da dose 2 — a Home já é conhecida e o "amanhã" dele fala da dose certa (a Saúde). */
+describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO é chave remota (tour_home_quando: dia1 padrão | dia2), nunca colado na festa", () => {
+  /* 1.0.17 (decisão do dono, 19/10): o tour curto fica no DIA 1, mas nunca colado na festa — festa → passagem calma → a
+     Home parada ~1,5 s sem outra camada → o tour; o "Plano de amanhã" só depois dele. Com `tour_home_quando: "dia2"`, o
+     dia 1 termina limpo e o tour vem num dia seguinte, depois da dose daquele dia. `depoisDaDose1` monta o dia 2 com a
+     dose 2 feita (o caminho do "dia2"). */
   const depoisDaDose1 = (extra: Record<string, unknown> = {}) => {
-    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" } }, extra);
+    // (a dica do score do dia 2 já foi vista — senão ela é a camada da vez e o tour espera ela sair)
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" }, 2: { dia: "2026-10-04", rotulo: "Beber água ao acordar" } }, { dicas: { 2: "2026-10-04" }, ...extra });
     vi.setSystemTime(new Date(2026, 9, 4, 15, 10));
   };
 
-  it("dia 1: depois da dose (a festa já passou), a Home NÃO abre o tour — nem reabrindo o app no mesmo dia; a folha do lembrete vem sozinha, com respiro", () => {
+  it("dia1 (o padrão, chave ausente): a festa ainda na tela segura o tour; saiu, a Home fica QUIETA ~1,5 s e só então o tour entra; o plano espera o tour acabar; reabrir não repete nada", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
-    ligarUmPorDia("on");
+    ligarUmPorDia("on"); // sem tour_home_quando = "dia1"
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } });
+    expect(tourHomeQuando()).toBe("dia1");
+    const store = montarStore({});
+    // a camada da festa (ou do véu da passagem) ainda na tela
+    const festa = document.createElement("div"); festa.setAttribute("data-camada-guia", "missao-doses-festa"); document.body.appendChild(festa);
+    montarComHome(store, "/home");
+    expect(missaoEmAndamento(lerMissao())).toBe(false); // a Home é dela: o tour pode vir...
+    avancar(3000);
+    expect(screen.queryByTestId("tour-balao")).toBeNull(); // ...mas nunca por cima/colado na festa
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull(); // uma camada por vez: o plano espera o tour
+    act(() => { festa.remove(); });
+    avancar(1000);
+    expect(screen.queryByTestId("tour-balao")).toBeNull(); // o respiro: a Home assenta antes
+    avancar(1000);
+    expect(screen.getByTestId("tour-contador")).toHaveTextContent("Passo 1 de 3");
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Amanhã, 📅 Rotina aparece aqui.");
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
+    expect(eventos.filter(([n]) => n === "home_tour_visto")).toEqual([["home_tour_visto", { total: 3, variante: "curto", tour_quando: "dia1" }]]);
+    fireEvent.click(screen.getByTestId("tour-continuar"));
+    fireEvent.click(screen.getByTestId("tour-continuar")); // "Deixar como está"
+    fireEvent.click(screen.getByTestId("tour-concluir"));
+    expect(screen.queryByTestId("tour-balao")).toBeNull();
+    avancar(800);
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull(); // nunca colado no fim do tour
+    avancar(2000);
+    expect(screen.getByTestId("plano-amanha-a")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("plano-a-combinado"));
+    cleanup();
+    _novaAberturaDoTour();
+    montarComHome(store, "/home");
+    avancar(4000);
+    for (const t of ["tour-balao", "plano-amanha-a", "missao-doses-festa"]) expect(screen.queryByTestId(t), t).toBeNull();
+    expect(eventos).toContainEqual(["home_tour_concluido", expect.objectContaining({ tour_quando: "dia1" })]);
+  });
+
+  it("dia2 (chave remota): depois da dose do dia 1 a Home NÃO abre o tour — nem reabrindo o app no mesmo dia; a folha do lembrete vem sozinha, com respiro", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on", "dia2");
+    expect(tourHomeQuando()).toBe("dia2");
+    expect(localStorage.getItem("core-tour-home-quando")).toBe("dia2"); // a última resposta fica no aparelho
     missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } });
     const store = montarStore({});
     montarComHome(store, "/home");
@@ -1087,18 +1137,18 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: NUNCA no
 
   it("Pendências conta que a dose de amanhã aparece ali; Ações rápidas grava um gasto DE VERDADE; Módulos: 'Deixar todos'; o 'visto' sai quando aparece de fato; 1x (aparelho e conta)", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
-    ligarUmPorDia("on");
+    ligarUmPorDia("on", "dia2");
     depoisDaDose1();
     const store = montarStore({});
     montarComHome(store, "/home");
-    avancar(1500);
+    avancar(2500); // o respiro antes do tour (RESPIRO_ANTES_DO_TOUR_MS)
     expect(screen.getByTestId("tour-contador")).toHaveTextContent("Passo 1 de 3");
-    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Pendências de hoje");
-    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Aqui fica o que falta fazer hoje. Amanhã, a sua dose de ❤️ Saúde vai aparecer nessa lista.");
-    expect(eventos.filter(([n]) => n === "home_tour_visto")).toEqual([["home_tour_visto", { total: 3, variante: "curto" }]]);
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Amanhã, ❤️ Saúde aparece aqui.");
+    expect(eventos.filter(([n]) => n === "home_tour_visto")).toEqual([["home_tour_visto", { total: 3, variante: "curto", tour_quando: "dia2" }]]);
     fireEvent.click(screen.getByTestId("tour-continuar"));
     expect(screen.getByTestId("tour-contador")).toHaveTextContent("Passo 2 de 3");
-    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Da próxima vez, anota o gasto daqui mesmo, sem abrir Finanças.");
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Anote sem abrir o módulo.");
     expect(screen.getByTestId("tour-continuar")).toHaveTextContent("Deixar como está");
     expect(within(screen.getByTestId("tour-gastos")).getAllByRole("button").map((x) => x.textContent)).toEqual(["☕ Café · R$ 12", "🚗 Uber · R$ 23", "🍔 Almoço · R$ 35"]);
     fireEvent.click(screen.getByTestId("tour-gasto-Uber"));
@@ -1110,7 +1160,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: NUNCA no
     expect(localStorage.getItem("core-home-tour-done")).not.toBeNull();
     expect(store.dados["core-home-tour-done"]).toBeTruthy();
     expect(eventos.filter(([n]) => n === "home_tour_passo").map(([, d]) => [d.indice, d.acao])).toEqual([[0, "continuar"], [1, "gasto:Uber"], [2, "deixar"]]);
-    expect(eventos).toContainEqual(["home_tour_concluido", { total: 3, variante: "curto" }]);
+    expect(eventos).toContainEqual(["home_tour_concluido", { total: 3, variante: "curto", tour_quando: "dia2" }]);
     // a folha do plano de amanhã vem DEPOIS do tour
     avancar(2000);
     expect(screen.getByTestId("plano-amanha-a")).toBeInTheDocument();
@@ -1118,7 +1168,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: NUNCA no
 
   it("reinstalou (aparelho sem a marca, conta com ela): o tour não volta — e o aparelho guarda a marca", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
-    ligarUmPorDia("on");
+    ligarUmPorDia("on", "dia2");
     depoisDaDose1();
     const store = montarStore({ "core-home-tour-done": "2026-10-03T15:00:00.000Z" });
     montarComHome(store, "/home");
@@ -1142,19 +1192,19 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: NUNCA no
     expect(lerMissao()?.saiuDaHome).toBe(true);
     cleanup();
     montarComHome(store, "/home");
-    avancar(1500);
-    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Aqui fica o que falta fazer hoje: água, hábitos, refeições. Tocou, resolveu.");
+    avancar(2500);
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("Tocou, resolveu.");
   });
 
   it("fechou o app no meio do tour: ele volta, mas no máximo em 2 aberturas", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
-    ligarUmPorDia("on");
+    ligarUmPorDia("on", "dia2");
     depoisDaDose1();
     const store = montarStore({});
     for (const abertura of [1, 2]) {
       _novaAberturaDoTour();
       montarComHome(store, "/home");
-      avancar(1500);
+      avancar(2500);
       expect(screen.getByTestId("tour-balao"), `abertura ${abertura}`).toBeInTheDocument();
       cleanup();
     }
@@ -2005,7 +2055,7 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
 
   /* ── 17/10, revisão tela a tela #17: o passeio que a FESTA abriu devolve a pessoa pro caminho da missão ── */
 
-  it("A (#17): 'Mais dicas' NA FESTA do dia 1 → o passeio abre ali; no 'Sair' ela volta pra HOME — 1.0.17: sem tour no dia 1, só o 'Plano de amanhã'; reabrir o app não repete nada", () => {
+  it("A (#17): 'Mais dicas' NA FESTA do dia 1 → o passeio abre ali; no 'Sair' ela volta pra HOME — o tour curto (depois do respiro) e DEPOIS o 'Plano de amanhã'; reabrir o app não repete nada", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     missaoA({});
@@ -2022,9 +2072,15 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     expect(screen.queryByTestId("conhecer-mais-faixa")).toBeNull();
     expect(screen.getByTestId("rota")).toHaveTextContent("/home");
     expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 1, modulo: "financas", completo: false, para: "home", variante: "A" })]);
-    // 1.0.17: o dia 1 termina limpo — sem tour; depois do respiro, só a folha do lembrete
-    avancar(1500); avancar(1000);
+    // 1.0.17 (tour_home_quando "dia1"): a Home quieta ~1,5 s → o tour curto; o plano só depois dele (uma camada por vez)
+    avancar(2500);
+    expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
+    expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
+    fireEvent.click(screen.getByTestId("tour-continuar"));
+    fireEvent.click(screen.getByTestId("tour-continuar")); // "Deixar como está"
+    fireEvent.click(screen.getByTestId("tour-concluir"));
     expect(screen.queryByTestId("tour-balao")).toBeNull();
+    avancar(2000);
     expect(screen.getByTestId("plano-amanha-a")).toBeInTheDocument(); // a hora do lembrete do dia 2 e a permissão de aviso
     fireEvent.click(screen.getByTestId("plano-a-hora-20h"));
     fireEvent.click(screen.getByTestId("plano-a-combinado"));

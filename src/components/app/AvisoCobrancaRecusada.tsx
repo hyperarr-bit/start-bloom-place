@@ -2,10 +2,11 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { AlertTriangle, CreditCard, X } from "lucide-react";
-import { isNativeShell } from "@/lib/native-shell";
+import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { problemaDeCobranca, type ProblemaDeCobranca } from "@/lib/revenuecat";
 import { donoDaFolha, nomeLoja } from "@/lib/loja";
 import { trackEvent } from "@/lib/analytics";
+import { segurarFolhaNativa } from "@/lib/cobranca-nativa";
 import {
   avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
   fecharTelaNestaAbertura, guiaNaTela, marcarAvisoVistoNestaAbertura, marcarTelaVista, registrarVisibilidadeDoAviso,
@@ -58,6 +59,13 @@ const lerVaga = () => vagaNoGate;
 /** A vaga do aviso no topo do bloqueio (TrialBanner). Vazia, não ocupa nada. */
 export const VagaDoAvisoCobranca = () => <div ref={registrarVaga} data-vaga="aviso-cobranca" />;
 
+/**
+ * A tela cheia existe AQUI? No iPhone só com COBRANCA_V14 (o binário de loja): é ela que observa a folha do StoreKit
+ * e consegue segurá-la — sem a chave o iOS mostra a folha dele sozinho e o app fica só com a faixa (uma superfície
+ * grande por abertura). Android: sempre (não há folha nativa concorrendo).
+ */
+const telaCheiaPossivel = (): boolean => plataformaApp() !== "ios" || cobrancaV14Ligada();
+
 export const AvisoCobrancaRecusada = () => {
   const [p, setP] = useState<ProblemaDeCobranca | null>(null);
   const [fechado, setFechado] = useState(fechadoAgora);
@@ -67,7 +75,13 @@ export const AvisoCobrancaRecusada = () => {
   useEffect(() => {
     if (!isNativeShell()) return;
     let vivo = true;
-    const conferir = () => { void problemaDeCobranca().then((r) => { if (vivo) setP(r); }); };
+    const conferir = () => {
+      void problemaDeCobranca().then((r) => {
+        // 1.0.17: a tela cheia do app ganha da folha do StoreKit (lib/cobranca-nativa) — no iPhone, só com ela ligada
+        if (plataformaApp() === "ios" && cobrancaV14Ligada()) void segurarFolhaNativa(telaCheiaPossivel() && !!r.temProblema);
+        if (vivo) setP(r);
+      });
+    };
     conferir();
     // Trocou o cartão na loja e voltou pro app: confere de novo. E, com a chave
     // ligada, voltar depois de 30 min no fundo conta como abertura nova.
@@ -98,8 +112,8 @@ export const AvisoCobrancaRecusada = () => {
      (ou 30 min no fundo) e aí, só nesta abertura, fica a faixa pequena de reserva. */
   const temProblema = isNativeShell() && !!p?.temProblema;
   const telaLivre = !(esperaGuia && guiaNaTela());
-  const visivelTela = temProblema && !telaFechada && telaLivre;
-  const visivel = temProblema && telaFechada && !fechado && telaLivre;
+  const visivelTela = temProblema && telaCheiaPossivel() && !telaFechada && telaLivre;
+  const visivel = temProblema && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
   const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
   useEffect(() => {
     if (!visivelTela || telaVistaAgora()) return;

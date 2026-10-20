@@ -264,7 +264,9 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(quadros()).toBe(0);
   });
 
-  it("sem folga no mês: 'R$ 0 por dia', a frase de onde apertar e 'Continuar →' (nada anima)", async () => {
+  /* 1.0.17: 18% terminavam com "Você pode gastar R$ 0" como herói — o mês apertado troca o herói pelo acolhimento
+     e o número vai pra conta do mês ("Por dia"). */
+  it("sem folga no mês: 'Seu mês tá apertado.' no lugar do R$ 0 gigante; o número fica na conta do mês; 'Continuar →'", async () => {
     montarTela();
     fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1000" } });
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
@@ -273,9 +275,27 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
     fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
     await respirar();
-    expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 0");
-    expect(screen.getByText(/Suas contas fixas já levam a renda do mês inteira/)).toBeTruthy();
+    expect(screen.queryByTestId("montar-por-dia")).toBeNull();
+    expect(screen.getByTestId("montar-apertado").textContent).toMatch(/Seu mês tá apertado\.\s*Vamos achar folga juntos/);
+    expect(screen.queryByText(/VOCÊ PODE GASTAR HOJE/)).toBeNull();
+    expect(screen.getByTestId("montar-por-dia-apertado").textContent).toMatch(/Por dia\s*R\$\s*0/);
+    expect(tela().getByRole("button", { name: "Ver a conta do mês" })).toBeTruthy();
     expect(tela().getByRole("button", { name: "Continuar →" })).toBeTruthy();
+    expect(eventos.find(([n]) => n === "montar_financas_pronto")?.[1]).toMatchObject({ sem_folga: true, apertado: true });
+  });
+
+  it("folga pequena (< R$ 15/dia): também 'apertado', com o '÷ N dias' na conta; folga normal segue com o número herói", async () => {
+    montarTela();
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1100" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: /^🏠 Aluguel/ })); // 900
+    fireEvent.click(tela().getByRole("button", { name: /^🏋️ Academia/ })); // 100 → ~100 livre no mês
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar();
+    expect(screen.getByTestId("montar-apertado")).toBeTruthy();
+    expect(screen.queryByTestId("montar-por-dia")).toBeNull();
+    expect(screen.getByText(/÷ \d+ dias/)).toBeTruthy();
   });
 });
 

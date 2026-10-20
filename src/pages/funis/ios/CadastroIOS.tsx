@@ -30,11 +30,11 @@
  * Coberto por `cadastro-pos-compra-ios.test.tsx`.
  */
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, EVENTO_RELER_ASSINATURA } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
@@ -42,9 +42,12 @@ import { entrarComApple } from "@/lib/auth-nativo";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
-import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
+import { BoasVindasPago, pulaPelaMissao } from "@/components/onboarding/BoasVindasPago";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ultimaCompraAnualFoiTrial } from "@/lib/revenuecat";
+import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
+import { lerAcessoAnteriorDaConta, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
+import { AvisoJaTinhaAcesso } from "@/components/app/AvisoJaTinhaAcesso";
 
 
 /* Glifo oficial da Apple: as diretrizes de marca não aceitam emoji nem ícone
@@ -77,6 +80,39 @@ export function SignupIOS({
   const [appleLoading, setAppleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [existingAccount, setExistingAccount] = useState(false);
+  /** 1.0.17: a conta em que ela entrou já tinha acesso (vitalício da web…) e acabou de começar o teste da Apple. */
+  const [jaTinha, setJaTinha] = useState<{ tipo: TipoDeAcessoAnterior; seguir: () => void } | null>(null);
+
+  /*
+   * 1.0.17 (bug de produção 20/10): cliente com o VITALÍCIO da web fez o funil do iPhone, começou o teste da App
+   * Store, o cadastro disse "User already registered" e entrou na conta antiga — e a Apple ia cobrar por cima do
+   * vitalício. Depois de entrar numa conta QUE JÁ EXISTIA, no pós-compra: se a conta já tinha acesso fora da App
+   * Store E a loja mostra a assinatura/teste desta compra → avisa (nunca bloqueia: "Entendi" segue igual).
+   * Até 4 s; qualquer falha = segue sem avisar.
+   */
+  const entrouEmContaExistente = async (via: string, seguir: () => void) => {
+    if (!posCompra) { seguir(); return; }
+    const conferir = async (): Promise<TipoDeAcessoAnterior | null> => {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (!uid) return null;
+      const [tipo, rcAtivo] = await Promise.all([
+        lerAcessoAnteriorDaConta(uid),
+        (async () => {
+          try { const rc = await import("@/lib/revenuecat"); return (await rc.compraAssinaturaLocal()) || rc.ultimaCompraAnualFoiTrial(); }
+          catch { return false; }
+        })(),
+      ]);
+      return tipo && rcAtivo ? tipo : null;
+    };
+    let tipo: TipoDeAcessoAnterior | null = null;
+    try {
+      tipo = await Promise.race([conferir(), new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
+    } catch { tipo = null; }
+    if (!tipo) { seguir(); return; }
+    trackEvent("conta_ja_tinha_acesso", { tipo, via, funil: "ios" });
+    setJaTinha({ tipo, seguir });
+  };
 
   /**
    * LIGA O TUTORIAL — e tem que rodar em TODO caminho que cria conta.
@@ -154,11 +190,20 @@ export function SignupIOS({
       return;
     }
     const { data } = await supabase.auth.getSession();
-    if (!data.session) { setAppleLoading(false); return; }
+    if (!data.session) {
+      // 1.0.17: cancelou ou a Apple falhou sem erro — antes nada era registrado nem dito
+      trackEvent("funnel_error", { where: "signup_apple_sem_sessao", funil: "ios", pos_compra: !!posCompra });
+      setErr("Não deu certo com a Apple. Tente de novo ou use o e-mail.");
+      setAppleLoading(false);
+      return;
+    }
     // Conta nova pela Apple é conta nova igual: liga o tutorial antes de sair
     // desta tela, senão a pessoa entra no app sem nada.
     ligarTutorial();
     trackEvent("funnel_click", { cta: "signup_success", via: "apple", funil: "ios", pos_compra: !!posCompra });
+    // a Apple também entra em conta que já existia (criada há mais de 10 min): a mesma conferência do e-mail
+    const criada = data.session.user?.created_at ? new Date(data.session.user.created_at).getTime() : Date.now();
+    if (Date.now() - criada > 10 * 60e3) { await entrouEmContaExistente("apple", () => { setAppleLoading(false); onSession(); }); return; }
     setAppleLoading(false);
     onSession();
   };
@@ -188,8 +233,7 @@ export function SignupIOS({
         return;
       }
       trackEvent("funnel_click", { cta: "signup_success", via: "existing_login", funil: "ios" });
-      setLoading(false);
-      onSession();
+      await entrouEmContaExistente("senha", onSession); // 1.0.17: o spinner fica até a tela sair
       return;
     }
 
@@ -202,8 +246,7 @@ export function SignupIOS({
         const { error: signInErr } = await signIn(email.trim().toLowerCase(), password);
         if (!signInErr) {
           trackEvent("funnel_click", { cta: "signup_success", via: "existing_login", funil: "ios" });
-          setLoading(false);
-          onSession();
+          await entrouEmContaExistente("ja_registrado", onSession);
           return;
         }
         setExistingAccount(true);
@@ -216,12 +259,14 @@ export function SignupIOS({
       return;
     }
 
-    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
+    // 1.0.17: a Home lê "core-user-name" — só "user-name" fazia a saudação usar o começo do e-mail.
+    try { setUserData("user-name", name.trim()); setUserData("core-user-name", name.trim()); } catch { /* noop */ }
     ligarTutorial();
 
     trackEvent("funnel_click", { cta: "signup_success", funil: "ios", instant: !!session });
     fireMetaEvent("CompleteRegistration", { content_name: "signup" });
-    setLoading(false);
+    /* 1.0.17 (vídeo do dono, 19/10): o botão voltava a "Salvar meu acesso →" no instante antes de a tela sair —
+       parecia que tinha falhado. No sucesso o spinner fica até a troca de tela (o componente sai). */
     if (session) onSession();
     else onConfirm(email.trim().toLowerCase());
   };
@@ -291,7 +336,13 @@ export function SignupIOS({
           </p>
         )}
         {err && <p className="text-sm text-destructive">{err}</p>}
-        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
+        {/* 1.0.17: o toque no botão NÃO tira o foco do campo. Sem isto o teclado do iPhone fechava no toque, a
+            página (rolada pra cima pelo teclado) descia ~20 px e o selo "Teste ativado" "entrava" empurrando tudo
+            — um pulo de layout logo antes da troca de tela. O teclado fecha junto com a tela, quando ela sai. */}
+        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}
+          onMouseDown={(e) => { if (valid) e.preventDefault(); }}
+          onPointerDown={(e) => { if (valid && e.pointerType !== "mouse") e.preventDefault(); }}
+          aria-busy={loading || undefined}>
           {loading
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : existingAccount
@@ -304,7 +355,7 @@ export function SignupIOS({
           <>
             {/* 15/09: sem senha e sem provedor — código por e-mail, dentro do
                 app. Foi o que faltou pra quem pagou às 11:51 e ficou fora. */}
-            <EntrarComCodigo email={email} funil="ios" onSession={() => { trackEvent("funnel_click", { cta: "signup_success", via: "codigo_email_existente", funil: "ios", pos_compra: !!posCompra }); onSession(); }} />
+            <EntrarComCodigo email={email} funil="ios" onSession={() => { trackEvent("funnel_click", { cta: "signup_success", via: "codigo_email_existente", funil: "ios", pos_compra: !!posCompra }); void entrouEmContaExistente("codigo", onSession); }} />
             <button type="button" onClick={recuperarSenha} className="block mx-auto text-[12.5px] text-muted-foreground underline underline-offset-2">
               Esqueci minha senha
             </button>
@@ -313,9 +364,11 @@ export function SignupIOS({
       </form>
 
       <div className="mt-4"><SelosIOS /></div>
+      {jaTinha && <AvisoJaTinhaAcesso tipo={jaTinha.tipo} oQue="teste" via="cadastro" onEntendi={() => { const seguir = jaTinha.seguir; setJaTinha(null); seguir(); }} />}
     </div>
   );
 }
+
 
 /**
  * LIBERANDO — a ponte entre "criou a conta" e "app aberto" pra quem pagou
@@ -323,9 +376,14 @@ export function SignupIOS({
  */
 export function LiberandoIOS() {
   const { get: getUserData } = useUserData();
+  const { user, isSubscribed } = useAuth();
+  const navigate = useNavigate();
   const nome = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   const [demorou, setDemorou] = useState(false);
-  const [pronto, setPronto] = useState(false);
+  /** null = conferindo na loja; true = o acesso foi gravado; false = não deu (cai no recarregamento de antes). */
+  const [sincronizado, setSincronizado] = useState<boolean | null>(null);
+  const [esperouDemais, setEsperouDemais] = useState(false);
+  const [missaoPronta, setMissaoPronta] = useState(() => !!lerMissao());
 
   useEffect(() => {
     let vivo = true;
@@ -341,13 +399,44 @@ export function LiberandoIOS() {
         ok = await rc.sincronizarAssinatura(3);
       }
       trackEvent("app_pos_compra_liberado", { ok, funil: "ios" });
-      if (vivo) setPronto(true);
+      if (!vivo) return;
+      setSincronizado(ok);
+      // 1.0.17: o acesso já está no servidor — o AuthProvider relê agora (sem esperar o ciclo de 60 s).
+      if (ok) window.dispatchEvent(new Event(EVENTO_RELER_ASSINATURA));
     })();
     return () => { vivo = false; clearTimeout(t); };
   }, []);
 
+  /* 1.0.17 — SEM RECARREGAR O APP (vídeo do dono, 19/10). O `location.href = "/"` de antes subia o WebView do
+   * zero: tela preta, branco, e a Home com o tour LONGO aparecia ~150 ms antes do "Tá dentro!" (a missão só
+   * nascia depois do 1º render). Agora a troca é pela rota (SPA), e só depois que: (1) o AuthProvider já vê a
+   * assinatura (senão a Home abriria o bloqueio por cima) e (2) a missão em doses, que nasce sozinha assim
+   * que há conta + acesso (MissaoDosesNaWeb, no App), já existe — a 1ª pintura da Home já sai com o
+   * "Tá dentro!" por cima. Rede: 6 s sem isso → o recarregamento de antes. */
+  const vaiTerMissao = (() => { try { return pulaPelaMissao(user?.created_at); } catch { return false; } })();
+  useEffect(() => {
+    if (!sincronizado) return;
+    const t = setTimeout(() => setEsperouDemais(true), 6000);
+    return () => clearTimeout(t);
+  }, [sincronizado]);
+  useEffect(() => {
+    if (missaoPronta || !vaiTerMissao) return;
+    const reler = () => { if (lerMissao()) setMissaoPronta(true); };
+    reler();
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, [missaoPronta, vaiTerMissao, isSubscribed]);
+
+  const spa = sincronizado === true && isSubscribed && (missaoPronta || !vaiTerMissao);
+  const pronto = sincronizado === false || spa || esperouDemais;
+  const irPraHome = () => {
+    if (spa) { trackEvent("app_pos_compra_home", { via: "rota", funil: "ios" }); navigate("/", { replace: true }); return; }
+    trackEvent("app_pos_compra_home", { via: "recarregar", funil: "ios", acesso: isSubscribed, missao: missaoPronta });
+    window.location.href = "/";
+  };
+
   if (pronto) {
-    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
+    return <BoasVindasPago imediato nome={nome} onComecar={irPraHome} />;
   }
   return (
     <div className="w-full max-w-sm mx-auto text-center py-16">

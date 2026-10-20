@@ -307,7 +307,7 @@ describe("a tela, com a conta vazia", () => {
     expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO]);
     expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, e]) => e.acao)).toEqual(["resultado", "continuar"]);
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
-    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, origem: "missao", cartao: false });
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, apertado: false, origem: "missao", cartao: false });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
     // feito: no aparelho e na conta
     expect(marcaDoAparelho()?.r).toBe("pronto");

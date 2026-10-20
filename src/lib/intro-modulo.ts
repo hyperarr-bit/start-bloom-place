@@ -708,7 +708,7 @@ export const INTROS: Record<string, IntroConfig> = {
     pronto: "Mente é isso: cada pensamento fica na hora em que apareceu. Depois você acha tudo pela busca.",
     passos: [{
       pergunta: "O que está na sua cabeça agora?",
-      descricao: "Toca num pra ver como fica, ou escreve o seu.",
+      descricao: "Toca num pra ver como fica.",
       opcoes: [op("📝", "Uma pendência pra resolver", "pendencia"), op("💡", "Uma ideia pra não perder", "ideia"), op("😮‍💨", "Uma preocupação de hoje", "preocupacao")],
       executar: (ctx, o) => anotarPensamento(ctx, o.rotulo),
       // a linha do tempo abre o campo da HORA que a pessoa toca: toca na hora de agora e aponta pro campo
@@ -940,6 +940,39 @@ export function tutorialAntigoPodeMarcarVisto(moduleKey: string, get: Leitor): b
   } catch { return true; }
 }
 
+/* ───── ação rápida da Home (1.0.17) ─────
+ * Revisão do 1º dia da 1.0.16: "Beber água"/"Registrar sono" na Home gravam nas MESMAS chaves que o `vazio` da Saúde
+ * confere — quem marcava água antes de abrir Saúde caía em "com_dado" e o módulo abria sem tutorial (fura a regra dura:
+ * nenhum módulo abre pela 1ª vez sem tutorial). Agora a ação rápida anota o módulo NESTA CONTA quando, na hora do toque,
+ * ele ainda estava vazio e nunca apresentado; na decisão, esse dado não conta. Veterano (módulo já com dado na hora do
+ * toque) nunca é anotado, então segue sem intro. */
+export const CHAVE_INTRO_ACAO_RAPIDA = "core-intro-acao-rapida";
+/** ação rápida (QuickActions) → o módulo cuja checagem de "vazio" ela suja */
+export const MODULO_DA_ACAO_RAPIDA: Readonly<Record<string, string>> = {
+  water: "saude", sleep: "saude", workout: "treino", expense: "financas", detox: "detox", idea: "hiperfoco",
+};
+const listaDaConta = (get: Leitor, k: string): string[] => {
+  const v = get<unknown>(k, []);
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+};
+export function dadoSoDaAcaoRapida(moduleId: string, get: Leitor): boolean {
+  try { return listaDaConta(get, CHAVE_INTRO_ACAO_RAPIDA).includes(moduleId); } catch { return false; }
+}
+/** Chamar ANTES de gravar o dado da ação rápida. */
+export function anotarAcaoRapida(acao: string, get: Leitor, set: (k: string, v: unknown) => void): void {
+  try {
+    const m = MODULO_DA_ACAO_RAPIDA[acao];
+    const config = m ? INTROS[m] : undefined;
+    if (!m || !config) return;
+    if (dadoSoDaAcaoRapida(m, get)) return;
+    if (introVistaNesteAparelho(m) || introVistaNaConta(m, get) || moduloJaApresentado(m, get)) return;
+    let vazio = false;
+    try { vazio = config.vazio(get); } catch { vazio = false; }
+    if (!vazio) return;
+    set(CHAVE_INTRO_ACAO_RAPIDA, [...listaDaConta(get, CHAVE_INTRO_ACAO_RAPIDA), m]);
+  } catch { /* nunca atrapalha a ação rápida */ }
+}
+
 /* ───── a decisão ───── */
 export type MotivoSemIntro = "desligada" | "sem_intro" | "ja_vista" | "ja_apresentado" | "com_dado" | "missao" | "outra_guia";
 /** Mostra a intro deste módulo? `null` = mostra; senão o motivo de não mostrar (pros testes e pro dev). */
@@ -951,7 +984,7 @@ export function porQueNaoMostrar(moduleId: string, get: Leitor, extras: { outraG
   if (moduloJaApresentado(moduleId, get)) return "ja_apresentado";
   let vazio = true;
   try { vazio = config.vazio(get); } catch { vazio = true; }
-  if (!vazio) return "com_dado";
+  if (!vazio && !dadoSoDaAcaoRapida(moduleId, get)) return "com_dado";
   if (introBloqueadaPelaMissao(moduleId)) return "missao";
   if (extras.outraGuiaAtiva) return "outra_guia";
   return null;

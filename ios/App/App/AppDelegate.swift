@@ -191,6 +191,12 @@ final class FolhaDeCobranca {
     private var fila: [(mensagem: Message, desde: Date)] = []
     private var naHome = false
     private var reserva: Timer?
+    /// 1.0.17 (dono, 20/10: a folha do StoreKit apareceu pra 26 pessoas e recuperou 0; a tela cheia do app recupera):
+    /// UMA superfície de cobrança por abertura, e a do app ganha. Enquanto o app segura (a tela cheia dele está na
+    /// tela ou vai aparecer), billingIssue fica na fila e NUNCA é exibida — e a fila continua observada, então o
+    /// iOS também não mostra sozinho. `respostaDoApp` guarda o que o JS disse antes de `ativar` (a ordem não importa).
+    private var seguraPeloApp = false
+    private var respostaDoApp: Bool?
     /// Avisa o plugin de cada exibição (motivo, espera em ms, forçada pela reserva?).
     var aoExibir: ((String, Int, Bool) -> Void)?
 
@@ -198,13 +204,23 @@ final class FolhaDeCobranca {
 
     var ativa: Bool { observacao != nil }
 
-    func ativar() {
+    func ativar(aguardarApp: Bool = false) {
+        seguraPeloApp = respostaDoApp ?? aguardarApp
         guard observacao == nil else { return }
         observacao = Task { @MainActor [weak self] in
             for await mensagem in Message.messages {
                 self?.receber(mensagem)
             }
         }
+    }
+
+    /// O JS (lib/cobranca-nativa `segurarFolhaNativa`): true = a tela cheia do app cuida do cartão recusado.
+    func segurar(_ s: Bool) {
+        respostaDoApp = s
+        seguraPeloApp = s
+        if s { reserva?.invalidate(); reserva = nil }
+        else if naHome { exibirPendentes(forcado: false) }
+        else if !fila.isEmpty { armarReserva() }
     }
 
     func telaAtual(rota: String) {
@@ -215,6 +231,7 @@ final class FolhaDeCobranca {
     private func receber(_ m: Message) {
         if m.reason == .billingIssue {
             fila.append((m, Date()))
+            if seguraPeloApp { return } // a tela cheia do app manda (fica na fila, sem reserva)
             if naHome { exibirPendentes(forcado: false) } else { armarReserva() }
         } else {
             exibir(m, desde: Date(), forcado: false)
@@ -230,6 +247,7 @@ final class FolhaDeCobranca {
 
     private func exibirPendentes(forcado: Bool) {
         reserva?.invalidate(); reserva = nil
+        guard !seguraPeloApp else { return }
         guard !fila.isEmpty else { return }
         let pendentes = fila
         fila.removeAll()
@@ -273,6 +291,7 @@ public class CoreNativoPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "telaAtual", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ativarFolhaDeCobranca", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "segurarFolhaDeCobranca", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pularATT", returnType: CAPPluginReturnPromise)
     ]
 
@@ -291,14 +310,25 @@ public class CoreNativoPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    /// 1.0.17: { segurar: true } = a tela cheia do app cuida do cartão recusado; a folha do StoreKit não aparece.
+    @objc func segurarFolhaDeCobranca(_ call: CAPPluginCall) {
+        let segurar = call.getBool("segurar") ?? false
+        guard #available(iOS 16.4, *) else { call.resolve(); return }
+        Task { @MainActor in
+            FolhaDeCobranca.compartilhada.segurar(segurar)
+            call.resolve()
+        }
+    }
+
     @objc func ativarFolhaDeCobranca(_ call: CAPPluginCall) {
         guard #available(iOS 16.4, *) else { call.resolve(["ativo": false, "suportado": false]); return }
+        let aguardarApp = call.getBool("aguardarApp") ?? false
         Task { @MainActor [weak self] in
             let folha = FolhaDeCobranca.compartilhada
             folha.aoExibir = { [weak self] motivo, esperou, forcada in
                 self?.notifyListeners("billingSheetExibida", data: ["motivo": motivo, "esperou_ms": esperou, "forcada": forcada])
             }
-            folha.ativar()
+            folha.ativar(aguardarApp: aguardarApp)
             call.resolve(["ativo": folha.ativa, "suportado": true])
         }
     }

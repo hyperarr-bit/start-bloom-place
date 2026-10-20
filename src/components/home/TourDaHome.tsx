@@ -9,6 +9,7 @@ import { CATALOGO_PENDENCIAS, CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, ocultar, typ
 import { EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MODULOS as MODULOS_DA_MISSAO, ehUmPorDia, lerMissao, passoPendente, type EstadoMissaoDoses } from "@/lib/missao-doses";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import { abrirAcaoRapida } from "@/components/home/QuickActions";
+import { anotarAcaoRapida } from "@/lib/intro-modulo";
 import { alvoDaMissao, gravacoesDoChip, itemDoChip, type ChipDaMissao } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO_PENDENCIAS_ABRIR, EVENTO_TOUR_HOME_FIM, avisar, deveMostrarTourHome, marcarTourFeito, registrarTourVisto, tourFeito, tourFeitoNesteAparelho, tourHomeLigado } from "@/lib/tour-home";
@@ -346,6 +347,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
               {CHIPS_DO_TOUR.map((c) => (
                 <button key={c.nome} type="button" className={chip} data-testid={`tour-gasto-${c.nome}`} onClick={() => {
                   try {
+                    anotarAcaoRapida("expense", get, set); // 1.0.17: o gasto do tour não tira o tutorial de Finanças
                     const item = itemDoChip("gasto", c);
                     if (item) for (const g of gravacoesDoChip(item, c)) {
                       const prox = g.proximo(get<unknown>(g.chave, undefined));

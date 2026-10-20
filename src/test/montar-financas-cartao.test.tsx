@@ -246,7 +246,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
     expect(onPronto).toHaveBeenCalledWith({ contas: 2, porDia: 72, semFolga: false, cartao: true });
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
-    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 2, faixa: "2a4", sem_folga: false, origem: "modulo", cartao: true });
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 2, faixa: "2a4", sem_folga: false, apertado: false, origem: "modulo", cartao: true });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/800|nubank|"dia"/);
   });
 

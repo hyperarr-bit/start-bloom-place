@@ -16,6 +16,7 @@ import { numeroBR } from "@/lib/data-normalizers";
 import { chaveDoHabito, datasDeCheckin, marcarCheckin } from "@/lib/detox";
 import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
 import { CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
+import { anotarAcaoRapida } from "@/lib/intro-modulo";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -183,6 +184,7 @@ export const QuickActions = () => {
      */
     const current = Math.max(waterLog[tStr] || 0, Number(waterLogModulo[tStr]) || 0);
     const proximo = Math.min(20, current + 1);
+    anotarAcaoRapida("water", get, set); // 1.0.17: o tutorial da Saúde ainda aparece na 1ª abertura
     set("core-saude-water", { ...waterLog, [tStr]: proximo });
     set("water-log", { ...waterLogModulo, [tStr]: proximo });
     const copoMl = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
@@ -202,6 +204,7 @@ export const QuickActions = () => {
     // e a trilha do teste credita o passo mesmo quando o treino de hoje já
     // estava marcado — antes o if engolia o gesto (review 16/08)
     const jaTinha = log.includes(tStr);
+    anotarAcaoRapida("workout", get, set);
     set("saude-workout-log", jaTinha ? [...log] : [...log, tStr]);
     vibrate();
     showSuccess("workout");
@@ -222,6 +225,7 @@ export const QuickActions = () => {
     if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
     const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
     // 28/09: o mesmo caminho do "Lançar em Finanças · Beleza" (lib/finance-lancar) — balde do mês, perfil ativo
+    anotarAcaoRapida("expense", get, set);
     if (!lancarGasto(get, set, { descricao: expenseCategory, valor: amount, categoria: catMap[expenseCategory] || "outros", data: todayStr() })) {
       toast.error("Não deu pra lançar daqui. Abre Finanças e lança por lá.");
       return;
@@ -285,6 +289,7 @@ export const QuickActions = () => {
     const thoughts = dayData[hour] || [];
     thoughts.push({ id: crypto.randomUUID(), text: ideaText.trim(), tags: ["ideia"], hour });
     dayData[hour] = thoughts;
+    anotarAcaoRapida("idea", get, set);
     set("hiperfoco-thoughts", { ...allDays, [dateKey]: dayData });
     vibrate();
     showSuccess("idea");
@@ -335,6 +340,7 @@ export const QuickActions = () => {
     if (!hours || hours <= 0 || hours > 24) { toast.error("Informe horas válidas (1-24)"); return; }
     const tStr = todayStr();
     const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
+    anotarAcaoRapida("sleep", get, set);
     set("core-saude-sleep", { ...sleepLog, [tStr]: hours });
     vibrate();
     showSuccess("sleep");
@@ -372,6 +378,7 @@ export const QuickActions = () => {
     // virava [] no banco (e quebrava o Detox em hábito antigo). Um por dia.
     // 28/09: pelo ID (ou posição, em hábito antigo) — pelo nome, dois hábitos
     // com o mesmo nome levavam o check-in juntos.
+    anotarAcaoRapida("detox", get, set);
     set("detox-habits", marcarCheckin(Array.isArray(habits) ? habits : [], chave, todayStr()));
     vibrate();
     showSuccess("detox");

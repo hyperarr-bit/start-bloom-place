@@ -6,7 +6,7 @@
  * na /assinar tem 1 ano (ou 1 mês) e NÃO tem senha (a conta nasce no pagamento, só com nome + e-mail): entra no app
  * com "Entrar sem senha — receber código por e-mail". Testado no vitest (src/test/venda-web-servidor.test.ts).
  */
-import { OFERTA_CASAL, ehPlanoHoje, temKit } from "./ofertas-hoje.ts";
+import { OFERTA_CASAL, OFERTA_VITALICIO_HOJE, ehPlanoHoje, temKit } from "./ofertas-hoje.ts";
 export const OFERTA_PIX_ANUAL = "a97";
 /** 16/10: o PRESENTE do funil do app na web (/assinatura) — o mesmo anual por R$ 69,90 (6990), 365 dias. */
 export const OFERTA_PIX_ANUAL_69 = "a69";
@@ -31,6 +31,8 @@ export const ehAnualDaVenda = (offer: string | null | undefined): boolean => !!o
  * "acesso vitalício" e "a senha que você criou" pra quem pagou 30 dias (e a conta do funil novo nem tem senha).
  */
 export function periodoDoEmailVenda(offer: string | null | undefined): PeriodoVenda | null {
+  // 20/10: o plano vitalício do /hoje (hv279) — é plano do /hoje, então TEM que ter período (os chamadores usam `!`)
+  if (offer === OFERTA_VITALICIO_HOJE) return "lifetime";
   if (ehAnualDaVenda(offer)) return "annual";
   if (ehMesDaVenda(offer)) return "monthly_prepaid";
   return null;

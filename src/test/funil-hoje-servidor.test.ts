@@ -13,9 +13,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { creditarPedido } from "../../supabase/functions/_shared/grant-pix";
 import { reservarBoasVindas, soltarBoasVindas } from "../../supabase/functions/_shared/boas-vindas-hoje";
-import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje, temKit } from "../../supabase/functions/_shared/ofertas-hoje";
 import {
-  assuntoParceiro, assuntoVenda, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify,
+  CONCESSAO_HOJE, DESCRICAO_HOJE, OFERTAS_PLANO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje, temKit,
+} from "../../supabase/functions/_shared/ofertas-hoje";
+import {
+  assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify,
 } from "../../supabase/functions/_shared/email-venda";
 import { validarPedido } from "../../supabase/functions/_shared/venda-capi";
 
@@ -85,7 +87,7 @@ describe("as ofertas do /hoje nas 3 funções (uma fonte só)", () => {
     expect(fonte("asaas-pix/index.ts")).toContain("...DESCRICAO_HOJE");
   });
   it("preços e prazos (decisão do dono): 27,90 1º ano / 14,90 mês, sem renovação; kit +9,90 no mesmo Pix; 47 e 27 vitalício; 19,90 casal", () => {
-    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv47: 4700, hv27: 2700, hc199: 1990 });
+    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990 });
     expect(ehPlanoHoje("h279k")).toBe(true);
     expect(ehUpsellHoje("hv27")).toBe(true);
     expect(ehOfertaCasal("hc199")).toBe(true);
@@ -332,5 +334,66 @@ describe("Purchase do upsell pago com a aba fechada chega na Meta (19/10)", () =
     const s = fonte("pix-reconcile/index.ts");
     expect(s).toContain("q.event_data?.client_ip");
     expect(s).toContain("q.event_data?.user_agent");
+  });
+});
+
+/* ───────── 20/10: o VITALÍCIO R$ 27,90 como PLANO do /hoje (hv279, OFERTA_HOJE = "vitalicio") ───────── */
+describe("hv279 — o plano vitalício do /hoje (a mesma oferta do /inicio)", () => {
+  it("é PLANO (boas-vindas, destino, CAPI/UTMify como o h279), não upsell nem kit; 2790; vitalício na linha do Pix (sem linhaNova)", () => {
+    expect(PRECOS_HOJE.hv279).toBe(2790);
+    expect(CONCESSAO_HOJE.hv279).toEqual({ plano: "lifetime", periodo: "lifetime", dias: null });
+    expect(DESCRICAO_HOJE.hv279).toBe("CORE vitalicio");
+    expect(ehPlanoHoje("hv279")).toBe(true);
+    expect(ehOfertaHoje("hv279")).toBe(true); // a ação boas_vindas do asaas-pix aceita
+    expect(ehUpsellHoje("hv279")).toBe(false);
+    expect(ehOfertaCasal("hv279")).toBe(false);
+    expect(temKit("hv279")).toBe(false);
+  });
+  it("TODO plano do /hoje tem período de e-mail (check/webhook/destino usam `periodoDoEmailVenda(offer)!`)", () => {
+    for (const o of OFERTAS_PLANO_HOJE) expect(periodoDoEmailVenda(o)).not.toBeNull();
+    expect(periodoDoEmailVenda("hv279")).toBe("lifetime");
+    expect(assuntoVenda(periodoDoEmailVenda("hv279")!)).toBe("Seu CORE pra sempre tá ativo ✅");
+    const h = htmlVenda({ email: "mari@exemplo.com", periodo: periodoDoEmailVenda("hv279")!, fim: "2126-10-20T12:00:00Z", hoje: true });
+    expect(h).toContain("pra sempre");
+    expect(h).toContain("Seu CORE também no celular");
+    expect(h).toContain("apps.apple.com");
+    expect(h).not.toMatch(/plano anual|renova|30 dias/i);
+  });
+  it("UTMify 'lifetime' e nome 'CORE Vitalício' (o mesmo do w27 do /inicio)", () => {
+    expect(planoUtmify("hv279")).toBe("lifetime");
+    expect(nomeDoProduto({ offer: "hv279" })).toBe("CORE Vitalício");
+    expect(nomeDoProduto({ offer: "w27" })).toBe("CORE Vitalício");
+  });
+  it("3 caminhos ao mesmo tempo: 1 linha só, vitalícia (+100 anos), R$ 27,90, o pedido dele", async () => {
+    const { db, admin } = bancoFalso();
+    const rs = await Promise.all([1, 2, 3].map(() => creditar(admin, "qr_vit", "hv279")));
+    expect(rs.filter((r) => r.r === "creditado")).toHaveLength(1);
+    expect(db.subscriptions).toHaveLength(1);
+    expect(db.subscriptions[0]).toMatchObject({ abacatepay_billing_id: "qr_vit", plan: "lifetime", billing_period: "lifetime", amount_cents: 2790 });
+    expect(new Date(String(db.subscriptions[0].current_period_end)).getUTCFullYear()).toBe(2126);
+    // webhook atrasado do mesmo pedido: nada muda
+    const tarde = await creditar(admin, "qr_vit", "hv279");
+    expect(["preservado", "ja_creditado"]).toContain(tarde.r);
+    expect(db.subscriptions).toHaveLength(1);
+  });
+  it("as 3 funções conhecem o hv279 pela fonte única (preço, concessão, descrição do Pix) — o reconcile tira os dias de CONCESSAO_HOJE", () => {
+    expect(fonte("pix-reconcile/index.ts")).toContain("...Object.fromEntries(Object.entries(CONCESSAO_HOJE).map(([k, c]) => [k, c.dias]))");
+    // a derivação do reconcile: dias null = vitalício; fora do mapa de período (que só tem ofertas com prazo)
+    const dias = Object.fromEntries(Object.entries(CONCESSAO_HOJE).map(([k, c]) => [k, c.dias]));
+    expect("hv279" in dias && dias.hv279 === null).toBe(true);
+  });
+  it("e-mail da tela do Pix (destino): a compra vitalícia vai pra conta e o e-mail diz 'pra sempre'", async () => {
+    const b = bancoComAuth([{ id: "anon", email: null }, { id: "conta-ana", email: "ana@exemplo.com" }]);
+    await salvarDestino(b.admin as never, "anon", "ana@exemplo.com");
+    b.db.subscriptions.push({ id: "l1", user_id: "anon", status: "active", payment_method: "pix", abacatepay_billing_id: "qr_vit", billing_period: "lifetime", plan: "lifetime", current_period_end: "2126-10-20T12:00:00Z", amount_cents: 2790 });
+    const enviados: Array<{ assunto: string; html: string }> = [];
+    const r = await encaminharParaDestino(b.admin as never, { uidAnonimo: "anon", orderId: "qr_vit", offer: "hv279", enviar: async (_p, assunto, html) => { enviados.push({ assunto, html }); return true; } });
+    expect(r).toMatchObject({ r: "movido", para: "conta-ana", email: true });
+    expect(enviados[0].assunto).toBe("Seu CORE pra sempre tá ativo ✅");
+    expect(enviados[0].html).toContain("pra sempre");
+  });
+  it("venda-capi: InitiateCheckout 27,90 com o conteúdo core_vitalicio_hoje", () => {
+    const p = validarPedido({ evento: "InitiateCheckout", event_id: "venda_ic_12345678-bbbb", url: "https://coreaplicativo.com.br/hoje", valor: 27.9, conteudo: "core_vitalicio_hoje" });
+    expect(p).toMatchObject({ valor: 27.9, conteudo: "core_vitalicio_hoje" });
   });
 });

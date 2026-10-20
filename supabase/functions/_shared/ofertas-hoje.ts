@@ -20,7 +20,7 @@
  * pedido preservados pra receita e pra trava de "1 pedido = 1 crédito").
  */
 export const PRECOS_HOJE: Record<string, number> = {
-  h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv47: 4700, hv27: 2700, hc199: 1990,
+  h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990,
 };
 
 export type ConcessaoHoje = { plano: string; periodo: string; dias: number | null; linhaNova?: boolean };
@@ -30,17 +30,20 @@ export const CONCESSAO_HOJE: Record<string, ConcessaoHoje> = {
   h149: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
   h279k: { plano: "core-pro", periodo: "annual", dias: 365 },
   h149k: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+  hv279: { plano: "lifetime", periodo: "lifetime", dias: null },
   hv47: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
   hv27: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
 };
 
 export const DESCRICAO_HOJE: Record<string, string> = {
-  h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit",
+  h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit", hv279: "CORE vitalicio",
   hv47: "CORE pra sempre", hv27: "CORE pra sempre", hc199: "CORE a dois",
 };
 
 /** Os planos (a compra principal do /hoje) — são eles que levam as boas-vindas. */
-export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k"];
+export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k", "hv279"];
+/** 20/10: o plano VITALÍCIO do /hoje (o e-mail de boas-vindas diz "pra sempre"). */
+export const OFERTA_VITALICIO_HOJE = "hv279";
 /** Os upsells (sem boas-vindas próprias: quem comprou já recebe a do plano). */
 export const OFERTAS_UPSELL_HOJE: readonly string[] = ["hv47", "hv27", "hc199"];
 export const OFERTA_CASAL = "hc199";

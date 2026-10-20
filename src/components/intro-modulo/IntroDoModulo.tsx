@@ -10,8 +10,11 @@ import { ConhecerMaisHost } from "./ConhecerMais";
 import { temTour } from "@/lib/conhecer-mais";
 import { trackEvent } from "@/lib/analytics";
 
-/** Só a camada de guia de OUTRO componente conta (a própria intro também é uma camada). */
-const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="intro-modulo"])';
+/** Só a camada de guia de OUTRO componente conta (a própria intro também é uma camada). 1.0.17 (gravação no Simulador,
+ *  20/10): o ANEL da própria intro é um `demo-holofote` (o Anel da demo guiada, testid `intro-modulo-anel[-olhar]`); quando
+ *  ele acendia antes da conferência de 700 ms — a Rotina numa conta vazia acende em ~0,6 s num aparelho rápido — a intro
+ *  se via como "outra guia por cima" e sumia 0,8 s depois de aparecer, sem marcar vista. */
+const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="intro-modulo"]):not([data-testid^="intro-modulo"])';
 
 /**
  * Outra guia está (ou vai estar) na tela deste módulo? O holofote/tutorial antigo (force-new-user-tutorial,

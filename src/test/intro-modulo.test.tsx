@@ -507,6 +507,21 @@ describe("ligada: a porta do módulo", () => {
   });
 });
 
+describe("1.0.17: o anel da PRÓPRIA intro não é 'outra guia'", () => {
+  beforeEach(ligar);
+  it("o anel da intro (demo-holofote, testid intro-modulo-anel) acendendo antes da conferência de 700 ms não derruba a intro; o anel da missão (sem o testid) derruba", async () => {
+    montar(<IntroDoModulo moduleId="casa" />);
+    expect(card()).toBeTruthy();
+    const anel = document.createElement("div"); anel.setAttribute("data-camada-guia", "demo-holofote"); anel.setAttribute("data-testid", "intro-modulo-anel"); document.body.appendChild(anel);
+    await dormir(800);
+    expect(card()).toBeTruthy(); // no Simulador a Rotina sumia 0,8 s depois de aparecer
+    const olhar = document.createElement("div"); olhar.setAttribute("data-camada-guia", "demo-holofote"); olhar.setAttribute("data-testid", "intro-modulo-anel-olhar"); document.body.appendChild(olhar);
+    await dormir(800);
+    expect(card()).toBeTruthy();
+    anel.remove(); olhar.remove();
+  });
+});
+
 /* ───────────────────────────────── a intro de 1 toque ───────────────────────────────── */
 describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10)", () => {
   beforeEach(ligar);

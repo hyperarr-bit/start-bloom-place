@@ -814,6 +814,39 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.getByTestId("construiu")).toBeInTheDocument();
   });
 
+  it("1.0.17 (bug da 1.0.16): na dose da Rotina o chip CRIA o hábito em 1 toque — mesmo com o campo fechado; e com a dose na tela o '+ Hábito' só ABRE (nunca fecha); o '+ Outro' cria igual", () => {
+    ligarUmPorDia("on");
+    const store = montarStore({ [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"] });
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { convites: { "2026-10-04": "foi" } });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    montar(store, "/rotina");
+    const postIt = esperarPostIt();
+    const maisHabito = () => document.querySelector<HTMLElement>('[data-spotlight="add-habit"]')!;
+    expect(screen.getByPlaceholderText("Nome do hábito...")).toBeInTheDocument(); // a dose abriu o campo
+    fireEvent.click(maisHabito()); fireEvent.click(maisHabito()); // os toques da 1.0.16 que FECHAVAM o campo
+    expect(screen.getByPlaceholderText("Nome do hábito...")).toBeInTheDocument();
+    fireEvent.click(within(postIt).getAllByTestId("demo-guia-chip")[1]); // 🧘 Alongar 5 min — 1 toque
+    avancar(100);
+    expect(store.dados["rotina-habits"]).toEqual(["Alongar 5 min"]);
+    expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ nome: "Alongar 5 min", ok: true })]);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "criar_habito", acao: "feito" })]);
+  });
+
+  it("1.0.17: o '+ Outro' da dose da Rotina cria o hábito DELA pelo mesmo caminho (abre o campo, preenche, Adicionar)", () => {
+    ligarUmPorDia("on");
+    const store = montarStore({ [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"] });
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Pode gastar R$ 61 por dia" } }, { convites: { "2026-10-04": "foi" } });
+    vi.setSystemTime(new Date(2026, 9, 4, 10, 0));
+    montar(store, "/rotina");
+    const postIt = esperarPostIt();
+    fireEvent.click(within(postIt).getByTestId("demo-guia-outro"));
+    fireEvent.change(within(postIt).getByTestId("demo-guia-texto"), { target: { value: "Caminhar 10 min" } });
+    fireEvent.click(within(postIt).getByTestId("demo-guia-adicionar"));
+    avancar(100);
+    expect(store.dados["rotina-habits"]).toEqual(["Caminhar 10 min"]);
+    expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ nome: "outro", proprio: true, ok: true })]);
+  });
+
   it("pulou um dia: a dose 2 no dia 3 NÃO é '2 dias seguidos' — 'Voltou! A sequência recomeça hoje.' (sem adesivo de sequência, sem drama)", () => {
     ligarUmPorDia("on");
     const store = montarStore({ [CHAVE_DIAS_ANOTADOS]: ["2026-10-03"] });

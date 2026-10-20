@@ -415,17 +415,17 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     const campo = screen.getByPlaceholderText("Nome do hábito...") as HTMLInputElement;
     expect(postIt).toHaveTextContent("1 de 2");
     expect(postIt).toHaveTextContent("Qual hábito você quer começar?");
-    expect(postIt).toHaveTextContent("Depois, toque em Adicionar.");
+    expect(postIt).not.toHaveTextContent("Adicionar"); // 1.0.17: o chip cria sozinho — nada de "toque em Adicionar"
     const chips = within(postIt).getAllByTestId("demo-guia-chip");
     expect(chips.map((c) => c.textContent)).toEqual(["💧Beber água ao acordar", "🧘Alongar 5 min", "🛏️Arrumar a cama"]);
     fireEvent.pointerDown(chips[0]);
     fireEvent.click(chips[0]);
-    expect(campo.value).toBe("Beber água ao acordar"); // só preencheu
-    expect(store.dados["rotina-habits"]).toBeUndefined(); // NADA gravado por fora
-    expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
-    // a pessoa toca em Adicionar: o hábito nasce pelo código da Rotina
-    fireEvent.click(screen.getByText("Adicionar"));
+    expect(campo.value).toBe("Beber água ao acordar"); // preencheu o campo real...
+    expect(store.dados["rotina-habits"]).toBeUndefined(); // ...nada gravado por fora
+    // 1.0.17 (bug da 1.0.16): 1 TOQUE — a missão toca no "Adicionar" da Rotina e o hábito nasce pelo código do módulo
+    avancar(100);
     expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
+    expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ nome: "Beber água ao acordar", ok: true })]);
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "criar_habito", acao: "feito", nome: "Beber água ao acordar" })]);
     // passo B: o anel foi pro quadradinho de hoje; o post-it pede pra marcar
     avancar(400); avancar(3000);

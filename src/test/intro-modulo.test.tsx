@@ -553,6 +553,25 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(escolher).toHaveBeenCalledWith(expect.objectContaining({ id: "outro", rotulo: "Lavanderia", sua: true }));
   });
 
+  it("1.0.17 (telemetria): saiu da intro sem 'Pronto' nem 'Agora não' (←, outro módulo) → modulo_intro_saiu {modulo, passo, via}; com 'Agora não', não", async () => {
+    const a = montar(<IntroDoModulo moduleId="casa" />);
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-postit")).toBeTruthy(), { timeout: 8000 });
+    a.unmount();
+    expect(eventos.filter(([n]) => n === "modulo_intro_saiu")).toEqual([["modulo_intro_saiu", { modulo: "casa", passo: 1, via: "saiu" }]]);
+    eventos.length = 0; cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+    const b = montar(<IntroDoModulo moduleId="estudos" />);
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
+    b.unmount();
+    expect(eventos.filter(([n]) => n === "modulo_intro_saiu")).toEqual([]);
+    // o app foi pro 2º plano com a intro na tela: conta com via "segundo_plano" (ela pode voltar)
+    eventos.length = 0; cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+    montar(<IntroDoModulo moduleId="dieta" />);
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    expect(eventos).toContainEqual(["modulo_intro_saiu", expect.objectContaining({ modulo: "dieta", via: "segundo_plano" })]);
+  }, 15_000);
+
   it("'Agora não' (1.0.17) fecha SÓ este tutorial, marca vista (pulada, não feita) e conta como pulada — os outros módulos seguem com o deles", () => {
     const { estado } = montar(<IntroDoModulo moduleId="casa" />);
     fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
@@ -820,6 +839,9 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     fireEvent.click(chips[0]); // Beber água ao acordar
     await waitFor(() => expect(estado.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]), { timeout: 3000 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "criar_habito")).toBeTruthy();
+    // 1.0.17 (telemetria): a troca de âncora criar → marcar NÃO é "âncora perdida"
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marque o de hoje"), { timeout: 4000 });
+    expect(eventos.filter(([n, d]) => n === "modulo_intro_anel_saiu" && d.motivo === "ancora_invisivel")).toEqual([]);
     // passo 2: o anel abraça o QUADRADINHO de hoje (a célula com o checkbox), não a linha inteira
     await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marque o de hoje"), { timeout: 4000 });
     expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 4"); // criar → marcar → olha → humor

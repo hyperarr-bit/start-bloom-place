@@ -6,8 +6,8 @@ import { problemaDeCobranca, type ProblemaDeCobranca } from "@/lib/revenuecat";
 import { donoDaFolha, nomeLoja } from "@/lib/loja";
 import { trackEvent } from "@/lib/analytics";
 import {
-  avisoFechadoNestaAbertura, cobrancaV14Ligada, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
-  registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento,
+  avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
+  guiaNaTela, marcarAvisoVistoNestaAbertura, registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento,
 } from "@/lib/cobranca-recusada";
 
 /**
@@ -76,10 +76,27 @@ export const AvisoCobrancaRecusada = () => {
     return () => { vivo = false; document.removeEventListener("visibilitychange", aoVoltar); };
   }, []);
 
-  const visivel = isNativeShell() && !!p?.temProblema && !fechado;
+  /* 1.0.17: com acesso, nunca por cima de uma guia (missão, Montar, festa, tour, folha) — lib/cobranca-recusada.
+     O relógio só roda pra quem tem o cartão recusado. */
+  const [guia, setGuia] = useState(false);
+  const esperaGuia = !!p?.temProblema && !!p?.comAcesso;
+  useEffect(() => {
+    if (!esperaGuia) { setGuia(false); return; }
+    const ver = () => setGuia(guiaNaTela());
+    ver();
+    const t = window.setInterval(ver, 700);
+    return () => window.clearInterval(t);
+  }, [esperaGuia]);
+
+  // lido também no render: a 1ª pintura com o problema já respeita a guia (o relógio só re-renderiza quando muda)
+  void guia;
+  const visivel = isNativeShell() && !!p?.temProblema && !fechado && !(esperaGuia && guiaNaTela());
   const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
   useEffect(() => {
-    if (visivel) trackEvent("aviso_cobranca_view", { com_acesso: p!.comAcesso, dias_restantes: diasRestantes });
+    // no máximo 1 view por abertura do app (some e volta com as guias sem contar de novo)
+    if (!visivel || avisoVistoNestaAbertura()) return;
+    marcarAvisoVistoNestaAbertura();
+    trackEvent("aviso_cobranca_view", { com_acesso: p!.comAcesso, dias_restantes: diasRestantes });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visivel]);
   if (!visivel || !p) return null;

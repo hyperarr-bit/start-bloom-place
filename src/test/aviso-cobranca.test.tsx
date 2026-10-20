@@ -39,6 +39,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import {
   CARENCIA_DIAS, CHAVE_FORCA_COBRANCA_V14, URL_PAGAMENTO_APPLE, avisoFechadoNestaAbertura, diasRestantesDaCarencia,
   fecharAvisoNestaAbertura, registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento, zerarAvisoDaAbertura,
+  guiaNaTela, avisoVistoNestaAbertura,
 } from "@/lib/cobranca-recusada";
 
 const info = (ent: Record<string, unknown>, url: string | null = "https://apps.apple.com/account/subscriptions") => ({
@@ -102,6 +103,7 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    zerarAvisoDaAbertura(); // 1.0.17: o view sai 1x por abertura (memória do processo)
     vi.mocked(trackEvent).mockClear();
     (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
   });
@@ -297,5 +299,84 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     registrarVisibilidadeDoAviso(false, t0 + 12 * 60e3);
     registrarVisibilidadeDoAviso(true, t0 + 44 * 60e3);
     expect(avisoFechadoNestaAbertura()).toBe(false);
+  });
+});
+
+/* 1.0.17 — o aviso nunca por cima de uma guia (missão, Montar Finanças, festa, tour, folha modal), sem "24 h",
+   e no máximo 1 view por abertura do app. */
+describe("Cobrança recusada — 1.0.17: calmo, sem disputar com a missão", () => {
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const views = () => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === "aviso_cobranca_view");
+  beforeEach(() => {
+    localStorage.clear();
+    zerarAvisoDaAbertura();
+    vi.mocked(trackEvent).mockClear();
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.querySelectorAll("[data-guia-de-teste]").forEach((e) => e.remove());
+    zerarAvisoDaAbertura();
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+  const guia = (attrs: Record<string, string>) => {
+    const d = document.createElement("div");
+    d.setAttribute("data-guia-de-teste", "");
+    for (const [k, v] of Object.entries(attrs)) d.setAttribute(k, v);
+    document.body.appendChild(d);
+    return d;
+  };
+
+  it("guiaNaTela reconhece as camadas da missão, o Montar, a festa e folhas modais — e ignora o resto", () => {
+    expect(guiaNaTela()).toBe(false);
+    for (const attrs of [
+      { "data-camada-guia": "missao-doses-boas-vindas" }, { "data-testid": "montar-financas" }, { "data-momento": "festa" },
+      { role: "dialog", "aria-modal": "true" }, { role: "alertdialog" },
+    ]) {
+      const d = guia(attrs);
+      expect(guiaNaTela()).toBe(true);
+      d.remove();
+    }
+    guia({ role: "dialog" }); // popover sem aria-modal não segura
+    expect(guiaNaTela()).toBe(false);
+  });
+
+  it("com acesso e a boas-vindas da missão na tela: o aviso espera; a guia sai → aparece, com 1 view só", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-18T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    const g = guia({ "data-camada-guia": "missao-doses-boas-vindas" });
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(views()).toHaveLength(0);
+    g.remove();
+    expect(await screen.findByText("Seu pagamento não passou", {}, { timeout: 2000 })).toBeInTheDocument();
+    await waitFor(() => expect(views()).toHaveLength(1));
+    // a guia volta (ex.: a festa da dose) e sai de novo: some e volta SEM contar outra exibição
+    const g2 = guia({ "data-momento": "festa" });
+    await waitFor(() => expect(screen.queryByText("Seu pagamento não passou")).toBeNull(), { timeout: 2000 });
+    g2.remove();
+    expect(await screen.findByText("Seu pagamento não passou", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(views()).toHaveLength(1);
+    expect(avisoVistoNestaAbertura()).toBe(true);
+  });
+
+  it("nunca fala de '24 h' nem de antecedência da cobrança; o botão leva pra forma de pagamento da Apple", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-18T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    render(<AvisoCobrancaRecusada />);
+    const aviso = (await screen.findByText("Seu pagamento não passou")).closest('[role="alert"]') as HTMLElement;
+    expect(aviso.textContent).not.toMatch(/24\s*h|horas antes|antes do fim/i);
+    expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", URL_PAGAMENTO_APPLE);
+    fireEvent.click(screen.getByRole("link", { name: "Atualizar pagamento" }));
+    expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "aviso_cobranca_click")).toBe(true);
+  });
+
+  it("sem acesso (no bloqueio) não espera guia nenhuma — o bloqueio é a tela inteira", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: false, noTrial: true, trialExpired: false };
+    guia({ role: "dialog", "aria-modal": "true" });
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByText("Seu pagamento não passou")).toBeInTheDocument();
   });
 });

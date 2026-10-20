@@ -94,16 +94,32 @@ export const PAUSA_QUE_CONTA_COMO_ABERTURA_MS = 30 * 60e3;
 let fechadoNestaAbertura = false;
 let escondidoDesde: number | null = null;
 
+let vistoNestaAbertura = false;
+
 export const fecharAvisoNestaAbertura = (): void => { fechadoNestaAbertura = true; };
+/** 1.0.17: o `aviso_cobranca_view` sai no máximo 1x por abertura (o aviso some e volta quando uma guia abre e fecha). */
+export const avisoVistoNestaAbertura = (): boolean => vistoNestaAbertura;
+export const marcarAvisoVistoNestaAbertura = (): void => { vistoNestaAbertura = true; };
 export const avisoFechadoNestaAbertura = (): boolean => fechadoNestaAbertura;
 /** O aviso chama a cada mudança de visibilidade; voltar depois de 30 min = abertura nova. */
 export function registrarVisibilidadeDoAviso(visivel: boolean, agora: number = Date.now()): void {
   if (!visivel) { escondidoDesde = escondidoDesde ?? agora; return; }
-  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) fechadoNestaAbertura = false;
+  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) { fechadoNestaAbertura = false; vistoNestaAbertura = false; }
   escondidoDesde = null;
 }
 /** Pra teste. */
-export const zerarAvisoDaAbertura = (): void => { fechadoNestaAbertura = false; escondidoDesde = null; };
+export const zerarAvisoDaAbertura = (): void => { fechadoNestaAbertura = false; vistoNestaAbertura = false; escondidoDesde = null; };
+
+/* ─── 1.0.17: nunca por cima de uma guia ──────────────────────────────────────
+ * Com acesso (carência), o aviso espera a tela ficar livre: boas-vindas e doses da missão, Montar Finanças,
+ * festa, tour da Home, intro do módulo, qualquer folha modal. Quem acabou de entrar no teste não tem cartão
+ * recusado — mas quem está na carência e abre o app no meio de uma dose não leva duas coisas de uma vez.
+ * Sem acesso o aviso mora no alto do bloqueio (é a tela inteira) e não espera nada. */
+export const SELETOR_GUIA_NA_TELA =
+  '[data-camada-guia], [data-momento], [data-testid="montar-financas"], [role="dialog"][aria-modal="true"], [role="alertdialog"]';
+export function guiaNaTela(doc: Document | undefined = typeof document === "undefined" ? undefined : document): boolean {
+  try { return !!doc?.querySelector(SELETOR_GUIA_NA_TELA); } catch { return false; }
+}
 
 /* ─── avisos locais +24 h / +72 h ──────────────────────────────────────────── */
 const CHAVE_AVISOS_ARMADOS = "core-aviso-cobranca-notif";

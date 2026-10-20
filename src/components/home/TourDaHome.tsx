@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
+import { entrada, MOV } from "@/lib/movimento";
+import { tourHomeQuando } from "@/lib/dia1-cheio";
 import { trackEvent } from "@/lib/analytics";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { WIDGET_CATALOG, type WidgetId } from "@/hooks/use-home-widgets";
@@ -25,8 +27,13 @@ import { CHAVE_TOUR_FEITO, EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR, EVENTO
  * festa "Casa arrumada". Quem pulou a missão: tour direto.
  */
 const OUTRA_CAMADA = '[data-camada-guia]:not([data-camada-guia="tour-home"])';
+/** 1.0.17 (dono 19/10): o tour nunca entra colado em outra tela — a Home tem que ficar parada, SEM outra camada de guia
+ *  (festa, véu da passagem, folha, intro), por este tempo antes de ele entrar. */
+export const RESPIRO_ANTES_DO_TOUR_MS = 1500;
 export function useTourDaHome(criadoEm: string | null | undefined, ligado = true): boolean {
   const [tick, setTick] = useState(0);
+  /** a Home está quieta (nenhuma outra camada) há RESPIRO_ANTES_DO_TOUR_MS — só aí o tour pode entrar */
+  const [quieta, setQuieta] = useState(false);
   const { get, loaded } = useUserData();
   // 1.0.16 (4.8): a marca da CONTA também vale — reinstalou ou trocou de aparelho, o tour não volta. Vista a marca
   // da conta, o aparelho guarda a dele (a próxima abertura nem precisa esperar o dado da conta).
@@ -43,13 +50,16 @@ export function useTourDaHome(criadoEm: string | null | undefined, ligado = true
     // a folha do plano / a festa desmontam sem evento próprio: um relógio curto confere a camada —
     // e só re-renderiza a Home quando a camada APARECE ou SOME (nunca a cada tique)
     let bloqueado = !!document.querySelector(OUTRA_CAMADA);
+    let livreDesde = bloqueado ? null as number | null : Date.now();
     const relogio = window.setInterval(() => {
       const agora = !!document.querySelector(OUTRA_CAMADA);
+      if (agora) { livreDesde = null; setQuieta(false); } else if (livreDesde === null) livreDesde = Date.now();
+      if (livreDesde !== null && Date.now() - livreDesde >= RESPIRO_ANTES_DO_TOUR_MS) setQuieta(true);
       if (agora !== bloqueado) { bloqueado = agora; reler(); }
-    }, 700);
+    }, 250);
     return () => { window.removeEventListener(EVENTO_MISSAO_DOSES, reler); window.removeEventListener(EVENTO_MISSAO_COMPLETA, reler); window.clearInterval(relogio); };
   }, [pertinente]);
-  if (!pertinente) return false;
+  if (!pertinente || !quieta) return false;
   void tick;
   if (!deveMostrarTourHome(criadoEm)) return false;
   try { if (document.querySelector(OUTRA_CAMADA)) return false; } catch { /* sem DOM */ }
@@ -114,14 +124,13 @@ export function passosDoTourCurto(m: EstadoMissaoDoses | null): PassoDoTour[] {
   return [
     {
       alvo: "pendencias",
-      titulo: "Pendências de hoje",
-      texto: cfg
-        ? `Aqui fica o que falta fazer hoje. Amanhã, a sua dose de ${cfg.emoji} ${cfg.nome} vai aparecer nessa lista.`
-        : "Aqui fica o que falta fazer hoje: água, hábitos, refeições. Tocou, resolveu.",
+      // 1.0.17 (dono: "minimalista"): título de uma linha + no máximo uma frase curta
+      titulo: "O que falta hoje.",
+      texto: cfg ? `Amanhã, ${cfg.emoji} ${cfg.nome} aparece aqui.` : "Tocou, resolveu.",
       faca: "",
     },
-    { alvo: "acoes-rapidas", titulo: "Ações rápidas", texto: "Da próxima vez, anota o gasto daqui mesmo, sem abrir Finanças.", faca: "Toca no gasto de agora" },
-    { alvo: "modulos", titulo: "Seus módulos", texto: "São 16. Esconde o que não vai usar agora; dá pra trazer de volta quando quiser.", faca: "Toca nos que quer esconder" },
+    { alvo: "acoes-rapidas", titulo: "Anote sem abrir o módulo.", texto: "Um toque e o gasto entra.", faca: "Toque no gasto de agora" },
+    { alvo: "modulos", titulo: "Esconda o que não usa.", texto: "Dá pra trazer de volta.", faca: "Toque nos que quer esconder" },
   ];
 }
 type PassoDoTour = { alvo: string; titulo: string; texto: string; faca: string };
@@ -253,7 +262,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
     avisar(EVENTO_MODULOS_EDITAR, { editar: false });
     marcarTourFeito();
     set(CHAVE_TOUR_FEITO, new Date().toISOString());
-    trackEvent("home_tour_concluido", { total: TOTAL, variante });
+    trackEvent("home_tour_concluido", { total: TOTAL, variante, tour_quando: tourHomeQuando() });
     setAtivo(false);
     onFim?.();
     // 10/10: a missão em doses (braço B) fecha o 4º passo dela com isto
@@ -261,7 +270,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   }, [set, onFim]);
 
   const avancar = useCallback((acao: string) => {
-    trackEvent("home_tour_passo", { indice: passo, total: TOTAL, acao, variante });
+    trackEvent("home_tour_passo", { indice: passo, total: TOTAL, acao, variante, tour_quando: tourHomeQuando() });
     setVerPontos(false);
     // ação feita (não "Continuar"/"Concluir"): ✓ Pronto! por 600 ms — o passo avança JÁ, o selo só confirma
     if (acao !== "continuar" && acao !== "concluir" && acao !== "deixar") {
@@ -279,7 +288,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
     if (vistoRef.current || !ativo || !rect || folhaAberta) return;
     vistoRef.current = true;
     registrarTourVisto(); // fechou o app no meio: volta no máximo em 2 aberturas
-    trackEvent("home_tour_visto", { total: TOTAL, variante });
+    trackEvent("home_tour_visto", { total: TOTAL, variante, tour_quando: tourHomeQuando() });
   }, [ativo, rect, folhaAberta, TOTAL, variante]);
 
   if (!ativo) return null;
@@ -414,7 +423,7 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   return (
     <AnimatePresence>
       <motion.div key="tour-home" className="fixed inset-0 z-[200] pointer-events-none" data-camada-guia="tour-home" data-testid="tour-home" data-passo={passo + 1}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.calmo)}>
         {rect && (
           <>
             {/* o escuro (55%) com o ALVO recortado: só o alvo e o balão ficam nítidos (não parece um aviso solto) */}
@@ -456,9 +465,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
           ref={balaoRef}
           className="absolute pointer-events-auto"
           style={{ top: topo, left: esquerda, width: LARG }}
-          initial={reduzir ? false : { opacity: 0, y: abaixo ? -6 : 6 }}
+          initial={reduzir ? false : { opacity: 0, y: abaixo ? -8 : 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.22 }}
+          transition={entrada(reduzir, MOV.calmo, passo === 0 ? 0.25 : 0.08)}
         >
           {rect && (
             <div className="absolute w-3 h-3 bg-accent" style={{ left: bicoX, transform: "translateX(-50%) rotate(45deg)", ...(abaixo ? { top: -6 } : { bottom: -6 }) }} aria-hidden="true" />

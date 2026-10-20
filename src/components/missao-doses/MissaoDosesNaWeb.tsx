@@ -132,7 +132,7 @@ function VeuDaMissao() {
   }, [fase, reduzir]);
   if (!fase) return null;
   return (
-    <motion.div className="fixed inset-0 z-[250] bg-background pointer-events-none" aria-hidden data-testid="missao-doses-veu" data-fase={fase}
+    <motion.div className="fixed inset-0 z-[250] bg-background pointer-events-none" aria-hidden data-testid="missao-doses-veu" data-fase={fase} data-camada-guia="missao-doses-veu"
       initial={{ opacity: 0 }} animate={{ opacity: fase === "cobre" ? 1 : 0 }}
       transition={fase === "cobre" ? saida(reduzir, MOV.base) : entrada(reduzir, MOV.calmo)} />
   );

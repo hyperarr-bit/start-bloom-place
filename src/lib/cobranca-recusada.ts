@@ -95,6 +95,13 @@ let fechadoNestaAbertura = false;
 let escondidoDesde: number | null = null;
 
 let vistoNestaAbertura = false;
+/* 1.0.17 (dono, 20/10): a TELA CHEIA — "Agora não" esconde até a próxima abertura; o view sai 1x por abertura. */
+let telaFechadaNestaAbertura = false;
+let telaVistaNestaAbertura = false;
+export const fecharTelaNestaAbertura = (): void => { telaFechadaNestaAbertura = true; };
+export const telaFechadaAgora = (): boolean => telaFechadaNestaAbertura;
+export const telaVistaAgora = (): boolean => telaVistaNestaAbertura;
+export const marcarTelaVista = (): void => { telaVistaNestaAbertura = true; };
 
 export const fecharAvisoNestaAbertura = (): void => { fechadoNestaAbertura = true; };
 /** 1.0.17: o `aviso_cobranca_view` sai no máximo 1x por abertura (o aviso some e volta quando uma guia abre e fecha). */
@@ -104,11 +111,13 @@ export const avisoFechadoNestaAbertura = (): boolean => fechadoNestaAbertura;
 /** O aviso chama a cada mudança de visibilidade; voltar depois de 30 min = abertura nova. */
 export function registrarVisibilidadeDoAviso(visivel: boolean, agora: number = Date.now()): void {
   if (!visivel) { escondidoDesde = escondidoDesde ?? agora; return; }
-  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) { fechadoNestaAbertura = false; vistoNestaAbertura = false; }
+  if (escondidoDesde != null && agora - escondidoDesde >= PAUSA_QUE_CONTA_COMO_ABERTURA_MS) { fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false; }
   escondidoDesde = null;
 }
 /** Pra teste. */
-export const zerarAvisoDaAbertura = (): void => { fechadoNestaAbertura = false; vistoNestaAbertura = false; escondidoDesde = null; };
+export const zerarAvisoDaAbertura = (): void => {
+  fechadoNestaAbertura = false; vistoNestaAbertura = false; telaFechadaNestaAbertura = false; telaVistaNestaAbertura = false; escondidoDesde = null;
+};
 
 /* ─── 1.0.17: nunca por cima de uma guia ──────────────────────────────────────
  * Com acesso (carência), o aviso espera a tela ficar livre: boas-vindas e doses da missão, Montar Finanças,
@@ -118,7 +127,8 @@ export const zerarAvisoDaAbertura = (): void => { fechadoNestaAbertura = false; 
 export const SELETOR_GUIA_NA_TELA =
   '[data-camada-guia], [data-momento], [data-testid="montar-financas"], [role="dialog"][aria-modal="true"], [role="alertdialog"]';
 export function guiaNaTela(doc: Document | undefined = typeof document === "undefined" ? undefined : document): boolean {
-  try { return !!doc?.querySelector(SELETOR_GUIA_NA_TELA); } catch { return false; }
+  // a própria tela cheia do aviso (role="alertdialog") não conta como guia
+  try { return Array.from(doc?.querySelectorAll(SELETOR_GUIA_NA_TELA) ?? []).some((el) => !el.closest("[data-aviso-cobranca]")); } catch { return false; }
 }
 
 /* ─── avisos locais +24 h / +72 h ──────────────────────────────────────────── */

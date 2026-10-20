@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { doseCurta, emSegundos, MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { entrada, MOV } from "@/lib/movimento";
+import { EscolhaDeHora } from "./EscolhaDeHora";
 import "./missao-doses.css";
 import { lembretesSoNoApp } from "@/lib/missao-web";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
@@ -24,20 +26,11 @@ export function horaMaisPerto(agora: Date = new Date()): Exclude<Lembrete, "sem"
   return HORAS.reduce((melhor, h) => (Math.abs(MINUTOS[h] - min) < Math.abs(MINUTOS[melhor] - min) ? h : melhor));
 }
 
-/** "Amanhã a gente monta sua Rotina em 20 s." — a frase da dose de amanhã, do jeito que se fala. */
+/** 1.0.17 (dono: "minimalista, sem segundos na tela"): "Amanhã: Rotina." — a frase da dose de amanhã, curta. */
 export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined, n = 2): string {
-  if (!modulo) return "Amanhã tem mais um passo do seu plano.";
-  const cfg = MODULOS[modulo];
-  const seg = doseCurta(modulo, n).seg;
-  switch (modulo) {
-    // 1.0.16: o quiz é só a 1ª dose — em 2º/3º, Finanças é o gasto de hoje
-    case "financas": return n === 1 ? `Amanhã a gente monta suas Finanças em ${emSegundos(seg)}.` : `Amanhã é 1 gasto nas suas Finanças: ${emSegundos(seg)}.`;
-    case "rotina": return `Amanhã a gente monta sua Rotina em ${emSegundos(seg)}.`;
-    case "saude": return `Amanhã é a vez da sua Saúde: 1 copo d'água, ${emSegundos(seg)}.`;
-    case "treino": return `Amanhã a gente escolhe o seu treino em ${emSegundos(seg)}.`;
-    case "desenvolvimento": return `Amanhã a gente escolhe a sua primeira meta em ${emSegundos(seg)}.`;
-    default: return `Amanhã é a vez de ${cfg.emoji} ${cfg.nome}: ${emSegundos(seg)}.`;
-  }
+  void n;
+  if (!modulo) return "Amanhã tem mais um passo.";
+  return `Amanhã: ${MODULOS[modulo].nome}.`;
 }
 
 export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
@@ -46,7 +39,7 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   aoSemLembrete: () => void;
 }) {
   const reduzir = !!useReducedMotion();
-  const [hora, setHora] = useState<Exclude<Lembrete, "sem">>(() => horaMaisPerto());
+  const [hora, setHora] = useState<Lembrete>(() => horaMaisPerto());
   const proxima = passoPendente(missao);
   // 18/10 (funil da missão na WEB): "que horas te lembro?" vira o pop-up "Baixe o app pra receber os lembretes" —
   // o navegador não manda notificação. "Agora não" = "Sem lembrete" (a missão segue)
@@ -60,19 +53,17 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       role="dialog" aria-modal="true" aria-label="Plano de amanhã" data-camada-guia="missao-doses-plano" data-testid="plano-amanha-a"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}>
+      <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.08)}
         className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Plano de amanhã</p>
-        <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-1.5" data-testid="plano-amanha-a-titulo">
-          {fraseDeAmanha(proxima?.modulo, proxima?.n)} Que horas te lembro?
+        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight" data-testid="plano-amanha-a-titulo">
+          {fraseDeAmanha(proxima?.modulo, proxima?.n)}
         </p>
-        <div className="flex gap-2 mt-4" role="radiogroup" aria-label="Hora do lembrete">
-          {HORAS.map((h) => (
-            <button key={h} type="button" role="radio" aria-checked={hora === h} className="md-hora flex-1" data-marcada={hora === h ? "" : undefined} data-testid={`plano-a-hora-${h}`} onClick={() => setHora(h)}>{h}</button>
-          ))}
+        <p className="text-[15px] text-muted-foreground mt-1">Que horas te lembro?</p>
+        <div className="mt-4">
+          <EscolhaDeHora valor={hora} aoMudar={(h) => setHora(h)} comSem={false} testid="plano-a-hora" />
         </div>
-        <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="plano-a-combinado" onClick={() => aoCombinar(hora)}>Combinado</button>
+        <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="plano-a-combinado" onClick={() => aoCombinar(hora)}>Combinado</button>
         <button type="button" className="md-link" data-testid="plano-a-sem" onClick={aoSemLembrete}>Sem lembrete</button>
       </motion.div>
     </motion.div>,

@@ -3,9 +3,9 @@
  * ele deveria ser o foco, só que ele é dividido pelo 'já gastou alguma coisa hoje?'. Isso deveria aparecer no
  * tutorial em si, não no montar o plano"). Conta VAZIA, Dashboard de sempre (painel limpo DESLIGADO):
  *   · a tela do número (o Montar pela missão) é SÓ o número: "VOCÊ PODE GASTAR HOJE / R$ X por dia" (sobe de 0 em
- *     ~0,6 s; direto pra quem pediu menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →" — nada de
+ *     ~0,6 s; direto pra quem pediu menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar" — nada de
  *     post-it, chips, "Ainda não gastei" nem "✓ Já está tudo nas suas Finanças";
- *   · "Continuar →" leva pro TUTORIAL no formulário de verdade de Finanças (aba MEU FINANCEIRO): a faixa da missão,
+ *   · "Continuar" leva pro TUTORIAL no formulário de verdade de Finanças (aba MEU FINANCEIRO): a faixa da missão,
  *     o anel no "+ Novo gasto", o post-it "Já gastou com alguma coisa hoje?" com Café · Uber · Almoço · ✎ escrever o
  *     meu e "Ainda não gastei nada hoje →"; 1 toque = o gasto DE VERDADE na lista;
  *   · depois do toque, UM balão no MEU MÊS: o "Saiu" do mês somou e "Hoje ainda dá pra gastar R$ X" — o MESMO número
@@ -178,7 +178,7 @@ afterEach(() => {
 /* ───────────────────────── a tela do número ───────────────────────── */
 
 describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutorial, depois)", () => {
-  it("o número de herói, a linha curta, A CONTA DO SEU MÊS e 'Continuar →' — nada de post-it, chips, 'Ainda não gastei' nem '✓ Já está tudo…'", async () => {
+  it("o número de herói, a linha curta, A CONTA DO SEU MÊS e 'Continuar' — nada de post-it, chips, 'Ainda não gastei' nem '✓ Já está tudo…'", async () => {
     expect(PAINEL_LIMPO).toBe("off"); // o Dashboard de sempre (dono, 17/10)
     montarTela();
     await ateONumero();
@@ -187,8 +187,10 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(numero.querySelector(".sr-only")!.textContent).toBe("R$ 66 por dia"); // o leitor de tela lê o número final
     expect(lido(numero)).toContain("R$ 66por dia");
     expect(screen.getByTestId("montar-pronto").hasAttribute("data-heroi")).toBe(true);
-    expect(tela().getByText(/até o fim do mês \(16 dias, contando hoje\), já tirando as contas fixas e a fatura/)).toBeTruthy();
-    expect(tela().getByText(/A conta do seu mês/i)).toBeTruthy();
+    expect(tela().getByText("até o fim do mês.")).toBeTruthy();
+    // 1.0.17 (dono: "joga informação na cara"): a conta do mês fica FECHADA — "Ver a conta" abre
+    expect(tela().queryByText("Livre pro mês")).toBeNull();
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(tela().getByText("Livre pro mês")).toBeTruthy();
     // o 1º gasto saiu daqui
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
@@ -196,7 +198,7 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(screen.queryByText(/Ainda não gastei/)).toBeNull();
     expect(screen.queryByText(/Café/)).toBeNull();
     expect(screen.queryByText(/Já está tudo nas suas Finanças/)).toBeNull();
-    expect(tela().getByRole("button", { name: "Continuar →" })).toBeTruthy();
+    expect(tela().getByRole("button", { name: "Continuar" })).toBeTruthy();
     // o evento do passo 1 começa aqui (o mesmo envelope dos outros eventos da missão)
     expect(doPasso1()).toEqual([expect.objectContaining({ acao: "resultado", ms: 0 })]);
     expect(eventos.find(([n]) => n === EV_PRIMEIRO_GASTO)![1]).toMatchObject({ prototipo: "app", plataforma: "ios", versao: "dev" });
@@ -208,17 +210,17 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     await ateONumero();
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
     expect(screen.getByTestId("montar-pronto").hasAttribute("data-heroi")).toBe(false);
-    expect(screen.getByText(/Já está tudo nas suas Finanças/)).toBeTruthy();
+    expect(screen.getByText(/Já está nas suas Finanças/)).toBeTruthy();
     expect(tela().getByRole("button", { name: "Ver minhas Finanças" })).toBeTruthy();
     expect(doPasso1()).toEqual([]);
   });
 
-  it("'Continuar →': onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; evento 'continuar' com o tempo desde o número, sem reais", async () => {
+  it("'Continuar': onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; evento 'continuar' com o tempo desde o número, sem reais", async () => {
     const onPronto = vi.fn();
     const controle = montarTela({ onPronto });
     await ateONumero();
     vi.setSystemTime(HOJE.getTime() + 2500); // 2,5 s olhando o número
-    const cta = tela().getByRole("button", { name: "Continuar →" });
+    const cta = tela().getByRole("button", { name: "Continuar" });
     fireEvent.click(cta);
     fireEvent.click(cta);
     expect(onPronto).toHaveBeenCalledTimes(1);
@@ -265,8 +267,8 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
   });
 
   /* 1.0.17: 18% terminavam com "Você pode gastar R$ 0" como herói — o mês apertado troca o herói pelo acolhimento
-     e o número vai pra conta do mês ("Por dia"). */
-  it("sem folga no mês: 'Seu mês tá apertado.' no lugar do R$ 0 gigante; o número fica na conta do mês; 'Continuar →'", async () => {
+     e o número vai pra conta do mês ("Ver a conta" → "Por dia"). */
+  it("sem folga no mês: 'Seu mês tá apertado.' no lugar do R$ 0 gigante; o número fica na conta do mês; 'Continuar' (nada anima)", async () => {
     montarTela();
     fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1000" } });
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
@@ -278,9 +280,11 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(screen.queryByTestId("montar-por-dia")).toBeNull();
     expect(screen.getByTestId("montar-apertado").textContent).toMatch(/Seu mês tá apertado\.\s*Vamos achar folga juntos/);
     expect(screen.queryByText(/VOCÊ PODE GASTAR HOJE/)).toBeNull();
+    // 1.0.17 (p2): a conta do mês fica fechada; o número do mês apertado mora nela
+    expect(screen.queryByTestId("montar-por-dia-apertado")).toBeNull();
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByTestId("montar-por-dia-apertado").textContent).toMatch(/Por dia\s*R\$\s*0/);
-    expect(tela().getByRole("button", { name: "Ver a conta do mês" })).toBeTruthy();
-    expect(tela().getByRole("button", { name: "Continuar →" })).toBeTruthy();
+    expect(tela().getByRole("button", { name: "Continuar" })).toBeTruthy();
     expect(eventos.find(([n]) => n === "montar_financas_pronto")?.[1]).toMatchObject({ sem_folga: true, apertado: true });
   });
 
@@ -295,6 +299,7 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     await respirar();
     expect(screen.getByTestId("montar-apertado")).toBeTruthy();
     expect(screen.queryByTestId("montar-por-dia")).toBeNull();
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByText(/÷ \d+ dias/)).toBeTruthy();
   });
 });
@@ -306,7 +311,7 @@ describe("fechar o app: o número que ainda não apareceu volta; o que apareceu,
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
     fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
     fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
-    expect(screen.getByText("Montando suas finanças…")).toBeTruthy();
+    expect(screen.getByText("Calculando…")).toBeTruthy();
     expect(marcaDoAparelho()?.r).toBe("pronto"); // o Montar já decidiu (e gravou) na entrada do "Montando…"
     const dados = controle.dados();
     cleanup();
@@ -415,7 +420,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     });
   });
 
-  it("braço A, Café: o número sem chips → 'Continuar →' → o tutorial na aba MEU FINANCEIRO (faixa, anel no '+ Novo gasto', post-it) → o Café DE VERDADE na lista → UM balão: 'Saiu no mês' somou + 'Hoje ainda dá pra gastar R$ X' = o card do Dashboard → festa", { timeout: 40_000 }, async () => {
+  it("braço A, Café: o número sem chips → 'Continuar' → o tutorial na aba MEU FINANCEIRO (faixa, anel no '+ Novo gasto', post-it) → o Café DE VERDADE na lista → UM balão: 'Saiu no mês' somou + 'Hoje ainda dá pra gastar R$ X' = o card do Dashboard → festa", { timeout: 40_000 }, async () => {
     missao("A");
     const controle = montarAppEmFinancas();
     await avancar(300);
@@ -427,7 +432,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.queryByText("Já gastou com alguma coisa hoje?")).toBeNull();
     const doMontar = numeroDoMontar();
     expect(doMontar).toBe(calcularMontar(3000, [{ id: "a", nome: "Aluguel", emoji: "", valor: 900, categoria: "moradia" }, { id: "l", nome: "Luz", emoji: "", valor: 150, categoria: "contas_casa" }, { id: "i", nome: "Internet", emoji: "", valor: 100, categoria: "internet_telefone" }], HOJE).porDia);
-    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar →" }));
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`); // a dose já conta
     // o TUTORIAL no formulário de verdade
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
@@ -435,11 +440,12 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.getByTestId("missao-doses-anel")).toBeTruthy();
     expect(document.querySelector('[data-spotlight="financeiro"]')!.getAttribute("data-active")).toBe("true"); // aba MEU FINANCEIRO
     const postIt = postItDoTutorial()!;
-    expect(postIt).toHaveTextContent("Agora · 1 toque");
-    expect(postIt).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    // 1.0.17 (dono: "minimalista"): a pergunta, os chips, "+ Outro" (campo ali mesmo, com o R$) e a saída quieta "Ainda não"
+    expect(postIt).toHaveTextContent("Gastou algo hoje?");
+    expect(postIt).not.toHaveTextContent("Toca num");
     expect(within(postIt).getAllByTestId("demo-guia-chip").map((c) => lido(c))).toEqual(["☕Café· R$ 12", "🚗Uber· R$ 23", "🍔Almoço· R$ 35"]);
-    expect(within(postIt).getByTestId("demo-guia-escrever")).toHaveTextContent("✎ escrever o meu");
-    expect(within(postIt).getByTestId("missao-doses-ainda-nao")).toHaveTextContent("Ainda não gastei nada hoje →");
+    expect(within(postIt).getByTestId("demo-guia-outro")).toHaveTextContent("Outro");
+    expect(within(postIt).getByTestId("missao-doses-ainda-nao")).toHaveTextContent("Ainda não");
     // 1 toque = o gasto DE VERDADE na lista de Finanças
     await tocar(within(postIt).getAllByTestId("demo-guia-chip")[0]);
     expect(controle.dados()["finance-expenses"]).toEqual([expect.objectContaining({ description: "Café", value: 12, date: "2026-10-16" })]);
@@ -449,13 +455,13 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(document.querySelector('[data-spotlight="financeiro"]')!.getAttribute("data-active")).toBe("true");
     const balao = screen.getByTestId("missao-doses-olhar");
     expect(balao).toHaveAttribute("data-olha", "financas");
-    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Olha o seu mês");
+    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Seu mês");
     expect(screen.getByTestId("missao-doses-olhar-saiu")).toHaveTextContent("Saiu no mês");
     expect(lido(screen.getByTestId("missao-doses-olhar-saiu"))).toContain("R$ 1.150"); // o de antes, riscado → R$ 1.162
     // (17/10, opção 3) com gasto: "Sobra pra hoje ~~R$ 116~~ R$ 104" — o que dava no começo do dia − o Café (a linha do card)
     const pode = screen.getByTestId("missao-doses-olhar-pode");
-    expect(pode).toHaveTextContent("Sobra pra hoje");
-    expect(pode).not.toHaveTextContent("Hoje ainda dá pra gastar");
+    expect(pode).toHaveTextContent("Sobra hoje");
+    expect(pode).not.toHaveTextContent("Dá pra gastar hoje");
     const noBalao = Number(pode.getAttribute("data-valor"));
     expect(noBalao).toBe(doMontar - 12);
     expect(lido(pode.querySelector("s")!)).toBe(`R$ ${doMontar}`);
@@ -467,8 +473,11 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.queryByTestId("missao-doses-olhar-tempo")).toBeNull(); // sem "Olha · 1 de 2"
     // a festa entra sozinha
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
-    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
-    expect(screen.getByTestId("missao-doses-gasto-extra")).toHaveTextContent("E o gasto de hoje (Café, R$ 12) já entrou no seu mês.");
+    // 1.0.17 (dono: "a festa tem informação demais"): "Dia 1 feito." + 1 linha do que ficou + "Amanhã: Rotina." + 1 botão
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
+    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: Rotina.");
+    expect(screen.getByTestId("missao-doses-continuar")).toHaveTextContent("Até amanhã");
     // o card QUANTO POSSO GASTAR HOJE do Dashboard de sempre: o número grande de sempre + a linha com a MESMA sobra do balão
     expect(await cardDoDashboard()).toEqual({ numero: numeroGrande, linha: linhaEsperada(noBalao, 12, doMontar) });
     // os eventos do passo 1, na ordem, sem reais
@@ -490,7 +499,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await responderOMontar();
     await avancar(2500);
     const doMontar = numeroDoMontar();
-    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar →" }));
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     const ainda = within(postItDoTutorial()!).getByTestId("missao-doses-ainda-nao");
     fireEvent.click(ainda);
@@ -499,12 +508,12 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(controle.dados()["finance-expenses"]).toBeUndefined();
     expect(await ate(() => !!screen.queryByTestId("missao-doses-olhar"))).toBe(true);
     expect(screen.getByTestId("missao-doses-olhar")).toHaveAttribute("data-sem-gasto");
-    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Dia sem gasto anotado ✓");
+    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Dia sem gasto ✓");
     expect(screen.queryByTestId("missao-doses-olhar-saiu")).toBeNull();
-    expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent(`Hoje ainda dá pra gastar`);
+    expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent(`Dá pra gastar hoje`);
     expect(Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"))).toBe(doMontar);
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
-    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
     expect(await cardDoDashboard()).toEqual({ numero: doMontar, linha: null }); // sem gasto hoje: o card de sempre, sem a linha
     expect(lerMissao()?.feitos[1]).toBeDefined();
@@ -523,13 +532,13 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await responderOMontar();
     await avancar(2500);
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
-    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar →" }));
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     await tocar(within(postItDoTutorial()!).getAllByTestId("demo-guia-chip")[2]); // 🍔 Almoço · R$ 35
     expect(controle.dados()["finance-expenses"]).toEqual([expect.objectContaining({ description: "Almoço", value: 35 })]);
     expect(await ate(() => !!screen.queryByTestId("missao-doses-olhar"))).toBe(true);
     const noBalao = Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"));
-    expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent("Sobra pra hoje");
+    expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent("Sobra hoje");
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Primeira dose feita!");
     expect(screen.getByTestId("missao-doses-agora-o")).toHaveTextContent("Agora a Rotina");
@@ -543,7 +552,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await avancar(300);
     await responderOMontar();
     await avancar(2500);
-    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar →" }));
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     const dados = controle.dados();
     cleanup(); // o iOS matou o app
@@ -554,7 +563,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await avancar(300);
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     expect(screen.queryByTestId("montar-financas")).toBeNull(); // nunca o Montar de novo (nem o número: já foi visto)
-    expect(postItDoTutorial()).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    expect(postItDoTutorial()).toHaveTextContent("Gastou algo hoje?");
     await tocar(within(postItDoTutorial()!).getAllByTestId("demo-guia-chip")[1]); // 🚗 Uber
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 8000)).toBe(true);
     expect((de.dados()["finance-incomes"] as unknown[]).length).toBe(1); // a renda do Montar, uma só
@@ -563,29 +572,29 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(eventos).toContainEqual([EV_PRIMEIRO_GASTO, expect.objectContaining({ acao: "tutorial", retomada: true })]);
   });
 
-  it("o app morreu no 'Montando…' (o número ainda não apareceu): reabrir volta NO NÚMERO (não nas perguntas), e o 'Continuar →' segue pro tutorial", { timeout: 40_000 }, async () => {
+  it("o app morreu no 'Montando…' (o número ainda não apareceu): reabrir volta NO NÚMERO (não nas perguntas), e o 'Continuar' segue pro tutorial", { timeout: 40_000 }, async () => {
     missao("A");
     const controle = montarAppEmFinancas();
     await avancar(300);
     await responderOMontar();
     await avancar(500); // ainda no "Montando…"
-    expect(screen.getByText("Montando suas finanças…")).toBeTruthy();
+    expect(screen.getByText("Calculando…")).toBeTruthy();
     const dados = controle.dados();
     cleanup();
     _novaAberturaMontar();
     montarAppEmFinancas(dados);
     await avancar(300);
     expect(screen.getByTestId("montar-pronto")).toBeTruthy();
-    expect(screen.queryByText("Quanto entra por mês, mais ou menos?")).toBeNull();
-    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar →" }));
+    expect(screen.queryByText("Quanto entra por mês?")).toBeNull();
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
-    expect(postItDoTutorial()).toHaveTextContent("Já gastou com alguma coisa hoje?");
+    expect(postItDoTutorial()).toHaveTextContent("Gastou algo hoje?");
   });
 });
 
 /* ── o fim da tela do número nunca fica atrás do botão colado (revisão tela a tela #15) ── */
 
-describe("o fim da tela do número fica inteiro acima do botão 'Continuar →'", () => {
+describe("o fim da tela do número fica inteiro acima do botão 'Continuar'", () => {
   const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
   /** O corpo da regra cujo seletor é EXATAMENTE `seletor` (no começo da linha). */
   const regra = (seletor: string): string => {
@@ -600,10 +609,12 @@ describe("o fim da tela do número fica inteiro acima do botão 'Continuar →'"
     await ateONumero();
     const pronto = screen.getByTestId("montar-pronto");
     expect(pronto.lastElementChild?.className).toBe("mf-folha");
+    expect(lido(pronto.lastElementChild!)).toContain("Ver a conta"); // 1.0.17: fechada; abre ali mesmo
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(lido(pronto.lastElementChild!)).toContain("Livre pro mês");
     const rodape = pronto.nextElementSibling as HTMLElement;
     expect(rodape.className).toBe("mf-rodape");
-    expect(within(rodape).getByRole("button", { name: "Continuar →" })).toBeTruthy();
+    expect(within(rodape).getByRole("button", { name: "Continuar" })).toBeTruthy();
     expect(pronto.parentElement?.className).toBe("mf-corpo"); // o que rola
     expect(valor(regra(".mf-corpo"), "overflow-y")).toBe("auto");
     expect(valor(regra(".mf-rodape"), "position")).toBe("sticky");

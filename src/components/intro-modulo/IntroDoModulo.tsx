@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import {
-  INTROS, chavesDoTutorialAntigo, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, type FimDaIntro, type Leitor,
+  INTROS, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, type FimDaIntro, type Leitor,
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { IntroGuiada } from "./IntroGuiada";
 import { IntroDeUmToque } from "./IntroDeUmToque";
 import { ConhecerMaisHost } from "./ConhecerMais";
 import { temTour } from "@/lib/conhecer-mais";
+import { trackEvent } from "@/lib/analytics";
 
 /** Só a camada de guia de OUTRO componente conta (a própria intro também é uma camada). */
 const OUTRA_GUIA = '[data-camada-guia]:not([data-camada-guia="intro-modulo"])';
@@ -105,6 +106,22 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, estado, moduleId, tentativa, montar]);
 
+  /* 1.0.17 (telemetria): a intro SAIU sem "Pronto" nem "Agora não" — voltou (←), foi pra outro módulo, outra guia entrou
+     por cima, ou o app foi pro 2º plano (pode voltar; o `via` separa). `modulo_intro_saiu {modulo, passo, via}`. */
+  const terminou = useRef(false);
+  const motivoDaSaida = useRef<"saiu" | "outra_guia">("saiu");
+  useEffect(() => {
+    if (estado !== "visivel") return;
+    terminou.current = false;
+    motivoDaSaida.current = "saiu";
+    const aoEsconder = () => { if (document.visibilityState === "hidden" && !terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: "segundo_plano" }); };
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => {
+      document.removeEventListener("visibilitychange", aoEsconder);
+      if (!terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: motivoDaSaida.current });
+    };
+  }, [estado, moduleId]);
+
   // uma guia que monta logo depois (a dose da missão, o holofote que espera o `loaded`): a intro sai sem marcar vista;
   // o Montar montando depois: a intro volta a esperar por ele
   useEffect(() => {
@@ -112,7 +129,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     const conferir = () => {
       try {
         if (montar && montarNaTela(montar)) { setEstado("decidindo"); return; }
-        if (doseNaTela() || document.querySelector(OUTRA_GUIA)) setEstado("nada");
+        if (doseNaTela() || document.querySelector(OUTRA_GUIA)) { motivoDaSaida.current = "outra_guia"; setEstado("nada"); }
       } catch { /* noop */ }
     };
     const t = window.setTimeout(conferir, 700);
@@ -122,7 +139,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   // o host do "Conhecer mais" (passeio opcional) mora aqui: nos 3 módulos, com a intro na tela ou não
   const host = temTour(moduleId) ? <ConhecerMaisHost moduleId={moduleId} /> : null;
   if (estado !== "visivel" || !config) return host;
-  const terminar = (como: FimDaIntro) => { marcarIntroVista(moduleId, getRef.current, setRef.current, como); setEstado("nada"); };
+  const terminar = (como: FimDaIntro) => { terminou.current = true; marcarIntroVista(moduleId, getRef.current, setRef.current, como); setEstado("nada"); };
   // 17/10 (dono: "tipo Finanças, que tem vários"): a guiada faz a 1ª ação e o "olha"; os passos seguintes (config.maisPassos)
   // rodam no motor de 1 toque, que mostra o cartão do fim com tudo o que entrou
   const maisPassos = config.formato === "guiada" ? config.maisPassos : undefined;

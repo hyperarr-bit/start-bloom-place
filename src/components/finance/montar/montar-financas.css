@@ -176,7 +176,11 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 button.mf-tirar { position: relative; }
 button.mf-tirar::before { content: ""; position: absolute; inset: -5px; }
 
+/* 1.0.17: "Ver a conta" — a conta do mês fica fechada (o número é o herói); abre na própria folha */
+button.mf-ver-conta { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; background: transparent; border: 0; color: hsl(var(--muted-foreground)); font-size: 14px; font-weight: 700; }
+.mf-folha[data-aberta] button.mf-ver-conta { border-bottom: 1px solid hsl(var(--border)); }
+.mf-kicker:empty { display: none; }
+.mf-grande small { text-transform: uppercase; }
 /* 1.0.17 — mês apertado (R$ 0 ou < R$ 15/dia): o acolhimento no lugar do número pequeno */
 .mf-apertado h2 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 6px; }
 .mf-pronto[data-heroi] .mf-apertado h2 { font-size: 30px; margin-top: 8px; }
-button.mf-ver-conta { margin-top: 12px; padding: 0; background: none; border: 0; font-size: 14px; font-weight: 700; color: var(--mf-ambar-valor); text-decoration: underline; text-underline-offset: 3px; }

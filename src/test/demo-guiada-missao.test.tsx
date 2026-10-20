@@ -295,7 +295,7 @@ describe("braço on: a missão, passo a passo", () => {
     await abrirDemo(`${DEMO}&guia=1`);
     const postit = await esperarPostIt();
     expect(postit.textContent).toMatch(/Passo 2 de 3 · 1 toque/i);
-    expect(postit.textContent).toMatch(/Qual foi o seu último gasto\?/);
+    expect(postit.textContent).toMatch(/Gastou algo hoje\?/);
     const chips = within(postit).getAllByTestId("demo-guia-chip").map((b) => b.textContent);
     expect(chips).toEqual(["☕Café· R$ 12", "🚗Uber· R$ 23", "🍔Almoço· R$ 35"]);
     expect(within(postit).getByTestId("demo-guia-escrever").textContent).toMatch(/escrever o meu/);

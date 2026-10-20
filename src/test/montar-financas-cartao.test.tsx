@@ -117,7 +117,7 @@ const ateOCartao = () => {
   fireEvent.click(tela().getByRole("button", { name: /Aluguel/ }));
   fireEvent.click(tela().getByRole("button", { name: /Luz/ }));
   fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
-  expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+  expect(tela().getByText("Usa cartão de crédito?")).toBeTruthy();
 };
 const responderCartao = ({ banco, valor, dia }: { banco?: string; valor?: string; dia?: number }) => {
   fireEvent.click(tela().getByRole("button", { name: /Uso cartão/ }));
@@ -221,18 +221,19 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     const controle = montarTela({ onPronto });
     await respirar(); // a do módulo conta a vista na volta seguinte
     ateOCartao();
-    expect(tela().getByText(/3 de 3/)).toBeTruthy();
+    expect(document.querySelectorAll(".mf-barra i[data-on]")).toHaveLength(3); // a 3ª pergunta (a barra; 1.0.17 sem o "3 de 3" escrito)
     responderCartao({ banco: "Nubank", valor: "800", dia: 25 });
     expect(tela().getByText("Faltam 9 dias. O CORE avisa quando estiver perto.")).toBeTruthy();
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await respirar();
 
+    fireEvent.click(screen.getByTestId("montar-ver-conta")); // 1.0.17: a conta fica fechada até ela abrir
     const linha = screen.getByTestId("montar-fatura");
     expect(linha.textContent).toContain("Fatura do Nubank");
     expect(linha.textContent).toContain("vence dia 25");
     expect(linha.textContent).toContain("R$ 800");
     expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 72");
-    expect(screen.getByText(/já tirando as contas fixas e a fatura/)).toBeTruthy();
+    expect(screen.getByText("até o fim do mês.")).toBeTruthy();
 
     const d = controle.dados();
     expect(fatura(d)).toMatchObject({ description: "Fatura do cartão", value: 800, paymentMethod: "credito", cardName: "nubank", category: "fatura_cartao", faturaDoCartao: true });
@@ -270,6 +271,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     expect(tela().getByText("Já passou neste mês, então a de outubro entra como paga.")).toBeTruthy();
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await respirar();
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByTestId("montar-fatura").textContent).toContain("já paga");
     const d = controle.dados();
     expect(fatura(d)).toMatchObject({ cardName: "itau", value: 650, pagoEm: "2026-10" });
@@ -290,6 +292,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     expect(criados[0].label).toBe("Cartão");
     expect(fatura(d).cardName).toBe(criados[0].value);
     expect(d["finance-card-config"]).toEqual({ [criados[0].value]: { dueDay: 20, mesDoVencimento: true } });
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByTestId("montar-fatura").textContent).toContain("Fatura do cartão");
     cleanup();
 
@@ -370,7 +373,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     cleanup(); // fechou o app
     _novaAberturaMontar();
     montarTela();
-    expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+    expect(tela().getByText("Usa cartão de crédito?")).toBeTruthy();
     expect(tela().getByRole("button", { name: /Uso cartão/ }).getAttribute("aria-pressed")).toBe("true");
     expect(tela().getByRole("button", { name: "Santander" }).getAttribute("aria-pressed")).toBe("true");
     expect((tela().getByLabelText("Fatura deste mês em reais") as HTMLInputElement).value).toBe("950");
@@ -442,7 +445,7 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
   /** A tela da MISSÃO (a única porta desde 17/10) por cima de Finanças, com o cartão vencendo dia 19
-   *  (daqui a 3 dias); "Continuar →" fecha a tela e o módulo por baixo já adotou o dado. */
+   *  (daqui a 3 dias); "Continuar" fecha a tela e o módulo por baixo já adotou o dado. */
   const montarComCartao = async (dia = 19) => {
     const controle = novoControle();
     const ComMissao = () => {
@@ -464,7 +467,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
-    fireEvent.click(screen.getByRole("button", { name: "Continuar →" })); // a tela do número pela missão: só o número
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // a tela do número pela missão: só o número
     await respirar();
     return { controle, numero };
   };

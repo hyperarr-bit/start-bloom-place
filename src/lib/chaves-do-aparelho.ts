@@ -61,6 +61,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-festas-mostradas",
   "core-dia1-braco",
   "core-missao-1-por-dia", // 1.0.16: a última resposta do RevenueCat pro teste "missão 1 por dia" (metadata missao_1_por_dia)
+  "core-tour-home-quando", // 1.0.17: a última resposta do RevenueCat pra QUANDO o tour curto entra (metadata tour_home_quando: dia1|dia2)
   "core-tour-home-remoto", // 1.0.16: a última resposta do RevenueCat pro tour da Home (metadata tour_home: curto|longo|off)
   "core-device-id",
   "core-aviso-cobranca-notif",
@@ -139,6 +140,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
     "core-intro-acao-rapida", // 1.0.17: módulos cujo único dado veio da ação rápida da Home (a intro ainda aparece)
     "core-conhecer-feitos", // lista de módulos com o passeio "Conhecer mais" feito nesta conta (lib/conhecer-mais)
+    "core-escolhas-proprias", // 1.0.17: as opções que a pessoa ESCREVEU no "+ Outro" (EscolhaRapida), por lista — na conta (useUserData)
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",

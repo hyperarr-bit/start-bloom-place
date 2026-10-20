@@ -7,12 +7,13 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO_MONTAR_NA_TELA, EVENTO_MONTAR_FINANCAS_FIM, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MODELOS as MODELOS_DE_TREINO, aplicarModelo } from "@/lib/treino-plano";
+import { montarTreinoProprio } from "@/lib/intro-modulo-acoes";
 import { trackEvent } from "@/lib/analytics";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
-import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
@@ -22,26 +23,26 @@ import { EV_PRIMEIRO_GASTO, lerTelaDoNumero, msDesdeOResultado } from "@/lib/mon
 import { CHAVE_SEM_GASTO, marcarDiaSemGasto } from "@/lib/acao-do-dia";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS, metaGuiadaDaIntro } from "./encaixes";
 import { horaSugeridaDaMissao, porDiaExato, praHojeDasFinancas } from "@/lib/lembrete-dia2";
-import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
-import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
-import { temArte } from "@/components/conquistas/adesivos-arte";
-import { Fogo } from "@/components/conquistas/Fogo";
+import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
 import { lembretesSoNoApp } from "@/lib/missao-web";
+import { EscolhaDeHora } from "./EscolhaDeHora";
+import { entrada, MOV, MOV_MS, saida } from "@/lib/movimento";
 import { BaixarAppPopup } from "@/missao/BaixarAppPopup";
 
-/** 17/10 (relatório 11, D2; revisão do dono — o 1º gasto é o tutorial no formulário, não a tela do número) — a copy
- *  do 1º gasto: curta (o dono odeia texto demais). */
-export const PERGUNTA_DO_GASTO = "Já gastou com alguma coisa hoje?";
-export const DESCRICAO_DO_GASTO = "Toca num e ele já entra na sua lista.";
-export const AINDA_NAO_GASTEI = "Ainda não gastei nada hoje →";
+/** 1.0.17 (dono 19/10: "minimalista, uma ideia por tela") — a copy do 1º gasto: uma pergunta, os chips, "+ Outro" e a
+ *  saída quieta. Sem frase explicando o toque (o post-it já diz). */
+export const PERGUNTA_DO_GASTO = "Gastou algo hoje?";
+export const AINDA_NAO_GASTEI = "Ainda não";
 /** O balão do "olha" de Finanças (um só, no MEU MÊS): a linha do número do card QUANTO POSSO GASTAR HOJE. */
-export const HOJE_AINDA_DA = "Hoje ainda dá pra gastar";
+export const HOJE_AINDA_DA = "Dá pra gastar hoje";
 /** 17/10 (dono, opção 3): com gasto, o balão mostra a sobra de HOJE — a mesma conta da linha "Sobram R$ X pra hoje" do
  *  card QUANTO POSSO GASTAR HOJE do Dashboard (lib/montar-financas `praHojeDoDia`). */
-export const SOBRA_PRA_HOJE = "Sobra pra hoje";
-export const JA_PASSOU_HOJE = "Hoje já passou do que dava";
+export const SOBRA_PRA_HOJE = "Sobra hoje";
+export const JA_PASSOU_HOJE = "Passou do de hoje";
+/** 1.0.17: as memórias do "+ Outro" das doses (o que ela escreveu volta como chip "seu") */
+export const LISTAS_DA_DOSE = { gasto: "missao-gasto", habito: "missao-habito", treino: "missao-treino", exercicio: "missao-exercicio", meta: "missao-meta" } as const;
 /** O "Pular" da faixa só aparece depois disto (ou ao 2º toque na faixa) — seção 5 do estudo. */
 export const PULAR_DEPOIS_DE_MS = 20_000;
 export const TEMPOS_DO_PASSO = {
@@ -318,8 +319,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     : doseDeGasto ? PERGUNTA_DO_GASTO
     : continuacao && cfg.tipo === "habito" ? "Já fez o seu hábito hoje?"
     : continuacao && cfg.tipo === "agua" ? "Mais 1 copo d'água hoje?"
-    : continuacao && cfg.tipo === "exercicio" && !treinoPronto ? "Anota 1 exercício de hoje:"
-    : treinoPronto ? "Escolhe um treino pronto" : semMetaAgua ? "Quantos copos por dia?" : (alvoCfg?.pergunta ?? cfg.pedido);
+    : continuacao && cfg.tipo === "exercicio" && !treinoPronto ? "Qual exercício você fez hoje?"
+    : treinoPronto ? "Qual treino combina com você?" : semMetaAgua ? "Quantos copos por dia?" : (alvoCfg?.pergunta ?? cfg.pedido);
   const chipTocado = useRef<ChipDaMissao | null>(null);
   const reduzir = !!useReducedMotion();
   const [fase, setFase] = useState<Fase>("achar");
@@ -679,9 +680,13 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     // 1.0.16: Treino — o chip aplica o modelo pronto (plano + dias de treino), pelo formato da aba PLANO
     if (treinoPronto) {
       const modelo = MODELOS_DE_TREINO.find((m) => m.name === chip.nome);
-      trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!modelo, tipo: "treino_modelo", ...ondeDoChip() }));
-      if (!modelo) return;
+      trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: modelo && !chip.proprio ? chip.nome : "outro", ok: true, tipo: modelo ? "treino_modelo" : "treino_proprio", ...ondeDoChip() }));
       chipTocado.current = chip; viaRef.current = "chip"; setTocado(chip.nome);
+      if (!modelo) {
+        // 1.0.17: o treino DELA ("+ Outro"): vira o treino de hoje, com ele como 1º exercício
+        try { montarTreinoProprio({ get, gravar: (k, v) => { set(k, v); avisarEscritaDeFora(k, v); } }, chip.nome); } catch { /* a missão nunca derruba o módulo */ }
+        return;
+      }
       try {
         const r = aplicarModelo((get<Record<string, never>>("saude-workouts-v2", {}) ?? {}) as Record<string, never>, modelo);
         set("saude-workouts-v2", r.plano); avisarEscritaDeFora("saude-workouts-v2", r.plano);
@@ -698,24 +703,23 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     }
     const item = itemDoChip(cfg.tipo, semMetaAgua ? { emoji: "💧", nome: "1 copo d'água" } : chip);
     // (17/10: sem `valor` — nada de reais em evento, nem o do chip)
-    trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: chip.nome, ok: !!item, ...ondeDoChip() }));
-    if (cfg.tipo === "gasto") evPrimeiroGasto("chip", { chip: chip.nome });
+    // 1.0.17: a opção que ELA escreveu vai como "outro" (o texto dela nunca sai do aparelho em evento)
+    const nomeNoEvento = chip.proprio ? "outro" : chip.nome;
+    const evChip = (ok: boolean) => trackEvent("missao_doses_chip", eventoDaMissao({ dia: n, modulo, nome: nomeNoEvento, ok, ...(chip.proprio ? { proprio: true } : {}), ...ondeDoChip() }));
+    // passo A da Rotina (1.0.17, bug da 1.0.16): o chip CRIA o hábito em 1 toque — abre o campo se estiver fechado,
+    // preenche e toca no Adicionar da Rotina (o hábito nasce pelo código do módulo); o evento diz se deu de verdade
+    if (subPassoRef.current === "criar") {
+      if (!item) { evChip(false); return; }
+      chipTocado.current = chip;
+      setTocado(chip.nome);
+      criarHabitoPeloCampo(chip.nome, (ok) => { evChip(ok); if (!ok) setTocado(null); });
+      return;
+    }
+    evChip(!!item);
+    if (cfg.tipo === "gasto") evPrimeiroGasto("chip", { chip: nomeNoEvento });
     if (!item) return;
     chipTocado.current = chip;
     setTocado(chip.nome);
-    // passo A da Rotina: o chip só PREENCHE o campo real (e dá foco) — quem cria é o Adicionar da Rotina
-    if (subPassoRef.current === "criar") {
-      const campo = (alvo?.querySelector("input") ?? document.querySelector('input[placeholder="Nome do hábito..."]')) as HTMLInputElement | null;
-      if (campo) {
-        try {
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-          setter ? setter.call(campo, chip.nome) : (campo.value = chip.nome);
-          campo.dispatchEvent(new Event("input", { bubbles: true }));
-          // sem focar: o teclado esconderia o post-it (o ✓ no chip + "toca em Adicionar" ficam na tela)
-        } catch { /* noop */ }
-      }
-      return;
-    }
     viaRef.current = "chip";
     try {
       for (const g of gravacoesDoChip(item, chip)) {
@@ -729,19 +733,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       }
     } catch { /* a missão nunca derruba o módulo */ }
   };
-  const escreverOMeu = () => {
-    trackEvent("missao_doses_escrever", eventoDaMissao({ dia: n, modulo }));
-    evPrimeiroGasto("escrever");
-    // post-it solto (a âncora tinha sumido ou ela voltou do 2º plano): acha a linha do campo agora e devolve o anel
-    let base: Element | null = alvo;
-    if (!base) {
-      base = reacharAlvo();
-      if (base) { setPerdeuAlvo(false); setAlvo(base); setAcende((x) => x + 1); setAnelVivo(true); }
-    }
-    const campo = base?.querySelector<HTMLInputElement>("input, textarea");
-    try { campo?.focus(); } catch { /* noop */ }
-  };
-
   /* 16/10 (1.0.16 — o anel do passo 1 sumia antes do toque, `anel_saiu motivo=ancora_invisivel`): quando o
    * módulo redesenha e troca o nó, o anel RE-ACHA a âncora pelo mesmo caminho do "achar" — o botão/linha
    * de adicionar; no passo A da Rotina, a linha do campo; no B, a linha de HOJE da tabela (que se refaz
@@ -984,25 +975,34 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       return primeiro ? `É o quadradinho de hoje, na coluna de ${primeiro}.` : "É o quadradinho da linha de HOJE.";
     } catch { return "É o quadradinho da linha de HOJE."; }
   };
+  /* 1.0.17 (dono 19/10: "e se ela não comeu nenhuma daquelas?") — o "+ Outro" de cada lista da dose: o campo abre ali
+   * mesmo e a opção dela vai pelo MESMO caminho do chip (o gasto com o R$ dela; o hábito preenche o campo; o treino
+   * dela vira o treino de hoje; a meta de água num stepper). Sem lista quando não há o que escolher (marcar, 1 copo). */
+  const outroDaDose: OutroDoPostIt | undefined = ((): OutroDoPostIt | undefined => {
+    if (!cfg.tipo || fraseDoSetup || subPasso === "marcar" || !chips.length) return undefined;
+    if (semMetaAgua) return { numero: { min: 2, max: 20, inicial: 8, formatar: (x) => `${x} copos`, rotulo: "Outra meta" }, aoEscolher: ({ valor }) => tocarChip({ emoji: "💧", nome: `Meta de ${valor ?? 8} copos`, proprio: true }) };
+    if (cfg.tipo === "agua") return undefined;
+    if (doseDeGasto || cfg.tipo === "gasto") return { lista: LISTAS_DA_DOSE.gasto, placeholder: "Ex.: Mercado", comValor: true, aoEscolher: ({ nome, valor }) => tocarChip({ emoji: "🧾", nome, valor: valor ?? 0, categoria: "outros", proprio: true }) };
+    if (subPasso === "criar") return { lista: LISTAS_DA_DOSE.habito, placeholder: "Ex.: Caminhar 10 min", aoEscolher: ({ nome }) => tocarChip({ emoji: "✨", nome, proprio: true }) };
+    if (treinoPronto) return { lista: LISTAS_DA_DOSE.treino, placeholder: "Ex.: Natação", aoEscolher: ({ nome }) => tocarChip({ emoji: "🏋️", nome, proprio: true }) };
+    if (cfg.tipo === "exercicio") return { lista: LISTAS_DA_DOSE.exercicio, placeholder: "Ex.: Bicicleta", aoEscolher: ({ nome }) => tocarChip({ emoji: "🏋️", nome, proprio: true }) };
+    if (cfg.tipo === "meta") return { lista: LISTAS_DA_DOSE.meta, placeholder: "Ex.: Aprender a nadar", aoEscolher: ({ nome }) => tocarChip({ emoji: "🎯", nome, proprio: true }) };
+    return undefined;
+  })();
   const postItDe = (compacto: boolean) => (
     <motion.div animate={chacoalha && !reduzir ? { x: chacoalha % 2 ? [0, -9, 9, -6, 6, -2, 0] : [0, 9, -9, 6, -6, 2, 0] } : undefined} transition={{ duration: 0.45 }}>
       <PostItDaMissao
-        rotulo={avisoDeAba ? "Primeiro o gasto — depois é só explorar" : subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
+        rotulo={avisoDeAba ? "Primeiro o gasto" : subPasso === "criar" ? "1 de 2" : subPasso === "marcar" ? "2 de 2" : ""}
         pergunta={pergunta}
-        descricao={doseDeGasto ? DESCRICAO_DO_GASTO
-          : metaGuiada ? metaGuiada.detalhe
+        descricao={metaGuiada ? metaGuiada.detalhe
           : fraseDoSetup && cfg.tipo === "habito" ? fraseDoQuadradinhoDoSetup()
-          : semMetaAgua ? "Escolhe a sua meta — o 1º copo de hoje já entra junto."
-          : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: toca no quadradinho da linha de HOJE.` : "Toca no quadradinho da linha de HOJE.")
-          : continuacao && cfg.tipo === "agua" ? "Ele entra na sua meta de hoje."
-          : subPasso === "criar" ? "Escolhe um ou escreve o seu, e toca em Adicionar."
-          : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
-          : cfg.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined}
+          : semMetaAgua ? "O 1º copo já entra junto."
+          : continuacao && cfg.tipo === "habito" ? (habitoDela ? `“${habitoDela}”: o quadradinho de hoje.` : "Toque no quadradinho de hoje.")
+          : subPasso === "marcar" || cfg.tipo === "habito" ? "Toque no quadradinho de hoje." : undefined}
         chips={chips}
         tocado={tocado}
         aoChip={tocarChip}
-        aoEscrever={alvoCfg?.escrever ? escreverOMeu : undefined}
-        dica={chips.length && alvoCfg?.escrever && !doseDeGasto ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+        outro={outroDaDose}
         secundaria={doseDeGasto ? { texto: AINDA_NAO_GASTEI, aoTocar: aindaNaoGastei, testid: "missao-doses-ainda-nao" } : undefined}
         compacto={compacto}
       />
@@ -1150,7 +1150,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
               /* Finanças (17/10, revisão do dono): UM balão, curto — o "Saiu" do mês e o número do card do Dashboard.
                  A missão SEM braço (a 1.0.15, chave desligada) fica com o balão de sempre, logo abaixo. */
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="missao-doses-olhar" data-olha="financas" data-sem-gasto={olhaFin.semGasto ? "" : undefined}>
-                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{olhaFin.semGasto ? "Dia sem gasto anotado ✓" : cfg.olhar.titulo}</span>
+                <span className="block text-[15px] font-extrabold leading-snug" data-testid="missao-doses-olhar-titulo">{olhaFin.semGasto ? "Dia sem gasto ✓" : "Seu mês"}</span>
                 {olhaFin.saiu || olhaFin.pode ? (
                   <div className="mt-1.5 divide-y divide-white/10" data-testid="missao-doses-olhar-numero">
                     {olhaFin.saiu && (
@@ -1183,7 +1183,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
                     })()}
                   </div>
                 ) : (
-                  <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olhaFin.semGasto ? "Suas contas do mês já estão aqui." : "O gasto já entrou no seu mês."}</span>
+                  <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olhaFin.semGasto ? "Suas contas já estão aqui." : "Entrou no seu mês."}</span>
                 )}
                 <div className="mt-2.5">
                   <BotaoSeguir claro onClick={() => entendi("botao")} testid="missao-doses-entendi">Entendi</BotaoSeguir>
@@ -1439,7 +1439,7 @@ export function tomarTransicao(para: ModuloDaMissao, agora: number = Date.now())
 
 const DE_ARTIGO: Record<string, string> = { as: "das", a: "da", o: "do", os: "dos" };
 /** "Conhecer mais das Finanças (1 min)" — só com o tour do outro ramo encaixado (encaixes.ts → CONHECER_MAIS). */
-export const rotuloConhecerMais = (modulo: ModuloDaMissao): string => `Conhecer mais ${DE_ARTIGO[ARTIGO[modulo] ?? "o"]} ${MODULOS[modulo].nome} (1\u00a0min)`;
+export const rotuloConhecerMais = (modulo: ModuloDaMissao): string => `Mais dicas ${DE_ARTIGO[ARTIGO[modulo] ?? "o"]} ${MODULOS[modulo].nome}`;
 function LinkConhecerMais({ modulo, aoConhecerMais }: { modulo: ModuloDaMissao; aoConhecerMais?: () => void }) {
   if (!aoConhecerMais || !CONHECER_MAIS.abrir) return null;
   try { if (CONHECER_MAIS.temPara && !CONHECER_MAIS.temPara(modulo)) return null; } catch { return null; }
@@ -1458,20 +1458,21 @@ function LinkConhecerMais({ modulo, aoConhecerMais }: { modulo: ModuloDaMissao; 
 export function fraseDoFeito(modulo: ModuloDaMissao, rotulo: string, porDiaAgora?: number | null): string {
   const cfg = MODULOS[modulo];
   const r = rotulo.trim();
+  // 1.0.17 (dono: "minimalista"): UMA linha curta do que ficou feito — sem repetir o que ela acabou de ver
   if (modulo === "financas") {
     const porDia = /^Pode gastar (R\$ [\d.,]+) por dia$/.exec(r);
     // o número de AGORA (o card acabou de mostrar, já com o gasto de hoje), senão o do Montar
-    if (porDia) return `Você pode gastar ${typeof porDiaAgora === "number" ? `R$ ${reais(Math.round(porDiaAgora))}` : porDia[1]} por dia — e isso já está nas suas Finanças.`;
-    if (/^Renda e /.test(r)) return `${r} — tudo já está nas suas Finanças.`;
-    return `${r} já está nas suas Finanças.`;
+    if (porDia) return `${typeof porDiaAgora === "number" ? `R$ ${reais(Math.round(porDiaAgora))}` : porDia[1]} por dia, já nas suas Finanças.`;
+    if (/^Renda e /.test(r)) return "Suas contas do mês já estão nas Finanças.";
+    return `${r} nas suas Finanças.`;
   }
-  if (modulo === "rotina") return `“${r}” já está na sua Rotina, com o quadradinho de hoje marcado.`;
+  if (modulo === "rotina") return `“${r}” está na sua Rotina.`;
   if (modulo === "saude") {
     const meta = /meta (\d+)/.exec(r);
-    return meta ? `1 copo d'água marcado. Sua meta agora é de ${meta[1]} copos por dia.` : "1 copo d'água marcado na sua Saúde.";
+    return meta ? `Meta de ${meta[1]} copos. O 1º já foi.` : "1 copo d'água marcado.";
   }
-  if (modulo === "treino") return `O treino “${r}” já está montado na sua semana.`;
-  return `“${r}” já está ${cfg.onde}.`;
+  if (modulo === "treino") return `“${r}” está na sua semana.`;
+  return `“${r}” ${cfg.onde}.`;
 }
 
 /** O gasto de carona depois do Montar ("Café · R$ 12") numa frase. */
@@ -1480,15 +1481,6 @@ export const fraseDoGastoExtra = (g: string, quantos = 1): string => {
   if (quantos > 1) return m ? `E os gastos de hoje (${m[1]}, ${m[2]}) já entraram no seu mês.` : `E “${g.trim()}” já entraram no seu mês.`;
   return m ? `E o gasto de hoje (${m[1]}, ${m[2]}) já entrou no seu mês.` : `E “${g.trim()}” já entrou no seu mês.`;
 };
-
-/** O próximo adesivo da sequência, TRANCADO (a silhueta do de amanhã): o do registro, se tiver arte; senão o fogo apagado. */
-function AdesivoDeAmanha({ dias, tamanho }: { dias: 2 | 3; tamanho: number }) {
-  const conq = useConquistas();
-  const id = `sequencia-${dias}`;
-  const b = conq.adesivos.find((x) => x.id === id);
-  if (b && temArte(id)) return <span aria-hidden data-testid="missao-doses-adesivo-amanha" data-adesivo={id}><AdesivoRaro id={id} raridade={b.raridade ?? "comum"} tamanho={tamanho} trancado /></span>;
-  return <span aria-hidden className="md-adesivo-fogo" data-trancado="" style={{ width: tamanho, height: tamanho }} data-testid="missao-doses-adesivo-amanha" data-adesivo={id}><Fogo dias={0} tamanho={Math.round(tamanho * 0.62)} /></span>;
-}
 
 /** A legenda do adesivo na comemoração pequena ("Adesivo novo: Primeira Despesa" / "Adesivos novos: X e Y"). */
 export const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: Array<{ nome: string }>): string | null => {
@@ -1500,13 +1492,15 @@ export const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: Array<{ nome: 
   return `Adesivos novos: ${a.nome} e mais ${extras.length}`;
 };
 
-function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, gastoExtra, gastosNoExtra = 1, porDiaAgora, aoConhecerMais }: {
+/** 1.0.17: a folha da comemoração sai DESCENDO (base, 280 ms) antes de a missão trocar de tela — nunca some no seco. */
+export const SAIDA_DA_FESTA_MS = MOV_MS.base;
+
+function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVerFim, aoFecharDia, aoMostrarAdesivo, porDiaAgora, aoConhecerMais }: {
   n: DiaDaMissao; missao: EstadoMissaoDoses; modulo: ModuloDaMissao; rotulo: string; hoje: string;
   aoCombinar: (l: Lembrete) => void; aoVerFim: () => void; aoFecharDia?: () => void;
   aoMostrarAdesivo?: (ids: string[]) => void; gastoExtra?: string | null; gastosNoExtra?: number; porDiaAgora?: number | null; aoConhecerMais?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
-  const cfg = MODULOS[modulo];
   const proximo = n === 1 ? MODULOS[missao.modulos[1]] : n === 2 ? MODULOS[missao.modulos[2]] : null;
   const escolha = useAdesivoDaDose(n, modulo, missao.adesivosMostrados, aoMostrarAdesivo);
   const seq = useSequencia();
@@ -1517,6 +1511,14 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   // receber os lembretes" e o "Agora não" combina "sem lembrete" (o navegador não manda notificação)
   const [soNoApp] = useState(lembretesSoNoApp);
   const [popupApp, setPopupApp] = useState(false);
+  /* 1.0.17 (dono: "o corte entre Finanças e a Home é brusco"): o botão primeiro faz a folha DESCER e o fundo clarear
+     (280 ms); só então a missão troca de tela. Um toque só (o 2º toque no meio da saída não chama de novo). */
+  const [saindo, setSaindo] = useState(false);
+  const sair = (depois: () => void) => {
+    if (saindo) return;
+    setSaindo(true);
+    window.setTimeout(depois, reduzir ? MOV_MS.rapido : SAIDA_DA_FESTA_MS);
+  };
 
   /* A ÚNICA festa em tela cheia do teste: o adesivo "3 dias seguidos" */
   if (escolha.telaCheia && escolha.principal && escolha.principal.tipo !== "recomeca") {
@@ -1524,19 +1526,18 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
     return createPortal(
       <motion.div className="fixed inset-0 z-[230] flex flex-col items-center justify-center px-6 text-center text-white" style={{ background: "linear-gradient(180deg,#2a1840 0%,#16121c 100%)", paddingTop: "var(--app-safe-top)", paddingBottom: "var(--app-safe-bottom, 0px)" }}
         role="dialog" aria-modal="true" aria-label="3 dias seguidos"
-        data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-tela-cheia="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <Confete />
-        <motion.div initial={reduzir ? false : { scale: 0.6, rotate: -10, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 220, damping: 14, delay: 0.1 }}
+        data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-tela-cheia="" initial={{ opacity: 0 }} animate={{ opacity: saindo ? 0 : 1 }} exit={{ opacity: 0 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.calmo)}>
+        <Confete atraso={reduzir ? 0 : 0.7} />
+        <motion.div initial={reduzir ? false : { scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.25)}
           data-testid="missao-doses-adesivo" data-adesivo={a.id}>
           <ArteDoAdesivo adesivo={a} tamanho={156} />
         </motion.div>
-        <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white/60 mt-6">Adesivo novo</p>
-        <p className="text-[30px] font-black tracking-[-0.02em] leading-tight mt-1">3 dias seguidos!</p>
-        <p className="text-[15px] text-white/85 leading-snug mt-2 max-w-[320px]">Você usou o CORE três dias seguidos. É assim que um hábito pega.</p>
-        <p className="text-[13px] text-white/60 leading-snug mt-3 max-w-[320px]" data-testid="missao-doses-festa-texto">{cfg.emoji} {frase}</p>
-        {escolha.extras.length > 0 && <p className="text-[12.5px] text-white/60 mt-2" data-testid="missao-doses-adesivo-extras">E mais {escolha.extras.length} {escolha.extras.length === 1 ? "adesivo" : "adesivos"} na sua coleção.</p>}
-        <button type="button" className="md-botao mt-7 max-w-[320px]" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>
-          Ver o que você construiu <ArrowRight className="w-4 h-4" />
+        <motion.div initial={reduzir ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, 0.5)}>
+          <p className="text-[30px] font-black tracking-[-0.02em] leading-tight mt-6">3 dias seguidos!</p>
+          <p className="text-[15px] text-white/80 leading-snug mt-2 max-w-[320px]" data-testid="missao-doses-festa-texto">É assim que um hábito pega.</p>
+        </motion.div>
+        <button type="button" className="md-botao mt-8 max-w-[320px]" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={() => sair(aoVerFim)}>
+          Ver meu resumo
         </button>
       </motion.div>,
       document.body,
@@ -1544,63 +1545,51 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   }
 
   const a = escolha.principal;
-  const legenda = legendaDoAdesivo(a, escolha.extras);
   const comArte = !!a && a.tipo !== "recomeca";
   const fechaMissao = n === 3 || !proximo;
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
-      role="dialog" aria-modal="true" aria-label={`Dia ${n} de 3 feito`}
-      data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-      <motion.div initial={reduzir ? false : { y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 24 }}
-        className="md-tema relative w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-left shadow-2xl">
+      role="dialog" aria-modal="true" aria-label={`Dia ${n} feito`}
+      data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-saindo={saindo ? "" : undefined}
+      initial={{ opacity: 0 }} animate={{ opacity: saindo ? 0 : 1 }} exit={{ opacity: 0 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.base)}>
+      <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={saindo && !reduzir ? { y: "110%", opacity: 1 } : { y: 0, opacity: 1 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.calmo, 0.05)}
+        className="md-tema relative w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 pt-6 text-left shadow-2xl">
         {comArte && a && (
-          <motion.div initial={reduzir ? false : { y: -10, rotate: -14, scale: 0.7, opacity: 0 }} animate={{ y: 0, rotate: 0, scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 260, damping: 15, delay: 0.25 }}
-            className="absolute -top-7 right-4" data-testid="missao-doses-adesivo" data-adesivo={a.id}>
-            <ArteDoAdesivo adesivo={a} tamanho={68} />
+          <motion.div initial={reduzir ? false : { scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.35)}
+            className="absolute -top-7 right-4" data-testid="missao-doses-adesivo" data-adesivo={a.id} aria-label={`Adesivo: ${a.nome}`} role="img">
+            <ArteDoAdesivo adesivo={a} tamanho={64} />
           </motion.div>
         )}
         <div className="flex items-center gap-1.5" role="img" aria-label={`${n} de 3 dias feitos`}>
           {[1, 2, 3].map((i) => <Quadradinho key={i} marcado={i <= n} tam={16} />)}
         </div>
-        <p className="text-[22px] font-black tracking-[-0.02em] leading-tight mt-2 pr-16">Dia {n} de 3 feito ✅</p>
-        {legenda && <p className="text-[13.5px] font-bold leading-snug mt-1" data-testid="missao-doses-adesivo-legenda">{legenda}</p>}
-        {n >= 2 && seq.dias >= 2 && <p className="text-[13.5px] font-extrabold mt-1" data-testid="missao-doses-sequencia">Sequência: {seq.dias} dias 🔥</p>}
-        <p className="text-[13.5px] text-muted-foreground leading-snug mt-2" data-testid="missao-doses-festa-texto">{cfg.emoji} {frase}</p>
-        {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
+        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight mt-2.5 pr-16" data-testid="missao-doses-festa-titulo">Dia {n} feito.</p>
+        {n >= 2 && seq.dias >= 2 && <p className="text-[14px] font-bold mt-1" data-testid="missao-doses-sequencia">🔥 {seq.dias} dias seguidos</p>}
+        <p className="text-[14px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-festa-texto">{frase}</p>
         {proximo && (
-          <div className="mt-3.5 rounded-2xl px-4 py-3 flex items-center gap-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-amanha">
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13.5px] font-extrabold leading-snug">Amanhã: {proximo.emoji} {proximo.nome} · {emSegundos(doseCurta(proximo.modulo, n + 1).seg)}</span>
-              <span className="block text-[12px] opacity-75 mt-0.5">{n === 1 ? "O adesivo do dia 2 te espera 🔒" : "E o adesivo dos 3 dias é seu 🔒"}</span>
-            </span>
-            <AdesivoDeAmanha dias={n === 1 ? 2 : 3} tamanho={40} />
-          </div>
+          <p className="text-[16px] font-extrabold leading-snug mt-4" data-testid="missao-doses-amanha">Amanhã: {proximo.nome}.</p>
         )}
         {n === 2 && proximo && !soNoApp && (
           <>
-            <span className="block text-[12px] text-muted-foreground mt-3">Te lembro às:</span>
-            <div className="flex flex-wrap gap-2 mt-1.5" role="radiogroup" aria-label="Hora do lembrete">
-              {HORAS_DO_LEMBRETE.map((h) => (
-                <button key={h.id} type="button" role="radio" aria-checked={hora === h.id} className="md-hora" data-marcada={hora === h.id ? "" : undefined} data-sem={h.id === "sem" ? "" : undefined} data-testid={`missao-doses-hora-${h.id}`} onClick={() => setHora(h.id)}>{h.rotulo}</button>
-              ))}
-            </div>
+            <span className="block text-[12.5px] text-muted-foreground mt-2.5 mb-1.5">Te lembro às</span>
+            <EscolhaDeHora valor={hora} aoMudar={setHora} />
           </>
         )}
         {fechaMissao ? (
-          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={aoVerFim}>
-            Ver o que você construiu <ArrowRight className="w-4 h-4" />
+          <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-ver-fim" onClick={() => sair(aoVerFim)}>
+            Ver meu resumo
           </button>
         ) : n === 2 && soNoApp ? (
-          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-combinado" data-hora="sem" onClick={() => setPopupApp(true)}>
-            Combinado, até amanhã
+          <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-combinado" data-hora="sem" onClick={() => setPopupApp(true)}>
+            Combinado
           </button>
         ) : n === 2 ? (
-          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => aoCombinar(hora)}>
-            {hora === "sem" ? "Combinado, até amanhã" : `Combinado, me lembra às ${hora}`}
+          <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-combinado" data-hora={hora} onClick={() => sair(() => aoCombinar(hora))}>
+            Combinado
           </button>
         ) : (
-          <button type="button" className="md-botao mt-4" data-tom="magenta" data-testid="missao-doses-continuar" onClick={aoFecharDia}>
-            Continuar <ArrowRight className="w-4 h-4" />
+          <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-continuar" onClick={() => sair(() => aoFecharDia?.())}>
+            Até amanhã
           </button>
         )}
         <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />

@@ -51,6 +51,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Bell, Calendar, Check, Clock } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { trocaDePasso } from "@/lib/movimento";
+import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
@@ -160,7 +163,7 @@ export const ehACelulaDoGuia = (celula: Element, indice: number, agora: Date = n
   return dia === DIAS_DA_ROTINA[(agora.getDay() + 6) % 7] && Array.prototype.indexOf.call(linha.children, celula) === 1 + indice;
 };
 
-export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, guiarPrimeiro = true, agora, esperaMs = 2200 }: PropsMontarRotina) {
+export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, guiarPrimeiro = true, agora, esperaMs = 1400 }: PropsMontarRotina) {
   const { get, set } = useUserData();
   const hoje = useMemo(() => agora ?? new Date(), [agora]);
   // fechou o app no meio: volta com o que já tinha respondido; senão, o que o onboarding já sabe
@@ -170,6 +173,10 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   const [opcao, setOpcao] = useState<OpcaoAcordar | null>(rascunho ? rascunho.opcao : onb.opcao);
   const [outro, setOutro] = useState<string>((rascunho ? rascunho.outro : onb.outro) ?? "");
   const [itens, setItens] = useState<ItemId[]>(rascunho ? rascunho.itens : onb.itens);
+  /** 1.0.17: os hábitos que ela escreveu no "+ Outro" (entram na tabela de hábitos, sem horário) */
+  const [proprios, setProprios] = useState<string[]>([]);
+  const direcao = useRef(1);
+  const reduzirMov = !!useReducedMotion();
   const [lembrete, setLembrete] = useState<boolean | null>(rascunho?.lembrete ?? null);
   // a permissão de notificação: a 1ª leitura decide se a 3ª pergunta existe; a viva decide se o "Sim" pede
   const [permissao, setPermissao] = useState<EstadoPermissao | null>(null);
@@ -251,6 +258,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   }, [cedeu, fase, etapa, opcao, outro, escolhidos, lembrete]);
 
   const irPara = (e: Etapa) => {
+    direcao.current = 1;
     setEtapa(e);
     if (e === "itens" || e === "lembrete") trackEvent(EV_PASSO, { n: PASSO[e], origem });
   };
@@ -305,13 +313,13 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
 
   /** Grava na Rotina (as chaves de sempre) — na ENTRADA do "Montando". */
   const montar = () => {
-    if (!acordar || !escolhidos.length) return;
+    if (!acordar || (!escolhidos.length && !proprios.length)) return;
     const escrever = (k: string, v: unknown) => {
       // estrutura = escrita de sistema: não é o dia anotado (o 1º quadradinho é); a Rotina aberta por baixo adota na hora
       set(k, v, { system: true });
       avisarEscritaDeFora(k, v);
     };
-    escrever("rotina-habits", habitosParaGravar(acordar, escolhidos, get<unknown>("rotina-habits", [])));
+    escrever("rotina-habits", habitosParaGravar(acordar, escolhidos, get<unknown>("rotina-habits", []), proprios));
     escrever("rotina-schedule", agendaParaGravar(acordar, escolhidos, get<unknown>("rotina-schedule", undefined)));
     const inicioAtual = get<unknown>("rotina-agenda-inicio", undefined);
     const inicioNovo = inicioAtual ? null : inicioDaAgenda(acordar);
@@ -321,11 +329,11 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
     // a tela substitui as boas-vindas da Rotina (cartões e "Dicas para começar")
     try { marcarCartoesVistos("rotina"); } catch { /* storage bloqueado */ }
     set("core-tip-seen-rotina", "true", { system: true });
-    decidir("pronto", escolhidos.length);
+    decidir("pronto", escolhidos.length + proprios.length);
     const primeiro = primeiroDoDia(acordar, escolhidos);
     const escolha = opcao ?? "outro";
     resumoRef.current = {
-      itens: escolhidos.length, acordar: escolha, hora: acordar, lembrete: comAviso, primeiroMarcado: false,
+      itens: escolhidos.length + proprios.length, acordar: escolha, hora: acordar, lembrete: comAviso, primeiroMarcado: false,
       primeiro: primeiro ? { id: primeiro.item.id, nome: primeiro.item.habito, hora: horaDe(primeiro.min) } : null,
     };
     const reaproveitou = [
@@ -333,7 +341,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
       ...(!rascunho && onb.itens.length ? ["itens"] : []),
     ];
     trackEvent(EV_PRONTO, {
-      itens: escolhidos.length, lembrete: comAviso, acordar: escolha, origem,
+      itens: escolhidos.length + proprios.length, lembrete: comAviso, acordar: escolha, origem, ...(proprios.length ? { proprios: proprios.length } : {}),
       ...(comPergunta3 ? {} : { lembrete_pulado: soNoApp ? "web" : pergunta }),
       ...(reaproveitou.length ? { reaproveitou } : {}),
     });
@@ -364,9 +372,9 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
     <div className="mrt-barra" aria-hidden>{Array.from({ length: total }, (_, i) => <i key={i} {...(i < n ? { "data-on": "" } : {})} />)}</div>
   );
   const voltar = (para: Etapa) => (
-    <button type="button" className="mrt-voltar" onClick={() => setEtapa(para)}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
+    <button type="button" className="mrt-voltar" onClick={() => { direcao.current = -1; setEtapa(para); }}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
   );
-  const nItens = escolhidos.length;
+  const nItens = escolhidos.length + proprios.length;
 
   return (
     <div className="mrt" role="dialog" aria-modal="true" aria-label="Vamos montar sua rotina" data-testid="montar-minha-rotina" data-etapa={etapa} data-folha={`montar-rotina:${etapa}`}>
@@ -375,14 +383,13 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
         <span className="mrt-cab-nome">ROTINA</span>
         <MesDoCabecalho data={hoje} className="mrt-cab-mes" />
       </header>
-      <div className="mrt-corpo">
+      {/* 1.0.17: cada passo ENTRA deslizando 24 px + fade (260 ms); Voltar desliza do outro lado */}
+      <motion.div key={etapa} className="mrt-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
         {etapa === "acordar" && (
           <>
             {barra(1)}
             <div className="mrt-q">
-              <div className="mrt-kicker">Vamos montar sua rotina · 1 de {total}</div>
               <h2>Que horas você acorda?</h2>
-              <p>Seu dia começa daí. Dá pra mudar depois.</p>
             </div>
             <div className="mrt-chips" data-grade="">
               {OPCOES_ACORDAR.map((o) => (
@@ -412,16 +419,22 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
           <>
             {barra(2)}
             <div className="mrt-q">
-              <div className="mrt-kicker">2 de {total}{voltar("acordar")}</div>
+              <div className="mrt-kicker">{voltar("acordar")}</div>
               <h2>O que não pode faltar no seu dia?</h2>
-              <p>Toca em quantos quiser. Cada um entra no seu dia já com um horário.</p>
             </div>
-            <div className="mrt-chips">
-              {ITENS_DA_ROTINA.map((i) => (
-                <button key={i.id} type="button" className="mrt-chip" aria-pressed={escolhidos.includes(i.id)} onClick={() => alternar(i.id)}>
-                  <span aria-hidden>{i.emoji}</span><span>{i.chip}</span>
-                </button>
-              ))}
+            {/* 1.0.17 (dono: "deixa a pessoa pôr a opção dela"): os 7 de sempre + "+ Outro" — o que ela escreve entra marcado
+                e volta como chip "seu" da próxima vez */}
+            <div className="mrt-chips mrt-chips-er">
+              <EscolhaRapida
+                tom="montar" classeChip="mrt-chip" multi lista="rotina-itens" testid="montar-rotina-item"
+                opcoes={ITENS_DA_ROTINA.map((i) => ({ id: i.id, rotulo: i.chip, emoji: i.emoji }))}
+                marcado={[...escolhidos, ...proprios]}
+                outro={{ placeholder: "Ex.: Caminhar 10 min" }}
+                aoEscolher={(op) => {
+                  if (op.sua) { setProprios((l) => (l.some((x) => x.toLowerCase() === op.rotulo.toLowerCase()) ? l.filter((x) => x.toLowerCase() !== op.rotulo.toLowerCase()) : [...l, op.rotulo])); return; }
+                  alternar(op.id as ItemId);
+                }}
+              />
             </div>
             {acordar && (
               <div className="mrt-folha" data-testid="montar-rotina-previa">
@@ -433,17 +446,23 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
                     {l.soSemana && <span className="mrt-linha-dias">seg a sex</span>}
                   </div>
                 ))}
+                {proprios.map((p) => (
+                  <div key={`seu-${p}`} className="mrt-linha" data-seu="">
+                    <span className="mrt-linha-hora">—</span>
+                    <span className="mrt-linha-texto">{p}</span>
+                  </div>
+                ))}
                 {nItens === 0 && (
                   <div className="mrt-linha" data-vazia="">
                     <span className="mrt-linha-hora" />
-                    <span className="mrt-linha-texto">Toca nos itens acima e eles entram aqui, cada um no seu horário.</span>
+                    <span className="mrt-linha-texto">O que você marcar aparece aqui.</span>
                   </div>
                 )}
               </div>
             )}
             <div className="mrt-rodape">
               <button type="button" className="mrt-cta" disabled={nItens === 0} onClick={() => (comPergunta3 ? irPara("lembrete") : soNoApp ? setPopupApp(true) : montar())}>
-                {nItens === 0 ? "Escolhe pelo menos um" : comPergunta3 ? "Continuar" : "Montar minha rotina"}
+                {nItens === 0 ? "Escolha pelo menos um" : comPergunta3 ? "Continuar" : "Montar minha rotina"}
               </button>
               <button type="button" className="mrt-pular" onClick={pular}>Pular</button>
             </div>
@@ -454,9 +473,9 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
           <>
             {barra(3)}
             <div className="mrt-q">
-              <div className="mrt-kicker">3 de 3{voltar("itens")}</div>
+              <div className="mrt-kicker">{voltar("itens")}</div>
               <h2>Quer um lembrete de manhã?</h2>
-              <p>Um aviso às {horaDoAviso ? horaFalada(minutosDe(horaDoAviso)) : "7h15"} com o que tem no seu dia. Só esse, uma vez por dia.</p>
+              <p>Às {horaDoAviso ? horaFalada(minutosDe(horaDoAviso)) : "7h15"}, uma vez por dia.</p>
             </div>
             {previaDoAviso && horaDoAviso && (
               /* o gostinho: o aviso como ele vai chegar (o mesmo texto que a notificação leva) */
@@ -476,10 +495,10 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
               </button>
             </div>
             {lembrete === true && horaDoAviso && (
-              <p className="mrt-nota" aria-live="polite"><Check size={16} strokeWidth={3} aria-hidden />Combinado: todo dia às {horaFalada(minutosDe(horaDoAviso))}. Dá pra desligar quando quiser.</p>
+              <p className="mrt-nota" aria-live="polite"><Check size={16} strokeWidth={3} aria-hidden />Todo dia às {horaFalada(minutosDe(horaDoAviso))}.</p>
             )}
             {negouAgora && (
-              <p className="mrt-nota" data-aviso="" aria-live="polite">Sem problema. As notificações do CORE estão desligadas neste celular — dá pra ligar depois nos ajustes do aparelho.</p>
+              <p className="mrt-nota" data-aviso="" aria-live="polite">As notificações estão desligadas neste celular. Dá pra ligar nos ajustes.</p>
             )}
             <div className="mrt-rodape">
               <button type="button" className="mrt-cta" disabled={lembrete === null || pedindo} onClick={montar}>Montar minha rotina</button>
@@ -490,20 +509,10 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
         {etapa === "montando" && acordar && (
           <div className="mrt-montando" aria-live="polite">
             <div className="mrt-orbe" aria-hidden><div><Calendar size={38} /></div></div>
-            <h2>Montando sua rotina…</h2>
-            <div className="mrt-passos">
-              <div className="mrt-passo" style={{ animationDelay: "150ms" }}><i><Check size={13} strokeWidth={3} /></i>Seu dia começa às {horaFalada(minutosDe(acordar))}</div>
-              <div className="mrt-passo" style={{ animationDelay: "600ms" }}><i><Check size={13} strokeWidth={3} /></i>
-                {nItens === 1 ? "1 hábito com horário" : `${nItens} hábitos com horário`}
-              </div>
-              {resumoRef.current?.lembrete && horaDoAviso && (
-                <div className="mrt-passo" style={{ animationDelay: "1050ms" }}><i><Check size={13} strokeWidth={3} /></i>Lembrete às {horaFalada(minutosDe(horaDoAviso))}</div>
-              )}
-              <div className="mrt-passo" data-esperando="" style={{ animationDelay: resumoRef.current?.lembrete ? "1500ms" : "1050ms" }}><i />Organizando sua semana</div>
-            </div>
+            <h2>Montando…</h2>
           </div>
         )}
-      </div>
+      </motion.div>
       {popupApp && etapa === "itens" && (
         <BaixarAppPopup contexto="rotina" onAgoraNao={() => { setPopupApp(false); montar(); }} />
       )}

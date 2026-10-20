@@ -178,9 +178,9 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
       if (entendi) { expect(braco).toBe("B"); fireEvent.click(entendi); }
       await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toBeTruthy(), { timeout: 12_000 });
       if (braco === "A") {
-        expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅");
-        expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("“Beber água” já está na sua Rotina, com o quadradinho de hoje marcado.");
-        expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: 💰 Finanças · 10 s"); // em 2º, Finanças é o gasto de hoje
+        expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito.");
+        expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("“Beber água” está na sua Rotina.");
+        expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent(/^Amanhã: Finanças\.$/); // 1.0.17: sem segundos
       } else {
         expect(screen.getByTestId("missao-doses-agora-o")).toHaveTextContent("Agora as Finanças — 10 s");
       }
@@ -208,7 +208,7 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
     await respirar();
-    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 de 3 feito ✅"), { timeout: 12_000 });
+    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito."), { timeout: 12_000 });
     expect(lerMissao()?.feitos[1]?.rotulo).toBe("Beber água");
   });
 
@@ -221,7 +221,7 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     fireEvent.click(tela().getByRole("button", { name: /Pular/ }));
     await respirar();
     expect(lerMissao()?.setupPulado?.["montar-rotina"]).toBe(HOJE_DIA);
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("Qual hábito você quer começar hoje?"), { timeout: 12_000 });
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!).toHaveTextContent("Qual hábito você quer começar?"), { timeout: 12_000 });
     cleanup();
     _novaAberturaMontarRotina();
     montar({ atual: {} });

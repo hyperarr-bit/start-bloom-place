@@ -6,9 +6,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
-import type { IntroGuiadaConfig } from "@/lib/intro-modulo";
+import { marcarPassoDaIntro, type IntroGuiadaConfig } from "@/lib/intro-modulo";
 import { Anel, BotaoSeguir, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
-import { CHIPS_DE_HABITO, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
+import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
 import { abrirConhecerMais, ofertaDoTour } from "@/lib/conhecer-mais";
 import { podeOferecerTour } from "./ConhecerMais";
@@ -62,6 +62,9 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
   const [perdeuAlvo, setPerdeuAlvo] = useState(false);
   /** Rotina, criar → marcar: o anel troca de alvo em ~350 ms; nesse intervalo o post-it não vai pro topo */
   const [reancorando, setReancorando] = useState(false);
+  /** 1.0.17 (telemetria): criar → marcar troca a âncora (o campo some, a linha nova nasce) — o anel que sai nesse meio NÃO
+   *  é "âncora perdida" (não vai como modulo_intro_anel_saiu nem acende o ⌖) */
+  const reancorandoRef = useRef(false);
   const [tocado, setTocado] = useState<string | null>(null);
   const [rotulo, setRotulo] = useState("");
   const [numero, setNumero] = useState<Numero | null>(null);
@@ -142,9 +145,10 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
         // o hábito NASCEU: passa pro (B) — o anel vai pro quadradinho de HOJE da linha nova
         if (subPassoRef.current === "criar") {
           trackEvent("modulo_intro_registrou", { modulo: m, via: "criar_habito", segundos: segundos() });
+          reancorandoRef.current = true;
           setSubPasso("marcar"); setTocado(null); setAnelVivo(false); setReancorando(true);
           window.setTimeout(() => {
-            setReancorando(false);
+            setReancorando(false); reancorandoRef.current = false;
             if (faseRef.current !== "anotar") return;
             const btn = document.querySelector('[data-spotlight="add-habit"]');
             const linha = btn ? linhaDeHoje(btn) : null;
@@ -230,22 +234,14 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
 
   const tocarChip = (chip: ChipDaMissao) => {
     const item = itemDoChip(config.tipo, chip);
-    trackEvent("modulo_intro_chip", { modulo: m, nome: chip.nome, valor: chip.valor, ok: !!item });
+    trackEvent("modulo_intro_chip", { modulo: m, nome: chip.proprio ? "outro" : chip.nome, ...(chip.proprio ? {} : { valor: chip.valor }), ok: !!item });
     if (!item) return;
     chipTocado.current = chip; setTocado(chip.nome);
     if (subPassoRef.current === "criar") {
-      // 1 TOQUE: preenche o campo real da Rotina e toca no "Adicionar" dela — o hábito nasce pelo código do módulo
-      // (17/10: nas doses, só 63% completavam o 1º passo quando precisava de 2 toques; o chip resolve sozinho)
-      const campo = (alvo?.querySelector("input") ?? document.querySelector('input[placeholder="Nome do hábito..."]')) as HTMLInputElement | null;
-      if (campo) {
-        try {
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-          setter ? setter.call(campo, chip.nome) : (campo.value = chip.nome);
-          campo.dispatchEvent(new Event("input", { bubbles: true }));
-          const adicionar = Array.from(campo.parentElement?.querySelectorAll<HTMLButtonElement>("button") ?? []).find((b) => /adicionar/i.test(b.textContent ?? ""));
-          if (adicionar) window.setTimeout(() => adicionar.click(), 60); // depois que o React viu o valor
-        } catch { /* noop */ }
-      }
+      // 1 TOQUE: abre o campo da Rotina se estiver fechado, preenche e toca no "Adicionar" dela — o hábito nasce pelo
+      // código do módulo (1.0.17: antes, com o campo fechado, o chip não fazia nada)
+      reancorandoRef.current = true;
+      criarHabitoPeloCampo(chip.nome, (ok) => { if (ok) window.setTimeout(() => { if (subPassoRef.current === "criar") reancorandoRef.current = false; }, 2000); if (!ok) { reancorandoRef.current = false; setTocado(null); trackEvent("modulo_intro_chip", { modulo: m, nome: chip.proprio ? "outro" : chip.nome, ok: false, motivo: "sem_campo" }); } });
       return;
     }
     viaRef.current = "chip";
@@ -259,42 +255,45 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
     } catch { /* a intro nunca derruba o módulo */ }
   };
   const escreverOMeu = () => { try { alvo?.querySelector<HTMLInputElement>("input, textarea")?.focus(); } catch { /* noop */ } };
-  const pular = (fase: "toque" | "olhar") => { trackEvent("modulo_intro_pulou", { modulo: m, fase, segundos: segundos() }); aoTerminar("pulada"); };
+  /* 1.0.17 (dono 19/10): "Agora não" quieto no post-it (no lugar do "Pular" da faixa): fecha SÓ este tutorial, marcado
+     como visto — nunca volta. */
+  const pular = (fase: "toque" | "olhar") => { trackEvent("modulo_intro_pulou", { modulo: m, fase, segundos: segundos(), via: "agora_nao" }); aoTerminar("pulada"); };
   const toqueNaFaixa = () => { toquesNaFaixa.current += 1; if (toquesNaFaixa.current >= 2) setPularVisivel(true); };
   const mostrarOnde = () => { setPerdeuAlvo(false); setAcende((x) => x + 1); setAnelVivo(true); };
   const entendi = useCallback((via: "botao" | "auto") => { if (faseRef.current !== "olhar") return; trackEvent("modulo_intro_olhar", { modulo: m, via }); setFase("pronto"); }, [m]);
 
   /* 17/10 (uma voz só em todos os tutoriais): a faixa conta "1 de 4 · toca em 1 gasto seu", "2 de 4 · agora olha" — os passos da
    * guiada (ação[+marcar na Rotina] → olha) mais os de 1 toque que vêm depois (config.maisPassos) */
+  // os passos da 1.0.16: ação [+ marcar na Rotina vazia] → olha → os de 1 toque (config.maisPassos)
   const passosDaGuiada = config.tipo === "habito" ? 3 : 2;
   const totalDePassos = passosDaGuiada + (config.maisPassos?.length ?? 0);
   const passoAtual = fase === "olhar" ? passosDaGuiada : subPasso === "marcar" ? 2 : 1;
-  const numeroDoPasso = totalDePassos > passosDaGuiada ? `${passoAtual} de ${totalDePassos} · ` : "";
+  useEffect(() => { marcarPassoDaIntro(m, passoAtual); }, [m, passoAtual]);
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-passo={passoAtual} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
-      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : `${numeroDoPasso}${fase === "olhar" ? "agora olha" : config.pedido}`}</span>
+      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "olhe aqui" : config.pedido}</span>
+      {/* 1.0.17: "Agora não" quieto, à vista desde o 1º segundo — fecha SÓ este tutorial (marcado como visto) */}
+      {pularVisivel && fase !== "pronto" && (
+        <button type="button" className="im-faixa-pular" data-quieto="" data-testid="intro-modulo-agora-nao" onClick={(e) => { e.stopPropagation(); pular(fase === "olhar" ? "olhar" : "toque"); }}>Agora não</button>
+      )}
       {perdeuAlvo && !reancorando && fase === "anotar" && (
         <button type="button" className="im-faixa-onde bg-faixa" data-testid="intro-modulo-onde" aria-label="Mostrar onde tocar" onClick={(e) => { e.stopPropagation(); mostrarOnde(); }}><Crosshair className="w-4 h-4" /></button>
       )}
-      {pularVisivel && fase !== "pronto" && (
-        <button type="button" className="im-faixa-pular" data-testid="intro-modulo-pular" onClick={(e) => { e.stopPropagation(); pular(fase === "olhar" ? "olhar" : "toque"); }}>Pular</button>
-      )}
+
     </div>
   );
 
   const postIt = (
     <PostItDaMissao
-      rotulo={totalDePassos > passosDaGuiada ? `${passoAtual} de ${totalDePassos} · ${subPasso === "criar" ? "criar" : subPasso === "marcar" ? "marcar" : "1 toque"}` : subPasso === "criar" ? "1 de 2 · criar" : subPasso === "marcar" ? "2 de 2 · marcar" : "Agora · 1 toque"}
+      rotulo={`${passoAtual} de ${totalDePassos}`}
       pergunta={pergunta}
-      descricao={copiaDoMontar?.descricao ?? (config.tipo === "gasto" ? "Toca num pronto ou escreve o seu. Cada gasto entra na linha de cima e o mês soma sozinho."
-        : subPasso === "criar" ? "Toca num deles e ele já entra. Ou escreve o seu e toca em Adicionar."
-        : subPasso === "marcar" ? "É a linha de HOJE, na coluna do hábito novo. Toca no quadradinho."
-        : config.tipo === "habito" ? "Toca num quadradinho da linha de HOJE." : undefined)}
+      descricao={copiaDoMontar?.descricao ?? (subPasso === "marcar" || (config.tipo === "habito" && subPasso !== "criar") ? "Toque no quadradinho de hoje." : undefined)}
       chips={chips}
       tocado={tocado}
       aoChip={tocarChip}
-      aoEscrever={alvoCfg.escrever ? escreverOMeu : undefined}
-      dica={chips.length && alvoCfg.escrever ? "Ou escreve o seu ali no campo e toca no +." : undefined}
+      outro={!chips.length || config.tipo === "agua" ? undefined
+        : config.tipo === "gasto" ? { lista: `intro-${m}-gasto`, placeholder: "Ex.: Mercado", comValor: true, aoEscolher: ({ nome, valor }) => tocarChip({ emoji: "🧾", nome, valor: valor ?? 0, categoria: "outros", proprio: true }) }
+        : { lista: `intro-${m}-${subPasso === "criar" ? "habito" : config.tipo}`, placeholder: subPasso === "criar" ? "Ex.: Caminhar 10 min" : "Escreva aqui", aoEscolher: ({ nome }) => tocarChip({ emoji: "✨", nome, proprio: true }) }}
     />
   );
 
@@ -310,7 +309,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
         <motion.div className="im-pronto" data-testid="intro-modulo-pronto" initial={reduzir ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
           <div className="im-pronto-linha">
             <span className="im-pronto-check"><Check className="w-4 h-4" strokeWidth={3} /></span>
-            <span className="im-pronto-texto"><b>{rotulo}</b> já está aqui. {config.pronto}</span>
+            <span className="im-pronto-texto"><b>{rotulo}</b> entrou. {config.pronto}</span>
           </div>
           {oferta && (
             /* dono 17/10: um BOTÃO de verdade (borda clara, ≥48 px, lâmpada na frente, "›" atrás), secundário ao "Pronto" cheio */
@@ -329,16 +328,16 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
       <AnimatePresence>
         {anelVivo && alvo && (fase === "anotar" || fase === "registrou") && (
           <Anel key={`anotar-${acende}`} fixo interativo duracao={60_000} alvo={alvo} testid="intro-modulo-anel" abaixo={false}
-            aoSair={(motivo) => { setAnelVivo(false); if (faseRef.current !== "anotar") return; setPerdeuAlvo(true); trackEvent("modulo_intro_anel_saiu", { modulo: m, motivo }); }}
+            aoSair={(motivo) => { setAnelVivo(false); if (faseRef.current !== "anotar" || reancorandoRef.current) return; setPerdeuAlvo(true); trackEvent("modulo_intro_anel_saiu", { modulo: m, motivo }); }}
             balao={postIt} />
         )}
         {fase === "olhar" && olharEm && (
           <Anel key="olhar" fixo interativo alvo={olharEm} recorte={olharAlt ? undefined : alvoCfg.olhar?.recorte} duracao={TEMPOS_DA_INTRO.olhar} testid="intro-modulo-anel-olhar" aoSair={() => entendi("auto")}
             balao={(
               <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="intro-modulo-olhar">
-                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{totalDePassos > passosDaGuiada ? `Olha · ${passosDaGuiada} de ${totalDePassos}` : "Olha · 1 de 1"}</span>
-                <span className="block text-[15px] font-extrabold leading-snug">{olharAlt && config.olharNoResumo ? config.olharNoResumo.titulo : config.olhar.titulo}</span>
-                <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{olharAlt && config.olharNoResumo ? config.olharNoResumo.texto : config.olhar.texto}</span>
+                <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{passosDaGuiada} de {totalDePassos}</span>
+                <span className="block text-[16px] font-extrabold leading-snug">{olharAlt && config.olharNoResumo ? config.olharNoResumo.titulo : config.olhar.titulo}</span>
+                <span className="block text-[13px] text-white/80 leading-snug mt-1">{olharAlt && config.olharNoResumo ? config.olharNoResumo.texto : config.olhar.texto}</span>
                 {numero && (
                   <span className="flex items-baseline gap-2 mt-2">
                     <span className="text-[12px] text-white/50">{numero.titulo}:</span>

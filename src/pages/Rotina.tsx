@@ -1189,6 +1189,15 @@ const WeeklyReview = () => {
 
 
 // ============= MAIN ROTINA COMPONENT =============
+/** 1.0.17 (bug da 1.0.16): com uma guia na tela (a dose da missão, a intro do módulo) o "+ Hábito" só ABRE o campo — nunca
+ *  fecha (o post-it solto tapava o campo e o toque seguinte fechava ele de novo). */
+const guiaNaTela = (): boolean => {
+  try {
+    const html = document.documentElement;
+    return html.getAttribute("data-missao-dose") === "1" || html.hasAttribute("data-intro-modulo-faixa") || html.hasAttribute("data-missao-doses-faixa");
+  } catch { return false; }
+};
+
 const Rotina = () => {
   // Sequência viva de dias marcados — a mesma conta que os lembretes usam,
   // pra o convite não prometer um número diferente do que a notificação diz.
@@ -1418,7 +1427,7 @@ const Rotina = () => {
                   <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>
                   <span>✅</span>
                 </div>
-                <Button size="sm" variant="ghost" data-spotlight="add-habit" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
+                <Button size="sm" variant="ghost" data-spotlight="add-habit" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit((aberto) => (guiaNaTela() ? true : !aberto))}>
                   <Plus className="w-3 h-3 mr-1" /> Hábito
                 </Button>
               </div>

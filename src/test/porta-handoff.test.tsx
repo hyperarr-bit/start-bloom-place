@@ -139,9 +139,9 @@ describe("deep link core://porta (deep-link.ts)", () => {
     const navegar = await ligar();
     expect(navegar).not.toHaveBeenCalled();
     // o ouvinte do appUrlOpen entra depois de um await (App.addListener): com a máquina carregada ele ainda não está lá
-    await waitFor(() => expect(typeof app.ouvintes[0]).toBe("function"));
+    await waitFor(() => expect(typeof app.ouvintes[0]).toBe("function"), { timeout: 5000 }); // a suíte cheia demora pra resolver o import dinâmico
     app.ouvintes[0]({ url: `core://entrar?h=${CODIGO}` });
-    await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"));
+    await waitFor(() => expect(navegar).toHaveBeenCalledWith("/home"), { timeout: 5000 });
     app.ouvintes[0]({ url: "core://financas" });
     await waitFor(() => expect(navegar).toHaveBeenCalledWith("/financas"));
     app.ouvintes[0]({ url: "core://entrar" }); // sem código: só a tela de entrar

@@ -422,19 +422,17 @@ describe("LIGADA: a sequência enxuta", () => {
     expect(screen.getByTestId("welcome-video")).toHaveAttribute("data-falhou");
   });
 
-  it("20/10 (Modo Pouca Energia): a capa cobre o vídeo desde o início (sem o play do iOS); sem rodar em 1,2 s o passeio troca as telas; rodando, a capa sai", async () => {
+  it("20/10 (Modo Pouca Energia): a capa cobre o vídeo desde o início (sem o play do iOS); sem rodar em 1,2 s entra o vídeo em WebP animado; rodando, a capa sai", async () => {
     vi.useFakeTimers();
     try {
       montar("/funil-w");
       await tick();
       const capa = screen.getByTestId("welcome-cobre");
-      expect(capa.querySelector("img")).toHaveAttribute("src", "/funil/welcome-app.jpg");
-      expect(capa).not.toHaveAttribute("data-passeio");
+      const imgs = Array.from(capa.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+      expect(imgs).toEqual(["/funil/welcome-app.jpg", "/funil/welcome-app.webp"]);
+      expect(capa).not.toHaveAttribute("data-animado");
       await act(async () => { vi.advanceTimersByTime(1300); });
-      expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-passeio", "0");
-      expect(screen.getByTestId("welcome-cobre").querySelector(".wca-cobre-tela img")).toHaveAttribute("src", "/porta/tour/1.jpg");
-      await act(async () => { vi.advanceTimersByTime(2000); });
-      expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-passeio", "1");
+      expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-animado");
       fireEvent.playing(screen.getByTestId("welcome-video"));
       expect(screen.queryByTestId("welcome-cobre")).toBeNull();
     } finally {

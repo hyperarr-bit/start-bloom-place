@@ -42,8 +42,8 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  */
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
-/** As 6 telas do passeio (as mesmas da Porta/web), quando o iPhone nega o vídeo. */
-export const TELAS_PASSEIO_APP = [1, 2, 3, 4, 5, 6].map((n) => `/porta/tour/${n}.jpg`);
+/** O mesmo vídeo em WebP animado, pra quando o iPhone nega o vídeo (Modo Pouca Energia). */
+export const VIDEO_WELCOME_ANIMADO = "/funil/welcome-app.webp";
 
 const PROMESSA_PADRAO = "Sua vida inteira organizada num app só.";
 const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
@@ -61,17 +61,12 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);
   /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
-   * Agora a tela do app (pôster) cobre o vídeo até ele rodar de verdade; sem rodar em 1,2 s, as 6 telas do passeio
-   * passam sozinhas (2 s cada, troca suave) — o toque segue tentando o vídeo e, rodando, as imagens saem. */
+   * O iOS bloqueia <video> no WebView com pouca energia (o Cal AI é nativo, por isso roda lá), mas NÃO bloqueia imagem
+   * animada. Então o pôster cobre o vídeo até ele rodar de verdade e, sem rodar em 1,2 s, entra o MESMO vídeo em WebP
+   * animado (720 px, 15 qps, ~2,6 MB no pacote). O toque segue tentando o vídeo e, rodando, a capa sai. */
   const [rodando, setRodando] = useState(false);
   const [passeio, setPasseio] = useState(false);
-  const [quadroPasseio, setQuadroPasseio] = useState(0);
   useEffect(() => { const t = window.setTimeout(() => { if (!rodouRef.current) setPasseio(true); }, 1200); return () => window.clearTimeout(t); }, []);
-  useEffect(() => {
-    if (!passeio || rodando) return;
-    const t = window.setInterval(() => setQuadroPasseio((q) => (q + 1) % TELAS_PASSEIO_APP.length), 2000);
-    return () => window.clearInterval(t);
-  }, [passeio, rodando]);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
 
@@ -191,15 +186,10 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
               data-falhou={videoFalhou ? "" : undefined}
             />
             {!rodando && (
-              <div className="wca-cobre" data-testid="welcome-cobre" data-passeio={passeio ? quadroPasseio : undefined}>
+              <div className="wca-cobre" data-testid="welcome-cobre" data-animado={passeio ? "" : undefined}>
                 <img className="wca-cobre-img" src={POSTER_WELCOME} alt="" draggable={false} />
-                {passeio && (
-                  <div className="wca-cobre-tela">
-                    <img key={quadroPasseio} src={TELAS_PASSEIO_APP[quadroPasseio]} alt="" draggable={false} />
-                  </div>
-                )}
-                {/* pré-carrega as telas pra troca não piscar */}
-                <div style={{ display: "none" }}>{TELAS_PASSEIO_APP.map((u) => <img key={u} src={u} alt="" />)}</div>
+                {/* carrega desde o início (pra estar pronto em 1,2 s) e só aparece se o vídeo não rodar */}
+                <img className="wca-cobre-img wca-cobre-anim" src={VIDEO_WELCOME_ANIMADO} alt="" draggable={false} />
               </div>
             )}
           </div>
@@ -270,14 +260,11 @@ const CSS_WCA = `
 }
 /* contain + o mesmo fundo do vídeo: se a caixa sair um pixel da proporção, nada é cortado nem ampliado */
 .wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
-/* a capa = o pôster (o 1º quadro do vídeo, com o iPhone) por cima do vídeo até ele rodar; no passeio, as telas
-   entram DENTRO da tela do iPhone do pôster (abaixo da barra de status, 9:41 e a ilha continuam do pôster) */
+/* a capa = o pôster (o 1º quadro do vídeo) por cima do vídeo até ele rodar; sem vídeo, o WebP animado aparece suave */
 .wca-cobre { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; pointer-events: none; }
-.wca-cobre-img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.wca-cobre-tela { position: absolute; left: 23.4%; right: 23.4%; top: 11%; bottom: 4.7%; overflow: hidden; background: #ffffff; border-radius: 0 0 12% 12% / 0 0 6% 6%; }
-.wca-cobre-tela img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; animation: wca-entra .45s ease-out both; }
-@keyframes wca-entra { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .wca-cobre-tela img { animation: none; } }
+.wca-cobre-img { position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
+.wca-cobre-anim { opacity: 0; transition: opacity .35s ease-out; }
+.wca-cobre[data-animado] .wca-cobre-anim { opacity: 1; }
 .wca-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
 .wca-video::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; }
 .wca-video::-webkit-media-controls { display: none !important; }

@@ -42,7 +42,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { EVENTO_ACAO_RAPIDA } from "@/components/home/QuickActions";
-import { TourDaHome, TOTAL_PASSOS } from "@/components/home/TourDaHome";
+import { TourDaHome, TOTAL_PASSOS, ASSENTA_MS } from "@/components/home/TourDaHome";
 import { CartoesDoModulo, guiaDoModuloAtiva } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesFinancas } from "@/components/cartoes-modulo/cartoes-financas";
 import Beleza from "@/pages/Beleza";
@@ -328,6 +328,17 @@ const HomeDeMentira = ({ adicionarWidget }: { adicionarWidget: (id: string) => v
 
 describe("Sua Home em 5 passos (força on)", () => {
   beforeEach(() => ligar(CHAVE_FORCA_TOUR_HOME, CHAVE_FORCA_MODULO_OCULTA));
+
+  it("1.0.17: o balão só entra quando o alvo ASSENTA (a lista abrindo + a rolagem) — antes ele nascia por cima do cabeçalho e pulava", async () => {
+    const s = criarStore(CONTA());
+    s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    const tour = screen.getByTestId("tour-home");
+    const balao = () => screen.getByTestId("tour-balao").parentElement as HTMLElement;
+    expect(tour.hasAttribute("data-assentado")).toBe(false);
+    expect(balao().style.pointerEvents).toBe("none"); // invisível e sem toque enquanto o alvo se mexe
+    await waitFor(() => expect(screen.getByTestId("tour-home").hasAttribute("data-assentado")).toBe(true), { timeout: ASSENTA_MS * 6 });
+    expect(balao().style.pointerEvents).toBe("auto");
+  });
 
   it("5 passos, cada um com UMA ação de 1 toque: o que cada toque grava, os eventos e o fim", async () => {
     const s = criarStore(CONTA());

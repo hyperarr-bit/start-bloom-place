@@ -139,6 +139,9 @@ type PassoDoTour = { alvo: string; titulo: string; texto: string; faca: string }
 const CHIPS_DO_TOUR: ChipDaMissao[] = alvoDaMissao("gasto").chips;
 /** "✓ Pronto!" fica na tela por isto depois de uma ação feita (o passo já avançou). */
 export const PRONTO_MS = 600;
+/** 1.0.17: o alvo do passo parado por este tempo = assentou (a lista abriu, a rolagem acabou) → o balão entra */
+export const ASSENTA_MS = 240;
+export const ASSENTA_TETO_MS = 1600;
 export const TOTAL_PASSOS = PASSOS_LONGO.length;
 export const TOTAL_PASSOS_CURTO = 3;
 const PADDING = 8;
@@ -252,6 +255,30 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
     window.addEventListener("scroll", aoRolar, true);
     window.addEventListener("resize", aoRolar);
     return () => { clearInterval(relogio); if (raf) cancelAnimationFrame(raf); window.removeEventListener("scroll", aoRolar, true); window.removeEventListener("resize", aoRolar); };
+  }, [passo, ativo]);
+
+  /* 1.0.17 (gravação no Simulador, 20/10): no passo 1 a lista de Pendências abre e a página rola até ela — o balão entrava
+     NO MEIO disso, desenhado por cima do cabeçalho da lista, e pulava pro lugar ~0,2 s depois. Agora o balão (e, no 1º
+     passo, o tour inteiro) só aparece quando o alvo ASSENTA: a mesma posição por ASSENTA_MS (teto de ASSENTA_TETO_MS). */
+  const [assentado, setAssentado] = useState(false);
+  useEffect(() => {
+    if (!ativo) return;
+    setAssentado(false);
+    const sel = `[data-tour="${PASSOS[passo].alvo}"]`;
+    const t0 = Date.now();
+    let ult = "", desde = t0;
+    const relogio = window.setInterval(() => {
+      const el = document.querySelector(sel) as HTMLElement | null;
+      const agora = Date.now();
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const k = `${Math.round(r.top)}|${Math.round(r.left)}|${Math.round(r.width)}|${Math.round(r.height)}`;
+        if (k !== ult) { ult = k; desde = agora; }
+      } else desde = agora;
+      if ((el && agora - desde >= ASSENTA_MS) || agora - t0 >= ASSENTA_TETO_MS) { window.clearInterval(relogio); setAssentado(true); }
+    }, 60);
+    return () => window.clearInterval(relogio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [passo, ativo]);
 
   useLayoutEffect(() => {
@@ -425,7 +452,8 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
   return (
     <AnimatePresence>
       <motion.div key="tour-home" className="fixed inset-0 z-[200] pointer-events-none" data-camada-guia="tour-home" data-testid="tour-home" data-passo={passo + 1}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.calmo)}>
+        initial={{ opacity: 0 }} animate={{ opacity: passo === 0 && !assentado ? 0 : 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.calmo)}
+        data-assentado={assentado ? "" : undefined}>
         {rect && (
           <>
             {/* o escuro (55%) com o ALVO recortado: só o alvo e o balão ficam nítidos (não parece um aviso solto) */}
@@ -466,9 +494,9 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
           key={`balao-${passo}`}
           ref={balaoRef}
           className="absolute pointer-events-auto"
-          style={{ top: topo, left: esquerda, width: LARG }}
+          style={{ top: topo, left: esquerda, width: LARG, pointerEvents: assentado ? "auto" : "none" }}
           initial={reduzir ? false : { opacity: 0, y: abaixo ? -8 : 8 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={assentado ? { opacity: 1, y: 0 } : { opacity: 0, y: reduzir ? 0 : abaixo ? -8 : 8 }}
           transition={entrada(reduzir, MOV.calmo, passo === 0 ? 0.25 : 0.08)}
         >
           {rect && (

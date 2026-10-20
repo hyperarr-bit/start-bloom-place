@@ -75,6 +75,33 @@ export const reduzirMovimento = (): boolean => {
  * role nem toque — nada do app a enxerga) fica por cima e some em `ms`; o que vem embaixo já está montado e se ajeita
  * por trás dela. O estado e os callbacks seguem síncronos. Sem animação: "reduzir movimento" e jsdom (os testes).
  */
+/** O framer anima opacidade/transform pelo Web Animations: o valor da animação NÃO está no style — a cópia nasceria no
+ *  estado de antes (uma folha que já saiu reapareceria). Marca, nos alvos de animação dentro de `raizes`, o valor
+ *  calculado de agora; `aplicarEstilosCongelados` põe na cópia. Devolve os marcados (pra limpar). */
+function congelarAnimados(raizes: Element[]): HTMLElement[] {
+  const marcados: HTMLElement[] = [];
+  try {
+    const anims = typeof document.getAnimations === "function" ? document.getAnimations() : [];
+    for (const a of anims) {
+      const alvo = (a.effect as KeyframeEffect | null)?.target;
+      if (!(alvo instanceof HTMLElement) || !raizes.some((r) => r === alvo || r.contains(alvo))) continue;
+      const cs = getComputedStyle(alvo);
+      alvo.setAttribute("data-sc-estilo", `${cs.opacity}|${cs.transform}`);
+      marcados.push(alvo);
+    }
+  } catch { /* sem Web Animations */ }
+  return marcados;
+}
+function aplicarEstilosCongelados(copia: HTMLElement): void {
+  for (const n of [copia, ...Array.from(copia.querySelectorAll<HTMLElement>("[data-sc-estilo]"))]) {
+    const v = n.getAttribute("data-sc-estilo");
+    if (v === null) continue;
+    const [o, t] = v.split("|");
+    n.style.opacity = o;
+    n.style.transform = t && t !== "none" ? t : "none";
+    n.removeAttribute("data-sc-estilo");
+  }
+}
 const ATRIBUTOS_DA_COPIA = ["data-testid", "data-camada-guia", "role", "aria-modal", "data-momento", "id", "data-folha", "data-state", "data-missao-dose"];
 /** `segura`: ms em que a cópia fica INTEIRA antes de sumir — quando o que vem embaixo ainda está se mexendo (troca de
  *  rota, rolagem até o alvo), a cópia cobre isso e só some com a tela de baixo já parada (sem dupla exposição). */
@@ -86,7 +113,10 @@ export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.c
     if (typeof el.animate !== "function") return;
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) return;
+    const congelados = congelarAnimados([el]);
     const copia = el.cloneNode(true) as HTMLElement;
+    for (const m of congelados) m.removeAttribute("data-sc-estilo");
+    aplicarEstilosCongelados(copia);
     for (const n of [copia, ...Array.from(copia.querySelectorAll<HTMLElement>("*"))]) for (const a of ATRIBUTOS_DA_COPIA) n.removeAttribute(a);
     copia.setAttribute("aria-hidden", "true");
     copia.setAttribute("data-saida-calma", "");
@@ -108,8 +138,8 @@ export const saidaCalmaDe = (seletor: string, ms?: number, segura?: number): voi
 /**
  * A TELA INTEIRA em saída calma (1.0.17 QA, pedido do dono: "nenhum corte seco"): a troca de rota da missão (festa →
  * Home, plano do dia 2 → Home) passava por ~0,13 s de BRANCO — o véu da cor do app cobria, a rota trocava, o véu abria.
- * Aqui a foto do que está na tela (o #root e as camadas fixas do body, com a rolagem, os cabeçalhos grudados e o que foi
- * digitado) fica inteira por `segura` ms enquanto a rota troca e a página nova entra por baixo, e some em `ms` — um
+ * Aqui a foto do que está na tela (o #root e as camadas fixas do body, com a rolagem, os cabeçalhos grudados no lugar e o
+ * que foi digitado) fica inteira por `segura` ms enquanto a rota troca e a página nova entra por baixo, e some em `ms` — um
  * cross-fade direto, sem quadro em branco. Devolve false quando não anima (reduzir movimento, jsdom): quem chama usa o
  * caminho antigo.
  */
@@ -126,11 +156,12 @@ export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boole
         if (el.scrollTop > 0 || el.scrollLeft > 0) marcar(el, "data-sc-rolagem", `${el.scrollTop},${el.scrollLeft}`);
         if (/sticky/.test(typeof el.className === "string" ? el.className : "") && getComputedStyle(el).position === "sticky") {
           const r = el.getBoundingClientRect();
-          marcar(el, "data-sc-fixo", `${r.top},${r.left},${r.width},${r.height}`);
+          marcar(el, "data-sc-fixo", `${r.top},${r.left}`);
         }
         if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.value) marcar(el, "data-sc-valor", el.value);
       }
     }
+    marcados.push(...congelarAnimados(filhos));
     const fundo = getComputedStyle(document.body).backgroundColor || "#fff";
     const foto = document.createElement("div");
     foto.setAttribute("aria-hidden", "true");
@@ -144,16 +175,26 @@ export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boole
       if (cs.position !== "fixed") Object.assign(c.style, { position: "absolute", top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0" });
       foto.appendChild(c);
     }
-    for (const el of marcados) { el.removeAttribute("data-sc-rolagem"); el.removeAttribute("data-sc-fixo"); el.removeAttribute("data-sc-valor"); }
+    for (const el of marcados) { el.removeAttribute("data-sc-rolagem"); el.removeAttribute("data-sc-fixo"); el.removeAttribute("data-sc-valor"); el.removeAttribute("data-sc-estilo"); }
+    aplicarEstilosCongelados(foto);
     for (const n of Array.from(foto.querySelectorAll<HTMLElement>("*"))) {
       for (const a of ATRIBUTOS_DA_COPIA) n.removeAttribute(a);
       if (n.tagName === "CANVAS" || n.tagName === "VIDEO") n.style.visibility = "hidden";
-      const fixo = n.getAttribute("data-sc-fixo");
-      if (fixo) { const [t, l, w, h] = fixo.split(",").map(Number); Object.assign(n.style, { position: "fixed", top: `${t}px`, left: `${l}px`, width: `${w}px`, height: `${h}px`, margin: "0" }); n.removeAttribute("data-sc-fixo"); }
       const valor = n.getAttribute("data-sc-valor");
       if (valor !== null) { (n as HTMLInputElement).value = valor; n.removeAttribute("data-sc-valor"); }
     }
     document.body.appendChild(foto);
+    // cabeçalho grudado: na foto ele vira "absolute" no lugar onde está na tela agora (medido no mesmo quadro, antes de
+    // pintar), com um calço da altura dele no fluxo (o resto não sobe) — sem camada fixa nova (que o WebKit pinta um quadro depois)
+    for (const n of Array.from(foto.querySelectorAll<HTMLElement>("[data-sc-fixo]"))) {
+      const [t, l] = (n.getAttribute("data-sc-fixo") ?? "0,0").split(",").map(Number);
+      n.removeAttribute("data-sc-fixo");
+      const h = n.getBoundingClientRect().height;
+      const calco = document.createElement("div"); calco.style.height = `${h}px`; n.parentNode?.insertBefore(calco, n);
+      Object.assign(n.style, { position: "absolute", top: "0px", left: "0px", width: `${n.getBoundingClientRect().width || n.offsetWidth}px`, zIndex: "2", margin: "0" });
+      const r2 = n.getBoundingClientRect(); // onde o 0,0 do bloco que contém ele cai na tela
+      n.style.top = `${Math.round(t - r2.top)}px`; n.style.left = `${Math.round(l - r2.left)}px`;
+    }
     for (const n of Array.from(foto.querySelectorAll<HTMLElement>("[data-sc-rolagem]"))) {
       const [t, l] = (n.getAttribute("data-sc-rolagem") ?? "0,0").split(",").map(Number);
       n.scrollTop = t; n.scrollLeft = l; n.removeAttribute("data-sc-rolagem");
@@ -165,7 +206,7 @@ export function saidaCalmaDaTela(ms: number = MOV_MS.calmo, segura = 260): boole
     window.setTimeout(tirar, total + 400);
     return true;
   } catch {
-    try { document.querySelectorAll("[data-sc-rolagem],[data-sc-fixo],[data-sc-valor]").forEach((e) => { e.removeAttribute("data-sc-rolagem"); e.removeAttribute("data-sc-fixo"); e.removeAttribute("data-sc-valor"); }); } catch { /* noop */ }
+    try { document.querySelectorAll("[data-sc-rolagem],[data-sc-fixo],[data-sc-valor],[data-sc-estilo]").forEach((e) => { e.removeAttribute("data-sc-rolagem"); e.removeAttribute("data-sc-fixo"); e.removeAttribute("data-sc-valor"); e.removeAttribute("data-sc-estilo"); }); } catch { /* noop */ }
     return false;
   }
 }

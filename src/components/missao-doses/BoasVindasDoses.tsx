@@ -248,7 +248,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   }
 
   /* ── BRAÇO A ("uma dose por dia") — 1.0.17, dono 19/10: "muito confuso, faz minimalista; joga informação na cara".
-     UMA tela calma, uma coisa entra por vez: a tela (fade 420 ms) → o ✓ → o texto → o confete (depois do ✓, nunca junto).
+     UMA tela calma, uma coisa entra por vez: a tela (fundo opaco já no 1º quadro) → o ✓ → o texto → o confete (depois do ✓, nunca junto).
      Só o essencial: "Tá dentro, Lucas." / "Vamos com calma: um passo por dia." / o plano (Hoje · Amanhã · Dia 3, sem
      segundos) / [Começar] e o link "Prefiro explorar sozinho". "Trocar" é um link pequeno embaixo do plano. ── */
   if (braco === "A") {
@@ -256,7 +256,10 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
     const primeiro = primeiroNome(nome);
     return (
       <motion.div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo)}>
+        /* QA 20/10 (gravação no Simulador, 30 fps): com a TELA entrando em fade de 0, a Home que monta por baixo aparecia
+           apagada por ~0,1–0,2 s logo depois do cadastro (a "piscada" da 1.0.16, mais fraca). O fundo agora nasce opaco;
+           a sequência calma continua nos filhos (✓ → texto → confete) — o cadastro já saiu em branco, então não há corte. */
+        initial={false}>
         <Confete atraso={reduzir ? 0 : ATRASO_DO_CONFETE_S} />
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[12vh] pb-4">

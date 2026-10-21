@@ -35,6 +35,7 @@ import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBotaoAcimaDoTeclado } from "@/hooks/use-botao-acima-do-teclado";
+import { TarjaDoRelogio } from "@/components/app/TarjaDoRelogio";
 import { useAuth, EVENTO_RELER_ASSINATURA } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
@@ -285,6 +286,8 @@ export function SignupIOS({
 
   return (
     <div className="w-full max-w-sm mx-auto">
+      {/* 1.0.17: com o teclado, o que a página rolou pra cima não passa por baixo do relógio/ilha */}
+      <TarjaDoRelogio />
       <div className="text-center mb-7">
         {posCompra ? (
           <>

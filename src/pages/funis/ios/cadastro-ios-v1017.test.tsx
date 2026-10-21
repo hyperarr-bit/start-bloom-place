@@ -206,6 +206,21 @@ describe("iPhone SE com o teclado de verdade (1.0.17)", () => {
     expect(topoVisivelNoCliente(163, 0)).toBe(163);
     expect(topoVisivelNoCliente(0, 300)).toBe(0);
   });
+  it("com o teclado e a página rolada, uma tarja da cor do fundo cobre a área do relógio (no topo da tela: top = offsetTop); sem teclado, nada", () => {
+    vi.useFakeTimers();
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 328 });
+    try {
+      render(<MemoryRouter><SignupIOS posCompra onSession={() => {}} onConfirm={() => {}} /></MemoryRouter>);
+      expect(screen.queryByTestId("tarja-do-relogio")).toBeNull();
+      teclado.abrir(screen.getByPlaceholderText("Seu nome"), 163, 163);
+      const tarja = screen.getByTestId("tarja-do-relogio");
+      expect(tarja.style.top).toBe("163px");
+      expect(tarja.className).toMatch(/pointer-events-none/);
+      teclado.soltarFoco();
+      teclado.assentar();
+      expect(screen.queryByTestId("tarja-do-relogio")).toBeNull();
+    } finally { teclado.desinstalar(); vi.useRealTimers(); }
+  });
   it("quantoSubir nunca empurra o campo em foco pra fora da área visível", () => {
     expect(quantoSubir(384, 339, 145, 8)).toBe(45);
     expect(quantoSubir(300, 339, 145, 8)).toBe(0);

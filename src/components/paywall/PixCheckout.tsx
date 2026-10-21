@@ -9,16 +9,19 @@ import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analyt
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { sairDeVerdade, useSegurarVoltar, varianteDoBack, type FunilDoBack } from "@/lib/back-funil";
 import { BackFolha } from "@/components/paywall/BackFolha";
+import { modoOfertas } from "@/lib/ofertas-pos-compra";
+/* 21/10: o upsell "Seu 2027" (src/upsell-2027) só carrega com a chave central em "2027" (OFERTAS_POS_COMPRA, src/lib/ofertas-pos-compra.ts) */
+const Fluxo2027 = lazy(() => import("@/upsell-2027/Fluxo2027").then((m) => ({ default: m.Fluxo2027 })));
 import { isNativeShell } from "@/lib/native-shell";
 import { FUNNEL_AREA_KEY, isInAppBrowser, type AreaKey } from "@/lib/funnel";
-import { presenteLigado, primeiroNome } from "@/lib/presente";
+import { primeiroNome } from "@/lib/presente";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
 import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
-/* 21/10: o UPSELL DE PRESENTE (src/presente) só carrega com a chave ligada (UPSELL_PRESENTE, src/lib/presente.ts) */
+/* 21/10: o UPSELL DE PRESENTE e o plano de 30 dias (src/presente) só carregam com a chave central ligada (OFERTAS_POS_COMPRA) */
 const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => ({ default: m.FluxoPresente })));
 
 /**
@@ -616,11 +619,26 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
    * "Dê o CORE pra sempre pra quem você ama" (src/presente/FluxoPresente) cobre o checkout; terminou → a confirmação de
    * sempre. Decidido no mount: chave UPSELL_PRESENTE (padrão OFF; QA `?presente=on`), só funil do /inicio, só
    * vitalício, nunca no Funil B nem no v2. Desligado: nada muda (o estado fica parado em false). */
-  const [presenteAtivo] = useState<boolean>(() =>
+  /* 21/10 (integração): NO MÁXIMO 2 OFERTAS depois do Pix, uma camada por vez — a chave central OFERTAS_POS_COMPRA
+   * (src/lib/ofertas-pos-compra.ts; QA `?ofertas=2027|presente|off`) escolhe UM caminho:
+   *   "2027": Seu 2027 → (Agora não) plano de 30 dias da área → confirmação com as lojas · (pagou) → confirmação
+   *   "presente": presente → (Agora não) plano de 30 dias (dentro do FluxoPresente) → confirmação
+   * Elegível = funil do /inicio, vitalício, nunca no Funil B nem no v2. */
+  const [ofertasPosCompra] = useState<"off" | "presente" | "2027">(() =>
     context === "funnel" && !funilB && !v2 && OFERTA_VITALICIA[offer]
-    && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio") && presenteLigado());
+    && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio") ? modoOfertas() : "off");
+  const presenteAtivo = ofertasPosCompra === "presente";
   const [presenteFeito, setPresenteFeito] = useState(false);
   const cpfRef = useRef<HTMLInputElement>(null);
+  /* UPSELL "SEU 2027" (21/10): no "Pagamento confirmado" do vitalício do /inicio, ANTES da tela com as lojas, a oferta
+   * "Seu 2027 já organizado" (src/upsell-2027/Fluxo2027) cobre o checkout; terminou → a confirmação de sempre. Decidido
+   * no mount: chave UPSELL_2027 (padrão OFF; QA `?up2027=on`), só funil do /inicio, só vitalício, nunca no Funil B nem
+   * no v2. Desligado: nada muda (o estado fica parado em false). */
+  const pacote2027Ativo = ofertasPosCompra === "2027";
+  /** o fluxo do 2027 terminou: null = ainda não; "pago" | "recusou" */
+  const [pacote2027Fim, setPacote2027Fim] = useState<null | "pago" | "recusou">(null);
+  /** o plano de 30 dias depois do "Agora não" do 2027 terminou */
+  const [plano30Feito, setPlano30Feito] = useState(false);
   // 26/09: o toque em pagar = abertura do checkout; mede espera_ms do pix_generated.
   const toqueEm = useRef<number | null>(Date.now());
   // 26/09: sessão (anônima, se preciso) que começa a nascer no mount — ver o efeito abaixo.
@@ -1271,6 +1289,24 @@ export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: 
           onFicar={() => setBackPix(false)}
           onSair={() => { setBackPix(false); sairDeVerdade(); }}
         />
+      )}
+      {pacote2027Ativo && step === "confirmed" && !pacote2027Fim && (
+        <Suspense fallback={null}>
+          <div className="fn u27 u27-sobre" data-testid="inicio-2027"><div className="fn-corpo">
+            <Fluxo2027 origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              onFim={(r) => setPacote2027Fim(r.pedido ? "pago" : "recusou")} />
+          </div></div>
+        </Suspense>
+      )}
+      {/* 21/10: o "Agora não" do 2027 → o plano de 30 dias da área (só depois que a camada do 2027 saiu) */}
+      {pacote2027Ativo && step === "confirmed" && pacote2027Fim === "recusou" && !plano30Feito && (
+        <Suspense fallback={null}>
+          <div className="fn pv pv-sobre" data-testid="inicio-plano30"><div className="fn-corpo">
+            <FluxoPresente so30Dias origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              area={(() => { try { const a = localStorage.getItem(FUNNEL_AREA_KEY); return a ? (a as AreaKey) : null; } catch { return null; } })()}
+              onFim={() => setPlano30Feito(true)} />
+          </div></div>
+        </Suspense>
       )}
       {presenteAtivo && step === "confirmed" && !presenteFeito && (
         <Suspense fallback={null}>

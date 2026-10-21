@@ -27,13 +27,16 @@ import "./presente.css";
  *                                                                          → "Não, obrigado" → fim
  * O estado fica no navegador (localStorage + heap) por compra: quem vai pro app do banco e volta cai na mesma tela.
  *
+ * `so30Dias` (21/10, chave central OFERTAS_POS_COMPRA = "2027"): o "Agora não" do 2027 cai AQUI direto no plano de 30
+ * dias (sem a oferta do presente) — os eventos levam `via: "u2027"`.
+ *
  * Eventos (todos com `origem` + os ids do funil): presente_oferta_view · presente_quero · presente_agora_nao ·
  * presente_pix_gerado · presente_pago · presente_link_copiado · presente_whatsapp · plano30_view · plano30_quero ·
  * plano30_nao · plano30_pix_gerado · plano30_pago. (O PixHoje manda os dele também: hoje_pix_gerado etc.)
  */
 export type FimDoPresente = { pedido: string | null; codigo: string | null; plano30: string | null };
 
-export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = null, ids, onFim, copy = COPY_PRESENTE, versaoPlano30 = VERSAO_PLANO30 }: {
+export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = null, ids, onFim, copy = COPY_PRESENTE, versaoPlano30 = VERSAO_PLANO30, so30Dias = false }: {
   origem: "inicio" | "hoje";
   /** o pedido do vitalício que abriu o fluxo (1 fluxo por compra) */
   compra: string;
@@ -44,8 +47,13 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
   onFim: (r: FimDoPresente) => void;
   copy?: CopyPresente;
   versaoPlano30?: VersaoPlano30;
+  /** só o downsell do plano de 30 dias (depois do "Agora não" do 2027): nunca mostra a oferta do presente */
+  so30Dias?: boolean;
 }) {
-  const [e, setE] = useState<EstadoPresente>(() => lerEstadoPresente(compra));
+  const [e, setE] = useState<EstadoPresente>(() => {
+    const x = lerEstadoPresente(compra);
+    return so30Dias && (x.etapa === "oferta" || x.etapa === "pix" || x.etapa === "cartao") ? { ...x, etapa: "plano30", pix: null } : x;
+  });
   /** a área do plano de 30 dias (a do quiz; sem área = "tudo") */
   const areaPlano = areaDoPlano(area);
   const set = useCallback((f: (x: EstadoPresente) => EstadoPresente) => {
@@ -53,7 +61,7 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
   }, []);
   const idsRef = useRef(ids);
   idsRef.current = ids;
-  const base = useCallback((): Record<string, unknown> => ({ origem, ...(idsRef.current?.() ?? {}) }), [origem]);
+  const base = useCallback((): Record<string, unknown> => ({ origem, ...(so30Dias ? { via: "u2027" } : {}), ...(idsRef.current?.() ?? {}) }), [origem, so30Dias]);
   const evento = (nome: string, extra: Record<string, unknown> = {}) => trackEvent(nome, { ...extra, ...base() });
 
   /* vistas (1 por chegada na tela) */

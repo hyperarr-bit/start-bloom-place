@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
+import { confirmarPacote2027, eh2027, ipUaDoPedido } from "../_shared/pacote-2027.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
@@ -296,6 +297,21 @@ serve(async (req) => {
         await sendMetaCapi(admin, { userId, email: uc?.user?.email ?? null, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ip: regData.client_ip ?? null, ua: regData.user_agent ?? null });
       }
       return jsonResponse({ received: true, granted: false, casal: true });
+    }
+    /* 21/10 (upsell "Seu 2027", u2027): pagou e fechou a aba antes do check → o pacote vai pra conta de quem pagou aqui +
+     * Purchase 19,90 1x por pedido (IP/UA do pedido; a trava é a mesma do check e do reconcile). Não é assinatura. */
+    if (eh2027(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
+      const p27 = await confirmarPacote2027(admin, {
+        userId, orderId: qrCodeId, origem: "upsell",
+        enviarCompra: async () => {
+          const { data: uc } = await admin.auth.admin.getUserById(userId!);
+          const em = uc?.user?.email ?? null;
+          await sendToUtmify(admin, { userId: userId!, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+          await sendMetaCapi(admin, { userId: userId!, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ...ipUaDoPedido(regData) });
+        },
+      });
+      if (p27.r === "falhou") return jsonResponse({ received: true, granted: false, pacote2027: true, error: "gravar" });
+      return jsonResponse({ received: true, granted: true, pacote2027: true });
     }
     /* 16/10: oferta desconhecida NUNCA vira vitalício (antes: `offer = "lifetime"`) — sem ela na tabela, não credita;
      * o pix-reconcile tenta de novo depois do deploy que a conhece. 200 sempre (a fila da Asaas não pode pausar). */

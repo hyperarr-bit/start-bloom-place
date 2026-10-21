@@ -190,11 +190,11 @@ describe("a chave (padrão OFF)", () => {
   it("proximoPosCompra: sem a chave nada muda; com a chave, pra sempre → presente (1 vez); quem não é pra sempre nunca vê", () => {
     const vit = { pagos: [{ oferta: "hv279" as const, orderId: "x", em: 0 }], recusou: [], parceiro: null };
     expect(proximoPosCompra(vit)).toBe("pago");
-    expect(proximoPosCompra(vit, false, false)).toBe("pago");
-    expect(proximoPosCompra(vit, false, true)).toBe("presente");
-    expect(proximoPosCompra({ ...vit, presente: { pedido: null, plano30: null } }, false, true)).toBe("pago");
+    expect(proximoPosCompra(vit, false, "off")).toBe("pago");
+    expect(proximoPosCompra(vit, false, "presente")).toBe("presente");
+    expect(proximoPosCompra({ ...vit, presente: { pedido: null, plano30: null } }, false, "presente")).toBe("pago");
     const anualSemPraSempre = { pagos: [{ oferta: "h279" as const, orderId: "y", em: 0 }], recusou: ["hv47" as const, "hv27" as const], parceiro: null };
-    expect(proximoPosCompra(anualSemPraSempre, false, true)).toBe("pago");
+    expect(proximoPosCompra(anualSemPraSempre, false, "presente")).toBe("pago");
   });
   it("/hoje com a chave OFF: pagou o vitalício → DIRETO pro pós-compra; nenhum evento nem tela do presente", async () => {
     await pagarVitalicio("/hoje?funil-hoje=on&utm_source=meta");

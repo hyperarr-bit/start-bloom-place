@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { usePacote2027 } from "@/hooks/use-pacote-2027";
+import { Pacote2027 } from "@/components/pacote-2027/Pacote2027";
 import { localDayKey, dataSegura, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
@@ -62,6 +64,8 @@ const moodOptions = [
 /* Abas do módulo, fora do componente (mesma referência em todo render — o
    useAbasOcultas memoiza em cima). A pessoa pode ocultar qualquer uma, menos
    a última (avaliação: "Opção de ocultar certas abas"). */
+/** 21/10: o pacote "Seu 2027" (upsell da web, chave da conta core-pacote-2027) — 1ª aba, só pra quem tem. */
+const ABA_2027 = { id: "2027", label: "📒 SEU 2027" };
 const ABAS_DP = [
   { id: "sobre", label: "SOBRE MIM" },
   { id: "metas", label: "METAS" },
@@ -306,12 +310,25 @@ const DesenvolvimentoPessoal = () => {
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const t = new URLSearchParams(window.location.search).get("tab");
-      return t && ["sobre", "metas", "diario", "humor", "respiracao", "gratidao", "carta", "desafios"].includes(t) ? t : "sobre";
+      return t && ["sobre", "metas", "diario", "humor", "respiracao", "gratidao", "carta", "desafios", ABA_2027.id].includes(t) ? t : "sobre";
     } catch { return "sobre"; }
   });
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const abas = useAbasOcultas("desenvolvimento", ABAS_DP);
+  // 21/10: a aba "📒 SEU 2027" só existe pra conta com o pacote (upsell da web); sem ele a barra é a de sempre
+  const { pacote: pacote2027 } = usePacote2027();
+  const temPacote2027 = !!pacote2027;
+  const abasDoModulo = useMemo(() => (temPacote2027 ? [ABA_2027, ...ABAS_DP] : ABAS_DP), [temPacote2027]);
+  const abas = useAbasOcultas("desenvolvimento", abasDoModulo);
+  /* `?tab=2027` chega ANTES da conta carregar (a aba ainda não existe e a barra cai na 1ª visível): quando o pacote
+   * aparece, volta pra ela — 1 vez, só se foi pedido pela URL */
+  const [pediu2027] = useState(() => { try { return new URLSearchParams(window.location.search).get("tab") === ABA_2027.id; } catch { return false; } });
+  const voltou2027 = useRef(false);
+  useEffect(() => {
+    if (!pediu2027 || !temPacote2027 || voltou2027.current) return;
+    voltou2027.current = true;
+    setActiveTab(ABA_2027.id);
+  }, [pediu2027, temPacote2027]);
   const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
   const { set: setUserData, isGuest } = useUserData();
 
@@ -785,6 +802,8 @@ const DesenvolvimentoPessoal = () => {
           </div>}
 
           {/* ========== 30-DAY CHALLENGES ========== */}
+          {activeTab === ABA_2027.id && temPacote2027 && <Pacote2027 />}
+
           {activeTab === "desafios" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-500" /> DESAFIOS DE 30 DIAS</h3>

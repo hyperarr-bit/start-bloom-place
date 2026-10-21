@@ -7,36 +7,30 @@
  * dias pra organizar a vida" (R$ 9,90, `pk99` — o conteúdo do Kit Primeiro Mês), só pra área Dinheiro por enquanto.
  * Servidor: supabase/functions/_shared/presente.ts.
  *
- * DESLIGADO (UPSELL_PRESENTE = "off"): os funis /inicio e /hoje ficam exatamente como estão (travado nos testes).
- * QA sem mexer em ninguém: `?presente=on` (fica neste navegador; `?presente=off` tira).
+ * LIGA PELA CHAVE CENTRAL: OFERTAS_POS_COMPRA = "presente" (src/lib/ofertas-pos-compra.ts; padrão "off" = os funis
+ * /inicio e /hoje ficam exatamente como estão, travado nos testes). Com "2027" o presente NÃO aparece.
+ * QA sem mexer em ninguém: `?ofertas=presente` (ou o antigo `?presente=on`; `?ofertas=off` tira).
+ * O downsell do plano de 30 dias também roda depois do "Agora não" do 2027 (FluxoPresente com `so30Dias`).
  */
 import type { AreaKey } from "@/lib/funnel";
+import { FORCA_PRESENTE, OFERTAS_POS_COMPRA, _zerarForcaOfertas, modoOfertas } from "@/lib/ofertas-pos-compra";
 import { AREAS_DO_PLANO, areaDoPlano, type AreaDoPlano } from "@/lib/plano-30-areas";
 
 export type ModoChavePresente = "on" | "off";
-export const UPSELL_PRESENTE: ModoChavePresente = "off";
-export const PARAM_QA_PRESENTE = "presente";
-export const CHAVE_FORCA_PRESENTE = "presente-force";
-/** O downsell do "Agora não" (plano de 30 dias, R$ 9,90). Só vale com o presente ligado. */
+/** 21/10 (integração): sai da chave central OFERTAS_POS_COMPRA (src/lib/ofertas-pos-compra.ts) — "presente" liga. */
+export const UPSELL_PRESENTE: ModoChavePresente = OFERTAS_POS_COMPRA === "presente" ? "on" : "off";
+export const PARAM_QA_PRESENTE = FORCA_PRESENTE.param;
+export const CHAVE_FORCA_PRESENTE = FORCA_PRESENTE.chave;
+/** O downsell do "Agora não" (plano de 30 dias, R$ 9,90). Só vale com o presente ligado (ou depois do "Agora não" do 2027). */
 export const DOWNSELL_PLANO30: boolean = true;
 
-let forca: ModoChavePresente | null = null;
 /** Só testes. */
-export const _zerarForcaPresente = (): void => { forca = null; };
+export const _zerarForcaPresente = (): void => { _zerarForcaOfertas(); };
 
-/** O upsell de presente está ligado AQUI? Lê `?presente=on|off` (fica no navegador e no heap — o Instagram zera o storage). */
+/** O upsell de presente está ligado AQUI? = a chave central em "presente" (QA `?ofertas=presente` ou `?presente=on|off`).
+ *  Com o 2027 ligado, o presente NUNCA liga (no máximo 2 ofertas depois do Pix). */
 export function presenteLigado(busca: string = typeof window === "undefined" ? "" : window.location.search): boolean {
-  let v: string | null = null;
-  try { v = new URLSearchParams(busca).get(PARAM_QA_PRESENTE); } catch { /* noop */ }
-  if (v === "on" || v === "off") {
-    forca = v;
-    try { localStorage.setItem(CHAVE_FORCA_PRESENTE, v); } catch { /* storage bloqueado: fica o heap */ }
-  }
-  let f: string | null = forca;
-  if (!f) { try { f = localStorage.getItem(CHAVE_FORCA_PRESENTE); } catch { f = null; } }
-  if (f === "on") return true;
-  if (f === "off") return false;
-  return UPSELL_PRESENTE === "on";
+  return modoOfertas(busca) === "presente";
 }
 
 /* ───────────────────────── ofertas e valores ───────────────────────── */

@@ -127,6 +127,18 @@ describe("cadastro por e-mail no iPhone (1.0.17)", () => {
     expect(screen.getByText(/Teste ativado · nada cobrado hoje/)).toBeInTheDocument();
   });
 
+  it("SEM INTERNET (20/10): o erro do fetch do WKWebView ('Load failed', em inglês) vira a frase em português e o botão volta a funcionar", async () => {
+    estado.signUpErro = { message: "Load failed", name: "AuthRetryableFetchError" } as { message: string };
+    const onSession = vi.fn();
+    render(<MemoryRouter><SignupIOS posCompra onSession={onSession} onConfirm={() => {}} /></MemoryRouter>);
+    preencher();
+    await act(async () => { fireEvent.submit(screen.getByRole("button", { name: /Salvar meu acesso/ }).closest("form")!); });
+    expect(onSession).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Load failed/)).toBeNull();
+    expect(screen.getByText(/Sem conexão com a internet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Salvar meu acesso/ })).not.toBeDisabled();
+  });
+
   it("formulário incompleto: o toque segue normal (não segura o foco)", () => {
     render(<MemoryRouter><SignupIOS posCompra onSession={() => {}} onConfirm={() => {}} /></MemoryRouter>);
     const botao = screen.getByRole("button", { name: /Salvar meu acesso/ });

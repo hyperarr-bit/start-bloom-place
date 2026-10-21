@@ -68,6 +68,13 @@ const SelosIOS = () => (
   </div>
 );
 
+/* 20/10 (caça aos bugs de aparelho): sem internet no cadastro, o Supabase devolve o erro do fetch do WKWebView — "Load
+ * failed", em inglês, logo depois de ela começar o teste (e "Senha incorreta" pra quem só estava sem rede). No Simulador
+ * a rede nunca cai. */
+const SEM_INTERNET = "Sem conexão com a internet. Confira o Wi-Fi ou os dados e toque de novo.";
+const ehFaltaDeRede = (e: { message?: string; name?: string; status?: number } | null | undefined): boolean =>
+  !!e && (e.name === "AuthRetryableFetchError" || /load failed|failed to fetch|network ?error|internet connection|offline/i.test(e.message || ""));
+
 export function SignupIOS({
   onSession, onConfirm, posCompra,
 }: { onSession: () => void; onConfirm: (email: string) => void; posCompra?: boolean }) {
@@ -228,7 +235,7 @@ export function SignupIOS({
     if (existingAccount) {
       const { error: signInErr } = await signIn(email.trim().toLowerCase(), password);
       if (signInErr) {
-        setErr("Senha incorreta. Tente de novo ou recupere abaixo.");
+        setErr(ehFaltaDeRede(signInErr) ? SEM_INTERNET : "Senha incorreta. Tente de novo ou recupere abaixo.");
         setLoading(false);
         return;
       }
@@ -254,7 +261,7 @@ export function SignupIOS({
         setLoading(false);
         return;
       }
-      setErr(error.message || "Não consegui criar a conta. Tente outro e-mail.");
+      setErr(ehFaltaDeRede(error) ? SEM_INTERNET : error.message || "Não consegui criar a conta. Tente outro e-mail.");
       setLoading(false);
       return;
     }

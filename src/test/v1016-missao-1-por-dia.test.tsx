@@ -1720,6 +1720,36 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ nome: "outro", proprio: true })]);
   });
 
+  it("20/10 (vídeo do dono no iPhone, build 42): '+ Outro' com o TECLADO DE VERDADE — a área visível encolhe e o iPhone rola; o post-it NÃO recolhe (antes recolhia levando o campo, o teclado fechava e voltava fechado, em loop)", () => {
+    ligarUmPorDia("on");
+    missaoNova("A");
+    const store = montarStore({});
+    montar(store, "/financas");
+    fazerMontar();
+    ate(postItNaTela);
+    const postIt = () => screen.getAllByTestId("demo-guia-postit").at(-1)!;
+    fireEvent.click(within(postIt()).getByTestId("demo-guia-outro"));
+    const campo = within(postIt()).getByTestId("demo-guia-texto") as HTMLInputElement;
+    act(() => { campo.dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+    // o teclado do iPhone: o visualViewport encolhe (o alvo "+ Novo gasto" fica debaixo do teclado) e a página rola
+    const ouvintes: Array<() => void> = [];
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: { height: 90, offsetTop: 0, addEventListener: (_: string, f: () => void) => ouvintes.push(f), removeEventListener: () => {} } });
+    try {
+      act(() => { window.dispatchEvent(new Event("resize")); window.dispatchEvent(new Event("scroll")); });
+      avancar(900);
+      expect(screen.queryByTestId("missao-doses-postit-doca")).toBeNull();
+      expect(screen.queryAllByTestId("demo-guia-postit").length).toBeGreaterThan(0);
+      expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo); // o MESMO campo (não remontou fechado)
+      expect(document.activeElement).toBe(campo);
+      fireEvent.change(campo, { target: { value: "Padaria" } });
+      fireEvent.change(within(postIt()).getByTestId("demo-guia-reais"), { target: { value: "18" } });
+      fireEvent.click(within(postIt()).getByTestId("demo-guia-adicionar"));
+      expect(store.dados["finance-expenses"]).toEqual([expect.objectContaining({ description: "Padaria", value: 18 })]);
+    } finally {
+      delete (window as { visualViewport?: unknown }).visualViewport;
+    }
+  });
+
   it("saiu do app no meio do passo (2º plano) e voltou: o post-it com os chips NUNCA some (fica solto) e o anel volta sozinho; o chip do post-it solto grava", () => {
     ligarUmPorDia("on");
     missaoNova("A");

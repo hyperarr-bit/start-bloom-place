@@ -819,6 +819,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * lugar (sem rolar a tela dela). Só depois de o anel ter aparecido (a rolagem dele até o alvo não conta). */
   const [anelFora, setAnelFora] = useState(false);
   const anelForaRef = useRef(false);
+  const focoNoCampoDoPostIt = () => {
+    try { return !!(document.activeElement as Element | null)?.closest?.("[data-escolha-campo]"); } catch { return false; }
+  };
   const anelApareceu = useRef(false);
   /** só uma rolagem DEPOIS de o anel aparecer recolhe ele (a rolagem dele até o alvo, e redesenho sem rolar, não) */
   const rolouDesdeOAnel = useRef(false);
@@ -836,6 +839,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     }
     const medir = () => {
       if (!anelApareceu.current || !alvo.isConnected) return;
+      /* 20/10 (vídeo do dono no iPhone, build 42): o "+ Outro" abre o campo DENTRO do post-it; o teclado sobe, a área
+       * visível encolhe e o iPhone rola — o alvo "saía da tela", o post-it recolhia levando o campo junto, o teclado
+       * fechava e o post-it voltava fechado (loop, nunca dava pra digitar). Escrevendo no post-it, nada muda de lugar. */
+      if (focoNoCampoDoPostIt()) return;
       if (!anelForaRef.current && !rolouDesdeOAnel.current) return;
       const r = (doseDeGasto ? recorteDoNovoGasto(alvo) : null) ?? alvo.getBoundingClientRect();
       const fora = r.bottom < fundoDoTopoFixo() + 24 || r.top > alturaVisivel() - 24;

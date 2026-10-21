@@ -1,0 +1,60 @@
+import { useEffect, type RefObject } from "react";
+
+/* Movido do MontarFinancas (20/10) pra servir também o "Rotina pronta em 3 toques" (MontarRotina): a mesma folha fixa
+ * de tela inteira, o mesmo teclado do iPhone cobrindo o "+ Outro" e o botão. Quem usa esconde o que sobra com
+ * `[data-teclado]` no CSS dele. */
+/**
+ * Com o teclado do iPhone aberto, a folha (fixa, tela inteira) passa a ocupar só a área VISÍVEL
+ * (visualViewport): o campo em foco vai pro meio e o botão fica logo acima do teclado. Fora do
+ * iPhone (sem visualViewport encolhendo) nada muda. A faixa da missão, se estiver visível em cima,
+ * continua por cima: a folha começa embaixo dela.
+ */
+export function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const el = ref.current;
+    if (!vv || !el) return;
+    let aberto = false;
+    let t = 0;
+    const centralizarCampo = () => {
+      const ativo = document.activeElement as HTMLElement | null;
+      if (ativo && el.contains(ativo) && /^(INPUT|TEXTAREA)$/.test(ativo.tagName)) ativo.scrollIntoView?.({ block: "center" });
+    };
+    const soltar = () => {
+      el.style.removeProperty("top");
+      el.style.removeProperty("bottom");
+      el.style.removeProperty("height");
+      el.removeAttribute("data-teclado");
+    };
+    const aplicar = () => {
+      t = 0;
+      const agoraAberto = vv.height < window.innerHeight - 140;
+      if (!agoraAberto) { if (aberto) soltar(); aberto = false; return; }
+      const html = document.documentElement;
+      const faixa = html.hasAttribute("data-missao-doses-faixa")
+        ? (parseFloat(getComputedStyle(html).getPropertyValue("--missao-doses-faixa-h")) || 40)
+        : 0;
+      const topo = Math.max(vv.offsetTop, faixa);
+      el.style.top = `${topo}px`;
+      el.style.bottom = "auto";
+      el.style.height = `${Math.max(0, vv.offsetTop + vv.height - topo)}px`;
+      el.setAttribute("data-teclado", "");
+      if (!aberto) window.setTimeout(centralizarCampo, 30); // acabou de abrir: o campo vai pro meio
+      aberto = true;
+    };
+    const agendar = () => { if (!t) t = window.setTimeout(aplicar, 0); };
+    // trocou de campo com o teclado já aberto: centraliza o novo
+    const aoFocar = () => { if (aberto) window.setTimeout(centralizarCampo, 30); };
+    vv.addEventListener("resize", agendar);
+    vv.addEventListener("scroll", agendar);
+    el.addEventListener("focusin", aoFocar);
+    aplicar();
+    return () => {
+      vv.removeEventListener("resize", agendar);
+      vv.removeEventListener("scroll", agendar);
+      el.removeEventListener("focusin", aoFocar);
+      if (t) window.clearTimeout(t);
+      soltar();
+    };
+  }, [ref]);
+}

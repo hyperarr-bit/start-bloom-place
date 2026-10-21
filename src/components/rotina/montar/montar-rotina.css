@@ -98,6 +98,11 @@ button.mrt-chip[data-escolha] { justify-content: center; min-height: 56px; font-
 .mrt-nota svg { flex-shrink: 0; margin-top: 2px; color: var(--mrt-ok); }
 .mrt-nota[data-aviso] { color: hsl(var(--muted-foreground)); }
 
+/* teclado do iPhone aberto (o "+ Outro" do hábito): a folha cabe na área visível (useFolhaAcimaDoTeclado) — sai o
+   cabeçalho e o "Pular" enquanto se digita, o botão fica logo acima do teclado (igual ao Montar Finanças) */
+.mrt[data-teclado] .mrt-cab, .mrt[data-teclado] button.mrt-pular { display: none; }
+.mrt[data-teclado] .mrt-rodape { padding-top: 10px; padding-bottom: 10px; }
+
 /* rodapé grudado embaixo: o botão nunca some atrás da prévia */
 .mrt-rodape { position: sticky; bottom: 0; margin-top: auto; padding: 18px 22px 14px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to bottom, hsl(var(--background) / 0) 0, hsl(var(--background)) 18px); }
 button.mrt-cta { width: 100%; min-height: 56px; border-radius: 16px; border: 0; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-size: 16px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .15s, transform .1s; }

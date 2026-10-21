@@ -76,6 +76,7 @@ import {
 } from "@/lib/montar-rotina";
 import { MontarRotina, ehACelulaDoGuia, quadradinhoDeHoje, recorteDoQuadradinho, type ResumoMontarRotina } from "@/components/rotina/montar/MontarRotina";
 import Rotina from "@/pages/Rotina";
+import { instalarTecladoIphone } from "./helpers/teclado-iphone";
 
 const UID = "u-mr";
 const HOJE = new Date(2026, 9, 17, 15, 0); // sábado 17/10/2026, 15h (a semana começa na segunda 12/10)
@@ -461,6 +462,32 @@ describe("a tela, com a conta vazia", () => {
     expect(controle.dados()["rotina-agenda-inicio"]).toBe("5:00");
     expect((controle.dados()["rotina-schedule"] as Agenda)["5:30"].Sábado).toBe("Acordar");
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toMatchObject({ acordar: "outro", itens: 1 });
+  });
+
+  it("TECLADO DE VERDADE (20/10): o '+ Outro' do hábito com o teclado do iPhone aberto — a folha cabe na área visível (o campo e o 'Adicionar' acima do teclado, como no Montar Finanças) e volta inteira quando o teclado fecha; o que ela escreveu entra marcado", async () => {
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 300 }); // iPhone SE
+    try {
+      montarTela();
+      await respirar();
+      fireEvent.click(tela().getByRole("button", { name: "7h" }));
+      await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
+      const folha = screen.getByTestId("montar-minha-rotina");
+      fireEvent.click(screen.getByTestId("montar-rotina-item-outro"));
+      const campo = screen.getByTestId("montar-rotina-item-texto") as HTMLInputElement;
+      expect(document.activeElement).toBe(campo);
+      teclado.abrir(campo);
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(true);
+      expect(folha.style.height).toBe(`${667 - 300}px`);
+      fireEvent.change(campo, { target: { value: "Caminhar 10 min" } });
+      fireEvent.click(screen.getByTestId("montar-rotina-item-adicionar"));
+      teclado.soltarFoco();
+      teclado.assentar();
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(false);
+      expect(folha.style.height).toBe("");
+      expect(screen.getByTestId("montar-rotina-previa").textContent).toContain("Caminhar 10 min");
+    } finally { teclado.desinstalar(); }
   });
 
   it("a 2ª pergunta não segue sem nenhum item; Voltar guarda as respostas", async () => {

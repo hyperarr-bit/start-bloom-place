@@ -55,6 +55,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { trocaDePasso } from "@/lib/movimento";
 import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import { useUserData } from "@/hooks/use-user-data";
+import { useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
@@ -193,6 +194,11 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   const avancar = useRef<number | null>(null);
   const vivo = useRef(true);
   useEffect(() => () => { vivo.current = false; if (avancar.current) window.clearTimeout(avancar.current); }, []);
+  /* 20/10 (caça aos bugs de aparelho): a mesma folha fixa do Montar Finanças, sem o conserto dele — com o teclado do
+   * iPhone aberto no "+ Outro" do hábito, o teclado cobria o campo/"Adicionar" e o botão de baixo (o Simulador usa o
+   * teclado do Mac e nunca mostra isso). Agora a folha cabe na área visível enquanto ela escreve. */
+  const folha = useRef<HTMLDivElement>(null);
+  useFolhaAcimaDoTeclado(folha);
 
   const acordar = horaDaResposta(opcao, outro);
   const pergunta: PerguntaDoLembrete = permissaoInicial === "denied" ? "negado" : onb.lembrete === "sem_aviso" ? "sem_aviso" : "perguntar";
@@ -381,7 +387,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   const nItens = escolhidos.length + proprios.length;
 
   return (
-    <div className="mrt" role="dialog" aria-modal="true" aria-label="Vamos montar sua rotina" data-testid="montar-minha-rotina" data-etapa={etapa} data-folha={`montar-rotina:${etapa}`}>
+    <div ref={folha} className="mrt" role="dialog" aria-modal="true" aria-label="Vamos montar sua rotina" data-testid="montar-minha-rotina" data-etapa={etapa} data-folha={`montar-rotina:${etapa}`}>
       <header className="mrt-cab">
         <Calendar className="mrt-cab-icone" aria-hidden />
         <span className="mrt-cab-nome">ROTINA</span>

@@ -2776,13 +2776,13 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     teclado = instalarTecladoIphone();
     expect(screen.getByTestId("anel-recorte")).toBeInTheDocument();
     const campo = abrirOutro();
-    const balao = postIt().parentElement!;
-    const topoAntes = balao.style.top;
+    const topoAntes = postIt().parentElement!.parentElement!.style.top; // o lugar do balão no Anel
+    expect(topoAntes).not.toBe("");
     teclado.abrir(campo, 120, 60); // o iPhone desloca a área visível pra mostrar o campo do post-it
     alvoEmbaixo(420); // o alvo "anda" na medida (rolagem/deslocamento) — antes o recorte ia junto pro lugar errado e o post-it pulava
     avancar(900);
     expect(screen.queryByTestId("anel-recorte")).toBeNull();
-    expect(postIt().parentElement!.style.top).toBe(topoAntes); // o post-it parado enquanto ela escreve
+    expect(postIt().parentElement!.parentElement!.style.top).toBe(topoAntes); // não vai atrás do alvo enquanto ela escreve
     expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo);
     fireEvent.click(within(postIt()).getByText("Cancelar"));
     teclado.soltarFoco();
@@ -2790,6 +2790,31 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     teclado.assentar();
     avancar(600);
     expect(screen.getByTestId("anel-recorte")).toBeInTheDocument();
+  });
+
+  it("toque real no Simulador (20/10, regressão pega no build bd198e7d): o post-it 'parado' deixava o campo ATRÁS do teclado (o iPhone não rola por campo dentro de algo fixed) — ele sobe o que precisa pra caber acima do teclado e depois não segue o anel", () => {
+    const alturas = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.querySelector?.('[data-testid="demo-guia-postit"]') && !this.matches('[data-testid="demo-guia-postit"]') ? 300 : 0;
+    });
+    try {
+      teclado = instalarTecladoIphone();
+      dose();
+      alvoEmbaixo(600);
+      avancar(900);
+      const balao = () => postIt().parentElement!.parentElement!; // o lugar do balão no Anel
+      const topoSemTeclado = parseFloat(balao().style.top);
+      expect(topoSemTeclado + 300).toBeGreaterThan(844 - 336); // com o teclado aberto, ficaria debaixo dele
+      const campo = abrirOutro();
+      teclado.abrir(campo, 0, 0);
+      avancar(900);
+      const topo = parseFloat(balao().style.top);
+      expect(topo + 300).toBeLessThanOrEqual(844 - 336 - 8); // inteiro acima do teclado: o campo, o R$ e o Adicionar à vista
+      alvoEmbaixo(200); // o alvo "anda" — o post-it não vai atrás dele enquanto ela escreve
+      act(() => { window.dispatchEvent(new Event("scroll")); });
+      avancar(900);
+      expect(parseFloat(balao().style.top)).toBe(topo);
+      expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo);
+    } finally { alturas.mockRestore(); }
   });
 
   it("print do dono: com o teclado aberto o iPhone desloca a área visível e a faixa 'Missão · dia 1 de 3' subia pra cima do relógio — enquanto deslocada, <html data-tela-deslocada> (o CSS tira a faixa); fechou, volta", () => {

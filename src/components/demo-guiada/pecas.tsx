@@ -454,20 +454,35 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo]);
 
+  /* a área visível (o teclado abre/fecha/troca de tipo): o balão confere se ainda cabe, sem esperar o anel medir */
+  const [areaVisivel, setAreaVisivel] = useState(() => alturaVisivel());
+  useEffect(() => {
+    const v = vv();
+    const mudou = () => setAreaVisivel(alturaVisivel());
+    v?.addEventListener("resize", mudou);
+    return () => v?.removeEventListener("resize", mudou);
+  }, []);
   // balão: acima do anel se couber entre o topo fixo e o anel; senão, embaixo
   useLayoutEffect(() => {
-    // escrevendo no balão: ele fica PARADO (o iPhone está ajustando a tela pro campo dele — mexer aqui é o loop)
-    if (!rect || !balaoRef.current || digitando || (noBalao && posicao)) return;
+    if (!rect || !balaoRef.current || digitando) return;
     const h = balaoRef.current.offsetHeight;
     const topoLivre = fundoDoTopoFixo() + 8;
     const fundoLivre = topoVisivel() + alturaVisivel() - alturaDoRodapeFixo() - 8;
+    /* escrevendo no balão: ele NÃO segue o anel (o recorte some; seguir o alvo enquanto o iPhone ajusta a tela é o loop)
+     * — só SOBE o que for preciso pra caber acima do teclado. O iPhone não rola por um campo dentro de algo `fixed`
+     * (toque real, 20/10: parado, o campo ficava atrás do teclado e ela digitava sem ver). */
+    if (noBalao && posicao) {
+      const topo = Math.max(topoLivre, Math.min(posicao.top, fundoLivre - h));
+      if (Math.abs(topo - posicao.top) >= 1) setPosicao({ top: topo });
+      return;
+    }
     const emCima = rect.top - 14 - h;
     const embaixo = rect.bottom + 16;
     const cabeEmbaixo = embaixo + h <= fundoLivre;
     const top = abaixo && cabeEmbaixo ? embaixo : emCima >= topoLivre ? emCima : Math.min(embaixo, fundoLivre - h);
     setPosicao({ top: Math.max(topoLivre, top) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rect, digitando, noBalao]);
+  }, [rect, digitando, noBalao, areaVisivel]);
 
   if (!rect || digitando || recolhido) return null;
   const pad = 8;

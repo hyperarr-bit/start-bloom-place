@@ -689,8 +689,9 @@ function Ligada() {
         }}
         aoPular={(via, passoPulado, segundos, extra) => {
           trackEvent("missao_pular", eventoDaMissao({ dia: n, passo: passoPulado, segundos, via, ...(passo.modo ? { modo: passo.modo } : {}), ...(extra ?? {}) }));
-          // "Ainda não gastei nada hoje" (sem o Montar) = a dose fica pra depois, como o "Pular" (medido à parte pelo `via`)
-          if (via === "faixa_20s" || via === "ainda_nao") {
+          // "Ainda não gastei nada hoje" (sem o Montar) = a dose fica pra depois, como o "Pular" (medido à parte pelo `via`);
+          // 1.0.17: o "Agora não" do post-it no dia 1 sem faixa é o "Pular" dela
+          if (via === "faixa_20s" || via === "ainda_nao" || via === "agora_nao") {
             const m = lerMissao() ?? missao;
             if (passo.modo === "aprofundar") {
               const deHoje = m.aprofundados?.[hoje] ?? [];

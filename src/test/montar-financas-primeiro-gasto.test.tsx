@@ -535,7 +535,10 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     const controle = montarAppEmFinancas();
     await avancar(300);
     expect(screen.getByTestId("montar-financas")).toBeTruthy();
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 1 de 3");
+    // 1.0.17 (dono 20/10): o dia 1 roda SEM a faixa preta (o atributo fica, com a altura zerada)
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("0");
+    expect(screen.getByTestId("montar-contexto")).toHaveTextContent("Tutorial · Finanças · 3 perguntas");
     await responderOMontar();
     await avancar(2500); // "Montando…" → o número
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
@@ -695,7 +698,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     missao("B");
     const controle = montarAppEmFinancas();
     await avancar(300);
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 4");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 4"); // o B segue com a faixa
     await responderOMontar();
     await avancar(2500);
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();

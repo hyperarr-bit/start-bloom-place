@@ -2,6 +2,8 @@
    por cima do cabeçalho do módulo; a página desce a altura dela enquanto o passo está na tela. */
 :root { --missao-doses-faixa-h: 40px; }
 html[data-missao-doses-faixa] body { padding-top: var(--missao-doses-faixa-h); }
+/* 1.0.17 (dono 20/10): a 1ª dose do braço A roda SEM a faixa preta — o atributo fica ("0") e a altura dela vira 0 */
+html[data-missao-doses-faixa="0"] { --missao-doses-faixa-h: 0px; }
 /* 03/10 (app das lojas): a faixa começa ABAIXO da status bar/notch (--app-safe-top, 0 na web) e o
    cabeçalho sticky do módulo desce safe-top + faixa — antes ela ficava atrás do horário/bateria. */
 html[data-missao-doses-faixa] header.sticky { top: calc(var(--app-safe-top, 0px) + var(--missao-doses-faixa-h)) !important; }

@@ -63,6 +63,7 @@ import {
 import { MontarFinancas, dicaDoVencimento } from "@/components/finance/montar/MontarFinancas";
 import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import Index from "@/pages/Index";
+import { instalarTecladoIphone } from "./helpers/teclado-iphone";
 
 const UID = "u-mfc";
 const HOJE = new Date(2026, 9, 16, 12, 0); // 16/10/2026 (sexta): faltam 16 dias contando hoje
@@ -439,6 +440,28 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
     expect(folha.style.top).toBe("44px");
     expect(folha.style.height).toBe(`${window.innerHeight - 300 - 44}px`);
     document.documentElement.style.removeProperty("--missao-doses-faixa-h");
+  });
+  it("1.0.17 — dia 1 SEM a faixa (atributo '0', altura 0): com o TECLADO DO iPHONE de verdade no campo da renda, a folha começa no topo da área visível (não 40 px abaixo, o `|| 40` de antes) e o botão fica acima do teclado", async () => {
+    document.documentElement.setAttribute("data-missao-doses-faixa", "0");
+    document.documentElement.style.setProperty("--missao-doses-faixa-h", "0px"); // o que o CSS faz com o atributo "0"
+    const teclado = instalarTecladoIphone();
+    try {
+      montarTela({ origem: "missao" });
+      const campo = screen.getByLabelText("Renda do mês em reais") as HTMLElement;
+      teclado.abrir(campo, 0, 0);
+      await respirar();
+      const folha = screen.getByTestId("montar-financas");
+      expect(folha.hasAttribute("data-teclado")).toBe(true);
+      expect(folha.style.top).toBe("0px");
+      expect(folha.style.height).toBe(`${teclado.altura}px`); // 844 − 336: a folha inteira acima do teclado
+      teclado.soltarFoco();
+      teclado.assentar();
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(false);
+    } finally {
+      teclado.desinstalar();
+      document.documentElement.style.removeProperty("--missao-doses-faixa-h");
+    }
   });
 });
 

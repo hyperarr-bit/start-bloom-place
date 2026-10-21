@@ -61,7 +61,10 @@ import { ConhecerMaisHost } from "@/components/intro-modulo/ConhecerMais";
 import { EVENTO_FIM_TOUR } from "@/lib/conhecer-mais";
 import { CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, _zerarIntroRemota, chaveIntroVista, porQueNaoMostrar, registrarIntroRemota } from "@/lib/intro-modulo";
 import { IntroDoModulo } from "@/components/intro-modulo/IntroDoModulo";
-import { PASSAGEM_B_MS, rotuloConhecerMais } from "@/components/missao-doses/PassoDoDia";
+import { PASSAGEM_B_MS, rotuloConhecerMais, semFaixaNaDose } from "@/components/missao-doses/PassoDoDia";
+import { alturaDaFaixa } from "@/hooks/use-folha-acima-do-teclado";
+import fsDaFaixa from "node:fs";
+import pathDaFaixa from "node:path";
 import { _novaAberturaDoTour, marcarTourFeito, varianteDoTour } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -646,7 +649,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(screen.queryByTestId("demo-guia-postit")).toBeNull();
   });
 
-  it("depois do Montar: o 'Pular' da faixa (aos 20 s) fecha a dose com a festa — a dose NÃO conta como pulada; fechar o app no post-it do gasto não desfaz a dose", () => {
+  it("depois do Montar (dia 1, SEM a faixa desde 20/10): nenhum 'Pular' de faixa nem aos 20 s — a saída é o 'Ainda não' do post-it, que fecha a dose com a festa (não conta como pulada); fechar o app no post-it do gasto não desfaz a dose", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     const fazerMontar = () => {
@@ -659,21 +662,23 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
       fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
       passarDaPonte();
     };
-    // 1) o "Pular" da faixa, que aparece aos 20 s
+    // 1) sem faixa no dia 1: nem a faixa nem o "Pular" dela, nem depois de 20 s — o "Ainda não" do post-it é a saída
     localStorage.removeItem("core-montar-financas");
     missaoA({});
     const store = montarStore({});
     montar(store, "/financas");
     fazerMontar();
-    esperarPostIt();
+    const postIt1 = esperarPostIt();
     avancar(20_000);
-    fireEvent.click(screen.getByTestId("missao-doses-pular"));
-    const festa = screen.getByTestId("missao-doses-festa");
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-pular")).toBeNull();
+    fireEvent.click(within(postIt1).getByTestId("missao-doses-ainda-nao"));
+    const festa = passarOlhaDeFinancas();
     expect(festa).toHaveTextContent("Dia 1 feito.");
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
     expect(lerMissao()?.feitos[1]).toBeDefined();
     expect(lerMissao()?.pulados).toBeUndefined();
-    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "gasto_extra", acao: "agora_nao" })]);
+    expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "gasto_extra", acao: "ainda_nao" })]);
     cleanup();
     // 2) fecha o app com o post-it do gasto na tela: a dose está gravada e o gasto fica PENDENTE — reabrir no mesmo
     //    dia volta NO PASSO DO GASTO, com os chips prontos (nunca o Montar) — a seção 15 cobre o resto
@@ -1487,6 +1492,65 @@ describe("13. contrato com a introdução dos módulos: o módulo já apresentad
   });
 });
 
+/* ------------------------------------------------------------ 10b: o dia 1 SEM a faixa preta (1.0.17, dono 20/10) */
+
+describe("10b. 1.0.17 (dono 20/10: 'não é necessário ter essa barra preta no topo'): a 1ª dose do braço A roda SEM a faixa 'Missão · dia 1 de 3' — e ninguém fica sem saída", () => {
+  it("a regra: só a 1ª dose do braço A (dias 2 e 3, o 'aprofundar' e o braço B seguem com a faixa)", () => {
+    expect(semFaixaNaDose("A", "dose", 1)).toBe(true);
+    expect(semFaixaNaDose("A", "dose", 2)).toBe(false);
+    expect(semFaixaNaDose("A", "dose", 3)).toBe(false);
+    expect(semFaixaNaDose("B", "dose", 1)).toBe(false);
+    expect(semFaixaNaDose(null, "dose", 1)).toBe(false);
+    expect(semFaixaNaDose("A", "aprofundar", 1)).toBe(false);
+  });
+
+  it("Saúde no dia 1 (conta vazia): nem faixa nem 'Pular' (nem aos 20 s); a altura dela zera ('0'); a saída é o 'Agora não' do post-it — a dose fica pra depois, como o 'Pular' fazia, e ela volta pra Home", () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    guardarChave(CHAVES_FUNIL_W.area, "saude");
+    const store = montarStore({});
+    montar(store, "/home");
+    fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+    expect(screen.getByTestId("rota")).toHaveTextContent("/saude");
+    const postIt = esperarPostIt();
+    avancar(20_000);
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(screen.queryByTestId("missao-doses-pular")).toBeNull();
+    // o atributo fica (quem precisa saber que a dose está na tela continua sabendo), com a altura zerada no CSS
+    expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("0");
+    expect(document.documentElement.getAttribute("data-missao-dose")).toBe("1");
+    const agoraNao = within(postIt).getByTestId("missao-doses-agora-nao");
+    expect(agoraNao).toHaveTextContent(/^Agora não$/);
+    fireEvent.click(agoraNao);
+    expect(screen.getByTestId("rota")).toHaveTextContent("/home");
+    expect(lerMissao()?.pulados).toEqual({ 1: "2026-10-03" });
+    expect(lerMissao()?.feitos[1]).toBeUndefined();
+    expect(eventos).toContainEqual(["missao_pular", expect.objectContaining({ dia: 1, passo: "toque", via: "agora_nao" })]);
+    expect(document.documentElement.hasAttribute("data-missao-doses-faixa")).toBe(false);
+  });
+
+  it("o dia 2 segue com a faixa (e o 'Pular' dela aos 20 s); o post-it do dia 2 não ganha o 'Agora não'", () => {
+    ligarUmPorDia("on");
+    missaoA({ 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } }, { dicas: { 2: "2026-10-04" } });
+    vi.setSystemTime(new Date(2026, 9, 4, 15, 10));
+    montar(montarStore({}), "/rotina");
+    const postIt = esperarPostIt();
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 2 de 3");
+    expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("1");
+    expect(within(postIt).queryByTestId("missao-doses-agora-nao")).toBeNull();
+    avancar(20_000);
+    expect(screen.getByTestId("missao-doses-pular")).toBeInTheDocument();
+  });
+
+  it("o CSS zera a altura da faixa com o atributo '0' (a página não desce 40 px por nada) e a folha acima do teclado lê o 0 como 0 (o `|| 40` de antes virava 40)", () => {
+    const css = fsDaFaixa.readFileSync(pathDaFaixa.resolve(__dirname, "../components/missao-doses/missao-doses.css"), "utf8");
+    expect(css).toMatch(/html\[data-missao-doses-faixa="0"\]\s*\{\s*--missao-doses-faixa-h:\s*0px;\s*\}/);
+    expect(alturaDaFaixa("0px")).toBe(0);
+    expect(alturaDaFaixa(" 40px")).toBe(40);
+    expect(alturaDaFaixa("")).toBe(40);
+  });
+});
+
 /* ------------------------------------------------------------ 14: a dose de Finanças termina OLHANDO o número */
 
 describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º gasto → UM balão no MEU MÊS ('Saiu' + 'Hoje ainda dá pra gastar', o número do card do Dashboard) → festa", () => {
@@ -1839,7 +1903,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
   });
 
-  it("no máximo 2 retomadas: a 3ª abertura sem o gasto é a Home de sempre; num dia novo, nada; 'Pular' na retomada fecha a dose com a festa", () => {
+  it("no máximo 2 retomadas: a 3ª abertura sem o gasto é a Home de sempre; num dia novo, nada; o 'Ainda não' na retomada fecha a dose com a festa (dia 1 sem faixa: sem 'Pular')", () => {
     ligarUmPorDia("on");
     missaoNova("A");
     const store = montarStore({});
@@ -1862,12 +1926,14 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     // num dia novo, a pendência de ontem não vale
     localStorage.setItem(CHAVE_ESTADO_MISSAO_DOSES, JSON.stringify({ ...lerMissao()!, gastoGuiado: { n: 1, dia: "2026-10-03", retomadas: 0 } }));
     expect(retomadaDoGasto(lerMissao(), "2026-10-04")).toBeNull();
-    // Pular na retomada: a festa (a dose já estava feita), nada de "pulada"
+    // a saída na retomada (1.0.17: o dia 1 não tem faixa nem "Pular" — o "Ainda não" do post-it): a festa (a dose já
+    // estava feita), nada de "pulada"
     montar(store, "/financas");
     ate(postItNaTela);
     avancar(20_000);
-    fireEvent.click(screen.getByTestId("missao-doses-pular"));
-    expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito.");
+    expect(screen.queryByTestId("missao-doses-pular")).toBeNull();
+    fireEvent.click(within(screen.getAllByTestId("demo-guia-postit").at(-1)!).getByTestId("missao-doses-ainda-nao"));
+    expect(passarOlhaDeFinancas()).toHaveTextContent("Dia 1 feito.");
     expect(lerMissao()?.pulados).toBeUndefined();
     expect(lerMissao()?.gastoGuiado).toBeUndefined();
   });

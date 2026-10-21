@@ -179,7 +179,14 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
         <IncomeTable incomes={incomes} setIncomes={setIncomes} />
       </div>
       <div className="min-w-0">
-        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} mes={mesId} projetados={fixosProjetados} />
+        {/* (21/10, chamado "os custos fixos pagos não deviam sumir quando vira o mês"):
+            o ✓ do fixo COM Dia mora na conta fx-<id> do balde de contas — e a virada
+            guarda o retrato das contas do mês que acabou (finance-AAAA-mes-dueDays)
+            com os ✓ dentro. A planilha do mês passado só não ENTREGAVA esse balde à
+            tabela, que caía no `pagoEm` (vazio pra fixo com Dia) e mostrava setembro
+            inteiro como não pago. Passa o balde do próprio mês: corrente, passado ou
+            futuro, a conta lida/gravada é sempre a da chave deste mês. */}
+        <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} dueDays={dueDays as any[]} setDueDays={setDueDays as (d: any[]) => void} mes={mesId} projetados={fixosProjetados} />
       </div>
       <div className="min-w-0">
         <ExpenseTable expenses={expenses} setExpenses={setExpenses} mes={mesId} />

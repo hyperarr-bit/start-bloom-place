@@ -555,6 +555,24 @@ describe("1.0.17 — toque duplo nos 'Continuar' do Montar não pula passo", () 
   });
 });
 
+describe("1.0.17 — trocar de passo com o teclado aberto", () => {
+  it("o 'Continuar' com o campo da renda focado solta o campo ANTES de trocar o passo (nada de campo focado sumindo do DOM); o fundo da folha continua atrás do teclado", () => {
+    montarTela();
+    const renda = tela().getByLabelText("Renda do mês em reais") as HTMLInputElement;
+    renda.focus();
+    fireEvent.change(renda, { target: { value: "3000" } });
+    expect(document.activeElement).toBe(renda);
+    const blur = vi.fn();
+    renda.addEventListener("blur", blur);
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(blur).toHaveBeenCalled();
+    expect(screen.getByTestId("montar-financas")).toHaveAttribute("data-etapa", "contas");
+    expect(document.activeElement === document.body || document.activeElement === null).toBe(true);
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
+    expect(css).toMatch(/\.mf\[data-teclado\]::after \{ content: ""; position: absolute;[^}]*top: 100%;[^}]*background: hsl\(var\(--background\)\)/);
+  });
+});
+
 describe("1.0.17 — o número do dia 1 é UM só (número, ponte, festa)", () => {
   it("R$ 103,6 por dia: o rótulo da missão, a festa e a ponte dizem R$ 104 (nada de Math.floor de um lado e Math.round do outro)", () => {
     expect(porDiaNaTela(103.6)).toBe(104);

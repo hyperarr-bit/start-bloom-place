@@ -71,7 +71,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import { useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
+import { soltarCampoDe, useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
 import { useGuardaDeToque } from "@/hooks/use-guarda-de-toque";
 import { reais } from "@/lib/dinheiro";
 import { marcarCartoesVistos } from "@/lib/tour-home";
@@ -256,7 +256,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
   const [etapa, setEtapa] = useState<Etapa>(retomada ? (retomada.ponte ? "ponte" : "pronto") : rascunho?.etapa ?? "renda");
   /** 1.0.17: a troca de passo desliza pro lado certo (avançar → da direita; Voltar → da esquerda) */
   const direcao = useRef(1);
-  const voltarPara = (e: Etapa) => { direcao.current = -1; setEtapa(e); };
+  const voltarPara = (e: Etapa) => { soltarCampoDe(folha.current); direcao.current = -1; setEtapa(e); };
   /** 1.0.17: o 2º toque rápido no "Continuar" caía no "Continuar" do passo seguinte (mesmo lugar) e pulava as contas —
    *  os botões do rodapé ignoram toques por ~450 ms depois de cada troca de passo (hooks/use-guarda-de-toque) */
   const guardar = useGuardaDeToque(etapa);
@@ -317,6 +317,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
   }, [etapa, cartao.usa, cartao.dia]);
 
   const irPara = (e: Etapa) => {
+    soltarCampoDe(folha.current);
     direcao.current = PASSO_DA_ETAPA[e] >= PASSO_DA_ETAPA[etapa] ? 1 : -1;
     setEtapa(e);
     if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[e], origem }));

@@ -100,6 +100,9 @@ button.mrt-chip[data-escolha] { justify-content: center; min-height: 56px; font-
 
 /* teclado do iPhone aberto (o "+ Outro" do hábito): a folha cabe na área visível (useFolhaAcimaDoTeclado) — sai o
    cabeçalho e o "Pular" enquanto se digita, o botão fica logo acima do teclado (igual ao Montar Finanças) */
+/* 1.0.17 (gravação no Simulador): com o teclado a folha encolhe até a área visível e, atrás da barra translúcida do
+   teclado, aparecia o módulo de baixo (a calculadora de Finanças). O fundo da folha continua por baixo do teclado. */
+.mrt[data-teclado]::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 100vh; background: hsl(var(--background)); pointer-events: none; }
 .mrt[data-teclado] .mrt-cab, .mrt[data-teclado] button.mrt-pular { display: none; }
 .mrt[data-teclado] .mrt-rodape { padding-top: 10px; padding-bottom: 10px; }
 

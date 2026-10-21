@@ -55,7 +55,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { trocaDePasso } from "@/lib/movimento";
 import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import { useUserData } from "@/hooks/use-user-data";
-import { useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
+import { soltarCampoDe, useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
 import { useGuardaDeToque } from "@/hooks/use-guarda-de-toque";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
@@ -271,6 +271,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   }, [cedeu, fase, etapa, opcao, outro, escolhidos, lembrete]);
 
   const irPara = (e: Etapa) => {
+    soltarCampoDe(folha.current);
     direcao.current = 1;
     setEtapa(e);
     if (e === "itens" || e === "lembrete") trackEvent(EV_PASSO, { n: PASSO[e], origem });

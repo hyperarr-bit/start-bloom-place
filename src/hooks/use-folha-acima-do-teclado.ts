@@ -16,6 +16,15 @@ export const alturaDaFaixa = (valorCss: string): number => {
   const n = parseFloat(valorCss);
   return Number.isFinite(n) && n >= 0 ? n : 40;
 };
+/** 1.0.17 (sentinela no Simulador: "CAMPO FOCADO SAIU DO DOM: Renda do mês"): o "Continuar" com o teclado aberto trocava
+ *  o passo com o campo ainda focado — o campo sumia do DOM focado e a página ficava rolada pelo teclado. Quem troca de
+ *  passo solta o campo antes (o teclado fecha junto com a troca, sem foco órfão). */
+export function soltarCampoDe(raiz: HTMLElement | null | undefined): void {
+  try {
+    const a = document.activeElement as HTMLElement | null;
+    if (a && raiz?.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName)) a.blur();
+  } catch { /* noop */ }
+}
 export function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;

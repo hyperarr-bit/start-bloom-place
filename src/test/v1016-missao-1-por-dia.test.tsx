@@ -2804,6 +2804,29 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     expect(document.documentElement.hasAttribute("data-tela-deslocada")).toBe(false);
   });
 
+  it("o Anel sozinho (o mesmo dos tutoriais de 1ª abertura): '+ Outro' do balão, o 'OK' do teclado com a área ainda pequena — o balão não sai nem remonta, o texto fica", () => {
+    teclado = instalarTecladoIphone();
+    const alvo = document.createElement("button");
+    document.body.appendChild(alvo);
+    render(<Anel alvo={alvo} fixo interativo duracao={60_000} aoSair={() => {}} testid="anel-x"
+      balao={<PostItDaMissao pergunta="O que você comeu?" chips={[{ emoji: "🍞", nome: "Pão" }]} aoChip={() => {}} outro={{ placeholder: "Escreva aqui", aoEscolher: () => {} }} />} />);
+    avancar(900);
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    const campo = screen.getByTestId("demo-guia-texto") as HTMLInputElement;
+    teclado.abrir(campo, 120, 40);
+    fireEvent.change(campo, { target: { value: "Tapioca" } });
+    avancar(500);
+    teclado.soltarFoco();
+    avancar(100);
+    expect(screen.queryByTestId("demo-guia-postit")).not.toBeNull();
+    avancar(350);
+    teclado.assentar();
+    avancar(500);
+    expect(screen.getByTestId("demo-guia-texto")).toBe(campo);
+    expect(campo.value).toBe("Tapioca");
+    alvo.remove();
+  });
+
   it("tocou em 'Cancelar' com o teclado aberto: o post-it não pisca (sai e volta) enquanto o teclado desce", () => {
     dose();
     teclado = instalarTecladoIphone();

@@ -6,6 +6,7 @@
  * na /assinar tem 1 ano (ou 1 mês) e NÃO tem senha (a conta nasce no pagamento, só com nome + e-mail): entra no app
  * com "Entrar sem senha — receber código por e-mail". Testado no vitest (src/test/venda-web-servidor.test.ts).
  */
+import { eh2027 } from "./pacote-2027.ts";
 import { OFERTA_CASAL, OFERTA_VITALICIO_HOJE, ehPlanoHoje, temKit } from "./ofertas-hoje.ts";
 export const OFERTA_PIX_ANUAL = "a97";
 /** 16/10: o PRESENTE do funil do app na web (/assinatura) — o mesmo anual por R$ 69,90 (6990), 365 dias. */
@@ -40,6 +41,7 @@ export function periodoDoEmailVenda(offer: string | null | undefined): PeriodoVe
 
 /** O planName da UTMify por oferta de Pix (antes: "annual" só pro a97, "lifetime" pra todo o resto — até o mês). */
 export function planoUtmify(offer: string | null | undefined): string {
+  if (eh2027(offer)) return "pacote_2027"; // 21/10: o upsell "Seu 2027" (u2027) não é plano
   if (ehAnualDaVenda(offer)) return "annual";
   if (ehMesDaVenda(offer)) return "monthly_prepaid";
   if (offer === OFERTA_CASAL) return "casal";
@@ -48,6 +50,7 @@ export function planoUtmify(offer: string | null | undefined): string {
 
 /** O nome que vai pra CAPI (content_name) e pra UTMify — mantém os antigos ("CORE Vitalício") pra quem não é venda. */
 export function nomeDoProduto(args: { offer?: string | null; periodo?: string | null; downsell?: boolean }): string {
+  if (eh2027(args.offer)) return "CORE Seu 2027"; // 21/10: o upsell "Seu 2027 já organizado" (u2027, R$ 19,90)
   // 18/10 (/hoje): os upsells têm nome próprio (o hc199 não é plano de quem pagou; hv47/hv27 = vitalício do upsell)
   if (args.offer === OFERTA_CASAL) return "CORE a dois";
   if (args.offer === "hv47" || args.offer === "hv27") return "CORE pra sempre";

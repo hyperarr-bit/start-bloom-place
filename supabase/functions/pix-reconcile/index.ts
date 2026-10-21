@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
+import { PRECO_2027_CENTAVOS, confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
@@ -83,6 +84,37 @@ const basicAuth = (key: string) => `Basic ${btoa(`${key}:`)}`;
 
 /** `valorReais`: só a Asaas devolve (15/10: o grant exige que cubra o preço da oferta). */
 type Veredito = { pago: boolean; status: string; valorReais?: unknown };
+
+/** 21/10 (upsell "Seu 2027", u2027): o Purchase 19,90 — o mesmo formato do Purchase da varredura (event_id = pedido,
+ *  event_time = criação do QR, sinais do pix_order_created). */
+type Pedido2027 = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null };
+async function capi2027(o: Pedido2027, email: string | null, cents: number): Promise<string> {
+  if (!Deno.env.get("META_PIXEL_ID") || !Deno.env.get("META_CAPI_TOKEN")) return "skipped_no_secrets";
+  try {
+    const sha = async (val: string) => {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(val.trim().toLowerCase()));
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    };
+    const res = await fetchNosPixels({
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [{
+        event_name: "Purchase", event_time: Math.floor(new Date(o.criadoEm).getTime() / 1000), event_id: o.orderId,
+        action_source: "website", event_source_url: o.sourceUrl ?? "https://www.coreaplicativo.com.br",
+        user_data: {
+          ...(email ? { em: [await sha(email)] } : {}),
+          external_id: [await sha(o.uid)],
+          ...(o.fbc ? { fbc: o.fbc } : {}),
+          ...(o.fbp ? { fbp: o.fbp } : {}),
+          ...(o.ip && o.ua ? { client_ip_address: o.ip, client_user_agent: o.ua } : {}),
+        },
+        custom_data: { value: cents / 100, currency: "BRL", content_name: nomeDoProduto({ offer: "u2027" }) },
+      }] }),
+    });
+    return res.ok ? "sent" : `error_${res.status}`;
+  } catch {
+    return "error_throw";
+  }
+}
 
 async function statusAbacate(key: string, id: string): Promise<Veredito> {
   const res = await fetch(`${ABACATE_API}/transparents/check?id=${encodeURIComponent(id)}`, {
@@ -250,6 +282,8 @@ serve(async (req) => {
         .in("event_data->>order_id", adiantados.slice(i, i + 100));
       for (const g of gs ?? []) exibidos.add(String(g.event_data?.order_id ?? ""));
     }
+    /** 21/10: os pedidos do "Seu 2027" (u2027) — passada própria (gravam o pacote na conta, não linha de assinatura). */
+    const pedidos2027: Pedido2027[] = [];
     let adiantadosFora = 0;
     let ofertasDesconhecidas = 0;
 
@@ -262,6 +296,13 @@ serve(async (req) => {
       // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
       // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.
       const ofertaCrua = String(q.event_data?.offer ?? "");
+      if (eh2027(ofertaCrua)) {
+        pedidos2027.push({
+          uid, orderId: oid, criadoEm: String(q.created_at), amountCents: Number(q.event_data?.amount_cents) || null,
+          fbp: q.event_data?.fbp ?? null, fbc: q.event_data?.fbc ?? null, ip: q.event_data?.client_ip ?? null, ua: q.event_data?.user_agent ?? null, sourceUrl: q.event_data?.source_url ?? null,
+        });
+        continue;
+      }
       /* 18/10 (/hoje): o hc199 ("vida a dois") não credita quem pagou — quem libera a outra conta é a página (ação
        * `parceiro` do asaas-pix); o Purchase sai do check/webhook. Fora da varredura, e fora da conta de desconhecidas. */
       if (ehOfertaCasal(ofertaCrua)) continue;
@@ -309,6 +350,39 @@ serve(async (req) => {
     let sondadas = 0;
     const creditados: Array<Record<string, unknown>> = [];
     const falhas: Array<Record<string, unknown>> = [];
+
+    /* 21/10 (upsell "Seu 2027", u2027): pagou e o check/webhook não gravaram → o pacote vai pra conta de quem pagou aqui +
+     * Purchase 19,90 1x (a mesma trava do check/webhook). Quem já tem o pacote sai da fila numa consulta só. Entra em
+     * `creditados` com `pacote2027: true`. */
+    if (pedidos2027.length) {
+      const { data: comPacote } = await admin.from("user_data").select("user_id").eq("key", "core-pacote-2027").in("user_id", [...new Set(pedidos2027.map((o) => o.uid))]);
+      const jaTemPacote = new Set(((comPacote ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+      for (const o of pedidos2027) {
+        if (jaTemPacote.has(o.uid)) continue;
+        sondadas++;
+        let v: Veredito;
+        try { v = await statusAsaas(asaasKey, o.orderId); } catch (e) { falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) }); continue; }
+        if (!v.pago) continue;
+        const cents = o.amountCents ?? PRECO_2027_CENTAVOS;
+        if (!valorCobre(v.valorReais, cents)) { falhas.push({ orderId: o.orderId, erro: "valor_menor" }); continue; }
+        if (dryRun) { creditados.push({ uid: o.uid, orderId: o.orderId, offer: "u2027", pacote2027: true, dryRun: true }); continue; }
+        let capi = "ja_enviado";
+        const p27 = await confirmarPacote2027(admin, {
+          userId: o.uid, orderId: o.orderId, origem: "upsell",
+          enviarCompra: async () => {
+            const { data: au } = await admin.auth.admin.getUserById(o.uid);
+            capi = await capi2027(o, au?.user?.email ?? null, cents);
+          },
+        });
+        if (p27.r === "falhou") { falhas.push({ orderId: o.orderId, erro: "pacote2027_gravar" }); continue; }
+        jaTemPacote.add(o.uid);
+        await admin.from("analytics_events").insert({
+          event_name: "pix_reconciled", user_id: o.uid,
+          event_data: { order_id: o.orderId, offer: "u2027", pacote2027: true, gateway_status: v.status, amount_cents: cents, meta_capi: capi },
+        });
+        creditados.push({ uid: o.uid, orderId: o.orderId, offer: "u2027", pacote2027: true, capi });
+      }
+    }
 
     for (const [uid, ordens] of porUser) {
       /* 18/10 (/hoje): os upsells (hv47/hv27) são pagos por quem JÁ tem o plano ativo — a regra "já tem assinatura

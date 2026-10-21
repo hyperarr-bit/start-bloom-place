@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
+import { confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
@@ -480,6 +481,23 @@ serve(async (req) => {
         }
         logStep("Casal pago — esperando o e-mail da(o) parceira(o)", { id });
         return jsonResponse({ paid: true, status: "PAID", casal: true });
+      }
+      /* 21/10 (upsell "Seu 2027", u2027): não é assinatura — grava o pacote (`core-pacote-2027`) na conta de QUEM PAGOU +
+       * Purchase 19,90 1x por pedido (trava própria). Não gravou → PENDING (a página confere de novo; webhook/reconcile são a rede). */
+      if (eh2027(offer)) {
+        const p27 = await confirmarPacote2027(supabaseAdmin, {
+          userId: user.id, orderId: id, origem: "upsell",
+          enviarCompra: async () => {
+            await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+            await sendMetaCapi(supabaseAdmin, {
+              userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
+              fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+            });
+          },
+        });
+        if (p27.r === "falhou") { logStep("Seu 2027 pago mas o pacote não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
+        logStep("Seu 2027 pago — pacote na conta", { id, r: p27.r });
+        return jsonResponse({ paid: true, status: "PAID", pacote2027: true });
       }
       const concessao = CONCESSAO[offer];
       if (!concessao) {

@@ -45,7 +45,7 @@ import { trackEvent } from "@/lib/analytics";
 const KEY = "pix-purchase-pending";
 
 type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a97" | "a69"
-  | "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199";
+  | "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199" | "u2027";
 
 /* O VALOR VEM DAQUI, NÃO DE UM TERNÁRIO (31/08). O cabeçalho deste arquivo
  * conta o estrago de disparar o preço errado: R$47,80 de pixel onde entraram
@@ -56,6 +56,7 @@ type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a
 const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
   lifetime: 97.9, // 03/09: a web virou preço único — ver PIX_PRICES no PixCheckout
   w25: 24.9,      // 03/09: 1 mês pré-pago na web (2ª coluna do paywall)
+  u2027: 19.9,    // 21/10: o upsell "Seu 2027 já organizado" (supabase/functions/_shared/pacote-2027.ts)
 
   downsell: 19.9,
   w97: 97.9,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Fingerprint, ShieldCheck, User, X, Zap } from "lucide-react";
@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { upsell2027Ligado } from "@/lib/upsell-2027";
+/* 21/10: o upsell "Seu 2027" (src/upsell-2027) só carrega com a chave ligada (UPSELL_2027, src/lib/upsell-2027.ts) */
+const Fluxo2027 = lazy(() => import("@/upsell-2027/Fluxo2027").then((m) => ({ default: m.Fluxo2027 })));
 import { isNativeShell } from "@/lib/native-shell";
 import { isInAppBrowser } from "@/lib/funnel";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
@@ -605,6 +608,14 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
   const cpfRef = useRef<HTMLInputElement>(null);
+  /* UPSELL "SEU 2027" (21/10): no "Pagamento confirmado" do vitalício do /inicio, ANTES da tela com as lojas, a oferta
+   * "Seu 2027 já organizado" (src/upsell-2027/Fluxo2027) cobre o checkout; terminou → a confirmação de sempre. Decidido
+   * no mount: chave UPSELL_2027 (padrão OFF; QA `?up2027=on`), só funil do /inicio, só vitalício, nunca no Funil B nem
+   * no v2. Desligado: nada muda (o estado fica parado em false). */
+  const [pacote2027Ativo] = useState<boolean>(() =>
+    context === "funnel" && !funilB && !v2 && OFERTA_VITALICIA[offer]
+    && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio") && upsell2027Ligado());
+  const [pacote2027Feito, setPacote2027Feito] = useState(false);
   // 26/09: o toque em pagar = abertura do checkout; mede espera_ms do pix_generated.
   const toqueEm = useRef<number | null>(Date.now());
   // 26/09: sessão (anônima, se preciso) que começa a nascer no mount — ver o efeito abaixo.
@@ -1238,6 +1249,14 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   return (
     <div className="fixed inset-0 z-[400] bg-background overflow-y-auto">
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
+        {pacote2027Ativo && step === "confirmed" && !pacote2027Feito && (
+          <Suspense fallback={null}>
+            <div className="fn u27 u27-sobre" data-testid="inicio-2027"><div className="fn-corpo">
+              <Fluxo2027 origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+                onFim={() => setPacote2027Feito(true)} />
+            </div></div>
+          </Suspense>
+        )}
         {step !== "confirmed" && (
           <button
             onClick={() => { trackEvent("pix_checkout_close", { offer, context, step, ...marca }); onClose(step); }}

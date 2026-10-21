@@ -75,11 +75,12 @@ export function funilHojeLigado(busca: string = typeof window === "undefined" ? 
 /* ───────────────────────── planos e ofertas ───────────────────────── */
 
 export type PlanoHoje = "anual" | "mensal";
-export type OfertaHoje = "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199";
+/** 21/10: + u2027 ("Seu 2027 já organizado", src/lib/upsell-2027.ts) — o PixHoje cobra. */
+export type OfertaHoje = "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199" | "u2027";
 
 /** O preço de cada oferta em REAIS (o servidor guarda em centavos: ofertas-hoje.ts PRECOS_HOJE). */
 export const VALOR_OFERTA: Record<OfertaHoje, number> = {
-  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv279: 27.9, hv47: 47, hv27: 27, hc199: 19.9,
+  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv279: 27.9, hv47: 47, hv27: 27, hc199: 19.9, u2027: 19.9,
 };
 /** 20/10: o vitalício como PLANO do /hoje (OFERTA_HOJE = "vitalicio") — o mesmo produto/preço do /inicio (w27). */
 export const PLANO_VITALICIO = { oferta: "hv279" as const, valor: 27.9, conteudo: "core_vitalicio_hoje" };

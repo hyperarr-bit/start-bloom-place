@@ -19,8 +19,11 @@
  *      dinheiro/"tudo" (scratchpad/definitiva/8-trial-desenho.md):
  *      Montar → a tela do número, SÓ o número (17/10, revisão do dono: "o 'quanto posso gastar hoje' deveria
  *      ser o foco"): "VOCÊ PODE GASTAR HOJE / R$ X por dia" subindo de 0 (~0,6 s; sem animação pra quem pediu
- *      menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →". O 1º gasto ("Já gastou com alguma
- *      coisa hoje?") é o tutorial guiado no formulário de verdade, que a missão abre logo depois (PassoDoDia).
+ *      menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →". 1.0.17 (dono 20/10): a 1ª pergunta leva o
+ *      cartão "Tutorial · Finanças · 3 perguntas"; o "Montando" é a conta dela entrando linha por linha (sem a bola); e
+ *      entre o número e o 1º gasto vem a PONTE ("Agora vamos anotar seu primeiro gasto." · [Ir pro app] · "Ainda não
+ *      gastei" → `onAindaNaoGastei`). O 1º gasto é o tutorial guiado no formulário de verdade, que a missão abre logo
+ *      depois (PassoDoDia).
  *      Quem cuida da missão liga; nada aqui mexe nela:
  *
  *        import { MontarFinancas, deveMostrarMontarFinancas, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA }
@@ -35,8 +38,8 @@
  *
  *      FECHAR O APP ANTES DE VER O NÚMERO (B11): o Montar já decidiu (grava na entrada do "Montando"); se o app
  *      morre no "Montando…", `deveMostrarMontarFinancas` responde true — hoje, nesta conta (`lerTelaDoNumero
- *      (criadoEm)` de lib/montar-financas ≠ null) — e a tela abre direto NO NÚMERO. O número que APARECEU não volta
- *      (sai da marca na hora): reabrir depois disso é o tutorial do 1º gasto.
+ *      (criadoEm)` de lib/montar-financas ≠ null) — e a tela abre direto NO NÚMERO. O número que APARECEU não volta:
+ *      a marca passa a apontar pra PONTE (reabrir volta nela); saiu da ponte, reabrir é o tutorial do 1º gasto.
  *
  *      É uma folha fixa por cima de tudo (z 200), que começa abaixo da faixa da missão. UMA TELA POR VEZ:
  *      se a do módulo (a) estiver aberta, ela some quando a da missão monta (`onCeder`), e o módulo não

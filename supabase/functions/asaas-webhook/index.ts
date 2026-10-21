@@ -7,6 +7,9 @@ import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoj
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import {
+  PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarPlano30, mandarLinkPorEmail, reservar,
+} from "../_shared/presente.ts";
 
 /**
  * Webhook do ASAAS (21/07) — fecha o "pagou e não liberou" de quem paga no
@@ -41,7 +44,9 @@ const ASAAS_API = "https://api.asaas.com/v3";
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
 // 18/10: as ofertas do funil web novo (/hoje) vêm de _shared/ofertas-hoje.ts — a MESMA fonte nas 3 funções.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
+// 21/10: `pv149` = o PRESENTE (R$ 14,90, _shared/presente.ts) — fora do CONCESSAO (vira código pra outra pessoa);
+// `pk99` = o downsell do plano de 30 dias (R$ 9,90) — grava o kit na conta de quem pagou, não é assinatura.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
 /* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
  * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
  * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
@@ -194,6 +199,16 @@ async function enviarResend(para: string, assunto: string, html: string): Promis
   return !!r?.ok;
 }
 
+/** 21/10 (presente): manda um corpo pronto do Resend (com reply_to). true = saiu. */
+async function enviarCorpoResend(corpo: Record<string, unknown>): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
 serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
@@ -244,6 +259,35 @@ serve(async (req) => {
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
     /* 18/10 (/hoje, "vida a dois"): o hc199 não credita quem pagou (a página libera a outra conta pela ação `parceiro`).
      * Aqui só o Purchase, 1x por pedido — cobre quem pagou e fechou a aba antes do check da página. */
+    /* 21/10 (presente, pv149): pagou e fechou a aba antes do check → o código nasce aqui (1 por pedido), o Purchase 14,90
+     * sai 1x (IP/UA do pedido) e o link vai por e-mail se a conta já tem e-mail. Quem pagou não ganha linha. */
+    if (ehOfertaPresente(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
+      const presente = await garantirPresente(admin, { orderId: qrCodeId, compradorId: userId, valorCentavos: PRECOS_CENTAVOS[offer] });
+      if (!presente) { logStep("Presente pago — código não gravou (o reconcile tenta de novo)", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, granted: false, presente: true, error: "codigo" }); }
+      const { data: uc } = await admin.auth.admin.getUserById(userId);
+      const emailComprador = uc?.user?.email ?? null;
+      if (await reservar(admin, chaveCapiPresente(qrCodeId), "capi")) {
+        await sendToUtmify(admin, { userId, email: emailComprador, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+        await sendMetaCapi(admin, { userId, email: emailComprador, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ip: regData.client_ip ?? null, ua: regData.user_agent ?? null });
+      }
+      if (emailComprador) {
+        const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+        await mandarLinkPorEmail(admin, { orderId: qrCodeId, codigo: presente.codigo, para: emailComprador, de: from, enviar: enviarCorpoResend });
+      }
+      return jsonResponse({ received: true, granted: false, presente: true });
+    }
+    /* 21/10 (downsell do presente, pk99): o plano de 30 dias na conta de QUEM PAGOU + Purchase 9,90 1x (IP/UA do pedido). */
+    if (ehOfertaPlano30(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
+      const lib = await liberarPlano30(admin, { userId, orderId: qrCodeId });
+      if (lib === "falhou") return jsonResponse({ received: true, granted: false, plano30: true, error: "gravar" });
+      if (await reservar(admin, chaveCapiPlano30(qrCodeId), "capi")) {
+        const { data: uc } = await admin.auth.admin.getUserById(userId);
+        const em = uc?.user?.email ?? null;
+        await sendToUtmify(admin, { userId, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+        await sendMetaCapi(admin, { userId, email: em, orderId: qrCodeId, offer, amountCents: PRECOS_CENTAVOS[offer], fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null, ip: regData.client_ip ?? null, ua: regData.user_agent ?? null });
+      }
+      return jsonResponse({ received: true, granted: true, plano30: true });
+    }
     if (ehOfertaCasal(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
       const { error: travaCapi } = await admin.from("webhook_events").insert({ id: chaveCapiCasal(qrCodeId), source: "hoje", event: "casal_capi" });
       if (!travaCapi) {

@@ -70,10 +70,11 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import {
   CHAVE_MONTAR_FINANCAS, EV_PRIMEIRO_GASTO, _novaAberturaMontar, _zerarRemotaMontar, _zerarResultadoVisto, calcularMontar,
   deveMostrarMontarFinancas, lerTelaDoNumero, marcaDoAparelho,
-  exemploDaPonte,
+  exemploDaPonte, EVENTO_MONTAR_FINANCAS_FIM,
 } from "@/lib/montar-financas";
 import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, PONTE_CENA_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
+import { fraseDoFeito, porDiaNaTela, rotuloDoNumero } from "@/components/missao-doses/PassoDoDia";
 import { CHAVE_ESTADO_MISSAO_DOSES, definirDonoDaMissao, donoDaConta, iniciarMissao, lerMissao } from "@/lib/missao-doses";
 import { CHAVE_BRACO_DIA1, _zerarUmPorDiaRemoto, registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 import { CHAVE_SEM_GASTO } from "@/lib/acao-do-dia";
@@ -504,6 +505,31 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
   });
 });
 
+describe("1.0.17 — o número do dia 1 é UM só (número, ponte, festa)", () => {
+  it("R$ 103,6 por dia: o rótulo da missão, a festa e a ponte dizem R$ 104 (nada de Math.floor de um lado e Math.round do outro)", () => {
+    expect(porDiaNaTela(103.6)).toBe(104);
+    expect(rotuloDoNumero(103.6, 3)).toBe("Pode gastar R$ 104 por dia");
+    expect(fraseDoFeito("financas", rotuloDoNumero(103.6, 3))).toBe("R$ 104 por dia, já nas suas Finanças.");
+    expect(fraseDoFeito("financas", rotuloDoNumero(103.6, 3), 103.6)).toBe("R$ 104 por dia, já nas suas Finanças.");
+    expect(exemploDaPonte(porDiaNaTela(103.6))).toEqual({ gasto: 12, depois: 92 });
+    expect(rotuloDoNumero(0, 2)).toBe("Renda e 2 contas do mês");
+    expect(rotuloDoNumero(0.4, 1)).toBe("Renda e 1 conta do mês");
+  });
+  it("o EVENTO_MONTAR_FINANCAS_FIM leva o número que a tela mostra (o rótulo do dia gravado no 'Montando' usa ESTE)", async () => {
+    const recebidos: Array<Record<string, unknown>> = [];
+    const ouvir = (e: Event) => recebidos.push((e as CustomEvent).detail);
+    window.addEventListener(EVENTO_MONTAR_FINANCAS_FIM, ouvir);
+    try {
+      montarTela();
+      await ateONumero();
+    } finally {
+      window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, ouvir);
+    }
+    const doNumero = Number(screen.getByTestId("montar-por-dia").getAttribute("data-valor"));
+    expect(recebidos.find((d) => d.resultado === "pronto")).toMatchObject({ resultado: "pronto", porDia: doNumero });
+  });
+});
+
 describe("fechar o app: o número que ainda não apareceu volta; o que apareceu, não (B11)", () => {
   it("morreu no 'Montando…' (já gravou, o número ainda não apareceu) → reabre DIRETO no número; aí o número foi visto e não volta mais", async () => {
     const controle = montarTela({ esperaMs: 60_000 });
@@ -650,7 +676,9 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(doMontar).toBe(calcularMontar(3000, [{ id: "a", nome: "Aluguel", emoji: "", valor: 900, categoria: "moradia" }, { id: "l", nome: "Luz", emoji: "", valor: 150, categoria: "contas_casa" }, { id: "i", nome: "Internet", emoji: "", valor: 100, categoria: "internet_telefone" }], HOJE).porDia);
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`); // a dose já conta
-    await tocar(screen.getByTestId("montar-ponte-ir")); // 1.0.17: a ponte pro 1º gasto
+    // 1.0.17: a ponte pro 1º gasto — o MESMO número da tela anterior
+    expect(lido(screen.getByTestId("montar-ponte-numero"))).toBe(`R$ ${doMontar} por dia`);
+    await tocar(screen.getByTestId("montar-ponte-ir"));
     // o TUTORIAL no formulário de verdade
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -692,6 +720,11 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
     // 1.0.17 (dono: "a festa tem informação demais"): "Dia 1 feito." + 1 linha do que ficou + "Amanhã: Rotina." + 1 botão
     expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    /* 1.0.17 (prints do dono: "R$ 104 por dia" no número e "R$ 103 por dia" na festa): a festa diz o MESMO número do
+       número, da ponte e do riscado do "Seu mês" — não a média refeita com o café (aqui 115,6 → 116 antes, 114,9 → 115 depois) */
+    expect(numeroGrande).not.toBe(doMontar);
+    expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(`R$ ${doMontar} por dia, já nas suas Finanças.`);
+    expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`);
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
     expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: Rotina.");
     expect(screen.getByTestId("missao-doses-continuar")).toHaveTextContent("Até amanhã");

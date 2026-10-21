@@ -314,10 +314,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
     if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[e], origem }));
   };
 
-  const decidir = (r: Resultado, nContas = 0, comCartao = false) => {
+  const decidir = (r: Resultado, nContas = 0, comCartao = false, porDia?: number) => {
     const marca = marcarMontarDecidido(r);
     set(CHAVE_MONTAR_FINANCAS, marca, { system: true });
-    try { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_FINANCAS_FIM, { detail: { resultado: r, contas: nContas, cartao: comCartao } })); } catch { /* sem window */ }
+    // `porDia` (1.0.17): o número que a tela vai mostrar — quem grava o rótulo do dia usa ESTE, não refaz a conta
+    try { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_FINANCAS_FIM, { detail: { resultado: r, contas: nContas, cartao: comCartao, ...(porDia !== undefined ? { porDia } : {}) } })); } catch { /* sem window */ }
   };
 
   const pular = () => {
@@ -363,10 +364,10 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
     }
     juntar("finance-incomes", receita);
     juntar("finance-fixed-expenses", fixosDaTela);
-    decidir("pronto", fixos.length, comCartao);
+    const final = calcularMontar(renda, contas, hoje, resposta);
+    decidir("pronto", fixos.length, comCartao, final.semFolga ? 0 : final.porDia);
     // o app morrer daqui até o número APARECER (o "Montando…"): a tela volta no número (B11)
     if (origem === "missao") guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao: resposta });
-    const final = calcularMontar(renda, contas, hoje, resposta);
     trackEvent(EV_PRONTO, ev({
       contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, apertado: mesApertado(final), origem, cartao: comCartao,
       ...(pulouCartao ? { cartao_pulou: true } : {}),

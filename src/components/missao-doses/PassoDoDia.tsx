@@ -570,7 +570,10 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         let depois = antes;
         try { const v = porDiaExato(getRef.current); depois = v === null ? 0 : Math.round(v); } catch { depois = antes; }
         pode = { antes: depois !== antes ? antes : null, depois };
-        setPorDiaDepois(depois);
+        /* 1.0.17 (prints do dono: o número dizia "R$ 104 por dia" e a festa "R$ 103 por dia"): a festa mostra o número do
+           DIA — o mesmo da tela do número, da ponte e do riscado do "Seu mês" —, não a média do mês refeita com o café
+           (que tira centavos e, arredondada, virava 1 real a menos) */
+        setPorDiaDepois(antes);
         /* 17/10 (dono, opção 3): com gasto, "Sobra pra hoje ~~R$ 123~~ R$ 111" — a linha "Sobram R$ X pra hoje" do card do
            Dashboard (a mesma conta), que um café MEXE (o número grande, a média do mês, quase não). "Não gastei": o de cima. */
         if (!semGasto) {
@@ -1061,14 +1064,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * da tela do número (SÓ o número — 17/10, revisão do dono) traz pra cá: a dose já conta e o 1º gasto é o TUTORIAL no
    * formulário de verdade (o anel no "+ Novo gasto", o post-it "Já gastou com alguma coisa hoje?"). */
   const montarPronto = (r: ResumoMontar) => {
-    const rot = r.semFolga || !(r.porDia > 0) ? `Renda e ${r.contas} ${r.contas === 1 ? "conta" : "contas"} do mês` : `Pode gastar R$ ${reais(Math.floor(r.porDia))} por dia`;
+    const rot = rotuloDoNumero(r.semFolga ? 0 : r.porDia, r.contas);
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "montar_financas", acao: "feito", contas: r.contas, segundos: segundos() }));
     // a tela substitui os cartões de Finanças (como no caminho do módulo, useMontarFinancasNoModulo.aoPronto)
     try { marcarCartoesVistos("financas"); } catch { /* storage bloqueado */ }
     rotuloDoMontar.current = rot;
     montarFeitoRef.current = true;
     // o número que o Montar acabou de mostrar É o do card (a mesma conta, arredondada igual): é o "antes" do olhar
-    porDiaAntes.current = r.semFolga || !(r.porDia > 0) ? null : Math.round(r.porDia);
+    porDiaAntes.current = r.semFolga || !(r.porDia > 0) ? null : porDiaNaTela(r.porDia);
     setRotulo(rot);
     setNumero(null);
     setMontarFeito(true);
@@ -1088,14 +1091,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     if (!montarAberto || !comBraco) return;
     let t = 0;
     const aoDecidir = (e: Event) => {
-      const d = (e as CustomEvent<{ resultado?: string; contas?: number }>).detail;
+      const d = (e as CustomEvent<{ resultado?: string; contas?: number; porDia?: number }>).detail;
       if (d?.resultado !== "pronto" || montarFeitoRef.current) return;
       t = window.setTimeout(() => {
         if (montarFeitoRef.current) return;
-        let porDia: number | null = null;
-        try { const v = porDiaExato(getRef.current); porDia = v === null ? null : Math.round(v); } catch { porDia = null; }
-        const contas = d.contas ?? 0;
-        const rot = porDia && porDia > 0 ? `Pode gastar R$ ${reais(porDia)} por dia` : `Renda e ${contas} ${contas === 1 ? "conta" : "contas"} do mês`;
+        // o número que o Montar calculou (o mesmo da tela do número); sem ele, o do card (a mesma conta)
+        let porDia: number | null = typeof d.porDia === "number" ? d.porDia : null;
+        if (porDia === null) { try { const v = porDiaExato(getRef.current); porDia = v === null ? null : v; } catch { porDia = null; } }
+        const rot = rotuloDoNumero(porDia ?? 0, d.contas ?? 0);
         rotuloDoMontar.current = rot;
         aoFeito(rot, segundos());
         aoGastoGuiado?.("pendente");
@@ -1502,6 +1505,16 @@ function LinkConhecerMais({ modulo, aoConhecerMais }: { modulo: ModuloDaMissao; 
   );
 }
 
+/** 1.0.17 — O número do dia 1 em TODAS as telas (número, ponte, "Seu mês" do olhar, festa) é um só: o "por dia" do
+ *  Montar arredondado pro real mais perto (o mesmo Math.round do calcularMontar e do card do Dashboard). Antes o rótulo
+ *  usava Math.floor e a festa a média refeita depois do café — 104 numa tela, 103 na outra. */
+export const porDiaNaTela = (v: number): number => Math.round(v);
+/** O rótulo que a missão grava no dia do Montar (e a festa lê): com folga, o número; sem, as contas. */
+export function rotuloDoNumero(porDia: number, contas: number): string {
+  const n = porDiaNaTela(porDia);
+  return n > 0 ? `Pode gastar R$ ${reais(n)} por dia` : `Renda e ${contas} ${contas === 1 ? "conta" : "contas"} do mês`;
+}
+
 /**
  * A frase do que a dose deixou feito, do jeito que se fala ("Você pode gastar R$ 61 por dia — e isso já está
  * nas suas Finanças."). `rotulo` é o que a missão grava no dia (o da Rotina é o nome do hábito; o da Saúde
@@ -1514,7 +1527,7 @@ export function fraseDoFeito(modulo: ModuloDaMissao, rotulo: string, porDiaAgora
   if (modulo === "financas") {
     const porDia = /^Pode gastar (R\$ [\d.,]+) por dia$/.exec(r);
     // o número de AGORA (o card acabou de mostrar, já com o gasto de hoje), senão o do Montar
-    if (porDia) return `${typeof porDiaAgora === "number" ? `R$ ${reais(Math.round(porDiaAgora))}` : porDia[1]} por dia, já nas suas Finanças.`;
+    if (porDia) return `${typeof porDiaAgora === "number" ? `R$ ${reais(porDiaNaTela(porDiaAgora))}` : porDia[1]} por dia, já nas suas Finanças.`;
     if (/^Renda e /.test(r)) return "Suas contas do mês já estão nas Finanças.";
     return `${r} nas suas Finanças.`;
   }

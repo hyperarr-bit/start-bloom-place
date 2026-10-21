@@ -304,7 +304,7 @@ describe("a tela, com a conta vazia", () => {
     fireEvent.click(screen.getByTestId("montar-ponte-ir"));
     expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);
-    expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
+    expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false, porDia: 78 }); // 1.0.17: o número da tela vai junto (o rótulo do dia usa este)
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
     // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado"), o "Continuar", a ponte e a saída dela

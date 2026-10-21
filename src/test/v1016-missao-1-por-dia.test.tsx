@@ -1589,7 +1589,8 @@ describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º ga
     for (let i = 0; i < 80 && !screen.queryByTestId("missao-doses-festa"); i++) avancar(50);
     expect(Date.now() - tToque).toBeLessThanOrEqual(4000);
     expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito.");
-    expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("R$ 372 por dia, já nas suas Finanças."); // o número de AGORA
+    // 1.0.17: a festa diz o número do DIA (o mesmo do número, da ponte e do riscado do balão), não a média refeita (372)
+    expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("R$ 375 por dia, já nas suas Finanças.");
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", acao: "feito", via: "auto" })]);
     // o card QUANTO POSSO GASTAR HOJE do Dashboard: o MESMO número do balão
     fireEvent.click(screen.getByText("DASHBOARD"));

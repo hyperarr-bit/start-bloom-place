@@ -88,6 +88,7 @@ import { TreinoPlano, type AcoesDoPlano } from "@/components/treino/TreinoPlano"
 import { tomDoDia } from "@/components/treino/planner";
 import { PeDoEsqueceu, TreinoDeOntem, type PedidoDeSalvar } from "@/components/treino/TreinoDeOntem";
 import { gravarTreinoDeOutroDia, tirarTreinoDoDia, treinouNoDia } from "@/lib/treino-outro-dia";
+import { bipeDoDescanso } from "@/lib/bipe-descanso";
 import { useMarcarOntem } from "@/hooks/use-marcar-ontem";
 import { aplicarModelo, exercicioNovo, moverNaLista, planoVazio, type DiaDoPlano } from "@/lib/treino-plano";
 
@@ -135,19 +136,8 @@ function migratePlan(plan: unknown): WorkoutPlan {
   return result;
 }
 
-/** Um AudioContext só pro bipe do descanso (26/09: criava um novo a cada bipe). */
-let audioDoDescanso: AudioContext | null = null;
-const bipeDoDescanso = () => {
-  try {
-    audioDoDescanso ??= new AudioContext();
-    if (audioDoDescanso.state === "suspended") void audioDoDescanso.resume();
-    const osc = audioDoDescanso.createOscillator();
-    osc.connect(audioDoDescanso.destination);
-    osc.frequency.value = 800;
-    osc.start();
-    setTimeout(() => osc.stop(), 300);
-  } catch { /* sem áudio no aparelho */ }
-};
+/* O bipe do descanso mora em lib/bipe-descanso (21/10: o `resume()` negado pelo
+   iOS virava rejeição solta → "Failed to start the audio device" no js_error). */
 
 type Aba = "hoje" | "plano" | "semana" | "evolucao";
 const ABAS: { id: Aba; label: string; icon: string }[] = [
@@ -383,7 +373,7 @@ const Treino = () => {
     const t = window.setTimeout(() => {
       // voltou da tela bloqueada muito depois: não bipa atrasado
       if (Date.now() - descansoAte < 3000) {
-        if (soundEnabled) bipeDoDescanso();
+        if (soundEnabled) void bipeDoDescanso();
         try { navigator.vibrate?.([200, 100, 200]); } catch { /* sem vibração */ }
       }
       setDescansoAte(null);

@@ -42,7 +42,7 @@ export function OfertaPlano30({ versao, onSim, onNao }: { versao: VersaoPlano30;
           </div>
         </div>
         <div className="pv-rodape">
-          <button type="button" className="pv-cta" onClick={onSim} data-testid="plano30-sim"><PixIcone />Quero meu plano · {reais(VALOR_PLANO30)}</button>
+          <button type="button" className="pv-cta" onClick={onSim} data-testid="plano30-sim"><PixIcone /><span>Quero meu plano · {reais(VALOR_PLANO30)}</span></button>
           <button type="button" className="pv-nao" onClick={onNao} data-testid="plano30-nao">Não, obrigado</button>
         </div>
       </div>
@@ -72,7 +72,7 @@ export function OfertaPlano30({ versao, onSim, onNao }: { versao: VersaoPlano30;
       </div>
       <div className="pv-rodape">
         <div className="pk-preco-linha"><strong data-testid="plano30-preco">{reais(VALOR_PLANO30)}</strong><small>Pix, uma vez · no app hoje</small></div>
-        <button type="button" className="pv-cta" onClick={onSim} data-testid="plano30-sim"><PixIcone />Quero meu plano</button>
+        <button type="button" className="pv-cta" onClick={onSim} data-testid="plano30-sim"><PixIcone /><span>Quero meu plano</span></button>
         <button type="button" className="pv-nao" onClick={onNao} data-testid="plano30-nao">Não, obrigado</button>
       </div>
     </div>

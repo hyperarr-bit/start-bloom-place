@@ -240,7 +240,8 @@ function TelaCartao({ estado, nomeSugerido, evento, onCodigo, onNome, onContinua
             setCopiado(true);
             evento("presente_link_copiado", { ok });
           }}>
-          {copiado ? <><Check size={18} strokeWidth={3} />Link copiado</> : <><Copy size={18} strokeWidth={2.4} />Copiar link</>}
+          {/* o texto em <span>: um <svg> sozinho como elemento faria a regra de área de toque do index.css (margem −8 px) pegar */}
+          {copiado ? <><Check size={18} strokeWidth={3} /><span>Link copiado</span></> : <><Copy size={18} strokeWidth={2.4} /><span>Copiar link</span></>}
         </button>
         <button type="button" className="pv-nao" onClick={() => { void salvarNome(); onContinuar(); }} data-testid="presente-continuar">Continuar</button>
       </div>

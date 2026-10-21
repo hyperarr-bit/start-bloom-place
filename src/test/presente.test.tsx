@@ -266,13 +266,12 @@ describe("/hoje com ?presente=on — quero presentear", () => {
 });
 
 describe("/hoje com ?presente=on — Agora não → downsell do plano de 30 dias", () => {
-  it("só pra área Dinheiro (as outras esperam o conteúdo); o /hoje é Dinheiro", () => {
+  it("toda área tem plano (sem área = 'Tudo'); o /hoje é Dinheiro; a chave do downsell desliga", () => {
     expect(DOWNSELL_PLANO30).toBe(true);
-    expect(depoisDoAgoraNao("dinheiro")).toBe("plano30");
-    expect(depoisDoAgoraNao("rotina")).toBe("fim");
-    expect(depoisDoAgoraNao(null)).toBe("fim");
+    for (const a of ["dinheiro", "rotina", "corpo", "saude", "metas"] as const) expect(depoisDoAgoraNao(a)).toBe("plano30");
+    expect(depoisDoAgoraNao(null)).toBe("plano30");
     expect(depoisDoAgoraNao("dinheiro", false)).toBe("fim");
-    expect(temPlano30("corpo")).toBe(false);
+    expect(temPlano30("corpo")).toBe(true);
   });
   it("Agora não → plano de 30 dias (dia 1 marcado, R$ 9,90) → Não, obrigado → pós-compra", async () => {
     await pagarVitalicio();
@@ -308,6 +307,8 @@ describe("/hoje com ?presente=on — Agora não → downsell do plano de 30 dias
     await waitFor(() => expect(screen.getByTestId("hoje-lojas")).toBeTruthy());
     const kit = upserts.find((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes") as { value: { comprado: boolean; pedido: string } } | undefined;
     expect(kit?.value).toMatchObject({ comprado: true, pedido: "qr_2_pk99" });
+    // o pedido do plano leva a área (o /hoje é Dinheiro) — os 3 caminhos do servidor gravam o plano dessa área
+    expect(invocacoes("asaas-pix", "create").find((b) => b.offer === "pk99")).toMatchObject({ area: "dinheiro" });
   });
 });
 

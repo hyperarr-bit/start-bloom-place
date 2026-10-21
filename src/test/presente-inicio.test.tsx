@@ -64,7 +64,7 @@ describe("/inicio — o presente no 'Pagamento confirmado'", () => {
     expect(eventos("presente_oferta_view")).toHaveLength(0);
   }, 20000);
 
-  it("ON: a oferta cobre a confirmação; 'Agora não' (área sem plano de 30 dias) → a confirmação com as lojas", async () => {
+  it("ON: a oferta cobre a confirmação; 'Agora não' → o plano de 30 dias da ÁREA do quiz (Rotina) → 'Não, obrigado' → as lojas", async () => {
     window.history.replaceState(null, "", "/inicio?presente=on");
     localStorage.setItem("core-funnel-area", "rotina");
     abrir();
@@ -74,9 +74,14 @@ describe("/inicio — o presente no 'Pagamento confirmado'", () => {
     expect(screen.getByTestId("presente-confirmado").textContent).toContain("R$ 27,90");
     expect(eventos("presente_oferta_view")[0]).toMatchObject({ origem: "inicio" });
     fireEvent.click(screen.getByTestId("presente-agora-nao"));
+    await waitFor(() => expect(screen.getByTestId("plano30")).toBeInTheDocument());
+    expect(screen.getByTestId("plano30").getAttribute("data-area")).toBe("rotina");
+    expect(screen.getByTestId("plano30-area").textContent).toContain("Começando por Rotina");
+    expect(document.body.textContent).toContain("Escolha 2 hábitos pequenos");
+    expect(eventos("plano30_view")[0]).toMatchObject({ area: "rotina", origem: "inicio" });
+    fireEvent.click(screen.getByTestId("plano30-nao"));
     await waitFor(() => expect(screen.queryByTestId("inicio-presente")).toBeNull());
     await waitFor(() => expect(screen.getByTestId("pix-confirmado-lojas")).toBeInTheDocument());
-    expect(eventos("plano30_view")).toHaveLength(0);
   }, 20000);
 
   it("ON + área Dinheiro: 'Agora não' → o plano de 30 dias; 'Não, obrigado' → as lojas", async () => {
@@ -91,6 +96,20 @@ describe("/inicio — o presente no 'Pagamento confirmado'", () => {
     fireEvent.click(screen.getByTestId("plano30-nao"));
     await waitFor(() => expect(screen.queryByTestId("inicio-presente")).toBeNull());
     await waitFor(() => expect(screen.getByTestId("pix-confirmado-lojas")).toBeInTheDocument());
+  }, 20000);
+
+  it("ON sem área no quiz → o plano 'Tudo' (30 dias pra vida entrar nos eixos); 'Quero meu plano' → Pix pk99 com a área", async () => {
+    window.history.replaceState(null, "", "/inicio?presente=on");
+    abrir();
+    await confirmou();
+    await waitFor(() => expect(screen.getByTestId("presente-agora-nao")).toBeInTheDocument(), { timeout: 5000 });
+    fireEvent.click(screen.getByTestId("presente-agora-nao"));
+    await waitFor(() => expect(screen.getByTestId("plano30")).toBeInTheDocument());
+    expect(screen.getByTestId("plano30").getAttribute("data-area")).toBe("tudo");
+    expect(screen.getByTestId("plano30-area").textContent).toContain("Um pouco de tudo");
+    fireEvent.click(screen.getByTestId("plano30-sim"));
+    await waitFor(() => expect(m.invoke.mock.calls.find((c) => c[0] === "asaas-pix" && c[1].body.offer === "pk99")).toBeTruthy());
+    expect(m.invoke.mock.calls.find((c) => c[0] === "asaas-pix" && c[1].body.offer === "pk99")![1].body).toMatchObject({ action: "create", area: "tudo" });
   }, 20000);
 
   it("ON: quero presentear → Pix pv149 → cartão já com o nome da conta", async () => {

@@ -11,6 +11,7 @@
  * QA sem mexer em ninguém: `?presente=on` (fica neste navegador; `?presente=off` tira).
  */
 import type { AreaKey } from "@/lib/funnel";
+import { AREAS_DO_PLANO, areaDoPlano, type AreaDoPlano } from "@/lib/plano-30-areas";
 
 export type ModoChavePresente = "on" | "off";
 export const UPSELL_PRESENTE: ModoChavePresente = "off";
@@ -80,9 +81,9 @@ export const primeiroNome = (v: string | null | undefined): string => String(v ?
 
 /* ───────────────────────── o downsell por área ───────────────────────── */
 
-/** Só a área Dinheiro tem conteúdo construído (o PLANO_30_DIAS do kit). As outras esperam o dono aprovar. */
-export const AREAS_COM_PLANO30: readonly AreaKey[] = ["dinheiro"];
-export const temPlano30 = (area: AreaKey | null | undefined): boolean => !!area && AREAS_COM_PLANO30.includes(area);
+/** 21/10 (tarde, dono: "faz tudo hoje"): TODAS as áreas têm plano (src/lib/plano-30-areas.ts) — sem área = "Tudo". */
+export const AREAS_COM_PLANO30: readonly AreaDoPlano[] = AREAS_DO_PLANO;
+export const temPlano30 = (area: AreaKey | null | undefined): boolean => AREAS_COM_PLANO30.includes(areaDoPlano(area));
 
 /* ───────────────────────── o fluxo (estado puro) ───────────────────────── */
 

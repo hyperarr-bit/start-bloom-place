@@ -10,7 +10,7 @@ import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_share
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import {
   DESCRICAO_PLANO30, DESCRICAO_PRESENTE, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente,
-  liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
+  areaPlano30, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
 } from "../_shared/presente.ts";
 
 /**
@@ -408,6 +408,8 @@ serve(async (req) => {
           /* 19/10: IP + user-agent do comprador SÓ existem aqui (o webhook é chamado pela Asaas). Sem o user-agent a Meta
            * DESCARTA o Purchase de site — o upsell pago com a aba já fechada (crédito pelo webhook/reconcile) sumia. */
           ...(clientIp && userAgent ? { client_ip: clientIp, user_agent: userAgent.slice(0, 400) } : {}),
+          /* 21/10: o plano de 30 dias (pk99) é da ÁREA do quiz — fica no pedido pros 3 caminhos que gravam o plano */
+          ...(ehOfertaPlano30(offer) && areaPlano30(body.area) ? { area: areaPlano30(body.area) } : {}),
         },
       });
       /* Sem a ponte, o QR vira um buraco: o webhook não sabe de quem é o
@@ -523,7 +525,7 @@ serve(async (req) => {
       }
       /* 21/10 (downsell do presente, pk99): o plano de 30 dias (o kit) na conta de QUEM PAGOU + Purchase 9,90 1x. */
       if (ehOfertaPlano30(offer)) {
-        const lib = await liberarPlano30(supabaseAdmin, { userId: user.id, orderId: id });
+        const lib = await liberarPlano30(supabaseAdmin, { userId: user.id, orderId: id, area: (reg?.[0]?.event_data as Record<string, unknown> | undefined)?.area });
         if (lib === "falhou") { logStep("Plano 30 dias pago mas não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
         if (await reservar(supabaseAdmin, chaveCapiPlano30(id), "capi")) {
           await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });

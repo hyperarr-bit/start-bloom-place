@@ -11,6 +11,7 @@ import { PixHoje, type PixSalvo } from "@/pages/hoje/PixHoje";
 import type { OfertaHoje } from "@/pages/hoje/conteudo";
 import { ConfetePresente, IconeZap, IlustraPresente } from "./IlustraPresente";
 import { OfertaPlano30 } from "./OfertaPlano30";
+import { areaDoPlano } from "@/lib/plano-30-areas";
 import { copiarTexto, gravarNomeDoPresente, meuPresente } from "./api";
 import "@/pages/hoje/funil-hoje.css";
 import "./presente.css";
@@ -45,6 +46,8 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
   versaoPlano30?: VersaoPlano30;
 }) {
   const [e, setE] = useState<EstadoPresente>(() => lerEstadoPresente(compra));
+  /** a área do plano de 30 dias (a do quiz; sem área = "tudo") */
+  const areaPlano = areaDoPlano(area);
   const set = useCallback((f: (x: EstadoPresente) => EstadoPresente) => {
     setE((x) => { const n = f(x); gravarEstadoPresente(n); return n; });
   }, []);
@@ -56,7 +59,7 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
   /* vistas (1 por chegada na tela) */
   useEffect(() => {
     if (e.etapa === "oferta") evento("presente_oferta_view", { copy });
-    if (e.etapa === "plano30") evento("plano30_view", { area, versao: versaoPlano30 });
+    if (e.etapa === "plano30") evento("plano30_view", { area: areaPlano, versao: versaoPlano30 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [e.etapa]);
 
@@ -114,14 +117,14 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
       <PixHoje key={oferta} oferta={oferta} valor={presente ? VALOR_PRESENTE : VALOR_PLANO30}
         rotulo={presente ? "CORE pra sempre · de presente" : "Plano de 30 dias pra organizar a vida"}
         faixa={<div className="pv-pix-cabeca">{presente ? "🎁 Presente pra alguém especial" : "🗓️ Seu plano de 30 dias"}</div>}
-        pix={pixDe(oferta)} onPix={onPix(oferta as "pv149" | "pk99")} ids={base}
+        pix={pixDe(oferta)} onPix={onPix(oferta as "pv149" | "pk99")} ids={base} extraNoPedido={presente ? null : { area: areaPlano }}
         onVoltar={() => set((x) => ({ ...x, etapa: presente ? "oferta" : "plano30" }))}
         onPago={(p) => {
           if (presente) {
             evento("presente_pago", { order_id: p.orderId, valor: VALOR_PRESENTE });
             set((x) => ({ ...x, pix: null, pedido: p.orderId, etapa: "cartao" }));
           } else {
-            evento("plano30_pago", { order_id: p.orderId, valor: VALOR_PLANO30, area });
+            evento("plano30_pago", { order_id: p.orderId, valor: VALOR_PLANO30, area: areaPlano });
             set((x) => ({ ...x, pix: null, plano30: p.orderId, etapa: "fim" }));
           }
         }} />
@@ -136,9 +139,9 @@ export function FluxoPresente({ origem, compra, valorPago, area, nomeSugerido = 
   }
 
   if (e.etapa === "plano30") {
-    return <OfertaPlano30 versao={versaoPlano30}
-      onSim={() => { evento("plano30_quero", { area, versao: versaoPlano30 }); set((x) => ({ ...x, etapa: "plano30pix" })); }}
-      onNao={() => { evento("plano30_nao", { area, versao: versaoPlano30 }); set((x) => ({ ...x, etapa: "fim" })); }} />;
+    return <OfertaPlano30 area={areaPlano} versao={versaoPlano30}
+      onSim={() => { evento("plano30_quero", { area: areaPlano, versao: versaoPlano30 }); set((x) => ({ ...x, etapa: "plano30pix" })); }}
+      onNao={() => { evento("plano30_nao", { area: areaPlano, versao: versaoPlano30 }); set((x) => ({ ...x, etapa: "fim" })); }} />;
   }
 
   return <div className="pv-tela" data-testid="presente-fim" />;

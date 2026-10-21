@@ -278,7 +278,7 @@ serve(async (req) => {
     }
     /* 21/10 (downsell do presente, pk99): o plano de 30 dias na conta de QUEM PAGOU + Purchase 9,90 1x (IP/UA do pedido). */
     if (ehOfertaPlano30(offer) && valorCobre(pago.value, PRECOS_CENTAVOS[offer])) {
-      const lib = await liberarPlano30(admin, { userId, orderId: qrCodeId });
+      const lib = await liberarPlano30(admin, { userId, orderId: qrCodeId, area: regData.area });
       if (lib === "falhou") return jsonResponse({ received: true, granted: false, plano30: true, error: "gravar" });
       if (await reservar(admin, chaveCapiPlano30(qrCodeId), "capi")) {
         const { data: uc } = await admin.auth.admin.getUserById(userId);

@@ -302,7 +302,7 @@ serve(async (req) => {
     let adiantadosFora = 0;
     let ofertasDesconhecidas = 0;
     /** 21/10: os pedidos de PRESENTE (pv149) — passada própria no fim (viram código, não linha de quem pagou). */
-    type PedidoExtra = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null };
+    type PedidoExtra = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null; area?: unknown };
     const pedidosPresente: PedidoExtra[] = [];
     /** 21/10: o downsell do plano de 30 dias (pk99) — passada própria no fim (grava o kit, não linha de assinatura). */
     const pedidosPlano30: PedidoExtra[] = [];
@@ -323,6 +323,7 @@ serve(async (req) => {
         (ehOfertaPresente(ofertaCrua) ? pedidosPresente : pedidosPlano30).push({
           uid, orderId: oid, criadoEm: String(q.created_at), amountCents: Number(q.event_data?.amount_cents) || null,
           fbp: q.event_data?.fbp ?? null, fbc: q.event_data?.fbc ?? null, ip: q.event_data?.client_ip ?? null, ua: q.event_data?.user_agent ?? null, sourceUrl: q.event_data?.source_url ?? null,
+          area: q.event_data?.area ?? null,
         });
         continue;
       }
@@ -553,7 +554,7 @@ serve(async (req) => {
         const cents = o.amountCents ?? PRECOS_CENTAVOS.pk99;
         if (!valorCobre(v.valorReais, cents)) { falhas.push({ orderId: o.orderId, erro: "valor_menor" }); continue; }
         if (dryRun) { planos30.push({ uid: o.uid, orderId: o.orderId, dryRun: true }); continue; }
-        const lib = await liberarPlano30(admin, { userId: o.uid, orderId: o.orderId });
+        const lib = await liberarPlano30(admin, { userId: o.uid, orderId: o.orderId, area: o.area });
         if (lib === "falhou") { falhas.push({ orderId: o.orderId, erro: "plano30_gravar" }); continue; }
         jaTemKit.add(o.uid);
         let capi = "ja_enviado";

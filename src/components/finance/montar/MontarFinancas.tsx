@@ -221,6 +221,10 @@ function CenaDaPonte({ porDia, apertado, parado }: { porDia: number; apertado: b
   );
 }
 
+/** 1.0.17 (gravação do Simulador, app aberto do zero na ponte): o módulo rolava até o gasto DEPOIS de a cópia do Montar
+ *  sumir (480 ms fixos não bastavam) — a cópia fica até a rolagem parar (mín. 480 ms, máx. 1,5 s). */
+const SEGURA_DA_SAIDA = { min: 480, max: 1500 } as const;
+
 /** O que o dia escolhido quer dizer NESTE mês — embaixo dos dias, pra ninguém se surpreender depois. */
 export function dicaDoVencimento(dia: number, hoje: Date): string {
   const ultimo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
@@ -457,7 +461,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
     saiu.current = true;
     // 1.0.17 (Simulador): o Montar sumia num quadro e o módulo aparecia no meio da página, rolando às pressas até o gasto
     // — a cópia do Montar some devagar por cima enquanto o módulo se ajeita embaixo
-    saidaCalma(folha.current, MOV_MS.base, 480); // inteira enquanto o módulo rola até o gasto; some com ele parado
+    saidaCalma(folha.current, MOV_MS.base, SEGURA_DA_SAIDA); // inteira enquanto o módulo rola até o gasto; some com ele parado
     fecharTelaDoNumero();
     onPronto?.(resumo());
   };
@@ -466,7 +470,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
     if (saiu.current) return;
     saiu.current = true;
     // a cópia da ponte fica inteira enquanto o módulo se ajeita embaixo (rola até o gasto / o MEU MÊS) e some com ele parado
-    saidaCalma(folha.current, MOV_MS.base, 480);
+    // (1.0.17, gravação: a cena parada no estado final — a cópia não recomeça a animação de entrada)
+    folha.current?.querySelector("[data-testid='montar-ponte-cena']")?.setAttribute("data-parado", "");
+    saidaCalma(folha.current, MOV_MS.base, SEGURA_DA_SAIDA);
     fecharTelaDoNumero();
     trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "ponte_saiu", via, ms: msDesdeOResultado() }));
     if (via === "ainda_nao" && onAindaNaoGastei) onAindaNaoGastei(resumo());

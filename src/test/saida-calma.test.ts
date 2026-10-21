@@ -45,6 +45,47 @@ describe("saidaCalma", () => {
     delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
   });
 
+  it("1.0.17 — { min, max }: a cópia fica inteira enquanto a tela de baixo ROLA e só some com ela parada (no máximo max)", () => {
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone)", configurable: true });
+    const animar = vi.fn(() => ({ onfinish: null }));
+    (HTMLElement.prototype as unknown as { animate: unknown }).animate = animar;
+    saidaCalma(folha(), 280, { min: 480, max: 1500 });
+    expect(document.querySelector("[data-saida-calma]")).not.toBeNull();
+    // o módulo rola até o gasto de 100 em 100 ms por 900 ms
+    for (let t = 0; t < 900; t += 100) { vi.advanceTimersByTime(100); document.dispatchEvent(new Event("scroll")); }
+    expect(animar).not.toHaveBeenCalled(); // ainda inteira: a rolagem não parou
+    vi.advanceTimersByTime(300); // parou há > 180 ms
+    expect(animar).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(800);
+    expect(document.querySelector("[data-saida-calma]")).toBeNull();
+    // rolagem que nunca para: sai no máximo
+    animar.mockClear();
+    saidaCalma(folha(), 280, { min: 480, max: 1500 });
+    for (let t = 0; t < 1700; t += 50) { vi.advanceTimersByTime(50); document.dispatchEvent(new Event("scroll")); }
+    expect(animar).toHaveBeenCalledTimes(1);
+    delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
+  });
+
+  it("1.0.17 — o que estava animando entra na cópia CONGELADO e sem animação (a cena da ponte não volta pro 1º quadro no toque)", () => {
+    vi.useFakeTimers();
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone)", configurable: true });
+    (HTMLElement.prototype as unknown as { animate: unknown }).animate = vi.fn(() => ({ onfinish: null }));
+    const el = folha();
+    const cafe = document.createElement("div"); cafe.className = "cafe"; el.appendChild(cafe);
+    const antes = (document as { getAnimations?: unknown }).getAnimations;
+    (document as unknown as { getAnimations: () => unknown[] }).getAnimations = () => [{ effect: { target: cafe } }];
+    try {
+      saidaCalma(el, 280);
+      const naCopia = document.querySelector<HTMLElement>("[data-saida-calma] .cafe")!;
+      expect(naCopia.style.animation).toBe("none");
+      expect(cafe.style.animation).toBe(""); // o original não muda
+    } finally {
+      (document as unknown as { getAnimations?: unknown }).getAnimations = antes;
+      delete (HTMLElement.prototype as unknown as { animate?: unknown }).animate;
+    }
+  });
+
   it("a TELA inteira (troca de rota da missão): no jsdom devolve false (o véu antigo segue); no aparelho a foto entra por cima, sem testid/camada, e o original fica sem marcas", () => {
     expect(saidaCalmaDaTela()).toBe(false);
     vi.useFakeTimers();

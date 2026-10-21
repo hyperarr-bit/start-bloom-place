@@ -99,13 +99,23 @@ function aplicarEstilosCongelados(copia: HTMLElement): void {
     const [o, t] = v.split("|");
     n.style.opacity = o;
     n.style.transform = t && t !== "none" ? t : "none";
+    /* 1.0.17 (gravação do Simulador, ponte do Montar): a animação CSS recomeça na cópia (nó novo) e passa por cima do
+       estilo em linha — a cena da ponte "voltava" pro 1º quadro no toque (o café e o "hoje" sumiam) antes de a cópia sumir.
+       O estado de agora fica congelado SEM animação. */
+    n.style.animation = "none";
     n.removeAttribute("data-sc-estilo");
   }
 }
 const ATRIBUTOS_DA_COPIA = ["data-testid", "data-camada-guia", "role", "aria-modal", "data-momento", "id", "data-folha", "data-state", "data-missao-dose"];
 /** `segura`: ms em que a cópia fica INTEIRA antes de sumir — quando o que vem embaixo ainda está se mexendo (troca de
  *  rota, rolagem até o alvo), a cópia cobre isso e só some com a tela de baixo já parada (sem dupla exposição). */
-export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.calmo, segura = 0): void {
+/** `segura` como `{ min, max }` (1.0.17): a cópia fica inteira pelo menos `min` ms e até a rolagem de baixo PARAR (180 ms
+ *  sem rolar), no máximo `max` ms — no app aberto do zero o módulo leva mais pra rolar até o alvo, e com um tempo fixo
+ *  a rolagem aparecia por baixo da cópia já sumindo. */
+export type SeguraDaSaida = number | { min: number; max: number };
+export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.calmo, seguraOuAteParar: SeguraDaSaida = 0): void {
+  const segura = typeof seguraOuAteParar === "number" ? seguraOuAteParar : 0;
+  const ateParar = typeof seguraOuAteParar === "object" ? seguraOuAteParar : null;
   try {
     if (!el || typeof document === "undefined" || !(el instanceof HTMLElement)) return;
     if (/jsdom/i.test(navigator.userAgent)) return;
@@ -125,6 +135,25 @@ export function saidaCalma(el: Element | null | undefined, ms: number = MOV_MS.c
     if (cs.position !== "fixed") Object.assign(copia.style, { position: "fixed", top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: "0", zIndex: cs.zIndex && cs.zIndex !== "auto" ? cs.zIndex : "250" });
     document.body.appendChild(copia);
     const tirar = () => { try { copia.remove(); } catch { /* já saiu */ } };
+    if (ateParar) {
+      const t0 = Date.now();
+      let ultimaRolagem = t0;
+      const rolou = () => { ultimaRolagem = Date.now(); };
+      document.addEventListener("scroll", rolou, { capture: true, passive: true });
+      const sumir = () => {
+        document.removeEventListener("scroll", rolou, { capture: true });
+        const a = copia.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: "ease-in-out", fill: "forwards" });
+        a.onfinish = tirar;
+        window.setTimeout(tirar, ms + 400);
+      };
+      const olhar = () => {
+        const agora = Date.now();
+        if ((agora - t0 >= ateParar.min && agora - ultimaRolagem >= 180) || agora - t0 >= ateParar.max) { sumir(); return; }
+        window.setTimeout(olhar, 60);
+      };
+      window.setTimeout(olhar, Math.max(0, ateParar.min));
+      return;
+    }
     const total = ms + Math.max(0, segura);
     const quadros: Keyframe[] = segura > 0 ? [{ opacity: 1, offset: 0 }, { opacity: 1, offset: segura / total }, { opacity: 0, offset: 1 }] : [{ opacity: 1 }, { opacity: 0 }];
     const a = copia.animate(quadros, { duration: total, easing: "ease-in-out", fill: "forwards" });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ChevronLeft, Copy, Loader2, QrCode, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +49,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null, faixa = null }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -72,6 +72,8 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** 18/10 (funil da missão): a URL que vai como source_url do Pix e da CAPI no lugar da atual (o /missao?utm… do
    *  anúncio — a página já está no módulo). Padrão null: a URL atual, como o /hoje sempre fez. */
   fonteUrl?: string | null;
+  /** 21/10 (upsell de presente): uma faixa logo abaixo do topo ("🎁 Presente pra alguém especial"). Padrão null: nada muda. */
+  faixa?: ReactNode;
 }) {
   const urlFonte = () => (fonteUrl || window.location.href).slice(0, 300);
   const [gerando, setGerando] = useState(false);
@@ -252,6 +254,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     return (
       <div className="fn-tela" data-testid="hoje-pix" data-fase={erro ? "erro" : "gerando"}>
         {topo}
+        {faixa}
         <div className="fn-pix-topo" style={{ paddingTop: 40 }}>
           <small>PAGAMENTO COM PIX</small>
           <div className="fn-pix-valor">{preco(valor)}</div>
@@ -273,6 +276,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   return (
     <div className="fn-tela" data-testid="hoje-pix" data-fase={vencido ? "vencido" : "qr"} data-oferta={oferta}>
       {topo}
+      {faixa}
       <div className="fn-pix-topo">
         <small>PAGAMENTO COM PIX</small>
         <div className="fn-pix-valor" data-testid="hoje-pix-valor">{preco(valor)}</div>

@@ -45,7 +45,7 @@ import { trackEvent } from "@/lib/analytics";
 const KEY = "pix-purchase-pending";
 
 type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27" | "a97" | "a69"
-  | "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199";
+  | "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199" | "pv149" | "pk99";
 
 /* O VALOR VEM DAQUI, NÃO DE UM TERNÁRIO (31/08). O cabeçalho deste arquivo
  * conta o estrago de disparar o preço errado: R$47,80 de pixel onde entraram
@@ -72,6 +72,9 @@ const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
   hv47: 47,       // upsell: CORE pra sempre
   hv27: 27,       // downsell: CORE pra sempre por 27 (quem recusou o de 47)
   hc199: 19.9,    // upsell: vida a dois (a 2ª conta)
+  // 21/10: o upsell de presente (supabase/functions/_shared/presente.ts, src/lib/presente.ts)
+  pv149: 14.9,    // o CORE pra sempre DE PRESENTE (vira código pra outra pessoa)
+  pk99: 9.9,      // downsell do "Agora não": o plano de 30 dias (o kit)
 };
 type Pending = { offer: PendingOffer; orderId: string | null; at: number; uid?: string | null };
 

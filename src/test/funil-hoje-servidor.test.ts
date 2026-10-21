@@ -328,7 +328,8 @@ describe("Purchase do upsell pago com a aba fechada chega na Meta (19/10)", () =
   it("o webhook manda client_ip_address + client_user_agent do registro (sem o UA a Meta descarta evento de site)", () => {
     const s = fonte("asaas-webhook/index.ts");
     expect(s).toMatch(/args\.ip && args\.ua \? \{ client_ip_address: args\.ip, client_user_agent: args\.ua \}/);
-    expect(s.match(/ip: regData\.client_ip \?\? null, ua: regData\.user_agent \?\? null/g)?.length).toBe(2);
+    // plano/upsell + casal + (21/10) presente pv149 + plano de 30 dias pk99
+    expect(s.match(/ip: regData\.client_ip \?\? null, ua: regData\.user_agent \?\? null/g)?.length).toBe(4);
   });
   it("o pix-reconcile lê os mesmos campos", () => {
     const s = fonte("pix-reconcile/index.ts");

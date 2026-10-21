@@ -7,6 +7,7 @@
  * com "Entrar sem senha — receber código por e-mail". Testado no vitest (src/test/venda-web-servidor.test.ts).
  */
 import { OFERTA_CASAL, OFERTA_VITALICIO_HOJE, ehPlanoHoje, temKit } from "./ofertas-hoje.ts";
+import { ehOfertaPlano30, ehOfertaPresente } from "./presente.ts";
 export const OFERTA_PIX_ANUAL = "a97";
 /** 16/10: o PRESENTE do funil do app na web (/assinatura) — o mesmo anual por R$ 69,90 (6990), 365 dias. */
 export const OFERTA_PIX_ANUAL_69 = "a69";
@@ -43,6 +44,8 @@ export function planoUtmify(offer: string | null | undefined): string {
   if (ehAnualDaVenda(offer)) return "annual";
   if (ehMesDaVenda(offer)) return "monthly_prepaid";
   if (offer === OFERTA_CASAL) return "casal";
+  if (ehOfertaPresente(offer)) return "presente"; // 21/10: o presente (pv149) não é plano de quem pagou
+  if (ehOfertaPlano30(offer)) return "plano30"; // 21/10: o downsell do plano de 30 dias (pk99)
   return "lifetime";
 }
 
@@ -50,6 +53,8 @@ export function planoUtmify(offer: string | null | undefined): string {
 export function nomeDoProduto(args: { offer?: string | null; periodo?: string | null; downsell?: boolean }): string {
   // 18/10 (/hoje): os upsells têm nome próprio (o hc199 não é plano de quem pagou; hv47/hv27 = vitalício do upsell)
   if (args.offer === OFERTA_CASAL) return "CORE a dois";
+  if (ehOfertaPresente(args.offer)) return "CORE de presente"; // 21/10: o upsell de presente (pv149, R$ 14,90)
+  if (ehOfertaPlano30(args.offer)) return "Plano de 30 dias"; // 21/10: o downsell do presente (pk99, R$ 9,90)
   if (args.offer === "hv47" || args.offer === "hv27") return "CORE pra sempre";
   if (temKit(args.offer)) return ehAnualDaVenda(args.offer) ? "CORE Anual + Kit" : "CORE 1 mês + Kit";
   if (ehAnualDaVenda(args.offer) || args.periodo === "annual") return "CORE Anual";

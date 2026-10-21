@@ -9,6 +9,7 @@ import {
   CHAVE_KIT, CHAVE_KIT_PROGRESSO, desafioDoKitParaAplicar, inicioDaCompra, kitLiberado, lerProgresso,
   type KitCompra, type ProgressoDoKit,
 } from "@/lib/kit-primeiro-mes";
+import { areaDoKit } from "@/lib/plano-30-areas";
 
 /** O kit da conta: `null` = não comprou (nada do kit aparece). */
 export const useKitPrimeiroMes = () => {
@@ -38,6 +39,8 @@ export const useDesafioDoKit = () => {
     if (!loaded || !user?.id) return;
     const bruto = get<unknown>(CHAVE_KIT, null);
     if (!kitLiberado(bruto)) return;
+    // 21/10: os desafios das 4 semanas são de Finanças — só o plano da área Dinheiro (compra sem área = Dinheiro)
+    if (areaDoKit(bruto) !== "dinheiro") return;
     const progresso = lerProgresso(get<unknown>(CHAVE_KIT_PROGRESSO, null), inicioDaCompra(bruto));
     const r = desafioDoKitParaAplicar(lerDesafios(get<unknown>(CHAVE_DESAFIOS, undefined)), progresso, new Date());
     if (!r) return;

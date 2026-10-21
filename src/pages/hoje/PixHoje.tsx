@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ChevronLeft, Copy, Loader2, QrCode, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,7 +51,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null, backFunil }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null, backFunil, faixa = null, extraNoPedido = null }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -77,6 +77,10 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** BACK (21/10, src/lib/back-funil.ts): com o código na tela (e vivo), o voltar do navegador (1x por sessão) mostra
    *  "seu Pix continua valendo" com o MESMO código. Sem a prop (upsells, funil da missão), nada muda. */
   backFunil?: FunilDoBack;
+  /** 21/10 (upsell de presente): uma faixa logo abaixo do topo ("🎁 Presente pra alguém especial"). Padrão null: nada muda. */
+  faixa?: ReactNode;
+  /** 21/10 (plano de 30 dias por área): campos a mais no `create` (ex.: { area }). Padrão null: o pedido de sempre. */
+  extraNoPedido?: Record<string, string> | null;
 }) {
   const urlFonte = () => (fonteUrl || window.location.href).slice(0, 300);
   const [gerando, setGerando] = useState(false);
@@ -110,7 +114,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       }
       const c = cookiesDaMeta();
       const { data, error } = await supabase.functions.invoke("asaas-pix", {
-        body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: urlFonte() },
+        body: { action: "create", offer: oferta, fbp: c.fbp, fbc: c.fbc, sourceUrl: urlFonte(), ...(extraNoPedido ?? {}) },
       });
       const d = data as { orderId?: string; qrCode?: string; qrCodeBase64?: string | null; expiresAt?: string | null } | null;
       if (error || !d?.orderId || !d?.qrCode) {
@@ -129,7 +133,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
       pedindo.current = false;
       setGerando(false);
     }
-  }, [ids, onPix, oferta, valor, simular, fonteUrl]);
+  }, [ids, onPix, oferta, valor, simular, fonteUrl, extraNoPedido]);
 
   /* sem QR desta oferta (ou o salvo venceu) → gera na montagem */
   useEffect(() => {
@@ -260,6 +264,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
     return (
       <div className="fn-tela" data-testid="hoje-pix" data-fase={erro ? "erro" : "gerando"}>
         {topo}
+        {faixa}
         <div className="fn-pix-topo" style={{ paddingTop: 40 }}>
           <small>PAGAMENTO COM PIX</small>
           <div className="fn-pix-valor">{preco(valor)}</div>
@@ -288,6 +293,7 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
           onSair={() => { setBackPix(false); sairDeVerdade(); }} />
       )}
       {topo}
+      {faixa}
       <div className="fn-pix-topo">
         <small>PAGAMENTO COM PIX</small>
         <div className="fn-pix-valor" data-testid="hoje-pix-valor">{preco(valor)}</div>

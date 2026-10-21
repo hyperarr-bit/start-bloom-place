@@ -7,6 +7,10 @@ import { nomeDoProduto } from "../_shared/email-venda.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import {
+  CHAVE_KIT_CONTA, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarPlano30,
+  mandarLinkPorEmail, reservar,
+} from "../_shared/presente.ts";
 
 /**
  * RECONCILIAÇÃO DE PIX (22/07): rede de segurança pro buraco achado na
@@ -46,7 +50,9 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 15/10: `a97` = o ANUAL da venda da web (/assinar): R$ 97,90, 365 dias (não vitalício). Mesma linha nas 3 funções.
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
 // 18/10: as ofertas do funil web novo (/hoje) vêm de _shared/ofertas-hoje.ts — a MESMA fonte nas 3 funções.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
+// 21/10: `pv149` = o PRESENTE (R$ 14,90, _shared/presente.ts) — não credita ninguém aqui: vira código (passada própria);
+// `pk99` = o plano de 30 dias (R$ 9,90) — grava o kit na conta de quem pagou (passada própria).
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
@@ -157,6 +163,49 @@ async function enviarResend(para: string, assunto: string, html: string): Promis
   return !!r?.ok;
 }
 
+/** 21/10 (presente): manda um corpo pronto do Resend (com reply_to). true = saiu. */
+async function enviarCorpoResend(corpo: Record<string, unknown>): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
+/** 21/10: o Purchase do PRESENTE (14,90) e do plano de 30 dias (9,90) — o mesmo formato do Purchase da varredura
+ *  (event_id = pedido, IP/UA do create). */
+async function capiPresente(
+  o: { uid: string; orderId: string; criadoEm: string; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null },
+  email: string | null, cents: number, offer = "pv149",
+): Promise<string> {
+  if (!Deno.env.get("META_PIXEL_ID") || !Deno.env.get("META_CAPI_TOKEN")) return "skipped_no_secrets";
+  try {
+    const sha = async (val: string) => {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(val.trim().toLowerCase()));
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    };
+    const res = await fetchNosPixels({
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [{
+        event_name: "Purchase", event_time: Math.floor(new Date(o.criadoEm).getTime() / 1000), event_id: o.orderId,
+        action_source: "website", event_source_url: o.sourceUrl ?? "https://www.coreaplicativo.com.br",
+        user_data: {
+          ...(email ? { em: [await sha(email)] } : {}),
+          external_id: [await sha(o.uid)],
+          ...(o.fbc ? { fbc: o.fbc } : {}),
+          ...(o.fbp ? { fbp: o.fbp } : {}),
+          ...(o.ip && o.ua ? { client_ip_address: o.ip, client_user_agent: o.ua } : {}),
+        },
+        custom_data: { value: cents / 100, currency: "BRL", content_name: nomeDoProduto({ offer }) },
+      }] }),
+    });
+    return res.ok ? "sent" : `error_${res.status}`;
+  } catch {
+    return "error_throw";
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -252,6 +301,11 @@ serve(async (req) => {
     }
     let adiantadosFora = 0;
     let ofertasDesconhecidas = 0;
+    /** 21/10: os pedidos de PRESENTE (pv149) — passada própria no fim (viram código, não linha de quem pagou). */
+    type PedidoExtra = { uid: string; orderId: string; criadoEm: string; amountCents: number | null; fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null; area?: unknown };
+    const pedidosPresente: PedidoExtra[] = [];
+    /** 21/10: o downsell do plano de 30 dias (pk99) — passada própria no fim (grava o kit, não linha de assinatura). */
+    const pedidosPlano30: PedidoExtra[] = [];
 
     const porUser = new Map<string, Ordem[]>();
     for (const q of qrs ?? []) {
@@ -265,6 +319,14 @@ serve(async (req) => {
       /* 18/10 (/hoje): o hc199 ("vida a dois") não credita quem pagou — quem libera a outra conta é a página (ação
        * `parceiro` do asaas-pix); o Purchase sai do check/webhook. Fora da varredura, e fora da conta de desconhecidas. */
       if (ehOfertaCasal(ofertaCrua)) continue;
+      if (ehOfertaPresente(ofertaCrua) || ehOfertaPlano30(ofertaCrua)) {
+        (ehOfertaPresente(ofertaCrua) ? pedidosPresente : pedidosPlano30).push({
+          uid, orderId: oid, criadoEm: String(q.created_at), amountCents: Number(q.event_data?.amount_cents) || null,
+          fbp: q.event_data?.fbp ?? null, fbc: q.event_data?.fbc ?? null, ip: q.event_data?.client_ip ?? null, ua: q.event_data?.user_agent ?? null, sourceUrl: q.event_data?.source_url ?? null,
+          area: q.event_data?.area ?? null,
+        });
+        continue;
+      }
       /* 16/10: oferta desconhecida NUNCA vira vitalício (antes caía em "lifetime" — um a69 pago antes do deploy que o
        * conhece ganharia acesso pra sempre). Fica fora desta passada; o próximo cron, com a oferta na tabela, credita. */
       if (!(ofertaCrua in DIAS_DA_OFERTA)) { ofertasDesconhecidas++; continue; }
@@ -443,8 +505,73 @@ serve(async (req) => {
       }
     }
 
-    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, falhas: falhas.length });
-    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, falhas });
+    /* 21/10 (UPSELL DE PRESENTE, pv149): pagou e o check/webhook não fecharam → o código nasce aqui (1 por pedido), o
+     * Purchase 14,90 sai 1x (mesma trava do check/webhook) e o link vai por e-mail se a conta tem e-mail. Pedido que já
+     * virou código sai da fila numa consulta só. */
+    const presentes: Array<Record<string, unknown>> = [];
+    if (pedidosPresente.length) {
+      const { data: jaFeitos } = await admin.from("presentes").select("pedido").in("pedido", pedidosPresente.map((o) => o.orderId));
+      const feitos = new Set(((jaFeitos ?? []) as Array<{ pedido: string }>).map((r) => r.pedido));
+      for (const o of pedidosPresente) {
+        if (feitos.has(o.orderId)) continue;
+        sondadas++;
+        let v: Veredito;
+        try { v = await statusAsaas(asaasKey, o.orderId); } catch (e) { falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) }); continue; }
+        if (!v.pago) continue;
+        const cents = o.amountCents ?? PRECOS_CENTAVOS.pv149;
+        if (!valorCobre(v.valorReais, cents)) { falhas.push({ orderId: o.orderId, erro: "valor_menor" }); continue; }
+        if (dryRun) { presentes.push({ uid: o.uid, orderId: o.orderId, dryRun: true }); continue; }
+        const p = await garantirPresente(admin, { orderId: o.orderId, compradorId: o.uid, valorCentavos: cents });
+        if (!p) { falhas.push({ orderId: o.orderId, erro: "presente_codigo" }); continue; }
+        const { data: au } = await admin.auth.admin.getUserById(o.uid);
+        const email = au?.user?.email ?? null;
+        let capi = "ja_enviado";
+        if (await reservar(admin, chaveCapiPresente(o.orderId), "capi")) capi = await capiPresente(o, email, cents);
+        if (email) {
+          const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+          await mandarLinkPorEmail(admin, { orderId: o.orderId, codigo: p.codigo, para: email, de: from, enviar: enviarCorpoResend });
+        }
+        await admin.from("analytics_events").insert({
+          event_name: "pix_reconciled", user_id: o.uid,
+          event_data: { order_id: o.orderId, offer: "pv149", presente: true, gateway_status: v.status, amount_cents: cents, meta_capi: capi },
+        });
+        presentes.push({ uid: o.uid, orderId: o.orderId, novo: p.novo, capi });
+      }
+    }
+
+    /* 21/10 (downsell pk99): pagou o plano de 30 dias e o check/webhook não gravaram → grava o kit na conta de quem pagou
+     * + Purchase 9,90 1x (mesma trava). Quem já tem o kit sai da fila numa consulta só. */
+    const planos30: Array<Record<string, unknown>> = [];
+    if (pedidosPlano30.length) {
+      const { data: comKit } = await admin.from("user_data").select("user_id").eq("key", CHAVE_KIT_CONTA).in("user_id", [...new Set(pedidosPlano30.map((o) => o.uid))]);
+      const jaTemKit = new Set(((comKit ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+      for (const o of pedidosPlano30) {
+        if (jaTemKit.has(o.uid)) continue;
+        sondadas++;
+        let v: Veredito;
+        try { v = await statusAsaas(asaasKey, o.orderId); } catch (e) { falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) }); continue; }
+        if (!v.pago) continue;
+        const cents = o.amountCents ?? PRECOS_CENTAVOS.pk99;
+        if (!valorCobre(v.valorReais, cents)) { falhas.push({ orderId: o.orderId, erro: "valor_menor" }); continue; }
+        if (dryRun) { planos30.push({ uid: o.uid, orderId: o.orderId, dryRun: true }); continue; }
+        const lib = await liberarPlano30(admin, { userId: o.uid, orderId: o.orderId, area: o.area });
+        if (lib === "falhou") { falhas.push({ orderId: o.orderId, erro: "plano30_gravar" }); continue; }
+        jaTemKit.add(o.uid);
+        let capi = "ja_enviado";
+        if (await reservar(admin, chaveCapiPlano30(o.orderId), "capi")) {
+          const { data: au } = await admin.auth.admin.getUserById(o.uid);
+          capi = await capiPresente(o, au?.user?.email ?? null, cents, "pk99");
+        }
+        await admin.from("analytics_events").insert({
+          event_name: "pix_reconciled", user_id: o.uid,
+          event_data: { order_id: o.orderId, offer: "pk99", plano30: true, gateway_status: v.status, amount_cents: cents, meta_capi: capi },
+        });
+        planos30.push({ uid: o.uid, orderId: o.orderId, capi });
+      }
+    }
+
+    logStep("Fim", { janelaHoras: hours, usuarios: porUser.size, sondadas, adiantadosFora, ofertasDesconhecidas, creditados: creditados.length, presentes: presentes.length, planos30: planos30.length, falhas: falhas.length });
+    return jsonResponse({ ok: true, dryRun, janelaHoras: hours, sondadas, adiantadosFora, ofertasDesconhecidas, creditados, presentes, planos30, falhas });
   } catch (e) {
     logStep("ERRO", { e: String(e).slice(0, 200) });
     return jsonResponse({ error: String(e).slice(0, 200) }, 500);

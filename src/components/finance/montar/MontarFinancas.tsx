@@ -686,7 +686,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
                    fica na conta do mês ("Ver a conta" → "÷ N dias" ou "Por dia"). */
                 <div className="mf-grande mf-apertado" data-testid="montar-apertado">
                   <small>Seu mês</small>
-                  <h2>Seu mês tá apertado.</h2>
+                  <h2>Seu mês tá apertado</h2>
                   <p>Vamos achar folga juntos. Anotar o que sai é o primeiro passo.</p>
                 </div>
               ) : (

@@ -470,7 +470,7 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
 
   /* 1.0.17: 18% terminavam com "Você pode gastar R$ 0" como herói — o mês apertado troca o herói pelo acolhimento
      e o número vai pra conta do mês ("Ver a conta" → "Por dia"). */
-  it("sem folga no mês: 'Seu mês tá apertado.' no lugar do R$ 0 gigante; o número fica na conta do mês; 'Continuar' (nada anima)", async () => {
+  it("sem folga no mês: 'Seu mês tá apertado' no lugar do R$ 0 gigante; o número fica na conta do mês; 'Continuar' (nada anima)", async () => {
     montarTela();
     fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1000" } });
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
@@ -480,7 +480,8 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
     await respirar();
     expect(screen.queryByTestId("montar-por-dia")).toBeNull();
-    expect(screen.getByTestId("montar-apertado").textContent).toMatch(/Seu mês tá apertado\.\s*Vamos achar folga juntos/);
+    expect(screen.getByTestId("montar-apertado").textContent).toMatch(/Seu mês tá apertado\s*Vamos achar folga juntos/);
+    expect(screen.getByTestId("montar-apertado").querySelector("h2")!.textContent).toBe("Seu mês tá apertado"); // 1.0.17: título sem ponto final
     expect(screen.queryByText(/VOCÊ PODE GASTAR HOJE/)).toBeNull();
     // 1.0.17 (p2): a conta do mês fica fechada; o número do mês apertado mora nela
     expect(screen.queryByTestId("montar-por-dia-apertado")).toBeNull();

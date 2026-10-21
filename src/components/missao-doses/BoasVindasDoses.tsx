@@ -268,7 +268,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   }
 
   /* ── BRAÇO A ("uma dose por dia") — 1.0.17, dono 20/10 (mockup a1 aprovado): a pessoa tem que ENTENDER que começa um
-     tutorial. "Tá dentro, Lucas. 💛" / "Seus 3 dias grátis começaram." / a frase dele ("Pra você tirar o melhor do CORE,
+     tutorial. "Tá dentro, Lucas 💛" / "Seus 3 dias grátis começaram" (sem ponto final: dono 20/10) / a frase dele ("Pra você tirar o melhor do CORE,
      preparamos um tutorial especial pra você.") / SEU PLANO DE 3 DIAS — os 3 módulos com o que cada um entrega (HOJE ·
      AMANHÃ · o dia da semana), sem "Trocar" (6–14% mexiam) / [Começar meu tutorial] e o link "Prefiro explorar sozinho".
      Uma coisa entra por vez: a tela (fundo opaco já no 1º quadro) → o ✓ → o texto → o confete (depois do ✓, nunca junto). ── */
@@ -290,10 +290,10 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               <Check className="w-7 h-7 text-white" strokeWidth={3.5} />
             </motion.div>
             <motion.div initial={parado ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
-              <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}.` : "Tá dentro."} <span aria-hidden>💛</span></h1>
-              {/* dono 19/10: "Seus 3 dias grátis começaram." só com teste da loja de verdade (fraseDoAcesso); sem teste,
-                  "Seu acesso começou." */}
-              <p className="text-[17px] font-semibold text-foreground/80 mt-2 leading-snug" data-testid="missao-doses-subtitulo">{acesso}.</p>
+              <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}` : "Tá dentro"} <span aria-hidden>💛</span></h1>
+              {/* dono 19/10: "Seus 3 dias grátis começaram" só com teste da loja de verdade (fraseDoAcesso); sem teste,
+                  "Seu acesso começou". 1.0.17 (dono: ponto final em título é "sério demais"): sem ponto no título e aqui */}
+              <p className="text-[17px] font-semibold text-foreground/80 mt-2 leading-snug" data-testid="missao-doses-subtitulo">{acesso}</p>
               <p className="text-[15px] text-muted-foreground mt-1 leading-snug" data-testid="missao-doses-tutorial">{FRASE_DO_TUTORIAL}</p>
               <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-7">Seu plano de 3 dias</p>
               <div className="mt-2 rounded-2xl bg-card border border-border/60 divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">

@@ -88,7 +88,7 @@ describe("2. 'Trocar' os módulos da missão", () => {
     const comecar = vi.fn();
     render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-20" braco="A" aoComecar={comecar} aoExplorar={() => {}} />);
     expect(screen.queryByTestId("missao-doses-trocar")).toBeNull();
-    expect(screen.getByTestId("missao-doses-titulo").textContent).toBe("Tá dentro, Lucas. 💛");
+    expect(screen.getByTestId("missao-doses-titulo").textContent).toBe("Tá dentro, Lucas 💛"); // 1.0.17: sem ponto final no título (dono: "sério demais")
     expect(screen.getByTestId("missao-doses-tutorial").textContent).toBe("Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.");
     expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Seu plano de 3 dias");
     expect(screen.getByTestId("missao-doses-entrega-1").textContent).toBe("Quanto dá pra gastar por dia");

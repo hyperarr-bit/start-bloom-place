@@ -477,7 +477,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     const boas = screen.getByTestId("missao-doses-boas-vindas");
     // 1.0.17 (dono 19/10: "minimalista, calmo"): uma ideia por tela — sem segundos, sem parágrafo, sem "16 módulos"
     expect(screen.getByTestId("missao-doses-titulo")).toHaveTextContent(/^Tá dentro/);
-    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent(/^Seus 3 dias grátis começaram\.$/); // dono 19/10: a linha do teste volta
+    expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent(/^Seus 3 dias grátis começaram$/); // dono 19/10: a linha do teste volta (1.0.17: sem ponto final)
     // 1.0.17 (dono 20/10, mockup a1): o Tá dentro diz que começa um TUTORIAL e mostra o plano (o que cada dia entrega)
     expect(screen.getByTestId("missao-doses-tutorial")).toHaveTextContent("Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.");
     expect(boas).toHaveTextContent("Seu plano de 3 dias");
@@ -2684,7 +2684,7 @@ describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só 
     expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1 }), expect.objectContaining({ tela: 2, braco: "dia1_cheio" })]);
   });
 
-  it("boas-vindas do A: 'Seus N dias grátis começaram.' só com teste da loja de verdade — 3 dias (paywall), 7 dias (código da App Store); quem pagou no site ou assinou o mensal lê 'Seu acesso começou.'", () => {
+  it("boas-vindas do A: 'Seus N dias grátis começaram' (sem ponto final, 1.0.17) só com teste da loja de verdade — 3 dias (paywall), 7 dias (código da App Store); quem pagou no site ou assinou o mensal lê 'Seu acesso começou'", () => {
     vi.stubEnv("VITE_V14_LOJA", "1");
     ligarUmPorDia("on");
     const abrirBoasVindas = () => {
@@ -2697,18 +2697,18 @@ describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só 
     // 1) comprou o anual com 3 dias grátis no paywall (o pedido do aviso guarda o início e o fim do teste)
     // 1.0.17 (dono 19/10): a linha do teste volta no layout mínimo — só com teste da loja de verdade
     pedidoDoTeste(3);
-    expect(abrirBoasVindas()).toHaveTextContent(/^Seus 3 dias grátis começaram\.$/);
+    expect(abrirBoasVindas()).toHaveTextContent(/^Seus 3 dias grátis começaram$/);
     localStorage.removeItem(CHAVE_LEMBRETE_TESTE);
     // 2) o código de 7 dias da App Store (afiliados): a loja confirmou o teste no boot
     localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + 7 * 864e5 - 60_000));
-    expect(abrirBoasVindas()).toHaveTextContent(/^Seus 7 dias grátis começaram\.$/);
+    expect(abrirBoasVindas()).toHaveTextContent(/^Seus 7 dias grátis começaram$/);
     localStorage.removeItem(CHAVE_TRIAL_CARTAO);
     // 3) pagou no site ou assinou o mensal (cobra hoje): teste nenhum
-    expect(abrirBoasVindas()).toHaveTextContent(/^Seu acesso começou\.$/);
+    expect(abrirBoasVindas()).toHaveTextContent(/^Seu acesso começou$/);
     expect(screen.getByTestId("missao-doses-boas-vindas")).not.toHaveTextContent(/dias? grátis/);
     // 4) um teste que já acabou não conta
     localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() - 1));
-    expect(abrirBoasVindas()).toHaveTextContent(/^Seu acesso começou\.$/);
+    expect(abrirBoasVindas()).toHaveTextContent(/^Seu acesso começou$/);
   });
 
   it("boas-vindas do B (já no ar): a mesma regra — sem teste, 'Seu acesso começou agora'; o boot que confirma o teste DEPOIS da 1ª tela troca a frase pra 'Seus 3 dias grátis começaram agora'", () => {

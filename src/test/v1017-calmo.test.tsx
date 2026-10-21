@@ -192,8 +192,8 @@ describe("movimento calmo — um vocabulário só, e 'reduzir movimento' respeit
   });
 });
 
-describe("o nome do 'Tá dentro, Lucas.' — nunca o começo do e-mail", () => {
-  it("conta > metadados; e-mail nunca; nome longo ou vazio = 'Tá dentro.'", () => {
+describe("o nome do 'Tá dentro, Lucas' — nunca o começo do e-mail", () => {
+  it("conta > metadados; e-mail nunca; nome longo ou vazio = 'Tá dentro'", () => {
     expect(nomeDaPessoa("Lucas Andrade", { full_name: "Outro" })).toBe("Lucas Andrade");
     expect(nomeDaPessoa("", { full_name: "Marina Souza" })).toBe("Marina Souza");
     expect(nomeDaPessoa("lucas@exemplo.com", {})).toBe("");

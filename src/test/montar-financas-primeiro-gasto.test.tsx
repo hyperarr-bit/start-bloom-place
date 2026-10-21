@@ -70,8 +70,9 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import {
   CHAVE_MONTAR_FINANCAS, EV_PRIMEIRO_GASTO, _novaAberturaMontar, _zerarRemotaMontar, _zerarResultadoVisto, calcularMontar,
   deveMostrarMontarFinancas, lerTelaDoNumero, marcaDoAparelho,
+  exemploDaPonte,
 } from "@/lib/montar-financas";
-import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
+import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, PONTE_CENA_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CHAVE_ESTADO_MISSAO_DOSES, definirDonoDaMissao, donoDaConta, iniciarMissao, lerMissao } from "@/lib/missao-doses";
 import { CHAVE_BRACO_DIA1, _zerarUmPorDiaRemoto, registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
@@ -215,7 +216,7 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(doPasso1()).toEqual([]);
   });
 
-  it("'Continuar' → a PONTE (1.0.17): 'Você já viu quanto pode gastar hoje.' / 'Agora vamos anotar seu primeiro gasto.' com o número pequeno; 'Ir pro app' chama onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; eventos sem reais", async () => {
+  it("'Continuar' → a PONTE (1.0.17): 'Você já viu quanto pode gastar hoje' / 'Agora vamos anotar seu primeiro gasto' com o número; 'Ir pro app' chama onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; eventos sem reais", async () => {
     const onPronto = vi.fn();
     const naoGastei = vi.fn();
     const controle = montarTela({ onPronto, onAindaNaoGastei: naoGastei });
@@ -225,9 +226,9 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     fireEvent.click(cta);
     fireEvent.click(cta);
     expect(onPronto).not.toHaveBeenCalled();
-    const ponte = screen.getByTestId("montar-ponte");
-    expect(ponte).toHaveTextContent("Você já viu quanto pode gastar hoje.");
-    expect(ponte).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    // 1.0.17 (ponte "versão 1"): sem ponto final; a cena = o número dela → ☕ Café − R$ 12 → ~~R$ 66~~ R$ 54 hoje
+    expect(lido(screen.getByTestId("montar-ponte-viu"))).toBe("Você já viu quanto pode gastar hoje");
+    expect(lido(screen.getByTestId("montar-ponte-titulo"))).toBe("Agora vamos anotar seu primeiro gasto");
     expect(lido(screen.getByTestId("montar-ponte-numero"))).toBe("R$ 66 por dia");
     expect(screen.getByTestId("montar-ponte-nao-gastei")).toHaveTextContent("Ainda não gastei");
     vi.setSystemTime(HOJE.getTime() + 4000);
@@ -259,6 +260,108 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(onPronto).not.toHaveBeenCalled();
     expect(doPasso1().at(-1)).toMatchObject({ acao: "ponte_saiu", via: "ainda_nao" });
     expect(lerTelaDoNumero(CRIADA, HOJE)).toBeNull();
+  });
+
+  /* 1.0.17 — a ponte "versão 1" (mockup ponte2, aprovado pelo dono 20/10) */
+  const cenaDaPonte = () => {
+    const numero = screen.queryByTestId("montar-ponte-numero");
+    const hoje = screen.queryByTestId("montar-ponte-hoje");
+    return {
+      viu: lido(screen.getByTestId("montar-ponte-viu")),
+      titulo: lido(screen.getByTestId("montar-ponte-titulo")),
+      numero: numero ? lido(numero) : null,
+      gasto: lido(screen.getByTestId("montar-ponte-gasto")),
+      riscado: hoje ? lido(hoje.querySelector("s")!) : null,
+      hoje: hoje ? lido(hoje.querySelector("b")!) : null,
+      folga: screen.queryByTestId("montar-ponte-folga") ? lido(screen.getByTestId("montar-ponte-folga")) : null,
+    };
+  };
+  it("a ponte normal: a cena ligada por tracejado — 'R$ X por dia' → '☕ Café − R$ 12' → '~~R$ X~~ R$ X−12 hoje', com o MESMO número da tela anterior; nada de ponto final; botões embaixo", async () => {
+    montarTela();
+    await ateONumero();
+    const doNumero = Number(screen.getByTestId("montar-por-dia").getAttribute("data-valor"));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    const c = cenaDaPonte();
+    expect(c).toEqual({
+      viu: "Você já viu quanto pode gastar hoje", titulo: "Agora vamos anotar seu primeiro gasto",
+      numero: `R$ ${doNumero} por dia`, gasto: "☕ Café− R$ 12", riscado: `R$ ${doNumero}`, hoje: `R$ ${doNumero - 12}`, folga: null,
+    });
+    expect(doNumero).toBe(66);
+    expect(screen.getByTestId("montar-ponte-hoje")).toHaveAttribute("data-valor", "54");
+    expect(screen.getByTestId("montar-ponte-hoje").querySelector(".sr-only")!.textContent).toBe("R$\u00a054 hoje");
+    for (const t of [c.viu, c.titulo]) expect(t).not.toMatch(/\.\s*$/);
+    expect(screen.getByTestId("montar-ponte-cena").querySelectorAll(".mf-ponte-linha")).toHaveLength(2);
+    expect(screen.getByTestId("montar-ponte-ir")).toHaveTextContent("Ir pro app");
+    expect(screen.getByTestId("montar-ponte-nao-gastei")).toHaveTextContent("Ainda não gastei");
+  });
+  it("a ponte com pouca folga (R$ 15–23 por dia): o café de exemplo é R$ 6 — a conta nunca dá zero nem negativo", async () => {
+    expect(exemploDaPonte(66)).toEqual({ gasto: 12, depois: 54 });
+    expect(exemploDaPonte(24)).toEqual({ gasto: 12, depois: 12 });
+    expect(exemploDaPonte(23)).toEqual({ gasto: 6, depois: 17 });
+    expect(exemploDaPonte(15)).toEqual({ gasto: 6, depois: 9 });
+    montarTela();
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1300" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: /^🏠 Aluguel/ }));
+    fireEvent.change(tela().getByLabelText("Valor de Aluguel"), { target: { value: "1000" } }); // 300 ÷ 16 = 19
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar();
+    const doNumero = Number(screen.getByTestId("montar-por-dia").getAttribute("data-valor"));
+    expect(doNumero).toBeGreaterThanOrEqual(15);
+    expect(doNumero).toBeLessThan(24);
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    const c = cenaDaPonte();
+    expect(c.gasto).toBe("☕ Café− R$ 6");
+    expect(c.riscado).toBe(`R$ ${doNumero}`);
+    expect(c.hoje).toBe(`R$ ${doNumero - 6}`);
+    expect(doNumero - 6).toBeGreaterThan(0);
+  });
+  it("a ponte do mês apertado: 'Você já viu como tá seu mês' + o café → tracejado → '🔍 anotar mostra onde tem folga' (sem número nenhum)", async () => {
+    montarTela();
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "1000" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: /^🏠 Aluguel/ }));
+    fireEvent.click(tela().getByRole("button", { name: /^🏋️ Academia/ })); // → 0 livre
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar();
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(screen.getByTestId("montar-ponte")).toHaveAttribute("data-apertado");
+    expect(cenaDaPonte()).toEqual({
+      viu: "Você já viu como tá seu mês", titulo: "Agora vamos anotar seu primeiro gasto",
+      numero: null, gasto: "☕ Café− R$ 12", riscado: null, hoje: null, folga: "🔍anotar mostra onde tem folga",
+    });
+    expect(screen.getByTestId("montar-ponte-cena").querySelectorAll(".mf-ponte-linha")).toHaveLength(1);
+    expect(lido(screen.getByTestId("montar-ponte"))).not.toMatch(/R\$ 0/);
+  });
+  it("a ponte anima peça por peça (atrasos em ordem, o número de hoje CONTA pra baixo); com 'menos movimento' tudo parado no estado final", async () => {
+    window.matchMedia = semMenosMovimento;
+    montarTela();
+    await ateONumero();
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    const cena = screen.getByTestId("montar-ponte-cena");
+    expect(cena).not.toHaveAttribute("data-parado");
+    const atrasos = Array.from(cena.children).map((el) => parseInt((el as HTMLElement).style.animationDelay || "0", 10));
+    expect(atrasos).toEqual([0, PONTE_CENA_MS.linha1, PONTE_CENA_MS.cafe, PONTE_CENA_MS.linha2, PONTE_CENA_MS.hoje]);
+    expect(lido(screen.getByTestId("montar-ponte-hoje").querySelector("b")!)).toBe("R$ 66"); // começa no antigo
+    await act(async () => { await new Promise((r) => setTimeout(r, PONTE_CENA_MS.conta + PONTE_CENA_MS.contaDura + 200)); });
+    expect(lido(screen.getByTestId("montar-ponte-hoje").querySelector("b")!)).toBe("R$ 54"); // contou até o novo
+    cleanup();
+    window.matchMedia = comMenosMovimento;
+    localStorage.clear();
+    _novaAberturaMontar();
+    _zerarResultadoVisto();
+    montarTela();
+    await ateONumero();
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    const parada = screen.getByTestId("montar-ponte-cena");
+    expect(parada).toHaveAttribute("data-parado");
+    expect(Array.from(parada.children).every((el) => !(el as HTMLElement).style.animationDelay)).toBe(true);
+    expect(lido(screen.getByTestId("montar-ponte-hoje").querySelector("b")!)).toBe("R$ 54"); // já no final
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
+    expect(css).toMatch(/\.mf-ponte-cena:not\(\[data-parado\]\) > \.mf-ponte-cafe \{ animation: mf-ponte-cai/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{\s*\.mf-ponte-cena > \*/);
   });
 
   it("o número SOBE de 0 até o 'por dia' (~0,6 s) quando a tela aparece — digitar a renda não roda quadro a quadro; com 'menos movimento', direto", async () => {

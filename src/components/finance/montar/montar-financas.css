@@ -151,13 +151,41 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 .mf-pronto[data-de-montando] + .mf-rodape { animation: mf-aparece .3s ease-out .3s both; }
 @keyframes mf-aparece { from { opacity: 0; } }
 
-/* 1.0.17: a ponte do número pro 1º gasto — calma, no estilo da tela do número (o número dela pequeno, a frase, o botão) */
-.mf-ponte { padding: 34px 22px 24px; }
-.mf-ponte-numero { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--mf-cartao); border: 1px solid var(--mf-cartao-borda); color: var(--mf-ambar-texto); font-size: 14px; font-variant-numeric: tabular-nums; }
-.mf-ponte-numero svg { color: var(--mf-ambar); }
-.mf-ponte-numero b { font-weight: 800; color: hsl(var(--foreground)); }
-.mf-ponte-viu { font-size: 16px; color: hsl(var(--muted-foreground)); margin-top: 18px; line-height: 1.4; }
-.mf-ponte h2 { font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 6px; }
+/* 1.0.17 (dono 20/10, ponte "versão 1"): em cima a frase cinza + o título; no meio, centralizada, a CENA ligada por
+   tracejado vertical (o número → o café → o que sobra hoje); os botões embaixo. Entra peça por peça (~1,5 s). */
+.mf-ponte { flex: 1 0 auto; display: flex; flex-direction: column; padding: 30px 24px 8px; }
+.mf-ponte-viu { font-size: 16px; color: hsl(var(--muted-foreground)); line-height: 1.4; }
+.mf-ponte h2 { font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 8px; }
+.mf-ponte-cena { margin: auto 0; padding: 28px 0 12px; display: flex; flex-direction: column; align-items: center; }
+.mf-ponte-pilula { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 999px; background: var(--mf-cartao); border: 1px solid var(--mf-cartao-borda); color: var(--mf-ambar-texto); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mf-ponte-pilula svg { color: var(--mf-ambar); flex-shrink: 0; }
+.mf-ponte-pilula b { font-weight: 800; color: hsl(var(--foreground)); }
+.mf-ponte-pilula s { position: relative; text-decoration: none; color: var(--mf-ambar-texto); opacity: .55; font-weight: 600; }
+/* o risco do número antigo: uma linha que se desenha da esquerda pra direita */
+.mf-ponte-pilula s::after { content: ""; position: absolute; left: -1px; right: -1px; top: 52%; height: 1.5px; background: currentColor; transform-origin: left; }
+.mf-ponte-linha { display: block; width: 2px; height: 30px; margin: 6px 0; background: repeating-linear-gradient(hsl(var(--border)) 0 5px, transparent 5px 10px); transform-origin: top; }
+.mf-ponte-cafe { display: flex; align-items: center; gap: 10px; width: 270px; max-width: 100%; padding: 13px 16px; border-radius: 18px; background: hsl(var(--card)); border: 1.5px dashed hsl(var(--border)); box-shadow: 0 10px 24px -14px rgba(0, 0, 0, .18); font-size: 16px; font-weight: 600; transform: rotate(-2deg); }
+.mf-ponte-cafe b { margin-left: auto; font-weight: 700; color: var(--mf-gasto); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mf { --mf-gasto: #c2410c; }
+.dark .mf { --mf-gasto: #fb923c; }
+
+/* a entrada, uma peça por vez (os atrasos vêm do componente: PONTE_CENA_MS) */
+.mf-ponte-cena:not([data-parado]) > .mf-ponte-pilula { animation: mf-ponte-surge .3s cubic-bezier(.22, 1, .36, 1) both; }
+.mf-ponte-cena:not([data-parado]) > .mf-ponte-linha { animation: mf-ponte-desce .2s ease-out both; }
+.mf-ponte-cena:not([data-parado]) > .mf-ponte-cafe { animation: mf-ponte-cai .38s cubic-bezier(.22, 1, .36, 1) both; }
+.mf-ponte-cena:not([data-parado]) .mf-ponte-pilula s::after { animation: mf-ponte-risca .25s ease-out both; animation-delay: inherit; }
+@keyframes mf-ponte-surge { from { opacity: 0; transform: translateY(6px) scale(.96); } }
+@keyframes mf-ponte-desce { from { transform: scaleY(0); } }
+/* o café CAI no lugar com um tranco leve (passa 3 px e volta), sempre inclinado */
+@keyframes mf-ponte-cai {
+  0% { opacity: 0; transform: translateY(-22px) rotate(-5deg); }
+  70% { opacity: 1; transform: translateY(3px) rotate(-1.5deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(-2deg); }
+}
+@keyframes mf-ponte-risca { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .mf-ponte-cena > *, .mf-ponte-pilula s::after { animation: none !important; }
+}
 
 /* pronto. O RESPIRO no fim (17/10, revisão tela a tela #15): o botão é colado (sticky, no fluxo) e o degradê dele
    cobre 18 px acima do botão — sem nada depois da última linha ("✓ Já está tudo nas suas Finanças…"), ela ficava

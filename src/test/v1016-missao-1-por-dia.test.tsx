@@ -513,8 +513,8 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(Array.isArray(store.dados["finance-incomes"])).toBe(true);
     // a dose JÁ conta no "Continuar" do Montar (fechar o app no tutorial não desfaz o Montar)
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`);
-    // 1.0.17: a ponte ("Agora vamos anotar seu primeiro gasto.") → "Ir pro app"
-    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    // 1.0.17: a ponte ("Agora vamos anotar seu primeiro gasto") → "Ir pro app"
+    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto");
     passarDaPonte();
     // o TUTORIAL no formulário de verdade: o post-it com os 3 prontos, "escrever o meu" e "Ainda não gastei" (o anel só
     // procura o "+ Novo gasto" com o Montar fora da tela)

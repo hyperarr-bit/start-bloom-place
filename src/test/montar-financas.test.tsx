@@ -298,9 +298,9 @@ describe("a tela, com a conta vazia", () => {
     expect(controle.dados()["finance-card-config"]).toBeUndefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // pela missão: o 1º gasto é o tutorial, depois
-    // 1.0.17 (dono 20/10): antes do tutorial, a PONTE ("Agora vamos anotar seu primeiro gasto.") — "Ir pro app" segue
+    // 1.0.17 (dono 20/10): antes do tutorial, a PONTE ("Agora vamos anotar seu primeiro gasto") — "Ir pro app" segue
     expect(onPronto).not.toHaveBeenCalled();
-    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto");
     fireEvent.click(screen.getByTestId("montar-ponte-ir"));
     expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);

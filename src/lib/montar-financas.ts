@@ -68,7 +68,7 @@
  *   "Montando"); se o app morre no "Montando…", a tela volta NO NÚMERO, no mesmo dia e na mesma conta
  *   (`numero` na marca do aparelho; `deveMostrarMontarFinancas` responde sim enquanto ela existir). O número
  *   VISTO é tela de uma vez: assim que aparece, a marca passa a apontar pra PONTE (1.0.17, dono 20/10: "Você já viu
- *   quanto pode gastar hoje. / Agora vamos anotar seu primeiro gasto." — [Ir pro app] / "Ainda não gastei") — reabrir
+ *   quanto pode gastar hoje / Agora vamos anotar seu primeiro gasto" — [Ir pro app] / "Ainda não gastei") — reabrir
  *   volta na ponte, nunca de novo no número nem no Montar; saiu da ponte, a marca some e reabrir é o tutorial do 1º
  *   gasto (a missão retoma o passo do gasto).
  *   Evento do passo inteiro (número → tutorial → 1º gasto): `missao_doses_primeiro_gasto` (EV_PRIMEIRO_GASTO).
@@ -552,6 +552,18 @@ export function calcularMontar(renda: number, contas: ContaEscolhida[], agora: D
  */
 export const POR_DIA_APERTADO = 15;
 export const mesApertado = (r: { porDia: number; semFolga: boolean }): boolean => r.semFolga || r.porDia < POR_DIA_APERTADO;
+
+/**
+ * 1.0.17 (dono 20/10, ponte "versão 1") — o gasto de EXEMPLO da ponte do número pro 1º gasto: "R$ X por dia" →
+ * "☕ Café − R$ 12" → "~~R$ X~~ R$ X−12 hoje". Mês com pouca folga (< R$ 24/dia) usa um café menor (R$ 6), pra conta
+ * nunca dar zero nem negativo. `porDia` é o MESMO número da tela anterior (resultado.porDia, já arredondado).
+ */
+export const GASTO_DA_PONTE = 12;
+export const GASTO_DA_PONTE_PEQUENO = 6;
+export function exemploDaPonte(porDia: number): { gasto: number; depois: number } {
+  const gasto = porDia < GASTO_DA_PONTE * 2 ? GASTO_DA_PONTE_PEQUENO : GASTO_DA_PONTE;
+  return { gasto, depois: Math.max(1, Math.round(porDia) - gasto) };
+}
 
 /** Os itens exatamente no formato que IncomeTable/FixedExpensesTable gravam. */
 export function itensParaGravar(renda: number, contas: ContaEscolhida[], agora: Date = new Date()) {

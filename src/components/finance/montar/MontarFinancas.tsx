@@ -21,8 +21,8 @@
  *      ser o foco"): "VOCÊ PODE GASTAR HOJE / R$ X por dia" subindo de 0 (~0,6 s; sem animação pra quem pediu
  *      menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →". 1.0.17 (dono 20/10): a 1ª pergunta leva o
  *      cartão "Tutorial · Finanças · 3 perguntas"; o "Montando" é a conta dela entrando linha por linha (sem a bola); e
- *      entre o número e o 1º gasto vem a PONTE ("Agora vamos anotar seu primeiro gasto." · [Ir pro app] · "Ainda não
- *      gastei" → `onAindaNaoGastei`). O 1º gasto é o tutorial guiado no formulário de verdade, que a missão abre logo
+ *      entre o número e o 1º gasto vem a PONTE ("Agora vamos anotar seu primeiro gasto" + a cena número → café → o que
+ *      sobra hoje · [Ir pro app] · "Ainda não gastei" → `onAindaNaoGastei`). O 1º gasto é o tutorial guiado no formulário de verdade, que a missão abre logo
  *      depois (PassoDoDia).
  *      Quem cuida da missão liga; nada aqui mexe nela:
  *
@@ -62,7 +62,7 @@
  *          Finanças inteiro — lib/montar-financas EV_PRIMEIRO_GASTO) missao_doses_primeiro_gasto {acao: resultado
  *          (a tela do número apareceu; ms_desde_abertura, retomou) | continuar (ms desde o número)}. Nunca valor em reais.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, Check, ChevronDown, DollarSign, Plus, X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { trocaDePasso, saidaCalma, MOV_MS } from "@/lib/movimento";
@@ -85,7 +85,7 @@ import {
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
   faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
-  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, marcarPonteDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
+  EV_PRIMEIRO_GASTO, GASTO_DA_PONTE, exemploDaPonte, fecharTelaDoNumero, guardarTelaDoNumero, marcarPonteDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
   type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado, type TelaDoNumero,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
@@ -157,6 +157,67 @@ function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_M
     return () => cancelAnimationFrame(raf);
   }, [alvo, naTela, ms, atrasoMs]);
   return v;
+}
+
+/** A cena da ponte entra peça por peça (~1,5 s, ease-out): a pílula do número → o tracejado desce → o café CAI no lugar
+ *  com um tranco leve → o tracejado → a pílula de hoje, com o número antigo riscando e o novo contando pra baixo. */
+export const PONTE_CENA_MS = { linha1: 220, cafe: 400, linha2: 740, hoje: 900, conta: 1020, contaDura: 430 } as const;
+
+/** Conta de `de` até `ate` depois de `atrasoMs` (desacelerando); parado → `ate` direto. */
+function useContagem(de: number, ate: number, atrasoMs: number, ms: number, parado: boolean): number {
+  const animar = !parado && de !== ate && typeof requestAnimationFrame === "function";
+  const [v, setV] = useState(animar ? de : ate);
+  useEffect(() => {
+    if (!animar) { setV(ate); return; }
+    const agora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const t0 = agora() + atrasoMs;
+    let raf = 0;
+    const passo = () => {
+      const p = Math.min(1, Math.max(0, (agora() - t0) / ms));
+      setV(Math.round(de + (ate - de) * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(passo);
+    };
+    setV(de);
+    raf = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(raf);
+  }, [animar, de, ate, atrasoMs, ms]);
+  return v;
+}
+
+function CenaDaPonte({ porDia, apertado, parado }: { porDia: number; apertado: boolean; parado: boolean }) {
+  const { gasto, depois } = exemploDaPonte(porDia);
+  const hoje = useContagem(porDia, depois, PONTE_CENA_MS.conta, PONTE_CENA_MS.contaDura, parado || apertado);
+  const rs = (v: number) => `R$\u00a0${reais(v)}`;
+  const atraso = (ms: number) => (parado ? undefined : ({ animationDelay: `${ms}ms` } as CSSProperties));
+  const cafe = (ms: number, valor: number) => (
+    <div className="mf-ponte-cafe" data-testid="montar-ponte-gasto" style={atraso(ms)}>
+      <span aria-hidden>☕</span> Café<b>{`− ${rs(valor)}`}</b>
+    </div>
+  );
+  const linha = (ms: number) => <i className="mf-ponte-linha" aria-hidden style={atraso(ms)} />;
+  if (apertado) {
+    return (
+      <div className="mf-ponte-cena" data-testid="montar-ponte-cena" data-parado={parado ? "" : undefined}>
+        {cafe(0, GASTO_DA_PONTE)}
+        {linha(380)}
+        <p className="mf-ponte-pilula" data-testid="montar-ponte-folga" style={atraso(560)}><span aria-hidden>🔍</span>anotar mostra onde tem folga</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mf-ponte-cena" data-testid="montar-ponte-cena" data-parado={parado ? "" : undefined}>
+      <p className="mf-ponte-pilula" data-testid="montar-ponte-numero"><DollarSign size={15} aria-hidden /><b>{rs(porDia)}</b> por dia</p>
+      {linha(PONTE_CENA_MS.linha1)}
+      {cafe(PONTE_CENA_MS.cafe, gasto)}
+      {linha(PONTE_CENA_MS.linha2)}
+      <p className="mf-ponte-pilula" data-testid="montar-ponte-hoje" data-valor={depois} style={atraso(PONTE_CENA_MS.hoje)}>
+        <DollarSign size={15} aria-hidden />
+        <s style={atraso(PONTE_CENA_MS.conta)}>{rs(porDia)}</s>
+        <span className="sr-only">{`${rs(depois)} hoje`}</span>
+        <b aria-hidden>{rs(hoje)}</b> hoje
+      </p>
+    </div>
+  );
 }
 
 /** O que o dia escolhido quer dizer NESTE mês — embaixo dos dias, pra ninguém se surpreender depois. */
@@ -365,8 +426,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
     trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "resultado", ms: 0, ms_desde_abertura: Date.now() - abertura.current, ...(retomada ? { retomou: true } : {}) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naMissao, etapa, cedeu]);
-  /* A PONTE pro 1º gasto (1.0.17, dono 20/10 — a copy dele): "Você já viu quanto pode gastar hoje. / Agora vamos anotar
-     seu primeiro gasto." com o número dela pequeno, [Ir pro app] (o tutorial do gasto de hoje) e "Ainda não gastei" (a
+  /* A PONTE pro 1º gasto (1.0.17, dono 20/10 — a copy dele, sem ponto final): "Você já viu quanto pode gastar hoje /
+     Agora vamos anotar seu primeiro gasto" com a cena (o número dela → um café → o que sobra hoje), [Ir pro app] (o tutorial do gasto de hoje) e "Ainda não gastei" (a
      dose já conta, vai pra festa). Antes o corte era seco: tela limpa → o módulo inteiro rolando e escurecendo. */
   const ponteContada = useRef(false);
   useEffect(() => {
@@ -673,12 +734,12 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
 
         {etapa === "ponte" && (
           <>
-            <div className="mf-ponte" data-testid="montar-ponte">
-              {!apertado && resultado.porDia > 0 && (
-                <p className="mf-ponte-numero" data-testid="montar-ponte-numero"><DollarSign size={15} aria-hidden /><b>{rs(resultado.porDia)}</b> por dia</p>
-              )}
-              <p className="mf-ponte-viu">Você já viu quanto pode gastar hoje.</p>
-              <h2>Agora vamos anotar seu primeiro gasto.</h2>
+            {/* 1.0.17 (dono 20/10, ponte "versão 1", mockup ponte2): em cima o que ela viu e o que vem (sem ponto final);
+                no meio a CENA — o número dela → um café que cai → o que sobra hoje —, ligada por tracejado; embaixo os botões */}
+            <div className="mf-ponte" data-testid="montar-ponte" data-apertado={apertado ? "" : undefined}>
+              <p className="mf-ponte-viu" data-testid="montar-ponte-viu">{apertado ? "Você já viu como tá seu mês" : "Você já viu quanto pode gastar hoje"}</p>
+              <h2 data-testid="montar-ponte-titulo">Agora vamos anotar seu primeiro gasto</h2>
+              <CenaDaPonte porDia={resultado.porDia} apertado={apertado || !(resultado.porDia > 0)} parado={reduzirMov || menosMovimento()} />
             </div>
             <div className="mf-rodape">
               <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={() => sairDaPonte("ir_pro_app")}>Ir pro app</button>

@@ -482,6 +482,8 @@ const Relacionamentos = lazyPage(() => import("./pages/Relacionamentos"));
 const PetPage = lazyPage(() => import("./pages/Pet"));
 const Detox = lazyPage(() => import("./pages/Detox"));
 const Conquistas = lazyPage(() => import("./pages/Conquistas"));
+// 21/10: o plano de 30 dias da área comprada no downsell do presente (src/lib/plano-30-areas) — só com a compra
+const Plano30 = lazyPage(() => import("./pages/Plano30"));
 const Retrospectiva = lazyPage(() => import("./pages/Retrospectiva"));
 const Notificacoes = lazyPage(() => import("./pages/Notificacoes"));
 const Preview = lazyPage(() => import("./pages/Preview"));
@@ -829,6 +831,7 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="pet"><TrackedModule moduleId="pet"><PetPage /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="detox"><TrackedModule moduleId="detox"><Detox /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        <Route path="/plano-30" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="plano-30"><Plano30 /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         {/* Destino da notificação mensal e do item do menu. Fora do TrackedModule:
             não é módulo, é uma tela transversal que lê todos eles. */}
         <Route path="/retrospectiva" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="retrospectiva"><Retrospectiva /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />

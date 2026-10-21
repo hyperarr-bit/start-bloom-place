@@ -76,6 +76,7 @@ import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 import { KitPrimeiroMes, KitHojeNoPainel } from "@/components/kit/KitPrimeiroMes";
 import { useKitPrimeiroMes } from "@/hooks/use-kit-primeiro-mes";
+import { areaDoKit } from "@/lib/plano-30-areas";
 import type { DestinoDoKit } from "@/lib/kit-primeiro-mes";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 import { useDemoDoFunil } from "@/lib/demo-do-funil";
@@ -90,6 +91,16 @@ interface PropsDoConteudo {
   abaInicial?: string | null;
   aoTrocarAba?: (aba: string) => void;
 }
+
+/** 21/10 (plano de 30 dias por área, src/lib/plano-30-areas): `/financas?aba=<aba>` abre direto nessa aba — o mesmo
+ *  `?aba=` que Rotina, Saúde e Treino já leem. Sem o parâmetro (ou com aba desconhecida), nada muda. */
+export const ABAS_DE_FINANCAS_NA_URL = ["dashboard", "financeiro", "investimentos", "itens", "viagem", "simuladores", "limites", "relatorios", "saude"] as const;
+const abaDaUrlDeFinancas = (): string | null => {
+  try {
+    const a = new URLSearchParams(window.location.search).get("aba");
+    return a && (ABAS_DE_FINANCAS_NA_URL as readonly string[]).includes(a) ? a : null;
+  } catch { return null; }
+};
 
 const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   // A seta ←: no app, o hub; na demo, o mesmo destino do botão de baixo (P5, 30/09).
@@ -133,7 +144,7 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   const quizVictory = VICTORY_PHRASE[quiz.vitoria ?? ""];
   const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
   const [activeTab, setActiveTab] = useState(
-    () => abaInicial ?? (getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard")
+    () => abaInicial ?? abaDaUrlDeFinancas() ?? (getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard")
   );
   useEffect(() => { aoTrocarAba?.(activeTab); }, [activeTab, aoTrocarAba]);
   useScrollActiveTabIntoView(activeTab);
@@ -445,7 +456,8 @@ const IndexConteudo = ({ abaInicial, aoTrocarAba }: PropsDoConteudo) => {
   /* KIT PRIMEIRO MÊS (18/10): a aba só existe pra quem comprou o kit (chave
      core-kit-primeiro-mes) — sem cadeado nem anúncio pra quem não comprou. */
   const { kit: kitPrimeiroMes } = useKitPrimeiroMes();
-  const temKit = !!kitPrimeiroMes && !isPreview;
+  // 21/10: o plano de 30 dias de OUTRA área (Rotina, Saúde…) mora na /plano-30, não aqui — compra sem área = Dinheiro
+  const temKit = !!kitPrimeiroMes && !isPreview && areaDoKit(kitPrimeiroMes) === "dinheiro";
   const irParaDoKit = (d: DestinoDoKit) => {
     setOpenMonth(null);
     setActiveTab(d.aba);

@@ -90,7 +90,9 @@ describe("os destinos abrem telas que existem", () => {
     expect([...ABAS_NA_URL["/rotina"]]).toEqual(idsDoBloco(ler("src/pages/Rotina.tsx"), "const ABAS_ROTINA = ["));
     expect([...ABAS_NA_URL["/saude"]]).toEqual(idsDoBloco(ler("src/pages/Saude.tsx"), "const tabs = ["));
     expect([...ABAS_NA_URL["/treino"]]).toEqual(idsDoBloco(ler("src/pages/Treino.tsx"), "const ABAS: { id: Aba;"));
-    expect(ler("src/pages/DesenvolvimentoPessoal.tsx")).toContain(`get("tab");\n      return t && ${JSON.stringify([...ABAS_NA_URL["/desenvolvimento"]]).replace(/,/g, ", ")}.includes(t)`);
+    // 21/10 (integração com o upsell-2027): a aba SEU 2027 também é lida da URL, mas só existe pra quem comprou o pacote —
+    // não é destino do plano de 30 dias, então fica fora do ABAS_NA_URL
+    expect(ler("src/pages/DesenvolvimentoPessoal.tsx")).toContain(`get("tab");\n      return t && ${JSON.stringify([...ABAS_NA_URL["/desenvolvimento"]]).replace(/,/g, ", ").replace(/\]$/, ", ABA_2027.id]")}.includes(t)`);
     const index = ler("src/pages/Index.tsx");
     expect(index).toContain(`export const ABAS_DE_FINANCAS_NA_URL = ${JSON.stringify([...ABAS_NA_URL["/financas"]]).replace(/,/g, ", ")} as const;`);
     for (const a of ABAS_NA_URL["/financas"]) expect(index).toContain(`{ id: "${a}", label:`);

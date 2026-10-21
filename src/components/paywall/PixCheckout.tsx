@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { sairDeVerdade, useSegurarVoltar, varianteDoBack, type FunilDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
 import { isNativeShell } from "@/lib/native-shell";
 import { isInAppBrowser } from "@/lib/funnel";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
@@ -90,6 +92,9 @@ interface Props {
   v2?: { mascote?: React.ReactNode; missao?: string | null; onConfirmado?: () => void };
   /** FUNIL B (30/09): o checkout do funil "o app é o funil" — e-mail ACIMA do QR, copiar exige e-mail (escanear não), e o pagamento confirmado sai direto pro "Pronto" do funil (sem a tela confirmed daqui). Sem a prop, o checkout fica byte a byte igual. */
   funilB?: { aoConfirmar: () => void };
+  /** BACK (21/10, src/lib/back-funil.ts): com o QR na tela, o voltar do navegador (1x por sessão) mostra "seu Pix
+   *  continua valendo" com o MESMO código. Sem a prop (o gate do app, o /planos), nada muda. */
+  backFunil?: FunilDoBack;
 }
 
 // Gateway do Pix de TODO o app (16/07 noite, ordem do dono: Cakto não volta
@@ -529,7 +534,7 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 const MARCA_B = { funil: "b" as const };
 const SEM_MARCA = {} as const;
 
-export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
+export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: Props) {
   // APP DA LOJA (22/07): dentro do shell Capacitor, Pix in-app viola o Play
   // Billing (obrigatório no BR p/ conteúdo digital). ESTE é o único ponto de
   // bifurcação — todo caminho que abre PixCheckout vira Play Billing no app.
@@ -1159,6 +1164,11 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
     }
   };
 
+  /* BACK no Pix gerado: o MESMO código (nada de Pix novo). "Copiar" usa o copyCode de sempre — no toque, por causa
+   * do clipboard — e a tela de baixo já mostra o "Código copiado!". */
+  const [backPix, setBackPix] = useState(false);
+  useSegurarVoltar(backFunil ?? "inicio", "pix", !!backFunil && step === "qr" && !!pix, () => setBackPix(true));
+
   const enterApp = () => { window.location.href = "/"; };
   /* SELOS DAS LOJAS NO PAGAMENTO CONFIRMADO (19/10, regra do dono pra todo funil web: na época do vitalício a maioria
    * dos reembolsos era "pensei que não era app da App Store/Play"). Só no checkout de FUNIL (o /inicio) — o gate e o
@@ -1237,6 +1247,20 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
 
   return (
     <div className="fixed inset-0 z-[400] bg-background overflow-y-auto">
+      {backPix && backFunil && step === "qr" && pix && (
+        <BackFolha
+          funil={backFunil}
+          etapa="pix"
+          variante={varianteDoBack()}
+          preco={fmtBRL(pix.amount)}
+          codigo={pix.qrCode}
+          validade={mm != null && ss != null && secondsLeft! > 0 ? `${mm}:${ss}` : null}
+          extra={{ offer, ...marca }}
+          onQuero={() => { setBackPix(false); void copyCode(); }}
+          onFicar={() => setBackPix(false)}
+          onSair={() => { setBackPix(false); sairDeVerdade(); }}
+        />
+      )}
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
         {step !== "confirmed" && (
           <button

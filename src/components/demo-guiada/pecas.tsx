@@ -472,7 +472,15 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
      * — só SOBE o que for preciso pra caber acima do teclado. O iPhone não rola por um campo dentro de algo `fixed`
      * (toque real, 20/10: parado, o campo ficava atrás do teclado e ela digitava sem ver). */
     if (noBalao && posicao) {
-      const topo = Math.max(topoLivre, Math.min(posicao.top, fundoLivre - h));
+      let topo = Math.min(posicao.top, fundoLivre - h);
+      if (topo < topoLivre) {
+        /* não cabe inteiro entre o topo fixo e o teclado (iPhone SE: 339 px visíveis, toque real 20/10 — o campo e o
+         * "Adicionar" ficavam atrás da barra do teclado): o que importa é o CAMPO — o balão passa por cima do cabeçalho
+         * (o pedaço de cima pode sair) e o fim do campo fica logo acima do teclado */
+        const campo = balaoRef.current.querySelector("[data-escolha-campo]");
+        const fimDoCampo = campo ? campo.getBoundingClientRect().bottom - balaoRef.current.getBoundingClientRect().top : h;
+        topo = Math.min(topoLivre, fundoLivre - fimDoCampo);
+      }
       if (Math.abs(topo - posicao.top) >= 1) setPosicao({ top: topo });
       return;
     }

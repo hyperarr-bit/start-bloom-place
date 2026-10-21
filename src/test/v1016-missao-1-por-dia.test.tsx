@@ -2817,6 +2817,35 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     } finally { alturas.mockRestore(); }
   });
 
+  it("toque real no iPhone SE (375×667, 339 px visíveis com o teclado): o post-it não cabe inteiro abaixo das abas — o CAMPO e o 'Adicionar' ficam acima do teclado (o balão passa por cima do cabeçalho)", () => {
+    const alturas = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.querySelector?.('[data-testid="demo-guia-postit"]') && !this.matches('[data-testid="demo-guia-postit"]') ? 290 : 0;
+    });
+    try {
+      teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 328 });
+      dose();
+      alvoEmbaixo(500);
+      avancar(900);
+      const balao = () => postIt().parentElement!.parentElement!;
+      const campo = abrirOutro();
+      // no balão, o fim do campo (com o R$ e o "Adicionar") fica 240 px abaixo do topo do balão
+      const rectAntes = vi.mocked(Element.prototype.getBoundingClientRect).getMockImplementation()!;
+      vi.mocked(Element.prototype.getBoundingClientRect).mockImplementation(function (this: Element) {
+        const topoDoBalao = parseFloat(balao().style.top) || 0;
+        if (this === balao()) return { top: topoDoBalao, bottom: topoDoBalao + 290, left: 0, right: 375, width: 375, height: 290, x: 0, y: topoDoBalao, toJSON: () => ({}) } as DOMRect;
+        if (this.matches?.("[data-escolha-campo]")) return { top: topoDoBalao + 150, bottom: topoDoBalao + 240, left: 0, right: 375, width: 375, height: 90, x: 0, y: topoDoBalao + 150, toJSON: () => ({}) } as DOMRect;
+        // o cabeçalho do módulo + as abas, grudados no topo (no SE terminam em ~112)
+        if (this.matches?.("header.sticky")) return { top: 0, bottom: 112, left: 0, right: 375, width: 375, height: 112, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+        return rectAntes.call(this);
+      });
+      teclado.abrir(campo, 0, 0);
+      avancar(900);
+      const topo = parseFloat(balao().style.top);
+      expect(topo + 240).toBeLessThanOrEqual(667 - 328 - 8); // o fim do campo acima do teclado
+      expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo);
+    } finally { alturas.mockRestore(); }
+  });
+
   it("print do dono: com o teclado aberto o iPhone desloca a área visível e a faixa 'Missão · dia 1 de 3' subia pra cima do relógio — enquanto deslocada, <html data-tela-deslocada> (o CSS tira a faixa); fechou, volta", () => {
     teclado = instalarTecladoIphone(); // no aparelho o visualViewport existe desde a abertura
     dose();

@@ -71,7 +71,7 @@ import {
   CHAVE_MONTAR_FINANCAS, EV_PRIMEIRO_GASTO, _novaAberturaMontar, _zerarRemotaMontar, _zerarResultadoVisto, calcularMontar,
   deveMostrarMontarFinancas, lerTelaDoNumero, marcaDoAparelho,
 } from "@/lib/montar-financas";
-import { MontarFinancas, SUBIDA_DO_NUMERO_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
+import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CHAVE_ESTADO_MISSAO_DOSES, definirDonoDaMissao, donoDaConta, iniciarMissao, lerMissao } from "@/lib/missao-doses";
 import { CHAVE_BRACO_DIA1, _zerarUmPorDiaRemoto, registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
@@ -248,7 +248,8 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(quadros()).toBeGreaterThan(0);
     expect(Number(visivel().replace(/\D/g, ""))).toBeLessThan(188); // começou de baixo (3.000 ÷ 16 = 188)
     expect(screen.getByTestId("montar-por-dia").querySelector(".sr-only")!.textContent).toBe("R$ 188 por dia"); // o leitor de tela: o final
-    await act(async () => { await new Promise((r) => setTimeout(r, SUBIDA_DO_NUMERO_MS + 250)); });
+    // 1.0.17: vindo da conta linha por linha, o número espera a conta sumir (CONTA_SAI_MS) e então sobe
+    await act(async () => { await new Promise((r) => setTimeout(r, CONTA_SAI_MS + SUBIDA_DO_NUMERO_MS + 250)); });
     expect(visivel()).toBe("R$ 188");
     cleanup();
     // menos movimento: o número final na hora, sem quadro a quadro
@@ -264,6 +265,73 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     await respirar(2);
     expect(visivel()).toBe("R$ 188");
     expect(quadros()).toBe(0);
+  });
+
+  /* 1.0.17 (dono 20/10, mockups b2 e c1) */
+  it("o cartão de contexto: 'Tutorial · Finanças · 3 perguntas' SÓ na 1ª pergunta e SÓ pela missão (sem toque a mais); nas outras, só a barra", () => {
+    montarTela();
+    expect(screen.getByTestId("montar-contexto")).toHaveTextContent("Tutorial · Finanças · 3 perguntas");
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(screen.getByText("Quais contas você paga todo mês?")).toBeTruthy();
+    expect(screen.queryByTestId("montar-contexto")).toBeNull();
+    cleanup();
+    localStorage.clear();
+    _novaAberturaMontar();
+    montarTela({ origem: "modulo" });
+    expect(screen.queryByTestId("montar-contexto")).toBeNull();
+  });
+
+  it("no lugar do 'Calculando…' (bola girando): a conta DELA entra linha por linha — Entra no mês → Contas fixas (N) → a fatura (com cartão), 250 ms entre elas; o tempo do 'Montando' é o de sempre; com 'menos movimento', paradas", () => {
+    window.matchMedia = semMenosMovimento;
+    montarTela({ esperaMs: 60_000 });
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    for (const c of [/^🏠 Aluguel/, /^💡 Luz/]) fireEvent.click(tela().getByRole("button", { name: c }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: /Uso cartão/ }));
+    fireEvent.click(tela().getByRole("button", { name: "Nubank" }));
+    fireEvent.change(tela().getByLabelText("Fatura deste mês em reais"), { target: { value: "600" } });
+    fireEvent.click(tela().getByRole("button", { name: "Dia 20" }));
+    fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
+    const montando = screen.getByTestId("montar-montando");
+    expect(screen.queryByText("Calculando…")).toBeNull();
+    expect(montando.querySelector(".mf-orbe")).toBeNull();
+    const linhas = Array.from(montando.querySelectorAll<HTMLElement>("[data-entra]"));
+    expect(linhas.map((l) => lido(l))).toEqual(["Entra no mêsR$ 3.000", "Contas fixas (2)− R$ 1.050", "Fatura do Nubank− R$ 600"]);
+    expect(linhas.map((l) => l.style.animationDelay)).toEqual(["0ms", `${LINHA_DA_CONTA_MS}ms`, `${2 * LINHA_DA_CONTA_MS}ms`]);
+    expect(LINHA_DA_CONTA_MS).toBe(250);
+    cleanup();
+    // menos movimento: as mesmas linhas, sem atraso nenhum (e o CSS tira a animação delas)
+    window.matchMedia = comMenosMovimento;
+    localStorage.clear();
+    _novaAberturaMontar();
+    montarTela({ esperaMs: 60_000 });
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "3000" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    const paradas = Array.from(screen.getByTestId("montar-montando").querySelectorAll<HTMLElement>("[data-entra]"));
+    expect(paradas.map((l) => lido(l))).toEqual(["Entra no mêsR$ 3.000", "Contas fixas (0)− R$ 0"]);
+    expect(paradas.every((l) => !l.style.animationDelay)).toBe(true);
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^@]*\.mf-conta\[data-entra\]\s*\{\s*animation:\s*none/);
+  });
+
+  it("a conta → o número na MESMA tela (sem deslizar): o número só começa a subir depois de a conta sumir", async () => {
+    window.matchMedia = semMenosMovimento;
+    montarTela({ esperaMs: 0 });
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "3000" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar(2);
+    const pronto = screen.getByTestId("montar-pronto");
+    expect(pronto.hasAttribute("data-de-montando")).toBe(true); // entra parado (sem o "sobe" da tela)
+    const visivel = () => lido(screen.getByTestId("montar-por-dia").querySelector("[aria-hidden]")!);
+    expect(visivel()).toBe("R$ 0"); // ainda esperando a conta sumir
+    await act(async () => { await new Promise((r) => setTimeout(r, CONTA_SAI_MS + SUBIDA_DO_NUMERO_MS + 250)); });
+    expect(visivel()).toBe("R$ 188");
   });
 
   /* 1.0.17: 18% terminavam com "Você pode gastar R$ 0" como herói — o mês apertado troca o herói pelo acolhimento
@@ -311,7 +379,7 @@ describe("fechar o app: o número que ainda não apareceu volta; o que apareceu,
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
     fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
     fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
-    expect(screen.getByText("Calculando…")).toBeTruthy();
+    expect(screen.getByTestId("montar-montando")).toBeTruthy();
     expect(marcaDoAparelho()?.r).toBe("pronto"); // o Montar já decidiu (e gravou) na entrada do "Montando…"
     const dados = controle.dados();
     cleanup();
@@ -577,8 +645,8 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     const controle = montarAppEmFinancas();
     await avancar(300);
     await responderOMontar();
-    await avancar(500); // ainda no "Montando…"
-    expect(screen.getByText("Calculando…")).toBeTruthy();
+    await avancar(500); // ainda no "Montando…" (a conta entrando linha por linha)
+    expect(screen.getByTestId("montar-montando")).toBeTruthy();
     const dados = controle.dados();
     cleanup();
     _novaAberturaMontar();

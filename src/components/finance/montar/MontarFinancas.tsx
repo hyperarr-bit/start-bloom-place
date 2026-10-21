@@ -114,12 +114,17 @@ const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long
 
 /** Quanto dura a subida do número na tela do resultado (de 0 até o "por dia" dela). */
 export const SUBIDA_DO_NUMERO_MS = 600;
+/** 1.0.17 (dono 20/10, mockup c1): no lugar do "Calculando…" com a bola girando, as linhas da conta DELA entram uma por vez
+ *  (Entra no mês → Contas fixas (N) → Fatura, se tiver cartão), a cada isto (ms). O tempo total do "Montando" não muda. */
+export const LINHA_DA_CONTA_MS = 250;
+/** A conta some (cópia por cima) neste tempo e só então o número começa a subir. */
+export const CONTA_SAI_MS = 280;
 const menosMovimento = (): boolean => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
 /** O número da tela do resultado SOBE de 0 até o "por dia" dela (~0,6 s, desacelerando), uma vez, quando a tela
  *  aparece; sem animação pra quem pediu menos movimento (ou sem requestAnimationFrame). Fora da tela (`naTela`
  *  false) só acompanha o valor, sem quadro a quadro — digitar a renda muda o "por dia" a cada tecla. */
-function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_MS): number {
+function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_MS, atrasoMs = 0): number {
   const [v, setV] = useState(() => (naTela && alvo > 0 && !menosMovimento() && typeof requestAnimationFrame === "function" ? 0 : alvo));
   const subiu = useRef(false);
   useEffect(() => {
@@ -131,7 +136,8 @@ function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_M
     let raf = 0;
     // o relógio é o mesmo no começo e em cada quadro (o carimbo do rAF pode vir de outra origem em WebView/jsdom)
     const agora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-    const t0 = agora();
+    // 1.0.17: vindo da conta linha por linha, o número espera a conta sumir (uma coisa se mexe por vez)
+    const t0 = agora() + Math.max(0, atrasoMs);
     const passo = () => {
       const p = Math.min(1, Math.max(0, (agora() - t0) / ms));
       setV(Math.round(alvo * (1 - Math.pow(1 - p, 3))));
@@ -142,7 +148,7 @@ function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_M
     raf = requestAnimationFrame(passo);
     // interrompida no meio (remontou): a próxima volta recomeça do 0
     return () => cancelAnimationFrame(raf);
-  }, [alvo, naTela, ms]);
+  }, [alvo, naTela, ms, atrasoMs]);
   return v;
 }
 
@@ -303,9 +309,16 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     gravar(resposta, pulouCartao);
     irPara("montando");
   };
+  /** 1.0.17: o número chegou pela conta linha por linha (não pela retomada) — ele espera a conta sumir pra subir */
+  const [deMontando, setDeMontando] = useState(false);
   useEffect(() => {
     if (etapa !== "montando") return;
-    const t = window.setTimeout(() => irPara("pronto"), Math.max(0, esperaMs));
+    const t = window.setTimeout(() => {
+      // a conta some devagar por cima (cópia) e o número já está parado embaixo — sem corte nem deslize de tela
+      saidaCalma(folha.current?.querySelector(".mf-montando-conta"), CONTA_SAI_MS);
+      setDeMontando(true);
+      irPara("pronto");
+    }, Math.max(0, esperaMs));
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, esperaMs]);
@@ -356,7 +369,13 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     if (naMissao) trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
     onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
   };
-  const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto");
+  const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto", SUBIDA_DO_NUMERO_MS, deMontando && !reduzirMov && !menosMovimento() ? CONTA_SAI_MS : 0);
+  /** As linhas da conta do "Montando" (as mesmas da "Ver a conta"), na ordem em que entram. */
+  const linhasDaConta: Array<{ id: string; rotulo: string; valor: string }> = [
+    { id: "renda", rotulo: "Entra no mês", valor: `R$ ${reais(resultado.renda)}` },
+    { id: "contas", rotulo: `Contas fixas (${resultado.contas})`, valor: `− R$ ${reais(resultado.fixos)}` },
+    ...(resultado.cartao && cartao.dia ? [{ id: "fatura", rotulo: faturaNaTela, valor: `− R$ ${reais(resultado.fatura)}` }] : []),
+  ];
   const apertado = mesApertado(resultado);
   /** "R$ 123" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */
   const rs = (v: number) => `R$\u00a0${reais(v)}`;
@@ -378,7 +397,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
       {cabecalho}
       {/* 1.0.17 (dono: "os cortes entre as telas são bruscos"): cada passo ENTRA deslizando 24 px + fade (260 ms); o de
           antes sai na hora (nada de esperar uma saída animada pra responder ao toque) */}
-      <motion.div key={etapa} className="mf-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
+      <motion.div key={etapa === "montando" || etapa === "pronto" ? "resultado" : etapa} className="mf-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
         {etapa === "renda" && (
           <>
             {/* 1.0.17 (dono 20/10, mockup b2): pela missão, a 1ª pergunta diz que isto é o TUTORIAL — curtíssimo, sem toque a
@@ -539,9 +558,18 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
         )}
 
         {etapa === "montando" && (
-          <div className="mf-montando" aria-live="polite">
-            <div className="mf-orbe" aria-hidden><div><DollarSign size={38} /></div></div>
-            <h2>Calculando…</h2>
+          /* 1.0.17 (dono 20/10, mockup c1): a conta DELA entrando linha por linha (no lugar da bola girando), e o número
+             sobe logo depois na tela do resultado. Com "reduzir movimento", as linhas aparecem paradas. */
+          <div className="mf-montando-conta" data-testid="montar-montando" aria-live="polite">
+            <p className="mf-montando-kicker">Montando seu mês…</p>
+            <div className="mf-folha">
+              <div className="mf-faixa">📋 Seu mês</div>
+              {linhasDaConta.map((l, i) => (
+                <div key={l.id} className="mf-conta" data-entra="" data-linha={l.id} style={reduzirMov || menosMovimento() ? undefined : { animationDelay: `${i * LINHA_DA_CONTA_MS}ms` }}>
+                  <span>{l.rotulo}</span>{l.valor}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -549,7 +577,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {/* 17/10 (revisão do dono): SÓ o número — o herói da tela. O 1º gasto é o tutorial no formulário de verdade
                 (a missão abre depois do "Continuar →"); nada de post-it aqui. */}
-            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined} data-apertado={apertado ? "" : undefined}>
+            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined} data-apertado={apertado ? "" : undefined} data-de-montando={deMontando ? "" : undefined}>
               {apertado ? (
                 /* 1.0.17: mês apertado (R$ 0 ou < R$ 15/dia) — o herói é o acolhimento, não o número pequeno. O número
                    fica na conta do mês ("Ver a conta" → "÷ N dias" ou "Por dia"). */

@@ -193,6 +193,8 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 @media (prefers-reduced-motion: reduce) {
   .mf-orbe, .mf-orbe > div { animation: none; }
   .mf-passo, .mf-pronto { animation-duration: .01s; }
+  .mf-conta[data-entra] { animation: none; opacity: 1; transform: none; }
+  .mf-pronto[data-de-montando] + .mf-rodape { animation: none; }
 }
 /* "＋ Outra"/"← Voltar": o texto mora num <span> — com o svg como único filho, a regra global
    `button:has(> svg:only-child)` (botão só de ícone) trocava padding e borda. */

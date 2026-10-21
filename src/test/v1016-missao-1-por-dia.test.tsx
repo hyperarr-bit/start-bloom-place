@@ -1578,8 +1578,8 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     fireEvent.click(mf().getByRole("button", { name: /Aluguel/ }));
     fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
     fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
-    avancar(400); // ainda no "Montando…" — mas a dose já gravou (B11)
-    expect(screen.getByText("Calculando…")).toBeInTheDocument();
+    avancar(400); // ainda no "Montando…" (a conta entrando linha por linha) — mas a dose já gravou (B11)
+    expect(screen.getByTestId("montar-montando")).toBeInTheDocument();
     expect(lerMissao()?.feitos[1]).toBeDefined();
     expect(lerMissao()?.gastoGuiado).toMatchObject({ n: 1, dia: "2026-10-03" });
     // (1) o app morre no "Montando…" → reabre na Home → a missão leva pra Finanças, DIRETO NO NÚMERO (sem as perguntas)

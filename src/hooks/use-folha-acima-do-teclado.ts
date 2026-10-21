@@ -9,6 +9,12 @@ import { useEffect, type RefObject } from "react";
  * iPhone (sem visualViewport encolhendo) nada muda. A faixa da missão, se estiver visível em cima,
  * continua por cima: a folha começa embaixo dela.
  */
+/** A altura da faixa da missão lida do CSS. 1.0.17: no dia 1 sem faixa ela é "0px" — o `|| 40` de antes virava 40 (0 é
+ *  falso) e a folha descia 40 px por nada com o teclado aberto. Sem valor legível: 40, a altura padrão. */
+export const alturaDaFaixa = (valorCss: string): number => {
+  const n = parseFloat(valorCss);
+  return Number.isFinite(n) && n >= 0 ? n : 40;
+};
 export function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
@@ -32,7 +38,7 @@ export function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
       if (!agoraAberto) { if (aberto) soltar(); aberto = false; return; }
       const html = document.documentElement;
       const faixa = html.hasAttribute("data-missao-doses-faixa")
-        ? (parseFloat(getComputedStyle(html).getPropertyValue("--missao-doses-faixa-h")) || 40)
+        ? alturaDaFaixa(getComputedStyle(html).getPropertyValue("--missao-doses-faixa-h"))
         : 0;
       const topo = Math.max(vv.offsetTop, faixa);
       el.style.top = `${topo}px`;

@@ -71,7 +71,7 @@ import {
   CHAVE_MONTAR_FINANCAS, EV_PRIMEIRO_GASTO, _novaAberturaMontar, _zerarRemotaMontar, _zerarResultadoVisto, calcularMontar,
   deveMostrarMontarFinancas, lerTelaDoNumero, marcaDoAparelho,
 } from "@/lib/montar-financas";
-import { MontarFinancas, SUBIDA_DO_NUMERO_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
+import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { CHAVE_ESTADO_MISSAO_DOSES, definirDonoDaMissao, donoDaConta, iniciarMissao, lerMissao } from "@/lib/missao-doses";
 import { CHAVE_BRACO_DIA1, _zerarUmPorDiaRemoto, registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
@@ -215,21 +215,50 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(doPasso1()).toEqual([]);
   });
 
-  it("'Continuar': onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; evento 'continuar' com o tempo desde o número, sem reais", async () => {
+  it("'Continuar' → a PONTE (1.0.17): 'Você já viu quanto pode gastar hoje.' / 'Agora vamos anotar seu primeiro gasto.' com o número pequeno; 'Ir pro app' chama onPronto UMA vez (toque duplo) e sem primeiroGasto; nada gravado em gastos; eventos sem reais", async () => {
     const onPronto = vi.fn();
-    const controle = montarTela({ onPronto });
+    const naoGastei = vi.fn();
+    const controle = montarTela({ onPronto, onAindaNaoGastei: naoGastei });
     await ateONumero();
     vi.setSystemTime(HOJE.getTime() + 2500); // 2,5 s olhando o número
     const cta = tela().getByRole("button", { name: "Continuar" });
     fireEvent.click(cta);
     fireEvent.click(cta);
+    expect(onPronto).not.toHaveBeenCalled();
+    const ponte = screen.getByTestId("montar-ponte");
+    expect(ponte).toHaveTextContent("Você já viu quanto pode gastar hoje.");
+    expect(ponte).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    expect(lido(screen.getByTestId("montar-ponte-numero"))).toBe("R$ 66 por dia");
+    expect(screen.getByTestId("montar-ponte-nao-gastei")).toHaveTextContent("Ainda não gastei");
+    vi.setSystemTime(HOJE.getTime() + 4000);
+    const ir = screen.getByTestId("montar-ponte-ir");
+    expect(ir).toHaveTextContent("Ir pro app");
+    fireEvent.click(ir);
+    fireEvent.click(ir);
     expect(onPronto).toHaveBeenCalledTimes(1);
+    expect(naoGastei).not.toHaveBeenCalled();
     const r = onPronto.mock.calls[0][0] as ResumoMontar;
     expect(r).toEqual({ contas: 3, porDia: 66, semFolga: false, cartao: true });
     expect("primeiroGasto" in r).toBe(false);
     expect(controle.dados()["finance-expenses"]).toBeUndefined();
-    expect(doPasso1()).toEqual([expect.objectContaining({ acao: "resultado" }), { acao: "continuar", ms: 2500 }]);
+    expect(doPasso1()).toEqual([expect.objectContaining({ acao: "resultado" }), { acao: "continuar", ms: 2500 }, { acao: "ponte", ms: 2500 }, { acao: "ponte_saiu", via: "ir_pro_app", ms: 4000 }]);
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|1050|800|66/);
+  });
+
+  it("a ponte: 'Ainda não gastei' chama onAindaNaoGastei (não o onPronto), uma vez; a ponte não volta mais", async () => {
+    const onPronto = vi.fn();
+    const naoGastei = vi.fn();
+    montarTela({ onPronto, onAindaNaoGastei: naoGastei });
+    await ateONumero();
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(lerTelaDoNumero(CRIADA, HOJE)?.ponte).toBe(true); // fechar o app aqui volta NA ponte
+    fireEvent.click(screen.getByTestId("montar-ponte-nao-gastei"));
+    fireEvent.click(screen.getByTestId("montar-ponte-nao-gastei"));
+    expect(naoGastei).toHaveBeenCalledTimes(1);
+    expect(naoGastei).toHaveBeenCalledWith({ contas: 3, porDia: 66, semFolga: false, cartao: true });
+    expect(onPronto).not.toHaveBeenCalled();
+    expect(doPasso1().at(-1)).toMatchObject({ acao: "ponte_saiu", via: "ainda_nao" });
+    expect(lerTelaDoNumero(CRIADA, HOJE)).toBeNull();
   });
 
   it("o número SOBE de 0 até o 'por dia' (~0,6 s) quando a tela aparece — digitar a renda não roda quadro a quadro; com 'menos movimento', direto", async () => {
@@ -248,7 +277,8 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(quadros()).toBeGreaterThan(0);
     expect(Number(visivel().replace(/\D/g, ""))).toBeLessThan(188); // começou de baixo (3.000 ÷ 16 = 188)
     expect(screen.getByTestId("montar-por-dia").querySelector(".sr-only")!.textContent).toBe("R$ 188 por dia"); // o leitor de tela: o final
-    await act(async () => { await new Promise((r) => setTimeout(r, SUBIDA_DO_NUMERO_MS + 250)); });
+    // 1.0.17: vindo da conta linha por linha, o número espera a conta sumir (CONTA_SAI_MS) e então sobe
+    await act(async () => { await new Promise((r) => setTimeout(r, CONTA_SAI_MS + SUBIDA_DO_NUMERO_MS + 250)); });
     expect(visivel()).toBe("R$ 188");
     cleanup();
     // menos movimento: o número final na hora, sem quadro a quadro
@@ -264,6 +294,73 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     await respirar(2);
     expect(visivel()).toBe("R$ 188");
     expect(quadros()).toBe(0);
+  });
+
+  /* 1.0.17 (dono 20/10, mockups b2 e c1) */
+  it("o cartão de contexto: 'Tutorial · Finanças · 3 perguntas' SÓ na 1ª pergunta e SÓ pela missão (sem toque a mais); nas outras, só a barra", () => {
+    montarTela();
+    expect(screen.getByTestId("montar-contexto")).toHaveTextContent("Tutorial · Finanças · 3 perguntas");
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(screen.getByText("Quais contas você paga todo mês?")).toBeTruthy();
+    expect(screen.queryByTestId("montar-contexto")).toBeNull();
+    cleanup();
+    localStorage.clear();
+    _novaAberturaMontar();
+    montarTela({ origem: "modulo" });
+    expect(screen.queryByTestId("montar-contexto")).toBeNull();
+  });
+
+  it("no lugar do 'Calculando…' (bola girando): a conta DELA entra linha por linha — Entra no mês → Contas fixas (N) → a fatura (com cartão), 250 ms entre elas; o tempo do 'Montando' é o de sempre; com 'menos movimento', paradas", () => {
+    window.matchMedia = semMenosMovimento;
+    montarTela({ esperaMs: 60_000 });
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    for (const c of [/^🏠 Aluguel/, /^💡 Luz/]) fireEvent.click(tela().getByRole("button", { name: c }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: /Uso cartão/ }));
+    fireEvent.click(tela().getByRole("button", { name: "Nubank" }));
+    fireEvent.change(tela().getByLabelText("Fatura deste mês em reais"), { target: { value: "600" } });
+    fireEvent.click(tela().getByRole("button", { name: "Dia 20" }));
+    fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
+    const montando = screen.getByTestId("montar-montando");
+    expect(screen.queryByText("Calculando…")).toBeNull();
+    expect(montando.querySelector(".mf-orbe")).toBeNull();
+    const linhas = Array.from(montando.querySelectorAll<HTMLElement>("[data-entra]"));
+    expect(linhas.map((l) => lido(l))).toEqual(["Entra no mêsR$ 3.000", "Contas fixas (2)− R$ 1.050", "Fatura do Nubank− R$ 600"]);
+    expect(linhas.map((l) => l.style.animationDelay)).toEqual(["0ms", `${LINHA_DA_CONTA_MS}ms`, `${2 * LINHA_DA_CONTA_MS}ms`]);
+    expect(LINHA_DA_CONTA_MS).toBe(250);
+    cleanup();
+    // menos movimento: as mesmas linhas, sem atraso nenhum (e o CSS tira a animação delas)
+    window.matchMedia = comMenosMovimento;
+    localStorage.clear();
+    _novaAberturaMontar();
+    montarTela({ esperaMs: 60_000 });
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "3000" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    const paradas = Array.from(screen.getByTestId("montar-montando").querySelectorAll<HTMLElement>("[data-entra]"));
+    expect(paradas.map((l) => lido(l))).toEqual(["Entra no mêsR$ 3.000", "Contas fixas (0)− R$ 0"]);
+    expect(paradas.every((l) => !l.style.animationDelay)).toBe(true);
+    const css = fs.readFileSync(path.resolve(__dirname, "../components/finance/montar/montar-financas.css"), "utf8");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^@]*\.mf-conta\[data-entra\]\s*\{\s*animation:\s*none/);
+  });
+
+  it("a conta → o número na MESMA tela (sem deslizar): o número só começa a subir depois de a conta sumir", async () => {
+    window.matchMedia = semMenosMovimento;
+    montarTela({ esperaMs: 0 });
+    fireEvent.change(tela().getByLabelText("Renda do mês em reais"), { target: { value: "3000" } });
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar(2);
+    const pronto = screen.getByTestId("montar-pronto");
+    expect(pronto.hasAttribute("data-de-montando")).toBe(true); // entra parado (sem o "sobe" da tela)
+    const visivel = () => lido(screen.getByTestId("montar-por-dia").querySelector("[aria-hidden]")!);
+    expect(visivel()).toBe("R$ 0"); // ainda esperando a conta sumir
+    await act(async () => { await new Promise((r) => setTimeout(r, CONTA_SAI_MS + SUBIDA_DO_NUMERO_MS + 250)); });
+    expect(visivel()).toBe("R$ 188");
   });
 
   /* 1.0.17: 18% terminavam com "Você pode gastar R$ 0" como herói — o mês apertado troca o herói pelo acolhimento
@@ -311,7 +408,7 @@ describe("fechar o app: o número que ainda não apareceu volta; o que apareceu,
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
     fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
     fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
-    expect(screen.getByText("Calculando…")).toBeTruthy();
+    expect(screen.getByTestId("montar-montando")).toBeTruthy();
     expect(marcaDoAparelho()?.r).toBe("pronto"); // o Montar já decidiu (e gravou) na entrada do "Montando…"
     const dados = controle.dados();
     cleanup();
@@ -324,12 +421,22 @@ describe("fechar o app: o número que ainda não apareceu volta; o que apareceu,
     expect(screen.getByTestId("montar-pronto")).toBeTruthy();
     expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 188"); // 3.000 ÷ 16
     expect(doPasso1()).toEqual([expect.objectContaining({ acao: "resultado", retomou: true })]);
-    // APARECEU: é tela de uma vez — reabrir de novo não volta nela (a missão retoma no tutorial do 1º gasto)
+    // APARECEU: é tela de uma vez — a marca agora aponta pra PONTE (1.0.17): reabrir volta na ponte, nunca no número
+    expect(lerTelaDoNumero(CRIADA, HOJE)?.ponte).toBe(true);
+    cleanup();
+    _novaAberturaMontar();
+    eventos.length = 0;
+    montarTela({}, dados);
+    expect(screen.queryByTestId("montar-pronto")).toBeNull();
+    expect(screen.getByTestId("montar-ponte")).toBeTruthy();
+    expect(doPasso1()).toEqual([expect.objectContaining({ acao: "ponte", retomou: true })]);
+    // saiu da ponte: a marca some — reabrir agora é o tutorial do 1º gasto (a missão retoma o passo do gasto)
+    fireEvent.click(screen.getByTestId("montar-ponte-ir"));
     expect(lerTelaDoNumero(CRIADA, HOJE)).toBeNull();
     expect(deveMostrarMontarFinancas({ criadoEm: CRIADA, get, isGuest: false })).toBe(false);
   });
 
-  it("fechou NA tela do número (já vista): não volta — nem no mesmo dia; e a marca da conta nunca levou a tela do número", async () => {
+  it("fechou NA tela do número (já vista): o número não volta — reabre na PONTE (1.0.17), só no mesmo dia; e a marca da conta nunca levou a tela do número", async () => {
     const controle = montarTela();
     await ateONumero();
     const dados = controle.dados();
@@ -338,8 +445,11 @@ describe("fechar o app: o número que ainda não apareceu volta; o que apareceu,
     expect(daConta?.numero).toBeUndefined();
     cleanup();
     _novaAberturaMontar();
-    expect(lerTelaDoNumero(CRIADA, HOJE)).toBeNull();
-    expect(deveMostrarMontarFinancas({ criadoEm: CRIADA, get: <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f), isGuest: false })).toBe(false);
+    expect(lerTelaDoNumero(CRIADA, HOJE)?.ponte).toBe(true);
+    expect(lerTelaDoNumero(CRIADA, new Date(HOJE.getTime() + 24 * HORA))).toBeNull(); // outro dia: nada
+    montarTela({}, dados);
+    expect(screen.queryByTestId("montar-pronto")).toBeNull();
+    expect(screen.getByTestId("montar-ponte")).toBeTruthy();
   });
 
   it("morreu no 'Montando…': no dia seguinte ou em OUTRA conta deste celular, o número não volta (a outra pessoa começa do começo)", () => {
@@ -425,7 +535,10 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     const controle = montarAppEmFinancas();
     await avancar(300);
     expect(screen.getByTestId("montar-financas")).toBeTruthy();
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dia 1 de 3");
+    // 1.0.17 (dono 20/10): o dia 1 roda SEM a faixa preta (o atributo fica, com a altura zerada)
+    expect(screen.queryByTestId("missao-doses-faixa")).toBeNull();
+    expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("0");
+    expect(screen.getByTestId("montar-contexto")).toHaveTextContent("Tutorial · Finanças · 3 perguntas");
     await responderOMontar();
     await avancar(2500); // "Montando…" → o número
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
@@ -434,6 +547,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(doMontar).toBe(calcularMontar(3000, [{ id: "a", nome: "Aluguel", emoji: "", valor: 900, categoria: "moradia" }, { id: "l", nome: "Luz", emoji: "", valor: 150, categoria: "contas_casa" }, { id: "i", nome: "Internet", emoji: "", valor: 100, categoria: "internet_telefone" }], HOJE).porDia);
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`); // a dose já conta
+    await tocar(screen.getByTestId("montar-ponte-ir")); // 1.0.17: a ponte pro 1º gasto
     // o TUTORIAL no formulário de verdade
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -481,7 +595,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     // o card QUANTO POSSO GASTAR HOJE do Dashboard de sempre: o número grande de sempre + a linha com a MESMA sobra do balão
     expect(await cardDoDashboard()).toEqual({ numero: numeroGrande, linha: linhaEsperada(noBalao, 12, doMontar) });
     // os eventos do passo 1, na ordem, sem reais
-    expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "tutorial", "chip", "gasto", "olha"]);
+    expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu", "tutorial", "chip", "gasto", "olha"]);
     expect(doPasso1().find((e) => e.acao === "chip")).toMatchObject({ chip: "Café" });
     expect(doPasso1().find((e) => e.acao === "gasto")).toMatchObject({ via: "chip", ms_tutorial: expect.any(Number) });
     expect(doPasso1().find((e) => e.acao === "olha")).toMatchObject({ com_gasto: true, numero: true });
@@ -500,6 +614,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await avancar(2500);
     const doMontar = numeroDoMontar();
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    await tocar(screen.getByTestId("montar-ponte-ir"));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     const ainda = within(postItDoTutorial()!).getByTestId("missao-doses-ainda-nao");
     fireEvent.click(ainda);
@@ -519,20 +634,76 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(lerMissao()?.feitos[1]).toBeDefined();
     expect(lerMissao()?.pulados).toBeUndefined(); // não é dose pulada
     expect(lerMissao()?.gastoGuiado).toBeUndefined(); // reabrir não volta no tutorial
-    expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "tutorial", "nao_gastei", "olha"]);
+    expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu", "tutorial", "nao_gastei", "olha"]);
     expect(doPasso1().find((e) => e.acao === "olha")).toMatchObject({ com_gasto: false, numero: true, caiu: false });
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "gasto_extra", acao: "ainda_nao" })]);
+  });
+
+  it("1.0.17 — 'Ainda não gastei' NA PONTE: o mesmo do 'Ainda não' do post-it — o dia sem gasto, o balão 'Dia sem gasto ✓' no MEU MÊS e a festa; a dose conta, nada de gasto, reabrir não volta em nada", { timeout: 40_000 }, async () => {
+    missao("A");
+    const controle = montarAppEmFinancas();
+    await avancar(300);
+    await responderOMontar();
+    await avancar(2500);
+    const doMontar = numeroDoMontar();
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    await tocar(screen.getByTestId("montar-ponte-nao-gastei"));
+    expect(controle.dados()[CHAVE_SEM_GASTO]).toEqual({ "2026-10-16": true });
+    expect(controle.dados()["finance-expenses"]).toBeUndefined();
+    expect(await ate(() => !!screen.queryByTestId("missao-doses-olhar"))).toBe(true);
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
+    expect(postItDoTutorial()).toBeNull(); // nada do tutorial do gasto
+    expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Dia sem gasto ✓");
+    expect(Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"))).toBe(doMontar);
+    expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    expect(lerMissao()?.feitos[1]).toBeDefined();
+    expect(lerMissao()?.pulados).toBeUndefined();
+    expect(lerMissao()?.gastoGuiado).toBeUndefined();
+    expect(lerTelaDoNumero(CRIADA, HOJE)).toBeNull();
+    expect(doPasso1().map((e) => e.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu", "nao_gastei", "olha"]);
+  });
+
+  it("1.0.17 — fechar o app NA PONTE e reabrir: volta na ponte (nunca no Montar, nunca no número); 'Ir pro app' segue pro tutorial do gasto", { timeout: 40_000 }, async () => {
+    missao("A");
+    const controle = montarAppEmFinancas();
+    await avancar(300);
+    await responderOMontar();
+    await avancar(2500);
+    await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    expect(screen.getByTestId("montar-ponte")).toBeTruthy();
+    const dados = controle.dados();
+    cleanup(); // o iOS matou o app
+    _novaAberturaMontar();
+    const de = montarAppEmFinancas(dados);
+    await avancar(300);
+    expect(screen.getByTestId("montar-ponte")).toBeTruthy();
+    expect(screen.queryByTestId("montar-pronto")).toBeNull();
+    expect(screen.queryByText("Quanto entra por mês?")).toBeNull();
+    await tocar(screen.getByTestId("montar-ponte-ir"));
+    expect(await ate(() => !!postItDoTutorial())).toBe(true);
+    expect(postItDoTutorial()).toHaveTextContent("Gastou algo hoje?");
+    expect((de.dados()["finance-incomes"] as unknown[]).length).toBe(1); // a renda do Montar, uma só
+    // passou da ponte: reabrir de novo é o tutorial (a ponte não volta)
+    const dados2 = de.dados();
+    cleanup();
+    _novaAberturaMontar();
+    montarAppEmFinancas(dados2);
+    await avancar(300);
+    expect(await ate(() => !!postItDoTutorial())).toBe(true);
+    expect(screen.queryByTestId("montar-financas")).toBeNull();
   });
 
   it("braço B: o mesmo caminho — número sem chips → tutorial → Almoço → o balão com o número do Dashboard → 'Primeira dose feita!' que leva pra Rotina", { timeout: 40_000 }, async () => {
     missao("B");
     const controle = montarAppEmFinancas();
     await avancar(300);
-    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 4");
+    expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · dose 1 de 4"); // o B segue com a faixa
     await responderOMontar();
     await avancar(2500);
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    await tocar(screen.getByTestId("montar-ponte-ir"));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     await tocar(within(postItDoTutorial()!).getAllByTestId("demo-guia-chip")[2]); // 🍔 Almoço · R$ 35
     expect(controle.dados()["finance-expenses"]).toEqual([expect.objectContaining({ description: "Almoço", value: 35 })]);
@@ -553,6 +724,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     await responderOMontar();
     await avancar(2500);
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    await tocar(screen.getByTestId("montar-ponte-ir"));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     const dados = controle.dados();
     cleanup(); // o iOS matou o app
@@ -577,8 +749,8 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     const controle = montarAppEmFinancas();
     await avancar(300);
     await responderOMontar();
-    await avancar(500); // ainda no "Montando…"
-    expect(screen.getByText("Calculando…")).toBeTruthy();
+    await avancar(500); // ainda no "Montando…" (a conta entrando linha por linha)
+    expect(screen.getByTestId("montar-montando")).toBeTruthy();
     const dados = controle.dados();
     cleanup();
     _novaAberturaMontar();
@@ -587,6 +759,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.getByTestId("montar-pronto")).toBeTruthy();
     expect(screen.queryByText("Quanto entra por mês?")).toBeNull();
     await tocar(within(screen.getByTestId("montar-financas")).getByRole("button", { name: "Continuar" }));
+    await tocar(screen.getByTestId("montar-ponte-ir"));
     expect(await ate(() => !!postItDoTutorial())).toBe(true);
     expect(postItDoTutorial()).toHaveTextContent("Gastou algo hoje?");
   });

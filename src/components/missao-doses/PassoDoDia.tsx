@@ -54,7 +54,14 @@ export const TEMPOS_DO_PASSO = {
 };
 
 type Fase = "achar" | "anotar" | "registrou" | "olhar" | "festa";
-export type ViaDoPulo = "link_boas_vindas" | "faixa_20s" | "toque_fora" | "passo" | "ainda_nao";
+export type ViaDoPulo = "link_boas_vindas" | "faixa_20s" | "toque_fora" | "passo" | "ainda_nao" | "agora_nao";
+/** 1.0.17 (dono 20/10: "não é necessário ter essa barra preta no topo, deixa só o que importa"): a 1ª dose do braço A
+ *  (o dia 1, logo depois do "Tá dentro") roda SEM a faixa preta "Missão · dia 1 de 3". As saídas que a faixa dava (o
+ *  "Pular") moram no próprio passo: o "Pular" do Montar, o "Ainda não" do gasto e o "Agora não" do post-it das outras
+ *  doses. Dias 2 e 3 (e o braço B) seguem com a faixa. */
+export const semFaixaNaDose = (braco: BracoDoPasso, modo: ModoDoPasso, n: DiaDaMissao): boolean => braco === "A" && modo === "dose" && n === 1;
+/** A saída do post-it das doses sem faixa que não são de gasto (o gasto tem o "Ainda não"). */
+export const AGORA_NAO = "Agora não";
 
 const visivel = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 8 && r.height > 8; };
 
@@ -236,6 +243,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * continuação se a introdução daquele módulo já foi feita"); sem braço (chave desligada) é a 1.0.15. Lido uma
    * vez no mount. */
   const comBraco = braco === "A" || braco === "B";
+  const semFaixa = semFaixaNaDose(braco, modo, n);
   const [introFeita] = useState(() => { try { return comBraco && modo === "dose" && introConcluida(modulo, get); } catch { return false; } });
   const [semMetaAgua] = useState(() => cfg.tipo === "agua" && modo === "dose" && !introFeita && !(Number(get<unknown>("core-saude-water-goal", 0)) > 0));
   /** a dose continua o que ela já fez no módulo (a introdução, ou o hábito que já existe num dia 2+) */
@@ -349,7 +357,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   // a página desce a altura da faixa enquanto o passo está na tela; `data-missao-dose` avisa quem precisa ficar
   // quieto (toast/popup de adesivo, cartões de boas-vindas do módulo) — da faixa até a comemoração fechar
   useEffect(() => {
-    document.documentElement.setAttribute("data-missao-doses-faixa", "1");
+    // sem a faixa (dia 1 do A), o atributo fica (quem precisa saber que a dose está na tela continua sabendo) com "0": o
+    // CSS zera --missao-doses-faixa-h e nada desce a altura dela
+    document.documentElement.setAttribute("data-missao-doses-faixa", semFaixa ? "0" : "1");
     const soltarDose = marcarDoseNaTela();
     if (modo === "dose" && comBraco) { try { montagemRef.current = registrarMontagem(n).montagem; } catch { /* noop */ } }
     const passagem = modo === "dose" ? tomarTransicao(modulo) : null;
@@ -930,6 +940,14 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     trackEvent("missao_doses_passo", eventoDaMissao({ dia: n, modulo, passo: "toque", acao: "ainda_nao", segundos: segundos(), montagem: montagemRef.current }));
     aoPular("ainda_nao", "toque", segundos(), extrasDoPulo());
   };
+  /** Dia 1 sem faixa, dose que não é de gasto: "Agora não" no post-it = o "Pular" da faixa (a dose fica pra depois). */
+  const agoraNaoSemFaixa = () => {
+    if (faseRef.current !== "achar" && faseRef.current !== "anotar") return;
+    aoPular("agora_nao", "toque", segundos(), extrasDoPulo());
+  };
+  /** A saída do post-it nas doses sem faixa ("Ainda não" no gasto, "Agora não" nas outras). */
+  const saidaSemFaixa = doseDeGasto ? { texto: AINDA_NAO_GASTEI, aoTocar: () => aindaNaoGastei(), testid: "missao-doses-ainda-nao" }
+    : semFaixa ? { texto: AGORA_NAO, aoTocar: () => agoraNaoSemFaixa(), testid: "missao-doses-agora-nao" } : undefined;
   const naoGasteiHoje = () => {
     if (faseRef.current !== "achar" && faseRef.current !== "anotar") return; // o toque duplo registra 1 vez
     faseRef.current = "registrou";
@@ -1022,12 +1040,22 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         tocado={tocado}
         aoChip={tocarChip}
         outro={outroDaDose}
-        secundaria={doseDeGasto ? { texto: AINDA_NAO_GASTEI, aoTocar: aindaNaoGastei, testid: "missao-doses-ainda-nao" } : undefined}
+        secundaria={saidaSemFaixa}
         compacto={compacto}
       />
     </motion.div>
   );
   const postIt = postItDe(false);
+  /* O post-it COMPACTO (solto/colado no topo) não tem a saída de texto — sem a faixa (e o "Pular" dela), ela vem logo
+   * embaixo dele, pra ninguém ficar sem saída no dia 1 */
+  const saidaDoCompacto = saidaSemFaixa ? (
+    <div className="flex justify-center mt-2">
+      <button type="button" onClick={saidaSemFaixa.aoTocar} data-testid={`${saidaSemFaixa.testid}-compacto`}
+        className="min-h-10 px-4 rounded-full text-[13px] font-semibold bg-background/95 text-muted-foreground shadow-[0_6px_18px_-8px_rgba(0,0,0,.45)]">
+        {saidaSemFaixa.texto}
+      </button>
+    </div>
+  ) : null;
 
   /* 1.0.16 — a dose de Finanças = "Vamos montar suas Finanças" (folha fixa abaixo da faixa da missão). O "Continuar →"
    * da tela do número (SÓ o número — 17/10, revisão do dono) traz pra cá: a dose já conta e o 1º gasto é o TUTORIAL no
@@ -1118,22 +1146,24 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
 
   return (
     <>
-      {createPortal(faixa, document.body)}
+      {!semFaixa && createPortal(faixa, document.body)}
       {/* braço A, dose 2+: o score de ANTES da dose (a dica do dia 2 conta "foi de X pra Y") */}
       {braco === "A" && modo === "dose" && n >= 2 && missao.scoreAntes?.[n] === undefined && aoScoreAntes && <LerScoreDoDia aoLer={aoScoreAntes} />}
-      {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onPular={montarPulou} />}
+      {/* "Ainda não gastei" na ponte do número (1.0.17): o Montar sai como no "Continuar" e segue o mesmo caminho do
+          "Ainda não" do post-it (o dia sem gasto, o balão no MEU MÊS e a festa) */}
+      {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onAindaNaoGastei={(r) => { montarPronto(r); naoGasteiHoje(); }} onPular={montarPulou} />}
       {setupAberto && encaixe && <encaixe.Componente origem="missao" onPronto={setupPronto} onPular={setupPulou} />}
       {/* fora do AnimatePresence (um portal ali dentro era descartado: o post-it solto NUNCA montava) */}
       {!alvo && fase === "anotar" && !montarAberto && !setupAberto && !quieto && createPortal(
           <motion.div key="postit-solto" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 64px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} data-testid="missao-doses-postit-solto">
-            <div className="w-[92%] max-w-[360px] pointer-events-auto">{doseDeGasto ? postItDe(true) : postIt}</div>
+            <div className="w-[92%] max-w-[360px] pointer-events-auto">{doseDeGasto ? postItDe(true) : postIt}{doseDeGasto && semFaixa && saidaDoCompacto}</div>
           </motion.div>,
           document.body,
         )}
       {/* D4: o alvo saiu da área visível — o post-it fica colado embaixo da faixa (o anel recolhido segue o alvo) */}
       {anelFora && anelVivo && alvo && fase === "anotar" && !quieto && createPortal(
           <motion.div key="postit-doca" className="fixed inset-x-0 z-[200] flex justify-center pointer-events-none" style={{ top: "calc(var(--missao-doses-faixa-h) + var(--app-safe-top) + 10px)" }} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} data-testid="missao-doses-postit-doca">
-            <div className="w-[92%] max-w-[360px] pointer-events-auto">{postItDe(true)}</div>
+            <div className="w-[92%] max-w-[360px] pointer-events-auto">{postItDe(true)}{semFaixa && saidaDoCompacto}</div>
           </motion.div>,
           document.body,
         )}

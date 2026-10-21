@@ -298,14 +298,18 @@ describe("a tela, com a conta vazia", () => {
     expect(controle.dados()["finance-card-config"]).toBeUndefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // pela missão: o 1º gasto é o tutorial, depois
+    // 1.0.17 (dono 20/10): antes do tutorial, a PONTE ("Agora vamos anotar seu primeiro gasto.") — "Ir pro app" segue
+    expect(onPronto).not.toHaveBeenCalled();
+    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    fireEvent.click(screen.getByTestId("montar-ponte-ir"));
     expect(onPronto).toHaveBeenCalledWith({ contas: 3, porDia: 78, semFolga: false, cartao: false });
     expect(fim).toHaveBeenCalledTimes(1);
     expect((fim.mock.calls[0][0] as CustomEvent).detail).toEqual({ resultado: "pronto", contas: 3, cartao: false });
     window.removeEventListener(EVENTO_MONTAR_FINANCAS_FIM, fim as EventListener);
 
-    // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado") e o "Continuar"
-    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO]);
-    expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, e]) => e.acao)).toEqual(["resultado", "continuar"]);
+    // + o passo 1 de Finanças da missão: a tela do número apareceu ("resultado"), o "Continuar", a ponte e a saída dela
+    expect(nomes()).toEqual([EV_VIEW, EV_PASSO, EV_PASSO, EV_PASSO, EV_PRONTO, EV_PASSO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO, EV_PRIMEIRO_GASTO]);
+    expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, e]) => e.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu"]);
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 3, faixa: "2a4", sem_folga: false, apertado: false, origem: "missao", cartao: false });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/3000|900|700|150|1750|78/);
@@ -391,6 +395,7 @@ describe("pages/Index (Finanças de verdade), app da loja", () => {
     await fazerOsTresToques();
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    fireEvent.click(screen.getByTestId("montar-ponte-ir")); // 1.0.17: a ponte pro 1º gasto
     await respirar();
 
     expect(screen.queryByTestId("montar-financas")).toBeNull();

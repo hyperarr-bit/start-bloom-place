@@ -65,10 +65,11 @@ describe("2. 'Trocar' os módulos da missão", () => {
     expect(alternarModulo(["rotina", "saude", "treino"], "dieta")).toEqual(["rotina", "saude", "dieta"]);
     expect(alternarModulo(["rotina"], "rotina")).toEqual([]);
   });
-  it("na tela: tirar Finanças TIRA (2 escolhidos, 'Pronto' desligado); escolher Treino ocupa a vaga; 'Pronto' volta e a missão começa com os 3 dela", () => {
+  it("na tela (braço B — o A não tem mais 'Trocar' desde 20/10): tirar Finanças TIRA (2 escolhidos, 'Pronto' desligado); escolher Treino ocupa a vaga; 'Pronto' volta e a missão começa com os 3 dela", () => {
     const missao = { ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03"), boasVindas: false };
     const comecar = vi.fn();
-    render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-03" braco="A" aoComecar={comecar} aoExplorar={() => {}} />);
+    render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-03" braco="B" aoComecar={comecar} aoExplorar={() => {}} />);
+    fireEvent.click(screen.getByTestId("missao-doses-vamos-la"));
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     fireEvent.click(screen.getByTestId("missao-doses-tile-financas"));
     expect(screen.getByTestId("missao-doses-tile-financas")).not.toHaveAttribute("data-marcado");
@@ -82,15 +83,24 @@ describe("2. 'Trocar' os módulos da missão", () => {
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(comecar).toHaveBeenCalledWith(["rotina", "saude", "treino"]);
   });
-  it("1.0.17 QA (nenhum corte seco): voltar da escolha NÃO refaz a entrada do Tá dentro — sem confete de novo, ✓ e texto já no lugar", () => {
-    const missao = { ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-03"), boasVindas: false };
-    render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-03" braco="A" aoComecar={() => {}} aoExplorar={() => {}} />);
-    expect(document.querySelector("[data-testid=demo-guia-confete]")).not.toBeNull(); // a 1ª vez tem a festa
-    fireEvent.click(screen.getByTestId("missao-doses-trocar"));
-    expect(screen.getByTestId("missao-doses-escolha")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("missao-doses-pronto"));
-    expect(screen.getByTestId("missao-doses-boas-vindas")).toBeInTheDocument();
-    expect(document.querySelector("[data-testid=demo-guia-confete]")).toBeNull();
-    expect((screen.getByTestId("missao-doses-check") as HTMLElement).style.opacity).not.toBe("0");
+  it("1.0.17 (dono 20/10, mockup a1): o Tá dentro do braço A é o PLANO — sem 'Trocar'; os 3 módulos com o que entregam (HOJE · AMANHÃ · dia da semana); 'Começar meu tutorial' começa com os 3 da missão", () => {
+    const missao = { ...iniciarMissao(["financas", "rotina", "saude"], "2026-10-20"), boasVindas: false };
+    const comecar = vi.fn();
+    render(<BoasVindasDoses missao={missao} nome="Lucas" areaNome={null} hoje="2026-10-20" braco="A" aoComecar={comecar} aoExplorar={() => {}} />);
+    expect(screen.queryByTestId("missao-doses-trocar")).toBeNull();
+    expect(screen.getByTestId("missao-doses-titulo").textContent).toBe("Tá dentro, Lucas. 💛");
+    expect(screen.getByTestId("missao-doses-tutorial").textContent).toBe("Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Seu plano de 3 dias");
+    expect(screen.getByTestId("missao-doses-entrega-1").textContent).toBe("Quanto dá pra gastar por dia");
+    expect(screen.getByTestId("missao-doses-entrega-2").textContent).toBe("Seu primeiro hábito");
+    expect(screen.getByTestId("missao-doses-entrega-3").textContent).toBe("Sua meta de água");
+    expect(screen.getByTestId("missao-doses-quando-1").textContent).toBe("Hoje");
+    expect(screen.getByTestId("missao-doses-quando-2").textContent).toBe("Amanhã");
+    expect(screen.getByTestId("missao-doses-quando-3").textContent).toBe("Quinta"); // 20/10/2026 é terça → dia 3 = quinta
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveAttribute("data-hoje");
+    expect(document.querySelector("[data-testid=demo-guia-confete]")).not.toBeNull();
+    fireEvent.click(screen.getByTestId("missao-doses-comecar"));
+    expect(screen.getByTestId("missao-doses-comecar").textContent).toBe("Começar meu tutorial");
+    expect(comecar).toHaveBeenCalledWith(["financas", "rotina", "saude"]);
   });
 });

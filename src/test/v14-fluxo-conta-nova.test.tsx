@@ -259,6 +259,9 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     expect(screen.queryByTestId("plano-amanha")).toBeNull();
     expect(missaoEmAndamento(lerMissao())).toBe(false); // o tour É o passo 4: pode entrar
     await respirar(20); // 1.0.17: o tour espera a Home parada ~1,5 s (RESPIRO_ANTES_DO_TOUR_MS)
+    // 1.0.17 (mockup d1): o popup de entrada do tour, com o número real de passos → "Mostrar"
+    expect(screen.getByTestId("tour-popup-titulo")).toHaveTextContent(`Agora, sua Home em ${TOTAL_PASSOS} toques`);
+    fireEvent.click(screen.getByTestId("tour-popup-mostrar"));
     const tour = screen.getByTestId("tour-home");
     expect(tour.getAttribute("data-passo")).toBe("1");
     expect(screen.getByTestId("tour-contador").textContent).toBe(`Passo 1 de ${TOTAL_PASSOS} · falta ${TOTAL_PASSOS - 1}`);
@@ -311,6 +314,8 @@ describe("o fluxo inteiro da conta nova (QA: tudo ligado)", () => {
     fireEvent.click(screen.getByTestId("missao-doses-explorar"));
     expect(lerMissao()?.explorou).toBe(true);
     await respirar(20); // 1.0.17: o respiro antes do tour
+    expect(screen.getByTestId("tour-popup")).toBeInTheDocument(); // 1.0.17: começa no popup de entrada
+    fireEvent.click(screen.getByTestId("tour-popup-mostrar"));
     expect(screen.getByTestId("tour-home")).toBeInTheDocument();
   });
 });

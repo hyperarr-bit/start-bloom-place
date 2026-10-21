@@ -27,6 +27,17 @@ export function fraseDoAcesso(diasDeTeste: number | null): string {
   if (!diasDeTeste) return "Seu acesso começou";
   return diasDeTeste === 1 ? "Seu 1 dia grátis começou" : `Seus ${diasDeTeste} dias grátis começaram`;
 }
+/** 1.0.17 (dono 20/10, a frase dele quase literal): o "Tá dentro" diz que começa um TUTORIAL. */
+export const FRASE_DO_TUTORIAL = "Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.";
+/** O que cada dia do plano entrega, em uma linha (o "SEU PLANO DE 3 DIAS" do braço A). Finanças, Rotina e Saúde são as do
+ *  mockup aprovado; as outras vêm dos títulos do "olha" de cada módulo (MODULOS[m].olhar). */
+export const ENTREGA_DO_MODULO: Record<ModuloDaMissao, string> = {
+  financas: "Quanto dá pra gastar por dia", rotina: "Seu primeiro hábito", saude: "Sua meta de água",
+  treino: "Seu treino da semana", dieta: "Seu dia na dieta", desenvolvimento: "Sua meta com plano", hiperfoco: "A mente no papel",
+  estudos: "Sua grade de estudos", carreira: "Seu dia de trabalho", biblioteca: "Sua estante", casa: "Sua lista da casa",
+  beleza: "Sua rotina de beleza", viagens: "Sua lista de destinos", relacionamentos: "As pessoas que importam", pet: "A agenda do pet",
+  detox: "Menos tela, mais presença",
+};
 /** 1.0.17: a sequência da entrada do braço A (segundos) — a tela, depois o ✓, o texto e por último o confete. */
 export const ATRASO_DO_CHECK_S = 0.35;
 export const ATRASO_DO_TEXTO_S = 0.6;
@@ -256,13 +267,14 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
     );
   }
 
-  /* ── BRAÇO A ("uma dose por dia") — 1.0.17, dono 19/10: "muito confuso, faz minimalista; joga informação na cara".
-     UMA tela calma, uma coisa entra por vez: a tela (fundo opaco já no 1º quadro) → o ✓ → o texto → o confete (depois do ✓, nunca junto).
-     Só o essencial: "Tá dentro, Lucas." / "Vamos com calma: um passo por dia." / o plano (Hoje · Amanhã · Dia 3, sem
-     segundos) / [Começar] e o link "Prefiro explorar sozinho". "Trocar" é um link pequeno embaixo do plano. ── */
+  /* ── BRAÇO A ("uma dose por dia") — 1.0.17, dono 20/10 (mockup a1 aprovado): a pessoa tem que ENTENDER que começa um
+     tutorial. "Tá dentro, Lucas. 💛" / "Seus 3 dias grátis começaram." / a frase dele ("Pra você tirar o melhor do CORE,
+     preparamos um tutorial especial pra você.") / SEU PLANO DE 3 DIAS — os 3 módulos com o que cada um entrega (HOJE ·
+     AMANHÃ · o dia da semana), sem "Trocar" (6–14% mexiam) / [Começar meu tutorial] e o link "Prefiro explorar sozinho".
+     Uma coisa entra por vez: a tela (fundo opaco já no 1º quadro) → o ✓ → o texto → o confete (depois do ✓, nunca junto). ── */
   if (braco === "A") {
-    const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
-    const parado = reduzir || jaEntrou.current; // voltou da escolha: tudo já no lugar, sem confete de novo
+    const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : diaDaSemanaDoPasso(n, missao, hoje));
+    const parado = reduzir || jaEntrou.current;
     const primeiro = primeiroNome(nome);
     return (
       <motion.div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}
@@ -272,36 +284,37 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
         initial={false}>
         {!jaEntrou.current && <Confete atraso={reduzir ? 0 : ATRASO_DO_CONFETE_S} />}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[12vh] pb-4">
+          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[9vh] pb-4">
             <motion.div initial={parado ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_CHECK_S)} data-testid="missao-doses-check"
               className="w-14 h-14 rounded-full bg-emerald-500 grid place-items-center mb-5 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
               <Check className="w-7 h-7 text-white" strokeWidth={3.5} />
             </motion.div>
             <motion.div initial={parado ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
-              <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}.` : "Tá dentro."}</h1>
-              {/* dono 19/10 (fixes, sem apostas): a linha do teste volta — "Seus 3 dias grátis começaram." só com teste da loja
-                  de verdade (fraseDoAcesso); sem teste, "Seu acesso começou." */}
+              <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}.` : "Tá dentro."} <span aria-hidden>💛</span></h1>
+              {/* dono 19/10: "Seus 3 dias grátis começaram." só com teste da loja de verdade (fraseDoAcesso); sem teste,
+                  "Seu acesso começou." */}
               <p className="text-[17px] font-semibold text-foreground/80 mt-2 leading-snug" data-testid="missao-doses-subtitulo">{acesso}.</p>
-              <p className="text-[15px] text-muted-foreground mt-1 leading-snug" data-testid="missao-doses-calma">Vamos com calma: um passo por dia.</p>
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-9">Seu plano</p>
+              <p className="text-[15px] text-muted-foreground mt-1 leading-snug" data-testid="missao-doses-tutorial">{FRASE_DO_TUTORIAL}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-7">Seu plano de 3 dias</p>
               <div className="mt-2 rounded-2xl bg-card border border-border/60 divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
                 {linhas.map(({ n, cfg }) => (
-                  <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
-                    <Quadradinho marcado={false} tam={18} />
-                    <span className="md-linha-texto"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome}</span>
+                  <div key={n} className="md-linha md-linha-plano" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
+                    <span className="md-plano-icone" style={{ background: cfg.cor }} aria-hidden>{cfg.emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="md-plano-nome">{cfg.nome}</span>
+                      <span className="md-plano-entrega" data-testid={`missao-doses-entrega-${n}`}>{ENTREGA_DO_MODULO[cfg.modulo]}</span>
+                    </span>
+                    <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"} data-testid={`missao-doses-quando-${n}`}>{quandoA(n)}</span>
                   </div>
                 ))}
               </div>
-              <button type="button" className="text-[13px] font-semibold text-muted-foreground mt-2 min-h-10 underline underline-offset-2" data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setEscolhidos(modulos); trocarDeTela("escolha"); }}>
-                Trocar
-              </button>
             </motion.div>
           </div>
         </div>
         <motion.div initial={parado ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
           <RodapeColado tema>
             <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
-              Começar
+              Começar meu tutorial
             </button>
             <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
               Prefiro explorar sozinho

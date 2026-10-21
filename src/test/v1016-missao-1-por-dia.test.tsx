@@ -471,16 +471,17 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     // 1.0.17 (dono 19/10: "minimalista, calmo"): uma ideia por tela — sem segundos, sem parágrafo, sem "16 módulos"
     expect(screen.getByTestId("missao-doses-titulo")).toHaveTextContent(/^Tá dentro/);
     expect(screen.getByTestId("missao-doses-subtitulo")).toHaveTextContent(/^Seus 3 dias grátis começaram\.$/); // dono 19/10: a linha do teste volta
-    expect(screen.getByTestId("missao-doses-calma")).toHaveTextContent("Vamos com calma: um passo por dia.");
-    expect(boas).toHaveTextContent("Seu plano");
+    // 1.0.17 (dono 20/10, mockup a1): o Tá dentro diz que começa um TUTORIAL e mostra o plano (o que cada dia entrega)
+    expect(screen.getByTestId("missao-doses-tutorial")).toHaveTextContent("Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.");
+    expect(boas).toHaveTextContent("Seu plano de 3 dias");
     expect(boas).not.toHaveTextContent(/\d+\s?s\b|16 módulos/);
-    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent(/^Hoje · 💰 Finanças$/);
-    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent(/^Amanhã · 📅 Rotina$/);
-    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent(/^Dia 3 · ❤️ Saúde$/);
+    expect(screen.getByTestId("missao-doses-linha-1")).toHaveTextContent(/^💰\s*Finanças\s*Quanto dá pra gastar por dia\s*Hoje$/);
+    expect(screen.getByTestId("missao-doses-linha-2")).toHaveTextContent(/^📅\s*Rotina\s*Seu primeiro hábito\s*Amanhã$/);
+    expect(screen.getByTestId("missao-doses-linha-3")).toHaveTextContent(/^❤️\s*Saúde\s*Sua meta de água\s*\S+$/);
     expect(screen.queryByTestId("missao-doses-boas-vindas-nota")).toBeNull();
-    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent(/^Começar$/);
+    expect(screen.getByTestId("missao-doses-comecar")).toHaveTextContent(/^Começar meu tutorial$/);
     expect(screen.getByTestId("missao-doses-explorar")).toHaveTextContent("Prefiro explorar sozinho");
-    expect(screen.getByTestId("missao-doses-trocar")).toBeInTheDocument();
+    expect(screen.queryByTestId("missao-doses-trocar")).toBeNull(); // sem "Trocar" (6–14% mexiam)
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     expect(screen.getByTestId("rota")).toHaveTextContent("/financas");
     // contrato: enquanto a dose está na tela, <html data-missao-dose="1"> e o módulo de hoje é Finanças
@@ -1961,12 +1962,11 @@ describe("16. regra final do dono (17/10): o quiz ('monte o seu módulo') só na
     localStorage.removeItem("core-montar-rotina"); // o quiz da Rotina ligado: "monte em 3 toques, 30 s"
     guardarChave(CHAVES_FUNIL_W.area, "rotina");
     montar(montarStore({}), "/home");
-    // 1.0.17 (dono: "sem segundos na tela"): a linha é só "Hoje · 📅 Rotina" — nenhum tempo pra quebrar (nem pra pressionar)
-    const linha = screen.getByTestId("missao-doses-linha-1").querySelector(".md-linha-texto")!;
-    expect(linha.textContent).toBe("Hoje · 📅 Rotina");
+    // 1.0.17 (dono: "sem segundos na tela"; 20/10: o plano diz o que cada dia entrega) — nenhum tempo pra quebrar
+    expect(screen.getByTestId("missao-doses-linha-1").textContent).toBe("📅RotinaSeu primeiro hábitoHoje");
     expect(screen.queryByTestId("missao-doses-linha-1-dose")).toBeNull();
-    expect(screen.getByTestId("missao-doses-linha-2").textContent).toBe("Amanhã · 💰 Finanças");
-    expect(screen.getByTestId("missao-doses-comecar").textContent).toBe("Começar");
+    expect(screen.getByTestId("missao-doses-linha-2").textContent).toBe("💰FinançasQuanto dá pra gastar por diaAmanhã");
+    expect(screen.getByTestId("missao-doses-comecar").textContent).toBe("Começar meu tutorial");
     // e nenhum "N s"/"N min" na tela
     expect(screen.getByTestId("missao-doses-boas-vindas").textContent).not.toMatch(/\d[\s\u00a0](s|min)(?![\p{L}\d])/u);
   });
@@ -2573,8 +2573,8 @@ describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só 
     montar(store, "/home");
     expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
     expect(vistasDasBoasVindas()).toEqual([expect.objectContaining({ tela: 1, variante: "A", braco: "um_por_dia" })]);
-    fireEvent.click(screen.getByTestId("missao-doses-trocar"));
-    fireEvent.click(screen.getByTestId("missao-doses-pronto")); // voltar da escolha dos módulos não é outra vista
+    // (1.0.17: o A não tem mais "Trocar" — a escolha dos módulos é só do B) re-render na mesma abertura não é outra vista
+    act(() => { window.dispatchEvent(new Event("resize")); });
     expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveAttribute("data-braco", "A");
     expect(vistasDasBoasVindas()).toHaveLength(1);
     cleanup(); // fechou o app na tela, sem decidir

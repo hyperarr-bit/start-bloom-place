@@ -27,6 +27,13 @@ export function quantoSubir(fundo: number, limite: number, topoDoCampo: number, 
   return Math.max(0, Math.min(falta, topoDoCampo - topoMin));
 }
 
+/** Onde começa a área VISÍVEL nas coordenadas de getBoundingClientRect. Medido no Simulador (iPhone SE, teclado de
+ *  software, sentinela 21/10): no WKWebView do app a página rola junto com o teclado — scrollY = visualViewport.offsetTop
+ *  (163 = 163) e o rect já é o da tela (o campo em top=145 aparece em y≈145 no print); somar o offsetTop de novo jogava o
+ *  "fundo visível" pra 502 com o teclado em 339 e o botão ficava atrás dele. No Safari (offsetTop sem a rolagem da
+ *  página) o offsetTop vale como está. */
+export const topoVisivelNoCliente = (offsetTop: number, scrollY: number): number => (Math.abs(offsetTop - scrollY) < 2 ? 0 : Math.max(0, offsetTop));
+
 export function useBotaoAcimaDoTeclado(botao: RefObject<HTMLElement>) {
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
@@ -35,13 +42,16 @@ export function useBotaoAcimaDoTeclado(botao: RefObject<HTMLElement>) {
     const ajustar = () => {
       t = 0;
       const b = botao.current;
-      if (!b || !(vv.height < window.innerHeight - 140)) return;
+      // no WKWebView a janela (innerHeight) ENCOLHE junto com a rolagem do teclado (sentinela no SE: 667 → 505 → 458), então
+      // o teclado aberto se mede contra a tela inteira também
+      const alturaCheia = Math.max(window.innerHeight, typeof screen !== "undefined" ? screen.height || 0 : 0);
+      if (!b || !(vv.height < alturaCheia - 140)) return;
       const ativo = document.activeElement as HTMLElement | null;
       if (!ativo || !/^(INPUT|TEXTAREA)$/.test(ativo.tagName)) return;
       const form = b.closest("form");
       if (form && !form.contains(ativo)) return;
-      const visivelEmbaixo = vv.offsetTop + vv.height;
-      const d = quantoSubir(b.getBoundingClientRect().bottom + FOLGA, visivelEmbaixo, ativo.getBoundingClientRect().top, vv.offsetTop + 8);
+      const topo = topoVisivelNoCliente(vv.offsetTop, window.scrollY);
+      const d = quantoSubir(b.getBoundingClientRect().bottom + FOLGA, topo + vv.height, ativo.getBoundingClientRect().top, topo + 8);
       if (d < 1) return;
       const rolo = rolavel(b);
       if (rolo) rolo.scrollTop += d;

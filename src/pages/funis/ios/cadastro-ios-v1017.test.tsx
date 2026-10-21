@@ -65,7 +65,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
 import { SignupIOS, LiberandoIOS } from "./CadastroIOS";
 import { instalarTecladoIphone } from "@/test/helpers/teclado-iphone";
-import { quantoSubir } from "@/hooks/use-botao-acima-do-teclado";
+import { quantoSubir, topoVisivelNoCliente } from "@/hooks/use-botao-acima-do-teclado";
 import { trackEvent } from "@/lib/analytics";
 import { acessoAnteriorDaConta, URL_ASSINATURAS_APPLE } from "@/lib/conta-ja-tinha-acesso";
 import { iniciarMissao, CHAVE_ESTADO_MISSAO_DOSES } from "@/lib/missao-doses";
@@ -180,6 +180,31 @@ describe("iPhone SE com o teclado de verdade (1.0.17)", () => {
     } finally {
       rects.mockRestore(); scrollBy.mockRestore(); teclado.desinstalar(); vi.useRealTimers();
     }
+  });
+  it("o WKWebView de verdade (sentinela no SE: vv=339@163 com scrollY=163 — a página rola JUNTO e o rect já é o da tela): o botão sobe acima do teclado mesmo assim", () => {
+    vi.useFakeTimers();
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 328 });
+    let rolado = 0;
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(((_x: number, y: number) => { rolado += y; }) as typeof window.scrollBy);
+    // o rect já é o da tela depois da rolagem do iPhone (top=145 no "Seu nome", o botão 325–373)
+    const rect = (top: number, h: number) => ({ top: top - rolado, bottom: top + h - rolado, left: 20, right: 355, width: 335, height: h, x: 20, y: top - rolado, toJSON: () => ({}) }) as DOMRect;
+    const rects = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if ((this as HTMLInputElement).placeholder === "Seu nome") return rect(145, 48);
+      if (this.matches('[data-testid="cadastro-ios-salvar"]')) return rect(325, 48);
+      return rect(0, 0);
+    });
+    try {
+      render(<MemoryRouter><SignupIOS posCompra onSession={() => {}} onConfirm={() => {}} /></MemoryRouter>);
+      teclado.abrir(screen.getByPlaceholderText("Seu nome"), 163, 163); // a página rolou 163 E o offsetTop diz 163
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(screen.getByTestId("cadastro-ios-salvar").getBoundingClientRect().bottom).toBeLessThanOrEqual(339);
+      expect(screen.getByPlaceholderText("Seu nome").getBoundingClientRect().top).toBeGreaterThanOrEqual(8);
+    } finally {
+      rects.mockRestore(); scrollBy.mockRestore(); teclado.desinstalar(); vi.useRealTimers();
+    }
+    expect(topoVisivelNoCliente(163, 163)).toBe(0);
+    expect(topoVisivelNoCliente(163, 0)).toBe(163);
+    expect(topoVisivelNoCliente(0, 300)).toBe(0);
   });
   it("quantoSubir nunca empurra o campo em foco pra fora da área visível", () => {
     expect(quantoSubir(384, 339, 145, 8)).toBe(45);

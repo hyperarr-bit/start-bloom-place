@@ -7,7 +7,7 @@ import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { ID_OUTRO_DA_INTRO, marcarPassoDaIntro, type IntroDeUmToqueConfig, type OpcaoDaIntro, type PassoDaIntro } from "@/lib/intro-modulo";
 import { abrirAba } from "@/components/cartoes-modulo/registro";
-import { Anel, BotaoSeguir, PostItDaMissao } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, PostItDaMissao, useMarcaDaTelaDeslocada } from "@/components/demo-guiada/pecas";
 import type { ChipDaMissao } from "@/components/demo-guiada/alvos";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
 import { abrirConhecerMais, ofertaDoTour } from "@/lib/conhecer-mais";
@@ -50,6 +50,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
 }) {
   const { get, set } = useUserData();
   const reduzir = !!useReducedMotion();
+  useMarcaDaTelaDeslocada(); // a faixa sai de cena enquanto o teclado do iPhone desloca a tela (20/10)
   const m = config.moduleId;
   const [n, setN] = useState(0);
   const passo: PassoDaIntro | undefined = config.passos[n];

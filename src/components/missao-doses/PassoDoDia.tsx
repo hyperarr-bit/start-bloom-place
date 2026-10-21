@@ -11,7 +11,7 @@ import { montarTreinoProprio } from "@/lib/intro-modulo-acoes";
 import { trackEvent } from "@/lib/analytics";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
-import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, useMarcaDaTelaDeslocada, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, cardMeuMes, gravacoesDoChip, lerReais, itemDoChip, linhaDeHoje, linhaDoNovoHabito, nomesDosHabitos, type AlvoDaMissao, type ChipDaMissao, type Numero, type Retangulo } from "@/components/demo-guiada/alvos";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
@@ -771,6 +771,7 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
         || !!document.querySelector('[data-testid="demo-guia-postit"] [data-escolha-campo]');
     } catch { return false; }
   };
+  useMarcaDaTelaDeslocada(); // a faixa sai de cena enquanto o teclado do iPhone desloca a tela (20/10)
   const [voltouDoFundo, setVoltouDoFundo] = useState(0);
   useEffect(() => {
     const aoVoltar = () => { if (document.visibilityState === "visible" && faseRef.current === "anotar") setVoltouDoFundo((x) => x + 1); };

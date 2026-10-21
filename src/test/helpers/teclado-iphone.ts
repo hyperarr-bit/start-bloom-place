@@ -4,7 +4,9 @@
  *
  * O que o WKWebView faz e o jsdom não (o app NÃO usa o plugin de teclado do Capacitor):
  *   · abrir: o campo ganha foco (focusin), a JANELA continua do mesmo tamanho e o `visualViewport` ENCOLHE
- *     (resize nele e na janela) e o iPhone ROLA a página pra mostrar o campo (scroll);
+ *     (resize nele e na janela) e o iPhone ROLA a página pra mostrar o campo (scroll); campo dentro de algo `fixed`
+ *     (o post-it, a folha): o iPhone DESLOCA a área visível (`visualViewport.offsetTop` > 0) e tudo que é fixo no topo
+ *     sobe junto (a faixa ia parar em cima do relógio — print do dono, 20/10);
  *   · fechar pelo "OK" da barra do teclado (ou tocando fora): o campo perde o foco NA HORA (focusout), mas o teclado
  *     ainda leva ~250 ms descendo — nesse meio a área visível CONTINUA pequena e o iPhone desfaz a rolagem (scroll);
  *     só depois o `visualViewport` volta ao tamanho (resize).
@@ -16,8 +18,9 @@ import { act } from "@testing-library/react";
 export interface TecladoIphone {
   /** a área visível agora (a janela continua `alturaTela`) */
   readonly altura: number;
-  /** foco no campo + teclado subindo (área visível encolhe) + a rolagem que o iPhone faz */
-  abrir(campo: HTMLElement, rolagem?: number): void;
+  /** foco no campo + teclado subindo (área visível encolhe) + a rolagem que o iPhone faz; `deslocamento` = o quanto o
+   *  iPhone desloca a ÁREA VISÍVEL (visualViewport.offsetTop) pra mostrar um campo que está num elemento `fixed` */
+  abrir(campo: HTMLElement, rolagem?: number, deslocamento?: number): void;
   /** o "OK" da barra do teclado / toque fora: o foco sai NA HORA, a área visível ainda pequena, o iPhone desfaz a rolagem */
   soltarFoco(): void;
   /** o teclado terminou de descer: a área visível volta ao tamanho da janela */
@@ -53,15 +56,16 @@ export function instalarTecladoIphone({ alturaTela = 844, larguraTela = 390, alt
   Object.defineProperty(window, "scrollY", { configurable: true, get: () => y });
 
   const redimensionou = () => { vv.dispatchEvent(new Event("resize")); window.dispatchEvent(new Event("resize")); };
-  const rolou = (novo: number) => { y = novo; vv.offsetTop = 0; vv.pageTop = novo; window.dispatchEvent(new Event("scroll")); vv.dispatchEvent(new Event("scroll")); };
+  const rolou = (novo: number) => { y = novo; vv.pageTop = novo + vv.offsetTop; window.dispatchEvent(new Event("scroll")); vv.dispatchEvent(new Event("scroll")); };
 
   return {
     get altura() { return vv.height; },
-    abrir(campo, rolagem = 180) {
+    abrir(campo, rolagem = 180, deslocamento = 0) {
       act(() => {
         if (document.activeElement !== campo) campo.focus();
         campo.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
         vv.height = alturaTela - alturaTeclado;
+        vv.offsetTop = deslocamento;
         redimensionou();
         rolou(y + rolagem);
       });
@@ -79,7 +83,9 @@ export function instalarTecladoIphone({ alturaTela = 844, larguraTela = 390, alt
     assentar() {
       act(() => {
         vv.height = alturaTela;
+        vv.offsetTop = 0;
         redimensionou();
+        vv.dispatchEvent(new Event("scroll"));
       });
     },
     trocarPara(campo, altura = alturaTeclado) {

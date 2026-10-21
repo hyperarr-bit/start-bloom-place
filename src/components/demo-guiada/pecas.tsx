@@ -172,7 +172,17 @@ const ehCampo = (el: unknown) => el instanceof HTMLElement
  * aberto (visualViewport encolhido) = nada desenhado; fechou, volta no lugar.
  */
 export function useDigitando(): boolean {
-  const [digitando, setDigitando] = useState(false);
+  return useTecladoDoGuia().digitando;
+}
+
+/**
+ * `digitando` (acima) + `noBalao` (20/10, dono no Simulador com o teclado do iPhone, "+ Outro" do gasto): ela escreve
+ * no campo DO BALÃO com o teclado aberto. Nessa hora o iPhone desloca a área visível (visualViewport.offsetTop) pra
+ * mostrar o campo, e o recorte do anel ia parar em outro lugar (no "TOTAL", nas abas) — e mexer no balão enquanto o
+ * iPhone ajusta a tela pro campo dele é o loop da build 42. Com `noBalao`: só o balão, parado, sem recorte nem escuro.
+ */
+export function useTecladoDoGuia(): { digitando: boolean; noBalao: boolean } {
+  const [estado, setEstado] = useState({ digitando: false, noBalao: false });
   useEffect(() => {
     /* 1.0.17: o campo do "+ Outro" (EscolhaRapida) mora DENTRO do balão — escrever nele não é "digitando no módulo": o
        post-it fica na tela (sumir com ele seria sumir com o próprio campo). */
@@ -181,14 +191,16 @@ export function useDigitando(): boolean {
        Cancelar/Adicionar) o foco sai NA HORA, mas o teclado leva ~250 ms descendo com a área visível ainda pequena; contar
        isso como "digitando no módulo" tirava o balão da tela e ele voltava REMONTADO: campo fechado, texto perdido. */
     let tecladoDoBalao = false;
+    const mudar = (digitando: boolean, noBalao: boolean) => setEstado((e) => (e.digitando === digitando && e.noBalao === noBalao ? e : { digitando, noBalao }));
     const conferir = () => {
       const el = document.activeElement;
-      if (!tecladoAberto()) tecladoDoBalao = false;
-      setDigitando(!doBalao(el) && (ehCampo(el) || (tecladoAberto() && !tecladoDoBalao)));
+      const aberto = tecladoAberto();
+      if (!aberto) tecladoDoBalao = false;
+      mudar(!doBalao(el) && (ehCampo(el) || (aberto && !tecladoDoBalao)), doBalao(el) || (aberto && tecladoDoBalao));
     };
     const entrou = (e: FocusEvent) => {
-      if (doBalao(e.target)) { tecladoDoBalao = true; return; }
-      if (ehCampo(e.target)) { tecladoDoBalao = false; setDigitando(true); }
+      if (doBalao(e.target)) { tecladoDoBalao = true; mudar(false, true); return; }
+      if (ehCampo(e.target)) { tecladoDoBalao = false; mudar(true, false); }
     };
     // o Safari demora um instante pra devolver a área visível depois do blur
     const saiu = () => { window.setTimeout(conferir, 80); window.setTimeout(conferir, 400); };
@@ -203,7 +215,42 @@ export function useDigitando(): boolean {
       v?.removeEventListener("resize", conferir);
     };
   }, []);
-  return digitando;
+  return estado;
+}
+
+/**
+ * A ÁREA VISÍVEL DESLOCADA (20/10, dono no Simulador com o teclado do iPhone): pra mostrar o campo em foco o iPhone
+ * desloca a área visível pra baixo (visualViewport.offsetTop > 0) e tudo que é `fixed` no topo sobe junto — a faixa
+ * da missão/do tutorial ia parar em cima do relógio, com o "Pular" cortado. Enquanto deslocada: <html
+ * data-tela-deslocada> e o CSS da faixa a tira de cena (ela volta quando o teclado fecha). Contado por quem usa: o
+ * último a sair limpa.
+ */
+let usosDoDeslocamento = 0;
+let pararDeslocamento: (() => void) | null = null;
+export function useMarcaDaTelaDeslocada(): void {
+  useEffect(() => {
+    usosDoDeslocamento += 1;
+    if (usosDoDeslocamento === 1) {
+      const v = vv();
+      const html = document.documentElement;
+      const conferir = () => {
+        const deslocada = !!v && v.offsetTop > 1;
+        if (deslocada) html.setAttribute("data-tela-deslocada", ""); else html.removeAttribute("data-tela-deslocada");
+      };
+      conferir();
+      v?.addEventListener("resize", conferir);
+      v?.addEventListener("scroll", conferir);
+      pararDeslocamento = () => {
+        v?.removeEventListener("resize", conferir);
+        v?.removeEventListener("scroll", conferir);
+        html.removeAttribute("data-tela-deslocada");
+      };
+    }
+    return () => {
+      usosDoDeslocamento -= 1;
+      if (usosDoDeslocamento === 0) { pararDeslocamento?.(); pararDeslocamento = null; }
+    };
+  }, []);
 }
 
 /**
@@ -250,7 +297,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
 }) {
   const [rect, setRect] = useState<Retangulo | null>(null);
   const [leve, setLeve] = useState(false);
-  const digitando = useDigitando();
+  const { digitando, noBalao } = useTecladoDoGuia();
   const [posicao, setPosicao] = useState<{ top: number } | null>(null);
   const balaoRef = useRef<HTMLDivElement>(null);
   const reduzir = useReducedMotion();
@@ -409,7 +456,8 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
 
   // balão: acima do anel se couber entre o topo fixo e o anel; senão, embaixo
   useLayoutEffect(() => {
-    if (!rect || !balaoRef.current || digitando) return;
+    // escrevendo no balão: ele fica PARADO (o iPhone está ajustando a tela pro campo dele — mexer aqui é o loop)
+    if (!rect || !balaoRef.current || digitando || (noBalao && posicao)) return;
     const h = balaoRef.current.offsetHeight;
     const topoLivre = fundoDoTopoFixo() + 8;
     const fundoLivre = topoVisivel() + alturaVisivel() - alturaDoRodapeFixo() - 8;
@@ -419,7 +467,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     const top = abaixo && cabeEmbaixo ? embaixo : emCima >= topoLivre ? emCima : Math.min(embaixo, fundoLivre - h);
     setPosicao({ top: Math.max(topoLivre, top) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rect, digitando]);
+  }, [rect, digitando, noBalao]);
 
   if (!rect || digitando || recolhido) return null;
   const pad = 8;
@@ -432,18 +480,19 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       data-testid={testid}
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
     >
-      {/* o escuro é a sombra do anel — um elemento só, nada clicável */}
-      <div
+      {/* o escuro é a sombra do anel — um elemento só, nada clicável (escrevendo no balão: sem recorte nem escuro) */}
+      {!noBalao && <div
         className="absolute rounded-2xl pointer-events-none"
         style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2, boxShadow: `0 0 0 9999px rgba(15,12,20,${leve ? 0.22 : 0.5})`, transition: "box-shadow .3s ease" }}
-      />
+        data-testid="anel-recorte"
+      />}
       {/* o contorno pulsa (elemento pequeno: barato em Android fraco) */}
-      <motion.div
+      {!noBalao && <motion.div
         className="absolute rounded-2xl border-[2.5px] border-white pointer-events-none"
         style={{ top: rect.top - pad, left: esquerda, width: largura, height: rect.height + pad * 2 }}
         animate={reduzir ? undefined : { opacity: [1, 0.55, 1] }}
         transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-      />
+      />}
       <div
         ref={balaoRef}
         className={`absolute left-1/2 -translate-x-1/2 w-[92%] max-w-[360px] ${interativo ? "pointer-events-auto" : "pointer-events-none"}`}

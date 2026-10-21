@@ -7,7 +7,7 @@ import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { marcarPassoDaIntro, type IntroGuiadaConfig } from "@/lib/intro-modulo";
-import { Anel, BotaoSeguir, ContaSubindo, PostItDaMissao } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, ContaSubindo, PostItDaMissao, useMarcaDaTelaDeslocada } from "@/components/demo-guiada/pecas";
 import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA_HABITO_VAZIO, alvoDaMissao, gravacoesDoChip, itemDoChip, linhaDeHoje, linhaDoNovoHabito, type ChipDaMissao, type Numero } from "@/components/demo-guiada/alvos";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
 import { abrirConhecerMais, ofertaDoTour } from "@/lib/conhecer-mais";
@@ -45,6 +45,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
   const alvoCfg = alvoDaMissao(config.tipo);
   const { get, set } = useUserData();
   const reduzir = !!useReducedMotion();
+  useMarcaDaTelaDeslocada(); // a faixa sai de cena enquanto o teclado do iPhone desloca a tela (20/10)
   // Rotina numa conta vazia: (A) criar o hábito pelo campo real, (B) marcar o quadradinho de hoje
   const [semHabito] = useState(() => config.tipo === "habito" && !((get<unknown[]>("rotina-habits", []) ?? []).length > 0));
   const [subPasso, setSubPasso] = useState<"criar" | "marcar" | null>(semHabito ? "criar" : null);

@@ -78,3 +78,8 @@ button.md-hora { min-height: 40px; padding: 0 14px; border-radius: 999px; border
 /* área de toque de 44 px no "Pular" da faixa (36 px) — ::before invisível (polimento 17/10) */
 .md-faixa-pular { position: relative; }
 .md-faixa-pular::before { content: ""; position: absolute; inset: -4px; }
+
+/* 20/10 (dono no Simulador com o teclado do iPhone): com o teclado aberto o iPhone desloca a área visível pra mostrar o
+   campo e a faixa fixa subia pra cima do relógio, com o "Pular" cortado — enquanto deslocada, a faixa sai de cena
+   (useMarcaDaTelaDeslocada); fechou o teclado, ela volta no lugar */
+html[data-tela-deslocada] .md-faixa { visibility: hidden; pointer-events: none; }

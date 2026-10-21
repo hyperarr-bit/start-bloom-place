@@ -2771,6 +2771,39 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     alvo.remove();
   });
 
+  it("print do dono (Simulador, teclado do iPhone): escrevendo no '+ Outro', o recorte do anel NÃO fica em outro lugar — some (só o post-it, parado); fechou o teclado, o recorte volta no '+ Novo gasto'", () => {
+    dose();
+    teclado = instalarTecladoIphone();
+    expect(screen.getByTestId("anel-recorte")).toBeInTheDocument();
+    const campo = abrirOutro();
+    const balao = postIt().parentElement!;
+    const topoAntes = balao.style.top;
+    teclado.abrir(campo, 120, 60); // o iPhone desloca a área visível pra mostrar o campo do post-it
+    alvoEmbaixo(420); // o alvo "anda" na medida (rolagem/deslocamento) — antes o recorte ia junto pro lugar errado e o post-it pulava
+    avancar(900);
+    expect(screen.queryByTestId("anel-recorte")).toBeNull();
+    expect(postIt().parentElement!.style.top).toBe(topoAntes); // o post-it parado enquanto ela escreve
+    expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo);
+    fireEvent.click(within(postIt()).getByText("Cancelar"));
+    teclado.soltarFoco();
+    avancar(300);
+    teclado.assentar();
+    avancar(600);
+    expect(screen.getByTestId("anel-recorte")).toBeInTheDocument();
+  });
+
+  it("print do dono: com o teclado aberto o iPhone desloca a área visível e a faixa 'Missão · dia 1 de 3' subia pra cima do relógio — enquanto deslocada, <html data-tela-deslocada> (o CSS tira a faixa); fechou, volta", () => {
+    teclado = instalarTecladoIphone(); // no aparelho o visualViewport existe desde a abertura
+    dose();
+    const campo = abrirOutro();
+    expect(document.documentElement.hasAttribute("data-tela-deslocada")).toBe(false);
+    teclado.abrir(campo, 0, 59);
+    expect(document.documentElement.hasAttribute("data-tela-deslocada")).toBe(true);
+    teclado.soltarFoco();
+    teclado.assentar();
+    expect(document.documentElement.hasAttribute("data-tela-deslocada")).toBe(false);
+  });
+
   it("tocou em 'Cancelar' com o teclado aberto: o post-it não pisca (sai e volta) enquanto o teclado desce", () => {
     dose();
     teclado = instalarTecladoIphone();

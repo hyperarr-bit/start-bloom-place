@@ -334,5 +334,7 @@ describe("Dev. Pessoal só ganha a aba com a chave (fonte)", () => {
     const s = readFileSync("src/pages/DesenvolvimentoPessoal.tsx", "utf8");
     expect(s).toMatch(/temPacote2027 \? \[ABA_2027, \.\.\.ABAS_DP\] : ABAS_DP/);
     expect(s).toMatch(/activeTab === ABA_2027\.id && temPacote2027 && <Pacote2027 \/>/);
+    // ?tab=2027 chega antes da conta carregar: quando o pacote aparece, a aba volta pra ele (1 vez)
+    expect(s).toMatch(/if \(!pediu2027 \|\| !temPacote2027 \|\| voltou2027\.current\) return;/);
   });
 });

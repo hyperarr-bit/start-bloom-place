@@ -61,15 +61,15 @@ export function htmlDoPlanner2027(p: Plano2027, c: Cofrinho2027, hoje: Date = ne
     return `<div class="${feito ? "ok" : ""}"><small>sem ${s}</small><b>R$ ${valorDaSemana(s, c.invertido)}</b></div>`;
   }).join("")}</div><p class="nota">Marque cada semana quando guardar. Total no fim do ano: <b>R$ ${TOTAL_COFRINHO.toLocaleString("pt-BR")}</b>.</p>`;
   const pgRevisao = `<div class="rev">${MESES_2027.map((m) => `<div><b>${m}</b><small>Funcionou</small><div class="ln"></div><small>Vou mudar</small><div class="ln"></div></div>`).join("")}</div>`;
-  const areas = AREAS_DO_PLANNER.map((a) => `<div class="area"><h3>${a.emoji} ${a.nome}</h3><p class="q">${esc(a.pergunta)}</p>${linhas(4)}
-    <small>Primeiro passo</small>${linhas(1)}<div class="chk"><span>☐ revisei em junho</span><span>☐ revisei em dezembro</span></div></div>`);
+  const areas = AREAS_DO_PLANNER.map((a) => `<div class="area"><h3>${a.emoji} ${a.nome}</h3><p class="q">${esc(a.pergunta)}</p>${linhas(7)}
+    <small>Primeiro passo</small>${linhas(2)}<div class="chk"><span>☐ revisei em junho</span><span>☐ revisei em dezembro</span></div></div>`);
   const pgAreas: string[] = [];
   for (let i = 0; i < areas.length; i += 2) pgAreas.push(`<section class="pg"><h2>As 16 áreas · ${i / 2 + 1} de 8</h2>${areas[i]}${areas[i + 1] ?? ""}</section>`);
 
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Planner 2027 · CORE</title><style>
   @page{size:A4;margin:14mm}
   *{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,Helvetica,sans-serif;color:#16121c;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pg{page-break-after:always;padding:4mm 0;min-height:260mm}
+  .pg{page-break-after:always;padding:4mm 0}
   .pg:last-child{page-break-after:auto}
   h1{font-size:64px;letter-spacing:-.04em;margin:0;line-height:1}h1 em{font-style:normal;color:#d6338a}
   h2{font-size:22px;letter-spacing:-.02em;margin:0 0 6mm;padding-bottom:3mm;border-bottom:2px solid #16121c}

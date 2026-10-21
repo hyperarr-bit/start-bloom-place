@@ -320,6 +320,15 @@ const DesenvolvimentoPessoal = () => {
   const temPacote2027 = !!pacote2027;
   const abasDoModulo = useMemo(() => (temPacote2027 ? [ABA_2027, ...ABAS_DP] : ABAS_DP), [temPacote2027]);
   const abas = useAbasOcultas("desenvolvimento", abasDoModulo);
+  /* `?tab=2027` chega ANTES da conta carregar (a aba ainda não existe e a barra cai na 1ª visível): quando o pacote
+   * aparece, volta pra ela — 1 vez, só se foi pedido pela URL */
+  const [pediu2027] = useState(() => { try { return new URLSearchParams(window.location.search).get("tab") === ABA_2027.id; } catch { return false; } });
+  const voltou2027 = useRef(false);
+  useEffect(() => {
+    if (!pediu2027 || !temPacote2027 || voltou2027.current) return;
+    voltou2027.current = true;
+    setActiveTab(ABA_2027.id);
+  }, [pediu2027, temPacote2027]);
   const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
   const { set: setUserData, isGuest } = useUserData();
 

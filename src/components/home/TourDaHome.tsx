@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
-import { entrada, MOV, saidaCalmaDe } from "@/lib/movimento";
+import { entrada, MOV, MOV_MS, saidaCalmaDe } from "@/lib/movimento";
 import { tourHomeQuando } from "@/lib/dia1-cheio";
 import { trackEvent } from "@/lib/analytics";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -146,14 +146,103 @@ export const TOTAL_PASSOS = PASSOS_LONGO.length;
 export const TOTAL_PASSOS_CURTO = 3;
 const PADDING = 8;
 
-export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, variante = "longo" }: {
+type PropsDoTour = {
   lifeData: LifeHubData;
   widgetsAtivos: WidgetId[];
   adicionarWidget: (id: WidgetId) => void;
   onFim?: () => void;
   /** 1.0.16: "curto" = 3 passos (braço A); "longo" = os 5 de sempre */
   variante?: "curto" | "longo";
-}) => {
+};
+
+/** O "Pular" do popup grava a MESMA marca do tour feito (aparelho + conta), com este prefixo — o tour não volta (nem ao
+ *  reabrir, nem no login em outro aparelho), mas o adesivo "Casa arrumada" é de quem fez o tour (badges-vida). */
+export const PREFIXO_TOUR_PULADO = "pulou:";
+
+/**
+ * 1.0.17 (dono 20/10, mockup d1) — O POPUP DE ENTRADA DO TOUR: antes do 1º balão, um cartão no meio da tela diz que é
+ * um tutorial e quanto ele dura: "ÚLTIMO PASSO DE HOJE" / "Agora, sua Home em N toques" (N = os passos do tour que vai
+ * rodar) / "É aqui que seu dia fica todo junto." / [Mostrar] / "Pular". "Pular" = tour visto (as marcas de sempre). O
+ * popup leva `data-camada-guia="tour-home"` (a mesma camada do tour: nada entra por cima, a barra some).
+ */
+export const TourDaHome = (props: PropsDoTour) => {
+  const [mostrar, setMostrar] = useState(false);
+  /* O escuro do popup NÃO some antes de o tour aparecer (gravação 20/10: entre o "Mostrar" e o 1º balão a Home ficava
+     clara ~0,4 s enquanto a lista abria e rolava — escuro → claro → escuro). O véu fica inteiro até o tour assentar e
+     aparecer, e então sai devagar: o escuro continua e o recorte do 1º passo se abre. */
+  const [veu, setVeu] = useState<"fora" | "inteiro" | "saindo">("fora");
+  useEffect(() => {
+    if (veu !== "inteiro") return;
+    const teto = window.setTimeout(() => setVeu("saindo"), ASSENTA_TETO_MS + 900); // nunca preso
+    return () => window.clearTimeout(teto);
+  }, [veu]);
+  useEffect(() => {
+    if (veu !== "saindo") return;
+    const t = window.setTimeout(() => setVeu("fora"), MOV_MS.base + 60);
+    return () => window.clearTimeout(t);
+  }, [veu]);
+  const aoAparecer = useCallback(() => {
+    // o tour leva MOV.calmo pra entrar inteiro; só então o véu sai
+    window.setTimeout(() => setVeu((v) => (v === "inteiro" ? "saindo" : v)), MOV_MS.calmo);
+  }, []);
+  if (mostrar) {
+    return (
+      <>
+        {veu !== "fora" && (
+          <div aria-hidden className="fixed inset-0 z-[199] pointer-events-none" data-testid="tour-veu"
+            style={{ background: "rgba(15,12,20,.55)", opacity: veu === "saindo" ? 0 : 1, transition: `opacity ${MOV_MS.base}ms ease-out` }} />
+        )}
+        <TourDosPassos {...props} aoAparecer={aoAparecer} />
+      </>
+    );
+  }
+  return <PopupDoTour {...props} aoMostrar={() => { setVeu("inteiro"); setMostrar(true); }} />;
+};
+
+function PopupDoTour({ variante = "longo", onFim, aoMostrar }: PropsDoTour & { aoMostrar: () => void }) {
+  const { set } = useUserData();
+  const reduzir = !!useReducedMotion();
+  // o mesmo total que o tour vai ter (o curto lê a missão; os dois têm o número fixo de passos)
+  const total = variante === "curto" ? TOTAL_PASSOS_CURTO : TOTAL_PASSOS;
+  const [saiu, setSaiu] = useState(false);
+  const visto = useRef(false);
+  useEffect(() => {
+    if (visto.current) return;
+    visto.current = true;
+    registrarTourVisto(); // fechou o app no popup: conta como uma abertura do tour (no máximo 2)
+    trackEvent("home_tour_popup", { acao: "visto", total, variante, tour_quando: tourHomeQuando() });
+  }, [total, variante]);
+  const decidir = (acao: "mostrar" | "pular") => {
+    if (saiu) return;
+    setSaiu(true);
+    saidaCalmaDe('[data-testid="tour-popup"]', MOV_MS.base);
+    trackEvent("home_tour_popup", { acao, total, variante, tour_quando: tourHomeQuando() });
+    if (acao === "mostrar") { aoMostrar(); return; }
+    const marca = `${PREFIXO_TOUR_PULADO}${new Date().toISOString()}`;
+    marcarTourFeito(marca);
+    set(CHAVE_TOUR_FEITO, marca);
+    onFim?.();
+    avisar(EVENTO_TOUR_HOME_FIM, { total, pulou: true });
+  };
+  if (saiu) return null;
+  return (
+    <motion.div className="fixed inset-0 z-[200] flex items-center justify-center px-6" style={{ background: "rgba(15,12,20,.55)" }}
+      data-camada-guia="tour-home" data-testid="tour-popup" initial={reduzir ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo)}>
+      <motion.div role="dialog" aria-modal="true" aria-labelledby="tour-popup-titulo"
+        className="w-full max-w-[340px] rounded-[28px] bg-card text-card-foreground px-6 pt-7 pb-4 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,.55)]"
+        initial={reduzir ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, reduzir ? 0 : 0.12)}>
+        <div className="mx-auto w-16 h-16 rounded-[20px] grid place-items-center text-[30px] rotate-[-4deg]" style={{ background: "hsl(var(--accent) / 0.12)" }} aria-hidden>🏠</div>
+        <p className="mt-4 text-[11px] font-extrabold uppercase tracking-[0.16em] text-accent">Último passo de hoje</p>
+        <h2 id="tour-popup-titulo" className="mt-1.5 text-[24px] font-black tracking-[-0.03em] leading-[1.1]" data-testid="tour-popup-titulo">Agora, sua Home em {total} toques</h2>
+        <p className="mt-2 text-[14.5px] text-muted-foreground leading-snug">É aqui que seu dia fica todo junto.</p>
+        <button type="button" className="mt-5 w-full h-[52px] rounded-full bg-accent text-accent-foreground text-[16px] font-extrabold active:scale-[0.98] transition" data-testid="tour-popup-mostrar" onClick={() => decidir("mostrar")}>Mostrar</button>
+        <button type="button" className="mt-1 w-full min-h-11 text-[14px] font-semibold text-muted-foreground" data-testid="tour-popup-pular" onClick={() => decidir("pular")}>Pular</button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function TourDosPassos({ lifeData, widgetsAtivos, adicionarWidget, onFim, variante = "longo", aoAparecer }: PropsDoTour & { aoAparecer?: () => void }) {
   // o curto lê a missão UMA vez (o texto do passo 1 não muda no meio do tour)
   const [passosCurto] = useState(() => passosDoTourCurto((() => { try { return lerMissao(); } catch { return null; } })()));
   const PASSOS: readonly PassoDoTour[] = variante === "curto" ? passosCurto : PASSOS_LONGO;
@@ -280,6 +369,13 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
     return () => window.clearInterval(relogio);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [passo, ativo]);
+
+  const apareceu = useRef(false);
+  useEffect(() => {
+    if (!assentado || apareceu.current) return;
+    apareceu.current = true;
+    aoAparecer?.();
+  }, [assentado, aoAparecer]);
 
   useLayoutEffect(() => {
     const h = balaoRef.current?.getBoundingClientRect().height ?? 0;
@@ -536,4 +632,4 @@ export const TourDaHome = ({ lifeData, widgetsAtivos, adicionarWidget, onFim, va
       </motion.div>
     </AnimatePresence>
   );
-};
+}

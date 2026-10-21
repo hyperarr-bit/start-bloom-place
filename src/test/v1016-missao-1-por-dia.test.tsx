@@ -1133,7 +1133,12 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO �
     act(() => { festa.remove(); });
     avancar(1000);
     expect(screen.queryByTestId("tour-balao")).toBeNull(); // o respiro: a Home assenta antes
+    expect(screen.queryByTestId("tour-popup")).toBeNull();
     avancar(1000);
+    // 1.0.17 (mockup d1): primeiro o popup de entrada, com o número real de passos do tour curto
+    expect(screen.getByTestId("tour-popup-titulo")).toHaveTextContent("Agora, sua Home em 3 toques");
+    expect(screen.queryByTestId("tour-balao")).toBeNull();
+    mostrarTour();
     expect(screen.getByTestId("tour-contador")).toHaveTextContent("Passo 1 de 3");
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("Amanhã, 📅 Rotina aparece aqui.");
@@ -1152,7 +1157,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO �
     _novaAberturaDoTour();
     montarComHome(store, "/home");
     avancar(4000);
-    for (const t of ["tour-balao", "plano-amanha-a", "missao-doses-festa"]) expect(screen.queryByTestId(t), t).toBeNull();
+    for (const t of ["tour-balao", "tour-popup", "plano-amanha-a", "missao-doses-festa"]) expect(screen.queryByTestId(t), t).toBeNull();
     expect(eventos).toContainEqual(["home_tour_concluido", expect.objectContaining({ tour_quando: "dia1" })]);
   });
 
@@ -1186,6 +1191,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO �
     const store = montarStore({});
     montarComHome(store, "/home");
     avancar(2500); // o respiro antes do tour (RESPIRO_ANTES_DO_TOUR_MS)
+    mostrarTour(); // 1.0.17: o popup de entrada
     expect(screen.getByTestId("tour-contador")).toHaveTextContent("Passo 1 de 3");
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("Amanhã, ❤️ Saúde aparece aqui.");
@@ -1237,6 +1243,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO �
     cleanup();
     montarComHome(store, "/home");
     avancar(2500);
+    mostrarTour();
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("Tocou, resolveu.");
   });
 
@@ -1249,6 +1256,7 @@ describe("9. o tour curto do braço A (3 passos 'faz isso') — 1.0.17: QUANDO �
       _novaAberturaDoTour();
       montarComHome(store, "/home");
       avancar(2500);
+      mostrarTour();
       expect(screen.getByTestId("tour-balao"), `abertura ${abertura}`).toBeInTheDocument();
       cleanup();
     }
@@ -2153,6 +2161,7 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 1, modulo: "financas", completo: false, para: "home", variante: "A" })]);
     // 1.0.17 (tour_home_quando "dia1"): a Home quieta ~1,5 s → o tour curto; o plano só depois dele (uma camada por vez)
     avancar(2500);
+    mostrarTour(); // 1.0.17: o popup de entrada do tour
     expect(screen.getByTestId("tour-balao")).toHaveTextContent("O que falta hoje.");
     expect(screen.queryByTestId("plano-amanha-a")).toBeNull();
     fireEvent.click(screen.getByTestId("tour-continuar"));
@@ -2251,6 +2260,7 @@ describe("17. a comemoração: 'Conhecer mais do <módulo> (1 min)' quieto (pont
     expect(eventos).toContainEqual(["missao_doses_conhecer_mais_volta", expect.objectContaining({ dia: 3, modulo: "saude", para: "home" })]);
     expect(screen.getByTestId("missao-doses-faixa")).toHaveTextContent("Missão · 4 de 4");
     avancar(1500);
+    mostrarTour(); // 1.0.17: o popup de entrada do tour
     expect(screen.getByTestId("tour-balao")).toBeInTheDocument();
     expect(screen.queryByTestId("plano-amanha")).toBeNull();
   });

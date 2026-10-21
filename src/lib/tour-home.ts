@@ -107,7 +107,8 @@ export const tourForcadoPorQa = (): boolean => !isNativeShell() && lerForca(CHAV
 /** 10/10: o tour acabou (TourDaHome dispara) — a missão em doses (braço B) fecha o 4º passo com isto. */
 export const EVENTO_TOUR_HOME_FIM = "tour-home:concluido";
 export const tourFeitoNesteAparelho = (): boolean => !!ls.get(CHAVE_TOUR_FEITO);
-export const marcarTourFeito = (): void => ls.set(CHAVE_TOUR_FEITO, new Date().toISOString());
+/** `valor`: o "Pular" do popup de entrada (1.0.17) grava "pulou:<data>" — a mesma chave, o tour não volta. */
+export const marcarTourFeito = (valor: string = new Date().toISOString()): void => ls.set(CHAVE_TOUR_FEITO, valor);
 
 export const cartoesVistosNesteAparelho = (moduleId: string): boolean => !!ls.get(chaveCartoesVistos(moduleId));
 export const marcarCartoesVistos = (moduleId: string): void => ls.set(chaveCartoesVistos(moduleId), new Date().toISOString());

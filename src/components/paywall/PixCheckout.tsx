@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Fingerprint, ShieldCheck, User, X, Zap } from "lucide-react";
@@ -8,13 +8,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
-import { isInAppBrowser } from "@/lib/funnel";
+import { FUNNEL_AREA_KEY, isInAppBrowser, type AreaKey } from "@/lib/funnel";
+import { presenteLigado, primeiroNome } from "@/lib/presente";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
 import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
+/* 21/10: o UPSELL DE PRESENTE (src/presente) só carrega com a chave ligada (UPSELL_PRESENTE, src/lib/presente.ts) */
+const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => ({ default: m.FluxoPresente })));
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -604,6 +607,14 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   const [mostrarQR, setMostrarQR] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
+  /* UPSELL DE PRESENTE (21/10): no "Pagamento confirmado" do vitalício do /inicio, ANTES da tela com as lojas, a oferta
+   * "Dê o CORE pra sempre pra quem você ama" (src/presente/FluxoPresente) cobre o checkout; terminou → a confirmação de
+   * sempre. Decidido no mount: chave UPSELL_PRESENTE (padrão OFF; QA `?presente=on`), só funil do /inicio, só
+   * vitalício, nunca no Funil B nem no v2. Desligado: nada muda (o estado fica parado em false). */
+  const [presenteAtivo] = useState<boolean>(() =>
+    context === "funnel" && !funilB && !v2 && OFERTA_VITALICIA[offer]
+    && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio") && presenteLigado());
+  const [presenteFeito, setPresenteFeito] = useState(false);
   const cpfRef = useRef<HTMLInputElement>(null);
   // 26/09: o toque em pagar = abertura do checkout; mede espera_ms do pix_generated.
   const toqueEm = useRef<number | null>(Date.now());
@@ -1237,6 +1248,16 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
 
   return (
     <div className="fixed inset-0 z-[400] bg-background overflow-y-auto">
+      {presenteAtivo && step === "confirmed" && !presenteFeito && (
+        <Suspense fallback={null}>
+          <div className="fn pv pv-sobre" data-testid="inicio-presente"><div className="fn-corpo">
+            <FluxoPresente origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              area={(() => { try { const a = localStorage.getItem(FUNNEL_AREA_KEY); return a ? (a as AreaKey) : null; } catch { return null; } })()}
+              nomeSugerido={primeiroNome((abUser?.user_metadata as { full_name?: string } | undefined)?.full_name) || null}
+              onFim={() => setPresenteFeito(true)} />
+          </div></div>
+        </Suspense>
+      )}
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
         {step !== "confirmed" && (
           <button

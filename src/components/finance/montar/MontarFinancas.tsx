@@ -82,7 +82,7 @@ import {
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
   faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
-  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
+  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, marcarPonteDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
   type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado, type TelaDoNumero,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
@@ -95,6 +95,9 @@ export interface PropsMontarFinancas {
   /** De onde abriu (vai nos eventos): a 1ª abertura do módulo ou o passo da missão. */
   origem?: OrigemMontar;
   onPronto?: (r: ResumoMontar) => void;
+  /** 1.0.17, só pela missão: "Ainda não gastei" na ponte do número pro 1º gasto (a dose já conta; quem chama faz o mesmo
+   *  do "Ainda não" do post-it). Sem isto, a ponte chama `onPronto`. */
+  onAindaNaoGastei?: (r: ResumoMontar) => void;
   onPular?: () => void;
   /** Só a do módulo: a missão abriu a dela — esta some (sem decidir nada). */
   onCeder?: () => void;
@@ -106,8 +109,9 @@ export interface PropsMontarFinancas {
   contaCriadaEm?: string;
 }
 
-type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto";
-const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, cartao: 3, montando: 3, pronto: 4 };
+/** "ponte" (1.0.17, só pela missão): depois do número, antes do tutorial do 1º gasto. */
+type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto" | "ponte";
+const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, cartao: 3, montando: 3, pronto: 4, ponte: 5 };
 const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long" });
@@ -164,7 +168,7 @@ export function dicaDoVencimento(dia: number, hoje: Date): string {
   return `${antes}Faltam ${faltam} dias. O CORE avisa quando estiver perto.`;
 }
 
-export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 1400, contaCriadaEm }: PropsMontarFinancas) {
+export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, onPular, onCeder, agora, esperaMs = 1400, contaCriadaEm }: PropsMontarFinancas) {
   // 1.0.16: chamada PELA missão, os eventos levam o braço e o id dela (o funil Montar → 1º gasto → olha se lê junto)
   const ev = (dados: Record<string, unknown>) => (origem === "missao" ? { ...dados, ...camposDaMissaoNosEventos() } : dados);
   const { get, set } = useUserData();
@@ -179,7 +183,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
      no número. Senão, fechou no meio das perguntas: volta com o que já tinha respondido. */
   const [retomada] = useState<TelaDoNumero | null>(() => (origem === "missao" ? lerTelaDoNumero(criadoEm, agora ?? new Date()) : null));
   const [rascunho] = useState(() => (retomada ? null : lerRascunhoMontar()));
-  const [etapa, setEtapa] = useState<Etapa>(retomada ? "pronto" : rascunho?.etapa ?? "renda");
+  // fechou o app na PONTE (o número já visto): volta nela, nunca no número de novo
+  const [etapa, setEtapa] = useState<Etapa>(retomada ? (retomada.ponte ? "ponte" : "pronto") : rascunho?.etapa ?? "renda");
   /** 1.0.17: a troca de passo desliza pro lado certo (avançar → da direita; Voltar → da esquerda) */
   const direcao = useRef(1);
   const voltarPara = (e: Etapa) => { direcao.current = -1; setEtapa(e); };
@@ -346,28 +351,57 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   /* ── a tela do número (o resultado) ── */
   const naMissao = origem === "missao";
   const abertura = useRef(Date.now());
-  /* APARECEU (pela missão): é tela de uma vez — sai da marca do "ainda não visto" (reabrir não volta nela: a missão
-     retoma no tutorial do 1º gasto) e o relógio do passo 1 começa */
+  /* APARECEU (pela missão): é tela de uma vez — a marca passa a apontar pra ponte (reabrir volta na PONTE, nunca no
+     número) e o relógio do passo 1 começa */
   const resultadoContado = useRef(false);
   useEffect(() => {
     if (!naMissao || etapa !== "pronto" || cedeu || resultadoContado.current) return;
     resultadoContado.current = true;
-    fecharTelaDoNumero();
+    marcarPonteDoNumero();
     marcarResultadoVisto();
     trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "resultado", ms: 0, ms_desde_abertura: Date.now() - abertura.current, ...(retomada ? { retomou: true } : {}) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naMissao, etapa, cedeu]);
+  /* A PONTE pro 1º gasto (1.0.17, dono 20/10 — a copy dele): "Você já viu quanto pode gastar hoje. / Agora vamos anotar
+     seu primeiro gasto." com o número dela pequeno, [Ir pro app] (o tutorial do gasto de hoje) e "Ainda não gastei" (a
+     dose já conta, vai pra festa). Antes o corte era seco: tela limpa → o módulo inteiro rolando e escurecendo. */
+  const ponteContada = useRef(false);
+  useEffect(() => {
+    if (!naMissao || etapa !== "ponte" || cedeu || ponteContada.current) return;
+    ponteContada.current = true;
+    marcarPonteDoNumero(); // a retomada direto na ponte já está marcada; vinda do número, garante
+    trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "ponte", ms: msDesdeOResultado(), ...(retomada?.ponte ? { retomou: true } : {}) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naMissao, etapa, cedeu]);
   /** "Continuar →" (missão) / "Ver minhas Finanças" (módulo). Uma vez só: o toque duplo não chama o `onPronto` duas vezes. */
   const saiu = useRef(false);
+  const resumo = (): ResumoMontar => ({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
   const continuar = () => {
+    if (naMissao) {
+      // pela missão o "Continuar" do número leva pra ponte (o mesmo evento de sempre: tocou "Continuar" no número)
+      if (etapa !== "pronto") return;
+      trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
+      irPara("ponte");
+      return;
+    }
     if (saiu.current) return;
     saiu.current = true;
     // 1.0.17 (Simulador): o Montar sumia num quadro e o módulo aparecia no meio da página, rolando às pressas até o gasto
     // — a cópia do Montar some devagar por cima enquanto o módulo se ajeita embaixo
     saidaCalma(folha.current, MOV_MS.base, 480); // inteira enquanto o módulo rola até o gasto; some com ele parado
     fecharTelaDoNumero();
-    if (naMissao) trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
-    onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
+    onPronto?.(resumo());
+  };
+  /** Saiu da ponte (uma vez só): a marca some — reabrir agora é o tutorial do 1º gasto (ou a festa). */
+  const sairDaPonte = (via: "ir_pro_app" | "ainda_nao") => {
+    if (saiu.current) return;
+    saiu.current = true;
+    // a cópia da ponte fica inteira enquanto o módulo se ajeita embaixo (rola até o gasto / o MEU MÊS) e some com ele parado
+    saidaCalma(folha.current, MOV_MS.base, 480);
+    fecharTelaDoNumero();
+    trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "ponte_saiu", via, ms: msDesdeOResultado() }));
+    if (via === "ainda_nao" && onAindaNaoGastei) onAindaNaoGastei(resumo());
+    else onPronto?.(resumo());
   };
   const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto", SUBIDA_DO_NUMERO_MS, deMontando && !reduzirMov && !menosMovimento() ? CONTA_SAI_MS : 0);
   /** As linhas da conta do "Montando" (as mesmas da "Ver a conta"), na ordem em que entram. */
@@ -630,6 +664,22 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
             </div>
             <div className="mf-rodape">
               <button type="button" className="mf-cta" onClick={continuar}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
+            </div>
+          </>
+        )}
+
+        {etapa === "ponte" && (
+          <>
+            <div className="mf-ponte" data-testid="montar-ponte">
+              {!apertado && resultado.porDia > 0 && (
+                <p className="mf-ponte-numero" data-testid="montar-ponte-numero"><DollarSign size={15} aria-hidden /><b>{rs(resultado.porDia)}</b> por dia</p>
+              )}
+              <p className="mf-ponte-viu">Você já viu quanto pode gastar hoje.</p>
+              <h2>Agora vamos anotar seu primeiro gasto.</h2>
+            </div>
+            <div className="mf-rodape">
+              <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={() => sairDaPonte("ir_pro_app")}>Ir pro app</button>
+              <button type="button" className="mf-pular" data-testid="montar-ponte-nao-gastei" onClick={() => sairDaPonte("ainda_nao")}>Ainda não gastei</button>
             </div>
           </>
         )}

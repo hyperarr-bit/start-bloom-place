@@ -468,6 +468,7 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
     fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // a tela do número pela missão: só o número
+    fireEvent.click(screen.getByTestId("montar-ponte-ir")); // 1.0.17: a ponte pro 1º gasto
     await respirar();
     return { controle, numero };
   };

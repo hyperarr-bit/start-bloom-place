@@ -1121,7 +1121,9 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
       {createPortal(faixa, document.body)}
       {/* braço A, dose 2+: o score de ANTES da dose (a dica do dia 2 conta "foi de X pra Y") */}
       {braco === "A" && modo === "dose" && n >= 2 && missao.scoreAntes?.[n] === undefined && aoScoreAntes && <LerScoreDoDia aoLer={aoScoreAntes} />}
-      {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onPular={montarPulou} />}
+      {/* "Ainda não gastei" na ponte do número (1.0.17): o Montar sai como no "Continuar" e segue o mesmo caminho do
+          "Ainda não" do post-it (o dia sem gasto, o balão no MEU MÊS e a festa) */}
+      {montarAberto && <MontarFinancas origem="missao" onPronto={montarPronto} onAindaNaoGastei={(r) => { montarPronto(r); naoGasteiHoje(); }} onPular={montarPulou} />}
       {setupAberto && encaixe && <encaixe.Componente origem="missao" onPronto={setupPronto} onPular={setupPulou} />}
       {/* fora do AnimatePresence (um portal ali dentro era descartado: o post-it solto NUNCA montava) */}
       {!alvo && fase === "anotar" && !montarAberto && !setupAberto && !quieto && createPortal(

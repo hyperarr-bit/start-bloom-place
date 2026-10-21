@@ -231,6 +231,10 @@ const montarComPasseio = (store: Store, rota: string) =>
 const avancar = (ms: number) => act(() => { vi.advanceTimersByTime(ms); });
 /** O relógio em passos de 50 ms: o React desenha entre um timer e outro (como no aparelho) — pra medir tempo de verdade. */
 const andar = (ms: number) => { for (let t = 0; t < ms; t += 50) avancar(Math.min(50, ms - t)); };
+/** 1.0.17 (dono 20/10): entre a tela do número e o tutorial do gasto, a PONTE — "Ir pro app" segue. */
+const passarDaPonte = () => fireEvent.click(screen.getByTestId("montar-ponte-ir"));
+/** 1.0.17 (mockup d1): o tour da Home começa num popup — "Mostrar" leva aos balões. */
+const mostrarTour = () => fireEvent.click(screen.getByTestId("tour-popup-mostrar"));
 const esperarPostIt = () => { for (let i = 0; i < 12; i++) avancar(300); return screen.getAllByTestId("demo-guia-postit").at(-1)!; };
 /** O "olha" de Finanças anda SOZINHO (≤ 4 s: o número → o MEU MÊS, ou só o MEU MÊS) até a festa. */
 const passarOlhaDeFinancas = () => {
@@ -506,6 +510,9 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
     expect(Array.isArray(store.dados["finance-incomes"])).toBe(true);
     // a dose JÁ conta no "Continuar" do Montar (fechar o app no tutorial não desfaz o Montar)
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`);
+    // 1.0.17: a ponte ("Agora vamos anotar seu primeiro gasto.") → "Ir pro app"
+    expect(screen.getByTestId("montar-ponte")).toHaveTextContent("Agora vamos anotar seu primeiro gasto.");
+    passarDaPonte();
     // o TUTORIAL no formulário de verdade: o post-it com os 3 prontos, "escrever o meu" e "Ainda não gastei" (o anel só
     // procura o "+ Novo gasto" com o Montar fora da tela)
     const postIt = esperarPostIt();
@@ -650,6 +657,7 @@ describe("4. braço A — uma dose por dia, conta VAZIA, do dia 1 ao dia 3", () 
       fireEvent.click(mf().getByRole("button", { name: "Pular" })); // pula só a pergunta do cartão: o Montar fecha igual
       avancar(2500);
       fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+      passarDaPonte();
     };
     // 1) o "Pular" da faixa, que aparece aos 20 s
     localStorage.removeItem("core-montar-financas");
@@ -1482,6 +1490,7 @@ describe("14. dose de Finanças (os dois braços): Montar → tutorial do 1º ga
     fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
     avancar(2500);
     fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    passarDaPonte();
   };
 
   it("fim do mês (28/10, 4 dias): o balão mostra a SOBRA de hoje — ~~R$ 375~~ R$ 363 —, a aba fica no MEU FINANCEIRO e o card do Dashboard mostra R$ 372 + a MESMA linha 'Sobram R$ 363 pra hoje' (a mesma conta)", () => {
@@ -1552,6 +1561,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     fireEvent.click(mf().getByRole("button", { name: "Não uso cartão" }));
     avancar(2500);
     fireEvent.click(mf().getByRole("button", { name: "Continuar" }));
+    passarDaPonte(); // 1.0.17: a ponte pro 1º gasto
     return Date.now();
   };
   const ate = (cond: () => boolean, maxMs = 8000) => { const t0 = Date.now(); while (!cond() && Date.now() - t0 < maxMs) avancar(50); return Date.now(); };
@@ -1591,9 +1601,13 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     expect(screen.queryByTestId("montar-postit-gasto")).toBeNull();
     expect(screen.queryByText("Quanto entra por mês?")).toBeNull();
     expect(screen.queryAllByTestId("demo-guia-postit")).toHaveLength(0); // o tutorial espera o número sair da tela
-    // (2) VIU o número e o app morreu de novo → reabre: o TUTORIAL (o número é tela de uma vez)
+    // (2) VIU o número e o app morreu de novo → reabre: a PONTE (1.0.17; o número é tela de uma vez)
     cleanup();
     montar(store, "/financas");
+    avancar(300);
+    expect(screen.getByTestId("montar-ponte")).toBeInTheDocument();
+    expect(screen.queryByTestId("montar-pronto")).toBeNull();
+    passarDaPonte();
     const postIt = esperarPostIt();
     expect(postIt).toHaveTextContent("Gastou algo hoje?");
     expect(screen.queryByTestId("montar-financas")).toBeNull();
@@ -1637,7 +1651,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
       expect(lerMissao()?.pulados).toBeUndefined();
       expect(lerMissao()?.gastoGuiado).toBeUndefined(); // reabrir não volta no tutorial
       expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "gasto_extra", acao: "ainda_nao" })]);
-      expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, d]) => d.acao)).toEqual(["resultado", "continuar", "tutorial", "nao_gastei", "olha"]);
+      expect(eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, d]) => d.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu", "tutorial", "nao_gastei", "olha"]);
       // o card QUANTO POSSO GASTAR HOJE do Dashboard: o MESMO número
       fireEvent.click(screen.getByText("DASHBOARD"));
       expect(screen.getByTestId("pode-gastar-valor")).toHaveTextContent(`R$ ${porDia}`);
@@ -1685,7 +1699,7 @@ describe("15. o 1º passo de Finanças, do fim do Montar ao 1º gasto (dono, 17/
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "olhar", alvo: "meu_mes", missao_id: id })]);
     // o passo 1 novo, do número ao 1º gasto, num evento só (sem reais): resultado → continuar → tutorial → chip → gasto → olha
     const doPasso1 = eventos.filter(([n]) => n === EV_PRIMEIRO_GASTO).map(([, d]) => d);
-    expect(doPasso1.map((d) => d.acao)).toEqual(["resultado", "continuar", "tutorial", "chip", "gasto", "olha"]);
+    expect(doPasso1.map((d) => d.acao)).toEqual(["resultado", "continuar", "ponte", "ponte_saiu", "tutorial", "chip", "gasto", "olha"]);
     for (const d of doPasso1) expect(d).toMatchObject({ missao_id: id, braco: "um_por_dia" });
     expect(doPasso1.find((d) => d.acao === "gasto")).toMatchObject({ via: "chip", ms: expect.any(Number), ms_tutorial: expect.any(Number) });
     expect(lerMissao()?.gastoGuiado).toBeUndefined(); // o gasto entrou: nada pendente

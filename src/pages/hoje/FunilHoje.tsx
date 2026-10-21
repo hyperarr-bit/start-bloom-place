@@ -23,6 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import "./funil-hoje.css";
 import { Confete, Etiqueta, GraficoPraSempre, SeloPago } from "./UpsellAnimado";
 import { DemoHoje, type ViaDemo } from "./DemoHoje";
+import { sairDeVerdade, useSegurarVoltar, varianteDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
 
 /**
  * FUNIL WEB NOVO — coreaplicativo.com.br/hoje (18/10). Só na WEB (SoNaWeb no App.tsx), noindex, sem link no site.
@@ -282,6 +284,14 @@ export function FunilHoje() {
     });
   };
 
+  /* BACK (21/10, src/lib/back-funil.ts): na OFERTA do vitalício, o voltar do navegador (1x por sessão) mostra a MESMA
+   * oferta de 27,90 em vez de sair; "Quero meu CORE" = o "Pagar com Pix" de sempre. O do Pix gerado mora no PixHoje.
+   * Só no modo vitalício (o "anual" tem outra oferta) e nunca pra quem já tem o CORE ativo. */
+  const [backOferta, setBackOferta] = useState(false);
+  const podeBack = vitalicio && !naDemo && !(user && isSubscribed && !estado.pagos.length);
+  useSegurarVoltar("hoje", "oferta", podeBack && estado.etapa === "oferta", () => setBackOferta(true));
+  const precoDoBack = valorPlano.toFixed(2).replace(".", ",");
+
   const upsell = (oferta: OfertaHoje, sim: boolean) => {
     clique(sim ? "upsell_sim" : "upsell_nao", { oferta });
     trackEvent("hoje_upsell", { oferta, acao: sim ? "aceitou" : "recusou", ...ids() });
@@ -465,9 +475,17 @@ export function FunilHoje() {
           </div>
         )}
 
+        {backOferta && e.etapa === "oferta" && (
+          <BackFolha funil="hoje" etapa="oferta" variante={varianteDoBack()} preco={precoDoBack} extra={ids()}
+            onQuero={() => { setBackOferta(false); pagar(); }}
+            onFicar={() => setBackOferta(false)}
+            onSair={() => { setBackOferta(false); sairDeVerdade(); }} />
+        )}
+
         {e.etapa === "pix" && (
           <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={vitalicio ? "CORE pra sempre" : `${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
             pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
+            backFunil={podeBack ? "hoje" : undefined}
             emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => setEstado((x) => ({ ...x, emailPix: { email, via } }))} />
         )}
 

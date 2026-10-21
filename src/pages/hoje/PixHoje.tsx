@@ -8,6 +8,8 @@ import { firePixPurchaseOnce, markPixPurchasePending } from "@/lib/purchase-trac
 import { cookiesDaMeta } from "@/pages/venda/rastreio";
 import { EMAIL_OK, abrirSessaoParaPagar, salvarEmailDaCompra, sessaoViva } from "./conta";
 import { preco, type OfertaHoje } from "./conteudo";
+import { sairDeVerdade, useSegurarVoltar, varianteDoBack, type FunilDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
 
 /**
  * O PIX NA PÁGINA DO /hoje (18/10) — o mesmo componente pro plano e pros upsells.
@@ -49,7 +51,7 @@ export function PixIcone({ size = 20 }: { size?: number }) {
   );
 }
 
-export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null }: {
+export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalvo = null, onEmailSalvo, onPix, onPago, onVoltar, ids, simular = false, fonteUrl = null, backFunil }: {
   oferta: OfertaHoje;
   valor: number;
   /** a linha embaixo do valor ("1º ano do CORE", "CORE pra sempre"…) */
@@ -72,6 +74,9 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   /** 18/10 (funil da missão): a URL que vai como source_url do Pix e da CAPI no lugar da atual (o /missao?utm… do
    *  anúncio — a página já está no módulo). Padrão null: a URL atual, como o /hoje sempre fez. */
   fonteUrl?: string | null;
+  /** BACK (21/10, src/lib/back-funil.ts): com o código na tela (e vivo), o voltar do navegador (1x por sessão) mostra
+   *  "seu Pix continua valendo" com o MESMO código. Sem a prop (upsells, funil da missão), nada muda. */
+  backFunil?: FunilDoBack;
 }) {
   const urlFonte = () => (fonteUrl || window.location.href).slice(0, 300);
   const [gerando, setGerando] = useState(false);
@@ -241,6 +246,9 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
   const resta = pixAtual ? venceEm(pixAtual) - agora : 0;
   const vencido = !!pixAtual && resta <= 0;
 
+  const [backPix, setBackPix] = useState(false);
+  useSegurarVoltar(backFunil ?? "hoje", "pix", !!backFunil && !!pixAtual && !gerando && !vencido, () => setBackPix(true));
+
   const topo = (
     <div className="fn-topo">
       {onVoltar ? <button type="button" className="fn-voltar" onClick={onVoltar}><ChevronLeft size={18} /><span>Voltar</span></button> : null}
@@ -272,6 +280,13 @@ export function PixHoje({ oferta, valor, rotulo, pix, anteriores = [], emailSalv
 
   return (
     <div className="fn-tela" data-testid="hoje-pix" data-fase={vencido ? "vencido" : "qr"} data-oferta={oferta}>
+      {backPix && backFunil && !vencido && (
+        <BackFolha funil={backFunil} etapa="pix" variante={varianteDoBack()} preco={valor.toFixed(2).replace(".", ",")}
+          codigo={pixAtual.qrCode} validade={mmss(resta)} extra={{ oferta, ...ids() }}
+          onQuero={() => { setBackPix(false); void copiar(); }}
+          onFicar={() => setBackPix(false)}
+          onSair={() => { setBackPix(false); sairDeVerdade(); }} />
+      )}
       {topo}
       <div className="fn-pix-topo">
         <small>PAGAMENTO COM PIX</small>

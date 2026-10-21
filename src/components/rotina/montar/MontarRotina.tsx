@@ -56,6 +56,7 @@ import { trocaDePasso } from "@/lib/movimento";
 import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import { useUserData } from "@/hooks/use-user-data";
 import { useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
+import { useGuardaDeToque } from "@/hooks/use-guarda-de-toque";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
@@ -174,6 +175,9 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
   const [rascunho] = useState(() => lerRascunhoRotina());
   const [onb] = useState(() => reaproveitarDoOnboarding({ get }));
   const [etapa, setEtapa] = useState<Etapa>(rascunho?.etapa ?? "acordar");
+  /** 1.0.17: o 2º toque rápido no "Continuar" cai no botão do passo seguinte (mesmo lugar) — o rodapé ignora toques
+   *  por ~450 ms depois de cada troca de passo (hooks/use-guarda-de-toque) */
+  const guardar = useGuardaDeToque(etapa);
   const [opcao, setOpcao] = useState<OpcaoAcordar | null>(rascunho ? rascunho.opcao : onb.opcao);
   const [outro, setOutro] = useState<string>((rascunho ? rascunho.outro : onb.outro) ?? "");
   const [itens, setItens] = useState<ItemId[]>(rascunho ? rascunho.itens : onb.itens);
@@ -419,8 +423,8 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
               </div>
             )}
             <div className="mrt-rodape">
-              <button type="button" className="mrt-cta" disabled={!acordar} onClick={() => irPara("itens")}>Continuar</button>
-              <button type="button" className="mrt-pular" onClick={pular}>Pular</button>
+              <button type="button" className="mrt-cta" disabled={!acordar} onClick={guardar(() => irPara("itens"))}>Continuar</button>
+              <button type="button" className="mrt-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -471,10 +475,10 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
               </div>
             )}
             <div className="mrt-rodape">
-              <button type="button" className="mrt-cta" disabled={nItens === 0} onClick={() => (comPergunta3 ? irPara("lembrete") : soNoApp ? setPopupApp(true) : montar())}>
+              <button type="button" className="mrt-cta" disabled={nItens === 0} onClick={guardar(() => (comPergunta3 ? irPara("lembrete") : soNoApp ? setPopupApp(true) : montar()))}>
                 {nItens === 0 ? "Escolha pelo menos um" : comPergunta3 ? "Continuar" : "Montar minha rotina"}
               </button>
-              <button type="button" className="mrt-pular" onClick={pular}>Pular</button>
+              <button type="button" className="mrt-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -511,7 +515,7 @@ export function MontarRotina({ origem = "modulo", onPronto, onPular, onCeder, gu
               <p className="mrt-nota" data-aviso="" aria-live="polite">As notificações estão desligadas neste celular. Dá pra ligar nos ajustes.</p>
             )}
             <div className="mrt-rodape">
-              <button type="button" className="mrt-cta" disabled={lembrete === null || pedindo} onClick={montar}>Montar minha rotina</button>
+              <button type="button" className="mrt-cta" disabled={lembrete === null || pedindo} onClick={guardar(() => montar())}>Montar minha rotina</button>
             </div>
           </>
         )}

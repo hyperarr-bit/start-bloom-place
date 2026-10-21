@@ -75,6 +75,7 @@ import {
 import { MontarFinancas, SUBIDA_DO_NUMERO_MS, LINHA_DA_CONTA_MS, CONTA_SAI_MS, PONTE_CENA_MS, type ResumoMontar } from "@/components/finance/montar/MontarFinancas";
 import { MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
 import { fraseDoFeito, porDiaNaTela, rotuloDoNumero } from "@/components/missao-doses/PassoDoDia";
+import { GUARDA_DE_TOQUE_MS } from "@/hooks/use-guarda-de-toque";
 import { CHAVE_ESTADO_MISSAO_DOSES, definirDonoDaMissao, donoDaConta, iniciarMissao, lerMissao } from "@/lib/missao-doses";
 import { CHAVE_BRACO_DIA1, _zerarUmPorDiaRemoto, registrarUmPorDiaRemoto } from "@/lib/dia1-cheio";
 import { CHAVE_SEM_GASTO } from "@/lib/acao-do-dia";
@@ -502,6 +503,54 @@ describe("a tela do número pela missão: SÓ o número (o 1º gasto é o tutori
     expect(screen.queryByTestId("montar-por-dia")).toBeNull();
     fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByText(/÷ \d+ dias/)).toBeTruthy();
+  });
+});
+
+describe("1.0.17 — toque duplo nos 'Continuar' do Montar não pula passo", () => {
+  afterEach(() => { (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = 0; });
+  const esperar = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+  const etapa = () => screen.getByTestId("montar-financas").getAttribute("data-etapa");
+  it("renda → 2 cliques no 'Continuar': o 2º cairia no 'Não tenho conta fixa' (mesmo lugar) e pularia as contas — fica nas contas; número → 2 cliques: o 2º cairia no 'Ir pro app' — fica na ponte", async () => {
+    (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = GUARDA_DE_TOQUE_MS;
+    const onPronto = vi.fn();
+    montarTela({ onPronto });
+    await esperar(GUARDA_DE_TOQUE_MS + 80); // a tela acabou de abrir
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(etapa()).toBe("contas");
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" })); // o 2º toque
+    expect(etapa()).toBe("contas");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: /^🏠 Aluguel/ }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(etapa()).toBe("cartao");
+    fireEvent.click(tela().getByRole("button", { name: "Pular" })); // o 2º toque cairia no "Pular" do cartão
+    expect(etapa()).toBe("cartao");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "Não uso cartão" }));
+    await respirar();
+    expect(etapa()).toBe("pronto");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(etapa()).toBe("ponte");
+    fireEvent.click(screen.getByTestId("montar-ponte-ir")); // o 2º toque
+    expect(onPronto).not.toHaveBeenCalled();
+    expect(etapa()).toBe("ponte");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(screen.getByTestId("montar-ponte-ir"));
+    expect(onPronto).toHaveBeenCalledTimes(1);
+  });
+  it("a guarda é por TEMPO (nunca espera animação): sem requestAnimationFrame nenhum, o botão volta a valer sozinho", async () => {
+    (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = GUARDA_DE_TOQUE_MS;
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0); // nenhum quadro roda
+    montarTela();
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "R$ 2 a 4 mil" }));
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "Não tenho conta fixa" }));
+    expect(etapa()).toBe("cartao");
+    raf.mockRestore();
   });
 });
 

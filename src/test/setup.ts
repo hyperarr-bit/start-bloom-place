@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom";
 import { afterAll } from "vitest";
 
+/* 1.0.17 — a guarda do toque duplo dos Montar (hooks/use-guarda-de-toque) ignora toques por ~450 ms depois de cada troca
+ * de passo; os fluxos dos testes clicam em sequência em < 1 ms. Zerada aqui; o teste da guarda liga ela. */
+(globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = 0;
+
 /**
  * REDE EXTERNA BLOQUEADA NOS TESTES (28/09). O cliente do Supabase aponta pra
  * PRODUÇÃO (endereço fixo em integrations/supabase/client) e o trackEvent

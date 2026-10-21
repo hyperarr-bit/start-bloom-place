@@ -72,6 +72,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
+import { useGuardaDeToque } from "@/hooks/use-guarda-de-toque";
 import { reais } from "@/lib/dinheiro";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { camposDaMissaoNosEventos, eventoDaMissao } from "@/lib/missao-doses";
@@ -252,6 +253,9 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
   /** 1.0.17: a troca de passo desliza pro lado certo (avançar → da direita; Voltar → da esquerda) */
   const direcao = useRef(1);
   const voltarPara = (e: Etapa) => { direcao.current = -1; setEtapa(e); };
+  /** 1.0.17: o 2º toque rápido no "Continuar" caía no "Continuar" do passo seguinte (mesmo lugar) e pulava as contas —
+   *  os botões do rodapé ignoram toques por ~450 ms depois de cada troca de passo (hooks/use-guarda-de-toque) */
+  const guardar = useGuardaDeToque(etapa);
   const reduzirMov = !!useReducedMotion();
   const [verConta, setVerConta] = useState(false);
   const [faixa, setFaixa] = useState<string | null>(retomada?.faixa ?? rascunho?.faixa ?? null);
@@ -536,8 +540,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               </div>
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" disabled={renda <= 0} onClick={() => irPara("contas")}>Continuar</button>
-              <button type="button" className="mf-pular" onClick={pular}>Pular</button>
+              <button type="button" className="mf-cta" disabled={renda <= 0} onClick={guardar(() => irPara("contas"))}>Continuar</button>
+              <button type="button" className="mf-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -587,10 +591,10 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               </div>
             )}
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={() => irPara("cartao")}>
+              <button type="button" className="mf-cta" onClick={guardar(() => irPara("cartao"))}>
                 {nValidas > 0 ? "Continuar" : "Não tenho conta fixa"}
               </button>
-              <button type="button" className="mf-pular" onClick={pular}>Pular</button>
+              <button type="button" className="mf-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -650,8 +654,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               </div>
             )}
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" disabled={!cartaoCompleto(cartao)} onClick={() => montar()}>Ver quanto posso gastar</button>
-              <button type="button" className="mf-pular" onClick={() => montar({ ...cartao, usa: null }, true)}>Pular</button>
+              <button type="button" className="mf-cta" disabled={!cartaoCompleto(cartao)} onClick={guardar(() => montar())}>Ver quanto posso gastar</button>
+              <button type="button" className="mf-pular" onClick={guardar(() => montar({ ...cartao, usa: null }, true))}>Pular</button>
             </div>
           </>
         )}
@@ -728,7 +732,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está nas suas Finanças.</p>}
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={continuar}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
+              <button type="button" className="mf-cta" onClick={guardar(continuar)}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
             </div>
           </>
         )}
@@ -743,8 +747,8 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               <CenaDaPonte porDia={resultado.porDia} apertado={apertado || !(resultado.porDia > 0)} parado={reduzirMov || menosMovimento()} />
             </div>
             <div className="mf-rodape">
-              <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={() => sairDaPonte("ir_pro_app")}>Ir pro app</button>
-              <button type="button" className="mf-pular" data-testid="montar-ponte-nao-gastei" onClick={() => sairDaPonte("ainda_nao")}>Ainda não gastei</button>
+              <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={guardar(() => sairDaPonte("ir_pro_app"))}>Ir pro app</button>
+              <button type="button" className="mf-pular" data-testid="montar-ponte-nao-gastei" onClick={guardar(() => sairDaPonte("ainda_nao"))}>Ainda não gastei</button>
             </div>
           </>
         )}

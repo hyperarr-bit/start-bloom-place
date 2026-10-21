@@ -177,8 +177,19 @@ export function useDigitando(): boolean {
     /* 1.0.17: o campo do "+ Outro" (EscolhaRapida) mora DENTRO do balão — escrever nele não é "digitando no módulo": o
        post-it fica na tela (sumir com ele seria sumir com o próprio campo). */
     const doBalao = (el: unknown) => el instanceof Element && !!el.closest("[data-escolha-campo]");
-    const conferir = () => { const el = document.activeElement; setDigitando(!doBalao(el) && (ehCampo(el) || tecladoAberto())); };
-    const entrou = (e: FocusEvent) => { if (ehCampo(e.target) && !doBalao(e.target)) setDigitando(true); };
+    /* 20/10 (caça aos bugs de aparelho): o teclado aberto É o do campo do balão — no "OK" do teclado (ou no
+       Cancelar/Adicionar) o foco sai NA HORA, mas o teclado leva ~250 ms descendo com a área visível ainda pequena; contar
+       isso como "digitando no módulo" tirava o balão da tela e ele voltava REMONTADO: campo fechado, texto perdido. */
+    let tecladoDoBalao = false;
+    const conferir = () => {
+      const el = document.activeElement;
+      if (!tecladoAberto()) tecladoDoBalao = false;
+      setDigitando(!doBalao(el) && (ehCampo(el) || (tecladoAberto() && !tecladoDoBalao)));
+    };
+    const entrou = (e: FocusEvent) => {
+      if (doBalao(e.target)) { tecladoDoBalao = true; return; }
+      if (ehCampo(e.target)) { tecladoDoBalao = false; setDigitando(true); }
+    };
     // o Safari demora um instante pra devolver a área visível depois do blur
     const saiu = () => { window.setTimeout(conferir, 80); window.setTimeout(conferir, 400); };
     conferir();

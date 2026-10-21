@@ -77,6 +77,7 @@ import { CHAVE_DIAS_ANOTADOS, contaComoAnotacao, registrarDia, temConteudo } fro
 import { CHAVE_SEM_GASTO } from "@/lib/acao-do-dia";
 import { EV_PRIMEIRO_GASTO } from "@/lib/montar-financas";
 import { localDayKey } from "@/lib/utils";
+import { instalarTecladoIphone, type TecladoIphone } from "./helpers/teclado-iphone";
 
 /* ------------------------------------------------------------ o aparelho de mentira (o mesmo do dia1-cheio.test) */
 
@@ -2658,5 +2659,92 @@ describe("20. boas-vindas: o 'viu' nos dois braços e 'Seus N dias grátis' só 
     expect(fraseDoAcesso(7)).toBe("Seus 7 dias grátis começaram");
     expect(fraseDoAcesso(1)).toBe("Seu 1 dia grátis começou");
     expect(fraseDoAcesso(null)).toBe("Seu acesso começou");
+  });
+});
+
+/* ------------------------------------------------------------ 21: o TECLADO DO iPHONE DE VERDADE no "+ Outro" do post-it */
+
+describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro' do post-it sobrevive ao teclado abrir, FECHAR e à troca de lugar do post-it", () => {
+  let teclado: TecladoIphone | null = null;
+  afterEach(() => { teclado?.desinstalar(); teclado = null; });
+  /** o alvo ("+ Novo gasto") mais embaixo na tela: com o teclado aberto ele fica DEBAIXO do teclado */
+  const alvoEmbaixo = (top = 600) => vi.mocked(Element.prototype.getBoundingClientRect).mockImplementation(function (this: Element) {
+    return (this.matches?.("header.sticky, .demo-tour-nav")
+      ? { top: 0, left: 0, width: 390, height: 56, bottom: 56, right: 390, x: 0, y: 0, toJSON: () => ({}) }
+      : { top, left: 10, width: 300, height: 48, bottom: top + 48, right: 310, x: 10, y: top, toJSON: () => ({}) }) as DOMRect;
+  });
+  const dose = () => {
+    vi.stubEnv("VITE_V14_LOJA", "1");
+    ligarUmPorDia("on");
+    missaoA({});
+    const store = montarStore({});
+    montar(store, "/financas");
+    esperarPostIt();
+    return store;
+  };
+  const postIt = () => screen.getAllByTestId("demo-guia-postit").at(-1)!;
+  const abrirOutro = () => {
+    fireEvent.click(within(postIt()).getByTestId("demo-guia-outro"));
+    return within(postIt()).getByTestId("demo-guia-texto") as HTMLInputElement;
+  };
+
+  it("escreveu o nome, tocou no 'OK' do teclado (o foco sai ANTES de o teclado descer): o post-it NÃO some nem remonta — o campo segue aberto com o que ela escreveu", () => {
+    const store = dose();
+    alvoEmbaixo();
+    teclado = instalarTecladoIphone();
+    const campo = abrirOutro();
+    teclado.abrir(campo);
+    fireEvent.change(campo, { target: { value: "Padaria" } });
+    avancar(900);
+    expect(within(postIt()).getByTestId("demo-guia-texto")).toBe(campo);
+    // o "OK" da barra do teclado: o foco sai na hora, a área visível ainda pequena por ~250 ms, o iPhone desfaz a rolagem
+    teclado.soltarFoco();
+    avancar(100);
+    expect(screen.queryAllByTestId("demo-guia-postit").length).toBeGreaterThan(0); // o post-it não pisca fora
+    avancar(250);
+    teclado.assentar();
+    avancar(900);
+    const agora = within(postIt()).getByTestId("demo-guia-texto") as HTMLInputElement;
+    expect(agora).toBe(campo); // o MESMO campo (não remontou fechado)
+    expect(agora.value).toBe("Padaria");
+    expect(screen.queryByTestId("missao-doses-postit-doca")).toBeNull();
+    fireEvent.change(within(postIt()).getByTestId("demo-guia-reais"), { target: { value: "18" } });
+    fireEvent.click(within(postIt()).getByTestId("demo-guia-adicionar"));
+    expect(store.dados["finance-expenses"]).toEqual([expect.objectContaining({ description: "Padaria", value: 18 })]);
+  });
+
+  it("com o campo aberto, o '+ Novo gasto' some e volta (o módulo redesenha): o post-it solto NÃO troca pelo do anel enquanto ela escreve (trocar = campo fechado e teclado caindo)", () => {
+    const store = dose();
+    teclado = instalarTecladoIphone();
+    act(() => { store.set("__semBotao", true); });
+    avancar(300); avancar(3000);
+    expect(screen.getByTestId("missao-doses-postit-solto")).toBeInTheDocument();
+    const campo = abrirOutro();
+    teclado.abrir(campo);
+    fireEvent.change(campo, { target: { value: "Farmácia" } });
+    act(() => { store.set("__semBotao", false); });
+    avancar(2000);
+    const agora = within(postIt()).getByTestId("demo-guia-texto") as HTMLInputElement;
+    expect(agora).toBe(campo);
+    expect(agora.value).toBe("Farmácia");
+    fireEvent.change(within(postIt()).getByTestId("demo-guia-reais"), { target: { value: "32,50" } });
+    fireEvent.click(within(postIt()).getByTestId("demo-guia-adicionar"));
+    expect(store.dados["finance-expenses"]).toEqual([expect.objectContaining({ description: "Farmácia", value: 32.5 })]);
+  });
+
+  it("tocou em 'Cancelar' com o teclado aberto: o post-it não pisca (sai e volta) enquanto o teclado desce", () => {
+    dose();
+    teclado = instalarTecladoIphone();
+    const campo = abrirOutro();
+    teclado.abrir(campo);
+    const antes = postIt();
+    fireEvent.click(within(postIt()).getByText("Cancelar"));
+    avancar(100);
+    expect(screen.queryAllByTestId("demo-guia-postit").length).toBeGreaterThan(0);
+    avancar(400);
+    expect(screen.queryAllByTestId("demo-guia-postit").length).toBeGreaterThan(0);
+    teclado.assentar();
+    avancar(500);
+    expect(postIt()).toBe(antes); // o mesmo post-it (não remontou)
   });
 });

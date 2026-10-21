@@ -762,6 +762,15 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * em 2º plano 67× e tempo 36×): o post-it com os chips NUNCA some — sem âncora ele fica solto (os chips gravam
    * sozinhos) e o app segue procurando o alvo; achou, o anel volta sozinho (nada de depender do ⌖). Sem desistir:
    * a cada 750 ms no começo, depois a cada 2 s, enquanto o passo estiver na tela; voltar do 2º plano procura na hora. */
+  /* 20/10: o campo do "+ Outro" do post-it ABERTO (com foco ou não — no "OK" do teclado o foco sai antes de o teclado
+   * descer, com a área visível ainda pequena): enquanto ela escreve, o post-it não troca de lugar (anel ↔ colado ↔
+   * solto são post-its DIFERENTES — trocar remonta, fecha o campo e leva o que ela escreveu). */
+  const focoNoCampoDoPostIt = () => {
+    try {
+      return !!(document.activeElement as Element | null)?.closest?.("[data-escolha-campo]")
+        || !!document.querySelector('[data-testid="demo-guia-postit"] [data-escolha-campo]');
+    } catch { return false; }
+  };
   const [voltouDoFundo, setVoltouDoFundo] = useState(0);
   useEffect(() => {
     const aoVoltar = () => { if (document.visibilityState === "visible" && faseRef.current === "anotar") setVoltouDoFundo((x) => x + 1); };
@@ -773,6 +782,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
     let tentativas = 0;
     let t = 0;
     const tentar = () => {
+      // escrevendo no "+ Outro" do post-it solto: o anel espera o campo fechar (o post-it do anel é outro — trocaria o campo)
+      if (focoNoCampoDoPostIt()) { t = window.setTimeout(tentar, 750); return; }
       tentativas += 1;
       const el = reacharAlvo();
       if (el) {
@@ -819,9 +830,6 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
    * lugar (sem rolar a tela dela). Só depois de o anel ter aparecido (a rolagem dele até o alvo não conta). */
   const [anelFora, setAnelFora] = useState(false);
   const anelForaRef = useRef(false);
-  const focoNoCampoDoPostIt = () => {
-    try { return !!(document.activeElement as Element | null)?.closest?.("[data-escolha-campo]"); } catch { return false; }
-  };
   const anelApareceu = useRef(false);
   /** só uma rolagem DEPOIS de o anel aparecer recolhe ele (a rolagem dele até o alvo, e redesenho sem rolar, não) */
   const rolouDesdeOAnel = useRef(false);

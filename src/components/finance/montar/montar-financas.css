@@ -151,12 +151,12 @@ button.mf-pular { width: 100%; padding: 12px 0 6px; background: none; border: 0;
 .mf-pronto[data-de-montando] + .mf-rodape { animation: mf-aparece .3s ease-out .3s both; }
 @keyframes mf-aparece { from { opacity: 0; } }
 
-/* 1.0.17 (dono 20/10, ponte "versão 1"): em cima a frase cinza + o título; no meio, centralizada, a CENA ligada por
+/* 1.0.17 (dono 20/10, ponte "versão 1"): em cima a frase cinza + o título; logo abaixo (como no mockup), centralizada, a CENA ligada por
    tracejado vertical (o número → o café → o que sobra hoje); os botões embaixo. Entra peça por peça (~1,5 s). */
 .mf-ponte { flex: 1 0 auto; display: flex; flex-direction: column; padding: 30px 24px 8px; }
 .mf-ponte-viu { font-size: 16px; color: hsl(var(--muted-foreground)); line-height: 1.4; }
 .mf-ponte h2 { font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 8px; }
-.mf-ponte-cena { margin: auto 0; padding: 28px 0 12px; display: flex; flex-direction: column; align-items: center; }
+.mf-ponte-cena { margin: clamp(36px, 8.5vh, 76px) 0 auto; padding: 0 0 12px; display: flex; flex-direction: column; align-items: center; }
 .mf-ponte-pilula { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 999px; background: var(--mf-cartao); border: 1px solid var(--mf-cartao-borda); color: var(--mf-ambar-texto); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mf-ponte-pilula svg { color: var(--mf-ambar); flex-shrink: 0; }
 .mf-ponte-pilula b { font-weight: 800; color: hsl(var(--foreground)); }

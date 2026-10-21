@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { MODULOS, eventoDaMissao, passoPendente, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { MODULOS, eventoDaMissao, passoPendente, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { localDayKey } from "@/lib/utils";
 import { entrada, MOV } from "@/lib/movimento";
 import { EscolhaDeHora } from "./EscolhaDeHora";
 import "./missao-doses.css";
@@ -33,6 +34,12 @@ export function fraseDeAmanha(modulo: ModuloDaMissao | null | undefined, n = 2):
   return `Amanhã: ${MODULOS[modulo].nome}.`;
 }
 
+/** 1.0.17 (item 7): "Dia 1 feito 💛" — o dia da dose feita hoje (sem ponto final), o fechamento do dia. */
+export function tituloDoDiaFeito(missao: EstadoMissaoDoses, hoje: string = localDayKey()): string {
+  const n = ([3, 2, 1] as DiaDaMissao[]).find((d) => missao.feitos[d]?.dia === hoje) ?? 1;
+  return `Dia ${n} feito 💛`;
+}
+
 export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   missao: EstadoMissaoDoses;
   aoCombinar: (l: Lembrete) => void;
@@ -49,16 +56,16 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
     if (!soNoApp) trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null, sugerida: hora }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (soNoApp) return <BaixarAppPopup contexto="plano_amanha" depoisDaOferta onAgoraNao={aoSemLembrete} />;
+  if (soNoApp) return <BaixarAppPopup contexto="plano_amanha" depoisDaOferta onAgoraNao={aoSemLembrete} antes={tituloDoDiaFeito(missao)} />;
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
       role="dialog" aria-modal="true" aria-label="Plano de amanhã" data-camada-guia="missao-doses-plano" data-testid="plano-amanha-a"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={entrada(reduzir, MOV.base)}>
       <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, 0.08)}
         className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
-        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight" data-testid="plano-amanha-a-titulo">
-          {fraseDeAmanha(proxima?.modulo, proxima?.n)}
-        </p>
+        {/* 1.0.17 (item 7): o fechamento do dia mora AQUI (a festa da dose 1 comemora o módulo; o tour vem no meio) */}
+        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight" data-testid="plano-amanha-a-titulo">{tituloDoDiaFeito(missao)}</p>
+        <p className="text-[16px] font-extrabold leading-snug mt-1.5" data-testid="plano-amanha-a-amanha">{fraseDeAmanha(proxima?.modulo, proxima?.n).replace(/\.$/, "")}</p>
         <p className="text-[15px] text-muted-foreground mt-1">Que horas te lembro?</p>
         <div className="mt-4">
           <EscolhaDeHora valor={hora} aoMudar={(h) => setHora(h)} comSem={false} testid="plano-a-hora" />

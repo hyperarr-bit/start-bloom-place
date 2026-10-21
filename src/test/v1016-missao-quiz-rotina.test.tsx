@@ -178,9 +178,9 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
       if (entendi) { expect(braco).toBe("B"); fireEvent.click(entendi); }
       await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toBeTruthy(), { timeout: 12_000 });
       if (braco === "A") {
-        expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito.");
+        expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent(/^Rotina pronta 💛$/); // 1.0.17 (item 7): a dose 1 comemora o módulo
         expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent("“Beber água” está na sua Rotina.");
-        expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent(/^Amanhã: Finanças\.$/); // 1.0.17: sem segundos
+        expect(screen.queryByTestId("missao-doses-amanha")).toBeNull(); // o "Amanhã: Finanças" mora no plano de amanhã (item 7)
       } else {
         expect(screen.getByTestId("missao-doses-agora-o")).toHaveTextContent("Agora as Finanças — 10 s");
       }
@@ -210,7 +210,7 @@ describe("a 1ª dose da Rotina = 'Rotina pronta em 3 toques' (os dois braços, c
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(within(linhaDeHoje().children[1] as HTMLElement).getByRole("checkbox"));
     await respirar();
-    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Dia 1 feito."), { timeout: 12_000 });
+    await waitFor(() => expect(screen.getByTestId("missao-doses-festa")).toHaveTextContent("Rotina pronta 💛"), { timeout: 12_000 }); // 1.0.17 (item 7): a dose 1 comemora o módulo
     expect(lerMissao()?.feitos[1]?.rotulo).toBe("Beber água");
   });
 

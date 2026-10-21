@@ -269,7 +269,7 @@ describe("braço A (1.0.16: uma dose por dia) + `variante: 'A'`", () => {
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "A", prototipo: "app" })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Dia 1 feito.");
+    expect(festa).toHaveTextContent(/(pronta|pronto|prontas|prontos) 💛/); // 1.0.17 (item 7): a dose 1 comemora o módulo
     expect(screen.getByTestId("missao-doses-continuar")).toBeInTheDocument();
     expect(screen.queryByTestId("missao-doses-bora-proxima")).toBeNull();
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();

@@ -9,7 +9,7 @@ import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO
 import { MODELOS as MODELOS_DE_TREINO, aplicarModelo } from "@/lib/treino-plano";
 import { montarTreinoProprio } from "@/lib/intro-modulo-acoes";
 import { trackEvent } from "@/lib/analytics";
-import { marcarCartoesVistos } from "@/lib/tour-home";
+import { deveMostrarTourHome, marcarCartoesVistos, tourFeito } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, useMarcaDaTelaDeslocada, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -1557,6 +1557,17 @@ export const legendaDoAdesivo = (a: AdesivoDaDose | null, extras: Array<{ nome: 
   return `Adesivos novos: ${a.nome} e mais ${extras.length}`;
 };
 
+/** 1.0.17 (item 7, dono 20/10): a festa da dose 1 do braço A comemora o MÓDULO ("Finanças pronta 💛"), não o dia — logo
+ *  depois vem o popup "ÚLTIMO PASSO DE HOJE" + o tour, e "Dia 1 feito" ali contradizia. O "Dia 1 feito 💛" mora no
+ *  "Plano de amanhã" (PlanoDeAmanhaA), a última coisa do dia. */
+const PRONTO_DO_MODULO: Record<ModuloDaMissao, string> = {
+  financas: "pronta", rotina: "pronta", saude: "pronta", treino: "pronto", dieta: "pronta", desenvolvimento: "prontas",
+  hiperfoco: "pronto", estudos: "prontos", carreira: "pronta", biblioteca: "pronta", casa: "pronta", beleza: "pronta",
+  viagens: "prontas", relacionamentos: "prontas", pet: "pronto", detox: "pronto",
+};
+export const tituloDoModuloPronto = (modulo: ModuloDaMissao): string => `${MODULOS[modulo].nome} ${PRONTO_DO_MODULO[modulo]} 💛`;
+export const FALTA_A_HOME = "Falta só conhecer sua Home";
+
 /** 1.0.17: a folha da comemoração sai DESCENDO (base, 280 ms) antes de a missão trocar de tela — nunca some no seco. */
 export const SAIDA_DA_FESTA_MS = MOV_MS.base;
 
@@ -1572,6 +1583,12 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
   const frase = fraseDoFeito(modulo, rotulo, porDiaAgora);
   void hoje;
+  /* 1.0.17 (item 7): a dose 1 comemora o módulo; o dia fecha no "Plano de amanhã". Com o tour da Home por vir, a linha
+     de baixo é "Falta só conhecer sua Home" (e o botão leva pra ela); sem tour, o plano entra logo depois. */
+  const primeiraDose = n === 1 && !!proximo;
+  const { get: lerDados } = useUserData();
+  const { user: dono } = useAuth();
+  const [tourPorVir] = useState(() => { try { return primeiraDose && !tourFeito(lerDados) && deveMostrarTourHome((dono as { created_at?: string } | null)?.created_at); } catch { return false; } });
   // 18/10 (funil da missão na WEB): o "Te lembro às" do dia 2 sai — o "Combinado" abre o pop-up "Baixe o app pra
   // receber os lembretes" e o "Agora não" combina "sem lembrete" (o navegador não manda notificação)
   const [soNoApp] = useState(lembretesSoNoApp);
@@ -1614,7 +1631,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   const fechaMissao = n === 3 || !proximo;
   return createPortal(
     <motion.div className="fixed inset-0 z-[230] flex items-end justify-center px-4 pt-10 overflow-y-auto" style={{ background: "rgba(15,12,20,.45)", paddingBottom: "calc(var(--app-safe-bottom, 0px) + 20px)" }}
-      role="dialog" aria-modal="true" aria-label={`Dia ${n} feito`}
+      role="dialog" aria-modal="true" aria-label={primeiraDose ? tituloDoModuloPronto(modulo) : `Dia ${n} feito`}
       data-camada-guia="missao-doses-festa" data-testid="missao-doses-festa" data-dia={n} data-braco="A" data-saindo={saindo ? "" : undefined}
       initial={{ opacity: 0 }} animate={{ opacity: saindo ? 0 : 1 }} exit={{ opacity: 0 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.base)}>
       <motion.div initial={reduzir ? false : { y: 40, opacity: 0 }} animate={saindo && !reduzir ? { y: "110%", opacity: 1 } : { y: 0, opacity: 1 }} transition={saindo ? saida(reduzir) : entrada(reduzir, MOV.calmo, 0.05)}
@@ -1628,10 +1645,12 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
         <div className="flex items-center gap-1.5" role="img" aria-label={`${n} de 3 dias feitos`}>
           {[1, 2, 3].map((i) => <Quadradinho key={i} marcado={i <= n} tam={16} />)}
         </div>
-        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight mt-2.5 pr-16" data-testid="missao-doses-festa-titulo">Dia {n} feito.</p>
+        <p className="text-[24px] font-black tracking-[-0.02em] leading-tight mt-2.5 pr-16" data-testid="missao-doses-festa-titulo">{primeiraDose ? tituloDoModuloPronto(modulo) : `Dia ${n} feito.`}</p>
         {n >= 2 && seq.dias >= 2 && <p className="text-[14px] font-bold mt-1" data-testid="missao-doses-sequencia">🔥 {seq.dias} dias seguidos</p>}
         <p className="text-[14px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-festa-texto">{frase}</p>
-        {proximo && (
+        {primeiraDose ? (
+          tourPorVir && <p className="text-[16px] font-extrabold leading-snug mt-4" data-testid="missao-doses-falta-home">{FALTA_A_HOME}</p>
+        ) : proximo && (
           <p className="text-[16px] font-extrabold leading-snug mt-4" data-testid="missao-doses-amanha">Amanhã: {proximo.nome}.</p>
         )}
         {n === 2 && proximo && !soNoApp && (
@@ -1654,7 +1673,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
           </button>
         ) : (
           <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-continuar" onClick={() => sair(() => aoFecharDia?.())}>
-            Até amanhã
+            {primeiraDose ? (tourPorVir ? "Conhecer minha Home" : "Continuar") : "Até amanhã"}
           </button>
         )}
         <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />

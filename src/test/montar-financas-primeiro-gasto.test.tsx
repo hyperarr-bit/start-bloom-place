@@ -768,16 +768,16 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.queryByTestId("missao-doses-olhar-tempo")).toBeNull(); // sem "Olha · 1 de 2"
     // a festa entra sozinha
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
-    // 1.0.17 (dono: "a festa tem informação demais"): "Dia 1 feito." + 1 linha do que ficou + "Amanhã: Rotina." + 1 botão
-    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    // 1.0.17 (item 7): a dose 1 comemora o módulo — "Finanças pronta 💛" + 1 linha do que ficou + 1 botão (o dia fecha no plano)
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent(/^Finanças pronta 💛$/);
     /* 1.0.17 (prints do dono: "R$ 104 por dia" no número e "R$ 103 por dia" na festa): a festa diz o MESMO número do
        número, da ponte e do riscado do "Seu mês" — não a média refeita com o café (aqui 115,6 → 116 antes, 114,9 → 115 depois) */
     expect(numeroGrande).not.toBe(doMontar);
     expect(screen.getByTestId("missao-doses-festa-texto")).toHaveTextContent(`R$ ${doMontar} por dia, já nas suas Finanças.`);
     expect(lerMissao()?.feitos[1]?.rotulo).toBe(`Pode gastar R$ ${doMontar} por dia`);
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
-    expect(screen.getByTestId("missao-doses-amanha")).toHaveTextContent("Amanhã: Rotina.");
-    expect(screen.getByTestId("missao-doses-continuar")).toHaveTextContent("Até amanhã");
+    expect(screen.queryByTestId("missao-doses-amanha")).toBeNull(); // "Amanhã: Rotina" mora no plano de amanhã (item 7)
+    expect(screen.getByTestId("missao-doses-continuar")).toHaveTextContent(/^(Conhecer minha Home|Continuar)$/);
     // o card QUANTO POSSO GASTAR HOJE do Dashboard de sempre: o número grande de sempre + a linha com a MESMA sobra do balão
     expect(await cardDoDashboard()).toEqual({ numero: numeroGrande, linha: linhaEsperada(noBalao, 12, doMontar) });
     // os eventos do passo 1, na ordem, sem reais
@@ -814,7 +814,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.getByTestId("missao-doses-olhar-pode")).toHaveTextContent(`Dá pra gastar hoje`);
     expect(Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"))).toBe(doMontar);
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
-    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent(/(pronta|pronto|prontas|prontos) 💛/); // 1.0.17 (item 7): a dose 1 comemora o módulo
     expect(screen.queryByTestId("missao-doses-gasto-extra")).toBeNull();
     expect(await cardDoDashboard()).toEqual({ numero: doMontar, linha: null }); // sem gasto hoje: o card de sempre, sem a linha
     expect(lerMissao()?.feitos[1]).toBeDefined();
@@ -842,7 +842,7 @@ describe("o fluxo inteiro no Finanças de verdade: número → tutorial no formu
     expect(screen.getByTestId("missao-doses-olhar-titulo")).toHaveTextContent("Dia sem gasto ✓");
     expect(Number(screen.getByTestId("missao-doses-olhar-pode").getAttribute("data-valor"))).toBe(doMontar);
     expect(await ate(() => !!screen.queryByTestId("missao-doses-festa"), 5000)).toBe(true);
-    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent("Dia 1 feito.");
+    expect(screen.getByTestId("missao-doses-festa-titulo")).toHaveTextContent(/(pronta|pronto|prontas|prontos) 💛/); // 1.0.17 (item 7): a dose 1 comemora o módulo
     expect(lerMissao()?.feitos[1]).toBeDefined();
     expect(lerMissao()?.pulados).toBeUndefined();
     expect(lerMissao()?.gastoGuiado).toBeUndefined();

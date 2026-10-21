@@ -363,7 +363,11 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       timers.push(window.setTimeout(assentar, 200));
     };
     timers.push(window.setTimeout(assentar, rapido ? 40 : 300));
-    if (duracao != null) timers.push(window.setTimeout(() => sair("timeout"), duracao));
+    /* 20/10 (caça aos bugs de aparelho): escrevendo no "+ Outro" do balão, o anel não sai pelo tempo nem pelo 2º plano
+     * (ela saiu pra ver o valor no banco) — sair troca o balão por outro post-it: o campo fecha e leva o que ela escreveu. */
+    const escrevendoNoBalao = () => !!balaoRef.current?.querySelector("[data-escolha-campo]");
+    const expirar = () => { if (escrevendoNoBalao()) { timers.push(window.setTimeout(expirar, 5000)); return; } sair("timeout"); };
+    if (duracao != null) timers.push(window.setTimeout(expirar, duracao));
 
     // Saídas passivas — NUNCA preventDefault: a demo continua 100% tocável.
     const aoTocar = (e: Event) => {
@@ -380,7 +384,7 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
       }
       sair("toque_fora");
     };
-    const aoEsconder = () => { if (document.visibilityState === "hidden") sair("segundo_plano"); };
+    const aoEsconder = () => { if (document.visibilityState === "hidden" && !escrevendoNoBalao()) sair("segundo_plano"); };
     document.addEventListener("pointerdown", aoTocar, { passive: true, capture: true });
     document.addEventListener("visibilitychange", aoEsconder);
     window.addEventListener("resize", aoRolar);

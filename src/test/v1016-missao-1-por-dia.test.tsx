@@ -47,7 +47,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { getSessio
 import { UserDataContext, useUserData } from "@/hooks/use-user-data";
 import { purgeLocalUserCache } from "@/hooks/use-auth";
 import { MissaoDosesNaWeb, areaDaMissao } from "@/components/missao-doses/MissaoDosesNaWeb";
-import { Anel, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
+import { Anel, PostItDaMissao, TOLERANCIA_ANCORA_MS } from "@/components/demo-guiada/pecas";
 import {
   CHAVE_ESTADO_MISSAO_DOSES, EVENTO_MISSAO_DOSES, conviteDoDiaDevido, doseDeHojeDevida, doseLiberadaHoje, ehUmPorDia, eventoDaMissao, iniciarMissao, lerMissao, missaoEmAndamento, modulosPadrao, precisaPlanoA,
   missaoDoDiaEmCena, moduloDaMissaoHoje, definirDonoDaMissao, donoDaConta, marcarDoseNaTela, doseNaTela, CHAVE_MISSAO_NA_CONTA,
@@ -2730,6 +2730,45 @@ describe("21. TECLADO DE VERDADE (20/10, caça aos bugs de aparelho): o '+ Outro
     fireEvent.change(within(postIt()).getByTestId("demo-guia-reais"), { target: { value: "32,50" } });
     fireEvent.click(within(postIt()).getByTestId("demo-guia-adicionar"));
     expect(store.dados["finance-expenses"]).toEqual([expect.objectContaining({ description: "Farmácia", value: 32.5 })]);
+  });
+
+  it("escreveu 'Padaria' e saiu do app pra ver o valor no banco (2º plano): ao voltar, o campo segue aberto com o que ela escreveu", () => {
+    const store = dose();
+    teclado = instalarTecladoIphone();
+    const campo = abrirOutro();
+    teclado.abrir(campo);
+    fireEvent.change(campo, { target: { value: "Padaria" } });
+    // o app vai pro 2º plano: o teclado some junto
+    teclado.soltarFoco();
+    teclado.assentar();
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    avancar(5000);
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    avancar(1000);
+    const agora = within(postIt()).getByTestId("demo-guia-texto") as HTMLInputElement;
+    expect(agora.value).toBe("Padaria");
+    fireEvent.change(within(postIt()).getByTestId("demo-guia-reais"), { target: { value: "18" } });
+    fireEvent.click(within(postIt()).getByTestId("demo-guia-adicionar"));
+    expect(store.dados["finance-expenses"]).toEqual([expect.objectContaining({ description: "Padaria", value: 18 })]);
+  });
+
+  it("o Anel com tempo (os tutoriais: 60 s) não sai pelo tempo enquanto ela escreve no '+ Outro' do balão", () => {
+    const alvo = document.createElement("button");
+    document.body.appendChild(alvo);
+    const saidas: string[] = [];
+    render(<Anel alvo={alvo} fixo interativo duracao={60_000} aoSair={(m) => saidas.push(m)} testid="anel-x"
+      balao={<PostItDaMissao pergunta="O que você comeu?" chips={[{ emoji: "🍞", nome: "Pão" }]} aoChip={() => {}} outro={{ placeholder: "Escreva aqui", aoEscolher: () => {} }} />} />);
+    avancar(900);
+    avancar(50_000);
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    fireEvent.change(screen.getByTestId("demo-guia-texto"), { target: { value: "Tapioca" } });
+    avancar(15_000);
+    expect(saidas).toEqual([]);
+    expect((screen.getByTestId("demo-guia-texto") as HTMLInputElement).value).toBe("Tapioca");
+    // (fechar o campo devolve o tempo: no jsdom a animação de saída do campo não termina com o relógio falso — não dá pra conferir aqui)
+    alvo.remove();
   });
 
   it("tocou em 'Cancelar' com o teclado aberto: o post-it não pisca (sai e volta) enquanto o teclado desce", () => {

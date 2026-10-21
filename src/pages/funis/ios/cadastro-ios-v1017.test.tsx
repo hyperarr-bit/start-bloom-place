@@ -64,6 +64,8 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import { SignupIOS, LiberandoIOS } from "./CadastroIOS";
+import { instalarTecladoIphone } from "@/test/helpers/teclado-iphone";
+import { quantoSubir } from "@/hooks/use-botao-acima-do-teclado";
 import { trackEvent } from "@/lib/analytics";
 import { acessoAnteriorDaConta, URL_ASSINATURAS_APPLE } from "@/lib/conta-ja-tinha-acesso";
 import { iniciarMissao, CHAVE_ESTADO_MISSAO_DOSES } from "@/lib/missao-doses";
@@ -145,6 +147,44 @@ describe("cadastro por e-mail no iPhone (1.0.17)", () => {
     const md = createEvent.mouseDown(botao);
     fireEvent(botao, md);
     expect(md.defaultPrevented).toBe(false);
+  });
+});
+
+describe("iPhone SE com o teclado de verdade (1.0.17)", () => {
+  it("teclado no 'Seu nome' (339 px visíveis): o 'Salvar meu acesso' ficava meio atrás da barra do teclado — a página sobe o que falta e o campo continua à vista", () => {
+    vi.useFakeTimers();
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 328 });
+    let rolado = 0;
+    const scrollBy = vi.spyOn(window, "scrollBy").mockImplementation(((_x: number, y: number) => { rolado += y; }) as typeof window.scrollBy);
+    // as posições do print (se1-cal-texto): "Seu nome" 145–195, o botão 325–372 (com a página já rolada pelo iPhone)
+    const rect = (top: number, h: number) => ({ top: top - rolado, bottom: top + h - rolado, left: 20, right: 355, width: 335, height: h, x: 20, y: top - rolado, toJSON: () => ({}) }) as DOMRect;
+    const rects = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if ((this as HTMLInputElement).placeholder === "Seu nome") return rect(145, 50);
+      if (this.matches('[data-testid="cadastro-ios-salvar"]')) return rect(325, 48);
+      return rect(0, 0);
+    });
+    try {
+      render(<MemoryRouter><SignupIOS posCompra onSession={() => {}} onConfirm={() => {}} /></MemoryRouter>);
+      const nome = screen.getByPlaceholderText("Seu nome");
+      teclado.abrir(nome, 0, 0);
+      act(() => { vi.advanceTimersByTime(200); });
+      const botao = screen.getByTestId("cadastro-ios-salvar").getBoundingClientRect();
+      expect(botao.bottom).toBeLessThanOrEqual(667 - 328); // inteiro acima do teclado
+      expect(nome.getBoundingClientRect().top).toBeGreaterThanOrEqual(8); // o campo segue à vista
+      expect(rolado).toBeGreaterThan(0);
+      // sem teclado (ou o Simulador com o teclado do Mac): nada rola
+      teclado.assentar();
+      const antes = rolado;
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(rolado).toBe(antes);
+    } finally {
+      rects.mockRestore(); scrollBy.mockRestore(); teclado.desinstalar(); vi.useRealTimers();
+    }
+  });
+  it("quantoSubir nunca empurra o campo em foco pra fora da área visível", () => {
+    expect(quantoSubir(384, 339, 145, 8)).toBe(45);
+    expect(quantoSubir(300, 339, 145, 8)).toBe(0);
+    expect(quantoSubir(600, 339, 60, 8)).toBe(52); // faltariam 261, mas o campo só pode subir 52
   });
 });
 

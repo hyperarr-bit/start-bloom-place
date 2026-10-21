@@ -465,6 +465,41 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
   });
 });
 
+describe("1.0.17 — iPhone SE com o teclado de verdade no passo do cartão", () => {
+  it("teclado na 'Fatura deste mês' (372 px visíveis): os dias de 'Vence todo dia' ficavam atrás do botão colado 'Ver quanto posso gastar' — o bloco do cartão sobe até terminar acima do rodapé, e o campo da fatura continua à vista", async () => {
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 295 });
+    try {
+      montarTela({ origem: "missao" });
+      ateOCartao();
+      responderCartao({ banco: "Nubank", valor: "850" });
+      const corpo = screen.getByTestId("montar-financas").querySelector<HTMLElement>(".mf-corpo")!;
+      corpo.style.overflowY = "auto"; // o CSS do .mf-corpo (o jsdom não carrega o .css)
+      const rodape = screen.getByTestId("montar-financas").querySelector<HTMLElement>("[data-teclado-rodape]")!;
+      const bloco = screen.getByTestId("montar-cartao");
+      const campo = screen.getByLabelText("Fatura deste mês em reais") as HTMLElement;
+      // as posições do print se1-fatura (com o cabeçalho escondido pelo teclado): o campo 180–220, o bloco até 340
+      // (os dias terminam em 318), o rodapé colado em 296 (372 visíveis − 76 do botão)
+      const r = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 375, width: 375, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+      const rects = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+        const s = corpo.scrollTop;
+        if (this === corpo) return r(0, 372);
+        if (this === rodape) return r(296, 372);
+        if (this === bloco) return r(30 - s, 340 - s);
+        if (this === campo) return r(180 - s, 220 - s);
+        return r(0, 0);
+      });
+      try {
+        teclado.abrir(campo, 0, 0);
+        await act(async () => { await new Promise((ok) => setTimeout(ok, 80)); });
+        expect(screen.getByTestId("montar-financas").hasAttribute("data-teclado")).toBe(true);
+        expect(bloco.getBoundingClientRect().bottom).toBeLessThanOrEqual(296); // os dias acima do botão
+        expect(campo.getBoundingClientRect().top).toBeGreaterThanOrEqual(8); // o campo da fatura segue à vista
+        expect(within(bloco).getByRole("button", { name: "Dia 1" })).toBeTruthy();
+      } finally { rects.mockRestore(); }
+    } finally { teclado.desinstalar(); }
+  });
+});
+
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
   /** A tela da MISSÃO (a única porta desde 17/10) por cima de Finanças, com o cartão vencendo dia 19

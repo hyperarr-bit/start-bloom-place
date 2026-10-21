@@ -539,7 +539,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
                 </label>
               </div>
             </div>
-            <div className="mf-rodape">
+            <div className="mf-rodape" data-teclado-rodape="">
               <button type="button" className="mf-cta" disabled={renda <= 0} onClick={guardar(() => irPara("contas"))}>Continuar</button>
               <button type="button" className="mf-pular" onClick={guardar(pular)}>Pular</button>
             </div>
@@ -590,7 +590,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
                 <div className="mf-total"><span>Total por mês</span>R$ {reais(totalContas)}</div>
               </div>
             )}
-            <div className="mf-rodape">
+            <div className="mf-rodape" data-teclado-rodape="">
               <button type="button" className="mf-cta" onClick={guardar(() => irPara("cartao"))}>
                 {nValidas > 0 ? "Continuar" : "Não tenho conta fixa"}
               </button>
@@ -613,7 +613,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               <button type="button" className="mf-chip" aria-pressed={cartao.usa === false} onClick={() => montar({ ...cartao, usa: false })}>Não uso cartão</button>
             </div>
             {cartao.usa === true && (
-              <div className="mf-folha" data-testid="montar-cartao">
+              <div className="mf-folha" data-testid="montar-cartao" data-teclado-junto="">
                 <div className="mf-faixa">💳 Cartão de crédito</div>
                 <div className="mf-campo">
                   <span className="mf-rotulo" id="mf-qual-cartao">Qual cartão?</span>
@@ -653,7 +653,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
                 </div>
               </div>
             )}
-            <div className="mf-rodape">
+            <div className="mf-rodape" data-teclado-rodape="">
               <button type="button" className="mf-cta" disabled={!cartaoCompleto(cartao)} onClick={guardar(() => montar())}>Ver quanto posso gastar</button>
               <button type="button" className="mf-pular" onClick={guardar(() => montar({ ...cartao, usa: null }, true))}>Pular</button>
             </div>
@@ -731,7 +731,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               </div>
               {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está nas suas Finanças.</p>}
             </div>
-            <div className="mf-rodape">
+            <div className="mf-rodape" data-teclado-rodape="">
               <button type="button" className="mf-cta" onClick={guardar(continuar)}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
             </div>
           </>
@@ -746,7 +746,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, 
               <h2 data-testid="montar-ponte-titulo">Agora vamos anotar seu primeiro gasto</h2>
               <CenaDaPonte porDia={resultado.porDia} apertado={apertado || !(resultado.porDia > 0)} parado={reduzirMov || menosMovimento()} />
             </div>
-            <div className="mf-rodape">
+            <div className="mf-rodape" data-teclado-rodape="">
               <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={guardar(() => sairDaPonte("ir_pro_app"))}>Ir pro app</button>
               <button type="button" className="mf-pular" data-testid="montar-ponte-nao-gastei" onClick={guardar(() => sairDaPonte("ainda_nao"))}>Ainda não gastei</button>
             </div>

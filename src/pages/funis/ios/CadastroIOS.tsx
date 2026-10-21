@@ -34,6 +34,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, MailCheck, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useBotaoAcimaDoTeclado } from "@/hooks/use-botao-acima-do-teclado";
 import { useAuth, EVENTO_RELER_ASSINATURA } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,6 +147,10 @@ export function SignupIOS({
   };
 
   const camposFocados = useRef<Set<string>>(new Set());
+  /* 1.0.17 (iPhone SE, teclado de verdade): com o teclado no "Seu nome", o "Salvar meu acesso" ficava meio atrás da barra
+     do teclado — a página sobe o que falta pro botão aparecer inteiro (sem tirar o campo da vista) */
+  const botaoSalvar = useRef<HTMLButtonElement>(null);
+  useBotaoAcimaDoTeclado(botaoSalvar);
   const focoCampo = (campo: string) => () => {
     if (camposFocados.current.has(campo)) return;
     camposFocados.current.add(campo);
@@ -346,7 +351,7 @@ export function SignupIOS({
         {/* 1.0.17: o toque no botão NÃO tira o foco do campo. Sem isto o teclado do iPhone fechava no toque, a
             página (rolada pra cima pelo teclado) descia ~20 px e o selo "Teste ativado" "entrava" empurrando tudo
             — um pulo de layout logo antes da troca de tela. O teclado fecha junto com a tela, quando ela sai. */}
-        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}
+        <Button ref={botaoSalvar} type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading} data-testid="cadastro-ios-salvar"
           onMouseDown={(e) => { if (valid) e.preventDefault(); }}
           onPointerDown={(e) => { if (valid && e.pointerType !== "mouse") e.preventDefault(); }}
           aria-busy={loading || undefined}>

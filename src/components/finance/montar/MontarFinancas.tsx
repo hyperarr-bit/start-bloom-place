@@ -381,6 +381,14 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
       <motion.div key={etapa} className="mf-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
         {etapa === "renda" && (
           <>
+            {/* 1.0.17 (dono 20/10, mockup b2): pela missão, a 1ª pergunta diz que isto é o TUTORIAL — curtíssimo, sem toque a
+                mais; nas perguntas seguintes fica só a barra de progresso */}
+            {naMissao && (
+              <div className="mf-contexto" data-testid="montar-contexto">
+                <i aria-hidden><DollarSign size={20} /></i>
+                <span><b>Tutorial</b> · Finanças · 3 perguntas</span>
+              </div>
+            )}
             {barra(1)}
             <div className="mf-q">
               <h2>Quanto entra por mês?</h2>

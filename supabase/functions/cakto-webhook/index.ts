@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
 import { assuntoVenda, htmlVenda, nomeDoProduto } from "../_shared/email-venda.ts";
 import { COLUNAS_DECISAO, linhaParaEscrever, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
@@ -226,13 +227,8 @@ serve(async (req) => {
        * da web (sem e-mail até o batismo) — e é o mesmo que o asaas-webhook
        * usa. E-mail vira o segundo caminho. */
       if (purchaseId) {
-        const { data: reg } = await supabaseClient
-          .from("analytics_events")
-          .select("user_id")
-          .eq("event_name", "pix_order_created")
-          .contains("event_data", { order_id: purchaseId })
-          .not("user_id", "is", null)
-          .limit(1);
+        // segurança 21/10: todas as linhas do pedido têm que concordar (o cliente conseguia gravar pix_order_created)
+        const reg = await registroDoPedido(supabaseClient, purchaseId, logStep);
         if (reg?.[0]?.user_id) {
           logStep("Found user by order_id (pix_order_created)", { userId: reg[0].user_id });
           return String(reg[0].user_id);

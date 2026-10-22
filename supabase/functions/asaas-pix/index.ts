@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
@@ -439,9 +440,8 @@ serve(async (req) => {
       const id = String(body.id ?? "");
       if (!id) return jsonResponse({ error: "id_required" }, 400);
       const r = await buscarPagamento(apiKey, id);
-      if (body.probeOnly === true) {
-        return jsonResponse({ probe: true, ok: r.ok, gw: JSON.stringify(r.body).slice(0, 800) });
-      }
+      /* segurança 21/10: saiu o `probeOnly` — devolvia o corpo cru da Asaas (pagamentos, externalReference com o
+       * user_id de quem gerou) de QUALQUER id pra qualquer sessão; a sonda de QA mora no pix-reconcile (com token). */
       if (!r.ok) {
         logStep("Asaas check error", { status: r.status, body: JSON.stringify(r.body).slice(0, 300) });
         return jsonResponse({ paid: false, status: "ERROR" });
@@ -452,9 +452,8 @@ serve(async (req) => {
       // carrega o nosso usuário; o elo é o id do QR).
       let offer = "";
       let donoId: string | null = null;
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("user_id, event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      // segurança 21/10: todas as linhas do pedido têm que concordar (o cliente conseguia gravar pix_order_created)
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       if (reg?.[0]) {
         donoId = reg[0].user_id as string;
         const o = (reg[0].event_data as Record<string, string>)?.offer;
@@ -674,9 +673,7 @@ serve(async (req) => {
         .select("id, status, current_period_end, customer_email")
         .eq("user_id", user.id).eq("abacatepay_billing_id", id).limit(1).maybeSingle();
       if (!linha || linha.status !== "active") return jsonResponse({ ok: false, motivo: "sem_linha" });
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
       if (!ehOfertaHoje(offer)) return jsonResponse({ ok: false, motivo: "oferta" });
       if (!linha.customer_email) {
@@ -716,7 +713,7 @@ serve(async (req) => {
       if (!(await salvarDestino(supabaseAdmin as never, user.id, email))) return jsonResponse({ ok: false, motivo: "gravar" });
       let encaminhado = false;
       if (id) {
-        const { data: reg } = await supabaseAdmin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: id }).limit(1);
+        const reg = await registroDoPedido(supabaseAdmin, id, logStep);
         const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
         if (reg?.[0]?.user_id === user.id && (ehPlanoHoje(offer) || ehUpsellHoje(offer))) {
           const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
@@ -738,9 +735,7 @@ serve(async (req) => {
       if (!id) return jsonResponse({ error: "id_required" }, 400);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailParceiro)) return jsonResponse({ ok: false, motivo: "email_invalido" });
       if (user.email && user.email.toLowerCase() === emailParceiro) return jsonResponse({ ok: false, motivo: "mesmo_email" });
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("user_id, event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       const dono = reg?.[0]?.user_id as string | undefined;
       const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
       if (!dono || dono !== user.id || !ehOfertaCasal(offer)) return jsonResponse({ ok: false, motivo: "pedido" });

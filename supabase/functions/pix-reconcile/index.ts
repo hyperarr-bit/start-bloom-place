@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { pedidosEmConflito } from "../_shared/registro-pedido.ts";
 import { ehDaLoja, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { PRECO_2027_CENTAVOS, confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
@@ -292,6 +293,9 @@ serve(async (req) => {
     // de UMA ordem sem creditar nada — pra validar contrato de status após
     // mudança de gateway. { probe: "<orderId>" }.
     if (typeof body.probe === "string" && body.probe) {
+      // segurança 21/10: a sonda só com o RECONCILE_TOKEN — a anon key é pública (está no bundle) e a sonda devolvia o
+      // status/valor de QUALQUER pedido.
+      if (!(esperado && String(body.token ?? "") === esperado)) return jsonResponse({ error: "unauthorized" }, 401);
       const id = String(body.probe);
       let v: Veredito;
       if (body.gw === "cakto") v = await statusCakto(await caktoToken(), id);
@@ -311,6 +315,10 @@ serve(async (req) => {
       .order("created_at", { ascending: true })
       .limit(2000);
     if (qErr) return jsonResponse({ error: `query: ${qErr.message}` }, 500);
+    /* segurança 21/10: pedido com registros que discordam (conta ou oferta) não é creditado por aqui — o cliente
+     * conseguia gravar pix_order_created com o id de um pedido alheio. Fica no log pro suporte. */
+    const emConflito = pedidosEmConflito(qrs);
+    if (emConflito.size) console.log(`[PIX-RECONCILE] ALARME pedidos com registro em conflito: ${[...emConflito].map((o) => o.slice(0, 24)).join(", ")}`);
 
     // agrupa por usuário; ignora QR sem user (não deveria existir — create exige JWT)
     type Ordem = {
@@ -346,6 +354,7 @@ serve(async (req) => {
       const uid = q.user_id as string | null;
       const oid = String(q.event_data?.order_id ?? "");
       if (!uid || !oid) continue;
+      if (emConflito.has(oid)) continue;
       if (q.event_data?.adiantado === true && !exibidos.has(oid)) { adiantadosFora++; continue; }
       // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
       // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.

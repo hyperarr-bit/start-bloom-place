@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoVenda, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
 import { confirmarPacote2027, eh2027, ipUaDoPedido } from "../_shared/pacote-2027.ts";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
@@ -254,7 +255,8 @@ serve(async (req) => {
     // resolve dono + oferta pelo registro do create (o QR estático não tem nosso user)
     let userId: string | null = null;
     let offer = "";
-    const { data: reg } = await admin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: qrCodeId }).limit(1);
+    // segurança 21/10: todas as linhas do pedido têm que concordar em conta e oferta (o cliente conseguia gravar pix_order_created)
+    const reg = await registroDoPedido(admin, qrCodeId, logStep);
     const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }

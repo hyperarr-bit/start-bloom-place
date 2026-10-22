@@ -240,3 +240,33 @@ describe("revisor 1.0.18: a escolha do dia 2 espera o balão do menu novo sair",
     expect(screen.getByTestId("dia2-escolha")).toBeInTheDocument();
   });
 });
+
+/* ------------------------------------------------------------ "Agora não" no dia 2: a folha dos dias seguintes */
+
+describe("revisor 1.0.18: a escolha depois de 'Agora não' no dia 2 tem o título do dia real", () => {
+  it("dia 2 'Dia 2: escolhe o seu' → 'Agora não' → dia 4: 'Hoje: escolhe o seu' e 'Dia 1: Finanças', 1x no dia", () => {
+    ligar("on");
+    const store = montarStore({}); // sem Finanças: a linha da dose 1 aparece
+    missaoA(DIA1, { fimVisto: true }); // o resumo do dia 3 já foi (não disputa a abertura)
+    vi.setSystemTime(new Date(2026, 9, 4, 9, 0));
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("dia2-escolha-titulo")).toHaveTextContent(/^Dia 2: escolhe o seu$/);
+    expect(screen.getByTestId("dia2-ontem")).toHaveTextContent(/Ontem: Finanças/);
+    fireEvent.click(screen.getByTestId("dia2-escolha-depois"));
+    cleanup();
+    vi.setSystemTime(new Date(2026, 9, 6, 9, 0)); // dia 4
+    montar(store, "/home");
+    avancar(1500);
+    expect(screen.getByTestId("dia2-escolha-titulo")).toHaveTextContent(/^Hoje: escolhe o seu$/);
+    expect(screen.getByTestId("dia2-escolha")).toHaveAttribute("aria-label", "Hoje: escolhe o seu");
+    expect(screen.getByTestId("dia2-ontem")).toHaveTextContent(/Dia 1: Finanças/);
+    expect(screen.getByTestId("dia2-ontem")).not.toHaveTextContent(/Ontem/);
+    // "Agora não" de novo: reabrir no mesmo dia não repete
+    fireEvent.click(screen.getByTestId("dia2-escolha-depois"));
+    cleanup();
+    montar(store, "/home");
+    avancar(4000);
+    expect(screen.queryByTestId("dia2-escolha")).toBeNull();
+  });
+});

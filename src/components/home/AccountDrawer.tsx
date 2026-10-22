@@ -224,6 +224,8 @@ export const AccountDrawer = ({
           className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto
                      pb-[max(1.25rem,var(--app-safe-bottom))]"
           overlayClassName="z-[290]"
+          // 1.0.18: o menu novo segue o desenho (sem o X do canto — fecha tocando fora, arrastando ou no ‹ das sub-telas)
+          semFechar={novo}
         >
           {/* pegador: sinaliza que a folha desce arrastando */}
           <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
@@ -484,7 +486,7 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
 
   const nomeDaPaleta = palettes[palette]?.name ?? "Original";
   const temaAtual = `${mode === "dark" ? "Escuro" : "Claro"} · ${nomeDaPaleta}`;
-  const bolinhas = (palettes[palette]?.preview ?? palettes.default.preview).slice(0, 3);
+  const bolinhas = palettes[palette]?.preview ?? palettes.default.preview;
   const detalheAparencia = (
     <>
       <span className="flex -space-x-1" aria-hidden>
@@ -521,11 +523,10 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
   ];
 
   return (
-    <div className="px-4 pt-3 pb-2 space-y-5" data-testid="menu-novo">
-      {/* a folha precisa de título (leitor de tela e a medição total, que lê "MENU"); o desenho não mostra */}
-      <SheetHeader className="sr-only">
-        <SheetTitle>Menu</SheetTitle>
-      </SheetHeader>
+    <>
+    {/* a folha precisa de título (leitor de tela e a medição total, que lê "MENU"); o desenho não mostra */}
+    <SheetTitle className="sr-only">Menu</SheetTitle>
+    <div className="px-4 pt-2 pb-2 space-y-4" data-testid="menu-novo">
 
       {/* (1) você + plano + conquistas */}
       <section aria-label="Você" data-testid="menu-grupo-voce">
@@ -582,5 +583,6 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
         </button>
       )}
     </div>
+    </>
   );
 }

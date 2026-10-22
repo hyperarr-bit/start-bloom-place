@@ -172,6 +172,19 @@ describe("gate do iPhone com a chave 'curto' = o PaywallIOS curto", () => {
     expect(eventos("app_sheet_success")).toEqual([]);
   });
 
+  it("1.0.18: Restaurar sem compra no gate → 'Comprou pelo site ou com outro e-mail? Entrar com o e-mail da compra' sai desta conta e vai pro /entrar", async () => {
+    montar();
+    await screen.findByTestId("ios-curto");
+    fireEvent.click(screen.getByText("Restaurar compras"));
+    const caixa = await screen.findByTestId("ios-restauro-vazio");
+    expect(caixa.textContent).toContain("Nenhuma compra encontrada nesta conta da App Store.");
+    expect(beacons("app_sheet_success")).toEqual([]);
+    expect(eventos("app_restore_vazio")).toEqual([expect.objectContaining({ funil: "gate_ios" })]);
+    fireEvent.click(screen.getByTestId("ios-restauro-vazio-entrar"));
+    await waitFor(() => expect(href).toBe("/entrar"));
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
   it("'Entrar com outra conta': sai desta conta e vai pro /entrar", async () => {
     montar();
     fireEvent.click(await screen.findByTestId("gate-trocar-conta"));

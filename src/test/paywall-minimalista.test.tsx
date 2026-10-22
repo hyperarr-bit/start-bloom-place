@@ -19,6 +19,7 @@ const loja = vi.hoisted(() => ({
   preco: "R$ 97,90", mes: "R$ 8,16", valorAnual: 97.9, valorMensal: 24.9 as number | null, precoMensal: "R$ 24,90" as string | null,
   precoTeste: "R$ 0,00" as string | null, dias: 3, trial: true,
   compraOk: true, motivo: null as string | null, compraPresenteOk: true,
+  tipo: null as string | null, codigo: null as string | null, restauraOk: false,
   presente: { preco: "R$ 69,90", valor: 69.9, precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: true, dias: 3, precoTeste: "R$ 0,00" } as null | { preco: string; valor?: number; precoMes: string | null; produto: string; comTrial: boolean; dias: number; precoTeste?: string | null },
   permissao: "granted" as "granted" | "denied" | "prompt" | "indisponivel",
   metadataMini: null as null | "on" | "off",
@@ -60,10 +61,12 @@ vi.mock("@/lib/revenuecat", async (original) => {
     comprarAnualIos: vi.fn(async () => loja.compraOk),
     comprar: vi.fn(async () => loja.compraOk),
     estadoRevenueCat: () => "pronto",
-    restaurar: vi.fn().mockResolvedValue(false),
+    restaurar: vi.fn(async () => loja.restauraOk),
     compraVitaliciaLocal: vi.fn().mockResolvedValue(false),
     compraAssinaturaLocal: vi.fn().mockResolvedValue(false),
     motivoUltimaCompra: () => loja.motivo,
+    tipoUltimaFalha: () => loja.tipo,
+    codigoUltimaFalha: () => loja.codigo,
     sincronizarAssinatura: vi.fn(),
     valorAnualIos: () => loja.valorAnual,
     valorMensalIos: () => loja.valorMensal,
@@ -85,7 +88,7 @@ import { trackEvent } from "@/lib/analytics";
 import { comprarAnualIos, comprar as comprarAssinatura, comprarPresente69 } from "@/lib/revenuecat";
 import { CHAVE_FORCA_OFERTAS, _zerarChavesRemotas } from "@/lib/ofertas-saida";
 import { CHAVE_FORCA_PAYWALL_MINIMALISTA, _zerarRemotaMinimalista } from "@/lib/paywall-minimalista";
-import { PaywallIOS, diaDoAviso as diaDoAvisoDoPaywall } from "@/pages/funis/ios/PaywallIOS";
+import { PaywallIOS, TEXTO_DO_ERRO_DA_LOJA, diaDoAviso as diaDoAvisoDoPaywall } from "@/pages/funis/ios/PaywallIOS";
 import { diaDoAviso, diasAteOAviso, passosDoTeste, passosSemTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
@@ -115,7 +118,7 @@ beforeEach(() => {
   ligar("curto"); // o curto (na loja: VITE_V14_LOJA); a chave minimalista nasce ligada
   Object.assign(loja, {
     preco: "R$ 97,90", mes: "R$ 8,16", valorAnual: 97.9, valorMensal: 24.9, precoMensal: "R$ 24,90", precoTeste: "R$ 0,00", dias: 3, trial: true,
-    compraOk: true, motivo: null, compraPresenteOk: true, permissao: "granted", metadataMini: null,
+    compraOk: true, motivo: null, compraPresenteOk: true, permissao: "granted", metadataMini: null, tipo: null, codigo: null, restauraOk: false,
     presente: { preco: "R$ 69,90", valor: 69.9, precoMes: "R$ 5,82", produto: "core_anual_69", comTrial: true, dias: 3, precoTeste: "R$ 0,00" },
   });
 });
@@ -420,5 +423,80 @@ describe("2ª vez e saídas, enxutas como a tela", () => {
     fireEvent.click(screen.getByTestId("ios-mini-voltar"));
     await espera(450);
     expect(onVoltar).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ─────────────── 1.0.18 (decepções 21/10, itens 1 e 4): erro da loja com "Tentar de novo" e Restaurar vazio ─────────────── */
+describe("1.0.18: a loja falhou (depois da retentativa automática) → caixa por tipo com 'Tentar de novo'", () => {
+  let href = "";
+  beforeEach(() => {
+    href = "";
+    Object.defineProperty(window, "location", { configurable: true, value: { ...window.location, get href() { return href; }, set href(v: string) { href = v; }, pathname: "/comecar", search: "" } });
+  });
+  const falhar = async (motivo: string, tipo: string | null, codigo: string | null) => {
+    Object.assign(loja, { compraOk: false, motivo, tipo, codigo });
+    montar();
+    await esperarLoja();
+    fireEvent.click(screen.getByRole("button", { name: "Começar teste grátis" }));
+    await waitFor(() => expect(screen.getByTestId("ios-erro-loja")).toBeInTheDocument());
+    return screen.getByTestId("ios-erro-loja");
+  };
+
+  it("loja (problem with the App Store): a frase do pagamento do ID Apple + 'Tentar de novo' compra de novo; evento com tipo e código; sem a linha vermelha antiga", async () => {
+    const caixa = await falhar("billing_erro", "loja", "2");
+    expect(caixa.textContent).toContain(TEXTO_DO_ERRO_DA_LOJA.loja);
+    expect(TEXTO_DO_ERRO_DA_LOJA.loja).toBe("A App Store não conseguiu concluir. Confira a forma de pagamento do seu ID Apple (Ajustes › seu nome › Pagamento) e tente de novo.");
+    expect(screen.queryByText(/A Apple não concluiu o pagamento/)).toBeNull();
+    expect(eventos("paywall_erro_loja_view")).toEqual([expect.objectContaining({ funil: "ios", produto: "core_anual_97", motivo: "billing_erro", tipo: "loja", codigo: "2", minimalista: true })]);
+    expect(comprarAnualIos).toHaveBeenCalledTimes(1);
+    loja.compraOk = true; loja.motivo = null;
+    fireEvent.click(screen.getByTestId("ios-erro-loja-tentar"));
+    expect(eventos("funnel_click").find((e) => e.cta === "erro_loja_tentar_de_novo")).toMatchObject({ produto: "anual", codigo: "2" });
+    await waitFor(() => expect(comprarAnualIos).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByTestId("ios-erro-loja")).toBeNull());
+  });
+
+  it("rede: a frase da internet; bloqueado (nao_permitido): a frase do Tempo de Uso; nenhuma fala de cobrança nem de 24 h", async () => {
+    const rede = await falhar("billing_erro", "rede", "10");
+    expect(rede.textContent).toContain("Sem conexão com a App Store agora. Confira a internet e tente de novo.");
+    cleanup(); vi.mocked(trackEvent).mockClear();
+    const bloq = await falhar("nao_permitido", "bloqueado", "3");
+    expect(bloq.textContent).toContain("Este iPhone está com compras bloqueadas (Tempo de Uso ou conta familiar). Libere em Ajustes e tente de novo.");
+    expect(eventos("paywall_erro_loja_view")[0]).toMatchObject({ motivo: "nao_permitido", tipo: "bloqueado" });
+    for (const t of Object.values(TEXTO_DO_ERRO_DA_LOJA)) expect(t).not.toMatch(/cobr|24 ?h/i);
+  });
+
+  it("cancelou a folha: nenhuma caixa de erro (é decisão dela)", async () => {
+    Object.assign(loja, { compraOk: false, motivo: "cancelou", tipo: "cancelou", codigo: "1", presente: null });
+    montar();
+    await esperarLoja();
+    fireEvent.click(screen.getByRole("button", { name: "Começar teste grátis" }));
+    await espera(80);
+    expect(screen.queryByTestId("ios-erro-loja")).toBeNull();
+    expect(eventos("paywall_erro_loja_view")).toEqual([]);
+  });
+
+  it("Restaurar sem compra: 'Nenhuma compra encontrada…' + 'Comprou pelo site ou com outro e-mail? Entrar com o e-mail da compra' → /entrar (só login, sem link de pagamento)", async () => {
+    montar();
+    await esperarLoja();
+    expect(screen.queryByTestId("ios-restauro-vazio")).toBeNull();
+    fireEvent.click(screen.getByText("Restaurar compras"));
+    const caixa = await screen.findByTestId("ios-restauro-vazio");
+    expect(caixa.textContent).toContain("Nenhuma compra encontrada nesta conta da App Store.");
+    expect(caixa.textContent).toContain("Comprou pelo site ou com outro e-mail?");
+    expect(caixa.textContent).not.toMatch(/pix|site\.|http|pagar|assinar/i);
+    expect(eventos("app_restore_vazio")).toEqual([expect.objectContaining({ funil: "ios", minimalista: true })]);
+    fireEvent.click(screen.getByTestId("ios-restauro-vazio-entrar"));
+    expect(href).toBe("/entrar");
+    expect(eventos("funnel_click").find((e) => e.cta === "restauro_vazio_entrar")).toBeTruthy();
+  });
+
+  it("Restaurar que ACHA a compra: segue pra Home, sem a caixa", async () => {
+    loja.restauraOk = true;
+    montar();
+    await esperarLoja();
+    fireEvent.click(screen.getByText("Restaurar compras"));
+    await waitFor(() => expect(href).toBe("/"));
+    expect(screen.queryByTestId("ios-restauro-vazio")).toBeNull();
   });
 });

@@ -92,8 +92,11 @@ describe("folha_apple_resultado", () => {
 
   it("erro da loja: 'erro'; falhou ANTES de abrir a folha (catálogo vazio): nenhum folha_apple_resultado", async () => {
     const m = await carregar();
-    rc.purchasePackage.mockRejectedValueOnce({ code: "2", message: "Store problem" });
+    // 1.0.18: código 2 é transitório → a folha repete sozinha 1,5 s depois; falhou de novo = UM "erro" (não dois)
+    rc.purchasePackage.mockRejectedValueOnce({ code: "2", message: "Store problem" }).mockRejectedValueOnce({ code: "2", message: "Store problem" });
     expect(await m.comprarAnualIos()).toBe(false);
+    expect(rc.purchasePackage).toHaveBeenCalledTimes(2);
+    expect(eventos.filter((e) => e[0] === "app_compra_retentativa")).toHaveLength(1);
     expect(folhas()).toEqual([expect.objectContaining({ resultado: "erro" })]);
     eventos.length = 0;
     rc.offering = null; rc.produtos = {};

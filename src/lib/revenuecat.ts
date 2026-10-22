@@ -526,8 +526,8 @@ export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean
       lugar,
       pacote: true,
     });
-    marcarFolhaAberta();
-    const resultado = await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: presente69.pacote });
+    const pacote69 = presente69.pacote, P = Purchases as NonNullable<typeof Purchases>;
+    const resultado = await folhaComRetentativa(ID_ANUAL_69, () => P.purchasePackage({ aPackage: pacote69 }));
     registrarResultadoDaFolha("sucesso", ID_ANUAL_69);
     // 10/10: no "x_paywall" a compra pode ENTRAR EM TESTE (3 dias) — o paywall do
     // funil lê isto pra armar o lembrete "acaba amanhã", como no comprarAnualIos.
@@ -613,8 +613,8 @@ export async function comprarMensal19(lugar: LugarDoMensal19): Promise<boolean> 
       lugar,
       pacote: true,
     });
-    marcarFolhaAberta();
-    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: mensal19.pacote });
+    const pacote19 = mensal19.pacote, P = Purchases as NonNullable<typeof Purchases>;
+    await folhaComRetentativa(ID_MENSAL_19, () => P.purchasePackage({ aPackage: pacote19 }));
     registrarResultadoDaFolha("sucesso", ID_MENSAL_19);
     await sincronizarAssinatura();
     return true;
@@ -712,6 +712,60 @@ export type MotivoCompra =
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * ERRO DA LOJA NA COMPRA, COM RETENTATIVA (1.0.18 — decepções 21/10, item 1): 106 pessoas / 135 sessões em 30 dias
+ * tiveram ERRO na compra no iPhone (não é "cancelou"): "Error performing request." 153×, "There was a problem with
+ * the App Store." 138×, rede 12× — e só 22 % conseguiram depois; o paywall só mostrava uma linha pequena. Agora:
+ *   · erro TRANSITÓRIO (loja fria/ocupada, rede, tempo esgotado) → 1 retentativa automática 1,5 s depois, na mesma
+ *     folha (a loja costuma responder na 2ª) — `folhaComRetentativa`, nas 4 folhas do iPhone;
+ *   · falhou de novo → o paywall mostra a caixa calma com "Tentar de novo" (PaywallIOS);
+ *   · o CÓDIGO do erro vai no evento (separa rede × conta × loja): app_compra_retentativa / app_compra_falhou.
+ * Códigos do RevenueCat: 0 UNKNOWN · 2 STORE_PROBLEM · 10 NETWORK · 12/16 BACKEND · 32 PRODUCT_REQUEST_TIMED_OUT ·
+ * 35 OFFLINE. Cancelou (1), conta não pode (3), já é sua (6) e pendente (20) nunca repetem.
+ * ───────────────────────────────────────────────────────────────────────────── */
+export const RETENTATIVA_DA_FOLHA_MS = 1500;
+const codigoDoErro = (e: unknown): string | null => { const c = String((e as { code?: string | number })?.code ?? ""); return c || null; };
+const mensagemDoErro = (e: unknown): string => String((e as { message?: string })?.message ?? e);
+/**
+ * O TIPO do erro (medido em 30 dias, só o que não é "cancelou"):
+ *   · "loja"      — "There was a problem with the App Store." (113 pessoas, ~3–4/dia; código 2 STORE_PROBLEM): o genérico
+ *                   do StoreKit, comum quando a forma de pagamento do ID Apple falha na verificação ou a loja oscila;
+ *   · "bloqueado" — "The device or user is not allowed to make the purchase." (33 pessoas; código 3): Tempo de Uso /
+ *                   restrição de compras ou conta familiar com "Pedir para comprar" — sem retentativa;
+ *   · "rede"      — "A network error has occurred" / "Error performing request" (~19 pessoas; códigos 10/35);
+ *   · "cancelou"  — foi ela (código 1); · "outro" — o resto (0/12/16/32 contam como transitórios).
+ */
+export type TipoErroDaLoja = "cancelou" | "rede" | "loja" | "bloqueado" | "outro";
+export function tipoDoErroDaLoja(e: unknown): TipoErroDaLoja {
+  const msg = mensagemDoErro(e);
+  const codigo = codigoDoErro(e);
+  if (codigo === "1" || /cancel/i.test(msg)) return "cancelou";
+  if (codigo === "3" || /not allowed to make the purchase/i.test(msg)) return "bloqueado";
+  if (codigo === "10" || codigo === "35" || /network|offline|error performing request|connection|timed out|time out/i.test(msg)) return "rede";
+  if (codigo === "2" || codigo === "0" || codigo === "12" || codigo === "16" || codigo === "32" || /problem with the app store/i.test(msg)) return "loja";
+  return "outro";
+}
+/** Vale repetir sozinho? Só rede e loja (a loja costuma responder na 2ª); bloqueado/cancelou/pendente nunca. */
+export const erroTransitorioDaLoja = (e: unknown): boolean => { const t = tipoDoErroDaLoja(e); return t === "rede" || t === "loja"; };
+let ultimoCodigo: string | null = null;
+let ultimoTipo: TipoErroDaLoja | null = null;
+/** O código / o tipo do erro da última compra que falhou (null = sem código / não falhou). */
+export const codigoUltimaFalha = (): string | null => ultimoCodigo;
+export const tipoUltimaFalha = (): TipoErroDaLoja | null => ultimoTipo;
+/** Abre a folha; erro transitório na 1ª tentativa = espera 1,5 s e abre de novo (uma vez). O que a 2ª devolver, vale. */
+async function folhaComRetentativa<T>(produto: string, abrir: () => Promise<T>): Promise<T> {
+  marcarFolhaAberta();
+  try {
+    return await abrir();
+  } catch (e) {
+    if (!erroTransitorioDaLoja(e)) throw e;
+    trackEvent("app_compra_retentativa", { produto, tipo: tipoDoErroDaLoja(e), codigo: codigoDoErro(e), erro: mensagemDoErro(e).slice(0, 160) });
+    await new Promise<void>((r) => setTimeout(r, RETENTATIVA_DA_FOLHA_MS));
+    marcarFolhaAberta();
+    return await abrir();
+  }
+}
+
 /**
  * DESFECHO COMUM das três folhas (assinatura, pré-pago, vitalício) — 02/09.
  *
@@ -729,6 +783,8 @@ export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 export async function desfechoDaFalha(e: unknown, produto: string): Promise<boolean> {
   const msg = String((e as { message?: string })?.message ?? e);
   const codigo = String((e as { code?: string })?.code ?? "");
+  ultimoCodigo = codigo || null; // 1.0.18: o paywall e os eventos levam o código e o tipo
+  ultimoTipo = tipoDoErroDaLoja(e);
   registrarResultadoDaFolha(/cancel/i.test(msg) || codigo === "1" ? "cancelou" : "erro", produto);
   // Pix/boleto escolhido NA FOLHA: compra fica pendente, o webhook libera.
   if (codigo === "20" || /pending/i.test(msg)) {
@@ -745,12 +801,12 @@ export async function desfechoDaFalha(e: unknown, produto: string): Promise<bool
   }
   if (codigo === "3" || /not allowed to make the purchase/i.test(msg)) {
     ultimoMotivo = "nao_permitido";
-    trackEvent("app_compra_falhou", { motivo: "nao_permitido", produto, erro: msg.slice(0, 160) });
+    trackEvent("app_compra_falhou", { motivo: "nao_permitido", produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: "bloqueado" });
     return false;
   }
   const cancelou = /cancel/i.test(msg) || codigo === "1";
   ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
-  trackEvent("app_compra_falhou", { motivo: ultimoMotivo, produto, erro: msg.slice(0, 160) });
+  trackEvent("app_compra_falhou", { motivo: ultimoMotivo, produto, erro: msg.slice(0, 160), codigo: codigo || null, tipo: ultimoTipo, transitorio: !cancelou && erroTransitorioDaLoja(e) });
   return false;
 }
 
@@ -921,14 +977,12 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
       return false;
     }
     const escolhida = decisao.escolhida;
-    if (escolhida) {
-      marcarFolhaAberta();
-      await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({
-        subscriptionOption: escolhida as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
-      });
-    } else {
-      await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
-    }
+    const P = Purchases as NonNullable<typeof Purchases>;
+    // 1.0.18: a folha com 1 retentativa (e o carimbo da folha também no caminho do pacote — o mensal do iPhone
+    // comprava sem marcarFolhaAberta e ficava fora do folha_apple_resultado)
+    await folhaComRetentativa(productId, () => (escolhida
+      ? P.purchaseSubscriptionOption({ subscriptionOption: escolhida as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"] })
+      : P.purchasePackage({ aPackage: alvo })));
     registrarResultadoDaFolha("sucesso", productId);
     // Folha fechou com sucesso = dinheiro saiu. Como no vitalício, o acesso
     // NÃO depende do entitlement do RC (quem manda é a linha em
@@ -1345,12 +1399,12 @@ export async function comprarAnualIos(): Promise<boolean> {
       trial: anualIosTemTrial(),
       ...dadosDaOfertaIos(),
     });
-    marcarFolhaAberta();
     // Pelo PACOTE quando veio da offering (é o que amarra a compra ao braço do
-    // experimento); pelo produto só na reserva.
-    const resultado = pacoteAnualIos
-      ? await Purchases.purchasePackage({ aPackage: pacoteAnualIos })
-      : await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    // experimento); pelo produto só na reserva. 1.0.18: com 1 retentativa se a loja falhar de passagem.
+    const pacote = pacoteAnualIos, produto = produtoAnualIos, P = Purchases;
+    const resultado = await folhaComRetentativa(idProdutoAnualIos(), () => (pacote
+      ? P.purchasePackage({ aPackage: pacote })
+      : P.purchaseStoreProduct({ product: produto })));
     registrarResultadoDaFolha("sucesso", idProdutoAnualIos());
     anotarTrialDaCompra(resultado, anualIosTemTrial());
     /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro

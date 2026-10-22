@@ -151,7 +151,17 @@ export const PREPARACAO_DA_FOLHA_MS = 1200;
 export { diaDoAviso };
 /** Um `core:voltar` nos últimos N ms faz a saída contar como "voltar". */
 export const JANELA_DO_VOLTAR_MS = 10_000;
-import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
+import { erroJaAtivo } from "@/lib/loja";
+import type { TipoErroDaLoja } from "@/lib/revenuecat";
+
+/** 1.0.18 (decepções 21/10, item 1): o que a caixa do erro da loja diz, por tipo — calmo, curto, sem falar de cobrança. */
+export const TEXTO_DO_ERRO_DA_LOJA: Record<TipoErroDaLoja, string> = {
+  rede: "Sem conexão com a App Store agora. Confira a internet e tente de novo.",
+  loja: "A App Store não conseguiu concluir. Confira a forma de pagamento do seu ID Apple (Ajustes › seu nome › Pagamento) e tente de novo.",
+  bloqueado: "Este iPhone está com compras bloqueadas (Tempo de Uso ou conta familiar). Libere em Ajustes e tente de novo.",
+  outro: "A App Store não conseguiu concluir agora. Tente de novo.",
+  cancelou: "", // nunca aparece: cancelar é decisão dela
+};
 import { DIAS_DE_TESTE_PADRAO } from "@/lib/teste-da-loja";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
@@ -387,6 +397,11 @@ export function PaywallIOS({
   const [pendente, setPendente] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  /* 1.0.18 (decepções 21/10, itens 1 e 4): o ERRO DA LOJA vira uma caixa calma com "Tentar de novo" (depois da
+   * retentativa automática do revenuecat.ts), e um "Restaurar" que não acha nada ganha a saída "Comprou pelo site ou
+   * com outro e-mail? Entrar com o e-mail da compra" (só login — nunca link de pagamento/site no iOS). */
+  const [erroDaLoja, setErroDaLoja] = useState<{ produto: "anual" | "mensal"; codigo: string | null; tipo: TipoErroDaLoja } | null>(null);
+  const [restauroVazio, setRestauroVazio] = useState(false);
   const vivoRef = useRef(true);
   // Disponibilidade real do vitalício: otimista até resposta NEGATIVA da loja.
   const [anualNaLoja, setAnualNaLoja] = useState<boolean | null>(null);
@@ -628,6 +643,7 @@ export function PaywallIOS({
   const comprar = async (produto: "anual" | "mensal") => {
     if (comprando) return;
     setErro(null);
+    setErroDaLoja(null);
     setComprando(true);
     comprandoRef.current = true; // já (o render vem depois): o presente da folha fechada confere isto
     try {
@@ -665,13 +681,16 @@ export function PaywallIOS({
         setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
       } else if (motivo === "ja_ativo") {
         setErro(erroJaAtivo());
-      } else if (motivo === "nao_permitido") {
-        setErro(erroNaoPermitido());
-      } else if (motivo && motivo !== "cancelou") {
+      } else if (motivo === "nao_permitido" || (motivo && motivo !== "cancelou")) {
         /* 04/09: a StoreKit recusou ("not available for purchase") e o
          * paywall ficava MUDO — botão voltava ao normal sem dizer nada. Foi o
-         * que o revisor viu. Cancelar continua silencioso (foi decisão dela). */
-        setErro(erroFolhaNaoConcluiu());
+         * que o revisor viu. Cancelar continua silencioso (foi decisão dela).
+         * 1.0.18: em vez da linha pequena, a caixa por TIPO (rede / loja / bloqueado / outro) com "Tentar de novo"
+         * — a retentativa automática (rede e loja) já rodou no revenuecat.ts. */
+        const codigo = rc.codigoUltimaFalha?.() ?? null;
+        const tipo: TipoErroDaLoja = motivo === "nao_permitido" ? "bloqueado" : (rc.tipoUltimaFalha?.() ?? "outro");
+        setErroDaLoja({ produto, codigo, tipo });
+        trackEvent("paywall_erro_loja_view", { funil: FUNIL, loja: "ios", produto: idProduto, motivo, codigo, tipo, ...(mini ? { minimalista: true } : {}) });
       }
       // "cancelou" = PURCHASE_CANCELLED do RevenueCat (código 1): foi ela que
       // fechou a folha. Não reabre nada sozinho — só deixa o cartão perto do
@@ -694,7 +713,8 @@ export function PaywallIOS({
           .catch(() => { /* paywall de sempre */ });
       }
     } catch {
-      setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
+      setErroDaLoja({ produto, codigo: null, tipo: "outro" });
+      trackEvent("paywall_erro_loja_view", { funil: FUNIL, loja: "ios", produto, motivo: "excecao", codigo: null, tipo: "outro", ...(mini ? { minimalista: true } : {}) });
     }
     comprandoRef.current = false;
     setComprando(false);
@@ -867,6 +887,25 @@ export function PaywallIOS({
         </div>
       )}
       {erro && <p className="mt-2 text-[12px] text-destructive text-center">{erro}</p>}
+      {/* 1.0.18: a loja falhou (depois da retentativa automática) — caixa calma, botão à vista; nada de aviso de cobrança */}
+      {erroDaLoja && !comprando && (
+        <div role="alert" data-testid="ios-erro-loja" className="mt-2.5 rounded-2xl border border-border bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 flex items-center gap-2.5 text-left">
+          <p className="flex-1 text-[12.5px] font-semibold leading-snug text-foreground" data-tipo={erroDaLoja.tipo}>{TEXTO_DO_ERRO_DA_LOJA[erroDaLoja.tipo]}</p>
+          <button
+            type="button"
+            data-testid="ios-erro-loja-tentar"
+            className="shrink-0 rounded-full bg-accent/10 text-accent text-[12.5px] font-bold px-3.5 py-2 active:scale-[0.97] transition-transform"
+            onClick={() => {
+              const p = erroDaLoja.produto;
+              trackEvent("funnel_click", { cta: "erro_loja_tentar_de_novo", funil: FUNIL, loja: "ios", produto: p, codigo: erroDaLoja.codigo });
+              setErroDaLoja(null);
+              void comprar(p);
+            }}
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
       {mostraSegundaChance && (
         <div role="status" data-testid="ios-segunda-chance" className="mt-2.5 rounded-2xl border border-accent/30 bg-card shadow-[0_10px_28px_-14px_rgba(0,0,0,0.3)] pl-3.5 pr-2 py-2 flex items-center gap-2.5 text-left">
           {/* minimalista: a linha do tempo logo acima já diz "Hoje — R$ 0,00" — o cartão fica numa linha */}
@@ -897,12 +936,35 @@ export function PaywallIOS({
             trackEvent("app_restore_paywall", {});
             const rc = await import("@/lib/revenuecat");
             const ok = await rc.restaurar();
-            if (ok) { if (gate) concluir(); else window.location.href = "/"; }
+            if (ok) { if (gate) concluir(); else window.location.href = "/"; return; }
+            // 1.0.18: 250 sessões/30 d tocavam Restaurar (muitas repetidas) e paravam no nada — quem comprou no site ou
+            // com outro e-mail precisa é de LOGIN (a Apple nunca vai "restaurar" um Pix do site)
+            setRestauroVazio(true);
+            trackEvent("app_restore_vazio", { funil: FUNIL, loja: "ios", ...(mini ? { minimalista: true } : {}) });
           }}
         >
           Restaurar compras
         </button>
       </p>
+      {restauroVazio && (
+        <div role="status" data-testid="ios-restauro-vazio" className="mt-2 rounded-2xl border border-border bg-card px-3.5 py-2.5 text-left">
+          <p className="text-[12.5px] leading-snug text-foreground">Nenhuma compra encontrada nesta conta da App Store.</p>
+          <p className="text-[12.5px] leading-snug text-muted-foreground mt-0.5">
+            Comprou pelo site ou com outro e-mail?{" "}
+            <button
+              type="button"
+              data-testid="ios-restauro-vazio-entrar"
+              className="font-bold underline underline-offset-2 text-foreground"
+              onClick={() => {
+                trackEvent("funnel_click", { cta: "restauro_vazio_entrar", funil: FUNIL, loja: "ios" });
+                if (gate) void trocarConta(); else window.location.href = "/entrar";
+              }}
+            >
+              Entrar com o e-mail da compra
+            </button>
+          </p>
+        </div>
+      )}
       {gate && (
         <p className="mt-0.5 text-center text-[11px] text-muted-foreground" data-testid="gate-ios-conta">
           <button type="button" className="underline underline-offset-2" onClick={() => void trocarConta()} data-testid="gate-trocar-conta">Entrar com outra conta</button>

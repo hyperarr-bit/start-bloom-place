@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-const att = vi.hoisted(() => ({ pedir: vi.fn(async () => "nao_ios"), segurar: vi.fn() }));
+const att = vi.hoisted(() => ({ pedir: vi.fn(async (_origem: string) => "nao_ios"), segurar: vi.fn() }));
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
 vi.mock("@/lib/att-ios", () => ({ pedirRastreamentoIos: (o: string) => att.pedir(o), segurarReservaNativaDoATT: () => att.segurar() }));
 vi.mock("@/lib/analytics", async (orig) => ({

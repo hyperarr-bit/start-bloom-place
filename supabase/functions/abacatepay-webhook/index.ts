@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { respostaGatewayDesativado } from "../_shared/gateway-desativado.ts";
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -13,6 +14,10 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   });
 
 serve(async (req) => {
+  // 21/10: gateway antigo DESLIGADO (dono aprovou) — 410 antes de qualquer leitura/escrita (_shared/gateway-desativado.ts)
+  const desligado = respostaGatewayDesativado(req, "abacatepay-webhook");
+  if (desligado) return desligado;
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }

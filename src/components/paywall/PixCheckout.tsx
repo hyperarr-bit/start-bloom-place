@@ -214,23 +214,28 @@ export const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer):
   return braco === "cakto" && !OFERTAS_NA_CAKTO.includes(offer) ? "asaas" : braco;
 };
 
+/** Os gateways que ainda respondem (21/10: pagarme/abacate desligados no servidor). */
+export const gatewayVivo = (g: string | null | undefined): g is "asaas" | "cakto" => g === "asaas" || g === "cakto";
+
 const bracoSemTrava = (uid: string | null | undefined, offer: PixOffer): Gateway => {
   /* TESTE DE GATEWAY POR LINK (02/09): `?gw=cakto` na URL grava a escolha na
    * sessão e vale ANTES do FORCE_GATEWAY — é como se testa outro gateway
    * sem tocar no funil de todo mundo. A Cakto recusou 2 de 8 pedidos de
    * teste hoje (intermitente, só na oferta antiga de 27,90); a w97 passou
    * sempre. Só quem abre o link com o parâmetro entra nesse braço. */
+  /* 21/10: AbacatePay e Pagar.me DESLIGADOS no servidor (as funções respondem 410) — `?gw=` e a força do aparelho só
+   * aceitam os dois gateways vivos; um link/aparelho antigo com "pagarme"/"abacate" cai no caminho normal (Asaas). */
   try {
     const url = new URLSearchParams(window.location.search).get("gw");
-    if (url === "asaas" || url === "pagarme" || url === "abacate" || url === "cakto") sessionStorage.setItem("pix-gw-teste", url);
+    if (gatewayVivo(url)) sessionStorage.setItem("pix-gw-teste", url);
     const t = sessionStorage.getItem("pix-gw-teste");
-    if (t === "asaas" || t === "pagarme" || t === "abacate" || t === "cakto") return t;
+    if (gatewayVivo(t)) return t;
   } catch { /* noop */ }
   const forcado = forceGateway();
   if (forcado) return forcado;
   try {
     const f = localStorage.getItem("pix-ab-force");
-    if (f === "asaas" || f === "pagarme" || f === "abacate" || f === "cakto") return f;
+    if (gatewayVivo(f)) return f;
   } catch { /* noop */ }
   return bracoPorSemente(uid || sementeSemConta(), offer);
 };

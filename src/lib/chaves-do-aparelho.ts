@@ -87,6 +87,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-menu-novo", // 1.0.18: a última resposta do RevenueCat pro menu novo da conta (metadata menu_novo: todos|off)
   "core-menu-novo-aviso", // 1.0.18: o aviso "modo escuro e cores agora ficam no menu › Aparência" já resolvido (visto|nao-precisa), 1x por aparelho
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
+  "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)
+  "core-sino-braco", // 1.0.18: o braço sorteado no modo "ab" do sino_paywall (com|sem), estável entre aberturas
+  "core-sino-visto", // 1.0.18: a tela do sino já apareceu neste aparelho (nunca repete: voltar, reabrir, deep link)
   "core-lembrete-teste", // pedido do aviso de 36 h do teste (texto de uso desde 16/10), armado quando a permissão vier
   "core-semana-pagante", // 16/10: semana do pagante (começo + último agendamento dos 7 avisos depois do pagamento)
   "core-folha-aberta-em", // saída do app: hora do último toque em comprar

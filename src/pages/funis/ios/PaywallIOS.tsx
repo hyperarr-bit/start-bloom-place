@@ -182,6 +182,7 @@ import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/compon
 import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
 import { LinhaDoTempoDoTeste, diaDoAviso, lerAvisoDoTeste, passosDoTeste, passosSemTeste, type AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 import { guardarForcaDoMinimalista, paywallMinimalistaLigado } from "@/lib/paywall-minimalista";
+import { camposDoSino } from "@/lib/sino-paywall";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -390,7 +391,10 @@ export function PaywallIOS({
   /* 1.0.18 (análise do paywall 21/10): no gate o pós-compra RECARREGA o app (`onPagoSemConta` → "/") logo depois
    * do `app_sheet_success` — o insert do trackEvent morria na recarga (124 folhas, 0 app_sheet_success; o banco
    * mostrava 18 % das contas comprando). O sucesso do gate vai por beacon (fetch keepalive, o mesmo do paywall_saiu). */
-  const registrarSucesso = gate ? trackEventBeacon : trackEvent;
+  /* 1.0.18 (dono 22/10, chave `sino_paywall`, lib/sino-paywall): o braço do sino ("com"|"sem") nos eventos do paywall
+   * do FUNIL — {} com a chave desligada (eventos de hoje, byte a byte) e no gate. Lido 1x por paywall. */
+  const [sinoCampos] = useState(() => (gate ? {} : camposDoSino()));
+  const registrarSucesso = (ev: string, d: Record<string, unknown>) => (gate ? trackEventBeacon : trackEvent)(ev, { ...d, ...sinoCampos });
   const { user: usuarioLogado } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
   const [comprando, setComprando] = useState(false);
@@ -496,7 +500,7 @@ export function PaywallIOS({
     // `loja: "ios"` em todo evento: sem isso o iPhone entraria somando nos
     // números do funil do Android e as duas leituras virariam uma média de
     // dois públicos, duas lojas e duas mecânicas de pagamento.
-    trackEvent("funnel_view", { step: "offer", funil: FUNIL, area, loja: "ios" });
+    trackEvent("funnel_view", { step: "offer", funil: FUNIL, area, loja: "ios", ...sinoCampos });
     // gate: a mesma régua do gate antigo ("seu plano ficou salvo", 2 h / 24 h), cancelada na compra
     if (gate) { try { void agendarResgateDoPlano(null)?.catch?.(() => { /* noop */ }); } catch { /* noop */ } }
     /* Aquecimento do RevenueCat no mount (lição da v91 do Android): sem
@@ -534,7 +538,7 @@ export function PaywallIOS({
           // 16/10: sempre (a explicação da 2ª folha também mostra o "R$ 0,00" da loja)
           setPrecoTeste(seguro(() => rc.precoDoTesteIos() ?? null, null));
           // o braço que a pessoa VIU (o funnel_view do mount sai antes da loja responder)
-          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}), ...((curtoLigou || gate) && miniLigou ? { minimalista: true } : {}) });
+          trackEvent("paywall_oferta_vista", { funil: FUNIL, loja: "ios", area, ...d, dias: rc.diasTrialIos() || DIAS_DE_TESTE_PADRAO, trial: rc.anualIosTemTrial(), ...(ligou ? { textos: true, economia: economiaLida } : {}), ...(curtoLigou || gate ? { paywall_curto: true, economia: economiaLida } : {}), ...((curtoLigou || gate) && miniLigou ? { minimalista: true } : {}), ...sinoCampos });
         }
       };
       lido();

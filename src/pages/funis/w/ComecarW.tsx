@@ -66,6 +66,7 @@ const ConviteAvaliacao = lazy(() =>
   import("@/components/avaliacao/ConviteAvaliacao").then((m) => ({ default: m.ConviteAvaliacao })));
 import type { PlanoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
+import { AntesDoPaywallIOS } from "@/pages/funis/ios/SinoIOS";
 import { SignupIOS, ConfirmIOS, LiberandoIOS } from "@/pages/funis/ios/CadastroIOS";
 import { ehApple } from "@/lib/loja";
 
@@ -673,6 +674,13 @@ export default function ComecarW() {
     guardarChave(CHAVES.passo, recuo);
     window.scrollTo(0, 0);
   };
+  /** O Voltar da tela do sino: o mesmo recuo do paywall (o sino já ficou marcado como visto — não repete). */
+  const recuarDoSino = () => {
+    const recuo = recuoDoPaywall(onboarding1TelaLigado());
+    setStepCru(recuo as Step);
+    guardarChave(CHAVES.passo, recuo);
+    window.scrollTo(0, 0);
+  };
   const propsDoPaywallIOS = { area: areaOuPadrao, answers, onPagoSemConta: () => pagoSemConta(), onVoltar: recuarDoPaywall };
 
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
@@ -907,7 +915,11 @@ export default function ComecarW() {
                      passo, o MESMO recuo do Voltar do Android (recuoDoPaywall: plano_3_dias ou contrato).
                      Passado por spread pra compilar nos dois lados da junção (antes dela o PaywallIOS
                      ainda não conhece a prop e só a ignora). */
-                  <PaywallIOS {...propsDoPaywallIOS} />
+                  /* 1.0.18 (dono 22/10, chave remota `sino_paywall`, lib/sino-paywall): a tela do sino UMA vez antes
+                     do paywall ("A gente te avisa antes do teste acabar"). Desligada = só o paywall, como hoje. */
+                  <AntesDoPaywallIOS area={areaOuPadrao} onVoltar={recuarDoSino} desligado={posCompra || !!(usuarioLogado && jaAssina)}>
+                    <PaywallIOS {...propsDoPaywallIOS} />
+                  </AntesDoPaywallIOS>
                 ) : (
                   /* 07/09 10h20–10h40: a web rodou o PaywallDia14 (27,90, Cakto)
                    * por vinte minutos e voltou pro PaywallW a 24,90/97,90 na

@@ -51,6 +51,7 @@ import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
 import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
+import { registrarSinoRemoto } from "@/lib/sino-paywall";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -73,6 +74,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarChavePaywallMinimalista,
     registrarAttMomentoRemoto, // 1.0.18: `att_momento` (auto3s|comecar|ab) — quando o ATT é pedido (lib/att-momento)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
+    registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
   ];
   for (const f of cada) {
     try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }

@@ -15,7 +15,7 @@ import type { OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 
 export type CampoDoCard = { com_acesso: boolean; dias_restantes: number | null };
 
-export function CardRecusa({ href, comAcesso, oferta, campos, onFechar }: {
+export function CardRecusa({ href, comAcesso, oferta, campos, onFechar, onTrocou }: {
   /** A forma de pagamento da loja (urlAtualizarPagamento). */
   href: string;
   comAcesso: boolean;
@@ -24,6 +24,8 @@ export function CardRecusa({ href, comAcesso, oferta, campos, onFechar }: {
   campos: CampoDoCard;
   /** Fechou o card (qualquer saída). Depois dele, nesta abertura, a faixa de sempre. */
   onFechar: () => void;
+  /** 1.0.18: trocou pro mensal aqui (o 2º degrau da recusa, lib/mensal-degraus, não aparece mais nesta recusa). */
+  onTrocou?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const [comprando, setComprando] = useState(false);
@@ -54,7 +56,7 @@ export function CardRecusa({ href, comAcesso, oferta, campos, onFechar }: {
     setComprando(false);
     const motivo = ok ? null : rc.motivoUltimaCompra();
     trackEvent("card_recusa_compra", { ...extra, resultado: ok ? "sucesso" : motivo === "cancelou" || motivo === null ? "cancelou" : "falhou", motivo, preco: oferta.preco });
-    if (ok) { setTrocou(true); return; }
+    if (ok) { setTrocou(true); onTrocou?.(); return; }
     if (motivo === "cancelou" || motivo === null) return;
     if (motivo === "ja_ativo") setErro(erroJaAtivo());
     else if (motivo === "nao_permitido") setErro(erroNaoPermitido());

@@ -93,6 +93,11 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-card-recusa", // 1.0.18: a última resposta do RevenueCat pro card da recusa (metadata card_recusa: on|off)
   "core-card-recusa-visto", // 1.0.18: a recusa (billingIssueDetectedAt) cujo card já apareceu — 1x por recusa, reabrir não repete
   "card-recusa-force", // 1.0.18: força de QA do card da recusa (?card-recusa=on|off|auto)
+  "core-card-recusa-visto-em", // 1.0.18: QUANDO o card da recusa apareceu (o 2º degrau espera 7 dias depois dele)
+  "core-recusa-degrau2", // 1.0.18: a última resposta do RevenueCat pro 2º degrau da recusa (metadata recusa_degrau2: on|off)
+  "core-recusa-degrau2-visto", // 1.0.18: a recusa (billingIssueDetectedAt) cujo 2º degrau já apareceu — 1x por recusa, reabrir não repete
+  "core-motivos-folha", // 1.0.18: a última resposta do RevenueCat pra folha "O que te fez parar?" (metadata motivos_folha: off|on|ab)
+  "core-motivos-braco", // 1.0.18: o braço sorteado no modo "ab" do motivos_folha (com|sem), estável entre aberturas
   "core-menu-novo-aviso", // 1.0.18: o aviso "modo escuro e cores agora ficam no menu › Aparência" já resolvido (visto|nao-precisa), 1x por aparelho
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)

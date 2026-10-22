@@ -50,6 +50,8 @@ export const CHAVE_REMOTA_CARD_RECUSA = "card_recusa";
 export const CHAVE_CARD_RECUSA_APARELHO = "core-card-recusa";
 /** A recusa (billingIssueDetectedAt) cujo card já apareceu neste aparelho (chave do aparelho). */
 export const CHAVE_CARD_RECUSA_VISTO = "core-card-recusa-visto";
+/** QUANDO (ms) o card apareceu pela última vez (chave do aparelho) — o 2º degrau (lib/mensal-degraus) espera 7 dias. */
+export const CHAVE_CARD_RECUSA_VISTO_EM = "core-card-recusa-visto-em";
 /** Força de QA (fora dos prefixos varridos). */
 export const CHAVE_FORCA_CARD_RECUSA = "card-recusa-force";
 export const PARAM_CARD_RECUSA = "card-recusa";
@@ -120,5 +122,7 @@ export const marcaDaRecusa = (detectadoEm: string | null | undefined): string =>
 export const cardRecusaJaVisto = (detectadoEm: string | null | undefined): boolean =>
   ls.get(CHAVE_CARD_RECUSA_VISTO) === marcaDaRecusa(detectadoEm);
 /** Gravado na hora em que o card APARECE: fechar o app com o card na tela não o repete. */
-export const marcarCardRecusaVisto = (detectadoEm: string | null | undefined): void =>
+export const marcarCardRecusaVisto = (detectadoEm: string | null | undefined, agora: number = Date.now()): void => {
   ls.set(CHAVE_CARD_RECUSA_VISTO, marcaDaRecusa(detectadoEm));
+  ls.set(CHAVE_CARD_RECUSA_VISTO_EM, String(agora));
+};

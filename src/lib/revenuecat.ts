@@ -55,6 +55,7 @@ import { registrarSinoRemoto } from "@/lib/sino-paywall";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 import { registrarDias23Remoto } from "@/lib/dias23";
 import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
+import { registrarDegrau2Remoto, registrarMotivosRemoto } from "@/lib/mensal-degraus";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -81,6 +82,8 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
     registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
     registrarAvaliacaoTesteDia2Remoto, // 1.0.18: `avaliacao_teste_dia2` (on|off, padrão off) — pedir nota também pro teste que voltou no dia 2 (lib/avaliacao-teste-dia2)
+    registrarDegrau2Remoto, // 1.0.18: `recusa_degrau2` (on|off, padrão off) — o 2º degrau da recusa, mensal 19,90 (lib/mensal-degraus)
+    registrarMotivosRemoto, // 1.0.18: `motivos_folha` (off|on|ab, padrão off) — a folha "O que te fez parar?" depois da folha do anual fechada (lib/mensal-degraus)
   ];
   for (const f of cada) {
     try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }
@@ -634,7 +637,10 @@ export async function carregarMensal19(): Promise<Mensal19 | null> {
 }
 
 /** Compra o mensal 19 pelo PACOTE da offering `mensal_19`. true = folha fechou e sincronizou. */
-export async function comprarMensal19(lugar: LugarDoMensal19): Promise<boolean> {
+/* 22/10 (1.0.18, lib/mensal-degraus): + "degrau2" (o 2º degrau da recusa — a mesma troca do card, vale na próxima
+ * tentativa da Apple) e "motivo_mensal" (o "Achei caro" da folha de motivos: recusou o presente 69,90 no paywall do funil — compra na hora).
+ * Só vão no `lugar` dos eventos: esses dois não têm marca de "visto" por lugar (a marca é deles, em lib/mensal-degraus). */
+export async function comprarMensal19(lugar: LugarDoMensal19 | "degrau2" | "motivo_mensal"): Promise<boolean> {
   ultimoMotivo = null;
   if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";

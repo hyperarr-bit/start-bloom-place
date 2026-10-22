@@ -12,6 +12,8 @@ import { AvisoJaTinhaAcesso } from "@/components/app/AvisoJaTinhaAcesso";
 import { CardRecusa } from "@/components/app/CardRecusa";
 import { carregarOfertaMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
 import { cardRecusaJaVisto, cardRecusaLigado, marcarCardRecusaVisto } from "@/lib/card-recusa";
+import { degrau2JaVisto, degrau2Ligado, marcarDegrau2Visto, recusaNoPontoDoDegrau2 } from "@/lib/mensal-degraus";
+import { MensalHeroi } from "@/components/paywall/MensalHeroi";
 import {
   avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, conflitoFechadoAgora, conflitoVistoAgora,
   fecharConflitoNestaAbertura, marcarConflitoVisto, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
@@ -160,8 +162,34 @@ export const AvisoCobrancaRecusada = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elegivelCard]);
   const cardAtivo = elegivelCard || (!!card && temProblema);
-  const visivelTela = temProblema && !cardAtivo && telaCheiaPossivel() && !telaFechada && telaLivre;
-  const visivel = temProblema && !cardAtivo && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
+  /* 1.0.18 (dono 22/10): o 2º DEGRAU DA RECUSA (lib/mensal-degraus, chave `recusa_degrau2`, padrão off) — o mensal 19,90
+     em tela inteira pra quem segue recusado 7+ dias depois do card, ou sem acesso. Nunca na abertura em que o card
+     apareceu (nem enquanto ele pode aparecer), 1x por recusa (gravado quando aparece), só com a offering `mensal_19`
+     (sem ela, nada — e nada gravado). Enquanto carrega (até 2,5 s), nenhuma outra superfície de cobrança pisca. */
+  const [degrau2, setDegrau2] = useState<OfertaDoMensal19 | null>(null);
+  const [degrau2Feito, setDegrau2Feito] = useState(false);
+  const iniciouDegrau2 = useRef(false);
+  const elegivelDegrau2 = temProblema && !cardAtivo && !card && !cardFeito && !degrau2Feito && telaLivre && !!p
+    && degrau2Ligado() && !degrau2JaVisto(p.detectadoEm) && !String(p.produto ?? "").startsWith("core_mensal_19")
+    && recusaNoPontoDoDegrau2(p);
+  useEffect(() => {
+    if (!elegivelDegrau2 || iniciouDegrau2.current || !p) return;
+    iniciouDegrau2.current = true;
+    const problema = p;
+    let vivo = true;
+    const espera = new Promise<null>((r) => window.setTimeout(() => r(null), 2500));
+    void Promise.race([carregarOfertaMensal19().catch(() => null), espera]).then((o) => {
+      if (!vivo) return;
+      if (!o) { setDegrau2Feito(true); return; } // sem a offering: nada aparece e nada é gravado
+      marcarDegrau2Visto(problema.detectadoEm);
+      setDegrau2(o);
+    });
+    return () => { vivo = false; iniciouDegrau2.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elegivelDegrau2]);
+  const degrau2Ativo = elegivelDegrau2 || (!!degrau2 && temProblema);
+  const visivelTela = temProblema && !cardAtivo && !degrau2Ativo && telaCheiaPossivel() && !telaFechada && telaLivre;
+  const visivel = temProblema && !cardAtivo && !degrau2Ativo && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
   const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
   useEffect(() => {
     if (!visivelTela || telaVistaAgora()) return;
@@ -198,10 +226,25 @@ export const AvisoCobrancaRecusada = () => {
         oferta={card.oferta}
         campos={{ com_acesso: p.comAcesso, dias_restantes: diasRestantesDaCarencia(p.detectadoEm) }}
         onFechar={fecharCard}
+        onTrocou={() => marcarDegrau2Visto(p.detectadoEm)}
       />
     );
   }
   if (elegivelCard) return null; // carregando o card: nem tela cheia nem faixa por baixo
+  if (degrau2 && temProblema && p) {
+    // fechado (qualquer saída), nesta abertura fica a faixa de sempre — como depois do card
+    const fecharDegrau2 = () => { setDegrau2(null); setDegrau2Feito(true); fecharTelaNestaAbertura(); setTelaFechada(true); };
+    return (
+      <MensalHeroi
+        modo="degrau2"
+        oferta={degrau2}
+        comAcesso={p.comAcesso}
+        campos={{ com_acesso: p.comAcesso, dias_restantes: diasRestantesDaCarencia(p.detectadoEm) }}
+        onFechar={fecharDegrau2}
+      />
+    );
+  }
+  if (elegivelDegrau2) return null; // carregando o 2º degrau: idem
   if (visivelTela && p) {
     const fecharTela = () => {
       fecharTelaNestaAbertura();

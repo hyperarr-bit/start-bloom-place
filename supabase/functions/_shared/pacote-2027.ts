@@ -9,7 +9,8 @@
  * Os 3 caminhos que confirmam Pix da Asaas (asaas-pix `check`, asaas-webhook, pix-reconcile) chamam
  * `confirmarPacote2027`: grava a chave (idempotente) e manda o Purchase 19,90 1x por pedido (trava própria em
  * webhook_events, como o casal e o presente). Conta anônima que depois entra numa conta existente: o pix-vincular copia
- * o user_data da anônima (copiar-dados-anonima) e a página grava a chave de novo na conta final.
+ * o user_data da anônima (copiar-dados-anonima). 21/10 (segurança): a página NÃO grava mais a chave — só o servidor
+ * (migração 20261022130000 tira do cliente a escrita de `core-pacote-2027`).
  *
  * Sem Deno: o cliente do banco é uma interface mínima (o mesmo jeito do grant-pix.ts) — testado no vitest com um banco
  * falso (src/test/pacote-2027-servidor.test.ts).

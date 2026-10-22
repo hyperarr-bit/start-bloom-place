@@ -16,8 +16,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { definirEmailDaCompra, garantirSessao, guardarCompraAnonima, limparBatismo, vincularCompraAnonima } from "@/lib/sessao-anonima";
-import { CHAVE_KIT, itensParaGravar, type Conta } from "./conteudo";
-import { CHAVE_PACOTE_2027 } from "@/lib/pacote-2027";
+import { itensParaGravar, type Conta } from "./conteudo";
 
 /* ───────────────────────── a cópia da sessão no heap ───────────────────────── */
 
@@ -154,41 +153,10 @@ export async function gravarFinancas(renda: number, contas: Conta[], agora: Date
   }
 }
 
-/** O kit do order bump: a chave da conta que o app lê pra liberar o conteúdo. */
-export async function gravarKit(pedido: string, agora: Date = new Date()): Promise<boolean> {
-  try {
-    const { data: s } = await supabase.auth.getSession();
-    const uid = s?.session?.user?.id;
-    if (!uid) return false;
-    const { error } = await db.from("user_data").upsert(
-      { user_id: uid, key: CHAVE_KIT, value: { comprado: true, em: agora.toISOString(), pedido, origem: "hoje" } },
-      { onConflict: "user_id,key" },
-    );
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 21/10 (upsell "Seu 2027", u2027): o pacote na conta FINAL. O servidor já grava na conta que pagou (a anônima); quem
- * entrou numa conta que já existia recebe aqui (o pix-vincular também copia o user_data da anônima — os dois são
- * idempotentes). Nunca lança.
- */
-export async function gravarPacote2027(pedido: string, agora: Date = new Date()): Promise<boolean> {
-  try {
-    const { data: s } = await supabase.auth.getSession();
-    const uid = s?.session?.user?.id;
-    if (!uid) return false;
-    const { error } = await db.from("user_data").upsert(
-      { user_id: uid, key: CHAVE_PACOTE_2027, value: { comprado: true, em: agora.toISOString(), pedido, origem: "hoje" } },
-      { onConflict: "user_id,key" },
-    );
-    return !error;
-  } catch {
-    return false;
-  }
-}
+/* 21/10 (segurança): saíram o gravarKit e o gravarPacote2027 — o kit (`core-kit-primeiro-mes`) e o "Seu 2027"
+ * (`core-pacote-2027`) são conteúdo PAGO e só o servidor grava (asaas-pix check / asaas-webhook / pix-reconcile, na
+ * conta que pagou; pix-vincular / destino-hoje copiam pra conta final). A migração 20261022130000 tira do cliente a
+ * escrita dessas duas chaves no user_data. */
 
 /** A atribuição e as respostas na conta (user_metadata.hoje, só se ausente) + a origem do lead. Nunca lança. */
 export async function gravarAtribuicao(hoje: Record<string, unknown>): Promise<void> {

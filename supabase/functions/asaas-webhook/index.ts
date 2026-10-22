@@ -10,7 +10,7 @@ import { CONCESSAO_HOJE, PRECOS_HOJE, chaveCapiCasal, ehOfertaCasal, ehPlanoHoje
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import {
-  PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarPlano30, mandarLinkPorEmail, reservar,
+  PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar,
 } from "../_shared/presente.ts";
 
 /**
@@ -352,6 +352,11 @@ serve(async (req) => {
         current_period_start: now.toISOString(), current_period_end: fim,
       }),
     });
+    // 21/10 (segurança): o kit do order bump (h279k/h149k) nasce no servidor — idempotente, também pro pedido já creditado
+    if (g.r !== "erro" && g.r !== "em_andamento") {
+      const kit = await liberarKitDoBump(admin, { userId, orderId: qrCodeId, offer });
+      if (kit === "falhou") logStep("Kit do bump não gravou (o reconcile tenta de novo)", { offer, qrCodeId: qrCodeId.slice(0, 20) });
+    }
     if (g.r === "preservado") {
       logStep("Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
       return jsonResponse({ received: true, granted: true, jaVitalicio: true });

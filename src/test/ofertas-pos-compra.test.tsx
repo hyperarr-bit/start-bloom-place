@@ -232,7 +232,7 @@ describe("/hoje com as ofertas", () => {
     expect(criados().map((b) => b.offer)).toEqual(["hv279"]);
   });
 
-  it("?ofertas=2027: Agora não → Quero meu plano → Pix pk99 R$ 9,90 (área) → pós-compra; o kit vai pra conta final", async () => {
+  it("?ofertas=2027: Agora não → Quero meu plano → Pix pk99 R$ 9,90 (área) → pós-compra; o kit quem grava é o servidor", async () => {
     await pagarVitalicio("&ofertas=2027");
     await waitFor(() => expect(screen.getByTestId("u2027-nao")).toBeTruthy());
     fireEvent.click(screen.getByTestId("u2027-nao"));
@@ -242,8 +242,8 @@ describe("/hoje com as ofertas", () => {
     expect(criados().find((b) => b.offer === "pk99")).toMatchObject({ area: "dinheiro" });
     await pagarEConferir("pk99");
     await salvarEmail();
-    const kit = upserts.find((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes") as { value: { pedido: string } } | undefined;
-    expect(kit?.value).toMatchObject({ comprado: true, pedido: "qr_2_pk99" });
+    // 21/10 (segurança): o kit é gravado pelo SERVIDOR; a página não grava a chave paga
+    expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
     expect(criados().map((b) => b.offer)).toEqual(["hv279", "pk99"]);
   });
 

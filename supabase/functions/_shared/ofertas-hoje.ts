@@ -9,7 +9,8 @@
  *   h279k  1º ano + Kit Primeiro Mês Organizado (order bump +R$ 9,90) = R$ 37,80 num Pix só · 365 dias
  *   h149k  mês + Kit = R$ 24,80 num Pix só · 30 dias
  *     O bump vai NO MESMO Pix (o botão soma o valor) — dois Pix pra uma decisão seria pedir dois pagamentos. O kit em
- *     si é conteúdo do app: a página grava `core-kit-primeiro-mes` na conta (user_data) e o app libera.
+ *     si é conteúdo do app: o SERVIDOR grava `core-kit-primeiro-mes` na conta (user_data) quando confirma o Pix
+ *     (presente.ts liberarKitDoBump; 21/10 — antes a página gravava pelo cliente) e o app libera.
  * Upsells depois do pagamento (1 tela cada, sempre com "Não, obrigado"):
  *   hv47   "Troque o 1º ano pelo CORE pra sempre" +R$ 47 → VITALÍCIO (+100 anos, como o vitalício de sempre)
  *   hv27   downsell de quem recusou o hv47 (dono, 18/10): "O CORE pra sempre por R$ 27" → o MESMO vitalício (+100 anos),

@@ -13,14 +13,13 @@ import { eventoMeta, novoEventId } from "@/pages/venda/rastreio";
 import {
   AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PLANO_VITALICIO, PRECO_KIT, UPSELL_A_DOIS, UPSELL_PRA_SEMPRE, BUMP_KIT,
   VALOR_OFERTA, calcular, contasEscolhidas, dataCurta, ehPlanoDoHoje, ehPraSempre, fimDoAcesso, funilHojeLigado, modoOfertaHoje, ofertaDoPlano, preco, reais,
-  reaisDigitados, temKit, type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
+  reaisDigitados, type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
 } from "./conteudo";
 import {
-  EMAIL_OK, emailAtual, gravarAtribuicao, gravarFinancas, gravarKit, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
+  EMAIL_OK, emailAtual, gravarAtribuicao, gravarFinancas, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
 } from "./conta";
 import { PixHoje, PixIcone, venceEm, type PixSalvo } from "./PixHoje";
 import { modoOfertas, type ModoOfertas } from "@/lib/ofertas-pos-compra";
-import { gravarPacote2027 } from "./conta";
 /* 21/10: o upsell "Seu 2027" só carrega com a chave central em "2027" (OFERTAS_POS_COMPRA, src/lib/ofertas-pos-compra.ts) */
 const Fluxo2027 = lazy(() => import("@/upsell-2027/Fluxo2027").then((m) => ({ default: m.Fluxo2027 })));
 import { supabase } from "@/integrations/supabase/client";
@@ -873,10 +872,10 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, planoAtrib, onEmail, o
   const [aviso, setAviso] = useState<string | null>(null);
   const finalizou = useRef(false);
   const pedidoPlano = estado.pagos.find((p) => ehPlanoDoHoje(p.oferta)) ?? null;
-  // 21/10: o plano de 30 dias do "Agora não" do presente (pk99) é o mesmo kit — vai pra conta final igual ao bump
-  //        e o do "Agora não" do 2027 (estado.plano30) também
-  const plano30Pago = estado.presente?.plano30 ?? estado.plano30?.pedido ?? null;
-  const pedidoKit = estado.pagos.find((p) => temKit(p.oferta)) ?? (plano30Pago ? { orderId: plano30Pago } : null);
+  /* 21/10 (segurança): o kit (bump h279k/h149k e plano de 30 dias pk99) e o "Seu 2027" (u2027) NÃO são gravados pela
+   * página: o servidor grava na conta que pagou quando confirma o Pix (asaas-pix check / asaas-webhook / pix-reconcile)
+   * e o pix-vincular / destino-hoje copiam pra conta final no servidor. O cliente não consegue mais gravar essas chaves
+   * (migração 20261022130000). */
   const praSempre = estado.pagos.some((p) => ehPraSempre(p.oferta));
 
   /** a conta final está pronta: Finanças, kit, atribuição, boas-vindas */
@@ -885,9 +884,6 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, planoAtrib, onEmail, o
     finalizou.current = true;
     const fin = await gravarFinancas(estado.renda, contasEscolhidas(estado.contas));
     trackEvent("hoje_financas", { r: fin, ...ids() });
-    if (pedidoKit) await gravarKit(pedidoKit.orderId);
-    // 21/10: o "Seu 2027" pago vai pra conta final (quem entrou numa conta que já existia)
-    if (estado.u2027?.pedido) await gravarPacote2027(estado.u2027.pedido);
     await gravarAtribuicao({
       v: 1, attr: lerAtribuicao(), faixa: estado.faixa, contas: Object.keys(estado.contas).length, plano: planoAtrib,
       pagos: estado.pagos.map((p) => p.oferta), hoje_session_id: ids().hoje_session_id, em: new Date().toISOString(),

@@ -203,7 +203,8 @@ describe("/hoje com ?up2027=on", () => {
     await salvarEmail();
     // 21/10 (integração): pagou o 2027 → pós-compra direto, sem o plano de 30 dias
     expect(eventos("plano30_view")).toHaveLength(0);
-    expect(upsertDoPacote()).toMatchObject({ key: "core-pacote-2027", value: { comprado: true, pedido: "qr_2_u2027", origem: "hoje" } });
+    // 21/10 (segurança): o pacote é conteúdo pago — quem grava é o SERVIDOR (asaas-pix check/webhook/reconcile); a página não
+    expect(upsertDoPacote()).toBeUndefined();
     // o pós-compra mostra o total pago (27,90 + 19,90) e as lojas
     expect(screen.getByTestId("hoje-lojas")).toBeTruthy();
   });

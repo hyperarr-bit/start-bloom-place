@@ -425,8 +425,8 @@ describe("[anual] pós-compra: 1 campo de e-mail", () => {
     expect(fin.map((l) => l.key)).toEqual(["finance-incomes", "finance-fixed-expenses"]);
     expect(fin[0].value).toEqual([expect.objectContaining({ description: "Renda do mês", value: 3000 })]);
     expect((fin[1].value as Array<{ description: string }>).map((x) => x.description)).toEqual(["Aluguel", "Luz", "Internet"]);
-    if (BUMP_KIT) expect(upserts).toContainEqual(expect.objectContaining({ key: "core-kit-primeiro-mes", value: expect.objectContaining({ comprado: true, pedido: ped }) }));
-    else expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
+    // 21/10 (segurança): o kit do bump é gravado pelo SERVIDOR na confirmação do Pix — a página nunca grava a chave paga
+    expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
     expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: ped });
     expect(updateUser).toHaveBeenCalledWith({ data: { hoje: expect.objectContaining({ v: 1, plano: "anual" }) } });
     expect(screen.getByTestId("hoje-lojas").textContent).toContain("mari@exemplo.com");

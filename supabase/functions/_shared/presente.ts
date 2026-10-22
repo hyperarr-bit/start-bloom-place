@@ -19,6 +19,7 @@
  * banco falso (src/test/presente-servidor.test.ts).
  */
 import { creditarPedido } from "./grant-pix.ts";
+import { temKit } from "./ofertas-hoje.ts";
 
 export const OFERTA_PRESENTE = "pv149";
 export const PRECO_PRESENTE_CENTAVOS = 1490;
@@ -60,16 +61,28 @@ export const areaPlano30 = (v: unknown): string | null => (typeof v === "string"
  * Libera o plano de 30 dias na conta de quem pagou. Idempotente: conta que já tem o kit fica como está (o "dia 1" do
  * plano é o da 1ª compra). Nunca lança.
  */
-export async function liberarPlano30(admin: ClienteMin, a: { userId: string; orderId: string; agora?: Date; area?: unknown }): Promise<"liberado" | "ja_tinha" | "falhou"> {
+export async function liberarPlano30(admin: ClienteMin, a: { userId: string; orderId: string; agora?: Date; area?: unknown; origem?: string }): Promise<"liberado" | "ja_tinha" | "falhou"> {
   try {
     const { data } = await admin.from("user_data").select("value").eq("user_id", a.userId).eq("key", CHAVE_KIT_CONTA).maybeSingle();
     if ((data as { value?: { comprado?: unknown } } | null)?.value?.comprado === true) return "ja_tinha";
     const { error } = await admin.from("user_data").upsert(
-      { user_id: a.userId, key: CHAVE_KIT_CONTA, value: { comprado: true, em: (a.agora ?? new Date()).toISOString(), pedido: a.orderId, origem: "downsell_presente", ...(areaPlano30(a.area) ? { area: areaPlano30(a.area) } : {}) } },
+      { user_id: a.userId, key: CHAVE_KIT_CONTA, value: { comprado: true, em: (a.agora ?? new Date()).toISOString(), pedido: a.orderId, origem: a.origem ?? "downsell_presente", ...(areaPlano30(a.area) ? { area: areaPlano30(a.area) } : {}) } },
       { onConflict: "user_id,key" },
     );
     return error ? "falhou" : "liberado";
   } catch { return "falhou"; }
+}
+
+/**
+ * 21/10 (segurança): o KIT do order bump (h279k/h149k) também nasce no SERVIDOR. Antes a página gravava
+ * `core-kit-primeiro-mes` pelo próprio cliente (pages/hoje/conta gravarKit) — e qualquer conta conseguia gravar a mesma
+ * chave sem pagar. Agora a migração 20261022130000 tira do cliente a escrita dessa chave e os 3 caminhos que creditam
+ * Pix da Asaas chamam isto depois do crédito do plano (idempotente; a área do bump é Dinheiro). Conta anônima que
+ * entra numa conta existente: o pix-vincular/destino-hoje copiam o user_data no servidor. Oferta sem kit → "sem_kit".
+ */
+export async function liberarKitDoBump(admin: ClienteMin, a: { userId: string; orderId: string; offer: string; agora?: Date }): Promise<"liberado" | "ja_tinha" | "falhou" | "sem_kit"> {
+  if (!temKit(a.offer)) return "sem_kit";
+  return liberarPlano30(admin, { userId: a.userId, orderId: a.orderId, agora: a.agora, area: "dinheiro", origem: "bump" });
 }
 
 /* ───────────────────────── o código ───────────────────────── */

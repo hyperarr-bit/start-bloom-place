@@ -8,13 +8,13 @@ import { EVENTO_MISSAO_DOSES, MODULOS, lerMissao, type EstadoMissaoDoses } from 
 import { EVENTO_MISSAO_WEB, gravarMissaoWeb, lerMissaoWeb, missaoWebConvidada, type EstadoMissaoWeb } from "@/lib/missao-web";
 import {
   BUMP_KIT, DOWNSELL_PRA_SEMPRE_27, LINHA_RENOVACAO, PLANOS, PRECO_KIT, UPSELL_PRA_SEMPRE, VALOR_OFERTA, dataCurta, fimDoAcesso,
-  ofertaDoPlano, preco, temKit, type OfertaHoje, type PlanoHoje,
+  ofertaDoPlano, preco, type OfertaHoje, type PlanoHoje,
 } from "@/pages/hoje/conteudo";
 import { PixHoje, PixIcone, venceEm, type PixSalvo } from "@/pages/hoje/PixHoje";
 import { TelaUpsell, proximoPosCompra, type EtapaHoje } from "@/pages/hoje/FunilHoje";
 import { Confete, SeloPago } from "@/pages/hoje/UpsellAnimado";
 import {
-  EMAIL_OK, emailAtual, gravarAtribuicao, gravarKit, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
+  EMAIL_OK, emailAtual, gravarAtribuicao, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
 } from "@/pages/hoje/conta";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
@@ -443,14 +443,13 @@ function TelaPagoMissao({ total, praSempre, acessoTxt, modulo, pagos, plano, ema
   const [erro, setErro] = useState<string | null>(null);
   const finalizou = useRef(false);
   const pedidoPlano = pagos.find((p) => !["hv47", "hv27", "hc199"].includes(p.oferta)) ?? null;
-  const pedidoKit = pagos.find((p) => temKit(p.oferta)) ?? null;
+  // 21/10 (segurança): o kit do bump é gravado pelo SERVIDOR na confirmação do Pix (o cliente não grava mais a chave)
 
   /** a conta final está pronta: kit, atribuição, boas-vindas (com as lojas); os dados do dia 1 já estão nela */
   const finalizar = async (emailFinal: string, via: string) => {
     if (finalizou.current) return;
     finalizou.current = true;
     if (!simular) {
-      if (pedidoKit) await gravarKit(pedidoKit.orderId);
       const w = lerMissaoWeb();
       await gravarAtribuicao({
         v: 1, funil: "missao", attr: lerAtribuicao(), area: w?.area ?? null, plano, pagos: pagos.map((p) => p.oferta),

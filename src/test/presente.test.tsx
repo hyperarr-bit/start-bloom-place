@@ -290,7 +290,7 @@ describe("/hoje com ?presente=on — Agora não → downsell do plano de 30 dias
     expect(eventos("plano30_nao")).toHaveLength(1);
     expect(invocacoes("asaas-pix", "create").map((b) => b.offer)).toEqual(["hv279"]);
   });
-  it("Quero meu plano → Pix pk99 R$ 9,90 → pago → o kit na conta final (core-kit-primeiro-mes com o pedido)", async () => {
+  it("Quero meu plano → Pix pk99 R$ 9,90 → pago → pós-compra (o kit quem grava é o servidor)", async () => {
     await pagarVitalicio();
     await waitFor(() => expect(screen.getByTestId("presente-agora-nao")).toBeTruthy());
     fireEvent.click(screen.getByTestId("presente-agora-nao"));
@@ -305,8 +305,8 @@ describe("/hoje com ?presente=on — Agora não → downsell do plano de 30 dias
     fireEvent.change(screen.getByTestId("hoje-email"), { target: { value: "mari@exemplo.com" } });
     fireEvent.click(screen.getByTestId("hoje-salvar-email"));
     await waitFor(() => expect(screen.getByTestId("hoje-lojas")).toBeTruthy());
-    const kit = upserts.find((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes") as { value: { comprado: boolean; pedido: string } } | undefined;
-    expect(kit?.value).toMatchObject({ comprado: true, pedido: "qr_2_pk99" });
+    // 21/10 (segurança): o kit é gravado pelo SERVIDOR (liberarPlano30 nos 3 caminhos); a página não grava a chave paga
+    expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
     // o pedido do plano leva a área (o /hoje é Dinheiro) — os 3 caminhos do servidor gravam o plano dessa área
     expect(invocacoes("asaas-pix", "create").find((b) => b.offer === "pk99")).toMatchObject({ area: "dinheiro" });
   });

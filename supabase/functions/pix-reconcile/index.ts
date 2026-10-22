@@ -10,7 +10,7 @@ import { CONCESSAO_HOJE, PRECOS_HOJE, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje }
 import { encaminharParaDestino } from "../_shared/destino-hoje.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import {
-  CHAVE_KIT_CONTA, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarPlano30,
+  CHAVE_KIT_CONTA, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente, liberarKitDoBump, liberarPlano30,
   mandarLinkPorEmail, reservar,
 } from "../_shared/presente.ts";
 
@@ -516,6 +516,10 @@ serve(async (req) => {
           userId: uid, orderId: o.orderId, gateway: gw, concessao: { dias }, agora: inicio, linhaNova,
           montarPayload: (fimDecidido) => (linhaNova ? { ...payload, current_period_end: fimDecidido } : payload),
         });
+        // 21/10 (segurança): o kit do order bump (h279k/h149k) nasce no servidor — idempotente
+        if (g.r !== "erro" && g.r !== "em_andamento" && (await liberarKitDoBump(admin, { userId: uid, orderId: o.orderId, offer: o.offer })) === "falhou") {
+          logStep("Kit do bump não gravou", { uid, orderId: o.orderId });
+        }
         if (g.r === "preservado") { logStep("Vitalício pagou o mês — linha preservada", { uid, orderId: o.orderId }); break; }
         // revisor 15/10: `continue` (não `break`) — um pedido antigo já creditado não pode impedir o pedido NOVO da
         // mesma pessoa (cancelou/reembolsou o antigo e pagou outro em 48 h) de ser creditado pela rede de segurança

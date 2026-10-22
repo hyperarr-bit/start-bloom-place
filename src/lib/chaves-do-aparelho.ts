@@ -148,7 +148,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-perfis", "finance-sem-gasto",
     "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
     "core-financas-painel", // 1.0.16: { limpo: true } do painel limpo (a cópia do aparelho é a família core-financas-painel-<id>)
-    "core-kit-primeiro-mes", // o kit do /hoje: a página grava no user_data da conta (pages/hoje/conta gravarKit); o app lê pelo useUserData
+    "core-kit-primeiro-mes", // o kit pago: só o SERVIDOR grava no user_data da conta (21/10, lib/conteudo-pago); o app lê pelo useUserData
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [

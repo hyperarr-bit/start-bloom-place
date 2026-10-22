@@ -12,8 +12,9 @@ import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_share
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
 import {
   DESCRICAO_PLANO30, DESCRICAO_PRESENTE, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente,
-  areaPlano30, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
+  areaPlano30, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
 } from "../_shared/presente.ts";
+import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -348,6 +349,16 @@ serve(async (req) => {
       const offer = String(body.offer ?? "lifetime");
       const amount = PRECOS_CENTAVOS[offer];
       if (!amount) return jsonResponse({ error: "Oferta não configurada. Avise o suporte." }, 503);
+      /* 21/10 (segurança): o downsell (vitalício R$ 14,90) só pra quem já gerou um Pix de preço cheio (recuperação,
+       * fugas do paywall) ou tem conta de 3+ dias (winback) — antes qualquer conta pedia direto e pagava 14,90 no
+       * vitalício. Regra em _shared/elegibilidade-downsell.ts. */
+      if (ehDownsell(offer)) {
+        const v = await podePedirDownsell(supabaseAdmin, { userId: user.id, criadoEm: user.created_at ?? null });
+        if (!v.ok) {
+          logStep("Downsell fora do fluxo — recusado", { userId: user.id.slice(0, 8) });
+          return jsonResponse({ error: MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v.motivo }, 403);
+        }
+      }
       /* 21/10: o presente (pv149) é upsell de quem JÁ é pra sempre (acabou de pagar o vitalício). Sem isso, o vitalício
        * sairia por R$ 14,90 pra qualquer um (paga o "presente" e resgata numa 2ª conta). A compra pode ter sido levada
        * pro e-mail de destino da tela do Pix (/hoje): aí vale o acesso daquela conta. */
@@ -582,6 +593,12 @@ serve(async (req) => {
           amount_cents: PRECOS_CENTAVOS[offer],
         }),
       });
+      /* 21/10 (segurança): o kit do order bump (h279k/h149k) é gravado AQUI, no servidor (o cliente não grava mais
+       * `core-kit-primeiro-mes`). Idempotente; vale também pro pedido já creditado (cura quem ficou sem). */
+      if (g.r !== "erro" && g.r !== "em_andamento") {
+        const kit = await liberarKitDoBump(supabaseAdmin, { userId: user.id, orderId: id, offer });
+        if (kit === "falhou") logStep("Kit do bump não gravou (webhook/reconcile tentam de novo)", { id, offer });
+      }
       if (g.r === "preservado") {
         // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
         // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.

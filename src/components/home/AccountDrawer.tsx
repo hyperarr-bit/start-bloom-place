@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, type LucideIcon } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, NotebookPen, type LucideIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,6 +15,8 @@ import { NameEditDialog } from "./NameEditDialog";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { ApagarDadosDialog } from "@/components/account/ApagarDadosDialog";
 import { toast } from "sonner";
+import { CHAVE_KIT, kitLiberado } from "@/lib/kit-primeiro-mes";
+import { areaDoKit } from "@/lib/plano-30-areas";
 import { useTheme, palettes } from "@/hooks/use-theme";
 import { menuNovoLigado } from "@/lib/menu-novo";
 import { linhaDoPlano } from "@/lib/linha-do-plano";
@@ -78,7 +80,7 @@ export const AccountDrawer = ({
   inicial = "menu",
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
-  const { set: setUserData, isGuest } = useUserData();
+  const { set: setUserData, get, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -163,6 +165,12 @@ export const AccountDrawer = ({
   const itemAvaliar = isNativeShell() && avaliacaoV14Ligada()
     ? [{ icon: Star, label: "Avaliar o CORE", onClick: () => { onOpenChange(false); abrirPaginaDeAvaliacao("menu"); } }]
     : [];
+  /* 21/10: o plano de 30 dias de OUTRA área (comprado no downsell do presente) tem porta aqui — o de Dinheiro mora na
+     aba "KIT 30 DIAS" de Finanças. Sem a compra, o item não existe. */
+  const kitDaConta = get<unknown>(CHAVE_KIT, null);
+  const itemPlano30 = kitLiberado(kitDaConta) && areaDoKit(kitDaConta) !== "dinheiro"
+    ? [{ icon: NotebookPen, label: "Plano de 30 dias", onClick: () => go("/plano-30") }]
+    : [];
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
@@ -191,6 +199,7 @@ export const AccountDrawer = ({
         { icon: Sparkles, label: "Retrospectiva", onClick: () => go("/retrospectiva") },
         // origem "menu" (26/09): o evento conquistas_open separa quem chega pelo menu de quem vem da Home
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas", { origem: "menu" }) },
+        ...itemPlano30,
         // Notificações são LOCAIS do app da loja — na web/PWA não existe como
         // entregar (30/07, dono: some da web pra não virar ticket de suporte).
         ...(isNativeShell() ? [{ icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") }] : []),
@@ -244,6 +253,7 @@ export const AccountDrawer = ({
                 conquistas: () => go("/conquistas", { origem: "menu" }),
                 aparencia: () => setView("aparencia"),
                 lembretes: () => go("/notificacoes"),
+                plano30: itemPlano30.length ? () => go("/plano-30") : undefined,
                 computador: () => setView("computador"),
                 tutorial: handleReplayTutorial,
                 ajuda: () => go("/ajuda"),
@@ -463,6 +473,8 @@ interface AcoesDoMenu {
   tutorial: () => void;
   ajuda: () => void;
   avaliar?: () => void;
+  /** só quando a conta comprou o plano de 30 dias de outra área no site */
+  plano30?: () => void;
   legal: () => void;
   sair: () => void;
 }
@@ -508,6 +520,8 @@ function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean;
     ...(isGuest ? [{ id: "nome", grupo: "voce" as const, Icone: Pencil, rotulo: "Alterar meu nome", onClick: clicar("nome", "voce", acoes.alterarNome) }] : []),
     { id: "plano", grupo: "voce", Icone: CreditCard, rotulo: "Meu plano", detalhe: <span data-testid="menu-plano-status">{linhaDoPlano(auth, trialCartaoAtivo())}</span>, onClick: clicar("plano", "voce", acoes.plano) },
     ...(!isGuest ? [{ id: "conquistas", grupo: "voce" as const, Icone: Trophy, rotulo: "Conquistas", detalhe: detalheSequencia, onClick: clicar("conquistas", "voce", acoes.conquistas) }] : []),
+    // 21/10 (main): o plano de 30 dias de outra área comprado no site — sem a compra, o item não existe
+    ...(acoes.plano30 ? [{ id: "plano30", grupo: "voce" as const, Icone: NotebookPen, rotulo: "Plano de 30 dias", onClick: clicar("plano30", "voce", acoes.plano30) }] : []),
   ];
   const app: ItemDoMenu[] = [
     { id: "aparencia", grupo: "app", Icone: Palette, rotulo: "Aparência", detalhe: detalheAparencia, onClick: clicar("aparencia", "app", acoes.aparencia) },

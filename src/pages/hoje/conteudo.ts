@@ -9,6 +9,8 @@
  *   · sem o aviso "o Pix aparece em nome de…": no lugar, só "CORE · CNPJ …" (lib/empresa) na tela do Pix;
  *   · order bump (Kit Primeiro Mês Organizado +R$ 9,90, no MESMO Pix) e upsells depois do pagamento (pra sempre +R$ 47
  *     → se recusar, pra sempre por R$ 27 → vida a dois +R$ 19,90), cada um com "Não, obrigado" e chave própria aqui.
+ *   · 20/10: OFERTA_HOJE = "vitalicio" (padrão) troca tudo isso pela oferta do /inicio — vitalício R$ 27,90, 1 Pix, sem
+ *     upsells (ver a chave abaixo); "anual" volta pro desenho acima.
  * As ofertas do servidor (centavos e o que cada uma concede) moram em supabase/functions/_shared/ofertas-hoje.ts —
  * o teste confere que os valores daqui batem com os de lá.
  */
@@ -33,6 +35,24 @@ export const DOWNSELL_PRA_SEMPRE_27: boolean = true;
  *  não vender o que não existe. O código, a oferta e a ação `parceiro` continuam; `true` religa. */
 export const UPSELL_A_DOIS: boolean = false;
 
+/**
+ * O QUE O /hoje VENDE (dono, 20/10): a MESMA oferta do /inicio — VITALÍCIO R$ 27,90, um Pix só ("Pague 1x. Seu pra
+ * sempre.") — pra comparar os dois funis com justiça.
+ *   "vitalicio" (padrão): oferta `hv279` (2790, vitalício, conta como PLANO do /hoje no servidor: crédito, Finanças,
+ *                boas-vindas, CAPI Purchase 27,90, UTMify e reconcile iguais ao h279). Tela com UMA opção, sem a escolha
+ *                anual × mensal e sem a linha "renova por R$ 97,90"; depois de pagar NÃO tem o upsell pra sempre 47 nem o
+ *                downsell 27 (seriam o mesmo produto) — vai direto pro pós-compra (e-mail + lojas).
+ *   "anual":     o de 18–19/10 — 1º ano R$ 27,90 (h279) × mensal R$ 14,90 (h149) → upsell pra sempre 47 → downsell 27.
+ * ROLLBACK = "anual" + push (as ofertas e as telas do anual continuam no código e nos testes).
+ * Todo evento do /hoje leva `oferta_hoje: "vitalicio" | "anual"`.
+ */
+export type ModoOfertaHoje = "vitalicio" | "anual";
+export const OFERTA_HOJE: ModoOfertaHoje = "vitalicio";
+let ofertaForcada: ModoOfertaHoje | null = null;
+/** Só testes (roda as suítes do anual com a chave no vitalício). `null` volta pro OFERTA_HOJE. */
+export const _forcarOfertaHoje = (m: ModoOfertaHoje | null): void => { ofertaForcada = m; };
+export const modoOfertaHoje = (): ModoOfertaHoje => ofertaForcada ?? OFERTA_HOJE;
+
 let forcaNaMemoria: ModoChave | null = null;
 /** Só testes. */
 export const _zerarForcaHoje = (): void => { forcaNaMemoria = null; };
@@ -55,12 +75,20 @@ export function funilHojeLigado(busca: string = typeof window === "undefined" ? 
 /* ───────────────────────── planos e ofertas ───────────────────────── */
 
 export type PlanoHoje = "anual" | "mensal";
-export type OfertaHoje = "h279" | "h149" | "h279k" | "h149k" | "hv47" | "hv27" | "hc199";
+/** 21/10: + u2027 ("Seu 2027 já organizado", src/lib/upsell-2027.ts), pv149 (o presente) e pk99 (o plano de 30 dias do "Agora não") — src/lib/presente.ts; o PixHoje cobra os dois. */
+export type OfertaHoje = "h279" | "h149" | "h279k" | "h149k" | "hv279" | "hv47" | "hv27" | "hc199" | "pv149" | "pk99" | "u2027";
 
 /** O preço de cada oferta em REAIS (o servidor guarda em centavos: ofertas-hoje.ts PRECOS_HOJE). */
 export const VALOR_OFERTA: Record<OfertaHoje, number> = {
-  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv47: 47, hv27: 27, hc199: 19.9,
+  h279: 27.9, h149: 14.9, h279k: 37.8, h149k: 24.8, hv279: 27.9, hv47: 47, hv27: 27, hc199: 19.9, pv149: 14.9, pk99: 9.9, u2027: 19.9,
 };
+/** 20/10: o vitalício como PLANO do /hoje (OFERTA_HOJE = "vitalicio") — o mesmo produto/preço do /inicio (w27). */
+export const PLANO_VITALICIO = { oferta: "hv279" as const, valor: 27.9, conteudo: "core_vitalicio_hoje" };
+/** As ofertas que deixam a conta VITALÍCIA (o plano vitalício ou um upsell pra sempre). */
+export const OFERTAS_PRA_SEMPRE: readonly OfertaHoje[] = ["hv279", "hv47", "hv27"];
+export const ehPraSempre = (o: OfertaHoje | null | undefined): boolean => !!o && OFERTAS_PRA_SEMPRE.includes(o);
+/** A compra PRINCIPAL (o plano: anual/mês/kit ou o vitalício) — não um upsell. */
+export const ehPlanoDoHoje = (o: OfertaHoje | null | undefined): boolean => !!o && ["h279", "h149", "h279k", "h149k", "hv279"].includes(o);
 export const PRECO_KIT = 9.9;
 export const PRECO_ANUAL_DEPOIS = 97.9;
 
@@ -151,7 +179,7 @@ export function itensParaGravar(renda: number, contas: Conta[], agora: Date = ne
 
 /** O fim do acesso que a pessoa comprou até aqui (o servidor decide de verdade; isto é só o texto da tela). */
 export function fimDoAcesso(plano: PlanoHoje, pagos: OfertaHoje[], desde: Date = new Date()): { vitalicio: boolean; fim: Date } {
-  if (pagos.includes("hv47") || pagos.includes("hv27")) return { vitalicio: true, fim: new Date(desde.getTime() + 100 * 365 * 86_400_000) };
+  if (pagos.some(ehPraSempre)) return { vitalicio: true, fim: new Date(desde.getTime() + 100 * 365 * 86_400_000) };
   const fim = new Date(desde);
   fim.setDate(fim.getDate() + PLANOS[plano].dias);
   return { vitalicio: false, fim };

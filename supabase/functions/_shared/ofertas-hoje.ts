@@ -9,7 +9,8 @@
  *   h279k  1º ano + Kit Primeiro Mês Organizado (order bump +R$ 9,90) = R$ 37,80 num Pix só · 365 dias
  *   h149k  mês + Kit = R$ 24,80 num Pix só · 30 dias
  *     O bump vai NO MESMO Pix (o botão soma o valor) — dois Pix pra uma decisão seria pedir dois pagamentos. O kit em
- *     si é conteúdo do app: a página grava `core-kit-primeiro-mes` na conta (user_data) e o app libera.
+ *     si é conteúdo do app: o SERVIDOR grava `core-kit-primeiro-mes` na conta (user_data) quando confirma o Pix
+ *     (presente.ts liberarKitDoBump; 21/10 — antes a página gravava pelo cliente) e o app libera.
  * Upsells depois do pagamento (1 tela cada, sempre com "Não, obrigado"):
  *   hv47   "Troque o 1º ano pelo CORE pra sempre" +R$ 47 → VITALÍCIO (+100 anos, como o vitalício de sempre)
  *   hv27   downsell de quem recusou o hv47 (dono, 18/10): "O CORE pra sempre por R$ 27" → o MESMO vitalício (+100 anos),
@@ -20,7 +21,10 @@
  * pedido preservados pra receita e pra trava de "1 pedido = 1 crédito").
  */
 export const PRECOS_HOJE: Record<string, number> = {
-  h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv47: 4700, hv27: 2700, hc199: 1990,
+  h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990,
+  // 21/10: o upsell "Seu 2027 já organizado" (R$ 19,90, uma vez) — NÃO é assinatura: fora do CONCESSAO_HOJE; o pagamento
+  // grava o pacote na conta de quem pagou (_shared/pacote-2027.ts). Aqui pra entrar nas 3 funções pelo `...PRECOS_HOJE`.
+  u2027: 1990,
 };
 
 export type ConcessaoHoje = { plano: string; periodo: string; dias: number | null; linhaNova?: boolean };
@@ -30,17 +34,20 @@ export const CONCESSAO_HOJE: Record<string, ConcessaoHoje> = {
   h149: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
   h279k: { plano: "core-pro", periodo: "annual", dias: 365 },
   h149k: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+  hv279: { plano: "lifetime", periodo: "lifetime", dias: null },
   hv47: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
   hv27: { plano: "lifetime", periodo: "lifetime", dias: null, linhaNova: true },
 };
 
 export const DESCRICAO_HOJE: Record<string, string> = {
-  h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit",
-  hv47: "CORE pra sempre", hv27: "CORE pra sempre", hc199: "CORE a dois",
+  h279: "CORE 1 ano", h149: "CORE 30 dias", h279k: "CORE 1 ano + kit", h149k: "CORE 30 dias + kit", hv279: "CORE vitalicio",
+  hv47: "CORE pra sempre", hv27: "CORE pra sempre", hc199: "CORE a dois", u2027: "CORE seu 2027",
 };
 
 /** Os planos (a compra principal do /hoje) — são eles que levam as boas-vindas. */
-export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k"];
+export const OFERTAS_PLANO_HOJE: readonly string[] = ["h279", "h149", "h279k", "h149k", "hv279"];
+/** 20/10: o plano VITALÍCIO do /hoje (o e-mail de boas-vindas diz "pra sempre"). */
+export const OFERTA_VITALICIO_HOJE = "hv279";
 /** Os upsells (sem boas-vindas próprias: quem comprou já recebe a do plano). */
 export const OFERTAS_UPSELL_HOJE: readonly string[] = ["hv47", "hv27", "hc199"];
 export const OFERTA_CASAL = "hc199";
@@ -55,3 +62,7 @@ export const temKit = (o: string | null | undefined): boolean => !!o && OFERTAS_
 export const chaveCapiCasal = (orderId: string): string => `hoje-casal-capi:${orderId}`;
 /** Chave da liberação da(o) parceira(o): 1 pedido = 1 conta liberada. */
 export const chaveParceiro = (orderId: string): string => `hoje-casal:${orderId}`;
+
+/** 21/10: o upsell "Seu 2027 já organizado" (R$ 19,90) — conteúdo do app na conta de quem pagou, não acesso. */
+export const OFERTA_2027 = "u2027";
+export const eh2027 = (o: string | null | undefined): boolean => o === OFERTA_2027;

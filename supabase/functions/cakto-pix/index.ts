@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
 
 /**
  * Pix TRANSPARENTE via API da Cakto (13/07): gera a cobrança e devolve o
@@ -86,7 +87,7 @@ const CAKTO_LENTA_MS = 10_000; // só pra log: acima disso fica marcado no cron�
  *   toque tenta de novo do jeito de sempre (aí, se falhar, conta).
  * - DESLIGAR = false aqui + redeploy: o aquecimento passa a responder
  *   adiantar:false e o front para de pedir na hora (sem push). */
-const PIX_ADIANTADO_LIGADO = true;
+const PIX_ADIANTADO_LIGADO = false; // 22/10: segue DESLIGADO (decisão do dono 27/09 — a Cakto manda e-mail de Pix pendente)
 const OFERTAS_ADIANTADAS = new Set(["w27"]);
 
 /** `pix.expirationDate` da Cakto → ms (26/09). Sem fuso, lê como UTC — a leitura
@@ -501,6 +502,14 @@ serve(async (req) => {
     const parsed = RequestSchema.safeParse(rawBody);
     if (!parsed.success) return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
     const body = parsed.data;
+
+    /* 21/10 (segurança): o downsell (vitalício com desconto) só pra quem já viu o preço cheio ou é do winback —
+     * antes qualquer conta pedia direto (_shared/elegibilidade-downsell.ts). Nenhum funil manda downsell pra Cakto
+     * (OFERTAS_NA_CAKTO = w27); a trava fecha o pedido direto. */
+    if (ehDownsell(body.offer)) {
+      const v = await podePedirDownsell(supabaseAdmin, { userId: user.id });
+      if (!v.ok) { logStep("Downsell fora do fluxo — recusado", { userId: user.id }); return jsonResponse({ error: MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v.motivo }, 403); }
+    }
 
     // Pix adiantado (26/09): só a w27 (a trava de preço vale aqui também).
     const pixAdiantado = body.adiantado === true;

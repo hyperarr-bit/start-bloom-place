@@ -37,6 +37,9 @@ describe("a carga das migrações", () => {
   it("a migração de segurança roda inteira", () => {
     expect(falhas.filter((f) => f.arquivo.startsWith("20261022120000"))).toEqual([]);
   });
+  it("a migração do conteúdo pago roda inteira", () => {
+    expect(falhas.filter((f) => f.arquivo.startsWith("20261022130000"))).toEqual([]);
+  });
 });
 
 describe("toda tabela do public tem RLS", () => {
@@ -156,5 +159,43 @@ describe("storage", () => {
     const r = await db.query(`select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'
       and 'anon' = any(roles) and cmd = 'SELECT'`);
     expect(r.rows).toEqual([]);
+  });
+});
+
+describe("conteúdo pago (kit / Seu 2027): só o servidor libera (migração 20261022130000)", () => {
+  const PAGAS = ["core-pacote-2027", "core-kit-primeiro-mes"];
+  const VALOR = `{"comprado": true, "pedido": "forjado"}`;
+  it("o dono NÃO insere a chave paga na própria conta (nem pelo upsert do app)", async () => {
+    for (const k of PAGAS) {
+      expect(await comoUsuario(db, ANA, () => tenta(() => db.query(`insert into public.user_data (user_id, key, value) values ($1, $2, $3)`, [ANA, k, VALOR]))), k).toMatch(/row-level security/);
+      expect(await comoUsuario(db, ANA, () => tenta(() => db.query(
+        `insert into public.user_data (user_id, key, value) values ($1, $2, $3) on conflict (user_id, key) do update set value = excluded.value`, [ANA, k, VALOR],
+      ))), `${k} upsert`).toMatch(/row-level security/);
+    }
+    const r = await db.query(`select key from public.user_data where user_id = $1 and key = any($2)`, [ANA, PAGAS]);
+    expect(r.rows).toEqual([]);
+  });
+  it("o servidor (service_role) libera; o dono LÊ, mas não altera, não renomeia outra chave pra paga e não apaga", async () => {
+    for (const k of PAGAS) {
+      expect(await comoPapel(db, "service_role", null, () => tenta(() => db.query(`insert into public.user_data (user_id, key, value) values ($1, $2, '{"comprado": true, "pedido": "qr_ok"}')`, [BIA, k])))).toBe("ok");
+    }
+    const lidas = await comoUsuario(db, BIA, () => db.query<{ key: string }>(`select key from public.user_data where key = any($1) order by key`, [PAGAS]));
+    expect(lidas.rows.map((x) => x.key)).toEqual([...PAGAS].sort());
+    // alterar a linha paga: a RLS filtra (0 linhas) ou recusa — o valor do servidor fica
+    for (const k of PAGAS) {
+      await comoUsuario(db, BIA, () => tenta(() => db.query(`update public.user_data set value = '{"comprado": true, "pedido": "outro"}' where user_id = $1 and key = $2`, [BIA, k])));
+    }
+    // transformar uma chave comum em paga: recusado
+    expect(await comoUsuario(db, BIA, () => tenta(() => db.query(`update public.user_data set key = 'core-pacote-2027' where user_id = $1 and key = 'core-financas'`, [BIA])))).toMatch(/row-level security/);
+    // "Começar do zero" (delete de tudo): o comum sai, o pago fica
+    await comoUsuario(db, BIA, () => db.query(`delete from public.user_data where user_id = $1`, [BIA]));
+    const ficou = await db.query<{ key: string; value: { pedido: string } }>(`select key, value from public.user_data where user_id = $1 order by key`, [BIA]);
+    expect(ficou.rows.map((x) => x.key)).toEqual([...PAGAS].sort());
+    expect(ficou.rows.every((x) => x.value.pedido === "qr_ok")).toBe(true);
+  });
+  it("as chaves de progresso continuam do cliente (filtro por chave exata)", async () => {
+    for (const k of ["core-kit-primeiro-mes-progresso", "core-kit-dividas", "core-pacote-2027-plano", "core-pacote-2027-cofrinho", "core-tip-seen-pacote-2027"]) {
+      expect(await comoUsuario(db, ANA, () => tenta(() => db.query(`insert into public.user_data (user_id, key, value) values ($1, $2, '{}')`, [ANA, k]))), k).toBe("ok");
+    }
   });
 });

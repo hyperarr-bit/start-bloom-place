@@ -1,0 +1,111 @@
+/* UPSELL "SEU 2027 JÁ ORGANIZADO" (21/10) — a mesma régua do upsell de presente (fundo lavanda neutro, wash rosa que
+   morre no neutro, cards brancos raio 22 com sombra em 2 camadas, CTA pílula grafite 56 px, ilustração sticker com
+   contorno de tinta) na identidade do CORE: Inter, grafite, magenta, cara de planner (folha pautada, argolas, fita).
+   Escopo `.u27`; vive DENTRO do `.fn` do /hoje (mesmos botões/Pix) ou num `.fn.u27-sobre` por cima do checkout do
+   /inicio. Seletores `button.u27-…` de propósito: o index.css zera o fundo de [type="button"]. Independente do
+   presente.css (os dois ramos juntam sem depender um do outro). */
+.u27 {
+  --u27-fundo: #f3f2f7;
+  --u27-tinta: #16121c;
+  --u27-tinta-2: #6b6575;
+  --u27-magenta: #d6338a;
+  --u27-magenta-forte: #b8206f;
+  --u27-magenta-suave: #fde8f2;
+  --u27-sol: #ffd25e;
+  --u27-ok: #16a34a;
+  --u27-card: #ffffff;
+  --u27-linha: rgba(22, 18, 28, .09);
+  --u27-sombra: 0 1px 2px rgba(22, 18, 28, .05), 0 10px 30px rgba(22, 18, 28, .09);
+  --u27-sombra-cta: 0 2px 4px rgba(22, 18, 28, .18), 0 10px 24px rgba(22, 18, 28, .22);
+  background: linear-gradient(180deg, #ffe3ef 0%, #f6eef6 34%, var(--u27-fundo) 62%);
+  color: var(--u27-tinta);
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+}
+.fn.u27-sobre { z-index: 450; }
+.u27 * { box-sizing: border-box; }
+
+.u27-tela { display: flex; flex-direction: column; flex: 1; min-height: 100%; animation: u27-entra .32s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes u27-entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.u27-col { padding: 14px 22px 0; display: flex; flex-direction: column; flex: 1; }
+
+.u27-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; }
+.u27-marca { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .16em; }
+.u27-marca i { width: 7px; height: 7px; border-radius: 50%; background: var(--u27-magenta); }
+.u27-ok { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 99px; background: rgba(22, 163, 74, .1); color: #15803d; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+.u27-cena { position: relative; display: grid; place-items: center; height: 150px; margin: 4px 0 0; }
+.u27-cena::before { content: ""; position: absolute; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, 0) 68%); }
+.u27-cena svg { position: relative; animation: u27-flutua 3.4s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(214, 51, 138, .18)); }
+@keyframes u27-flutua { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-6px) rotate(1.5deg); } }
+.u27-cena-grande { height: 186px; }
+@media (prefers-reduced-motion: reduce) { .u27-cena svg, .u27-tela { animation: none; } }
+
+.u27-titulo { font-size: 31px; line-height: 1.06; font-weight: 900; letter-spacing: -.035em; margin: 0; text-align: center; text-wrap: balance; }
+.u27-titulo em { font-style: normal; color: var(--u27-magenta); }
+.u27-sub { margin: 10px auto 0; max-width: 31ch; text-align: center; color: var(--u27-tinta-2); font-size: 15.5px; line-height: 1.42; font-weight: 500; text-wrap: balance; }
+.u27-sub b { color: var(--u27-tinta); font-weight: 800; }
+
+/* o que vem no pacote: 4 linhas com ícone (versão visual) */
+.u27-lista { margin-top: 18px; background: var(--u27-card); border-radius: 22px; box-shadow: var(--u27-sombra); padding: 4px 16px; }
+.u27-lista ul { margin: 0; padding: 0; }
+.u27-lista li { list-style: none; display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.u27-lista li + li { border-top: 1px solid var(--u27-linha); }
+.u27-lista i { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-style: normal; font-size: 18px; flex: 0 0 auto; background: var(--u27-magenta-suave); }
+.u27-lista b { display: block; font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+.u27-lista small { display: block; font-size: 12.5px; font-weight: 600; color: var(--u27-tinta-2); margin-top: 1px; line-height: 1.3; }
+.u27-lista [data-bonus] { font-style: normal; margin-left: auto; align-self: center; font-size: 10px; font-weight: 900; letter-spacing: .08em; color: var(--u27-magenta-forte); background: var(--u27-magenta-suave); padding: 4px 7px; border-radius: 99px; flex: 0 0 auto; }
+
+/* versão curta: chips */
+.u27-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 16px; }
+.u27-chips span { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 99px; background: rgba(255, 255, 255, .78); font-size: 13px; font-weight: 700; color: #3b3542; box-shadow: 0 1px 2px rgba(22, 18, 28, .05); }
+
+/* a folha do planner 2027 (prévia): 12 meses em grade, o mês 1 marcado */
+.u27-folha { position: relative; margin-top: 16px; padding: 14px 14px 12px 26px; border-radius: 22px; background: #fff; box-shadow: var(--u27-sombra); }
+.u27-folha::before { content: ""; position: absolute; left: 9px; top: 18px; bottom: 18px; width: 6px; background: radial-gradient(circle, #d9d3df 2.6px, transparent 3px) 0 0 / 6px 14px repeat-y; }
+.u27-folha-topo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.u27-folha-topo b { font-size: 12px; font-weight: 900; letter-spacing: .12em; }
+.u27-folha-topo small { font-size: 11px; font-weight: 700; color: var(--u27-tinta-2); }
+.u27-meses { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 10px; }
+.u27-meses span { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 5px; border-radius: 10px; background: #f6f4f8; font-size: 10.5px; font-weight: 800; color: #3b3542; }
+.u27-meses span i { width: 14px; height: 14px; border-radius: 5px; border: 2px solid #cfc9d6; background: #fff; }
+.u27-meses span[data-on] { background: var(--u27-magenta-suave); color: var(--u27-magenta-forte); }
+.u27-meses span[data-on] i { border-color: var(--u27-magenta); background: var(--u27-magenta); }
+
+/* preço em linha (as duas versões) */
+.u27-preco { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 13px 16px; border-radius: 20px; background: var(--u27-tinta); color: #fff; }
+.u27-preco b { display: block; font-size: 14.5px; font-weight: 800; }
+.u27-preco small { display: block; font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, .72); line-height: 1.35; }
+.u27-preco strong { font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1; white-space: nowrap; }
+.u27-preco-linha { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-top: 16px; }
+.u27-preco-linha strong { font-size: 32px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+.u27-preco-linha small { font-size: 13px; font-weight: 600; color: var(--u27-tinta-2); }
+
+.u27-rodape { position: sticky; bottom: 0; padding: 14px 22px calc(14px + env(safe-area-inset-bottom)); margin-top: auto; background: linear-gradient(180deg, rgba(243, 242, 247, 0) 0%, var(--u27-fundo) 26%); display: flex; flex-direction: column; gap: 6px; }
+button.u27-cta, a.u27-cta { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; min-height: 56px; padding: 0 22px; border: 0; border-radius: 99px; background: var(--u27-tinta); color: #fff; font-family: inherit; font-size: 16.5px; font-weight: 800; letter-spacing: -.01em; box-shadow: var(--u27-sombra-cta); cursor: pointer; text-decoration: none; transition: transform .1s ease; }
+button.u27-cta:active, a.u27-cta:active { transform: scale(.98); }
+button.u27-cta:disabled { opacity: .45; box-shadow: none; }
+button.u27-nao { min-height: 44px; border: 0; background: none; color: var(--u27-tinta-2); font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.u27-miuda { margin: 2px 0 0; text-align: center; font-size: 12.5px; color: var(--u27-tinta-2); line-height: 1.4; }
+
+/* pago: "Pronto, seu 2027 tá no seu CORE" */
+.u27-entregue { margin-top: 18px; background: var(--u27-card); border-radius: 22px; box-shadow: var(--u27-sombra); padding: 6px 16px; }
+.u27-entregue li { list-style: none; display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 14.5px; font-weight: 700; }
+.u27-entregue li + li { border-top: 1px solid var(--u27-linha); }
+.u27-entregue ul { margin: 0; padding: 0; }
+.u27-entregue i { width: 22px; height: 22px; border-radius: 50%; background: rgba(22, 163, 74, .12); color: var(--u27-ok); display: grid; place-items: center; flex: 0 0 auto; font-style: normal; }
+.u27-onde { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: var(--u27-magenta-suave); font-size: 13.5px; line-height: 1.45; color: #3b2a35; text-align: center; }
+.u27-onde b { color: var(--u27-tinta); }
+
+/* o Pix do pacote é o PixHoje (as classes .fn-…) com a cara do pacote por cima */
+.u27 .fn-rodape { background: transparent; }
+.u27 .fn-pix-valor { color: var(--u27-tinta); }
+.u27 .fn-pix-rotulo { color: var(--u27-magenta-forte); font-weight: 800; }
+.u27 button.fn-copiar-btn { border-radius: 99px; }
+.u27 .fn-topo { background: transparent; }
+.u27-pix-cabeca { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 22px -6px; padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, .72); font-size: 13.5px; font-weight: 800; color: var(--u27-magenta-forte); }
+
+/* confete leve no pago (só CSS; some com prefers-reduced-motion) */
+.u27-confete { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.u27-confete i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: u27-cai 2.4s ease-in forwards; }
+@keyframes u27-cai { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(520px) rotate(540deg); } }
+@media (prefers-reduced-motion: reduce) { .u27-confete { display: none; } }

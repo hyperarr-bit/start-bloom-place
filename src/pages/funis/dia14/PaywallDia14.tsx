@@ -21,6 +21,8 @@ import { isNativeShell } from "@/lib/native-shell";
 import { ehApple } from "@/lib/loja";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
+import { backLigado, sairDeVerdade, useSegurarVoltar, varianteDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
 
 /**
  * CÓPIA CONGELADA do paywall do DIA 14 (83c0d98, 14/07 22:30) — usada só pelo
@@ -1218,8 +1220,11 @@ export function PaywallDia14({
    * ela aperta voltar, nada acontece na tela, e o funil parece travado. Então o
    * listener se remove no primeiro disparo — e, se o resgate já tinha sido gasto
    * (pelo X, por exemplo), eu mesmo mando o voltar adiante. Ninguém fica preso. */
+  /* BACK (21/10, src/lib/back-funil.ts): com a chave ligada, o degrau do voltar é o do back — este, antigo, sai do
+   * caminho (com a roleta desligada ele só repassava o voltar; os dois juntos fariam o 1º voltar sair da página). */
+  const [backNoMount] = useState<boolean>(() => !nativoNoMount.current && context === "funnel" && backLigado());
   useEffect(() => {
-    if (nativoNoMount.current) return;
+    if (nativoNoMount.current || backNoMount) return;
     window.history.pushState({ paywallDia14: true }, "");
     const onPop = () => {
       window.removeEventListener("popstate", onPop);
@@ -1231,6 +1236,7 @@ export function PaywallDia14({
   }, []);
 
   const navigate = useNavigate();
+  const [backAberto, setBackAberto] = useState(false);
   // Braço congelado no mount: ninguém vê a tela trocar de cara no meio.
   const { user: abUser, isSubscribed, subLoaded } = useAuth();
   const [braco] = useState<PaywallArm>(() => bracoPaywall(abUser?.id));
@@ -1265,6 +1271,10 @@ export function PaywallDia14({
     if (answers && Object.keys(answers).length) return answers;
     try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
   });
+
+  /* BACK na OFERTA: o voltar do navegador (1x por sessão) mostra a mesma oferta de 27,90 em vez de sair.
+   * Só na oferta (sem o Pix por cima — lá o back é o do Pix, dentro do PixCheckout) e nunca pra quem já tem acesso. */
+  useSegurarVoltar("inicio", "oferta", backNoMount && phase === "offer" && !pixOffer && !(subLoaded && isSubscribed), () => setBackAberto(true));
 
   // Funil ROI 2 (27/09): congelado no mount, como o braço — a tela não troca
   // de cara no meio. Rollback = FUNIL_ROI2 em src/lib/funil-roi2.ts.
@@ -1331,6 +1341,19 @@ export function PaywallDia14({
           onClose={fecharPix}
           v2={!funilB && onPagoSemConta ? { onConfirmado: onPagoSemConta } : undefined}
           funilB={funilB ? { aoConfirmar: () => onPagoSemConta?.() } : undefined}
+          backFunil={backNoMount && pixOffer === OFERTA_WEB ? "inicio" : undefined}
+        />
+      )}
+      {backAberto && !pixOffer && (
+        <BackFolha
+          funil="inicio"
+          etapa="oferta"
+          variante={varianteDoBack()}
+          preco={PRICING.lifetime.total}
+          extra={{ paywall_ab: braco, roi2, ...marcaDoFunilB(funilB) }}
+          onQuero={() => { setBackAberto(false); openPixIntent(OFERTA_WEB, "back_quero", context, abrirPix, marcaDoFunilB(funilB)); }}
+          onFicar={() => setBackAberto(false)}
+          onSair={() => { setBackAberto(false); sairDeVerdade(); }}
         />
       )}
       <div className="px-5">

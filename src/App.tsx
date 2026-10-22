@@ -433,6 +433,9 @@ const AssinaturaApp = lazyPage(() => import("./pages/funis/app-web/AssinaturaApp
 // os dois no Pix da Asaas SEM conta antes → upsells → e-mail → o app web logado com as Finanças montadas. Só na WEB
 // (SoNaWeb), noindex, sem link no site, atrás da chave FUNIL_HOJE (padrão OFF; QA ?funil-hoje=on — pages/hoje/conteudo).
 const FunilHoje = lazyPage(() => import("./pages/hoje/FunilHoje"));
+// 21/10: o UPSELL DE PRESENTE — a página que a pessoa presenteada abre (/presente/<código>): cria a conta e ganha o
+// vitalício (função presente-resgatar). Só na WEB (SoNaWeb), noindex. Sem venda (chave UPSELL_PRESENTE off) não existe código.
+const ResgatePresente = lazyPage(() => import("./pages/presente/ResgatePresente"));
 // 18/10: o FUNIL DA MISSÃO (protótipo, chave FUNIL_MISSAO off): /missao é o missao.html leve; o app monta no módulo
 // da área, sem cadastro, direto no tutorial da missão. /missao/app = entrada direta. A camada (oferta depois da
 // dose 1) só carrega com o convidado da missão ativo. Ver lib/missao-web.
@@ -485,6 +488,8 @@ const Relacionamentos = lazyPage(() => import("./pages/Relacionamentos"));
 const PetPage = lazyPage(() => import("./pages/Pet"));
 const Detox = lazyPage(() => import("./pages/Detox"));
 const Conquistas = lazyPage(() => import("./pages/Conquistas"));
+// 21/10: o plano de 30 dias da área comprada no downsell do presente (src/lib/plano-30-areas) — só com a compra
+const Plano30 = lazyPage(() => import("./pages/Plano30"));
 const Retrospectiva = lazyPage(() => import("./pages/Retrospectiva"));
 const Notificacoes = lazyPage(() => import("./pages/Notificacoes"));
 // 1.0.17 (parte 3): as abas Módulos e Você (lib/nav-abas, chave NAV_ABAS — DESLIGADA: fica pra depois da 1.0.17,
@@ -719,6 +724,7 @@ const AnimatedRoutes = () => {
             replaceState): devolve pro módulo — a camada vê a saída e mostra a oferta */}
         <Route path="/missao" element={<SoNaWeb><RouteErrorBoundary routeName="funil-missao"><EntradaMissao /></RouteErrorBoundary></SoNaWeb>} />
         <Route path="/hoje" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
+        <Route path="/presente/:codigo" element={<SoNaWeb><RouteErrorBoundary routeName="presente"><ResgatePresente /></RouteErrorBoundary></SoNaWeb>} />
         {/* 19/10: a variante "demo" do /hoje (?v=demo) — Finanças com os números da pessoa; o mesmo componente decide */}
         <Route path="/hoje/demo" element={<SoNaWeb><RouteErrorBoundary routeName="funil-hoje"><FunilHoje /></RouteErrorBoundary></SoNaWeb>} />
         {/* 09/10: painel público da afiliada — o token na URL é a senha; sem login, sem dado de cliente */}
@@ -837,6 +843,7 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="pet"><TrackedModule moduleId="pet"><PetPage /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="detox"><TrackedModule moduleId="detox"><Detox /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        <Route path="/plano-30" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="plano-30"><Plano30 /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         {/* Destino da notificação mensal e do item do menu. Fora do TrackedModule:
             não é módulo, é uma tela transversal que lê todos eles. */}
         <Route path="/retrospectiva" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="retrospectiva"><Retrospectiva /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />

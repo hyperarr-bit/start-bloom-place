@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { registroDoPedido } from "../_shared/registro-pedido.ts";
+import { respostaGatewayDesativado } from "../_shared/gateway-desativado.ts";
 
 /**
  * Webhook da AbacatePay (19/07) — fecha o buraco do "pagou e não liberou".
@@ -140,6 +141,10 @@ const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html
 </body></html>`;
 
 serve(async (req) => {
+  // 21/10: gateway antigo DESLIGADO (dono aprovou) — 410 antes de qualquer leitura/escrita (_shared/gateway-desativado.ts)
+  const desligado = respostaGatewayDesativado(req, "abacate-webhook");
+  if (desligado) return desligado;
+
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   const secret = Deno.env.get("ABACATE_WEBHOOK_SECRET");

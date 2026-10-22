@@ -10,7 +10,10 @@ html[data-intro-modulo-faixa="1"] header.sticky { top: calc(var(--app-safe-top, 
   font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
   box-shadow: 0 1px 0 rgba(0,0,0,.08);
 }
-.im-faixa-titulo { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* B3 (1.0.18, QA 21/10): "PRIMEIRA VEZ AQUI · PONHA 1 LIVRO NA E…" — o pedido, que é o que ela precisa ler, saía cortado
+   com reticências (Biblioteca, Detox, Treino no SE). Até 2 linhas dentro dos mesmos 36 px (11 px × 1,15 × 2 = 25 px);
+   pedido curto continua numa linha só, igual a antes. */
+.im-faixa-titulo { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
 /* `button.` NAS REGRAS COM FUNDO (polimento 17/10): esta folha entra ANTES do index.css (main.tsx importa o App
    antes do index.css), e o preflight `button, [type="button"] { background-color: transparent }` tem a MESMA
    especificidade de uma classe — ganhava por vir depois, e o "Ver" do lembrete, o "Próxima" do balão do passeio e

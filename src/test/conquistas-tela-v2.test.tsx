@@ -526,3 +526,18 @@ describe("momentos: no máximo 3 festas de tela cheia de uma vez (01/10: comuns 
     for (const id of ["first-income", "multi-income", "investor-100k", "investor-1k", "investor-10k", "investor-50k", "bills-ok", "wishlist"]) expect(gravadas[id]).toBe(HOJE);
   });
 });
+
+describe("1.0.18 (menu novo): a Retrospectiva sai do menu e ganha a porta fixa no fim das Conquistas", () => {
+  afterEach(() => { try { localStorage.removeItem("core-menu-novo"); } catch { /* noop */ } });
+  it("menu novo (padrão): o link leva à /retrospectiva", async () => {
+    abrir(montarStore(cenario()));
+    fireEvent.click(await screen.findByTestId("conquistas-retrospectiva"));
+    expect(await screen.findByText("outra tela")).toBeTruthy();
+  });
+  it("menu_novo off: o link não existe (a Retrospectiva volta pro menu)", async () => {
+    localStorage.setItem("core-menu-novo", "off");
+    abrir(montarStore(cenario()));
+    await screen.findByTestId("tela-conquistas");
+    expect(screen.queryByTestId("conquistas-retrospectiva")).toBeNull();
+  });
+});

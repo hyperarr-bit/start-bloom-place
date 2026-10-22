@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon, CloudSun, Sunset, Pencil, ChevronDown } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
@@ -10,7 +10,13 @@ import { NameEditDialog } from "./NameEditDialog";
 import { AccountDrawer } from "./AccountDrawer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, aguaQueFalta, normalizarCopoMl } from "@/lib/saude-copo";
-import { navAbasLigada } from "@/lib/nav-abas";
+import { navAbasLigada, lerTela } from "@/lib/nav-abas";
+import { consumirAvisoMenuNovo, menuNovoLigado } from "@/lib/menu-novo";
+import { useTheme } from "@/hooks/use-theme";
+
+/** O aviso único do menu novo espera a Home assentar (e nenhuma camada por cima) e some sozinho. */
+const AVISO_ESPERA_MS = 1200;
+const AVISO_DURA_MS = 8000;
 
 interface GreetingHeaderProps {
   data: LifeHubData;
@@ -89,8 +95,51 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  // 1.0.18: a folha pode abrir direto na Aparência (o toque no aviso único)
+  const [inicialDaFolha, setInicialDaFolha] = useState<"menu" | "aparencia">("menu");
   // 1.0.17: com a barra de abas, avatar (folha da conta), sol e paleta moram no Você — o topo fica só a saudação
   const comAbas = navAbasLigada() && !!user;
+  // 1.0.18 (lib/menu-novo): o menu em 3 grupos; o sol e a paleta saem do topo e vão pra Aparência dentro dele.
+  // `menu_novo: off` (RevenueCat) = o topo de hoje, com os dois.
+  const menuNovo = menuNovoLigado();
+  const { mode, palette } = useTheme();
+  const [aviso, setAviso] = useState(false);
+
+  /* O AVISO ÚNICO: quem estava no escuro ou numa cor ≠ Original quando o menu novo aparece pela 1ª vez vê um balão
+   * no avatar, uma vez por aparelho (gravado na hora em que aparece — reabrir o app não repete). Espera a Home
+   * assentar e nenhuma camada por cima (tour, missão, festa, folha aberta); quem está no Claro · Original é marcado
+   * "não precisa" na 1ª Home e nunca vê. */
+  useEffect(() => {
+    if (!menuNovo || comAbas || !user) return;
+    let tentativas = 0;
+    let fim: ReturnType<typeof setTimeout> | undefined;
+    const tentar = (): boolean => {
+      const { camadaPorCima } = lerTela();
+      if (camadaPorCima || document.querySelector('[role="dialog"]')) return false;
+      if (consumirAvisoMenuNovo(mode, palette)) {
+        setAviso(true);
+        trackEvent("menu_novo_aviso_visto", { modo: mode, paleta: palette });
+        fim = setTimeout(() => setAviso(false), AVISO_DURA_MS);
+      }
+      return true;
+    };
+    let id: ReturnType<typeof setInterval> | undefined;
+    const t = setTimeout(() => {
+      if (tentar()) return;
+      id = setInterval(() => { if (tentar() || ++tentativas > 120) clearInterval(id); }, 1000);
+    }, AVISO_ESPERA_MS);
+    return () => { clearTimeout(t); if (id) clearInterval(id); if (fim) clearTimeout(fim); };
+    // o tema de quando a Home abriu é o que decide (trocar de tema depois não reabre a pergunta)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuNovo, comAbas, !!user]);
+
+  const abrirMenu = (via: "avatar" | "aviso") => {
+    trackEvent("account_drawer_open", menuNovo ? { via, menu: "novo" } : { via });
+    if (via === "aviso") trackEvent("menu_novo_aviso_toque", {});
+    setAviso(false);
+    setInicialDaFolha(via === "aviso" ? "aparencia" : "menu");
+    setShowAccount(true);
+  };
 
   /* B4 (1.0.18, QA 21/10): `Que tal ler um pouco de "Dom casmurro"? 📖` quebrava com o 📖 sozinho numa 3ª linha, e ao
    * rolar o rótulo "AÇÕES RÁPIDAS" aparecia por baixo dele (o cabeçalho sticky não cobria essa linha). Dois cintos:
@@ -148,8 +197,9 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
               avatar É o menu — anel degradê + mini-badge ⌄ no canto, padrão
               Google/Instagram. Um elemento só, nada solto do lado.
               account_drawer_open segue medindo a descoberta real. */}
+          <span className="relative">
           <motion.button
-            onClick={() => { trackEvent("account_drawer_open", { via: "avatar" }); setShowAccount(true); }}
+            onClick={() => abrirMenu("avatar")}
             className="relative rounded-full"
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"
@@ -165,7 +215,26 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
               <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" strokeWidth={3} />
             </span>
           </motion.button>
-          <ThemeToggle showPalette />
+          {aviso && (
+            <motion.button
+              type="button"
+              onClick={() => abrirMenu("aviso")}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute right-0 top-full mt-2.5 z-50 w-[15.5rem] rounded-xl px-3.5 py-2.5 text-left text-[12.5px] leading-snug shadow-lg bg-foreground text-background"
+              data-testid="aviso-menu-novo"
+              aria-live="polite"
+            >
+              {/* a setinha aponta pro avatar */}
+              <span aria-hidden className="absolute -top-1.5 right-3.5 w-3 h-3 rotate-45 bg-foreground" />
+              <span className="relative block">
+                Modo escuro e cores agora ficam aqui no menu, em <b className="font-bold">Aparência</b> ›
+              </span>
+            </motion.button>
+          )}
+          </span>
+          {!menuNovo && <ThemeToggle showPalette origem="home_topo" />}
         </div>}
       </motion.div>
 
@@ -185,6 +254,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
       {!comAbas && <AccountDrawer
         open={showAccount}
         onOpenChange={setShowAccount}
+        inicial={inicialDaFolha}
         displayName={nomeCompleto}
         onNameChange={onNameChange}
         onReplayTutorial={onReplayTutorial}

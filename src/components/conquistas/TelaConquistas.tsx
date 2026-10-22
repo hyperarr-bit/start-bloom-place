@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LinkRetrospectiva } from "@/components/conquistas/LinkRetrospectiva";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
@@ -340,6 +341,7 @@ export const TelaConquistas = () => {
               onCompartilhar={compartilharAlbum}
             />
           </div>
+          <LinkRetrospectiva />
         </main>
       )}
 

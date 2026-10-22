@@ -1,6 +1,6 @@
-import { useState, useEffect, startTransition } from "react";
+import { useState, useEffect, startTransition, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, ChevronRight, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy, Eraser, Star, Palette, Shield, FileText, type LucideIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,6 +15,46 @@ import { NameEditDialog } from "./NameEditDialog";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { ApagarDadosDialog } from "@/components/account/ApagarDadosDialog";
 import { toast } from "sonner";
+import { useTheme, palettes } from "@/hooks/use-theme";
+import { menuNovoLigado } from "@/lib/menu-novo";
+import { linhaDoPlano } from "@/lib/linha-do-plano";
+import { trialCartaoAtivo } from "@/lib/teste-gratis";
+import { PainelAparencia } from "@/components/account/PainelAparencia";
+import { useSequencia } from "@/components/conquistas/use-conquistas";
+import { Fogo } from "@/components/conquistas/Fogo";
+
+/* ───────────── 1.0.18: o MENU NOVO (lib/menu-novo) — 3 grupos, no desenho v1-menu ───────────── */
+
+type GrupoDoMenu = "voce" | "app" | "ajuda" | "sair";
+type ItemDoMenu = { id: string; grupo: GrupoDoMenu; Icone: LucideIcon; rotulo: string; detalhe?: ReactNode; onClick: () => void; spotlight?: string };
+
+/** O título do grupo (APP, AJUDA) — o 1º grupo, o da pessoa, não tem título: o cartão com o nome já diz. */
+const TituloDoGrupo = ({ children }: { children: ReactNode }) => (
+  <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">{children}</h3>
+);
+
+const CaixaDoGrupo = ({ children, testid }: { children: ReactNode; testid: string }) => (
+  <ul className="bg-card rounded-2xl border border-border/70 divide-y divide-border/60 overflow-hidden" data-testid={testid}>{children}</ul>
+);
+
+const LinhaDoMenu = ({ item }: { item: ItemDoMenu }) => (
+  <li>
+    <button
+      type="button"
+      onClick={item.onClick}
+      data-testid={`menu-${item.id}`}
+      data-track={`menu:${item.id}`}
+      data-grupo={item.grupo}
+      data-spotlight={item.spotlight}
+      className="w-full min-h-[52px] flex items-center gap-3 px-4 text-left text-foreground transition-colors hover:bg-muted/40 active:bg-muted/60"
+    >
+      <item.Icone className="w-[18px] h-[18px] shrink-0 text-muted-foreground" aria-hidden />
+      <span className="flex-1 min-w-0 text-[15px] font-medium truncate">{item.rotulo}</span>
+      {item.detalhe !== undefined && <span className="text-[13px] text-muted-foreground shrink-0 max-w-[55%] truncate flex items-center gap-1.5">{item.detalhe}</span>}
+      <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden />
+    </button>
+  </li>
+);
 
 interface AccountDrawerProps {
   open: boolean;
@@ -23,8 +63,11 @@ interface AccountDrawerProps {
   onNameChange?: (name: string) => void;
   onReplayTutorial?: () => void;
   /** 1.0.17 (aba Você): abre direto numa sub-tela; o "‹" dela fecha a folha em vez de cair no menu. */
-  inicial?: "menu" | "account" | "computador";
+  inicial?: Vista;
 }
+
+/** As telas da folha: o menu e as sub-telas ("aparencia" e "legal" só existem com o menu novo da 1.0.18). */
+type Vista = "menu" | "account" | "computador" | "aparencia" | "legal";
 
 export const AccountDrawer = ({
   open,
@@ -40,7 +83,9 @@ export const AccountDrawer = ({
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApagarDados, setShowApagarDados] = useState(false);
-  const [view, setView] = useState<"menu" | "account" | "computador">(inicial);
+  const [view, setView] = useState<Vista>(inicial);
+  // 1.0.18: a chave é lida a cada abertura da folha (a resposta do RevenueCat pode chegar com o app aberto)
+  const novo = menuNovoLigado();
 
   useEffect(() => {
     setView(inicial);
@@ -179,12 +224,58 @@ export const AccountDrawer = ({
           className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto
                      pb-[max(1.25rem,var(--app-safe-bottom))]"
           overlayClassName="z-[290]"
+          // 1.0.18: o menu novo segue o desenho (sem o X do canto — fecha tocando fora, arrastando ou no ‹ das sub-telas)
+          semFechar={novo}
         >
           {/* pegador: sinaliza que a folha desce arrastando */}
           <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
             <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />
           </div>
-          {view === "menu" && (
+          {view === "menu" && novo && (
+            <MenuNovo
+              isGuest={isGuest}
+              nome={displayName}
+              email={user?.email ?? ""}
+              iniciais={initials}
+              acoes={{
+                conta: handleMinhaConta,
+                alterarNome: () => { onOpenChange(false); setShowNameDialog(true); },
+                plano: handleManageSubscription,
+                conquistas: () => go("/conquistas", { origem: "menu" }),
+                aparencia: () => setView("aparencia"),
+                lembretes: () => go("/notificacoes"),
+                computador: () => setView("computador"),
+                tutorial: handleReplayTutorial,
+                ajuda: () => go("/ajuda"),
+                avaliar: itemAvaliar.length ? itemAvaliar[0].onClick : undefined,
+                legal: () => setView("legal"),
+                sair: () => { void signOut(); },
+              }}
+            />
+          )}
+
+          {view === "aparencia" && (
+            <>
+              <CabecalhoDaSubtela titulo="Aparência" onVoltar={voltarAoMenu} />
+              <div className="px-4 pb-4" data-testid="menu-tela-aparencia">
+                <PainelAparencia origem="menu" />
+              </div>
+            </>
+          )}
+
+          {view === "legal" && (
+            <>
+              <CabecalhoDaSubtela titulo="Privacidade e termos" onVoltar={voltarAoMenu} />
+              <div className="px-4 pb-4">
+                <CaixaDoGrupo testid="menu-legal">
+                  <LinhaDoMenu item={{ id: "privacidade", grupo: "ajuda", Icone: Shield, rotulo: "Política de privacidade", onClick: () => { trackEvent("menu_item_click", { item: "privacidade", grupo: "ajuda", menu: "novo" }); go("/privacidade"); } }} />
+                  <LinhaDoMenu item={{ id: "termos", grupo: "ajuda", Icone: FileText, rotulo: "Termos de uso", onClick: () => { trackEvent("menu_item_click", { item: "termos", grupo: "ajuda", menu: "novo" }); go("/termos"); } }} />
+                </CaixaDoGrupo>
+              </div>
+            </>
+          )}
+
+          {view === "menu" && !novo && (
             <>
               <SheetHeader className="px-5 pt-6 pb-4">
                 <SheetTitle className="text-sm font-semibold">Menu</SheetTitle>
@@ -350,3 +441,148 @@ export const AccountDrawer = ({
     </>
   );
 };
+
+/** O cabeçalho das sub-telas do menu novo (‹ + título), igual ao das sub-telas de sempre. */
+const CabecalhoDaSubtela = ({ titulo, onVoltar }: { titulo: string; onVoltar: () => void }) => (
+  <SheetHeader className="px-5 pt-6 pb-4 flex-row items-center gap-2 space-y-0">
+    <button onClick={onVoltar} className="p-1 -ml-1 rounded-md hover:bg-muted transition-colors" aria-label="Voltar">
+      <ChevronLeft className="w-4 h-4" />
+    </button>
+    <SheetTitle className="text-sm font-semibold">{titulo}</SheetTitle>
+  </SheetHeader>
+);
+
+interface AcoesDoMenu {
+  conta: () => void;
+  alterarNome: () => void;
+  plano: () => void;
+  conquistas: () => void;
+  aparencia: () => void;
+  lembretes: () => void;
+  computador: () => void;
+  tutorial: () => void;
+  ajuda: () => void;
+  avaliar?: () => void;
+  legal: () => void;
+  sair: () => void;
+}
+
+/**
+ * O MENU NOVO (1.0.18): (1) você — cartão nome + e-mail, Meu plano, Conquistas com "🔥 N dias"; (2) APP — Aparência
+ * (mostra "Claro · Original"), Lembretes e Usar no computador (só no app da loja), Rever tutorial; (3) AJUDA — Ajuda e
+ * suporte, [Avaliar o CORE], Privacidade e termos; Sair separado. Componente próprio: só monta com a folha aberta
+ * (a sequência e o tema não são lidos com a folha fechada). `menu_item_click {item, grupo, menu: "novo"}` em todo item.
+ */
+function MenuNovo({ isGuest, nome, email, iniciais, acoes }: { isGuest: boolean; nome: string; email: string; iniciais: string; acoes: AcoesDoMenu }) {
+  const auth = useAuth();
+  const seq = useSequencia();
+  const { mode, palette } = useTheme();
+  const nativo = isNativeShell();
+
+  const clicar = (id: string, grupo: GrupoDoMenu, acao: () => void) => () => {
+    trackEvent("menu_item_click", { item: id, grupo, menu: "novo" });
+    acao();
+  };
+
+  const nomeDaPaleta = palettes[palette]?.name ?? "Original";
+  const temaAtual = `${mode === "dark" ? "Escuro" : "Claro"} · ${nomeDaPaleta}`;
+  const bolinhas = palettes[palette]?.preview ?? palettes.default.preview;
+  const detalheAparencia = (
+    <>
+      <span className="flex -space-x-1" aria-hidden>
+        {bolinhas.map((c, i) => <span key={i} className="w-3.5 h-3.5 rounded-full border border-border/70" style={{ backgroundColor: c }} />)}
+      </span>
+      <span data-testid="menu-aparencia-estado">{temaAtual}</span>
+    </>
+  );
+  const detalheSequencia = seq.dias > 0 ? (
+    <span className="inline-flex items-center gap-1 font-bold" data-testid="menu-conquistas-dias">
+      <Fogo faixa={seq.faixa} tamanho={15} semBrilho />
+      <span className="text-[var(--dias-c)] dark:text-[var(--dias-cd)]" style={{ "--dias-c": seq.faixa.hojeTexto, "--dias-cd": seq.faixa.hojeTextoEscuro } as CSSProperties}>
+        {seq.dias} {seq.dias === 1 ? "dia" : "dias"}
+      </span>
+    </span>
+  ) : undefined;
+
+  const voce: ItemDoMenu[] = [
+    ...(isGuest ? [{ id: "nome", grupo: "voce" as const, Icone: Pencil, rotulo: "Alterar meu nome", onClick: clicar("nome", "voce", acoes.alterarNome) }] : []),
+    { id: "plano", grupo: "voce", Icone: CreditCard, rotulo: "Meu plano", detalhe: <span data-testid="menu-plano-status">{linhaDoPlano(auth, trialCartaoAtivo())}</span>, onClick: clicar("plano", "voce", acoes.plano) },
+    ...(!isGuest ? [{ id: "conquistas", grupo: "voce" as const, Icone: Trophy, rotulo: "Conquistas", detalhe: detalheSequencia, onClick: clicar("conquistas", "voce", acoes.conquistas) }] : []),
+  ];
+  const app: ItemDoMenu[] = [
+    { id: "aparencia", grupo: "app", Icone: Palette, rotulo: "Aparência", detalhe: detalheAparencia, onClick: clicar("aparencia", "app", acoes.aparencia) },
+    // Notificações são locais do app da loja — na web não existe como entregar (30/07)
+    ...(nativo && !isGuest ? [{ id: "lembretes", grupo: "app" as const, Icone: Bell, rotulo: "Lembretes", onClick: clicar("lembretes", "app", acoes.lembretes) }] : []),
+    ...(nativo && !isGuest ? [{ id: "computador", grupo: "app" as const, Icone: Monitor, rotulo: "Usar no computador", onClick: clicar("computador", "app", acoes.computador) }] : []),
+    ...(!isGuest ? [{ id: "tutorial", grupo: "app" as const, Icone: RotateCcw, rotulo: "Rever tutorial", onClick: clicar("tutorial", "app", acoes.tutorial) }] : []),
+  ];
+  const ajuda: ItemDoMenu[] = [
+    { id: "ajuda", grupo: "ajuda", Icone: LifeBuoy, rotulo: "Ajuda e suporte", onClick: clicar("ajuda", "ajuda", acoes.ajuda) },
+    ...(acoes.avaliar ? [{ id: "avaliar", grupo: "ajuda" as const, Icone: Star, rotulo: "Avaliar o CORE", onClick: clicar("avaliar", "ajuda", acoes.avaliar) }] : []),
+    { id: "legal", grupo: "ajuda", Icone: Shield, rotulo: "Privacidade e termos", onClick: clicar("legal", "ajuda", acoes.legal) },
+  ];
+
+  return (
+    <>
+    {/* a folha precisa de título (leitor de tela e a medição total, que lê "MENU"); o desenho não mostra */}
+    <SheetTitle className="sr-only">Menu</SheetTitle>
+    <div className="px-4 pt-2 pb-2 space-y-4" data-testid="menu-novo">
+
+      {/* (1) você + plano + conquistas */}
+      <section aria-label="Você" data-testid="menu-grupo-voce">
+        <ul className="bg-card rounded-2xl border border-border/70 divide-y divide-border/60 overflow-hidden">
+          <li>
+            <button
+              type="button"
+              onClick={clicar("conta", "voce", acoes.conta)}
+              data-testid="menu-conta"
+              data-track="menu:conta"
+              data-grupo="voce"
+              data-spotlight="minha-conta"
+              aria-label="Minha conta"
+              className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-muted/40 active:bg-muted/60"
+            >
+              <span className="w-12 h-12 rounded-full flex items-center justify-center text-[15px] font-bold shrink-0" style={{ background: "hsl(var(--fixo-tinta) / 0.08)", color: "hsl(var(--fixo-tinta))" }} aria-hidden>
+                {iniciais}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[17px] font-bold leading-tight truncate">{nome || (isGuest ? "Criar minha conta" : "Adicionar seu nome")}</span>
+                <span className="block text-[13px] text-muted-foreground truncate mt-0.5">{email || (isGuest ? "Seus dados ficam salvos na conta" : "")}</span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden />
+            </button>
+          </li>
+          {voce.map((i) => <LinhaDoMenu key={i.id} item={i} />)}
+        </ul>
+      </section>
+
+      {/* (2) o app */}
+      <section aria-label="App" data-testid="menu-grupo-app">
+        <TituloDoGrupo>App</TituloDoGrupo>
+        <CaixaDoGrupo testid="menu-caixa-app">{app.map((i) => <LinhaDoMenu key={i.id} item={i} />)}</CaixaDoGrupo>
+      </section>
+
+      {/* (3) ajuda */}
+      <section aria-label="Ajuda" data-testid="menu-grupo-ajuda">
+        <TituloDoGrupo>Ajuda</TituloDoGrupo>
+        <CaixaDoGrupo testid="menu-caixa-ajuda">{ajuda.map((i) => <LinhaDoMenu key={i.id} item={i} />)}</CaixaDoGrupo>
+      </section>
+
+      {/* Sair, separado (convidado não tem conta pra sair — como no menu de antes) */}
+      {!isGuest && (
+        <button
+          type="button"
+          onClick={clicar("sair", "sair", acoes.sair)}
+          data-testid="menu-sair"
+          data-track="menu:sair"
+          data-grupo="sair"
+          className="w-full min-h-[52px] flex items-center gap-3 px-4 rounded-2xl border border-border/70 bg-card text-left text-destructive transition-colors hover:bg-destructive/5 active:bg-destructive/10"
+        >
+          <LogOut className="w-[18px] h-[18px] shrink-0" aria-hidden />
+          <span className="text-[15px] font-medium">Sair</span>
+        </button>
+      )}
+    </div>
+    </>
+  );
+}

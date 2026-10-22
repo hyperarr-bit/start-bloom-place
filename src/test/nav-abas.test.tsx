@@ -4,7 +4,8 @@
  * Trava: (1) a regra de visibilidade da barra por rota/estado (nativo × web, tutorial, missão, tour,
  * dentro do módulo, funil/site); (2) o Voltar do Android (histórico) entre abas; (3) os itens do Você
  * levam aonde devem (suporte incluído), com `voce_item_click`; (4) a Aparência liga o modo escuro;
- * (5) a Home com a chave: sem avatar/sol/paleta, engrenagem só pro tour; (6) chave desligada = o app de hoje.
+ * (5) a Home com a chave: sem avatar/sol/paleta, engrenagem só pro tour; (6) chave desligada = o app de hoje (com o
+ * menu novo da 1.0.18 — lib/menu-novo — o sol e a paleta saem do topo mesmo sem abas; `menu_novo: off` os devolve).
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
@@ -468,8 +469,16 @@ describe("topo da Home", () => {
     expect(screen.queryByRole("button", { name: "Alternar modo escuro" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Trocar a cor do tema" })).toBeNull();
   });
-  it("sem a chave: avatar, sol e paleta como hoje", () => {
+  it("sem a chave e com o menu novo da 1.0.18 (padrão): avatar, sem sol e paleta (moram no menu › Aparência)", () => {
     vi.stubEnv("VITE_NAV_ABAS", "");
+    montarSimples(<GreetingHeader data={lifeData} />);
+    expect(screen.getByRole("button", { name: "Minha conta" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Alternar modo escuro" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Trocar a cor do tema" })).toBeNull();
+  });
+  it("sem a chave e com menu_novo off: avatar, sol e paleta como na 1.0.17", () => {
+    vi.stubEnv("VITE_NAV_ABAS", "");
+    localStorage.setItem("core-menu-novo", "off");
     montarSimples(<GreetingHeader data={lifeData} />);
     expect(screen.getByRole("button", { name: "Minha conta" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Alternar modo escuro" })).toBeTruthy();

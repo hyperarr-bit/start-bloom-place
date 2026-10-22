@@ -32,6 +32,7 @@ import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
 import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
+import { guardarForcaMenuNovoDaUrl } from "@/lib/menu-novo";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
@@ -52,6 +53,7 @@ import { anotarTela } from "@/lib/medicao-total";
 captureLeadSource();
 // 1.0.17: `?nav-abas=on|off|auto` (QA, só no navegador) antes da 1ª tela ler a chave
 guardarForcaNavDaUrl();
+guardarForcaMenuNovoDaUrl();
 
 
 

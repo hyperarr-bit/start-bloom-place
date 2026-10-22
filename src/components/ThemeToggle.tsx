@@ -2,9 +2,23 @@ import { Sun, Moon, Palette } from "lucide-react";
 import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 
-export const ThemeToggle = ({ showPalette = false }: { showPalette?: boolean }) => {
+/**
+ * O sol (e, na Home de antes, a paleta). 1.0.18: `tema_trocado {modo, paleta, origem}` também aqui — a régua do
+ * menu novo compara de onde o tema é trocado (o topo da Home com `menu_novo: off`, o cabeçalho dos módulos e
+ * Conquistas, e a Aparência do menu).
+ */
+export const ThemeToggle = ({ showPalette = false, origem = "cabecalho" }: { showPalette?: boolean; origem?: string }) => {
   const { mode, toggleMode, palette, setPalette } = useTheme();
+  const alternarModo = () => {
+    trackEvent("tema_trocado", { modo: mode === "dark" ? "light" : "dark", paleta: palette, origem });
+    toggleMode();
+  };
+  const escolherPaleta = (p: ThemePalette) => {
+    if (p !== palette) trackEvent("tema_trocado", { modo: mode, paleta: p, origem });
+    setPalette(p);
+  };
   const [showPaletteMenu, setShowPaletteMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,7 +36,7 @@ export const ThemeToggle = ({ showPalette = false }: { showPalette?: boolean }) 
     <div className="flex items-center gap-1.5">
       {/* Dark mode toggle */}
       <motion.button
-        onClick={toggleMode}
+        onClick={alternarModo}
         className="relative w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
         whileTap={{ scale: 0.9 }}
         aria-label="Alternar modo escuro"
@@ -65,7 +79,7 @@ export const ThemeToggle = ({ showPalette = false }: { showPalette?: boolean }) 
                 {(Object.keys(palettes) as ThemePalette[]).map(key => (
                   <motion.button
                     key={key}
-                    onClick={() => { setPalette(key as any); setShowPaletteMenu(false); }}
+                    onClick={() => { escolherPaleta(key); setShowPaletteMenu(false); }}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                       palette === key ? "bg-primary/10 text-primary" : "hover:bg-muted"
                     }`}

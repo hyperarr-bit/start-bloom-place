@@ -84,6 +84,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-extratos-importados",
   "core-att-status", // o ATT do iPhone já foi pedido (e o estado que vai nos eventos)
   "core-att-momento", // 1.0.18: a última resposta do RevenueCat pra QUANDO o ATT é pedido (metadata att_momento: auto3s|comecar|ab)
+  "core-menu-novo", // 1.0.18: a última resposta do RevenueCat pro menu novo da conta (metadata menu_novo: todos|off)
+  "core-menu-novo-aviso", // 1.0.18: o aviso "modo escuro e cores agora ficam no menu › Aparência" já resolvido (visto|nao-precisa), 1x por aparelho
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-lembrete-teste", // pedido do aviso de 36 h do teste (texto de uso desde 16/10), armado quando a permissão vier
   "core-semana-pagante", // 16/10: semana do pagante (começo + último agendamento dos 7 avisos depois do pagamento)

@@ -14,7 +14,8 @@
  *   "erro-loja"     → { code: "2" } "There was a problem with the App Store." (sempre)
  *   "erro-rede"     → { code: "10" } "Error performing request." (sempre)
  *   "bloqueado"     → { code: "3" } "The device or user is not allowed to make the purchase."
- *   "erro-loja-1x"  → a 1ª folha falha com o code 2 e a 2ª compra (a retentativa automática resolve)
+ *   "erro-loja-Nx" / "erro-rede-Nx" → as N primeiras folhas desta abertura falham (code 2 / 10) e a seguinte compra:
+ *                     1x = a retentativa automática resolve; 2x = aparece a caixa e o "Tentar de novo" compra
  *   O modo também pode vir de `localStorage.__rc_mock_modo` (o QA de aparelho grava com o app parado).
  *
  * As compras simuladas persistem em localStorage — matar o app e reabrir
@@ -67,15 +68,21 @@ const modo = (): string => {
   if ((window as any).__rcModo) return (window as any).__rcModo;
   try { return localStorage.getItem("__rc_mock_modo") || "compra"; } catch { return "compra"; }
 };
-let falhouUmaVez = false;
-/** os erros da loja simulados (1.0.18); o "erro-loja-1x" falha só na 1ª folha desta abertura do app */
+let falhas = 0;
+/** os erros da loja simulados (1.0.18); o "erro-loja-Nx" falha só nas N primeiras folhas desta abertura do app */
 const erroDaLojaSimulado = (m: string): void => {
   if (m === "cancela") throw { code: "1", message: "Purchase was cancelled. (mock)" };
   if (m === "pendente") throw { code: "20", message: "PAYMENT_PENDING_ERROR (mock)" };
   if (m === "erro-loja") throw { code: "2", message: "There was a problem with the App Store. (mock)" };
   if (m === "erro-rede") throw { code: "10", message: "Error performing request. (mock)" };
   if (m === "bloqueado") throw { code: "3", message: "The device or user is not allowed to make the purchase. (mock)" };
-  if (m === "erro-loja-1x" && !falhouUmaVez) { falhouUmaVez = true; throw { code: "2", message: "There was a problem with the App Store. (mock 1x)" }; }
+  const n = /^erro-(loja|rede)-(\d+)x$/.exec(m);
+  if (n && falhas < Number(n[2])) {
+    falhas += 1;
+    throw n[1] === "rede"
+      ? { code: "10", message: `Error performing request. (mock ${falhas}/${n[2]})` }
+      : { code: "2", message: `There was a problem with the App Store. (mock ${falhas}/${n[2]})` };
+  }
 };
 
 // v53: o mock separa compra ÚNICA (vitalício) de ASSINATURA — o boot-check

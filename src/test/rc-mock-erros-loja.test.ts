@@ -48,6 +48,14 @@ describe("mock da loja: erros do iPhone (1.0.18)", () => {
     expect(localStorage.getItem("__rc_mock_assinante")).toBe("1");
   });
 
+  it("erro-rede-2x: as 2 primeiras falham com o código 10 (a retentativa também) e o 'Tentar de novo' compra", async () => {
+    localStorage.setItem("__rc_mock_modo", "erro-rede-2x");
+    const P = await carregar();
+    expect((await P.purchasePackage(pacote).catch((x) => x)).code).toBe("10");
+    expect((await P.purchaseStoreProduct({ product: { identifier: "core_anual" } }).catch((x) => x)).code).toBe("10");
+    await expect(P.purchasePackage(pacote)).resolves.toBeTruthy();
+  });
+
   it("window.__rcModo vence o localStorage", async () => {
     localStorage.setItem("__rc_mock_modo", "erro-loja");
     (window as unknown as { __rcModo?: string }).__rcModo = "cancela";

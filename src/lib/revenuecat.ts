@@ -45,6 +45,7 @@ import { registrarChaveMontarFinancas } from "@/lib/montar-financas";
 import { registrarChavePainelLimpo } from "@/lib/financas-painel-limpo";
 import { registrarChaveRemotaConquistas2 } from "@/lib/conquistas2";
 import { registrarIntroRemota } from "@/lib/intro-modulo";
+import { registrarAttMomentoRemoto } from "@/lib/att-momento";
 import { registrarChaveMontarRotina } from "@/lib/montar-rotina";
 import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
 import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
@@ -69,6 +70,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarChaveMontarRotina,
     registrarMedicaoTotalRemota,
     registrarChavePaywallMinimalista,
+    registrarAttMomentoRemoto, // 1.0.18: `att_momento` (auto3s|comecar|ab) — quando o ATT é pedido (lib/att-momento)
   ];
   for (const f of cada) {
     try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }

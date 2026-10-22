@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { pedirRastreamentoIos, segurarReservaNativaDoATT } from "@/lib/att-ios";
+import { bracoATT, camposDoATT } from "@/lib/att-momento";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { ehApple } from "@/lib/loja";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
@@ -49,14 +50,19 @@ function Contador({ ate }: { ate: number }) {
 }
 
 export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onEntrar?: () => void }) {
-  /* ATT (1.0.18, dono 21/10): NADA automático — o pedido sai só no toque em "Começar" (abaixo) ou na Home; a
-   * welcome segura a reserva nativa de 10 s do AppDelegate (era o pedido 3 s depois de a tela aparecer). */
-  useEffect(() => { segurarReservaNativaDoATT(); }, []);
+  /* ATT (1.0.18, dono 21/10 — chave remota `att_momento`, lib/att-momento): braço "auto3s" = o de hoje (o pedido 3 s
+   * depois de a tela aparecer); braço "comecar" = nada automático — só no toque em "Começar" ou na Home, e a welcome
+   * segura a reserva nativa de 10 s do AppDelegate. */
+  useEffect(() => {
+    if (bracoATT() === "comecar") { segurarReservaNativaDoATT(); return; }
+    const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000);
+    return () => window.clearTimeout(t);
+  }, []);
   const navigate = useNavigate();
   const [restaurando, setRestaurando] = useState(false);
   const [msgRestore, setMsgRestore] = useState<string | null>(null);
 
-  useEffect(() => { trackEvent("app_welcome_view", {}); }, []);
+  useEffect(() => { trackEvent("app_welcome_view", { ...camposDoATT() }); }, []);
   /* Referrer da Play chega por plugin, assíncrono: confere agora e de novo
      em 2 s. Quem veio do card pós-compra do site já tem conta paga. */
   const [veioDoSite, setVeioDoSite] = useState(() => instalouVindoDoSite());
@@ -164,14 +170,14 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           {veioDoSite ? (
             <button
               className="apw-cta btn-shine"
-              onClick={() => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }}
+              onClick={() => { trackEvent("app_welcome_login", { pos_compra_web: true, ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar"); }}
             >
               Entrar na minha conta
             </button>
           ) : (
             <button
               className="apw-cta btn-shine"
-              onClick={async () => { trackEvent("app_welcome_start", {}); await pedirRastreamentoIos("welcome"); onComecar(); }}
+              onClick={async () => { trackEvent("app_welcome_start", { ...camposDoATT() }); await pedirRastreamentoIos("welcome"); onComecar(); }}
             >
               Começar
             </button>
@@ -182,11 +188,11 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
               tem a esteira de conta existente); /entrar é o fallback do uso
               antigo em Comecar/Radar. */}
           {veioDoSite ? (
-            <button className="apw-link" onClick={async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}>
+            <button className="apw-link" onClick={async () => { trackEvent("app_welcome_start", { pos_compra_web: true, ...camposDoATT() }); await pedirRastreamentoIos("welcome"); onComecar(); }}>
               Ainda não tenho conta? <b>Começar</b>
             </button>
           ) : (
-            <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
+            <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", { ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
               Já tenho conta? <b>Entrar</b>
             </button>
           )}

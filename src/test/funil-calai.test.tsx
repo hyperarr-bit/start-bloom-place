@@ -217,7 +217,7 @@ describe("LIGADA: a sequência enxuta", () => {
       expect(screen.getByTestId("welcome-video")).toHaveAttribute("loop");
       expect(screen.getByTestId("welcome-video")).toHaveAttribute("playsinline");
       expect(eventos).toContainEqual(["funnel_view", { step: "welcome", funil: "w", video: true }]);
-      expect(eventos).toContainEqual(["app_welcome_view", { calai: true }]);
+      expect(eventos).toContainEqual(["app_welcome_view", expect.objectContaining({ calai: true, att_braco: "auto3s" })]);
       // 10/10 (dono): "Já tem conta? Entrar" ABAIXO do Começar, como o Cal AI; sem termos, sem
       // "Restaurar compras" (foi pra tela de Entrar), sem "Já é cliente?"
       const entrar = screen.getByText(/Já tem conta\?/).closest("button")!;
@@ -235,7 +235,7 @@ describe("LIGADA: a sequência enxuta", () => {
       fireEvent.click(screen.getByTestId("welcome-comecar"));
       await tick(); await tick();
       expect(pedirRastreamentoIos).toHaveBeenCalledWith("welcome");
-      expect(eventos).toContainEqual(["app_welcome_start", { calai: true }]);
+      expect(eventos).toContainEqual(["app_welcome_start", expect.objectContaining({ calai: true, att_braco: "auto3s" })]);
       expect(screen.queryByLabelText("Pular apresentação")).toBeNull();
       expect(nomes()).not.toContain("funnel_view:promessas");
       expect(screen.getByText("Qual área da sua vida tá mais fora de controle hoje?")).toBeInTheDocument();

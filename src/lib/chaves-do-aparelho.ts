@@ -83,6 +83,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-contas-pagas", // contadores de momento de valor (pedido de nota "na 2ª vez")
   "core-extratos-importados",
   "core-att-status", // o ATT do iPhone já foi pedido (e o estado que vai nos eventos)
+  "core-att-momento", // 1.0.18: a última resposta do RevenueCat pra QUANDO o ATT é pedido (metadata att_momento: auto3s|comecar|ab)
+  "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-lembrete-teste", // pedido do aviso de 36 h do teste (texto de uso desde 16/10), armado quando a permissão vier
   "core-semana-pagante", // 16/10: semana do pagante (começo + último agendamento dos 7 avisos depois do pagamento)
   "core-folha-aberta-em", // saída do app: hora do último toque em comprar

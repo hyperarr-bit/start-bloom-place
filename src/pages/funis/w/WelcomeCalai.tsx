@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { pedirRastreamentoIos, segurarReservaNativaDoATT } from "@/lib/att-ios";
+import { bracoATT, camposDoATT } from "@/lib/att-momento";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 
@@ -55,9 +56,14 @@ const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
 };
 
 export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => void; onEntrar?: () => void; area?: AreaKey | null }) {
-  /* ATT (1.0.18, dono 21/10): NADA automático — o pedido sai só no toque em "Começar" (abaixo) ou na Home; a
-   * welcome segura a reserva nativa de 10 s pra o diálogo não cair sozinho em cima do vídeo (era 3 s depois de abrir). */
-  useEffect(() => { segurarReservaNativaDoATT(); }, []);
+  /* ATT (1.0.18, dono 21/10 — chave remota `att_momento`, lib/att-momento): braço "auto3s" = o de hoje, o pedido
+   * 3 s depois de a tela aparecer; braço "comecar" = nada automático — o pedido sai só no toque em "Começar"
+   * (abaixo) ou na Home, e a welcome segura a reserva nativa de 10 s pra o diálogo não cair sozinho no vídeo. */
+  useEffect(() => {
+    if (bracoATT() === "comecar") { segurarReservaNativaDoATT(); return; }
+    const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000);
+    return () => window.clearTimeout(t);
+  }, []);
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);
@@ -71,7 +77,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
 
-  useEffect(() => { trackEvent("app_welcome_view", { calai: true }); }, []);
+  useEffect(() => { trackEvent("app_welcome_view", { calai: true, ...camposDoATT() }); }, []);
   const [veioDoSite, setVeioDoSite] = useState(() => instalouVindoDoSite());
   useEffect(() => {
     if (veioDoSite) { trackEvent("app_welcome_pos_compra_web", {}); return; }
@@ -220,12 +226,12 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
             texto={veioDoSite ? "Entrar na minha conta" : "Começar"}
             testid={veioDoSite ? "welcome-entrar-conta" : "welcome-comecar"}
             onClick={veioDoSite
-              ? () => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }
-              : async () => { trackEvent("app_welcome_start", { calai: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}
+              ? () => { trackEvent("app_welcome_login", { pos_compra_web: true, ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar"); }
+              : async () => { trackEvent("app_welcome_start", { calai: true, ...camposDoATT() }); await pedirRastreamentoIos("welcome"); onComecar(); }}
             secundarioAbaixo
             secundario={veioDoSite
-              ? { texto: <>Ainda não tenho conta? <b>Começar</b></>, onClick: async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); } }
-              : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
+              ? { texto: <>Ainda não tenho conta? <b>Começar</b></>, onClick: async () => { trackEvent("app_welcome_start", { pos_compra_web: true, ...camposDoATT() }); await pedirRastreamentoIos("welcome"); onComecar(); } }
+              : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", { ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
           />
         </motion.div>
       </div>

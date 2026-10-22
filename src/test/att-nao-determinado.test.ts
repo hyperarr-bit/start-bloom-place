@@ -43,13 +43,17 @@ describe("ATT: notDetermined não vira 'já pedido'", () => {
     nativo.respostas = ["notDetermined", "authorized"];
     expect(await pedirRastreamentoIos("welcome_auto")).toBe("notDetermined");
     expect(localStorage.getItem(CHAVE)).toBeNull();
-    expect(eventos).toEqual([["att_resposta", { status: "notDetermined", origem: "welcome_auto", tentativa: 1 }]]);
+    // 1.0.18: att_pedido quando o plugin é chamado; todo evento do ATT leva o braço do `att_momento`
+    expect(eventos).toEqual([
+      ["att_pedido", { origem: "welcome_auto", att_braco: "auto3s", att_momento: "auto3s" }],
+      ["att_resposta", { status: "notDetermined", origem: "welcome_auto", tentativa: 1, att_braco: "auto3s", att_momento: "auto3s" }],
+    ]);
 
     expect(await pedirRastreamentoIos("welcome")).toBe("authorized");
     expect(nativo.pedir).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(CHAVE)).toBe("authorized");
     expect(ficha.capturar).toHaveBeenCalledTimes(1); // a ficha do aparelho regravada com o IDFA
-    expect(eventos[1]).toEqual(["att_resposta", { status: "authorized", origem: "welcome" }]);
+    expect(eventos[3]).toEqual(["att_resposta", { status: "authorized", origem: "welcome", att_braco: "auto3s", att_momento: "auto3s" }]);
 
     // respondido: nunca mais pergunta (nem na Home, nem noutra abertura)
     expect(await pedirRastreamentoIos("home")).toBe("ja_pedido");
@@ -65,7 +69,8 @@ describe("ATT: notDetermined não vira 'já pedido'", () => {
     expect(await pedirRastreamentoIos("home")).toBe("ja_pedido"); // sem chamar o plugin
     expect(nativo.pedir).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(CHAVE)).toBeNull();
-    expect(eventos.map(([, d]) => d.tentativa)).toEqual([1, 2]);
+    expect(eventos.filter(([n]) => n === "att_resposta").map(([, d]) => d.tentativa)).toEqual([1, 2]);
+    expect(eventos.filter(([n]) => n === "att_pedido")).toHaveLength(2); // o 3º pedido nem chegou ao plugin
 
     _zerarAberturaDoATT(); // o app foi fechado e aberto de novo
     expect(await pedirRastreamentoIos("home")).toBe("denied");

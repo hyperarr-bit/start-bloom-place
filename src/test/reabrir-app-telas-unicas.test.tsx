@@ -66,7 +66,7 @@ const usarOApp = () => {
     // 1.0.16: o teste "missão 1 por dia" — a resposta do RevenueCat, o braço e o convite do dia (dentro da missão),
     // o Montar Finanças decidido, as aberturas do tour curto, a resposta remota do tour e as decisões do dia 1
     // (boas-vindas, plano de amanhã, dicas, adesivos mostrados, o score de antes) — tudo dentro da missão
-    ["core-missao-1-por-dia", "ab"], ["core-dia1-braco", "A"], ["core-tour-home-remoto", "curto"], ["core-home-tour-vistas", "1"],
+    ["core-missao-1-por-dia", "ab"], ["core-dia1-braco", "A"], ["core-tour-home-remoto", "curto"], ["core-home-tour-vistas", "1"], ["core-att-momento", "ab"], ["core-att-braco", "comecar"],
     ["core-montar-financas", JSON.stringify({ r: "pronto", em: "2026-10-12T15:00:00.000Z" })],
     ["missao-doses", JSON.stringify({
       v: 1, inicio: "2026-10-12", modulos: ["financas", "rotina", "saude"], feitos: { 1: { dia: "2026-10-12", rotulo: "Pode gastar R$ 61 por dia" } }, boasVindas: true, braco: "A",
@@ -92,7 +92,7 @@ const esperarTudoVisto = () => {
   expect(momentoRuimRecente()).toBe(true);
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
     "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
-    "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas",
+    "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas", "core-att-momento", "core-att-braco",
     "conquistas2-force", "core-festas-mostradas"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }

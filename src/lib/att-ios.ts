@@ -17,6 +17,7 @@
  * chave local evita chamar o plugin de novo à toa.
  */
 import { capturarDispositivoApp, trackEvent } from "@/lib/analytics";
+import { camposDoATT } from "@/lib/att-momento";
 
 const CHAVE = "core-att-status";
 
@@ -48,12 +49,12 @@ const avisarNativo = async (): Promise<void> => {
 };
 
 /**
- * SEM PEDIDO AUTOMÁTICO NA WELCOME (1.0.18, dono 21/10): o diálogo do ATT não cai mais sozinho em cima do vídeo
- * da welcome (eram 3 s depois de abrir; 173 instalações fechavam o app em 3 s, 66 com o diálogo aberto). O pedido
- * sai só no toque em "Começar" (que já pedia) e, pra quem entra por outro caminho ("Já tem conta? Entrar" → gate),
- * na Home (que já pede). A reserva nativa de 10 s do AppDelegate (recusa 2.1 de 20/09: o revisor entrou pelo login
- * e nunca viu o diálogo) continua existindo pra quem NÃO passa pela welcome — a welcome a segura pelo mesmo
- * `CoreNativo.pularATT()` da Porta, SEM a marca permanente do aparelho: o JS segue pedindo no Começar e na Home.
+ * BRAÇO "comecar" DO `att_momento` (1.0.18, dono 21/10 — lib/att-momento): nesse braço o diálogo do ATT não cai
+ * sozinho em cima do vídeo da welcome; o pedido sai só no toque em "Começar" (que já pedia) e, pra quem entra por
+ * outro caminho ("Já tem conta? Entrar" → gate), na Home (que já pede). A reserva nativa de 10 s do AppDelegate
+ * (recusa 2.1 de 20/09: o revisor entrou pelo login e nunca viu o diálogo) continua existindo pra quem NÃO passa
+ * pela welcome — a welcome desse braço a segura pelo mesmo `CoreNativo.pularATT()` da Porta, SEM a marca
+ * permanente do aparelho: o JS segue pedindo no Começar e na Home.
  */
 export function segurarReservaNativaDoATT(): void { void avisarNativo(); }
 
@@ -107,6 +108,8 @@ export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
     if (naoDeterminadosNestaAbertura > REPETICOES_POR_ABERTURA) return "ja_pedido"; // já repetiu nesta abertura: fica pra próxima
     if (await ehDaPorta()) return "pulado_porta";
     const MetaAds = registerPlugin<{ pedirRastreamento(): Promise<{ status: string }> }>("MetaAds");
+    const braco = camposDoATT(); // 1.0.18: o braço do `att_momento` vai em todo evento do ATT
+    trackEvent("att_pedido", { origem, ...braco });
     // 20 s de teto: se o diálogo não vier (build sem o método), o funil segue.
     const r = await Promise.race([
       MetaAds.pedirRastreamento(),
@@ -116,10 +119,10 @@ export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
     if (status === "notDetermined") {
       // o diálogo não apareceu: não grava (o próximo pedido pergunta de novo); o evento guarda qual tentativa foi
       naoDeterminadosNestaAbertura += 1;
-      trackEvent("att_resposta", { status, origem, tentativa: naoDeterminadosNestaAbertura });
+      trackEvent("att_resposta", { status, origem, tentativa: naoDeterminadosNestaAbertura, ...braco });
     } else if (status !== "sem_plugin") {
       try { localStorage.setItem(CHAVE, status); } catch { /* noop */ }
-      trackEvent("att_resposta", { status, origem });
+      trackEvent("att_resposta", { status, origem, ...braco });
       // Aceitou: regrava a ficha do aparelho, agora com o IDFA dentro.
       if (status === "authorized") void capturarDispositivoApp();
     }

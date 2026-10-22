@@ -31,6 +31,8 @@ const CHAVES: Record<LugarDoMensal19, string> = {
   mensal_paywall: "core-mensal19-mensal-paywall-visto", // nas 2 allowlists (use-auth / use-user-data)
   cancelou_teste: "core-mensal19-cancelou-visto",
   bloqueio: "core-mensal19-bloqueio-visto",
+  // 22/10: o card da recusa tem a própria marca, POR RECUSA (lib/card-recusa: core-card-recusa-visto); esta não é gravada por ele
+  recusa: "core-mensal19-recusa-visto",
 };
 export const mensal19JaVisto = (lugar: LugarDoMensal19): boolean => {
   try { return !!localStorage.getItem(CHAVES[lugar]); } catch { return false; }
@@ -53,6 +55,15 @@ export type OfertaDoMensal19 = Mensal19 & {
 /** Carrega tudo que a folha precisa; null = não mostrar (sem offering, já visto, não é iPhone). */
 export async function prepararMensal19(lugar: LugarDoMensal19, fimMs: number | null = null): Promise<OfertaDoMensal19 | null> {
   if (!ehApple() || mensal19JaVisto(lugar)) return null;
+  return carregarOfertaMensal19(fimMs);
+}
+
+/**
+ * A oferta do 19,90 SEM a marca de "visto" do lugar (22/10: o card da recusa usa a marca por recusa dele). Mesmas
+ * regras: só iPhone, só com a offering `mensal_19`, preço da loja, e só se for MAIS BARATO que o mensal da vitrine.
+ */
+export async function carregarOfertaMensal19(fimMs: number | null = null): Promise<OfertaDoMensal19 | null> {
+  if (!ehApple()) return null;
   const rc = await import("@/lib/revenuecat");
   let dados: Mensal19 | null = null;
   try { dados = await rc.carregarMensal19(); } catch { return null; } // módulo sem a função (mock antigo) = sem oferta

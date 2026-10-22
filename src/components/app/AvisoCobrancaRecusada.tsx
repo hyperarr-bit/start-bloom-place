@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { AlertTriangle, CreditCard, X } from "lucide-react";
@@ -9,6 +9,9 @@ import { trackEvent } from "@/lib/analytics";
 import { segurarFolhaNativa } from "@/lib/cobranca-nativa";
 import { acessoAnteriorDaSessao, URL_ASSINATURAS_APPLE, type TipoDeAcessoAnterior } from "@/lib/conta-ja-tinha-acesso";
 import { AvisoJaTinhaAcesso } from "@/components/app/AvisoJaTinhaAcesso";
+import { CardRecusa } from "@/components/app/CardRecusa";
+import { carregarOfertaMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { cardRecusaJaVisto, cardRecusaLigado, marcarCardRecusaVisto } from "@/lib/card-recusa";
 import {
   avisoFechadoNestaAbertura, avisoVistoNestaAbertura, cobrancaV14Ligada, conflitoFechadoAgora, conflitoVistoAgora,
   fecharConflitoNestaAbertura, marcarConflitoVisto, diasRestantesDaCarencia, fecharAvisoNestaAbertura,
@@ -88,7 +91,7 @@ export const AvisoCobrancaRecusada = () => {
         const tipo = r.temProblema ? await acessoAnteriorDaSessao() : null;
         // a tela cheia do app ganha da folha do StoreKit (lib/cobranca-nativa) — no iPhone, só com ela ligada. Com a
         // conta que já tinha acesso a folha nativa também fica segurada: ela mandaria atualizar o cartão.
-        if (plataformaApp() === "ios" && cobrancaV14Ligada()) void segurarFolhaNativa((telaCheiaPossivel() || !!tipo) && !!r.temProblema);
+        if (plataformaApp() === "ios" && cobrancaV14Ligada()) void segurarFolhaNativa((telaCheiaPossivel() || !!tipo || cardRecusaLigado()) && !!r.temProblema);
         if (vivo) { setJaTinha(tipo); setP(r); }
       });
     };
@@ -130,8 +133,35 @@ export const AvisoCobrancaRecusada = () => {
     trackEvent("conta_ja_tinha_acesso", { tipo: jaTinha, via: "cobranca", com_acesso_loja: !!p?.comAcesso });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visivelConflito]);
-  const visivelTela = temProblema && telaCheiaPossivel() && !telaFechada && telaLivre;
-  const visivel = temProblema && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
+  /* 1.0.18 (dono 22/10): o CARD DA RECUSA (lib/card-recusa, chave `card_recusa`, padrão off) — 1x por recusa, gravado
+     quando aparece. Ganha da tela cheia e da faixa nesta abertura; fechado, segue a faixa de sempre (como o "Agora não"
+     da tela cheia). Enquanto carrega o 19,90 da loja (até 2,5 s), nenhuma outra superfície de cobrança pisca. */
+  const [card, setCard] = useState<{ oferta: OfertaDoMensal19 | null } | null>(null);
+  const [cardFeito, setCardFeito] = useState(false);
+  const iniciouCard = useRef(false);
+  const elegivelCard = temProblema && !cardFeito && telaLivre && cardRecusaLigado() && !cardRecusaJaVisto(p?.detectadoEm);
+  useEffect(() => {
+    if (!elegivelCard || iniciouCard.current || !p) return;
+    iniciouCard.current = true;
+    const problema = p;
+    let vivo = true;
+    const comMensal = plataformaApp() === "ios" && !String(problema.produto ?? "").startsWith("core_mensal_19");
+    const espera = new Promise<null>((r) => window.setTimeout(() => r(null), 2500));
+    const oferta = comMensal ? Promise.race([carregarOfertaMensal19().catch(() => null), espera]) : Promise.resolve(null);
+    void oferta.then((o) => {
+      if (!vivo) return;
+      marcarCardRecusaVisto(problema.detectadoEm);
+      setCard({ oferta: o });
+      trackEvent("card_recusa_view", {
+        com_acesso: problema.comAcesso, dias_restantes: diasRestantesDaCarencia(problema.detectadoEm), com_mensal19: !!o,
+      });
+    });
+    return () => { vivo = false; iniciouCard.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elegivelCard]);
+  const cardAtivo = elegivelCard || (!!card && temProblema);
+  const visivelTela = temProblema && !cardAtivo && telaCheiaPossivel() && !telaFechada && telaLivre;
+  const visivel = temProblema && !cardAtivo && (telaFechada || !telaCheiaPossivel()) && !fechado && telaLivre;
   const diasRestantes = p ? diasRestantesDaCarencia(p.detectadoEm) : null;
   useEffect(() => {
     if (!visivelTela || telaVistaAgora()) return;
@@ -159,6 +189,19 @@ export const AvisoCobrancaRecusada = () => {
       />
     );
   }
+  if (card && temProblema && p) {
+    const fecharCard = () => { setCard(null); setCardFeito(true); fecharTelaNestaAbertura(); setTelaFechada(true); };
+    return (
+      <CardRecusa
+        href={urlAtualizarPagamento(p)}
+        comAcesso={p.comAcesso}
+        oferta={card.oferta}
+        campos={{ com_acesso: p.comAcesso, dias_restantes: diasRestantesDaCarencia(p.detectadoEm) }}
+        onFechar={fecharCard}
+      />
+    );
+  }
+  if (elegivelCard) return null; // carregando o card: nem tela cheia nem faixa por baixo
   if (visivelTela && p) {
     const fecharTela = () => {
       fecharTelaNestaAbertura();

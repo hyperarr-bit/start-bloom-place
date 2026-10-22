@@ -194,6 +194,15 @@ export const EVENTO_INTRO_FIM = "intro-modulo:fim";
 export const avisarFimDaIntro = (moduleId: string, como: FimDaIntro): void => {
   try { window.dispatchEvent(new CustomEvent(EVENTO_INTRO_FIM, { detail: { modulo: moduleId, como } })); } catch { /* sem window */ }
 };
+/**
+ * 1.0.18 (revisor 22/10): a intro deste módulo está NA TELA agora (entre aparecer e terminar/sair)? A 2ª aparição
+ * (retomada) já grava "vista" ao montar — quem decide pela marca "vista" (a missão, pra saber se a intro do módulo
+ * escolhido no dia 2 ainda é a dose 2) lê isto também, senão monta o passo guiado por cima da intro retomada.
+ * Só memória (não sobrevive a fechar o app): a marca é da tela, não do aparelho.
+ */
+const introsNaTela = new Set<string>();
+export const marcarIntroNaTela = (moduleId: string, naTela: boolean): void => { if (naTela) introsNaTela.add(moduleId); else introsNaTela.delete(moduleId); };
+export const introNaTela = (moduleId: string): boolean => introsNaTela.has(moduleId);
 export const marcarIntroVista = (moduleId: string, get: Leitor, set: Escritor, como: FimDaIntro = "feita"): void => {
   marcarIntroVistaNoAparelho(moduleId, como);
   marcarIntroVistaNaConta(moduleId, get, set);

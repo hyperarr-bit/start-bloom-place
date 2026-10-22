@@ -17,6 +17,7 @@ import { chaveDoHabito, datasDeCheckin, marcarCheckin } from "@/lib/detox";
 import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
 import { CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
 import { anotarAcaoRapida } from "@/lib/intro-modulo";
+import { TarjaDoRelogio } from "@/components/app/TarjaDoRelogio";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -430,6 +431,10 @@ export const QuickActions = () => {
         ))}
       </div>
 
+      {/* B5 (1.0.18, QA 21/10): "Registrar Gasto" com o teclado do iPhone — o WKWebView rola a Home pra mostrar o campo e
+          a linha "1 dia · garantido hoje" passava por baixo do relógio/ilha. A mesma tarja do cadastro pós-compra
+          (1.0.17): só com o teclado aberto E a página rolada; sem teclado, nada. */}
+      {activeAction && <TarjaDoRelogio />}
       {/* Inline forms */}
       <AnimatePresence>
         {activeAction && (

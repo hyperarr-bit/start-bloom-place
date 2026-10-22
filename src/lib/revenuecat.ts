@@ -51,6 +51,7 @@ import { registrarDesafiosRodizioRemoto } from "@/lib/desafios-rodizio";
 import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
+import { registrarDias23Remoto } from "@/lib/dias23";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -72,6 +73,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarMedicaoTotalRemota,
     registrarChavePaywallMinimalista,
     registrarAttMomentoRemoto, // 1.0.18: `att_momento` (auto3s|comecar|ab) — quando o ATT é pedido (lib/att-momento)
+    registrarDias23Remoto, // 1.0.18: `dias23` (on|off) — os dias 2 e 3 do teste: número pronto + escolhe o seu + o resumo ao abrir no dia 3 (lib/dias23)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
   ];
   for (const f of cada) {

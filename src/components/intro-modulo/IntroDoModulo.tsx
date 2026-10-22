@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import {
-  INTROS, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, retomadaDaIntro,
+  INTROS, avisarFimDaIntro, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, retomadaDaIntro,
   type FimDaIntro, type IntroDeUmToqueConfig, type Leitor, type RetomadaDaIntro,
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
@@ -150,7 +150,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   // o host do "Conhecer mais" (passeio opcional) mora aqui: nos 3 módulos, com a intro na tela ou não
   const host = temTour(moduleId) ? <ConhecerMaisHost moduleId={moduleId} /> : null;
   if (estado !== "visivel" || !config) return host;
-  const terminar = (como: FimDaIntro) => { terminou.current = true; marcarIntroVista(moduleId, getRef.current, setRef.current, como); setEstado("nada"); };
+  const terminar = (como: FimDaIntro) => { terminou.current = true; marcarIntroVista(moduleId, getRef.current, setRef.current, como); setEstado("nada"); avisarFimDaIntro(moduleId, como); };
   // 17/10 (dono: "tipo Finanças, que tem vários"): a guiada faz a 1ª ação e o "olha"; os passos seguintes (config.maisPassos)
   // rodam no motor de 1 toque, que mostra o cartão do fim com tudo o que entrou
   const maisPassos = config.formato === "guiada" ? config.maisPassos : undefined;

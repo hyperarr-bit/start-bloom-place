@@ -55,6 +55,7 @@ import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, tourHomeQuando, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { dias23Ligado } from "@/lib/dias23";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -324,6 +325,16 @@ export interface EstadoMissaoDoses {
   scoreAntes?: Partial<Record<DiaDaMissao, number>>;
   /** 1.0.16, braço A: quem tocou "Explorar por conta própria" já saiu da Home uma vez (o tour curto entra na volta) */
   saiuDaHome?: boolean;
+  /* ── 1.0.18 (chave `dias23`, lib/dias23) — só com a chave ligada; desligada, nenhum destes nasce ── */
+  /** dia 2: o 2º módulo que ELA escolheu ("escolhe o seu"); `de` = o módulo que a dose 2 tinha antes (vai pro dia 3).
+   *  `via` "comecar" (tocou Começar) | "agora_nao" (fechou: o módulo marcado fica como a dose de hoje) */
+  escolha2?: { modulo: ModuloDaMissao; dia: string; via: "comecar" | "agora_nao"; de: ModuloDaMissao };
+  /** dia 3+: o dia em que "Você construiu isso em 3 dias" abriu sozinho (na abertura) — o convite da dose 3 não vem
+   *  por cima no mesmo dia (uma camada por abertura) */
+  fimAoAbrir?: string;
+  /** dia 3+: quantas vezes o resumo APARECEU sozinho (conta na hora em que entra): fechou o app sem o "Continuar" →
+   *  volta 1 vez, depois nunca mais (MAX_VISTAS_SEM_DECISAO) */
+  fimAoAbrirVistas?: number;
 }
 
 /**
@@ -454,7 +465,7 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
   let diaCal: number | null = null;
   let missaoId: string | null = null;
   try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; missaoId = m ? idDaMissao(m) : null; } catch { diaCal = null; }
-  return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia(), tour_quando: tourHomeQuando() };
+  return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia(), tour_quando: tourHomeQuando(), ...(variante === "A" && dias23Ligado() ? { dias23: "on" } : {}) };
 };
 /** 1.0.16 (relatório 11 §7: nunca valor em reais em evento): o rótulo do feito sem o número — "Café · R$ 12" →
  *  "Café · R$ x", "Pode gastar R$ 61 por dia" → "Pode gastar R$ x por dia". O resto do rótulo (nome do hábito, do
@@ -724,6 +735,8 @@ export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = lo
   if (!m.boasVindas) return true;
   // o 1º gasto depois do Montar ficou no meio: a missão volta nele antes de qualquer tour/folha
   if (retomadaDoGasto(m, hoje)) return true;
+  // 1.0.18 (dias23): o resumo dos 3 dias abre no dia 3 — antes de qualquer tour/dica
+  if (construiuAoAbrirDevido(m, hoje)) return true;
   if (precisaPlanoAmanha(m, hoje)) return true;
   const dia = diaDaMissao(m, hoje);
   // 1.0.16, braço A: a dose de hoje já foi → a missão volta amanhã (o tour e os adesivos podem entrar);
@@ -793,3 +806,80 @@ export const rotuloDoFeito = (m: EstadoMissaoDoses, n: DiaDaMissao): string | nu
 export const HORAS_DO_LEMBRETE: Array<{ id: Lembrete; rotulo: string }> = [
   { id: "8h", rotulo: "8h" }, { id: "12h", rotulo: "12h" }, { id: "20h", rotulo: "20h" }, { id: "sem", rotulo: "sem aviso" },
 ];
+
+/* ───────────────────────────── 1.0.18 — DIAS 2 E 3 DO TESTE (chave `dias23`, lib/dias23) ───────────────────────────── */
+
+/** Os dias 2 e 3 novos valem PARA ESTA MISSÃO? Só no braço A (uma dose por dia) e com a chave ligada. */
+export const dias23NaMissao = (m: EstadoMissaoDoses | null): boolean => !!m && ehUmPorDia(m) && dias23Ligado();
+
+/** Os módulos pessoais do "escolhe o seu" (dia 2), 3 por área da porta (RELATORIO M3); o resto completa se faltar. */
+export const OPCOES_DIA2_POR_AREA: Record<AreaKey, ModuloDaMissao[]> = {
+  dinheiro: ["casa", "beleza", "estudos"],
+  rotina: ["beleza", "casa", "desenvolvimento"],
+  corpo: ["dieta", "beleza", "casa"],
+  saude: ["dieta", "beleza", "casa"],
+  metas: ["desenvolvimento", "estudos", "beleza"],
+};
+export const OPCOES_DIA2_RESERVA: ModuloDaMissao[] = ["beleza", "casa", "estudos", "dieta", "desenvolvimento", "detox"];
+/** A linha curta de cada tile (o que a intro faz em 1 toque). */
+export const SUB_DO_TILE: Partial<Record<ModuloDaMissao, string>> = {
+  beleza: "rotina de pele", casa: "1 cômodo", estudos: "1 matéria", dieta: "1 refeição", desenvolvimento: "1 meta", detox: "1 hábito",
+};
+
+/**
+ * As até 3 opções do dia 2: as da área primeiro, depois a reserva; nunca o módulo da dose 1, nem um que já foi feito
+ * na missão, nem um cuja intro já não pode abrir (`introPodeAbrir` — já vista, já com dado: a dose é a intro, e
+ * sem intro não há dose). Vazia = cai no convite de sempre.
+ */
+export function opcoesDoDia2(m: EstadoMissaoDoses, area: string | null | undefined, introPodeAbrir: (modulo: ModuloDaMissao) => boolean): ModuloDaMissao[] {
+  const daArea = (area && area in OPCOES_DIA2_POR_AREA ? OPCOES_DIA2_POR_AREA[area as AreaKey] : OPCOES_DIA2_POR_AREA.dinheiro);
+  const out: ModuloDaMissao[] = [];
+  for (const mod of [...daArea, ...OPCOES_DIA2_RESERVA]) {
+    if (out.length === 3) break;
+    if (out.includes(mod) || mod === m.modulos[0]) continue;
+    let ok = false;
+    try { ok = introPodeAbrir(mod); } catch { ok = false; }
+    if (ok) out.push(mod);
+  }
+  return out;
+}
+
+/** Dia 2, a folha "Dia 2: escolhe o seu" está devendo? (no lugar do convite "Dia 2: Rotina"; mesma régua: 1x por dia) */
+export function escolhaDoDia2Devida(m: EstadoMissaoDoses | null, hoje: string = localDayKey(), naTela = false): boolean {
+  if (!dias23NaMissao(m) || m!.escolha2) return false;
+  if (passoPendente(m!)?.n !== 2) return false;
+  return conviteDoDiaDevido(m, hoje, naTela);
+}
+
+/** Grava a escolha do dia 2: a dose 2 passa a ser o módulo escolhido; o que estava lá (Rotina) vai pro dia 3. */
+export function comEscolha2(m: EstadoMissaoDoses, modulo: ModuloDaMissao, via: "comecar" | "agora_nao", hoje: string = localDayKey()): EstadoMissaoDoses {
+  const de = m.modulos[1];
+  const terceiro = de !== modulo ? de : m.modulos[2];
+  const modulos: [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao] = [m.modulos[0], modulo, terceiro];
+  return { ...m, modulos, escolha2: { modulo, dia: hoje, via, de } };
+}
+
+/**
+ * A INTRO do módulo é a dose 2 (o tutorial do módulo escolhido no dia 2)? Enquanto sim, a missão NÃO monta o passo
+ * guiado nesse módulo e NÃO bloqueia a intro dele (lib/intro-modulo `introBloqueadaPelaMissao`): é a intro que roda,
+ * e o fim dela grava a dose 2.
+ */
+export function introEhADoseDoDia2(m: EstadoMissaoDoses | null, modulo: string): boolean {
+  if (!dias23NaMissao(m) || !m!.escolha2 || m!.feitos[2]) return false;
+  return m!.escolha2.modulo === modulo && m!.modulos[1] === modulo;
+}
+
+/** O rótulo da dose 2 feita pela intro (sem número, neutro). */
+export const ROTULO_DOSE_PELA_INTRO = "1º passo feito";
+
+/**
+ * Dia 3: "Você construiu isso em 3 dias" abre SOZINHO ao abrir o app (pela data, não pela 3ª dose)? 1x: some com o
+ * "Continuar" (fimVisto, que já era a marca da tela). Do dia 3 ao 7 (quem volta no dia 4 também vê), nunca antes
+ * das boas-vindas.
+ */
+export function construiuAoAbrirDevido(m: EstadoMissaoDoses | null, hoje: string = localDayKey(), naTela = false): boolean {
+  if (!dias23NaMissao(m) || !m!.boasVindas || m!.fimVisto) return false;
+  const dia = diaDaMissao(m!, hoje);
+  if (dia < 3 || dia > DIA_FIM_DA_MISSAO) return false;
+  return (m!.fimAoAbrirVistas ?? 0) - (naTela ? 1 : 0) < MAX_VISTAS_SEM_DECISAO;
+}

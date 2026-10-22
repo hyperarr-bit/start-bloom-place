@@ -36,7 +36,7 @@ import { somaParcelasDoMes, type Parcela } from "./finance-parcelas";
 import { reais } from "./dinheiro";
 import { gastoDoDia, praHojeDoDia, type PraHoje } from "./montar-financas";
 import {
-  doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
+  doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dias23NaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
   minutosDoLembrete, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
 import type { QuandoAmanha } from "./dia1-cheio";
@@ -360,6 +360,15 @@ export function conteudoDaMissao(missao: EstadoMissaoDoses | null, hoje: string 
     }
     if (pendente.n === 3 && vivo) {
       return { title: "Dia 3: feche seus 3 dias seguidos 🔥", body: `${toque.charAt(0).toUpperCase() + toque.slice(1)} e o adesivo dos 3 dias é seu. ${dose.seg} segundos.`, modulo: "missao", temNumero: false, rota: cfgA.rota };
+    }
+    // 1.0.18 (chave `dias23`): o dia 2 é "escolhe o seu" — o aviso leva o número pronto e a escolha, e abre a Home
+    // (a folha da escolha está lá); a dose ainda não tem módulo
+    if (pendente.n === 2 && dias23NaMissao(missao) && !missao.escolha2) {
+      return {
+        title: porDia ? `Hoje dá pra gastar até R$ ${reais(porDia)}` : "Dia 2: escolhe o seu",
+        body: porDia ? "Ficou pronto. E hoje você escolhe o seu 2º módulo." : "Hoje você escolhe um módulo só seu.",
+        modulo: "missao", temNumero: !!porDia, rota: "/home",
+      };
     }
     if (pendente.n === 2) {
       return {

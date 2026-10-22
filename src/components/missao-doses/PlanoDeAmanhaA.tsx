@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { MODULOS, eventoDaMissao, passoPendente, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { MODULOS, dias23NaMissao, diaDaMissao, eventoDaMissao, passoPendente, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao } from "@/lib/missao-doses";
+import { useUserData } from "@/hooks/use-user-data";
+import { porDiaDasFinancas } from "@/lib/lembrete-dia2";
 import { localDayKey } from "@/lib/utils";
 import { entrada, MOV } from "@/lib/movimento";
 import { EscolhaDeHora } from "./EscolhaDeHora";
@@ -51,9 +53,17 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
   // 18/10 (funil da missão na WEB): "que horas te lembro?" vira o pop-up "Baixe o app pra receber os lembretes" —
   // o navegador não manda notificação. "Agora não" = "Sem lembrete" (a missão segue)
   const [soNoApp] = useState(lembretesSoNoApp);
+  /* 1.0.18 (chave `dias23`, RELATORIO M1): a folha promete o que FICA PRONTO amanhã — com Finanças montada, "quanto dá
+     pra gastar amanhã"; sem, "você escolhe o seu 2º módulo" (o dia 2 novo). Desligada: a folha de sempre. */
+  const { get } = useUserData();
+  const [promessa] = useState<null | "numero" | "escolha">(() => {
+    if (!dias23NaMissao(missao)) return null;
+    try { return porDiaDasFinancas(get) !== null ? "numero" : "escolha"; } catch { return "escolha"; }
+  });
   useEffect(() => {
     // na web quem conta a vista é o pop-up (missao_web_lembrete_popup) — ele espera a oferta sair
     if (!soNoApp) trackEvent("plano_amanha_folha", eventoDaMissao({ acao: "view", indice: proxima?.n ?? null, sugerida: hora }));
+    if (!soNoApp && promessa) trackEvent("dia1_promessa_view", eventoDaMissao({ promessa, dia_do_teste: diaDaMissao(missao) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (soNoApp) return <BaixarAppPopup contexto="plano_amanha" depoisDaOferta onAgoraNao={aoSemLembrete} antes={tituloDoDiaFeito(missao)} />;
@@ -65,8 +75,22 @@ export function PlanoDeAmanhaA({ missao, aoCombinar, aoSemLembrete }: {
         className="md-tema w-full max-w-[380px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 shadow-2xl">
         {/* 1.0.17 (item 7): o fechamento do dia mora AQUI (a festa da dose 1 comemora o módulo; o tour vem no meio) */}
         <p className="text-[24px] font-black tracking-[-0.02em] leading-tight" data-testid="plano-amanha-a-titulo">{tituloDoDiaFeito(missao)}</p>
-        <p className="text-[16px] font-extrabold leading-snug mt-1.5" data-testid="plano-amanha-a-amanha">{fraseDeAmanha(proxima?.modulo, proxima?.n).replace(/\.$/, "")}</p>
-        <p className="text-[15px] text-muted-foreground mt-1">Que horas te lembro?</p>
+        {promessa ? (
+          <>
+            <p className="text-[15px] text-muted-foreground mt-1">Amanhã fica pronto</p>
+            <div className="mt-3 rounded-2xl px-4 py-3 bg-[#FFF6D1] text-[#2b2b2f] dark:bg-[rgba(255,211,110,.14)] dark:text-foreground" data-testid="plano-amanha-a-promessa" data-promessa={promessa}>
+              <span className="block text-[11px] font-extrabold tracking-[.12em] uppercase text-[#9a5b00] dark:text-[#ffd36e]" data-testid="plano-amanha-a-promessa-hora">Amanhã · {hora === "sem" ? "de manhã" : hora}</span>
+              <span className="block text-[17px] font-black tracking-[-0.01em] leading-tight mt-0.5">{promessa === "numero" ? "Quanto dá pra gastar amanhã" : "Você escolhe o seu 2º módulo"}</span>
+              <span className="block text-[13px] opacity-70 mt-0.5">{promessa === "numero" ? "com o que você anotou hoje" : "um módulo só seu"}</span>
+            </div>
+            <p className="text-[15px] text-muted-foreground mt-4">Que horas te aviso?</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[16px] font-extrabold leading-snug mt-1.5" data-testid="plano-amanha-a-amanha">{fraseDeAmanha(proxima?.modulo, proxima?.n).replace(/\.$/, "")}</p>
+            <p className="text-[15px] text-muted-foreground mt-1">Que horas te lembro?</p>
+          </>
+        )}
         <div className="mt-4">
           <EscolhaDeHora valor={hora} aoMudar={(h) => setHora(h)} comSem={false} testid="plano-a-hora" />
         </div>

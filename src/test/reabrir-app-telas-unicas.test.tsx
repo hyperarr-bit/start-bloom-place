@@ -71,7 +71,10 @@ const usarOApp = () => {
     ["missao-doses", JSON.stringify({
       v: 1, inicio: "2026-10-12", modulos: ["financas", "rotina", "saude"], feitos: { 1: { dia: "2026-10-12", rotulo: "Pode gastar R$ 61 por dia" } }, boasVindas: true, braco: "A",
       convites: { "2026-10-13": "depois" }, convitesVistos: { "2026-10-13": 1 }, lembrete: "20h", dicas: { 2: "2026-10-13" }, dicasVistas: { 2: 1, 3: 2 }, adesivosMostrados: ["first-income"], scoreAntes: { 2: 20 },
+      // 1.0.18 (dias23): a escolha do dia 2 e o resumo dos 3 dias aberto na abertura — dentro da missão
+      escolha2: { modulo: "beleza", dia: "2026-10-13", via: "comecar", de: "rotina" }, fimVisto: true, fimAoAbrir: "2026-10-14",
     })],
+    ["core-dias23", "on"], ["dias23-force", "on"],
     // 16/10: a força de QA da Conquistas 2 (sem prefixo varrido) e o toast que já apareceu (core-festas-mostradas)
     ["conquistas2-force", "on"], ["core-festas-mostradas", JSON.stringify(["first-expense", "sequencia-2"])],
   ] as const) localStorage.setItem(k, v);
@@ -93,13 +96,14 @@ const esperarTudoVisto = () => {
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
     "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
     "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas", "core-att-momento", "core-att-braco",
-    "conquistas2-force", "core-festas-mostradas"]) {
+    "conquistas2-force", "core-festas-mostradas", "core-dias23", "dias23-force"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
   const missao = JSON.parse(localStorage.getItem("missao-doses")!);
   expect(missao.convites).toEqual({ "2026-10-13": "depois" });
   // 1.0.16 (revisão pré-build): as vistas das dicas sem "Entendi" (no máximo 2) moram na missão — fechar/reabrir e sair da conta não zeram
   expect(missao).toMatchObject({ boasVindas: true, lembrete: "20h", dicas: { 2: "2026-10-13" }, dicasVistas: { 2: 1, 3: 2 }, convitesVistos: { "2026-10-13": 1 }, adesivosMostrados: ["first-income"], feitos: { 1: { dia: "2026-10-12" } } });
+  expect(missao).toMatchObject({ escolha2: { modulo: "beleza", dia: "2026-10-13" }, fimVisto: true, fimAoAbrir: "2026-10-14" });
   expect(JSON.parse(localStorage.getItem("core-montar-financas")!).r).toBe("pronto");
 };
 

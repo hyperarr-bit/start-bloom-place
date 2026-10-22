@@ -87,7 +87,7 @@ const CAKTO_LENTA_MS = 10_000; // só pra log: acima disso fica marcado no cron�
  *   toque tenta de novo do jeito de sempre (aí, se falhar, conta).
  * - DESLIGAR = false aqui + redeploy: o aquecimento passa a responder
  *   adiantar:false e o front para de pedir na hora (sem push). */
-const PIX_ADIANTADO_LIGADO = true;
+const PIX_ADIANTADO_LIGADO = false; // 22/10: segue DESLIGADO (decisão do dono 27/09 — a Cakto manda e-mail de Pix pendente)
 const OFERTAS_ADIANTADAS = new Set(["w27"]);
 
 /** `pix.expirationDate` da Cakto → ms (26/09). Sem fuso, lê como UTC — a leitura

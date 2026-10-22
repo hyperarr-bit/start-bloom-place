@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { CHAVE_NOME_DA_HOME, nomeDaHome, nomeParaMigrar } from "@/lib/nome-da-pessoa";
 import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
@@ -94,6 +95,15 @@ const weekDayMap: Record<number, string> = {
 export function useLifeHubData(): LifeHubData {
   const { get, set, loaded } = useUserData();
   const streakHandled = useRef(false);
+
+  /* 1.0.17: o cadastro do iPhone gravava o nome só em "user-name" e a saudação caía no começo do e-mail.
+   * Com a conta carregada, copia UMA vez o nome antigo pra chave da Home (lib/nome-da-pessoa). Escrita de
+   * sistema: não conta como registro do dia. */
+  useEffect(() => {
+    if (!loaded) return;
+    const n = nomeParaMigrar(get);
+    if (n) set(CHAVE_NOME_DA_HOME, n, { system: true });
+  }, [loaded, get, set]);
 
   // Handle streak as a side-effect — wait for Supabase to fully load (not just
   // local cache hydration) so we don't overwrite a fresher server value.
@@ -436,7 +446,7 @@ export function useLifeHubData(): LifeHubData {
     const pendenciasPorModulo = tiposDosModulosOcultos(modulosOcultos);
     const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, pendenciasPorModulo);
     const dayScore = scoreDosBlocos(blocos, cobrados);
-    const userName = get<string>("core-user-name", "");
+    const userName = nomeDaHome(get);
 
     return {
       dayScore, streak, monthBalance,

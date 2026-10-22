@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 import { AlarmClock, ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Droplets, Dumbbell, Flame, Gift, Mail, PartyPopper, Pill, Receipt, Salad, Sparkles, Sunrise, Wallet, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
@@ -52,7 +53,7 @@ const Notificacoes = () => {
   // isNativeShell() é constante na sessão, então a contagem de hooks é
   // estável por ambiente. Reverter quando houver push web.
   if (!isNativeShell()) return <Navigate to="/home" replace />;
-  const navigate = useNavigate();
+  const voltar = useVoltarDaSubpagina("/home");
   const { get, set } = useUserData();
   const [prefs, setPrefs] = usePersistedState<PrefsNotificacoes>(CHAVE_PREFS, lerPrefs(undefined));
   // remédios (07/09): chave própria, nasce ligado — ver CHAVE_REMEDIOS_LIGADO
@@ -364,7 +365,7 @@ const Notificacoes = () => {
     <div className="min-h-[100dvh] bg-background">
       <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/85 backdrop-blur border-b border-border
                          pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button onClick={() => navigate("/home")} aria-label="Voltar" className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors">
+        <button onClick={voltar} aria-label="Voltar" className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-base font-bold">Notificações</h1>

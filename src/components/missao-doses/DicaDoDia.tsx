@@ -20,13 +20,14 @@ import { eventoDaMissao } from "@/lib/missao-doses";
 const ALVOS: Record<2 | 3, string> = { 2: '[data-tour="score"]', 3: '[data-tour="adicionar-widget"]' };
 
 export function textoDaDica(dia: 2 | 3, scoreAntes?: number | null, scoreAgora?: number | null): { titulo: string; texto: string } {
-  if (dia === 3) return { titulo: "Quer ver isso logo de cara?", texto: "Em “Adicionar widget” você escolhe o que fica aqui na sua Home: o quanto dá pra gastar, seus hábitos, a água." };
+  // 1.0.17 (dono: "minimalista"): título de uma linha + no máximo uma frase curta
+  if (dia === 3) return { titulo: "Escolha o que aparece aqui.", texto: "Em “Adicionar widget”." };
   const antes = typeof scoreAntes === "number" ? Math.round(scoreAntes) : null;
   const agora = typeof scoreAgora === "number" ? Math.round(scoreAgora) : null;
   if (antes !== null && agora !== null && agora > antes) {
-    return { titulo: `Seu score foi de ${antes} pra ${agora} hoje`, texto: "Ele junta tudo o que você faz no dia. Cada registro conta." };
+    return { titulo: `Seu score foi de ${antes} pra ${agora}.`, texto: "Cada registro soma." };
   }
-  return { titulo: "Esse é o seu score do dia", texto: "Ele junta tudo o que você faz no dia — a dose de hoje já contou." };
+  return { titulo: "Seu score do dia.", texto: "Cada registro soma." };
 }
 
 export function DicaDoDia({ dia, aoFechar, aoVer, scoreAntes }: {

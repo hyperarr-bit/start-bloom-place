@@ -22,6 +22,8 @@ interface AccountDrawerProps {
   displayName?: string;
   onNameChange?: (name: string) => void;
   onReplayTutorial?: () => void;
+  /** 1.0.17 (aba Você): abre direto numa sub-tela; o "‹" dela fecha a folha em vez de cair no menu. */
+  inicial?: "menu" | "account" | "computador";
 }
 
 export const AccountDrawer = ({
@@ -30,6 +32,7 @@ export const AccountDrawer = ({
   displayName = "",
   onNameChange,
   onReplayTutorial,
+  inicial = "menu",
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
   const { set: setUserData, isGuest } = useUserData();
@@ -37,11 +40,12 @@ export const AccountDrawer = ({
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showApagarDados, setShowApagarDados] = useState(false);
-  const [view, setView] = useState<"menu" | "account" | "computador">("menu");
+  const [view, setView] = useState<"menu" | "account" | "computador">(inicial);
 
   useEffect(() => {
-    if (!open) setView("menu");
-  }, [open]);
+    setView(inicial);
+  }, [open, inicial]);
+  const voltarAoMenu = () => (inicial === "menu" ? setView("menu") : onOpenChange(false));
 
   // Aquece os chunks lazy dos destinos do menu enquanto o drawer abre — sem
   // isso, clicar em "Conquistas"/"Assinatura" ainda baixa o chunk na hora e
@@ -218,7 +222,7 @@ export const AccountDrawer = ({
             <>
               <SheetHeader className="px-5 pt-6 pb-4 flex-row items-center gap-2 space-y-0">
                 <button
-                  onClick={() => setView("menu")}
+                  onClick={voltarAoMenu}
                   className="p-1 -ml-1 rounded-md hover:bg-muted transition-colors"
                   aria-label="Voltar"
                 >
@@ -254,7 +258,7 @@ export const AccountDrawer = ({
             <>
               <SheetHeader className="px-5 pt-6 pb-4 flex-row items-center gap-2 space-y-0">
                 <button
-                  onClick={() => setView("menu")}
+                  onClick={voltarAoMenu}
                   className="p-1 -ml-1 rounded-md hover:bg-muted transition-colors"
                   aria-label="Voltar"
                 >

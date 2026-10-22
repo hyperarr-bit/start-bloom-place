@@ -265,11 +265,11 @@ describe("braço A (1.0.16: uma dose por dia) + `variante: 'A'`", () => {
     montar(montarStore(dados()), "/home");
     expect(lerMissao()?.braco).toBe("A");
     expect(screen.queryByTestId("missao-doses-vamos-la")).toBeNull(); // uma tela só
-    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Seu plano de 3 dias");
+    expect(screen.getByTestId("missao-doses-boas-vindas")).toHaveTextContent("Seu plano");
     expect(eventos).toContainEqual(["missao_doses_inicio", expect.objectContaining({ variante: "A", prototipo: "app" })]);
     fireEvent.click(screen.getByTestId("missao-doses-comecar"));
     const festa = tocarChipAteAFesta();
-    expect(festa).toHaveTextContent("Dia 1 de 3 feito ✅");
+    expect(festa).toHaveTextContent(/(pronta|pronto|prontas|prontos) 💛/); // 1.0.17 (item 7): a dose 1 comemora o módulo
     expect(screen.getByTestId("missao-doses-continuar")).toBeInTheDocument();
     expect(screen.queryByTestId("missao-doses-bora-proxima")).toBeNull();
     expect(screen.queryByTestId("missao-doses-amanha-agora")).toBeNull();
@@ -413,25 +413,25 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     const postIt = esperarPostIt();
     // passo A: o campo "Nome do hábito..." abriu (a missão tocou no "+ Hábito") e o anel está na linha dele
     const campo = screen.getByPlaceholderText("Nome do hábito...") as HTMLInputElement;
-    expect(postIt).toHaveTextContent("1 de 2 · criar");
-    expect(postIt).toHaveTextContent("Qual hábito você quer começar hoje?");
-    expect(postIt).toHaveTextContent("toca em Adicionar");
+    expect(postIt).toHaveTextContent("1 de 2");
+    expect(postIt).toHaveTextContent("Qual hábito você quer começar?");
+    expect(postIt).not.toHaveTextContent("Adicionar"); // 1.0.17: o chip cria sozinho — nada de "toque em Adicionar"
     const chips = within(postIt).getAllByTestId("demo-guia-chip");
     expect(chips.map((c) => c.textContent)).toEqual(["💧Beber água ao acordar", "🧘Alongar 5 min", "🛏️Arrumar a cama"]);
     fireEvent.pointerDown(chips[0]);
     fireEvent.click(chips[0]);
-    expect(campo.value).toBe("Beber água ao acordar"); // só preencheu
-    expect(store.dados["rotina-habits"]).toBeUndefined(); // NADA gravado por fora
-    expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
-    // a pessoa toca em Adicionar: o hábito nasce pelo código da Rotina
-    fireEvent.click(screen.getByText("Adicionar"));
+    expect(campo.value).toBe("Beber água ao acordar"); // preencheu o campo real...
+    expect(store.dados["rotina-habits"]).toBeUndefined(); // ...nada gravado por fora
+    // 1.0.17 (bug da 1.0.16): 1 TOQUE — a missão toca no "Adicionar" da Rotina e o hábito nasce pelo código do módulo
+    avancar(100);
     expect(store.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]);
+    expect(eventos).toContainEqual(["missao_doses_chip", expect.objectContaining({ nome: "Beber água ao acordar", ok: true })]);
     expect(eventos).toContainEqual(["missao_doses_passo", expect.objectContaining({ passo: "criar_habito", acao: "feito", nome: "Beber água ao acordar" })]);
     // passo B: o anel foi pro quadradinho de hoje; o post-it pede pra marcar
     avancar(400); avancar(3000);
     const postItB = screen.getAllByTestId("demo-guia-postit").at(-1)!;
-    expect(postItB).toHaveTextContent("2 de 2 · marcar");
-    expect(postItB).toHaveTextContent("Agora marca o quadradinho de hoje");
+    expect(postItB).toHaveTextContent("2 de 2");
+    expect(postItB).toHaveTextContent("Agora marque o de hoje");
     expect(within(postItB).queryAllByTestId("demo-guia-chip")).toEqual([]);
     expect(screen.queryByTestId("missao-doses-festa")).toBeNull();
     fireEvent.click(screen.getByLabelText(`Beber água ao acordar ${DIAS_ROTINA[(new Date().getDay() + 6) % 7]}`));
@@ -451,7 +451,6 @@ describe("braço B: as 3 doses no dia 1 (+ arrumar a Home) — conta VAZIA", () 
     missaoGravada({ braco: "B", feitos: { 1: { dia: "2026-10-03", rotulo: "Café · R$ 12" } } });
     montar(store, "/rotina");
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("Agora · 1 toque");
     expect(postIt).toHaveTextContent("quadradinho");
     expect(within(postIt).queryAllByTestId("demo-guia-chip")).toEqual([]);
     expect(screen.queryByPlaceholderText("Nome do hábito...")).toBeNull();

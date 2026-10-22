@@ -5,7 +5,11 @@ import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { modeloPara, montarTreino, type DiasPorSemana, type OndeTreina } from "@/lib/intro-modulo-acoes";
 import { abrirAba } from "@/components/cartoes-modulo/registro";
+import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import "./intro-modulo.css";
+
+/** 1.0.17: os dias que ELA disse no "+ Outro" (stepper 1–7) → a faixa do modelo que casa. */
+export const faixaDosDias = (n: number): DiasPorSemana => (n >= 5 ? "5-6" : n === 4 ? "4" : "2-3");
 
 /**
  * ESCOLHER TREINO — as 2 perguntas que montam a semana (17/10). SÓ roda como a 1ª dose da missão na área
@@ -56,9 +60,9 @@ const NOME_DO_DIA: Record<string, string> = { SEGUNDA: "segunda", TERÇA: "terç
 /** "O treino de hoje já está aberto…" ou, em dia de descanso no modelo, "o primeiro treino é segunda". */
 function fraseDoPronto(diasAtivos: string[], hoje: Date = new Date()): string {
   const idx = (hoje.getDay() + 6) % 7;
-  if (diasAtivos.includes(DIAS_SEMANA[idx])) return "O treino de hoje já está aberto. Marca o primeiro exercício quando fizer.";
-  for (let i = 1; i <= 7; i++) { const d = DIAS_SEMANA[(idx + i) % 7]; if (diasAtivos.includes(d)) return `Hoje é descanso no modelo. O primeiro treino é ${NOME_DO_DIA[d]} — já está montado na aba HOJE.`; }
-  return "A semana está montada. Abre a aba HOJE no dia do treino.";
+  if (diasAtivos.includes(DIAS_SEMANA[idx])) return "O treino de hoje está aberto. Marque o 1º quando fizer.";
+  for (let i = 1; i <= 7; i++) { const d = DIAS_SEMANA[(idx + i) % 7]; if (diasAtivos.includes(d)) return `Hoje é descanso. O 1º treino é ${NOME_DO_DIA[d]}.`; }
+  return "A semana está montada.";
 }
 
 export function EscolherTreino({ onPronto, onPular }: { onPronto: (r: ResultadoDaEscolha) => void; onPular?: () => void }) {
@@ -113,7 +117,12 @@ export function EscolherTreino({ onPronto, onPular }: { onPronto: (r: ResultadoD
                 </button>
               ))}
             </div>
-            <p className="im-vazio-detalhe">{onde ? "Escolhe os dias e a semana fica montada. Depois você ajusta o que quiser." : "Duas respostas e a sua semana sai montada com um modelo pronto."}</p>
+            {/* 1.0.17: "+ Outro" — o número de dias dela num stepper (1 a 7) */}
+            <div className="mt-2">
+              <EscolhaRapida opcoes={[]} tom="montar" classeChip="im-vazio-chip" testid="escolher-dias-outro" desabilitado={!onde}
+                numero={{ min: 1, max: 7, inicial: 3, formatar: (n) => (n === 1 ? "1 dia" : `${n} dias`), rotulo: "Outro" }}
+                aoEscolher={(op) => escolherDias(faixaDosDias(op.valor ?? 3))} />
+            </div>
           </>
         ) : (
           <div className="im-escolha-pronto" data-testid="escolher-treino-pronto">

@@ -42,6 +42,8 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  */
 export const VIDEO_WELCOME = "/funil/welcome-app.mp4";
 export const POSTER_WELCOME = "/funil/welcome-app.jpg";
+/** O mesmo vídeo em WebP animado, pra quando o iPhone nega o vídeo (Modo Pouca Energia). */
+export const VIDEO_WELCOME_ANIMADO = "/funil/welcome-app.webp";
 
 const PROMESSA_PADRAO = "Sua vida inteira organizada num app só.";
 const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
@@ -58,6 +60,13 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);
+  /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
+   * O iOS bloqueia <video> no WebView com pouca energia (o Cal AI é nativo, por isso roda lá), mas NÃO bloqueia imagem
+   * animada. Então o pôster cobre o vídeo até ele rodar de verdade e, sem rodar em 1,2 s, entra o MESMO vídeo em WebP
+   * animado (720 px, 15 qps, ~2,6 MB no pacote). O toque segue tentando o vídeo e, rodando, a capa sai. */
+  const [rodando, setRodando] = useState(false);
+  const [passeio, setPasseio] = useState(false);
+  useEffect(() => { const t = window.setTimeout(() => { if (!rodouRef.current) setPasseio(true); }, 1200); return () => window.clearTimeout(t); }, []);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rodouRef = useRef(false);
 
@@ -112,6 +121,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
     if (rodouRef.current) return;
     rodouRef.current = true;
     setVideoFalhou(false);
+    setRodando(true);
     trackEvent("welcome_video_play", {});
   };
   const aoFalhar = () => {
@@ -175,6 +185,13 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
               data-testid="welcome-video"
               data-falhou={videoFalhou ? "" : undefined}
             />
+            {!rodando && (
+              <div className="wca-cobre" data-testid="welcome-cobre" data-animado={passeio ? "" : undefined}>
+                <img className="wca-cobre-img" src={POSTER_WELCOME} alt="" draggable={false} />
+                {/* carrega desde o início (pra estar pronto em 1,2 s) e só aparece se o vídeo não rodar */}
+                <img className="wca-cobre-img wca-cobre-anim" src={VIDEO_WELCOME_ANIMADO} alt="" draggable={false} />
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -243,6 +260,14 @@ const CSS_WCA = `
 }
 /* contain + o mesmo fundo do vídeo: se a caixa sair um pixel da proporção, nada é cortado nem ampliado */
 .wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
+/* a capa = o pôster (o 1º quadro do vídeo) por cima do vídeo até ele rodar; sem vídeo, o WebP animado aparece suave */
+.wca-cobre { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; pointer-events: none; }
+.wca-cobre-img { position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
+.wca-cobre-anim { opacity: 0; transition: opacity .35s ease-out; }
+.wca-cobre[data-animado] .wca-cobre-anim { opacity: 1; }
+.wca-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
+.wca-video::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; }
+.wca-video::-webkit-media-controls { display: none !important; }
 .wca-corpo { flex: 0 0 auto; text-align: center; padding: 14px 22px 0; }
 .wca h1 {
   margin: 0; font-weight: 900; letter-spacing: -.03em; line-height: 1.08;

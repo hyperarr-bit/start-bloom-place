@@ -110,10 +110,10 @@ export const slide = {
 const deslizeComDirecao = (dx: number) => ({
   entra: (dir: number) => ({ opacity: 0, x: dir * dx }),
   fica: { opacity: 1, x: 0 },
-  sai: (dir: number) => ({ opacity: 0, x: -dir * dx }),
+  sai: (dir: number) => ({ opacity: 0, x: -dir * dx, pointerEvents: "none" as const }),
 });
 /** O `{...slide}` de antes de 17/10, em forma de variantes (o funil do dia 14 / /inicio usa este). */
-const DESLIZE_DE_SETEMBRO = { entra: slide.initial, fica: slide.animate, sai: slide.exit };
+const DESLIZE_DE_SETEMBRO = { entra: slide.initial, fica: slide.animate, sai: { ...slide.exit, pointerEvents: "none" as const } };
 
 const PREP_STEPS = [
   "Identificando seu perfil financeiro",
@@ -720,7 +720,10 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
       </div>
 
       {/* com `inicio` quem entra deslizando na 1ª vez é o passo inteiro (funil W): aqui não desliza de novo */}
-      <AnimatePresence mode="wait" custom={dir} initial={!inicio}>
+      {/* 1.0.17 QA (dono: "nenhum quadro vazio"): a pergunta que sai e a que entra deslizam JUNTAS (popLayout: a que sai
+          vira absoluta e sai por baixo) — antes era "wait" (sai, ~0,2 s de tela vazia, entra) */}
+      <div className="relative">
+      <AnimatePresence mode="popLayout" custom={dir} initial={!inicio}>
         <motion.div
           key={naInicio ? `inicio:${inicio!.chave}` : item.kind === "q" ? q!.key : item.kind === "eco" ? `eco${item.qIdx}` : item.kind}
           custom={dir} variants={variantes} initial="entra" animate="fica" exit="sai" transition={slide.transition}
@@ -759,6 +762,7 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
           )}
         </motion.div>
       </AnimatePresence>
+      </div>
     </div>
   );
 }

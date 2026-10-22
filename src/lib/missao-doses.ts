@@ -54,7 +54,7 @@ import { somarDias } from "@/lib/sequencia";
 import { missaoAtual } from "@/lib/teste-gratis";
 import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
-import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
+import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, tourHomeQuando, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -247,7 +247,17 @@ export const MAX_VISTAS_DO_SETUP = 2;
 /* ------------------------------------------------------------------ o estado */
 
 export type DiaDaMissao = 1 | 2 | 3;
-export type Lembrete = "8h" | "12h" | "20h" | "sem";
+/** 1.0.17: além dos 3 chips, a hora DELA pelo "+ Outro" (hora cheia, 6h–22h: "21h"). */
+export type Lembrete = "8h" | "12h" | "20h" | "sem" | `${number}h`;
+/** "21h" → 21 * 60; "sem" → "sem"; lixo → null. */
+export function minutosDoLembrete(l: unknown): number | "sem" | null {
+  if (l === "sem") return "sem";
+  const m = typeof l === "string" ? /^(\d{1,2})h$/.exec(l) : null;
+  const h = m ? Number(m[1]) : NaN;
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h * 60 : null;
+}
+/** A hora do stepper do "+ Outro" (6h–22h). */
+export const HORA_PROPRIA = { min: 6, max: 22 } as const;
 
 export interface EstadoMissaoDoses {
   v: 1;
@@ -444,7 +454,7 @@ export const eventoDaMissao = (dados: Record<string, unknown> = {}): Record<stri
   let diaCal: number | null = null;
   let missaoId: string | null = null;
   try { const m = lerMissao(); diaCal = m ? diaDaMissao(m) : null; missaoId = m ? idDaMissao(m) : null; } catch { diaCal = null; }
-  return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia() };
+  return { dia_cal: diaCal, missao_id: missaoId, ...base, variante, braco: variante === "A" ? "um_por_dia" : "dia1_cheio", missao_1_por_dia: modoUmPorDia(), tour_quando: tourHomeQuando() };
 };
 /** 1.0.16 (relatório 11 §7: nunca valor em reais em evento): o rótulo do feito sem o número — "Café · R$ 12" →
  *  "Café · R$ x", "Pode gastar R$ 61 por dia" → "Pode gastar R$ x por dia". O resto do rótulo (nome do hábito, do
@@ -719,8 +729,15 @@ export function missaoEmAndamento(m: EstadoMissaoDoses | null, hoje: string = lo
   // 1.0.16, braço A: a dose de hoje já foi → a missão volta amanhã (o tour e os adesivos podem entrar);
   // num dia novo, o convite "Dia N da missão" é a tela que falta
   if (ehUmPorDia(m) && !missaoCumprida(m)) {
+    /* 1.0.17 — QUANDO o tour curto entra é chave remota (`tour_home_quando`, lib/dia1-cheio):
+       · "dia1" (padrão, decisão do dono 19/10): no dia 1, depois da dose — a Home espera ~1,5 s parada, sem outra
+         camada (useTourDaHome), e o "Plano de amanhã" vem depois do tour;
+       · "dia2": o dia 1 termina limpo (festa → Home → só o lembrete); o tour vem num dia seguinte, DEPOIS da dose
+         daquele dia. Quem pulou a missão ("explorar") segue a regra de sempre (na 1ª volta à Home). */
+    const noDia2 = tourHomeQuando() === "dia2";
+    if (noDia2 && !m.explorou && dia === 1) return true;
     if (!doseLiberadaHoje(m, hoje)) return false;
-    if (dia >= 2) return conviteDoDiaDevido(m, hoje);
+    if (dia >= 2) return (noDia2 && !m.explorou && dia <= DIA_FIM_DA_MISSAO) || conviteDoDiaDevido(m, hoje);
   }
   // dose por fazer no dia 1 (não pulada hoje; no B, "Agora não" encerra a sessão — a Home é da pessoa)
   if (!missaoCumprida(m)) return dia === 1 && m.pulados?.[passoPendente(m)?.n ?? 1] !== hoje && !(ehBracoB(m) && m.agoraNao?.dia === hoje);

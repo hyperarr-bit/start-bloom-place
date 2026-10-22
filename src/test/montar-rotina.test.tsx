@@ -76,6 +76,8 @@ import {
 } from "@/lib/montar-rotina";
 import { MontarRotina, ehACelulaDoGuia, quadradinhoDeHoje, recorteDoQuadradinho, type ResumoMontarRotina } from "@/components/rotina/montar/MontarRotina";
 import Rotina from "@/pages/Rotina";
+import { instalarTecladoIphone } from "./helpers/teclado-iphone";
+import { GUARDA_DE_TOQUE_MS } from "@/hooks/use-guarda-de-toque";
 
 const UID = "u-mr";
 const HOJE = new Date(2026, 9, 17, 15, 0); // sábado 17/10/2026, 15h (a semana começa na segunda 12/10)
@@ -337,7 +339,7 @@ describe("reaproveita o que já foi respondido", () => {
     perm.estado = "denied";
     const controle = montarTela();
     await respirar();
-    expect(tela().getByText(/1 de 2/)).toBeTruthy();
+    expect(document.querySelectorAll(".mrt-barra i")).toHaveLength(2); // 2 perguntas (a barra; 1.0.17 sem o "1 de 2" escrito)
     await responder({ lembrete: null });
     expect(controle.dados()[CHAVE_LEMBRETE_ROTINA_MANHA]).toBeUndefined();
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toMatchObject({ lembrete: false, lembrete_pulado: "negado" });
@@ -416,13 +418,13 @@ describe("a tela, com a conta vazia", () => {
     await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
     fireEvent.click(tela().getByRole("button", { name: "Ler" }));
     fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
-    expect(tela().getByText(/Um aviso às 6h15/)).toBeTruthy();
+    expect(tela().getByText(/Às 6h15, uma vez por dia/)).toBeTruthy();
     expect(screen.getByTestId("montar-rotina-previa-aviso").textContent).toContain("Ler");
     fireEvent.click(tela().getByRole("button", { name: "Sim, quero" }));
     await respirar();
     expect(perm.pedidos).toBe(1);
     expect(dia2).toHaveBeenCalledTimes(1);
-    expect(tela().getByText(/Combinado: todo dia às 6h15/)).toBeTruthy();
+    expect(tela().getByText(/Todo dia às 6h15/)).toBeTruthy();
     window.removeEventListener(EVENTO_DIA2, dia2);
   });
 
@@ -463,12 +465,38 @@ describe("a tela, com a conta vazia", () => {
     expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toMatchObject({ acordar: "outro", itens: 1 });
   });
 
+  it("TECLADO DE VERDADE (20/10): o '+ Outro' do hábito com o teclado do iPhone aberto — a folha cabe na área visível (o campo e o 'Adicionar' acima do teclado, como no Montar Finanças) e volta inteira quando o teclado fecha; o que ela escreveu entra marcado", async () => {
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 300 }); // iPhone SE
+    try {
+      montarTela();
+      await respirar();
+      fireEvent.click(tela().getByRole("button", { name: "7h" }));
+      await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
+      const folha = screen.getByTestId("montar-minha-rotina");
+      fireEvent.click(screen.getByTestId("montar-rotina-item-outro"));
+      const campo = screen.getByTestId("montar-rotina-item-texto") as HTMLInputElement;
+      expect(document.activeElement).toBe(campo);
+      teclado.abrir(campo);
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(true);
+      expect(folha.style.height).toBe(`${667 - 300}px`);
+      fireEvent.change(campo, { target: { value: "Caminhar 10 min" } });
+      fireEvent.click(screen.getByTestId("montar-rotina-item-adicionar"));
+      teclado.soltarFoco();
+      teclado.assentar();
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(false);
+      expect(folha.style.height).toBe("");
+      expect(screen.getByTestId("montar-rotina-previa").textContent).toContain("Caminhar 10 min");
+    } finally { teclado.desinstalar(); }
+  });
+
   it("a 2ª pergunta não segue sem nenhum item; Voltar guarda as respostas", async () => {
     montarTela();
     await respirar();
     fireEvent.click(tela().getByRole("button", { name: "8h" }));
     await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
-    expect(tela().getByRole("button", { name: "Escolhe pelo menos um" })).toHaveProperty("disabled", true);
+    expect(tela().getByRole("button", { name: "Escolha pelo menos um" })).toHaveProperty("disabled", true);
     fireEvent.click(tela().getByRole("button", { name: "Estudar" }));
     fireEvent.click(tela().getByRole("button", { name: /Voltar/ }));
     expect(tela().getByRole("button", { name: "8h" }).getAttribute("aria-pressed")).toBe("true");
@@ -503,6 +531,29 @@ describe("a tela, com a conta vazia", () => {
 });
 
 /* ───────────────────────── o alvo do guia, sem tela ───────────────────────── */
+describe("1.0.17 — toque duplo no 'Continuar' não pula passo", () => {
+  afterEach(() => { (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = 0; });
+  it("2 cliques seguidos no 'Continuar': o 2º (que cairia no botão do passo seguinte, mesmo lugar) é ignorado; depois de ~450 ms o botão volta a valer", async () => {
+    (globalThis as { __CORE_GUARDA_TOQUE_MS?: number }).__CORE_GUARDA_TOQUE_MS = GUARDA_DE_TOQUE_MS;
+    const esperar = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+    montarTela({ origem: "missao" });
+    await respirar();
+    fireEvent.click(tela().getByRole("button", { name: "7h" }));
+    await waitFor(() => expect(tela().getByText("O que não pode faltar no seu dia?")).toBeTruthy());
+    for (const n of ["Beber água", "Treinar"]) fireEvent.click(tela().getByRole("button", { name: n }));
+    fireEvent.click(tela().getByRole("button", { name: "Voltar" }));
+    expect(screen.getByTestId("montar-minha-rotina")).toHaveAttribute("data-etapa", "acordar");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(screen.getByTestId("montar-minha-rotina")).toHaveAttribute("data-etapa", "itens");
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" })); // o 2º toque, já no passo dos itens
+    expect(screen.getByTestId("montar-minha-rotina")).toHaveAttribute("data-etapa", "itens");
+    await esperar(GUARDA_DE_TOQUE_MS + 80);
+    fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
+    expect(screen.getByTestId("montar-minha-rotina")).toHaveAttribute("data-etapa", "lembrete");
+  });
+});
+
 describe("o alvo do guia: só o quadradinho de hoje do 1º hábito", () => {
   it("a marca guiada é SÓ esse quadradinho: outro hábito hoje ou outro dia não contam", () => {
     const base = { habitos: ["Beber água", "Treinar"], semana: "2026-10-12", habitLog: {}, indice: 0, hoje: HOJE_DIA };

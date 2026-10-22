@@ -1112,6 +1112,13 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
   body.com-trilho .fixed.left-0.right-0 { left: 232px; }
 }
 
+/* Barra de abas (1.0.17, components/nav/BarraDeAbas.tsx): nas 3 raízes o fim do conteúdo não pode morar
+   embaixo da barra. A área segura de baixo já está no .app-safe-shell; aqui entra a altura da barra
+   (52 px + o respiro mínimo de 0,5rem da regra `.fixed.bottom-0`). No computador a barra não existe. */
+@media (max-width: 1023px) {
+  body.com-abas { padding-bottom: calc(52px + 0.5rem) !important; }
+}
+
 /*
  * ALVO DE TOQUE DOS BOTÕES SÓ-ÍCONE "NUS" (22/09, varredura de usabilidade).
  *
@@ -1136,4 +1143,28 @@ button:has(> svg:only-child):not(.md-botao):not([class*="bg-"]):not([style*="bac
   padding: 8px;
   margin: -8px;
   box-sizing: content-box;
+}
+
+/*
+ * MOVIMENTO CALMO (1.0.17, dono 19/10: "os cortes são bruscos — agradável e lento"). Os mesmos tempos de
+ * src/lib/movimento.ts: rápido (toque), base (troca de passo / folha que sai), calmo (o que entra), respiro (a pausa
+ * antes de pedir algo novo). Com "reduzir movimento": tudo vira um fade curto, sem deslocamento.
+ */
+:root {
+  --mov-rapido: 150ms;
+  --mov-base: 280ms;
+  --mov-calmo: 420ms;
+  --mov-respiro: 500ms;
+  --mov-troca: 260ms;
+  --mov-ease-sai: cubic-bezier(0.22, 1, 0.36, 1);
+  --mov-ease-entra-saida: cubic-bezier(0.4, 0, 1, 1);
+  --mov-passo: 24px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mov-base: 150ms;
+    --mov-calmo: 150ms;
+    --mov-troca: 150ms;
+    --mov-passo: 0px;
+  }
 }

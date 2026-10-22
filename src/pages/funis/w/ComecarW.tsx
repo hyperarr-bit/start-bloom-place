@@ -104,7 +104,8 @@ const LIGHT_VARS = {
 const fade = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -16 },
+  // 1.0.17 QA: a tela que sai só esmaece (sem subir) enquanto a próxima entra — popLayout, sem quadro vazio no meio
+  exit: { opacity: 0, pointerEvents: "none" as const },
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
 /* 17/10 (dono: "a 1ª pergunta some pra cima e a 2ª aparece de lado; parecem 2 coisas
@@ -778,9 +779,9 @@ export default function ComecarW() {
            topo; só resultado/central/paywall — compridos de verdade — rolam. */
         <div
           style={{ ["--util" as string]: "calc(100dvh - var(--app-safe-top, 0px))" }}
-          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : telaComprida ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
+          className={`relative flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : telaComprida ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
         >
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
             <motion.div key={passoDaSequencia(step) ? "perguntas" : step} {...(passoDaSequencia(step) ? deslizeDoQuiz : fade)} className="w-full flex-1 flex flex-col">
               {/* 10/10 (FUNIL_CALAI): quem entrou por "Tudo, sinceramente" começa pelo dinheiro — a linha diz isso em cima do quiz */}
               {step === "quiz" && calai && portaTudo(answers) && (

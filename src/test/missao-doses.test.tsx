@@ -225,7 +225,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     // o card ainda não aparece por baixo das boas-vindas? aparece (a Home é a mesma) — mas a missão manda na tela
     fireEvent.click(screen.getByTestId("missao-doses-trocar"));
     const escolha = screen.getByTestId("missao-doses-escolha");
-    expect(escolha).toHaveTextContent("Os outros 13 continuam liberados.");
+    expect(escolha).toHaveTextContent("Um por dia. Os outros continuam abertos."); // 1.0.17: curto
     expect(escolha.querySelectorAll("[data-modulo]")).toHaveLength(16);
     expect(escolha.querySelectorAll("[data-marcado]")).toHaveLength(3);
     fireEvent.click(screen.getByTestId("missao-doses-tile-treino")); // entra no lugar do 3º
@@ -252,8 +252,7 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(document.documentElement.getAttribute("data-missao-doses-faixa")).toBe("1");
     expect(screen.queryByTestId("missao-doses-pular")).toBeNull(); // sem "pular tudo" nos primeiros 20 s
     const postIt = esperarPostIt();
-    expect(postIt).toHaveTextContent("Agora · 1 toque");
-    expect(postIt).toHaveTextContent("Qual foi o seu último gasto?");
+    expect(postIt).toHaveTextContent("Gastou algo hoje?");
     const chips = within(postIt).getAllByTestId("demo-guia-chip");
     expect(chips.map((c) => c.textContent)).toEqual(["☕Café· R$ 12", "🚗Uber· R$ 23", "🍔Almoço· R$ 35"]);
     fireEvent.click(chips[0]);
@@ -335,12 +334,13 @@ describe("com a força ligada: o fluxo tela a tela", () => {
     expect(screen.queryByTestId("missao-doses-amanha")).toBeNull();
     fireEvent.click(screen.getByTestId("missao-doses-ver-fim"));
     const fim = screen.getByTestId("missao-doses-fim");
-    expect(fim).toHaveTextContent("O que você construiu em 3 dias");
-    expect(screen.getByTestId("missao-doses-fim-missao")).toHaveTextContent("Café · R$ 12");
-    expect(screen.getByTestId("missao-doses-fim-missao")).toHaveTextContent("1 copo d'água");
+    // 1.0.17 (dono: "minimalista"): o título e 3 números grandes (dias seguidos, score, adesivos) — nada de 5 blocos
+    expect(fim).toHaveTextContent("Você construiu isso em 3 dias");
+    expect(screen.getByTestId("missao-doses-fim-numeros").children).toHaveLength(3);
+    // 1.0.17: 3 números grandes — dias seguidos, score de hoje, adesivos
     expect(screen.getByTestId("missao-doses-fim-sequencia")).toBeInTheDocument();
-    expect(screen.getByTestId("missao-doses-fim-conquistas")).toBeInTheDocument();
-    expect(screen.getByTestId("missao-doses-fim-pendencias")).toHaveTextContent("Pendências de amanhã");
+    expect(screen.getByTestId("missao-doses-fim-score")).toBeInTheDocument();
+    expect(screen.getByTestId("missao-doses-fim-adesivos")).toBeInTheDocument();
     expect(eventos).toContainEqual(["missao_doses_fim", expect.objectContaining({ modulos: ["financas", "rotina", "saude"] })]);
     fireEvent.click(screen.getByTestId("missao-doses-continuar"));
     expect(screen.queryByTestId("missao-doses-fim")).toBeNull();
@@ -446,7 +446,7 @@ describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a
     const rodape = screen.getByTestId("missao-doses-fim-rodape");
     // o botão mora no rodapé colado — e o rodapé é a ÚLTIMA coisa da coluna que rola (no fluxo: rolado até o fim, as
     // pendências ficam inteiras acima dele)
-    expect(within(rodape).getByTestId("missao-doses-continuar")).toHaveTextContent("Continuar com o meu CORE");
+    expect(within(rodape).getByTestId("missao-doses-continuar")).toHaveTextContent(/^Continuar$/);
     expect(rodape.parentElement!.lastElementChild).toBe(rodape);
     expect(fim.contains(rodape)).toBe(true);
     // a regra do rodapé (missao-doses.css): colado no fluxo, empurrado pro fim quando sobra espaço, degradê, área segura
@@ -459,8 +459,7 @@ describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a
     expect(prop("margin").split(/\s+/)[0]).toBe("auto");
     expect(prop("padding")).toContain("--app-safe-bottom"); // por cima da barra do iPhone
     expect(prop("background")).toMatch(/^linear-gradient\(to bottom, hsl\(var\(--background\) \/ 0\)/); // o que rola por baixo some no degradê
-    // a ordem não mudou: pendências de amanhã e, por último, o botão
-    expect(rodape.previousElementSibling).toBe(screen.getByTestId("missao-doses-fim-pendencias"));
+    // a ordem: os números, o espaço que empurra e, por último, o botão
     fireEvent.click(screen.getByTestId("missao-doses-continuar"));
     expect(aoContinuar).toHaveBeenCalledTimes(1);
   });
@@ -470,6 +469,6 @@ describe("'O que você construiu em 3 dias' numa tela de iPhone (revisão tela a
     const titulo = screen.getByTestId("missao-doses-fim-titulo");
     expect(titulo.tagName).toBe("H1");
     expect(titulo.className.split(/\s+/)).toContain("text-balance");
-    expect(titulo.textContent).toBe("O que você construiu em 3\u00a0dias");
+    expect(titulo.textContent).toBe("Você construiu isso em 3\u00a0dias");
   });
 });

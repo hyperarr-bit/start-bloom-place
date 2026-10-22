@@ -71,11 +71,13 @@
       <string>NSPrivacyCollectedDataTypeEmailAddress</string>
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
+      <!-- 1.0.17 (20/10): o servidor manda o e-mail em hash (em) no StartTrial/Purchase da CAPI da Meta = publicidade de terceiros -->
       <key>NSPrivacyCollectedDataTypeTracking</key>
-      <false/>
+      <true/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
       </array>
     </dict>
     <dict>
@@ -83,12 +85,14 @@
       <string>NSPrivacyCollectedDataTypeUserID</string>
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
+      <!-- 1.0.17 (20/10): o id da conta vai em hash (external_id) na CAPI da Meta -->
       <key>NSPrivacyCollectedDataTypeTracking</key>
-      <false/>
+      <true/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
       </array>
     </dict>
 
@@ -98,12 +102,14 @@
       <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
+      <!-- 1.0.17 (20/10): teste e compra vão pra Meta (StartTrial/Purchase pela CAPI) pra medir anúncio -->
       <key>NSPrivacyCollectedDataTypeTracking</key>
-      <false/>
+      <true/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
       </array>
     </dict>
 

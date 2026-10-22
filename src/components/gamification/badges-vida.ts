@@ -164,7 +164,9 @@ export function medirVida(get: Leitor, hoje: string = localDayKey()) {
   const diasDeDetox = diasDaLista(get<unknown>("detox-diary", []));
   const revisoes = Object.values(objeto(get<unknown>("estudos-revisoes", {}))).filter((e) => (Number((e as { vezes?: unknown })?.vezes) || 0) >= 1).length;
   // 10/10 — o tour da Home terminou nesta conta (a chave vai pra conta no fim do tour; lib/tour-home)
-  const tourDaHome = !!get<unknown>(CHAVE_TOUR_FEITO, "");
+  // 1.0.17: o "Pular" do popup de entrada grava "pulou:<data>" na mesma chave (o tour não volta) — o adesivo é de quem FEZ
+  const marcaDoTour = get<unknown>(CHAVE_TOUR_FEITO, "");
+  const tourDaHome = !!marcaDoTour && !String(marcaDoTour).startsWith("pulou:");
 
   return {
     diasAtivos, recordeRotina, diasDeDiario, diasDeHumor, minutosDeFoco,

@@ -308,10 +308,12 @@ const nomesDe = (lista: unknown): string[] =>
     .filter((n): n is string => typeof n === "string" && n.trim().length > 0)
     .map((n) => n.trim());
 /** A lista de hábitos a gravar: os que já existem + os novos, na ordem do dia, sem repetir (sem caixa). */
-export function habitosParaGravar(acordar: string, escolhidos: readonly ItemId[], atual?: unknown): string[] {
+export function habitosParaGravar(acordar: string, escolhidos: readonly ItemId[], atual?: unknown, proprios: readonly string[] = []): string[] {
   const existentes = nomesDe(atual);
   const ja = new Set(existentes.map((n) => n.toLowerCase()));
-  const novos = horariosDosItens(acordar, escolhidos).map(({ item }) => item.habito).filter((n) => !ja.has(n.toLowerCase()));
+  // 1.0.17: os hábitos que ELA escreveu ("+ Outro") entram depois dos do dia, sem horário (na tabela de hábitos)
+  const novos = [...horariosDosItens(acordar, escolhidos).map(({ item }) => item.habito), ...nomesDe(proprios)]
+    .filter((n, i, arr) => !ja.has(n.toLowerCase()) && arr.findIndex((x) => x.toLowerCase() === n.toLowerCase()) === i);
   return [...existentes, ...novos];
 }
 

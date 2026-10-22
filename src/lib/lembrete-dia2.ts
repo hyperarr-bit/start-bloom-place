@@ -37,7 +37,7 @@ import { reais } from "./dinheiro";
 import { gastoDoDia, praHojeDoDia, type PraHoje } from "./montar-financas";
 import {
   doseCurta, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaMissao, dosesFeitas, ehBracoB, ehUmPorDia, missaoCumprida, passoPendente, sequenciaDaMissao,
-  type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
+  minutosDoLembrete, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
 } from "./missao-doses";
 import type { QuandoAmanha } from "./dia1-cheio";
 import type { AreaKey } from "./funnel";
@@ -117,7 +117,7 @@ export function registrarAbertura(agora: Date = new Date(), criadoEm?: string | 
 /** O dia do uso em que `dia` cai (1 = o dia do 1º uso). */
 export const diaDoUso = (e: EstadoDia2, dia: string): number => diasEntre(e.primeiroUso, dia) + 1;
 
-export const HORA_DA_MISSAO: Record<Lembrete, number | "sem"> = { "8h": 8 * 60, "12h": 12 * 60, "20h": 20 * 60, sem: "sem" };
+export const HORA_DA_MISSAO: Record<"8h" | "12h" | "20h" | "sem", number | "sem"> & Partial<Record<Lembrete, number | "sem">> = { "8h": 8 * 60, "12h": 12 * 60, "20h": 20 * 60, sem: "sem" };
 
 /** 10/10 (DIA1_CHEIO, braço B): o chip do plano de amanhã ("manhã/almoço/noite") na hora do lembrete. */
 export const LEMBRETE_DO_PLANO: Record<QuandoAmanha, Lembrete> = { manha: "8h", almoco: "12h", noite: "20h" };
@@ -125,7 +125,8 @@ export const LEMBRETE_DO_PLANO: Record<QuandoAmanha, Lembrete> = { manha: "8h", 
 /** A comemoração da missão combinou a hora: vale a semana toda (escolha explícita > inferência). */
 export function combinarHora(l: Lembrete, agora: Date = new Date()): EstadoDia2 {
   const e = lerDia2() ?? registrarAbertura(agora);
-  return gravarDia2({ ...e, horaEscolhida: HORA_DA_MISSAO[l] });
+  // 1.0.17: a hora dela pelo "+ Outro" ("21h") vale como qualquer outra
+  return gravarDia2({ ...e, horaEscolhida: HORA_DA_MISSAO[l] ?? minutosDoLembrete(l) ?? HORA_DA_MISSAO["20h"] });
 }
 
 /** A hora do lembrete: a combinada, senão a da 1ª abertura de hoje (limitada a 08:00–21:30). */

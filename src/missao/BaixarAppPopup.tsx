@@ -15,11 +15,13 @@ import "./baixar-app-popup.css";
  *   · "Agora não" segue o tutorial sem travar (quem chama decide o que "seguir" quer dizer ali).
  * Mesma cara do resto do funil: branco, Inter, grafite, sem o ponto rosa.
  */
-export function BaixarAppPopup({ contexto, onAgoraNao, depoisDaOferta = false }: {
+export function BaixarAppPopup({ contexto, onAgoraNao, depoisDaOferta = false, antes }: {
   contexto: "rotina" | "plano_amanha" | "festa_dia2";
   onAgoraNao: () => void;
   /** só aparece depois que ela pagou e tocou "Continuar minha missão" (o plano de amanhã monta por baixo da oferta) */
   depoisDaOferta?: boolean;
+  /** 1.0.17: uma linha de fechamento em cima do título (o "Dia 1 feito 💛" do plano de amanhã na web) */
+  antes?: string;
 }) {
   // o estado do funil muda com o pop-up já montado (o e-mail entra depois de pagar): relê a cada mudança
   const [web, setWeb] = useState<EstadoMissaoWeb | null>(() => lerMissaoWeb());
@@ -40,6 +42,7 @@ export function BaixarAppPopup({ contexto, onAgoraNao, depoisDaOferta = false }:
     <div className="bap-fundo" role="dialog" aria-modal="true" aria-labelledby="bap-titulo" data-testid="baixar-app-popup" data-contexto={contexto} data-camada-guia="missao-lembrete-app">
       <div className="bap-folha">
         <div className="bap-icone" aria-hidden><Bell size={24} strokeWidth={2.4} /></div>
+        {antes && <p className="bap-antes" data-testid="baixar-app-antes" style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{antes}</p>}
         <h2 id="bap-titulo">Baixe o app pra receber os lembretes</h2>
         <p>O navegador não manda notificação. No app do CORE, o lembrete chega na hora que você escolher.</p>
         <SelosDasLojas onde={`missao_lembrete_${contexto}`} prefixo="web" altura={46} className="bap-selos" />

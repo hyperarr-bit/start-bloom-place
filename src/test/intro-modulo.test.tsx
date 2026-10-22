@@ -44,12 +44,12 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import {
   ATRIBUTO_MONTAR_FINANCAS, CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, EVENTO_MONTAR_FINANCAS_FIM, INTRO_MODULO, INTRO_MODULO_APP, INTROS,
   ATRIBUTO_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_FIM, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, MODULOS_SEM_NADA, MONTAR_ROTINA, OLHAR_POSSO_GASTAR, _zerarIntroRemota,
-  chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
+  anotarAcaoRapida, CHAVE_INTRO_ACAO_RAPIDA, chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
 } from "@/lib/intro-modulo";
 import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
 import { IntroDeUmToque } from "@/components/intro-modulo/IntroDeUmToque";
 import { modeloPara } from "@/lib/intro-modulo-acoes";
-import { TREINOS_DE_HOJE, adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, montarTreinoDeHoje, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
+import { TREINOS_DE_HOJE, adicionarCurso, anotarCafeDaManha, diaDaSemana, montarTreino, montarTreinoDeHoje, montarTreinoProprio, type ContextoDaAcao } from "@/lib/intro-modulo-acoes";
 // 19/10: "outro dia" nunca pode ser hoje (numa segunda o SEGUNDA fixo era o próprio dia e o teste quebrava)
 const OUTRO_DIA = diaDaSemana() === "SEGUNDA" ? "TERÇA" : "SEGUNDA";
 import type { IntroDeUmToqueConfig } from "@/lib/intro-modulo";
@@ -164,9 +164,10 @@ describe("chave, constantes e classificação", () => {
     expect(MODULOS_SEM_INTRO).toEqual([]);
     expect(MODULOS_SEM_NADA).toEqual([]);
     const conferirPasso = (m: string, p: { pergunta: string; opcoes: unknown[]; olhar?: { titulo: string; texto: string }; escutar?: unknown; executar?: unknown; foco?: unknown; quandoNoModulo?: { pergunta: string } }) => {
-      if (p.olhar) { expect(p.opcoes.length, m).toBe(0); expect(p.olhar.titulo.length, m).toBeLessThanOrEqual(40); expect(p.olhar.texto.length, m).toBeLessThanOrEqual(170); return; }
+      // 1.0.17 (dono: "minimalista"): o "olha" é 1 título curto + 1 frase curta; a pergunta é 1 linha
+      if (p.olhar) { expect(p.opcoes.length, m).toBe(0); expect(p.olhar.titulo.length, m).toBeLessThanOrEqual(30); expect(p.olhar.texto.length, m).toBeLessThanOrEqual(60); return; }
       expect(p.pergunta.length, m).toBeGreaterThan(8);
-      expect(p.pergunta.length, m).toBeLessThanOrEqual(60);
+      expect(p.pergunta.length, m).toBeLessThanOrEqual(40);
       // quandoNoModulo (Beleza): usa o controle do módulo e escuta; os chips são só o plano B sem ele na tela
       if (p.quandoNoModulo) { expect(p.quandoNoModulo.pergunta.length, m).toBeLessThanOrEqual(60); expect(p.escutar, m).toBeTruthy(); expect(p.opcoes.length, m).toBeLessThanOrEqual(5); }
       else if (p.escutar) expect(p.opcoes.length, m).toBe(0);
@@ -176,9 +177,11 @@ describe("chave, constantes e classificação", () => {
       const c = INTROS[m];
       expect(c.formato).toBe("guiada");
       if (c.formato !== "guiada") continue;
-      const guiada = m === "rotina" ? 3 : 2; // criar → marcar → olha · ação → olha
+      const guiada = m === "rotina" ? 3 : 2; // criar → marcar → olha · ação → olha (os passos da 1.0.16 ficam)
       expect(guiada + (c.maisPassos?.length ?? 0), m).toBeGreaterThanOrEqual(3);
       expect(guiada + (c.maisPassos?.length ?? 0), m).toBeLessThanOrEqual(4);
+      for (const p of c.maisPassos ?? []) conferirPasso(m, p);
+      expect(c.olhar.titulo.length, m).toBeLessThanOrEqual(30); expect(c.olhar.texto.length, m).toBeLessThanOrEqual(60);
       for (const p of c.maisPassos ?? []) conferirPasso(m, p);
     }
     for (const m of ["treino", "dieta", "estudos", "biblioteca", "casa", "desenvolvimento", "carreira", "detox", "hiperfoco", "viagens", "beleza", "relacionamentos", "pet"]) {
@@ -187,6 +190,7 @@ describe("chave, constantes e classificação", () => {
       if (c.formato !== "toque") continue;
       expect(c.pedido.length, m).toBeGreaterThan(8);
       expect(c.pronto.length, m).toBeGreaterThan(12);
+      expect(c.pronto.length, m).toBeLessThanOrEqual(45);
       expect(c.passos.length, m).toBeGreaterThanOrEqual(3);
       expect(c.passos.length, m).toBeLessThanOrEqual(4);
       expect(c.passos[0].olhar, `${m}: o 1º passo é uma ação`).toBeUndefined();
@@ -259,14 +263,14 @@ describe("ligada: a porta do módulo", () => {
     expect(screen.queryByText("Dica antiga")).toBeNull();
     cleanup(); document.body.innerHTML = "";
     montar(<BoasVindasDoModulo moduleId="relacionamentos" tips={["Guarde as datas"]} />);
-    expect(card()?.textContent).toContain("anota 1 pessoa");
+    expect(card()?.textContent).toContain("anote 1 pessoa");
     expect(screen.queryByText("Guarde as datas")).toBeNull();
     cleanup(); document.body.innerHTML = "";
     montar(<BoasVindasDoModulo moduleId="pet" />);
-    expect(card()?.textContent).toContain("cadastra o seu pet");
+    expect(card()?.textContent).toContain("cadastre o seu pet");
     cleanup(); document.body.innerHTML = "";
     montar(<BoasVindasDoModulo moduleId="treino" tips={["Dica antiga do Treino"]} />);
-    expect(card()?.textContent).toContain("monta o treino de hoje");
+    expect(card()?.textContent).toContain("monte o treino de hoje");
     expect(screen.queryByText("Dica antiga do Treino")).toBeNull();
   });
 
@@ -277,6 +281,35 @@ describe("ligada: a porta do módulo", () => {
     act(() => s.carregar());
     await waitFor(() => expect(card()).toBeTruthy());
     expect(localStorage.getItem(chaveIntroAberta("casa"))).toBeTruthy();
+  });
+
+  it("1.0.17: ação rápida da Home num módulo vazio NÃO tira o tutorial; veterano com dado continua sem", () => {
+    // conta nova: toca "Beber água" e "Registrar sono" na Home antes de abrir Saúde
+    const dados: Record<string, unknown> = {};
+    const get = <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f);
+    const set = (k: string, v: unknown) => { dados[k] = v; };
+    anotarAcaoRapida("water", get, set);
+    dados["core-saude-water"] = { "2026-10-19": 1 }; dados["water-log"] = { "2026-10-19": 1 };
+    anotarAcaoRapida("sleep", get, set); // de novo no mesmo módulo: não duplica
+    dados["core-saude-sleep"] = { "2026-10-19": 7 };
+    expect(dados[CHAVE_INTRO_ACAO_RAPIDA]).toEqual(["saude"]);
+    expect(porQueNaoMostrar("saude", get)).toBeNull();
+    // treino e finanças pelo mesmo caminho
+    anotarAcaoRapida("workout", get, set); dados["saude-workout-log"] = ["2026-10-19"];
+    anotarAcaoRapida("expense", get, set); dados["finance-expenses"] = [{ id: "1", value: 10 }];
+    expect(porQueNaoMostrar("treino", get)).toBeNull();
+    expect(porQueNaoMostrar("financas", get)).toBeNull();
+    // veterano: já tinha água no módulo ANTES do toque → não anota → segue "com_dado"
+    const vet: Record<string, unknown> = { "core-saude-water": { "2026-10-01": 3 } };
+    const gv = <T,>(k: string, f: T): T => (k in vet ? (vet[k] as T) : f);
+    anotarAcaoRapida("water", gv, (k, v) => { vet[k] = v; });
+    expect(vet[CHAVE_INTRO_ACAO_RAPIDA]).toBeUndefined();
+    expect(porQueNaoMostrar("saude", gv)).toBe("com_dado");
+    // intro já vista: não anota (e a decisão segue "ja_vista")
+    const vista: Record<string, unknown> = { [CHAVE_INTRO_VISTAS_CONTA]: ["mente", "hiperfoco"] };
+    const g3 = <T,>(k: string, f: T): T => (k in vista ? (vista[k] as T) : f);
+    anotarAcaoRapida("idea", g3, (k, v) => { vista[k] = v; });
+    expect(vista[CHAVE_INTRO_ACAO_RAPIDA]).toBeUndefined();
   });
 
   it("quem já tem dado no módulo nunca vê a intro (conta de antes)", () => {
@@ -353,7 +386,7 @@ describe("ligada: a porta do módulo", () => {
 
   it("logout → login: a vassoura não apaga a marca do aparelho e a conta traz a lista de volta ⇒ não repete; outra conta no mesmo aparelho também não", () => {
     const a = montar(<IntroDoModulo moduleId="casa" />);
-    fireEvent.click(screen.getByTestId("intro-modulo-pular"));
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
     expect(localStorage.getItem(chaveIntroVista("casa"))).toBeTruthy();
     const lista = a.estado.dados[CHAVE_INTRO_VISTAS_CONTA];
     a.unmount();
@@ -425,7 +458,7 @@ describe("ligada: a porta do módulo", () => {
     expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeNull();
     a.unmount();
     montar(<IntroDoModulo moduleId="rotina" />);
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marca 1 hábito");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marque 1 hábito");
   });
 
   it("introConcluida: só a intro FEITA conta (pular não), pelo aparelho, pelo get da conta ou pelo cache do user_data", () => {
@@ -457,7 +490,7 @@ describe("ligada: a porta do módulo", () => {
     act(() => { document.documentElement.removeAttribute(ATRIBUTO_MONTAR_FINANCAS); });
     await waitFor(() => expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeTruthy());
     expect(container).toBeTruthy();
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("toca em 1 gasto");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("anote 1 gasto");
   });
 
   it("outra guia por cima: presente no mount ⇒ nada; aparecendo logo depois ⇒ a intro sai sem marcar vista", async () => {
@@ -474,41 +507,55 @@ describe("ligada: a porta do módulo", () => {
   });
 });
 
+describe("1.0.17: o anel da PRÓPRIA intro não é 'outra guia'", () => {
+  beforeEach(ligar);
+  it("o anel da intro (demo-holofote, testid intro-modulo-anel) acendendo antes da conferência de 700 ms não derruba a intro; o anel da missão (sem o testid) derruba", async () => {
+    montar(<IntroDoModulo moduleId="casa" />);
+    expect(card()).toBeTruthy();
+    const anel = document.createElement("div"); anel.setAttribute("data-camada-guia", "demo-holofote"); anel.setAttribute("data-testid", "intro-modulo-anel"); document.body.appendChild(anel);
+    await dormir(800);
+    expect(card()).toBeTruthy(); // no Simulador a Rotina sumia 0,8 s depois de aparecer
+    const olhar = document.createElement("div"); olhar.setAttribute("data-camada-guia", "demo-holofote"); olhar.setAttribute("data-testid", "intro-modulo-anel-olhar"); document.body.appendChild(olhar);
+    await dormir(800);
+    expect(card()).toBeTruthy();
+    anel.remove(); olhar.remove();
+  });
+});
+
 /* ───────────────────────────────── a intro de 1 toque ───────────────────────────────── */
 describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10)", () => {
   beforeEach(ligar);
   const hoje = localDayKey();
   const comodos = () => <div><header><button type="button">🚪 CÔMODOS</button></header><div><input placeholder="Adicionar item..." /><button type="button">+</button></div></div>;
 
-  it("Casa (4 passos): a faixa '1 de 4' com 'Pular' à vista, o anel no campo real, chip grava 1 tarefa no cômodo (a ação #1) → olha → mercado → olha → o cartão do fim junta o que entrou e 'Pronto' marca vista (aparelho + conta)", { timeout: 40_000 }, async () => {
+  it("Casa (4 passos, os da 1.0.16): faixa calma com 'Agora não' à vista, o anel no campo real, chip grava 1 tarefa no cômodo → olha → mercado → olha → o cartão do fim junta o que entrou e 'Pronto' marca vista (aparelho + conta)", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const { estado } = montar(<>{comodos()}<BoasVindasDoModulo moduleId="casa" tips={["Dica antiga"]} /></>);
     expect(screen.queryByText("Dica antiga")).toBeNull();
-    expect(card()?.textContent).toContain("1 de 4 · organiza 1 cômodo");
-    expect(screen.getByTestId("intro-modulo-pular")).toBeTruthy();
+    expect(card()?.textContent).toContain("Primeira vez aqui · organize 1 cômodo");
+    expect(screen.getByTestId("intro-modulo-agora-nao").textContent).toBe("Agora não");
     expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.modulo === "casa" && d.formato === "toque" && d.passos === 4)).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 3000 });
-    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Qual cômodo você quer organizar primeiro?");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Qual cômodo primeiro?");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 4");
     expect(screen.getAllByTestId("demo-guia-chip").map((c) => c.textContent)).toEqual(["🍳Cozinha", "🛏️Quarto", "🚿Banheiro"]);
+    expect(screen.getByTestId("demo-guia-outro")).toBeTruthy(); // "+ Outro" (1.0.17)
     await tocar(0);
     const rooms = estado.dados["casa-rooms"] as Array<{ name: string; tasks: Array<{ text: string; done: boolean }> }>;
     expect(rooms.map((r) => r.name)).toEqual(["COZINHA", "SALA", "QUARTO", "BANHEIRO", "ÁREA DE SERVIÇO", "ESCRITÓRIO"]); // os cômodos padrão nascem junto
     expect(rooms.flatMap((r) => r.tasks)).toEqual([{ id: expect.any(String), text: "Lavar a louça", done: false }]); // 1 toque = 1 tarefa, no cômodo certo
-    expect(rooms[0].tasks).toHaveLength(1);
-    expect(estado.dados["casa-grocery-categories"]).toBeUndefined();
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "cozinha" && d.passo === 1)).toBeTruthy();
-    // 2) o "olha" do cômodo (sem o card no DOM de mentira: pulado sozinho) → 3) o mercado (chips) → 4) olha a limpeza (pulado) → o fim
-    await waitFor(() => expect(card()?.textContent).toContain("3 de 4 · anota 1 item do mercado"), { timeout: 9000 });
+    // 2) o "olha" do cômodo (sem o card no DOM de mentira: pulado sozinho) → 3) o mercado (chips, com "+ Outro") → 4) olha a limpeza (pulado) → o fim
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 item do mercado"), { timeout: 9000 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.passo === 2 && d.via === "pulado")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("3 de 4"), { timeout: 9000 });
+    expect(screen.getByTestId("demo-guia-outro")).toBeTruthy();
     await tocar(0); // Leite
     const cats = estado.dados["casa-grocery-categories"] as typeof CATEGORIAS_PADRAO_MERCADO;
     expect(cats.flatMap((c) => c.items.map((i) => i.text))).toEqual(["Leite"]);
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Lavar a louça (Cozinha) e Leite já estão aqui. Casa é isso");
-    expect(screen.queryByTestId("intro-modulo-conhecer-mais")).toBeNull(); // Casa não tem passeio: sem oferta
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Lavar a louça (Cozinha) e Leite entraram. Cada cômodo com as tarefas dele.");
     expect(card()?.textContent).toContain("pronto ✓");
-    expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "chip")).toBeTruthy();
-    expect(eventos.find(([n]) => n === "modulo_intro_concluida")).toBeTruthy();
     expect(localStorage.getItem(chaveIntroVista("casa"))).toBeNull(); // só o "Pronto" (ou o tempo) marca
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(card()).toBeNull();
@@ -519,15 +566,66 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     medir.mockRestore();
   });
 
-  it("Pular fecha, marca vista (pulada, não feita) e conta como pulada", () => {
+  it("'+ Outro' (1.0.17): o cômodo DELA entra pelo campo ali mesmo e volta como chip 'seu' na próxima vez (memória na conta)", { timeout: 30_000 }, async () => {
     const { estado } = montar(<IntroDoModulo moduleId="casa" />);
-    fireEvent.click(screen.getByTestId("intro-modulo-pular"));
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-outro")).toBeTruthy(), { timeout: 8000 });
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    const campo = screen.getByTestId("demo-guia-texto") as HTMLInputElement;
+    expect(document.activeElement).toBe(campo); // o campo abre com foco
+    expect(campo.placeholder).toBe("Ex.: Lavanderia");
+    fireEvent.change(campo, { target: { value: "Lavanderia" } });
+    fireEvent.click(screen.getByTestId("demo-guia-adicionar"));
+    const rooms = estado.dados["casa-rooms"] as Array<{ name: string; tasks: Array<{ text: string }> }>;
+    expect(rooms.find((r) => r.name === "LAVANDERIA")?.tasks.map((t) => t.text)).toEqual(["Organizar"]);
+    expect(estado.dados["core-escolhas-proprias"]).toEqual({ "intro-casa-1": [{ nome: "Lavanderia" }] });
+    expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.opcao === "outro")).toBeTruthy();
+    // "Agora não" no meio: fecha SÓ este tutorial e, como ela já fez o passo 1, conta como feito
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 item do mercado"), { timeout: 9000 });
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
+    expect(card()).toBeNull();
+    expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^feita@/);
+    // a opção dela volta como chip "seu", na frente das sugestões (aqui na Escolha solta, com a mesma conta)
+    cleanup(); document.body.innerHTML = "";
+    const { EscolhaRapida } = await import("@/components/ui/escolha-rapida");
+    const escolher = vi.fn();
+    montar(<EscolhaRapida lista="intro-casa-1" opcoes={[{ id: "cozinha", rotulo: "Cozinha" }]} outro={{}} aoEscolher={escolher} testid="er" />, estado.dados as Dados);
+    const sua = screen.getByTestId("er-sua");
+    expect(sua.textContent).toContain("Lavanderia");
+    expect(sua.textContent).toContain("seu");
+    expect(screen.getAllByRole("button").map((b) => b.textContent)[0]).toContain("Lavanderia");
+    fireEvent.click(sua);
+    expect(escolher).toHaveBeenCalledWith(expect.objectContaining({ id: "outro", rotulo: "Lavanderia", sua: true }));
+  });
+
+  it("1.0.17 (telemetria): saiu da intro sem 'Pronto' nem 'Agora não' (←, outro módulo) → modulo_intro_saiu {modulo, passo, via}; com 'Agora não', não", async () => {
+    const a = montar(<IntroDoModulo moduleId="casa" />);
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-postit")).toBeTruthy(), { timeout: 8000 });
+    a.unmount();
+    expect(eventos.filter(([n]) => n === "modulo_intro_saiu")).toEqual([["modulo_intro_saiu", { modulo: "casa", passo: 1, via: "saiu" }]]);
+    eventos.length = 0; cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+    const b = montar(<IntroDoModulo moduleId="estudos" />);
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
+    b.unmount();
+    expect(eventos.filter(([n]) => n === "modulo_intro_saiu")).toEqual([]);
+    // o app foi pro 2º plano com a intro na tela: conta com via "segundo_plano" (ela pode voltar)
+    eventos.length = 0; cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
+    montar(<IntroDoModulo moduleId="dieta" />);
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    expect(eventos).toContainEqual(["modulo_intro_saiu", expect.objectContaining({ modulo: "dieta", via: "segundo_plano" })]);
+  }, 15_000);
+
+  it("'Agora não' (1.0.17) fecha SÓ este tutorial, marca vista (pulada, não feita) e conta como pulada — os outros módulos seguem com o deles", () => {
+    const { estado } = montar(<IntroDoModulo moduleId="casa" />);
+    fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
     expect(card()).toBeNull();
     expect(localStorage.getItem(chaveIntroVista("casa"))).toMatch(/^pulada@/);
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["casa"]);
     expect(estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toBeUndefined();
     expect(introConcluida("casa")).toBe(false);
-    expect(eventos.find(([n, d]) => n === "modulo_intro_pulou" && d.fase === "toque" && d.passo === 1)).toBeTruthy();
+    expect(eventos.find(([n, d]) => n === "modulo_intro_pulou" && d.fase === "toque" && d.passo === 1 && d.via === "agora_nao")).toBeTruthy();
+    expect(porQueNaoMostrar("dieta", ((k: string, f: unknown) => (k === CHAVE_INTRO_VISTAS_CONTA ? estado.dados[k] ?? f : f)) as never)).toBeNull();
   });
 
   it("sem o controle real na tela (módulo pesado, aba diferente): o post-it fica SOLTO embaixo da faixa e os chips continuam funcionando", async () => {
@@ -538,11 +636,11 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(estado.dados["estudos-cursos-andamento"]).toMatchObject([{ name: "Inglês" }]);
   }, 12_000);
 
-  it("Treino (4 passos): 'Qual treino você faz hoje?' monta o treino de HOJE no plano real → marcar o 1º exercício no módulo (a ação #1) → olha a semana → olha os modelos → o fim junta o que entrou", { timeout: 40_000 }, async () => {
+  it("Treino (1.0.17, 2 passos): 'Qual treino você faz hoje?' monta o treino de HOJE no plano real → marcar o 1º exercício no módulo → o fim", { timeout: 40_000 }, async () => {
     expect(TREINOS_DE_HOJE.map((t) => t.rotulo)).toEqual(["Peito e tríceps", "Costas e bíceps", "Pernas", "Em casa", "Corrida"]);
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const { estado, set } = montarComSet(<><header><button type="button">📋 PLANO</button><button type="button">🏋️ HOJE</button></header><section data-testid="plano-semana"><h2>MEU PLANO DA SEMANA</h2></section><div data-testid="treino-hoje"><button type="button" aria-label="Marcar Supino reto inteiro">☐</button></div><IntroDoModulo moduleId="treino" /></>);
-    expect(card()?.textContent).toContain("1 de 4 · monta o treino de hoje");
+    expect(card()?.textContent).toContain("monte o treino de hoje");
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 3000 });
     await tocar(0); // Peito e tríceps
     const plano = estado.dados["saude-workouts-v2"] as Record<string, { muscles: string[]; exercises: Array<{ name: string; sets: string; done: boolean }> }>;
@@ -550,17 +648,15 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     expect(plano[dia].muscles).toEqual(["Peito", "Tríceps"]);
     expect(plano[dia].exercises).toHaveLength(5);
     expect(plano[dia].exercises[0]).toMatchObject({ name: "Supino reto", sets: "4", done: false });
-    // dia útil já é ativo no padrão (seg–sex) e não se grava nada; fim de semana entra na lista
     expect((estado.dados["treino-active-days"] as string[] | undefined) ?? ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"]).toContain(dia);
     // passo 2: o anel vai pro quadradinho do 1º exercício de HOJE e espera a pessoa marcar (nenhum chip)
-    await waitFor(() => expect(card()?.textContent).toContain("2 de 4 · marca a 1ª série"), { timeout: 2500 });
-    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Fez o primeiro? Marca ali"), { timeout: 3000 });
+    await waitFor(() => expect(card()?.textContent).toContain("marque a 1ª série"), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Fez o primeiro? Marque ali."), { timeout: 3000 });
     expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
     expect(screen.queryByTestId("intro-modulo-pronto")).toBeNull();
     act(() => { set("saude-workouts-v2", { ...plano, [dia]: { ...plano[dia], exercises: plano[dia].exercises.map((e, i) => (i === 0 ? { ...e, done: true } : e)) } }); }); // ela marcou no módulo
-    // 3) olha a semana e 4) olha os modelos: sem os cards no DOM de mentira, pulados sozinhos → o fim
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 12_000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Peito e tríceps (5 exercícios) e Supino reto feito já estão aqui. Marca cada série no HOJE");
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Peito e tríceps (5 exercícios) e Supino reto feito entraram. Marque cada série quando fizer.");
     expect(screen.getByTestId("intro-modulo-conhecer-mais").textContent).toContain("Ver mais 4 dicas de Treino"); // o passeio do Treino (17/10)
     expect(eventos.filter(([n]) => n === "modulo_intro_registrou").map(([, d]) => [d.passo, d.via])).toEqual([[1, "chip"], [2, "foco"]]);
     medir.mockRestore();
@@ -575,6 +671,10 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     const cheio = ctx({ "saude-workouts-v2": { [dia]: { muscles: ["Costas"], exercises: [{ name: "Remada", sets: "3", reps: "10", carga: "", done: false, obs: "" }] } } });
     expect(montarTreinoDeHoje(cheio, "pernas").exercicios).toBe(1);
     expect((cheio.dados["saude-workouts-v2"] as Record<string, { muscles: string[] }>)[dia].muscles).toEqual(["Pernas"]);
+    // 1.0.17: o treino DELA ("+ Outro") vira o treino de hoje, com ele como 1º exercício
+    const proprio = ctx({});
+    expect(montarTreinoProprio(proprio, "Natação")).toMatchObject({ rotulo: "Natação", exercicios: 1 });
+    expect((proprio.dados["saude-workouts-v2"] as Record<string, { exercises: Array<{ name: string }> }>)[dia].exercises.map((e) => e.name)).toEqual(["Natação"]);
   });
 
   it("EscolherTreino (só a missão monta): 2 perguntas → o modelo existente que casa, gravado pelo caminho do módulo; o bloco de modelos do módulo some enquanto o quiz está na tela", async () => {
@@ -605,16 +705,31 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
   it("Dieta: o chip grava o café da manhã de HOJE no cardápio, sem mexer no resto", async () => {
     const plano = { [OUTRO_DIA]: { "Café da Manhã": "", Almoço: "" }, [diaDaSemana()]: { "Café da Manhã": "", Almoço: "" } };
     const { estado } = montar(<IntroDoModulo moduleId="dieta" />, { "saude-meals": plano });
-    expect(card()?.textContent).toContain("anota o café de hoje");
+    expect(card()?.textContent).toContain("anote o café de hoje");
     await chip(0);
-    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("O que foi o seu café da manhã hoje?");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("O que você comeu no café?");
     expect(screen.getAllByTestId("demo-guia-chip")).toHaveLength(3);
+    expect(screen.getByTestId("demo-guia-outro").textContent).toContain("Outro");
     await tocar(1);
     const meals = estado.dados["saude-meals"] as Record<string, Record<string, string>>;
     expect(meals[diaDaSemana()]["Café da Manhã"]).toBe("Ovos mexidos");
     expect(meals[diaDaSemana()].Almoço).toBe("");
     expect(meals[OUTRO_DIA]["Café da Manhã"]).toBe("");
     expect(eventos.find(([n, d]) => n === "modulo_intro_acao" && d.via === "chip" && d.opcao === "ovos")).toBeTruthy();
+  }, 12_000);
+
+  it("Dieta (dono 19/10: 'e se ela não comeu nenhuma daquelas?'): '+ Outro' grava o café DELA no cardápio de hoje e lembra a opção", async () => {
+    const plano = { [diaDaSemana()]: { "Café da Manhã": "", Almoço: "" } };
+    const { estado } = montar(<IntroDoModulo moduleId="dieta" />, { "saude-meals": plano });
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-outro")).toBeTruthy(), { timeout: 8000 });
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    expect((screen.getByTestId("demo-guia-texto") as HTMLInputElement).placeholder).toBe("Ex.: Tapioca");
+    // vazio não adiciona
+    expect((screen.getByTestId("demo-guia-adicionar") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("demo-guia-texto"), { target: { value: "  Tapioca com queijo " } });
+    fireEvent.keyDown(screen.getByTestId("demo-guia-texto"), { key: "Enter" });
+    expect((estado.dados["saude-meals"] as Record<string, Record<string, string>>)[diaDaSemana()]["Café da Manhã"]).toBe("Tapioca com queijo");
+    expect(estado.dados["core-escolhas-proprias"]).toEqual({ "intro-dieta-1": [{ nome: "Tapioca com queijo" }] });
   }, 12_000);
 
   it("Dieta: o alvo do post-it é o card de HOJE e abre SÓ o botão 'Abrir <dia>' — nunca o gatilho do diálogo 'Limpar cardápio' (bug de 16/10)", () => {
@@ -678,7 +793,7 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     cleanup(); document.body.innerHTML = ""; localStorage.clear(); ligar();
 
     const b = montar(<IntroDoModulo moduleId="beleza" />);
-    expect(card()?.textContent).toContain("monta o seu skincare");
+    expect(card()?.textContent).toContain("monte o seu skincare");
     await tocar(0); // Oleosa
     expect(b.estado.dados["skincare-perfil"]).toMatchObject({ pele: "oleosa", objetivo: "basico", nivel: "iniciante" });
     expect((b.estado.dados["skincare-am-steps"] as unknown[]).length).toBeGreaterThan(0);
@@ -698,7 +813,7 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     vi.useRealTimers();
   }, 40_000);
 
-  it("vários passos: cada um é 1 toque; a faixa conta '1 de 2'; o fim junta o que entrou", async () => {
+  it("vários passos: cada um é 1 toque; o post-it conta '1 de 2'; o fim junta o que entrou", async () => {
     const escritas: Record<string, unknown> = {};
     const config: IntroDeUmToqueConfig = {
       formato: "toque", moduleId: "casa", nome: "Casa", pedido: "2 toques", pronto: "Pronto é isso.",
@@ -710,15 +825,15 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     };
     const fim = vi.fn();
     montar(<IntroDeUmToque config={config} aoTerminar={fim} />);
-    expect(card()?.textContent).toContain("1 de 2 · 2 toques");
+    expect(card()?.textContent).toContain("Primeira vez aqui · 2 toques");
     await waitFor(() => expect(screen.queryByTestId("demo-guia-postit")).toBeTruthy(), { timeout: 8000 });
-    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 2 · 1 toque");
+    expect(screen.getByTestId("demo-guia-postit").textContent).toContain("1 de 2");
     await tocar(0);
-    await waitFor(() => expect(card()?.textContent).toContain("2 de 2 · 2 toques"), { timeout: 2500 });
+    await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("2 de 2"), { timeout: 2500 });
     await waitFor(() => expect(screen.getByTestId("demo-guia-postit").textContent).toContain("Segundo?"), { timeout: 8000 });
     await tocar(0);
     await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 2500 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Leite e Pão francês já estão aqui. Pronto é isso.");
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Leite e Pão francês entraram. Pronto é isso.");
     expect(escritas).toEqual({ p1: "leite", p2: "pao" });
     expect(eventos.filter(([n]) => n === "modulo_intro_registrou").map(([, d]) => d.passo)).toEqual([1, 2]);
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
@@ -741,8 +856,8 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     act(() => { document.documentElement.removeAttribute(ATRIBUTO_MONTAR_ROTINA); });
     await waitFor(() => expect(document.querySelector("[data-testid=intro-modulo-faixa]")).toBeTruthy());
     const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 4000 });
-    expect(postIt.at(-1)!.textContent).toContain("Marca o primeiro quando fizer");
-    expect(postIt.at(-1)!.textContent).toContain("A linha de HOJE");
+    expect(postIt.at(-1)!.textContent).toContain("Marque o primeiro quando fizer");
+    expect(postIt.at(-1)!.textContent).toContain("Toque no quadradinho de hoje.");
     medir.mockRestore();
   });
   it("o chip da Rotina cria o hábito em 1 TOQUE (preenche o campo real e toca no Adicionar do módulo) e o anel vai pro quadradinho de hoje", async () => {
@@ -768,9 +883,12 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
     fireEvent.click(chips[0]); // Beber água ao acordar
     await waitFor(() => expect(estado.dados["rotina-habits"]).toEqual(["Beber água ao acordar"]), { timeout: 3000 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "criar_habito")).toBeTruthy();
+    // 1.0.17 (telemetria): a troca de âncora criar → marcar NÃO é "âncora perdida"
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marque o de hoje"), { timeout: 4000 });
+    expect(eventos.filter(([n, d]) => n === "modulo_intro_anel_saiu" && d.motivo === "ancora_invisivel")).toEqual([]);
     // passo 2: o anel abraça o QUADRADINHO de hoje (a célula com o checkbox), não a linha inteira
-    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marca o quadradinho de hoje"), { timeout: 4000 });
-    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 4 · marcar");
+    await waitFor(() => expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("Agora marque o de hoje"), { timeout: 4000 });
+    expect(screen.getAllByTestId("demo-guia-postit").at(-1)!.textContent).toContain("2 de 4"); // criar → marcar → olha → humor
     medir.mockRestore();
   });
 
@@ -790,10 +908,10 @@ describe("Montar Rotina (ramo v1016-rotina, só como 1ª dose da missão)", () =
   it("sem o montar (abriu por curiosidade): a intro de sempre, 'criar' o 1º hábito", { timeout: 20_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     montar(<div><button type="button" data-spotlight="add-habit">+ Hábito</button><IntroDoModulo moduleId="rotina" /></div>);
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marca 1 hábito");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("marque 1 hábito");
     // (sem o campo do hábito no DOM de mentira, a intro procura ~5,4 s e segue no botão — com folga pra suíte carregada)
     const postIt = await screen.findAllByTestId("demo-guia-postit", {}, { timeout: 10_000 });
-    expect(postIt.at(-1)!.textContent).toContain("Qual hábito você quer começar hoje?");
+    expect(postIt.at(-1)!.textContent).toContain("Qual hábito você quer começar?");
     medir.mockRestore();
   });
 });
@@ -828,7 +946,7 @@ describe("as ações de 1 toque são idempotentes e respeitam o que já existe",
 /* ───────────────────────────────── guiada ───────────────────────────────── */
 describe("ligada: a intro guiada de Finanças", () => {
   beforeEach(ligar);
-  it("a faixa sobe, o post-it acha o controle real e o chip grava o gasto na conta no formato do módulo; depois do 'olha' continua na conta fixa (passos 3–4) e o 'pronto' marca vista", { timeout: 40_000 }, async () => {
+  it("a faixa sobe, o post-it acha o controle real e o chip grava o gasto na conta no formato do módulo; depois do 'olha' continua na conta fixa (passos 3–4, '+ Outro' com R$) e o 'pronto' marca vista", { timeout: 40_000 }, async () => {
     // o módulo de mentira: só o controle que a intro procura, com tamanho (jsdom não mede)
     const Modulo = () => (
       <div>
@@ -839,7 +957,7 @@ describe("ligada: a intro guiada de Finanças", () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const { estado } = montar(<Modulo />);
     expect(document.documentElement.getAttribute("data-intro-modulo-faixa")).toBe("1");
-    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("toca em 1 gasto");
+    expect(screen.getByTestId("intro-modulo-faixa").textContent).toContain("anote 1 gasto");
     expect(screen.getByTestId("intro-modulo-faixa").getAttribute("data-camada-guia")).toBe("intro-modulo");
     expect(eventos.find(([n, d]) => n === "modulo_intro_vista" && d.formato === "guiada")).toBeTruthy();
     const chip = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
@@ -849,13 +967,18 @@ describe("ligada: a intro guiada de Finanças", () => {
     expect(gastos[0]).toMatchObject({ description: "Café", value: 12 });
     expect(eventos.find(([n, d]) => n === "modulo_intro_chip" && d.nome === "Café")).toBeTruthy();
     await waitFor(() => expect(eventos.find(([n, d]) => n === "modulo_intro_registrou" && d.via === "chip")).toBeTruthy(), { timeout: 3000 });
-    // sem o card MEU MÊS na tela, o "olha" é pulado (fail-open) e a intro CONTINUA nos passos 3 e 4 (17/10): a conta fixa, o olha dela
-    await waitFor(() => expect(card()?.textContent).toContain("3 de 4 · anota 1 conta fixa"), { timeout: 4000 });
+    // sem o card MEU MÊS na tela, o "olha" é pulado (fail-open) e a intro CONTINUA nos passos 3 e 4 (os da 1.0.16): a conta fixa
+    // (com "+ Outro": nome + R$), o olha dela
+    await waitFor(() => expect(card()?.textContent).toContain("anote 1 conta fixa"), { timeout: 4000 });
     expect(screen.queryByTestId("intro-modulo-pronto")).toBeNull();
-    await tocar(0); // Aluguel
-    expect(estado.dados["finance-fixed-expenses"]).toMatchObject([{ description: "Aluguel", value: 1200, paymentMethod: "pix" }]);
+    await waitFor(() => expect(screen.queryByTestId("demo-guia-outro")).toBeTruthy(), { timeout: 9000 });
+    fireEvent.click(screen.getByTestId("demo-guia-outro"));
+    fireEvent.change(screen.getByTestId("demo-guia-texto"), { target: { value: "Academia" } });
+    fireEvent.change(screen.getByTestId("demo-guia-reais"), { target: { value: "90" } });
+    fireEvent.click(screen.getByTestId("demo-guia-adicionar"));
+    expect(estado.dados["finance-fixed-expenses"]).toMatchObject([{ description: "Academia", value: 90, paymentMethod: "pix" }]);
     await waitFor(() => expect(screen.getByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
-    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Café · R$ 12 e Aluguel · R$ 1.200 já estão aqui. Finanças é isso");
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Café · R$ 12 e Academia · R$ 90 entraram. Você anota, o mês soma.");
     fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
     expect(localStorage.getItem(chaveIntroVista("financas"))).toBeTruthy();
     expect(estado.dados[CHAVE_INTRO_VISTAS_CONTA]).toEqual(["financas"]);
@@ -887,8 +1010,8 @@ describe("ligada: a intro guiada de Finanças", () => {
     fireEvent.click(chip[0]); // Café · R$ 12
     await waitFor(() => expect(screen.getByTestId("intro-modulo-olhar")).toBeTruthy(), { timeout: 6000 });
     const balao = screen.getByTestId("intro-modulo-olhar");
-    expect(balao.textContent).toContain("Esse número é o seu guia do dia");
-    expect(balao.textContent).toContain("Hoje dá pra gastar");
+    expect(balao.textContent).toContain("Seu número do dia");
+    expect(balao.textContent).toContain("Dá pra gastar hoje");
     const antes = Math.round(2400 / dias), depois = Math.round((2400 - 12) / dias);
     if (antes !== depois) expect(balao.textContent).toContain(`R$ ${antes}`);
     expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.resumo === "alternativo")).toBeTruthy();

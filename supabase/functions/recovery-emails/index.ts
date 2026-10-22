@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { destinoDePreview } from "../_shared/preview-seguro.ts";
 
 /**
  * Régua de recuperação do funil pago — 5 TOQUES (28/07, reforma agressiva).
@@ -194,7 +195,9 @@ serve(async (req) => {
     // PREVIEW: manda os 5 estágios pro e-mail informado, sem gravar nada.
     const body = await req.json().catch(() => ({}));
     if (body?.preview) {
-      const to = String(body.preview);
+      // segurança 21/10: o preview só sai pras caixas da equipe (a função é pública)
+      const to = destinoDePreview(body.preview);
+      if (!to) return Response.json({ error: "forbidden" }, { status: 403 });
       for (const stage of ["h1", "h24", "h48", "h72", "d7"] as Stage[]) {
         await fetch("https://api.resend.com/emails", {
           method: "POST",

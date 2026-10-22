@@ -108,12 +108,12 @@ const temEntitlement = (info: unknown): boolean =>
  * (ver o cabeçalho do scripts/preparar-loja.mjs). Por isso a escolha é
  * explícita por plataforma, e não uma chave só com fallback.
  */
-const chaveDaLoja = (): string | undefined => {
-  const env = import.meta.env as Record<string, string | undefined>;
-  return plataformaApp() === "ios"
-    ? env.VITE_REVENUECAT_IOS_KEY
-    : env.VITE_REVENUECAT_ANDROID_KEY;
-};
+/* segurança 21/10: leitura NOMEADA de cada variável. `import.meta.env` usado como objeto faz o Vite colar o env
+ * INTEIRO no bundle (todas as VITE_*, inclusive a senha da conta de QA da Porta) — trava em src/test/seguranca. */
+const chaveDaLoja = (): string | undefined =>
+  plataformaApp() === "ios"
+    ? (import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined)
+    : (import.meta.env.VITE_REVENUECAT_ANDROID_KEY as string | undefined);
 
 export async function initRevenueCat(): Promise<EstadoRC> {
   if (!isNativeShell()) return "sem_chave";

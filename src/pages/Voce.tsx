@@ -1,12 +1,12 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, Check, ChevronRight, CreditCard, FileText, LifeBuoy, LogOut, Monitor, Moon, Palette,
-  RotateCcw, Shield, Sparkles, Star, Sun, Trophy,
+  ArrowLeft, Bell, ChevronRight, CreditCard, FileText, LifeBuoy, LogOut, Monitor, Palette,
+  RotateCcw, Shield, Sparkles, Star, Trophy,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
+import { useTheme, palettes } from "@/hooks/use-theme";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { abrirPaginaDeAvaliacao } from "@/lib/avaliacao";
@@ -14,6 +14,8 @@ import { avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { ATRIBUTO_RAIZ, marcarVolta } from "@/lib/nav-abas";
 import { AccountDrawer } from "@/components/home/AccountDrawer";
+import { PainelAparencia } from "@/components/account/PainelAparencia";
+import { linhaDoPlano } from "@/lib/linha-do-plano";
 
 /**
  * ABA VOCÊ (1.0.17) — a página que substitui a folha "Menu" do avatar da Home.
@@ -31,24 +33,8 @@ import { AccountDrawer } from "@/components/home/AccountDrawer";
 
 type Item = { id: string; Icone: typeof Trophy; rotulo: string; detalhe?: string; onClick: () => void; perigo?: boolean };
 
-const NOME_DO_PLANO: Record<string, string> = {
-  monthly: "Plano mensal",
-  monthly_prepaid: "1 mês de acesso",
-  annual: "Plano anual",
-  lifetime: "Acesso vitalício",
-};
-
-/** A linha curta do plano no cartão (o detalhe inteiro mora em /planos). */
-export function linhaDoPlano(a: { subLoaded: boolean; isSubscribed: boolean; billingPeriod: string | null; subscriptionEnd: string | null; inGracePeriod: boolean }, testeAtivo = false): string {
-  if (!a.subLoaded) return "Ver meu acesso";
-  if (a.inGracePeriod) return "Pagamento pendente";
-  if (!a.isSubscribed) return "Sem plano ativo";
-  if (a.billingPeriod === "annual" && testeAtivo && a.subscriptionEnd) {
-    const d = new Date(a.subscriptionEnd);
-    if (!Number.isNaN(d.getTime())) return `Teste grátis até ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}`;
-  }
-  return NOME_DO_PLANO[a.billingPeriod ?? ""] ?? "Todos os 16 módulos liberados";
-}
+/** A linha curta do plano — hoje em lib/linha-do-plano (o menu da conta da 1.0.18 usa a mesma). */
+export { linhaDoPlano };
 
 function Grupo({ titulo, children }: { titulo?: string; children: ReactNode }) {
   return (
@@ -192,19 +178,6 @@ export default function Voce() {
 /** /voce/aparencia — modo claro/escuro e a cor do tema, que moravam no sol e na paleta do topo da Home. */
 export function Aparencia() {
   const navigate = useNavigate();
-  const { mode, toggleMode, palette, setPalette } = useTheme();
-
-  const escolherModo = (m: "light" | "dark") => {
-    if (m === mode) return;
-    trackEvent("tema_trocado", { modo: m, paleta: palette, origem: "aparencia" });
-    toggleMode();
-  };
-  const escolherPaleta = (p: ThemePalette) => {
-    if (p === palette) return;
-    trackEvent("tema_trocado", { modo: mode, paleta: p, origem: "aparencia" });
-    setPalette(p);
-  };
-
   return (
     <div className="min-h-dvh bg-background flex flex-col" data-testid="tela-aparencia">
       <header className="sticky top-0 z-40 border-b border-border bg-card">
@@ -216,58 +189,8 @@ export function Aparencia() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg md:max-w-2xl mx-auto w-full px-4 pt-4 pb-8 space-y-6">
-        <section>
-          <h2 id="aparencia-modo" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">Modo</h2>
-          <div role="radiogroup" aria-labelledby="aparencia-modo" className="grid grid-cols-2 gap-3">
-            {([["light", "Claro", Sun], ["dark", "Escuro", Moon]] as const).map(([m, rotulo, Icone]) => {
-              const ativo = mode === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={ativo}
-                  onClick={() => escolherModo(m)}
-                  data-testid={`modo-${m}`}
-                  className={`min-h-[88px] rounded-2xl border bg-card flex flex-col items-center justify-center gap-2 transition-colors ${ativo ? "border-foreground ring-1 ring-foreground" : "border-border/60 hover:bg-muted/40"}`}
-                >
-                  <Icone className="w-5 h-5" aria-hidden />
-                  <span className="text-sm font-semibold">{rotulo}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section>
-          <h2 id="aparencia-cor" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">Cor</h2>
-          <ul role="radiogroup" aria-labelledby="aparencia-cor" className="bg-card rounded-2xl border border-border/60 divide-y divide-border/60 overflow-hidden">
-            {(Object.keys(palettes) as ThemePalette[]).map((p) => {
-              const ativo = palette === p;
-              return (
-                <li key={p}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={ativo}
-                    onClick={() => escolherPaleta(p)}
-                    data-testid={`paleta-${p}`}
-                    className="w-full min-h-[52px] flex items-center gap-3 px-4 text-left hover:bg-muted/40 transition-colors"
-                  >
-                    <span className="flex -space-x-1" aria-hidden>
-                      {palettes[p].preview.map((c, i) => (
-                        <span key={i} className="w-4 h-4 rounded-full border border-border/60" style={{ backgroundColor: c }} />
-                      ))}
-                    </span>
-                    <span className="flex-1 text-sm font-medium">{palettes[p].name}</span>
-                    {ativo && <Check className="w-4 h-4 text-foreground" aria-label="Escolhida" />}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+      <main className="flex-1 max-w-lg md:max-w-2xl mx-auto w-full px-4 pt-4 pb-8">
+        <PainelAparencia origem="aparencia" />
       </main>
     </div>
   );

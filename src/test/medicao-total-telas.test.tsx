@@ -250,8 +250,11 @@ describe("privacidade: nenhum dado da pessoa vira chave", () => {
     expect(p).not.toBeNull();
     console.log(`[medicao] home: ${Object.keys(p!.n as object).length} chaves · ${chavesPossiveis.size} possíveis`);
     expect(Object.keys(p!.n as object).length).toBeGreaterThan(15);
-    semSentinela(p, ["Conquistas"]);
-    semSentinela({ possiveis: [...chavesPossiveis] }, ["Conquistas"]);
+    // 1.0.18 (menu novo da conta): os itens têm data-track escrito no CÓDIGO ("menu:conquistas") — a chave sai dele,
+    // nunca do texto; o id "conquistas" do código não é o hábito da pessoa (a peneira do texto segue no teste abaixo)
+    const semIdsDoCodigo = (o: unknown) => JSON.parse(JSON.stringify(o).split("menu:conquistas").join("menu:ID_DO_CODIGO")) as Record<string, unknown>;
+    semSentinela(semIdsDoCodigo(p), ["Conquistas"]);
+    semSentinela(semIdsDoCodigo({ possiveis: [...chavesPossiveis] }), ["Conquistas"]);
     expect(chavesPossiveis.size).toBeGreaterThan(60);
     // cobertura da Home
     const n = Object.keys(p!.n as object);
@@ -299,8 +302,9 @@ describe("privacidade: nenhum dado da pessoa vira chave", () => {
 });
 
 describe("a peneira tira texto do código que virou dado", () => {
-  it("menu da conta: 'Conquistas' vira chave só pra quem NÃO tem um hábito chamado Conquistas", async () => {
+  it("menu da conta (o de antes, menu_novo off): 'Conquistas' vira chave só pra quem NÃO tem um hábito chamado Conquistas", async () => {
     const abrirMenu = async (dados: Dados) => {
+      localStorage.setItem("core-menu-novo", "off");
       await abrir("/home", <AccountDrawer open onOpenChange={() => {}} displayName="Anaclara Bittencourt" />, dados);
       fireEvent.click(await screen.findByText("Conquistas"));
       const p = descarregarResumo("teste")!;
@@ -312,6 +316,20 @@ describe("a peneira tira texto do código que virou dado", () => {
     const comDado = await abrirMenu({ "rotina-habits": ["Conquistas"] });
     expect(comDado).not.toContain("home||MENU||CONQUISTAS");
     expect(comDado).toContain("home||MENU||icone:trophy"); // cai pro ícone (nome de componente)
+  }, 60_000);
+
+  it("menu novo (1.0.18): a chave de cada item sai do data-track do código, tenha a pessoa o dado que tiver", async () => {
+    const abrirMenu = async (dados: Dados) => {
+      await abrir("/home", <AccountDrawer open onOpenChange={() => {}} displayName="Anaclara Bittencourt" />, dados);
+      fireEvent.click(await screen.findByText("Conquistas"));
+      const p = descarregarResumo("teste")!;
+      cleanup(); _zerarMedicaoTotal();
+      return Object.keys(p.n as object);
+    };
+    expect(await abrirMenu({})).toContain("home||MENU||menu:conquistas");
+    const comDado = await abrirMenu({ "rotina-habits": ["Conquistas"] });
+    expect(comDado).toContain("home||MENU||menu:conquistas");
+    expect(comDado.join(" ")).not.toMatch(/Anaclara|Bittencourt/i);
   }, 60_000);
 
   it("o use-user-data de verdade registra o store em memória na peneira", async () => {

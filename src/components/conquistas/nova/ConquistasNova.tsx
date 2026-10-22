@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { LinkRetrospectiva } from "@/components/conquistas/LinkRetrospectiva";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Check, ChevronRight, Shield, Trophy } from "lucide-react";
@@ -320,6 +321,7 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, onVoltar
           <AlbumHero e={e} levantando={levantando} onAbrir={() => abrirAlbum("capa", 0)} onPacotinho={() => abrirAlbum("pacotinho", e.paginaDasNovas)} />
           <Trilha e={e} onAdesivo={(b) => tocarAdesivo(b)} />
           <VerTodos onTodos={abrirTodos} />
+          <LinkRetrospectiva />
         </div>
       </main>
 

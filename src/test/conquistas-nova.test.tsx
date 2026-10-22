@@ -614,3 +614,30 @@ describe("momentos com conquistas2 ligada: toast no lugar do popup", () => {
     expect(screen.queryByTestId("cn-toast")).toBeNull();
   });
 });
+
+describe("1.0.18 (menu novo): a Retrospectiva sai do menu e ganha a porta fixa no fim das Conquistas 2", () => {
+  afterEach(() => { try { localStorage.removeItem("core-menu-novo"); } catch { /* noop */ } cleanup(); });
+  const montarComRotas = () => render(
+    <MemoryRouter initialEntries={["/conquistas"]}>
+      <Provedor store={montarStore(cenario())}>
+        <Routes>
+          <Route path="/conquistas" element={<ConquistasNova testeDia={null} />} />
+          <Route path="*" element={<Rota />} />
+        </Routes>
+      </Provedor>
+    </MemoryRouter>,
+  );
+  it("menu novo (padrão): 'Retrospectiva do mês' no fim, depois de 'Ver todos os adesivos', leva à /retrospectiva", async () => {
+    montarComRotas();
+    const link = await screen.findByTestId("conquistas-retrospectiva");
+    expect(screen.getByTestId("cn-ver-todos").compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(link);
+    expect((await screen.findByTestId("rota")).textContent).toMatch(/^\/retrospectiva\|/);
+  });
+  it("menu_novo off: sem o link", async () => {
+    localStorage.setItem("core-menu-novo", "off");
+    montarComRotas();
+    await screen.findByTestId("cn-ver-todos");
+    expect(screen.queryByTestId("conquistas-retrospectiva")).toBeNull();
+  });
+});

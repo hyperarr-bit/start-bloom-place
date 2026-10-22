@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
-import { pedirRastreamentoIos } from "@/lib/att-ios";
+import { pedirRastreamentoIos, segurarReservaNativaDoATT } from "@/lib/att-ios";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
 
@@ -55,8 +55,9 @@ const PROMESSA_DA_ROTA: Record<AreaKey, string> = {
 };
 
 export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => void; onEntrar?: () => void; area?: AreaKey | null }) {
-  /* ATT (20/09): a pessoa vê a tela PRIMEIRO; o pedido chega 3 s depois. Igual à welcome de hoje. */
-  useEffect(() => { const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000); return () => window.clearTimeout(t); }, []);
+  /* ATT (1.0.18, dono 21/10): NADA automático — o pedido sai só no toque em "Começar" (abaixo) ou na Home; a
+   * welcome segura a reserva nativa de 10 s pra o diálogo não cair sozinho em cima do vídeo (era 3 s depois de abrir). */
+  useEffect(() => { segurarReservaNativaDoATT(); }, []);
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
   const [videoFalhou, setVideoFalhou] = useState(false);

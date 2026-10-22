@@ -28,7 +28,7 @@ vi.mock("@/lib/analytics", async (orig) => ({
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null, isSubscribed: false, loading: false }) }));
 vi.mock("@/lib/sessao-anonima", () => ({ anonimoLigado: async () => true, precisaBatizar: async () => true }));
 vi.mock("@/lib/revenuecat", () => ({ compraNaLojaSemConta: async () => false, initRevenueCat: async () => {}, restaurar: async () => false }));
-vi.mock("@/lib/att-ios", () => ({ pedirRastreamentoIos: vi.fn(async () => "nao_ios") }));
+vi.mock("@/lib/att-ios", () => ({ pedirRastreamentoIos: vi.fn(async () => "nao_ios"), segurarReservaNativaDoATT: vi.fn() }));
 vi.mock("@/lib/notificacoes", () => ({ agendarResgateDoPlano: vi.fn(async () => {}), cancelarResgateDoPlano: vi.fn(async () => {}), pedirPermissao: vi.fn(async () => true), estadoPermissao: vi.fn(async () => "prompt") }));
 vi.mock("@/pages/funis/w/PaywallW", () => ({ PaywallW: () => <div data-testid="paywall-w">paywall</div> }));
 vi.mock("@/pages/funis/ios/PaywallIOS", () => ({ PaywallIOS: () => <div data-testid="paywall-ios">paywall ios</div> }));

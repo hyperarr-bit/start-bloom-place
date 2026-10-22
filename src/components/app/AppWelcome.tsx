@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { pedirRastreamentoIos } from "@/lib/att-ios";
+import { pedirRastreamentoIos, segurarReservaNativaDoATT } from "@/lib/att-ios";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { ehApple } from "@/lib/loja";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
@@ -49,12 +49,9 @@ function Contador({ ate }: { ate: number }) {
 }
 
 export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onEntrar?: () => void }) {
-  /* ATT (20/09, dono olhando o FitFolio): a pessoa vê a welcome e a animação
-   * PRIMEIRO; o pedido de rastreamento chega 3 s depois de a tela estar na
-   * frente dela. Fora do iPhone devolve na hora. O nativo (AppDelegate) tem
-   * uma reserva aos 10 s pra quem nunca passar por aqui; o sistema só mostra
-   * o diálogo uma vez, então os dois nunca se atropelam. */
-  useEffect(() => { const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000); return () => window.clearTimeout(t); }, []);
+  /* ATT (1.0.18, dono 21/10): NADA automático — o pedido sai só no toque em "Começar" (abaixo) ou na Home; a
+   * welcome segura a reserva nativa de 10 s do AppDelegate (era o pedido 3 s depois de a tela aparecer). */
+  useEffect(() => { segurarReservaNativaDoATT(); }, []);
   const navigate = useNavigate();
   const [restaurando, setRestaurando] = useState(false);
   const [msgRestore, setMsgRestore] = useState<string | null>(null);

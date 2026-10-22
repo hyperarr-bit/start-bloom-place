@@ -32,7 +32,7 @@ vi.mock("@/hooks/use-auth", () => ({
     billingPeriod: null, subscriptionEnd: null, paymentMethod: null, inGracePeriod: false,
   }),
 }));
-vi.mock("@/lib/att-ios", () => ({ pedirRastreamentoIos: vi.fn(async () => "nao_ios") }));
+vi.mock("@/lib/att-ios", () => ({ pedirRastreamentoIos: vi.fn(async () => "nao_ios"), segurarReservaNativaDoATT: vi.fn() }));
 vi.mock("@/lib/notificacoes", () => ({
   estadoPermissao: async () => "prompt",
   pedirPermissao: vi.fn(async () => true),

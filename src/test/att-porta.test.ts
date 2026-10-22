@@ -24,7 +24,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), capturarDispositivoApp: vi.fn(async () => undefined) }));
 
-import { CHAVE_PORTA_SEM_ATT, marcarPortaSemATT, pedirRastreamentoIos, reavisarPortaSemATT } from "@/lib/att-ios";
+import { CHAVE_PORTA_SEM_ATT, marcarPortaSemATT, pedirRastreamentoIos, reavisarPortaSemATT, segurarReservaNativaDoATT } from "@/lib/att-ios";
 
 beforeEach(() => {
   localStorage.clear();
@@ -55,6 +55,14 @@ describe("ATT × Porta", () => {
     expect(nativo.pedir).not.toHaveBeenCalled();
     expect(localStorage.getItem(CHAVE_PORTA_SEM_ATT)).toBe("1");
     await vi.waitFor(() => expect(nativo.pular).toHaveBeenCalled());
+  });
+
+  it("1.0.18: a welcome segura a reserva nativa (pularATT) SEM marcar o aparelho — o JS continua pedindo no Começar/Home", async () => {
+    segurarReservaNativaDoATT();
+    await vi.waitFor(() => expect(nativo.pular).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem(CHAVE_PORTA_SEM_ATT)).toBeNull();
+    expect(await pedirRastreamentoIos("welcome")).toBe("authorized");
+    expect(nativo.pedir).toHaveBeenCalledTimes(1);
   });
 
   it("reabrir o app num aparelho da Porta repete o aviso pro nativo; aparelho comum não avisa nada", async () => {

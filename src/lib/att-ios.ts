@@ -47,6 +47,16 @@ const avisarNativo = async (): Promise<void> => {
   } catch { /* build sem o método: a reserva nativa segue como antes */ }
 };
 
+/**
+ * SEM PEDIDO AUTOMÁTICO NA WELCOME (1.0.18, dono 21/10): o diálogo do ATT não cai mais sozinho em cima do vídeo
+ * da welcome (eram 3 s depois de abrir; 173 instalações fechavam o app em 3 s, 66 com o diálogo aberto). O pedido
+ * sai só no toque em "Começar" (que já pedia) e, pra quem entra por outro caminho ("Já tem conta? Entrar" → gate),
+ * na Home (que já pede). A reserva nativa de 10 s do AppDelegate (recusa 2.1 de 20/09: o revisor entrou pelo login
+ * e nunca viu o diálogo) continua existindo pra quem NÃO passa pela welcome — a welcome a segura pelo mesmo
+ * `CoreNativo.pularATT()` da Porta, SEM a marca permanente do aparelho: o JS segue pedindo no Começar e na Home.
+ */
+export function segurarReservaNativaDoATT(): void { void avisarNativo(); }
+
 /** Marca o aparelho como "veio da Porta" e segura o ATT (JS e reserva nativa). Nunca lança. */
 export function marcarPortaSemATT(): void {
   try { localStorage.setItem(CHAVE_PORTA_SEM_ATT, "1"); } catch { /* noop */ }

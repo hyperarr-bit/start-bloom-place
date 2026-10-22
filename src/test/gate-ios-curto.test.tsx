@@ -92,13 +92,15 @@ vi.mock("@/components/account/DeleteAccountDialog", () => ({ DeleteAccountDialog
 const signOut = vi.fn(async () => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { signOut: () => signOut() } } }));
 
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { CHAVE_FORCA_OFERTAS, _zerarChavesRemotas } from "@/lib/ofertas-saida";
 import { CHAVE_FORCA_PAYWALL_MINIMALISTA, _zerarRemotaMinimalista } from "@/lib/paywall-minimalista";
 import { TrialBanner } from "@/components/TrialBanner";
 import { _zerarParabens, linhaDoPlano } from "@/components/porta/ParabensPorta";
 
 const eventos = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
+/** 1.0.18: o sucesso do gate vai por BEACON (o app recarrega logo depois; o insert normal morria na recarga) */
+const beacons = (nome: string) => vi.mocked(trackEventBeacon).mock.calls.filter((c) => c[0] === nome).map((c) => c[1] as Record<string, unknown>);
 const plataforma = (p: "ios" | "android") => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => p }; };
 const montar = () => render(<MemoryRouter initialEntries={["/home"]}><main>Home</main><TrialBanner /></MemoryRouter>);
 let href = "";
@@ -113,6 +115,7 @@ beforeEach(() => {
   estado.metadataCurto = null;
   estado.metadataMini = null;
   vi.mocked(trackEvent).mockClear();
+  vi.mocked(trackEventBeacon).mockClear();
   [rcMock.identificar, rcMock.comprarAnual, rcMock.restaurar, notif.resgate, notif.cancelarResgate, notif.cancelarRegua, notif.recuperar, signOut].forEach((f) => f.mockClear());
   rcMock.comprarAnual.mockResolvedValue(true);
   plataforma("ios");
@@ -164,7 +167,9 @@ describe("gate do iPhone com a chave 'curto' = o PaywallIOS curto", () => {
     expect(notif.cancelarResgate).toHaveBeenCalled();
     expect(notif.cancelarRegua).toHaveBeenCalled();
     expect(notif.recuperar).not.toHaveBeenCalled(); // a recuperação do funil não arma no gate
-    expect(eventos("app_sheet_success")[0]).toMatchObject({ funil: "gate_ios", produto: "core_anual_97" });
+    // 1.0.18: por beacon, nunca pelo trackEvent (que morria na recarga pra "/")
+    expect(beacons("app_sheet_success")).toEqual([expect.objectContaining({ funil: "gate_ios", produto: "core_anual_97", loja: "ios" })]);
+    expect(eventos("app_sheet_success")).toEqual([]);
   });
 
   it("'Entrar com outra conta': sai desta conta e vai pro /entrar", async () => {
@@ -287,6 +292,8 @@ describe("gate do iPhone com o paywall minimalista (chave ligada)", () => {
     await waitFor(() => expect(href).toBe("/"));
     expect(notif.cancelarResgate).toHaveBeenCalled();
     expect(eventos("funnel_click").find((e) => e.cta === "app_paywall_cta")).toMatchObject({ funil: "gate_ios", paywall_curto: true, minimalista: true });
+    expect(beacons("app_sheet_success")).toEqual([expect.objectContaining({ funil: "gate_ios", produto: "core_anual_97" })]);
+    expect(eventos("app_sheet_success")).toEqual([]);
   });
 
   it("interruptor no ar: a metadata `paywall_minimalista: off` chega com as offerings → o curto de hoje no gate", async () => {

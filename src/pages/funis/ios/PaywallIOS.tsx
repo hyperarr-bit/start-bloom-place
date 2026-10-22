@@ -377,6 +377,10 @@ export function PaywallIOS({
 }: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void; onVoltar?: () => void; modo?: "funil" | "gate"; onChaveDesligada?: () => void }) {
   const gate = modo === "gate";
   const FUNIL = gate ? "gate_ios" : "ios";
+  /* 1.0.18 (análise do paywall 21/10): no gate o pós-compra RECARREGA o app (`onPagoSemConta` → "/") logo depois
+   * do `app_sheet_success` — o insert do trackEvent morria na recarga (124 folhas, 0 app_sheet_success; o banco
+   * mostrava 18 % das contas comprando). O sucesso do gate vai por beacon (fetch keepalive, o mesmo do paywall_saiu). */
+  const registrarSucesso = gate ? trackEventBeacon : trackEvent;
   const { user: usuarioLogado } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
   const [comprando, setComprando] = useState(false);
@@ -635,7 +639,7 @@ export function PaywallIOS({
         ? await rc.comprar("core_mensal", { semTrial: true })
         : await rc.comprarAnualIos();
       if (ok) {
-        trackEvent("app_sheet_success", { produto: idProduto, funil: FUNIL, loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
+        registrarSucesso("app_sheet_success", { produto: idProduto, funil: FUNIL, loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
         /* (D) LEMBRETE DO TESTE (01/10, de volta): a Apple não avisa antes de
          * cobrar. Compra que entrou em teste guarda o pedido do aviso "acaba
          * amanhã" e arma na hora se a permissão já existe. SEM diálogo aqui —
@@ -757,7 +761,7 @@ export function PaywallIOS({
         onFechar={() => setPresente(null)}
         onSucesso={async () => {
           const { lugar, oferta: p } = presente;
-          trackEvent("app_sheet_success", { produto: p.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar, offering: "anual_69", preco: p.preco, segunda_chance: lugar === "folha_cancelada" ? "imediata" : "saida" });
+          registrarSucesso("app_sheet_success", { produto: p.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar, offering: "anual_69", preco: p.preco, segunda_chance: lugar === "folha_cancelada" ? "imediata" : "saida" });
           try {
             const rc = await import("@/lib/revenuecat");
             if (seguro(() => rc.ultimaCompraAnualFoiTrial(), p.comTrial)) {
@@ -775,7 +779,7 @@ export function PaywallIOS({
         oferta={mensal19}
         onFechar={() => setMensal19(null)}
         onSucesso={() => {
-          trackEvent("app_sheet_success", { produto: mensal19.produto, funil: FUNIL, loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
+          registrarSucesso("app_sheet_success", { produto: mensal19.produto, funil: FUNIL, loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
           setMensal19(null);
           concluir();
         }}

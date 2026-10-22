@@ -799,7 +799,9 @@ function registrarResultadoDaFolha(resultado: ResultadoDaFolha, produto: string)
   if (plataformaApp() !== "ios") return;
   const agora = Date.now();
   const base = toqueDaFolhaEm ?? folhaAbertaEm;
-  trackEvent("folha_apple_resultado", {
+  // 1.0.18: o sucesso vai por beacon — no gate o app recarrega logo depois da compra e o insert normal morria
+  // (124 folhas do gate, 48 sem resultado); cancelou/erro seguem no trackEvent de sempre
+  (resultado === "sucesso" ? trackEventBeacon : trackEvent)("folha_apple_resultado", {
     resultado,
     produto,
     ms_desde_toque: base ? agora - base : null,

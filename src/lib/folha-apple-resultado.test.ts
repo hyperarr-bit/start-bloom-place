@@ -30,10 +30,10 @@ vi.mock("@revenuecat/purchases-capacitor", () => ({
     getCustomerInfo: async () => ({ customerInfo: { entitlements: { active: {} } } }),
   },
 }));
-const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
+const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>, "evento" | "beacon"]>);
 vi.mock("@/lib/analytics", () => ({
-  trackEvent: (n: string, d: Record<string, unknown>) => { eventos.push([n, d]); },
-  trackEventBeacon: (n: string, d: Record<string, unknown>) => { eventos.push([n, d]); },
+  trackEvent: (n: string, d: Record<string, unknown>) => { eventos.push([n, d, "evento"]); },
+  trackEventBeacon: (n: string, d: Record<string, unknown>) => { eventos.push([n, d, "beacon"]); },
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: null } }) }, functions: { invoke: async () => ({ data: null, error: null }) } },
@@ -41,6 +41,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 const P97: Produto = { identifier: "core_anual_97", priceString: "R$ 97,90", price: 97.9, currencyCode: "BRL", introPrice: { price: 0, periodUnit: "DAY", periodNumberOfUnits: 3 } };
 const folhas = () => eventos.filter((e) => e[0] === "folha_apple_resultado").map((e) => e[1]);
+/** 1.0.18: por onde cada folha saiu — o sucesso vai por beacon (o gate recarrega o app logo depois da compra) */
+const canais = () => eventos.filter((e) => e[0] === "folha_apple_resultado").map((e) => e[2]);
 
 beforeEach(() => {
   vi.resetModules();
@@ -74,6 +76,7 @@ describe("folha_apple_resultado", () => {
     rc.purchasePackage.mockImplementationOnce(async () => { vi.setSystemTime(new Date("2026-10-10T15:00:06Z")); return { customerInfo: { entitlements: { active: {} } } }; });
     expect(await m.comprarAnualIos()).toBe(true);
     expect(folhas()).toEqual([{ resultado: "sucesso", produto: "core_anual_97", ms_desde_toque: 10200, segunda_chance: false }]);
+    expect(canais()).toEqual(["beacon"]); // 1.0.18: sobrevive à recarga do gate
   });
 
   it("cancelou e tentou de novo: 'cancelou' e depois 'sucesso' com segunda_chance true", async () => {
@@ -84,6 +87,7 @@ describe("folha_apple_resultado", () => {
     vi.setSystemTime(new Date("2026-10-10T15:02:00Z"));
     expect(await m.comprarAnualIos()).toBe(true);
     expect(folhas()[1]).toMatchObject({ resultado: "sucesso", segunda_chance: true });
+    expect(canais()).toEqual(["evento", "beacon"]); // cancelou segue pelo trackEvent de sempre; o sucesso por beacon
   });
 
   it("erro da loja: 'erro'; falhou ANTES de abrir a folha (catálogo vazio): nenhum folha_apple_resultado", async () => {

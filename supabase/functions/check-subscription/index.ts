@@ -47,7 +47,8 @@ serve(async (req) => {
      * o gate de assinatura do app (use-auth.tsx) mostrava "sem assinatura"
      * para alguém que já tinha pago. */
     if (!user) throw new Error("User not authenticated");
-    logStep("User authenticated", { email: user.email ?? "(anônimo)" });
+    // segurança 21/10: sem e-mail no log (é a função mais chamada do app); o id basta pro suporte
+    logStep("User authenticated", { userId: user.id, anonimo: !user.email });
 
     const { data: profile } = await supabaseClient
       .from("profiles")

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
 
 /**
  * Pix in-app via ABACATEPAY (16/07): a API da Cakto caiu (docs da conta em
@@ -346,9 +347,7 @@ serve(async (req) => {
       const out = await res.json().catch(() => ({}));
       // sonda read-only (QA 19/07): devolve o corpo cru SEM tocar no grant —
       // pra descobrir se o check traz amount/metadata (bug do downsell 27,90)
-      if (body.probeOnly === true) {
-        return jsonResponse({ probe: true, status: res.status, gw: JSON.stringify(out).slice(0, 800) });
-      }
+      // segurança 21/10: saiu o `probeOnly` (devolvia o pedido cru do gateway — nome, e-mail, CPF — de qualquer id)
       const status = out?.data?.status ?? "UNKNOWN";
       if (!res.ok || out?.success === false) {
         logStep("Abacate check error", { status: res.status, body: JSON.stringify(out).slice(0, 300) });
@@ -370,9 +369,7 @@ serve(async (req) => {
       // venda entrava como 27,90 — inclusive downsell de 14,90.
       let offer = ext?.split(":")[1] === "downsell" ? "downsell" : ext ? "lifetime" : "";
       if (!offer) {
-        const { data: reg } = await supabaseAdmin.from("analytics_events")
-          .select("event_data").eq("event_name", "pix_order_created")
-          .contains("event_data", { order_id: id }).limit(1);
+        const reg = await registroDoPedido(supabaseAdmin, id, logStep); // segurança 21/10: linhas do pedido têm que concordar
         const regOffer = reg?.[0]?.event_data?.offer as string | undefined;
         if (regOffer === "downsell" || regOffer === "lifetime") offer = regOffer;
       }

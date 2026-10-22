@@ -6,6 +6,7 @@ import { pedirRastreamentoIos, segurarReservaNativaDoATT } from "@/lib/att-ios";
 import { bracoATT, camposDoATT } from "@/lib/att-momento";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
+import { rotaComFoto } from "@/lib/troca-de-rota";
 
 /**
  * WELCOME ESTILO CAL AI (10/10, chave FUNIL_CALAI em lib/funil-calai) — a tela 1 do
@@ -69,6 +70,12 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   }, []);
   const navigate = useNavigate();
   const semMovimento = useReducedMotion() === true;
+  /* 1.0.18 (QA de aparelho 21/10): voltando do /entrar ("Ainda não tem conta? Monte seu plano") a foto do Entrar saía em
+   * cima de uma welcome AINDA VAZIA (frase, prova e botão entrando com atraso; o vídeo começa em branco) — 1 a 3 quadros
+   * de tela branca. Chegando por troca de rota (a foto da tela anterior está por cima), frase, prova e botão já entram
+   * prontos; só a abertura a frio (o app abrindo) mantém a entrada animada. */
+  const [entrouPorTroca] = useState(rotaComFoto);
+  const semEntrada = semMovimento || entrouPorTroca;
   const [videoFalhou, setVideoFalhou] = useState(false);
   /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
    * O iOS bloqueia <video> no WebView com pouca energia (o Cal AI é nativo, por isso roda lá), mas NÃO bloqueia imagem
@@ -173,7 +180,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
         <motion.div
           ref={palcoRef}
           className="wca-palco"
-          initial={semMovimento ? false : { opacity: 0 }}
+          initial={semEntrada ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
@@ -209,10 +216,10 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
         </motion.div>
 
         <div className="wca-corpo">
-          <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.4 }}>
+          <motion.h1 initial={semEntrada ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.4 }}>
             {promessa}
           </motion.h1>
-          <motion.p className="wca-prova" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45, duration: 0.4 }}>
+          <motion.p className="wca-prova" initial={semEntrada ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45, duration: 0.4 }}>
             <span className="wca-st">★★★★★</span> <b>+1000 pessoas</b> organizando a vida
           </motion.p>
         </div>
@@ -220,7 +227,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
         {/* 10/10 (dono): o BotaoDoFunil (56 px, 12 px de margem, colado embaixo + safe-area), rendendo no
             fluxo (a welcome já é uma camada fixa). Só aqui o link secundário fica ABAIXO do botão —
             "não tem problema mudar o botão só na 1ª página". */}
-        <motion.div className="wca-rodape" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.4 }}>
+        <motion.div className="wca-rodape" initial={semEntrada ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.4 }}>
           {veioDoSite && (
             <div className="wca-aviso" data-testid="welcome-veio-do-site">
               Você já comprou pelo site? <b>Entra com o mesmo e-mail</b> — não precisa pagar de novo.

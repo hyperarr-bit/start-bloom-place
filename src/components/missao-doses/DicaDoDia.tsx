@@ -17,6 +17,8 @@ import { eventoDaMissao } from "@/lib/missao-doses";
  *     existe. Ela aponta pro que existe: o widget dentro do app.)
  * Sem o alvo na tela (Home diferente), o balão aparece embaixo, solto.
  */
+/** o máximo que o balão espera a posição assentar antes de aparecer (1.0.18) */
+export const ASSENTAR_MAX_MS = 1500;
 const ALVOS: Record<2 | 3, string> = { 2: '[data-tour="score"]', 3: '[data-tour="adicionar-widget"]' };
 
 export function textoDaDica(dia: 2 | 3, scoreAntes?: number | null, scoreAgora?: number | null): { titulo: string; texto: string } {
@@ -42,15 +44,28 @@ export function DicaDoDia({ dia, aoFechar, aoVer, scoreAntes }: {
   // o texto é decidido UMA vez (o número não pula enquanto ela lê)
   const [t] = useState(() => textoDaDica(dia, scoreAntes, dados.dayScore));
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const [pronto, setPronto] = useState(false);
   useEffect(() => {
     const vez = aoVer?.();
     trackEvent("missao_dica_dia", eventoDaMissao({ dia, acao: "view", score_antes: scoreAntes ?? null, score_agora: Math.round(dados.dayScore ?? 0), ...(typeof vez === "number" ? { vez } : {}) }));
     const el = document.querySelector(ALVOS[dia]);
     try { (el as HTMLElement | null)?.scrollIntoView?.({ block: "center", behavior: reduzir ? "auto" : "smooth" }); } catch { /* jsdom */ }
-    const medir = () => { const e = document.querySelector(ALVOS[dia]); setRect(e ? e.getBoundingClientRect() : null); };
-    const id = window.setTimeout(medir, 400);
-    const relogio = window.setInterval(medir, 500); // a rolagem suave termina depois: segue o alvo
-    return () => { window.clearTimeout(id); window.clearInterval(relogio); };
+    /* 1.0.18 (QA de aparelho 21/10): o balão nascia EMBAIXO (sem medida ainda = "sem alvo"), em cima da grade de
+     * módulos, e ~0,4–1,3 s depois pulava pro score — quem tocava no "Entendi" nesse pulo acertava o módulo de baixo
+     * (o véu deixa o toque passar) e abria o Treino. Agora ele só aparece quando a posição ASSENTOU (2 medidas iguais,
+     * depois da rolagem suave) ou, no máximo, em 1,5 s; sem alvo, aí sim embaixo. Depois segue o alvo como antes. */
+    const inicio = Date.now();
+    let ultimo: string | null = null;
+    const medir = () => {
+      const e = document.querySelector(ALVOS[dia]);
+      const r = e ? e.getBoundingClientRect() : null;
+      setRect(r);
+      const chave = r ? `${Math.round(r.top)}:${Math.round(r.left)}` : "sem";
+      if (chave === ultimo || Date.now() - inicio >= ASSENTAR_MAX_MS) setPronto(true);
+      ultimo = chave;
+    };
+    const relogio = window.setInterval(medir, 150);
+    return () => { window.clearInterval(relogio); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -58,9 +73,9 @@ export function DicaDoDia({ dia, aoFechar, aoVer, scoreAntes }: {
   const cabeAbaixo = rect ? rect.bottom + 12 + ALTURA <= vh - 8 : true;
   const top = rect ? (cabeAbaixo ? rect.bottom + 12 : Math.max(8, rect.top - ALTURA - 12)) : vh - 220;
   return createPortal(
-    <motion.div className="fixed inset-0 z-[220] pointer-events-none" data-camada-guia="missao-dica" data-testid="missao-dica" data-dia={dia} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      {rect && <div className="absolute rounded-2xl pointer-events-none" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 2px #fff, 0 0 0 9999px rgba(15,12,20,.45)" }} />}
-      <div className="absolute left-1/2 -translate-x-1/2 w-[92%] max-w-[340px] pointer-events-auto rounded-2xl bg-accent text-accent-foreground px-4 py-3.5 shadow-2xl" style={{ top }} role="dialog" aria-label={t.titulo}>
+    <motion.div className="fixed inset-0 z-[220] pointer-events-none" data-camada-guia="missao-dica" data-testid="missao-dica" data-dia={dia} data-pronto={pronto ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: pronto ? 1 : 0 }}>
+      {pronto && rect && <div className="absolute rounded-2xl pointer-events-none" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12, boxShadow: "0 0 0 2px #fff, 0 0 0 9999px rgba(15,12,20,.45)" }} />}
+      <div className={`absolute left-1/2 -translate-x-1/2 w-[92%] max-w-[340px] ${pronto ? "pointer-events-auto" : "pointer-events-none invisible"} rounded-2xl bg-accent text-accent-foreground px-4 py-3.5 shadow-2xl`} style={{ top }} role="dialog" aria-label={t.titulo}>
         <p className="text-[16px] font-bold leading-tight" data-testid="missao-dica-titulo">{t.titulo}</p>
         <p className="text-[13px] leading-snug opacity-90 mt-1">{t.texto}</p>
         <button type="button" className="mt-3 w-full h-10 rounded-full text-[14px] font-extrabold bg-white text-accent" data-testid="missao-dica-entendi"

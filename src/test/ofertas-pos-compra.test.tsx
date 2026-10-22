@@ -136,11 +136,11 @@ afterEach(() => { cleanup(); _zerarBack(); _forcarOfertaHoje(null); window.histo
 
 /* ---------------------------------------------------------------- a chave */
 describe("a chave central OFERTAS_POS_COMPRA", () => {
-  it("padrão 'off': as chaves dos ramos saem dela (presente off, 2027 off)", () => {
-    expect(OFERTAS_POS_COMPRA).toBe("off");
+  it("LIGADA em '2027' (dono 22/10): as chaves dos ramos saem dela (presente off, 2027 on)", () => {
+    expect(OFERTAS_POS_COMPRA).toBe("2027");
     expect(UPSELL_PRESENTE).toBe("off");
-    expect(UPSELL_2027).toBe(false);
-    expect(modoOfertas("")).toBe("off");
+    expect(UPSELL_2027).toBe(true);
+    expect(modoOfertas("")).toBe("2027");
   });
 
   it("?ofertas=2027|presente|off fica no navegador; valor estranho não mexe", () => {
@@ -208,8 +208,8 @@ describe("proximoPosCompra — a ordem das ofertas", () => {
 
 /* ---------------------------------------------------------------- /hoje de ponta a ponta */
 describe("/hoje com as ofertas", () => {
-  it("off: pagou o vitalício → pós-compra direto; nenhuma tela nem evento das ofertas", async () => {
-    await pagarVitalicio("");
+  it("?ofertas=off: pagou o vitalício → pós-compra direto; nenhuma tela nem evento das ofertas", async () => {
+    await pagarVitalicio("&ofertas=off");
     await waitFor(() => expect(etapa()).toBe("pago"));
     expect(eventosQueComecam("u2027_")).toHaveLength(0);
     expect(eventosQueComecam("presente_")).toHaveLength(0);

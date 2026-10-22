@@ -54,8 +54,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 
 describe("/inicio — o Seu 2027 no 'Pagamento confirmado'", () => {
-  it("chave OFF (padrão): a confirmação de sempre com as lojas; o 2027 não aparece", async () => {
-    window.history.replaceState(null, "", "/inicio");
+  it("?ofertas=off: a confirmação de sempre com as lojas; o 2027 não aparece", async () => {
+    window.history.replaceState(null, "", "/inicio?ofertas=off");
     abrir();
     await confirmou();
     await waitFor(() => expect(screen.getByTestId("pix-confirmado-lojas")).toBeInTheDocument());

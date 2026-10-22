@@ -135,14 +135,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); irPara("/"); _forcarOfertaHoje(null); });
 
 describe("a chave (padrão OFF)", () => {
-  it("UPSELL_2027 = false; ?up2027=on liga neste navegador e ?up2027=off desliga", () => {
-    expect(UPSELL_2027).toBe(false);
-    expect(upsell2027Ligado("")).toBe(false);
-    expect(upsell2027Ligado("?up2027=on")).toBe(true);
+  it("UPSELL_2027 = true (ligada 22/10); ?up2027=off desliga neste navegador e ?up2027=on liga", () => {
+    expect(UPSELL_2027).toBe(true);
     expect(upsell2027Ligado("")).toBe(true);
-    expect(localStorage.getItem("up2027-force")).toBe("on");
     expect(upsell2027Ligado("?up2027=off")).toBe(false);
     expect(upsell2027Ligado("")).toBe(false);
+    expect(localStorage.getItem("up2027-force")).toBe("off");
+    expect(upsell2027Ligado("?up2027=on")).toBe(true);
+    expect(upsell2027Ligado("")).toBe(true);
   });
   it("o preço bate com o servidor (R$ 19,90 = 1990)", () => {
     expect(VALOR_OFERTA.u2027).toBe(19.9);
@@ -160,8 +160,8 @@ describe("a chave (padrão OFF)", () => {
     const anualSemPraSempre = { pagos: [{ oferta: "h279" as const, orderId: "y", em: 0 }], recusou: ["hv47" as const, "hv27" as const], parceiro: null };
     expect(proximoPosCompra(anualSemPraSempre, false, "2027")).toBe("pago");
   });
-  it("/hoje com a chave OFF: pagou o vitalício → DIRETO pro pós-compra; nenhum evento nem tela do 2027", async () => {
-    await pagarVitalicio("/hoje?funil-hoje=on&utm_source=meta");
+  it("/hoje com ?ofertas=off: pagou o vitalício → DIRETO pro pós-compra; nenhum evento nem tela do 2027", async () => {
+    await pagarVitalicio("/hoje?funil-hoje=on&utm_source=meta&ofertas=off");
     await waitFor(() => expect(etapa()).toBe("pago"));
     expect(screen.queryByTestId("u2027-oferta")).toBeNull();
     expect(vi.mocked(trackEvent).mock.calls.some((c) => String(c[0]).startsWith("u2027_"))).toBe(false);

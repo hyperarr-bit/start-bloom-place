@@ -3,7 +3,7 @@
  * Uma camada por vez — a próxima só aparece quando a anterior terminou:
  *   · ?ofertas=2027: 2027 → Agora não → plano de 30 dias → lojas · 2027 pago → lojas (sem plano de 30 dias); presente nunca
  *   · ?ofertas=presente: presente (com o plano de 30 dias dentro) → lojas; 2027 nunca
- *   · off (padrão): a confirmação de sempre com as lojas, nada das ofertas
+ *   · off (?ofertas=off; a chave está em "2027" desde 22/10): a confirmação de sempre com as lojas, nada das ofertas
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -57,8 +57,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 
 describe("/inicio — a ordem das ofertas no 'Pagamento confirmado'", () => {
-  it("off (padrão): a confirmação de sempre com as lojas; nenhuma camada nem evento das ofertas", async () => {
-    window.history.replaceState(null, "", "/inicio");
+  it("?ofertas=off: a confirmação de sempre com as lojas; nenhuma camada nem evento das ofertas", async () => {
+    window.history.replaceState(null, "", "/inicio?ofertas=off");
     abrir();
     await confirmou();
     await waitFor(() => expect(screen.getByTestId("pix-confirmado-lojas")).toBeInTheDocument());

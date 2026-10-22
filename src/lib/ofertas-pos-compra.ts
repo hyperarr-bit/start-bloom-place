@@ -17,7 +17,7 @@
  */
 export type ModoOfertas = "off" | "presente" | "2027";
 /** A CHAVE. "off" = os funis ficam byte a byte como antes. */
-export const OFERTAS_POS_COMPRA: ModoOfertas = "off";
+export const OFERTAS_POS_COMPRA: ModoOfertas = "2027";
 
 export const PARAM_QA_OFERTAS = "ofertas";
 /** Fora do prefixo core-* de propósito (a vassoura do cache não mexe; é do aparelho, como o presente-force). */
@@ -73,7 +73,8 @@ export function modoOfertas(busca: string = typeof window === "undefined" ? "" :
     if (pr === "on" || pr === "off") {
       gravar(FORCA_PRESENTE.chave, pr);
       esquecer(CHAVE_FORCA_OFERTAS);
-      if (pr === "on" && up !== "on") esquecer(FORCA_2027.chave);
+      // "on" = presente AQUI, mesmo com a chave central em "2027" (só esquecer a força do 2027 cairia na central)
+      if (pr === "on" && up !== "on") gravar(FORCA_2027.chave, "off");
     }
   }
   const forcaCentral = ler(CHAVE_FORCA_OFERTAS);

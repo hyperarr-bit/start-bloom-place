@@ -196,8 +196,8 @@ describe("a chave (padrão OFF)", () => {
     const anualSemPraSempre = { pagos: [{ oferta: "h279" as const, orderId: "y", em: 0 }], recusou: ["hv47" as const, "hv27" as const], parceiro: null };
     expect(proximoPosCompra(anualSemPraSempre, false, "presente")).toBe("pago");
   });
-  it("/hoje com a chave OFF: pagou o vitalício → DIRETO pro pós-compra; nenhum evento nem tela do presente", async () => {
-    await pagarVitalicio("/hoje?funil-hoje=on&utm_source=meta");
+  it("/hoje com ?ofertas=off: pagou o vitalício → DIRETO pro pós-compra; nenhum evento nem tela do presente", async () => {
+    await pagarVitalicio("/hoje?funil-hoje=on&utm_source=meta&ofertas=off");
     await waitFor(() => expect(etapa()).toBe("pago"));
     expect(screen.queryByTestId("presente-oferta")).toBeNull();
     expect(vi.mocked(trackEvent).mock.calls.some((c) => String(c[0]).startsWith("presente_") || String(c[0]).startsWith("plano30_"))).toBe(false);

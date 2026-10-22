@@ -84,7 +84,8 @@ import { VALORES_VENDA } from "../../supabase/functions/_shared/venda-capi";
 /* ---------------------------------------------------------------- ambiente */
 const irPara = (url: string) => window.history.replaceState({}, "", url);
 const montar = (url = "/hoje?funil-hoje=on&utm_source=meta&utm_campaign=hoje&fbclid=IwAR_x") => {
-  irPara(url);
+  // as ofertas depois do Pix (ligadas em "2027" desde 22/10) têm teste próprio em ofertas-pos-compra.test.tsx
+  irPara(url.includes("ofertas=") ? url : `${url}${url.includes("?") ? "&" : "?"}ofertas=off`);
   return render(
     <MemoryRouter initialEntries={["/hoje"]}>
       <Routes>

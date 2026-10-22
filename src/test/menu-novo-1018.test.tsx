@@ -186,6 +186,31 @@ describe("o menu novo: 3 grupos + Sair", () => {
       cleanup();
     }
   });
+  it("revisor 22/10: 'Plano de 30 dias' só com a compra do plano de OUTRA área (no fim do grupo você); toque leva pro /plano-30", () => {
+    // sem compra: o item não existe
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // comprou o de Dinheiro: mora na aba KIT 30 DIAS de Finanças, não no menu
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: true, area: "dinheiro" } };
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // valor estranho (sem comprado === true) não libera
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: "sim", area: "rotina" } };
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // comprou o de Rotina: aparece em "você", com o rótulo, e leva pro plano
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: true, area: "rotina", em: "2026-10-21T12:00:00Z" } };
+    eventos.length = 0;
+    montarMenu();
+    expect(ids(screen.getByTestId("menu-grupo-voce"))).toEqual(["conta", "plano", "conquistas", "plano30"]);
+    expect(screen.getByTestId("menu-plano30").textContent).toMatch(/Plano de 30 dias/);
+    fireEvent.click(screen.getByTestId("menu-plano30"));
+    expect(dos("menu_item_click")).toEqual([{ item: "plano30", grupo: "voce", menu: "novo" }]);
+    expect(screen.getByTestId("onde").textContent).toBe("/plano-30");
+  });
   it("Minha conta abre a sub-tela da conta; Privacidade e termos abre as duas páginas", () => {
     montarMenu();
     fireEvent.click(screen.getByTestId("menu-conta"));
@@ -334,6 +359,35 @@ describe("o aviso único (tema fora do padrão quando o menu novo aparece)", () 
     document.documentElement.removeAttribute("data-missao-dose");
     await esperar(1100);
     expect(screen.getByTestId("aviso-menu-novo")).toBeTruthy();
+  });
+
+  it("revisor 22/10: a tela/card de cobrança recusada (role=alertdialog) por cima — espera ela sair, só então aparece e conta", async () => {
+    localStorage.setItem("core-theme-mode", "dark");
+    const recusa = document.createElement("div");
+    recusa.setAttribute("role", "alertdialog");
+    document.body.appendChild(recusa);
+    montar(<GreetingHeader data={lifeData} />);
+    await esperar(4000);
+    expect(screen.queryByTestId("aviso-menu-novo")).toBeNull();
+    expect(localStorage.getItem(CHAVE_AVISO_MENU_NOVO)).toBeNull();
+    expect(dos("menu_novo_aviso_visto")).toHaveLength(0);
+    recusa.remove();
+    await esperar(1100);
+    expect(screen.getByTestId("aviso-menu-novo")).toBeTruthy();
+    expect(localStorage.getItem(CHAVE_AVISO_MENU_NOVO)).toBe("visto");
+  });
+
+  it("revisor 22/10: uma folha que entra por cima do balão já na tela tira o balão na hora (nunca fica escondido por baixo)", async () => {
+    localStorage.setItem("core-theme-mode", "dark");
+    montar(<GreetingHeader data={lifeData} />);
+    await esperar(1300);
+    expect(screen.getByTestId("aviso-menu-novo").hasAttribute("data-aviso-menu-novo")).toBe(true); // a missão enxerga o balão por isto
+    const folha = document.createElement("div");
+    folha.setAttribute("role", "alertdialog");
+    document.body.appendChild(folha);
+    await esperar(400);
+    expect(screen.queryByTestId("aviso-menu-novo")).toBeNull();
+    folha.remove();
   });
 
   it("chave off: nada de aviso (e nada gravado — vale quando o menu novo aparecer)", async () => {

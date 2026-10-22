@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { entrada, MOV, MOV_MS, saida, saidaCalmaDe, saidaCalmaDaTela } from "@/lib/movimento";
-import { EVENTO_INTRO_FIM, introVistaNaConta, introVistaNesteAparelho, marcarIntroVista, porQueNaoMostrar, type FimDaIntro } from "@/lib/intro-modulo";
+import { EVENTO_INTRO_FIM, introNaTela, introVistaNaConta, introVistaNesteAparelho, marcarIntroVista, porQueNaoMostrar, type FimDaIntro } from "@/lib/intro-modulo";
 import { guardarForcaDias23 } from "@/lib/dias23";
 import { porDiaDasFinancas } from "@/lib/lembrete-dia2";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
@@ -175,8 +175,10 @@ export function nomeDaPessoa(daConta: unknown, userMetadata?: unknown): string {
 /** O CustomEvent da janela quando a missão fica completa (o tour da Home escuta). Mora em lib/missao-doses. */
 export { EVENTO_MISSAO_COMPLETA };
 
-/** Outra festa/folha na tela (adesivo dos Momentos, diálogo)? A folha do plano espera ela sair. */
-const FESTA_NA_TELA = '[data-momento], [role="dialog"]:not([data-testid="plano-amanha"]), [role="alertdialog"], [data-camada-guia="tour-home"]';
+/** Outra festa/folha na tela (adesivo dos Momentos, diálogo)? A folha do plano espera ela sair. 1.0.18 (revisor 22/10):
+ *  o balão "Modo escuro e cores agora ficam aqui no menu" (GreetingHeader, ~8 s) também — a escolha do dia 2, o resumo
+ *  do dia 3 e as outras folhas da missão esperam ele sair, em vez de cobri-lo (ele já conta como visto ao aparecer). */
+const FESTA_NA_TELA = '[data-momento], [role="dialog"]:not([data-testid="plano-amanha"]), [role="alertdialog"], [data-camada-guia="tour-home"], [data-aviso-menu-novo]';
 const festaNaTela = (): boolean => { try { return !!document.querySelector(FESTA_NA_TELA); } catch { return false; } };
 
 /** A faixa do 4º passo (B): "Missão · 4 de 4 · arrumar sua Home", por cima do tour da Home. */
@@ -224,10 +226,11 @@ function Ligada() {
     if (emCurso && !pathname.startsWith(MODULOS[emCurso.modulo].rota)) setEmCurso(null);
   }, [pathname, emCurso]);
   const pendenteAgora = missao ? passoPendente(missao) : null;
-  /** 1.0.18 (dias23): a intro do módulo escolhido no dia 2 ainda vai rodar (não vista) — é ela a dose 2 */
+  /** 1.0.18 (dias23): a intro do módulo escolhido no dia 2 ainda vai rodar (não vista) ou ESTÁ na tela (a 2ª aparição,
+   *  retomada, já grava "vista" ao montar — revisor 22/10) — é ela a dose 2; o fim dela grava a dose (feita/pulada) */
   const introDaEscolhaNaVez = (m: EstadoMissaoDoses, modulo: ModuloDaMissao): boolean => {
     if (!introEhADoseDoDia2(m, modulo)) return false;
-    try { return !introVistaNesteAparelho(modulo) && !introVistaNaConta(modulo, get); } catch { return true; }
+    try { return introNaTela(modulo) || (!introVistaNesteAparelho(modulo) && !introVistaNaConta(modulo, get)); } catch { return true; }
   };
   const aprofundar = missao && missao.boasVindas ? aprofundarPendente(missao, pathname, hoje) : null;
   type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar"; retomar?: boolean };

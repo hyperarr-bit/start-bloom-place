@@ -84,6 +84,10 @@ const usarOApp = () => {
     // 1.0.18 (mensal 19,90): quando o card apareceu, o 2º degrau já visto pra esta recusa, as respostas remotas, o braço dos motivos e as forças
     ["core-card-recusa-visto-em", "1792000000000"], ["core-recusa-degrau2-visto", "2026-10-20T10:00:00Z"], ["core-recusa-degrau2", "on"],
     ["core-motivos-folha", "ab"], ["core-motivos-braco", "com"], ["recusa-degrau2-force", "on"], ["motivos-folha-force", "ab"],
+    // 1.0.18 (revisor 22/10): a tela do sino (vista, braço, resposta remota, força de QA) e o menu novo (resposta remota,
+    // o balão único já visto, força de QA) — tudo do aparelho
+    ["core-sino-visto", "2026-10-20T10:00:00Z"], ["core-sino-braco", "com"], ["core-sino-paywall", "ab"], ["sino-paywall-force", "on"],
+    ["core-menu-novo", "todos"], ["core-menu-novo-aviso", "visto"], ["menu-novo-force", "todos"],
   ] as const) localStorage.setItem(k, v);
   // dado da CONTA (cache do user_data) e chaves antigas sem namespace: a vassoura leva
   localStorage.setItem("u:u1:finance-expenses", JSON.stringify([{ id: 1 }]));
@@ -105,7 +109,8 @@ const esperarTudoVisto = () => {
     "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas", "core-att-momento", "core-att-braco",
     "conquistas2-force", "core-festas-mostradas", "core-card-recusa-visto", "core-card-recusa", "card-recusa-force", "core-dias23", "dias23-force",
     "core-avaliacao-convite-teste-dia2", "core-avaliacao-teste-dia2", "avaliacao-teste-dia2-force",
-    "core-card-recusa-visto-em", "core-recusa-degrau2-visto", "core-recusa-degrau2", "core-motivos-folha", "core-motivos-braco", "recusa-degrau2-force", "motivos-folha-force"]) {
+    "core-card-recusa-visto-em", "core-recusa-degrau2-visto", "core-recusa-degrau2", "core-motivos-folha", "core-motivos-braco", "recusa-degrau2-force", "motivos-folha-force",
+    "core-sino-visto", "core-sino-braco", "core-sino-paywall", "sino-paywall-force", "core-menu-novo", "core-menu-novo-aviso", "menu-novo-force"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
   const missao = JSON.parse(localStorage.getItem("missao-doses")!);

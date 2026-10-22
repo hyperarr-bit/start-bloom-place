@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import {
-  INTROS, avisarFimDaIntro, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, retomadaDaIntro,
+  INTROS, avisarFimDaIntro, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroNaTela, marcarIntroVista, montarNaTela, porQueNaoMostrar, retomadaDaIntro,
   type FimDaIntro, type IntroDeUmToqueConfig, type Leitor, type RetomadaDaIntro,
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
@@ -64,6 +64,10 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   const getRef = useRef(get); getRef.current = get;
   const setRef = useRef(set); setRef.current = set;
   const abertaTratada = useRef(false);
+  /** esta é a 2ª aparição (a última): já está gravada como vista "pulada" desde que montou */
+  const ultimaAparicao = useRef(false);
+  /** a intro sai da tela só pra esperar o Montar (vai voltar): não é saída */
+  const voltaAEsperar = useRef(false);
   /* B1 (1.0.18, QA 21/10): a 2ª aparição RETOMA no passo onde parou (Detox/Treino abandonados no passo 2 depois de o
    * passo 1 gravar o hábito/treino nunca voltavam; Casa sem dado voltava do começo e repetia a pergunta) */
   const retomada = useRef<RetomadaDaIntro | null>(null);
@@ -104,10 +108,13 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     }
     const outraGuia = outraGuiaAtiva(moduleId, getRef.current);
     if (porQueNaoMostrar(moduleId, leitorDaDecisao, { outraGuiaAtiva: outraGuia }) !== null) { setEstado("nada"); return; }
+    // ANTES de gravar "vista" (a 2ª aparição grava ao montar): quem lê a marca sabe que ela ainda está na tela
+    marcarIntroNaTela(moduleId, true);
     if (!abertaTratada.current) {
       abertaTratada.current = true;
       if (introAbertaNesteAparelho(moduleId)) {
         // 2ª aparição: a última — e retoma onde parou (a guiada com a 1ª ação feita segue nos passos de 1 toque)
+        ultimaAparicao.current = true;
         retomada.current = retomadaDaIntro(moduleId);
         marcarIntroVista(moduleId, getRef.current, setRef.current, "pulada");
         if (config?.formato === "guiada" && retomada.current && retomada.current.passo >= 2) setContinuacao({ rotulos: retomada.current.rotulos });
@@ -129,7 +136,13 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     document.addEventListener("visibilitychange", aoEsconder);
     return () => {
       document.removeEventListener("visibilitychange", aoEsconder);
+      marcarIntroNaTela(moduleId, false);
       if (!terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: motivoDaSaida.current });
+      /* 1.0.18 (revisor 22/10): a ÚLTIMA aparição saiu sem "Pronto"/"Agora não" (voltou, outra tela, outra guia) — ela
+         já está gravada como pulada e não volta mais: avisa o fim como "pulada" (a missão grava a dose 2 pulada, em vez
+         de montar o passo guiado na próxima entrada do mesmo dia) */
+      if (!terminou.current && ultimaAparicao.current && !voltaAEsperar.current) { terminou.current = true; avisarFimDaIntro(moduleId, "pulada"); }
+      voltaAEsperar.current = false;
     };
   }, [estado, moduleId]);
 
@@ -139,7 +152,7 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     if (estado !== "visivel") return;
     const conferir = () => {
       try {
-        if (montar && montarNaTela(montar)) { setEstado("decidindo"); return; }
+        if (montar && montarNaTela(montar)) { voltaAEsperar.current = true; setEstado("decidindo"); return; }
         if (doseNaTela() || document.querySelector(OUTRA_GUIA)) { motivoDaSaida.current = "outra_guia"; setEstado("nada"); }
       } catch { /* noop */ }
     };

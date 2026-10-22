@@ -89,6 +89,12 @@ const getContextualMessage = (data: LifeHubData, copoMl: number = COPO_ML_PADRAO
   return "Hora de descansar. Amanhã é uma nova chance ✨";
 };
 
+/** 1.0.18: algo por cima do balão do menu novo? Camada guiada (tour, missão, festa…), folha (dialog) ou a tela/card de
+ *  cobrança recusada (alertdialog). */
+const algoPorCimaDoAviso = (): boolean => {
+  try { return lerTela().camadaPorCima || !!document.querySelector('[role="dialog"], [role="alertdialog"]'); } catch { return true; }
+};
+
 export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: GreetingHeaderProps) => {
   const { user } = useAuth();
   const { get, set: setUserData } = useUserData();
@@ -114,8 +120,8 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
     let tentativas = 0;
     let fim: ReturnType<typeof setTimeout> | undefined;
     const tentar = (): boolean => {
-      const { camadaPorCima } = lerTela();
-      if (camadaPorCima || document.querySelector('[role="dialog"]')) return false;
+      // 1.0.18 (revisor 22/10): também a tela cheia de cobrança recusada e o card de recusa (role="alertdialog")
+      if (algoPorCimaDoAviso()) return false;
       if (consumirAvisoMenuNovo(mode, palette)) {
         setAviso(true);
         trackEvent("menu_novo_aviso_visto", { modo: mode, paleta: palette });
@@ -132,6 +138,14 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
     // o tema de quando a Home abriu é o que decide (trocar de tema depois não reabre a pergunta)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuNovo, comAbas, !!user]);
+
+  /* se uma folha/camada entra por cima enquanto o balão está na tela (as duas decidiram no mesmo instante), o balão sai
+     na hora — nunca fica escondido por baixo */
+  useEffect(() => {
+    if (!aviso) return;
+    const id = setInterval(() => { if (algoPorCimaDoAviso()) setAviso(false); }, 300);
+    return () => clearInterval(id);
+  }, [aviso]);
 
   const abrirMenu = (via: "avatar" | "aviso") => {
     trackEvent("account_drawer_open", menuNovo ? { via, menu: "novo" } : { via });
@@ -224,6 +238,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
               transition={{ duration: 0.2 }}
               className="absolute right-0 top-full mt-2.5 z-50 w-[15.5rem] rounded-xl px-3.5 py-2.5 text-left text-[12.5px] leading-snug shadow-lg bg-foreground text-background"
               data-testid="aviso-menu-novo"
+              data-aviso-menu-novo=""
               aria-live="polite"
             >
               {/* a setinha aponta pro avatar */}

@@ -269,7 +269,7 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
   const passosDaGuiada = config.tipo === "habito" ? 3 : 2;
   const totalDePassos = passosDaGuiada + (config.maisPassos?.length ?? 0);
   const passoAtual = fase === "olhar" ? passosDaGuiada : subPasso === "marcar" ? 2 : 1;
-  useEffect(() => { marcarPassoDaIntro(m, passoAtual); }, [m, passoAtual]);
+  useEffect(() => { marcarPassoDaIntro(m, passoAtual, rotulo ? [rotulo] : []); }, [m, passoAtual, rotulo]); // + o aparelho (B1: retomada)
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-passo={passoAtual} style={{ background: config.cor.faixa, color: config.cor.tinta }} onClick={toqueNaFaixa} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : fase === "olhar" ? "olhe aqui" : config.pedido}</span>

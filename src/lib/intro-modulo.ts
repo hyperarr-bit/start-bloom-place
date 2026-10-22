@@ -128,9 +128,14 @@ export function introLigada(modo: ModoIntro = INTRO_MODULO, modoApp: ModoIntro =
   return modo === "on";
 }
 
-/* ───── 1.0.17: o passo da intro NA TELA (pro `modulo_intro_saiu`: a intro saiu sem "Pronto" nem "Agora não") ───── */
+/* ───── 1.0.17: o passo da intro NA TELA (pro `modulo_intro_saiu`: a intro saiu sem "Pronto" nem "Agora não") ─────
+ * 1.0.18: o passo (e o que já entrou) também fica no aparelho, junto da marca "aberta" — é por ele que a 2ª aparição
+ * RETOMA onde parou (ver `retomadaDaIntro`). */
 let passoNaTela: { modulo: string; passo: number } | null = null;
-export const marcarPassoDaIntro = (modulo: string, passo: number): void => { passoNaTela = { modulo, passo }; };
+export const marcarPassoDaIntro = (modulo: string, passo: number, rotulos?: string[]): void => {
+  passoNaTela = { modulo, passo };
+  anotarRetomadaDaIntro(modulo, passo, rotulos);
+};
 export const passoDaIntroNaTela = (modulo: string): number | null => (passoNaTela?.modulo === modulo ? passoNaTela.passo : null);
 
 /* ───── marcas: aparelho e conta ───── */
@@ -141,7 +146,35 @@ export const introVistaNesteAparelho = (moduleId: string): boolean => !!ls.get(c
 /** O valor guarda o desfecho: "feita@<iso>", "pulada@<iso>" ou "dose@<iso>". */
 export const marcarIntroVistaNoAparelho = (moduleId: string, como: FimDaIntro = "feita"): void => ls.set(chaveIntroVista(moduleId), `${como}@${new Date().toISOString()}`);
 export const introAbertaNesteAparelho = (moduleId: string): boolean => !!ls.get(chaveIntroAberta(moduleId));
-export const marcarIntroAbertaNoAparelho = (moduleId: string): void => ls.set(chaveIntroAberta(moduleId), new Date().toISOString());
+/**
+ * 1.0.18: o valor da marca "aberta" é `{ em, passo, rotulos }` — quando a intro apareceu, em que passo ela estava
+ * (1-based, o `numero` da faixa) e o que já tinha entrado. Versões antigas gravavam só o ISO: vale como "aberta, sem
+ * retomada" (volta do começo, como antes).
+ */
+export interface RetomadaDaIntro { passo: number; rotulos: string[] }
+export const marcarIntroAbertaNoAparelho = (moduleId: string): void => ls.set(chaveIntroAberta(moduleId), JSON.stringify({ em: new Date().toISOString() }));
+const lerAberta = (moduleId: string): { em?: string; passo?: number; rotulos?: string[] } | null => {
+  const v = ls.get(chaveIntroAberta(moduleId));
+  if (!v) return null;
+  try { const j = JSON.parse(v); return j && typeof j === "object" ? j : {}; } catch { return {}; }
+};
+/** Grava o passo (e o que entrou) na marca "aberta" — só enquanto a intro ainda não terminou. Nunca lança. */
+export const anotarRetomadaDaIntro = (moduleId: string, passo: number, rotulos?: string[]): void => {
+  try {
+    const a = lerAberta(moduleId);
+    if (!a || (ls.get(chaveIntroVista(moduleId)) ?? "").startsWith("feita")) return;
+    ls.set(chaveIntroAberta(moduleId), JSON.stringify({ em: a.em ?? new Date().toISOString(), passo, rotulos: rotulos ?? a.rotulos ?? [] }));
+  } catch { /* storage bloqueado */ }
+};
+/**
+ * Onde a intro parou da última vez (B1, QA 21/10: Detox/Treino abandonados no passo 2 depois de o passo 1 gravar
+ * o hábito/treino nunca voltavam — o módulo "tinha dado"). null = nunca apareceu, ou apareceu sem passar do 1º passo.
+ */
+export const retomadaDaIntro = (moduleId: string): RetomadaDaIntro | null => {
+  const a = lerAberta(moduleId);
+  if (!a || typeof a.passo !== "number" || a.passo < 2) return null;
+  return { passo: a.passo, rotulos: Array.isArray(a.rotulos) ? a.rotulos.filter((r): r is string => typeof r === "string") : [] };
+};
 /** Só testes/dev. */
 export const _apagarIntroVista = (moduleId: string): void => { ls.del(chaveIntroVista(moduleId)); ls.del(chaveIntroAberta(moduleId)); };
 
@@ -372,6 +405,12 @@ export type IntroConfig = IntroGuiadaConfig | IntroDeUmToqueConfig;
 
 const op = (emoji: string, rotulo: string, id: string): OpcaoDaIntro => ({ emoji, rotulo, id });
 const porSeletor = (seletor: string) => (): Element | null => { try { return document.querySelector(seletor); } catch { return null; } };
+/**
+ * Treino: o quadradinho da 1ª SÉRIE do 1º exercício de HOJE (TabelaDeSeries: "Marcar a série 1 de <nome>"); sem a tabela
+ * (cardio, exercício recolhido), o 1º "Marcar <nome>" do HOJE — nunca o "Marcar o treino de ontem/anteontem" do Esqueceu?.
+ * UM seletor pros 3 lugares que apontam pra ele (o passo 2 da intro, acenderPrimeiroExercicio e o EscolherTreino da missão).
+ */
+export const SELETOR_PRIMEIRA_SERIE_DE_HOJE = '[data-testid="treino-hoje"] button[aria-label^="Marcar a série 1"], [data-testid="treino-hoje"] button[aria-label^="Marcar "]:not([aria-label*="ontem"])';
 /** A linha do formulário (campo + botão) em volta de um campo: o anel abraça ela toda. */
 const linhaDoCampo = (seletor: string) => (): Element | null => { try { const el = document.querySelector(seletor); return el?.parentElement ?? el; } catch { return null; } };
 const seletorDoCardDeHoje = '[data-spotlight="first-day"]';
@@ -492,7 +531,7 @@ export const INTROS: Record<string, IntroConfig> = {
         const feito = lista(dia.exercises).find((e) => mapa(e).done === true);
         return feito ? `${String(mapa(feito).name ?? "o 1º exercício")} feito` : null;
       } },
-      alvo: { aba: "HOJE", achar: porSeletor('[data-testid="treino-hoje"] button[aria-label^="Marcar "]') },
+      alvo: { aba: "HOJE", achar: porSeletor(SELETOR_PRIMEIRA_SERIE_DE_HOJE) },
     }, {
       // 3) a semana (dias ativos / constância, 21%)
       pedido: "olhe a sua semana", pergunta: "", opcoes: [],
@@ -907,7 +946,7 @@ export const abrirAbaDoModulo = tocarAba;
 /** Treino: acende o 1º exercício de HOJE por uns segundos (o quadradinho de marcar) — o passo depois do treino montado. */
 export function acenderPrimeiroExercicio(): void {
   try {
-    const alvo = document.querySelector<HTMLElement>('[data-testid="treino-hoje"] button[aria-label^="Marcar "], [data-testid="treino-hoje"] button[aria-label^="Abrir "]');
+    const alvo = document.querySelector<HTMLElement>(`${SELETOR_PRIMEIRA_SERIE_DE_HOJE}, [data-testid="treino-hoje"] button[aria-label^="Abrir "]`);
     if (!alvo) return;
     alvo.scrollIntoView?.({ behavior: "smooth", block: "center" });
     alvo.classList.add("im-destaque");
@@ -1024,7 +1063,9 @@ export function porQueNaoMostrar(moduleId: string, get: Leitor, extras: { outraG
   if (moduloJaApresentado(moduleId, get)) return "ja_apresentado";
   let vazio = true;
   try { vazio = config.vazio(get); } catch { vazio = true; }
-  if (!vazio && !dadoSoDaAcaoRapida(moduleId, get)) return "com_dado";
+  /* B1 (QA 21/10): a intro já APARECEU neste aparelho e não terminou → o dado do módulo veio dela mesma (o passo 1
+   * gravou o hábito/treino) — não é "conta de antes"; a 2ª aparição retoma onde parou (IntroDoModulo marca vista). */
+  if (!vazio && !dadoSoDaAcaoRapida(moduleId, get) && !introAbertaNesteAparelho(moduleId)) return "com_dado";
   if (introBloqueadaPelaMissao(moduleId)) return "missao";
   if (extras.outraGuiaAtiva) return "outra_guia";
   return null;

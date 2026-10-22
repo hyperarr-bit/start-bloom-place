@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import {
-  INTROS, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, type FimDaIntro, type Leitor,
+  INTROS, chavesDoTutorialAntigo, passoDaIntroNaTela, doseNaTela, introAbertaNesteAparelho, marcarIntroAbertaNoAparelho, marcarIntroVista, montarNaTela, porQueNaoMostrar, retomadaDaIntro,
+  type FimDaIntro, type IntroDeUmToqueConfig, type Leitor, type RetomadaDaIntro,
 } from "@/lib/intro-modulo";
 import { missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { IntroGuiada } from "./IntroGuiada";
@@ -63,6 +64,9 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   const getRef = useRef(get); getRef.current = get;
   const setRef = useRef(set); setRef.current = set;
   const abertaTratada = useRef(false);
+  /* B1 (1.0.18, QA 21/10): a 2ª aparição RETOMA no passo onde parou (Detox/Treino abandonados no passo 2 depois de o
+   * passo 1 gravar o hábito/treino nunca voltavam; Casa sem dado voltava do começo e repetia a pergunta) */
+  const retomada = useRef<RetomadaDaIntro | null>(null);
   /** o montar do módulo acabou de terminar com "pronto" (a intro guiada muda o pedido) */
   const depoisDoMontar = useRef(false);
   const montar = config?.montar;
@@ -102,8 +106,12 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
     if (porQueNaoMostrar(moduleId, leitorDaDecisao, { outraGuiaAtiva: outraGuia }) !== null) { setEstado("nada"); return; }
     if (!abertaTratada.current) {
       abertaTratada.current = true;
-      if (introAbertaNesteAparelho(moduleId)) marcarIntroVista(moduleId, getRef.current, setRef.current, "pulada"); // 2ª aparição: a última
-      else marcarIntroAbertaNoAparelho(moduleId);
+      if (introAbertaNesteAparelho(moduleId)) {
+        // 2ª aparição: a última — e retoma onde parou (a guiada com a 1ª ação feita segue nos passos de 1 toque)
+        retomada.current = retomadaDaIntro(moduleId);
+        marcarIntroVista(moduleId, getRef.current, setRef.current, "pulada");
+        if (config?.formato === "guiada" && retomada.current && retomada.current.passo >= 2) setContinuacao({ rotulos: retomada.current.rotulos });
+      } else marcarIntroAbertaNoAparelho(moduleId);
     }
     setEstado("visivel");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,14 +154,20 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   // 17/10 (dono: "tipo Finanças, que tem vários"): a guiada faz a 1ª ação e o "olha"; os passos seguintes (config.maisPassos)
   // rodam no motor de 1 toque, que mostra o cartão do fim com tudo o que entrou
   const maisPassos = config.formato === "guiada" ? config.maisPassos : undefined;
+  /** os passos de 1 toque a partir de `base` passos anteriores — retomando no passo gravado, quando há (B1) */
+  const deUmToque = (cfg: IntroDeUmToqueConfig, base: number, rotulos: string[]) => {
+    const r = retomada.current;
+    const corte = r ? Math.min(Math.max(0, r.passo - 1 - base), Math.max(0, cfg.passos.length - 1)) : 0;
+    return <IntroDeUmToque config={{ ...cfg, passos: cfg.passos.slice(corte) }} aoTerminar={terminar} passoInicial={base + corte} rotulosIniciais={corte && r ? r.rotulos : rotulos} />;
+  };
   return (
     <>
       {host}
       {config.formato === "guiada"
         ? (continuacao
-          ? <IntroDeUmToque config={{ ...config, formato: "toque", passos: maisPassos ?? [] }} aoTerminar={terminar} passoInicial={config.tipo === "habito" ? 3 : 2} rotulosIniciais={continuacao.rotulos} />
+          ? deUmToque({ ...config, formato: "toque", passos: maisPassos ?? [] }, config.tipo === "habito" ? 3 : 2, continuacao.rotulos)
           : <IntroGuiada config={config} aoTerminar={terminar} depoisDoMontar={depoisDoMontar.current} aoContinuar={maisPassos?.length ? (rotulo) => setContinuacao({ rotulos: rotulo ? [rotulo] : [] }) : undefined} />)
-        : <IntroDeUmToque config={config} aoTerminar={terminar} />}
+        : deUmToque(config, 0, [])}
     </>
   );
 }

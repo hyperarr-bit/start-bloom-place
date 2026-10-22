@@ -44,8 +44,11 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import {
   ATRIBUTO_MONTAR_FINANCAS, CHAVE_FORCA_INTRO, CHAVE_INTRO_FEITAS_CONTA, CHAVE_INTRO_VISTAS_CONTA, EVENTO_MONTAR_FINANCAS_FIM, INTRO_MODULO, INTRO_MODULO_APP, INTROS,
   ATRIBUTO_MONTAR_ROTINA, EVENTO_MONTAR_ROTINA_FIM, MODULOS_COM_INTRO, MODULOS_SEM_INTRO, MODULOS_SEM_NADA, MONTAR_ROTINA, OLHAR_POSSO_GASTAR, _zerarIntroRemota,
-  anotarAcaoRapida, CHAVE_INTRO_ACAO_RAPIDA, chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, montarNaTela, porQueNaoMostrar, registrarIntroRemota, semConteudo,
+  anotarAcaoRapida, CHAVE_INTRO_ACAO_RAPIDA, chaveIntroAberta, chaveIntroVista, guardarForcaDaIntro, introConcluida, introLigada, marcarPassoDaIntro, montarNaTela, porQueNaoMostrar, registrarIntroRemota, retomadaDaIntro, semConteudo,
+  SELETOR_PRIMEIRA_SERIE_DE_HOJE,
 } from "@/lib/intro-modulo";
+import { TabelaDeSeries } from "@/components/treino/TabelaDeSeries";
+import { tomDoDia } from "@/components/treino/planner";
 import { EscolherTreino } from "@/components/intro-modulo/EscolherTreino";
 import { IntroDeUmToque } from "@/components/intro-modulo/IntroDeUmToque";
 import { modeloPara } from "@/lib/intro-modulo-acoes";
@@ -384,6 +387,54 @@ describe("ligada: a porta do módulo", () => {
     expect(c.container.innerHTML).toBe("");
   });
 
+  it("B1 (1.0.18, QA 21/10): abandonada no passo 2 DEPOIS de o passo 1 gravar (Detox): volta 1 vez, NO PASSO 2, com o que entrou; terminar marca feita + modulo_intro_concluida; a 3ª não existe", { timeout: 40_000 }, async () => {
+    const hoje = localDayKey();
+    const a = montarComSet(<IntroDoModulo moduleId="detox" />);
+    expect(card()?.getAttribute("data-passo")).toBe("1");
+    await tocar(1); // Açúcar: o passo 1 grava o hábito no módulo
+    expect(a.estado.dados["detox-habits"]).toMatchObject([{ name: "Açúcar" }]);
+    await waitFor(() => expect(card()?.getAttribute("data-passo")).toBe("2"), { timeout: 3000 });
+    const marca = JSON.parse(localStorage.getItem(chaveIntroAberta("detox"))!);
+    expect(marca).toMatchObject({ passo: 2, rotulos: ["Açúcar"] });
+    const dados = a.estado.dados;
+    a.unmount(); // saiu no passo 2 (← ou fechou o app)
+    cleanup(); document.body.innerHTML = "";
+    // antes: o módulo "tinha dado" (o hábito da própria intro) → porQueNaoMostrar = com_dado → nunca mais voltava
+    expect(porQueNaoMostrar("detox", <T,>(k: string, f: T): T => (k in dados ? (dados[k] as T) : f))).toBeNull();
+
+    const b = montarComSet(<IntroDoModulo moduleId="detox" />, dados);
+    expect(card()).toBeTruthy();
+    expect(card()?.getAttribute("data-passo")).toBe("2"); // retoma onde parou: não repete "O que você quer largar?"
+    expect(card()?.textContent).toContain("faça o check-in de hoje");
+    expect(localStorage.getItem(chaveIntroVista("detox"))).toMatch(/^pulada@/); // 2ª aparição: a última
+    expect(b.estado.dados["detox-habits"]).toHaveLength(1); // nada gravado em dobro
+    // ela faz o check-in no módulo → o passo 2 registra → o "olha" (sem card no DOM: pulado) → o cartão do fim
+    act(() => { b.set("detox-habits", [{ ...(b.estado.dados["detox-habits"] as Array<Record<string, unknown>>)[0], checkins: [hoje] }]); });
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 12_000 });
+    expect(screen.getByTestId("intro-modulo-pronto").textContent).toContain("Açúcar e o check-in de hoje entraram"); // o que entrou ANTES de sair também
+    fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
+    expect(localStorage.getItem(chaveIntroVista("detox"))).toMatch(/^feita@/);
+    expect(b.estado.dados[CHAVE_INTRO_FEITAS_CONTA]).toEqual(["detox"]);
+    expect(introConcluida("detox", b.get)).toBe(true);
+    expect(eventos.filter(([n, d]) => n === "modulo_intro_concluida" && d.modulo === "detox")).toHaveLength(1);
+    b.unmount();
+    const c = montarComSet(<IntroDoModulo moduleId="detox" />, b.estado.dados);
+    expect(c.container.innerHTML).toBe("");
+  });
+
+  it("B1: a marca 'aberta' antiga (só o ISO) e a do passo 1 não retomam (volta do começo, como antes); com dado e SEM a marca continua 'com_dado'", () => {
+    const comDado = <T,>(k: string, f: T): T => (k === "detox-habits" ? ([{ name: "Açúcar" }] as T) : f);
+    expect(porQueNaoMostrar("detox", comDado)).toBe("com_dado");
+    localStorage.setItem(chaveIntroAberta("detox"), new Date().toISOString());
+    expect(porQueNaoMostrar("detox", comDado)).toBeNull();
+    expect(retomadaDaIntro("detox")).toBeNull();
+    marcarPassoDaIntro("detox", 1, []);
+    expect(retomadaDaIntro("detox")).toBeNull();
+    marcarPassoDaIntro("detox", 3, ["Açúcar", "o check-in de hoje"]);
+    expect(retomadaDaIntro("detox")).toEqual({ passo: 3, rotulos: ["Açúcar", "o check-in de hoje"] });
+    expect(JSON.parse(localStorage.getItem(chaveIntroAberta("detox"))!).em).toBeTruthy();
+  });
+
   it("logout → login: a vassoura não apaga a marca do aparelho e a conta traz a lista de volta ⇒ não repete; outra conta no mesmo aparelho também não", () => {
     const a = montar(<IntroDoModulo moduleId="casa" />);
     fireEvent.click(screen.getByTestId("intro-modulo-agora-nao"));
@@ -675,6 +726,31 @@ describe("ligada: a intro de 1 toque de cada módulo (o padrão da Saúde, 17/10
     const proprio = ctx({});
     expect(montarTreinoProprio(proprio, "Natação")).toMatchObject({ rotulo: "Natação", exercicios: 1 });
     expect((proprio.dados["saude-workouts-v2"] as Record<string, { exercises: Array<{ name: string }> }>)[dia].exercises.map((e) => e.name)).toEqual(["Natação"]);
+  });
+
+  it("B2 (1.0.18, QA 21/10): o controle do passo 2 monta DEPOIS dos ~5 s de busca (Mac carregado) → o post-it fica solto, mas a busca segue devagar e o anel vai pro quadradinho quando ele aparece", { timeout: 40_000 }, async () => {
+    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+    montarComSet(<><header><button type="button">📋 PLANO</button><button type="button">🏋️ HOJE</button></header><section data-testid="plano-semana"><h2>MEU PLANO DA SEMANA</h2></section><div id="hoje-tarde" /><IntroDoModulo moduleId="treino" /></>);
+    await tocar(0); // Peito e tríceps → passo 2, mas a aba HOJE ainda não montou
+    await waitFor(() => expect(card()?.getAttribute("data-passo")).toBe("2"), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeTruthy(), { timeout: 9000 }); // desistiu: solto
+    expect(screen.queryByTestId("intro-modulo-anel")).toBeNull();
+    // o módulo montou tarde
+    document.getElementById("hoje-tarde")!.innerHTML = '<div data-testid="treino-hoje"><button type="button" aria-label="Marcar o treino de ontem, 20/10">☐</button><button type="button" aria-label="Marcar a série 1 de Supino reto">☐</button></div>';
+    await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 4000 });
+    expect(screen.queryByTestId("intro-modulo-postit-solto")).toBeNull();
+    expect(eventos.find(([n]) => n === "modulo_intro_reancorou")?.[1]).toMatchObject({ modulo: "treino", passo: 2 });
+    medir.mockRestore();
+  });
+
+  it("B2: UM seletor pro quadradinho da 1ª série de HOJE — acha o 'Marcar a série 1 de …' da tabela real, nunca o 'ontem' nem os −/+", () => {
+    const series = [1, 2, 3].map(() => ({ carga: 0, reps: 10, feito: false, ok: false }));
+    render(<div data-testid="treino-hoje">
+      <button type="button" aria-label="Marcar o treino de ontem, terça">☐</button>
+      <TabelaDeSeries nome="Teste qa" series={series} tom={tomDoDia("QUARTA")} ativa={0} onAtivar={() => {}} onAlternar={() => {}} onValor={() => {}} />
+    </div>);
+    expect(document.querySelector(SELETOR_PRIMEIRA_SERIE_DE_HOJE)?.getAttribute("aria-label")).toBe("Marcar a série 1 de Teste qa");
+    expect(INTROS.treino.formato === "toque" && INTROS.treino.passos[1].alvo?.achar()?.getAttribute("aria-label")).toBe("Marcar a série 1 de Teste qa");
   });
 
   it("EscolherTreino (só a missão monta): 2 perguntas → o modelo existente que casa, gravado pelo caminho do módulo; o bloco de modelos do módulo some enquanto o quiz está na tela", async () => {

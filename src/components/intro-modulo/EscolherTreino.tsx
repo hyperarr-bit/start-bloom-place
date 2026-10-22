@@ -4,6 +4,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
 import { modeloPara, montarTreino, type DiasPorSemana, type OndeTreina } from "@/lib/intro-modulo-acoes";
+import { SELETOR_PRIMEIRA_SERIE_DE_HOJE } from "@/lib/intro-modulo";
 import { abrirAba } from "@/components/cartoes-modulo/registro";
 import { EscolhaRapida } from "@/components/ui/escolha-rapida";
 import "./intro-modulo.css";
@@ -48,7 +49,7 @@ const DIAS: Array<{ id: DiasPorSemana; rotulo: string }> = [
  *  Num dia de descanso não há exercício: não acende nada (e nunca o "ontem/anteontem" do "Esqueceu?"). */
 function acenderPrimeiroExercicio(): void {
   try {
-    const alvo = document.querySelector<HTMLElement>('button[aria-label^="Marcar a série 1"], button[aria-label^="Marcar "]:not([aria-label*="ontem"]):not([aria-label*="anteontem"])');
+    const alvo = document.querySelector<HTMLElement>(SELETOR_PRIMEIRA_SERIE_DE_HOJE); // 1.0.18: o mesmo seletor da intro do Treino
     if (!alvo) return;
     alvo.scrollIntoView?.({ behavior: "smooth", block: "center" });
     alvo.classList.add("im-destaque");

@@ -34,7 +34,7 @@ import "./intro-modulo.css";
  * · modulo_intro_concluida {modulo, segundos, passos} · modulo_intro_pulou {modulo, fase:"toque", passo, segundos}
  * · modulo_intro_anel_saiu {modulo, motivo}.
  */
-export const TEMPOS_DO_TOQUE = { antesDoAnel: 300, registrou: 550, pronto: 6_000, prontoComOferta: 12_000, tentativasDoOlhar: 8 };
+export const TEMPOS_DO_TOQUE = { antesDoAnel: 300, registrou: 550, pronto: 6_000, prontoComOferta: 12_000, tentativasDoOlhar: 8, reancorar: 1_000, reancorarVoltas: 30 };
 
 type Fase = "achar" | "anotar" | "registrou" | "pronto";
 const visivel = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 8 && r.height > 8; };
@@ -69,7 +69,9 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const depois = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)); };
   const total = passoInicial + config.passos.length;
   const numero = passoInicial + n + 1;
-  useEffect(() => { marcarPassoDaIntro(m, numero); }, [m, numero]);
+  const rotulosRef = useRef(rotulos); rotulosRef.current = rotulos;
+  // o passo na tela (telemetria) e no aparelho (B1: a 2ª aparição retoma aqui, com o que já entrou)
+  useEffect(() => { marcarPassoDaIntro(m, numero, rotulosRef.current); }, [m, numero]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-intro-modulo-faixa", "1");
@@ -113,6 +115,24 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, n]);
+
+  /* B2 (1.0.18, QA 21/10 — Treino passo 2 "Fez o primeiro? Marque ali." num Mac carregado): a aba HOJE montou DEPOIS
+   * dos ~5 s de busca e o post-it ficou SOLTO pra sempre, sem o anel no quadradinho. Com o post-it solto num passo
+   * de ação, a busca segue devagar (1x por segundo, por 30 s): o controle apareceu → o anel vai pra ele. */
+  useEffect(() => {
+    if (fase !== "anotar" || alvo || !passo?.alvo || passo.olhar) return;
+    let vivo = true, voltas = 0;
+    const tentar = () => {
+      if (!vivo || faseRef.current !== "anotar") return;
+      let el: Element | null = null;
+      try { el = passo.alvo?.achar() ?? null; } catch { el = null; }
+      if (el && visivel(el)) { setAlvo(el); setAnelVivo(true); trackEvent("modulo_intro_reancorou", { modulo: m, passo: numero, segundos: segundos() }); return; }
+      if (++voltas < TEMPOS_DO_TOQUE.reancorarVoltas) depois(tentar, TEMPOS_DO_TOQUE.reancorar);
+    };
+    depois(tentar, TEMPOS_DO_TOQUE.reancorar);
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, alvo, n]);
 
   const registrou = (rotulo: string, via: "chip" | "foco") => {
     if (faseRef.current !== "anotar" && faseRef.current !== "achar") return;

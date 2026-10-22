@@ -87,7 +87,7 @@ describe("as ofertas do /hoje nas 3 funções (uma fonte só)", () => {
     expect(fonte("asaas-pix/index.ts")).toContain("...DESCRICAO_HOJE");
   });
   it("preços e prazos (decisão do dono): 27,90 1º ano / 14,90 mês, sem renovação; kit +9,90 no mesmo Pix; 47 e 27 vitalício; 19,90 casal", () => {
-    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990 });
+    expect(PRECOS_HOJE).toEqual({ h279: 2790, h149: 1490, h279k: 3780, h149k: 2480, hv279: 2790, hv47: 4700, hv27: 2700, hc199: 1990, u2027: 1990 }); // 21/10: + o "Seu 2027" (u2027)
     expect(ehPlanoHoje("h279k")).toBe(true);
     expect(ehUpsellHoje("hv27")).toBe(true);
     expect(ehOfertaCasal("hc199")).toBe(true);
@@ -328,7 +328,8 @@ describe("Purchase do upsell pago com a aba fechada chega na Meta (19/10)", () =
   it("o webhook manda client_ip_address + client_user_agent do registro (sem o UA a Meta descarta evento de site)", () => {
     const s = fonte("asaas-webhook/index.ts");
     expect(s).toMatch(/args\.ip && args\.ua \? \{ client_ip_address: args\.ip, client_user_agent: args\.ua \}/);
-    expect(s.match(/ip: regData\.client_ip \?\? null, ua: regData\.user_agent \?\? null/g)?.length).toBe(2);
+    // plano/upsell + casal + (21/10) presente pv149 + plano de 30 dias pk99
+    expect(s.match(/ip: regData\.client_ip \?\? null, ua: regData\.user_agent \?\? null/g)?.length).toBe(4);
   });
   it("o pix-reconcile lê os mesmos campos", () => {
     const s = fonte("pix-reconcile/index.ts");

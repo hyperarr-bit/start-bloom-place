@@ -1,0 +1,188 @@
+/* UPSELL DE PRESENTE (21/10) — a régua BitePal (fundo lavanda neutro, wash em gradiente que morre no neutro, cards
+   raio 22 com sombra em 2 camadas, CTA pílula preta 56px, ilustração sticker com contorno de tinta) na identidade do
+   CORE: Inter, grafite (tinta e botão), magenta (marca), cara de planner (cartão com picote e fita).
+   Escopo `.pv`; vive DENTRO do `.fn` do /hoje (mesmos botões/Pix) ou num `.fn.pv-sobre` por cima do checkout do
+   /inicio. Seletores `button.pv-…` de propósito: o index.css zera o fundo de [type="button"]. */
+.pv {
+  --pv-fundo: #f3f2f7;
+  --pv-tinta: #16121c;
+  --pv-tinta-2: #6b6575;
+  --pv-magenta: #d6338a;
+  --pv-magenta-forte: #b8206f;
+  --pv-magenta-suave: #fde8f2;
+  --pv-sol: #ffd25e;
+  --pv-ok: #16a34a;
+  --pv-card: #ffffff;
+  --pv-linha: rgba(22, 18, 28, .09);
+  --pv-sombra: 0 1px 2px rgba(22, 18, 28, .05), 0 10px 30px rgba(22, 18, 28, .09);
+  --pv-sombra-cta: 0 2px 4px rgba(22, 18, 28, .18), 0 10px 24px rgba(22, 18, 28, .22);
+  background: linear-gradient(180deg, #ffe3ef 0%, #f6eef6 34%, var(--pv-fundo) 62%);
+  color: var(--pv-tinta);
+  font-family: Inter, -apple-system, system-ui, sans-serif;
+}
+.fn.pv-sobre { z-index: 450; }
+.pv * { box-sizing: border-box; }
+
+.pv-tela { display: flex; flex-direction: column; flex: 1; min-height: 100%; animation: pv-entra .32s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes pv-entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.pv-col { padding: 14px 22px 0; display: flex; flex-direction: column; flex: 1; }
+
+/* topo: a marca + o "pagamento confirmado" do que a pessoa acabou de comprar */
+.pv-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; }
+.pv-marca { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .16em; }
+.pv-marca i { width: 7px; height: 7px; border-radius: 50%; background: var(--pv-magenta); }
+.pv-ok { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 99px; background: rgba(22, 163, 74, .1); color: #15803d; font-size: 12px; font-weight: 700; }
+
+/* a cena: o presente sticker, flutuando, com brilhos */
+.pv-cena { position: relative; display: grid; place-items: center; height: 196px; margin: 6px 0 2px; }
+.pv-cena::before { content: ""; position: absolute; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, 0) 68%); }
+.pv-cena svg { position: relative; animation: pv-flutua 3.2s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(214, 51, 138, .18)); }
+@keyframes pv-flutua { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(1.5deg); } }
+.pv-cena-pequena { height: 132px; }
+@media (prefers-reduced-motion: reduce) { .pv-cena svg, .pv-tela { animation: none; } }
+
+.pv-titulo { font-size: 31px; line-height: 1.06; font-weight: 900; letter-spacing: -.035em; margin: 0; text-align: center; text-wrap: balance; }
+.pv-titulo em { font-style: normal; color: var(--pv-magenta); }
+.pv-sub { margin: 10px auto 0; max-width: 30ch; text-align: center; color: var(--pv-tinta-2); font-size: 15.5px; line-height: 1.42; font-weight: 500; text-wrap: balance; }
+.pv-sub b { color: var(--pv-tinta); font-weight: 800; }
+
+/* o card da oferta: o que se dá + o preço */
+.pv-oferta { margin-top: 20px; background: var(--pv-card); border-radius: 22px; box-shadow: var(--pv-sombra); padding: 16px 16px 14px; }
+.pv-oferta-linha { display: flex; align-items: center; gap: 12px; }
+.pv-oferta-ico { width: 44px; height: 44px; border-radius: 14px; background: var(--pv-magenta-suave); display: grid; place-items: center; flex: 0 0 auto; font-size: 22px; }
+.pv-oferta-nome { display: flex; flex-direction: column; min-width: 0; }
+.pv-oferta-nome b { font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
+.pv-oferta-nome small { font-size: 12.5px; color: var(--pv-tinta-2); font-weight: 600; margin-top: 1px; }
+.pv-preco { margin-left: auto; text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.pv-preco s { font-size: 12.5px; color: var(--pv-tinta-2); font-weight: 600; }
+.pv-preco strong { font-size: 24px; font-weight: 900; letter-spacing: -.03em; line-height: 1.05; white-space: nowrap; }
+.pv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1.5px dashed var(--pv-linha); }
+.pv-chips span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 99px; background: #f6f4f8; font-size: 12.5px; font-weight: 700; color: #3b3542; }
+
+/* como funciona, em 3 toques (sem parágrafo) */
+.pv-como { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.pv-como div { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 16px; background: rgba(255, 255, 255, .6); text-align: center; font-size: 12px; font-weight: 700; line-height: 1.25; color: #3b3542; }
+.pv-como b { width: 24px; height: 24px; border-radius: 50%; background: var(--pv-tinta); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 900; }
+
+/* rodapé com o CTA preto e o "Agora não" fácil */
+.pv-rodape { position: sticky; bottom: 0; padding: 16px 22px calc(16px + env(safe-area-inset-bottom)); margin-top: auto; background: linear-gradient(180deg, rgba(243, 242, 247, 0) 0%, var(--pv-fundo) 26%); display: flex; flex-direction: column; gap: 6px; }
+button.pv-cta, a.pv-cta { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; min-height: 56px; padding: 0 22px; border: 0; border-radius: 99px; background: var(--pv-tinta); color: #fff; font-family: inherit; font-size: 16.5px; font-weight: 800; letter-spacing: -.01em; box-shadow: var(--pv-sombra-cta); cursor: pointer; text-decoration: none; transition: transform .1s ease; }
+button.pv-cta:active, a.pv-cta:active { transform: scale(.98); }
+button.pv-cta:disabled { opacity: .45; box-shadow: none; }
+button.pv-cta[data-zap] { background: #1faa59; }
+button.pv-sec { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; border-radius: 99px; border: 2px solid var(--pv-tinta); background: var(--pv-card); color: var(--pv-tinta); font-family: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer; }
+button.pv-sec[data-ok] { border-color: var(--pv-ok); color: var(--pv-ok); }
+button.pv-nao { min-height: 44px; border: 0; background: none; color: var(--pv-tinta-2); font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.pv-miuda { margin: 2px 0 0; text-align: center; font-size: 12.5px; color: var(--pv-tinta-2); line-height: 1.4; }
+
+/* o CARTÃO-PRESENTE (o que vai pro WhatsApp): planner com fita, picote e o link */
+.pv-cartao { position: relative; margin: 22px 4px 0; padding: 20px 18px 0; border-radius: 24px; background: linear-gradient(160deg, #ffffff 0%, #fff5fa 100%); box-shadow: var(--pv-sombra); transform: rotate(-1.2deg); }
+.pv-fita { position: absolute; top: -12px; left: 50%; width: 92px; height: 24px; margin-left: -46px; transform: rotate(3deg); border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(255, 210, 94, .92) 0 8px, rgba(255, 224, 140, .92) 8px 16px); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.pv-cartao-topo { display: flex; align-items: center; justify-content: space-between; }
+.pv-selo { font-size: 10.5px; font-weight: 900; letter-spacing: .14em; color: var(--pv-magenta); background: var(--pv-magenta-suave); padding: 5px 9px; border-radius: 99px; }
+.pv-cartao-meio { display: flex; align-items: center; gap: 14px; padding: 16px 0 18px; }
+.pv-cartao-meio svg { flex: 0 0 auto; }
+.pv-cartao-de { margin: 0; font-size: 21px; line-height: 1.18; font-weight: 900; letter-spacing: -.03em; text-wrap: balance; }
+.pv-cartao-de b { color: var(--pv-magenta); font-weight: 900; }
+.pv-picote { position: relative; height: 0; border-top: 2px dashed rgba(22, 18, 28, .14); margin: 0 -18px; }
+.pv-picote::before, .pv-picote::after { content: ""; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: #f5eff6; }
+.pv-picote::before { left: -10px; }
+.pv-picote::after { right: -10px; }
+.pv-cartao-link { display: block; padding: 13px 0 15px; font-size: 13px; font-weight: 700; color: var(--pv-tinta-2); overflow-wrap: anywhere; text-align: center; }
+.pv-cartao-link b { color: var(--pv-tinta); }
+
+/* campo (seu nome no cartão / e-mail de quem ganhou) */
+.pv-campo { margin-top: 16px; background: var(--pv-card); border-radius: 18px; box-shadow: var(--pv-sombra); padding: 12px 14px; }
+.pv-campo label { display: block; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--pv-tinta-2); }
+.pv-campo input { width: 100%; margin-top: 4px; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 17px; font-weight: 700; color: var(--pv-tinta); padding: 2px 0; }
+.pv-campo input::placeholder { color: #b9b3c0; font-weight: 600; }
+.pv-erro { margin: 8px 2px 0; font-size: 13px; font-weight: 600; color: #b91c1c; }
+
+/* página de quem GANHOU: o que vem no presente */
+.pv-ganhou { margin-top: 18px; background: var(--pv-card); border-radius: 22px; box-shadow: var(--pv-sombra); padding: 6px 16px; }
+.pv-ganhou li { list-style: none; display: flex; align-items: center; gap: 12px; padding: 11px 0; font-size: 15px; font-weight: 700; }
+.pv-ganhou li + li { border-top: 1px solid var(--pv-linha); }
+.pv-ganhou ul { margin: 0; padding: 0; }
+.pv-ganhou i { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-style: normal; font-size: 17px; flex: 0 0 auto; }
+.pv-ganhou small { display: block; font-size: 12.5px; font-weight: 600; color: var(--pv-tinta-2); }
+
+/* pós-resgate: as lojas + como entrar */
+.pv-lojas { margin-top: 18px; background: var(--pv-card); border-radius: 22px; box-shadow: var(--pv-sombra); padding: 16px; text-align: center; }
+.pv-lojas-titulo { font-size: 16px; font-weight: 900; letter-spacing: -.02em; }
+.pv-lojas p { margin: 6px 0 0; font-size: 14px; color: var(--pv-tinta-2); line-height: 1.4; }
+.pv-lojas p b { color: var(--pv-tinta); }
+.pv-email-chip { display: inline-block; max-width: 100%; margin-top: 10px; padding: 7px 12px; border-radius: 99px; background: #f6f4f8; font-size: 13.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-selos { justify-content: center; margin-top: 12px; }
+.pv-passos { margin: 14px 0 0; padding: 12px 14px; border-radius: 16px; background: var(--pv-magenta-suave); text-align: left; font-size: 13.5px; line-height: 1.45; color: #3b2a35; }
+.pv-passos b { color: var(--pv-tinta); }
+
+/* aviso gentil (já tem o CORE / código usado) */
+.pv-aviso { margin-top: 18px; padding: 14px 16px; border-radius: 18px; background: var(--pv-card); box-shadow: var(--pv-sombra); font-size: 14.5px; line-height: 1.45; color: #3b3542; text-align: center; }
+.pv-aviso b { color: var(--pv-tinta); }
+
+/* o Pix do presente é o PixHoje (as classes .fn-…) com a cara do presente por cima */
+.pv .fn-rodape { background: transparent; }
+.pv .fn-pix-valor { color: var(--pv-tinta); }
+.pv .fn-pix-rotulo { color: var(--pv-magenta-forte); font-weight: 800; }
+.pv button.fn-copiar-btn { border-radius: 99px; }
+.pv .fn-topo { background: transparent; }
+.pv-pix-cabeca { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 22px -6px; padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, .72); font-size: 13.5px; font-weight: 800; color: var(--pv-magenta-forte); }
+
+/* confete leve no "presente pago" (só CSS; some com prefers-reduced-motion) */
+.pv-confete { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.pv-confete i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; animation: pv-cai 2.4s ease-in forwards; }
+@keyframes pv-cai { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(520px) rotate(540deg); } }
+@media (prefers-reduced-motion: reduce) { .pv-confete { display: none; } }
+
+/* ───────── DOWNSELL "plano de 30 dias pra organizar a vida" (R$ 9,90, depois do "Agora não" do presente) ───────── */
+.pk-kicker { align-self: center; margin-top: 14px; padding: 6px 12px; border-radius: 99px; background: var(--pv-tinta); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.pk-titulo { margin-top: 12px; font-size: 29px; }
+.pk-area { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 99px; background: var(--pk-cor-suave, #fef3c7); color: var(--pk-cor, #92400e); font-size: 12px; font-weight: 800; }
+
+/* a folha do planner: semana, 4 dias com caixinha, o resto esmaecendo */
+.pk-folha { position: relative; margin-top: 16px; padding: 14px 16px 12px; border-radius: 22px; background: #fff; box-shadow: var(--pv-sombra);
+  background-image: repeating-linear-gradient(180deg, transparent 0 43px, rgba(22, 18, 28, .05) 43px 44px); background-position: 0 50px; }
+.pk-folha::before { content: ""; position: absolute; left: 44px; top: 50px; bottom: 34px; width: 1.5px; background: rgba(214, 51, 138, .22); }
+.pk-folha-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 8px; }
+.pk-semana { font-size: 11.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--pv-tinta-2); }
+.pk-dia { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.pk-caixa { width: 22px; height: 22px; border-radius: 7px; border: 2px solid #cfc9d6; display: grid; place-items: center; flex: 0 0 auto; background: #fff; }
+.pk-dia[data-feito] .pk-caixa { border-color: var(--pv-magenta); background: var(--pv-magenta); color: #fff; }
+.pk-dia-txt { display: flex; flex-direction: column; min-width: 0; padding-left: 8px; }
+.pk-dia-txt small { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--pv-magenta); text-transform: uppercase; }
+.pk-dia-txt b { font-size: 14.5px; font-weight: 750; line-height: 1.25; }
+.pk-dia[data-feito] .pk-dia-txt b { color: var(--pv-tinta-2); text-decoration: line-through; text-decoration-color: rgba(214, 51, 138, .55); text-decoration-thickness: 2px; }
+.pk-dia[data-apaga] { opacity: .38; }
+.pk-mais { padding-top: 6px; text-align: center; font-size: 12.5px; font-weight: 800; color: var(--pv-tinta-2); }
+.pk-semanas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+.pk-semanas span { display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; font-weight: 800; line-height: 1.2; color: var(--pv-tinta-2); }
+.pk-semanas span::before { content: ""; height: 5px; border-radius: 99px; background: #ece8f0; }
+.pk-semanas span[data-on]::before { background: var(--pv-magenta); }
+.pk-semanas span[data-on] { color: var(--pv-tinta); }
+
+/* "no dia 30" */
+.pk-fim { margin-top: 14px; }
+.pk-fim-titulo { font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--pv-tinta-2); margin: 0 0 8px; }
+.pk-fim li { list-style: none; display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 14.5px; font-weight: 700; }
+.pk-fim ul { margin: 0; padding: 0; }
+.pk-fim i { width: 22px; height: 22px; border-radius: 50%; background: rgba(22, 163, 74, .12); color: var(--pv-ok); display: grid; place-items: center; flex: 0 0 auto; font-style: normal; }
+
+/* o preço grande */
+.pk-preco { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 14px 16px; border-radius: 20px; background: var(--pv-tinta); color: #fff; }
+.pk-preco small { display: block; font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, .7); line-height: 1.35; }
+.pk-preco b { display: block; font-size: 14.5px; font-weight: 800; }
+.pk-preco strong { font-size: 34px; font-weight: 900; letter-spacing: -.04em; line-height: 1; white-space: nowrap; }
+
+/* versão curta: as 4 semanas em trilho */
+.pk-trilho { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.pk-trilho-sem { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: rgba(255, 255, 255, .62); }
+.pk-trilho-sem b { width: 30px; height: 30px; border-radius: 10px; background: #ece8f0; display: grid; place-items: center; font-size: 13px; font-weight: 900; color: var(--pv-tinta-2); flex: 0 0 auto; }
+.pk-trilho-sem span { font-size: 15px; font-weight: 800; }
+.pk-trilho-sem small { display: block; font-size: 12.5px; font-weight: 600; color: var(--pv-tinta-2); margin-top: 1px; }
+.pk-trilho-sem[data-on] { background: #fff; box-shadow: var(--pv-sombra); }
+.pk-trilho-sem[data-on] b { background: var(--pv-magenta); color: #fff; }
+.pk-centro { display: flex; justify-content: center; margin-top: 10px; }
+.pk-preco-linha { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin-bottom: 4px; }
+.pk-preco-linha strong { font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+.pk-preco-linha small { font-size: 13px; font-weight: 600; color: var(--pv-tinta-2); }
+.pk-folha .pk-dia { min-height: 42px; }

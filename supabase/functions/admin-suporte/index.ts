@@ -139,11 +139,11 @@ serve(async (req) => {
       const html =
         `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.55;color:#1c1917;max-width:560px">` +
         `<p style="margin:0 0 14px">Oi${nome ? `, ${esc(nome)}` : ""}!</p>` + paragrafos +
-        `<p style="margin:0 0 6px">Um abraço,<br>João, do CORE</p>` +
-        `<p style="margin:0;color:#78716c;font-size:13px">Pode responder este e-mail que eu leio.</p></div>`;
+        `<p style="margin:0 0 6px">Um abraço,<br>Equipe CORE</p>` +
+        `<p style="margin:0;color:#78716c;font-size:13px">Pode responder este e-mail que a gente lê.</p></div>`;
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [email], reply_to: "suporte@coreaplicativo.com.br", subject: assunto, html }),
+        body: JSON.stringify({ from, to: [email], reply_to: "contato@coreaplicativo.com.br", subject: assunto, html }),
       });
       if (!r.ok) return json({ error: `resend_${r.status}`, detalhe: (await r.text().catch(() => "")).slice(0, 200) }, 502);
       await admin.from("analytics_events").insert({ user_id: alvo, event_name: "email_livre_enviado", event_data: { assunto, chars: texto.length } }).then(() => {}, () => {});
@@ -180,14 +180,14 @@ serve(async (req) => {
       const html =
         `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.55;color:#1c1917;max-width:560px">` +
         `<p style="margin:0 0 14px">Oi${nome ? `, ${esc(nome)}` : ""}!</p>` + paragrafos +
-        `<p style="margin:0 0 6px">Um abraço,<br>João, do CORE</p>` +
-        `<p style="margin:0 0 22px;color:#78716c;font-size:13px">Pode responder este e-mail que eu leio.</p>` +
+        `<p style="margin:0 0 6px">Um abraço,<br>Equipe CORE</p>` +
+        `<p style="margin:0 0 22px;color:#78716c;font-size:13px">Pode responder este e-mail que a gente lê.</p>` +
         (original ? `<blockquote style="border-left:3px solid #d6d3d1;margin:0;padding:2px 0 2px 12px;color:#78716c;font-size:13px;white-space:pre-wrap">${esc(original)}</blockquote>` : "") +
         `</div>`;
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [email], reply_to: "suporte@coreaplicativo.com.br", subject: assunto, html }),
+        body: JSON.stringify({ from, to: [email], reply_to: "contato@coreaplicativo.com.br", subject: assunto, html }),
       });
       if (!r.ok) {
         const detalhe = await r.text().catch(() => "");

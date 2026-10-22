@@ -78,6 +78,7 @@ const comKit = it.skipIf(!BUMP_KIT); // 19/10: bump desligado pelo dono — os t
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { computeDailyBudget } from "@/lib/finance-totals";
 import { PRECOS_HOJE, CONCESSAO_HOJE } from "../../supabase/functions/_shared/ofertas-hoje";
+import { PRECOS_PLANO30, PRECOS_PRESENTE } from "../../supabase/functions/_shared/presente";
 import { VALORES_VENDA } from "../../supabase/functions/_shared/venda-capi";
 
 /* ---------------------------------------------------------------- ambiente */
@@ -216,9 +217,10 @@ describe("o número e o que vai pra Finanças", () => {
 
 /* ---------------------------------------------------------------- ofertas: cliente × servidor */
 describe("as ofertas batem com o servidor", () => {
-  it("VALOR_OFERTA (reais) = PRECOS_HOJE (centavos) do ofertas-hoje.ts", () => {
-    for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(PRECOS_HOJE[o]).toBe(Math.round(v * 100));
-    expect(Object.keys(PRECOS_HOJE).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
+  it("VALOR_OFERTA (reais) = PRECOS_HOJE (centavos) do ofertas-hoje.ts (+ 21/10: o presente e o plano de 30 dias, presente.ts)", () => {
+    const servidor: Record<string, number> = { ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
+    for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(servidor[o]).toBe(Math.round(v * 100));
+    expect(Object.keys(servidor).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
   });
   it("o que cada oferta concede: 1º ano 365 dias, mês 30, kit = mesmo prazo, upsells vitalício em linha própria, casal não credita quem pagou", () => {
     expect(CONCESSAO_HOJE.h279).toMatchObject({ periodo: "annual", dias: 365 });

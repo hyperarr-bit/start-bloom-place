@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Fingerprint, ShieldCheck, User, X, Zap } from "lucide-react";
@@ -7,14 +7,22 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, trackEventBeacon, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { sairDeVerdade, useSegurarVoltar, varianteDoBack, type FunilDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
+import { modoOfertas } from "@/lib/ofertas-pos-compra";
+/* 21/10: o upsell "Seu 2027" (src/upsell-2027) só carrega com a chave central em "2027" (OFERTAS_POS_COMPRA, src/lib/ofertas-pos-compra.ts) */
+const Fluxo2027 = lazy(() => import("@/upsell-2027/Fluxo2027").then((m) => ({ default: m.Fluxo2027 })));
 import { isNativeShell } from "@/lib/native-shell";
-import { isInAppBrowser } from "@/lib/funnel";
+import { FUNNEL_AREA_KEY, isInAppBrowser, type AreaKey } from "@/lib/funnel";
+import { primeiroNome } from "@/lib/presente";
 import { ehFunilRoi2 } from "@/lib/funil-roi2";
 import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { SelosDasLojas } from "@/components/site/SelosDasLojas";
+/* 21/10: o UPSELL DE PRESENTE e o plano de 30 dias (src/presente) só carregam com a chave central ligada (OFERTAS_POS_COMPRA) */
+const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => ({ default: m.FluxoPresente })));
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -90,6 +98,9 @@ interface Props {
   v2?: { mascote?: React.ReactNode; missao?: string | null; onConfirmado?: () => void };
   /** FUNIL B (30/09): o checkout do funil "o app é o funil" — e-mail ACIMA do QR, copiar exige e-mail (escanear não), e o pagamento confirmado sai direto pro "Pronto" do funil (sem a tela confirmed daqui). Sem a prop, o checkout fica byte a byte igual. */
   funilB?: { aoConfirmar: () => void };
+  /** BACK (21/10, src/lib/back-funil.ts): com o QR na tela, o voltar do navegador (1x por sessão) mostra "seu Pix
+   *  continua valendo" com o MESMO código. Sem a prop (o gate do app, o /planos), nada muda. */
+  backFunil?: FunilDoBack;
 }
 
 // Gateway do Pix de TODO o app (16/07 noite, ordem do dono: Cakto não volta
@@ -529,7 +540,7 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 const MARCA_B = { funil: "b" as const };
 const SEM_MARCA = {} as const;
 
-export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
+export function PixCheckout({ offer, onClose, context, v2, funilB, backFunil }: Props) {
   // APP DA LOJA (22/07): dentro do shell Capacitor, Pix in-app viola o Play
   // Billing (obrigatório no BR p/ conteúdo digital). ESTE é o único ponto de
   // bifurcação — todo caminho que abre PixCheckout vira Play Billing no app.
@@ -604,7 +615,30 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
   const [mostrarQR, setMostrarQR] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
+  /* UPSELL DE PRESENTE (21/10): no "Pagamento confirmado" do vitalício do /inicio, ANTES da tela com as lojas, a oferta
+   * "Dê o CORE pra sempre pra quem você ama" (src/presente/FluxoPresente) cobre o checkout; terminou → a confirmação de
+   * sempre. Decidido no mount: chave UPSELL_PRESENTE (padrão OFF; QA `?presente=on`), só funil do /inicio, só
+   * vitalício, nunca no Funil B nem no v2. Desligado: nada muda (o estado fica parado em false). */
+  /* 21/10 (integração): NO MÁXIMO 2 OFERTAS depois do Pix, uma camada por vez — a chave central OFERTAS_POS_COMPRA
+   * (src/lib/ofertas-pos-compra.ts; QA `?ofertas=2027|presente|off`) escolhe UM caminho:
+   *   "2027": Seu 2027 → (Agora não) plano de 30 dias da área → confirmação com as lojas · (pagou) → confirmação
+   *   "presente": presente → (Agora não) plano de 30 dias (dentro do FluxoPresente) → confirmação
+   * Elegível = funil do /inicio, vitalício, nunca no Funil B nem no v2. */
+  const [ofertasPosCompra] = useState<"off" | "presente" | "2027">(() =>
+    context === "funnel" && !funilB && !v2 && OFERTA_VITALICIA[offer]
+    && typeof window !== "undefined" && window.location.pathname.startsWith("/inicio") ? modoOfertas() : "off");
+  const presenteAtivo = ofertasPosCompra === "presente";
+  const [presenteFeito, setPresenteFeito] = useState(false);
   const cpfRef = useRef<HTMLInputElement>(null);
+  /* UPSELL "SEU 2027" (21/10): no "Pagamento confirmado" do vitalício do /inicio, ANTES da tela com as lojas, a oferta
+   * "Seu 2027 já organizado" (src/upsell-2027/Fluxo2027) cobre o checkout; terminou → a confirmação de sempre. Decidido
+   * no mount: chave UPSELL_2027 (padrão OFF; QA `?up2027=on`), só funil do /inicio, só vitalício, nunca no Funil B nem
+   * no v2. Desligado: nada muda (o estado fica parado em false). */
+  const pacote2027Ativo = ofertasPosCompra === "2027";
+  /** o fluxo do 2027 terminou: null = ainda não; "pago" | "recusou" */
+  const [pacote2027Fim, setPacote2027Fim] = useState<null | "pago" | "recusou">(null);
+  /** o plano de 30 dias depois do "Agora não" do 2027 terminou */
+  const [plano30Feito, setPlano30Feito] = useState(false);
   // 26/09: o toque em pagar = abertura do checkout; mede espera_ms do pix_generated.
   const toqueEm = useRef<number | null>(Date.now());
   // 26/09: sessão (anônima, se preciso) que começa a nascer no mount — ver o efeito abaixo.
@@ -1159,6 +1193,11 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
     }
   };
 
+  /* BACK no Pix gerado: o MESMO código (nada de Pix novo). "Copiar" usa o copyCode de sempre — no toque, por causa
+   * do clipboard — e a tela de baixo já mostra o "Código copiado!". */
+  const [backPix, setBackPix] = useState(false);
+  useSegurarVoltar(backFunil ?? "inicio", "pix", !!backFunil && step === "qr" && !!pix, () => setBackPix(true));
+
   const enterApp = () => { window.location.href = "/"; };
   /* SELOS DAS LOJAS NO PAGAMENTO CONFIRMADO (19/10, regra do dono pra todo funil web: na época do vitalício a maioria
    * dos reembolsos era "pensei que não era app da App Store/Play"). Só no checkout de FUNIL (o /inicio) — o gate e o
@@ -1237,6 +1276,48 @@ export function PixCheckout({ offer, onClose, context, v2, funilB }: Props) {
 
   return (
     <div className="fixed inset-0 z-[400] bg-background overflow-y-auto">
+      {backPix && backFunil && step === "qr" && pix && (
+        <BackFolha
+          funil={backFunil}
+          etapa="pix"
+          variante={varianteDoBack()}
+          preco={fmtBRL(pix.amount)}
+          codigo={pix.qrCode}
+          validade={mm != null && ss != null && secondsLeft! > 0 ? `${mm}:${ss}` : null}
+          extra={{ offer, ...marca }}
+          onQuero={() => { setBackPix(false); void copyCode(); }}
+          onFicar={() => setBackPix(false)}
+          onSair={() => { setBackPix(false); sairDeVerdade(); }}
+        />
+      )}
+      {pacote2027Ativo && step === "confirmed" && !pacote2027Fim && (
+        <Suspense fallback={null}>
+          <div className="fn u27 u27-sobre" data-testid="inicio-2027"><div className="fn-corpo">
+            <Fluxo2027 origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              onFim={(r) => setPacote2027Fim(r.pedido ? "pago" : "recusou")} />
+          </div></div>
+        </Suspense>
+      )}
+      {/* 21/10: o "Agora não" do 2027 → o plano de 30 dias da área (só depois que a camada do 2027 saiu) */}
+      {pacote2027Ativo && step === "confirmed" && pacote2027Fim === "recusou" && !plano30Feito && (
+        <Suspense fallback={null}>
+          <div className="fn pv pv-sobre" data-testid="inicio-plano30"><div className="fn-corpo">
+            <FluxoPresente so30Dias origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              area={(() => { try { const a = localStorage.getItem(FUNNEL_AREA_KEY); return a ? (a as AreaKey) : null; } catch { return null; } })()}
+              onFim={() => setPlano30Feito(true)} />
+          </div></div>
+        </Suspense>
+      )}
+      {presenteAtivo && step === "confirmed" && !presenteFeito && (
+        <Suspense fallback={null}>
+          <div className="fn pv pv-sobre" data-testid="inicio-presente"><div className="fn-corpo">
+            <FluxoPresente origem="inicio" compra={pix?.orderId ?? "inicio"} valorPago={Number(pix?.amount) || 27.9}
+              area={(() => { try { const a = localStorage.getItem(FUNNEL_AREA_KEY); return a ? (a as AreaKey) : null; } catch { return null; } })()}
+              nomeSugerido={primeiroNome((abUser?.user_metadata as { full_name?: string } | undefined)?.full_name) || null}
+              onFim={() => setPresenteFeito(true)} />
+          </div></div>
+        </Suspense>
+      )}
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
         {step !== "confirmed" && (
           <button

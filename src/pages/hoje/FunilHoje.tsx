@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Lock, Pencil, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,10 +19,19 @@ import {
   EMAIL_OK, emailAtual, gravarAtribuicao, gravarFinancas, gravarKit, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
 } from "./conta";
 import { PixHoje, PixIcone, venceEm, type PixSalvo } from "./PixHoje";
+import { modoOfertas, type ModoOfertas } from "@/lib/ofertas-pos-compra";
+import { gravarPacote2027 } from "./conta";
+/* 21/10: o upsell "Seu 2027" só carrega com a chave central em "2027" (OFERTAS_POS_COMPRA, src/lib/ofertas-pos-compra.ts) */
+const Fluxo2027 = lazy(() => import("@/upsell-2027/Fluxo2027").then((m) => ({ default: m.Fluxo2027 })));
 import { supabase } from "@/integrations/supabase/client";
 import "./funil-hoje.css";
 import { Confete, Etiqueta, GraficoPraSempre, SeloPago } from "./UpsellAnimado";
 import { DemoHoje, type ViaDemo } from "./DemoHoje";
+import { sairDeVerdade, useSegurarVoltar, varianteDoBack } from "@/lib/back-funil";
+import { BackFolha } from "@/components/paywall/BackFolha";
+import { pedirEmailDoPresente } from "@/presente/api";
+/* 21/10: o presente / plano de 30 dias só carregam com a chave central ligada (OFERTAS_POS_COMPRA) */
+const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => ({ default: m.FluxoPresente })));
 
 /**
  * FUNIL WEB NOVO — coreaplicativo.com.br/hoje (18/10). Só na WEB (SoNaWeb no App.tsx), noindex, sem link no site.
@@ -60,8 +69,8 @@ import { DemoHoje, type ViaDemo } from "./DemoHoje";
  */
 export type EtapaHoje =
   | "renda" | "contas" | "resultado" | "oferta" | "pix"
-  | "up1" | "up1pix" | "down" | "downpix" | "up2" | "up2pix" | "parceiro" | "pago";
-const ETAPAS: EtapaHoje[] = ["renda", "contas", "resultado", "oferta", "pix", "up1", "up1pix", "down", "downpix", "up2", "up2pix", "parceiro", "pago"];
+  | "up1" | "up1pix" | "down" | "downpix" | "up2" | "up2pix" | "parceiro" | "u2027" | "plano30" | "presente" | "pago";
+const ETAPAS: EtapaHoje[] = ["renda", "contas", "resultado", "oferta", "pix", "up1", "up1pix", "down", "downpix", "up2", "up2pix", "parceiro", "u2027", "plano30", "presente", "pago"];
 
 export type Pago = { oferta: OfertaHoje; orderId: string; em: number };
 export type EstadoHoje = {
@@ -85,9 +94,18 @@ export type EstadoHoje = {
   emailPix?: { email: string; via: "conta" | "destino" } | null;
   /** a tela logo depois de um pagamento mostra "Pagamento confirmado · R$ X" (a seguinte, depois de um "Não", não) */
   banner?: boolean;
+  /** 21/10 (upsell "Seu 2027", chave UPSELL_2027): o fluxo do 2027 já passou — o pedido pago nele (null = "Agora não").
+   *  Ausente = ainda não passou (ou a chave está desligada). */
+  u2027?: { pedido: string | null } | null;
   /** 19/10: a VARIANTE do teste. "demo" = chegou por `/hoje?v=demo` (fica salva: sobrevive ao recarregar e à volta do
    *  app do banco); sem ela = controle. Na demo, o "Ver meu CORE" abre Finanças com os números dela (/hoje/demo). */
   variante?: "demo";
+  /** 21/10 (upsell de presente, chave UPSELL_PRESENTE): o fluxo do presente já passou — os pedidos pagos nele (o presente
+   *  e o plano de 30 dias do "Agora não"). Ausente = ainda não passou (ou a chave está desligada). */
+  presente?: { pedido: string | null; plano30: string | null } | null;
+  /** 21/10 (chave central "2027"): o plano de 30 dias depois do "Agora não" do 2027 já passou — o pedido pago (null = "Não,
+   *  obrigado"). Ausente = ainda não passou. */
+  plano30?: { pedido: string | null } | null;
 };
 
 /** O link da campanha da variante: `/hoje?v=demo`. */
@@ -136,7 +154,10 @@ function sessaoDoHoje(): { id: string; nova: boolean } {
 }
 
 /** O próximo passo DEPOIS de um pagamento (o plano ou um upsell): cada oferta aparece no máximo 1 vez. */
-export function proximoPosCompra(e: Pick<EstadoHoje, "pagos" | "recusou" | "parceiro">, aDois: boolean = UPSELL_A_DOIS): EtapaHoje {
+export function proximoPosCompra(
+  e: Pick<EstadoHoje, "pagos" | "recusou" | "parceiro"> & Pick<Partial<EstadoHoje>, "presente" | "u2027" | "plano30">, aDois: boolean = UPSELL_A_DOIS,
+  ofertas: ModoOfertas = "off",
+): EtapaHoje {
   const pagou = (o: OfertaHoje) => e.pagos.some((p) => p.oferta === o);
   const recusou = (o: OfertaHoje) => e.recusou.includes(o);
   // 20/10: o plano vitalício (hv279) também — quem já é pra sempre não vê o upsell pra sempre nem o downsell
@@ -145,6 +166,15 @@ export function proximoPosCompra(e: Pick<EstadoHoje, "pagos" | "recusou" | "parc
   if (UPSELL_PRA_SEMPRE && DOWNSELL_PRA_SEMPRE_27 && !praSempre && recusou("hv47") && !recusou("hv27")) return "down";
   if (aDois && !pagou("hc199") && !recusou("hc199")) return "up2";
   if (pagou("hc199") && !e.parceiro) return "parceiro";
+  // 21/10: as ofertas depois do Pix (chave central OFERTAS_POS_COMPRA, src/lib/ofertas-pos-compra.ts) — no máximo 2,
+  // só pra quem é pra sempre, cada uma 1 vez, antes do pós-compra com as lojas:
+  //   "2027": Seu 2027 → (Agora não) plano de 30 dias → pago · (pagou o 2027) → pago. O presente nunca aparece aqui.
+  //   "presente": presente (o "Agora não" leva ao plano de 30 dias DENTRO do fluxo do presente) → pago
+  if (praSempre && ofertas === "2027") {
+    if (!e.u2027) return "u2027";
+    if (!e.u2027.pedido && !e.plano30) return "plano30";
+  }
+  if (praSempre && ofertas === "presente" && !e.presente) return "presente";
   return "pago";
 }
 
@@ -200,6 +230,9 @@ export function FunilHoje() {
   estadoRef.current = estado;
   varianteRef.current = estado.variante === "demo" ? "demo" : "controle";
   const ehDemo = estado.variante === "demo";
+  /** 21/10: as ofertas depois do Pix (chave central OFERTAS_POS_COMPRA), congeladas no mount (`?ofertas=2027|presente`
+   *  — ou os antigos `?up2027=on` / `?presente=on` — liga só neste navegador) */
+  const [ofertasAqui] = useState<ModoOfertas>(() => modoOfertas());
   const corpo = useRef<HTMLDivElement>(null);
   const ir = (etapa: EtapaHoje, extra: Partial<EstadoHoje> = {}) => setEstado((e) => ({ ...e, ...extra, etapa }));
   /** Variante demo: trocar de etapa E de endereço (/hoje ↔ /hoje/demo). Grava JÁ — a tela pode desmontar antes de o
@@ -264,7 +297,7 @@ export function FunilHoje() {
     const pagos = [...s.pagos, { oferta: p.oferta, orderId: p.orderId, em: Date.now() }];
     trackEvent("hoje_pago", { oferta: p.oferta, plano: ehPlanoDoHoje(p.oferta) ? planoEvento : null, order_id: p.orderId, valor: VALOR_OFERTA[p.oferta], ...ids() });
     if (p.oferta === "hv47" || p.oferta === "hv27" || p.oferta === "hc199") trackEvent("hoje_upsell", { oferta: p.oferta, acao: "pago", ...ids() });
-    const proximo = proximoPosCompra({ pagos, recusou: s.recusou, parceiro: s.parceiro });
+    const proximo = proximoPosCompra({ pagos, recusou: s.recusou, parceiro: s.parceiro, presente: s.presente, u2027: s.u2027, plano30: s.plano30 }, UPSELL_A_DOIS, ofertasAqui);
     setEstado((e) => ({ ...e, pagos, pix: null, anteriores: [], etapa: proximo, banner: true }));
   };
   const onPix = (p: PixSalvo | null) => setEstado((e) => ({ ...e, pix: p }));
@@ -282,6 +315,14 @@ export function FunilHoje() {
     });
   };
 
+  /* BACK (21/10, src/lib/back-funil.ts): na OFERTA do vitalício, o voltar do navegador (1x por sessão) mostra a MESMA
+   * oferta de 27,90 em vez de sair; "Quero meu CORE" = o "Pagar com Pix" de sempre. O do Pix gerado mora no PixHoje.
+   * Só no modo vitalício (o "anual" tem outra oferta) e nunca pra quem já tem o CORE ativo. */
+  const [backOferta, setBackOferta] = useState(false);
+  const podeBack = vitalicio && !naDemo && !(user && isSubscribed && !estado.pagos.length);
+  useSegurarVoltar("hoje", "oferta", podeBack && estado.etapa === "oferta", () => setBackOferta(true));
+  const precoDoBack = valorPlano.toFixed(2).replace(".", ",");
+
   const upsell = (oferta: OfertaHoje, sim: boolean) => {
     clique(sim ? "upsell_sim" : "upsell_nao", { oferta });
     trackEvent("hoje_upsell", { oferta, acao: sim ? "aceitou" : "recusou", ...ids() });
@@ -292,7 +333,7 @@ export function FunilHoje() {
     }
     setEstado((e) => {
       const recusou = [...new Set([...e.recusou, oferta])];
-      return { ...e, recusou, pix: null, banner: false, etapa: proximoPosCompra({ pagos: e.pagos, recusou, parceiro: e.parceiro }) };
+      return { ...e, recusou, pix: null, banner: false, etapa: proximoPosCompra({ pagos: e.pagos, recusou, parceiro: e.parceiro, presente: e.presente, u2027: e.u2027, plano30: e.plano30 }, UPSELL_A_DOIS, ofertasAqui) };
     });
   };
 
@@ -318,7 +359,7 @@ export function FunilHoje() {
 
   const e = estado;
   return (
-    <div className={e.etapa === "up1" || e.etapa === "down" || e.etapa === "pago" ? "fn ua" : "fn"} data-etapa={e.etapa} data-testid="hoje">
+    <div className={e.etapa === "up1" || e.etapa === "down" || e.etapa === "pago" ? "fn ua" : e.etapa === "u2027" ? "fn u27" : e.etapa === "presente" || e.etapa === "plano30" ? "fn pv" : "fn"} data-etapa={e.etapa} data-testid="hoje">
       <div className="fn-corpo" ref={corpo}>
         {e.etapa === "renda" && (
           <TelaRenda
@@ -465,9 +506,17 @@ export function FunilHoje() {
           </div>
         )}
 
+        {backOferta && e.etapa === "oferta" && (
+          <BackFolha funil="hoje" etapa="oferta" variante={varianteDoBack()} preco={precoDoBack} extra={ids()}
+            onQuero={() => { setBackOferta(false); pagar(); }}
+            onFicar={() => setBackOferta(false)}
+            onSair={() => { setBackOferta(false); sairDeVerdade(); }} />
+        )}
+
         {e.etapa === "pix" && (
           <PixHoje oferta={ofertaPlano} valor={valorPlano} rotulo={vitalicio ? "CORE pra sempre" : `${e.plano === "anual" ? "1º ano do CORE" : "30 dias de CORE"}${e.kit && BUMP_KIT ? " + Kit Primeiro Mês" : ""}`}
             pix={e.pix} anteriores={e.anteriores} onPix={onPix} onPago={aoPagar} onVoltar={() => ir("oferta")} ids={ids}
+            backFunil={podeBack ? "hoje" : undefined}
             emailSalvo={e.emailPix?.email ?? null} onEmailSalvo={(email, via) => setEstado((x) => ({ ...x, emailPix: { email, via } }))} />
         )}
 
@@ -514,7 +563,40 @@ export function FunilHoje() {
 
         {e.etapa === "parceiro" && (
           <TelaParceiro acessoTxt={acessoTxt} pedido={estado.pagos.find((p) => p.oferta === "hc199")?.orderId ?? ""} ids={ids}
-            onPronto={(email) => setEstado((x) => ({ ...x, parceiro: email, etapa: proximoPosCompra({ ...x, parceiro: email }) }))} />
+            onPronto={(email) => setEstado((x) => ({ ...x, parceiro: email, etapa: proximoPosCompra({ ...x, parceiro: email }, UPSELL_A_DOIS, ofertasAqui) }))} />
+        )}
+
+        {e.etapa === "u2027" && (
+          <Suspense fallback={null}>
+            <Fluxo2027 origem="hoje" compra={(pagoPlano ?? ultimoPago)?.orderId ?? "hoje"} valorPago={ultimoPago ? VALOR_OFERTA[ultimoPago.oferta] : valorPlano} ids={ids}
+              onFim={(r) => setEstado((x) => {
+                const u2027 = { pedido: r.pedido };
+                return { ...x, u2027, banner: false, etapa: proximoPosCompra({ ...x, u2027 }, UPSELL_A_DOIS, ofertasAqui) };
+              })} />
+          </Suspense>
+        )}
+
+        {/* 21/10: o "Agora não" do 2027 → o plano de 30 dias (o mesmo downsell do presente, sem a oferta do presente) */}
+        {e.etapa === "plano30" && (
+          <Suspense fallback={null}>
+            <FluxoPresente so30Dias origem="hoje" compra={(pagoPlano ?? ultimoPago)?.orderId ?? "hoje"} valorPago={ultimoPago ? VALOR_OFERTA[ultimoPago.oferta] : valorPlano}
+              area="dinheiro" ids={ids}
+              onFim={(r) => setEstado((x) => {
+                const plano30 = { pedido: r.plano30 };
+                return { ...x, plano30, banner: false, etapa: proximoPosCompra({ ...x, plano30 }, UPSELL_A_DOIS, ofertasAqui) };
+              })} />
+          </Suspense>
+        )}
+
+        {e.etapa === "presente" && (
+          <Suspense fallback={null}>
+            <FluxoPresente origem="hoje" compra={(pagoPlano ?? ultimoPago)?.orderId ?? "hoje"} valorPago={ultimoPago ? VALOR_OFERTA[ultimoPago.oferta] : valorPlano}
+              area="dinheiro" ids={ids}
+              onFim={(r) => setEstado((x) => {
+                const presente = { pedido: r.pedido, plano30: r.plano30 };
+                return { ...x, presente, banner: false, etapa: proximoPosCompra({ ...x, presente }, UPSELL_A_DOIS, ofertasAqui) };
+              })} />
+          </Suspense>
         )}
 
         {e.etapa === "pago" && (
@@ -791,7 +873,10 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, planoAtrib, onEmail, o
   const [aviso, setAviso] = useState<string | null>(null);
   const finalizou = useRef(false);
   const pedidoPlano = estado.pagos.find((p) => ehPlanoDoHoje(p.oferta)) ?? null;
-  const pedidoKit = estado.pagos.find((p) => temKit(p.oferta)) ?? null;
+  // 21/10: o plano de 30 dias do "Agora não" do presente (pk99) é o mesmo kit — vai pra conta final igual ao bump
+  //        e o do "Agora não" do 2027 (estado.plano30) também
+  const plano30Pago = estado.presente?.plano30 ?? estado.plano30?.pedido ?? null;
+  const pedidoKit = estado.pagos.find((p) => temKit(p.oferta)) ?? (plano30Pago ? { orderId: plano30Pago } : null);
   const praSempre = estado.pagos.some((p) => ehPraSempre(p.oferta));
 
   /** a conta final está pronta: Finanças, kit, atribuição, boas-vindas */
@@ -801,11 +886,15 @@ function TelaPago({ estado, r, acessoTxt, totalPago, ids, planoAtrib, onEmail, o
     const fin = await gravarFinancas(estado.renda, contasEscolhidas(estado.contas));
     trackEvent("hoje_financas", { r: fin, ...ids() });
     if (pedidoKit) await gravarKit(pedidoKit.orderId);
+    // 21/10: o "Seu 2027" pago vai pra conta final (quem entrou numa conta que já existia)
+    if (estado.u2027?.pedido) await gravarPacote2027(estado.u2027.pedido);
     await gravarAtribuicao({
       v: 1, attr: lerAtribuicao(), faixa: estado.faixa, contas: Object.keys(estado.contas).length, plano: planoAtrib,
       pagos: estado.pagos.map((p) => p.oferta), hoje_session_id: ids().hoje_session_id, em: new Date().toISOString(),
     });
     if (pedidoPlano) void pedirBoasVindas(pedidoPlano.orderId);
+    // 21/10: o link do presente pago vai pro e-mail que acabou de ser salvo (1x por pedido, no servidor)
+    if (estado.presente?.pedido) void pedirEmailDoPresente(estado.presente.pedido);
     trackEvent("hoje_email_salvo", { via, ...ids() });
     onEmail(emailFinal);
     setFase("pronto");

@@ -97,6 +97,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-codigo-pendente", // código promocional validado antes do cadastro, resgatado depois
   "core-montar-financas", // 1.0.16: "Vamos montar suas Finanças" feito/pulado (+ vistas); a mesma chave vai pra conta
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
+  "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -151,6 +152,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [
+    "core-back-qa", "core-back-qa-v", "core-back-usados", // 21/10: BACK dos funis web — força de QA e "já usado" por etapa, só no sessionStorage (lib/back-funil)
     "core-demo-guarda", "core-demo-volta", "core-demo-tour", "core-pwa-open-sent",
     "core-lembretes", // id do canal de notificação do Android
   ],

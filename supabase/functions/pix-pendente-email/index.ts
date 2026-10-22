@@ -17,6 +17,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { destinoDePreview } from "../_shared/preview-seguro.ts";
 
 const log = (m: string, x?: unknown) => console.log(`[pix-pendente-email] ${m}`, x ? JSON.stringify(x) : "");
 const PRECOS: Record<string, string> = { w27: "27,90", downsell: "14,90", w25: "24,90", w47: "47,90", w97: "97,90", lifetime: "97,90" };
@@ -57,7 +58,11 @@ serve(async (req) => {
       if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 200)}`);
     };
     // PREVIEW: manda pro e-mail informado, sem gravar nada
-    if (body?.preview) { await enviar(String(body.preview), "João", "27,90", `${site}/planos?from=pix_pendente_preview`); return Response.json({ preview: true }); }
+    if (body?.preview) {
+      // segurança 21/10: o preview só sai pras caixas da equipe (a anon key pública basta pra chamar a função)
+      const destino = destinoDePreview(body.preview);
+      if (!destino) return Response.json({ error: "forbidden" }, { status: 403 });
+      await enviar(destino, "João", "27,90", `${site}/planos?from=pix_pendente_preview`); return Response.json({ preview: true }); }
 
     const agora = Date.now();
     const de = new Date(agora - 90 * 60_000).toISOString(), ate = new Date(agora - 20 * 60_000).toISOString();

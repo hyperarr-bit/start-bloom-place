@@ -54,6 +54,7 @@ import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 import { registrarDias23Remoto } from "@/lib/dias23";
+import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -79,6 +80,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarDias23Remoto, // 1.0.18: `dias23` (on|off) — os dias 2 e 3 do teste: número pronto + escolhe o seu + o resumo ao abrir no dia 3 (lib/dias23)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
     registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
+    registrarAvaliacaoTesteDia2Remoto, // 1.0.18: `avaliacao_teste_dia2` (on|off, padrão off) — pedir nota também pro teste que voltou no dia 2 (lib/avaliacao-teste-dia2)
   ];
   for (const f of cada) {
     try { f(offerings); } catch { /* uma chave estranha não leva as outras */ }
@@ -371,6 +373,34 @@ export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
 export const lerTrialCancelado = (info: unknown): boolean =>
   Object.values((info as InfoLida)?.entitlements?.active ?? {}).some((e) =>
     e?.periodType === "TRIAL" && (!!e?.unsubscribeDetectedAt || (e?.willRenew === false && !e?.billingIssueDetectedAt)));
+
+/** 22/10 (1.0.18): o teste grátis visto pelo pedido de avaliação do dia 2 (lib/avaliacao → pedirAvaliacaoTesteDia2).
+ *  `ativo` = há um entitlement TRIAL ativo; `cancelado` = mesma regra de `lerTrialCancelado` (unsubscribeDetectedAt, ou
+ *  willRenew false sem cartão recusado); `inicioMs` = a compra do teste (latestPurchaseDateMillis — no trial é o início);
+ *  sem ela, fim − 3 dias (o teste do iPhone; num teste mais longo isso dá um início MAIS TARDE = mais conservador). */
+export type TesteParaAvaliacao = { ativo: boolean; cancelado: boolean; inicioMs: number | null };
+export function lerTesteParaAvaliacao(info: unknown): TesteParaAvaliacao {
+  type E = EntitlementLido & { latestPurchaseDateMillis?: number | null };
+  const ativos = Object.values(((info as InfoLida)?.entitlements?.active ?? {}) as Record<string, E>);
+  const t = ativos.find((e) => e?.periodType === "TRIAL");
+  if (!t) return { ativo: false, cancelado: false, inicioMs: null };
+  const cancelado = !!t.unsubscribeDetectedAt || (t.willRenew === false && !t.billingIssueDetectedAt);
+  const compra = typeof t.latestPurchaseDateMillis === "number" && t.latestPurchaseDateMillis > 0 ? t.latestPurchaseDateMillis : null;
+  const fim = typeof t.expirationDateMillis === "number" && t.expirationDateMillis > 0 ? t.expirationDateMillis : null;
+  return { ativo: true, cancelado, inicioMs: compra ?? (fim ? fim - 3 * 86_400_000 : null) };
+}
+/** null = não deu pra saber (web, RevenueCat fora, rede) — e aí o pedido não acontece. */
+export async function testeParaAvaliacao(): Promise<TesteParaAvaliacao | null> {
+  if (!isNativeShell()) return null;
+  if (!configurado) { try { await initRevenueCat(); } catch { return null; } }
+  if (!Purchases || !configurado) return null;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    return lerTesteParaAvaliacao(customerInfo);
+  } catch {
+    return null;
+  }
+}
 
 export async function estadoTrialCancelado(): Promise<boolean> {
   if (!isNativeShell()) return false;

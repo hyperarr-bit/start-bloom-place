@@ -78,6 +78,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-avaliacao-valor-recusas", // 2 "Agora não" → nunca mais
   "core-avaliacao-convite-em", // 1 semana entre convites
   "core-avaliacao-convite-valor",
+  "core-avaliacao-convite-teste-dia2", // 1.0.18: o pedido do teste que voltou no dia 2 já foi reservado (lib/avaliacao)
+  "core-avaliacao-teste-dia2", // 1.0.18: a última resposta do RevenueCat pro pedido do teste no dia 2 (metadata avaliacao_teste_dia2: on|off)
+  "avaliacao-teste-dia2-force", // 1.0.18: força de QA do pedido do teste no dia 2 (?avaliacao-teste-dia2=on|off|auto)
   "core-avaliacao-convite-funil",
   "core-avaliacao-primeiro-gasto",
   "core-avaliacao-plano-pronto",

@@ -4,6 +4,9 @@ import { userKeyOf } from "@/components/finance/storage-keys";
 import { ehCaminhoDeDemo } from "@/lib/caminho-demo";
 import { erroNaSessao, momentoRuimRecente } from "@/lib/momento-ruim";
 import { avaliacaoV14Ligada } from "@/lib/avaliacao-v14";
+import { avaliacaoTesteDia2Ligada } from "@/lib/avaliacao-teste-dia2";
+import { diaBRT } from "@/lib/aparelho";
+import type { TesteParaAvaliacao } from "@/lib/revenuecat";
 
 /**
  * PEDIDO DE AVALIAÇÃO NA PLAY (14/08).
@@ -208,7 +211,89 @@ export function reservarConviteDeValor(acao: string | null | undefined, { pagant
  */
 export async function pedirAvaliacaoDeValor(acao: string | null | undefined, o: { pagante: boolean; emTrial: boolean }): Promise<boolean> {
   if (!reservarConviteDeValor(acao, o)) return false;
-  return pedirAvaliacaoSePuder("momento_valor", { pagante: true });
+  return pedirAvaliacaoSePuder("momento_valor", { pagante: true, publico: "pagante" });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * iPHONE: O TESTE QUE VOLTOU NO DIA 2 TAMBÉM É PEDIDO (1.0.18, dono 22/10).
+ *
+ * A regra de 23/09 (só pagante) derrubou o volume de ~2,1/dia pra ~0,37/dia (47 notas no iPhone, 4,6). A
+ * mudança: quem está no TESTE GRÁTIS com a renovação LIGADA e VOLTOU — está usando o app num dia BRT
+ * diferente do da compra do teste E pelo menos 20 h depois dela — também é pedido, no MESMO momento de
+ * valor (ação concluída, `ACOES_DE_VALOR`) e com as MESMAS travas (2+ dias de uso, semana entre reservas,
+ * 90 dias e 3 na vida, momento ruim, /preview). Quem cancelou o teste (sem renovação) NÃO entra. Só a
+ * caixinha nativa da Apple (SKStoreReviewController) — nada de folha nossa nem pergunta antes (5.6.1/5.6.3),
+ * e nunca no funil/paywall/1ª abertura nem por cima de outra tela (ver `outraTelaNaFrente` e
+ * `rotaDoMomentoDeValorTeste`, que o ConviteDeValor confere). Atrás da chave `avaliacao_teste_dia2`
+ * (lib/avaliacao-teste-dia2, padrão "off"). Android: nada muda. Evento: app_avaliacao_pedida com
+ * `publico: "teste_dia2"` (o do pagante leva `publico: "pagante"`).
+ * ───────────────────────────────────────────────────────────────────────── */
+export type PublicoAvaliacao = "pagante" | "teste_dia2";
+export const HORAS_MINIMAS_TESTE_DIA2 = 20;
+
+/** As telas onde o pedido do teste pode aparecer: os módulos e a Home (um segmento só — /hoje/demo, funis,
+ *  paywall, /planos, /assinatura, /auth, /bem-vindo, /missao… ficam de fora). /treino fica de fora como no pagante. */
+const ROTAS_DO_PEDIDO_DO_TESTE: ReadonlySet<string> = new Set([
+  "home", "hoje", "financas", "rotina", "saude", "dieta", "estudos", "beleza", "casa", "carreira",
+  "desenvolvimento", "detox", "pet", "relacionamentos", "viagens", "hiperfoco", "biblioteca", "modulos",
+]);
+export function rotaDoMomentoDeValorTeste(caminho: string): boolean {
+  const partes = caminho.split("?")[0].split("/").filter(Boolean);
+  return partes.length === 1 && ROTAS_DO_PEDIDO_DO_TESTE.has(partes[0]);
+}
+
+/** Qualquer outra camada na tela: guias (tour, cartões, intro, doses, dias 2–3, convite do dia, plano de amanhã,
+ *  lembrete), festas/adesivos (`data-momento`), folhas e diálogos, o card da recusa e a tela de cobrança, o sino. */
+export const SELETOR_OUTRA_TELA =
+  '[data-camada-guia], [data-momento], [role="dialog"], [role="alertdialog"], [data-testid="card-recusa"], [data-testid="cobranca-tela-cheia"], [data-testid^="ios-sino"]';
+export function outraTelaNaFrente(): boolean {
+  try {
+    if (document.documentElement.hasAttribute("data-missao-dose")) return true;
+    return !!document.querySelector(SELETOR_OUTRA_TELA);
+  } catch {
+    return true;
+  }
+}
+
+/** A regra pura do teste no dia 2 — sem efeito colateral, testável. */
+export function deveConvidarTesteNoDia2(o: {
+  ligada: boolean; iphone: boolean; acao: string | null | undefined; teste: TesteParaAvaliacao | null;
+  agora: number; dias: number; podePedir: boolean; conviteRecente: boolean;
+}): boolean {
+  if (!o.ligada || !o.iphone) return false;
+  if (!o.acao || !(o.acao in ACOES_DE_VALOR)) return false;
+  const t = o.teste;
+  if (!t || !t.ativo || t.cancelado || !t.inicioMs) return false;
+  if (o.agora - t.inicioMs < HORAS_MINIMAS_TESTE_DIA2 * 3600_000) return false;
+  if (diaBRT(new Date(o.agora)) === diaBRT(new Date(t.inicioMs))) return false;
+  if (o.dias < DIAS_MINIMOS_PRA_CONVIDAR) return false;
+  return o.podePedir && !o.conviteRecente;
+}
+
+/**
+ * O pedido do teste no dia 2 (chamado pelo ConviteDeValor quando o do pagante não vale). Lê o teste na loja
+ * (RevenueCat: ativo, cancelado, início) só depois das travas baratas; `aindaPode` é conferido de novo depois
+ * dessa leitura (a tela pode ter mudado). Reserva a semana ANTES de pedir. Devolve se a caixinha foi pedida.
+ */
+export async function pedirAvaliacaoTesteDia2(
+  acao: string | null | undefined,
+  { aindaPode = () => true, lerTeste }: { aindaPode?: () => boolean; lerTeste?: () => Promise<TesteParaAvaliacao | null> } = {},
+): Promise<boolean> {
+  if (!avaliacaoTesteDia2Ligada() || !noIPhone()) return false;
+  if (!acao || !(acao in ACOES_DE_VALOR)) return false;
+  if (diasDeUso() < DIAS_MINIMOS_PRA_CONVIDAR || !podePedirAvaliacao() || conviteRecente()) return false;
+  let teste: TesteParaAvaliacao | null = null;
+  try {
+    teste = lerTeste ? await lerTeste() : await (await import("@/lib/revenuecat")).testeParaAvaliacao();
+  } catch { return false; }
+  if (!aindaPode()) return false;
+  const ok = deveConvidarTesteNoDia2({
+    ligada: avaliacaoTesteDia2Ligada(), iphone: noIPhone(), acao, teste, agora: Date.now(), dias: diasDeUso(),
+    podePedir: podePedirAvaliacao(), conviteRecente: conviteRecente(),
+  });
+  if (!ok) return false;
+  marcarConvite("core-avaliacao-convite-teste-dia2");
+  return pedirAvaliacaoSePuder("momento_valor", { forte: true, publico: "teste_dia2" });
 }
 
 /** "Agora não" da folha antiga de valor. 1.0.16: a folha saiu do iPhone e a contagem não barra mais nada
@@ -353,7 +438,7 @@ export function reservarConvitePrimeiroGasto(userId: string | null | undefined, 
  */
 export async function pedirAvaliacaoSePuder(
   motivo: MotivoAvaliacao,
-  { pagante = false, vezes = 1, forte = false, tocouParaAvaliar = false }: { pagante?: boolean; vezes?: number; forte?: boolean; tocouParaAvaliar?: boolean } = {},
+  { pagante = false, vezes = 1, forte = false, tocouParaAvaliar = false, publico }: { pagante?: boolean; vezes?: number; forte?: boolean; tocouParaAvaliar?: boolean; publico?: PublicoAvaliacao } = {},
 ): Promise<boolean> {
   if (!pagante && !forte && vezes < 2) return false;
   /* iPHONE (03/10, dono: "vê como a Play faz e faz igual"): a caixinha da Apple volta nos MESMOS momentos de uso do
@@ -399,7 +484,7 @@ export async function pedirAvaliacaoSePuder(
       localStorage.setItem(CHAVE_TOTAL, String(total + 1));
     } catch { /* modo privado: segue, o Google ainda tem a cota dele */ }
 
-    trackEvent("app_avaliacao_pedida", { motivo, pagante, vezes, ordem: total + 1 });
+    trackEvent("app_avaliacao_pedida", { motivo, pagante, vezes, ordem: total + 1, ...(publico ? { publico } : {}) });
     await InAppReview.requestReview();
     return true;
   } catch {

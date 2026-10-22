@@ -12,6 +12,7 @@ import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaCardRecusa } from "@/lib/card-recusa";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
+import { guardarForcaAvaliacaoTesteDia2 } from "@/lib/avaliacao-teste-dia2";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
 import { guardarForcaDesafiosRodizio } from "@/lib/desafios-rodizio";
@@ -34,6 +35,7 @@ void iniciarMedicaoDoAparelho();
 guardarForcaDaCobrancaV14();
 guardarForcaCardRecusa(); // 1.0.18: `?card-recusa=on|off|auto[,recomecar]` — o card de tela inteira do cartão recusado
 guardarForcaDaAvaliacaoV14();
+guardarForcaAvaliacaoTesteDia2(); // 1.0.18: `?avaliacao-teste-dia2=on|off|auto` — pedir nota também pro teste que voltou no dia 2
 guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)
 guardarForcaDesafiosRodizio(); // `?desafios-rodizio=on|off|auto`: o rodízio dos desafios da semana neste navegador (QA)
 guardarForcaDasOfertas(); // `?ofertas-saida=…` em qualquer rota: o paywall enxuto mora no gate e no /planos, não só no funil

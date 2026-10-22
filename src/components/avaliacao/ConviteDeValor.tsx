@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
-import { ACOES_DE_VALOR, noIPhone, pedirAvaliacaoDeValor, registrarDiaDeUso } from "@/lib/avaliacao";
+import {
+  ACOES_DE_VALOR, noIPhone, outraTelaNaFrente, pedirAvaliacaoDeValor, pedirAvaliacaoTesteDia2, registrarDiaDeUso, rotaDoMomentoDeValorTeste,
+} from "@/lib/avaliacao";
 
 /**
  * CONVITE DE AVALIAÇÃO NO MOMENTO DE VALOR — iPhone (23/09, ordem do dono).
@@ -14,6 +16,11 @@ import { ACOES_DE_VALOR, noIPhone, pedirAvaliacaoDeValor, registrarDiaDeUso } fr
  * 1.0.16 (17/10, dono): a folha ConviteAvaliacao saiu daqui (43 vistas, 41
  * "Agora não") — agora é a caixinha nativa da Apple direto
  * (`pedirAvaliacaoDeValor`), nas mesmas regras e no mesmo momento.
+ *
+ * 1.0.18 (22/10, dono): quando o pedido do pagante não vale e a pessoa está no TESTE, o mesmo momento tenta
+ * o pedido do teste que voltou no dia 2 (`pedirAvaliacaoTesteDia2`, chave `avaliacao_teste_dia2`, padrão off) —
+ * só na Home/módulos e sem NENHUMA outra camada na tela (`outraTelaNaFrente`), conferido antes e depois de
+ * ler o teste na loja.
  */
 export const ConviteDeValor = () => {
   const { user, isSubscribed, subLoaded } = useAuth();
@@ -45,7 +52,17 @@ export const ConviteDeValor = () => {
         // cartões, convite, festa da dose), a caixinha não abre por cima — a reserva fica pra próxima ação. Visto
         // no harness: criar o 1º hábito na dose do dia 2 abria a folha da nota no "2 de 2 · marcar".
         if (document.documentElement.hasAttribute("data-missao-dose") || document.querySelector("[data-camada-guia]")) return;
-        void pedirAvaliacaoDeValor(acao, { pagante: isSubscribed, emTrial: trialCartaoAtivo() });
+        const emTrial = trialCartaoAtivo();
+        void (async () => {
+          if (await pedirAvaliacaoDeValor(acao, { pagante: isSubscribed, emTrial })) return;
+          if (!emTrial) return;
+          const livre = () => {
+            const foco = document.activeElement as HTMLElement | null;
+            return rotaDoMomentoDeValorTeste(window.location.pathname) && !outraTelaNaFrente() && !(foco && /^(INPUT|TEXTAREA|SELECT)$/.test(foco.tagName));
+          };
+          if (!livre()) return;
+          await pedirAvaliacaoTesteDia2(acao, { aindaPode: livre });
+        })();
       }, 1500);
     };
     window.addEventListener("core:activation", ouvir);

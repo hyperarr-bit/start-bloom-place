@@ -62,7 +62,8 @@ class IntersectionObserverStub {
   disconnect() {}
   takeRecords(): IntersectionObserverEntry[] { return []; }
 }
-if (!("IntersectionObserver" in window)) {
+// Arquivos com `// @vitest-environment node` (ex.: os testes do banco em PGlite) não têm window.
+if (typeof window !== "undefined" && !("IntersectionObserver" in window)) {
   Object.defineProperty(window, "IntersectionObserver", {
     writable: true,
     value: IntersectionObserverStub,
@@ -73,7 +74,7 @@ if (!("IntersectionObserver" in window)) {
   });
 }
 
-Object.defineProperty(window, "matchMedia", {
+if (typeof window !== "undefined") Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
     matches: false,

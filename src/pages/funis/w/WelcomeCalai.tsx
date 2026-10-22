@@ -197,7 +197,10 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
             />
             {!rodando && (
               <div className="wca-cobre" data-testid="welcome-cobre" data-animado={passeio ? "" : undefined}>
-                <img className="wca-cobre-img" src={POSTER_WELCOME} alt="" draggable={false} />
+                {/* 1.0.18 (QA de aparelho 21/10): o pôster é o celular PARADO no meio, mas o vídeo (e o WebP) começa em branco com
+                    o celular ENTRANDO pela direita — o pôster na abertura piscava ~130 ms e o celular sumia e voltava deslizando.
+                    A capa abre BRANCA (igual ao 1º quadro do vídeo); o pôster fica só de reserva, por baixo do WebP, depois dele. */}
+                <img className="wca-cobre-img wca-cobre-foto" src={POSTER_WELCOME} alt="" draggable={false} />
                 {/* carrega desde o início (pra estar pronto em 1,2 s) e só aparece se o vídeo não rodar */}
                 <img className="wca-cobre-img wca-cobre-anim" src={VIDEO_WELCOME_ANIMADO} alt="" draggable={false} />
               </div>
@@ -270,9 +273,11 @@ const CSS_WCA = `
 }
 /* contain + o mesmo fundo do vídeo: se a caixa sair um pixel da proporção, nada é cortado nem ampliado */
 .wca-video { display: block; width: 100%; height: 100%; object-fit: contain; background: #ffffff; }
-/* a capa = o pôster (o 1º quadro do vídeo) por cima do vídeo até ele rodar; sem vídeo, o WebP animado aparece suave */
+/* a capa = branca (o 1º quadro do vídeo) por cima do vídeo até ele rodar; sem vídeo, o WebP animado aparece suave e o pôster fica de reserva por baixo */
 .wca-cobre { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #ffffff; pointer-events: none; }
 .wca-cobre-img { position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; object-fit: contain; }
+.wca-cobre-foto { opacity: 0; }
+.wca-cobre[data-animado] .wca-cobre-foto { opacity: 1; transition: opacity 0s linear .4s; }
 .wca-cobre-anim { opacity: 0; transition: opacity .35s ease-out; }
 .wca-cobre[data-animado] .wca-cobre-anim { opacity: 1; }
 .wca-video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }

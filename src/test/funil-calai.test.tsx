@@ -438,6 +438,12 @@ describe("LIGADA: a sequência enxuta", () => {
       const imgs = Array.from(capa.querySelectorAll("img")).map((i) => i.getAttribute("src"));
       expect(imgs).toEqual(["/funil/welcome-app.jpg", "/funil/welcome-app.webp"]);
       expect(capa).not.toHaveAttribute("data-animado");
+      /* 1.0.18 (QA 21/10): o pôster (celular parado no meio) NÃO aparece na abertura — o vídeo começa em branco com o
+         celular entrando, e o pôster piscava antes; a capa abre branca e o pôster só vale depois do WebP, por baixo */
+      const css = Array.from(document.querySelectorAll("style")).map((s) => s.textContent ?? "").join("\n");
+      expect(capa.querySelector("img")).toHaveClass("wca-cobre-foto");
+      expect(css).toMatch(/\.wca-cobre-foto \{ opacity: 0; \}/);
+      expect(css).toMatch(/\.wca-cobre\[data-animado\] \.wca-cobre-foto \{ opacity: 1; transition: opacity 0s linear \.4s; \}/);
       await act(async () => { vi.advanceTimersByTime(1300); });
       expect(screen.getByTestId("welcome-cobre")).toHaveAttribute("data-animado");
       fireEvent.playing(screen.getByTestId("welcome-video"));

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { entrada, MOV, MOV_MS, saida, saidaCalmaDe, saidaCalmaDaTela } from "@/lib/movimento";
-import { marcarIntroVista } from "@/lib/intro-modulo";
+import { EVENTO_INTRO_FIM, introVistaNaConta, introVistaNesteAparelho, marcarIntroVista, porQueNaoMostrar, type FimDaIntro } from "@/lib/intro-modulo";
+import { guardarForcaDias23 } from "@/lib/dias23";
+import { porDiaDasFinancas } from "@/lib/lembrete-dia2";
 import { useAuth, useAuthOpcional } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
@@ -20,7 +22,10 @@ import {
   CHAVE_MISSAO_NA_CONTA, EVENTO_MISSAO_COMPLETA, EVENTO_MISSAO_DOSES, MISSAO_DOSES_APP, MODULOS, TOTAL_PASSOS_B, apagarMissao, aprofundarPendente, contaNova, conviteDoDiaDevido, diaDaMissao, dicaDoDiaDevida, donoDaConta, doseAbreHoje, dosesFeitas, ehBracoB, ehUmPorDia, eventoDaMissao, gravarMissao, guardarForcaDaUrl, iniciarMissao, lerMissao,
   definirDonoDaMissao, marcarComecar, missaoDaConta, semValor, missaoValida, precisaPlanoA, retomadaDoGasto,
   missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, modulosPadrao, passoHomePendente, passoPendente, precisaPlanoAmanha, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao,
+  ROTULO_DOSE_PELA_INTRO, comEscolha2, construiuAoAbrirDevido, dias23NaMissao, escolhaDoDia2Devida, introEhADoseDoDia2, opcoesDoDia2,
 } from "@/lib/missao-doses";
+import { EscolhaDoDia2 } from "./EscolhaDoDia2";
+import { EVENTO_ABRIR_ESCOLHA_DIA2 } from "./LinhaDoseDeHoje";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { BoasVindasDoses } from "./BoasVindasDoses";
 import { LerScoreDoDia, PassoDoDia, type ViaDoPulo } from "./PassoDoDia";
@@ -84,6 +89,7 @@ export function MissaoDosesNaWeb() {
   // a força de QA pelo link, em qualquer rota (o link do dono pode cair em qualquer página)
   guardarForcaDaUrl(search);
   guardarForcaDia1Cheio(search);
+  guardarForcaDias23(search);
   const ligada = missaoDosesLigada();
   return ligada ? <><Ligada /><VeuDaMissao /></> : null;
 }
@@ -218,6 +224,11 @@ function Ligada() {
     if (emCurso && !pathname.startsWith(MODULOS[emCurso.modulo].rota)) setEmCurso(null);
   }, [pathname, emCurso]);
   const pendenteAgora = missao ? passoPendente(missao) : null;
+  /** 1.0.18 (dias23): a intro do módulo escolhido no dia 2 ainda vai rodar (não vista) — é ela a dose 2 */
+  const introDaEscolhaNaVez = (m: EstadoMissaoDoses, modulo: ModuloDaMissao): boolean => {
+    if (!introEhADoseDoDia2(m, modulo)) return false;
+    try { return !introVistaNesteAparelho(modulo) && !introVistaNaConta(modulo, get); } catch { return true; }
+  };
   const aprofundar = missao && missao.boasVindas ? aprofundarPendente(missao, pathname, hoje) : null;
   type Passo = { n: DiaDaMissao; modulo: ModuloDaMissao; chave: number; modo?: "aprofundar"; retomar?: boolean };
   /* 1.0.16 (dono, 17/10): fechou o app DEPOIS do Montar e antes do 1º gasto → a dose volta no passo do gasto (chips
@@ -239,6 +250,8 @@ function Ligada() {
        abre os módulos por CURIOSIDADE — nada de dose (nem o Montar) ao entrar neles; a introdução do módulo cuida da
        1ª visita. Sem braço (a missão da 1.0.10/1.0.15 que já estava rodando), como sempre foi. */
     : missao?.boasVindas && pendenteAgora && pathname.startsWith(MODULOS[pendenteAgora.modulo].rota) && missao.pulados?.[pendenteAgora.n] !== hoje && doseAbreHoje(missao, hoje) && !(missao.braco && missao.explorou)
+      // 1.0.18 (dias23): o módulo que ela escolheu no dia 2 — a dose é a INTRO dele (IntroDoModulo), não o passo guiado
+      && !introDaEscolhaNaVez(missao, pendenteAgora.modulo)
     ? { n: pendenteAgora.n, modulo: pendenteAgora.modulo, chave: passoAberto }
     : aprofundar ? { n: aprofundar.n, modulo: aprofundar.modulo, chave: passoAberto, modo: "aprofundar" }
     : null;
@@ -261,6 +274,41 @@ function Ligada() {
     const reler = () => setMissao(lerMissao());
     window.addEventListener(EVENTO_MISSAO_DOSES, reler);
     return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, []);
+
+  /* 1.0.18 (dias23) — A INTRO DO MÓDULO ESCOLHIDO NO DIA 2 É A DOSE 2: "Pronto" (feita) grava a dose; "Pular" deixa a
+     dose pulada hoje (amanhã ela vira o passo guiado de sempre, como qualquer dose com a intro já vista). */
+  useEffect(() => {
+    const aoFimDaIntro = (e: Event) => {
+      try {
+        const d = (e as CustomEvent<{ modulo?: string; como?: FimDaIntro }>).detail;
+        const m = lerMissao();
+        if (!d?.modulo || !m || !introEhADoseDoDia2(m, d.modulo)) return;
+        const dia = localDayKey();
+        const modulo = d.modulo as ModuloDaMissao;
+        if (d.como === "feita") {
+          const novo = { ...m, feitos: { ...m.feitos, 2: { dia, rotulo: ROTULO_DOSE_PELA_INTRO } } };
+          gravarMissao(novo); setMissao(novo);
+          const diaRelogio = diaDaMissao(m, dia);
+          trackEvent("missao_doses_dia_feito", eventoDaMissao({ dia: 2, dia_relogio: diaRelogio, modulo, segundos: null, rotulo: ROTULO_DOSE_PELA_INTRO, via: "intro" }));
+          trackEvent("missao_dose_concluida", eventoDaMissao({ indice: 2, modulo, dia_relogio: diaRelogio, segundos: null, via: "intro" }));
+          trackEvent("dia2_dose_feita", eventoDaMissao({ modulo, dia_do_teste: diaRelogio }));
+        } else if (d.como === "pulada") {
+          const novo = { ...m, pulados: { ...m.pulados, 2: dia } };
+          gravarMissao(novo); setMissao(novo);
+          trackEvent("dia2_dose_pulada", eventoDaMissao({ modulo, dia_do_teste: diaDaMissao(m, dia) }));
+        }
+      } catch { /* nunca derruba a missão */ }
+    };
+    window.addEventListener(EVENTO_INTRO_FIM, aoFimDaIntro);
+    return () => window.removeEventListener(EVENTO_INTRO_FIM, aoFimDaIntro);
+  }, []);
+  /* 1.0.18 (dias23): a linha "Dose de hoje · escolhe o seu" das Pendências reabre a folha da escolha (toque dela) */
+  const [escolhaForcada, setEscolhaForcada] = useState(false);
+  useEffect(() => {
+    const abrir = () => setEscolhaForcada(true);
+    window.addEventListener(EVENTO_ABRIR_ESCOLHA_DIA2, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_ESCOLHA_DIA2, abrir);
   }, []);
 
   /* 1.0.16 (revisão tela a tela 17/10, #17) — "CONHECER MAIS" TOCADO NA FESTA: a festa fecha e o passeio do módulo
@@ -390,13 +438,45 @@ function Ligada() {
      não pode sumir por causa da própria vista (a 2ª chance do convite contava "visto" e sumia no mesmo instante). O
      dia do convite / a dica NA TELA (vista já contada) ficam aqui até a decisão ou até ela sair da Home. */
   const [conviteNaTela, setConviteNaTela] = useState<string | null>(null);
+  /** 1.0.18 (dias23): o resumo dos 3 dias NA TELA (a vista dele já foi contada ao aparecer) */
+  const [construiuNaTela, setConstruiuNaTela] = useState(false);
   const [dicaNaTela, setDicaNaTela] = useState<2 | 3 | null>(null);
   useEffect(() => {
-    if (pathname !== "/home") { setConviteNaTela(null); setDicaNaTela(null); } // voltar pra Home é outra aparição
+    if (pathname !== "/home") { setConviteNaTela(null); setDicaNaTela(null); setEscolhaForcada(false); setConstruiuNaTela(false); } // voltar pra Home é outra aparição
   }, [pathname]);
+  /* 1.0.18 (dias23): as opções do "escolhe o seu" — a intro do módulo tem que poder abrir (sem intro vista, sem dado) */
+  const opcoesDia2 = (m: EstadoMissaoDoses): ModuloDaMissao[] => opcoesDoDia2(m, areaDaMissao(user?.user_metadata), (mod) => {
+    const r = porQueNaoMostrar(mod, get);
+    return r === null || r === "missao" || r === "outra_guia";
+  });
+  // tocou a linha "escolhe o seu" mas não sobrou opção (todas as intros já vistas): o módulo da dose, como sempre
+  useEffect(() => {
+    if (!escolhaForcada) return;
+    const m = lerMissao();
+    if (m && opcoesDia2(m).length) return;
+    setEscolhaForcada(false);
+    const p = m ? passoPendente(m) : null;
+    if (p) navigate(MODULOS[p.modulo].rota);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escolhaForcada]);
   /* 1.0.16, braço A: reabriu num dia novo → o convite "Dia N da missão" na Home (1x por dia). Espera
      1,2 s (a Home assentar) e qualquer outra festa/folha sair da tela — nunca duas folhas juntas. */
-  const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje, conviteNaTela === hoje);
+  const conviteDevido = !!missao && pathname === "/home" && !emCurso && conviteDoDiaDevido(missao, hoje, conviteNaTela === hoje)
+    // 1.0.18 (dias23): no dia em que o resumo dos 3 dias abriu sozinho, o convite não vem por cima (uma camada por abertura)
+    && !(dias23NaMissao(missao) && (missao.fimAoAbrir === hoje || construiuAoAbrirDevido(missao, hoje, construiuNaTela)));
+  /* 1.0.18 (dias23) — dia 3: "Você construiu isso em 3 dias" AO ABRIR (pela data). Espera a Home assentar (1,2 s sem
+     outra folha/festa), como o convite. */
+  const construiuDevido = !!missao && pathname === "/home" && !emCurso && construiuAoAbrirDevido(missao, hoje, construiuNaTela);
+  const [construiuLivre, setConstruiuLivre] = useState(false);
+  useEffect(() => {
+    if (!construiuDevido) { setConstruiuLivre(false); return; }
+    let estaveis = 0;
+    const t = window.setInterval(() => {
+      estaveis = festaNaTela() ? 0 : estaveis + 1;
+      if (estaveis >= 3) { setConstruiuLivre(true); window.clearInterval(t); }
+    }, 400);
+    return () => window.clearInterval(t);
+  }, [construiuDevido]);
   const [conviteLivre, setConviteLivre] = useState(false);
   /* 1.0.16, braço A — a folha "Plano de amanhã" (dia 1): depois da dose, da comemoração e do tour curto */
   const tourPendente = (() => { try { return !tourFeito(get) && deveMostrarTourHome(user?.created_at); } catch { return false; } })();
@@ -526,6 +606,73 @@ function Ligada() {
           salvar({ ...m, planoAmanhaPulado: hoje });
           trackEvent("plano_amanha_pulou", eventoDaMissao({ doses: dosesFeitas(m) }));
           if (!noHome) navigate("/home");
+        }}
+      />
+    );
+  }
+
+  /* 1.0.18 (dias23) — dia 3 (até o 7): "Você construiu isso em 3 dias" ao ABRIR, 1x (fimVisto) */
+  if (construiuDevido && construiuLivre) {
+    return (
+      <ConstruiuEm3Dias
+        missao={missao}
+        aoAbrir
+        aoVer={() => {
+          // conta a vista quando APARECE (fechar o app sem o "Continuar": volta 1 vez, depois nunca mais)
+          const m = lerMissao() ?? missao;
+          setConstruiuNaTela(true);
+          salvar({ ...m, fimAoAbrir: hoje, fimAoAbrirVistas: (m.fimAoAbrirVistas ?? 0) + 1 });
+        }}
+        aoContinuar={() => {
+          saidaCalmaDe('[data-testid="missao-doses-fim"]');
+          const m = lerMissao() ?? missao;
+          setConstruiuNaTela(false);
+          salvar({ ...m, fimVisto: true, fimAoAbrir: hoje });
+          trackEvent("missao_doses_fim_fechou", eventoDaMissao({ ao_abrir: true, dia_do_teste: dia }));
+        }}
+      />
+    );
+  }
+
+  /* 1.0.18 (dias23) — dia 2: "Ficou pronto" + "escolhe o seu" no lugar do convite "Dia 2: Rotina" (1x por dia, mesma
+     régua do convite) — ou reaberta pelo toque na linha das Pendências */
+  const escolhaNaVez = noHome && !emCurso && !missao.escolha2 && pendente?.n === 2 && dias23NaMissao(missao)
+    && ((conviteDevido && conviteLivre && escolhaDoDia2Devida(missao, hoje, conviteNaTela === hoje)) || escolhaForcada);
+  const opcoesDeHoje = escolhaNaVez ? opcoesDia2(missao) : [];
+  if (escolhaNaVez && opcoesDeHoje.length) {
+    const porDia = (() => { try { return porDiaDasFinancas(get); } catch { return null; } })();
+    const base = (m: EstadoMissaoDoses) => ({ opcoes: opcoesDeHoje, dia_do_teste: diaDaMissao(m, hoje) });
+    return (
+      <EscolhaDoDia2
+        missao={missao}
+        opcoes={opcoesDeHoje}
+        porDia={porDia}
+        aoVer={() => {
+          const m = lerMissao() ?? missao;
+          const vez = (m.convitesVistos?.[hoje] ?? 0) + 1;
+          setConviteNaTela(hoje);
+          salvar({ ...m, convitesVistos: { ...m.convitesVistos, [hoje]: vez } });
+          trackEvent("missao_convite", eventoDaMissao({ acao: "visto", dia: 2, modulo: null, vez, escolha: true }));
+          trackEvent("dia2_escolha_view", eventoDaMissao({ ...base(m), vez, via: escolhaForcada ? "pendencias" : "abertura" }));
+          if (porDia !== null) trackEvent("dia2_pronto_view", eventoDaMissao({ dia_do_teste: diaDaMissao(m, hoje), vez }));
+        }}
+        aoComecar={(modulo, posicao) => {
+          saidaCalmaDe('[data-testid="dia2-escolha"]', MOV_MS.base, 420);
+          const m = lerMissao() ?? missao;
+          const novo = comEscolha2(m, modulo, "comecar", hoje);
+          salvar({ ...novo, convites: { ...novo.convites, [hoje]: "foi" } });
+          setEscolhaForcada(false);
+          trackEvent("missao_convite", eventoDaMissao({ acao: "bora", dia: 2, modulo, escolha: true }));
+          trackEvent("dia2_escolhido", eventoDaMissao({ ...base(m), modulo, posicao, de: m.modulos[1] }));
+          navigate(MODULOS[modulo].rota);
+        }}
+        aoAgoraNao={() => {
+          saidaCalmaDe('[data-testid="dia2-escolha"]');
+          const m = lerMissao() ?? missao;
+          salvar({ ...m, convites: { ...m.convites, [hoje]: "depois" } });
+          setEscolhaForcada(false);
+          trackEvent("missao_convite", eventoDaMissao({ acao: "depois", dia: 2, modulo: null, escolha: true }));
+          trackEvent("dia2_escolha_agora_nao", eventoDaMissao(base(m)));
         }}
       />
     );

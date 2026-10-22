@@ -188,6 +188,12 @@ export const marcarIntroVistaNaConta = (moduleId: string, get: Leitor, set: Escr
   if (!arr.includes(moduleId)) set(CHAVE_INTRO_VISTAS_CONTA, [...arr, moduleId]);
 };
 /** Terminou (feita ou pulada): aparelho + conta; "feita" também entra na lista de feitas da conta. */
+/** 1.0.18 (dias23): o CustomEvent da janela quando a intro de um módulo TERMINA na tela ("Pronto" = feita, "Pular" =
+ *  pulada) — a missão escuta: a intro do módulo escolhido no dia 2 é a dose 2. `detail: { modulo, como }`. */
+export const EVENTO_INTRO_FIM = "intro-modulo:fim";
+export const avisarFimDaIntro = (moduleId: string, como: FimDaIntro): void => {
+  try { window.dispatchEvent(new CustomEvent(EVENTO_INTRO_FIM, { detail: { modulo: moduleId, como } })); } catch { /* sem window */ }
+};
 export const marcarIntroVista = (moduleId: string, get: Leitor, set: Escritor, como: FimDaIntro = "feita"): void => {
   marcarIntroVistaNoAparelho(moduleId, como);
   marcarIntroVistaNaConta(moduleId, get, set);
@@ -994,6 +1000,8 @@ export function introBloqueadaPelaMissao(moduleId: string): boolean {
   if (doseNaTela()) return true;
   try {
     if (!missaoDosesLigada()) return false;
+    // 1.0.18 (dias23): o módulo que ela ESCOLHEU no dia 2 — a dose 2 É a intro dele (nunca bloqueia)
+    if (missaoDoses.introEhADoseDoDia2(lerMissao(), moduleId)) return false;
     const hoje = moduloDaMissaoHoje();
     if (hoje === moduleId) return true;
     const m = lerMissao();

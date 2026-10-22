@@ -53,6 +53,7 @@ import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
+import { registrarDias23Remoto } from "@/lib/dias23";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -75,6 +76,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarChavePaywallMinimalista,
     registrarAttMomentoRemoto, // 1.0.18: `att_momento` (auto3s|comecar|ab) — quando o ATT é pedido (lib/att-momento)
     registrarCardRecusaRemoto, // 1.0.18: `card_recusa` (on|off, padrão off) — o card de tela inteira do cartão recusado (lib/card-recusa)
+    registrarDias23Remoto, // 1.0.18: `dias23` (on|off) — os dias 2 e 3 do teste: número pronto + escolhe o seu + o resumo ao abrir no dia 3 (lib/dias23)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
     registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
   ];

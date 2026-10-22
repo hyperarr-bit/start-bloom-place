@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
-import { EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, doseDeHojeDevida, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
+import { EVENTO_MISSAO_DOSES, MODULOS, diaDaMissao, dias23NaMissao, doseDeHojeDevida, eventoDaMissao, lerMissao, passoPendente } from "@/lib/missao-doses";
+
+/** 1.0.18 (dias23): tocar "Dia 2 · escolhe o seu" nas Pendências reabre a folha da escolha (a orquestra escuta). */
+export const EVENTO_ABRIR_ESCOLHA_DIA2 = "missao-doses:abrir-escolha-dia2";
 
 /**
  * "DOSE DE HOJE" NAS PENDÊNCIAS (1.0.16, braço A — desenho 8 seção 4.5). A única presença da missão na
@@ -22,7 +25,11 @@ export function useDoseDeHoje() {
   const hoje = localDayKey();
   if (!m || !doseDeHojeDevida(m, hoje)) return null;
   const p = passoPendente(m);
-  return p ? { n: p.n, modulo: p.modulo, diaCal: diaDaMissao(m, hoje) } : null;
+  if (!p) return null;
+  const diaCal = diaDaMissao(m, hoje);
+  // 1.0.18 (dias23): no dia 2, antes de ela escolher, a linha é a escolha (não "Rotina")
+  const escolher = p.n === 2 && diaCal >= 2 && dias23NaMissao(m) && !m.escolha2;
+  return { n: p.n, modulo: p.modulo, diaCal, ...(escolher ? { escolher: true as const } : {}) };
 }
 
 export function LinhaDoseDeHoje({ dose }: { dose: NonNullable<ReturnType<typeof useDoseDeHoje>> }) {
@@ -34,15 +41,21 @@ export function LinhaDoseDeHoje({ dose }: { dose: NonNullable<ReturnType<typeof 
         type="button"
         data-track="pendencia:dose_de_hoje"
         onClick={() => {
+          if ("escolher" in dose && dose.escolher) {
+            trackEvent("home_pendencia", { tipo: "dose_de_hoje", destino: "escolha_dia2" });
+            trackEvent("missao_pendencia_dose", eventoDaMissao({ indice: dose.n, modulo: null, escolha: true }));
+            try { window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_ESCOLHA_DIA2)); } catch { /* noop */ }
+            return;
+          }
           trackEvent("home_pendencia", { tipo: "dose_de_hoje", destino: cfg.rota });
           trackEvent("missao_pendencia_dose", eventoDaMissao({ indice: dose.n, modulo: dose.modulo }));
           navigate(cfg.rota);
         }}
         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-all text-left"
       >
-        <span className="text-sm" aria-hidden>{cfg.emoji}</span>
+        <span className="text-sm" aria-hidden>{"escolher" in dose && dose.escolher ? "✨" : cfg.emoji}</span>
         <span className="text-xs font-medium flex-1 min-w-0">
-          <span className="font-bold">Dose de hoje</span> · {cfg.nome}
+          <span className="font-bold">Dose de hoje</span> · {"escolher" in dose && dose.escolher ? "escolhe o seu" : cfg.nome}
         </span>
         <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">Dia {dose.n} de 3</span>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />

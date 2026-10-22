@@ -175,8 +175,10 @@ export function nomeDaPessoa(daConta: unknown, userMetadata?: unknown): string {
 /** O CustomEvent da janela quando a missão fica completa (o tour da Home escuta). Mora em lib/missao-doses. */
 export { EVENTO_MISSAO_COMPLETA };
 
-/** Outra festa/folha na tela (adesivo dos Momentos, diálogo)? A folha do plano espera ela sair. */
-const FESTA_NA_TELA = '[data-momento], [role="dialog"]:not([data-testid="plano-amanha"]), [role="alertdialog"], [data-camada-guia="tour-home"]';
+/** Outra festa/folha na tela (adesivo dos Momentos, diálogo)? A folha do plano espera ela sair. 1.0.18 (revisor 22/10):
+ *  o balão "Modo escuro e cores agora ficam aqui no menu" (GreetingHeader, ~8 s) também — a escolha do dia 2, o resumo
+ *  do dia 3 e as outras folhas da missão esperam ele sair, em vez de cobri-lo (ele já conta como visto ao aparecer). */
+const FESTA_NA_TELA = '[data-momento], [role="dialog"]:not([data-testid="plano-amanha"]), [role="alertdialog"], [data-camada-guia="tour-home"], [data-aviso-menu-novo]';
 const festaNaTela = (): boolean => { try { return !!document.querySelector(FESTA_NA_TELA); } catch { return false; } };
 
 /** A faixa do 4º passo (B): "Missão · 4 de 4 · arrumar sua Home", por cima do tour da Home. */

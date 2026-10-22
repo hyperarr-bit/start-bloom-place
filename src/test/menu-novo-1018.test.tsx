@@ -336,6 +336,35 @@ describe("o aviso único (tema fora do padrão quando o menu novo aparece)", () 
     expect(screen.getByTestId("aviso-menu-novo")).toBeTruthy();
   });
 
+  it("revisor 22/10: a tela/card de cobrança recusada (role=alertdialog) por cima — espera ela sair, só então aparece e conta", async () => {
+    localStorage.setItem("core-theme-mode", "dark");
+    const recusa = document.createElement("div");
+    recusa.setAttribute("role", "alertdialog");
+    document.body.appendChild(recusa);
+    montar(<GreetingHeader data={lifeData} />);
+    await esperar(4000);
+    expect(screen.queryByTestId("aviso-menu-novo")).toBeNull();
+    expect(localStorage.getItem(CHAVE_AVISO_MENU_NOVO)).toBeNull();
+    expect(dos("menu_novo_aviso_visto")).toHaveLength(0);
+    recusa.remove();
+    await esperar(1100);
+    expect(screen.getByTestId("aviso-menu-novo")).toBeTruthy();
+    expect(localStorage.getItem(CHAVE_AVISO_MENU_NOVO)).toBe("visto");
+  });
+
+  it("revisor 22/10: uma folha que entra por cima do balão já na tela tira o balão na hora (nunca fica escondido por baixo)", async () => {
+    localStorage.setItem("core-theme-mode", "dark");
+    montar(<GreetingHeader data={lifeData} />);
+    await esperar(1300);
+    expect(screen.getByTestId("aviso-menu-novo").hasAttribute("data-aviso-menu-novo")).toBe(true); // a missão enxerga o balão por isto
+    const folha = document.createElement("div");
+    folha.setAttribute("role", "alertdialog");
+    document.body.appendChild(folha);
+    await esperar(400);
+    expect(screen.queryByTestId("aviso-menu-novo")).toBeNull();
+    folha.remove();
+  });
+
   it("chave off: nada de aviso (e nada gravado — vale quando o menu novo aparecer)", async () => {
     registrarMenuNovoRemoto({ current: { metadata: { menu_novo: "off" } }, all: {} });
     localStorage.setItem("core-theme-mode", "dark");

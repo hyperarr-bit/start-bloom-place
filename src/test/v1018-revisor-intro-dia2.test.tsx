@@ -220,3 +220,23 @@ describe("revisor 1.0.18: a 2ª aparição da intro do módulo escolhido no dia 
     expect(moduloDaMissaoHoje()).toBe("rotina");
   });
 });
+
+/* ------------------------------------------------------------ o balão do menu novo × a escolha do dia 2 */
+
+describe("revisor 1.0.18: a escolha do dia 2 espera o balão do menu novo sair", () => {
+  it("com o balão na tela a folha 'escolhe o seu' não abre; quando ele sai, ela abre", () => {
+    ligar("on");
+    const store = comFinancas();
+    missaoA(DIA1);
+    vi.setSystemTime(new Date(2026, 9, 4, 9, 0));
+    const balao = document.createElement("button");
+    balao.setAttribute("data-aviso-menu-novo", "");
+    document.body.appendChild(balao);
+    montar(store, "/home");
+    avancar(4000);
+    expect(screen.queryByTestId("dia2-escolha")).toBeNull();
+    balao.remove();
+    avancar(1500);
+    expect(screen.getByTestId("dia2-escolha")).toBeInTheDocument();
+  });
+});

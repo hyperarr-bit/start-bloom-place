@@ -38,6 +38,7 @@ import { reais } from "@/lib/demo-guiada";
 import type { ChipDaMissao, Retangulo } from "./alvos";
 import { Quadradinho } from "./Quadradinho";
 import { EscolhaRapida, type NumeroDaEscolha, type OpcaoRapida } from "@/components/ui/escolha-rapida";
+import { TarjaDoRelogio } from "@/components/app/TarjaDoRelogio";
 
 export const GRAFITE = "#16121c";
 const AMARELO_POST_IT = "#FFF3B0";
@@ -582,6 +583,11 @@ export function PostItDaMissao({ pergunta, chips, tocado, aoChip, aoEscrever, di
   const comChips = chips.length > 0 || !!outro;
   return (
     <div className="relative" data-testid="demo-guia-postit">
+      {/* 1.0.18 (QA de aparelho 21/10): o "+ Outro" com o teclado do iPhone desloca a tela e o que está ATRÁS do post-it
+          ("Ordenar · Lançamento · Dia" das Finanças) passava por baixo do relógio/ilha. A tarja da cor do fundo (a mesma do
+          cadastro e das ações rápidas) cobre a área segura de cima só com o teclado aberto e a tela deslocada; o post-it
+          (z 200) fica por cima dela. */}
+      {outro && <TarjaDoRelogio />}
       <span aria-hidden className="absolute -top-2 left-1/2 -translate-x-1/2 rotate-2 w-[76px] h-4 rounded-[2px] z-10" style={{ background: "hsl(330 65% 50% / 0.55)" }} />
       <motion.div
         className={`rounded-md px-4 text-left shadow-[0_22px_44px_-18px_rgba(0,0,0,.7)] ${compacto ? "pt-2.5 pb-2.5" : "pt-3.5 pb-3.5"}`}

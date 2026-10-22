@@ -72,6 +72,59 @@ export function funilHojeLigado(busca: string = typeof window === "undefined" ? 
   return FUNIL_HOJE === "on";
 }
 
+/* ───────────────────────── a 1ª pergunta (teste de 22/10) ───────────────────────── */
+
+/**
+ * "1ª PERGUNTA LEVE" (22/10, hipótese do dono: perguntar de salário logo de cara afasta — 19–22/10, só 34% passavam da
+ * renda). Na variante "leve" a 1ª tela é "Qual gasto mais te pega?" (1 toque, sem dinheiro); a renda vira a 2ª pergunta
+ * (o texto de sempre) e o resultado cita o gasto escolhido.
+ *   "off"  (padrão) → o /hoje byte a byte como antes: sem a pergunta e SEM o campo `p1` nos eventos.
+ *   "leve" → todo mundo vê a pergunta leve; eventos com `p1: "leve"`.
+ *   "ab"   → 50/50 sorteado 1x (fica no estado do funil, que sobrevive ao recarregar); eventos com `p1: "leve" | "controle"`.
+ * QA neste navegador: `?hoje-p1=leve|ab|off` (o heap segura quando o Instagram zera o storage). ROLLBACK = "off" + push.
+ */
+export type ModoP1 = "off" | "leve" | "ab";
+export const HOJE_P1: ModoP1 = "off";
+export type BracoP1 = "leve" | "controle";
+export const PARAM_QA_P1 = "hoje-p1";
+export const CHAVE_FORCA_P1 = "hoje-p1-force";
+const MODOS_P1: readonly ModoP1[] = ["off", "leve", "ab"];
+let forcaP1NaMemoria: ModoP1 | null = null;
+/** Só testes. */
+export const _zerarForcaP1 = (): void => { forcaP1NaMemoria = null; };
+
+/** O modo da 1ª pergunta AQUI: lê `?hoje-p1=` e guarda a força (heap + localStorage). */
+export function modoP1(busca: string = typeof window === "undefined" ? "" : window.location.search): ModoP1 {
+  let v: string | null = null;
+  try { v = new URLSearchParams(busca).get(PARAM_QA_P1); } catch { /* noop */ }
+  if (v && (MODOS_P1 as readonly string[]).includes(v)) {
+    forcaP1NaMemoria = v as ModoP1;
+    try { localStorage.setItem(CHAVE_FORCA_P1, v); } catch { /* storage bloqueado: fica o heap */ }
+  }
+  let f: string | null = forcaP1NaMemoria;
+  if (!f) { try { f = localStorage.getItem(CHAVE_FORCA_P1); } catch { f = null; } }
+  if (f && (MODOS_P1 as readonly string[]).includes(f)) return f as ModoP1;
+  return HOJE_P1;
+}
+
+/** O braço desta pessoa: null = teste desligado (nada muda); no "ab" mantém o que já foi sorteado. */
+export function bracoP1(modo: ModoP1, jaSorteado: BracoP1 | null | undefined, sortear: () => number = Math.random): BracoP1 | null {
+  if (modo === "off") return null;
+  if (modo === "leve") return "leve";
+  if (jaSorteado === "leve" || jaSorteado === "controle") return jaSorteado;
+  return sortear() < 0.5 ? "leve" : "controle";
+}
+
+export interface GastoP1 { id: string; emoji: string; nome: string; /** como aparece no meio da frase do resultado */ curto: string; dica: string }
+export const GASTOS_P1: GastoP1[] = [
+  { id: "delivery", emoji: "🍔", nome: "Comida e delivery", curto: "comida e delivery", dica: "Cada pedido que você lança já sai do número do dia. Você vê na hora se ainda cabe." },
+  { id: "mercado", emoji: "🛒", nome: "Mercado", curto: "mercado", dica: "Lançou a compra do mercado, o número do dia se ajusta. Sem susto no fim do mês." },
+  { id: "impulso", emoji: "🛍️", nome: "Compras por impulso", curto: "compras por impulso", dica: "Antes de comprar, olhe o número do dia. Se não cabe, você sabe na hora." },
+  { id: "esqueco", emoji: "📅", nome: "Contas que eu esqueço", curto: "contas que você esquece", dica: "O CORE avisa antes de cada conta vencer. Sem multa e sem juros." },
+  { id: "naosei", emoji: "🤷", nome: "Não sei pra onde vai", curto: "não saber pra onde o dinheiro vai", dica: "Cada gasto entra numa categoria e você vê pra onde o dinheiro foi." },
+];
+export const gastoP1 = (id: string | null | undefined): GastoP1 | null => GASTOS_P1.find((g) => g.id === id) ?? null;
+
 /* ───────────────────────── planos e ofertas ───────────────────────── */
 
 export type PlanoHoje = "anual" | "mensal";

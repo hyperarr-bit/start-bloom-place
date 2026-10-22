@@ -14,6 +14,7 @@ import {
   AREAS, CONTAS, DOWNSELL_PRA_SEMPRE_27, FAIXAS, LINHA_RENOVACAO, PLANOS, PLANO_VITALICIO, PRECO_KIT, UPSELL_A_DOIS, UPSELL_PRA_SEMPRE, BUMP_KIT,
   VALOR_OFERTA, calcular, contasEscolhidas, dataCurta, ehPlanoDoHoje, ehPraSempre, fimDoAcesso, funilHojeLigado, modoOfertaHoje, ofertaDoPlano, preco, reais,
   reaisDigitados, type Conta, type Faixa, type OfertaHoje, type PlanoHoje, type Resultado,
+  GASTOS_P1, PARAM_QA_P1, bracoP1, gastoP1, modoP1, type BracoP1, type GastoP1,
 } from "./conteudo";
 import {
   EMAIL_OK, emailAtual, gravarAtribuicao, gravarFinancas, pedirBoasVindas, salvarEmailDaCompra, sessaoViva, trazerCompraParaConta,
@@ -67,9 +68,9 @@ const FluxoPresente = lazy(() => import("@/presente/FluxoPresente").then((m) => 
  * event_id; Purchase pela CAPI do pagamento (event_id = id do QR) + pixel com o mesmo id (firePixPurchaseOnce).
  */
 export type EtapaHoje =
-  | "renda" | "contas" | "resultado" | "oferta" | "pix"
+  | "gasto" | "renda" | "contas" | "resultado" | "oferta" | "pix"
   | "up1" | "up1pix" | "down" | "downpix" | "up2" | "up2pix" | "parceiro" | "u2027" | "plano30" | "presente" | "pago";
-const ETAPAS: EtapaHoje[] = ["renda", "contas", "resultado", "oferta", "pix", "up1", "up1pix", "down", "downpix", "up2", "up2pix", "parceiro", "u2027", "plano30", "presente", "pago"];
+const ETAPAS: EtapaHoje[] = ["gasto", "renda", "contas", "resultado", "oferta", "pix", "up1", "up1pix", "down", "downpix", "up2", "up2pix", "parceiro", "u2027", "plano30", "presente", "pago"];
 
 export type Pago = { oferta: OfertaHoje; orderId: string; em: number };
 export type EstadoHoje = {
@@ -105,6 +106,10 @@ export type EstadoHoje = {
   /** 21/10 (chave central "2027"): o plano de 30 dias depois do "Agora não" do 2027 já passou — o pedido pago (null = "Não,
    *  obrigado"). Ausente = ainda não passou. */
   plano30?: { pedido: string | null } | null;
+  /** 22/10 (teste da 1ª pergunta, chave HOJE_P1 em ./conteudo.ts): o braço sorteado/forçado. Ausente = chave "off". */
+  p1?: BracoP1;
+  /** 22/10: a resposta da 1ª pergunta leve ("Qual gasto mais te pega?") — id de GASTOS_P1. */
+  gasto?: string | null;
 };
 
 /** O link da campanha da variante: `/hoje?v=demo`. */
@@ -206,14 +211,28 @@ export function FunilHoje() {
   const sessao = inicio.current.sessao;
   /** "demo" | "controle" em TODO evento do /hoje (ids) — atualizado a cada render, pelo estado */
   const varianteRef = useRef<"demo" | "controle">("controle");
+  /** 22/10: o braço da 1ª pergunta (chave HOJE_P1) — null = teste desligado: nenhum evento ganha o campo `p1` */
+  const p1Ref = useRef<{ braco: BracoP1 | null } | null>(null);
+  if (!p1Ref.current) {
+    const busca = search.includes(PARAM_QA_P1) ? search : typeof window === "undefined" ? "" : window.location.search;
+    p1Ref.current = { braco: bracoP1(modoP1(busca), lerEstado()?.p1) };
+  }
+  const p1 = p1Ref.current.braco;
   const ids = useCallback((): Record<string, unknown> => {
     const { porta_session_id: _p, ...resto } = idsDoAnuncio(lerAtribuicao() ?? inicio.current!.attr, sessao);
-    return { hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), ...resto };
-  }, [sessao]);
+    return { hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), ...(p1 ? { p1 } : {}), ...resto };
+  }, [sessao, p1]);
   const clique = (cta: string, extra: Record<string, unknown> = {}) => trackEvent("funnel_click", { funil: "hoje", cta, ...extra, ...ids() });
 
   const [estado, setEstadoCru] = useState<EstadoHoje>(() => {
-    const e = lerEstado() ?? novoEstado();
+    const base = lerEstado() ?? novoEstado();
+    let e = base;
+    // 22/10 (1ª pergunta leve): com a chave ligada, o braço fica no estado; no braço "leve" quem ainda não respondeu nada
+    // começa pela pergunta leve. Chave "off": o estado não muda (e uma tela "gasto" que sobrou vira a renda).
+    if (p1 && e.p1 !== p1) e = { ...e, p1 };
+    if (p1 === "leve" && e.etapa === "renda" && !e.gasto && !e.faixa && !e.renda && !e.pagos.length) e = { ...e, etapa: "gasto" };
+    if (p1 !== "leve" && e.etapa === "gasto") e = { ...e, etapa: "renda" };
+    if (e !== base) gravarEstado(e);
     // `?v=demo` no link: a variante fica salva (o resto do estado não muda)
     if (e.variante !== "demo" && (pediuDemo(search) || pediuDemo(typeof window === "undefined" ? "" : window.location.search))) {
       const n: EstadoHoje = { ...e, variante: "demo" };
@@ -265,7 +284,7 @@ export function FunilHoje() {
   useEffect(() => {
     if (!inicio.current?.nova) return;
     const { origem, ...a } = inicio.current.attr;
-    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" ? estado.etapa : null });
+    trackEvent("hoje_view", { ...a, atribuicao: origem, hoje_session_id: sessao, variante: varianteRef.current, oferta_hoje: modoOfertaHoje(), ...(p1 ? { p1 } : {}), plataforma, in_app: emInApp, retomou: estado.etapa !== "renda" && estado.etapa !== "gasto" ? estado.etapa : null });
     eventoMeta("ViewContent", novoEventId("vc"), { content_name: "hoje", content_category: "venda" }, inicio.current.attr.fbc || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -360,8 +379,22 @@ export function FunilHoje() {
   return (
     <div className={e.etapa === "up1" || e.etapa === "down" || e.etapa === "pago" ? "fn ua" : e.etapa === "u2027" ? "fn u27" : e.etapa === "presente" || e.etapa === "plano30" ? "fn pv" : "fn"} data-etapa={e.etapa} data-testid="hoje">
       <div className="fn-corpo" ref={corpo}>
+        {e.etapa === "gasto" && (
+          <TelaGasto
+            gasto={e.gasto ?? null}
+            onGasto={(g) => {
+              clique("gasto", { gasto: g.id });
+              trackEvent("hoje_gasto", { gasto: g.id, ...ids() });
+              setEstado((x) => ({ ...x, gasto: g.id }));
+              window.setTimeout(() => ir("renda"), 160); // o realce aparece antes de trocar de tela
+            }}
+          />
+        )}
+
         {e.etapa === "renda" && (
           <TelaRenda
+            leve={p1 === "leve"}
+            onVoltar={() => ir("gasto")}
             faixa={e.faixa}
             onFaixa={(f) => {
               clique("faixa", { faixa: f.id });
@@ -384,9 +417,9 @@ export function FunilHoje() {
               <button type="button" className="fn-voltar" onClick={() => ir("renda")}><ChevronLeft size={18} /><span>Voltar</span></button>
               <span className="fn-topo-dir">Entra {reais(e.renda)}</span>
             </div>
-            <div className="fn-barra"><i data-on="" /><i data-on="" /></div>
+            <div className="fn-barra"><i data-on="" /><i data-on="" />{p1 === "leve" && <i data-on="" />}</div>
             <div className="fn-q">
-              <div className="fn-kicker">2 de 2</div>
+              <div className="fn-kicker">{p1 === "leve" ? "3 de 3" : "2 de 2"}</div>
               <h1>Quais contas chegam todo mês?</h1>
               <p>Toque nas suas. O valor é o típico — toque no número pra ajustar.</p>
             </div>
@@ -431,7 +464,8 @@ export function FunilHoje() {
         )}
 
         {e.etapa === "resultado" && (
-          <TelaResultado r={r} onVisto={() => trackEvent("hoje_resultado", { aperto: r.aperto, por_dia: r.porDia, n: r.n, faixa: e.faixa, ...ids() })}
+          <TelaResultado r={r} gasto={p1 === "leve" ? gastoP1(e.gasto) : null}
+            onVisto={() => trackEvent("hoje_resultado", { aperto: r.aperto, por_dia: r.porDia, n: r.n, faixa: e.faixa, ...(p1 === "leve" ? { gasto: e.gasto ?? null } : {}), ...ids() })}
             onSeguir={() => { clique("ver_core"); if (ehDemo) irPraDemo(); else ir("oferta"); }} onVoltar={() => ir("contas")} />
         )}
 
@@ -613,17 +647,54 @@ export function FunilHoje() {
 
 /* ───────────────────────── tela 1 ───────────────────────── */
 
-function TelaRenda({ faixa, onFaixa, onDigitado, onDigitar }: { faixa: string | null; onFaixa: (f: Faixa) => void; onDigitado: (n: number) => void; onDigitar: () => void }) {
+/* 22/10 (chave HOJE_P1): a 1ª pergunta leve — 1 toque, sem dinheiro. A resposta vira contexto no resultado. */
+function TelaGasto({ gasto, onGasto }: { gasto: string | null; onGasto: (g: GastoP1) => void }) {
+  return (
+    <div className="fn-tela" key="gasto" data-testid="hoje-p1">
+      <div className="fn-topo"><span className="fn-marca"><i />CORE</span></div>
+      <p className="fn-promessa">Descubra <b>quanto você pode gastar hoje</b> — em 20 segundos.</p>
+      <div className="fn-barra"><i data-on="" /><i /><i /></div>
+      <div className="fn-q">
+        <div className="fn-kicker">1 de 3</div>
+        <h1>Qual gasto mais te pega?</h1>
+        <p>Só um toque. Depois a gente faz a sua conta.</p>
+      </div>
+      <div className="fn-faixas">
+        {GASTOS_P1.map((g) => (
+          <button key={g.id} type="button" className="fn-faixa-btn" data-on={gasto === g.id ? "" : undefined} data-testid={`hoje-gasto-${g.id}`} onClick={() => onGasto(g)}>
+            <span className="fn-gasto-nome"><span aria-hidden>{g.emoji}</span>{g.nome}</span><ChevronRight size={20} strokeWidth={2.4} />
+          </button>
+        ))}
+      </div>
+      <div className="fn-confia"><Lock size={13} strokeWidth={2.4} />Grátis · sem cadastro · resultado na hora</div>
+    </div>
+  );
+}
+
+function TelaRenda({ faixa, onFaixa, onDigitado, onDigitar, leve = false, onVoltar }: {
+  faixa: string | null; onFaixa: (f: Faixa) => void; onDigitado: (n: number) => void; onDigitar: () => void;
+  /** 22/10: no braço "leve" a renda é a 2ª pergunta (com Voltar pra 1ª, sem a promessa, que já apareceu) */
+  leve?: boolean; onVoltar?: () => void;
+}) {
   const [digitando, setDigitando] = useState(false);
   const [texto, setTexto] = useState("");
   const n = reaisDigitados(texto);
   return (
     <div className="fn-tela" key="renda">
-      <div className="fn-topo"><span className="fn-marca"><i />CORE</span></div>
-      <p className="fn-promessa">Descubra <b>quanto você pode gastar hoje</b> — em 20 segundos.</p>
-      <div className="fn-barra"><i data-on="" /><i /></div>
+      {leve ? (
+        <div className="fn-topo">
+          <button type="button" className="fn-voltar" data-testid="hoje-renda-voltar" onClick={onVoltar}><ChevronLeft size={18} /><span>Voltar</span></button>
+          <span className="fn-topo-dir"><span className="fn-marca" style={{ fontSize: 12 }}><i />CORE</span></span>
+        </div>
+      ) : (
+        <>
+          <div className="fn-topo"><span className="fn-marca"><i />CORE</span></div>
+          <p className="fn-promessa">Descubra <b>quanto você pode gastar hoje</b> — em 20 segundos.</p>
+        </>
+      )}
+      <div className="fn-barra">{leve ? <><i data-on="" /><i data-on="" /><i /></> : <><i data-on="" /><i /></>}</div>
       <div className="fn-q">
-        <div className="fn-kicker">1 de 2</div>
+        <div className="fn-kicker">{leve ? "2 de 3" : "1 de 2"}</div>
         <h1>Quanto entra por mês?</h1>
         <p>Mais ou menos. Salário, freela, pensão — tudo junto.</p>
       </div>
@@ -685,7 +756,7 @@ function useSobe(alvo: number, ms = 900) {
   return v;
 }
 
-function TelaResultado({ r, onSeguir, onVoltar, onVisto }: { r: Resultado; onSeguir: () => void; onVoltar: () => void; onVisto: () => void }) {
+function TelaResultado({ r, onSeguir, onVoltar, onVisto, gasto = null }: { r: Resultado; onSeguir: () => void; onVoltar: () => void; onVisto: () => void; gasto?: GastoP1 | null }) {
   const falta = Math.abs(Math.round(r.livre));
   const n = useSobe(r.aperto ? falta : r.porDia);
   // 1 hoje_resultado por chegada na tela (não por re-render)
@@ -711,6 +782,12 @@ function TelaResultado({ r, onSeguir, onVoltar, onVisto }: { r: Resultado; onSeg
             <small>Suas contas passam da renda</small>
             <strong><span className="rs">R$</span>{n.toLocaleString("pt-BR")}<em>a mais por mês</em></strong>
             <p>Este mês não fecha sem cortar. No CORE você vê conta por conta e decide por onde começar.</p>
+          </div>
+        )}
+        {gasto && (
+          <div className="fn-p1" data-testid="hoje-p1-dica" data-gasto={gasto.id}>
+            <span className="fn-p1-emoji" aria-hidden>{gasto.emoji}</span>
+            <div><b>O que mais te pega: {gasto.curto}</b><p>{gasto.dica}</p></div>
           </div>
         )}
         <div className="fn-folha">

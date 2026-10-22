@@ -118,6 +118,13 @@ button.fn-sec { width: 100%; min-height: 52px; border-radius: 16px; border: 1.5p
 .fn-conta[data-forte] { font-weight: 800; }
 .fn-conta[data-forte] span { color: var(--fn-texto); }
 .fn-conta[data-dia] b { color: var(--fn-ambar-valor); }
+/* 22/10 (chave HOJE_P1): a 1ª pergunta leve e o gasto dela no resultado */
+.fn-gasto-nome { display: inline-flex; align-items: center; gap: 10px; }
+.fn-gasto-nome > span { font-size: 19px; width: 24px; text-align: center; }
+.fn-p1 { display: flex; gap: 12px; align-items: flex-start; margin: 12px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--fn-magenta-suave); }
+.fn-p1-emoji { font-size: 22px; line-height: 1.2; }
+.fn-p1 b { display: block; font-size: 14.5px; font-weight: 800; line-height: 1.3; }
+.fn-p1 p { font-size: 13.5px; color: var(--fn-suave); margin: 3px 0 0; line-height: 1.4; }
 .fn-nota { font-size: 12.5px; color: var(--fn-suave); margin: 10px 2px 0; line-height: 1.4; }
 
 /* "e mais 15 áreas": os ladrilhos pastel da Home do app */

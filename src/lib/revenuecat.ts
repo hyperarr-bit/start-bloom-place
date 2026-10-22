@@ -52,6 +52,7 @@ import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
+import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -73,6 +74,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarMedicaoTotalRemota,
     registrarChavePaywallMinimalista,
     registrarAttMomentoRemoto, // 1.0.18: `att_momento` (auto3s|comecar|ab) — quando o ATT é pedido (lib/att-momento)
+    registrarCardRecusaRemoto, // 1.0.18: `card_recusa` (on|off, padrão off) — o card de tela inteira do cartão recusado (lib/card-recusa)
     registrarMenuNovoRemoto, // 1.0.18: `menu_novo` (todos|off) — o menu da conta em 3 grupos + topo sem sol/paleta (lib/menu-novo)
     registrarSinoRemoto, // 1.0.18: `sino_paywall` (off|on|ab) — a tela do sino antes do paywall do iPhone (lib/sino-paywall)
   ];
@@ -307,6 +309,8 @@ export type ProblemaDeCobranca = {
   url: string | null;
   /** 10/10: quando a loja detectou o cartão recusado (ISO) — base do contador da carência. */
   detectadoEm?: string | null;
+  /** 22/10: o produto da assinatura recusada (o card da recusa não oferece o mensal 19 a quem já está nele). */
+  produto?: string | null;
 };
 const SEM_PROBLEMA: ProblemaDeCobranca = { temProblema: false, comAcesso: false, url: null };
 
@@ -318,6 +322,7 @@ type EntitlementLido = {
   expirationDateMillis?: number | null;
   billingIssueDetectedAt?: string | null;
   unsubscribeDetectedAt?: string | null;
+  productIdentifier?: string | null;
 };
 type InfoLida = {
   managementURL?: string | null;
@@ -329,7 +334,10 @@ export function lerProblemaDeCobranca(info: unknown): ProblemaDeCobranca {
   const todos = Object.values(i?.entitlements?.all ?? {});
   const e = todos.find((x) => !!x?.billingIssueDetectedAt && !x?.unsubscribeDetectedAt);
   if (!e) return SEM_PROBLEMA;
-  return { temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null, detectadoEm: e.billingIssueDetectedAt ?? null };
+  return {
+    temProblema: true, comAcesso: !!e.isActive, url: i?.managementURL ?? null, detectadoEm: e.billingIssueDetectedAt ?? null,
+    ...(e.productIdentifier ? { produto: e.productIdentifier } : {}),
+  };
 }
 
 export async function problemaDeCobranca(): Promise<ProblemaDeCobranca> {
@@ -556,7 +564,9 @@ export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean
  *   "bloqueio"       — perdeu o acesso e recusou o 69,90 (mesma chave): compra na hora
  * Preço SEMPRE do priceString da loja. Se a offering não existir (ou vier sem o produto
  * certo, ou com metadata `presente: "off"`), nenhuma dessas telas aparece — chave ou não. */
-export type LugarDoMensal19 = "mensal_paywall" | "cancelou_teste" | "bloqueio";
+/* 22/10 (1.0.18): + "recusa" — o card do cartão recusado na renovação (lib/card-recusa, chave `card_recusa`). Também é
+ * DOWNGRADE no grupo: vale na próxima renovação, que no billing retry é a cobrança pendente — nada libera na hora. */
+export type LugarDoMensal19 = "mensal_paywall" | "cancelou_teste" | "bloqueio" | "recusa";
 const ID_MENSAL_19 = "core_mensal_19";
 const OFFERING_MENSAL_19 = "mensal_19";
 

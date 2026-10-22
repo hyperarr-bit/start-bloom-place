@@ -10,6 +10,7 @@ import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback"
 import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
+import { guardarForcaCardRecusa } from "@/lib/card-recusa";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
@@ -31,6 +32,7 @@ if (isNativeShell()) instalarTrocaDeRotaSemBranco();
 void iniciarMedicaoDoAparelho();
 // As chaves de QA da 1.0.14 pelo link (`?cobranca-v14=on`, `?avaliacao-v14=on`): gravadas no aparelho, como a MISSAO_DOSES.
 guardarForcaDaCobrancaV14();
+guardarForcaCardRecusa(); // 1.0.18: `?card-recusa=on|off|auto[,recomecar]` — o card de tela inteira do cartão recusado
 guardarForcaDaAvaliacaoV14();
 guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)
 guardarForcaDesafiosRodizio(); // `?desafios-rodizio=on|off|auto`: o rodízio dos desafios da semana neste navegador (QA)

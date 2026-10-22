@@ -50,6 +50,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-mensal19-mensal-paywall-visto",
   "core-mensal19-cancelou-visto",
   "core-mensal19-bloqueio-visto",
+  "core-mensal19-recusa-visto", // 22/10: lugar "recusa" do mensal 19 (reservada; o card da recusa marca por recusa em core-card-recusa-visto)
   "ofertas-saida-force",
   // lembrete do dia 2 / 1ª semana e notificações já contadas (03/10)
   "core-dia2",
@@ -85,6 +86,9 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-att-status", // o ATT do iPhone já foi pedido (e o estado que vai nos eventos)
   "core-att-momento", // 1.0.18: a última resposta do RevenueCat pra QUANDO o ATT é pedido (metadata att_momento: auto3s|comecar|ab)
   "core-menu-novo", // 1.0.18: a última resposta do RevenueCat pro menu novo da conta (metadata menu_novo: todos|off)
+  "core-card-recusa", // 1.0.18: a última resposta do RevenueCat pro card da recusa (metadata card_recusa: on|off)
+  "core-card-recusa-visto", // 1.0.18: a recusa (billingIssueDetectedAt) cujo card já apareceu — 1x por recusa, reabrir não repete
+  "card-recusa-force", // 1.0.18: força de QA do card da recusa (?card-recusa=on|off|auto)
   "core-menu-novo-aviso", // 1.0.18: o aviso "modo escuro e cores agora ficam no menu › Aparência" já resolvido (visto|nao-precisa), 1x por aparelho
   "core-att-braco", // 1.0.18: o braço sorteado no modo "ab" do att_momento (auto3s|comecar), estável entre aberturas
   "core-sino-paywall", // 1.0.18: a última resposta do RevenueCat pra tela do sino antes do paywall (metadata sino_paywall: off|on|ab)

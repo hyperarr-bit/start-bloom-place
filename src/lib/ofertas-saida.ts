@@ -170,7 +170,7 @@ export const forcaDasOfertas = (nome: NomeDaOferta): ModoOferta | null => {
 /** As marcas de "1x por aparelho" de todas as ofertas (presente e mensal 19) — pra QA recomeçar. */
 export const CHAVES_DE_VISTO = [
   "core-presente69-cancelou-visto", "core-presente69-bloqueio-visto", "core-presente69-x-paywall-visto",
-  "core-mensal19-mensal-paywall-visto", "core-mensal19-cancelou-visto", "core-mensal19-bloqueio-visto",
+  "core-mensal19-mensal-paywall-visto", "core-mensal19-cancelou-visto", "core-mensal19-bloqueio-visto", "core-mensal19-recusa-visto",
   "core-save-offer-visto",
 ];
 export const apagarMarcasDeVisto = (): void => { for (const k of CHAVES_DE_VISTO) ls.del(k); };

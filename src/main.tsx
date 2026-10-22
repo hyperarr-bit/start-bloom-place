@@ -11,6 +11,7 @@ import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaCardRecusa } from "@/lib/card-recusa";
+import { guardarForcaDegrau2, guardarForcaMotivos } from "@/lib/mensal-degraus";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaDasOfertas } from "@/lib/ofertas-saida";
 import { guardarForcaConquistas2 } from "@/lib/conquistas2";
@@ -32,6 +33,8 @@ if (isNativeShell()) instalarTrocaDeRotaSemBranco();
 void iniciarMedicaoDoAparelho();
 // As chaves de QA da 1.0.14 pelo link (`?cobranca-v14=on`, `?avaliacao-v14=on`): gravadas no aparelho, como a MISSAO_DOSES.
 guardarForcaDaCobrancaV14();
+guardarForcaDegrau2(); // 1.0.18: `?recusa-degrau2=on|off|auto|agora[,recomecar]` — o 2º degrau da recusa (mensal 19,90)
+guardarForcaMotivos(); // 1.0.18: `?motivos-folha=on|off|ab|auto` — a folha "O que te fez parar?" no paywall do funil
 guardarForcaCardRecusa(); // 1.0.18: `?card-recusa=on|off|auto[,recomecar]` — o card de tela inteira do cartão recusado
 guardarForcaDaAvaliacaoV14();
 guardarForcaConquistas2(); // `?conquistas2=on|off|auto`: a tela nova de Conquistas neste aparelho (QA)

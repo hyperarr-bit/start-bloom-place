@@ -178,7 +178,10 @@ import { agendarRecuperacaoDoPaywall, agendarResgateDoPlano, cancelarRecuperacao
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { guardarForcaDasOfertas, ofertaLigada } from "@/lib/ofertas-saida";
 import { Presente69Folha, prepararPresente, type OfertaDoPresente } from "@/components/app/Presente69";
-import { Mensal19Folha, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { Mensal19Folha, carregarOfertaMensal19, prepararMensal19, type OfertaDoMensal19 } from "@/components/paywall/OfertaMensal19";
+import { MensalHeroi } from "@/components/paywall/MensalHeroi";
+import { camposDosMotivos } from "@/lib/mensal-degraus";
+import { FolhaMotivos, type MotivoComResposta } from "@/components/paywall/FolhaMotivos";
 import { ExplicaFolha } from "@/components/paywall/ExplicaFolha";
 import { LinhaDoTempoDoTeste, diaDoAviso, lerAvisoDoTeste, passosDoTeste, passosSemTeste, type AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
 import { guardarForcaDoMinimalista, paywallMinimalistaLigado } from "@/lib/paywall-minimalista";
@@ -393,7 +396,9 @@ export function PaywallIOS({
    * mostrava 18 % das contas comprando). O sucesso do gate vai por beacon (fetch keepalive, o mesmo do paywall_saiu). */
   /* 1.0.18 (dono 22/10, chave `sino_paywall`, lib/sino-paywall): o braço do sino ("com"|"sem") nos eventos do paywall
    * do FUNIL — {} com a chave desligada (eventos de hoje, byte a byte) e no gate. Lido 1x por paywall. */
-  const [sinoCampos] = useState(() => (gate ? {} : camposDoSino()));
+  /* 1.0.18 (dono 22/10, chave `motivos_folha`, lib/mensal-degraus): o braço da folha "O que te fez parar?" ("com"|"sem")
+   * vai junto, nos mesmos eventos — {} com a chave desligada e no gate. */
+  const [sinoCampos] = useState<{ sino?: "com" | "sem"; motivos?: "com" | "sem" }>(() => (gate ? {} : { ...camposDoSino(), ...camposDosMotivos() }));
   const registrarSucesso = (ev: string, d: Record<string, unknown>) => (gate ? trackEventBeacon : trackEvent)(ev, { ...d, ...sinoCampos });
   const { user: usuarioLogado } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
@@ -449,6 +454,26 @@ export function PaywallIOS({
   const [mensal19, setMensal19] = useState<OfertaDoMensal19 | null>(null);
   const presenteXTentadoRef = useRef(false);
   const presenteMostradoRef = useRef(false);
+  /* 1.0.18 — "O QUE TE FEZ PARAR?" (chave `motivos_folha`, lib/mensal-degraus): fechou a folha do anual com teste →
+   * ANTES do presente 69,90, a folha dos motivos (FolhaMotivos). Só no funil, só no braço "com", 1x por sessão do
+   * paywall. "Achei caro" → o presente 69,90 e, recusado, o mensal 19,90 (MensalHeroi) se a offering `mensal_19`
+   * existir (carregada assim que o presente do "caro" aparece: sem ela, o presente de sempre). */
+  const motivosBraco = gate ? null : sinoCampos.motivos ?? null;
+  const camposDosMotivosEv = { funil: FUNIL, loja: "ios", area, braco: motivosBraco };
+  const [motivosAberta, setMotivosAberta] = useState(false);
+  const motivosMostradaRef = useRef(false);
+  const motivosAbertaRef = useRef(false);
+  motivosAbertaRef.current = motivosAberta;
+  /** de qual motivo veio o presente 69,90 aberto agora (null = o presente de sempre) */
+  const motivoDoPresenteRef = useRef<"caro" | "outro" | null>(null);
+  /** a compra do anual em curso saiu de uma resposta da folha dos motivos (conta o resultado) */
+  const origemCompraRef = useRef<MotivoComResposta | null>(null);
+  const [mensalCaro, setMensalCaro] = useState<OfertaDoMensal19 | null>(null);
+  const [mensalCaroPronto, setMensalCaroPronto] = useState(false);
+  const mensalCaroTentadoRef = useRef(false);
+  const mensalCaroOfertaRef = useRef<Promise<OfertaDoMensal19 | null> | null>(null);
+  const carregarMensalCaro = () => (mensalCaroOfertaRef.current ??= carregarOfertaMensal19().catch(() => null));
+  const cabeMensalCaro = () => motivoDoPresenteRef.current === "caro" && !mensalCaroTentadoRef.current;
   const folhaCanceladaTratadaRef = useRef(false);
   const comprandoRef = useRef(false);
   comprandoRef.current = comprando;
@@ -459,7 +484,7 @@ export function PaywallIOS({
   const compraFeitaRef = useRef(false);
   const viuOfertaRef = useRef(false);
   const recuperacaoArmadaRef = useRef(false);
-  if (presente || mensal19) viuOfertaRef.current = true;
+  if (presente || mensal19 || motivosAberta || mensalCaro) viuOfertaRef.current = true;
   const registrarSaida = (motivoForcado?: "voltar" | "outro", beacon = false) => {
     if (saiuRegistradoRef.current || compraFeitaRef.current) return;
     saiuRegistradoRef.current = true;
@@ -564,7 +589,7 @@ export function PaywallIOS({
    * folha da Apple aberta não faz nada; com a chave off, nada muda. */
   useEffect(() => {
     const aoVoltar = () => {
-      if (presenteXTentadoRef.current || presenteMostradoRef.current || comprandoRef.current) return;
+      if (presenteXTentadoRef.current || presenteMostradoRef.current || comprandoRef.current || motivosAbertaRef.current) return;
       if (!ofertaLigada("x_paywall")) return;
       presenteXTentadoRef.current = true;
       void prepararPresente("x_paywall")
@@ -633,6 +658,14 @@ export function PaywallIOS({
   const depoisDaFolhaCancelada = () => {
     if (folhaCanceladaTratadaRef.current || presenteMostradoRef.current) { cartaoDeSempre(); return; }
     folhaCanceladaTratadaRef.current = true;
+    // 1.0.18 (motivos_folha "com"): a folha "O que te fez parar?" no lugar do presente direto — 1x por sessão
+    if (motivosBraco === "com" && !motivosMostradaRef.current) {
+      motivosMostradaRef.current = true;
+      setSegundaChance("usada"); // a folha dos motivos substitui o cartão de mesmo preço nesta sessão
+      if (aviso === null) void lerAvisoDoTeste().then((a) => { if (vivoRef.current) setAviso(a); }).catch(() => { if (vivoRef.current) setAviso("nao"); });
+      setMotivosAberta(true);
+      return;
+    }
     void prepararPresente("folha_cancelada")
       .then((o) => {
         if (!vivoRef.current) return;
@@ -644,6 +677,13 @@ export function PaywallIOS({
       .catch(() => { if (vivoRef.current) cartaoDeSempre(); });
   };
 
+  /* 1.0.18: o resultado da compra que saiu de uma resposta da folha dos motivos */
+  const contarCompraDoMotivo = (resultado: "sucesso" | "cancelou" | "falhou", motivoLoja: string | null) => {
+    const m = origemCompraRef.current;
+    if (!m) return;
+    origemCompraRef.current = null;
+    trackEvent("motivo_compra", { ...camposDosMotivosEv, motivo: m, resultado, motivo_loja: motivoLoja });
+  };
   const comprar = async (produto: "anual" | "mensal") => {
     if (comprando) return;
     setErro(null);
@@ -659,6 +699,7 @@ export function PaywallIOS({
         ? await rc.comprar("core_mensal", { semTrial: true })
         : await rc.comprarAnualIos();
       if (ok) {
+        contarCompraDoMotivo("sucesso", null);
         registrarSucesso("app_sheet_success", { produto: idProduto, funil: FUNIL, loja: "ios", ...(produto === "anual" ? rc.dadosDaOfertaIos() : { oferta: "mensal" }) });
         /* (D) LEMBRETE DO TESTE (01/10, de volta): a Apple não avisa antes de
          * cobrar. Compra que entrou em teste guarda o pedido do aviso "acaba
@@ -679,6 +720,7 @@ export function PaywallIOS({
        * botão vivo — no anual com teste, mais o cartão da segunda chance
        * (28/09, abaixo), que também não abre nada sozinho. */
       const motivo = rc.motivoUltimaCompra();
+      contarCompraDoMotivo(motivo === "cancelou" || motivo === null ? "cancelou" : "falhou", motivo);
       if (motivo === "pendente") {
         setPendente(true);
       } else if (motivo === "produto_ausente") {
@@ -717,6 +759,7 @@ export function PaywallIOS({
           .catch(() => { /* paywall de sempre */ });
       }
     } catch {
+      contarCompraDoMotivo("falhou", "excecao");
       setErroDaLoja({ produto, codigo: null, tipo: "outro" });
       trackEvent("paywall_erro_loja_view", { funil: FUNIL, loja: "ios", produto, motivo: "excecao", codigo: null, tipo: "outro", ...(mini ? { minimalista: true } : {}) });
     }
@@ -736,7 +779,33 @@ export function PaywallIOS({
   const mostraMensal = plano === "mensal";
   /** Tem oferta (presente, mensal 19 ou explicação) por cima AGORA? (o Voltar redondo confere) */
   const ofertaAbertaRef = useRef(false);
-  ofertaAbertaRef.current = !!(presente || mensal19 || explica);
+  ofertaAbertaRef.current = !!(presente || mensal19 || explica || motivosAberta || mensalCaro);
+  // 1.0.18 ("Achei caro"): o presente do motivo "caro" apareceu → a oferta do 19,90 já vem carregando
+  useEffect(() => {
+    if (!presente || !cabeMensalCaro()) return;
+    let vivo = true;
+    void carregarMensalCaro().then((m) => { if (vivo && m) setMensalCaroPronto(true); });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presente]);
+  const abrirMensalCaro = () => {
+    mensalCaroTentadoRef.current = true;
+    void carregarMensalCaro().then((m) => { if (vivoRef.current && m && !comprandoRef.current) setMensalCaro(m); });
+  };
+  /** "Achei caro" / "Outro motivo": o presente 69,90 da folha fechada (sem ele, o cartão de sempre). */
+  const presenteDoMotivo = (m: "caro" | "outro") => {
+    setMotivosAberta(false);
+    void prepararPresente("folha_cancelada")
+      .then((o) => {
+        if (!vivoRef.current) return;
+        if (!o || presenteMostradoRef.current || comprandoRef.current) { setSegundaChance("visivel"); return; }
+        presenteMostradoRef.current = true;
+        motivoDoPresenteRef.current = m;
+        setPresente({ lugar: "folha_cancelada", oferta: o });
+      })
+      .catch(() => { if (vivoRef.current) setSegundaChance("visivel"); });
+  };
+
   // O cartão fala do anual com teste: some com o mensal selecionado e durante
   // a folha aberta; volta com o anual (a mesma exibição — sem novo evento).
   const mostraSegundaChance = segundaChance === "visivel" && !mostraMensal && !comprando;
@@ -782,7 +851,8 @@ export function PaywallIOS({
         oferta={presente.oferta}
         explicar={presente.lugar === "folha_cancelada" || folhasCanceladasRef.current > 0}
         {...(mini ? { enxuto: true } : {})}
-        onFechar={() => setPresente(null)}
+        onFechar={() => { const caro = cabeMensalCaro(); setPresente(null); if (caro) abrirMensalCaro(); }}
+        {...(mensalCaroPronto && cabeMensalCaro() ? { onFolhaCancelada: () => { setPresente(null); abrirMensalCaro(); } } : {})}
         onSucesso={async () => {
           const { lugar, oferta: p } = presente;
           registrarSucesso("app_sheet_success", { produto: p.produto, funil: FUNIL, loja: "ios", oferta: "presente69", lugar, offering: "anual_69", preco: p.preco, segunda_chance: lugar === "folha_cancelada" ? "imediata" : "saida" });
@@ -805,6 +875,31 @@ export function PaywallIOS({
         onSucesso={() => {
           registrarSucesso("app_sheet_success", { produto: mensal19.produto, funil: FUNIL, loja: "ios", oferta: "mensal19", lugar: "mensal_paywall", offering: "mensal_19", preco: mensal19.preco, segunda_chance: "imediata" });
           setMensal19(null);
+          concluir();
+        }}
+      />
+    )}
+    {/* 1.0.18 — "O que te fez parar?" (motivos_folha). As respostas voltam pra MESMA compra do anual do paywall. */}
+    {motivosAberta && (
+      <FolhaMotivos
+        dias={dias}
+        aviso={aviso}
+        campos={camposDosMotivosEv}
+        onPresente={presenteDoMotivo}
+        onTeste={(m) => { setMotivosAberta(false); origemCompraRef.current = m; void comprar("anual"); }}
+        onVoltar={() => setMotivosAberta(false)}
+      />
+    )}
+    {/* 1.0.18 — "Achei caro" e recusou o 69,90: o mensal 19,90. "Agora não" = o paywall de sempre. */}
+    {mensalCaro && (
+      <MensalHeroi
+        modo="motivo_mensal"
+        oferta={mensalCaro}
+        campos={{ ...camposDosMotivosEv, motivo: "caro" }}
+        onFechar={() => setMensalCaro(null)}
+        onSucesso={() => {
+          registrarSucesso("app_sheet_success", { produto: mensalCaro.produto, funil: FUNIL, loja: "ios", oferta: "mensal19", lugar: "motivo_caro", offering: "mensal_19", preco: mensalCaro.preco, segunda_chance: "imediata" });
+          setMensalCaro(null);
           concluir();
         }}
       />

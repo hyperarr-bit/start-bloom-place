@@ -157,7 +157,7 @@ const dataCurta = (ms: number) => {
   try { return new Date(ms).toLocaleDateString("pt-BR", { day: "numeric", month: "long" }); } catch { return ""; }
 };
 
-export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar = false, enxuto = false }: {
+export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, onFolhaCancelada, explicar = false, enxuto = false }: {
   lugar: LugarDoPresente;
   oferta: OfertaDoPresente;
   /** 16/10: a pessoa já fechou uma folha da Apple nesta sessão → explicação antes desta (só com teste). */
@@ -168,6 +168,9 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
   onFechar: () => void;
   /** Folha fechou com sucesso e o acesso sincronizou (já marcado como visto). */
   onSucesso: () => void;
+  /** 1.0.18 (motivos_folha, "Achei caro" → mensal 19,90; lib/mensal-degraus): a pessoa FECHOU a folha da Apple deste 69,90 — quem passa isto decide
+   *  o próximo degrau (já marcado como visto). Sem ele (chave desligada), a folha fechada deixa o presente na tela. */
+  onFolhaCancelada?: () => void;
 }) {
   const reduzir = !!useReducedMotion();
   const [aberta, setAberta] = useState(reduzir);
@@ -222,7 +225,10 @@ export function Presente69Folha({ lugar, oferta, onFechar, onSucesso, explicar =
     const motivo = rc.motivoUltimaCompra();
     trackEvent("presente69_falhou", { lugar, motivo, ...extra });
     // fechou a folha = normal, sem alarde; o resto precisa de uma frase
-    if (motivo === "cancelou" || motivo === null) return;
+    if (motivo === "cancelou" || motivo === null) {
+      if (onFolhaCancelada) { marcarVisto(lugar); onFolhaCancelada(); }
+      return;
+    }
     if (motivo === "ja_ativo") setErro(erroJaAtivo());
     else if (motivo === "nao_permitido") setErro(erroNaoPermitido());
     else setErro(erroFolhaNaoConcluiu());

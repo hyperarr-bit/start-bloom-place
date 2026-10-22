@@ -218,9 +218,11 @@ describe("LIGADA: a sequência enxuta", () => {
       expect(screen.getByTestId("welcome-video")).toHaveAttribute("playsinline");
       expect(eventos).toContainEqual(["funnel_view", { step: "welcome", funil: "w", video: true }]);
       expect(eventos).toContainEqual(["app_welcome_view", expect.objectContaining({ calai: true, att_braco: "auto3s" })]);
-      // 10/10 (dono): "Já tem conta? Entrar" ABAIXO do Começar, como o Cal AI; sem termos, sem
-      // "Restaurar compras" (foi pra tela de Entrar), sem "Já é cliente?"
-      const entrar = screen.getByText(/Já tem conta\?/).closest("button")!;
+      // 10/10 (dono): o link de entrar ABAIXO do Começar, como o Cal AI; sem termos, sem
+      // "Restaurar compras" (foi pra tela de Entrar), sem "Já é cliente?". 1.0.18: o texto virou
+      // "Já sou cliente · Entrar" (welcome-1018.test.tsx)
+      const entrar = screen.getByTestId("welcome-ja-sou-cliente");
+      expect(entrar).toHaveTextContent("Já sou cliente · Entrar");
       const comecar = screen.getByTestId("welcome-comecar");
       expect(comecar.compareDocumentPosition(entrar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(screen.queryByText(/Termos e Aviso de Privacidade/)).toBeNull();
@@ -292,7 +294,12 @@ describe("LIGADA: a sequência enxuta", () => {
       expect(screen.getByTestId("plano-3-dias")).toBeInTheDocument();
       expect(eventos).toContainEqual(["funnel_view", expect.objectContaining({ step: "plano_3_dias" })]);
       expect(nomes().some((n) => /funnel_view:central|funnel_view:demo/.test(n))).toBe(false);
-      fireEvent.click(screen.getByTestId("plano-3-dias-fechado"));
+      // 1.0.18: o botão visível (o do rodapé fixo) diz "Começar meu Dia 1" (era "Fechado") e toca no da tela —
+      // mesma ação, mesmos eventos
+      const rodape = screen.getByTestId("plano-3-dias-fechado-rodape");
+      expect(rodape).toHaveTextContent("Começar meu Dia 1");
+      fireEvent.click(rodape);
+      expect(eventos).toContainEqual(["funnel_click", expect.objectContaining({ cta: "plano_3_dias_fechado" })]);
       await tick();
       expect(screen.getByTestId("paywall-w")).toBeInTheDocument();
     } finally { vi.useRealTimers(); }

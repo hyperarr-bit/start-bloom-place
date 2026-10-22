@@ -10,13 +10,18 @@ import { COMPROMISSOS_POR_AREA, DEPOIS_DO_TESTE_POR_AREA, DIAS_POR_AREA, comprom
 
 const FUNIL = "w";
 
+/** 1.0.18 (dono 21/10): o botão era "Fechado" — cara de contrato; 4% de quem chegava aqui fechava o app
+ *  sem tocar em nada. Mesmo lugar, mesmo estilo, mesma ação e mesmos eventos (o testid e o
+ *  `cta=plano_3_dias_fechado` ficam, pra série de hoje continuar comparável). */
+export const TEXTO_BOTAO_PLANO = "Começar meu Dia 1";
+
 /**
  * "SEU PLANO DE 3 DIAS" (10/10, chave ONBOARDING_1TELA) — a tela ÚNICA que
  * substitui os 3 "Claro!" + o contrato assinado no dedo, depois da demo.
  *
  *   · os 3 compromissos da rota já MARCADOS (chips com ✓; tocar desmarca);
  *   · 1 linha de contrato ("Eu vou dar 10 min por dia ao meu CORE por 3 dias");
- *   · um botão "Fechado". Nada pra digitar, nada pra desenhar.
+ *   · um botão "Começar meu Dia 1" (até a 1.0.17, "Fechado"). Nada pra digitar, nada pra desenhar.
  *
  * Eventos (as séries de hoje continuam comparáveis): no "Fechado", um
  * `funnel_quiz_answer step=compromisso_N answer=claro|nao` por chip e
@@ -207,7 +212,7 @@ export function PlanoDe3Dias({ area, nome, onDone }: { area: AreaKey; nome?: str
           className="w-full rounded-full py-4 text-[16px] font-extrabold text-white active:scale-[0.99] transition-transform disabled:opacity-60"
           style={{ background: "#16121c" }}
         >
-          Fechado
+          {TEXTO_BOTAO_PLANO}
         </button>
       </div>
     </div>

@@ -27,7 +27,10 @@ import { BotaoDoFunil } from "@/pages/funis/w/BotaoDoFunil";
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
- *   · UMA linha secundária, "Já tem conta? Entrar", ABAIXO do botão como no Cal AI (dono
+ *   · UMA linha secundária ABAIXO do botão como no Cal AI — "Já sou cliente · Entrar" desde a 1.0.18
+ *     (21/10: 7,6% das instalações tocavam o "Já tem conta? Entrar" em ~3 s SEM ter conta e iam criar
+ *     conta pela Apple/Google no /entrar, pulando o quiz; agora diz pra quem é, num corpo menor, e o
+ *     /entrar?de=welcome ganha a volta "Ainda não tem conta? Monte seu plano"). Era "Já tem conta? Entrar" (dono
  *     10/10: o rodapé tinha 4 linhas, duas dizendo a mesma coisa, e o link em cima do
  *     botão "não faz sentido nenhum"; a linha de termos saiu — o Cal AI não tem). "Restaurar
  *     compras" e o "Já pagou pelo site?" moraram aqui até 10/10; agora ficam na tela de
@@ -231,7 +234,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
             secundarioAbaixo
             secundario={veioDoSite
               ? { texto: <>Ainda não tenho conta? <b>Começar</b></>, onClick: async () => { trackEvent("app_welcome_start", { pos_compra_web: true, ...camposDoATT() }); await pedirRastreamentoIos("welcome"); onComecar(); } }
-              : { texto: <>Já tem conta? <b>Entrar</b></>, onClick: () => { trackEvent("app_welcome_login", { ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar"); } }}
+              : { texto: <>Já sou cliente · <b>Entrar</b></>, testid: "welcome-ja-sou-cliente", onClick: () => { trackEvent("app_welcome_login", { ...camposDoATT() }); if (onEntrar) onEntrar(); else navigate("/entrar?de=welcome"); } }}
           />
         </motion.div>
       </div>
@@ -291,6 +294,8 @@ const CSS_WCA = `
   box-shadow: 0 18px 38px -12px rgba(22,18,28,.5);
 }
 .wca-cta:active { transform: scale(.985); }
+/* 1.0.18: o "Já sou cliente · Entrar" é a porta de quem JÁ tem conta — menor que o link padrão do rodapé */
+.wca .bdf-link-abaixo[data-testid="welcome-ja-sou-cliente"] { font-size: 13px; color: #6b7480; }
 .wca-link { border: 0; background: none; padding: 9px 16px; font-size: 14px; color: #4f5a64; font-family: inherit; cursor: pointer; }
 .wca-link b { color: #16121c; }
 .wca-aviso { margin: 0 0 8px; padding: 10px 14px; border-radius: 12px; background: #f7f5fb; border: 1px solid #e4e0ee; color: #16121c; font-size: 13.5px; line-height: 1.4; text-align: center; }

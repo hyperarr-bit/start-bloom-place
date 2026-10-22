@@ -10,6 +10,12 @@
  *   "compra"   (padrão) → purchaseStoreProduct resolve na hora
  *   "cancela"  → lança { code: "1" } (pessoa fechou a folha do Google)
  *   "pendente" → lança { code: "20" } (escolheu Pix na folha, PAYMENT_PENDING)
+ *   1.0.18 — os ERROS DA LOJA do iPhone (paywall com retentativa automática + caixa "Tentar de novo"):
+ *   "erro-loja"     → { code: "2" } "There was a problem with the App Store." (sempre)
+ *   "erro-rede"     → { code: "10" } "Error performing request." (sempre)
+ *   "bloqueado"     → { code: "3" } "The device or user is not allowed to make the purchase."
+ *   "erro-loja-1x"  → a 1ª folha falha com o code 2 e a 2ª compra (a retentativa automática resolve)
+ *   O modo também pode vir de `localStorage.__rc_mock_modo` (o QA de aparelho grava com o app parado).
  *
  * As compras simuladas persistem em localStorage — matar o app e reabrir
  * mantém a "compra no aparelho", que é exatamente o que o boot-check do
@@ -57,7 +63,20 @@ const entitlementDaCompra = () => {
   };
 };
 
-const modo = (): string => (window as any).__rcModo || "compra";
+const modo = (): string => {
+  if ((window as any).__rcModo) return (window as any).__rcModo;
+  try { return localStorage.getItem("__rc_mock_modo") || "compra"; } catch { return "compra"; }
+};
+let falhouUmaVez = false;
+/** os erros da loja simulados (1.0.18); o "erro-loja-1x" falha só na 1ª folha desta abertura do app */
+const erroDaLojaSimulado = (m: string): void => {
+  if (m === "cancela") throw { code: "1", message: "Purchase was cancelled. (mock)" };
+  if (m === "pendente") throw { code: "20", message: "PAYMENT_PENDING_ERROR (mock)" };
+  if (m === "erro-loja") throw { code: "2", message: "There was a problem with the App Store. (mock)" };
+  if (m === "erro-rede") throw { code: "10", message: "Error performing request. (mock)" };
+  if (m === "bloqueado") throw { code: "3", message: "The device or user is not allowed to make the purchase. (mock)" };
+  if (m === "erro-loja-1x" && !falhouUmaVez) { falhouUmaVez = true; throw { code: "2", message: "There was a problem with the App Store. (mock 1x)" }; }
+};
 
 // v53: o mock separa compra ÚNICA (vitalício) de ASSINATURA — o boot-check
 // do cadastro pós-compra olha nonSubscriptionTransactions pro vitalício e
@@ -215,16 +234,12 @@ export const Purchases: any = {
     return r;
   },
   async purchaseStoreProduct({ product }: { product: { identifier: string } }) {
-    const m = modo();
-    if (m === "cancela") throw { code: "1", message: "Purchase was cancelled. (mock)" };
-    if (m === "pendente") throw { code: "20", message: "PAYMENT_PENDING_ERROR (mock)" };
+    erroDaLojaSimulado(modo());
     gravarCompra(product.identifier);
     return info();
   },
   async purchasePackage({ aPackage }: { aPackage?: { product?: { identifier?: string } } } = {}) {
-    const m = modo();
-    if (m === "cancela") throw { code: "1", message: "Purchase was cancelled. (mock)" };
-    if (m === "pendente") throw { code: "20", message: "PAYMENT_PENDING_ERROR (mock)" };
+    erroDaLojaSimulado(modo());
     gravarCompra(aPackage?.product?.identifier ?? "core_anual:coreanual");
     return info();
   },

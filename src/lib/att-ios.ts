@@ -72,11 +72,29 @@ async function ehDaPorta(): Promise<boolean> {
   return false;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * "notDetermined" NÃO É RESPOSTA (1.0.18 — raio-X do funil de 21/10: 641 instalações, 28 %, ficaram com o ATT
+ * `notDetermined` pra sempre, 598 delas pelo pedido automático dos 3 s). O iOS devolve notDetermined quando o
+ * diálogo NÃO chegou a aparecer (o app ainda não estava "ativo" na hora do pedido, ou o pedido foi interrompido) —
+ * e o código gravava isso como "já pedido" e nunca mais perguntava. Agora:
+ *   · notDetermined não grava nada: o próximo pedido natural que JÁ existe (o "Começar" da welcome, a Home, a
+ *     próxima abertura) pergunta de novo;
+ *   · no máximo 1 repetição por abertura do app (duas respostas notDetermined seguidas = espera a próxima abertura);
+ *   · authorized / denied / restricted continuam gravados pra sempre — nunca se pergunta depois de uma resposta.
+ * O momento do pedido (3 s depois da welcome) NÃO mudou: tirar o pedido automático é decisão do dono (anotado).
+ * ───────────────────────────────────────────────────────────────────────────── */
+const REPETICOES_POR_ABERTURA = 1;
+let naoDeterminadosNestaAbertura = 0;
+/** Só testes: simula uma nova abertura do app. */
+export const _zerarAberturaDoATT = (): void => { naoDeterminadosNestaAbertura = 0; };
+
 export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
   try {
     const { Capacitor, registerPlugin } = await import("@capacitor/core");
     if (Capacitor.getPlatform() !== "ios") return "nao_ios";
-    try { if (localStorage.getItem(CHAVE)) return "ja_pedido"; } catch { /* modo privado */ }
+    // "notDetermined" gravado pelas versões 1.0.14–1.0.17 não é resposta: esses aparelhos voltam a ser perguntados
+    try { const guardado = localStorage.getItem(CHAVE); if (guardado && guardado !== "notDetermined") return "ja_pedido"; } catch { /* modo privado */ }
+    if (naoDeterminadosNestaAbertura > REPETICOES_POR_ABERTURA) return "ja_pedido"; // já repetiu nesta abertura: fica pra próxima
     if (await ehDaPorta()) return "pulado_porta";
     const MetaAds = registerPlugin<{ pedirRastreamento(): Promise<{ status: string }> }>("MetaAds");
     // 20 s de teto: se o diálogo não vier (build sem o método), o funil segue.
@@ -85,7 +103,11 @@ export async function pedirRastreamentoIos(origem: string): Promise<StatusATT> {
       new Promise<{ status: string }>((res) => setTimeout(() => res({ status: "sem_plugin" }), 20000)),
     ]);
     const status = (r?.status || "sem_plugin") as StatusATT;
-    if (status !== "sem_plugin") {
+    if (status === "notDetermined") {
+      // o diálogo não apareceu: não grava (o próximo pedido pergunta de novo); o evento guarda qual tentativa foi
+      naoDeterminadosNestaAbertura += 1;
+      trackEvent("att_resposta", { status, origem, tentativa: naoDeterminadosNestaAbertura });
+    } else if (status !== "sem_plugin") {
       try { localStorage.setItem(CHAVE, status); } catch { /* noop */ }
       trackEvent("att_resposta", { status, origem });
       // Aceitou: regrava a ficha do aparelho, agora com o IDFA dentro.

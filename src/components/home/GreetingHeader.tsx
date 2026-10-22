@@ -92,7 +92,11 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   // 1.0.17: com a barra de abas, avatar (folha da conta), sol e paleta moram no Você — o topo fica só a saudação
   const comAbas = navAbasLigada() && !!user;
 
-  const contextMessage = getContextualMessage(data, normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO)));
+  /* B4 (1.0.18, QA 21/10): `Que tal ler um pouco de "Dom casmurro"? 📖` quebrava com o 📖 sozinho numa 3ª linha, e ao
+   * rolar o rótulo "AÇÕES RÁPIDAS" aparecia por baixo dele (o cabeçalho sticky não cobria essa linha). Dois cintos:
+   * o último pedaço (o emoji) gruda na palavra anterior com um espaço que não quebra — nunca mais uma linha só com o
+   * emoji — e o subtítulo fica em no máximo 2 linhas (line-clamp), então a altura do cabeçalho não cresce. */
+  const contextMessage = getContextualMessage(data, normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO))).replace(/ (\S+)$/, " $1");
   const nomeCompleto = data.userName || user?.email?.split("@")[0] || "";
   /* Só o PRIMEIRO nome na saudação (29/07). "Boa tarde, João Victor 👋" não
      cabe em 360px e virava "Boa tarde, João Vic…" — nome cortado no meio é
@@ -137,7 +141,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
               </button>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{contextMessage}</p>
+          <p className="text-xs text-muted-foreground line-clamp-2" data-testid="saudacao-subtitulo">{contextMessage}</p>
         </div>
         {!comAbas && <div className="flex items-center gap-1 flex-shrink-0">
           {/* Avatar-badge (22/07, escolha do dono após ▾ e ☰): o próprio

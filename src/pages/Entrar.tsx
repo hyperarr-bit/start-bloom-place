@@ -23,7 +23,8 @@ import {
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { isInAppBrowser } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
+import { ENTRADA_APP } from "@/lib/rotas-web";
 import { RestaurarCompras } from "@/components/app/RestaurarCompras";
 
 /** /entrar — duas plateias, a mesma tela.
@@ -71,6 +72,16 @@ const Entrar = () => {
   const next = destinoSeguro(params.get("next"));
   const emailDoLink = (params.get("e") ?? "").trim();
   const destinoPos = next ?? "/home";
+  /* 1.0.18 (21/10): quem chega da WELCOME do app ("Já sou cliente · Entrar") e não tem conta ganha a volta pro
+   * funil. Medido: 7,6% das instalações tocavam o "Entrar" da welcome em ~3 s e só 36 de 174 logavam — o resto
+   * criava conta pela Apple/Google aqui e caía no paywall sem passar pelo quiz. Só no app, só vindo da welcome
+   * (`?de=welcome`), nunca com `?next=` (link de e-mail) nem pra quem instalou vindo do site (essa já tem conta
+   * e já pagou — mandar pro quiz/paywall seria cobrar de novo). */
+  const mostraVoltaProFunil = app && !next && params.get("de") === "welcome" && !instalouVindoDoSite();
+  const irProFunil = () => {
+    trackEvent("entrar_sem_conta_funil", { origem: "welcome" });
+    navigate(ENTRADA_APP, { replace: true });
+  };
   // Quem veio pelo link não "comprou no tutorial": copy neutra, igual à do app.
   const neutro = app || !!next;
   const [email, setEmail] = useState(next && /\S+@\S+\.\S+/.test(emailDoLink) ? emailDoLink : "");
@@ -310,6 +321,23 @@ const Entrar = () => {
           <div className="mt-3">
             <EntrarComCodigo email={email} funil="entrar" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access", ...(next ? { next } : {}) }); navigate(destinoPos); }} />
           </div>
+        )}
+
+        {/* 1.0.18: a saída de quem tocou "Entrar" na welcome sem ter conta — ANTES da Apple/Google, que
+            criariam uma conta nova e pulariam o quiz. Some quando a pessoa já tem sessão (tela acima). */}
+        {mostraVoltaProFunil && (
+          <button
+            type="button"
+            onClick={irProFunil}
+            data-testid="entrar-sem-conta-funil"
+            className="w-full rounded-xl border border-border bg-card px-4 py-3.5 text-left flex items-center gap-3 active:scale-[0.99] transition-transform"
+          >
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm text-muted-foreground">Ainda não tem conta?</span>
+              <span className="block text-[15px] font-bold text-foreground">Monte seu plano</span>
+            </span>
+            <ArrowRight className="w-4 h-4 shrink-0 text-foreground" aria-hidden />
+          </button>
         )}
 
         {/* Quem criou a conta com Google não tem senha — precisa desta porta.

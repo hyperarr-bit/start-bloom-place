@@ -66,7 +66,7 @@ describe("os textos por área", () => {
 });
 
 describe("OFF: a tela da 1.0.14 de hoje", () => {
-  it("chips grandes, contrato, 'Fechado'; nada do cadeado; funnel_view sem `cadeado`", async () => {
+  it("chips grandes, contrato, 'Começar meu Dia 1' (era 'Fechado' até a 1.0.17); nada do cadeado; funnel_view sem `cadeado`", async () => {
     montar("/funil-w?step=compromissos&onboarding-1tela=on");
     await act(async () => { await Promise.resolve(); });
     const tela = screen.getByTestId("plano-3-dias");
@@ -75,7 +75,7 @@ describe("OFF: a tela da 1.0.14 de hoje", () => {
     expect(screen.queryByTestId("plano-3-dias-cadeado")).toBeNull();
     expect(screen.queryByTestId("plano-3-dias-dias")).toBeNull();
     expect(document.body.textContent).not.toMatch(/Depois do teste|Desbloque|DIA 1/);
-    expect(screen.getByTestId("plano-3-dias-fechado")).toHaveTextContent("Fechado");
+    expect(screen.getByTestId("plano-3-dias-fechado")).toHaveTextContent("Começar meu Dia 1");
     const view = eventos.find(([n, d]) => n === "funnel_view" && d.step === "plano_3_dias");
     expect(view).toBeTruthy();
     expect(view![1]).not.toHaveProperty("cadeado");

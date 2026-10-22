@@ -38,7 +38,7 @@ import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, recuoDoPaywall } from "@/pages/funis/w/retomada";
 import { COMPROMISSOS_POR_AREA } from "@/pages/funis/w/compromissos";
-import { PlanoDe3Dias } from "@/pages/funis/w/PlanoDe3Dias";
+import { PlanoDe3Dias, TEXTO_BOTAO_PLANO } from "@/pages/funis/w/PlanoDe3Dias";
 import { guardarForcaOnboarding1Tela, onboarding1TelaLigado, passoDoOnboarding, STEP_PLANO_3_DIAS } from "@/lib/onboarding-1tela";
 import { ofertaLigada } from "@/lib/ofertas-saida";
 /* 10/10 (FUNIL_CALAI, lib/funil-calai, DESLIGADA): o funil enxuto — welcome com vídeo,
@@ -739,11 +739,11 @@ export default function ComecarW() {
             {calai ? (
               /* 10/10 (FUNIL_CALAI): iPhone com vídeo do app real + 1 frase; o Começar pede o
                  ATT como hoje e cai DIRETO na porta (os 3 quadros de promessa saem). */
-              <WelcomeCalai area={area} onComecar={() => setStep("porta")} onEntrar={() => navigate("/entrar")} />
+              <WelcomeCalai area={area} onComecar={() => setStep("porta")} onEntrar={() => navigate("/entrar?de=welcome")} />
             ) : (
             <AppWelcome
               onComecar={() => setStep("promessas")}
-              onEntrar={() => navigate("/entrar")} /* 24/09: /entrar é o login completo do app —
+              onEntrar={() => navigate("/entrar?de=welcome")} /* 24/09: /entrar é o login completo do app —
                  código por e-mail + Apple/Google. O /auth antigo, no app, só tinha
                  e-mail e senha: quem criou a conta com Google no site ou esqueceu
                  a senha travava ali. 17–24/09, das 374 sessões que tocaram em
@@ -858,7 +858,7 @@ export default function ComecarW() {
               {/* 10/10 (ONBOARDING_1TELA, desligada): os 3 Claro! + o contrato numa tela só.
                   A demo termina AQUI; depois vem o paywall exatamente como no contrato de hoje. */}
               {step === "plano_3_dias" && (
-                /* 10/10 (FUNIL_CALAI): o "Fechado" vai pro rodapé fixo padrão (BotaoDoFunil) SEM mexer no
+                /* 10/10 (FUNIL_CALAI): o botão do plano ("Começar meu Dia 1" desde a 1.0.18; era "Fechado") vai pro rodapé fixo padrão (BotaoDoFunil) SEM mexer no
                    PlanoDe3Dias (arquivo do outro ramo): o botão da tela some pelo CSS e o do rodapé toca nele —
                    a lógica e os eventos continuam os da tela. Com a chave desligada, a tela de hoje. */
                 <div className={calai ? "flex-1 flex flex-col" : "contents"} data-plano-rodape-fixo={calai ? "" : undefined}>
@@ -869,7 +869,7 @@ export default function ComecarW() {
                     onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")}
                   />
                   {calai && (
-                    <BotaoDoFunil texto="Fechado" seta={false} testid="plano-3-dias-fechado-rodape"
+                    <BotaoDoFunil texto={TEXTO_BOTAO_PLANO} seta={false} testid="plano-3-dias-fechado-rodape"
                       onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="plano-3-dias-fechado"]')?.click()} />
                   )}
                 </div>

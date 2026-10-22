@@ -79,6 +79,10 @@ const usarOApp = () => {
     ["conquistas2-force", "on"], ["core-festas-mostradas", JSON.stringify(["first-expense", "sequencia-2"])],
     // 1.0.18: o card da recusa já apareceu pra esta recusa (1x por recusa), a última resposta remota e a força de QA
     ["core-card-recusa-visto", "2026-10-20T10:00:00Z"], ["core-card-recusa", "on"], ["card-recusa-force", "on"],
+    // 1.0.18 (revisor 22/10): a tela do sino (vista, braço, resposta remota, força de QA) e o menu novo (resposta remota,
+    // o balão único já visto, força de QA) — tudo do aparelho
+    ["core-sino-visto", "2026-10-20T10:00:00Z"], ["core-sino-braco", "com"], ["core-sino-paywall", "ab"], ["sino-paywall-force", "on"],
+    ["core-menu-novo", "todos"], ["core-menu-novo-aviso", "visto"], ["menu-novo-force", "todos"],
   ] as const) localStorage.setItem(k, v);
   // dado da CONTA (cache do user_data) e chaves antigas sem namespace: a vassoura leva
   localStorage.setItem("u:u1:finance-expenses", JSON.stringify([{ id: 1 }]));
@@ -98,7 +102,8 @@ const esperarTudoVisto = () => {
   for (const k of ["core-avaliacao-total", "core-avaliacao-ultima", "core-avaliacao-convite-em", "core-att-status", "core-saida-vista",
     "core-lembrete-teste", "core-funil-w-area", "core-area-landed", "core-boas-vindas-visto", "core-dia2", "core-presente69-cancelou-visto",
     "core-missao-1-por-dia", "core-dia1-braco", "missao-doses", "core-montar-financas", "core-tour-home-remoto", "core-home-tour-vistas", "core-att-momento", "core-att-braco",
-    "conquistas2-force", "core-festas-mostradas", "core-card-recusa-visto", "core-card-recusa", "card-recusa-force", "core-dias23", "dias23-force"]) {
+    "conquistas2-force", "core-festas-mostradas", "core-card-recusa-visto", "core-card-recusa", "card-recusa-force", "core-dias23", "dias23-force",
+    "core-sino-visto", "core-sino-braco", "core-sino-paywall", "sino-paywall-force", "core-menu-novo", "core-menu-novo-aviso", "menu-novo-force"]) {
     expect(localStorage.getItem(k), k).not.toBeNull();
   }
   const missao = JSON.parse(localStorage.getItem("missao-doses")!);

@@ -186,6 +186,31 @@ describe("o menu novo: 3 grupos + Sair", () => {
       cleanup();
     }
   });
+  it("revisor 22/10: 'Plano de 30 dias' só com a compra do plano de OUTRA área (no fim do grupo você); toque leva pro /plano-30", () => {
+    // sem compra: o item não existe
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // comprou o de Dinheiro: mora na aba KIT 30 DIAS de Finanças, não no menu
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: true, area: "dinheiro" } };
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // valor estranho (sem comprado === true) não libera
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: "sim", area: "rotina" } };
+    montarMenu();
+    expect(screen.queryByTestId("menu-plano30")).toBeNull();
+    cleanup();
+    // comprou o de Rotina: aparece em "você", com o rótulo, e leva pro plano
+    nuvem.dados = { "core-kit-primeiro-mes": { comprado: true, area: "rotina", em: "2026-10-21T12:00:00Z" } };
+    eventos.length = 0;
+    montarMenu();
+    expect(ids(screen.getByTestId("menu-grupo-voce"))).toEqual(["conta", "plano", "conquistas", "plano30"]);
+    expect(screen.getByTestId("menu-plano30").textContent).toMatch(/Plano de 30 dias/);
+    fireEvent.click(screen.getByTestId("menu-plano30"));
+    expect(dos("menu_item_click")).toEqual([{ item: "plano30", grupo: "voce", menu: "novo" }]);
+    expect(screen.getByTestId("onde").textContent).toBe("/plano-30");
+  });
   it("Minha conta abre a sub-tela da conta; Privacidade e termos abre as duas páginas", () => {
     montarMenu();
     fireEvent.click(screen.getByTestId("menu-conta"));

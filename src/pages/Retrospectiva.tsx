@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 import { motion } from "framer-motion";
 import { ArrowLeft, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -71,6 +72,7 @@ const Retrospectiva = () => {
   const { user } = useAuth();
   const { get, loaded, fetchKey } = useUserData();
   const navigate = useNavigate();
+  const voltar = useVoltarDaSubpagina("/home");
   const [params] = useSearchParams();
   const mesPedido = params.get("mes");
   const uid = user?.id ?? null;
@@ -201,7 +203,7 @@ const Retrospectiva = () => {
       <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/85 backdrop-blur border-b border-border
                          pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
-          onClick={() => navigate("/home")}
+          onClick={voltar}
           aria-label="Voltar"
           className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors"
         >

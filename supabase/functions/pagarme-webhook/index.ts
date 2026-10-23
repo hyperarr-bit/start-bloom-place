@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
+import { respostaGatewayDesativado } from "../_shared/gateway-desativado.ts";
 
 /**
  * Webhook da PAGAR.ME (21/07) — gêmeo do abacate-webhook para o braço B do
@@ -128,6 +130,10 @@ const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html
 </body></html>`;
 
 serve(async (req) => {
+  // 21/10: gateway antigo DESLIGADO (dono aprovou) — 410 antes de qualquer leitura/escrita (_shared/gateway-desativado.ts)
+  const desligado = respostaGatewayDesativado(req, "pagarme-webhook");
+  if (desligado) return desligado;
+
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   const secret = Deno.env.get("PAGARME_WEBHOOK_SECRET");
@@ -169,7 +175,7 @@ serve(async (req) => {
     // resolve dono + oferta: 1º pix_order_created (server), 2º pix_generated (cliente), 3º metadata do pedido
     let userId: string | null = null;
     let offer = "";
-    const { data: reg } = await admin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: orderId }).limit(1);
+    const reg = await registroDoPedido(admin, orderId, logStep); // segurança 21/10: linhas do pedido têm que concordar
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String((reg[0].event_data as Record<string, string>)?.offer ?? ""); }
     if (!userId) {
       const { data: gen } = await admin.from("analytics_events").select("user_id, event_data").in("event_name", ["pix_generated", "funnel_v2_pix_generated"]).contains("event_data", { order_id: orderId }).limit(1);

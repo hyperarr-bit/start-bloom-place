@@ -1,0 +1,70 @@
+/* ESCOLHA RÁPIDA (1.0.17) — chips + "+ Outro" com campo ali mesmo. `button.` na frente: esta folha pode entrar antes do
+   index.css e o preflight `[type="button"]` zera o fundo (o mesmo cuidado do md-hora). */
+.er { width: 100%; }
+.er-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+button.er-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px 0 12px; border-radius: 999px;
+  background: #fff; color: #262626; font-size: 13.5px; font-weight: 700; border: 1px solid transparent;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .12);
+  transition: transform var(--mov-rapido, 150ms) var(--mov-ease-sai, ease-out), background-color var(--mov-rapido, 150ms), color var(--mov-rapido, 150ms);
+}
+button.er-chip:active { transform: scale(.96); }
+button.er-chip[data-marcado] { background: #16121c; color: #fff; }
+button.er-chip:disabled { opacity: .55; }
+.er-check { width: 15px; height: 15px; }
+.er-valor { font-weight: 600; color: rgba(38, 38, 38, .55); }
+button.er-chip[data-marcado] .er-valor { color: rgba(255, 255, 255, .7); }
+/* a opção que ELA escreveu: uma etiqueta discreta "seu" no fim */
+.er-seu { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: rgba(38, 38, 38, .08); color: rgba(38, 38, 38, .6); }
+button.er-chip[data-marcado] .er-seu { background: rgba(255, 255, 255, .16); color: rgba(255, 255, 255, .8); }
+button.er-outro { background: transparent; border: 1.5px dashed rgba(38, 38, 38, .45); box-shadow: none; color: rgba(38, 38, 38, .85); font-weight: 650; }
+.er-mais { width: 15px; height: 15px; }
+
+/* o campo que abre no lugar do "+ Outro" */
+.er-campo { overflow: hidden; }
+.er-linha { display: flex; gap: 8px; margin-top: 10px; }
+.er-input {
+  flex: 1; min-width: 0; height: 44px; border-radius: 12px; padding: 0 12px; font-size: 16px; /* ≥16 px: o iPhone não dá zoom */
+  background: #fff; color: #262626; border: 1.5px solid rgba(38, 38, 38, .25); outline: none;
+}
+.er-input:focus { border-color: #16121c; }
+.er-reais { display: flex; align-items: center; gap: 4px; width: 96px; height: 44px; border-radius: 12px; padding: 0 10px; background: #fff; border: 1.5px solid rgba(38, 38, 38, .25); }
+.er-reais:focus-within { border-color: #16121c; }
+.er-reais small { font-size: 12px; font-weight: 700; color: rgba(38, 38, 38, .55); }
+.er-reais input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; font-size: 16px; font-weight: 700; color: #262626; font-variant-numeric: tabular-nums; }
+.er-acoes { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; }
+button.er-cancelar { min-height: 40px; padding: 0 10px; background: transparent; border: 0; font-size: 13px; font-weight: 650; color: rgba(38, 38, 38, .6); }
+button.er-adicionar { min-height: 40px; padding: 0 16px; border-radius: 999px; background: #16121c; color: #fff; font-size: 13.5px; font-weight: 800; border: 0; }
+button.er-adicionar:disabled { opacity: .35; }
+.er-stepper { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 10px; }
+button.er-step { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; background: #fff; border: 1.5px solid rgba(38, 38, 38, .25); color: #262626; }
+button.er-step:disabled { opacity: .35; }
+button.er-step svg { width: 18px; height: 18px; }
+.er-step-valor { min-width: 96px; text-align: center; font-size: 22px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* FOLHA (o cartão da comemoração / do plano de amanhã, que segue o tema do app) */
+.er[data-tom="folha"] button.er-chip { background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1.5px solid hsl(var(--foreground) / .7); box-shadow: none; min-height: 40px; font-weight: 800; font-size: 14px; }
+.er[data-tom="folha"] button.er-chip[data-marcado] { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.er[data-tom="folha"] button.er-outro { border: 1.5px dashed hsl(var(--foreground) / .35); color: hsl(var(--foreground) / .7); }
+.er[data-tom="folha"] .er-seu { background: hsl(var(--foreground) / .08); color: hsl(var(--foreground) / .6); }
+.er[data-tom="folha"] .er-input,
+.er[data-tom="folha"] .er-reais,
+.er[data-tom="folha"] button.er-step { background: hsl(var(--background)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+.er[data-tom="folha"] .er-reais input { color: hsl(var(--foreground)); }
+.er[data-tom="folha"] button.er-cancelar { color: hsl(var(--muted-foreground)); }
+.er[data-tom="folha"] button.er-adicionar { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+
+/* MONTAR (as folhas do Montar Finanças/Rotina): o chip do lugar manda (classeChip, sem o visual do er-chip); aqui só o
+   tracejado do "+ Outro", a etiqueta "seu" e o campo */
+.er[data-tom="montar"] .er-chips { gap: 10px; }
+.er-chip-lugar { gap: 6px; }
+.er-chip-lugar.er-outro-lugar { border-style: dashed !important; }
+.er-chip-lugar .er-check, .er-chip-lugar .er-mais { width: 16px; height: 16px; }
+.er[data-tom="montar"] .er-seu { background: hsl(var(--foreground) / .08); color: hsl(var(--foreground) / .6); }
+.er[data-tom="montar"] .er-input { background: hsl(var(--card)); color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+.er[data-tom="montar"] button.er-adicionar { background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.er[data-tom="montar"] button.er-cancelar { color: hsl(var(--muted-foreground)); }
+
+@media (prefers-reduced-motion: reduce) {
+  button.er-chip { transition: none; }
+}

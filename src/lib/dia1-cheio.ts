@@ -132,10 +132,44 @@ export function registrarUmPorDiaRemoto(offerings: unknown): void {
     ls.set(CHAVE_UM_POR_DIA_APARELHO, umPorDiaRemoto);
     tourHomeRemoto = lerTourHomeRemoto(offerings);
     if (tourHomeRemoto) ls.set(CHAVE_TOUR_HOME_APARELHO, tourHomeRemoto); else ls.del(CHAVE_TOUR_HOME_APARELHO);
+    tourQuandoRemoto = lerTourQuandoRemoto(offerings);
+    if (tourQuandoRemoto) ls.set(CHAVE_TOUR_QUANDO_APARELHO, tourQuandoRemoto); else ls.del(CHAVE_TOUR_QUANDO_APARELHO);
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarUmPorDiaRemoto = (): void => { umPorDiaRemoto = undefined; tourHomeRemoto = undefined; };
+export const _zerarUmPorDiaRemoto = (): void => { umPorDiaRemoto = undefined; tourHomeRemoto = undefined; tourQuandoRemoto = undefined; };
+
+/* ───────────── 1.0.17: `tour_home_quando` (RevenueCat) — QUANDO o tour curto entra ───────────── */
+/**
+ * Decisão do dono (19/10): o tour curto fica no DIA 1, mas nunca colado na festa — festa → passagem calma → a Home
+ * parada ~1,5 s sem outra camada → o tour; o "Plano de amanhã" só depois dele (uma camada por vez). A hora vai por
+ * chave REMOTA, pra comparar as turmas:
+ *   · "dia1" (ou ausente) → no dia 1, depois da dose e do respiro;
+ *   · "dia2" → nunca no dia 1: num dia seguinte, depois da dose daquele dia.
+ * Lida em qualquer offering (a `current` vence), como `tour_home`; a última resposta fica no aparelho
+ * (`core-tour-home-quando`). Vai nos eventos do tour e da missão como `tour_quando`.
+ */
+export type QuandoTourHome = "dia1" | "dia2";
+export const CHAVE_REMOTA_TOUR_QUANDO = "tour_home_quando";
+export const CHAVE_TOUR_QUANDO_APARELHO = "core-tour-home-quando";
+let tourQuandoRemoto: QuandoTourHome | null | undefined;
+const quandoTourDe = (v: unknown): QuandoTourHome | null => {
+  const t = String(v ?? "").trim().toLowerCase();
+  return t === "dia1" || t === "dia2" ? t : null;
+};
+export function lerTourQuandoRemoto(offerings: unknown): QuandoTourHome | null {
+  type Off = { metadata?: Record<string, unknown> } | null | undefined;
+  const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
+  let lido: QuandoTourHome | null = null;
+  for (const off of Object.values(o?.all ?? {})) if (off !== o?.current) lido = quandoTourDe(off?.metadata?.[CHAVE_REMOTA_TOUR_QUANDO]) ?? lido;
+  return quandoTourDe(o?.current?.metadata?.[CHAVE_REMOTA_TOUR_QUANDO]) ?? lido;
+}
+/** Quando o tour curto entra AQUI: o que o RevenueCat disse nesta abertura, senão a última resposta do aparelho, senão "dia1". */
+export function tourHomeQuando(): QuandoTourHome {
+  if (tourQuandoRemoto) return tourQuandoRemoto;
+  if (tourQuandoRemoto === null) return "dia1";
+  return quandoTourDe(ls.get(CHAVE_TOUR_QUANDO_APARELHO)) ?? "dia1";
+}
 
 /* ───────────── 1.0.16: `tour_home` (RevenueCat) — qual tour da Home ───────────── */
 /**

@@ -5,9 +5,9 @@ import { Check, ChevronRight, Lightbulb } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import type { IntroDeUmToqueConfig, OpcaoDaIntro, PassoDaIntro } from "@/lib/intro-modulo";
+import { ID_OUTRO_DA_INTRO, marcarPassoDaIntro, type IntroDeUmToqueConfig, type OpcaoDaIntro, type PassoDaIntro } from "@/lib/intro-modulo";
 import { abrirAba } from "@/components/cartoes-modulo/registro";
-import { Anel, BotaoSeguir, PostItDaMissao } from "@/components/demo-guiada/pecas";
+import { Anel, BotaoSeguir, PostItDaMissao, useMarcaDaTelaDeslocada } from "@/components/demo-guiada/pecas";
 import type { ChipDaMissao } from "@/components/demo-guiada/alvos";
 import { ROLAGEM_DO_OLHAR, rolarAte } from "@/components/missao-doses/PassoDoDia";
 import { abrirConhecerMais, ofertaDoTour } from "@/lib/conhecer-mais";
@@ -50,6 +50,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
 }) {
   const { get, set } = useUserData();
   const reduzir = !!useReducedMotion();
+  useMarcaDaTelaDeslocada(); // a faixa sai de cena enquanto o teclado do iPhone desloca a tela (20/10)
   const m = config.moduleId;
   const [n, setN] = useState(0);
   const passo: PassoDaIntro | undefined = config.passos[n];
@@ -68,6 +69,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const depois = (fn: () => void, ms: number) => { timers.current.push(window.setTimeout(fn, ms)); };
   const total = passoInicial + config.passos.length;
   const numero = passoInicial + n + 1;
+  useEffect(() => { marcarPassoDaIntro(m, numero); }, [m, numero]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-intro-modulo-faixa", "1");
@@ -145,9 +147,10 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   }, [assinatura]);
 
   const gravar = (k: string, v: unknown) => { set(k, v); avisarEscritaDeFora(k, v); };
-  const tocarChip = (chip: ChipDaMissao) => {
+  const tocarChip = (chip: ChipDaMissao, propria = false) => {
     if (!passo || tocado) return;
-    const o = passo.opcoes.find((x) => x.rotulo === chip.nome);
+    // 1.0.17: a opção que ELA escreveu ("+ Outro", ou um chip "seu" de antes) vai pelo mesmo `executar`, por texto
+    const o: OpcaoDaIntro | undefined = propria ? { emoji: chip.emoji, rotulo: chip.nome, id: ID_OUTRO_DA_INTRO, ...(chip.valor != null ? { valor: chip.valor } : {}) } : passo.opcoes.find((x) => x.rotulo === chip.nome);
     if (!o) return;
     setTocado(chip.nome);
     if (passo.foco) {
@@ -168,7 +171,12 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     try { rotulo = passo.executar?.({ get, gravar }, o); } catch { /* a intro nunca derruba o módulo */ }
     registrou(rotulo || o.rotulo, "chip");
   };
-  const pular = () => { trackEvent("modulo_intro_pulou", { modulo: m, fase: "toque", passo: numero, segundos: segundos() }); aoTerminar("pulada"); };
+  /* 1.0.17 (dono 19/10): no lugar do "Pular" da faixa (que fechava tudo de uma vez), um "Agora não" quieto em cada passo:
+     fecha SÓ este tutorial — marcado como visto (nunca volta); o que ela já fez nele conta como feito. */
+  const agoraNao = () => {
+    trackEvent("modulo_intro_pulou", { modulo: m, fase: "toque", passo: numero, segundos: segundos(), via: "agora_nao" });
+    aoTerminar(rotulos.length ? "feita" : "pulada");
+  };
 
   /* PRONTO: o cartão pequeno fica uns segundos e a intro termina; com o passeio por fazer, oferece ele (secundário) */
   const oferta = podeOferecerTour(m, get) ? ofertaDoTour(m) : null;
@@ -187,17 +195,18 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const noModulo = passo?.quandoNoModulo && alvo ? passo.quandoNoModulo : null;
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-formato="toque" data-passo={numero} style={{ background: config.cor.faixa, color: config.cor.tinta }} role="presentation">
-      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : total > 1 ? `${numero} de ${total} · ${pedido}` : pedido}</span>
+      <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : pedido}</span>
+      {/* 1.0.17: "Agora não" quieto, à vista desde o 1º segundo (regra do dono) — fecha SÓ este tutorial */}
       {fase !== "pronto" && (
-        <button type="button" className="im-faixa-pular" data-testid="intro-modulo-pular" onClick={pular}>Pular</button>
+        <button type="button" className="im-faixa-pular" data-quieto="" data-testid="intro-modulo-agora-nao" onClick={agoraNao}>Agora não</button>
       )}
     </div>
   );
   const balao = passo?.olhar ? (
     <div className="rounded-2xl px-4 py-3.5 text-white shadow-2xl ring-1 ring-white/15" style={{ background: "#16121c" }} data-testid="intro-modulo-olhar">
-      <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">Olha · {numero} de {total}</span>
-      <span className="block text-[15px] font-extrabold leading-snug">{passo.olhar.titulo}</span>
-      <span className="block text-[12.5px] text-white/80 leading-snug mt-1">{passo.olhar.texto}</span>
+      {total > 1 && <span className="block text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/60 mb-1">{numero} de {total}</span>}
+      <span className="block text-[16px] font-extrabold leading-snug">{passo.olhar.titulo}</span>
+      <span className="block text-[13px] text-white/80 leading-snug mt-1">{passo.olhar.texto}</span>
       <div className="mt-3 flex items-center gap-3">
         <BotaoSeguir claro onClick={entendi} testid="intro-modulo-entendi">Entendi</BotaoSeguir>
       </div>
@@ -205,7 +214,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   ) : passo && noModulo ? (
     // o módulo já faz a pergunta (Beleza): só a instrução, sem chips — a resposta é no controle dele
     <PostItDaMissao
-      rotulo={total > 1 ? `${numero} de ${total} · ${noModulo.rotulo ?? "aqui"}` : `Agora · ${noModulo.rotulo ?? "aqui"}`}
+      rotulo={total > 1 ? `${numero} de ${total}` : ""}
       pergunta={noModulo.pergunta}
       descricao={noModulo.descricao}
       chips={[]}
@@ -213,12 +222,16 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     />
   ) : passo ? (
     <PostItDaMissao
-      rotulo={total > 1 ? `${numero} de ${total} · 1 toque` : "Agora · 1 toque"}
+      rotulo={total > 1 ? `${numero} de ${total}` : ""}
       pergunta={passo.pergunta}
       descricao={passo.descricao}
       chips={passo.opcoes.map(chipDe)}
       tocado={tocado}
-      aoChip={tocarChip}
+      aoChip={(c) => tocarChip(c)}
+      outro={passo.opcoes.length && passo.executar && passo.outro !== false && !passo.foco
+        ? { lista: passo.outro?.numero ? undefined : `intro-${m}-${passoInicial + n + 1}`, placeholder: passo.outro?.placeholder ?? "Escreva aqui", comValor: passo.outro?.comValor, numero: passo.outro?.numero,
+            aoEscolher: ({ nome, valor }) => tocarChip({ emoji: "✎", nome, valor, proprio: true }, true) }
+        : undefined}
     />
   ) : null;
   const oQueEntrou = rotulos.length > 1 ? `${rotulos.slice(0, -1).join(", ")} e ${rotulos[rotulos.length - 1]}` : rotulos[0] ?? "";
@@ -235,7 +248,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
         <motion.div className="im-pronto" data-testid="intro-modulo-pronto" initial={reduzir ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
           <div className="im-pronto-linha">
             <span className="im-pronto-check"><Check className="w-4 h-4" strokeWidth={3} /></span>
-            <span className="im-pronto-texto">{oQueEntrou ? <><b>{oQueEntrou}</b> {rotulos.length > 1 ? "já estão aqui" : "já está aqui"}. </> : null}{config.pronto}</span>
+            <span className="im-pronto-texto">{oQueEntrou ? <><b>{oQueEntrou}</b> {rotulos.length > 1 ? "entraram" : "entrou"}. </> : null}{config.pronto}</span>
           </div>
           {oferta && (
             <button type="button" className="im-pronto-oferta" data-testid="intro-modulo-conhecer-mais" onClick={verMais}>

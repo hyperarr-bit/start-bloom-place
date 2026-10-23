@@ -25,7 +25,7 @@
  * lib/v14-qa), que liga as três.
  */
 import { isNativeShell } from "@/lib/native-shell";
-import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoEmAndamento } from "@/lib/missao-doses";
+import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, missaoDosesMandaNoApp, missaoEmAndamento } from "@/lib/missao-doses";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { v14Ligada } from "@/lib/v14-qa";
 import { modoTourHomeRemoto } from "@/lib/dia1-cheio";
@@ -107,7 +107,8 @@ export const tourForcadoPorQa = (): boolean => !isNativeShell() && lerForca(CHAV
 /** 10/10: o tour acabou (TourDaHome dispara) — a missão em doses (braço B) fecha o 4º passo com isto. */
 export const EVENTO_TOUR_HOME_FIM = "tour-home:concluido";
 export const tourFeitoNesteAparelho = (): boolean => !!ls.get(CHAVE_TOUR_FEITO);
-export const marcarTourFeito = (): void => ls.set(CHAVE_TOUR_FEITO, new Date().toISOString());
+/** `valor`: o "Pular" do popup de entrada (1.0.17) grava "pulou:<data>" — a mesma chave, o tour não volta. */
+export const marcarTourFeito = (valor: string = new Date().toISOString()): void => ls.set(CHAVE_TOUR_FEITO, valor);
 
 export const cartoesVistosNesteAparelho = (moduleId: string): boolean => !!ls.get(chaveCartoesVistos(moduleId));
 export const marcarCartoesVistos = (moduleId: string): void => ls.set(chaveCartoesVistos(moduleId), new Date().toISOString());
@@ -156,6 +157,10 @@ export function deveMostrarTourHome(criadoEm: string | null | undefined, agora: 
   try { if (!missaoDosesLigada() && trialCartaoAtivo()) return false; } catch { /* sem storage */ }
   if (missaoDosesLigada()) {
     const m = lerMissao();
+    // 1.0.17 (vídeo do dono, 19/10): a missão nasce num efeito DEPOIS do 1º render da Home. Sem missão ainda, a
+    // trava abaixo não valia e o tour LONGO (variante sem braço) aparecia ~150 ms antes do "Tá dentro!". Conta nova
+    // no app, onde a missão VAI nascer → o tour espera (a Home relê no `missao-doses:mudou`).
+    if (!m && isNativeShell() && missaoDosesMandaNoApp(criadoEm)) return false;
     // 1.0.16, braço A (uma dose por dia): a missão leva 3 dias — o tour não espera ela acabar, só a tela de hoje
     // (a dose do dia 1 + "amanhã · te lembro às…"; num dia novo, o convite do dia). B e a 1.0.10: como sempre.
     if (m && !m.explorou && (missaoEmAndamento(m) || (!missaoCumprida(m) && !ehUmPorDia(m)))) return false;

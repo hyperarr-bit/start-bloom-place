@@ -67,8 +67,10 @@
  *   FECHAR O APP ANTES DE VER O NÚMERO (B11): o Montar já está decidido ("pronto" grava na entrada do
  *   "Montando"); se o app morre no "Montando…", a tela volta NO NÚMERO, no mesmo dia e na mesma conta
  *   (`numero` na marca do aparelho; `deveMostrarMontarFinancas` responde sim enquanto ela existir). O número
- *   VISTO é tela de uma vez: sai da marca assim que aparece — reabrir depois disso leva direto pro
- *   tutorial do 1º gasto (a missão retoma o passo do gasto), nunca de novo pra tela do número.
+ *   VISTO é tela de uma vez: assim que aparece, a marca passa a apontar pra PONTE (1.0.17, dono 20/10: "Você já viu
+ *   quanto pode gastar hoje / Agora vamos anotar seu primeiro gasto" — [Ir pro app] / "Ainda não gastei") — reabrir
+ *   volta na ponte, nunca de novo no número nem no Montar; saiu da ponte, a marca some e reabrir é o tutorial do 1º
+ *   gasto (a missão retoma o passo do gasto).
  *   Evento do passo inteiro (número → tutorial → 1º gasto): `missao_doses_primeiro_gasto` (EV_PRIMEIRO_GASTO).
  *
  * ── UMA VEZ SÓ (chamado de 14/10: "toda vez que eu entro aparece o tutorial") ────────────────
@@ -143,6 +145,9 @@ export interface TelaDoNumero {
   faixa: string | null;
   contas: ContaEscolhida[];
   cartao: RespostaCartao;
+  /** 1.0.17 (dono 20/10): o número JÁ apareceu e ela está (ou estava) na PONTE pro 1º gasto ("Agora vamos anotar seu
+   *  primeiro gasto.") — reabrir volta na ponte (nunca no número de novo, nunca no Montar); a ponte passou = sai da marca. */
+  ponte?: boolean;
 }
 
 /**
@@ -337,9 +342,17 @@ export function lerTelaDoNumero(criadoEm: string | null | undefined, agora: Date
   return {
     conta: t.conta, dia: t.dia, renda: Number(t.renda) || 0, faixa: typeof t.faixa === "string" ? t.faixa : null,
     contas: Array.isArray(t.contas) ? t.contas : [], cartao: lerRespostaCartao(t.cartao),
+    ...(t.ponte === true ? { ponte: true } : {}),
   };
 }
-/** A tela do número apareceu (ou ela saiu dela): não volta mais. */
+/** 1.0.17: o número apareceu — a marca fica, mas agora aponta pra PONTE (o número visto não volta; a ponte, sim, até ela
+ *  sair por "Ir pro app" ou "Ainda não gastei"). */
+export function marcarPonteDoNumero(): void {
+  const m = marcaDoAparelho();
+  if (!m?.numero || m.numero.ponte === true) return;
+  ls.set(CHAVE_MONTAR_FINANCAS, JSON.stringify({ ...m, numero: { ...m.numero, ponte: true } }));
+}
+/** Ela saiu da ponte (ou a tela do número de fora da missão apareceu): não volta mais. */
 export function fecharTelaDoNumero(): void {
   const m = marcaDoAparelho();
   if (!m?.numero) return;
@@ -530,6 +543,26 @@ export function calcularMontar(renda: number, contas: ContaEscolhida[], agora: D
     renda, fixos, contas: validas.length, fatura, cartao: fatura > 0,
     livre: base.availableReal, porDia: base.cantSpend ? 0 : Math.round(base.perDay), dias: base.remainingDays, semFolga: base.cantSpend,
   };
+}
+
+/**
+ * 1.0.17 — MÊS APERTADO (dado 1.0.16: 18% terminam o Montar com "R$ 0 por dia"). Um número minúsculo como herói
+ * ("Você pode gastar R$ 0") desanima justo quem mais precisa do app. Abaixo desta régua (ou sem folga nenhuma) a
+ * tela troca o herói por "Seu mês tá apertado. Vamos achar folga juntos." — o número continua na conta do mês.
+ */
+export const POR_DIA_APERTADO = 15;
+export const mesApertado = (r: { porDia: number; semFolga: boolean }): boolean => r.semFolga || r.porDia < POR_DIA_APERTADO;
+
+/**
+ * 1.0.17 (dono 20/10, ponte "versão 1") — o gasto de EXEMPLO da ponte do número pro 1º gasto: "R$ X por dia" →
+ * "☕ Café − R$ 12" → "~~R$ X~~ R$ X−12 hoje". Mês com pouca folga (< R$ 24/dia) usa um café menor (R$ 6), pra conta
+ * nunca dar zero nem negativo. `porDia` é o MESMO número da tela anterior (resultado.porDia, já arredondado).
+ */
+export const GASTO_DA_PONTE = 12;
+export const GASTO_DA_PONTE_PEQUENO = 6;
+export function exemploDaPonte(porDia: number): { gasto: number; depois: number } {
+  const gasto = porDia < GASTO_DA_PONTE * 2 ? GASTO_DA_PONTE_PEQUENO : GASTO_DA_PONTE;
+  return { gasto, depois: Math.max(1, Math.round(porDia) - gasto) };
 }
 
 /** Os itens exatamente no formato que IncomeTable/FixedExpensesTable gravam. */

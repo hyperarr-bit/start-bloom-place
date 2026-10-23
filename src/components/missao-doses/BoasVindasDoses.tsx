@@ -1,12 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
 import { Confete } from "@/components/demo-guiada/pecas";
 import { trackEvent } from "@/lib/analytics";
-import { doseCurta, emSegundos, MODULOS, MODULO_DA_AREA, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, unidadeJunta, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
+import { emSegundos, MODULOS, ORDEM_MODULOS, diaDaSemanaDoPasso, eventoDaMissao, type DiaDaMissao, type EstadoMissaoDoses, type ModuloDaMissao } from "@/lib/missao-doses";
 import { EVENTO_TRIAL_CARTAO, diasDoTesteDaLoja } from "@/lib/teste-da-loja";
-import { AREAS, type AreaKey } from "@/lib/funnel";
+import { entrada, MOV, MOV_MS, saidaCalmaDe } from "@/lib/movimento";
 
 /** O resumo curto de cada dose na tela 2 do B ("Um gasto, um hábito, um copo d'água"). */
 const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
@@ -15,11 +15,6 @@ const RESUMO_DA_DOSE: Partial<Record<ModuloDaMissao, string>> = {
   viagens: "um destino", relacionamentos: "uma pessoa", pet: "o seu pet", detox: "um hábito de detox",
 };
 import "./missao-doses.css";
-
-/** "pelas Finanças", "pela Rotina", "pelo Treino" — o artigo certo de cada módulo da 1ª dose. */
-const PELO_MODULO: Partial<Record<ModuloDaMissao, string>> = {
-  financas: "pelas Finanças", rotina: "pela Rotina", treino: "pelo Treino", saude: "pela Saúde", desenvolvimento: "pelas Metas", dieta: "pela Dieta",
-};
 
 type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
 
@@ -31,6 +26,35 @@ type Tres = [ModuloDaMissao, ModuloDaMissao, ModuloDaMissao];
 export function fraseDoAcesso(diasDeTeste: number | null): string {
   if (!diasDeTeste) return "Seu acesso começou";
   return diasDeTeste === 1 ? "Seu 1 dia grátis começou" : `Seus ${diasDeTeste} dias grátis começaram`;
+}
+/** 1.0.17 (dono 20/10, a frase dele quase literal): o "Tá dentro" diz que começa um TUTORIAL. */
+export const FRASE_DO_TUTORIAL = "Pra você tirar o melhor do CORE, preparamos um tutorial especial pra você.";
+/** O que cada dia do plano entrega, em uma linha (o "SEU PLANO DE 3 DIAS" do braço A). Finanças, Rotina e Saúde são as do
+ *  mockup aprovado; as outras vêm dos títulos do "olha" de cada módulo (MODULOS[m].olhar). */
+export const ENTREGA_DO_MODULO: Record<ModuloDaMissao, string> = {
+  financas: "Quanto dá pra gastar por dia", rotina: "Seu primeiro hábito", saude: "Sua meta de água",
+  treino: "Seu treino da semana", dieta: "Seu dia na dieta", desenvolvimento: "Sua meta com plano", hiperfoco: "A mente no papel",
+  estudos: "Sua grade de estudos", carreira: "Seu dia de trabalho", biblioteca: "Sua estante", casa: "Sua lista da casa",
+  beleza: "Sua rotina de beleza", viagens: "Sua lista de destinos", relacionamentos: "As pessoas que importam", pet: "A agenda do pet",
+  detox: "Menos tela, mais presença",
+};
+/** 1.0.17: a sequência da entrada do braço A (segundos) — a tela, depois o ✓, o texto e por último o confete. */
+export const ATRASO_DO_CHECK_S = 0.35;
+export const ATRASO_DO_TEXTO_S = 0.6;
+export const ATRASO_DO_CONFETE_S = 0.95;
+/** "Lucas Andrade" → "Lucas"; nunca o começo de um e-mail (a saudação da 1.0.16 caía nele). */
+export function primeiroNome(nome: string | null | undefined): string {
+  const t = String(nome ?? "").trim();
+  if (!t || t.includes("@")) return "";
+  const p = t.split(/\s+/)[0] ?? "";
+  return p.length > 20 ? "" : p.charAt(0).toUpperCase() + p.slice(1);
+}
+/** A troca dos módulos (pura): tocar num escolhido tira (a vaga fica aberta, nada volta sozinho); tocar num novo ocupa a
+ *  vaga — com 3 já escolhidos, entra no lugar do último. */
+export function alternarModulo(atual: readonly ModuloDaMissao[], m: ModuloDaMissao): ModuloDaMissao[] {
+  if (atual.includes(m)) return atual.filter((x) => x !== m);
+  if (atual.length < 3) return [...atual, m];
+  return [atual[0], atual[1], m];
 }
 const lerDiasDoTeste = (): number | null => { try { return diasDoTesteDaLoja(); } catch { return null; } };
 /** Os dias do teste da loja, relidos quando o boot confirma o teste DEPOIS da 1ª tela (revenuecat.conferirTrialCartao). */
@@ -83,6 +107,15 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   braco?: "A" | "B" | null;
 }) {
   const [tela, setTela] = useState<"boas" | "escolha">("boas");
+  /* 1.0.17 QA (dono: "nenhum corte seco"): Tá dentro ⇄ "Escolha 3 módulos" trocavam num quadro. Agora a tela que sai some
+     devagar por cima (cópia visual, MOV_MS.base) e a que entra já está parada embaixo — uma coisa se mexe por vez. Na volta
+     da escolha o Tá dentro NÃO refaz a entrada (✓ → texto → confete): ele já foi visto. */
+  const jaEntrou = useRef(false);
+  const trocarDeTela = (para: "boas" | "escolha") => {
+    saidaCalmaDe(para === "escolha" ? '[data-testid="missao-doses-boas-vindas"]' : '[data-testid="missao-doses-escolha"]', MOV_MS.base + 40);
+    if (para === "escolha") jaEntrou.current = true;
+    setTela(para);
+  };
   /** braço B: 1 = "Tá dentro!", 2 = as doses (a escolha dos 3 volta pra 2) */
   const [telaB, setTelaB] = useState<1 | 2>(1);
   useEffect(() => {
@@ -96,25 +129,19 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
     if (braco === "A") trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "view", tela: 1 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const reduzir = !!useReducedMotion();
   const diasDeTeste = useDiasDoTesteDaLoja();
   const acesso = fraseDoAcesso(diasDeTeste); // "Seus 3 dias grátis começaram" / "Seu acesso começou"
   const [modulos, setModulos] = useState<Tres>(missao.modulos);
   const [t0] = useState(() => Date.now());
   const B = braco === "B";
 
-  const alternar = (m: ModuloDaMissao) => {
-    setModulos((atual) => {
-      const i = atual.indexOf(m);
-      if (i >= 0) {
-        // tirar o escolhido: os de trás sobem; o 3º vira o primeiro padrão que não está na lista
-        const resto = atual.filter((x) => x !== m);
-        const reposicao = ORDEM_MODULOS.find((x) => !resto.includes(x))!;
-        return [...resto, reposicao] as Tres;
-      }
-      // já tem 3: o novo entra no lugar do último
-      return [atual[0], atual[1], m] as Tres;
-    });
-  };
+  /* "Trocar" (1.0.17, bug da 1.0.16: tirar Finanças/Rotina/Saúde não tirava — a reposição era o 1º padrão que faltava,
+     o mesmo que acabou de sair; e todo toque novo trocava o 3º — uma pessoa tocou 57 vezes). Agora a escolha tem a lista
+     DELA (`escolhidos`): tirar deixa a vaga aberta (pode ficar com 2 enquanto escolhe), o próximo toque ocupa a vaga, e só
+     com 3 já escolhidos o novo entra no lugar do último. "Pronto" só com 3. */
+  const [escolhidos, setEscolhidos] = useState<ModuloDaMissao[]>(missao.modulos);
+  const alternar = (m: ModuloDaMissao) => setEscolhidos((atual) => alternarModulo(atual, m));
 
   const linhas = ([1, 2, 3] as DiaDaMissao[]).map((n) => {
     const cfg = MODULOS[modulos[n - 1]];
@@ -125,19 +152,23 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
   const pill = (n: DiaDaMissao) => (B ? (n === 1 ? "Agora" : "depois") : n === 1 ? "Hoje" : `Dia ${n}`);
 
   if (tela === "escolha") {
+    const linhasDaEscolha = ([1, 2, 3] as DiaDaMissao[]).map((n) => ({
+      n, cfg: escolhidos[n - 1] ? MODULOS[escolhidos[n - 1]] : null,
+      quando: B ? `Dose ${n}` : n === 1 ? "Hoje" : n === 2 ? "Amanhã" : diaDaSemanaDoPasso(n, missao, hoje),
+    }));
     return (
       <div className="fixed inset-0 z-[240] flex flex-col bg-background text-foreground" data-camada-guia="missao-doses-escolha" data-testid="missao-doses-escolha" style={{ paddingTop: "var(--app-safe-top)" }}>
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-[420px] mx-auto flex flex-col px-5 pt-6 pb-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{B ? "Sua missão de hoje" : "Sua missão dos 3 dias"}</p>
-            <h1 className="text-[26px] font-black tracking-[-0.03em] leading-[1.1] mt-1">{B ? "Escolhe 3 módulos — 3 doses hoje" : "Escolhe 3 módulos — um por dia"}</h1>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">{B ? "Sua missão de hoje" : "Seu plano"}</p>
+            <h1 className="text-[26px] font-black tracking-[-0.03em] leading-[1.1] mt-1">{B ? "Escolhe 3 módulos — 3 doses hoje" : "Escolha 3 módulos"}</h1>
             <p className="text-[14px] text-muted-foreground mt-2 leading-snug">
-              <b className="text-foreground">Os outros 13 continuam liberados.</b> {B ? "Isso só decide onde a gente te guia hoje — o app inteiro é seu desde já." : "Isso só decide onde a gente te guia nos 3 dias — o app inteiro é seu desde já."}
+              {B ? <><b className="text-foreground">Os outros 13 continuam liberados.</b> Isso só decide onde a gente te guia hoje — o app inteiro é seu desde já.</> : "Um por dia. Os outros continuam abertos."}
             </p>
             <div className="grid grid-cols-4 gap-3 mt-5" role="group" aria-label="Módulos da missão">
               {ORDEM_MODULOS.map((m) => {
                 const cfg = MODULOS[m];
-                const pos = modulos.indexOf(m);
+                const pos = escolhidos.indexOf(m);
                 return (
                   <button key={m} type="button" className="md-tile" style={{ background: cfg.cor }} data-marcado={pos >= 0 ? "" : undefined} data-modulo={m} data-testid={`missao-doses-tile-${m}`} onClick={() => alternar(m)} aria-pressed={pos >= 0}>
                     {pos >= 0 && <span className="md-tile-n" aria-label={`${pos + 1}º`}>{pos + 1}</span>}
@@ -148,23 +179,24 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
               })}
             </div>
             <div className="rounded-2xl border border-border bg-card mt-5 divide-y divide-border" data-testid="missao-doses-escolha-lista">
-              {linhas.map(({ n, cfg, quando }) => (
-                <div key={n} className="md-linha">
+              {linhasDaEscolha.map(({ n, cfg, quando }) => (
+                <div key={n} className="md-linha" data-vaga={cfg ? undefined : ""}>
                   <span className="w-6 h-6 rounded-md grid place-items-center text-[12px] font-extrabold text-white shrink-0" style={{ background: "#16121c" }}>{n}</span>
                   <span className="min-w-0 flex-1">
                     <span className="md-linha-rotulo">{quando}</span>
-                    <span className="md-linha-texto">{cfg.emoji} {cfg.nome} · {cfg.pedido.toLowerCase()}</span>
+                    <span className="md-linha-texto">{cfg ? <>{cfg.emoji} {cfg.nome} · {cfg.pedido.toLowerCase()}</> : <span className="text-muted-foreground">Toque num módulo</span>}</span>
                   </span>
                   <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"}>{pill(n)}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[12px] text-muted-foreground text-center mt-3">{B ? "Toca num módulo pra trocar. O 1º é a dose 1." : "Toca num módulo pra trocar. O 1º é o de hoje."}</p>
+            <p className="text-[12px] text-muted-foreground text-center mt-3">{B ? "Toca num módulo pra trocar. O 1º é a dose 1." : "O primeiro é o de hoje."}</p>
           </div>
         </div>
         <RodapeColado>
-          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" onClick={() => { setTela("boas"); setTelaB(2); }}>
-            Pronto, começar <ArrowRight className="w-4 h-4" />
+          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-pronto" disabled={escolhidos.length !== 3}
+            onClick={() => { if (escolhidos.length !== 3) return; setModulos(escolhidos as Tres); trocarDeTela("boas"); setTelaB(2); }}>
+            {B ? <>Pronto, começar <ArrowRight className="w-4 h-4" /></> : "Pronto"}
           </button>
         </RodapeColado>
       </div>
@@ -209,7 +241,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
             <p className="text-[15.5px] text-[#4f5a64] mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{resumo.charAt(0).toUpperCase() + resumo.slice(1)}. Uns 20 segundos cada.</p>
             <div className="mt-6 flex items-baseline justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4f5a64]">Hoje</span>
-              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>Trocar os 3</button>
+              <button type="button" className="text-[12px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); trocarDeTela("escolha"); }}>Trocar os 3</button>
             </div>
             <div className="mt-2 rounded-2xl bg-white border border-black/[0.06] shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-black/[0.06]" data-testid="missao-doses-linhas">
               {modulos.map((m, i) => (
@@ -235,58 +267,61 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
     );
   }
 
-  /* ── 1.0.16, BRAÇO A ("uma dose por dia", desenho 8 seção 4.2): UMA tela, tela cheia, 1x ──
-     "Tá dentro! 🎉" + "Seu plano de 3 dias" (Hoje · Amanhã · Dia 3, com o tempo de cada dose) + "Começar (30 s)",
-     e os links "Explorar por conta própria" e "Trocar os módulos". */
+  /* ── BRAÇO A ("uma dose por dia") — 1.0.17, dono 20/10 (mockup a1 aprovado): a pessoa tem que ENTENDER que começa um
+     tutorial. "Tá dentro, Lucas 💛" / "Seus 3 dias grátis começaram" (sem ponto final: dono 20/10) / a frase dele ("Pra você tirar o melhor do CORE,
+     preparamos um tutorial especial pra você.") / SEU PLANO DE 3 DIAS — os 3 módulos com o que cada um entrega (HOJE ·
+     AMANHÃ · o dia da semana), sem "Trocar" (6–14% mexiam) / [Começar meu tutorial] e o link "Prefiro explorar sozinho".
+     Uma coisa entra por vez: a tela (fundo opaco já no 1º quadro) → o ✓ → o texto → o confete (depois do ✓, nunca junto). ── */
   if (braco === "A") {
-    const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : "Dia 3");
-    const seg1 = doseCurta(modulos[0], 1).seg;
-    // "A gente começa pelas Finanças, que foi o que você escolheu." — só se a 1ª dose ainda é a da área escolhida
-    const areaDaPorta = areaNome ? (Object.keys(AREAS) as AreaKey[]).find((k) => AREAS[k].nome === areaNome) : undefined;
-    const comecaPelaArea = !!areaDaPorta && MODULO_DA_AREA[areaDaPorta] === modulos[0];
+    const quandoA = (n: DiaDaMissao) => (n === 1 ? "Hoje" : n === 2 ? "Amanhã" : diaDaSemanaDoPasso(n, missao, hoje));
+    const parado = reduzir || jaEntrou.current;
+    const primeiro = primeiroNome(nome);
     return (
-      <div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}>
-        <Confete />
+      <motion.div className="md-tema md-fundo-boas fixed inset-0 z-[240] flex flex-col text-foreground" data-camada-guia="missao-doses-boas-vindas" data-testid="missao-doses-boas-vindas" data-braco="A" style={{ paddingTop: "var(--app-safe-top)" }}
+        /* QA 20/10 (gravação no Simulador, 30 fps): com a TELA entrando em fade de 0, a Home que monta por baixo aparecia
+           apagada por ~0,1–0,2 s logo depois do cadastro (a "piscada" da 1.0.16, mais fraca). O fundo agora nasce opaco;
+           a sequência calma continua nos filhos (✓ → texto → confete) — o cadastro já saiu em branco, então não há corte. */
+        initial={false}>
+        {!jaEntrou.current && <Confete atraso={reduzir ? 0 : ATRASO_DO_CONFETE_S} />}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[8vh] pb-4">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 17, delay: 0.1 }} className="w-16 h-16 rounded-full bg-emerald-500 grid place-items-center mb-4 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
-              <Check className="w-8 h-8 text-white" strokeWidth={3.5} />
+          <div className="max-w-[420px] mx-auto flex flex-col px-6 pt-[9vh] pb-4">
+            <motion.div initial={parado ? false : { scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_CHECK_S)} data-testid="missao-doses-check"
+              className="w-14 h-14 rounded-full bg-emerald-500 grid place-items-center mb-5 shadow-[0_16px_32px_-10px_rgba(16,185,129,.55)]">
+              <Check className="w-7 h-7 text-white" strokeWidth={3.5} />
             </motion.div>
-            <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.05]">Tá dentro! 🎉</h1>
-            <p className="text-[15.5px] text-muted-foreground mt-2.5 leading-snug" data-testid="missao-doses-subtitulo">{acesso}. Os 16 módulos já estão abertos.</p>
-            <div className="mt-7 flex items-baseline justify-between gap-3">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground">Seu plano de 3 dias</p>
-              <button type="button" className="text-[13px] font-bold min-h-9 px-1 -mr-1" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { trackEvent("missao_doses_boas_vindas", eventoDaMissao({ acao: "trocar" })); setTela("escolha"); }}>
-                Trocar
-              </button>
-            </div>
-            <div className="mt-1 rounded-2xl bg-card border border-border/60 shadow-[0_18px_40px_-20px_rgba(20,60,110,.3)] divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
-              {linhas.map(({ n, cfg }) => (
-                <div key={n} className="md-linha" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
-                  <Quadradinho marcado={false} tam={18} />
-                  {/* 17/10 (#42, "monte em 3 toques, 30 / s"): o tempo nunca se separa do número ("30 s") e o pedido da dose
-                      anda INTEIRO pra 2ª linha quando não cabe ("Hoje · 📅 Rotina ·" / "monte em 3 toques, 30 s") — o
-                      inline-block só quebra por dentro se o pedido sozinho for maior que a linha; o "·" fica preso ao
-                      nome do módulo (nunca começa a 2ª linha) */}
-                  <span className="md-linha-texto text-balance"><b>{quandoA(n)}</b> · {cfg.emoji} {cfg.nome}{"\u00a0"}· <span className="inline-block" data-testid={`missao-doses-linha-${n}-dose`}>{unidadeJunta(doseCurta(cfg.modulo, n).texto)}</span></span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[12.5px] text-muted-foreground mt-3 leading-snug" data-testid="missao-doses-boas-vindas-nota">
-              {comecaPelaArea ? <>A gente começa {PELO_MODULO[modulos[0]] ?? `por ${MODULOS[modulos[0]].nome}`}, que foi o que você escolheu. </> : null}
-              Um passo por dia. O resto do app fica livre pra você mexer quando quiser.
-            </p>
+            <motion.div initial={parado ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
+              <h1 className="text-[32px] font-black tracking-[-0.03em] leading-[1.08]" data-testid="missao-doses-titulo">{primeiro ? `Tá dentro, ${primeiro}` : "Tá dentro"} <span aria-hidden>💛</span></h1>
+              {/* dono 19/10: "Seus 3 dias grátis começaram" só com teste da loja de verdade (fraseDoAcesso); sem teste,
+                  "Seu acesso começou". 1.0.17 (dono: ponto final em título é "sério demais"): sem ponto no título e aqui */}
+              <p className="text-[17px] font-semibold text-foreground/80 mt-2 leading-snug" data-testid="missao-doses-subtitulo">{acesso}</p>
+              <p className="text-[15px] text-muted-foreground mt-1 leading-snug" data-testid="missao-doses-tutorial">{FRASE_DO_TUTORIAL}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted-foreground mt-7">Seu plano de 3 dias</p>
+              <div className="mt-2 rounded-2xl bg-card border border-border/60 divide-y divide-border/60 overflow-hidden" data-testid="missao-doses-linhas">
+                {linhas.map(({ n, cfg }) => (
+                  <div key={n} className="md-linha md-linha-plano" data-hoje={n === 1 ? "" : undefined} data-testid={`missao-doses-linha-${n}`}>
+                    <span className="md-plano-icone" style={{ background: cfg.cor }} aria-hidden>{cfg.emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="md-plano-nome">{cfg.nome}</span>
+                      <span className="md-plano-entrega" data-testid={`missao-doses-entrega-${n}`}>{ENTREGA_DO_MODULO[cfg.modulo]}</span>
+                    </span>
+                    <span className="md-pill" data-tom={n === 1 ? "hoje" : "dia"} data-testid={`missao-doses-quando-${n}`}>{quandoA(n)}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </div>
-        <RodapeColado tema>
-          <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
-            Começar ({emSegundos(seg1)}) <ArrowRight className="w-4 h-4" />
-          </button>
-          <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
-            Explorar por conta própria
-          </button>
-        </RodapeColado>
-      </div>
+        <motion.div initial={parado ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={entrada(reduzir, MOV.calmo, ATRASO_DO_TEXTO_S)}>
+          <RodapeColado tema>
+            <button type="button" className="md-botao md-botao-56" data-testid="missao-doses-comecar" onClick={() => aoComecar(modulos)}>
+              Começar meu tutorial
+            </button>
+            <button type="button" className="md-link mt-1" data-testid="missao-doses-explorar" onClick={() => aoExplorar(modulos)} data-segundos={Math.round((Date.now() - t0) / 1000)}>
+              Prefiro explorar sozinho
+            </button>
+          </RodapeColado>
+        </motion.div>
+      </motion.div>
     );
   }
 
@@ -330,7 +365,7 @@ export function BoasVindasDoses({ missao, nome, areaNome, hoje, aoComecar, aoExp
                 {areaNome ? <>Você escolheu <b className="text-[#16121c]">{areaNome}</b> na porta — ela vem primeiro. </> : null}
                 Só esses 3 entram na missão; <b className="text-[#16121c]">os outros 13 seguem abertos</b>.
               </p>
-              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => setTela("escolha")}>
+              <button type="button" className="mt-1.5 text-[13.5px] font-bold" style={{ color: "hsl(var(--accent))" }} data-testid="missao-doses-trocar" onClick={() => { setEscolhidos(modulos); trocarDeTela("escolha"); }}>
                 Trocar os 3 módulos →
               </button>
             </div>

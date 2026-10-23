@@ -23,7 +23,9 @@ import { cobrancaV14Ligada } from "@/lib/cobranca-recusada";
 
 type PluginCoreNativo = {
   telaAtual(o: { rota: string }): Promise<void>;
-  ativarFolhaDeCobranca(): Promise<{ ativo: boolean; suportado: boolean }>;
+  ativarFolhaDeCobranca(o?: { aguardarApp?: boolean }): Promise<{ ativo: boolean; suportado: boolean }>;
+  /** 1.0.17 (binário novo; o antigo rejeita e nada muda). */
+  segurarFolhaDeCobranca(o: { segurar: boolean }): Promise<void>;
   addListener(evento: "billingSheetExibida", f: (d: { motivo?: string; esperou_ms?: number; forcada?: boolean }) => void): Promise<{ remove: () => Promise<void> }>;
 };
 
@@ -68,11 +70,27 @@ export async function ligarPonteDaFolhaDeCobranca(): Promise<() => void> {
       trackEvent("billing_sheet_exibida", { motivo: d?.motivo ?? "billingIssue", esperou_ms: d?.esperou_ms ?? null, forcada: !!d?.forcada });
     });
     if (cobrancaV14Ligada()) {
-      const r = await p.nativo.ativarFolhaDeCobranca();
+      // 1.0.17: a folha do StoreKit espera o app dizer se a tela cheia dele cuida do cartão recusado
+      const r = await p.nativo.ativarFolhaDeCobranca({ aguardarApp: true });
       trackEvent("billing_sheet_observando", { ativo: !!r?.ativo, suportado: !!r?.suportado });
     }
     return () => { void ouvinte.remove().catch(() => { /* noop */ }); };
   } catch {
     return () => {};
   }
+}
+
+/**
+ * 1.0.17 (dono, 20/10) — UMA SUPERFÍCIE DE COBRANÇA POR ABERTURA, E A DO APP GANHA. A folha do StoreKit foi exibida
+ * pra 26 pessoas e recuperou 0; a do app recuperou 2 de 3 toques. O AvisoCobrancaRecusada chama isto a cada leitura
+ * do RevenueCat: `true` (cartão recusado → a tela cheia do app vai aparecer/está na tela) → o nativo guarda a
+ * billingIssue na fila e nunca exibe (continua observando, então o iOS também não mostra sozinho); `false` → o
+ * nativo volta a exibir como antes (reserva: a loja sabe de algo que o RevenueCat ainda não disse).
+ * Até a 1ª resposta, o nativo segura (ativarFolhaDeCobranca({ aguardarApp: true })). Só iPhone; nunca lança.
+ */
+export async function segurarFolhaNativa(segurar: boolean): Promise<void> {
+  try {
+    const p = await carregar();
+    await p?.nativo.segurarFolhaDeCobranca({ segurar });
+  } catch { /* binário sem o método (até a 1.0.16): a folha segue como antes */ }
 }

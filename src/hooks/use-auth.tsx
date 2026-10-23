@@ -50,6 +50,9 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+/** 1.0.17: pede ao AuthProvider pra reler a assinatura agora (o LiberandoIOS dispara depois de gravar o acesso). */
+export const EVENTO_RELER_ASSINATURA = "core:reler-assinatura";
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -138,8 +141,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
+    // 1.0.17: o pós-compra do iPhone gravou o acesso e pede a releitura na hora (antes recarregava o app inteiro).
+    window.addEventListener(EVENTO_RELER_ASSINATURA, onFocus);
 
     return () => {
+      window.removeEventListener(EVENTO_RELER_ASSINATURA, onFocus);
       subscription.unsubscribe();
       if (intervalRef.current) clearInterval(intervalRef.current);
       window.removeEventListener("focus", onFocus);

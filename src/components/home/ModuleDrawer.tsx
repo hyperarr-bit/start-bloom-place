@@ -6,6 +6,7 @@ import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useEffect, useState } from "react";
 import { EVENTO_MODULOS_EDITAR, EVENTO_MODULOS_OCULTAR } from "@/lib/tour-home";
 import { trackEvent } from "@/lib/analytics";
+import { navAbasLigada } from "@/lib/nav-abas";
 
 const modules = MODULOS;
 
@@ -13,6 +14,9 @@ export const ModuleDrawer = () => {
   const navigate = useNavigate();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden, ordenar, moveModule } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
+  // 1.0.17: com a barra de abas, editar (★/olho/ordem) mora na aba Módulos. A engrenagem só aparece aqui
+  // enquanto a edição está aberta pelo tour da Home (passo 5, por evento) — é o "fechar" dela.
+  const comAbas = navAbasLigada();
 
   /* 10/10 — o tour da Home (passo 5) abre a engrenagem e esconde um módulo POR
      EVENTO: a preferência tem uma fonte só (este hook). Sem os eventos, nada muda. */
@@ -41,14 +45,14 @@ export const ModuleDrawer = () => {
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Módulos</h3>
-        <button
+        {(!comAbas || editMode) && <button
           onClick={() => { if (!editMode) trackEvent("home_modulos_editar", { origem: "engrenagem" }); setEditMode(!editMode); }}
           aria-label={editMode ? "Fechar edição dos módulos" : "Editar módulos"}
           data-tour="modulos-engrenagem"
           className={`p-1.5 rounded-lg transition-colors ${editMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
           <Settings className="w-3.5 h-3.5" />
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -131,7 +135,7 @@ export const ModuleDrawer = () => {
 
       {hiddenCount > 0 && !editMode && (
         <button
-          onClick={() => { trackEvent("home_modulos_editar", { origem: "ocultos", ocultos: hiddenCount }); setEditMode(true); }}
+          onClick={() => { trackEvent("home_modulos_editar", { origem: "ocultos", ocultos: hiddenCount }); if (comAbas) navigate("/modulos?editar=1"); else setEditMode(true); }}
           data-track="modulos-ocultos-editar"
           className="w-full text-center mt-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
         >

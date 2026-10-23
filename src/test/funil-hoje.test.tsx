@@ -10,6 +10,8 @@
  *   · cada upsell aparece no máximo 1 vez, sempre com "Não, obrigado"; o downsell (27) só depois do "Não" do 47;
  *   · depois de pagar: e-mail livre → mesma conta + Finanças/kit/boas-vindas; e-mail com conta → código (nunca 2ª conta);
  *   · os valores do cliente batem com os do servidor (ofertas-hoje.ts) e com o pixel (purchase-tracking).
+ * 20/10: OFERTA_HOJE = "vitalicio" (padrão) — 1 opção, vitalício R$ 27,90 (hv279), sem upsells. As suítes do "anual"
+ * (rollback) continuam rodando com `_forcarOfertaHoje("anual")`.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -68,19 +70,22 @@ import { markPixPurchasePending } from "@/lib/purchase-tracking";
 import FunilHojeRota, { _zerarEstadoHoje, proximoPosCompra } from "@/pages/hoje/FunilHoje";
 import { _zerarCopiaSessao } from "@/pages/hoje/conta";
 import {
-  CONTAS, FUNIL_HOJE, LINHA_RENOVACAO, UPSELL_A_DOIS, VALOR_OFERTA, _zerarForcaHoje, calcular, contasEscolhidas, funilHojeLigado, itensParaGravar, ofertaDoPlano,
+  CONTAS, FUNIL_HOJE, LINHA_RENOVACAO, OFERTA_HOJE, UPSELL_A_DOIS, VALOR_OFERTA, _forcarOfertaHoje, _zerarForcaHoje, calcular, contasEscolhidas, fimDoAcesso,
+  funilHojeLigado, itensParaGravar, modoOfertaHoje, ofertaDoPlano,
 } from "@/pages/hoje/conteudo";
 import { BUMP_KIT } from "@/pages/hoje/conteudo";
 const comKit = it.skipIf(!BUMP_KIT); // 19/10: bump desligado pelo dono — os testes do kit voltam quando ligar
 import { _zerarMemoriaPorta } from "@/pages/porta/atribuicao";
 import { computeDailyBudget } from "@/lib/finance-totals";
 import { PRECOS_HOJE, CONCESSAO_HOJE } from "../../supabase/functions/_shared/ofertas-hoje";
+import { PRECOS_PLANO30, PRECOS_PRESENTE } from "../../supabase/functions/_shared/presente";
 import { VALORES_VENDA } from "../../supabase/functions/_shared/venda-capi";
 
 /* ---------------------------------------------------------------- ambiente */
 const irPara = (url: string) => window.history.replaceState({}, "", url);
 const montar = (url = "/hoje?funil-hoje=on&utm_source=meta&utm_campaign=hoje&fbclid=IwAR_x") => {
-  irPara(url);
+  // as ofertas depois do Pix (ligadas em "2027" desde 22/10) têm teste próprio em ofertas-pos-compra.test.tsx
+  irPara(url.includes("ofertas=") ? url : `${url}${url.includes("?") ? "&" : "?"}ofertas=off`);
   return render(
     <MemoryRouter initialEntries={["/hoje"]}>
       <Routes>
@@ -130,7 +135,7 @@ const ateOferta = async () => {
 
 const clip = vi.fn(async () => {});
 beforeEach(() => {
-  _zerarEstadoHoje(); _zerarForcaHoje(); _zerarCopiaSessao(); _zerarMemoriaPorta();
+  _zerarEstadoHoje(); _zerarForcaHoje(); _zerarCopiaSessao(); _zerarMemoriaPorta(); _forcarOfertaHoje(null);
   try { localStorage.clear(); sessionStorage.clear(); } catch { /* noop */ }
   authState.user = null; authState.isSubscribed = false;
   [getSession, getUser, updateUser, setSession, invoke, garantirSessao, definirEmailDaCompra, clip, parceiroOk].forEach((f) => f.mockReset());
@@ -148,7 +153,9 @@ beforeEach(() => {
   servidor();
   Object.defineProperty(navigator, "clipboard", { value: { writeText: clip }, configurable: true });
 });
-afterEach(() => { cleanup(); irPara("/"); });
+afterEach(() => { cleanup(); irPara("/"); _forcarOfertaHoje(null); });
+/** as suítes do desenho "anual" (1º ano × mensal + upsells) — o rollback da chave OFERTA_HOJE */
+const comoAnual = () => beforeEach(() => _forcarOfertaHoje("anual"));
 
 /* ---------------------------------------------------------------- chave e rota */
 describe("a chave e a rota", () => {
@@ -211,9 +218,10 @@ describe("o número e o que vai pra Finanças", () => {
 
 /* ---------------------------------------------------------------- ofertas: cliente × servidor */
 describe("as ofertas batem com o servidor", () => {
-  it("VALOR_OFERTA (reais) = PRECOS_HOJE (centavos) do ofertas-hoje.ts", () => {
-    for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(PRECOS_HOJE[o]).toBe(Math.round(v * 100));
-    expect(Object.keys(PRECOS_HOJE).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
+  it("VALOR_OFERTA (reais) = PRECOS_HOJE (centavos) do ofertas-hoje.ts (+ 21/10: o presente e o plano de 30 dias, presente.ts)", () => {
+    const servidor: Record<string, number> = { ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
+    for (const [o, v] of Object.entries(VALOR_OFERTA)) expect(servidor[o]).toBe(Math.round(v * 100));
+    expect(Object.keys(servidor).sort()).toEqual(Object.keys(VALOR_OFERTA).sort());
   });
   it("o que cada oferta concede: 1º ano 365 dias, mês 30, kit = mesmo prazo, upsells vitalício em linha própria, casal não credita quem pagou", () => {
     expect(CONCESSAO_HOJE.h279).toMatchObject({ periodo: "annual", dias: 365 });
@@ -255,7 +263,8 @@ describe("os passos até a oferta", () => {
     await waitFor(() => expect(etapa()).toBe("contas"));
     expect(texto()).toContain("Entra R$ 3.200");
   });
-  it("oferta enxuta: anual 27,90 '1º ano, no Pix' × mensal 14,90 '30 dias, no Pix'; renovação UMA vez embaixo do botão; nada de cartão", async () => {
+  it("[anual] oferta enxuta: anual 27,90 '1º ano, no Pix' × mensal 14,90 '30 dias, no Pix'; renovação UMA vez embaixo do botão; nada de cartão", async () => {
+    _forcarOfertaHoje("anual");
     await ateOferta();
     expect(screen.getByTestId("hoje-plano-anual").textContent).toContain("1º ano, no Pix");
     expect(screen.getByTestId("hoje-plano-mensal").textContent).toContain("30 dias, no Pix");
@@ -268,6 +277,7 @@ describe("os passos até a oferta", () => {
     expect(screen.getByTestId("hoje-pagar").textContent).toContain("R$ 14,90");
   });
   comKit("o bump soma no botão (37,80) e é desmarcado por padrão", async () => {
+    _forcarOfertaHoje("anual");
     await ateOferta();
     expect(screen.getByTestId("hoje-bump").getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId("hoje-pagar").textContent).toContain("R$ 27,90");
@@ -277,7 +287,8 @@ describe("os passos até a oferta", () => {
 });
 
 /* ---------------------------------------------------------------- Pix */
-describe("o Pix (mock da asaas-pix)", () => {
+describe("[anual] o Pix (mock da asaas-pix)", () => {
+  comoAnual();
   it("gera SEM e-mail na sessão anônima, com a oferta do plano + fbp/fbc/url; InitiateCheckout com o valor; copiar no toque; CNPJ", async () => {
     await ateOferta();
     fireEvent.click(screen.getByTestId("hoje-pagar"));
@@ -321,7 +332,8 @@ describe("o Pix (mock da asaas-pix)", () => {
 });
 
 /* ---------------------------------------------------------------- upsells */
-describe("upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
+describe("[anual] upsells: 1 tela cada, sempre com 'Não, obrigado'", () => {
+  comoAnual();
   it("proximoPosCompra: 47 → (recusou) 27 → [vida a dois, desligada no lançamento] → e-mail; cada um 1 vez", () => {
     expect(UPSELL_A_DOIS).toBe(false);
     expect(proximoPosCompra({ pagos: [], recusou: [], parceiro: null })).toBe("up1");
@@ -401,7 +413,8 @@ const atePosCompra = async (kit = false) => {
   fireEvent.click(screen.getByTestId("hoje-down-nao"));
   await waitFor(() => expect(screen.getByTestId("hoje-email")).toBeTruthy());
 };
-describe("pós-compra: 1 campo de e-mail", () => {
+describe("[anual] pós-compra: 1 campo de e-mail", () => {
+  comoAnual();
   it("e-mail livre → MESMA conta; Finanças nas chaves do app; kit; boas-vindas; lojas + e-mail; abre o app web", async () => {
     await atePosCompra(BUMP_KIT);
     const ped = BUMP_KIT ? "qr_1_h279k" : "qr_1_h279";
@@ -413,8 +426,8 @@ describe("pós-compra: 1 campo de e-mail", () => {
     expect(fin.map((l) => l.key)).toEqual(["finance-incomes", "finance-fixed-expenses"]);
     expect(fin[0].value).toEqual([expect.objectContaining({ description: "Renda do mês", value: 3000 })]);
     expect((fin[1].value as Array<{ description: string }>).map((x) => x.description)).toEqual(["Aluguel", "Luz", "Internet"]);
-    if (BUMP_KIT) expect(upserts).toContainEqual(expect.objectContaining({ key: "core-kit-primeiro-mes", value: expect.objectContaining({ comprado: true, pedido: ped }) }));
-    else expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
+    // 21/10 (segurança): o kit do bump é gravado pelo SERVIDOR na confirmação do Pix — a página nunca grava a chave paga
+    expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
     expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: ped });
     expect(updateUser).toHaveBeenCalledWith({ data: { hoje: expect.objectContaining({ v: 1, plano: "anual" }) } });
     expect(screen.getByTestId("hoje-lojas").textContent).toContain("mari@exemplo.com");
@@ -458,7 +471,8 @@ describe("pós-compra: 1 campo de e-mail", () => {
 });
 
 /* ---------------------------------------------------------------- e-mail opcional na tela do Pix */
-describe("e-mail OPCIONAL na tela do Pix (não bloqueia; só aparece com o código)", () => {
+describe("[anual] e-mail OPCIONAL na tela do Pix (não bloqueia; só aparece com o código)", () => {
+  comoAnual();
   const atePix = async () => {
     await ateOferta();
     expect(screen.queryByTestId("hoje-email-pix")).toBeNull();
@@ -512,3 +526,83 @@ describe("bump desligado (19/10)", () => {
     expect(ofertaDoPlano("mensal", true)).toBe("h149");
   });
 });
+
+/* ---------------------------------------------------------------- 20/10: a oferta do /inicio (padrão) */
+describe("OFERTA_HOJE = 'vitalicio' (padrão, dono 20/10): a MESMA oferta do /inicio", () => {
+  it("a chave: padrão vitalício; o rollback é 'anual'", () => {
+    expect(OFERTA_HOJE).toBe("vitalicio");
+    expect(modoOfertaHoje()).toBe("vitalicio");
+    _forcarOfertaHoje("anual");
+    expect(modoOfertaHoje()).toBe("anual");
+    _forcarOfertaHoje(null);
+    expect(modoOfertaHoje()).toBe("vitalicio");
+  });
+  it("tela enxuta: UMA opção — 'CORE pra sempre' · R$ 27,90 · 'Pague 1x. Seu pra sempre.' + provas + garantia + botão; sem plano, sem mensal, sem 'renova'", async () => {
+    await ateOferta();
+    const card = screen.getByTestId("hoje-oferta-vitalicio");
+    expect(card.textContent).toContain("CORE pra sempre");
+    expect(card.textContent).toContain("R$ 27,90");
+    expect(card.textContent).toContain("Pague 1x. Seu pra sempre.");
+    expect(texto()).toContain("Finanças montada + 15 áreas da vida");
+    expect(texto()).toContain("No iPhone, no Android e no computador");
+    expect(texto()).toContain("Garantia de 7 dias");
+    expect(screen.getByTestId("hoje-pagar").textContent).toBe("Pagar R$ 27,90 com Pix");
+    expect(screen.queryByTestId("hoje-plano-anual")).toBeNull();
+    expect(screen.queryByTestId("hoje-plano-mensal")).toBeNull();
+    expect(screen.queryByTestId("hoje-renovacao")).toBeNull();
+    expect(screen.queryByTestId("hoje-bump")).toBeNull();
+    expect(texto()).not.toMatch(/97,90|14,90|renova|1º ano|mensal|anual/i);
+  });
+  it("Pix = hv279 de R$ 27,90 (InitiateCheckout 27,90 core_vitalicio_hoje); pagou → DIRETO pro pós-compra (sem o 47 nem o 27); eventos com oferta/plano", async () => {
+    await ateOferta();
+    fireEvent.click(screen.getByTestId("hoje-pagar"));
+    await waitFor(() => expect(screen.getByTestId("hoje-copiar")).toBeTruthy());
+    expect(invocacoes("asaas-pix", "create")[0]).toMatchObject({ action: "create", offer: "hv279" });
+    expect(screen.getByTestId("hoje-pix-valor").textContent).toBe("R$ 27,90");
+    expect(texto()).toContain("CORE pra sempre");
+    expect(vi.mocked(fireMetaEvent).mock.calls.find((x) => x[0] === "InitiateCheckout")?.[1]).toMatchObject({ value: 27.9, currency: "BRL", content_name: "core_vitalicio_hoje" });
+    expect(markPixPurchasePending).toHaveBeenCalledWith({ offer: "hv279", orderId: "qr_1_hv279" });
+    expect(eventos("funnel_click").find((x) => x.cta === "pagar_pix")).toMatchObject({ plano: "vitalicio", oferta: "hv279", valor: 27.9, oferta_hoje: "vitalicio" });
+    expect(eventos("hoje_pix_gerado")[0]).toMatchObject({ oferta: "hv279", valor: 27.9, oferta_hoje: "vitalicio" });
+    await pagarEConferir("hv279");
+    await waitFor(() => expect(etapa()).toBe("pago"));
+    expect(eventos("hoje_pago")).toEqual([expect.objectContaining({ oferta: "hv279", plano: "vitalicio", valor: 27.9, order_id: "qr_1_hv279", oferta_hoje: "vitalicio" })]);
+    expect(eventos("hoje_upsell")).toHaveLength(0);
+    expect(eventos("funnel_view").map((x) => x.step)).not.toEqual(expect.arrayContaining(["up1"]));
+    expect(eventos("funnel_view").map((x) => x.step)).not.toEqual(expect.arrayContaining(["down"]));
+    expect(invocacoes("asaas-pix", "create")).toHaveLength(1);
+    expect(texto()).toContain("R$ 27,90 recebido · acesso pra sempre");
+    expect(screen.getByTestId("hoje-pago-pra-sempre")).toBeTruthy();
+    expect(texto()).not.toMatch(/vida a dois|2ª conta|Kit Primeiro/i);
+  });
+  it("pós-compra: e-mail → Finanças + boas-vindas do pedido hv279 + atribuição plano 'vitalicio' + lojas; abre o app", async () => {
+    await ateOferta();
+    fireEvent.click(screen.getByTestId("hoje-pagar"));
+    await pagarEConferir("hv279");
+    await waitFor(() => expect(screen.getByTestId("hoje-email")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("hoje-email"), { target: { value: "mari@exemplo.com" } });
+    fireEvent.click(screen.getByTestId("hoje-salvar-email"));
+    await waitFor(() => expect(screen.getByTestId("hoje-lojas")).toBeTruthy());
+    expect(invocacoes("asaas-pix", "boas_vindas")[0]).toMatchObject({ id: "qr_1_hv279" });
+    expect((upserts.find((u) => Array.isArray(u)) as Array<{ key: string }>).map((l) => l.key)).toEqual(["finance-incomes", "finance-fixed-expenses"]);
+    expect(upserts.some((u) => (u as { key?: string })?.key === "core-kit-primeiro-mes")).toBe(false);
+    expect(updateUser).toHaveBeenCalledWith({ data: { hoje: expect.objectContaining({ plano: "vitalicio", pagos: ["hv279"] }) } });
+    expect(screen.getByTestId("selo-app-store")).toBeTruthy();
+    expect(screen.getByTestId("selo-google-play")).toBeTruthy();
+    expect(screen.getByTestId("hoje-lojas").textContent).toContain("mari@exemplo.com");
+    fireEvent.click(screen.getByTestId("hoje-abrir"));
+    await waitFor(() => expect(screen.getByTestId("financas")).toBeTruthy());
+  });
+  it("proximoPosCompra: quem pagou o hv279 já é pra sempre — nenhum upsell; fimDoAcesso vitalício", () => {
+    expect(proximoPosCompra({ pagos: [{ oferta: "hv279", orderId: "x", em: 0 }], recusou: [], parceiro: null })).toBe("pago");
+    expect(fimDoAcesso("anual", ["hv279"]).vitalicio).toBe(true);
+    expect(fimDoAcesso("anual", ["h279"]).vitalicio).toBe(false);
+  });
+  it("todo evento do /hoje leva oferta_hoje", async () => {
+    await ateOferta();
+    for (const nome of ["hoje_view", "funnel_view", "hoje_faixa", "hoje_resultado"]) expect(eventos(nome).every((x) => x.oferta_hoje === "vitalicio")).toBe(true);
+  });
+});
+
+// 22/10: a 1ª pergunta leve está ligada pra todos (HOJE_P1 = "leve"); este arquivo testa o resto do /hoje com a ordem de antes
+beforeEach(async () => { (await import("@/pages/hoje/conteudo")).modoP1("?hoje-p1=off"); });

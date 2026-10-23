@@ -42,7 +42,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { EVENTO_ACAO_RAPIDA } from "@/components/home/QuickActions";
-import { TourDaHome, TOTAL_PASSOS } from "@/components/home/TourDaHome";
+import { TourDaHome, TOTAL_PASSOS, ASSENTA_MS } from "@/components/home/TourDaHome";
 import { CartoesDoModulo, guiaDoModuloAtiva } from "@/components/cartoes-modulo/CartoesDoModulo";
 import { cartoesFinancas } from "@/components/cartoes-modulo/cartoes-financas";
 import Beleza from "@/pages/Beleza";
@@ -51,7 +51,7 @@ import { raridadeDe } from "@/components/gamification/types";
 import { temArte } from "@/components/conquistas/adesivos-arte";
 import {
   CARTOES_MODULO, TOUR_HOME, MODULO_OCULTA_PENDENCIAS, CHAVE_TOUR_FEITO, CHAVE_FORCA_CARTOES, CHAVE_FORCA_TOUR_HOME, CHAVE_FORCA_MODULO_OCULTA,
-  cartoesLigados, tourHomeLigado, moduloOcultaPendenciasLigado, guardarForcasDaUrl, deveMostrarTourHome, chaveCartoesVistos,
+  cartoesLigados, tourHomeLigado, moduloOcultaPendenciasLigado, guardarForcasDaUrl, deveMostrarTourHome, chaveCartoesVistos, tourFeito, _novaAberturaDoTour,
 } from "@/lib/tour-home";
 import { CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO, TIPOS_DO_MODULO, tiposCobradosHoje, tiposDosModulosOcultos, type PendenciasPrefs } from "@/lib/home-pendencias";
 import { CHAVE_ESTADO_MISSAO_DOSES, CHAVE_FORCA_MISSAO_DOSES, gravarMissao, iniciarMissao } from "@/lib/missao-doses";
@@ -326,8 +326,73 @@ const HomeDeMentira = ({ adicionarWidget }: { adicionarWidget: (id: string) => v
   );
 };
 
+/** 1.0.17 (dono 20/10, mockup d1): o tour começa num popup — "Mostrar" leva aos balões. */
+const passarDoPopup = () => fireEvent.click(screen.getByTestId("tour-popup-mostrar"));
+
+describe("1.0.17: o popup de entrada do tour (mockup d1)", () => {
+  beforeEach(() => ligar(CHAVE_FORCA_TOUR_HOME, CHAVE_FORCA_MODULO_OCULTA));
+
+  it("antes do 1º balão: 'ÚLTIMO PASSO DE HOJE' / 'Agora, sua Home em N toques' (N = os passos que vão rodar) / [Mostrar] / 'Pular'; é a camada do tour; 'Mostrar' abre o passo 1", () => {
+    const s = criarStore(CONTA());
+    s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    const popup = screen.getByTestId("tour-popup");
+    expect(popup.getAttribute("data-camada-guia")).toBe("tour-home"); // nada entra por cima, a festa espera
+    expect(popup).toHaveTextContent("Último passo de hoje");
+    expect(screen.getByTestId("tour-popup-titulo").textContent).toBe(`Agora, sua Home em ${TOTAL_PASSOS} toques`);
+    expect(popup).toHaveTextContent("É aqui que seu dia fica todo junto.");
+    expect(screen.queryByTestId("tour-balao")).toBeNull(); // nenhum balão (nem lista aberta) antes do "Mostrar"
+    expect(dos("home_tour_popup").map((d) => d.acao)).toEqual(["visto"]);
+    passarDoPopup();
+    expect(screen.queryByTestId("tour-popup")).toBeNull();
+    expect(screen.getByTestId("tour-home").getAttribute("data-passo")).toBe("1");
+    expect(dos("home_tour_popup").map((d) => d.acao)).toEqual(["visto", "mostrar"]);
+  });
+
+  it("entre o 'Mostrar' e o 1º balão a Home NÃO clareia: o véu escuro do popup fica até o tour assentar e aparecer, e só então sai", async () => {
+    const s = criarStore(CONTA());
+    s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    passarDoPopup();
+    expect(screen.getByTestId("tour-veu")).toBeInTheDocument(); // escuro contínuo
+    expect(screen.getByTestId("tour-home").hasAttribute("data-assentado")).toBe(false);
+    await waitFor(() => expect(screen.getByTestId("tour-home").hasAttribute("data-assentado")).toBe(true), { timeout: ASSENTA_MS * 6 });
+    await waitFor(() => expect(screen.queryByTestId("tour-veu")).toBeNull(), { timeout: 2000 });
+  });
+
+  it("'Pular' = tour VISTO: as marcas de sempre (aparelho + conta) — não volta ao reabrir o app nem no login em outro aparelho; o adesivo 'Casa arrumada' é de quem fez", () => {
+    const s = criarStore(CONTA());
+    s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    fireEvent.click(screen.getByTestId("tour-popup-pular"));
+    expect(screen.queryByTestId("tour-popup")).toBeNull();
+    expect(screen.queryByTestId("tour-home")).toBeNull();
+    expect(localStorage.getItem(CHAVE_TOUR_FEITO)).toMatch(/^pulou:/);
+    expect(s.ler<string>(CHAVE_TOUR_FEITO)).toMatch(/^pulou:/);
+    expect(dos("home_tour_popup").map((d) => d.acao)).toEqual(["visto", "pular"]);
+    expect(nomes()).not.toContain("home_tour_visto"); // os balões nunca apareceram
+    // reabrir o app (nova abertura): não volta
+    _novaAberturaDoTour();
+    expect(deveMostrarTourHome(new Date().toISOString())).toBe(false);
+    // outro aparelho (o aparelho sem a marca, a conta com ela): o tour sabe que já foi
+    localStorage.removeItem(CHAVE_TOUR_FEITO);
+    expect(tourFeito(s.get)).toBe(true);
+    // pular não ganha o adesivo
+    expect(buildBadgesVida(s.get).find((b) => b.id === "casa-arrumada")!.unlocked).toBe(false);
+  });
+});
+
 describe("Sua Home em 5 passos (força on)", () => {
   beforeEach(() => ligar(CHAVE_FORCA_TOUR_HOME, CHAVE_FORCA_MODULO_OCULTA));
+
+  it("1.0.17: o balão só entra quando o alvo ASSENTA (a lista abrindo + a rolagem) — antes ele nascia por cima do cabeçalho e pulava", async () => {
+    const s = criarStore(CONTA());
+    s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    passarDoPopup();
+    const tour = screen.getByTestId("tour-home");
+    const balao = () => screen.getByTestId("tour-balao").parentElement as HTMLElement;
+    expect(tour.hasAttribute("data-assentado")).toBe(false);
+    expect(balao().style.pointerEvents).toBe("none"); // invisível e sem toque enquanto o alvo se mexe
+    await waitFor(() => expect(screen.getByTestId("tour-home").hasAttribute("data-assentado")).toBe(true), { timeout: ASSENTA_MS * 6 });
+    expect(balao().style.pointerEvents).toBe("auto");
+  });
 
   it("5 passos, cada um com UMA ação de 1 toque: o que cada toque grava, os eventos e o fim", async () => {
     const s = criarStore(CONTA());
@@ -335,6 +400,7 @@ describe("Sua Home em 5 passos (força on)", () => {
     const acoesRapidas: string[] = [];
     window.addEventListener(EVENTO_ACAO_RAPIDA, (e) => acoesRapidas.push((e as CustomEvent<{ id: string }>).detail.id));
     s.montar(<HomeDeMentira adicionarWidget={addWidget} />, "/home");
+    passarDoPopup();
 
     const tour = screen.getByTestId("tour-home");
     expect(tour.getAttribute("data-camada-guia")).toBe("tour-home"); // a festa do adesivo espera o tour sair
@@ -348,7 +414,7 @@ describe("Sua Home em 5 passos (força on)", () => {
     expect(screen.getByTestId("tour-continuar").textContent).toBe("Continuar");
     expect(screen.queryByText("Fazer isso")).toBeNull();
     expect(screen.getByTestId("tour-balao").querySelector("[data-figurinha-placeholder]")).not.toBeNull();
-    expect(nomes()).toEqual(["home_tour_visto"]);
+    expect(nomes()).toEqual(["home_tour_popup", "home_tour_popup", "home_tour_visto"]); // 1.0.17: visto/mostrar do popup antes
 
     // 1 — score: "O que conta ponto" abre os 12 blocos com os pontos; "Entendi" avança
     fireEvent.click(screen.getByTestId("tour-ver-pontos"));
@@ -402,6 +468,7 @@ describe("Sua Home em 5 passos (força on)", () => {
   it("'Continuar' em todos (e 'Concluir missão' no último): termina em 5 toques sem gravar nada além da chave do tour — ninguém fica preso", () => {
     const s = criarStore(CONTA());
     s.montar(<HomeDeMentira adicionarWidget={vi.fn()} />, "/home");
+    passarDoPopup();
     for (let i = 0; i < TOTAL_PASSOS - 1; i++) fireEvent.click(screen.getByTestId("tour-continuar"));
     expect(screen.getByTestId("tour-concluir").textContent).toBe("Concluir missão");
     fireEvent.click(screen.getByTestId("tour-concluir"));

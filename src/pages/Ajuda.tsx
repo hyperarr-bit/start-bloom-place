@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bug, HelpCircle, ImagePlus, Lightbulb, Loader2, Mail, Send, X, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,6 +6,7 @@ import { uploadFromInput } from "@/lib/image-upload";
 import { montarDiagnostico } from "@/lib/diagnostico-suporte";
 import { trackEvent } from "@/lib/analytics";
 import { EMPRESA } from "@/lib/empresa";
+import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 
 /**
  * AJUDA E SUPORTE DENTRO DO APP (07/09).
@@ -69,7 +69,6 @@ const TIPOS: Array<{ id: Tipo; label: string; Icon: typeof Bug; dica: string }> 
 ];
 
 export default function Ajuda() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const arquivoRef = useRef<HTMLInputElement>(null);
 
@@ -85,7 +84,8 @@ export default function Ajuda() {
 
   /* O menu da conta só abre no hub, então a volta é sempre pra lá — e quem
      chegou por link direto não cai num histórico vazio. */
-  const voltar = () => navigate("/home");
+  // 1.0.17: aberta pelo Você, volta pro Você
+  const voltar = useVoltarDaSubpagina("/home");
 
   const escolhido = TIPOS.find((t) => t.id === tipo)!;
   const cheio = anexos.length >= MAX_ANEXOS;

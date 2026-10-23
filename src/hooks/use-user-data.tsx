@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { markActivation, trackEvent } from "@/lib/analytics";
 import { localDayKey } from "@/lib/utils";
 import { vassouraLeva } from "@/lib/chaves-do-aparelho";
+import { chaveSoDoServidor } from "@/lib/conteudo-pago";
 import { iguais, mesclar3 } from "@/lib/mesclar-dados";
 import { CHAVE_DIAS_ANOTADOS, CHAVE_HUB_STREAK, calcularSequencia, contaComoAnotacao, registrarDia, registrarDiaRetroativo, temConteudo } from "@/lib/sequencia";
 import { registrarLeitorDosDados } from "@/lib/medicao-total";
@@ -636,6 +637,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           const existingSet = new Set<string>((existing ?? []).map((r: any) => r.key));
 
           const toUpsert = guestKeys
+            // 21/10: conteúdo pago só o servidor grava (lib/conteudo-pago) — e a recusa do banco travaria a migração inteira
+            .filter(k => !chaveSoDoServidor(k))
             .filter(k => !existingSet.has(k) || GUEST_WINS_KEYS.has(k))
             .map(k => ({ user_id: user.id, key: k, value: guestData[k] }));
 
@@ -991,6 +994,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
   const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0) => {
     if (userRef.current?.id !== userId) return;
+    // 21/10: conteúdo pago (kit, "Seu 2027") só o SERVIDOR grava — o banco recusa a escrita do cliente (lib/conteudo-pago)
+    if (chaveSoDoServidor(key)) return;
     const { error } = await (supabase as any)
       .from("user_data")
       .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" });

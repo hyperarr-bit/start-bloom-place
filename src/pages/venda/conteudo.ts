@@ -50,7 +50,14 @@ export const OFERTA_PIX_ANUAL = "a97" as const;
  */
 export const ENV_CAKTO: Record<PlanoVenda, string> = { anual: "VITE_VENDA_CAKTO_ANUAL", mensal: "VITE_VENDA_CAKTO_MENSAL" };
 
-export function linkDoCakto(plano: PlanoVenda, env: Record<string, unknown> = import.meta.env as Record<string, unknown>): string | null {
+/* segurança 21/10: só as duas variáveis, por nome — `import.meta.env` inteiro como valor faz o Vite colar TODAS as
+ * VITE_* no bundle público (inclusive a senha da conta de QA). */
+const envDoCakto = (): Record<string, unknown> => ({
+  VITE_VENDA_CAKTO_ANUAL: import.meta.env.VITE_VENDA_CAKTO_ANUAL,
+  VITE_VENDA_CAKTO_MENSAL: import.meta.env.VITE_VENDA_CAKTO_MENSAL,
+});
+
+export function linkDoCakto(plano: PlanoVenda, env: Record<string, unknown> = envDoCakto()): string | null {
   const bruto = String(env[ENV_CAKTO[plano]] ?? "").trim();
   if (!bruto) return null;
   if (/^https:\/\/pay\.cakto\.com\.br\/[A-Za-z0-9_-]+\/?$/.test(bruto)) return bruto.replace(/\/$/, "");

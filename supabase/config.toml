@@ -56,3 +56,8 @@ verify_jwt = false
 # ANTES de existir conta (a página ainda não tem login).
 [functions.venda-capi]
 verify_jwt = false
+
+# Upsell de presente (21/10): a página /presente/<código> chama `ver` SEM conta;
+# as outras ações (meu/nome/email/resgatar) conferem o JWT dentro da função.
+[functions.presente-resgatar]
+verify_jwt = false

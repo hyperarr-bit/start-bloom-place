@@ -61,6 +61,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-festas-mostradas",
   "core-dia1-braco",
   "core-missao-1-por-dia", // 1.0.16: a última resposta do RevenueCat pro teste "missão 1 por dia" (metadata missao_1_por_dia)
+  "core-tour-home-quando", // 1.0.17: a última resposta do RevenueCat pra QUANDO o tour curto entra (metadata tour_home_quando: dia1|dia2)
   "core-tour-home-remoto", // 1.0.16: a última resposta do RevenueCat pro tour da Home (metadata tour_home: curto|longo|off)
   "core-device-id",
   "core-aviso-cobranca-notif",
@@ -96,6 +97,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-codigo-pendente", // código promocional validado antes do cadastro, resgatado depois
   "core-montar-financas", // 1.0.16: "Vamos montar suas Finanças" feito/pulado (+ vistas); a mesma chave vai pra conta
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
+  "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -137,17 +139,20 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
     "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
     "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
+    "core-intro-acao-rapida", // 1.0.17: módulos cujo único dado veio da ação rápida da Home (a intro ainda aparece)
     "core-conhecer-feitos", // lista de módulos com o passeio "Conhecer mais" feito nesta conta (lib/conhecer-mais)
+    "core-escolhas-proprias", // 1.0.17: as opções que a pessoa ESCREVEU no "+ Outro" (EscolhaRapida), por lista — na conta (useUserData)
     "core-mood-log", "core-rotina-habit-log", "core-saude-sleep", "core-saude-supplement-log",
     "core-saude-water", "core-saude-water-goal", "core-dieta-log", "core-dieta-meals", "core-gratitude-log",
     "finance-*", "finance-categorization-rules", "finance-dueDays", "finance-expenses", "finance-fixed-expenses",
     "finance-incomes", "finance-installments", "finance-notes", "finance-perfil-ativo", "finance-perfis", "finance-sem-gasto",
     "finance-ultima-importacao", "finance-dueDays-mes", "finance-fixed-expenses-mes", "finance-investments",
     "core-financas-painel", // 1.0.16: { limpo: true } do painel limpo (a cópia do aparelho é a família core-financas-painel-<id>)
-    "core-kit-primeiro-mes", // o kit do /hoje: a página grava no user_data da conta (pages/hoje/conta gravarKit); o app lê pelo useUserData
+    "core-kit-primeiro-mes", // o kit pago: só o SERVIDOR grava no user_data da conta (21/10, lib/conteudo-pago); o app lê pelo useUserData
   ],
   // SÓ NO sessionStorage (a vassoura só mexe no localStorage) ou nem é chave de storage.
   sessao_ou_nao_storage: [
+    "core-back-qa", "core-back-qa-v", "core-back-usados", // 21/10: BACK dos funis web — força de QA e "já usado" por etapa, só no sessionStorage (lib/back-funil)
     "core-demo-guarda", "core-demo-volta", "core-demo-tour", "core-pwa-open-sent",
     "core-lembretes", // id do canal de notificação do Android
   ],

@@ -63,6 +63,7 @@ import {
 import { MontarFinancas, dicaDoVencimento } from "@/components/finance/montar/MontarFinancas";
 import { TotalPorCartao } from "@/components/finance/TotalPorCartao";
 import Index from "@/pages/Index";
+import { instalarTecladoIphone } from "./helpers/teclado-iphone";
 
 const UID = "u-mfc";
 const HOJE = new Date(2026, 9, 16, 12, 0); // 16/10/2026 (sexta): faltam 16 dias contando hoje
@@ -117,7 +118,7 @@ const ateOCartao = () => {
   fireEvent.click(tela().getByRole("button", { name: /Aluguel/ }));
   fireEvent.click(tela().getByRole("button", { name: /Luz/ }));
   fireEvent.click(tela().getByRole("button", { name: "Continuar" }));
-  expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+  expect(tela().getByText("Usa cartão de crédito?")).toBeTruthy();
 };
 const responderCartao = ({ banco, valor, dia }: { banco?: string; valor?: string; dia?: number }) => {
   fireEvent.click(tela().getByRole("button", { name: /Uso cartão/ }));
@@ -221,18 +222,19 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     const controle = montarTela({ onPronto });
     await respirar(); // a do módulo conta a vista na volta seguinte
     ateOCartao();
-    expect(tela().getByText(/3 de 3/)).toBeTruthy();
+    expect(document.querySelectorAll(".mf-barra i[data-on]")).toHaveLength(3); // a 3ª pergunta (a barra; 1.0.17 sem o "3 de 3" escrito)
     responderCartao({ banco: "Nubank", valor: "800", dia: 25 });
     expect(tela().getByText("Faltam 9 dias. O CORE avisa quando estiver perto.")).toBeTruthy();
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await respirar();
 
+    fireEvent.click(screen.getByTestId("montar-ver-conta")); // 1.0.17: a conta fica fechada até ela abrir
     const linha = screen.getByTestId("montar-fatura");
     expect(linha.textContent).toContain("Fatura do Nubank");
     expect(linha.textContent).toContain("vence dia 25");
     expect(linha.textContent).toContain("R$ 800");
     expect(screen.getByTestId("montar-por-dia").textContent).toContain("R$ 72");
-    expect(screen.getByText(/já tirando as contas fixas e a fatura/)).toBeTruthy();
+    expect(screen.getByText("até o fim do mês.")).toBeTruthy();
 
     const d = controle.dados();
     expect(fatura(d)).toMatchObject({ description: "Fatura do cartão", value: 800, paymentMethod: "credito", cardName: "nubank", category: "fatura_cartao", faturaDoCartao: true });
@@ -246,7 +248,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ver minhas Finanças" }));
     expect(onPronto).toHaveBeenCalledWith({ contas: 2, porDia: 72, semFolga: false, cartao: true });
     expect(eventos.filter(([n]) => n === EV_PASSO).map(([, e]) => e.n)).toEqual([1, 2, 3, 4]);
-    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 2, faixa: "2a4", sem_folga: false, origem: "modulo", cartao: true });
+    expect(eventos.find(([n]) => n === EV_PRONTO)![1]).toEqual({ contas: 2, faixa: "2a4", sem_folga: false, apertado: false, origem: "modulo", cartao: true });
     for (const [, e] of eventos) expect(JSON.stringify(e)).not.toMatch(/800|nubank|"dia"/);
   });
 
@@ -270,6 +272,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     expect(tela().getByText("Já passou neste mês, então a de outubro entra como paga.")).toBeTruthy();
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await respirar();
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByTestId("montar-fatura").textContent).toContain("já paga");
     const d = controle.dados();
     expect(fatura(d)).toMatchObject({ cardName: "itau", value: 650, pagoEm: "2026-10" });
@@ -290,6 +293,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     expect(criados[0].label).toBe("Cartão");
     expect(fatura(d).cardName).toBe(criados[0].value);
     expect(d["finance-card-config"]).toEqual({ [criados[0].value]: { dueDay: 20, mesDoVencimento: true } });
+    fireEvent.click(screen.getByTestId("montar-ver-conta"));
     expect(screen.getByTestId("montar-fatura").textContent).toContain("Fatura do cartão");
     cleanup();
 
@@ -370,7 +374,7 @@ describe("a pergunta do cartão, com a conta vazia", () => {
     cleanup(); // fechou o app
     _novaAberturaMontar();
     montarTela();
-    expect(tela().getByText("Você usa cartão de crédito?")).toBeTruthy();
+    expect(tela().getByText("Usa cartão de crédito?")).toBeTruthy();
     expect(tela().getByRole("button", { name: /Uso cartão/ }).getAttribute("aria-pressed")).toBe("true");
     expect(tela().getByRole("button", { name: "Santander" }).getAttribute("aria-pressed")).toBe("true");
     expect((tela().getByLabelText("Fatura deste mês em reais") as HTMLInputElement).value).toBe("950");
@@ -437,12 +441,69 @@ describe("teclado aberto no iPhone (visualViewport encolhe)", () => {
     expect(folha.style.height).toBe(`${window.innerHeight - 300 - 44}px`);
     document.documentElement.style.removeProperty("--missao-doses-faixa-h");
   });
+  it("1.0.17 — dia 1 SEM a faixa (atributo '0', altura 0): com o TECLADO DO iPHONE de verdade no campo da renda, a folha começa no topo da área visível (não 40 px abaixo, o `|| 40` de antes) e o botão fica acima do teclado", async () => {
+    document.documentElement.setAttribute("data-missao-doses-faixa", "0");
+    document.documentElement.style.setProperty("--missao-doses-faixa-h", "0px"); // o que o CSS faz com o atributo "0"
+    const teclado = instalarTecladoIphone();
+    try {
+      montarTela({ origem: "missao" });
+      const campo = screen.getByLabelText("Renda do mês em reais") as HTMLElement;
+      teclado.abrir(campo, 0, 0);
+      await respirar();
+      const folha = screen.getByTestId("montar-financas");
+      expect(folha.hasAttribute("data-teclado")).toBe(true);
+      expect(folha.style.top).toBe("0px");
+      expect(folha.style.height).toBe(`${teclado.altura}px`); // 844 − 336: a folha inteira acima do teclado
+      teclado.soltarFoco();
+      teclado.assentar();
+      await respirar();
+      expect(folha.hasAttribute("data-teclado")).toBe(false);
+    } finally {
+      teclado.desinstalar();
+      document.documentElement.style.removeProperty("--missao-doses-faixa-h");
+    }
+  });
+});
+
+describe("1.0.17 — iPhone SE com o teclado de verdade no passo do cartão", () => {
+  it("teclado na 'Fatura deste mês' (372 px visíveis): os dias de 'Vence todo dia' ficavam atrás do botão colado 'Ver quanto posso gastar' — o bloco do cartão sobe até terminar acima do rodapé, e o campo da fatura continua à vista", async () => {
+    const teclado = instalarTecladoIphone({ alturaTela: 667, larguraTela: 375, alturaTeclado: 295 });
+    try {
+      montarTela({ origem: "missao" });
+      ateOCartao();
+      responderCartao({ banco: "Nubank", valor: "850" });
+      const corpo = screen.getByTestId("montar-financas").querySelector<HTMLElement>(".mf-corpo")!;
+      corpo.style.overflowY = "auto"; // o CSS do .mf-corpo (o jsdom não carrega o .css)
+      const rodape = screen.getByTestId("montar-financas").querySelector<HTMLElement>("[data-teclado-rodape]")!;
+      const bloco = screen.getByTestId("montar-cartao");
+      const campo = screen.getByLabelText("Fatura deste mês em reais") as HTMLElement;
+      // as posições do print se1-fatura (com o cabeçalho escondido pelo teclado): o campo 180–220, o bloco até 340
+      // (os dias terminam em 318), o rodapé colado em 296 (372 visíveis − 76 do botão)
+      const r = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 375, width: 375, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+      const rects = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+        const s = corpo.scrollTop;
+        if (this === corpo) return r(0, 372);
+        if (this === rodape) return r(296, 372);
+        if (this === bloco) return r(30 - s, 340 - s);
+        if (this === campo) return r(180 - s, 220 - s);
+        return r(0, 0);
+      });
+      try {
+        teclado.abrir(campo, 0, 0);
+        await act(async () => { await new Promise((ok) => setTimeout(ok, 80)); });
+        expect(screen.getByTestId("montar-financas").hasAttribute("data-teclado")).toBe(true);
+        expect(bloco.getBoundingClientRect().bottom).toBeLessThanOrEqual(296); // os dias acima do botão
+        expect(campo.getBoundingClientRect().top).toBeGreaterThanOrEqual(8); // o campo da fatura segue à vista
+        expect(within(bloco).getByRole("button", { name: "Dia 1" })).toBeTruthy();
+      } finally { rects.mockRestore(); }
+    } finally { teclado.desinstalar(); }
+  });
 });
 
 /* ───────────────────────── no módulo de verdade ───────────────────────── */
 describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
   /** A tela da MISSÃO (a única porta desde 17/10) por cima de Finanças, com o cartão vencendo dia 19
-   *  (daqui a 3 dias); "Continuar →" fecha a tela e o módulo por baixo já adotou o dado. */
+   *  (daqui a 3 dias); "Continuar" fecha a tela e o módulo por baixo já adotou o dado. */
   const montarComCartao = async (dia = 19) => {
     const controle = novoControle();
     const ComMissao = () => {
@@ -464,7 +525,8 @@ describe("pages/Index com a fatura do Montar (conta nova, app da loja)", () => {
     fireEvent.click(tela().getByRole("button", { name: "Ver quanto posso gastar" }));
     await waitFor(() => expect(screen.getByTestId("montar-pronto")).toBeTruthy(), { timeout: 4000 });
     const numero = screen.getByTestId("montar-por-dia").textContent!.match(/R\$ ([\d.]+)/)![1];
-    fireEvent.click(screen.getByRole("button", { name: "Continuar →" })); // a tela do número pela missão: só o número
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" })); // a tela do número pela missão: só o número
+    fireEvent.click(screen.getByTestId("montar-ponte-ir")); // 1.0.17: a ponte pro 1º gasto
     await respirar();
     return { controle, numero };
   };

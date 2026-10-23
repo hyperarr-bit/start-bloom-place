@@ -19,8 +19,9 @@
  * fazia antes (o `padrao`, "/home" no app logado).
  */
 import { createContext, useCallback, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { trackEvent } from "@/lib/analytics";
+import { destinoDaVolta } from "@/lib/nav-abas";
 
 export interface VoltaDaDemo {
   /** Pra onde o botão de baixo da demo leva — JÁ com o ajuste da demo guiada (o item anotado vai junto). */
@@ -46,14 +47,16 @@ export const useVoltaDaDemo = (): VoltaDaDemo | null => useContext(ContextoDaVol
  * O onClick da seta ← do cabeçalho de um módulo.
  *  · Na demo: mesmo destino (e mesmo efeito na missão) do botão de baixo, com
  *    o evento `funnel_click { cta: "demo_seta_voltar" }`.
- *  · Fora dela: `navigate(padrao)` — o de sempre.
+ *  · Fora dela: `navigate(padrao)` — o de sempre. 1.0.17: se o módulo foi aberto pela aba Módulos, a
+ *    seta volta pra ela (lib/nav-abas, destinoDaVolta); qualquer outra entrada segue no `padrao`.
  */
 export function useVoltarDoModulo(padrao = "/home"): () => void {
   const volta = useVoltaDaDemo();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   return useCallback(() => {
     if (!volta) {
-      navigate(padrao);
+      navigate(destinoDaVolta(pathname, padrao));
       return;
     }
     try {
@@ -61,5 +64,13 @@ export function useVoltarDoModulo(padrao = "/home"): () => void {
       volta.aoTocar?.("seta");
     } catch { /* medição e missão nunca prendem ninguém na demo: a navegação vem de qualquer jeito */ }
     navigate(volta.destino);
-  }, [volta, navigate, padrao]);
+  }, [volta, navigate, padrao, pathname]);
+}
+
+/** A seta ← das páginas que o Você abre (Ajuda, Conquistas, Retrospectiva, Lembretes): volta pro Você
+ *  quando foi ele que abriu; senão o `padrao` de sempre. */
+export function useVoltarDaSubpagina(padrao = "/home"): () => void {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  return useCallback(() => navigate(destinoDaVolta(pathname, padrao)), [navigate, pathname, padrao]);
 }

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
+import { respostaGatewayDesativado } from "../_shared/gateway-desativado.ts";
 
 /**
  * Pix in-app via PAGAR.ME (21/07): braço B do teste A/B de gateway — a taxa
@@ -226,6 +228,10 @@ const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html
 </body></html>`;
 
 serve(async (req) => {
+  // 21/10: gateway antigo DESLIGADO (dono aprovou) — 410 antes de qualquer leitura/escrita (_shared/gateway-desativado.ts)
+  const desligado = respostaGatewayDesativado(req, "pagarme-pix");
+  if (desligado) return desligado;
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -327,9 +333,7 @@ serve(async (req) => {
         headers: { Authorization: basicAuth(apiKey) },
       });
       const out = await res.json().catch(() => ({}));
-      if (body.probeOnly === true) {
-        return jsonResponse({ probe: true, status: res.status, gw: JSON.stringify(out).slice(0, 800) });
-      }
+      // segurança 21/10: saiu o `probeOnly` (devolvia o pedido cru do gateway — nome, e-mail, CPF — de qualquer id)
       const status = String(out?.status ?? "unknown").toUpperCase();
       if (!res.ok) {
         logStep("Pagarme check error", { status: res.status, body: JSON.stringify(out).slice(0, 300) });
@@ -346,9 +350,7 @@ serve(async (req) => {
       }
       let offer = ext?.split(":")[1] === "downsell" ? "downsell" : ext ? "lifetime" : "";
       if (!offer) {
-        const { data: reg } = await supabaseAdmin.from("analytics_events")
-          .select("event_data").eq("event_name", "pix_order_created")
-          .contains("event_data", { order_id: id }).limit(1);
+        const reg = await registroDoPedido(supabaseAdmin, id, logStep); // segurança 21/10: linhas do pedido têm que concordar
         const regOffer = reg?.[0]?.event_data?.offer as string | undefined;
         if (regOffer === "downsell" || regOffer === "lifetime") offer = regOffer;
       }

@@ -13,7 +13,9 @@ export type EventoVenda = (typeof EVENTOS_VENDA)[number];
 const PREFIXO: Record<EventoVenda, string> = { ViewContent: "venda_vc_", InitiateCheckout: "venda_ic_" };
 const CONTEUDOS = new Set(["venda_web", "core_anual_web", "core_mensal_web", "core_anual69_web", "core_mensal_pix_web",
   // 18/10: o funil web novo (/hoje)
-  "hoje", "core_anual_hoje", "core_mensal_hoje", "core_anual_kit_hoje", "core_mensal_kit_hoje"]);
+  "hoje", "core_anual_hoje", "core_mensal_hoje", "core_anual_kit_hoje", "core_mensal_kit_hoje",
+  // 20/10: o vitalício 27,90 do /hoje (OFERTA_HOJE = "vitalicio"); o valor 27,90 já estava na lista
+  "core_vitalicio_hoje"]);
 /** 15/10 (revisão): os ÚNICOS valores aceitos — os preços da venda (anual 97,90; mensal 24,90). Qualquer outro
  *  número recusa o pedido inteiro (ninguém infla o valor que a Meta vê). ViewContent vai sem valor.
  *  16/10: + 69,90 (o presente anual do funil do app na web, /assinatura). */

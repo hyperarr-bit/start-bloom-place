@@ -9,6 +9,7 @@ import { MemoryRouter, useNavigate } from "react-router-dom";
 const estado = vi.hoisted(() => ({
   problema: { temProblema: true, comAcesso: false, url: "https://apps.apple.com/account/subscriptions" } as { temProblema: boolean; comAcesso: boolean; url: string | null; detectadoEm?: string | null },
   auth: {} as Record<string, unknown>,
+  jaTinha: null as null | "vitalicio" | "assinatura",
 }));
 vi.mock("@/lib/revenuecat", async (original) => ({
   ...(await original<typeof import("@/lib/revenuecat")>()),
@@ -19,6 +20,16 @@ vi.mock("@/lib/revenuecat", async (original) => ({
   situacaoDoPresente: vi.fn(async () => null),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), trackEventBeacon: vi.fn(), getAttributionParams: () => ({}) }));
+// 1.0.17: a conta já tinha acesso fora da loja? (lido em `subscriptions` — aqui, de mentira)
+vi.mock("@/lib/conta-ja-tinha-acesso", async (original) => ({
+  ...(await original<typeof import("@/lib/conta-ja-tinha-acesso")>()),
+  acessoAnteriorDaSessao: vi.fn(async () => estado.jaTinha),
+}));
+// 1.0.17: a ponte que segura a folha do StoreKit (o nativo não existe no jsdom)
+vi.mock("@/lib/cobranca-nativa", async (original) => ({
+  ...(await original<typeof import("@/lib/cobranca-nativa")>()),
+  segurarFolhaNativa: vi.fn(async () => {}),
+}));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => estado.auth }));
 vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ get: (_k: string, d: unknown) => d, loaded: true }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ firePixPurchaseOnce: vi.fn(), temPixEmConfirmacao: () => false }));
@@ -34,11 +45,13 @@ vi.mock("@/components/paywall/PaywallFlow", () => ({ PaywallFlow: () => <div dat
 
 import { lerProblemaDeCobranca } from "@/lib/revenuecat";
 import { trackEvent } from "@/lib/analytics";
+import { segurarFolhaNativa } from "@/lib/cobranca-nativa";
 import { AvisoCobrancaRecusada } from "@/components/app/AvisoCobrancaRecusada";
 import { TrialBanner } from "@/components/TrialBanner";
 import {
   CARENCIA_DIAS, CHAVE_FORCA_COBRANCA_V14, URL_PAGAMENTO_APPLE, avisoFechadoNestaAbertura, diasRestantesDaCarencia,
   fecharAvisoNestaAbertura, registrarVisibilidadeDoAviso, textoDaCarencia, urlAtualizarPagamento, zerarAvisoDaAbertura,
+  guiaNaTela, avisoVistoNestaAbertura, fecharTelaNestaAbertura, telaFechadaAgora,
 } from "@/lib/cobranca-recusada";
 
 const info = (ent: Record<string, unknown>, url: string | null = "https://apps.apple.com/account/subscriptions") => ({
@@ -102,6 +115,7 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    zerarAvisoDaAbertura(); fecharTelaNestaAbertura(); /* 1.0.17: a faixa é a reserva depois da tela cheia */ // 1.0.17: o view sai 1x por abertura (memória do processo)
     vi.mocked(trackEvent).mockClear();
     (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
   });
@@ -132,7 +146,7 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     // 10/10: no iPhone o botão leva pra FORMA DE PAGAMENTO da Apple (a tela de assinaturas não tem cartão)
     expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", URL_PAGAMENTO_APPLE);
     // o evento sai num efeito depois do aviso montar — com a máquina cheia ele chega um tique depois (05/10: barrou o push)
-    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false, dias_restantes: null }]]));
+    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: false, dias_restantes: null, formato: "faixa" }]]));
   });
 
   it("sem acesso, fora do bloqueio (ex.: /planos): volta pra faixa de cima — sem contar outra exibição", async () => {
@@ -156,7 +170,7 @@ describe("Cobrança recusada — o aviso por cima do bloqueio", () => {
     expect(gate()).toBeNull();
     expect(screen.getByTestId("topo-do-app").firstElementChild).toBe(aviso);
     expect(aviso.textContent).toMatch(/pra não perder o acesso\./);
-    expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: null }]]);
+    expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: null, formato: "faixa" }]]);
     // chave desligada: sem contador
     expect(screen.queryByTestId("carencia-dias")).toBeNull();
   });
@@ -227,7 +241,7 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "on");
-    zerarAvisoDaAbertura();
+    zerarAvisoDaAbertura(); fecharTelaNestaAbertura(); /* 1.0.17: a faixa é a reserva depois da tela cheia */
     vi.mocked(trackEvent).mockClear();
     (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -246,7 +260,7 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     montar();
     await screen.findByText("Seu pagamento não passou");
     expect(screen.getByTestId("carencia-dias").textContent).toBe("Você tem 19 dias pra atualizar.");
-    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: 19 }]]));
+    await waitFor(() => expect(views()).toEqual([["aviso_cobranca_view", { com_acesso: true, dias_restantes: 19, formato: "faixa" }]]));
   });
 
   it("no bloqueio (sem acesso): o contador aparece lá também; carência vencida não mostra contador", async () => {
@@ -257,7 +271,7 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     expect(document.querySelector(".fixed.inset-0")!.contains(aviso)).toBe(true);
     expect(screen.getByTestId("carencia-dias").textContent).toBe("Você tem 26 dias pra atualizar.");
     cleanup();
-    zerarAvisoDaAbertura();
+    zerarAvisoDaAbertura(); fecharTelaNestaAbertura(); /* 1.0.17: a faixa é a reserva depois da tela cheia */
     estado.problema = { temProblema: true, comAcesso: false, url: null, detectadoEm: "2026-08-01T12:00:00Z" };
     montar();
     await screen.findByText("Seu pagamento não passou");
@@ -272,7 +286,7 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Agora não" })); });
     expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
     expect(localStorage.getItem("core-aviso-cobranca-fechado-ate")).toBeNull(); // o modo antigo (24 h) não é gravado
-    expect(vi.mocked(trackEvent).mock.calls.find((c) => c[0] === "aviso_cobranca_fechar")?.[1]).toEqual({ dias_restantes: 19 });
+    expect(vi.mocked(trackEvent).mock.calls.find((c) => c[0] === "aviso_cobranca_fechar")?.[1]).toEqual({ dias_restantes: 19, formato: "faixa" });
     cleanup();
     montar(); // mesma abertura do app (ex.: trocou de tela e voltou)
     await act(async () => { await Promise.resolve(); });
@@ -280,7 +294,8 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     cleanup();
     zerarAvisoDaAbertura(); // o app foi fechado e aberto de novo
     montar();
-    expect(await screen.findByText("Seu pagamento não passou")).toBeInTheDocument();
+    // 1.0.17: abertura nova = a tela cheia de novo (a faixa é só a reserva de quem fechou a tela nesta abertura)
+    expect(await screen.findByTestId("cobranca-tela-cheia")).toBeInTheDocument();
   });
 
   it("voltar do fundo depois de 30 min conta como abertura nova; antes disso, não", () => {
@@ -297,5 +312,365 @@ describe("Cobrança recusada — com a chave COBRANCA_V14 ligada (QA: ?cobranca-
     registrarVisibilidadeDoAviso(false, t0 + 12 * 60e3);
     registrarVisibilidadeDoAviso(true, t0 + 44 * 60e3);
     expect(avisoFechadoNestaAbertura()).toBe(false);
+  });
+});
+
+/* 1.0.17 — o aviso nunca por cima de uma guia (missão, Montar Finanças, festa, tour, folha modal), sem "24 h",
+   e no máximo 1 view por abertura do app. */
+describe("Cobrança recusada — 1.0.17: calmo, sem disputar com a missão", () => {
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const views = () => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === "aviso_cobranca_view");
+  beforeEach(() => {
+    localStorage.clear();
+    zerarAvisoDaAbertura(); fecharTelaNestaAbertura(); /* 1.0.17: a faixa é a reserva depois da tela cheia */
+    vi.mocked(trackEvent).mockClear();
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.querySelectorAll("[data-guia-de-teste]").forEach((e) => e.remove());
+    zerarAvisoDaAbertura();
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+  const guia = (attrs: Record<string, string>) => {
+    const d = document.createElement("div");
+    d.setAttribute("data-guia-de-teste", "");
+    for (const [k, v] of Object.entries(attrs)) d.setAttribute(k, v);
+    document.body.appendChild(d);
+    return d;
+  };
+
+  it("guiaNaTela reconhece as camadas da missão, o Montar, a festa e folhas modais — e ignora o resto", () => {
+    expect(guiaNaTela()).toBe(false);
+    for (const attrs of [
+      { "data-camada-guia": "missao-doses-boas-vindas" }, { "data-testid": "montar-financas" }, { "data-momento": "festa" },
+      { role: "dialog", "aria-modal": "true" }, { role: "alertdialog" },
+    ]) {
+      const d = guia(attrs);
+      expect(guiaNaTela()).toBe(true);
+      d.remove();
+    }
+    guia({ role: "dialog" }); // popover sem aria-modal não segura
+    expect(guiaNaTela()).toBe(false);
+  });
+
+  it("com acesso e a boas-vindas da missão na tela: o aviso espera; a guia sai → aparece, com 1 view só", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-18T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    const g = guia({ "data-camada-guia": "missao-doses-boas-vindas" });
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(views()).toHaveLength(0);
+    g.remove();
+    expect(await screen.findByText("Seu pagamento não passou", {}, { timeout: 2000 })).toBeInTheDocument();
+    await waitFor(() => expect(views()).toHaveLength(1));
+    // a guia volta (ex.: a festa da dose) e sai de novo: some e volta SEM contar outra exibição
+    const g2 = guia({ "data-momento": "festa" });
+    await waitFor(() => expect(screen.queryByText("Seu pagamento não passou")).toBeNull(), { timeout: 2000 });
+    g2.remove();
+    expect(await screen.findByText("Seu pagamento não passou", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(views()).toHaveLength(1);
+    expect(avisoVistoNestaAbertura()).toBe(true);
+  });
+
+  it("nunca fala de '24 h' nem de antecedência da cobrança; o botão leva pra forma de pagamento da Apple", async () => {
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: "2026-10-18T12:00:00Z" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    render(<AvisoCobrancaRecusada />);
+    const aviso = (await screen.findByText("Seu pagamento não passou")).closest('[role="alert"]') as HTMLElement;
+    expect(aviso.textContent).not.toMatch(/24\s*h|horas antes|antes do fim/i);
+    expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", URL_PAGAMENTO_APPLE);
+    fireEvent.click(screen.getByRole("link", { name: "Atualizar pagamento" }));
+    expect(vi.mocked(trackEvent).mock.calls.some((c) => c[0] === "aviso_cobranca_click")).toBe(true);
+  });
+
+  it("sem acesso (no bloqueio) não espera guia nenhuma — o bloqueio é a tela inteira", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: false, noTrial: true, trialExpired: false };
+    guia({ role: "dialog", "aria-modal": "true" });
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByText("Seu pagamento não passou")).toBeInTheDocument();
+  });
+});
+
+/* 1.0.17 (dono, 20/10) — A TELA CHEIA: a cada abertura, com a tela livre; "Agora não" até a próxima abertura (e aí a
+   faixa de reserva); contador da carência; destino do botão por loja; nada sem cartão recusado. */
+describe("Cobrança recusada — 1.0.17: tela cheia a cada abertura", () => {
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const ev = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1]);
+  const plataforma = (p: "ios" | "android") => { (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => p }; };
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "on"); // o binário de loja do iPhone (VITE_V14_LOJA)
+    zerarAvisoDaAbertura();
+    vi.mocked(trackEvent).mockClear();
+    vi.mocked(segurarFolhaNativa).mockClear();
+    plataforma("ios");
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    estado.problema = { temProblema: true, comAcesso: true, url: "https://play.google.com/store/account/subscriptions?package=br.com.coreaplicativo.app", detectadoEm: new Date(Date.now() - 2 * 86400e3).toISOString() };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.querySelectorAll("[data-guia-de-teste]").forEach((e) => e.remove());
+    zerarAvisoDaAbertura();
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+
+  it("abre o app com o cartão recusado → tela cheia: título, uma frase, o botão e 'Agora não'; view com formato tela_cheia", async () => {
+    render(<AvisoCobrancaRecusada />);
+    const tela = await screen.findByTestId("cobranca-tela-cheia");
+    expect(tela.getAttribute("role")).toBe("alertdialog");
+    expect(tela.textContent).toMatch(/Seu pagamento não passou/);
+    expect(tela.textContent).toMatch(/A Apple não conseguiu cobrar seu plano\. Atualize a forma de pagamento pra continuar com o CORE\./);
+    expect(tela.textContent).not.toMatch(/24\s*h|horas antes|antes do fim/i);
+    expect(screen.getByRole("button", { name: "Agora não" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull(); // a faixa não aparece junto
+    await waitFor(() => expect(ev("aviso_cobranca_view")).toEqual([{ com_acesso: true, dias_restantes: expect.any(Number), formato: "tela_cheia" }]));
+  });
+
+  it("contador da carência (COBRANCA_V14 ligada); no Android sem a chave: tela sem contador", async () => {
+    estado.problema = { ...estado.problema, detectadoEm: new Date(Date.now() - 2 * 86400e3 - 3600e3).toISOString() };
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    expect(screen.getByTestId("carencia-dias").textContent).toBe("Você tem 26 dias pra atualizar.");
+    cleanup();
+    zerarAvisoDaAbertura();
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "off");
+    plataforma("android");
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    expect(screen.queryByTestId("carencia-dias")).toBeNull();
+  });
+
+  /* UMA superfície de cobrança por abertura, e a do app ganha (folha do StoreKit: 26 exibições, 0 recuperados). */
+  it("iPhone com a chave: cartão recusado → segura a folha do StoreKit (true); sem problema → libera (false)", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    expect(vi.mocked(segurarFolhaNativa).mock.calls).toEqual([[true]]);
+    cleanup();
+    zerarAvisoDaAbertura();
+    vi.mocked(segurarFolhaNativa).mockClear();
+    estado.problema = { temProblema: false, comAcesso: true, url: null };
+    render(<AvisoCobrancaRecusada />);
+    await waitFor(() => expect(vi.mocked(segurarFolhaNativa).mock.calls).toEqual([[false]]));
+  });
+
+  it("iPhone SEM a chave (a folha do StoreKit não é observada e o iOS mostra a dele): sem tela cheia, só a faixa; não mexe na folha nativa", async () => {
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "off");
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(segurarFolhaNativa).not.toHaveBeenCalled();
+  });
+
+  it("Android: tela cheia, sem chamar a ponte do StoreKit", async () => {
+    plataforma("android");
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    expect(segurarFolhaNativa).not.toHaveBeenCalled();
+  });
+
+  it("tocou em 'Atualizar pagamento', trocou o cartão e voltou pro app: relê o RevenueCat e a tela some (e libera a folha nativa)", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    fireEvent.click(screen.getByRole("link", { name: "Atualizar pagamento" }));
+    // foi pra App Store…
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    // …a cobrança entrou; voltou pro app
+    estado.problema = { temProblema: false, comAcesso: true, url: null };
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    await waitFor(() => expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull());
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(vi.mocked(segurarFolhaNativa).mock.calls.at(-1)).toEqual([false]);
+    delete (document as { visibilityState?: unknown }).visibilityState;
+  });
+
+  it("voltou sem trocar o cartão: a tela continua (sem contar outra exibição na mesma abertura)", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(screen.getByTestId("cobranca-tela-cheia")).toBeInTheDocument();
+    expect(ev("aviso_cobranca_view")).toHaveLength(1);
+    delete (document as { visibilityState?: unknown }).visibilityState;
+  });
+
+  it("botão: iPhone → forma de pagamento da Apple; Android → managementURL da Play; o clique leva formato", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    const link = screen.getByRole("link", { name: "Atualizar pagamento" });
+    expect(link).toHaveAttribute("href", URL_PAGAMENTO_APPLE);
+    fireEvent.click(link);
+    expect(ev("aviso_cobranca_click")[0]).toMatchObject({ formato: "tela_cheia" });
+    cleanup();
+    zerarAvisoDaAbertura();
+    plataforma("android");
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    expect(screen.getByRole("link", { name: "Atualizar pagamento" })).toHaveAttribute("href", estado.problema.url);
+    expect(screen.getByTestId("cobranca-tela-cheia").textContent).toMatch(/O Google não conseguiu cobrar seu plano/);
+  });
+
+  it("espera a tela ficar livre (missão / Montar / folha) e só então aparece", async () => {
+    const g = guia({ "data-camada-guia": "missao-doses-boas-vindas" });
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(ev("aviso_cobranca_view")).toHaveLength(0);
+    g.remove();
+    expect(await screen.findByTestId("cobranca-tela-cheia", {}, { timeout: 2000 })).toBeInTheDocument();
+  });
+
+  it("'Agora não' esconde até a próxima abertura; nesta abertura sobra só a faixa de reserva; abertura nova → tela de novo", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("cobranca-tela-cheia");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Agora não" })); });
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(telaFechadaAgora()).toBe(true);
+    expect(ev("aviso_cobranca_fechar")[0]).toMatchObject({ formato: "tela_cheia" });
+    const faixa = screen.getByRole("alert");
+    expect(faixa.textContent).toMatch(/Seu pagamento não passou/);
+    expect(Object.keys(localStorage).filter((k) => k !== CHAVE_FORCA_COBRANCA_V14)).toEqual([]); // nada em disco
+    cleanup();
+    render(<AvisoCobrancaRecusada />); // mesma abertura (trocou de tela)
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    cleanup();
+    zerarAvisoDaAbertura(); // fechou e abriu o app
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("cobranca-tela-cheia")).toBeInTheDocument();
+  });
+
+  it("voltar do fundo depois de 30 min conta como abertura nova (a tela volta); antes disso, não", () => {
+    const t0 = Date.now();
+    fecharTelaNestaAbertura();
+    registrarVisibilidadeDoAviso(false, t0);
+    registrarVisibilidadeDoAviso(true, t0 + 10 * 60e3);
+    expect(telaFechadaAgora()).toBe(true);
+    registrarVisibilidadeDoAviso(false, t0 + 11 * 60e3);
+    registrarVisibilidadeDoAviso(true, t0 + 45 * 60e3);
+    expect(telaFechadaAgora()).toBe(false);
+  });
+
+  it("sem cartão recusado: nada (nem tela nem faixa)", async () => {
+    estado.problema = { temProblema: false, comAcesso: true, url: null };
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+  });
+
+  it("sem acesso, por cima do bloqueio: a tela cheia aparece sem esperar guia", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null };
+    guia({ role: "dialog", "aria-modal": "true" });
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("cobranca-tela-cheia")).toBeInTheDocument();
+    expect(screen.getByTestId("cobranca-tela-cheia").className).toMatch(/z-\[320\]/);
+  });
+
+  const guia = (attrs: Record<string, string>) => {
+    const d = document.createElement("div");
+    d.setAttribute("data-guia-de-teste", "");
+    for (const [k, v] of Object.entries(attrs)) d.setAttribute(k, v);
+    document.body.appendChild(d);
+    return d;
+  };
+});
+
+/* 1.0.17 (caso do suporte 20/10): vitalício da web (Pix, ativo) + teste anual da App Store em carência (cartão
+   recusado). "Atualize o pagamento" empurraria a pessoa a pagar o que não precisa. */
+describe("Cobrança recusada — 1.0.17: conta que já tem o CORE fora da loja", () => {
+  const usuario = { id: "u1", email: "maria@exemplo.com" };
+  const ev = (nome: string) => vi.mocked(trackEvent).mock.calls.filter((c) => c[0] === nome).map((c) => c[1]);
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(CHAVE_FORCA_COBRANCA_V14, "on");
+    zerarAvisoDaAbertura();
+    vi.mocked(trackEvent).mockClear();
+    vi.mocked(segurarFolhaNativa).mockClear();
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "ios" };
+    estado.auth = { user: usuario, subLoaded: true, isSubscribed: true, noTrial: false, trialExpired: false };
+    estado.problema = { temProblema: true, comAcesso: true, url: null, detectadoEm: new Date(Date.now() - 2 * 86400e3).toISOString() };
+    estado.jaTinha = "vitalicio";
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.querySelectorAll("[data-guia-de-teste]").forEach((e) => e.remove());
+    zerarAvisoDaAbertura();
+    estado.jaTinha = null;
+    delete (window as { Capacitor?: unknown }).Capacitor;
+  });
+
+  it("no lugar da cobrança: 'Você já tem o CORE vitalício. Pra não ser cobrado, cancele a assinatura na App Store.'", async () => {
+    render(<AvisoCobrancaRecusada />);
+    const folha = await screen.findByTestId("conta-ja-tinha-acesso");
+    expect(folha.textContent).toMatch(/Você já tem o CORE vitalício\./);
+    expect(folha.textContent).toMatch(/Pra não ser cobrado, cancele a assinatura na App Store\./);
+    expect(screen.getByRole("link", { name: "Gerenciar assinatura" })).toHaveAttribute("href", "itms-apps://apps.apple.com/account/subscriptions");
+    // nada de "atualizar pagamento": nem tela cheia, nem faixa
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Atualizar pagamento" })).toBeNull();
+    await waitFor(() => expect(ev("conta_ja_tinha_acesso")).toEqual([{ tipo: "vitalicio", via: "cobranca", com_acesso_loja: true }]));
+    expect(ev("aviso_cobranca_view")).toHaveLength(0);
+    // a folha do StoreKit (que mandaria atualizar o cartão) fica segurada
+    expect(vi.mocked(segurarFolhaNativa).mock.calls).toEqual([[true]]);
+  });
+
+  it("'Entendi' fecha até a próxima abertura (sem virar faixa de cobrança); abertura nova → de novo, 1 evento por abertura", async () => {
+    render(<AvisoCobrancaRecusada />);
+    await screen.findByTestId("conta-ja-tinha-acesso");
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    expect(screen.queryByText("Seu pagamento não passou")).toBeNull();
+    cleanup();
+    render(<AvisoCobrancaRecusada />); // mesma abertura
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    cleanup();
+    zerarAvisoDaAbertura(); // nova abertura
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("conta-ja-tinha-acesso")).toBeInTheDocument();
+    expect(ev("conta_ja_tinha_acesso")).toHaveLength(2);
+  });
+
+  it("espera a tela ficar livre (missão / folha) antes de aparecer", async () => {
+    const g = document.createElement("div");
+    g.setAttribute("data-guia-de-teste", "");
+    g.setAttribute("data-camada-guia", "missao-doses-boas-vindas");
+    document.body.appendChild(g);
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
+    g.remove();
+    expect(await screen.findByTestId("conta-ja-tinha-acesso", {}, { timeout: 2000 })).toBeInTheDocument();
+  });
+
+  it("sem acesso pela loja (retry) também: o vitalício manda, nada de bloqueio de cobrança", async () => {
+    estado.problema = { temProblema: true, comAcesso: false, url: null };
+    render(<AvisoCobrancaRecusada />);
+    expect(await screen.findByTestId("conta-ja-tinha-acesso")).toBeInTheDocument();
+    expect(screen.queryByTestId("cobranca-tela-cheia")).toBeNull();
+  });
+
+  it("Android: 'cancele a assinatura no Google Play' com o link da Play", async () => {
+    (window as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true, getPlatform: () => "android" };
+    estado.problema = { temProblema: true, comAcesso: true, url: "https://play.google.com/store/account/subscriptions?package=br.com.coreaplicativo.app" };
+    render(<AvisoCobrancaRecusada />);
+    const folha = await screen.findByTestId("conta-ja-tinha-acesso");
+    expect(folha.textContent).toMatch(/cancele a assinatura no Google Play\./);
+    expect(screen.getByRole("link", { name: "Gerenciar assinatura" })).toHaveAttribute("href", estado.problema.url);
+  });
+
+  it("sem cartão recusado não consulta nem mostra nada", async () => {
+    estado.problema = { temProblema: false, comAcesso: true, url: null };
+    render(<AvisoCobrancaRecusada />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByTestId("conta-ja-tinha-acesso")).toBeNull();
   });
 });

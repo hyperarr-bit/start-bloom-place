@@ -2,12 +2,19 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { assuntoParceiro, assuntoVenda, ehOfertaHoje, htmlParceiro, htmlVenda, nomeDoProduto, periodoDoEmailVenda, planoUtmify } from "../_shared/email-venda.ts";
 import { creditarPedido } from "../_shared/grant-pix.ts";
+import { confirmarPacote2027, eh2027 } from "../_shared/pacote-2027.ts";
+import { registroDoPedido } from "../_shared/registro-pedido.ts";
 import { valorCobre } from "../_shared/trava-grant.ts";
 import { reservarBoasVindas, soltarBoasVindas } from "../_shared/boas-vindas-hoje.ts";
 import { CONCESSAO_HOJE, DESCRICAO_HOJE, PRECOS_HOJE, chaveCapiCasal, chaveParceiro, ehOfertaCasal, ehPlanoHoje, ehUpsellHoje } from "../_shared/ofertas-hoje.ts";
 import { EMAIL_DESTINO_OK, acharConta, encaminharParaDestino, lerDestino, salvarDestino } from "../_shared/destino-hoje.ts";
 import { COLUNAS_DECISAO, linhasProprias, type LinhaAssinatura } from "../_shared/linha-pix.ts";
 import { fetchNosPixels } from "../_shared/meta-pixels.ts";
+import {
+  DESCRICAO_PLANO30, DESCRICAO_PRESENTE, PRECOS_PLANO30, PRECOS_PRESENTE, chaveCapiPlano30, chaveCapiPresente, ehOfertaPlano30, ehOfertaPresente, garantirPresente,
+  areaPlano30, liberarKitDoBump, liberarPlano30, mandarLinkPorEmail, reservar, temPraSempre,
+} from "../_shared/presente.ts";
+import { MENSAGEM_DOWNSELL_INDISPONIVEL, ehDownsell, podePedirDownsell } from "../_shared/elegibilidade-downsell.ts";
 
 /**
  * Pix in-app via ASAAS (21/07) — gateway principal, substitui a Pagar.me.
@@ -58,7 +65,10 @@ const ASAAS_API = "https://api.asaas.com/v3";
 // 16/10: `a69` = o PRESENTE do funil do app na web (/assinatura): o mesmo anual por R$ 69,90, 365 dias. Mesma linha nas 3.
 // 18/10: as ofertas do funil web novo (/hoje: h279, h149, h279k, h149k, hv47, hv27, hc199) vêm de _shared/ofertas-hoje.ts —
 // a MESMA fonte nas 3 funções. Pix gerado SEM e-mail (sessão anônima); o e-mail vem depois de pagar.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE };
+// 21/10: `pv149` = o PRESENTE (R$ 14,90, _shared/presente.ts) — NÃO entra no CONCESSAO: quem pagou não ganha nada; vira
+// um código /presente/<código> pra outra pessoa. `pk99` = o downsell do "Agora não" (plano de 30 dias, R$ 9,90): não é
+// assinatura — grava o kit na conta de quem pagou. Mesma linha nas 3 funções.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790, w27: 2790, a97: 9790, a69: 6990, ...PRECOS_HOJE, ...PRECOS_PRESENTE, ...PRECOS_PLANO30 };
 /* O que cada oferta CONCEDE (04/09). A primeira venda da w25 (07:42) recebeu
  * VITALÍCIO por este caminho: a página faz `check` enquanto o QR está aberto,
  * o check liberava com plan "lifetime" chumbado, e o webhook — que já sabia
@@ -76,7 +86,7 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   ...CONCESSAO_HOJE, // 18/10: o /hoje (o hc199 fica de fora: quem ganha é a outra conta, pela ação `parceiro`)
 };
 const DESCRICAO_PIX: Record<string, string> = {
-  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual", ...DESCRICAO_HOJE,
+  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio", w27: "CORE vitalicio", a97: "CORE anual", a69: "CORE anual", ...DESCRICAO_HOJE, ...DESCRICAO_PRESENTE, ...DESCRICAO_PLANO30,
 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
@@ -297,6 +307,16 @@ async function enviarResend(para: string, assunto: string, html: string): Promis
   return !!r?.ok;
 }
 
+/** 21/10 (presente): manda um corpo pronto do Resend (com reply_to). true = saiu. */
+async function enviarCorpoResend(corpo: Record<string, unknown>): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo),
+  }).catch(() => null);
+  return !!r?.ok;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -329,6 +349,28 @@ serve(async (req) => {
       const offer = String(body.offer ?? "lifetime");
       const amount = PRECOS_CENTAVOS[offer];
       if (!amount) return jsonResponse({ error: "Oferta não configurada. Avise o suporte." }, 503);
+      /* 21/10 (segurança): o downsell (vitalício R$ 14,90) só pra quem já gerou um Pix de preço cheio (recuperação,
+       * fugas do paywall) ou tem conta de 3+ dias (winback) — antes qualquer conta pedia direto e pagava 14,90 no
+       * vitalício. Regra em _shared/elegibilidade-downsell.ts. */
+      if (ehDownsell(offer)) {
+        const v = await podePedirDownsell(supabaseAdmin, { userId: user.id, criadoEm: user.created_at ?? null });
+        if (!v.ok) {
+          logStep("Downsell fora do fluxo — recusado", { userId: user.id.slice(0, 8) });
+          return jsonResponse({ error: MENSAGEM_DOWNSELL_INDISPONIVEL, motivo: v.motivo }, 403);
+        }
+      }
+      /* 21/10: o presente (pv149) é upsell de quem JÁ é pra sempre (acabou de pagar o vitalício). Sem isso, o vitalício
+       * sairia por R$ 14,90 pra qualquer um (paga o "presente" e resgata numa 2ª conta). A compra pode ter sido levada
+       * pro e-mail de destino da tela do Pix (/hoje): aí vale o acesso daquela conta. */
+      if (ehOfertaPresente(offer)) {
+        let praSempre = temPraSempre(await linhasDaConta(supabaseAdmin, user.id));
+        if (!praSempre) {
+          const destino = await lerDestino(supabaseAdmin as never, user.id);
+          const conta = destino ? await acharConta(supabaseAdmin as never, destino) : null;
+          if (conta) praSempre = temPraSempre(await linhasDaConta(supabaseAdmin, conta));
+        }
+        if (!praSempre) return jsonResponse({ error: "O presente é pra quem já tem o CORE pra sempre." }, 403);
+      }
 
       const chave = await obterChavePix(apiKey);
       if (!chave) {
@@ -379,6 +421,8 @@ serve(async (req) => {
           /* 19/10: IP + user-agent do comprador SÓ existem aqui (o webhook é chamado pela Asaas). Sem o user-agent a Meta
            * DESCARTA o Purchase de site — o upsell pago com a aba já fechada (crédito pelo webhook/reconcile) sumia. */
           ...(clientIp && userAgent ? { client_ip: clientIp, user_agent: userAgent.slice(0, 400) } : {}),
+          /* 21/10: o plano de 30 dias (pk99) é da ÁREA do quiz — fica no pedido pros 3 caminhos que gravam o plano */
+          ...(ehOfertaPlano30(offer) && areaPlano30(body.area) ? { area: areaPlano30(body.area) } : {}),
         },
       });
       /* Sem a ponte, o QR vira um buraco: o webhook não sabe de quem é o
@@ -407,9 +451,8 @@ serve(async (req) => {
       const id = String(body.id ?? "");
       if (!id) return jsonResponse({ error: "id_required" }, 400);
       const r = await buscarPagamento(apiKey, id);
-      if (body.probeOnly === true) {
-        return jsonResponse({ probe: true, ok: r.ok, gw: JSON.stringify(r.body).slice(0, 800) });
-      }
+      /* segurança 21/10: saiu o `probeOnly` — devolvia o corpo cru da Asaas (pagamentos, externalReference com o
+       * user_id de quem gerou) de QUALQUER id pra qualquer sessão; a sonda de QA mora no pix-reconcile (com token). */
       if (!r.ok) {
         logStep("Asaas check error", { status: r.status, body: JSON.stringify(r.body).slice(0, 300) });
         return jsonResponse({ paid: false, status: "ERROR" });
@@ -420,9 +463,8 @@ serve(async (req) => {
       // carrega o nosso usuário; o elo é o id do QR).
       let offer = "";
       let donoId: string | null = null;
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("user_id, event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      // segurança 21/10: todas as linhas do pedido têm que concordar (o cliente conseguia gravar pix_order_created)
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       if (reg?.[0]) {
         donoId = reg[0].user_id as string;
         const o = (reg[0].event_data as Record<string, string>)?.offer;
@@ -469,6 +511,42 @@ serve(async (req) => {
        * — este check, o asaas-webhook e o pix-reconcile — passam por lá). */
       /* 18/10 (/hoje, "vida a dois"): o hc199 não credita quem pagou — a página pede o e-mail da(o) parceira(o) e chama
        * `parceiro`. Aqui só confirma o pagamento e manda o Purchase (1x por pedido, a trava é própria). */
+      /* 21/10 (upsell de presente, pv149): também não credita quem pagou — o pedido pago vira um CÓDIGO (tabela
+       * presentes, 1 por pedido) que a página mostra no cartão do WhatsApp. Purchase 14,90 1x por pedido; o link vai
+       * por e-mail 1x se a conta já tem e-mail (no /hoje o e-mail vem depois: a página pede a ação `email`). */
+      if (ehOfertaPresente(offer)) {
+        const presente = await garantirPresente(supabaseAdmin, { orderId: id, compradorId: user.id, valorCentavos: PRECOS_CENTAVOS[offer] });
+        if (!presente) {
+          logStep("Presente pago mas o código não gravou — tenta de novo", { id });
+          return jsonResponse({ paid: false, status: "PENDING" });
+        }
+        if (await reservar(supabaseAdmin, chaveCapiPresente(id), "capi")) {
+          await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+          await sendMetaCapi(supabaseAdmin, {
+            userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
+            fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+          });
+        }
+        if (user.email) {
+          const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+          await mandarLinkPorEmail(supabaseAdmin, { orderId: id, codigo: presente.codigo, para: user.email, de: from, enviar: enviarCorpoResend });
+        }
+        logStep("Presente pago — código pronto", { id, novo: presente.novo });
+        return jsonResponse({ paid: true, status: "PAID", presente: true, codigo: presente.codigo });
+      }
+      /* 21/10 (downsell do presente, pk99): o plano de 30 dias (o kit) na conta de QUEM PAGOU + Purchase 9,90 1x. */
+      if (ehOfertaPlano30(offer)) {
+        const lib = await liberarPlano30(supabaseAdmin, { userId: user.id, orderId: id, area: (reg?.[0]?.event_data as Record<string, unknown> | undefined)?.area });
+        if (lib === "falhou") { logStep("Plano 30 dias pago mas não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
+        if (await reservar(supabaseAdmin, chaveCapiPlano30(id), "capi")) {
+          await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+          await sendMetaCapi(supabaseAdmin, {
+            userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
+            fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+          });
+        }
+        return jsonResponse({ paid: true, status: "PAID", plano30: true });
+      }
       if (ehOfertaCasal(offer)) {
         const { error: travaCapi } = await supabaseAdmin.from("webhook_events").insert({ id: chaveCapiCasal(id), source: "hoje", event: "casal_capi" });
         if (!travaCapi) {
@@ -480,6 +558,23 @@ serve(async (req) => {
         }
         logStep("Casal pago — esperando o e-mail da(o) parceira(o)", { id });
         return jsonResponse({ paid: true, status: "PAID", casal: true });
+      }
+      /* 21/10 (upsell "Seu 2027", u2027): não é assinatura — grava o pacote (`core-pacote-2027`) na conta de QUEM PAGOU +
+       * Purchase 19,90 1x por pedido (trava própria). Não gravou → PENDING (a página confere de novo; webhook/reconcile são a rede). */
+      if (eh2027(offer)) {
+        const p27 = await confirmarPacote2027(supabaseAdmin, {
+          userId: user.id, orderId: id, origem: "upsell",
+          enviarCompra: async () => {
+            await sendToUtmify(supabaseAdmin, { userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], name: null });
+            await sendMetaCapi(supabaseAdmin, {
+              userId: user.id, email: user.email ?? null, orderId: id, offer, amountCents: PRECOS_CENTAVOS[offer], req,
+              fbp: (body.fbp as string | undefined) ?? null, fbc: (body.fbc as string | undefined) ?? null, sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+            });
+          },
+        });
+        if (p27.r === "falhou") { logStep("Seu 2027 pago mas o pacote não gravou — tenta de novo", { id }); return jsonResponse({ paid: false, status: "PENDING" }); }
+        logStep("Seu 2027 pago — pacote na conta", { id, r: p27.r });
+        return jsonResponse({ paid: true, status: "PAID", pacote2027: true });
       }
       const concessao = CONCESSAO[offer];
       if (!concessao) {
@@ -498,6 +593,12 @@ serve(async (req) => {
           amount_cents: PRECOS_CENTAVOS[offer],
         }),
       });
+      /* 21/10 (segurança): o kit do order bump (h279k/h149k) é gravado AQUI, no servidor (o cliente não grava mais
+       * `core-kit-primeiro-mes`). Idempotente; vale também pro pedido já creditado (cura quem ficou sem). */
+      if (g.r !== "erro" && g.r !== "em_andamento") {
+        const kit = await liberarKitDoBump(supabaseAdmin, { userId: user.id, orderId: id, offer });
+        if (kit === "falhou") logStep("Kit do bump não gravou (webhook/reconcile tentam de novo)", { id, offer });
+      }
       if (g.r === "preservado") {
         // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
         // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.
@@ -589,9 +690,7 @@ serve(async (req) => {
         .select("id, status, current_period_end, customer_email")
         .eq("user_id", user.id).eq("abacatepay_billing_id", id).limit(1).maybeSingle();
       if (!linha || linha.status !== "active") return jsonResponse({ ok: false, motivo: "sem_linha" });
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
       if (!ehOfertaHoje(offer)) return jsonResponse({ ok: false, motivo: "oferta" });
       if (!linha.customer_email) {
@@ -631,7 +730,7 @@ serve(async (req) => {
       if (!(await salvarDestino(supabaseAdmin as never, user.id, email))) return jsonResponse({ ok: false, motivo: "gravar" });
       let encaminhado = false;
       if (id) {
-        const { data: reg } = await supabaseAdmin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: id }).limit(1);
+        const reg = await registroDoPedido(supabaseAdmin, id, logStep);
         const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
         if (reg?.[0]?.user_id === user.id && (ehPlanoHoje(offer) || ehUpsellHoje(offer))) {
           const d = await encaminharParaDestino(supabaseAdmin as never, { uidAnonimo: user.id, orderId: id, offer, enviar: enviarResend }).catch(() => null);
@@ -653,9 +752,7 @@ serve(async (req) => {
       if (!id) return jsonResponse({ error: "id_required" }, 400);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailParceiro)) return jsonResponse({ ok: false, motivo: "email_invalido" });
       if (user.email && user.email.toLowerCase() === emailParceiro) return jsonResponse({ ok: false, motivo: "mesmo_email" });
-      const { data: reg } = await supabaseAdmin.from("analytics_events")
-        .select("user_id, event_data").eq("event_name", "pix_order_created")
-        .contains("event_data", { order_id: id }).limit(1);
+      const reg = await registroDoPedido(supabaseAdmin, id, logStep);
       const dono = reg?.[0]?.user_id as string | undefined;
       const offer = String((reg?.[0]?.event_data as Record<string, string> | undefined)?.offer ?? "");
       if (!dono || dono !== user.id || !ehOfertaCasal(offer)) return jsonResponse({ ok: false, motivo: "pedido" });

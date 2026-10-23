@@ -22,6 +22,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, rmSync, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { jsComEnvVazado } from "./env-vazado.mjs";
 
 const teste = process.argv.includes("--teste");
 
@@ -240,6 +241,18 @@ if (!teste) {
     process.exit(1);
   }
   console.log("  ✓ sem o resgate falso da Porta no JS");
+  // segurança 21/10: o objeto `import.meta.env` INTEIRO colado no JS (acontece quando o código usa o env como valor,
+  // ex. `import.meta.env as Record<…>`) leva TODAS as VITE_* do ambiente/.env pro binário — inclusive a senha da conta
+  // de QA da Porta. A trava de cima só olha process.env; esta olha o JS que vai pra loja.
+  const vazouEnv = existsSync(dirJs)
+    ? readdirSync(dirJs).filter((f) => f.endsWith(".js") && jsComEnvVazado(readFileSync(join(dirJs, f), "utf8")))
+    : [];
+  if (vazouEnv.length) {
+    console.error(`\n✗ o JS do binário carrega o env inteiro do Vite ou variável de QA (${vazouEnv.join(", ")}).`);
+    console.error("  Leia cada variável pelo nome (import.meta.env.VITE_X), nunca o objeto import.meta.env.\n");
+    process.exit(1);
+  }
+  console.log("  ✓ sem env do Vite / variável de QA no JS");
 }
 
 // 4. tira o peso morto

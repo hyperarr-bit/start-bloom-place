@@ -19,8 +19,11 @@
  *      dinheiro/"tudo" (scratchpad/definitiva/8-trial-desenho.md):
  *      Montar → a tela do número, SÓ o número (17/10, revisão do dono: "o 'quanto posso gastar hoje' deveria
  *      ser o foco"): "VOCÊ PODE GASTAR HOJE / R$ X por dia" subindo de 0 (~0,6 s; sem animação pra quem pediu
- *      menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →". O 1º gasto ("Já gastou com alguma
- *      coisa hoje?") é o tutorial guiado no formulário de verdade, que a missão abre logo depois (PassoDoDia).
+ *      menos movimento), a linha curta, A CONTA DO SEU MÊS e "Continuar →". 1.0.17 (dono 20/10): a 1ª pergunta leva o
+ *      cartão "Tutorial · Finanças · 3 perguntas"; o "Montando" é a conta dela entrando linha por linha (sem a bola); e
+ *      entre o número e o 1º gasto vem a PONTE ("Agora vamos anotar seu primeiro gasto" + a cena número → café → o que
+ *      sobra hoje · [Ir pro app] · "Ainda não gastei" → `onAindaNaoGastei`). O 1º gasto é o tutorial guiado no formulário de verdade, que a missão abre logo
+ *      depois (PassoDoDia).
  *      Quem cuida da missão liga; nada aqui mexe nela:
  *
  *        import { MontarFinancas, deveMostrarMontarFinancas, EVENTO_MONTAR_FINANCAS_FIM, ATRIBUTO_NA_TELA }
@@ -35,8 +38,8 @@
  *
  *      FECHAR O APP ANTES DE VER O NÚMERO (B11): o Montar já decidiu (grava na entrada do "Montando"); se o app
  *      morre no "Montando…", `deveMostrarMontarFinancas` responde true — hoje, nesta conta (`lerTelaDoNumero
- *      (criadoEm)` de lib/montar-financas ≠ null) — e a tela abre direto NO NÚMERO. O número que APARECEU não volta
- *      (sai da marca na hora): reabrir depois disso é o tutorial do 1º gasto.
+ *      (criadoEm)` de lib/montar-financas ≠ null) — e a tela abre direto NO NÚMERO. O número que APARECEU não volta:
+ *      a marca passa a apontar pra PONTE (reabrir volta nela); saiu da ponte, reabrir é o tutorial do 1º gasto.
  *
  *      É uma folha fixa por cima de tudo (z 200), que começa abaixo da faixa da missão. UMA TELA POR VEZ:
  *      se a do módulo (a) estiver aberta, ela some quando a da missão monta (`onCeder`), e o módulo não
@@ -59,13 +62,17 @@
  *          Finanças inteiro — lib/montar-financas EV_PRIMEIRO_GASTO) missao_doses_primeiro_gasto {acao: resultado
  *          (a tela do número apareceu; ms_desde_abertura, retomou) | continuar (ms desde o número)}. Nunca valor em reais.
  */
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ArrowLeft, Check, DollarSign, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ArrowLeft, Check, ChevronDown, DollarSign, Plus, X } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { trocaDePasso, saidaCalma, MOV_MS } from "@/lib/movimento";
 import { MesDoCabecalho } from "@/components/MesDoCabecalho";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
+import { soltarCampoDe, useFolhaAcimaDoTeclado } from "@/hooks/use-folha-acima-do-teclado";
+import { useGuardaDeToque } from "@/hooks/use-guarda-de-toque";
 import { reais } from "@/lib/dinheiro";
 import { marcarCartoesVistos } from "@/lib/tour-home";
 import { camposDaMissaoNosEventos, eventoDaMissao } from "@/lib/missao-doses";
@@ -79,7 +86,7 @@ import {
   EVENTO_MONTAR_ABERTA, guardarRascunhoMontar, lerRascunhoMontar, montarAbertoPelaMissao, registrarTelaAberta,
   BANCOS_DO_CARTAO, BANCO_OUTRO, CARTAO_VAZIO, NOME_DO_CARTAO_SEM_BANCO, cartaoCompleto, configDoCartao, diaDoVencimentoNoMes,
   faturaJaVenceu, fixoDaFatura, mesDe, nomeDaFaturaNaTela, MONTAR_FINANCAS_NO_MODULO,
-  EV_PRIMEIRO_GASTO, fecharTelaDoNumero, guardarTelaDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado,
+  EV_PRIMEIRO_GASTO, GASTO_DA_PONTE, exemploDaPonte, fecharTelaDoNumero, guardarTelaDoNumero, marcarPonteDoNumero, lerTelaDoNumero, marcarResultadoVisto, msDesdeOResultado, mesApertado,
   type ContaEscolhida, type OrigemMontar, type RespostaCartao, type Resultado, type TelaDoNumero,
 } from "@/lib/montar-financas";
 import "./montar-financas.css";
@@ -92,6 +99,9 @@ export interface PropsMontarFinancas {
   /** De onde abriu (vai nos eventos): a 1ª abertura do módulo ou o passo da missão. */
   origem?: OrigemMontar;
   onPronto?: (r: ResumoMontar) => void;
+  /** 1.0.17, só pela missão: "Ainda não gastei" na ponte do número pro 1º gasto (a dose já conta; quem chama faz o mesmo
+   *  do "Ainda não" do post-it). Sem isto, a ponte chama `onPronto`. */
+  onAindaNaoGastei?: (r: ResumoMontar) => void;
   onPular?: () => void;
   /** Só a do módulo: a missão abriu a dela — esta some (sem decidir nada). */
   onCeder?: () => void;
@@ -103,20 +113,26 @@ export interface PropsMontarFinancas {
   contaCriadaEm?: string;
 }
 
-type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto";
-const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, cartao: 3, montando: 3, pronto: 4 };
+/** "ponte" (1.0.17, só pela missão): depois do número, antes do tutorial do 1º gasto. */
+type Etapa = "renda" | "contas" | "cartao" | "montando" | "pronto" | "ponte";
+const PASSO_DA_ETAPA: Record<Etapa, number> = { renda: 1, contas: 2, cartao: 3, montando: 3, pronto: 4, ponte: 5 };
 const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const nomeDoMesLongo = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long" });
 
 /** Quanto dura a subida do número na tela do resultado (de 0 até o "por dia" dela). */
 export const SUBIDA_DO_NUMERO_MS = 600;
+/** 1.0.17 (dono 20/10, mockup c1): no lugar do "Calculando…" com a bola girando, as linhas da conta DELA entram uma por vez
+ *  (Entra no mês → Contas fixas (N) → Fatura, se tiver cartão), a cada isto (ms). O tempo total do "Montando" não muda. */
+export const LINHA_DA_CONTA_MS = 250;
+/** A conta some (cópia por cima) neste tempo e só então o número começa a subir. */
+export const CONTA_SAI_MS = 280;
 const menosMovimento = (): boolean => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
 /** O número da tela do resultado SOBE de 0 até o "por dia" dela (~0,6 s, desacelerando), uma vez, quando a tela
  *  aparece; sem animação pra quem pediu menos movimento (ou sem requestAnimationFrame). Fora da tela (`naTela`
  *  false) só acompanha o valor, sem quadro a quadro — digitar a renda muda o "por dia" a cada tecla. */
-function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_MS): number {
+function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_MS, atrasoMs = 0): number {
   const [v, setV] = useState(() => (naTela && alvo > 0 && !menosMovimento() && typeof requestAnimationFrame === "function" ? 0 : alvo));
   const subiu = useRef(false);
   useEffect(() => {
@@ -128,7 +144,8 @@ function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_M
     let raf = 0;
     // o relógio é o mesmo no começo e em cada quadro (o carimbo do rAF pode vir de outra origem em WebView/jsdom)
     const agora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-    const t0 = agora();
+    // 1.0.17: vindo da conta linha por linha, o número espera a conta sumir (uma coisa se mexe por vez)
+    const t0 = agora() + Math.max(0, atrasoMs);
     const passo = () => {
       const p = Math.min(1, Math.max(0, (agora() - t0) / ms));
       setV(Math.round(alvo * (1 - Math.pow(1 - p, 3))));
@@ -139,9 +156,74 @@ function useNumeroQueSobe(alvo: number, naTela: boolean, ms = SUBIDA_DO_NUMERO_M
     raf = requestAnimationFrame(passo);
     // interrompida no meio (remontou): a próxima volta recomeça do 0
     return () => cancelAnimationFrame(raf);
-  }, [alvo, naTela, ms]);
+  }, [alvo, naTela, ms, atrasoMs]);
   return v;
 }
+
+/** A cena da ponte entra peça por peça (~1,5 s, ease-out): a pílula do número → o tracejado desce → o café CAI no lugar
+ *  com um tranco leve → o tracejado → a pílula de hoje, com o número antigo riscando e o novo contando pra baixo. */
+export const PONTE_CENA_MS = { linha1: 220, cafe: 400, linha2: 740, hoje: 900, conta: 1020, contaDura: 430 } as const;
+
+/** Conta de `de` até `ate` depois de `atrasoMs` (desacelerando); parado → `ate` direto. */
+function useContagem(de: number, ate: number, atrasoMs: number, ms: number, parado: boolean): number {
+  const animar = !parado && de !== ate && typeof requestAnimationFrame === "function";
+  const [v, setV] = useState(animar ? de : ate);
+  useEffect(() => {
+    if (!animar) { setV(ate); return; }
+    const agora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const t0 = agora() + atrasoMs;
+    let raf = 0;
+    const passo = () => {
+      const p = Math.min(1, Math.max(0, (agora() - t0) / ms));
+      setV(Math.round(de + (ate - de) * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(passo);
+    };
+    setV(de);
+    raf = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(raf);
+  }, [animar, de, ate, atrasoMs, ms]);
+  return v;
+}
+
+function CenaDaPonte({ porDia, apertado, parado }: { porDia: number; apertado: boolean; parado: boolean }) {
+  const { gasto, depois } = exemploDaPonte(porDia);
+  const hoje = useContagem(porDia, depois, PONTE_CENA_MS.conta, PONTE_CENA_MS.contaDura, parado || apertado);
+  const rs = (v: number) => `R$\u00a0${reais(v)}`;
+  const atraso = (ms: number) => (parado ? undefined : ({ animationDelay: `${ms}ms` } as CSSProperties));
+  const cafe = (ms: number, valor: number) => (
+    <div className="mf-ponte-cafe" data-testid="montar-ponte-gasto" style={atraso(ms)}>
+      <span aria-hidden>☕</span> Café<b>{`− ${rs(valor)}`}</b>
+    </div>
+  );
+  const linha = (ms: number) => <i className="mf-ponte-linha" aria-hidden style={atraso(ms)} />;
+  if (apertado) {
+    return (
+      <div className="mf-ponte-cena" data-testid="montar-ponte-cena" data-parado={parado ? "" : undefined}>
+        {cafe(0, GASTO_DA_PONTE)}
+        {linha(380)}
+        <p className="mf-ponte-pilula" data-testid="montar-ponte-folga" style={atraso(560)}><span aria-hidden>🔍</span>anotar mostra onde tem folga</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mf-ponte-cena" data-testid="montar-ponte-cena" data-parado={parado ? "" : undefined}>
+      <p className="mf-ponte-pilula" data-testid="montar-ponte-numero"><DollarSign size={15} aria-hidden /><b>{rs(porDia)}</b> por dia</p>
+      {linha(PONTE_CENA_MS.linha1)}
+      {cafe(PONTE_CENA_MS.cafe, gasto)}
+      {linha(PONTE_CENA_MS.linha2)}
+      <p className="mf-ponte-pilula" data-testid="montar-ponte-hoje" data-valor={depois} style={atraso(PONTE_CENA_MS.hoje)}>
+        <DollarSign size={15} aria-hidden />
+        <s style={atraso(PONTE_CENA_MS.conta)}>{rs(porDia)}</s>
+        <span className="sr-only">{`${rs(depois)} hoje`}</span>
+        <b aria-hidden>{rs(hoje)}</b> hoje
+      </p>
+    </div>
+  );
+}
+
+/** 1.0.17 (gravação do Simulador, app aberto do zero na ponte): o módulo rolava até o gasto DEPOIS de a cópia do Montar
+ *  sumir (480 ms fixos não bastavam) — a cópia fica até a rolagem parar (mín. 480 ms, máx. 1,5 s). */
+const SEGURA_DA_SAIDA = { min: 480, max: 1500 } as const;
 
 /** O que o dia escolhido quer dizer NESTE mês — embaixo dos dias, pra ninguém se surpreender depois. */
 export function dicaDoVencimento(dia: number, hoje: Date): string {
@@ -155,63 +237,7 @@ export function dicaDoVencimento(dia: number, hoje: Date): string {
   return `${antes}Faltam ${faltam} dias. O CORE avisa quando estiver perto.`;
 }
 
-/**
- * Com o teclado do iPhone aberto, a folha (fixa, tela inteira) passa a ocupar só a área VISÍVEL
- * (visualViewport): o campo em foco vai pro meio e o botão fica logo acima do teclado. Fora do
- * iPhone (sem visualViewport encolhendo) nada muda. A faixa da missão, se estiver visível em cima,
- * continua por cima: a folha começa embaixo dela.
- */
-function useFolhaAcimaDoTeclado(ref: RefObject<HTMLDivElement>) {
-  useEffect(() => {
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    const el = ref.current;
-    if (!vv || !el) return;
-    let aberto = false;
-    let t = 0;
-    const centralizarCampo = () => {
-      const ativo = document.activeElement as HTMLElement | null;
-      if (ativo && el.contains(ativo) && /^(INPUT|TEXTAREA)$/.test(ativo.tagName)) ativo.scrollIntoView?.({ block: "center" });
-    };
-    const soltar = () => {
-      el.style.removeProperty("top");
-      el.style.removeProperty("bottom");
-      el.style.removeProperty("height");
-      el.removeAttribute("data-teclado");
-    };
-    const aplicar = () => {
-      t = 0;
-      const agoraAberto = vv.height < window.innerHeight - 140;
-      if (!agoraAberto) { if (aberto) soltar(); aberto = false; return; }
-      const html = document.documentElement;
-      const faixa = html.hasAttribute("data-missao-doses-faixa")
-        ? (parseFloat(getComputedStyle(html).getPropertyValue("--missao-doses-faixa-h")) || 40)
-        : 0;
-      const topo = Math.max(vv.offsetTop, faixa);
-      el.style.top = `${topo}px`;
-      el.style.bottom = "auto";
-      el.style.height = `${Math.max(0, vv.offsetTop + vv.height - topo)}px`;
-      el.setAttribute("data-teclado", "");
-      if (!aberto) window.setTimeout(centralizarCampo, 30); // acabou de abrir: o campo vai pro meio
-      aberto = true;
-    };
-    const agendar = () => { if (!t) t = window.setTimeout(aplicar, 0); };
-    // trocou de campo com o teclado já aberto: centraliza o novo
-    const aoFocar = () => { if (aberto) window.setTimeout(centralizarCampo, 30); };
-    vv.addEventListener("resize", agendar);
-    vv.addEventListener("scroll", agendar);
-    el.addEventListener("focusin", aoFocar);
-    aplicar();
-    return () => {
-      vv.removeEventListener("resize", agendar);
-      vv.removeEventListener("scroll", agendar);
-      el.removeEventListener("focusin", aoFocar);
-      if (t) window.clearTimeout(t);
-      soltar();
-    };
-  }, [ref]);
-}
-
-export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, agora, esperaMs = 2200, contaCriadaEm }: PropsMontarFinancas) {
+export function MontarFinancas({ origem = "modulo", onPronto, onAindaNaoGastei, onPular, onCeder, agora, esperaMs = 1400, contaCriadaEm }: PropsMontarFinancas) {
   // 1.0.16: chamada PELA missão, os eventos levam o braço e o id dela (o funil Montar → 1º gasto → olha se lê junto)
   const ev = (dados: Record<string, unknown>) => (origem === "missao" ? { ...dados, ...camposDaMissaoNosEventos() } : dados);
   const { get, set } = useUserData();
@@ -226,7 +252,16 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
      no número. Senão, fechou no meio das perguntas: volta com o que já tinha respondido. */
   const [retomada] = useState<TelaDoNumero | null>(() => (origem === "missao" ? lerTelaDoNumero(criadoEm, agora ?? new Date()) : null));
   const [rascunho] = useState(() => (retomada ? null : lerRascunhoMontar()));
-  const [etapa, setEtapa] = useState<Etapa>(retomada ? "pronto" : rascunho?.etapa ?? "renda");
+  // fechou o app na PONTE (o número já visto): volta nela, nunca no número de novo
+  const [etapa, setEtapa] = useState<Etapa>(retomada ? (retomada.ponte ? "ponte" : "pronto") : rascunho?.etapa ?? "renda");
+  /** 1.0.17: a troca de passo desliza pro lado certo (avançar → da direita; Voltar → da esquerda) */
+  const direcao = useRef(1);
+  const voltarPara = (e: Etapa) => { soltarCampoDe(folha.current); direcao.current = -1; setEtapa(e); };
+  /** 1.0.17: o 2º toque rápido no "Continuar" caía no "Continuar" do passo seguinte (mesmo lugar) e pulava as contas —
+   *  os botões do rodapé ignoram toques por ~450 ms depois de cada troca de passo (hooks/use-guarda-de-toque) */
+  const guardar = useGuardaDeToque(etapa);
+  const reduzirMov = !!useReducedMotion();
+  const [verConta, setVerConta] = useState(false);
   const [faixa, setFaixa] = useState<string | null>(retomada?.faixa ?? rascunho?.faixa ?? null);
   const [renda, setRenda] = useState(retomada?.renda ?? rascunho?.renda ?? 0);
   const [contas, setContas] = useState<ContaEscolhida[]>(retomada?.contas ?? rascunho?.contas ?? []);
@@ -282,18 +317,22 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   }, [etapa, cartao.usa, cartao.dia]);
 
   const irPara = (e: Etapa) => {
+    soltarCampoDe(folha.current);
+    direcao.current = PASSO_DA_ETAPA[e] >= PASSO_DA_ETAPA[etapa] ? 1 : -1;
     setEtapa(e);
     if (e === "contas" || e === "cartao" || e === "pronto") trackEvent(EV_PASSO, ev({ n: PASSO_DA_ETAPA[e], origem }));
   };
 
-  const decidir = (r: Resultado, nContas = 0, comCartao = false) => {
+  const decidir = (r: Resultado, nContas = 0, comCartao = false, porDia?: number) => {
     const marca = marcarMontarDecidido(r);
     set(CHAVE_MONTAR_FINANCAS, marca, { system: true });
-    try { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_FINANCAS_FIM, { detail: { resultado: r, contas: nContas, cartao: comCartao } })); } catch { /* sem window */ }
+    // `porDia` (1.0.17): o número que a tela vai mostrar — quem grava o rótulo do dia usa ESTE, não refaz a conta
+    try { window.dispatchEvent(new CustomEvent(EVENTO_MONTAR_FINANCAS_FIM, { detail: { resultado: r, contas: nContas, cartao: comCartao, ...(porDia !== undefined ? { porDia } : {}) } })); } catch { /* sem window */ }
   };
 
   const pular = () => {
     trackEvent(EV_PULAR, ev({ passo: PASSO_DA_ETAPA[etapa], origem }));
+    saidaCalma(folha.current, MOV_MS.base, 480);
     decidir("pulou");
     onPular?.();
   };
@@ -334,12 +373,12 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     }
     juntar("finance-incomes", receita);
     juntar("finance-fixed-expenses", fixosDaTela);
-    decidir("pronto", fixos.length, comCartao);
+    const final = calcularMontar(renda, contas, hoje, resposta);
+    decidir("pronto", fixos.length, comCartao, final.semFolga ? 0 : final.porDia);
     // o app morrer daqui até o número APARECER (o "Montando…"): a tela volta no número (B11)
     if (origem === "missao") guardarTelaDoNumero({ conta: criadoEm ?? "", dia: localDayKey(hoje), renda, faixa, contas, cartao: resposta });
-    const final = calcularMontar(renda, contas, hoje, resposta);
     trackEvent(EV_PRONTO, ev({
-      contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, origem, cartao: comCartao,
+      contas: fixos.length, faixa: faixa ?? "digitou", sem_folga: final.semFolga, apertado: mesApertado(final), origem, cartao: comCartao,
       ...(pulouCartao ? { cartao_pulou: true } : {}),
     }));
   };
@@ -349,9 +388,16 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
     gravar(resposta, pulouCartao);
     irPara("montando");
   };
+  /** 1.0.17: o número chegou pela conta linha por linha (não pela retomada) — ele espera a conta sumir pra subir */
+  const [deMontando, setDeMontando] = useState(false);
   useEffect(() => {
     if (etapa !== "montando") return;
-    const t = window.setTimeout(() => irPara("pronto"), Math.max(0, esperaMs));
+    const t = window.setTimeout(() => {
+      // a conta some devagar por cima (cópia) e o número já está parado embaixo — sem corte nem deslize de tela
+      saidaCalma(folha.current?.querySelector(".mf-montando-conta"), CONTA_SAI_MS);
+      setDeMontando(true);
+      irPara("pronto");
+    }, Math.max(0, esperaMs));
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, esperaMs]);
@@ -379,27 +425,68 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   /* ── a tela do número (o resultado) ── */
   const naMissao = origem === "missao";
   const abertura = useRef(Date.now());
-  /* APARECEU (pela missão): é tela de uma vez — sai da marca do "ainda não visto" (reabrir não volta nela: a missão
-     retoma no tutorial do 1º gasto) e o relógio do passo 1 começa */
+  /* APARECEU (pela missão): é tela de uma vez — a marca passa a apontar pra ponte (reabrir volta na PONTE, nunca no
+     número) e o relógio do passo 1 começa */
   const resultadoContado = useRef(false);
   useEffect(() => {
     if (!naMissao || etapa !== "pronto" || cedeu || resultadoContado.current) return;
     resultadoContado.current = true;
-    fecharTelaDoNumero();
+    marcarPonteDoNumero();
     marcarResultadoVisto();
     trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "resultado", ms: 0, ms_desde_abertura: Date.now() - abertura.current, ...(retomada ? { retomou: true } : {}) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naMissao, etapa, cedeu]);
+  /* A PONTE pro 1º gasto (1.0.17, dono 20/10 — a copy dele, sem ponto final): "Você já viu quanto pode gastar hoje /
+     Agora vamos anotar seu primeiro gasto" com a cena (o número dela → um café → o que sobra hoje), [Ir pro app] (o tutorial do gasto de hoje) e "Ainda não gastei" (a
+     dose já conta, vai pra festa). Antes o corte era seco: tela limpa → o módulo inteiro rolando e escurecendo. */
+  const ponteContada = useRef(false);
+  useEffect(() => {
+    if (!naMissao || etapa !== "ponte" || cedeu || ponteContada.current) return;
+    ponteContada.current = true;
+    marcarPonteDoNumero(); // a retomada direto na ponte já está marcada; vinda do número, garante
+    trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "ponte", ms: msDesdeOResultado(), ...(retomada?.ponte ? { retomou: true } : {}) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naMissao, etapa, cedeu]);
   /** "Continuar →" (missão) / "Ver minhas Finanças" (módulo). Uma vez só: o toque duplo não chama o `onPronto` duas vezes. */
   const saiu = useRef(false);
+  const resumo = (): ResumoMontar => ({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
   const continuar = () => {
+    if (naMissao) {
+      // pela missão o "Continuar" do número leva pra ponte (o mesmo evento de sempre: tocou "Continuar" no número)
+      if (etapa !== "pronto") return;
+      trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
+      irPara("ponte");
+      return;
+    }
     if (saiu.current) return;
     saiu.current = true;
+    // 1.0.17 (Simulador): o Montar sumia num quadro e o módulo aparecia no meio da página, rolando às pressas até o gasto
+    // — a cópia do Montar some devagar por cima enquanto o módulo se ajeita embaixo
+    saidaCalma(folha.current, MOV_MS.base, SEGURA_DA_SAIDA); // inteira enquanto o módulo rola até o gasto; some com ele parado
     fecharTelaDoNumero();
-    if (naMissao) trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "continuar", ms: msDesdeOResultado() }));
-    onPronto?.({ contas: resultado.contas, porDia: resultado.porDia, semFolga: resultado.semFolga, cartao: resultado.cartao });
+    onPronto?.(resumo());
   };
-  const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto");
+  /** Saiu da ponte (uma vez só): a marca some — reabrir agora é o tutorial do 1º gasto (ou a festa). */
+  const sairDaPonte = (via: "ir_pro_app" | "ainda_nao") => {
+    if (saiu.current) return;
+    saiu.current = true;
+    // a cópia da ponte fica inteira enquanto o módulo se ajeita embaixo (rola até o gasto / o MEU MÊS) e some com ele parado
+    // (1.0.17, gravação: a cena parada no estado final — a cópia não recomeça a animação de entrada)
+    folha.current?.querySelector("[data-testid='montar-ponte-cena']")?.setAttribute("data-parado", "");
+    saidaCalma(folha.current, MOV_MS.base, SEGURA_DA_SAIDA);
+    fecharTelaDoNumero();
+    trackEvent(EV_PRIMEIRO_GASTO, eventoDaMissao({ acao: "ponte_saiu", via, ms: msDesdeOResultado() }));
+    if (via === "ainda_nao" && onAindaNaoGastei) onAindaNaoGastei(resumo());
+    else onPronto?.(resumo());
+  };
+  const numeroNaTela = useNumeroQueSobe(resultado.porDia, etapa === "pronto", SUBIDA_DO_NUMERO_MS, deMontando && !reduzirMov && !menosMovimento() ? CONTA_SAI_MS : 0);
+  /** As linhas da conta do "Montando" (as mesmas da "Ver a conta"), na ordem em que entram. */
+  const linhasDaConta: Array<{ id: string; rotulo: string; valor: string }> = [
+    { id: "renda", rotulo: "Entra no mês", valor: `R$ ${reais(resultado.renda)}` },
+    { id: "contas", rotulo: `Contas fixas (${resultado.contas})`, valor: `− R$ ${reais(resultado.fixos)}` },
+    ...(resultado.cartao && cartao.dia ? [{ id: "fatura", rotulo: faturaNaTela, valor: `− R$ ${reais(resultado.fatura)}` }] : []),
+  ];
+  const apertado = mesApertado(resultado);
   /** "R$ 123" que nunca quebra no meio (o "R$" sozinho no fim da linha parecia valor cortado) */
   const rs = (v: number) => `R$\u00a0${reais(v)}`;
 
@@ -418,14 +505,23 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
   return (
     <div ref={folha} className="mf" role="dialog" aria-modal="true" aria-label="Vamos montar suas finanças" data-testid="montar-financas" data-etapa={etapa} data-folha={`montar-financas:${etapa}`}>
       {cabecalho}
-      <div className="mf-corpo">
+      {/* 1.0.17 (dono: "os cortes entre as telas são bruscos"): cada passo ENTRA deslizando 24 px + fade (260 ms); o de
+          antes sai na hora (nada de esperar uma saída animada pra responder ao toque) */}
+      <motion.div key={etapa === "montando" || etapa === "pronto" ? "resultado" : etapa} className="mf-corpo" custom={direcao.current} variants={trocaDePasso(reduzirMov)} initial="entra" animate="fica" data-passo={etapa}>
         {etapa === "renda" && (
           <>
+            {/* 1.0.17 (dono 20/10, mockup b2): pela missão, a 1ª pergunta diz que isto é o TUTORIAL — curtíssimo, sem toque a
+                mais; nas perguntas seguintes fica só a barra de progresso */}
+            {naMissao && (
+              <div className="mf-contexto" data-testid="montar-contexto">
+                <i aria-hidden><DollarSign size={20} /></i>
+                <span><b>Tutorial</b> · Finanças · 3 perguntas</span>
+              </div>
+            )}
             {barra(1)}
             <div className="mf-q">
-              <div className="mf-kicker">Vamos montar suas finanças · 1 de 3</div>
-              <h2>Quanto entra por mês, mais ou menos?</h2>
-              <p>Só pra calcular quanto dá pra gastar por dia. Dá pra mudar depois.</p>
+              <h2>Quanto entra por mês?</h2>
+              <p>Pode ser aproximado.</p>
             </div>
             <div className="mf-chips" data-grade="">
               {FAIXAS_DE_RENDA.map((f) => (
@@ -448,12 +544,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                     onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
                   />
                 </label>
-                <p>{faixa ? "Um valor de partida — ajusta pro número certo se quiser." : "Salário, freela, pensão… o que entra no mês."}</p>
               </div>
             </div>
-            <div className="mf-rodape">
-              <button type="button" className="mf-cta" disabled={renda <= 0} onClick={() => irPara("contas")}>Continuar</button>
-              <button type="button" className="mf-pular" onClick={pular}>Pular</button>
+            <div className="mf-rodape" data-teclado-rodape="">
+              <button type="button" className="mf-cta" disabled={renda <= 0} onClick={guardar(() => irPara("contas"))}>Continuar</button>
+              <button type="button" className="mf-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -462,11 +557,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {barra(2)}
             <div className="mf-q">
-              <div className="mf-kicker">2 de 3
-                <button type="button" className="mf-voltar" onClick={() => setEtapa("renda")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
+              <div className="mf-kicker">
+                <button type="button" className="mf-voltar" onClick={() => voltarPara("renda")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
               </div>
-              <h2>Quais contas chegam todo mês?</h2>
-              <p>Toca nas que você tem. Cada uma já vem com um valor típico, que você ajusta. A fatura do cartão vem depois.</p>
+              <h2>Quais contas você paga todo mês?</h2>
+              <p>Toque para marcar.</p>
             </div>
             {/* chip = escolher (só o nome, cabe tudo na tela); o valor típico já entra na tabela, pra ajustar */}
             <div className="mf-chips" data-compacto="">
@@ -502,11 +597,11 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                 <div className="mf-total"><span>Total por mês</span>R$ {reais(totalContas)}</div>
               </div>
             )}
-            <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={() => irPara("cartao")}>
+            <div className="mf-rodape" data-teclado-rodape="">
+              <button type="button" className="mf-cta" onClick={guardar(() => irPara("cartao"))}>
                 {nValidas > 0 ? "Continuar" : "Não tenho conta fixa"}
               </button>
-              <button type="button" className="mf-pular" onClick={pular}>Pular</button>
+              <button type="button" className="mf-pular" onClick={guardar(pular)}>Pular</button>
             </div>
           </>
         )}
@@ -515,18 +610,17 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {barra(3)}
             <div className="mf-q">
-              <div className="mf-kicker">3 de 3
-                <button type="button" className="mf-voltar" onClick={() => setEtapa("contas")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
+              <div className="mf-kicker">
+                <button type="button" className="mf-voltar" onClick={() => voltarPara("contas")}><ArrowLeft size={14} aria-hidden /><span>Voltar</span></button>
               </div>
-              <h2>Você usa cartão de crédito?</h2>
-              <p>Assim a fatura já entra na conta e o CORE te avisa antes de vencer.</p>
+              <h2>Usa cartão de crédito?</h2>
             </div>
             <div className="mf-chips" data-grade="">
               <button type="button" className="mf-chip" aria-pressed={cartao.usa === true} onClick={() => mudarCartao({ usa: true })}>💳 Uso cartão</button>
               <button type="button" className="mf-chip" aria-pressed={cartao.usa === false} onClick={() => montar({ ...cartao, usa: false })}>Não uso cartão</button>
             </div>
             {cartao.usa === true && (
-              <div className="mf-folha" data-testid="montar-cartao">
+              <div className="mf-folha" data-testid="montar-cartao" data-teclado-junto="">
                 <div className="mf-faixa">💳 Cartão de crédito</div>
                 <div className="mf-campo">
                   <span className="mf-rotulo" id="mf-qual-cartao">Qual cartão?</span>
@@ -540,7 +634,7 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                   </div>
                 </div>
                 <div className="mf-campo">
-                  <span className="mf-rotulo" aria-hidden>Fatura deste mês, mais ou menos</span>
+                  <span className="mf-rotulo" aria-hidden>Fatura deste mês</span>
                   <label className="mf-valor-grande">
                     <small>R$</small>
                     <input
@@ -566,28 +660,25 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
                 </div>
               </div>
             )}
-            <div className="mf-rodape">
-              <button type="button" className="mf-cta" disabled={!cartaoCompleto(cartao)} onClick={() => montar()}>Ver quanto posso gastar</button>
-              <button type="button" className="mf-pular" onClick={() => montar({ ...cartao, usa: null }, true)}>Pular</button>
+            <div className="mf-rodape" data-teclado-rodape="">
+              <button type="button" className="mf-cta" disabled={!cartaoCompleto(cartao)} onClick={guardar(() => montar())}>Ver quanto posso gastar</button>
+              <button type="button" className="mf-pular" onClick={guardar(() => montar({ ...cartao, usa: null }, true))}>Pular</button>
             </div>
           </>
         )}
 
         {etapa === "montando" && (
-          <div className="mf-montando" aria-live="polite">
-            <div className="mf-orbe" aria-hidden><div><DollarSign size={38} /></div></div>
-            <h2>Montando suas finanças…</h2>
-            <div className="mf-passos">
-              <div className="mf-passo" style={{ animationDelay: "150ms" }}><i><Check size={13} strokeWidth={3} /></i>Renda de R$ {reais(renda)} no mês</div>
-              <div className="mf-passo" style={{ animationDelay: "600ms" }}><i><Check size={13} strokeWidth={3} /></i>
-                {nValidas === 0 ? "Sem contas fixas por enquanto" : nValidas === 1 ? "1 conta fixa anotada" : `${nValidas} contas fixas anotadas`}
-              </div>
-              {resultado.cartao && cartao.dia && (
-                <div className="mf-passo" style={{ animationDelay: "1050ms" }}><i><Check size={13} strokeWidth={3} /></i>
-                  {faturaPaga ? `${faturaNaTela}: paga este mês` : `${faturaNaTela}: dia ${cartao.dia}`}
+          /* 1.0.17 (dono 20/10, mockup c1): a conta DELA entrando linha por linha (no lugar da bola girando), e o número
+             sobe logo depois na tela do resultado. Com "reduzir movimento", as linhas aparecem paradas. */
+          <div className="mf-montando-conta" data-testid="montar-montando" aria-live="polite">
+            <p className="mf-montando-kicker">Montando seu mês…</p>
+            <div className="mf-folha">
+              <div className="mf-faixa">📋 Seu mês</div>
+              {linhasDaConta.map((l, i) => (
+                <div key={l.id} className="mf-conta" data-entra="" data-linha={l.id} style={reduzirMov || menosMovimento() ? undefined : { animationDelay: `${i * LINHA_DA_CONTA_MS}ms` }}>
+                  <span>{l.rotulo}</span>{l.valor}
                 </div>
-              )}
-              <div className="mf-passo" data-esperando="" style={{ animationDelay: resultado.cartao ? "1500ms" : "1050ms" }}><i />Calculando quanto dá por dia</div>
+              ))}
             </div>
           </div>
         )}
@@ -596,46 +687,79 @@ export function MontarFinancas({ origem = "modulo", onPronto, onPular, onCeder, 
           <>
             {/* 17/10 (revisão do dono): SÓ o número — o herói da tela. O 1º gasto é o tutorial no formulário de verdade
                 (a missão abre depois do "Continuar →"); nada de post-it aqui. */}
-            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined}>
+            <div className="mf-pronto" data-testid="montar-pronto" data-heroi={naMissao ? "" : undefined} data-apertado={apertado ? "" : undefined} data-de-montando={deMontando ? "" : undefined}>
+              {apertado ? (
+                /* 1.0.17: mês apertado (R$ 0 ou < R$ 15/dia) — o herói é o acolhimento, não o número pequeno. O número
+                   fica na conta do mês ("Ver a conta" → "÷ N dias" ou "Por dia"). */
+                <div className="mf-grande mf-apertado" data-testid="montar-apertado">
+                  <small>Seu mês</small>
+                  <h2>Seu mês tá apertado</h2>
+                  <p>Vamos achar folga juntos. Anotar o que sai é o primeiro passo.</p>
+                </div>
+              ) : (
               <div className="mf-grande">
-                <small>VOCÊ PODE GASTAR HOJE</small>
+                <small>Você pode gastar</small>
                 <strong data-testid="montar-por-dia" data-valor={resultado.porDia}>
                   {/* leitor de tela: o número final, sem a contagem (aria-label num <strong> não é lido no VoiceOver) */}
                   <span className="sr-only">{`R$ ${reais(resultado.porDia)} por dia`}</span>
                   <span aria-hidden>{rs(numeroNaTela)}</span><em aria-hidden>por dia</em>
                 </strong>
-                <p>
+                <p data-testid="montar-ate-quando">
                   {resultado.semFolga
-                    ? resultado.cartao
-                      ? "Suas contas fixas e a fatura já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
-                      : "Suas contas fixas já levam a renda do mês inteira. Nas suas Finanças dá pra ver onde apertar."
-                    : resultado.dias === 1
-                      ? `Hoje é o último dia do mês — já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`
-                      : `até o fim do mês (${resultado.dias} dias, contando hoje), já tirando as contas fixas${resultado.cartao ? " e a fatura" : ""}.`}
+                    ? "Suas contas já levam a renda do mês."
+                    : resultado.dias === 1 ? "Hoje é o último dia do mês." : "até o fim do mês."}
                 </p>
               </div>
-              <div className="mf-folha">
-                <div className="mf-faixa">🧾 A conta do seu mês</div>
-                <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
-                <div className="mf-conta"><span>Contas fixas ({resultado.contas})</span>− R$ {reais(resultado.fixos)}</div>
-                {resultado.cartao && cartao.dia && (
-                  <div className="mf-conta" data-testid="montar-fatura">
-                    <span>{faturaNaTela} <small>· {faturaPaga ? "já paga" : `vence dia ${cartao.dia}`}</small></span>− R$ {reais(resultado.fatura)}
+              )}
+              {/* 1.0.17 (dono: "joga informação na cara"): a conta do mês fica FECHADA — quem quiser, abre.
+                  No mês apertado o número (R$/dia) mora aqui dentro, na linha "Por dia". */}
+              <div className="mf-folha" data-aberta={verConta ? "" : undefined}>
+                <button type="button" className="mf-ver-conta" aria-expanded={verConta} data-testid="montar-ver-conta" onClick={() => setVerConta((v) => !v)}>
+                  <span>Ver a conta</span><ChevronDown size={16} aria-hidden style={{ transform: verConta ? "rotate(180deg)" : undefined, transition: "transform var(--mov-base)" }} />
+                </button>
+                {verConta && (
+                  <div data-testid="montar-conta">
+                    <div className="mf-conta"><span>Entra no mês</span>R$ {reais(resultado.renda)}</div>
+                    <div className="mf-conta"><span>Contas fixas ({resultado.contas})</span>− R$ {reais(resultado.fixos)}</div>
+                    {resultado.cartao && cartao.dia && (
+                      <div className="mf-conta" data-testid="montar-fatura">
+                        <span>{faturaNaTela} <small>· {faturaPaga ? "já paga" : `vence dia ${cartao.dia}`}</small></span>− R$ {reais(resultado.fatura)}
+                      </div>
+                    )}
+                    <div className="mf-conta" data-total=""><span>Livre pro mês</span>R$ {reais(Math.max(0, resultado.livre))}</div>
+                    {!resultado.semFolga && resultado.dias > 1 && (
+                      <div className="mf-conta"><span>÷ {resultado.dias} dias</span>R$ {reais(resultado.porDia)} por dia</div>
+                    )}
+                    {apertado && (resultado.semFolga || resultado.dias <= 1) && (
+                      <div className="mf-conta" data-testid="montar-por-dia-apertado"><span>Por dia</span>R$ {reais(resultado.porDia)}</div>
+                    )}
                   </div>
                 )}
-                <div className="mf-conta" data-total=""><span>Livre pro mês</span>R$ {reais(Math.max(0, resultado.livre))}</div>
-                {!resultado.semFolga && resultado.dias > 1 && (
-                  <div className="mf-conta"><span>÷ {resultado.dias} dias</span>R$ {reais(resultado.porDia)} por dia</div>
-                )}
               </div>
-              {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está tudo nas suas Finanças. Dá pra mudar quando quiser.</p>}
+              {!naMissao && <p className="mf-salvo"><i><Check size={15} strokeWidth={3} /></i>Já está nas suas Finanças.</p>}
             </div>
-            <div className="mf-rodape">
-              <button type="button" className="mf-cta" onClick={continuar}>{naMissao ? "Continuar →" : "Ver minhas Finanças"}</button>
+            <div className="mf-rodape" data-teclado-rodape="">
+              <button type="button" className="mf-cta" onClick={guardar(continuar)}>{naMissao ? "Continuar" : "Ver minhas Finanças"}</button>
             </div>
           </>
         )}
-      </div>
+
+        {etapa === "ponte" && (
+          <>
+            {/* 1.0.17 (dono 20/10, ponte "versão 1", mockup ponte2): em cima o que ela viu e o que vem (sem ponto final);
+                no meio a CENA — o número dela → um café que cai → o que sobra hoje —, ligada por tracejado; embaixo os botões */}
+            <div className="mf-ponte" data-testid="montar-ponte" data-apertado={apertado ? "" : undefined}>
+              <p className="mf-ponte-viu" data-testid="montar-ponte-viu">{apertado ? "Você já viu como tá seu mês" : "Você já viu quanto pode gastar hoje"}</p>
+              <h2 data-testid="montar-ponte-titulo">Agora vamos anotar seu primeiro gasto</h2>
+              <CenaDaPonte porDia={resultado.porDia} apertado={apertado || !(resultado.porDia > 0)} parado={reduzirMov || menosMovimento()} />
+            </div>
+            <div className="mf-rodape" data-teclado-rodape="">
+              <button type="button" className="mf-cta" data-testid="montar-ponte-ir" onClick={guardar(() => sairDaPonte("ir_pro_app"))}>Ir pro app</button>
+              <button type="button" className="mf-pular" data-testid="montar-ponte-nao-gastei" onClick={guardar(() => sairDaPonte("ainda_nao"))}>Ainda não gastei</button>
+            </div>
+          </>
+        )}
+      </motion.div>
     </div>
   );
 }

@@ -84,7 +84,7 @@ export function funilHojeLigado(busca: string = typeof window === "undefined" ? 
  * QA neste navegador: `?hoje-p1=leve|ab|off` (o heap segura quando o Instagram zera o storage). ROLLBACK = "off" + push.
  */
 export type ModoP1 = "off" | "leve" | "ab";
-export const HOJE_P1: ModoP1 = "off";
+export const HOJE_P1: ModoP1 = "leve";
 export type BracoP1 = "leve" | "controle";
 export const PARAM_QA_P1 = "hoje-p1";
 export const CHAVE_FORCA_P1 = "hoje-p1-force";

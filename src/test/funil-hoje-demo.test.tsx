@@ -295,3 +295,6 @@ describe("os números da demo (demoDoHoje)", () => {
     expect(b.cantSpend).toBe(true);
   });
 });
+
+// 22/10: a 1ª pergunta leve está ligada pra todos (HOJE_P1 = "leve"); este arquivo testa o resto do /hoje com a ordem de antes
+beforeEach(async () => { (await import("@/pages/hoje/conteudo")).modoP1("?hoje-p1=off"); });

@@ -70,8 +70,8 @@ afterEach(() => { cleanup(); irPara("/"); });
 
 describe("a chave HOJE_P1", () => {
   it("padrão DESLIGADA", () => {
-    expect(HOJE_P1).toBe("off");
-    expect(modoP1("")).toBe("off");
+    expect(HOJE_P1).toBe("leve"); // ligada pra todos em 22/10
+    expect(modoP1("")).toBe("leve");
   });
   it("?hoje-p1= liga/desliga e fica no navegador (heap + storage)", () => {
     expect(modoP1("?hoje-p1=leve")).toBe("leve");
@@ -94,6 +94,7 @@ describe("a chave HOJE_P1", () => {
 
 describe("off: o /hoje de sempre", () => {
   it("1ª tela = renda (1 de 2), nenhum evento com p1, estado sem p1/gasto", async () => {
+    modoP1("?hoje-p1=off"); // a chave está em "leve" desde 22/10: o modo antigo agora só pela força
     montar();
     expect(etapa()).toBe("renda");
     expect(screen.queryByTestId("hoje-p1")).toBeNull();

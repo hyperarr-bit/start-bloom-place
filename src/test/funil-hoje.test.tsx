@@ -603,3 +603,6 @@ describe("OFERTA_HOJE = 'vitalicio' (padrão, dono 20/10): a MESMA oferta do /in
     for (const nome of ["hoje_view", "funnel_view", "hoje_faixa", "hoje_resultado"]) expect(eventos(nome).every((x) => x.oferta_hoje === "vitalicio")).toBe(true);
   });
 });
+
+// 22/10: a 1ª pergunta leve está ligada pra todos (HOJE_P1 = "leve"); este arquivo testa o resto do /hoje com a ordem de antes
+beforeEach(async () => { (await import("@/pages/hoje/conteudo")).modoP1("?hoje-p1=off"); });

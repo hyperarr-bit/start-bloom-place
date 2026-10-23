@@ -371,6 +371,8 @@ const DevFunilNovo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevFun
 const DevMissao1PorDia = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevMissao1PorDia")) : null;
 // 16/10: a intro do módulo (1ª ação guiada em Finanças/Rotina/Saúde + estado vazio da Casa) numa conta vazia em memória — só no dev
 const DevIntroModulo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevIntroModulo")) : null;
+// 29/09: os cards de compartilhar (cada conquista em 9:16, 4:5 e adesivo) com dados de exemplo — só no dev
+const DevCompartilhar = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevCompartilhar")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -807,6 +809,14 @@ const AnimatedRoutes = () => {
         <Route path="/plano" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/funil-dia14" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition>} />} />
         <Route path="/funil-radar" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
+        {import.meta.env.DEV && DevCompartilhar && (
+          <Route path="/dev/compartilhar" element={<Suspense fallback={null}><DevCompartilhar /></Suspense>} />
+        )}
+        <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         {/* ENTRADA_APP: a porta do app da loja. v53 (16/08): no SHELL renderiza
             o funil do TESTE GRÁTIS (4 perguntas → app real em modo guiado →
             paywall de assinatura no dia 3). Na web, /app continua o radar de

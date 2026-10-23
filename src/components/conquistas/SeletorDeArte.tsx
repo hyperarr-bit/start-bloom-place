@@ -10,6 +10,13 @@ import { NOME_FAIXA, fraseDe, linhaDe, type Insignia as DadosInsignia } from "./
 import { STORIES, StoriesAlbum, StoriesConquista, StoriesRoseta, StoriesTres } from "./Stories";
 import { compartilharAlbum, compartilharConquista, compartilharRoseta, compartilharTres, compartilharVideoDaArte } from "./compartilhar-conquistas";
 import { suporteVideo } from "./video/suporte";
+// 29/09 — os cards novos de compartilhar (atrás da chave COMPARTILHAR_V2, desligada): com ela ligada,
+// a "Minha conquista do mês" vira o card do assunto (o calendário dos treinos, a água do mês no azul…)
+// (os cards e a prévia só baixam quando existe um card — com a chave desligada, nunca)
+import { useCardDaConquista } from "@/components/compartilhar/use-cards-do-app";
+import { legendaDoCard } from "@/components/compartilhar/legenda";
+const CardDeCompartilhar = lazy(() => import("@/components/compartilhar/cards").then((m) => ({ default: m.CardDeCompartilhar })));
+const PreviaDoCard = lazy(() => import("@/components/compartilhar/PreviaDoCard").then((m) => ({ default: m.PreviaDoCard })));
 
 export type { DadosArtes } from "./artes-dados";
 
@@ -104,7 +111,7 @@ const ArteEscalada = memo(({ elemento, largura }: { elemento: ReactElement; larg
 });
 ArteEscalada.displayName = "ArteEscalada";
 
-const Miniatura = ({ arte, videoSuportado, indice, dados, largura, onEscolher }: { arte: Arte; videoSuportado: boolean; indice: number; dados: DadosArtes; largura: number; onEscolher: (id: ArteId) => void }) => {
+const Miniatura = ({ arte, videoSuportado, indice, dados, largura, onEscolher, substituto }: { arte: Arte; videoSuportado: boolean; indice: number; dados: DadosArtes; largura: number; onEscolher: (id: ArteId) => void; substituto?: ReactElement }) => {
   // monta uma por quadro: a folha abre leve e as artes vão aparecendo
   const [pronta, setPronta] = useState(indice === 0);
   useEffect(() => {
@@ -112,7 +119,7 @@ const Miniatura = ({ arte, videoSuportado, indice, dados, largura, onEscolher }:
     const t = setTimeout(() => setPronta(true), 40 * indice);
     return () => clearTimeout(t);
   }, [pronta, indice]);
-  const elemento = pronta && !arte.bloqueio ? arteDe(arte.id, dados) : null;
+  const elemento = pronta && !arte.bloqueio ? substituto ?? arteDe(arte.id, dados) : null;
   return (
     <button type="button" onClick={() => !arte.bloqueio && onEscolher(arte.id)} className="block text-left self-start active:scale-[0.98] transition-transform disabled:active:scale-100" style={{ width: largura }} data-arte={arte.id} data-bloqueada={arte.bloqueio ? "" : undefined} disabled={!!arte.bloqueio} aria-disabled={!!arte.bloqueio}>
       <div className="relative rounded-[14px] overflow-hidden border border-border bg-muted shadow-[0_6px_16px_-10px_rgba(0,0,0,.4)]" style={{ width: largura, height: Math.round((largura * STORIES.h) / STORIES.w) }}>
@@ -344,7 +351,9 @@ export const SeletorDeArte = ({ aberto, onFechar, dados, direto, onDiretoConsumi
   }, [direto, onDiretoConsumido]);
 
   const dadosEfetivos: DadosArtes = heroiEscolhido ? { ...dados, heroi: heroiEscolhido } : dados;
-  const artes = artesDisponiveis(dadosEfetivos);
+  const cardV2 = useCardDaConquista(dadosEfetivos.heroi, dadosEfetivos.mesIdx, dadosEfetivos.ano);
+  // com o card novo, a legenda da miniatura diz o número e o período (e não mais "Setembro foi de academia.")
+  const artes = artesDisponiveis(dadosEfetivos).map((a) => (a.id === "conquista" && cardV2 ? { ...a, frase: legendaDoCard(cardV2) } : a));
   const escolher = (id: ArteId) => {
     trackEvent("arte_escolhida", { arte: id, origem: "seletor" });
     setEscolhida(id);
@@ -367,13 +376,40 @@ export const SeletorDeArte = ({ aberto, onFechar, dados, direto, onDiretoConsumi
             <SheetDescription className="text-[12px] text-muted-foreground mt-0.5">Vídeo com a sua conquista do mês — os números de verdade. Dinheiro sai em %; R$ só com "mostrar valores" ligado.</SheetDescription>
             <div className="grid grid-cols-2 mt-3.5" style={{ gap: "12px 10px" }}>
               {artes.map((a, i) => (
-                <Miniatura key={a.id} arte={a} videoSuportado={!!suporte} indice={i} dados={dadosEfetivos} largura={wMini} onEscolher={escolher} />
+                <Miniatura key={a.id} arte={a} videoSuportado={!!suporte} indice={i} dados={dadosEfetivos} largura={wMini} onEscolher={escolher} substituto={a.id === "conquista" && cardV2 ? <Suspense fallback={null}><CardDeCompartilhar dados={cardV2} formato="stories" /></Suspense> : undefined} />
               ))}
             </div>
           </div>
         </SheetContent>
       </Sheet>
-      {arte && elemento && aberto && (
+      {arte && aberto && arte.id === "conquista" && cardV2 && (
+        <Suspense fallback={null}>
+        <PreviaDoCard
+          dados={cardV2}
+          origem="conquista"
+          titulo={arte.nome}
+          onFechar={fecharPrevia}
+          acoes={dadosEfetivos.candidatas.length > 1 ? (
+            <button type="button" onClick={() => setTrocando(true)} className="h-10 rounded-xl text-[13px] font-bold inline-flex items-center justify-center gap-2 text-foreground border border-dashed border-border" data-testid="trocar-conquista-abrir">
+              <Repeat className="w-4 h-4" aria-hidden /> Trocar conquista
+            </button>
+          ) : undefined}
+        >
+          <AnimatePresence>
+            {trocando && (
+              <TrocarConquista
+                candidatas={dadosEfetivos.candidatas}
+                atual={dadosEfetivos.heroi?.id ?? ""}
+                mesIdx={dadosEfetivos.mesIdx}
+                onEscolher={(i) => { setHeroiEscolhido(i); setTrocando(false); trackEvent("conquista_trocada", { de: dadosEfetivos.heroi?.id, para: i.id, v2: true }); }}
+                onFechar={() => setTrocando(false)}
+              />
+            )}
+          </AnimatePresence>
+        </PreviaDoCard>
+        </Suspense>
+      )}
+      {arte && elemento && aberto && !(arte.id === "conquista" && cardV2) && (
         <Previa
           titulo={arte.nome}
           elemento={elemento}

@@ -266,12 +266,16 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
      muda a copy (curta), o "Agora não" quieto e o "+ Outro" nas listas (menos as escalas: pele, humor, espelho). */
   const guiadaPassos = (m: string) => (m === "rotina" ? 3 : m === "financas" || m === "saude" ? 2 : 0);
   const ESCALAS = new Set(["Como é a sua pele?", "Como você está hoje?", "Como está o seu humor hoje?", "Como a sua pele está hoje?"]);
-  it("cada um dos 16 tutoriais tem de 3 a 4 passos (os da 1.0.16), o 1º é sempre uma ação e toda lista de chips tem '+ Outro' (menos as escalas)", () => {
+  it("cada um dos 16 tutoriais tem de 3 a 4 passos (os da 1.0.16; as 5 curtas da 1.0.18, 1), o 1º é sempre uma ação e toda lista de chips tem '+ Outro' (menos as escalas)", () => {
     for (const m of TODOS) {
       const c = INTROS[m];
       const n = c.formato === "guiada" ? guiadaPassos(m) + (c.maisPassos?.length ?? 0) : c.passos.length;
-      expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(3);
-      expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(4);
+      // 1.0.18: as 5 CURTAS (Relacionamentos, Dieta, Viagens, Biblioteca, Carreira) têm 1 passo só
+      if (c.formato === "toque" && c.versao === "curta") expect(n, `${m}: ${n} passos`).toBe(1);
+      else {
+        expect(n, `${m}: ${n} passos`).toBeGreaterThanOrEqual(3);
+        expect(n, `${m}: ${n} passos`).toBeLessThanOrEqual(4);
+      }
       for (const p of (c.formato === "guiada" ? c.maisPassos ?? [] : [])) if (p.opcoes.length && p.executar) expect(p.outro === false ? ESCALAS.has(p.pergunta) : true, `${m}: "${p.pergunta}" sem "+ Outro"`).toBe(true);
       if (c.formato === "toque") {
         expect(c.passos[0].olhar, m).toBeUndefined();
@@ -310,9 +314,10 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
       }
       await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto")).toBeTruthy(), { timeout: 9000 });
       expect(faixa()!.textContent).toContain("pronto ✓");
-      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(2);
+      const curta = c.formato === "toque" && c.versao === "curta";
+      expect(acoes, `${m}: ações feitas`).toBeGreaterThanOrEqual(curta ? 1 : 2);
       expect(screen.getByTestId("intro-modulo-pronto").textContent).toMatch(/entr(ou|aram)\./);
-      expect(total).toBeGreaterThanOrEqual(3);
+      expect(total).toBeGreaterThanOrEqual(curta ? 1 : 3);
       fireEvent.click(screen.getByTestId("intro-modulo-fechar"));
       expect(localStorage.getItem(chaveIntroVista(m))).toMatch(/^feita@/);
       expect(porQueNaoMostrar(m, s.get)).toBe("ja_vista");

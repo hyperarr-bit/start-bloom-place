@@ -49,17 +49,18 @@ import type { TipoDoItem } from "@/lib/demo-guiada";
 import * as missaoDoses from "@/lib/missao-doses";
 import { lerMissao, missaoDosesLigada, type DiaDaMissao } from "@/lib/missao-doses";
 import {
-  CAFE_DA_MANHA, COMODOS_DA_INTRO, DESTINOS_DA_INTRO, DESTINOS_PLANEJANDO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE,
+  CAFE_DA_MANHA, COMODOS_DA_INTRO, DESTINOS_DA_INTRO, ESPELHO_DA_INTRO, HUMORES_DA_INTRO, PETS_DA_INTRO, TREINOS_DE_HOJE,
   adicionarCurso, adicionarCursoDesejado, adicionarLivro, adicionarPessoaDoComeco, adicionarPessoaPropria, anotarCafeDaManha, anotarComodoProprio,
   anotarContaFixa, anotarContaFixaPropria, anotarDestino, anotarEspelhoDoDia, anotarHumor, anotarItemDoMercado, anotarMetaDeCurtoPrazo, anotarMotivacao,
-  anotarPensamento, anotarRefeicao, anotarSkill, anotarSono, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, cadastrarPetProprio, comecarDetox,
-  criarMeta, diaDaSemana as diaDaSemanaDoTreino, marcarPaginaDoLivro, montarSkincare, montarTreinoDeHoje, montarTreinoProprio,
+  anotarPensamento, anotarSono, anotarTarefaDoComodo, anotarTarefaDoTrabalho, cadastrarPet, cadastrarPetProprio, comecarDetox,
+  criarMeta, diaDaSemana as diaDaSemanaDoTreino, montarSkincare, montarTreinoDeHoje, montarTreinoProprio,
   type ContextoDaAcao, type TreinoDeHoje,
 } from "@/lib/intro-modulo-acoes";
 import type { NumeroDaEscolha } from "@/components/ui/escolha-rapida";
 import { planoVazio } from "@/lib/treino-plano";
 import { cardPorTitulo } from "@/lib/conhecer-mais";
 import { localDayKey } from "@/lib/utils";
+import { CHAVE_MONTAR_FINANCAS } from "@/lib/montar-financas";
 import { CHAVE_PASSOS as CHAVE_PASSOS_BELEZA, CHAVE_PERFIL as CHAVE_PERFIL_BELEZA, OPCOES_PELE, type TipoDePele } from "@/lib/beleza-rotina";
 
 export type ModoIntro = "off" | "on";
@@ -415,6 +416,12 @@ export interface IntroDeUmToqueConfig extends IntroBase {
   passos: PassoDaIntro[];
   /** a frase do cartão do fim, depois do que entrou */
   pronto: string;
+  /**
+   * 1.0.18 (dados 17–23/10: Relacionamentos 58%, Viagens 55%, Dieta 53%, Biblioteca 45%, Carreira 43% pulavam; Beleza,
+   * curta e prática, 67% concluíam): "curta" = 1 passo só, registrar a 1ª coisa. Vai em todo `modulo_intro_*` como
+   * `versao` pra medir contra a versão longa.
+   */
+  versao?: "curta";
 }
 export type IntroConfig = IntroGuiadaConfig | IntroDeUmToqueConfig;
 
@@ -566,7 +573,8 @@ export const INTROS: Record<string, IntroConfig> = {
   dieta: {
     formato: "toque", moduleId: "dieta", nome: "Dieta",
     pedido: "anote o café de hoje",
-    pronto: "Cada refeição fica no dia dela.",
+    pronto: "Almoço e jantar, quando quiser.",
+    versao: "curta",
     passos: [{
       pergunta: "O que você comeu no café?",
       opcoes: [op("☕", "Pão com café", "pao_com_cafe"), op("🥚", "Ovos mexidos", "ovos"), op("🍌", "Fruta com iogurte", "fruta_iogurte")],
@@ -580,18 +588,6 @@ export const INTROS: Record<string, IntroConfig> = {
         try { hoje.querySelector<HTMLElement>('button[aria-label^="Abrir "]:not([aria-haspopup])')?.click(); } catch { /* noop */ }
         return hoje.querySelector("button") ? hoje.firstElementChild ?? hoje : hoje;
       }, abaixo: true },
-    }, {
-      // 2) olha o dia no cardápio (o dia é a ação #1 da Dieta, 9%)
-      pedido: "olhe o seu dia", pergunta: "", opcoes: [],
-      olhar: { titulo: "Seu dia no cardápio", texto: "As outras refeições você põe quando quiser." },
-      alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje) },
-    }, {
-      // 3) mais uma refeição de hoje
-      pedido: "anote o almoço", pergunta: "E o almoço de hoje?",
-      opcoes: [op("🍗", "Frango com arroz", "frango_arroz"), op("🥗", "Salada com proteína", "salada"), op("🍝", "Macarrão", "macarrao")],
-      outro: { placeholder: "Ex.: Feijoada" },
-      executar: (ctx, o) => anotarRefeicao(ctx, "Almoço", o.rotulo),
-      alvo: { aba: "CARDÁPIO", achar: porSeletor(seletorDoCardDeHoje), abaixo: true },
     }],
     cor: { faixa: "#E3F6E0", tinta: "#14532d", acento: "#16a34a" },
     vazio: (get) => {
@@ -629,25 +625,14 @@ export const INTROS: Record<string, IntroConfig> = {
   biblioteca: {
     formato: "toque", moduleId: "biblioteca", nome: "Biblioteca",
     pedido: "ponha 1 livro na estante",
-    pronto: "Capa, página e anotações de cada livro.",
+    pronto: "Marque a página quando ler.",
+    versao: "curta",
     passos: [{
       pergunta: "O que você está lendo?",
       opcoes: [op("📘", "Hábitos Atômicos", "habitos_atomicos"), op("📗", "O Poder do Hábito", "poder_do_habito"), op("📙", "Essencialismo", "essencialismo")],
       outro: { placeholder: "Título do livro" },
       executar: (ctx, o) => adicionarLivro(ctx, { titulo: o.rotulo, autor: LIVROS[o.id]?.autor ?? "", capa: LIVROS[o.id]?.capa ?? "" }),
       alvo: { achar: porSeletor('button[aria-label="Adicionar livro"]') },
-    }, {
-      // 2) olha o "Lendo agora" (14%, a ação #1)
-      pedido: "olhe o Lendo agora", pergunta: "", opcoes: [],
-      olhar: { titulo: "Lendo agora", texto: "Toque no livro pra anotar frases." },
-      alvo: { achar: olharPorTitulo(/LENDO AGORA/i) },
-    }, {
-      // 3) a página atual (a barra anda)
-      pedido: "marque a página", pergunta: "Em que página você está?",
-      opcoes: [op("📖", "Começando", "1"), op("📄", "Página 50", "50"), op("📑", "Página 120", "120")],
-      outro: { numero: { min: 1, max: 1500, passo: 10, inicial: 80, formatar: (n) => `Página ${n}`, rotulo: "Outra" } },
-      executar: (ctx, o) => marcarPaginaDoLivro(ctx, o.id === ID_OUTRO_DA_INTRO ? Number(o.valor ?? 1) : Number(o.id)),
-      alvo: { achar: olharPorTitulo(/LENDO AGORA/i), abaixo: true },
     }],
     cor: { faixa: "#FFE9D6", tinta: "#7c2d12", acento: "#ea580c" },
     vazio: (get) => vazias(get, ["lib-books"]),
@@ -724,26 +709,15 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   carreira: {
     formato: "toque", moduleId: "carreira", nome: "Carreira",
-    pedido: "anote 1 tarefa de hoje",
-    pronto: "Foco e tarefas do dia numa folha só.",
+    pedido: "anote 1 tarefa",
+    pronto: "Marque quando terminar.",
+    versao: "curta",
     passos: [{
-      pergunta: "Uma tarefa do trabalho pra hoje?",
+      pergunta: "Uma tarefa pra hoje?",
       opcoes: [op("📧", "Responder e-mails", "emails"), op("📊", "Fechar o relatório", "relatorio"), op("📞", "Ligar pro cliente", "cliente")],
       outro: { placeholder: "Ex.: Revisar a proposta" },
       executar: (ctx, o) => anotarTarefaDoTrabalho(ctx, o.rotulo),
       alvo: { aba: "Meu Dia", achar: linhaDoCampo('input[placeholder="Nova tarefa do trabalho..."]') },
-    }, {
-      // 2) olha o Meu Dia (fases + pomodoro: as ações #1 e #3)
-      pedido: "olhe o seu dia", pergunta: "", opcoes: [],
-      olhar: { titulo: "Seu dia de trabalho", texto: "A tarefa está na lista de hoje." },
-      alvo: { aba: "Meu Dia", achar: linhaDoCampo('input[placeholder="Nova tarefa do trabalho..."]') },
-    }, {
-      // 3) uma skill (a aba Skills)
-      pedido: "anote 1 skill", pergunta: "Uma skill pra evoluir?",
-      opcoes: [op("🇬🇧", "Inglês", "ingles"), op("📊", "Excel", "excel"), op("🗣️", "Falar em público", "falar")],
-      outro: { placeholder: "Ex.: Liderança" },
-      executar: (ctx, o) => { anotarSkill(ctx, o.rotulo); },
-      alvo: { aba: "Skills", achar: olharPorTitulo(/SKILL/i), abaixo: true },
     }],
     cor: { faixa: "#E6EAF0", tinta: "#1e293b", acento: "#475569" },
     vazio: (get) => {
@@ -827,24 +801,13 @@ export const INTROS: Record<string, IntroConfig> = {
   viagens: {
     formato: "toque", moduleId: "viagens", nome: "Viagens",
     pedido: "anote 1 destino",
-    pronto: "Primeiro o destino; o resto vem depois.",
+    pronto: "Datas e roteiro vêm depois.",
+    versao: "curta",
     passos: [{
       pergunta: "Pra onde você quer ir?",
       opcoes: [op("🏖️", "Praia no Nordeste", "nordeste"), op("🏔️", "Gramado", "gramado"), op("✈️", "Europa", "europa")],
       outro: { placeholder: "Ex.: Bonito" },
       executar: (ctx, o) => anotarDestino(ctx, DESTINOS_DA_INTRO[o.id] ?? { name: o.rotulo, country: "", continent: "" }),
-      alvo: { achar: linhaDoCampo('input[placeholder="Destino..."], input[placeholder="Destino"]') },
-    }, {
-      // 2) olha a lista
-      pedido: "olhe a sua lista", pergunta: "", opcoes: [],
-      olhar: { titulo: "O destino entrou", texto: "A etiqueta muda quando a viagem avança." },
-      alvo: { achar: () => { try { const el = document.querySelector('[aria-label^="Editar "]'); return el?.closest(".rounded-2xl, .rounded-xl, li, section") ?? el; } catch { return null; } } },
-    }, {
-      // 3) a próxima de verdade (planejando)
-      pedido: "anote a próxima", pergunta: "E a próxima viagem de verdade?",
-      opcoes: [op("🌵", "Chapada dos Veadeiros", "chapada"), op("🐠", "Fernando de Noronha", "noronha"), op("🥩", "Buenos Aires", "buenos_aires")],
-      outro: { placeholder: "Ex.: Salvador" },
-      executar: (ctx, o) => { anotarDestino(ctx, DESTINOS_PLANEJANDO[o.id] ?? { name: o.rotulo, country: "", continent: "" }, "planejando"); return `${o.rotulo} (planejando)`; },
       alvo: { achar: linhaDoCampo('input[placeholder="Destino..."], input[placeholder="Destino"]') },
     }],
     cor: { faixa: "#D9F4F0", tinta: "#134e4a", acento: "#0d9488" },
@@ -892,31 +855,15 @@ export const INTROS: Record<string, IntroConfig> = {
   },
   relacionamentos: {
     formato: "toque", moduleId: "relacionamentos", nome: "Relações",
-    pedido: "anote 1 pessoa que importa",
-    pronto: "Datas e momentos ficam com a pessoa.",
+    pedido: "anote 1 pessoa",
+    pronto: "Toque nela pra pôr o aniversário.",
+    versao: "curta",
     passos: [{
       pergunta: "Quem importa pra você?",
       opcoes: [op("🌷", "Mãe", "mae"), op("💛", "Meu amor", "amor"), op("✨", "Melhor amiga", "melhor-amiga")],
       outro: { placeholder: "Nome ou apelido" },
       executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? adicionarPessoaPropria(ctx, o.rotulo) : adicionarPessoaDoComeco(ctx, o.id)),
       alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="pessoas-vazio"], [data-testid="adicionar-pessoa"]') },
-    }, {
-      // 2) olha a pessoa (pessoas: 11%, a ação #1)
-      pedido: "olhe a ficha", pergunta: "", opcoes: [],
-      olhar: { titulo: "A pessoa entrou", texto: "Toque nela pra pôr o aniversário." },
-      alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="lista-pessoas"]') },
-    }, {
-      // 3) mais uma pessoa
-      pedido: "anote mais 1", pergunta: "Mais alguém?",
-      opcoes: [op("☕", "Pai", "pai"), op("🌻", "Irmã", "irma"), op("🧶", "Avó", "avo")],
-      outro: { placeholder: "Nome ou apelido" },
-      executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? adicionarPessoaPropria(ctx, o.rotulo) : adicionarPessoaDoComeco(ctx, o.id)),
-      alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="lista-pessoas"]'), abaixo: true },
-    }, {
-      // 4) as datas
-      pedido: "olhe as datas", pergunta: "", opcoes: [],
-      olhar: { titulo: "O ano em datas", texto: "O app avisa na véspera." },
-      alvo: { aba: "DATAS", achar: porSeletor('[data-testid="ano-em-datas"], [data-testid="lista-datas"]') },
     }],
     cor: { faixa: "#FFE1E7", tinta: "#881337", acento: "#e11d48" },
     vazio: (get) => vazias(get, ["rel-people", "rel-dates", "rel-moments", "relacoes-pessoas"]),
@@ -1031,7 +978,7 @@ export function tutorialAntigoPodeMarcarVisto(moduleKey: string, get: Leitor): b
   try {
     const id = Object.entries(APELIDOS_DO_TUTORIAL_ANTIGO).find(([, apelidos]) => apelidos.includes(moduleKey))?.[0] ?? moduleKey;
     if (!INTROS[id] || !introLigada()) return true;
-    if (introVistaNesteAparelho(id) || introVistaNaConta(id, get)) return true;
+    if (introVistaNesteAparelho(id) || introVistaNaConta(id, get) || introVistaPeloMontar(id, get)) return true;
     return !introBloqueadaPelaMissao(id);
   } catch { return true; }
 }
@@ -1069,6 +1016,22 @@ export function anotarAcaoRapida(acao: string, get: Leitor, set: (k: string, v: 
   } catch { /* nunca atrapalha a ação rápida */ }
 }
 
+/* ───── Finanças montada (1.0.18, dono 23/10) ─────
+ * Quem TERMINOU o "Montar Finanças" (renda → contas → "Você pode gastar hoje R$ X" — a marca `core-montar-financas`
+ * com `r: "pronto"`, no aparelho ou na conta) já teve o guia de Finanças: o tutorial do módulo conta como VISTO e não
+ * aparece. A regra dura ("nenhum módulo abre a 1ª vez sem tutorial") segue valendo — o Montar foi o tutorial. Quem
+ * pulou o Montar ("pulou") ou nunca montou continua vendo o tutorial. Só leitura: nada novo é gravado. */
+const montouFinancas = (get?: Leitor): boolean => {
+  const pronto = (raw: unknown): boolean => {
+    if (!raw) return false;
+    try { const v = typeof raw === "object" ? raw : JSON.parse(String(raw)); return !!v && (v as { r?: unknown }).r === "pronto"; } catch { return false; }
+  };
+  if (pronto(ls.get(CHAVE_MONTAR_FINANCAS))) return true;
+  try { return pronto(get?.<unknown>(CHAVE_MONTAR_FINANCAS, null)); } catch { return false; }
+};
+/** O tutorial deste módulo conta como visto por outro guia já feito (Finanças: o Montar terminado)? */
+export const introVistaPeloMontar = (moduleId: string, get?: Leitor): boolean => moduleId === "financas" && montouFinancas(get);
+
 /* ───── a decisão ───── */
 export type MotivoSemIntro = "desligada" | "sem_intro" | "ja_vista" | "ja_apresentado" | "com_dado" | "missao" | "outra_guia";
 /** Mostra a intro deste módulo? `null` = mostra; senão o motivo de não mostrar (pros testes e pro dev). */
@@ -1077,6 +1040,7 @@ export function porQueNaoMostrar(moduleId: string, get: Leitor, extras: { outraG
   if (!config) return "sem_intro";
   if (!introLigada()) return "desligada";
   if (introVistaNesteAparelho(moduleId) || introVistaNaConta(moduleId, get)) return "ja_vista";
+  if (introVistaPeloMontar(moduleId, get)) return "ja_vista";
   if (moduloJaApresentado(moduleId, get)) return "ja_apresentado";
   let vazio = true;
   try { vazio = config.vazio(get); } catch { vazio = true; }

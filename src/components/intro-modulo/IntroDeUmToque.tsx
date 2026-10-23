@@ -32,7 +32,7 @@ import "./intro-modulo.css";
  * Eventos: modulo_intro_vista {modulo, formato:"toque", passos} · modulo_intro_acao {modulo, via:"chip"|"foco", opcao,
  * passo} · modulo_intro_registrou {modulo, via, passo, segundos} · modulo_intro_olhar {modulo, passo, via:"botao"|"pulado"}
  * · modulo_intro_concluida {modulo, segundos, passos} · modulo_intro_pulou {modulo, fase:"toque", passo, segundos}
- * · modulo_intro_anel_saiu {modulo, motivo}.
+ * · modulo_intro_anel_saiu {modulo, motivo}. Nas intros curtas (config.versao), todos levam também `versao: "curta"`.
  */
 export const TEMPOS_DO_TOQUE = { antesDoAnel: 300, registrou: 550, pronto: 6_000, prontoComOferta: 12_000, tentativasDoOlhar: 8, reancorar: 1_000, reancorarVoltas: 30 };
 
@@ -52,6 +52,8 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const reduzir = !!useReducedMotion();
   useMarcaDaTelaDeslocada(); // a faixa sai de cena enquanto o teclado do iPhone desloca a tela (20/10)
   const m = config.moduleId;
+  /** 1.0.18: a versão curta (1 passo) vai em todo modulo_intro_* como `versao` — a longa sai igual a antes */
+  const comVersao = <T extends Record<string, unknown>>(dados: T): T & { versao?: "curta" } => (config.versao ? { ...dados, versao: config.versao } : dados);
   const [n, setN] = useState(0);
   const passo: PassoDaIntro | undefined = config.passos[n];
   const nRef = useRef(n); nRef.current = n;
@@ -75,7 +77,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
 
   useEffect(() => {
     document.documentElement.setAttribute("data-intro-modulo-faixa", "1");
-    if (!passoInicial) trackEvent("modulo_intro_vista", { modulo: m, formato: "toque", passos: config.passos.length });
+    if (!passoInicial) trackEvent("modulo_intro_vista", comVersao({ modulo: m, formato: "toque", passos: config.passos.length }));
     return () => { document.documentElement.removeAttribute("data-intro-modulo-faixa"); timers.current.forEach((t) => window.clearTimeout(t)); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -105,7 +107,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
         return;
       }
       if (++tentativas >= limite || !passo.alvo) {
-        if (passo.olhar) { trackEvent("modulo_intro_olhar", { modulo: m, passo: numero, via: "pulado" }); seguir(); return; }
+        if (passo.olhar) { trackEvent("modulo_intro_olhar", comVersao({ modulo: m, passo: numero, via: "pulado" })); seguir(); return; }
         setAlvo(null); setAnelVivo(false); setFase("anotar"); return;
       }
       depois(procurar, 300);
@@ -126,7 +128,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
       if (!vivo || faseRef.current !== "anotar") return;
       let el: Element | null = null;
       try { el = passo.alvo?.achar() ?? null; } catch { el = null; }
-      if (el && visivel(el)) { setAlvo(el); setAnelVivo(true); trackEvent("modulo_intro_reancorou", { modulo: m, passo: numero, segundos: segundos() }); return; }
+      if (el && visivel(el)) { setAlvo(el); setAnelVivo(true); trackEvent("modulo_intro_reancorou", comVersao({ modulo: m, passo: numero, segundos: segundos() })); return; }
       if (++voltas < TEMPOS_DO_TOQUE.reancorarVoltas) depois(tentar, TEMPOS_DO_TOQUE.reancorar);
     };
     depois(tentar, TEMPOS_DO_TOQUE.reancorar);
@@ -139,11 +141,11 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     faseRef.current = "registrou";
     setRotulos((r) => [...r, rotulo]);
     setFase("registrou");
-    trackEvent("modulo_intro_registrou", { modulo: m, via, passo: numero, segundos: segundos() });
+    trackEvent("modulo_intro_registrou", comVersao({ modulo: m, via, passo: numero, segundos: segundos() }));
     const p = config.passos[nRef.current];
     depois(() => { try { p?.depois?.(); } catch { /* a intro nunca derruba o módulo */ } seguir(); }, reduzir ? 100 : TEMPOS_DO_TOQUE.registrou);
   };
-  const entendi = () => { if (faseRef.current !== "anotar") return; trackEvent("modulo_intro_olhar", { modulo: m, passo: numero, via: "botao" }); seguir(); };
+  const entendi = () => { if (faseRef.current !== "anotar") return; trackEvent("modulo_intro_olhar", comVersao({ modulo: m, passo: numero, via: "botao" })); seguir(); };
 
   /* O passo que ESCUTA (depois do foco, ou ação no próprio módulo): as chaves do módulo na conta */
   const chaves = passo?.escutar?.chaves ?? [];
@@ -174,7 +176,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
     if (!o) return;
     setTocado(chip.nome);
     if (passo.foco) {
-      trackEvent("modulo_intro_acao", { modulo: m, via: "foco", opcao: o.id, passo: numero });
+      trackEvent("modulo_intro_acao", comVersao({ modulo: m, via: "foco", opcao: o.id, passo: numero }));
       // tudo síncrono, dentro do toque: no iPhone o teclado só abre por foco dado na própria ação da pessoa
       try {
         passo.foco.abrir?.();
@@ -186,7 +188,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
       else setTocado(null); // o ✓ só quando a gravação chegar
       return;
     }
-    trackEvent("modulo_intro_acao", { modulo: m, via: "chip", opcao: o.id, passo: numero });
+    trackEvent("modulo_intro_acao", comVersao({ modulo: m, via: "chip", opcao: o.id, passo: numero }));
     let rotulo: string | void = undefined;
     try { rotulo = passo.executar?.({ get, gravar }, o); } catch { /* a intro nunca derruba o módulo */ }
     registrou(rotulo || o.rotulo, "chip");
@@ -194,7 +196,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   /* 1.0.17 (dono 19/10): no lugar do "Pular" da faixa (que fechava tudo de uma vez), um "Agora não" quieto em cada passo:
      fecha SÓ este tutorial — marcado como visto (nunca volta); o que ela já fez nele conta como feito. */
   const agoraNao = () => {
-    trackEvent("modulo_intro_pulou", { modulo: m, fase: "toque", passo: numero, segundos: segundos(), via: "agora_nao" });
+    trackEvent("modulo_intro_pulou", comVersao({ modulo: m, fase: "toque", passo: numero, segundos: segundos(), via: "agora_nao" }));
     aoTerminar(rotulos.length ? "feita" : "pulada");
   };
 
@@ -202,7 +204,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
   const oferta = podeOferecerTour(m, get) ? ofertaDoTour(m) : null;
   useEffect(() => {
     if (fase !== "pronto") return;
-    trackEvent("modulo_intro_concluida", { modulo: m, segundos: segundos(), passos: total });
+    trackEvent("modulo_intro_concluida", comVersao({ modulo: m, segundos: segundos(), passos: total }));
     if (oferta) trackEvent("conhecer_mais_oferta", { modulo: m, origem: "fim_tutorial" });
     const t = window.setTimeout(() => aoTerminar("feita"), oferta ? TEMPOS_DO_TOQUE.prontoComOferta : TEMPOS_DO_TOQUE.pronto);
     return () => window.clearTimeout(t);
@@ -290,7 +292,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
               setAnelVivo(false);
               if (faseRef.current !== "anotar") return;
               if (passo.olhar) { entendi(); return; } // o olhar acabou (tempo, rolagem): segue
-              setAcende((x) => x + 1); trackEvent("modulo_intro_anel_saiu", { modulo: m, motivo });
+              setAcende((x) => x + 1); trackEvent("modulo_intro_anel_saiu", comVersao({ modulo: m, motivo }));
             }}
             balao={balao} />
         )}

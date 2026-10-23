@@ -127,17 +127,19 @@ export function IntroDoModulo({ moduleId }: { moduleId: string }) {
   /* 1.0.17 (telemetria): a intro SAIU sem "Pronto" nem "Agora não" — voltou (←), foi pra outro módulo, outra guia entrou
      por cima, ou o app foi pro 2º plano (pode voltar; o `via` separa). `modulo_intro_saiu {modulo, passo, via}`. */
   const terminou = useRef(false);
+  /** 1.0.18: as intros curtas (1 passo) levam `versao: "curta"` também no `modulo_intro_saiu` */
+  const versao = config?.formato === "toque" && config.versao ? { versao: config.versao } : {};
   const motivoDaSaida = useRef<"saiu" | "outra_guia">("saiu");
   useEffect(() => {
     if (estado !== "visivel") return;
     terminou.current = false;
     motivoDaSaida.current = "saiu";
-    const aoEsconder = () => { if (document.visibilityState === "hidden" && !terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: "segundo_plano" }); };
+    const aoEsconder = () => { if (document.visibilityState === "hidden" && !terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: "segundo_plano", ...versao }); };
     document.addEventListener("visibilitychange", aoEsconder);
     return () => {
       document.removeEventListener("visibilitychange", aoEsconder);
       marcarIntroNaTela(moduleId, false);
-      if (!terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: motivoDaSaida.current });
+      if (!terminou.current) trackEvent("modulo_intro_saiu", { modulo: moduleId, passo: passoDaIntroNaTela(moduleId), via: motivoDaSaida.current, ...versao });
       /* 1.0.18 (revisor 22/10): a ÚLTIMA aparição saiu sem "Pronto"/"Agora não" (voltou, outra tela, outra guia) — ela
          já está gravada como pulada e não volta mais: avisa o fim como "pulada" (a missão grava a dose 2 pulada, em vez
          de montar o passo guiado na próxima entrada do mesmo dia) */

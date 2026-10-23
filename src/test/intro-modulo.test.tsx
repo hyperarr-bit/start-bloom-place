@@ -194,10 +194,14 @@ describe("chave, constantes e classificação", () => {
       expect(c.pedido.length, m).toBeGreaterThan(8);
       expect(c.pronto.length, m).toBeGreaterThan(12);
       expect(c.pronto.length, m).toBeLessThanOrEqual(45);
-      expect(c.passos.length, m).toBeGreaterThanOrEqual(3);
-      expect(c.passos.length, m).toBeLessThanOrEqual(4);
       expect(c.passos[0].olhar, `${m}: o 1º passo é uma ação`).toBeUndefined();
-      expect(c.passos.some((p) => !!p.olhar), `${m}: tem um "olha"`).toBe(true);
+      // 1.0.18 (dados 17–23/10): as 5 mais puladas viraram CURTAS — 1 passo só, registrar a 1ª coisa (como a Beleza)
+      if (c.versao === "curta") { expect(c.passos.length, m).toBe(1); expect(c.pronto.endsWith("."), m).toBe(true); }
+      else {
+        expect(c.passos.length, m).toBeGreaterThanOrEqual(3);
+        expect(c.passos.length, m).toBeLessThanOrEqual(4);
+        expect(c.passos.some((p) => !!p.olhar), `${m}: tem um "olha"`).toBe(true);
+      }
       for (const p of c.passos) conferirPasso(m, p);
       const texto = JSON.stringify(c).toLowerCase();
       for (const proibido of ["no app do celular", ".mp4", "gravado do app"]) expect(texto, m).not.toContain(proibido);

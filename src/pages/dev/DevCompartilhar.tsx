@@ -7,6 +7,8 @@ import { TreinoConcluido } from "@/components/treino/TreinoConcluido";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { FORMATOS, type DadosCard, type Formato } from "@/components/compartilhar/tipos";
 import { DIRECOES } from "./compartilhar-direcoes";
+import { RetroOutubro } from "@/components/compartilhar/RetroOutubro";
+import { AGORA_EXEMPLO, RETRO_EXEMPLO, RETRO_FIN_INCOMPLETA, RETRO_POUCA, SEMENTE_COMPLETA, SEMENTE_FIN_INCOMPLETA, SEMENTE_POUCA, leitorDe } from "./retro-outubro-exemplo";
 import { AGUA, AZUL_1, AZUL_3, FIGURINHA_LENDARIA, HABITOS, INSIGNIA_OURO, LIVROS_MES, LIVROS_5, METAS, POUPANCA, SEQUENCIA, SONO, TREINOS_MES, TREINOS_TOTAL } from "./compartilhar-exemplos";
 
 /**
@@ -44,7 +46,13 @@ const EXEMPLOS: { id: string; nome: string; dados: DadosCard }[] = [
   { id: "metas", nome: "Metas do mês", dados: METAS },
   { id: "insignia", nome: "Insígnia que evoluiu", dados: INSIGNIA_OURO },
   { id: "figurinha", nome: "Figurinha lendária", dados: FIGURINHA_LENDARIA },
+  // 23/10: a RETROSPECTIVA DE OUTUBRO, saída da conta de verdade (montarRetroOutubro) com a conta de exemplo
+  ...RETRO_EXEMPLO.cards.map((c) => ({ id: `retro-${c.id}`, nome: `Retro outubro · ${c.id}`, dados: c.dados })),
+  ...(RETRO_FIN_INCOMPLETA?.cards.filter((c) => c.id === "financas").map((c) => ({ id: "retro-financas-neutro", nome: "Retro outubro · finanças incompletas (neutro)", dados: c.dados })) ?? []),
+  ...(RETRO_POUCA?.cards.map((c) => ({ id: `retro-pouca-${c.id}`, nome: `Retro outubro (pouco dado) · ${c.id}`, dados: c.dados })) ?? []),
 ];
+
+const SEMENTES_RETRO: Record<string, Record<string, unknown>> = { "1": SEMENTE_COMPLETA, pouca: SEMENTE_POUCA, incompleta: SEMENTE_FIN_INCOMPLETA };
 
 export const dadosDaChave = (chave: string): { dados: DadosCard; formato: Formato } | null => {
   const m = /^card-(.+)-(stories|feed|adesivo)$/.exec(chave);
@@ -186,6 +194,11 @@ const DevCompartilhar = () => {
   if (params.get("video")) return <GerarVideo chave={params.get("video")!} moeda={o.moeda} />;
   if (params.get("quadros")) return <Quadros chave={params.get("quadros")!} tempos={tempos} moeda={o.moeda} />;
   if (params.get("treino")) return <TreinoConcluidoExemplo />;
+  // 23/10: /dev/compartilhar?retro=1|pouca|incompleta — a tela da retrospectiva de outubro com a conta de exemplo (01/11)
+  if (params.get("retro")) {
+    const semente = SEMENTES_RETRO[params.get("retro")!] ?? SEMENTE_COMPLETA;
+    return <RetroOutubro ler={leitorDe(semente)} agora={AGORA_EXEMPLO} onClose={() => {}} semDados={<div style={{ padding: 24 }}>Sem dados.</div>} />;
+  }
   if (params.get("previa")) {
     const ex = EXEMPLOS.find((e) => e.id === params.get("previa"));
     if (!ex) return <div style={{ padding: 24 }}>Não achei a prévia.</div>;

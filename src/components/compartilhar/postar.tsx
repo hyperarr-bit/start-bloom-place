@@ -51,7 +51,7 @@ export async function prepararCapas(dados: DadosCard): Promise<DadosCard> {
 }
 
 const nomeDoArquivo = (d: DadosCard, formato: Formato, ext: "png" | "mp4") => `core-${d.tipo}-${formato}.${ext}`;
-const tituloDo = (d: DadosCard) => ({ treinos: "Meus treinos no CORE", azul: "No azul, com o CORE", poupanca: "Guardei no CORE", livros: "Minhas leituras no CORE", sequencia: "Minha sequência no CORE", agua: "Minha água no CORE", sono: "Meu sono no CORE", habitos: "Meu hábito no CORE", metas: "Minhas metas no CORE", insignia: "Minha insígnia no CORE", figurinha: "Minha figurinha no CORE", numero: "Minha conquista no CORE" })[d.tipo];
+const tituloDo = (d: DadosCard) => ({ treinos: "Meus treinos no CORE", azul: "No azul, com o CORE", poupanca: "Guardei no CORE", livros: "Minhas leituras no CORE", sequencia: "Minha sequência no CORE", agua: "Minha água no CORE", sono: "Meu sono no CORE", habitos: "Meu hábito no CORE", metas: "Minhas metas no CORE", insignia: "Minha insígnia no CORE", figurinha: "Minha figurinha no CORE", numero: "Minha conquista no CORE", lancamentos: "Minhas finanças no CORE", "retro-abertura": "Meu mês no CORE", "retro-resumo": "Meu mês no CORE" })[d.tipo];
 
 /** A imagem do card (PNG no tamanho do formato; o adesivo com fundo transparente). */
 export async function gerarImagemDoCard(dados: DadosCard, formato: Formato, moeda?: ReactNode): Promise<Blob | null> {

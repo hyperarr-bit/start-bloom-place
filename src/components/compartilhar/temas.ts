@@ -25,7 +25,15 @@ export interface TemaDoCard {
 }
 
 export const TEMAS: Record<TipoCard, TemaDoCard> = {
-  treinos: { paradas: ["#2563eb", "#1d4ed8", "#1e3a8a"], angulo: 165, tinta: "#ffffff", suave: "rgba(255,255,255,.86)", apagado: "rgba(255,255,255,.16)", modulo: "Treino", destaque: "#1d4ed8" },
+  // 23/10 (retrospectiva de outubro): o Treino saiu do AZUL — ficava igual a Finanças. Roxo-uva, o roxo do
+  // degradê roxo→magenta do topo do app: não colide com Rotina (verde), Água (petróleo), Leitura (terracota),
+  // Metas (magenta, hue 330 × 265 aqui), Finanças (azul) nem com a capa grafite da retrospectiva.
+  treinos: { paradas: ["#7c3aed", "#6d28d9", "#4c1d95"], angulo: 165, tinta: "#ffffff", suave: "rgba(255,255,255,.86)", apagado: "rgba(255,255,255,.16)", modulo: "Treino", destaque: "#6d28d9" },
+  // 23/10: Finanças sem "no azul" (o mês sem gastos completos): o azul que era do Treino, com o calendário dos lançamentos
+  lancamentos: { paradas: ["#2563eb", "#1d4ed8", "#1e3a8a"], angulo: 165, tinta: "#ffffff", suave: "rgba(255,255,255,.86)", apagado: "rgba(255,255,255,.16)", modulo: "Finanças", destaque: "#1d4ed8" },
+  // 23/10: a abertura e o resumo da retrospectiva — a moldura da marca (grafite + magenta)
+  "retro-abertura": { paradas: ["#2a2a31", "#1f1f25", "#141418"], angulo: 170, tinta: "#ffffff", suave: "rgba(255,255,255,.80)", apagado: "rgba(255,255,255,.10)", modulo: "Retrospectiva", destaque: "#db2777" },
+  "retro-resumo": { paradas: ["#2a2a31", "#1f1f25", "#141418"], angulo: 170, tinta: "#ffffff", suave: "rgba(255,255,255,.80)", apagado: "rgba(255,255,255,.10)", modulo: "Retrospectiva", destaque: "#db2777" },
   azul: { paradas: ["#f5efe3", "#f1e9da"], angulo: 180, tinta: "#1f1f24", suave: "#5f574d", apagado: "rgba(31,31,36,.08)", modulo: "Finanças", destaque: "#1d4ed8" },
   poupanca: { paradas: ["#f5efe3", "#f1e9da"], angulo: 180, tinta: "#1f1f24", suave: "#5f574d", apagado: "rgba(31,31,36,.08)", modulo: "Finanças", destaque: "#047857" },
   livros: { paradas: ["#c2410c", "#9a3412", "#7c2d12"], angulo: 165, tinta: "#ffffff", suave: "rgba(255,255,255,.86)", apagado: "rgba(255,255,255,.16)", modulo: "Leitura", destaque: "#9a3412" },

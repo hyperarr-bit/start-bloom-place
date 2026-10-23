@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { forcaRetroOutubro, guardarForcaRetroOutubro, PARAM_QA_RETRO, retroOutubroAtiva } from "@/lib/retro-outubro";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVoltarDaSubpagina } from "@/lib/volta-da-demo";
 import { motion } from "framer-motion";
@@ -28,6 +29,14 @@ import { Espiral, Fita, P3, creme, kicker, linho, relevo, serif, vinheta } from 
  * notificação com o app frio, o cálculo único da montagem acontecia antes da
  * carga do servidor e do arquivamento do mês — e setembro saía sem Finanças.
  */
+
+/**
+ * (23/10) A RETROSPECTIVA DE OUTUBRO em cards animados (src/components/compartilhar/RetroOutubro):
+ * atrás da chave `retro_outubro` (lib/retro-outubro — padrão off, liga pelo RevenueCat), só a partir de
+ * 01/11 no relógio do aparelho. Desligada, esta tela é a de sempre (o componente nem baixa).
+ * QA: `/retrospectiva?retro=outubro` liga neste navegador e abre direto (com os dados até hoje).
+ */
+const RetroOutubro = lazy(() => import("@/components/compartilhar/RetroOutubro"));
 
 /** "1 livros" é o tipo de detalhe que faz o app parecer feito às pressas. */
 const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`;
@@ -76,6 +85,12 @@ const Retrospectiva = () => {
   const [params] = useSearchParams();
   const mesPedido = params.get("mes");
   const uid = user?.id ?? null;
+  // (23/10) `?retro=outubro` (QA, só na web): grava a força ANTES de qualquer conta e abre outubro direto
+  const [qaOutubro, setQaOutubro] = useState(() => {
+    guardarForcaRetroOutubro(params);
+    return params.get(PARAM_QA_RETRO) === "outubro" && forcaRetroOutubro() === "on";
+  });
+  const lerRetro = useMemo(() => (chave: string) => get<unknown>(chave, undefined), [get]);
 
   // Últimos 12 meses FECHADOS, do mais recente pro mais antigo. Começa em
   // `atras = 1` de propósito (02/09, bug visto pelo dono): com 0, o mês
@@ -170,17 +185,40 @@ const Retrospectiva = () => {
   // "O setembro de Ana" (26/09, redesenho): o nome que a pessoa deu, nunca o e-mail
   const nome = nomeDaPessoa((chave) => get<unknown>(chave, undefined), user?.user_metadata);
 
-  if (aberto) {
+  if (qaOutubro) {
     return (
-      <MonthlyWrapped
-        retro={aberto}
-        nome={nome}
-        onClose={() => {
-          setPedidoEncerrado(true);
-          setAbertoId(null);
-        }}
-      />
+      <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
+        <RetroOutubro
+          ler={lerRetro}
+          onClose={() => setQaOutubro(false)}
+          semDados={
+            <div className="fixed inset-0 z-[400] grid place-items-center text-center px-8" style={{ background: "#0e0e11", color: "#fff" }}>
+              <div>
+                <p className="text-base font-bold">Outubro não tem registros nesta conta.</p>
+                <button onClick={() => setQaOutubro(false)} className="mt-5 rounded-full bg-white text-black font-bold px-6 py-2.5 text-sm">Voltar</button>
+              </div>
+            </div>
+          }
+        />
+      </Suspense>
     );
+  }
+
+  if (aberto) {
+    const fechar = () => {
+      setPedidoEncerrado(true);
+      setAbertoId(null);
+    };
+    const antiga = <MonthlyWrapped retro={aberto} nome={nome} onClose={fechar} />;
+    // (23/10) outubro com a chave ligada (e o mês acabado): os cards animados; sem nada pra mostrar neles, a de sempre
+    if (retroOutubroAtiva(aberto.ano, aberto.mesIdx)) {
+      return (
+        <Suspense fallback={<div className="fixed inset-0 z-[400]" style={{ background: "#0e0e11" }} />}>
+          <RetroOutubro ler={lerRetro} onClose={fechar} semDados={antiga} />
+        </Suspense>
+      );
+    }
+    return antiga;
   }
 
   if (esperandoPedido) {

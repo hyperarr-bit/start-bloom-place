@@ -1,5 +1,5 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Check, Droplets, Dumbbell, Flag, Flame, Moon, PiggyBank, Sparkles, Sprout, Star, type LucideIcon } from "lucide-react";
+import { BookOpen, Check, Droplets, Dumbbell, Flag, Flame, Moon, PiggyBank, Receipt, Sparkles, Sprout, Star, type LucideIcon } from "lucide-react";
 import { Adesivo } from "@/components/conquistas/adesivos-arte";
 import { AnelRaridadeSvg } from "@/components/conquistas/adesivos-raridade";
 import { AssinaturaCore, IconeCore, INTER, SERIF } from "./marca";
@@ -7,7 +7,7 @@ import { CalendarioDoMes, FaixaDeSemanas, Numero, Rotulo, type CoresDoCalendario
 import { caminhoDaOnda } from "./onda";
 import { LETRAS_DA_SEMANA, diasMarcadosNoMes, maiorCorrida } from "./calendario";
 import { TEMAS, fundoDo, temaDaCor, type TemaDoCard } from "./temas";
-import { FORMATOS, type DadosNumero, type DadosAgua, type DadosAzul, type DadosCard, type DadosFigurinha, type DadosHabitos, type DadosInsignia, type DadosLivros, type DadosMetas, type DadosPoupanca, type DadosSequencia, type DadosSono, type DadosTreinos, type Formato, type Livro, type NivelMoeda } from "./tipos";
+import { FORMATOS, type DadosLancamentos, type DadosRetroAbertura, type DadosRetroResumo, type ModuloDaRetro, type DadosNumero, type DadosAgua, type DadosAzul, type DadosCard, type DadosFigurinha, type DadosHabitos, type DadosInsignia, type DadosLivros, type DadosMetas, type DadosPoupanca, type DadosSequencia, type DadosSono, type DadosTreinos, type Formato, type Livro, type NivelMoeda } from "./tipos";
 import { capitalizar, desdeMes, diaDoMes, diasNoMes, lerMesId, mesAno, mesCurto, nomeDoMes, numeroBR, palavra, plural, porcento, reais, UNIDADES } from "./textos";
 
 /**
@@ -43,6 +43,7 @@ const Na = ({ de = [], children, style, bloco }: { de?: Camada | Camada[]; child
 const ICONES: Record<DadosCard["tipo"], LucideIcon> = {
   treinos: Dumbbell, azul: PiggyBank, poupanca: PiggyBank, livros: BookOpen, sequencia: Flame, agua: Droplets,
   sono: Moon, habitos: Sprout, metas: Flag, insignia: Sparkles, figurinha: Sparkles, numero: Star,
+  lancamentos: Receipt, "retro-abertura": Sparkles, "retro-resumo": Sparkles,
 };
 
 /* ------------------------------------------------------------------------- *
@@ -132,7 +133,7 @@ const Heroi = ({ numero, rotulo, base, tema, sub }: { numero: string; rotulo: Re
 );
 
 /** A linha de estatísticas (2 ou 3 números pequenos com legenda). */
-const Estatisticas = ({ itens, tema, tam = 64 }: { itens: { valor: ReactNode; legenda: string }[]; tema: TemaDoCard; tam?: number }) => (
+const Estatisticas = ({ itens, tema, tam = 64 }: { itens: { valor: ReactNode; legenda: string }[]; tema: TemaDoCard; tam?: number }) => itens.length === 0 ? null : (
   <Na de="textos" bloco="estatisticas" style={{ display: "grid", gridTemplateColumns: `repeat(${itens.length}, 1fr)`, gap: 28 }}>
     {itens.map((it, i) => (
       <div key={i} style={{ minWidth: 0, borderTop: `3px solid ${tema.apagado}`, paddingTop: 22 }}>
@@ -209,10 +210,13 @@ export const CardTreinos = ({ d, formato }: { d: DadosTreinos; formato: "stories
         </>
       )}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+        {/* 23/10: semanas na meta e recordes só quando vieram (a retrospectiva não manda — nunca "0 recordes batidos");
+            pouco dado não ganha número que diminui: "1 dia seguido" e "6% dos dias do mês" não entram */}
         <Estatisticas tema={tema} tam={stories ? 64 : 58} itens={[
-          { valor: corrida, legenda: palavra(corrida, UNIDADES.diaSeguido) },
-          { valor: d.semanasNaMeta ?? 0, legenda: `${palavra(d.semanasNaMeta ?? 0, UNIDADES.semana)} na meta` },
-          { valor: d.recordes ?? 0, legenda: `${palavra(d.recordes ?? 0, UNIDADES.recorde)} ${(d.recordes ?? 0) === 1 ? "batido" : "batidos"}` },
+          ...(corrida >= 2 ? [{ valor: corrida, legenda: palavra(corrida, UNIDADES.diaSeguido) }] : []),
+          ...(d.semanasNaMeta != null ? [{ valor: d.semanasNaMeta, legenda: `${palavra(d.semanasNaMeta, UNIDADES.semana)} na meta` }] : []),
+          ...(d.recordes != null ? [{ valor: d.recordes, legenda: `${palavra(d.recordes, UNIDADES.recorde)} ${d.recordes === 1 ? "batido" : "batidos"}` }] : []),
+          ...(d.semanasNaMeta == null && d.recordes == null && feitos.length / diasNoMes(d.ano, d.mesIdx) >= 0.25 ? [{ valor: porcento((feitos.length / diasNoMes(d.ano, d.mesIdx)) * 100), legenda: "dos dias do mês" }] : []),
         ]} />
       </div>
     </Moldura>
@@ -591,7 +595,8 @@ export const CardAgua = ({ d, formato }: { d: DadosAgua; formato: "stories" | "f
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
         <Estatisticas tema={tema} tam={stories ? 64 : 54} itens={[
           { valor: porcento((naMeta / Math.max(1, d.porDia.length)) * 100), legenda: "dos dias do mês" },
-          { valor: `${numeroBR(Math.min(total, d.porDia.length))}`, legenda: `${palavra(d.porDia.length, UNIDADES.dia)} anotados` },
+          // 23/10: "anotados" = dias com algum copo registrado (antes contava todos os dias até hoje, anotados ou não)
+          { valor: numeroBR(Math.min(total, d.porDia.filter((f) => f > 0).length)), legenda: `${palavra(d.porDia.filter((f) => f > 0).length, UNIDADES.dia)} anotados` },
         ]} />
       </div>
     </Moldura>
@@ -822,6 +827,152 @@ export const CardNumero = ({ d, formato }: { d: DadosNumero; formato: "stories" 
 };
 
 /* ------------------------------------------------------------------------- *
+ * RETROSPECTIVA DE OUTUBRO (23/10) — Finanças sem "no azul", a abertura e o resumo
+ * ------------------------------------------------------------------------- */
+
+/** Finanças quando os gastos do mês não fecham a conta: só o que foi anotado (quantos e em que dias). */
+export const CardLancamentos = ({ d, formato }: { d: DadosLancamentos; formato: "stories" | "feed" }) => {
+  const tema = TEMAS.lancamentos;
+  const stories = formato === "stories";
+  const feitos = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias);
+  const linhas = Math.ceil((((new Date(d.ano, d.mesIdx, 1).getDay() + 6) % 7) + diasNoMes(d.ano, d.mesIdx)) / 7);
+  const corrida = maiorCorrida(feitos);
+  return (
+    <Moldura tipo="lancamentos" formato={formato} periodo={mesAno(d.mesIdx, d.ano)}>
+      <Heroi numero={numeroBR(d.lancamentos)} rotulo={<>{d.lancamentos === 1 ? "lançamento anotado" : "lançamentos anotados"}</>} sub={`em ${nomeDoMes(d.mesIdx)}`} base={stories ? 360 : 260} tema={tema} />
+      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 60, right: stories ? 0 : 60, top: stories ? 540 : 360 }}>
+        <CalendarioEmCamada ano={d.ano} mesIdx={d.mesIdx} feitos={new Set(feitos)} hoje={d.hoje} largura={stories ? 912 : 792} alturaLinha={stories ? (linhas > 5 ? 80 : 92) : (linhas > 5 ? 54 : 62)} cores={coresDoCalendario(tema)} />
+      </Na>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+        <Estatisticas tema={tema} tam={stories ? 64 : 54} itens={[
+          { valor: feitos.length, legenda: `${palavra(feitos.length, UNIDADES.dia)} com lançamento` },
+          ...(corrida >= 2 ? [{ valor: corrida, legenda: palavra(corrida, UNIDADES.diaSeguido) }] : []),
+        ]} />
+      </div>
+    </Moldura>
+  );
+};
+
+/** As cores e os ícones dos módulos da retrospectiva (os mesmos dos cards de cada um). */
+export const MODULOS_DA_RETRO: Record<ModuloDaRetro, { nome: string; Icone: LucideIcon; cor: string }> = {
+  financas: { nome: "Finanças", Icone: PiggyBank, cor: "#2563eb" },
+  treino: { nome: "Treino", Icone: Dumbbell, cor: TEMAS.treinos.paradas[0] },
+  rotina: { nome: "Rotina", Icone: Sprout, cor: TEMAS.habitos.paradas[0] },
+  agua: { nome: "Água", Icone: Droplets, cor: TEMAS.agua.paradas[0] },
+  leitura: { nome: "Leitura", Icone: BookOpen, cor: TEMAS.livros.paradas[0] },
+  metas: { nome: "Metas", Icone: Flag, cor: TEMAS.metas.paradas[0] },
+};
+
+const MAGENTA = "#db2777";
+
+/** A ABERTURA: "Seu outubro", o número de dias com registro e o calendário do mês acendendo em magenta. */
+export const CardRetroAbertura = ({ d, formato }: { d: DadosRetroAbertura; formato: "stories" | "feed" }) => {
+  const tema = TEMAS["retro-abertura"];
+  const stories = formato === "stories";
+  const feitos = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias);
+  const linhas = Math.ceil((((new Date(d.ano, d.mesIdx, 1).getDay() + 6) % 7) + diasNoMes(d.ano, d.mesIdx)) / 7);
+  const cores: CoresDoCalendario = { ...coresDoCalendario(tema), feito: MAGENTA, feitoTexto: "#ffffff" };
+  return (
+    <Moldura tipo="retro-abertura" formato={formato} periodo={mesAno(d.mesIdx, d.ano)} marcaDagua={false}>
+      <Na de="textos" bloco="titulo" style={{ fontSize: stories ? 168 : 116, fontWeight: 900, letterSpacing: "-0.06em", lineHeight: 0.9, color: tema.tinta }}>
+        Seu<br /><span style={{ color: MAGENTA }}>{nomeDoMes(d.mesIdx)}</span>
+      </Na>
+      <div style={{ position: "absolute", left: 0, right: 0, top: stories ? 352 : 238, display: "flex", alignItems: "flex-end", gap: stories ? 30 : 24 }}>
+        <Na>
+          <Numero tam={stories ? 190 : 128} cor={tema.tinta} style={{ marginLeft: -6 }}>
+            <span data-base="" style={{ display: "inline-block", width: 0, height: 0, verticalAlign: "baseline" }} />
+            {feitos.length}
+          </Numero>
+        </Na>
+        <Na de="textos" bloco="rotulo" style={{ fontSize: stories ? 50 : 38, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1.02, color: tema.tinta, paddingBottom: stories ? 8 : 4 }}>
+          {feitos.length === 1 ? "dia" : "dias"} com a<br />vida anotada
+        </Na>
+      </div>
+      <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: stories ? 0 : 76, right: stories ? 0 : 76, top: stories ? 590 : 400 }}>
+        <CalendarioEmCamada ano={d.ano} mesIdx={d.mesIdx} feitos={new Set(feitos)} hoje={d.hoje} largura={stories ? 912 : 760} alturaLinha={stories ? (linhas > 5 ? 76 : 88) : (linhas > 5 ? 48 : 56)} cores={cores} />
+      </Na>
+      {/* os módulos que vêm a seguir: uma bolinha por módulo, na cor do card dele (o resumo dá o nome) */}
+      {d.modulos.length > 0 && (
+        <Na de="textos" bloco="legenda" style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", gap: stories ? 16 : 12 }}>
+          {d.modulos.map((m) => {
+            const { Icone, cor } = MODULOS_DA_RETRO[m];
+            const lado = stories ? 76 : 58;
+            return (
+              <div key={m} style={{ width: lado, height: lado, borderRadius: "50%", background: cor, color: "#ffffff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <Icone size={lado * 0.46} strokeWidth={2.5} />
+              </div>
+            );
+          })}
+          <span style={{ marginLeft: stories ? 8 : 6, fontSize: stories ? 30 : 24, fontWeight: 800, color: tema.suave, whiteSpace: "nowrap" }}>
+            {d.modulos.length === 1 ? "1 área" : `${d.modulos.length} áreas`}
+          </span>
+        </Na>
+      )}
+    </Moldura>
+  );
+};
+
+/** Um bloco do resumo: a cor do módulo, o ícone, o número e o rótulo. É uma "casa": o vídeo acende um por um. */
+const BlocoDoResumo = ({ item, w, h, indice }: { item: DadosRetroResumo["itens"][number]; w: number; h: number; indice: number }) => {
+  const c = useCamada();
+  const { nome, Icone, cor } = MODULOS_DA_RETRO[item.modulo];
+  const aceso = c !== "apagado";
+  const conteudo = c === "tudo" || c === "aceso";
+  const pad = Math.round(h * 0.13);
+  return (
+    <div data-cel={indice + 1} data-feito="" style={{ width: w, height: h, borderRadius: Math.round(h * 0.14), background: aceso ? cor : "rgba(255,255,255,.07)", boxSizing: "border-box", padding: pad, display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#ffffff", visibility: c === "fundo" || c === "textos" ? "hidden" : undefined, overflow: "hidden", position: "relative" }}>
+      {conteudo && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Icone size={Math.round(h * 0.13)} strokeWidth={2.6} />
+            <Rotulo cor="#ffffff" tam={Math.round(h * 0.085)}>{nome}</Rotulo>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: Math.round(h * (item.numero.length > 4 ? 0.3 : 0.38)), fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 0.9, fontVariantNumeric: "tabular-nums" }}>{item.numero}</div>
+            <div style={{ fontSize: Math.round(h * 0.1), fontWeight: 800, marginTop: Math.round(h * 0.04), lineHeight: 1.1, opacity: 0.92, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.rotulo}</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+/** O RESUMO: "Meu outubro" e um bloco colorido por módulo, que entram um por um. */
+export const CardRetroResumo = ({ d, formato }: { d: DadosRetroResumo; formato: "stories" | "feed" }) => {
+  const tema = TEMAS["retro-resumo"];
+  const stories = formato === "stories";
+  const itens = d.itens.slice(0, 6);
+  const gap = stories ? 20 : 16;
+  const largura = 912;
+  const w = itens.length === 1 ? largura : (largura - gap) / 2;
+  // poucos módulos: blocos mais altos (um bloco solto de 220 px deixava o card vazio)
+  const h = itens.length <= 2 ? (stories ? 360 : 240) : stories ? 220 : 160;
+  return (
+    <Moldura tipo="retro-resumo" formato={formato} periodo={mesAno(d.mesIdx, d.ano)} marcaDagua={false}>
+      <Na de="textos" bloco="titulo" style={{ fontSize: stories ? 130 : 92, fontWeight: 900, letterSpacing: "-0.06em", lineHeight: 0.9, color: tema.tinta }}>
+        Meu<br /><span style={{ color: MAGENTA }}>{nomeDoMes(d.mesIdx)}</span>
+      </Na>
+      {itens.length > 0 ? (
+        <Na de={["apagado", "aceso"]} bloco="prova" style={{ position: "absolute", left: 0, right: 0, top: stories ? 290 : 204, display: "flex", flexWrap: "wrap", gap }}>
+          {itens.map((it, i) => <BlocoDoResumo key={it.modulo} item={it} w={w} h={h} indice={i} />)}
+        </Na>
+      ) : (
+        // pouco dado, nenhum módulo com o mínimo: o número dos dias com registro (nunca um resumo vazio)
+        <div style={{ position: "absolute", left: 0, right: 0, top: stories ? 380 : 260 }}>
+          <Heroi numero={String(d.diasComRegistro)} rotulo={<>{palavra(d.diasComRegistro, UNIDADES.dia)} com registro</>} sub={`em ${nomeDoMes(d.mesIdx)}`} base={stories ? 400 : 280} tema={tema} />
+        </div>
+      )}
+      {itens.length > 0 && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+        <Estatisticas tema={tema} tam={stories ? 64 : 54} itens={[
+          { valor: d.diasComRegistro, legenda: `${palavra(d.diasComRegistro, UNIDADES.dia)} com registro` },
+          ...(itens.length > 1 ? [{ valor: itens.length, legenda: "áreas da vida no CORE" }] : []),
+        ]} />
+      </div>}
+    </Moldura>
+  );
+};
+
+/* ------------------------------------------------------------------------- *
  * O ADESIVO — o cartão branco com fundo transparente, pra pôr na própria foto
  * ------------------------------------------------------------------------- */
 
@@ -848,6 +999,9 @@ export const resumoDoAdesivo = (d: DadosCard): ResumoDoAdesivo => {
     case "insignia": return { ...base, cor: NIVEIS[d.nivel].metal[2], modulo: d.moduloNome, numero: NIVEIS[d.nivel].nome, rotulo: `em ${d.moduloNome}`, sub: d.feito };
     case "figurinha": return { ...base, numero: d.titulo, rotulo: `figurinha ${NOME_RARIDADE[d.raridade]}`, sub: d.descricao };
     case "numero": return { ...base, cor: temaDaCor(d.cor, d.modulo).destaque, modulo: d.modulo, numero: d.numero, rotulo: d.rotulo, sub: d.sub };
+    case "lancamentos": return { ...base, numero: numeroBR(d.lancamentos), rotulo: d.lancamentos === 1 ? "lançamento" : "lançamentos", sub: `anotados em ${nomeDoMes(d.mesIdx)}` };
+    case "retro-abertura": { const n = diasMarcadosNoMes(d.ano, d.mesIdx, d.dias).length; return { ...base, numero: String(n), rotulo: `${palavra(n, UNIDADES.dia)} com registro`, sub: `em ${nomeDoMes(d.mesIdx)}` }; }
+    case "retro-resumo": return { ...base, numero: String(d.diasComRegistro), rotulo: `${palavra(d.diasComRegistro, UNIDADES.dia)} com registro`, sub: `em ${nomeDoMes(d.mesIdx)}` };
   }
 };
 
@@ -906,6 +1060,9 @@ export const CardDeCompartilhar = ({ dados, formato, camada = "tudo", moeda }: P
     case "insignia": el = <CardInsignia d={dados} formato={f} moeda={moeda} />; break;
     case "figurinha": el = <CardFigurinha d={dados} formato={f} />; break;
     case "numero": el = <CardNumero d={dados} formato={f} />; break;
+    case "lancamentos": el = <CardLancamentos d={dados} formato={f} />; break;
+    case "retro-abertura": el = <CardRetroAbertura d={dados} formato={f} />; break;
+    case "retro-resumo": el = <CardRetroResumo d={dados} formato={f} />; break;
   }
   return <CamadaCtx.Provider value={camada}>{el}</CamadaCtx.Provider>;
 };

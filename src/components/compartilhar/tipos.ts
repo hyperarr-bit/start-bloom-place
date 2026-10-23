@@ -195,7 +195,59 @@ export interface DadosNumero {
   periodo: string;
 }
 
+/**
+ * FINANÇAS SEM "NO AZUL" (23/10, retrospectiva de outubro): quando os gastos
+ * do mês não estão completos o bastante pra dizer se sobrou (critério em
+ * retro-outubro-dados.ts), o card mostra só o que foi ANOTADO — quantos
+ * lançamentos e em quais dias. Nunca "fechou no azul".
+ */
+export interface DadosLancamentos {
+  tipo: "lancamentos";
+  ano: number;
+  mesIdx: number;
+  hoje: string;
+  /** Lançamentos com data no mês (entradas + saídas). */
+  lancamentos: number;
+  /** Os dias com algum lançamento ("AAAA-MM-DD"). */
+  dias: string[];
+}
+
+/** Um módulo que entrou na retrospectiva (o chip da abertura e o bloco do resumo). */
+export type ModuloDaRetro = "financas" | "treino" | "rotina" | "agua" | "leitura" | "metas";
+
+/** A ABERTURA da retrospectiva (23/10): "Seu outubro" + o calendário dos dias com registro acendendo. */
+export interface DadosRetroAbertura {
+  tipo: "retro-abertura";
+  ano: number;
+  mesIdx: number;
+  hoje: string;
+  /** Dias do mês com QUALQUER registro datado ("AAAA-MM-DD"). */
+  dias: string[];
+  /** Os módulos que têm card, na ordem da sequência. */
+  modulos: ModuloDaRetro[];
+}
+
+export interface ItemDoResumo {
+  modulo: ModuloDaRetro;
+  /** "18" · "18%" · "3" */
+  numero: string;
+  /** "treinos" · "do que entrou, sobrou" */
+  rotulo: string;
+}
+
+/** O RESUMO da retrospectiva (23/10): um bloco por módulo, cada um na cor do seu card. */
+export interface DadosRetroResumo {
+  tipo: "retro-resumo";
+  ano: number;
+  mesIdx: number;
+  itens: ItemDoResumo[];
+  diasComRegistro: number;
+}
+
 export type DadosCard =
+  | DadosLancamentos
+  | DadosRetroAbertura
+  | DadosRetroResumo
   | DadosNumero
   | DadosTreinos
   | DadosAzul

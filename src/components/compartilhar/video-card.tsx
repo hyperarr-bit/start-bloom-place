@@ -225,7 +225,8 @@ export function roteiroQueAcende(cam: CamadasDoCard, largura: number, altura: nu
       acesas++;
       const e = unica ? 1.25 - 0.25 * saiVolta(u) : 0.55 + 0.45 * saiVolta(u);
       // a folga do recorte não pode pegar a casa vizinha (nos quadradinhos pequenos do "desde março")
-      pedaco(ctx, cam.aceso, c, { alfa: Math.min(1, u * 3), escala: e, folga: unica ? 60 : Math.max(2, Math.min(10, Math.min(c.w, c.h) * 0.12)) });
+      // 23/10: a prova única (as capas, a moeda) também SOBE enquanto aparece (o dono: "coisas subindo")
+      pedaco(ctx, cam.aceso, c, { alfa: Math.min(1, u * 3), escala: e, dy: unica ? (1 - saiCubico(u)) * 160 : 0, folga: unica ? 60 : Math.max(2, Math.min(10, Math.min(c.w, c.h) * 0.12)) });
       // o brilho de acender
       if (u < 1) {
         const r = Math.max(c.w, c.h) * (0.5 + 0.7 * u);

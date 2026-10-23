@@ -118,7 +118,10 @@ export const outraTelaAberta = () =>
     // 10/10: a faixa da missão em doses no topo = passo em andamento (entre o anel e a festa há frestas sem camada)
     || document.documentElement.hasAttribute("data-missao-doses-faixa")
     // 16/10 (contrato com o ramo da missão): `document.documentElement.dataset.missaoDose = "1"` enquanto uma dose está na tela
-    || document.documentElement.dataset.missaoDose === "1");
+    || document.documentElement.dataset.missaoDose === "1"
+    // 23/10 (1.0.18 + conquistas do caderno): o balão "Modo escuro e cores agora ficam aqui" do menu novo some
+    // sozinho em segundos — a festa espera ele sair em vez de cobrir o avatar que ele aponta
+    || !!document.querySelector("[data-aviso-menu-novo]"));
 
 /**
  * 10/10 (print do dono: o adesivo "Primeira Despesa" POR CIMA do post-it da dose 2 — "cliquei e saiu da

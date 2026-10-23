@@ -241,7 +241,7 @@ const abrirTela = (store: ReturnType<typeof montarStore>) =>
     </MemoryRouter>,
   );
 /** 7 raras/épicas coladas (enchem "OS MAIS RAROS") + 1 COMUM colada hoje (Primeira Despesa) que ainda não foi vista no álbum. */
-const RARAS = ["sequencia-7", "leitura-1", "rotina-7", "rotina-21", "leitura-10", "treino-12", "treino-50"];
+const RARAS = ["sequencia-7", "leitura-1", "sequencia-14", "rotina-21", "leitura-10", "treino-12", "treino-50"];
 const cenario = () => ({
   "core-user-name": "Ana Beatriz",
   "conquistas-desbloqueadas": { ...Object.fromEntries(RARAS.map((id) => [id, "2026-09-20"])), "first-expense": "2026-10-02" },

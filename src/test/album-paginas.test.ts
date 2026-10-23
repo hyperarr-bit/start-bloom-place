@@ -7,7 +7,7 @@
 process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect } from "vitest";
-import { MAIS_RAROS, VAGAS_POR_PAGINA, contagemDaPagina, maisRaros, montarAlbum, proximosDoAlbum, resumoRaridades, tituloDaPagina } from "@/components/conquistas/album-paginas";
+import { MAIS_RAROS, VAGAS_POR_PAGINA, contagemDaPagina, maisRaros, montarAlbum, montarAlbumEditorial, proximosDoAlbum, resumoRaridades, tituloDaPagina } from "@/components/conquistas/album-paginas";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
 import { buildBadgesSequencia, mesclarDesbloqueios } from "@/lib/conquistas-registro";
@@ -49,9 +49,41 @@ describe("os mais raros", () => {
     ];
     expect(proximosDoAlbum(lista).map((x) => x.id)).toEqual(["perto", "meio", "longe"]);
   });
+
+  it("conta zerada começa por despesa, hábito e treino, em vez de esperar retorno ou protetor", () => {
+    const { adesivos } = colecao({});
+    expect(proximosDoAlbum(adesivos).map((x) => x.id)).toEqual(["first-expense", "rotina-1", "treino-1"]);
+    expect(montarAlbum(adesivos)[0].proximos.map((x) => x.id)).toEqual(["first-expense", "rotina-1", "treino-1"]);
+  });
+
+  it("progresso existente continua à frente das sugestões iniciais", () => {
+    const lista = [
+      b("sequencia-14", "raro", false, { progresso: { atual: 12, alvo: 14 } }),
+      b("first-expense", "comum", false),
+      b("rotina-1", "comum", false),
+      b("treino-1", "comum", false),
+    ];
+    expect(proximosDoAlbum(lista).map((x) => x.id)).toEqual(["sequencia-14", "first-expense", "rotina-1"]);
+  });
+
+  it("catálogo parcial só prioriza primeiras ações existentes e completa com a ordem habitual", () => {
+    const lista = [b("outro", "comum", false), b("treino-1", "comum", false), b("meta", "raro", false)];
+    expect(proximosDoAlbum(lista).map((x) => x.id)).toEqual(["treino-1", "outro", "meta"]);
+    expect(proximosDoAlbum(lista, 1).map((x) => x.id)).toEqual(["treino-1"]);
+  });
 });
 
 describe("as páginas", () => {
+  it("a abertura editorial cabe em duas fileiras sem retirar figurinhas do miolo nem mudar o legado", () => {
+    const lista = Array.from({ length: 8 }, (_, i) => b(`e${i}`, "epico", true));
+    const editorial = montarAlbumEditorial(lista);
+    const legado = montarAlbum(lista);
+    expect(editorial[0].vagas.map(x => x.id)).toEqual(legado[0].vagas.slice(0, 4).map(x => x.id));
+    expect(legado[0].vagas).toHaveLength(6);
+    expect(editorial[0].total).toBe(lista.length);
+    expect(editorial.slice(1).flatMap(p => p.vagas.map(x => x.id)).sort()).toEqual(lista.map(x => x.id).sort());
+  });
+
   it("1ª = OS MAIS RAROS (X de todos); depois LENDÁRIOS · ÉPICOS · RAROS · COMUNS com vaga FIXA (na ordem da coleção) e até 16 por página (02/10: 4 × 4), divididas PARELHAS", () => {
     const epicos = Array.from({ length: 20 }, (_, i) => b(`e${i}`, "epico", i === 3 || i === 9 || i === 13));
     const lendarios = Array.from({ length: 7 }, (_, i) => b(`l${i}`, "lendario", false));
@@ -111,17 +143,18 @@ describe("as páginas", () => {
     expect(tres.proximos).toEqual([]);
   });
 
-  it("na coleção de verdade (68, 16/10): 7 páginas — 1 + lendários 1 + épicos 1 (14 cabem) + raros 2 (12 + 11) + comuns 2 (12 + 12) — e o total fecha", () => {
+  it("na coleção legada com Primeiro gole: 7 páginas e nenhuma figurinha perdida ou repetida", () => {
     const { adesivos, desbloqueadas } = colecao({ "sequencia-7": "2026-09-20", "leitura-1": "2026-09-21", "rotina-21": "2026-09-10" });
     const paginas = montarAlbum(adesivos, desbloqueadas);
     expect(paginas.map((p) => p.id)).toEqual(["mais-raros", "lendario-1", "epico-1", "raro-1", "raro-2", "comum-1", "comum-2"]);
     expect(paginas[0].vagas.map((x) => x.id)).toEqual(["rotina-21", "leitura-1", "sequencia-7"]);
-    expect(paginas[0].total).toBe(68);
+    expect(paginas[0].total).toBe(adesivos.length);
     const soma = paginas.slice(1).reduce((s, p) => s + p.vagas.length, 0);
-    expect(soma).toBe(68);
+    expect(soma).toBe(adesivos.length);
+    expect(new Set(paginas.slice(1).flatMap(p => p.vagas.map(v => v.id))).size).toBe(adesivos.length);
     expect(paginas.filter((p) => p.raridade === "epico").map((p) => p.vagas.length)).toEqual([14]);
     expect(paginas.filter((p) => p.raridade === "raro").map((p) => p.vagas.length)).toEqual([12, 11]);
-    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([12, 12]);
+    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([13, 12]);
   });
 });
 

@@ -1,6 +1,9 @@
 import { useId, type CSSProperties } from "react";
-import { RARIDADE_LABEL, XP_RARIDADE, type Raridade } from "@/components/gamification/types";
+import { RARIDADE_LABEL, XP_RARIDADE, type Badge, type Raridade } from "@/components/gamification/types";
 import { Adesivo } from "./adesivos-arte";
+import { ARTES_CADERNO } from "./artes-caderno";
+import { FigurinhaOculta } from "./FigurinhaOculta";
+import { MarcaRaridade, RARIDADES_EM_TESTE } from "./MarcaRaridade";
 import "./conquistas.css";
 
 /**
@@ -27,6 +30,7 @@ interface Props {
   raridade: Raridade;
   tamanho: number;
   trancado?: boolean;
+  progresso?: Badge["progresso"];
   titulo?: string;
   bordaGrossa?: boolean;
   /** Rotação "colada à mão", em graus. */
@@ -37,19 +41,23 @@ interface Props {
   entradaIndice?: number;
 }
 
-export const AdesivoRaro = ({ id, raridade, tamanho, trancado, titulo, bordaGrossa, giro = 0, className, style, entradaIndice }: Props) => {
-  const brilha = !trancado && (raridade === "epico" || raridade === "lendario");
+export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo, bordaGrossa, giro = 0, className, style, entradaIndice }: Props) => {
+  const caderno = !!ARTES_CADERNO[id];
+  const brilha = !caderno && !trancado && (raridade === "epico" || raridade === "lendario");
   return (
     <span
       className={`ad-rar${entradaIndice !== undefined ? " ad-entra" : ""}${className ? ` ${className}` : ""}`}
       data-rar={raridade}
       data-trancado={trancado ? "" : undefined}
+      data-caderno={caderno ? "" : undefined}
+      data-acabamento-v2={caderno && RARIDADES_EM_TESTE ? "" : undefined}
       style={{ width: tamanho, height: tamanho, "--giro": `${giro}deg`, "--i": entradaIndice, transform: giro ? `rotate(${giro}deg)` : undefined, ...style } as CSSProperties}
     >
       {brilha && <span className="ad-anel" aria-hidden />}
       {brilha && <span className="ad-sheen" aria-hidden />}
-      {!trancado && raridade === "lendario" && <Faiscas />}
-      <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} />
+      {!caderno && !trancado && raridade === "lendario" && <Faiscas />}
+      {caderno && trancado ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} /> : <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} />}
+      {caderno && <MarcaRaridade raridade={raridade} />}
     </span>
   );
 };

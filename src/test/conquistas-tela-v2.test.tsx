@@ -363,10 +363,10 @@ describe("Postar nos Stories", () => {
 });
 
 describe("o álbum de figurinhas (card + tela cheia)", () => {
-  it("o card diz '4 de 68 coladas' (16/10: +Voltei e 3 Dias pelo recorde), a raridade e o mais perto; 'Abrir o álbum' abre a tela cheia na página dos mais raros com as vagas numeradas; as abas pulam de seção; a vaga abre o detalhe; o X fecha", async () => {
+  it("o card diz '4 de 98 coladas' (16/10: +Voltei e 3 Dias pelo recorde), a raridade e o mais perto; 'Abrir o álbum' abre a tela cheia na página dos mais raros com as vagas numeradas; as abas pulam de seção; a vaga abre o detalhe; o X fecha", async () => {
     abrir(montarStore(cenario()));
     const card = screen.getByTestId("album-card");
-    expect(screen.getByTestId("album-card-contagem")).toHaveTextContent("4 de 68 coladas");
+    expect(screen.getByTestId("album-card-contagem")).toHaveTextContent("4 de 98 coladas");
     expect(card).toHaveTextContent("3 raros");
     expect(screen.getByTestId("album-card-proximo")).toHaveTextContent(/Perto de colar/);
     expect(card).toHaveAttribute("data-novas", "0");
@@ -375,7 +375,7 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     fireEvent.click(screen.getByTestId("album-abrir"));
     const tela = await screen.findByTestId("album-tela");
     expect(tela).toHaveTextContent("Álbum CORE 2026");
-    expect(tela).toHaveTextContent("4 de 68 · faltam 64");
+    expect(tela).toHaveTextContent("4 de 98 · faltam 94");
     const p0 = within(tela).getByTestId("album-tela-pagina-0");
     expect(p0).toHaveTextContent("OS MAIS RAROS");
     const vagas = Array.from(p0.querySelectorAll("[data-vaga]")).map((el) => [el.getAttribute("data-vaga"), el.getAttribute("data-aberta")]);
@@ -399,12 +399,12 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     fireEvent.click(within(tela).getByTestId("album-aba-raro"));
     const raros = within(tela).getByTestId("album-tela-pagina-3");
     expect(raros).toHaveTextContent("RAROS · 1/2");
-    expect(raros).toHaveTextContent("3 de 23 · faltam 20");
+    expect(raros).toHaveTextContent("3 de 25 · faltam 22");
     fireEvent.click(raros.querySelector('[data-vaga="sequencia-7"]')!);
     const detalhe = await screen.findByTestId("detalhe-vaga");
     expect(detalhe).toHaveTextContent("Figurinha Nº 03");
     expect(detalhe).toHaveTextContent("7 Dias Seguidos");
-    expect(detalhe).toHaveTextContent(/Colada em 20 de setembro/);
+    expect(detalhe).toHaveTextContent(/Conquistada em 20 de setembro/);
     expect(within(detalhe).getByTestId("vaga-postar")).toBeInTheDocument();
     fireEvent.click(within(detalhe).getByRole("button", { name: "Fechar" }));
     await waitFor(() => expect(screen.queryByTestId("detalhe-vaga")).toBeNull());
@@ -499,11 +499,13 @@ describe("ciclo completo: abrir → conquistar → sair → reabrir", () => {
 describe("momentos: no máximo 3 festas de tela cheia de uma vez (01/10: comuns vão pro popup)", () => {
   it("quando muitos adesivos abrem juntos, celebra em tela cheia os 3 mais raros, o 4º raro cola quieto e os comuns ficam pra UM popup", async () => {
     const { MomentosConquistas } = await import("@/components/conquistas/Momentos");
-    // 5 adesivos novos de uma vez: 1º Salário (comum), Múltiplas Rendas (raro), Patrimônio 100k (lendário), Contas em Dia (comum), Lista de Desejos (comum)
+    // Quatro marcos de leitura e primeiros passos comuns: o limite de festas independe da edição.
     const store = montarStore(cenario({
-      "conquistas-vistas": { adesivos: ["sequencia-7", "leitura-1"], marcos: [7] },
-      "finance-incomes": [{ id: 1, description: "Salário", value: 3000, date: dia(5) }, { id: 2, description: "Freela", value: 100, date: dia(6) }, { id: 3, description: "Aluguel", value: 100, date: dia(7) }],
-      "finance-investments": [{ id: "i", name: "x", value: 100000 }],
+      "conquistas-vistas": { adesivos: ["sequencia-2", "sequencia-3", "sequencia-7", "leitura-1", "leitura-3"], marcos: [7] },
+      "lib-books": Array.from({length:25}, (_,i)=>({id:String(i),title:`Livro ${i}`,status:"lido",endDate:dia(5)})),
+      "lib-read-log": Array.from({length:30}, (_,i)=>somarDias(HOJE,-i)),
+      "finance-incomes": [{id:1,description:"Salário",value:3000,date:dia(5)}],
+      "finance-investments": [{id:"i",name:"x",value:100}],
       "finance-dueDays": [{ day: 5, bills: [{ id: "b1", name: "Luz", paid: true }] }],
       "finance-wishlist": [{ id: "w1", name: "Fone", price: 300, savedAmount: 0 }],
     }));
@@ -514,16 +516,16 @@ describe("momentos: no máximo 3 festas de tela cheia de uma vez (01/10: comuns 
     );
     await waitFor(() => {
       const v = store.dados["conquistas-vistas"] as { adesivos: string[] };
-      // raros+: lendário 100k, raros multi-income/10k/50k → 3 ganham tela cheia, 1 raro cola quieto
-      expect(v.adesivos).not.toContain("investor-100k");
-      const rarosQuietos = ["multi-income", "investor-10k", "investor-50k"].filter((id) => v.adesivos.includes(id));
+      // Quatro raros ou superiores: três festas e um marcado como visto sem festa.
+      expect(v.adesivos).not.toContain("leitura-25");
+      const rarosQuietos = ["leitura-10", "meta-ano", "leitura-30"].filter((id) => v.adesivos.includes(id));
       expect(rarosQuietos).toHaveLength(1);
       // os comuns NÃO entram como vistos: esperam o popup (um só, com os 4 em carrossel)
       for (const id of ["first-income", "investor-1k", "bills-ok", "wishlist"]) expect(v.adesivos).not.toContain(id);
     });
     // tudo continua gravado como conquistado
     const gravadas = store.dados["conquistas-desbloqueadas"] as Record<string, string>;
-    for (const id of ["first-income", "multi-income", "investor-100k", "investor-1k", "investor-10k", "investor-50k", "bills-ok", "wishlist"]) expect(gravadas[id]).toBe(HOJE);
+    for (const id of ["first-income", "leitura-10", "leitura-25", "leitura-30", "meta-ano", "investor-1k", "bills-ok", "wishlist"]) expect(gravadas[id]).toBe(HOJE);
   });
 });
 

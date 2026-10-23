@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { CATEGORIAS, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
-import { ORDEM_RARIDADE, montarAlbum, paginaDaFigurinha, type PaginaAlbum } from "../album-paginas";
+import { ORDEM_RARIDADE, montarAlbumEditorial, paginaDaFigurinha, type PaginaAlbum } from "../album-paginas";
 import { CHAVE_ALBUM_VISTO, ordenarParaFolha } from "@/lib/conquistas-registro";
 import { anoDeMembro, useConquistas, usePerfilConquistas, useSequencia, type Sequencia } from "../use-conquistas";
 import { fraseDaColecao, idDoMarco, marcoDoAdesivo, proximoPremio, quandoCurto, type ProximoPremio } from "./recompensas";
@@ -59,12 +59,16 @@ export interface EstadoConquistasNova {
   ano: number;
   /** Todos os adesivos (com os 3 novos da sequência no meio). */
   adesivos: Badge[];
+  arquivados?: Badge[];
   /** Na ordem da folha: colados primeiro (mais recente antes), depois os mais perto. */
   folha: Badge[];
   desbloqueadas: Record<string, string>;
   abertos: number;
+  /** Conquistadas que já foram efetivamente colocadas no álbum. */
+  coladas: number;
   total: number;
   porRaridade: Record<Raridade, { abertos: number; total: number }>;
+  porRaridadeColada: Record<Raridade, { abertos: number; total: number }>;
   /** Colados desde a última visita ao álbum (a chave `conquistas-album-visto` de hoje): esperam pra ser colados. */
   pendentes: Badge[];
   /** O último colado (pra "Colado hoje"/"Último adesivo"). */
@@ -117,7 +121,7 @@ export function useConquistasNova(): EstadoConquistasNova {
     const folha = ordenarParaFolha(adesivos, desbloqueadas);
     const colados = folha.filter((b) => b.unlocked);
     const pendentes = visto ? colados.filter((b) => !visto.includes(b.id)) : [];
-    const paginas = montarAlbum(adesivos, desbloqueadas);
+    const paginas = montarAlbumEditorial(adesivos, desbloqueadas);
     const colecoes: ColecaoNova[] = CATEGORIAS.map((c) => {
       const dela = ordenarParaFolha(adesivos.filter((b) => b.category === c.id), desbloqueadas);
       const abertos = dela.filter((b) => b.unlocked).length;
@@ -134,10 +138,10 @@ export function useConquistasNova(): EstadoConquistasNova {
     }).filter((x): x is PaginaDeRaridade => !!x);
     // a página mais perto de fechar: qualquer página de raridade (contando as vagas DELA), com algo já colado, com menos vagas vazias
     const candidatas = paginas
-      .map((p, indice) => ({ indice, raridade: p.raridade, parte: p.parte?.[0], coladas: p.vagas.filter((b) => b.unlocked).length, faltam: p.vagas.filter((b) => !b.unlocked).length }))
-      .filter((p) => p.raridade && p.faltam > 0)
+      .map((p, indice) => ({ indice, titulo: p.titulo, modulo: p.modulo, raridade: p.raridade, parte: p.parte?.[0], coladas: p.vagas.filter((b) => b.unlocked).length, faltam: p.vagas.filter((b) => !b.unlocked).length }))
+      .filter((p) => (p.modulo || p.raridade) && p.faltam > 0)
       .sort((a, b) => (b.coladas > 0 ? 1 : 0) - (a.coladas > 0 ? 1 : 0) || a.faltam - b.faltam);
-    const paginaMaisPerto = candidatas[0] ? { indice: candidatas[0].indice, faltam: candidatas[0].faltam, ...TITULO_RARIDADE[candidatas[0].raridade!], parte: candidatas[0].parte } : null;
+    const paginaMaisPerto = candidatas[0] ? { indice: candidatas[0].indice, faltam: candidatas[0].faltam, ...(candidatas[0].raridade ? TITULO_RARIDADE[candidatas[0].raridade!] : { titulo: candidatas[0].titulo, plural: candidatas[0].titulo }), parte: candidatas[0].parte } : null;
     const colar = (id: string) => {
       const atual = lerVisto(get<unknown>(CHAVE_ALBUM_VISTO, undefined)) ?? [];
       if (atual.includes(id)) return;
@@ -149,11 +153,17 @@ export function useConquistasNova(): EstadoConquistasNova {
       membroDesde: perfil.membroDesde,
       ano: anoDeMembro(perfil.membroDesde),
       adesivos,
+      arquivados: conq.arquivados ?? [],
       folha,
       desbloqueadas,
       abertos: colados.length,
+      coladas: colados.length - pendentes.length,
       total: adesivos.length,
       porRaridade: conq.porRaridade,
+      porRaridadeColada: Object.fromEntries(ORDEM_RARIDADE.map(r => [r, {
+        total: conq.porRaridade[r].total,
+        abertos: conq.porRaridade[r].abertos - pendentes.filter(b => raridadeDe(b) === r).length,
+      }])) as Record<Raridade, { abertos: number; total: number }>,
       pendentes,
       ultimo: colados[colados.length - 1] ?? null,
       premio,
@@ -167,7 +177,7 @@ export function useConquistasNova(): EstadoConquistasNova {
       registroPronto: conq.registroPronto,
       colar,
     };
-  }, [seq, conq.adesivos, conq.desbloqueadas, conq.porRaridade, conq.registroPronto, perfil.nome, perfil.membroDesde, visto, get, set]);
+  }, [seq, conq.adesivos, conq.arquivados, conq.desbloqueadas, conq.porRaridade, conq.registroPronto, perfil.nome, perfil.membroDesde, visto, get, set]);
 }
 
 /** "3 raros · 12 comuns" — pro rodapé da coleção. */

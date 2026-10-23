@@ -1,3 +1,8 @@
+import { PreviaComemoracoes } from "./PreviaComemoracoes";
+import { buildBadgesSequencia } from "@/lib/conquistas-registro";
+import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
+import { buildBadgesVida } from "@/components/gamification/badges-vida";
+import { aplicarCatalogoCaderno } from "@/components/gamification/catalogo-caderno";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
@@ -15,6 +20,7 @@ import { ConquistasNova, type CamadaDev } from "@/components/conquistas/nova/Con
  *                          (album = o livro na capa; pagina = a página com mais vagas perto de fechar; colar = a página da figurinha nova)
  *   ?novas=0             · nenhuma figurinha esperando pra colar (padrão: 1, o "Humor em Dia")
  *   ?tema=escuro         · modo escuro
+ *   ?todas=1             · coleção completa para revisar artes; &novas=1 deixa Chef de Casa para colar
  *   ?zero=1              · conta nova sem nada colado
  */
 
@@ -69,10 +75,10 @@ const seeds = (hoje: string): Record<string, unknown> => {
       "first-income": somarDias(hoje, -60), "first-expense": somarDias(hoje, -60), "rotina-1": somarDias(hoje, -59), "treino-1": somarDias(hoje, -58),
       "sequencia-2": somarDias(hoje, -11), "sequencia-3": somarDias(hoje, -10), "sequencia-7": somarDias(hoje, -6), "rotina-7": somarDias(hoje, -6),
       "saver-20": somarDias(hoje, -30), "leitura-estante": somarDias(hoje, -40), "agua-7": somarDias(hoje, -17), "leitura-1": somarDias(hoje, -40),
-      "humor-7": somarDias(hoje, -2), "investor-1k": somarDias(hoje, -33), "challenger": somarDias(hoje, -7), "protetor-1": somarDias(hoje, -4),
+      "sono-7": somarDias(hoje, -10), "humor-7": somarDias(hoje, -2), "investor-1k": somarDias(hoje, -33), "challenger": somarDias(hoje, -7), "protetor-1": somarDias(hoje, -4),
     },
     // tudo visto, menos o "Humor em Dia" (colado anteontem) — é o "novo desde a última visita"
-    "conquistas-album-visto": ["first-income", "first-expense", "rotina-1", "treino-1", "sequencia-2", "sequencia-3", "sequencia-7", "rotina-7", "saver-20", "leitura-estante", "agua-7", "leitura-1", "investor-1k", "challenger", "protetor-1", "treino-12", "meta-semanal-4", "rotina-21"],
+    "conquistas-album-visto": ["sono-7", "first-income", "first-expense", "rotina-1", "treino-1", "sequencia-2", "sequencia-3", "sequencia-7", "rotina-7", "saver-20", "leitura-estante", "agua-7", "leitura-1", "investor-1k", "challenger", "protetor-1", "treino-12", "meta-semanal-4", "rotina-21"],
   };
 };
 
@@ -92,11 +98,20 @@ const DevConquistasNova = () => {
   const teste = Number(params.get("teste") || 0);
   const testeDia = teste >= 1 && teste <= 3 ? (teste as 1 | 2 | 3) : null;
   const camadaCru = params.get("camada");
-  const camada = (["toast", "marco", "colecao", "sequencia", "album", "pagina", "colar"].includes(camadaCru ?? "") ? camadaCru : null) as CamadaDev;
+  const camada = (["toast", "festa", "marco", "colecao", "sequencia", "album", "pagina", "colar"].includes(camadaCru ?? "") ? camadaCru : null) as CamadaDev;
 
   const inicial = useMemo(() => {
     if (params.get("zero") === "1") return { "core-user-name": "Ana Beatriz", "conquistas-desbloqueadas": {}, "conquistas-album-visto": [] };
     const s = seeds(hoje);
+    if (params.get("todas") === "1") {
+      const get = <T,>(key: string, fallback: T): T => (s[key] as T) ?? fallback;
+      const catalogo = aplicarCatalogoCaderno([...buildBadgesSequencia(0), ...buildBadgesFinancas(get), ...buildBadgesVida(get, hoje)], get, {}, hoje);
+      const ids = [...catalogo.filter(b => !b.arquivada).map(b => b.id), "master"];
+      s["conquistas-desbloqueadas"] = Object.fromEntries(ids.map(id => [id, hoje]));
+      s["conquistas-album-visto"] = params.get("novas") === "1" ? ids.filter(id => id !== (params.get("figurinha") || "receita-1")) : ids;
+      s["core-dias-anotados"] = dias(12, 1, hoje);
+      return s;
+    }
     const comHoje = params.get("hoje") === "1";
     if (testeDia) {
       // teste grátis: conta nova de poucos dias — só a missão e os primeiros registros
@@ -126,8 +141,8 @@ const DevConquistasNova = () => {
   }, [params]);
 
   return (
-    <Provedor inicial={inicial}>
-      <ConquistasNova testeDia={testeDia} camada={camada} />
+    <Provedor key={params.toString()} inicial={inicial}>
+      {params.get("camada") === "festas" ? <PreviaComemoracoes /> : <ConquistasNova primeiraFesta={params.get("primeira") === "1"} figurinhaFesta={params.get("figurinha") || undefined} prototipoSequencia={params.get("prototipo") === "sequencia"} testeDia={testeDia} camada={camada} />}
     </Provedor>
   );
 };

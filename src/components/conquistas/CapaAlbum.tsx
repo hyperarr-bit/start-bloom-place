@@ -25,6 +25,8 @@ interface Props {
   /** "2026" */
   ano: number;
   foto?: boolean;
+  /** Composição impressa da capa da referência, independente do progresso. */
+  referencia?: boolean;
   style?: CSSProperties;
 }
 
@@ -47,24 +49,28 @@ const Figurinha = ({ b, tam, foto, grossa, giro }: { b: Badge; tam: number; foto
   );
 };
 
-export const CapaAlbum = ({ largura, altura, maisRaros, abertos, total, nome, ano, foto = false, style }: Props) => {
+export const CapaAlbum = ({ largura, altura, maisRaros, abertos, total, nome, ano, foto = false, referencia = false, style }: Props) => {
   const k = largura / 200;
   const h = altura ?? Math.round(largura * 1.32);
   const heroi = maisRaros[0];
   const minis = maisRaros.slice(1, 5);
   return (
-    <div className="alb-capa" data-capa-album="" style={{ width: largura, height: h, "--k": k, ...style } as CSSProperties}>
+    <div className="alb-capa" data-capa-album="" data-referencia={referencia ? "" : undefined} style={{ width: largura, height: h, "--k": k, ...style } as CSSProperties}>
       <div className="alb-capa-lombada" />
       <div className="alb-capa-face">
         <div className="alb-capa-faixa"><span>ÁLBUM DE FIGURINHAS</span><b>CORE · {ano}</b></div>
-        <div className="alb-capa-titulo">Figurinhas da<br />minha vida.</div>
+        <div className="alb-capa-titulo">{referencia ? <>Pequenas<br />conquistas.</> : <>Figurinhas da<br />minha vida.</>}</div>
         <div className="alb-capa-arte">
-          {heroi ? (
+          {referencia ? <>
+            <span className="alb-capa-caderno-leitura"><Adesivo id="leitura-1" tamanho={105 * k}/></span>
+            <span className="alb-capa-caderno-salario"><Adesivo id="first-income" tamanho={94 * k}/></span>
+            <span className="alb-capa-caderno-marco"><Adesivo id="sequencia-30" tamanho={61 * k}/></span>
+          </> : heroi ? (
             <span className="alb-capa-heroi"><Figurinha b={heroi} tam={92 * k} foto={foto} grossa /></span>
           ) : (
             <span className="alb-capa-heroi" data-vazio="">?</span>
           )}
-          {minis.map((b, i) => (
+          {!referencia && minis.map((b, i) => (
             <span key={b.id} className="alb-capa-mini" style={MINIS[i]}><Figurinha b={b} tam={40 * k} foto={foto} giro={giroDoAdesivo(i + 1)} /></span>
           ))}
         </div>

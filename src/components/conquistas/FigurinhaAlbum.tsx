@@ -1,6 +1,9 @@
+import { ARTES_CADERNO } from "./artes-caderno";
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import type { Raridade } from "@/components/gamification/types";
+import type { Badge, Raridade } from "@/components/gamification/types";
 import { Adesivo } from "./adesivos-arte";
+import { FigurinhaOculta } from "./FigurinhaOculta";
+import { MarcaRaridade, RARIDADES_EM_TESTE } from "./MarcaRaridade";
 import "./conquistas.css";
 
 /**
@@ -40,16 +43,22 @@ export const temFoil = (r: Raridade): r is "epico" | "lendario" => r === "epico"
  * cor de 300 % que corre com `--fx/--fy` (ou `--gx/--gy`) por transform e um
  * reflexo branco que corre mais rápido (paralaxe).
  */
-export const FoilDoAdesivo = ({ raridade }: { raridade: "epico" | "lendario" }) => {
+export const FoilDoAdesivo = ({ raridade, id }: { raridade: "epico" | "lendario"; id?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
+    const arte = id ? ARTES_CADERNO[id] : undefined;
+    if (el && arte) {
+      el.style.setProperty("-webkit-mask-image", `url("${arte}")`);
+      el.style.setProperty("mask-image", `url("${arte}")`);
+      return;
+    }
     const svg = el?.parentElement?.querySelector("svg[data-adesivo]");
     if (!el || !svg || typeof XMLSerializer === "undefined") return;
     const url = `url("data:image/svg+xml;utf8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}")`;
     el.style.setProperty("-webkit-mask-image", url);
     el.style.setProperty("mask-image", url);
-  }, []);
+  }, [id]);
   return (
     <div ref={ref} className="fig-foil" data-foil={raridade} aria-hidden>
       <i className="fig-foil-faixa" />
@@ -117,23 +126,27 @@ export const FigurinhaColada = ({ id, raridade, tamanho, giro = 0, grande, peel,
       ref={ref}
       className={`fig${className ? ` ${className}` : ""}`}
       data-rar={raridade}
+      data-caderno={ARTES_CADERNO[id] ? "" : undefined}
+      data-acabamento-v2={ARTES_CADERNO[id] && RARIDADES_EM_TESTE ? "" : undefined}
       data-foil-tem={foil ? "" : undefined}
       data-peel={peel ? "" : undefined}
       style={{ width: tamanho, height: tamanho, "--giro": `${giro}deg`, ...style } as CSSProperties}
       {...toque}
     >
-      {temFoil(raridade) && <span className="fig-aro" aria-hidden />}
+      {temFoil(raridade) && !ARTES_CADERNO[id] && <span className="fig-aro" aria-hidden />}
       <Adesivo id={id} tamanho={tamanho} bordaGrossa={grande} />
-      {foil && <FoilDoAdesivo raridade={raridade} />}
-      {peel && <span className="fig-canto" aria-hidden />}
+      {foil && <FoilDoAdesivo raridade={raridade} id={id} />}
+      {ARTES_CADERNO[id] && <MarcaRaridade raridade={raridade} />}
+      {peel && <><span className="fig-canto" aria-hidden /><span className="fig-colagem-brilho" aria-hidden /><span className="fig-colagem-festa" aria-hidden>{[[-28,-26,30],[23,-29,70],[-35,4,-40],[34,6,110],[-17,27,20],[21,25,-65]].map(([x,y,a],i)=><i key={i} style={{"--x":`${x}px`,"--y":`${y}px`,"--a":`${a}deg`} as CSSProperties} />)}</span></>}
     </span>
   );
 };
 
 /** A VAGA VAZIA: a silhueta cinza média da figurinha que falta. */
-export const FigurinhaVazia = ({ id, raridade, tamanho, className, style }: { id: string; raridade: Raridade; tamanho: number; className?: string; style?: CSSProperties }) => (
-  <span className={`fig fig-vazia${className ? ` ${className}` : ""}`} data-rar={raridade} style={{ width: tamanho, height: tamanho, ...style }}>
-    <Adesivo id={id} tamanho={tamanho} />
+export const FigurinhaVazia = ({ id, raridade, tamanho, progresso, className, style }: { id: string; raridade: Raridade; tamanho: number; progresso?: Badge["progresso"]; className?: string; style?: CSSProperties }) => (
+  <span className={`fig fig-vazia${className ? ` ${className}` : ""}`} data-rar={raridade} data-caderno={ARTES_CADERNO[id] ? "" : undefined} style={{ width: tamanho, height: tamanho, ...style }}>
+    {ARTES_CADERNO[id] ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} /> : <Adesivo id={id} tamanho={tamanho} />}
+    {ARTES_CADERNO[id] && <MarcaRaridade raridade={raridade} />}
   </span>
 );
 

@@ -1,5 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import { Award } from "lucide-react";
+import { arteReferencia } from "./artes-referencia";
+import { ARTES_CADERNO } from "./artes-caderno";
 
 /**
  * ADESIVOS PRÓPRIOS (26/09; coleção de 65 em 27/09) — no lugar dos emojis das insígnias.
@@ -891,7 +893,7 @@ const ARTES: Record<string, ReactNode> = {
 };
 
 /** Adesivos que usam a reserva (círculo com ícone) — vazio hoje: todos têm arte. */
-export const temArte = (id: string) => id in ARTES;
+export const temArte = (id: string) => id in ARTES_CADERNO || id in ARTES;
 
 /** Reserva: o mesmo recorte de adesivo com um ícone dentro (insígnia nova sem desenho ainda). */
 const reserva = (
@@ -917,6 +919,14 @@ interface AdesivoProps {
 export const Adesivo = ({ id, tamanho = 72, className, style, titulo, bordaGrossa }: AdesivoProps) => {
   const uid = `dc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const raio = bordaGrossa ? 4.5 : 3;
+  // Mantém o contrato SVG usado no álbum, nas raridades e nos Stories.
+  // A imagem já inclui o recorte; não recebe outra borda ou filtro pesado.
+  if (ARTES_CADERNO[id]) return (
+    <svg viewBox="0 0 100 100" width={tamanho} height={tamanho} className={className} style={style}
+      role={titulo ? "img" : undefined} aria-label={titulo} aria-hidden={titulo ? undefined : true} data-adesivo={id} data-arte-caderno="">
+      <image href={ARTES_CADERNO[id]} width="100" height="100" preserveAspectRatio="xMidYMid meet" />
+    </svg>
+  );
   return (
     <svg
       viewBox="0 0 100 100"
@@ -946,7 +956,7 @@ export const Adesivo = ({ id, tamanho = 72, className, style, titulo, bordaGross
         </filter>
       </defs>
       <g filter={`url(#${uid})`} stroke={TRACO} strokeWidth={2.2} strokeLinejoin="round">
-        {ARTES[id] ?? reserva}
+        {arteReferencia(id) ?? ARTES[id] ?? reserva}
       </g>
     </svg>
   );
@@ -957,4 +967,4 @@ const GIROS = [-5, 4, -3, 6, -4, 3, -6, 2];
 export const giroDoAdesivo = (i: number) => GIROS[i % GIROS.length];
 
 /** Todos os ids com arte própria (pra conferência e testes). */
-export const IDS_COM_ARTE = Object.keys(ARTES);
+export const IDS_COM_ARTE = [...new Set([...Object.keys(ARTES), ...Object.keys(ARTES_CADERNO)])];

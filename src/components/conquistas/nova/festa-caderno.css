@@ -1,0 +1,16 @@
+/* A raridade celebra a chegada; a arte permanece limpa no álbum. */
+[data-festa-caderno] { --festa-cor:#b9a1df; background:radial-gradient(ellipse at 50% 37%,#544367 0,#282b3d 48%,#1d2635 100%); color:#fff8eb; }
+[data-festa-caderno][data-raridade="lendario"] { --festa-cor:#e8c478; background:radial-gradient(ellipse at 50% 37%,#655436 0,#30322e 46%,#1d2635 100%); }
+[data-festa-caderno] > div:first-child { opacity:.13; }
+[data-festa-caderno] .mo-raios { background:radial-gradient(ellipse,#fff4 0,transparent 65%); animation:mo-luz-chegada 1.3s ease-out both; }
+[data-festa-caderno] .relative.flex-1 { padding-top:28px; padding-bottom:20px; min-height:0; overflow-y:auto; }
+[data-festa-caderno] .relative.flex-1 > p:first-child { color:var(--festa-cor) !important; letter-spacing:.18em; margin-bottom:20px; }
+[data-festa-caderno] h2 { font-family:'Instrument Serif',Georgia,serif; font-style:italic; font-weight:400; font-size:36px; max-width:340px; }
+[data-festa-caderno] p.text-muted-foreground { color:#ddd6ce; font-size:14px; line-height:1.5; }
+[data-festa-caderno] .chip-rar { background:transparent; color:var(--festa-cor); box-shadow:none; border:0; }
+[data-festa-caderno] button { color:#e9dfd2; background:transparent; }
+[data-festa-caderno] button.mo-colar { background:#fff3df; color:#263347; border:1px solid #fff8; box-shadow:0 5px 20px #0002; }
+[data-festa-caderno] .ad-rar { filter:drop-shadow(0 14px 15px #0003); }
+@keyframes mo-luz-chegada { from { transform:scale(.7); opacity:0; } 45% { opacity:.8; } to { transform:scale(1.2); opacity:.3; } }
+@media(max-height:650px) { [data-festa-caderno] .ad-rar { max-width:190px; max-height:190px; } [data-festa-caderno] h2 { font-size:28px; } [data-festa-caderno] .relative.flex-1 { padding-top:12px; } }
+@media(prefers-reduced-motion:reduce) { [data-festa-caderno] .mo-raios { animation:none; opacity:.3; } }

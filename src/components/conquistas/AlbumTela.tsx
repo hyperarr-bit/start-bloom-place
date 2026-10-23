@@ -1,20 +1,24 @@
 import "@fontsource/instrument-serif/latin-400-italic.css";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, type MotionValue } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useIsPresent, type MotionValue } from "framer-motion";
 import { ChevronLeft, ChevronRight, Instagram, X } from "lucide-react";
-import { RARIDADE_PLURAL, categoriaDe, fracaoDe, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
+import { categoriaDe, fracaoDe, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
 import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
 import { parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { ChipRaridade } from "./adesivos-raridade";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
+import { IconeMarcaAlbum } from "./IconeMarcaAlbum";
 import { CapaAlbum } from "./CapaAlbum";
 import { FigurinhaColada, FigurinhaVazia, soltarFoils, useGiroscopioDoFoil } from "./FigurinhaAlbum";
+import { quaseConquistada } from "./FigurinhaOculta";
 import { Destacar } from "./GradeAdesivos";
 import { ORDEM_RARIDADE, RARIDADE_FEM, contagemDaPagina, proximosDoAlbum, resumoRaridades, tituloDaPagina, type PaginaAlbum } from "./album-paginas";
 import { fraseDaPagina } from "./nova/recompensas";
 import "./conquistas.css";
+import "./nova/album-sequencia-prototipo.css";
+import "./nova/album-acabamento.css";
 
 /**
  * O ÁLBUM DE FIGURINHAS EM TELA CHEIA — 3D (02/10; dono: "essa direção 3
@@ -72,6 +76,7 @@ export const CAPITULO: Record<Raridade, { titulo: string; material: string; fras
  * (album-paginas.montarAlbumPorModulo): a frase do módulo e a cor da placa.
  */
 export const CAPITULO_MODULO: Record<BadgeCategoria, { frase: string; cor: string }> = {
+  carreira: { frase: "Seu caminho profissional.", cor: "#455b75" },
   sequencia: { frase: "Dias seguidos anotando — qualquer módulo conta.", cor: "#d22d80" },
   finance: { frase: "Cada gasto anotado é uma figurinha a caminho.", cor: "#b7791f" },
   rotina: { frase: "Hábitos marcados, dia após dia.", cor: "#0f9d6a" },
@@ -133,7 +138,7 @@ const Vaga = memo(({ b, n, tam, indice, cola, pendente, destaque, onSelecionar, 
           </span>
         ) : (
           <span className="vaga-fig">
-            <FigurinhaVazia id={b.id} raridade={raridade} tamanho={tam - 6} />
+            <FigurinhaVazia id={b.id} raridade={raridade} tamanho={tam - 6} progresso={b.progresso} />
           </span>
         )}
       </span>
@@ -169,6 +174,7 @@ interface PaginaProps {
   destaques: Readonly<Record<string, string>>;
   /** (16/10, Conquistas 2) o rodapé das páginas de seção diz "Faltam N figurinhas nesta página". */
   rodapeFaltam: boolean;
+  editorial?: boolean;
   /** (17/10) Colou a desta página e tem mais figurinha nova em OUTRA página: o rodapé leva até lá. */
   proximaNova: { indice: number; titulo: string; quantas: number } | null;
   onIrPara: (indice: number) => void;
@@ -176,12 +182,13 @@ interface PaginaProps {
   onColar?: (b: Badge) => void;
 }
 
-const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, proximaNova, onIrPara, onSelecionar, onColar }: PaginaProps) => {
+const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, colar, atrasoBase, diasDeSequencia, pendentes, destaques, rodapeFaltam, editorial, proximaNova, onIrPara, onSelecionar, onColar }: PaginaProps) => {
+  const prototipo = editorial && !!p.modulo;
   const grande = p.tipo === "mais-raros";
-  const col = grande ? 3 : 4;
-  const gapX = grande ? 10 : 6;
+  const col = editorial && !grande ? (largura < 350 ? 3 : 2) : grande ? 3 : 4;
+  const gapX = grande || editorial ? 10 : 6;
   const interno = largura - 24 - 14;
-  const tam = grande ? Math.min(78, Math.floor((interno - gapX * 2) / 3) - 16) : Math.min(54, Math.floor((interno - gapX * 3) / 4) - 14);
+  const tam = editorial && !grande ? Math.min(82, Math.floor((interno - gapX * (col - 1)) / col) - 16, col === 2 ? Math.floor((largura * 1.56 - 315) / 3) : 82) : grande ? Math.min(82, Math.floor((interno - gapX * 2) / 3) - 16) : Math.min(54, Math.floor((interno - gapX * 3) / 4) - 14);
   // (02/10, dono: "os mais raros é só pra mostrar os mais raros do usuário") as próximas a colar só aparecem com o álbum
   // ainda vazio ("Começando o álbum"); com alguma colada, a página é só delas — a grade desce pro meio da folha
   const vazia = grande && !p.vagas.length;
@@ -190,35 +197,38 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
   const cap = p.raridade ? CAPITULO[p.raridade] : null;
   const mod = p.modulo ? { ...categoriaDe(p.modulo), ...CAPITULO_MODULO[p.modulo] } : null;
   // a pendente não cola na abertura: ela espera o toque (e então cola com o peel, atraso 0)
-  const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && !pendentes.has(b.id) && (abertura || colar.has(b.id)) ? (colar.has(b.id) && !abertura ? 0 : atrasoBase + j * 90) : undefined);
+  const colaDe = (b: Badge, j: number) => (ativa && b.unlocked && !pendentes.has(b.id) && ((abertura && !editorial) || colar.has(b.id)) ? (colar.has(b.id) && (!abertura || editorial) ? 0 : atrasoBase + j * 90) : undefined);
   // nas páginas de seção: a vaga vazia mais perto de colar (o rodapé convida)
   const perto = useMemo(() => (grande ? null : p.vagas.filter((b) => !b.unlocked && b.progresso && b.progresso.atual > 0).sort((a, b) => fracaoDe(b) - fracaoDe(a))[0] ?? null), [grande, p.vagas]);
-  const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : mod ? mod.label : cap!.titulo;
-  const contagem = grande ? `${p.abertos} de ${p.total}` : p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`;
-  const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : mod ? mod.frase : `${cap!.material} · ${cap!.frase}`;
+  const titulo = grande ? (p.vagas.length ? "Os mais raros" : "Começando o álbum") : mod ? (p.modulos ? p.titulo : mod.label) : cap!.titulo;
+  const coladasAqui = p.vagas.filter((b) => b.unlocked && !pendentes.has(b.id)).length;
+  const completa = p.vagas.length > 0 && coladasAqui === p.vagas.length;
+  const contagem = editorial && !grande ? `${coladasAqui} de ${p.vagas.length} coladas` : grande ? `${editorial ? p.abertos - pendentes.size : p.abertos} de ${p.total}` : p.total > p.abertos ? contagemDaPagina(p) : `${p.abertos} de ${p.total} · completa!`;
+  const frase = grande ? (p.vagas.length ? "O orgulho da coleção." : "Cada coisa anotada cola uma figurinha.") : mod ? mod.frase : `${editorial ? (p.raridade === "lendario" ? "Acabamento dourado" : p.raridade === "epico" ? "Reflexo holográfico" : "Figurinhas de vinil") : cap!.material} · ${cap!.frase}`;
   // (16/10) as figurinhas novas desta página (esperando o toque) e as vagas vazias DESTA página (uma seção pode ter 2 páginas)
   const pendentesAqui = p.vagas.filter((b) => pendentes.has(b.id)).length;
-  const coladasAqui = p.vagas.filter((b) => b.unlocked).length;
   return (
-    <div className="alb-pag" data-pagina={p.id} data-rar={p.raridade ?? (mod ? "modulo" : "destaque")} data-modulo={p.modulo} style={mod ? ({ "--mod": mod.cor } as CSSProperties) : undefined} data-testid={`album-tela-pagina-${indice}`}>
+    <div className="alb-pag" data-pagina={p.id} data-prototipo={prototipo ? "sequencia" : undefined} data-inicio={editorial && vazia ? "" : undefined} data-galeria={editorial && grande && !vazia ? "" : undefined} data-vagas={p.vagas.length} data-completa={completa && !grande ? "" : undefined} data-rar={p.raridade ?? (mod ? "modulo" : "destaque")} data-modulo={p.modulo} style={mod ? ({ "--mod": mod.cor } as CSSProperties) : undefined} data-testid={`album-tela-pagina-${indice}`}>
       <span className="alb-marca" aria-hidden><Adesivo id={cap ? cap.emblema : mod ? (p.vagas[p.vagas.length - 1]?.id ?? "sequencia-100") : "sequencia-100"} tamanho={Math.round(largura * 0.5)} /></span>
-      <header className="alb-cap">
-        <div className="alb-cap-linha"><span>Capítulo {nDeDois(indice + 1)} · {grande ? p.titulo : tituloDaPagina(p)}</span><i /></div>
-        <div className="alb-cap-titulo"><h3>{titulo}</h3><b className="tabular-nums">{contagem}</b></div>
+      <header className="alb-cap" data-acabamento={p.raridade ?? (grande && !vazia ? "destaque" : "comum")}>
+        {!editorial ? <div className="alb-cap-linha"><span>Capítulo {nDeDois(indice + 1)} · {grande ? p.titulo : tituloDaPagina(p)}</span><i /></div> : grande && !vazia ? <div className="alb-cap-linha"><span>SELEÇÃO ESPECIAL</span><i /></div> : null}
+        <div className="alb-cap-titulo"><h3>{titulo}</h3>{(!editorial || !grande) && <b className="tabular-nums">{contagem}</b>}</div>
         <p className="alb-cap-frase">{frase}</p>
       </header>
-      <div className="alb-grade" data-raros-no-meio={grande && !vazia ? "" : undefined} style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${grande ? (vazia ? 8 : 22) : 5}px ${gapX}px`, marginBlock: grande && !vazia ? "auto" : undefined }}>
-        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} cola={colaDe(b, j)} pendente={pendentes.has(b.id)} destaque={destaques[b.id]} onSelecionar={onSelecionar} onColar={onColar} />)}
+      {editorial && grande && !vazia && <div className="alb-galeria-legenda"><strong>Pequenas provas de grandes passos.</strong></div>}
+      {editorial && vazia && <div className="alb-inicio-intro"><strong>Seu primeiro capítulo.</strong><p>Faça uma destas ações para ganhar sua primeira figurinha.</p></div>}
+      {prototipo && <div className="alb-jornada-intro"><strong>{p.modulo === "sequencia" ? (p.parte?.[0] === 1 ? "O começo de uma constância." : "Uma história que continua.") : mod?.frase}</strong><i aria-hidden><IconeMarcaAlbum modulo={p.modulo} /></i></div>}
+      <div className="alb-grade" data-raros-no-meio={grande && !vazia ? "" : undefined} style={{ gridTemplateColumns: `repeat(${col}, ${tam + 14}px)`, gap: `${editorial ? 14 : grande ? (vazia ? 8 : 22) : 5}px ${gapX}px`, marginBlock: grande && !vazia ? "auto" : undefined }}>
+        {p.vagas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={prototipo ? Math.min(j === 2 && p.vagas.length % 2 ? 100 : 84, Math.floor(largura * (j === 2 && p.vagas.length % 2 ? .28 : .23))) : editorial && grande ? Math.min(110, Math.floor(largura * .29)) : tam} indice={j} cola={colaDe(b, j)} pendente={pendentes.has(b.id)} destaque={destaques[b.id]} onSelecionar={onSelecionar} onColar={onColar} />)}
       </div>
       {grande && proximas.length > 0 && (
         <>
-          <div className="alb-subsecao">PRÓXIMAS A COLAR</div>
-          <div className="alb-grade" style={{ gridTemplateColumns: `repeat(3, ${tam + 14}px)`, gap: `8px ${gapX}px` }}>
+          {editorial && vazia ? <div className="alb-inicio-opcoes">{proximas.map(b=><button key={b.id} type="button" onClick={e=>{if(ehFundo(e.currentTarget))onSelecionar(b);}}><FigurinhaVazia id={b.id} raridade={raridadeDe(b)} tamanho={52} progresso={b.progresso} /><span><b>{b.name}</b><small>{b.description}</small></span><ChevronRight size={14} aria-hidden /></button>)}</div> : <><div className="alb-subsecao">PRÓXIMAS A COLAR</div><div className="alb-grade" style={{ gridTemplateColumns: `repeat(3, ${tam + 14}px)`, gap: `8px ${gapX}px` }}>
             {proximas.map((b, j) => <Vaga key={b.id} b={b} n={numeroDaFigurinha(adesivos, b.id)} tam={tam} indice={j} onSelecionar={onSelecionar} />)}
-          </div>
+          </div></>}
         </>
       )}
-      {grande && proximo && (
+      {grande && proximo && !(editorial && vazia) && (
         <p className="alb-dica" data-testid="album-tela-dica">
           Cada coisa anotada cola uma figurinha aqui. A mais perto: <b>{proximo.name}</b> — <mark><Destacar texto={textoFalta(proximo, diasDeSequencia)} /></mark>.
         </p>
@@ -237,7 +247,7 @@ const Pagina = memo(({ p, indice, total, largura, adesivos, ativa, abertura, col
         ) : !grande && p.abertos >= p.total ? (
           <span className="alb-pe-perto">Página completa — todas coladas.</span>
         ) : <span />}
-        <span className="alb-pag-num">{indice + 1} / {total}</span>
+        {!editorial && <span className="alb-pag-num">{indice + 1} / {total}</span>}
       </footer>
     </div>
   );
@@ -258,30 +268,45 @@ interface DetalheProps {
 }
 
 /** O detalhe da vaga (folha por cima da mesa): "FIGURINHA Nº 46", o chip, o que falta ou quando colou. */
-const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, onFechar, onPostar, onIr }: DetalheProps) => {
+export const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, onFechar, onPostar, onIr }: DetalheProps) => {
+  const reduzir = useReducedMotion();
+  const painel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const anterior = document.activeElement as HTMLElement | null;
+    painel.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => { if (anterior?.isConnected) anterior.focus(); };
+  }, []);
   const raridade = raridadeDe(b);
-  const conta = porRaridade[raridade];
   const colada = desbloqueadoEm ? parseLocalDay(desbloqueadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" }) : null;
   const destino = ROTA_PADRAO(b);
   return (
     <>
       <motion.div className="absolute inset-0 z-[5]" style={{ background: "rgba(0,0,0,.45)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onFechar} aria-hidden />
-      <motion.div className="fig-detalhe" role="dialog" aria-modal="true" aria-label={b.name} data-testid="detalhe-vaga" data-vaga-detalhe={b.id} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 380, damping: 36 }}>
+      <motion.div ref={painel} className="fig-detalhe fig-detalhe-ampliado" role="dialog" aria-modal="true" aria-label={b.name} data-testid="detalhe-vaga" data-vaga-detalhe={b.id} data-rar={raridade} initial={{ y: reduzir ? 0 : "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: reduzir ? 0 : "100%", opacity: 0 }} transition={reduzir ? { duration: 0.1 } : { type: "spring", stiffness: 380, damping: 36 }} onKeyDown={(e) => {
+        if (e.key !== "Tab") return;
+        const botoes = painel.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+        if (!botoes?.length) return;
+        const primeiro = botoes[0], ultimo = botoes[botoes.length - 1];
+        if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo.focus(); }
+        else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+      }}>
         <div className="fig-detalhe-puxador" />
-        <div className="flex items-center gap-3.5">
-          <span className="shrink-0 w-[120px] h-[120px] grid place-items-center">
-            {b.unlocked ? <FigurinhaColada id={b.id} raridade={raridade} tamanho={108} grande /> : <FigurinhaVazia id={b.id} raridade={raridade} tamanho={108} />}
-          </span>
+        <button type="button" className="fig-detalhe-fechar" aria-label="Fechar visualização da figurinha" onClick={onFechar}><X size={21} aria-hidden /></button>
+        <div className="fig-detalhe-arte" role="img" aria-label={b.unlocked ? b.name : `${b.name}: ainda não conquistada`}>
+          {!b.unlocked && quaseConquistada(b.progresso) && <span className="fig-detalhe-quase" data-rar={raridade}>Quase lá</span>}
+          {b.unlocked ? <FigurinhaColada id={b.id} raridade={raridade} tamanho={360} grande /> : <FigurinhaVazia id={b.id} raridade={raridade} tamanho={360} progresso={b.progresso} />}
+        </div>
+        <div className="text-center">
           <div className="min-w-0">
             <div className="pin-rot text-muted-foreground">Figurinha Nº {nDeDois(n)}</div>
-            <div className="text-[20px] font-black tracking-tight leading-[1.1] mt-0.5 mb-1.5">{b.name}</div>
+            <h2 className="text-[24px] font-black tracking-tight leading-[1.1] mt-1 mb-2">{b.name}</h2>
             <ChipRaridade raridade={raridade} tam="m" texto={b.unlocked ? RARIDADE_FEM[raridade] : `A caminho · ${RARIDADE_FEM[raridade]}`} />
+            <p className="text-[14px] text-muted-foreground mt-2 leading-snug">{b.description}</p>
           </div>
         </div>
         {b.unlocked ? (
           <p className="text-[13px] text-muted-foreground mt-3.5 leading-[1.4]">
-            {colada ? <>Colada em <b className="text-foreground">{colada}</b>. </> : null}
-            {conta ? `Uma das ${conta.total} ${RARIDADE_PLURAL[raridade]} do CORE` : RARIDADE_FEM[raridade]}{raridade === "epico" ? " — holográfica: toque e mexa o dedo." : raridade === "lendario" ? " — foil de ouro: toque e mexa o dedo." : "."}
+            {colada ? <>Conquistada em <b className="text-foreground">{colada}</b>.</> : "Já faz parte da sua coleção."}
           </p>
         ) : (
           <>
@@ -544,6 +569,8 @@ export interface AlbumTelaProps {
   destaques?: Record<string, string>;
   /** (16/10) Rodapé "Faltam N figurinhas nesta página" nas páginas de seção (a tela nova liga; a de hoje fica igual). */
   rodapeFaltam?: boolean;
+  /** Páginas com três colunas, papel neutro e animação apenas ao colar. */
+  editorial?: boolean;
   onFechar: () => void;
   /** (16/10) opcional: sem ele, os botões de compartilhar o álbum somem. */
   onCompartilhar?: () => void;
@@ -553,7 +580,7 @@ export interface AlbumTelaProps {
 const SEM_PENDENTES: string[] = [];
 const SEM_DESTAQUES: Record<string, string> = {};
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, editorial = false, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
   const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
@@ -561,7 +588,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const [atual, setAtual] = useState(inicial);
   const [virando, setVirando] = useState<Virada | null>(null);
   // já no 1º render (a página de abertura calcula o atraso do "colar" a partir da capa): o efeito de abrir confirma
-  const [capaVisivel, setCapaVisivel] = useState(aberto && !reduzir);
+  const presente = useIsPresent();
+  const mostrarCapa = !editorial || via === "capa";
+  const [capaVisivel, setCapaVisivel] = useState(aberto && !reduzir && mostrarCapa);
   const [capaGirada, setCapaGirada] = useState(false);
   const [detalhe, setDetalhe] = useState<Badge | null>(null);
   const [largura, setLargura] = useState(330);
@@ -588,11 +617,31 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const [coladasAgora, setColadasAgora] = useState<ReadonlySet<string>>(() => new Set());
   const pendentesTxt = pendentes.join(",");
   const pendentesEfetivas = useMemo(() => new Set(pendentesTxt.split(",").filter((id) => id && !coladasAgora.has(id))), [pendentesTxt, coladasAgora]);
+  const [ultimaColagem, setUltimaColagem] = useState<string | null>(null);
+  const [colando, setColando] = useState(false);
+  const colagensFeitas = useRef(new Set<string>());
+  // O CTA autoriza todas as pendentes daquele toque, em ordem de página.
+  // O snapshot não inclui conquistas que cheguem depois de abrir o álbum.
+  const [filaColagem] = useState(() => via === "pacotinho"
+    ? [...new Set([...paginas.slice(inicial), ...paginas.slice(1, inicial)].flatMap(p => p.vagas.filter(b => b.unlocked && pendentes.includes(b.id)).map(b => b.id)))]
+    : []);
+  const [filaAtiva, setFilaAtiva] = useState(via === "pacotinho");
+  const coladasDaFila = filaColagem.filter(id => !pendentesEfetivas.has(id)).length;
+  const filaConcluida = filaColagem.length > 0 && coladasDaFila === filaColagem.length;
+  useEffect(() => {
+    if (!ultimaColagem) return;
+    const movimento = setTimeout(() => setColando(false), reduzir ? 0 : 740);
+    const aviso = setTimeout(() => setUltimaColagem(null), 2400);
+    return () => { clearTimeout(movimento); clearTimeout(aviso); };
+  }, [ultimaColagem, reduzir]);
   const colarPendente = useCallback((b: Badge) => {
+    if (colagensFeitas.current.has(b.id)) return;
+    colagensFeitas.current.add(b.id);
+    if (editorial) { setColando(true); setUltimaColagem(b.name); }
     colar.current.add(b.id);
     setColadasAgora((s) => new Set([...s, b.id]));
     onColar?.(b);
-  }, [onColar]);
+  }, [onColar, editorial]);
   /** (17/10) Depois de colar as desta página (só então — não em qualquer página): a próxima página de seção que ainda tem figurinha nova. */
   const proximaNovaDe = useCallback((daqui: number): { indice: number; titulo: string; quantas: number } | null => {
     if (!pendentesEfetivas.size || !coladasAgora.size || !paginas[daqui]?.vagas.some((b) => coladasAgora.has(b.id))) return null;
@@ -611,8 +660,15 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const livro = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (typeof window !== "undefined") setLargura(Math.min(330, Math.max(240, window.innerWidth - 48)));
-  }, [aberto]);
+    const medir = () => {
+      const alturaUtil = (window.visualViewport?.height ?? window.innerHeight) - 172;
+      setLargura(Math.max(240, Math.floor(Math.min(editorial ? 400 : 330, window.innerWidth - (editorial ? 68 : 48), alturaUtil / (editorial ? 1.56 : 1.42)))));
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    window.visualViewport?.addEventListener("resize", medir);
+    return () => { window.removeEventListener("resize", medir); window.visualViewport?.removeEventListener("resize", medir); };
+  }, [aberto, editorial]);
 
   // a base das vizinhas acompanha a página atual, mas só com a folha parada
   useEffect(() => { if (!virando) setBase(atual); }, [virando, atual]);
@@ -623,10 +679,10 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   // aberta continuam montadas desde o início, então virar pra frente/pra trás não muda nada.
   const extrasComecaram = useRef(false);
   useEffect(() => {
-    if (!aberto || extras >= n || virando || abertura) return;
+    if (!aberto || editorial || extras >= n || virando || abertura || colando) return;
     const t = setTimeout(() => { extrasComecaram.current = true; setExtras((e) => e + 1); }, extrasComecaram.current ? 160 : 300);
     return () => clearTimeout(t);
-  }, [aberto, extras, n, virando, abertura]);
+  }, [aberto, editorial, extras, n, virando, abertura, colando]);
 
   // abrir: a capa vira na lombada e as figurinhas da página de abertura colam uma a uma
   useEffect(() => {
@@ -638,9 +694,10 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     setVirando(null);
     colar.current = new Set(novas);
     setAbertura(!reduzir);
-    const tAbertura = setTimeout(() => setAbertura(false), 2600 + (reduzir ? 0 : CAPA_REVELA_MS));
+    const esperaCapa = editorial ? 360 : CAPA_PARADA_MS;
+    const tAbertura = setTimeout(() => setAbertura(false), editorial ? (mostrarCapa && !reduzir ? esperaCapa + CAPA_GIRO_MS + 150 : 0) : 2600 + (reduzir ? 0 : CAPA_REVELA_MS));
     trackEvent("album_abrir", { adesivos: abertos, novas: novas.length, via, pagina: inicial });
-    if (reduzir) return () => clearTimeout(tAbertura);
+    if (reduzir || !mostrarCapa) { setCapaVisivel(false); return () => clearTimeout(tAbertura); }
     setCapaVisivel(true);
     setCapaGirada(false);
     rotCapa.set(0);
@@ -648,9 +705,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     const t1 = setTimeout(() => {
       setCapaGirada(true);
       a = animate(rotCapa, -180, { duration: (CAPA_GIRO_MS * lento()) / 1000, ease: EASE_FRENTE, onComplete: () => setCapaVisivel(false) });
-    }, CAPA_PARADA_MS);
+    }, esperaCapa);
     // rede de segurança: se o fim da animação não avisar, a capa sai no tempo dela
-    const t2 = setTimeout(() => setCapaVisivel(false), CAPA_PARADA_MS + CAPA_GIRO_MS * lento() + 120);
+    const t2 = setTimeout(() => setCapaVisivel(false), esperaCapa + CAPA_GIRO_MS * lento() + 120);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(tAbertura); a?.stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
@@ -672,7 +729,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   }, [aberto, detalhe, onFechar]);
 
   // o giroscópio (só quando já funciona) move o foil das épicas/lendárias
-  useGiroscopioDoFoil(raiz, aberto && !reduzir);
+  useGiroscopioDoFoil(raiz, aberto && !reduzir && !editorial);
 
   const chaveDaVirada = useRef(0);
   const terminarVirada = useCallback((chave: number) => setVirando((v) => (v && v.chave === chave ? null : v)), []);
@@ -686,7 +743,8 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       : { sobreIndice: alvo, fundoIndice: de, dir, chave: chaveDaVirada.current, alvo, manual };
   }, []);
 
-  const irPara = useCallback((i: number) => {
+  const irPara = useCallback((i: number, automatico = false) => {
+    if (!automatico) setFilaAtiva(false);
     const alvo = Math.max(0, Math.min(n - 1, i));
     if (alvo === atual) return;
     if (!reduzir) {
@@ -700,6 +758,22 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     setAtual(alvo);
     trackEvent("album_pagina", { indice: alvo, secao: paginas[alvo]?.id });
   }, [atual, n, paginas, reduzir, montarVirada, rot, terminarVirada]);
+
+  // Cada passo só é persistido depois de revelar sua página. Fechar cancela
+  // o timer; navegar manualmente pausa o restante sem marcar nada como colado.
+  useEffect(() => {
+    if (!aberto || !presente || !editorial || !onColar || !filaAtiva || capaVisivel || virando || colando || detalhe) return;
+    const id = filaColagem.find(item => pendentesEfetivas.has(item));
+    const b = adesivos.find(item => item.id === id && item.unlocked);
+    if (!b) return;
+    const paginaAlvo = paginas.findIndex((p, i) => i > 0 && p.vagas.some(item => item.id === b.id));
+    if (paginaAlvo >= 0 && paginaAlvo !== atual) {
+      const t = setTimeout(() => irPara(paginaAlvo, true), reduzir ? 0 : 120);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => colarPendente(b), reduzir ? 0 : coladasDaFila ? 80 : 450);
+    return () => clearTimeout(t);
+  }, [aberto, presente, editorial, onColar, filaAtiva, capaVisivel, virando, colando, detalhe, filaColagem, pendentesEfetivas, adesivos, paginas, atual, coladasDaFila, reduzir, irPara, colarPendente]);
 
   // a folha some quando a animação termina (onComplete); este relógio é a rede de segurança
   useEffect(() => {
@@ -728,6 +802,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
       if (Math.abs(dx) < g.limiar) return;
       const alvo = dx < 0 ? atual + 1 : atual - 1;
       if (alvo < 0 || alvo >= n) { gesto.current = null; return; }
+      setFilaAtiva(false);
       if (reduzir) { gesto.current = null; irPara(alvo); return; }
       animacao.current?.stop();
       // o arrasto assume o dedo: o foil que estava brilhando solta
@@ -790,14 +865,15 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const abas: { id: string; icone: string; nome: string; rar: string; modulo?: BadgeCategoria; cor?: string }[] = porModulo
     ? [
         { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" },
-        ...paginas.filter((p) => p.modulo && !(p.parte && p.parte[0] > 1)).map((p) => ({ id: p.id, icone: categoriaDe(p.modulo!).emoji, nome: categoriaDe(p.modulo!).label.toUpperCase(), rar: "modulo", modulo: p.modulo, cor: CAPITULO_MODULO[p.modulo!].cor })),
+        ...ORDEM_RARIDADE.flatMap(r => { const p = paginas.find(p => p.raridade === r); return p ? [{ id: p.id, icone: CAPITULO[r].icone, nome: CAPITULO[r].aba, rar: r }] : []; }),
+        ...paginas.filter((p) => p.modulo && !(p.parte && p.parte[0] > 1)).map((p) => ({ id: p.id, icone: categoriaDe(p.modulo!).emoji, nome: (p.modulos ? p.titulo : categoriaDe(p.modulo!).label).toUpperCase(), rar: "modulo", modulo: p.modulo, cor: CAPITULO_MODULO[p.modulo!].cor })),
       ]
     : [
         { id: "mais-raros", icone: "★", nome: "MAIS RAROS", rar: "destaque" },
         ...ORDEM_RARIDADE.map((r) => ({ id: paginas.find((p) => p.raridade === r)?.id ?? "", icone: CAPITULO[r].icone, nome: CAPITULO[r].aba, rar: r })).filter((s) => s.id),
       ];
   const ativaAba = (s: { id: string; rar: string; modulo?: BadgeCategoria }) => pagina.id === s.id || (pagina.raridade && pagina.raridade === s.rar) || (!!s.modulo && pagina.modulo === s.modulo);
-  const alturaLivro = Math.round(largura * 1.42);
+  const alturaLivro = Math.round(largura * (editorial ? 1.56 : 1.42));
   /**
    * As folhas montadas: as vizinhas da página atual (pré-rasterizadas) e as
    * duas da virada em curso. Cada uma tem a chave da página: trocar o papel
@@ -815,7 +891,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const papelDe = (i: number): Papel => (virando ? (i === virando.sobreIndice ? "sobre" : i === virando.fundoIndice ? "fundo" : "espera") : i === atual ? "fundo" : "espera");
 
   return (
-    <motion.div ref={raiz} className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
+    <motion.div ref={raiz} className="alb-tela" data-editorial={editorial ? "" : undefined} role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
       {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
           câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
           --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
@@ -826,7 +902,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
         <button type="button" className="alb-redondo border-0" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">
           <b className="block text-[14px] font-black truncate">Álbum CORE {ano}</b>
-          <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total} · faltam {total - abertos}{pendentesEfetivas.size > 0 ? ` · ${pendentesEfetivas.size} pra colar` : ""}</span>
+          <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total}{abertos === total && !pendentesEfetivas.size ? " · coleção completa" : editorial ? " coladas" : ` · faltam ${total - abertos}`}{pendentesEfetivas.size > 0 ? ` · ${pendentesEfetivas.size} pra colar` : ""}</span>
         </div>
         {onCompartilhar && <button type="button" className="alb-redondo border-0" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>}
       </div>
@@ -859,7 +935,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     dir={papel === "sobre" ? virando?.dir : undefined}
                     pagina={p.id}
                     testid={papel === "sobre" ? "album-virando" : undefined}
-                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} proximaNova={papel === "fundo" ? proximaNovaDe(i) : null} onIrPara={irPara} onSelecionar={setDetalhe} onColar={colarPendente} />}
+                    frente={<Pagina p={p} indice={i} total={n} largura={largura} adesivos={adesivos} ativa={papel === "fundo"} abertura={abertura && i === inicial} colar={colar.current} atrasoBase={i === inicial && capaVisivel ? CAPA_REVELA_MS : 260} diasDeSequencia={diasDeSequencia} pendentes={pendentesEfetivas} destaques={destaques} rodapeFaltam={rodapeFaltam} editorial={editorial} proximaNova={papel === "fundo" ? proximaNovaDe(i) : null} onIrPara={irPara} onSelecionar={setDetalhe} onColar={colarPendente} />}
                     verso={<VersoDaPagina ano={ano} />}
                   />
                   {/* a sombra que a folha projeta na página de baixo: logo DEPOIS dela no DOM (por cima dela, por baixo da que gira) */}
@@ -877,7 +953,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     papel="capa"
                     dir={1}
                     testid="album-capa-folha"
-                    frente={<CapaAlbum largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
+                    frente={<CapaAlbum referencia={editorial} largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
                     verso={<VersoDaCapa nome={nome} ano={ano} />}
                   />
                 </div>
@@ -886,28 +962,33 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
           </div>
           <div className="alb-abas" role="tablist" aria-label="Seções do álbum">
             {abas.map((s) => (
-              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-modulo={s.modulo} data-ativa={ativaAba(s) ? "" : undefined} style={s.cor ? ({ "--mod": s.cor } as CSSProperties) : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.modulo ?? s.rar}`} aria-label={s.nome}>
-                <i aria-hidden>{s.icone}</i>{!porModulo && <span>{s.nome}</span>}
+              <button key={s.id} type="button" role="tab" aria-selected={!!ativaAba(s)} className="alb-aba" data-rar={s.rar} data-modulo={s.modulo} data-ativa={ativaAba(s) ? "" : undefined} style={s.cor ? ({ "--mod": s.cor } as CSSProperties) : undefined} onClick={() => irPara(paginas.findIndex((p) => p.id === s.id))} data-testid={`album-aba-${s.modulo ?? s.rar}`} aria-label={s.nome} title={s.nome}>
+                <IconeMarcaAlbum modulo={s.modulo} />{!porModulo && <span>{s.nome}</span>}
               </button>
             ))}
           </div>
         </motion.div>
         <div className="alb-nav2">
           <button type="button" className="alb-seta border-0" onClick={() => irPara(atual - 1)} disabled={atual === 0} aria-label="Página anterior" data-testid="album-tela-anterior"><ChevronLeft className="w-5 h-5" /></button>
-          <div className="alb-dots2" aria-hidden>
+          {editorial ? <div className="alb-localizacao" aria-live="polite" aria-atomic="true"><span className="sr-only">{tituloDaPagina(paginas[atual])}, página </span><b>{nDeDois(atual + 1)} <i>/ {nDeDois(n)}</i></b></div> : <div className="alb-dots2" aria-hidden>
             {paginas.map((p, i) => <i key={p.id} data-rar={p.raridade ?? "destaque"} data-ativo={i === atual ? "" : undefined} />)}
-          </div>
+          </div>}
           <button type="button" className="alb-seta border-0" onClick={() => irPara(atual + 1)} disabled={atual >= n - 1} aria-label="Próxima página" data-testid="album-tela-proxima"><ChevronRight className="w-5 h-5" /></button>
         </div>
       </div>
 
+      {editorial && <div className="alb-colagem-status" role="status" aria-live="polite" data-visivel={ultimaColagem || filaConcluida ? "" : undefined}>{filaConcluida ? `✓ ${filaColagem.length === 1 ? "Sua figurinha foi colada" : `As ${filaColagem.length} figurinhas foram coladas`} no álbum` : ultimaColagem ? `✓ ${ultimaColagem} colada no álbum` : ""}</div>}
+      {editorial && filaColagem.length > 1 && !filaConcluida && <div className="alb-colagem-fila" data-testid="album-colagem-fila">
+        <span>{filaAtiva ? "Colando" : "Colagem pausada"} · <b>{coladasDaFila} de {filaColagem.length}</b></span>
+        <button type="button" onClick={() => setFilaAtiva(ativa => !ativa)}>{filaAtiva ? "Pausar" : "Continuar"}</button>
+      </div>}
       <div className="alb-rodape2">
         {onCompartilhar && (
           <button type="button" onClick={onCompartilhar} className="w-full h-11 rounded-xl font-bold text-[13.5px] inline-flex items-center justify-center gap-2" style={{ background: "#fff", color: "#2b2b2f" }} data-testid="album-tela-compartilhar">
             Compartilhar meu álbum
           </button>
         )}
-        <div className="alb-rodape2-linha"><span>{resumoRaridades(porRaridade)}</span>{nivel ? <span>Nível {nivel}</span> : <span>{abertos} de {total}</span>}</div>
+        {editorial ? <p className="alb-instrucao">Deslize para folhear · toque para ver de perto</p> : <div className="alb-rodape2-linha"><span>{resumoRaridades(porRaridade)}</span>{nivel ? <span>Nível {nivel}</span> : <span>{abertos} de {total}</span>}</div>}
       </div>
 
       <AnimatePresence>

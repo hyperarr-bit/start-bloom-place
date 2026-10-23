@@ -21,7 +21,7 @@ vi.mock("@/lib/analytics", async (importOriginal) => ({
 vi.mock("@/lib/native-shell", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/native-shell")>()), isNativeShell: () => false }));
 
 import { UserDataContext } from "@/hooks/use-user-data";
-import { MomentosConquistas, formatoDaFesta, registroEmAndamento } from "@/components/conquistas/Momentos";
+import { MomentosConquistas, formatoDaFesta, lerFestasMostradas, registroEmAndamento } from "@/components/conquistas/Momentos";
 import { somarDias } from "@/lib/sequencia";
 
 const HOJE = "2026-09-26";
@@ -53,8 +53,13 @@ const base = () => ({
 const umComum = () => ({ ...base(), "finance-expenses": [{ id: 1, value: 10, date: HOJE }] });
 // 3 comuns: Primeira Despesa + Primeiro Salário + Lista de Desejos
 const tresComuns = () => ({ ...umComum(), "finance-incomes": [{ id: 1, value: 3000, date: dia(5) }], "finance-wishlist": [{ id: "w1", name: "Fone", price: 300, savedAmount: 0 }] });
-// 1 raro (Múltiplas Rendas) + 2 comuns (Primeiro Salário, Primeira Despesa)
-const raroEComuns = () => ({ ...umComum(), "finance-incomes": [{ id: 1, description: "Salário", value: 3000, date: dia(5) }, { id: 2, description: "Freela", value: 100, date: dia(6) }, { id: 3, description: "Aluguel", value: 100, date: dia(7) }] });
+// 1 raro ainda não comemorado (Imbatível) + 2 comuns. Múltiplas Rendas foi
+// arquivada na curadoria e já não pode ser usada para gerar uma festa nova.
+const raroEComuns = () => ({
+  ...umComum(),
+  "conquistas-desbloqueadas": { ...base()["conquistas-desbloqueadas"], "challenger-5": HOJE },
+  "finance-incomes": [{ id: 1, description: "Salário", value: 3000, date: dia(5) }],
+});
 
 const montar = (store: ReturnType<typeof montarStore>, contaNova = false, rota = "/financas") =>
   render(<MemoryRouter initialEntries={[rota]}><Provedor store={store}><MomentosConquistas contaNova={contaNova} /></Provedor></MemoryRouter>);
@@ -75,7 +80,7 @@ describe("14/10: fechar o app com a festa aberta não a repete", () => {
     const primeira = montar(store);
     await screen.findByTestId("momento-popup", {}, { timeout: 3000 });
     expect(vistas(store)).not.toContain("first-expense"); // ainda não tocou em Continuar
-    expect(JSON.parse(localStorage.getItem("core-festas-mostradas") || "[]")).toContain("first-expense");
+    expect(lerFestasMostradas("u1")).toContain("first-expense");
     primeira.unmount(); // "fechou o app"
     eventos.length = 0;
     montar(store); // reabriu (mesma conta, mesmo aparelho)
@@ -184,12 +189,12 @@ describe("raro, épico e lendário seguem em tela cheia", () => {
     const store = montarStore(raroEComuns());
     montar(store);
     const cheia = await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 });
-    expect(cheia).toHaveTextContent("Múltiplas Rendas");
+    expect(cheia).toHaveTextContent("Imbatível");
     expect(cheia).toHaveAttribute("data-raridade", "raro");
     expect(screen.queryByTestId("momento-popup")).toBeNull();
     await waitFor(() => expect(eventos).toContainEqual(["festa_view", expect.objectContaining({ raridade: "raro", formato: "tela_cheia", origem: "direto" })]));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    await waitFor(() => expect(vistas(store)).toContain("multi-income"));
+    await waitFor(() => expect(vistas(store)).toContain("challenger-5"));
     const popup = await screen.findByTestId("momento-popup", {}, { timeout: 3000 });
     expect(popup).toHaveAttribute("data-quantidade", "2");
     expect(eventos.find((e) => e[0] === "festa_fechada")?.[1]).toMatchObject({ formato: "tela_cheia", como: "continuar", raridade: "raro" });
@@ -211,7 +216,7 @@ describe("conta nova", () => {
   it("com um raro: só a tela cheia dele; os comuns colam quietos", async () => {
     const store = montarStore(raroEComuns());
     montar(store, true);
-    expect(await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 })).toHaveTextContent("Múltiplas Rendas");
+    expect(await screen.findByTestId("momento-adesivo", {}, { timeout: 3000 })).toHaveTextContent("Imbatível");
     expect(vistas(store)).toEqual(expect.arrayContaining(["first-income", "first-expense"]));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     await espera(2200);

@@ -1,3 +1,4 @@
+import { CHAVE_ACOES_CONQUISTAS, acoesDaEscrita, registrarAcao } from "@/lib/conquistas-acoes";
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,6 +182,8 @@ export const purgeUserLocalCache = () => {
 interface OpcoesDeEscrita {
   /** Escrita de SISTEMA (virada do mês, carimbos): não conta como gesto da pessoa. */
   system?: boolean;
+  /** Estado anterior do formulário, inclusive quando ele usa valores padrão. */
+  baseDaAcao?: unknown;
   /**
    * De onde a tela partiu, quando ela escreveu ANTES de a conta chegar do servidor
    * (o `initial` do usePersistedState). Só serve pra juntar a escrita segurada com o
@@ -1133,6 +1136,14 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     // não dispara ativação — senão a trilha do teste e o spotlight
     // celebram degrau no BOOT, sem ninguém ter feito nada (review 16/08).
     if (!opts?.system) {
+      const evidencias = acoesDaEscrita(key, opts && "baseDaAcao" in opts ? opts.baseDaAcao : opts && "base" in opts ? opts.base : antes[key], value);
+      if (evidencias.length) {
+        let registro = storeRef.current[CHAVE_ACOES_CONQUISTAS];
+        for (const acao of evidencias) registro = registrarAcao(registro, acao, localDayKey());
+        // Síncrono só para o registro: duas ações no mesmo evento não se sobrescrevem.
+        storeRef.current = { ...storeRef.current, [CHAVE_ACOES_CONQUISTAS]: registro };
+        setRef.current(CHAVE_ACOES_CONQUISTAS, registro, { system: true });
+      }
       checkActivation(key, value);
       const escopo = escopoDiaRef.current;
       if (escopo) registrarDiaRetro(key, value, escopo.dia);

@@ -1,3 +1,4 @@
+import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
 /**
  * TREINO — redesenho de 26/09 (mockups p1–p4 e p7 aprovados pelo dono).
  *
@@ -173,7 +174,7 @@ const Treino = () => {
   const todayDayName = DIAS[indiceDoDia(hojeData)];
 
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
-  const { get: getUserData, isGuest, loaded } = useUserData();
+  const { get: getUserData, set: setUserData, isGuest, loaded } = useUserData();
   const tutorialPendente = useCallback(() => {
     const forceNewUser = !!getUserData<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     if (!isGuest && !forceNewUser) return false;
@@ -529,6 +530,9 @@ const Treino = () => {
     if (notaDoDia) {
       setNotasDasSessoes((prev) => ({ ...(prev ?? {}), [data]: notaDoDia }));
       setWorkoutNotes((prev) => ({ ...(prev ?? {}), [diaDoTreino]: "" }));
+    }
+    if (total > 0 && feitas === total) {
+      setUserData(CHAVE_ACOES_CONQUISTAS, registrarAcao(getUserData(CHAVE_ACOES_CONQUISTAS, {}), "treino-completo", data), { system: true });
     }
     setSessaoSalva({ ...sessao, series, inicio, fim: agora.toISOString(), assinatura: assinaturaDasSeries(series) });
     setDescansoAte(null);

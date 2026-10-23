@@ -98,6 +98,7 @@
 .cn-b-chip[data-ativo] { background: hsl(var(--foreground)); color: hsl(var(--background)); border-color: hsl(var(--foreground)); }
 .cn-b-chip .n { opacity: .6; font-variant-numeric: tabular-nums; }
 .cn-tela { position: fixed; inset: 0; z-index: 300; background: hsl(var(--background)); color: hsl(var(--foreground)); overflow-y: auto; }
+.cn-figurinha-em-foco { position: fixed; inset: 0; z-index: 350; }
 .cn-tela-cab { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); }
 .cn-grade4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 4px; }
 .cn-celula { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 2px 0 4px; border-radius: 12px; }
@@ -143,3 +144,26 @@
 /* área de toque de 44 px nos chips de filtro da coleção (28 px de altura) — ::before invisível (polimento 17/10) */
 .cn-b-chip { position: relative; }
 .cn-b-chip::before { content: ""; position: absolute; inset: -8px -3px; }
+
+/* Uma pequena entrega: arte maior, papel marfim e movimento só na entrada. */
+.cn-toast { --aviso-cor:#7b867b; min-height:96px; max-width:390px; gap:14px; padding:12px 16px 12px 10px; border-radius:22px; background:#fffdf6; color:#23314a; border:1px solid #e5dfd0; box-shadow:0 12px 32px #23314a24,0 2px 5px #23314a0a; }
+.cn-toast[data-rar="raro"] { --aviso-cor:#527ca7; box-shadow:0 12px 32px #23314a24,inset 0 0 0 1px #527ca766; }
+.cn-toast[data-rar="epico"] { --aviso-cor:#8b67a5; border-color:#c7aed8; }
+.cn-toast[data-rar="lendario"] { --aviso-cor:#a77d2f; border-color:#d4ba75; background:#fff9e9; }
+.cn-toast-arte { width:76px; height:76px; animation:cn-presente .65s .12s cubic-bezier(.2,.8,.2,1) both; }
+.cn-toast-eyebrow { color:var(--aviso-cor); letter-spacing:.12em; }
+.cn-toast-nome { font-size:17px; margin:4px 0; }
+.cn-toast-sub { color:#6d7480; }
+.cn-toast-barra { left:22px; right:22px; background:var(--aviso-cor); opacity:.5; }
+@keyframes cn-presente { 0% { transform:translateY(12px) rotate(-14deg) scale(.75); opacity:0; } 65% { transform:translateY(-3px) rotate(4deg) scale(1.07); opacity:1; } 100% { transform:none; opacity:1; } }
+.dark .cn-toast { background:#252a32; color:#fff7e7; border-color:#55505a; }
+.dark .cn-toast-sub { color:#b7bac1; }
+@media (prefers-reduced-motion:reduce) { .cn-toast-arte,.cn-toast-barra { animation:none !important; } }
+/* Marcos da sequência: chegada breve, depois a arte pode ser apreciada em repouso. */
+.cn-festa { background:radial-gradient(ellipse at 50% 38%,#354c60,#1d2635 72%); }
+.cn-festa[data-raridade="epico"] { background:radial-gradient(ellipse at 50% 38%,#544367,#1d2635 72%); }
+.cn-festa[data-raridade="lendario"] { background:radial-gradient(ellipse at 50% 38%,#655436,#1d2635 72%); }
+.cn-festa-raios { animation:cn-festa-luz 1.3s ease-out both; }
+.cn-festa-arte { animation:cn-presente .7s .1s both; }
+@keyframes cn-festa-luz { 0% { transform:scale(.65) rotate(-10deg); opacity:0; } 50% { opacity:.7; } 100% { transform:scale(1) rotate(8deg); opacity:.2; } }
+@media(prefers-reduced-motion:reduce) { .cn-festa-arte,.cn-festa-raios { animation:none !important; } .cn-confete { display:none; } }

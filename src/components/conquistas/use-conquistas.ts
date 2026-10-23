@@ -1,3 +1,4 @@
+import { aplicarCatalogoCaderno } from "@/components/gamification/catalogo-caderno";
 import { useEffect, useMemo } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -9,7 +10,7 @@ import {
 } from "@/lib/sequencia";
 import { acaoDoDia, type AcaoDoDia } from "@/lib/acao-do-dia";
 import { faixaDoFogo, type Faixa } from "@/lib/fogo-sequencia";
-import { CHAVE_ALBUM_VISTO, CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
+import { CHAVE_ALBUM_VISTO, CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, lerDesbloqueadas, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
 import {
@@ -92,6 +93,7 @@ export interface Colecao {
 export interface EstadoConquistas {
   /** Todas, com `unlocked` já somando o que está gravado. */
   adesivos: Badge[];
+  arquivados?: Badge[];
   /** Na ordem da folha (conquistados, depois os que faltam). */
   folha: Badge[];
   desbloqueadas: Record<string, string>;
@@ -149,7 +151,7 @@ export function useConquistas(): EstadoConquistas {
       console.error("[conquistas] cálculo falhou:", e);
       calculadas = daSequencia;
     }
-    return mesclarDesbloqueios(calculadas, gravadas, hoje);
+    return mesclarDesbloqueios(aplicarCatalogoCaderno(calculadas, get, lerDesbloqueadas(gravadas), hoje), gravadas, hoje);
   }, [get, gravadas, seq, hoje]);
 
   /*
@@ -205,21 +207,23 @@ export function useConquistas(): EstadoConquistas {
   }, [loaded, piso, pisoInicial, nivelPorXp.name]);
 
   return useMemo(() => {
-    const folha = ordenarParaFolha(r.adesivos, r.desbloqueadas);
+    const ativos = r.adesivos.filter(b => !b.arquivada);
+    const folha = ordenarParaFolha(ativos, r.desbloqueadas);
     const pisoEfetivo = piso === undefined ? pisoInicial : piso;
     const nivel = getLevel(r.xp, pisoEfetivo);
     return {
-      adesivos: r.adesivos,
+      adesivos: ativos,
+      arquivados: r.adesivos.filter(b => b.arquivada),
       folha,
       desbloqueadas: r.desbloqueadas,
-      abertos: r.adesivos.filter((b) => b.unlocked).length,
+      abertos: ativos.filter((b) => b.unlocked).length,
       xp: r.xp,
       nivel,
       nivelPorXp,
       pisoValendo: indiceDoNivel(nivel.name) > indiceDoNivel(nivelPorXp.name),
       proximoNivel: getNextLevel(r.xp, pisoEfetivo),
-      proximo: proximoAdesivo(r.adesivos),
-      ...contarAdesivos(r.adesivos),
+      proximo: proximoAdesivo(ativos),
+      ...contarAdesivos(ativos),
       registroPronto: gravadas !== undefined,
     };
   }, [r, gravadas, piso, pisoInicial, nivelPorXp]);

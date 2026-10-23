@@ -1,4 +1,4 @@
-export type BadgeCategoria = "sequencia" | "finance" | "rotina" | "leitura" | "treino" | "dieta" | "saude" | "vida" | "geral";
+export type BadgeCategoria = "sequencia" | "finance" | "rotina" | "leitura" | "treino" | "dieta" | "saude" | "vida" | "geral" | "carreira";
 
 /** Rótulo, ordem e rota das categorias — a ordem é a de uso real dos módulos. */
 export const CATEGORIAS: { id: BadgeCategoria; label: string; emoji: string; rota: string }[] = [
@@ -10,6 +10,7 @@ export const CATEGORIAS: { id: BadgeCategoria; label: string; emoji: string; rot
   { id: "dieta", label: "Dieta", emoji: "🥗", rota: "/dieta" },
   { id: "saude", label: "Saúde", emoji: "💧", rota: "/saude" },
   { id: "vida", label: "Vida", emoji: "🌱", rota: "/home" },
+  { id: "carreira", label: "Carreira", emoji: "💼", rota: "/carreira" },
   { id: "geral", label: "CORE", emoji: "👑", rota: "/home" },
 ];
 
@@ -35,6 +36,8 @@ export const RARIDADE_VISUAL: Record<Raridade, string> = {
 };
 
 export interface Badge {
+  /** Conquista de uma edição anterior: preserva histórico e XP. */
+  arquivada?: boolean;
   id: string;
   name: string;
   description: string;

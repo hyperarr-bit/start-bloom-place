@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Bell, ChevronRight, Share2, Shield, X } from "lucide-react";
+import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Bell, ChevronRight, Shield, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { trackEvent } from "@/lib/analytics";
 import { normalizarDias, somarDias } from "@/lib/sequencia";
@@ -7,15 +8,19 @@ import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type DiaDaSemana
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
+import { RARIDADES_EM_TESTE } from "../MarcaRaridade";
 import { giroDoAdesivo } from "../adesivos-arte";
 import { Fogo } from "../Fogo";
+import { IconeMarcaAlbum } from "../IconeMarcaAlbum";
+import { FOGOS_CADERNO, fogoDoCaderno } from "./fogo-caderno";
 import { varsDaFaixa } from "../CardSequencia";
 import { LembreteDaSequencia } from "../LembreteDaSequencia";
 import type { Sequencia } from "../use-conquistas";
 import { EVENTOS2, contagem, ehMarcoDeFesta, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
-import { resumoRaridadesCurto, type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
+import { type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import "../conquistas.css";
 import "./conquistas-nova.css";
+import "./colecao-caderno.css";
 
 /**
  * As CAMADAS da Conquistas 2 (16/10): o toast do adesivo comum/raro, a festa
@@ -33,58 +38,20 @@ export interface PropsToast {
   /** No teste grátis com a Missão valendo: "Seu adesivo está esperando no álbum" — mais baixo, sem festa. */
   suave?: boolean;
   onToque?: () => void;
+  onFechar?: () => void;
 }
 
-/** O aviso pequeno do adesivo comum/raro (3,5 s, por cima de qualquer tela; o toque abre o álbum na página dele). */
-export const ToastAdesivo = ({ badge, quantidade = 1, colecao, suave, onToque }: PropsToast) => {
+/** Comuns: cartão breve, agrupado e sem roubar o foco. */
+export const ToastAdesivo = ({ badge, quantidade = 1, suave, onToque, onFechar }: PropsToast) => {
   const r = raridadeDe(badge);
   useEffect(() => { trackEvent(EVENTOS2.toastView, { id: badge.id, raridade: r, quantidade, suave: !!suave }); }, [badge.id, r, quantidade, suave]);
-  return (
-    <button type="button" className="cn-toast" data-rar={r} data-suave={suave ? "" : undefined} data-testid="cn-toast" data-quantidade={quantidade} onClick={() => { trackEvent(EVENTOS2.toastToque, { id: badge.id, quantidade, suave: !!suave }); onToque?.(); }}>
-      <span className="shrink-0 grid place-items-center w-12 h-12"><AdesivoRaro id={badge.id} raridade={r} tamanho={46} giro={-5} /></span>
-      <span className="flex-1 min-w-0">
-        <span className="cn-toast-eyebrow block">{quantidade > 1 ? `${quantidade} adesivos novos` : r === "comum" ? "Adesivo novo" : `Adesivo ${RARIDADE_LABEL[r].toLowerCase()}`}</span>
-        <span className="cn-toast-nome block truncate">{quantidade > 1 ? `${badge.name} e mais ${quantidade - 1}` : badge.name}</span>
-        <span className="cn-toast-sub block truncate">{colecao ? `${colecao} · ` : ""}toque pra colar no álbum</span>
-      </span>
-      <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="cn-toast-barra" aria-hidden />
-    </button>
-  );
+  return <CelebracaoFigurinha badge={badge} quantidade={quantidade} onFechar={onFechar} onColar={() => { trackEvent(EVENTOS2.toastToque, { id: badge.id, quantidade, suave: !!suave }); onToque?.(); }} />;
 };
 
-/* ------------------------------------------------------------------ a festa do marco */
-
-const CORES_CONFETE = ["#d22d80", "#F5B301", "#4F8BFF", "#22c55e", "#fb923c", "#8b5cf6"];
-
-/** A festa do MARCO (7/30/100 dias): a única tela cheia que sobra — com o adesivo do marco e os Stories. */
-export const CelebracaoMarco = ({ badge, dias, seq, onContinuar, onCompartilhar }: { badge: Badge; dias: number; seq: Sequencia; onContinuar: () => void; onCompartilhar?: () => unknown }) => {
+/** Os marcos usam a mesma linguagem, preservando a opção de compartilhar. */
+export const CelebracaoMarco = ({ badge, dias, seq: _seq, onContinuar, onCompartilhar, onColar }: { badge: Badge; dias: number; seq: Sequencia; onContinuar: () => void; onCompartilhar?: () => unknown; onColar?: () => void }) => {
   useEffect(() => { trackEvent(EVENTOS2.marcoView, { dias }); }, [dias]);
-  const confetes = useMemo(() => Array.from({ length: 26 }, (_, i) => ({ x: 3 + ((i * 53) % 94), w: 6 + (i % 3) * 2.5, cor: CORES_CONFETE[i % CORES_CONFETE.length], atraso: 0.3 + (i % 6) * 0.09, dur: 2.2 + (i % 4) * 0.3, giro: (i % 2 ? 1 : -1) * (160 + ((i * 37) % 180)) })), []);
-  return (
-    <div className="cn-festa" role="dialog" aria-modal="true" aria-label={`${dias} dias seguidos`} data-testid="cn-festa" data-momento="" style={varsDaFaixa(seq.faixa)}>
-      <div aria-hidden className="absolute inset-0 pointer-events-none cn-pontilhado" />
-      <div aria-hidden className="cn-festa-raios" />
-      {confetes.map((c, i) => <span key={i} aria-hidden className="cn-confete" style={{ left: `${c.x}%`, width: c.w, height: c.w * 1.7, background: c.cor, "--atraso": `${c.atraso}s`, "--dur": `${c.dur}s`, "--giro": `${c.giro}deg` } as CSSProperties} />)}
-      <div className="relative flex-1 flex flex-col items-center justify-center px-8 text-center">
-        <p className="cn-caps mb-5" style={{ color: "#fde68a" }}>Sequência</p>
-        <div style={{ transform: "rotate(-5deg)" }}>
-          <AdesivoRaro id={badge.id} raridade={raridadeDe(badge)} tamanho={200} bordaGrossa titulo={badge.name} />
-        </div>
-        <h2 className="mt-7 text-[32px] font-black tracking-tight leading-[1.05]">{dias} dias seguidos!</h2>
-        <p className="cn-serif mt-1.5 text-[23px] text-white/75">Constância tem prêmio.</p>
-        {dias % 7 === 0 && <span className="cn-festa-chip mt-5"><Shield className="w-3.5 h-3.5" /> +1 protetor guardado</span>}
-      </div>
-      <div className="relative w-full max-w-md mx-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-2.5">
-        {podeCompartilhar(badge) && onCompartilhar && (
-          <button type="button" className="cn-btn cn-btn-1" onClick={() => { trackEvent(EVENTOS2.marcoShare, { dias }); void onCompartilhar(); }} data-testid="cn-festa-stories">
-            <Share2 className="w-4 h-4" /> Postar nos Stories
-          </button>
-        )}
-        <button type="button" className="cn-btn cn-btn-2" onClick={onContinuar} data-testid="cn-festa-continuar">Continuar</button>
-      </div>
-    </div>
-  );
+  return <CelebracaoFigurinha badge={badge} marco={{ dias, protetor: dias % 7 === 0 }} onFechar={onContinuar} onColar={onColar} onCompartilhar={podeCompartilhar(badge) && onCompartilhar ? () => { trackEvent(EVENTOS2.marcoShare, { dias }); return onCompartilhar(); } : undefined} />;
 };
 
 /* ------------------------------------------------------------------ o detalhe da sequência */
@@ -111,7 +78,7 @@ export const AnelDaSemana = ({ seq }: { seq: Sequencia }) => {
         {hojeIdx >= 0 && <path className="cn-b-seg" data-estado="hoje" d={`M ${p(a0)} A ${R} ${R} 0 0 1 ${p(a1)}`} />}
       </svg>
       <div className="cn-b-centro">
-        <Fogo dias={seq.dias} faixa={seq.dias > 0 ? seq.faixa : undefined} tamanho={44} viva={seq.dias > 0} />
+        <Fogo dias={seq.dias} faixa={seq.dias > 0 ? fogoDoCaderno(seq.dias) : undefined} tamanho={44} semBrilho={seq.dias < 100} />
         <span className="cn-b-num">{seq.dias}</span>
         <span className="cn-b-rot">{seq.dias === 1 ? "DIA SEGUIDO" : "DIAS SEGUIDOS"}</span>
       </div>
@@ -143,12 +110,18 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
   return (
     <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
       <SheetContent side="bottom" className="rounded-t-3xl max-h-[92dvh] overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="cn-detalhe-sequencia">
-        <div className="max-w-sm mx-auto pt-1" style={varsDaFaixa(seq.faixa)}>
+        <div className="max-w-sm mx-auto pt-1" style={varsDaFaixa(fogoDoCaderno(seq.dias))}>
           <AnelDaSemana seq={seq} />
           <div className="text-center mt-2">
             <SheetTitle className="text-[16px] font-black tracking-tight leading-none">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
-            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{seq.faixa.nome} · recorde {seq.recorde} · {contagem(seq.lista.length, "dia anotado", "dias anotados")}</SheetDescription>
+            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{fogoDoCaderno(seq.dias).nome} · recorde {seq.recorde} · {contagem(seq.lista.length, "dia anotado", "dias anotados")}</SheetDescription>
           </div>
+          <ol className="cn-fogo-trilha" aria-label="Evolução da chama">
+            {FOGOS_CADERNO.map(f => <li key={f.id} data-atual={seq.dias > 0 && fogoDoCaderno(seq.dias).id === f.id ? "" : undefined} aria-current={seq.dias > 0 && fogoDoCaderno(seq.dias).id === f.id ? "step" : undefined} aria-label={`${f.min} ${f.min === 1 ? "dia" : "dias"}: ${f.nome}`}>
+              <Fogo faixa={f} tamanho={27} semBrilho />
+              <span>{f.min}d</span>
+            </li>)}
+          </ol>
           <div className="mt-4 rounded-2xl border border-border p-3">
             <p className="cn-caps text-muted-foreground mb-2">Últimas 4 semanas</p>
             <Calendario28 seq={seq} />
@@ -167,7 +140,7 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
               const faltam = Math.max(1, m - seq.dias);
               return (
                 <button type="button" key={b.id} className="cn-premio-linha w-full text-left" onClick={() => onAdesivo(b)}>
-                  <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={40} trancado />
+                  <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={40} trancado progresso={b.progresso} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-extrabold leading-tight">{b.name}{m % 7 === 0 ? <span className="text-muted-foreground font-bold text-[11px]"> e mais 1 protetor</span> : ""}</p>
                     <p className="text-[11px] text-muted-foreground">adesivo {RARIDADE_LABEL[raridadeDe(b)].toLowerCase()}{ehMarcoDeFesta(b.id) ? " · com comemoração e Stories" : ""}</p>
@@ -193,47 +166,73 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
 
 /* ------------------------------------------------------------------ a coleção inteira (ver todos, secundária) */
 
-export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: EstadoConquistasNova; inicial: ColecaoNova | null; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
+export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<EstadoConquistasNova, "colecoes" | "abertos" | "total">; inicial: ColecaoNova | null; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
   const [filtro, setFiltro] = useState<string>(inicial?.id ?? "todas");
-  const secoes = filtro === "todas" ? e.colecoes : e.colecoes.filter((c) => c.id === filtro);
+  const [raridadeFiltro, setRaridadeFiltro] = useState("todas");
+  const fechar = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const origem = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    fechar.current?.focus({ preventScroll: true });
+    return () => { if (origem?.isConnected) origem.focus({ preventScroll: true }); };
+  }, []);
+  // O detalhe ampliado é outra camada: esta captura só teclas originadas na coleção.
+  const teclado = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") { event.stopPropagation(); onFechar(); return; }
+    if (event.key !== "Tab") return;
+    const controles = event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]');
+    const primeiro = controles[0], ultimo = controles[controles.length - 1];
+    if (event.shiftKey && document.activeElement === primeiro) { event.preventDefault(); ultimo?.focus(); }
+    else if (!event.shiftKey && document.activeElement === ultimo) { event.preventDefault(); primeiro?.focus(); }
+  };
+  const secoes = (filtro === "todas" ? e.colecoes : e.colecoes.filter((c) => c.id === filtro))
+    .map(c => ({...c, adesivos:c.adesivos.filter(b => raridadeFiltro === "todas" || raridadeDe(b) === raridadeFiltro)}))
+    .filter(c => c.adesivos.length > 0);
   return (
-    <div className="cn-tela" role="dialog" aria-modal="true" aria-label="Todos os adesivos" data-testid="cn-colecao-tela">
-      <div className="cn-tela-cab">
-        <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 rounded-full grid place-items-center bg-muted"><X className="w-5 h-5" /></button>
-        <div className="min-w-0">
-          <h2 className="text-[15px] font-extrabold tracking-tight leading-none">TODOS OS ADESIVOS</h2>
-          <p className="text-[11px] text-muted-foreground mt-1">{e.abertos} de {e.total} · {resumoRaridadesCurto(e.adesivos)}</p>
+    <div className="cn-tela cn-colecao" role="dialog" aria-modal="true" aria-label="Todos os adesivos" data-testid="cn-colecao-tela" onKeyDown={teclado}>
+      <div className="cn-colecao-moldura">
+        <div className="cn-tela-cab">
+          <button ref={fechar} type="button" onClick={onFechar} aria-label="Fechar" className="cn-colecao-fechar"><X aria-hidden /></button>
+          <div className="min-w-0">
+            <h2>Sua coleção</h2>
+            <p>{e.abertos} de {e.total} figurinhas conquistadas</p>
+          </div>
+          <span className="cn-colecao-simbolo" aria-hidden><IconeMarcaAlbum /></span>
         </div>
-      </div>
-      <div className="cn-b-chips pt-3">
-        <button type="button" className="cn-b-chip" data-ativo={filtro === "todas" ? "" : undefined} onClick={() => setFiltro("todas")}>Todas</button>
-        {e.colecoes.map((x) => (
-          <button key={x.id} type="button" className="cn-b-chip" data-ativo={filtro === x.id ? "" : undefined} onClick={() => setFiltro(x.id)}><span aria-hidden>{x.emoji}</span> {x.label} <span className="n">{x.abertos}/{x.total}</span></button>
-        ))}
-      </div>
-      <div className="px-3 pb-10 space-y-3">
-        {secoes.map((c) => (
-          <section key={c.id} className="cn-card cn-pontilhado" aria-label={c.label}>
-            <div className="h-10 px-3.5 flex items-center gap-2 border-b border-border/70">
-              <span aria-hidden>{c.emoji}</span>
-              <h3 className="cn-serif text-[19px] leading-none">{c.label}</h3>
-              <span className="text-[11px] font-bold text-muted-foreground tabular-nums">{c.abertos} de {c.total}</span>
-              <span className={`ml-auto cn-pill ${c.total - c.abertos <= 3 ? "cn-pill-acento" : "cn-pill-suave"}`}>{c.frase}</span>
-            </div>
-            <div className="cn-grade4 px-2 pt-3 pb-2">
-              {c.adesivos.map((b, i) => (
-                <button key={b.id} type="button" className="cn-celula" onClick={() => onAdesivo(b)} data-aberto={b.unlocked ? "true" : "false"}>
-                  <span className="relative grid place-items-center w-[70px] h-[70px]">
-                    <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={64} trancado={!b.unlocked} giro={b.unlocked ? giroDoAdesivo(i) : 0} />
-                    {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
-                  </span>
-                  <span className={`cn-celula-nome ${b.unlocked ? "text-foreground" : "text-muted-foreground"}`}>{b.name}</span>
-                  {!b.unlocked && raridadeDe(b) !== "comum" && <span className="chip-rar" data-rar={raridadeDe(b)} style={{ height: 14, fontSize: 7.5 }}>{RARIDADE_LABEL[raridadeDe(b)]}</span>}
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
+        <div className="cn-b-chips" role="group" aria-label="Filtrar por módulo">
+          <button type="button" className="cn-b-chip" data-ativo={filtro === "todas" ? "" : undefined} aria-pressed={filtro === "todas"} onClick={() => setFiltro("todas")}>Todas</button>
+          {e.colecoes.map((x) => (
+            <button key={x.id} type="button" className="cn-b-chip" data-ativo={filtro === x.id ? "" : undefined} aria-pressed={filtro === x.id} onClick={() => setFiltro(x.id)}><IconeMarcaAlbum modulo={x.id} /> {x.label} <span className="n">{x.abertos}/{x.total}</span></button>
+          ))}
+        </div>
+        <label className="cn-colecao-filtro">Raridade
+          <select aria-label="Filtrar por raridade" value={raridadeFiltro} onChange={event => setRaridadeFiltro(event.target.value)}>
+            <option value="todas">Todas as raridades</option><option value="comum">Comuns</option><option value="raro">Raras</option><option value="epico">Épicas</option><option value="lendario">Lendárias</option>
+          </select>
+        </label>
+        {secoes.length === 0 && <p className="cn-colecao-vazia" role="status">Nenhuma figurinha desta raridade neste módulo.</p>}
+        <div className="cn-colecao-secoes">
+          {secoes.map((c) => (
+            <section key={c.id} className="cn-card cn-colecao-secao" aria-label={c.label}>
+              <div className="cn-colecao-secao-cab">
+                <IconeMarcaAlbum modulo={c.id} />
+                <h3 className="cn-serif">{c.label}</h3>
+                <span>{c.abertos} de {c.total}</span>
+              </div>
+              <div className="cn-grade4">
+                {c.adesivos.map((b, i) => (
+                  <button key={b.id} type="button" className="cn-celula" onClick={() => onAdesivo(b)} data-aberto={b.unlocked ? "true" : "false"} aria-label={`${b.name}: ${b.unlocked ? "conquistada" : "a conquistar"}`}>
+                    <span className="cn-colecao-arte">
+                      <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={112} style={{ width: "var(--colecao-arte)", height: "var(--colecao-arte)" }} trancado={!b.unlocked} progresso={b.progresso} giro={b.unlocked ? giroDoAdesivo(i) : 0} />
+                      {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
+                    </span>
+                    <span className={`cn-celula-nome ${b.unlocked ? "text-foreground" : "text-muted-foreground"}`}>{b.name}</span>
+                    {(!b.unlocked || RARIDADES_EM_TESTE) && raridadeDe(b) !== "comum" && <span className="chip-rar" data-rar={raridadeDe(b)} style={{ height: 14, fontSize: 7.5 }}>{RARIDADE_LABEL[raridadeDe(b)]}</span>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

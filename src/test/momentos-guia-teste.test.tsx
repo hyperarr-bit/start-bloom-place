@@ -62,6 +62,7 @@ beforeEach(() => {
   toasts.length = 0;
   nativo.v = false;
   localStorage.clear();
+  localStorage.setItem("conquistas2-force", "off"); // Esta suíte verifica a experiência anterior.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 8, 26, 10, 0));
 });

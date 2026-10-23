@@ -1,0 +1,19 @@
+.pc-previa { min-height:100dvh; background:#f5f1e8; color:#28384d; padding:24px 22px 40px; }
+.pc-previa header { max-width:980px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.pc-previa header button { min-height:44px; display:flex; align-items:center; gap:8px; font-size:13px; }
+.pc-previa header>span { font-size:9px; letter-spacing:.18em; color:#7b827c; }
+.pc-intro { text-align:center; margin:48px auto 32px; }
+.pc-intro>p { text-transform:uppercase; font-size:9px; letter-spacing:.15em; color:#8e7c65; }
+.pc-intro h1 { font:italic 48px/1.05 'Instrument Serif',Georgia,serif; margin:15px 0; }
+.pc-intro>span { font-size:12px; color:#787d7e; }
+.pc-cenas { max-width:980px; margin:0 auto; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+.pc-cenas>button { display:flex; flex-direction:column; align-items:center; padding:18px 12px; border:1px solid #dfd8ca; border-top:3px solid; border-radius:18px; background:#fffaf2; box-shadow:0 4px 10px #25395405; transition:transform .2s; }
+.pc-cenas>button:hover { transform:translateY(-4px); }
+.pc-arte { display:grid; place-items:center; height:132px; }
+.pc-cenas strong { font:italic 29px 'Instrument Serif',Georgia,serif; margin-top:5px; }
+.pc-cenas small { font-size:10px; color:#7d817e; margin-top:5px; }
+.pc-ver { display:flex; align-items:center; gap:5px; font-size:10px; margin-top:20px; font-weight:700; }
+.pc-nota { text-align:center; font-size:10px; color:#8a8f8c; margin:30px 0 0; }
+.pc-previa button:focus-visible { outline:2px solid #71899b; outline-offset:4px; }
+@media(max-width:700px) { .pc-cenas { grid-template-columns:repeat(2,minmax(0,1fr)); } .pc-cenas>button:last-child { grid-column:1/-1; } .pc-cenas>button:last-child .pc-arte { height:110px; } .pc-intro { margin-top:24px; } .pc-intro h1 { font-size:36px; } }
+@media(prefers-reduced-motion:reduce) { .pc-cenas>button { transition:none; } }

@@ -141,7 +141,11 @@ export function medirVida(get: Leitor, hoje: string = localDayKey()) {
   // ---------- saúde: água (26/09 — o adesivo da gota do Fable) ----------
   // Dia "em dia" = copos do dia ≥ meta (a mesma meta que a Hidratação usa).
   const metaAgua = Math.min(20, Math.max(1, Math.round(Number(get<unknown>("core-saude-water-goal", 8)) || 8)));
-  const diasDeAgua = diasDe(get<unknown>("water-log", {}), (v) => Number(v) >= metaAgua).length;
+  const registroAgua = get<unknown>("water-log", {});
+  const diasDeAgua = diasDe(registroAgua, (v) => Number(v) >= metaAgua).length;
+  const primeiroCopo = diasDe(registroAgua, (v) =>
+    (typeof v === "number" || typeof v === "string") && Number.isFinite(Number(v)) && Number(v) >= 1,
+  ).length > 0;
 
   // sono: o registro mora em 2 chaves (Rotina e Saúde) — vale a maior do dia
   const metaSono = Math.min(12, Math.max(4, Number(get<unknown>("core-saude-sleep-goal", 8)) || 8));
@@ -173,7 +177,7 @@ export function medirVida(get: Leitor, hoje: string = localDayKey()) {
     livros, terminados, lidosNoAno, metaDoAno, diasDeLeitura,
     treinos, recordesPessoais, metaSemanal, semanasNaMeta,
     diasImpecaveis, recordeDieta, receitas,
-    metaAgua, diasDeAgua, noitesNaMeta, diasDeRemedio, medicoes,
+    metaAgua, diasDeAgua, primeiroCopo, noitesNaMeta, diasDeRemedio, medicoes,
     metasConcluidas, cartaEscrita, registrosDoPet, momentos, diasDeDetox, revisoes, tourDaHome,
   };
 }
@@ -229,6 +233,8 @@ export function buildBadgesVida(get: Leitor, hoje: string = localDayKey()): Badg
     fazer("momentos-5", "Álbum de Momentos", "5 momentos guardados", "📸", "vida", "comum", m.momentos, 5, ["momento", "momentos"], rota("/relacionamentos", "Relacionamentos")),
     fazer("detox-7", "Semana Detox", "7 dias no diário do detox", "🌿", "vida", "raro", m.diasDeDetox, 7, ["dia de diário", "dias de diário"], rota("/detox", "Detox")),
     fazer("estudos-revisao-1", "Revisão Feita", "Responda 1 revisão dos estudos", "🧠", "vida", "comum", m.revisoes, 1, ["revisão", "revisões"], rota("/estudos", "Estudos")),
+    // Primeiro registro de água, sem precisar completar a meta diária.
+    fazer("agua-1", "Primeiro gole", "Registre 1 copo d’água", "🥤", "saude", "comum", m.primeiroCopo ? 1 : 0, 1, ["copo d’água", "copos d’água"]),
     // 10/10 — "Casa arrumada": o tour da Home em 5 passos (lib/tour-home). Só existe no álbum com a
     // chave TOUR_HOME ligada: desligada, a coleção continua a de 65, byte a byte.
     ...(tourHomeLigado()

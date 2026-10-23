@@ -1,0 +1,8 @@
+/* Experimento isolado: estes estilos só existem com a chave visual ligada. */
+:is(.fig, .ad-rar)[data-caderno][data-acabamento-v2][data-rar="raro"] > svg[data-arte-caderno] { filter: drop-shadow(1.6px 0 0 #6186b4) drop-shadow(-1.6px 0 0 #6186b4) drop-shadow(0 1.6px 0 #6186b4) drop-shadow(0 -1.6px 0 #6186b4); }
+:is(.fig, .ad-rar)[data-caderno][data-acabamento-v2][data-rar="epico"] > svg[data-arte-caderno] { filter: drop-shadow(1.8px 0 0 #ad88cb) drop-shadow(-1.8px 0 0 #a3a4d4) drop-shadow(0 1.8px 0 #bd9bd6) drop-shadow(0 -1.8px 0 #d3c3e3); }
+:is(.fig, .ad-rar)[data-caderno][data-acabamento-v2][data-rar="lendario"] > svg[data-arte-caderno] { filter: drop-shadow(2px 0 0 #d2ad5b) drop-shadow(-2px 0 0 #b58a36) drop-shadow(0 2px 0 #a77d2e) drop-shadow(0 -2px 0 #eed49b); }
+.fig-marca-raridade { position: absolute; z-index: 4; right: 2%; bottom: 4%; width: clamp(14px, 20%, 27px); height: clamp(14px, 20%, 27px); display: grid; place-items: center; padding: 2px; border: 2px solid #fffdf6; border-radius: 50%; background: #4f759f; color: #fffdf8; box-shadow: 0 1px 3px #202c4733; pointer-events: none; }
+.fig-marca-raridade[data-rar="epico"] { background: linear-gradient(135deg, #765790, #a181ba); }
+.fig-marca-raridade[data-rar="lendario"] { background: linear-gradient(135deg, #ebd293, #bc9142); color: #4b3714; border-color: #fff8e6; }
+.fig-marca-raridade > svg { width: 100%; height: 100%; }

@@ -205,6 +205,15 @@ describe("o quadro da folha (pintarFolha)", () => {
 });
 
 describe("reduzir movimento", () => {
+  it("Os mais raros tem acabamento próprio e cada seção mantém sua raridade no topo", () => {
+    movimento.reduzido = true;
+    montar({ editorial: true });
+    for (const acabamento of ["destaque", "lendario", "epico", "raro", "comum", "comum"]) {
+      expect(fundo().querySelector(".alb-cap")).toHaveAttribute("data-acabamento", acabamento);
+      if (!screen.getByTestId("album-tela-proxima").hasAttribute("disabled")) fireEvent.click(screen.getByTestId("album-tela-proxima"));
+    }
+  });
+
   it("sem capa girando, sem folha, sem peel; a tela marca data-reduzir (o CSS tira foil e 3D) e a página troca na hora", () => {
     movimento.reduzido = true;
     montar();
@@ -225,7 +234,8 @@ describe("o foil das épicas e lendárias", () => {
     const epica = pagina.querySelector<HTMLElement>('[data-vaga="rotina-21"] .fig')!;
     expect(epica).toHaveAttribute("data-foil-tem");
     expect(epica.querySelector(".fig-foil")).toBeInTheDocument();
-    expect(epica.querySelector(".fig-aro")).toBeInTheDocument();
+    expect(epica).toHaveAttribute("data-caderno");
+    expect(epica.querySelector(".fig-aro")).toBeNull(); // o recorte usa contorno próprio, sem aro circular
     const rara = pagina.querySelector<HTMLElement>('[data-vaga="rotina-7"] .fig')!;
     expect(rara).not.toHaveAttribute("data-foil-tem");
     expect(rara.querySelector(".fig-foil")).toBeNull();
@@ -316,7 +326,7 @@ describe("a capa, as páginas e o peel", () => {
     montar();
     avancar(CAPA_SAI_MS + 2000);
     const aba = screen.getByTestId("album-aba-lendario");
-    expect(aba).toHaveTextContent("♛");
+    expect(aba.querySelector("svg.alb-marca-icone")).toBeTruthy();
     expect(aba).toHaveTextContent("LENDÁRIAS");
     expect(aba).toHaveAttribute("aria-label", "LENDÁRIAS");
     expect(screen.getByTestId("album-aba-destaque")).toHaveTextContent("MAIS RAROS");

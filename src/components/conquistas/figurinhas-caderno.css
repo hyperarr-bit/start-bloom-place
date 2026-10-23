@@ -1,0 +1,33 @@
+/* Arte limpa: raridade fica no contexto e na celebração, sem contorno colorido. */
+:is(.fig, .ad-rar)[data-caderno][data-rar="comum"], .fig-oculta[data-rar="comum"] { --fig-borda: #c9c3b6; --fig-silhueta: #dedbd3; }
+:is(.fig, .ad-rar)[data-caderno][data-rar="raro"], .fig-oculta[data-rar="raro"] { --fig-borda: #6c8db5; --fig-silhueta: #d9e3ef; }
+:is(.fig, .ad-rar)[data-caderno][data-rar="epico"], .fig-oculta[data-rar="epico"] { --fig-borda: #a48abc; --fig-silhueta: #ded6ed; }
+:is(.fig, .ad-rar)[data-caderno][data-rar="lendario"], .fig-oculta[data-rar="lendario"] { --fig-borda: #bd9850; --fig-silhueta: #e6dab9; }
+:is(.fig, .ad-rar)[data-caderno][data-rar] > svg[data-arte-caderno] { width: 100%; height: 100%; opacity: 1; filter: drop-shadow(0 2px 1px #292b3525); }
+:is(.fig, .ad-rar)[data-caderno][data-rar="comum"] > svg[data-arte-caderno] { filter: drop-shadow(0 2px 1px #292b3525); }
+.fig[data-caderno].fig-vazia { filter: none; }
+:is(.fig, .ad-rar)[data-caderno] > .fig-oculta { width: 100% !important; height: 100% !important; }
+.fig-oculta { position: relative; display: inline-block; line-height: 0; isolation: isolate; pointer-events: none; }
+.fig-oculta-papel, .fig-oculta-silhueta { position: absolute; inset: 0; -webkit-mask-image: var(--fig-mascara); mask-image: var(--fig-mascara); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-mode: alpha; }
+.fig-oculta-papel { background: #fffdf5; transform: scale(1.045); filter: drop-shadow(0 1px 1px #26334b30); }
+.fig-oculta-silhueta { background: var(--fig-silhueta, #dedbd3); }
+.fig-oculta > .fig-oculta-cadeado { position: absolute; left: 50%; top: 51%; width: 14%; height: 14%; min-width: 12px; min-height: 12px; max-width: 36px; max-height: 36px; transform: translate(-50%, -50%); color: #34415c; }
+.fig-oculta-espiada { position: absolute; inset: 0; clip-path: polygon(0 0, 95% 0, 0 70%); }
+.fig-oculta-espiada > svg { width: 100%; height: 100%; }
+.fig-oculta-dobra { position: absolute; inset: 0; background: linear-gradient(144deg, transparent 35%, #fffdf5 37%, #f3eddf 40%, #cfc5b4 41%, transparent 42%); -webkit-mask-image: var(--fig-mascara); mask-image: var(--fig-mascara); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; mask-mode: alpha; }
+.fig-detalhe-arte { position: relative; }
+.fig-detalhe-quase { position: absolute; z-index: 3; top: -4px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 20px; background: hsl(var(--muted)); color: hsl(var(--foreground)); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.fig-detalhe[data-rar="comum"] { --det-acento: #8b867c; }
+.fig-detalhe[data-rar="raro"] { --det-acento: #6c8db5; }
+.fig-detalhe[data-rar="epico"] { --det-acento: #a48abc; }
+.fig-detalhe[data-rar="lendario"] { --det-acento: #bd9850; }
+.fig-detalhe[data-rar] .det-barra > i { background: var(--det-acento); }
+.dark .fig-oculta[data-rar="comum"] { --fig-silhueta: #94969a; }
+.dark .fig-oculta[data-rar="raro"] { --fig-silhueta: #8d9eb6; }
+.dark .fig-oculta[data-rar="epico"] { --fig-silhueta: #a79bbd; }
+.dark .fig-oculta[data-rar="lendario"] { --fig-silhueta: #bdad83; }
+/* O álbum é papel claro mesmo quando a interface está no modo escuro. */
+.dark .alb-pag .fig-oculta[data-rar="comum"] { --fig-silhueta: #dedbd3; }
+.dark .alb-pag .fig-oculta[data-rar="raro"] { --fig-silhueta: #d9e3ef; }
+.dark .alb-pag .fig-oculta[data-rar="epico"] { --fig-silhueta: #ded6ed; }
+.dark .alb-pag .fig-oculta[data-rar="lendario"] { --fig-silhueta: #e6dab9; }

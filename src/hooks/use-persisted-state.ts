@@ -125,8 +125,10 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     latestRef.current = next;
     lastWrittenJson.current = json;
     setState(next);
-    if (hydratedRef.current) setData(key, next);
-    else setData(key, next, { base: anterior });
+    const registraAcao = /^(finance-wishlist|saude-workouts-v2|rotina-schedule|saude-meals|saude-fast-start|rotina-habits)$/.test(key);
+    const evidencia = registraAcao ? { baseDaAcao: anterior } : {};
+    if (hydratedRef.current) { if (registraAcao) setData(key, next, evidencia); else setData(key, next); }
+    else setData(key, next, { base: anterior, ...evidencia });
     // fora da pilha atual: quem escreve pode estar no meio de um updater/render
     const aviso: AvisoDeEscrita = { key, json, value: next, origem: origem.current };
     queueMicrotask(() => window.dispatchEvent(new CustomEvent(EVENTO_MESMA_CHAVE, { detail: aviso })));

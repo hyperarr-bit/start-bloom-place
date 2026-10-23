@@ -1,3 +1,4 @@
+import { CHAVE_ACOES_CONQUISTAS, registrarAcao } from "@/lib/conquistas-acoes";
 import { useState, useRef, useEffect } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -166,6 +167,7 @@ export const QuickActions = () => {
     if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
   }, []);
   const showSuccess = (id: ActionId) => {
+    set(CHAVE_ACOES_CONQUISTAS, registrarAcao(get(CHAVE_ACOES_CONQUISTAS, {}), "acao-rapida", todayStr()), { system: true });
     setSuccessId(id);
     if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
     timerSucesso.current = window.setTimeout(() => { timerSucesso.current = null; setSuccessId(null); }, 1500);

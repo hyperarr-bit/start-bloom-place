@@ -1,5 +1,6 @@
-import { CATEGORIAS, RARIDADE_LABEL, RARIDADE_PLURAL, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
+import { CATEGORIAS, RARIDADE_LABEL, RARIDADE_PLURAL, fracaoDe, raridadeDe, type Badge, type BadgeCategoria, type Raridade } from "@/components/gamification/types";
 import { ordenarParaFolha } from "@/lib/conquistas-registro";
+import { ordenarParaAlbumEditorial } from "./album-curadoria";
 
 /**
  * ÁLBUM DE ADESIVOS (27/09, dono: "no lugar das insígnias podiam ser os
@@ -42,6 +43,7 @@ export interface PaginaAlbum {
   raridade?: Raridade;
   /** (16/10, Conquistas 2) a página é de um MÓDULO (Finanças, Rotina…), não de uma raridade. */
   modulo?: BadgeCategoria;
+  modulos?: BadgeCategoria[];
   /** Conquistados e total do que a página representa (a coleção inteira na 1ª; a seção nas outras). */
   abertos: number;
   total: number;
@@ -67,11 +69,18 @@ export const maisRaros = (adesivos: Badge[], desbloqueadas: Record<string, strin
     .slice(0, n);
 };
 
-/** Os mais perto de colar (a mesma ordem da folha: começados primeiro, do mais perto pro mais longe). */
-export const proximosDoAlbum = (adesivos: Badge[], n = PROXIMOS_NO_ALBUM): Badge[] =>
-  ordenarParaFolha(adesivos, {}).filter((b) => !b.unlocked).slice(0, n);
+/** Começados primeiro. Sem nenhuma conquista nem progresso, oferece ações que a pessoa pode fazer hoje. */
+export const proximosDoAlbum = (adesivos: Badge[], n = PROXIMOS_NO_ALBUM): Badge[] => {
+  const proximos = ordenarParaFolha(adesivos, {}).filter((b) => !b.unlocked);
+  if (adesivos.some((b) => b.unlocked || fracaoDe(b) > 0)) return proximos.slice(0, n);
+  const primeirosPassos = ["first-expense", "rotina-1", "treino-1"]
+    .map((id) => proximos.find((b) => b.id === id))
+    .filter((b): b is Badge => !!b);
+  const priorizados = new Set(primeirosPassos.map((b) => b.id));
+  return [...primeirosPassos, ...proximos.filter((b) => !priorizados.has(b.id))].slice(0, n);
+};
 
-export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, string> = {}): PaginaAlbum[] {
+export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, string> = {}, maxPorPagina = VAGAS_POR_PAGINA): PaginaAlbum[] {
   const abertos = adesivos.filter((b) => b.unlocked).length;
   const raros = maisRaros(adesivos, desbloqueadas);
   const primeira: PaginaAlbum = {
@@ -87,7 +96,7 @@ export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, str
   for (const r of ORDEM_RARIDADE) {
     const da = adesivos.filter((b) => raridadeDe(b) === r);
     if (!da.length) continue;
-    const n = Math.ceil(da.length / VAGAS_POR_PAGINA);
+    const n = Math.ceil(da.length / Math.max(1, maxPorPagina));
     const porPagina = Math.ceil(da.length / n);
     const abertosDa = da.filter((b) => b.unlocked).length;
     for (let i = 0; i < n; i++) {
@@ -114,16 +123,19 @@ export function montarAlbum(adesivos: Badge[], desbloqueadas: Record<string, str
  * vaga fixa, as que faltam em silhueta, "faltam N pra completar a página".
  * Um módulo com mais de 16 figurinhas vira páginas parelhas, como as seções.
  */
-export function montarAlbumPorModulo(adesivos: Badge[], desbloqueadas: Record<string, string> = {}): PaginaAlbum[] {
+export function montarAlbumPorModulo(adesivos: Badge[], desbloqueadas: Record<string, string> = {}, maxPorPagina = VAGAS_POR_PAGINA): PaginaAlbum[] {
   const [primeira] = montarAlbum(adesivos, desbloqueadas);
   const paginas: PaginaAlbum[] = [primeira];
   for (const c of CATEGORIAS) {
     const da = adesivos.filter((b) => b.category === c.id);
     if (!da.length) continue;
-    const n = Math.ceil(da.length / VAGAS_POR_PAGINA);
-    const porPagina = Math.ceil(da.length / n);
+    const n = Math.ceil(da.length / Math.max(1, maxPorPagina));
+    const porPagina = Math.floor(da.length / n);
+    const extras = da.length % n;
     const abertosDa = da.filter((b) => b.unlocked).length;
     for (let i = 0; i < n; i++) {
+      const inicio = i * porPagina + Math.min(i, extras);
+      const tamanho = porPagina + (i < extras ? 1 : 0);
       paginas.push({
         id: `${c.id}-${i + 1}`,
         tipo: "secao",
@@ -132,7 +144,7 @@ export function montarAlbumPorModulo(adesivos: Badge[], desbloqueadas: Record<st
         abertos: abertosDa,
         total: da.length,
         parte: n > 1 ? [i + 1, n] : undefined,
-        vagas: da.slice(i * porPagina, (i + 1) * porPagina),
+        vagas: da.slice(inicio, inicio + tamanho),
         proximos: [],
       });
     }
@@ -164,3 +176,19 @@ export const contagemDaPagina = (p: PaginaAlbum): string => {
 
 /** O título com a parte ("ÉPICOS · 1/2"). */
 export const tituloDaPagina = (p: PaginaAlbum): string => (p.parte ? `${p.titulo} · ${p.parte[0]}/${p.parte[1]}` : p.titulo);
+
+/** Miolo editorial: cinco espaços no máximo, capítulos estáveis e nenhuma duplicata entre eles. */
+export function montarAlbumEditorial(adesivos: Badge[], desbloqueadas: Record<string, string> = {}): PaginaAlbum[] {
+  const ordenados = ordenarParaAlbumEditorial(adesivos);
+  const paginas = montarAlbumPorModulo(ordenados, desbloqueadas, 5);
+  // A abertura editorial tem duas fileiras de duas artes. O álbum legado
+  // continua com seis destaques; todas as figurinhas seguem no seu módulo.
+  paginas[0] = { ...paginas[0], vagas: paginas[0].vagas.slice(0, 4) };
+  const pequenas = paginas.filter(p => p.modulo === "carreira" || p.modulo === "geral");
+  const vagas = pequenas.flatMap(p => p.vagas);
+  if (vagas.length && vagas.length <= 5) {
+    const indice = paginas.findIndex(p => p === pequenas[0]);
+    paginas.splice(indice, pequenas.length, {id:"carreira-core",tipo:"secao",titulo:"Carreira & CORE",modulo:"carreira",modulos:["carreira","geral"],abertos:vagas.filter(b=>b.unlocked).length,total:vagas.length,vagas,proximos:[]});
+  }
+  return paginas;
+}

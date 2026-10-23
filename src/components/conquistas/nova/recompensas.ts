@@ -13,10 +13,10 @@ import { ADESIVOS_SEQUENCIA_NOVOS, MARCOS_ADESIVO, MARCOS_NOVOS } from "@/lib/co
  *  - Quem abre o álbum no teste paga 53% (× 31%) → o álbum é o herói da tela
  *    (capa grande, abrir, páginas por módulo com vaga vazia, figurinha nova
  *    esperando pra ser COLADA).
- *  - A festa em tela cheia (617 pessoas, 1.939 vezes, 1 compartilhamento) é
- *    interrupção → comum e raro viram um AVISO PEQUENO (toast, toque abre o álbum
- *    na página); tela cheia só nos marcos (7/30/100) e nos épicos/lendários.
- *    Compartilhar só nos marcos.
+ *  - Revisão de 23/10: primeira figurinha recebe apresentação, comuns ficam
+ *    em aviso breve, raras em cartão e épicas/lendárias em tela cheia.
+ *    A missão visível tem prioridade, sem consumir a festa pendente.
+ *    Compartilhar continua disponível nos marcos.
  */
 
 export { ADESIVOS_SEQUENCIA_NOVOS, MARCOS_ADESIVO, MARCOS_NOVOS };
@@ -41,15 +41,11 @@ export const ehMarcoDeFesta = (id: string): boolean => {
   return n !== null && (MARCOS_SEQUENCIA as readonly number[]).includes(n);
 };
 
-/**
- * Como um adesivo novo aparece: TOAST (aviso pequeno, 3,5 s, não interrompe) pros
- * comuns e raros; TELA CHEIA só pros marcos da sequência (7/30/100) e pros
- * épicos/lendários. É a regra "festa só em marco raro" do relatório de 16/10.
- */
-export const formatoDoAviso = (b: Pick<Badge, "id" | "xp" | "raridade">): "toast" | "tela_cheia" => {
-  if (ehMarcoDeFesta(b.id)) return "tela_cheia";
+/** Primeira figurinha: apresentação; comum: breve; rara: cartão; épica/lendária: cena completa. */
+export const formatoDoAviso = (b: Pick<Badge, "id" | "xp" | "raridade">, primeira = false): "toast" | "cartao" | "tela_cheia" => {
+  if (primeira || ehMarcoDeFesta(b.id)) return "tela_cheia";
   const r = raridadeDe(b);
-  return r === "epico" || r === "lendario" ? "tela_cheia" : "toast";
+  return r === "comum" ? "toast" : r === "raro" ? "cartao" : "tela_cheia";
 };
 
 /** Compartilhar só nos marcos (7/30/100 dias) — nunca num adesivo comum, raro, épico ou lendário avulso. */
@@ -176,7 +172,7 @@ export const fraseDaColecao = (abertos: number, total: number): string => {
   const faltam = total - abertos;
   if (total === 0) return "";
   if (faltam <= 0) return "coleção completa";
-  if (faltam <= 3) return `faltam ${faltam} pra fechar`;
+  if (abertos > 0 && abertos / total >= 0.7 && faltam <= 3) return `faltam ${faltam} pra fechar`;
   return `${abertos} de ${total}`;
 };
 

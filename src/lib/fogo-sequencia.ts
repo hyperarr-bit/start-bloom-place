@@ -18,7 +18,7 @@ import type { CapaId } from "@/components/conquistas/CapaPlanner";
  * lendário que já existe.
  */
 
-export type FaixaId = "laranja" | "vermelho" | "roxo" | "azul" | "dourado";
+export type FaixaId = "laranja" | "vermelho" | "roxo" | "azul" | "dourado" | "salvia" | "ambar" | "petroleo" | "violeta";
 
 export interface Faixa {
   id: FaixaId;

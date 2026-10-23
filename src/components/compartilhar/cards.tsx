@@ -86,7 +86,7 @@ export const Moldura = ({ tipo, formato, tema = TEMAS[tipo], periodo, modulo, ch
   const claro = tema.tinta !== "#ffffff";
   const comFundo = c === "tudo" || c === "fundo";
   return (
-    <div data-card={tipo} data-formato={formato} data-camada={c} style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: INTER, WebkitFontSmoothing: "antialiased", background: comFundo ? fundoDo(tema) : "transparent", color: tema.tinta }}>
+    <div data-cartao-share={tipo} data-formato={formato} data-camada={c} style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: INTER, WebkitFontSmoothing: "antialiased", background: comFundo ? fundoDo(tema) : "transparent", color: tema.tinta }}>
       {comFundo && <div style={{ ...textura(claro ? "rgba(60,50,40,.10)" : "rgba(255,255,255,.07)") }} />}
       {comFundo && marcaDagua && (
         <div aria-hidden style={{ position: "absolute", right: -150, top: formato === "stories" ? 260 : 40, transform: "rotate(-14deg)", color: claro ? "rgba(31,31,36,.05)" : "rgba(255,255,255,.075)" }}>
@@ -1010,7 +1010,7 @@ export const CardAdesivo = ({ d }: { d: DadosCard }) => {
   const { w, h } = FORMATOS.adesivo;
   const numeroEhTexto = /[a-zà-ú]/i.test(r.numero);
   return (
-    <div data-card={d.tipo} data-formato="adesivo" style={{ position: "relative", width: w, height: h, fontFamily: INTER, WebkitFontSmoothing: "antialiased", display: "grid", placeItems: "center", background: "transparent" }}>
+    <div data-cartao-share={d.tipo} data-formato="adesivo" style={{ position: "relative", width: w, height: h, fontFamily: INTER, WebkitFontSmoothing: "antialiased", display: "grid", placeItems: "center", background: "transparent" }}>
       <div style={{ width: 860, padding: "54px 60px 46px", borderRadius: 64, background: "#ffffff", boxShadow: "0 30px 60px -24px rgba(0,0,0,.45)", color: "#1f1f24", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, color: r.cor }}>
           <r.Icone size={34} strokeWidth={2.6} />

@@ -82,7 +82,7 @@ describe("os cards", () => {
     for (const d of TODOS) {
       for (const f of FORMATOS_TODOS) {
         const { container } = render(<CardDeCompartilhar dados={d} formato={f} />);
-        const raiz = container.querySelector<HTMLElement>("[data-card]")!;
+        const raiz = container.querySelector<HTMLElement>("[data-cartao-share]")!;
         expect(raiz, `${d.tipo}/${f}`).toBeTruthy();
         expect(raiz.style.width).toBe(`${FORMATOS[f].w}px`);
         expect(raiz.style.height).toBe(`${FORMATOS[f].h}px`);

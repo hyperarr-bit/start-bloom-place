@@ -212,13 +212,13 @@ describe("textos", () => {
     expect(assuntoSequencia({ ...base, nome: "", passo: "d0" })).toBe("O pagamento do seu CORE não passou");
   });
 
-  it("botão 'Atualizar pagamento' pra App Store, assinatura do João e link de sair em todos", () => {
+  it("botão 'Atualizar pagamento' pra App Store, assinatura Equipe CORE e link de sair em todos", () => {
     for (const passo of passos) {
       const h = htmlSequencia({ ...base, passo });
       expect(h).toContain(`href="${URL_PAGAMENTO_APPLE}"`);
       expect(URL_PAGAMENTO_APPLE).toBe("https://apps.apple.com/account/billing");
       expect(h).toMatch(/>Atualizar pagamento</);
-      expect(h).toMatch(/João, do CORE/);
+      expect(h).toMatch(/Equipe CORE/);
       expect(h).toContain('href="https://x/sair?sair=1&amp;u=1&amp;t=2"');
       expect(h).toMatch(/Não quero mais receber estes avisos/);
       expect(textoSequencia({ ...base, passo })).toContain(base.linkSair);

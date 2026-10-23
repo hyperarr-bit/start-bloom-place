@@ -121,7 +121,7 @@ const emailHtml = (nome: string, comAcesso: boolean) => `
   <p>Se o cartão continuar recusando, dá pra cadastrar outro (muitos bancos têm cartão virtual no app) ou pôr saldo na sua Conta Apple com um cartão-presente da Apple.</p>
   <p>Depois de atualizar, a Apple cobra sozinha — não precisa fazer mais nada no app.</p>
   <p>Qualquer dúvida, é só responder este e-mail.</p>
-  <p>Um abraço,<br/>João, do CORE</p>
+  <p>Um abraço,<br/>Equipe CORE</p>
 </div>`;
 
 async function montarAlvo(supabase: SupabaseClient, uid: string, secret: string): Promise<Alvo | null> {
@@ -337,7 +337,7 @@ serve(async (req) => {
     const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
     if (!secret || !resendKey) return Response.json({ error: "sem REVENUECAT_SECRET_KEY/RESEND_API_KEY" }, { status: 500 });
     const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
-    const from = fromBase.includes("<") ? `João do CORE <${fromBase.split("<")[1]}` : fromBase;
+    const from = fromBase.includes("<") ? `Equipe CORE <${fromBase.split("<")[1]}` : fromBase;
     try {
       const r = await rodarSequencia(supabase, secret, resendKey, from, dryRun);
       log(dryRun ? "sequencia dry_run" : "sequencia", r);
@@ -366,7 +366,7 @@ serve(async (req) => {
   const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
   if (!secret || !resendKey) return Response.json({ error: "sem REVENUECAT_SECRET_KEY/RESEND_API_KEY" }, { status: 500 });
   const fromBase = Deno.env.get("RECOVERY_EMAIL_FROM") || Deno.env.get("WELCOME_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
-  const from = fromBase.includes("<") ? `João do CORE <${fromBase.split("<")[1]}` : fromBase;
+  const from = fromBase.includes("<") ? `Equipe CORE <${fromBase.split("<")[1]}` : fromBase;
   const modo: Modo = body?.modo === "pix" ? "pix" : "apple";
 
   try {

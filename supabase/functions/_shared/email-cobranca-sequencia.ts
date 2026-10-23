@@ -3,7 +3,7 @@
  *
  * Regras do dono: curto, calmo, mínimo; NADA de Pix/site como alternativa
  * (regra da Apple + veto do dono); nunca "a Apple cobra até 24 h antes";
- * assinatura "João, do CORE"; um botão só, "Atualizar pagamento", pra
+ * assinatura "Equipe CORE"; um botão só, "Atualizar pagamento", pra
  * apps.apple.com/account/billing.
  *
  * Arquivo PURO: a cobranca-recusada importa daqui, o vitest testa e os prints
@@ -103,7 +103,7 @@ export function htmlSequencia(d: DadosEmailSequencia): string {
       <a href="${URL_PAGAMENTO_APPLE}" style="display:inline-block;background:#127A56;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:999px;font-weight:700;font-size:17px;">Atualizar pagamento</a>
     </p>
     ${(t.depois ?? []).map((s) => p(s, "font-size:14px;color:#5b5560;")).join("\n    ")}
-    <p style="margin:18px 0 0;">Um abraço,<br/>João, do CORE</p>
+    <p style="margin:18px 0 0;">Um abraço,<br/>Equipe CORE</p>
   </div>
   <p style="font-size:11px;color:#8a838f;text-align:center;margin:14px 0 0;line-height:1.5;">Você recebeu este aviso porque assina o CORE pela App Store.<br/><a href="${esc(d.linkSair)}" style="color:#8a838f;">Não quero mais receber estes avisos</a></p>
 </div>
@@ -120,7 +120,7 @@ export function textoSequencia(d: DadosEmailSequencia): string {
     "",
     ...(t.depois ?? []).flatMap((s) => [limpa(s), ""]),
     "Um abraço,",
-    "João, do CORE",
+    "Equipe CORE",
     "",
     `Não quer mais receber estes avisos? ${d.linkSair}`,
   ].join("\n");

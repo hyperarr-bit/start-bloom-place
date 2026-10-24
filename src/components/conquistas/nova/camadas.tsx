@@ -1,5 +1,5 @@
 import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { Bell, ChevronRight, Shield, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { trackEvent } from "@/lib/analytics";
@@ -8,6 +8,7 @@ import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type DiaDaSemana
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
+import { ARTES_CADERNO } from "../artes-caderno";
 import { RARIDADES_EM_TESTE } from "../MarcaRaridade";
 import { giroDoAdesivo } from "../adesivos-arte";
 import { Fogo } from "../Fogo";
@@ -166,10 +167,83 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
 
 /* ------------------------------------------------------------------ a coleção inteira (ver todos, secundária) */
 
+/**
+ * ARTE SOB DEMANDA (23/10): a coleção tem ~98 figurinhas e as trancadas usam a própria imagem como máscara — tudo
+ * montado de uma vez dava ~160 MB de imagem decodificada (risco de derrubar o app em iPhone antigo). Só a célula
+ * PERTO da tela (1 tela acima/abaixo) monta a arte; a que fica BEM longe (2 telas) solta. A moldura da célula fica
+ * no mesmo tamanho e lugar, então nada visível muda. Sem IntersectionObserver (teste/navegador velho): tudo monta.
+ */
+const MARGEM_CARREGA = 1; // telas
+const MARGEM_SOLTA = 2;
+type Observador = { observar: (el: HTMLElement, id: string) => () => void; perto: (id: string) => boolean };
+const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
+  const semIO = typeof IntersectionObserver === "undefined";
+  const [perto, setPerto] = useState<ReadonlySet<string>>(() => new Set());
+  const celulas = useRef(new Map<HTMLElement, string>());
+  const ios = useRef<{ carrega: IntersectionObserver; solta: IntersectionObserver } | null>(null);
+  const juntar = useCallback((ids: string[]) => {
+    if (ids.length) setPerto((p) => (ids.every((id) => p.has(id)) ? p : new Set([...p, ...ids])));
+  }, []);
+  // a conta na hora (antes de pintar): a célula que já nasce na tela nunca aparece vazia nem por 1 quadro
+  const pertoAgora = useCallback((els: HTMLElement[]) => {
+    const raiz = rolagem.current;
+    if (!raiz) return;
+    const r = raiz.getBoundingClientRect();
+    const m = (r.height || window.innerHeight) * MARGEM_CARREGA;
+    juntar(els.filter((el) => { const b = el.getBoundingClientRect(); return b.bottom >= r.top - m && b.top <= r.bottom + m; }).map((el) => celulas.current.get(el)!).filter(Boolean));
+  }, [rolagem, juntar]);
+  useLayoutEffect(() => {
+    const raiz = rolagem.current;
+    if (semIO || !raiz) return;
+    const idDe = (el: Element) => celulas.current.get(el as HTMLElement);
+    // a que chega rolando: a imagem já vem decodificada ANTES de montar (nunca um quadro com a célula vazia na tela)
+    const carrega = new IntersectionObserver((es) => {
+      for (const e of es) {
+        const id = e.isIntersecting ? idDe(e.target) : undefined;
+        if (!id) continue;
+        const url = ARTES_CADERNO[id];
+        if (!url) { juntar([id]); continue; }
+        const img = new Image();
+        img.src = url;
+        (typeof img.decode === "function" ? img.decode() : Promise.resolve()).catch(() => undefined).then(() => juntar([id]));
+      }
+    }, { root: raiz, rootMargin: `${MARGEM_CARREGA * 100}% 0px` });
+    const solta = new IntersectionObserver((es) => {
+      const longe = es.filter((e) => !e.isIntersecting).map((e) => idDe(e.target)!).filter(Boolean);
+      if (longe.length) setPerto((p) => (longe.some((id) => p.has(id)) ? new Set([...p].filter((id) => !longe.includes(id))) : p));
+    }, { root: raiz, rootMargin: `${MARGEM_SOLTA * 100}% 0px` });
+    ios.current = { carrega, solta };
+    for (const el of celulas.current.keys()) { carrega.observe(el); solta.observe(el); }
+    pertoAgora([...celulas.current.keys()]);
+    return () => { carrega.disconnect(); solta.disconnect(); ios.current = null; };
+  }, [rolagem, semIO, juntar, pertoAgora]);
+  const observar = useCallback((el: HTMLElement, id: string) => {
+    celulas.current.set(el, id);
+    if (ios.current) { ios.current.carrega.observe(el); ios.current.solta.observe(el); pertoAgora([el]); }
+    return () => { celulas.current.delete(el); ios.current?.carrega.unobserve(el); ios.current?.solta.unobserve(el); };
+  }, [pertoAgora]);
+  return { observar, perto: (id: string) => semIO || perto.has(id) };
+};
+
+/** A arte da célula da coleção: monta só perto da tela (ver useArteSobDemanda). */
+const ArteDaCelula = ({ b, i, obs }: { b: Badge; i: number; obs: Observador }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const { observar } = obs;
+  useLayoutEffect(() => (ref.current ? observar(ref.current, b.id) : undefined), [observar, b.id]);
+  return (
+    <span ref={ref} className="cn-colecao-arte">
+      <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={112} style={{ width: "var(--colecao-arte)", height: "var(--colecao-arte)" }} trancado={!b.unlocked} progresso={b.progresso} giro={b.unlocked ? giroDoAdesivo(i) : 0} semArte={!obs.perto(b.id)} />
+      {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
+    </span>
+  );
+};
+
 export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<EstadoConquistasNova, "colecoes" | "abertos" | "total">; inicial: ColecaoNova | null; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
   const [filtro, setFiltro] = useState<string>(inicial?.id ?? "todas");
   const [raridadeFiltro, setRaridadeFiltro] = useState("todas");
   const fechar = useRef<HTMLButtonElement>(null);
+  const rolagem = useRef<HTMLDivElement>(null);
+  const obs = useArteSobDemanda(rolagem);
   useEffect(() => {
     const origem = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     fechar.current?.focus({ preventScroll: true });
@@ -188,7 +262,7 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
     .map(c => ({...c, adesivos:c.adesivos.filter(b => raridadeFiltro === "todas" || raridadeDe(b) === raridadeFiltro)}))
     .filter(c => c.adesivos.length > 0);
   return (
-    <div className="cn-tela cn-colecao" role="dialog" aria-modal="true" aria-label="Todos os adesivos" data-testid="cn-colecao-tela" onKeyDown={teclado}>
+    <div ref={rolagem} className="cn-tela cn-colecao" role="dialog" aria-modal="true" aria-label="Todos os adesivos" data-testid="cn-colecao-tela" onKeyDown={teclado}>
       <div className="cn-colecao-moldura">
         <div className="cn-tela-cab">
           <button ref={fechar} type="button" onClick={onFechar} aria-label="Fechar" className="cn-colecao-fechar"><X aria-hidden /></button>
@@ -221,10 +295,7 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
               <div className="cn-grade4">
                 {c.adesivos.map((b, i) => (
                   <button key={b.id} type="button" className="cn-celula" onClick={() => onAdesivo(b)} data-aberto={b.unlocked ? "true" : "false"} aria-label={`${b.name}: ${b.unlocked ? "conquistada" : "a conquistar"}`}>
-                    <span className="cn-colecao-arte">
-                      <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={112} style={{ width: "var(--colecao-arte)", height: "var(--colecao-arte)" }} trancado={!b.unlocked} progresso={b.progresso} giro={b.unlocked ? giroDoAdesivo(i) : 0} />
-                      {!b.unlocked && rotuloProgresso(b) && <span className="cn-prog">{rotuloProgresso(b)}</span>}
-                    </span>
+                    <ArteDaCelula b={b} i={i} obs={obs} />
                     <span className={`cn-celula-nome ${b.unlocked ? "text-foreground" : "text-muted-foreground"}`}>{b.name}</span>
                     {(!b.unlocked || RARIDADES_EM_TESTE) && raridadeDe(b) !== "comum" && <span className="chip-rar" data-rar={raridadeDe(b)} style={{ height: 14, fontSize: 7.5 }}>{RARIDADE_LABEL[raridadeDe(b)]}</span>}
                   </button>

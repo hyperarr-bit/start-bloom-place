@@ -39,11 +39,16 @@ interface Props {
   style?: CSSProperties;
   /** Índice na entrada da tela (pipoca em sequência). */
   entradaIndice?: number;
+  /**
+   * 23/10 (coleção "Ver todas"): a moldura no MESMO tamanho/lugar, sem a arte (imagem, máscara, anel, faíscas) —
+   * pra célula longe da tela não decodificar imagem. Quem usa só liga fora da tela; nada visível muda.
+   */
+  semArte?: boolean;
 }
 
-export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo, bordaGrossa, giro = 0, className, style, entradaIndice }: Props) => {
+export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo, bordaGrossa, giro = 0, className, style, entradaIndice, semArte }: Props) => {
   const caderno = !!ARTES_CADERNO[id];
-  const brilha = !caderno && !trancado && (raridade === "epico" || raridade === "lendario");
+  const brilha = !semArte && !caderno && !trancado && (raridade === "epico" || raridade === "lendario");
   return (
     <span
       className={`ad-rar${entradaIndice !== undefined ? " ad-entra" : ""}${className ? ` ${className}` : ""}`}
@@ -55,8 +60,8 @@ export const AdesivoRaro = ({ id, raridade, tamanho, trancado, progresso, titulo
     >
       {brilha && <span className="ad-anel" aria-hidden />}
       {brilha && <span className="ad-sheen" aria-hidden />}
-      {!caderno && !trancado && raridade === "lendario" && <Faiscas />}
-      {caderno && trancado ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} /> : <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} />}
+      {!semArte && !caderno && !trancado && raridade === "lendario" && <Faiscas />}
+      {semArte ? null : caderno && trancado ? <FigurinhaOculta id={id} raridade={raridade} tamanho={tamanho} progresso={progresso} /> : <Adesivo id={id} tamanho={tamanho} titulo={titulo} bordaGrossa={bordaGrossa} />}
       {caderno && <MarcaRaridade raridade={raridade} />}
     </span>
   );

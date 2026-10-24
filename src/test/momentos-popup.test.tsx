@@ -9,7 +9,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { useState, type ReactNode } from "react";
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: "u1", created_at: "2026-07-10T12:00:00Z", email: "ana@x.com" } }) }));
@@ -89,6 +89,30 @@ describe("14/10: fechar o app com a festa aberta não a repete", () => {
     await espera(2500);
     expect(screen.queryByTestId("momento-popup")).toBeNull();
     expect(eventos.filter((e) => e[0] === "festa_view")).toHaveLength(0);
+  });
+});
+
+describe("23/10: troca de rota com a festa aberta", () => {
+  it("Voltar do Android / toque na notificação: a festa JÁ aberta continua na tela, sem sumir e voltar ~1,6 s depois", async () => {
+    const store = montarStore(umComum());
+    const Ir = () => { const nav = useNavigate(); return <><button data-testid="ir-casa" onClick={() => nav("/casa")} /><button data-testid="voltar" onClick={() => nav(-1)} /></>; };
+    render(<MemoryRouter initialEntries={["/financas"]}><Provedor store={store}><Ir /><MomentosConquistas contaNova={false} /></Provedor></MemoryRouter>);
+    const popup = await screen.findByTestId("momento-popup", {}, { timeout: 3000 });
+    // vigia: a festa nunca pode sair do DOM durante as trocas
+    let sumiu = false;
+    const obs = new MutationObserver(() => { if (!screen.queryByTestId("momento-popup")) sumiu = true; });
+    obs.observe(document.body, { childList: true, subtree: true });
+    fireEvent.click(screen.getByTestId("ir-casa"));
+    await espera(50);
+    fireEvent.click(screen.getByTestId("voltar"));
+    await espera(2000);
+    obs.disconnect();
+    expect(sumiu).toBe(false);
+    expect(screen.getByTestId("momento-popup")).toBe(popup); // o mesmo cartão, não remontado
+    expect(eventos.filter((e) => e[0] === "festa_view")).toHaveLength(1);
+    // fechar continua funcionando depois da troca
+    fireEvent.click(screen.getByTestId("momento-popup-continuar"));
+    await waitFor(() => expect(vistas(store)).toContain("first-expense"));
   });
 });
 

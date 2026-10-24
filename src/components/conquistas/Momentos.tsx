@@ -829,7 +829,15 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   const [liberado, setLiberado] = useState(false);
   const [entregaAoAlbum, setEntregaAoAlbum] = useState(0);
   const temFila = fila.length > 0;
+  // 23/10: festa JÁ aberta continua aberta na troca de ROTA (Voltar do Android, toque na notificação) — antes a troca
+  // reiniciava a espera e a festa sumia e reaparecia ~1,6 s depois. Fila nova, álbum ou outra conta ainda reiniciam.
+  const liberadoRef = useRef(false);
+  liberadoRef.current = liberado;
+  const esperaAntes = useRef({ temFila, entregaAoAlbum, conta });
   useEffect(() => {
+    const antes = esperaAntes.current;
+    esperaAntes.current = { temFila, entregaAoAlbum, conta };
+    if (liberadoRef.current && temFila && antes.temFila === temFila && antes.entregaAoAlbum === entregaAoAlbum && antes.conta === conta) return;
     setLiberado(false);
     if (!temFila) return;
     let vivo = true;

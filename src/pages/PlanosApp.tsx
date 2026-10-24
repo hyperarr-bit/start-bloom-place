@@ -12,6 +12,7 @@ import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
 import { JaPagouPeloSite } from "@/components/app/JaPagouPeloSite";
 import { estadoTeste, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { APP_PRECOS } from "@/lib/native-shell";
+import { versaoVisivel } from "@/lib/versao-visivel";
 import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura, ehApple } from "@/lib/loja";
 
 /**
@@ -326,9 +327,9 @@ const PlanosApp = () => {
               disse que ainda ia pro site, e ninguém sabia se era o conserto
               que falhou ou se o aparelho estava com um build de cinco dias
               atrás. Primeira pergunta de qualquer suporte, e não tínhamos
-              resposta. Vem do build (__APP_VERSION__), não escrito à mão. */}
+              resposta. Vem do build (__APP_VERSION__; no iPhone __APP_VERSION_IOS__), não escrito à mão. */}
           <p className="text-[10px] text-muted-foreground/60 tabular-nums pt-1">
-            versão {__APP_VERSION__}
+            versão {versaoVisivel()}
           </p>
         </div>
       </main>

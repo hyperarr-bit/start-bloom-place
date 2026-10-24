@@ -25,6 +25,21 @@ const versaoDoApp = (() => {
   }
 })();
 
+/**
+ * QA 1.0.18: o "Meu acesso" do iPhone mostrava a versão do ANDROID ("1.0.133 (134)"). A do iPhone vem do
+ * project.pbxproj (MARKETING_VERSION / CURRENT_PROJECT_VERSION), lida no build igual à do gradle.
+ */
+const versaoDoAppIos = (() => {
+  try {
+    const p = fs.readFileSync(path.resolve(__dirname, "ios/App/App.xcodeproj/project.pbxproj"), "utf8");
+    const nome = p.match(/MARKETING_VERSION\s*=\s*"?([^";\s]+)"?;/)?.[1];
+    const codigo = p.match(/CURRENT_PROJECT_VERSION\s*=\s*"?([^";\s]+)"?;/)?.[1];
+    return nome && codigo ? `${nome} (${codigo})` : "dev";
+  } catch {
+    return "dev";
+  }
+})();
+
 /** /missao → /missao.html no servidor de desenvolvimento e no `vite preview` (a Vercel faz pelo vercel.json). */
 const rotaDaMissao = () => {
   const reescrever = (req: { url?: string }, _res: unknown, next: () => void) => {
@@ -45,6 +60,7 @@ export default defineConfig(({ mode }) => ({
   // outras (VITE_SUPABASE_URL etc). Foi o que quebrou o smoke agora há pouco.
   define: {
     __APP_VERSION__: JSON.stringify(versaoDoApp),
+    __APP_VERSION_IOS__: JSON.stringify(versaoDoAppIos),
     // 10/10: true SÓ no build de TESTE (RC_MOCK=1, do `npm run loja -- --teste`) — é o que deixa
     // o use-auth tratar a compra do mock como assinatura (lib/rc-mock). Produção: false.
     __RC_MOCK__: JSON.stringify(process.env.RC_MOCK === "1"),

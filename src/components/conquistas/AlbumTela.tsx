@@ -7,6 +7,7 @@ import { categoriaDe, fracaoDe, raridadeDe, type Badge, type BadgeCategoria, typ
 import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
 import { parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
+import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 import { ChipRaridade } from "./adesivos-raridade";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { IconeMarcaAlbum } from "./IconeMarcaAlbum";
@@ -349,6 +350,8 @@ export const CAPA_SAI_MS = CAPA_PARADA_MS + CAPA_GIRO_MS + 120;
 /** Passada desta fração, soltar completa a virada. */
 export const FRACAO_PRA_COMPLETAR = 0.34;
 /** Velocidade (graus/ms) que completa mesmo antes da fração. */
+/** Quanto tempo o "✓ As N figurinhas foram coladas" fica na tela depois da última colagem (QA 1.0.18). */
+export const AVISO_FIM_COLAGEM_MS = 3000;
 const VELOCIDADE_PRA_COMPLETAR = 0.35;
 /** Arrasto mínimo (px) pra virar um gesto. */
 const ARRASTO_MINIMO = 8;
@@ -628,6 +631,18 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const [filaAtiva, setFilaAtiva] = useState(via === "pacotinho");
   const coladasDaFila = filaColagem.filter(id => !pendentesEfetivas.has(id)).length;
   const filaConcluida = filaColagem.length > 0 && coladasDaFila === filaColagem.length;
+  /* QA 1.0.18: o "✓ As N figurinhas foram coladas" ficava na tela pra sempre e cobria o contador e a seta ‹.
+     Some sozinho em 3 s, ou antes, assim que a pessoa vira a página. */
+  const [fimDispensado, setFimDispensado] = useState(false);
+  const [paginaDoFim, setPaginaDoFim] = useState<number | null>(null);
+  useEffect(() => {
+    if (!filaConcluida || fimDispensado) return;
+    if (paginaDoFim === null) { setPaginaDoFim(atual); return; }
+    if (atual !== paginaDoFim) { setFimDispensado(true); return; }
+    const t = setTimeout(() => setFimDispensado(true), AVISO_FIM_COLAGEM_MS);
+    return () => clearTimeout(t);
+  }, [filaConcluida, fimDispensado, paginaDoFim, atual]);
+  const avisoDoFim = filaConcluida && !fimDispensado && (paginaDoFim === null || paginaDoFim === atual);
   useEffect(() => {
     if (!ultimaColagem) return;
     const movimento = setTimeout(() => setColando(false), reduzir ? 0 : 740);
@@ -858,6 +873,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     return () => clearTimeout(t);
   }, [aberto, atual, paginas, n]);
 
+  useFaixaDoRelogioTransparente(aberto);
   if (!aberto) return null;
   const pagina = paginas[Math.min(atual, n - 1)];
   // (16/10) álbum por módulo: uma aba por módulo (só o emoji — 10 abas cabem na borda); por raridade, as de sempre
@@ -977,7 +993,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
         </div>
       </div>
 
-      {editorial && <div className="alb-colagem-status" role="status" aria-live="polite" data-visivel={ultimaColagem || filaConcluida ? "" : undefined}>{filaConcluida ? `✓ ${filaColagem.length === 1 ? "Sua figurinha foi colada" : `As ${filaColagem.length} figurinhas foram coladas`} no álbum` : ultimaColagem ? `✓ ${ultimaColagem} colada no álbum` : ""}</div>}
+      {editorial && <div className="alb-colagem-status" role="status" aria-live="polite" data-visivel={(filaConcluida ? avisoDoFim : ultimaColagem) ? "" : undefined}>{filaConcluida ? `✓ ${filaColagem.length === 1 ? "Sua figurinha foi colada" : `As ${filaColagem.length} figurinhas foram coladas`} no álbum` : ultimaColagem ? `✓ ${ultimaColagem} colada no álbum` : ""}</div>}
       {editorial && filaColagem.length > 1 && !filaConcluida && <div className="alb-colagem-fila" data-testid="album-colagem-fila">
         <span>{filaAtiva ? "Colando" : "Colagem pausada"} · <b>{coladasDaFila} de {filaColagem.length}</b></span>
         <button type="button" onClick={() => setFilaAtiva(ativa => !ativa)}>{filaAtiva ? "Pausar" : "Continuar"}</button>

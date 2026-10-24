@@ -15,6 +15,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ChevronRight, Bell, Sparkles, CreditCard } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import type { AvisoDoTeste } from "@/components/paywall/LinhaDoTempoDoTeste";
+import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 
 export type MotivoDaFolha = "caro" | "medo_esquecer" | "conhecer_antes" | "sem_cartao" | "outro";
 /** Os que têm resposta aqui e voltam pro teste do anual. */
@@ -48,6 +49,8 @@ export function FolhaMotivos({ dias, aviso, campos = {}, onPresente, onTeste, on
   /** "Voltar ao plano": a folha sai, o paywall fica. */
   onVoltar: () => void;
 }) {
+  // QA 1.0.18: o escurecido (fixed inset-0) cobre também a área do relógio — sem a faixa branca por cima.
+  useFaixaDoRelogioTransparente();
   const reduzir = !!useReducedMotion();
   const [resposta, setResposta] = useState<MotivoComResposta | null>(null);
   const vivo = useRef(true);

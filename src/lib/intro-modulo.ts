@@ -248,10 +248,12 @@ export interface OlharNoResumo {
   abrir: () => void;
   /** acha o card (depois de abrir a aba; a intro espera até ~1,5 s por ele) */
   achar: () => Element | null;
-  /** lê o número que o card mostra agora */
+  /** lê o número do card agora, SEM arredondar quando dá (a conta por trás do que ele mostra) */
   ler: (el: Element) => number | null;
-  /** o número de ANTES do registro, a partir do de depois e do valor registrado */
-  antes: (depois: number, valor: number) => number;
+  /** o que o card MOSTRA pra um número lido (padrão: arredondado) */
+  exibir?: (bruto: number) => number;
+  /** o que o card MOSTRAVA antes do registro, a partir do número lido agora (bruto) e do valor registrado */
+  antes: (bruto: number, valor: number) => number;
   numero: { titulo: string; formatar: (n: number) => string };
   titulo: string;
   texto: string;
@@ -307,15 +309,24 @@ const lerReaisDoTexto = (texto: string | null | undefined): number | null => {
 };
 /** Dias restantes no mês, contando hoje — a mesma conta do computeDailyBudget (lib/finance-totals). */
 const diasRestantesNoMes = (agora: Date = new Date()): number => new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate() - agora.getDate() + 1;
+/** O que o card QUANTO POSSO GASTAR HOJE mostra pra um por-dia: livre ≤ 0 → "R$ 0" (cantSpend); senão arredondado. */
+export const exibidoNoPossoGastar = (porDia: number): number => (porDia <= 0 ? 0 : Math.round(porDia));
 const reaisInteiros = (n: number) => `R$ ${Math.round(n).toLocaleString("pt-BR")}`;
 /** O card QUANTO POSSO GASTAR HOJE do Dashboard de Finanças (components/Dashboard.tsx, data-missao="posso-gastar"). */
 export const OLHAR_POSSO_GASTAR: OlharNoResumo = {
   quando: (get) => !semConteudo(get<unknown>("finance-incomes", undefined)),
   abrir: () => tocarAba("DASHBOARD"),
   achar: () => document.querySelector('[data-missao="posso-gastar"]'),
-  ler: (el) => lerReaisDoTexto(el.querySelector("p")?.textContent),
-  // o por-dia cai exatamente valor ÷ dias restantes (computeDailyBudget): o de antes sai daí
-  antes: (depois, valor) => Math.round(depois + valor / diasRestantesNoMes()),
+  // 23/10: lê a conta SEM arredondar (data-livre ÷ data-dias, a mesma do computeDailyBudget) — reconstruir o "antes"
+  // a partir do número já arredondado errava R$ 1 (card R$ 267 → balão "R$ 266 → R$ 265"; card R$ 0 → "R$ 1 → R$ 0")
+  ler: (el) => {
+    const livre = Number(el.getAttribute("data-livre")), dias = Number(el.getAttribute("data-dias"));
+    if (el.hasAttribute("data-livre") && Number.isFinite(livre) && dias > 0) return livre / dias;
+    return lerReaisDoTexto(el.querySelector("p")?.textContent);
+  },
+  exibir: exibidoNoPossoGastar,
+  // o gasto sai inteiro do livre: antes = (livre + valor) ÷ dias, arredondado do mesmo jeito que o card
+  antes: (bruto, valor) => exibidoNoPossoGastar(bruto + valor / diasRestantesNoMes()),
   numero: { titulo: "Dá pra gastar hoje", formatar: reaisInteiros },
   titulo: "Seu número do dia",
   texto: "Cada gasto mexe nele na hora.",

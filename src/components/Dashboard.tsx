@@ -947,7 +947,7 @@ export const Dashboard = ({
   const pctDoDia = praHoje && praHoje.doDia > 0 ? Math.min(100, Math.max(0, Math.round((praHoje.gasto / praHoje.doDia) * 100))) : 0;
   const temReserva = dailyBudget.unpaidBillsEstimate > 0;
   const blocoPodeGastarSimples = (
-    <div data-spotlight="pode-gastar" data-missao="posso-gastar" data-testid="pode-gastar-simples" className={`rounded-lg border p-4 ${
+    <div data-spotlight="pode-gastar" data-missao="posso-gastar" data-testid="pode-gastar-simples" data-livre={dailyBudget.availableReal} data-dias={dailyBudget.remainingDays} className={`rounded-lg border p-4 ${
       dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
       dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
       "bg-red-500/5 border-red-500/20"
@@ -1061,8 +1061,9 @@ export const Dashboard = ({
   ) : simples ? blocoPodeGastarSimples : (
     <>
         {/* Quanto Posso Gastar Hoje — `data-spotlight` é a âncora do "olha" da dose de Finanças da missão (1.0.16);
-            `data-missao`, o do "olha" da intro do módulo (lib/intro-modulo) */}
-        <div data-spotlight="pode-gastar" data-missao="posso-gastar" className={`rounded-lg border p-4 ${
+            `data-missao`, o do "olha" da intro do módulo (lib/intro-modulo); `data-livre`/`data-dias` (invisíveis) dão
+            à intro a conta SEM arredondar, pra o "antes → depois" sair igual ao que o card mostrou (23/10) */}
+        <div data-spotlight="pode-gastar" data-missao="posso-gastar" data-livre={dailyBudget.availableReal} data-dias={dailyBudget.remainingDays} className={`rounded-lg border p-4 ${
           dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
           dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
           "bg-red-500/5 border-red-500/20"

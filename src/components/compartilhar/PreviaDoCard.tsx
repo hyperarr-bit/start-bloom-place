@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { EMPRESA } from "@/lib/empresa";
 import { Switch } from "@/components/ui/switch";
 import { trackEvent } from "@/lib/analytics";
+import { isIOS, isNativeShell } from "@/lib/native-shell";
 import { suporteVideo } from "@/components/conquistas/video/suporte";
 import { CardDeCompartilhar } from "./cards";
 import { postarCardImagem, postarCardVideo } from "./postar";
@@ -200,7 +201,8 @@ export const PreviaDoCard = ({ dados, origem, titulo, onFechar, formatos = ["sto
             <button type="button" onClick={postarImagem} disabled={!!enviando} className={`h-11 rounded-xl text-[13.5px] font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 ${video ? "border border-border bg-card" : "bg-foreground text-background"}`} data-testid="postar-card-imagem">
               {enviando === "imagem" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagemIcone className="w-4 h-4" aria-hidden />} Postar imagem
             </button>
-            {formato === "stories" && (
+            {/* 23/10: no app do iPhone, nada de link do site (regra da loja: sem link de site/Pix no iOS) */}
+            {formato === "stories" && !(isNativeShell() && isIOS()) && (
               <button
                 type="button"
                 onClick={async () => {

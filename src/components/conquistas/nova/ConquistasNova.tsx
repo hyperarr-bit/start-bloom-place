@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarDays, Check, ChevronRight, Shield } from "lucide-rea
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { diaCurtoPtBR } from "@/lib/utils";
 import { diaDaMissao, missaoAtual, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { diaDaMissao as diaDaMissaoDoses, lerMissao as lerMissaoDoses } from "@/lib/missao-doses";
 import { semanaDaSequencia } from "@/lib/sequencia-semana";
@@ -276,7 +277,7 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, prototip
           <CartaoSequencia e={e} onDetalhe={abrirDetalhe} onAcao={irPara} onAdesivo={(b) => tocarAdesivo(b)} />
           <PreviaColecao e={e} onTodos={abrirTodos} onAdesivo={(b) => tocarAdesivo(b)} />
           <LinkRetrospectiva />
-          {!!e.arquivados?.length && <details className="cn-memorias"><summary>Memórias da coleção · {e.arquivados.length}</summary><p>Suas conquistas de outras edições. O XP e a data continuam com você.</p><div>{e.arquivados.map(b => <figure key={b.id}><figcaption>{b.name}<small>{e.desbloqueadas[b.id]}</small></figcaption></figure>)}</div></details>}
+          {!!e.arquivados?.length && <details className="cn-memorias"><summary>Memórias da coleção · {e.arquivados.length}</summary><p>Suas conquistas de outras edições. O XP e a data continuam com você.</p><div>{e.arquivados.map(b => <figure key={b.id}><figcaption>{b.name}<small>{diaCurtoPtBR(e.desbloqueadas[b.id])}</small></figcaption></figure>)}</div></details>}
         </div>
       </main>
 

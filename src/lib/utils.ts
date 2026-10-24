@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -81,4 +82,15 @@ export const dataSegura = (valor: unknown, padrao: string, opcoes?: Parameters<t
   const d = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? parseLocalDay(texto) : new Date(texto);
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "—";
   try { return format(d, padrao, opcoes); } catch { return "—"; }
+};
+
+/**
+ * "1 de setembro" (ano junto só quando não é o ano corrente: "1 de setembro de 2025") — pra data GRAVADA mostrada
+ * curta (Memórias da coleção, 23/10: aparecia "2026-09-01" cru). "YYYY-MM-DD" é dia LOCAL (via dataSegura →
+ * parseLocalDay); vazio/inválido → "—".
+ */
+export const diaCurtoPtBR = (valor: unknown, agora: Date = new Date()): string => {
+  const texto = valor == null ? "" : String(valor);
+  const ano = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? Number(texto.slice(0, 4)) : new Date(texto).getFullYear();
+  return dataSegura(valor, ano === agora.getFullYear() ? "d 'de' MMMM" : "d 'de' MMMM 'de' yyyy", { locale: ptBR });
 };

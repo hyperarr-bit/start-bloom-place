@@ -54,3 +54,16 @@ describe("chave de dia/mês", () => {
     expect(infratores, `use localDayKey() em: ${infratores.join(", ")}`).toEqual([]);
   });
 });
+
+describe("diaCurtoPtBR (Memórias da coleção, 23/10)", () => {
+  it("'2026-09-01' vira '1 de setembro' no ano corrente e leva o ano nos outros; dia LOCAL, nunca o anterior", async () => {
+    const { diaCurtoPtBR } = await import("@/lib/utils");
+    const agora = new Date(2026, 9, 23, 22, 30);
+    expect(diaCurtoPtBR("2026-09-01", agora)).toBe("1 de setembro");
+    expect(diaCurtoPtBR("2026-12-31", agora)).toBe("31 de dezembro");
+    expect(diaCurtoPtBR("2025-09-01", agora)).toBe("1 de setembro de 2025");
+    expect(diaCurtoPtBR("", agora)).toBe("—");
+    expect(diaCurtoPtBR(undefined, agora)).toBe("—");
+    expect(diaCurtoPtBR("lixo", agora)).toBe("—");
+  });
+});

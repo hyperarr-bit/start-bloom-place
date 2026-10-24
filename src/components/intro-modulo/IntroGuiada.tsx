@@ -201,11 +201,12 @@ export function IntroGuiada({ config, aoTerminar, depoisDoMontar = false, aoCont
         if (faseRef.current !== "registrou") return;
         const el = alt.achar();
         if (el && visivel(el)) {
-          const depois = alt.ler(el);
+          const bruto = alt.ler(el);
           const valor = valorRef.current ?? 0;
-          if (depois !== null) {
-            const antes = alt.antes(depois, valor);
-            setNumero(antes !== Math.round(depois) ? { titulo: alt.numero.titulo, antes, depois: Math.round(depois), formatar: alt.numero.formatar } : null);
+          if (bruto !== null) {
+            const antes = alt.antes(bruto, valor);
+            const depois = alt.exibir ? alt.exibir(bruto) : Math.round(bruto);
+            setNumero(antes !== depois ? { titulo: alt.numero.titulo, antes, depois, formatar: alt.numero.formatar } : null);
           } else setNumero(null);
           setOlharAlt(true);
           apontar(el, "alternativo");

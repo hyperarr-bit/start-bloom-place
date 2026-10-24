@@ -1066,35 +1066,72 @@ describe("ligada: a intro guiada de Finanças", () => {
     medir.mockRestore();
   });
 
-  it("depois do Montar (renda gravada): o 'olha' vai no QUANTO POSSO GASTAR HOJE do Dashboard, com o número de antes → depois", async () => {
-    const dias = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate() + 1;
-    // o Dashboard de mentira: o card com o número REAL da conta (renda − gastos) ÷ dias restantes, como o computeDailyBudget
-    const Modulo = () => {
+  describe("depois do Montar (renda gravada): o 'olha' vai no QUANTO POSSO GASTAR HOJE do Dashboard, com o número de antes → depois", () => {
+    // 23/10: o "antes" tem que ser EXATAMENTE o que o card mostrava antes do gasto (antes saía R$ 1 a menos: card R$ 267 →
+    // balão "R$ 266 → R$ 265"; card R$ 0 → "R$ 1 → R$ 0"). Datas fixas: meio do mês, 1º dia, último dia, fevereiro, card em R$ 0.
+    // o Dashboard de mentira: igual ao de verdade — livre = renda − gastos, por dia = livre ÷ dias restantes, o card mostra
+    // "R$ 0" com livre ≤ 0 e o arredondado senão, e leva data-livre/data-dias (a conta sem arredondar)
+    const Modulo = ({ renda }: { renda: number }) => {
       const { get } = useUserData();
+      const agora = new Date();
+      const dias = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate() - agora.getDate() + 1;
       const gastos = (get<Array<{ value: number }>>("finance-expenses", []) ?? []).reduce((s, e) => s + Number(e.value || 0), 0);
+      const livre = renda - gastos;
       return (
         <div>
           <header><button type="button">📊 DASHBOARD</button><button type="button">💰 MEU FINANCEIRO</button></header>
           <div><input placeholder="+ Novo gasto" /><button data-spotlight="add-expense">+</button></div>
-          <div data-missao="posso-gastar"><h3>QUANTO POSSO GASTAR HOJE</h3><p>R$ {Math.round((2400 - gastos) / dias)}</p></div>
+          <div data-missao="posso-gastar" data-livre={livre} data-dias={dias}><h3>QUANTO POSSO GASTAR HOJE</h3><p>R$ {(livre <= 0 ? 0 : Math.round(livre / dias)).toLocaleString("pt-BR")}</p></div>
           <IntroDoModulo moduleId="financas" />
         </div>
       );
     };
-    const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
-    const dados = { "finance-incomes": [{ id: "r", value: 2400, description: "Salário", date: localDayKey() }] };
-    expect(OLHAR_POSSO_GASTAR.quando((k, f) => (k === "finance-incomes" ? (dados["finance-incomes"] as never) : f))).toBe(true);
-    expect(OLHAR_POSSO_GASTAR.quando((_k, f) => f)).toBe(false);
-    montar(<Modulo />, dados);
-    const chip = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
-    fireEvent.click(chip[0]); // Café · R$ 12
-    await waitFor(() => expect(screen.getByTestId("intro-modulo-olhar")).toBeTruthy(), { timeout: 6000 });
-    const balao = screen.getByTestId("intro-modulo-olhar");
-    expect(balao.textContent).toContain("Seu número do dia");
-    expect(balao.textContent).toContain("Dá pra gastar hoje");
-    const antes = Math.round(2400 / dias), depois = Math.round((2400 - 12) / dias);
-    if (antes !== depois) expect(balao.textContent).toContain(`R$ ${antes}`);
-    expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.resumo === "alternativo")).toBeTruthy();
-    medir.mockRestore();
+    const fmt = (n: number) => `R$ ${n.toLocaleString("pt-BR")}`;
+    const card = (renda: number, gasto: number, dias: number) => { const l = renda - gasto; return l <= 0 ? 0 : Math.round(l / dias); };
+    const casos: Array<{ data: Date; renda: number; antes: number; depois: number }> = [
+      { data: new Date(2026, 9, 23, 10), renda: 2400, antes: 267, depois: 265 }, // o caso do dono (9 dias)
+      { data: new Date(2026, 9, 1, 9), renda: 2400, antes: 77, depois: 77 }, // 31 dias: o café não mexe → sem número
+      { data: new Date(2026, 9, 31, 20), renda: 2400, antes: 2400, depois: 2388 }, // último dia do mês (1 dia)
+      { data: new Date(2026, 1, 28, 12), renda: 1000, antes: 1000, depois: 988 }, // último dia de fevereiro
+      { data: new Date(2026, 9, 15, 12), renda: 1550, antes: 91, depois: 90 }, // 17 dias: 91,18 → 90,47
+      { data: new Date(2026, 9, 31, 8), renda: 10, antes: 10, depois: 0 }, // card vai a R$ 0
+      { data: new Date(2026, 9, 20, 8), renda: 10, antes: 1, depois: 0 }, // 12 dias: 0,83 → R$ 0 (livre negativo)
+      { data: new Date(2026, 9, 20, 8), renda: 5, antes: 0, depois: 0 }, // card JÁ em R$ 0 → sem número (antes saía "R$ 1 → R$ 0")
+    ];
+    it.each(casos.map((c) => ({ ...c, dia: localDayKey(c.data) })))("$dia · renda R$ $renda: card R$ $antes → R$ $depois", async (c) => {
+      const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+      try {
+        vi.setSystemTime(c.data);
+        const dias = new Date(c.data.getFullYear(), c.data.getMonth() + 1, 0).getDate() - c.data.getDate() + 1;
+        // o gabarito confere com a conta do card (Café · R$ 12)
+        expect([card(c.renda, 0, dias), card(c.renda, 12, dias)]).toEqual([c.antes, c.depois]);
+        const dados = { "finance-incomes": [{ id: "r", value: c.renda, description: "Salário", date: localDayKey() }] };
+        expect(OLHAR_POSSO_GASTAR.quando((k, f) => (k === "finance-incomes" ? (dados["finance-incomes"] as never) : f))).toBe(true);
+        expect(OLHAR_POSSO_GASTAR.quando((_k, f) => f)).toBe(false);
+        eventos.length = 0;
+        montar(<Modulo renda={c.renda} />, dados);
+        const chip = await screen.findAllByTestId("demo-guia-chip", {}, { timeout: 4000 });
+        fireEvent.click(chip[0]); // Café · R$ 12
+        await waitFor(() => expect(screen.getByTestId("intro-modulo-olhar")).toBeTruthy(), { timeout: 6000 });
+        // o número do balão sobe/desce animado: espera ele chegar no de depois
+        if (c.antes !== c.depois) await waitFor(() => expect(screen.getByTestId("intro-modulo-olhar").textContent).toMatch(new RegExp(`${fmt(c.antes).replace(/[$.]/g, "\\$&")}.*${fmt(c.depois).replace(/[$.]/g, "\\$&")}`)), { timeout: 4000 });
+        const texto = screen.getByTestId("intro-modulo-olhar").textContent ?? "";
+        expect(texto).toContain("Seu número do dia");
+        if (c.antes !== c.depois) {
+          expect(texto).toContain("Dá pra gastar hoje");
+          const ia = texto.indexOf(fmt(c.antes)), id = texto.lastIndexOf(fmt(c.depois));
+          expect(ia, `${c.data.toDateString()}: ${texto}`).toBeGreaterThanOrEqual(0);
+          expect(id, `${c.data.toDateString()}: ${texto}`).toBeGreaterThan(ia);
+          if (c.antes - 1 !== c.depois) expect(texto, `${c.data.toDateString()}: só os dois números do card`).not.toContain(fmt(c.antes - 1));
+        } else {
+          expect(texto).not.toContain("Dá pra gastar hoje"); // o card não mexeu: sem "antes → depois"
+          expect(texto).not.toContain(fmt(c.antes + 1));
+        }
+        expect(eventos.find(([n, d]) => n === "modulo_intro_olhar" && d.resumo === "alternativo")).toBeTruthy();
+      } finally {
+        medir.mockRestore();
+        vi.useRealTimers();
+      }
+    }, 30_000);
   });
 });

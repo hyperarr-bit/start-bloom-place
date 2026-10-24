@@ -812,11 +812,6 @@ const AnimatedRoutes = () => {
         {import.meta.env.DEV && DevCompartilhar && (
           <Route path="/dev/compartilhar" element={<Suspense fallback={null}><DevCompartilhar /></Suspense>} />
         )}
-        <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         {/* ENTRADA_APP: a porta do app da loja. v53 (16/08): no SHELL renderiza
             o funil do TESTE GRÁTIS (4 perguntas → app real em modo guiado →
             paywall de assinatura no dia 3). Na web, /app continua o radar de

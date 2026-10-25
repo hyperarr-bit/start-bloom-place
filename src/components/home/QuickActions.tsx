@@ -86,11 +86,14 @@ const vibrate = () => {
 
 /* 1.0.19 (Home nova): a folha do "+" (home-nova/e/FolhaMaisE) monta ESTE componente só com os formulários
    (`apenasFormularios`: a fileira de botões não existe; as ações chegam pelo EVENTO_ACAO_RAPIDA) e escuta
-   `onAtivaChange` (qual formulário está aberto) e `onFeito` (uma ação gravou). Sem as props, nada muda. */
-export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito }: {
+   `onAtivaChange` (qual formulário está aberto), `onFeito` (uma ação gravou) e `onFolhaPropriaChange` (a ação
+   abriu/fechou uma FOLHA PRÓPRIA — hoje só a Tarefa, que é um Sheet do Radix e não um formulário inline; quem
+   nos monta dentro de outra folha precisa sair da frente). Sem as props, nada muda. */
+export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito, onFolhaPropriaChange }: {
   apenasFormularios?: boolean;
   onAtivaChange?: (id: ActionId | null) => void;
   onFeito?: (id: ActionId) => void;
+  onFolhaPropriaChange?: (id: ActionId | null) => void;
 } = {}) => {
   const { get, set } = useUserData();
   // Água: o botão diz o tamanho do copo/garrafa que a pessoa escolheu em Saúde.
@@ -114,6 +117,8 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
   // grava nas tarefas de hoje da Rotina — antes virava urgência sem hora (e ia pra duas listas).
   const tarefasRotina = useTarefasDoDia(CHAVE_TAREFAS_ROTINA);
   const [folhaTarefa, setFolhaTarefa] = useState(false);
+  // a folha da tarefa é um Sheet do Radix (z-50, modal): quem nos abriga numa folha própria precisa saber (1.0.19)
+  useEffect(() => { onFolhaPropriaChange?.(folhaTarefa ? "task" : null); }, [folhaTarefa]); // eslint-disable-line react-hooks/exhaustive-deps
   const [gratitudeText, setGratitudeText] = useState("");
   const [sleepHours, setSleepHours] = useState("");
   /* Refeição em dois toques (07/09): escolhe a refeição do plano, confirma as

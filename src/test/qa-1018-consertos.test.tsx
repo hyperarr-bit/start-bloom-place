@@ -131,11 +131,17 @@ describe("3. a versão do 'Meu acesso' por plataforma", () => {
     expect(versaoVisivel("ios")).toBe("dev");
   });
 
-  it("o vite.config lê 1.0.18 (45) do project.pbxproj", async () => {
+  it("o vite.config lê a versão do iOS do project.pbxproj (sem fixar número: 1.0.19 (46) hoje, a próxima amanhã)", async () => {
     const fs = await import("fs");
     const p = fs.readFileSync("ios/App/App.xcodeproj/project.pbxproj", "utf8");
-    expect(p).toMatch(/MARKETING_VERSION = 1\.0\.18;/);
-    expect(p).toMatch(/CURRENT_PROJECT_VERSION = 45;/);
+    // as MESMAS expressões do vite.config.ts — um pbxproj com a versão em outro formato quebraria o "Meu acesso"
+    const nome = p.match(/MARKETING_VERSION\s*=\s*"?([^";\s]+)"?;/)?.[1];
+    const codigo = p.match(/CURRENT_PROJECT_VERSION\s*=\s*"?([^";\s]+)"?;/)?.[1];
+    expect(nome).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(codigo).toMatch(/^\d+$/);
+    // todas as configurações (Debug/Release) com a mesma versão
+    expect(new Set(p.match(/MARKETING_VERSION\s*=\s*"?[^";\s]+"?;/g)).size).toBe(1);
+    expect(new Set(p.match(/CURRENT_PROJECT_VERSION\s*=\s*"?[^";\s]+"?;/g)).size).toBe(1);
     const cfg = fs.readFileSync("vite.config.ts", "utf8");
     expect(cfg).toContain("__APP_VERSION_IOS__: JSON.stringify(versaoDoAppIos)");
   });

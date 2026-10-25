@@ -38,7 +38,7 @@ import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data
 import { ThemeProvider } from "@/hooks/use-theme";
 import {
   ATRIBUTO_RAIZ, CHAVE_FORCA_NAV_ABAS, NAV_ABAS, abaDaRota, barraVisivel, destinoDaVolta, guardarForcaNavDaUrl, lerTela,
-  marcarVolta, navAbasLigada, planoDeNavegacao,
+  dialogoAberto, marcarVolta, navAbasLigada, planoDeNavegacao,
 } from "@/lib/nav-abas";
 import { BarraDeAbas, __zerarPilhaDasAbas } from "@/components/nav/BarraDeAbas";
 import Voce, { Aparencia, linhaDoPlano } from "@/pages/Voce";
@@ -157,6 +157,19 @@ describe("regra de visibilidade (pura)", () => {
     expect(abaDaRota("/voce")).toBe("voce");
     expect(abaDaRota("/voce/aparencia")).toBeNull();
   });
+  it("dialogoAberto (1.0.19, barra de vidro): folha/diálogo PADRÃO aberto (Radix: role=dialog + data-state=open) conta; fechado, ou sem data-state (as folhas da Home nova), não", () => {
+    document.body.innerHTML = '<div role="dialog" data-state="open"></div>';
+    expect(dialogoAberto()).toBe(true);
+    document.body.innerHTML = '<div role="alertdialog" data-state="open"></div>';
+    expect(dialogoAberto()).toBe(true);
+    document.body.innerHTML = '<div role="dialog" data-state="closed"></div>';
+    expect(dialogoAberto()).toBe(false);
+    document.body.innerHTML = '<div role="dialog" aria-label="Registrar agora"></div>';
+    expect(dialogoAberto()).toBe(false);
+    document.body.innerHTML = "";
+    expect(dialogoAberto()).toBe(false);
+  });
+
   it("lerTela: tour/missão/festa/holofote e os atributos da missão em doses contam como camada", () => {
     document.body.innerHTML = `<div ${ATRIBUTO_RAIZ}="hoje"></div>`;
     expect(lerTela()).toEqual({ raizPronta: true, camadaPorCima: false });

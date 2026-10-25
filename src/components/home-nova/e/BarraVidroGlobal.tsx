@@ -5,8 +5,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useHomeNova } from "@/hooks/use-home-nova";
 import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { trackEvent } from "@/lib/analytics";
-import { lerTela, limparVolta, marcarVolta, planoDeNavegacao } from "@/lib/nav-abas";
-import { EVENTO_HOME_NOVA_MAIS } from "@/lib/home-nova";
+import { dialogoAberto, lerTela, limparVolta, marcarVolta, planoDeNavegacao } from "@/lib/nav-abas";
+import { EVENTO_HOME_NOVA_MAIS, pedirMaisNaHome } from "@/lib/home-nova";
 import { BarraVidro } from "./BarraVidro";
 import { iniciaisDe } from "../HomeNova";
 import type { AbaNova } from "../BarraFlutuante";
@@ -44,7 +44,9 @@ export function BarraVidroGlobal() {
   const aba = abaDa(pathname);
   const candidata = nova.ligada && !!user && aba !== null;
 
-  const [tela, setTela] = useState(() => (candidata ? lerTela() : { raizPronta: false, camadaPorCima: false }));
+  // a tela por baixo: raiz pronta? camada guiada por cima? folha/diálogo padrão (Radix, z-50) aberto?
+  const ler = () => ({ ...lerTela(), dialogo: dialogoAberto() });
+  const [tela, setTela] = useState(() => (candidata ? ler() : { raizPronta: false, camadaPorCima: false, dialogo: false }));
   useEffect(() => {
     if (!candidata) return;
     let quadro = 0;
@@ -53,18 +55,22 @@ export function BarraVidroGlobal() {
       const agendar = typeof window.requestAnimationFrame === "function" ? window.requestAnimationFrame : (cb: FrameRequestCallback) => window.setTimeout(() => cb(0), 16);
       quadro = agendar(() => {
         quadro = 0;
-        const t = lerTela();
-        setTela((ant) => (ant.raizPronta === t.raizPronta && ant.camadaPorCima === t.camadaPorCima ? ant : t));
+        const t = ler();
+        setTela((ant) => (ant.raizPronta === t.raizPronta && ant.camadaPorCima === t.camadaPorCima && ant.dialogo === t.dialogo ? ant : t));
       }) as unknown as number;
     };
     reler();
     const obs = new MutationObserver(reler);
-    obs.observe(document.body, { childList: true, subtree: true });
+    // data-state: o Radix marca open/closed na própria folha (abrir/fechar sem tirar o nó durante a animação)
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state"] });
     obs.observe(document.documentElement, { attributes: true });
     return () => { obs.disconnect(); if (quadro) (window.cancelAnimationFrame ?? window.clearTimeout)(quadro); };
   }, [candidata, pathname]);
 
-  const visivel = candidata && !tela.camadaPorCima && (aba !== "inicio" || tela.raizPronta);
+  /** a barra pertence a esta tela (o respiro de baixo também) */
+  const naTela = candidata && !tela.camadaPorCima && (aba !== "inicio" || tela.raizPronta);
+  /** …e está na frente: com uma folha/diálogo padrão aberto (z-50) ela sai, pra não ficar por cima dele */
+  const visivel = naTela && !tela.dialogo;
 
   const ultimoPath = useRef(pathname);
   useEffect(() => {
@@ -76,12 +82,12 @@ export function BarraVidroGlobal() {
     if (abaDa(pathname)) limparVolta();
   }, [pathname]);
 
-  // Conquistas e Você ganham o respiro da barra; a Home nova já tem o seu
+  // Conquistas e Você ganham o respiro da barra; a Home nova já tem o seu (o respiro fica mesmo com um diálogo aberto: a página não pula)
   useEffect(() => {
-    const precisa = visivel && aba !== "inicio";
+    const precisa = naTela && aba !== "inicio";
     document.body.classList.toggle("com-barra-vidro", precisa);
     return () => { document.body.classList.remove("com-barra-vidro"); };
-  }, [visivel, aba]);
+  }, [naTela, aba]);
 
   if (!visivel || !aba) return null;
 
@@ -99,8 +105,13 @@ export function BarraVidroGlobal() {
   const mais = () => {
     trackEvent("home_mais_abrir", { de: aba });
     if (aba === "inicio") { try { window.dispatchEvent(new CustomEvent(EVENTO_HOME_NOVA_MAIS)); } catch { /* noop */ } return; }
+    // fora da Home: leva pra Home SEM empilhar histórico (volta 1 se a Home está logo abaixo; senão substitui) e a
+    // folha abre ao chegar (pedido em memória, consumido 1x pela Home — nunca no estado da navegação)
+    pedirMaisNaHome();
+    const plano = planoDeNavegacao(pathname, "/home", hojeLogoAbaixo);
     pendente = { para: "/home", hojeAbaixo: false };
-    navigate("/home", { state: { mais: true } });
+    if (plano.tipo === "voltar") { navigate(-1); return; }
+    navigate("/home", { replace: true });
   };
 
   const nome = nomeDaHome(get) || user?.email?.split("@")[0] || "";

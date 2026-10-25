@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Banknote, Check, Droplets, Dumbbell, Heart, Leaf, Lightbulb, ListTodo, Moon, Scale, Smile, Utensils, Wallet, X, type LucideIcon } from "lucide-react";
 import { QuickActions, abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
+import { useVoltarFecha } from "@/hooks/use-voltar-fecha";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloMl } from "@/lib/saude-copo";
 import { trackEvent } from "@/lib/analytics";
 import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
@@ -20,6 +21,13 @@ import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./palet
  *
  * TECLADO (o dono já achou bugs de teclado em aparelho real): a folha acompanha o visualViewport — com o
  * teclado aberto ela sobe junto (bottom = o que o teclado cobre) e o campo em foco é rolado pra dentro dela.
+ *
+ * FOLHA PRÓPRIA DE UMA AÇÃO (revisor 26/10): "Tarefa" não é formulário inline — o QuickActions abre a FolhaNovaTarefa
+ * da Rotina, um Sheet do Radix (z-50, modal: põe pointer-events:none no body). Esta folha é z-70, então a da tarefa
+ * abria ESCONDIDA atrás e a grade travava. Agora, quando o QuickActions avisa (`onFolhaPropriaChange`) que abriu uma
+ * folha própria, ESTA sai da frente (desce e fica inerte, sem desmontar — o QuickActions, e a folha da tarefa com
+ * ele, continuam vivos); quando a folha própria fecha (salvou ou cancelou), esta fecha junto. Vindo já em "task"
+ * (pendência/folha do score), nem chega a aparecer. O Voltar do Android com a folha aberta fecha a folha (useVoltarFecha).
  */
 interface Acao { id: ActionId; Icone: LucideIcon; rotulo: string; tom: Tom }
 
@@ -69,20 +77,27 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
   const [ativa, setAtiva] = useState<ActionId | null>(null);
   const [feita, setFeita] = useState<ActionId | null>(null);
+  /** uma folha PRÓPRIA da ação (a da Tarefa) está na frente: esta desce e fica inerte, sem desmontar */
+  const [escondida, setEscondida] = useState(false);
   const tinhaAtiva = useRef(false);
+  const tinhaPropria = useRef(false);
   const fechando = useRef(false);
   const timer = useRef<number | null>(null);
   const folha = useRef<HTMLDivElement>(null);
   const teclado = useAlturaDoTeclado(aberta);
+  useVoltarFecha(aberta, onFechar, "home-mais");
 
-  // abrir: zera; e, se veio com uma ação (pendência), pede ao QuickActions assim que ele estiver montado
+  // abrir: zera; e, se veio com uma ação (pendência), pede ao QuickActions assim que ele estiver montado.
+  // Vindo em "task" a folha já nasce escondida (a da tarefa é quem aparece); se a folha própria não vier, fecha.
   useEffect(() => {
     if (!aberta) return;
-    setAtiva(null); setFeita(null); tinhaAtiva.current = false; fechando.current = false;
+    setAtiva(null); setFeita(null); tinhaAtiva.current = false; tinhaPropria.current = false; fechando.current = false;
+    setEscondida(inicial === "task");
     if (!inicial) return;
     const t = window.setTimeout(() => abrirAcaoRapida(inicial), 60);
-    return () => window.clearTimeout(t);
-  }, [aberta, inicial]);
+    const guarda = inicial === "task" ? window.setTimeout(() => { if (!tinhaPropria.current) onFechar(); }, 2500) : null;
+    return () => { window.clearTimeout(t); if (guarda !== null) window.clearTimeout(guarda); };
+  }, [aberta, inicial]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current); }, []);
 
   // o campo em foco (o QuickActions foca sozinho) fica à vista dentro da folha, acima do teclado
@@ -116,26 +131,37 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
     if (id) { tinhaAtiva.current = true; return; }
     if (tinhaAtiva.current) { tinhaAtiva.current = false; fecharEmBreve(fechando.current ? 0 : 150); }
   };
-  /** Uma ação gravou: as diretas (água, treino) mostram o ✓ no azulejo e a folha fecha; as outras fecham pelo formulário. */
+  /** Uma ação gravou: as diretas (água, treino) mostram o ✓ no azulejo e a folha fecha; as outras fecham pelo formulário
+   *  (a tarefa fecha pela folha própria — aoMudarPropria). */
   const aoFeito = (id: ActionId) => {
-    if (DIRETAS.has(id) || id === "task") { setFeita(id); fecharEmBreve(650); }
+    if (DIRETAS.has(id)) { setFeita(id); fecharEmBreve(650); }
+  };
+  /** O QuickActions abriu uma folha própria (Tarefa): esta sai da frente; fechou-a (salvou ou cancelou): esta fecha junto. */
+  const aoMudarPropria = (id: ActionId | null) => {
+    if (id) { tinhaPropria.current = true; setEscondida(true); return; }
+    if (tinhaPropria.current) { tinhaPropria.current = false; fecharEmBreve(0); }
   };
 
   const titulo = ativa ? ROTULO[ativa] : "O que você quer registrar?";
-  const estilo: CSSProperties = teclado > 0 ? { bottom: teclado, maxHeight: `calc(100dvh - ${teclado}px - 12px)` } : { maxHeight: "88dvh" };
+  const estilo: CSSProperties = {
+    ...(teclado > 0 ? { bottom: teclado, maxHeight: `calc(100dvh - ${teclado}px - 12px)` } : { maxHeight: "88dvh" }),
+    ...(escondida ? { pointerEvents: "none", visibility: "hidden" } : {}),
+  };
 
   return (
     <AnimatePresence>
       {aberta && (
         <>
           <motion.button
-            type="button" aria-label="Fechar" onClick={onFechar}
+            type="button" aria-label="Fechar" onClick={onFechar} tabIndex={escondida ? -1 : undefined}
             className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
+            style={escondida ? { visibility: "hidden", pointerEvents: "none" } : undefined}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
           />
           <motion.div
             ref={folha}
             role="dialog" aria-label="Registrar agora" data-testid="hn-folha-mais" data-ativa={ativa ?? undefined}
+            data-escondida={escondida ? "1" : undefined} aria-hidden={escondida || undefined}
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+20px)]"
             style={estilo}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 420, damping: 38 }}
@@ -170,7 +196,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
 
             {/* o QuickActions de verdade, só com os formulários — é ele quem grava */}
             <div className={ativa ? "-mt-2" : "hidden"} data-testid="hn-formularios">
-              <QuickActions apenasFormularios onAtivaChange={aoMudarAtiva} onFeito={aoFeito} />
+              <QuickActions apenasFormularios onAtivaChange={aoMudarAtiva} onFeito={aoFeito} onFolhaPropriaChange={aoMudarPropria} />
             </div>
           </motion.div>
         </>

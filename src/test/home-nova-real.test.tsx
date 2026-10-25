@@ -15,7 +15,7 @@ process.env.TZ = "America/Sao_Paulo";
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, act, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
@@ -55,7 +55,9 @@ vi.mock("@/integrations/supabase/client", () => {
 
 import HomePage from "@/pages/Home";
 import { BarraVidroGlobal, __zerarPilhaDaBarraVidro } from "@/components/home-nova/e/BarraVidroGlobal";
-import { _zerarConsultaAdmin } from "@/hooks/use-home-nova";
+import { _definirTempoLimiteAdmin, _zerarConsultaAdmin } from "@/hooks/use-home-nova";
+import { FolhaMaisE } from "@/components/home-nova/e/FolhaMaisE";
+import type { ActionId } from "@/components/home/QuickActions";
 import { CHAVE_ADMIN_HOME_NOVA, CHAVE_FOGO_ACESO_HOME_NOVA, CHAVE_FORCA_HOME_NOVA, _zerarHomeNova, registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { localDayKey, semanaAtualId } from "@/lib/utils";
 import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
@@ -77,7 +79,11 @@ const DADOS: Dados = {
   "finance-dueDays": [{ day: Number(hoje.slice(8, 10)), bills: [{ name: "Cartão Nubank", paid: false }] }],
 };
 
-const Sonda = () => { const { pathname, state } = useLocation(); return <div data-testid="sonda" data-rota={pathname} data-origem={(state as { origem?: string } | null)?.origem ?? ""} />; };
+const Sonda = () => {
+  const { pathname, state } = useLocation();
+  const tipo = useNavigationType();
+  return <div data-testid="sonda" data-rota={pathname} data-tipo={tipo} data-estado={state ? JSON.stringify(state) : ""} data-origem={(state as { origem?: string } | null)?.origem ?? ""} />;
+};
 const App = () => (
   <>
     <Routes>
@@ -259,35 +265,242 @@ describe("Home nova — chave ON", () => {
   });
 });
 
-describe("Home nova — modo admin", () => {
-  it("conta sem papel de admin: a Home de hoje (a checagem roda 1x e fica guardada pra conta)", async () => {
-    registrarHomeNovaRemoto({ current: { metadata: { home_nova: "admin" } }, all: {} });
-    adminMock.resposta = false;
+/** uma consulta de admin PRESA: devolve quem responde, pro teste decidir quando (e o quê) */
+const consultaPresa = async () => {
+  let resolver: (v: boolean) => void = () => {};
+  const { checkIsAdmin } = await import("@/lib/admin");
+  (checkIsAdmin as unknown as { mockImplementationOnce: (f: () => Promise<boolean>) => void }).mockImplementationOnce(() => new Promise<boolean>((r) => { adminMock.chamadas++; resolver = r; }));
+  return (v: boolean) => act(async () => { resolver(v); await new Promise((r) => setTimeout(r, 0)); });
+};
+/** a tela em branco da Home (carregando) */
+const BRANCO = '[aria-hidden="true"].fixed.inset-0';
+const ligarAdmin = () => registrarHomeNovaRemoto({ current: { metadata: { home_nova: "admin" } }, all: {} });
+
+describe("Home nova — modo admin (a chave é global no RevenueCat: nenhum cliente pode ver a tela em branco)", () => {
+  it("1ª abertura, conta SEM papel de admin: a Home de HOJE aparece na hora, antes da consulta responder; a resposta fica guardada pra conta", async () => {
+    ligarAdmin();
+    const responder = await consultaPresa();
     await montar();
+    // ainda sem resposta: a Home de hoje (não a tela em branco, não a nova)
     await waitFor(() => expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeTruthy());
+    expect(document.querySelector(BRANCO)).toBeNull();
     expect(document.querySelector('[data-layout="e"]')).toBeNull();
     expect(adminMock.chamadas).toBe(1); // a Home e a barra perguntam, a consulta é uma só
+    expect(localStorage.getItem(CHAVE_ADMIN_HOME_NOVA)).toBeNull();
+    await responder(false);
+    expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeTruthy();
+    expect(document.querySelector('[data-layout="e"]')).toBeNull();
+    expect(document.querySelector('[data-testid="barra-vidro-global"]')).toBeNull();
     expect(localStorage.getItem(CHAVE_ADMIN_HOME_NOVA)).toBe("u1:0");
   });
-  it("conta admin: a Home nova; na abertura seguinte a resposta guardada vale na hora (a consulta só confirma, 1x)", async () => {
-    registrarHomeNovaRemoto({ current: { metadata: { home_nova: "admin" } }, all: {} });
-    adminMock.resposta = true;
-    const primeira = await montar();
+
+  it("consulta que não responde no tempo limite: vale 'não' (a Home de hoje fica), SEM guardar; um 'sim' atrasado ainda liga (o dono numa rede lenta)", async () => {
+    ligarAdmin();
+    _definirTempoLimiteAdmin(40);
+    const responder = await consultaPresa();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeTruthy());
+    await respirar(120); // passou do tempo limite
+    expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeTruthy();
+    expect(document.querySelector(BRANCO)).toBeNull();
+    expect(document.querySelector('[data-layout="e"]')).toBeNull();
+    expect(localStorage.getItem(CHAVE_ADMIN_HOME_NOVA)).toBeNull(); // tempo limite não é resposta: a próxima abertura pergunta de novo
+    await responder(true);
     await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
     expect(localStorage.getItem(CHAVE_ADMIN_HOME_NOVA)).toBe("u1:1");
+  });
+
+  it("1ª abertura, conta ADMIN: a Home de hoje primeiro; quando a resposta vem, troca pra nova sem a tela em branco; na abertura seguinte a guardada vale na hora", async () => {
+    ligarAdmin();
+    const responder = await consultaPresa();
+    const primeira = await montar();
+    await waitFor(() => expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeTruthy());
+    expect(document.querySelector(BRANCO)).toBeNull();
+    await responder(true);
+    await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
+    expect(document.querySelector(BRANCO)).toBeNull();
+    expect(document.querySelector('[data-tour="acoes-rapidas"]')).toBeNull();
+    expect(localStorage.getItem(CHAVE_ADMIN_HOME_NOVA)).toBe("u1:1");
     expect(adminMock.chamadas).toBe(1);
+    await waitFor(() => expect(document.querySelector('[data-testid="barra-vidro-global"] [data-testid="hn-barra"]')).toBeTruthy());
     primeira.unmount(); cleanup();
     _zerarHomeNova(); _zerarConsultaAdmin(); // outra abertura: o RevenueCat ainda não respondeu, a resposta do aparelho vale
     localStorage.setItem("core-home-nova", "admin");
-    adminMock.resposta = true;
-    let resolver: (v: boolean) => void = () => {};
-    const { checkIsAdmin } = await import("@/lib/admin");
-    (checkIsAdmin as unknown as { mockImplementationOnce: (f: () => Promise<boolean>) => void }).mockImplementationOnce(() => new Promise<boolean>((r) => { adminMock.chamadas++; resolver = r; }));
+    const responder2 = await consultaPresa();
     await montar();
     // a Home nova já está na tela ANTES da consulta responder (a resposta guardada vale)
     await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
     expect(adminMock.chamadas).toBe(2);
-    await act(async () => { resolver(true); });
+    await responder2(true);
     expect(document.querySelector('[data-layout="e"]')).toBeTruthy();
+  });
+});
+
+describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria escondida atrás da folha e travava a grade)", () => {
+  const TODAS: ActionId[] = ["water", "mood", "expense", "income", "task", "workout", "sleep", "meal", "weight", "idea", "gratitude", "detox"];
+  const DIALOGO_PADRAO = '[role="dialog"][data-state="open"]';
+
+  it("nenhuma ação abre escondida nem trava a grade; a Tarefa (Sheet do Radix) tira a folha do '+' da frente e, ao fechar, leva a folha junto", async () => {
+    ligar();
+    const { n } = await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
+    const abrir = async () => { fireEvent.click(screen.getByTestId("hn-mais")); await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy()); };
+    const fecharPeloX = async () => { fireEvent.click(screen.getByTestId("hn-folha-mais-fechar")); await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull()); };
+    for (const id of TODAS) {
+      await abrir();
+      expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida"), id).toBeNull();
+      fireEvent.click(document.querySelector(`[data-testid="hn-acoes"] [data-acao="${id}"]`)!);
+      if (id === "water" || id === "workout") {
+        // gravou no toque: ✓ e a folha fecha sozinha
+        await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
+        expect(document.querySelector(DIALOGO_PADRAO)).toBeNull();
+        continue;
+      }
+      if (id === "task") {
+        const tarefa = await screen.findByTestId("folha-nova-tarefa");
+        expect(tarefa.getAttribute("data-state")).toBe("open");
+        // a folha do "+" saiu da frente (continua montada: é ela quem segura o QuickActions e a folha da tarefa)
+        const mais = screen.getByTestId("hn-folha-mais");
+        expect(mais.getAttribute("data-escondida")).toBe("1");
+        expect(mais.getAttribute("aria-hidden")).toBe("true");
+        expect(mais.style.visibility).toBe("hidden");
+        expect(mais.style.pointerEvents).toBe("none");
+        // cancelar a tarefa (X da faixa) fecha a folha do "+" junto, e o toque volta (o Radix solta o body)
+        fireEvent.click(within(tarefa).getByLabelText("Fechar"));
+        await waitFor(() => expect(screen.queryByTestId("folha-nova-tarefa")).toBeNull());
+        await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull());
+        expect(document.body.style.pointerEvents).not.toBe("none");
+        continue;
+      }
+      // formulário inline dentro da folha, na frente, sem nenhum diálogo padrão escondido atrás
+      await waitFor(() => expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa"), id).toBe(id));
+      expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida")).toBeNull();
+      expect(screen.getByTestId("hn-formularios").className).not.toContain("hidden");
+      expect(document.querySelector(DIALOGO_PADRAO), id).toBeNull();
+      await fecharPeloX();
+    }
+    // depois de tudo a grade responde: a água grava (3 do dia + 1 do laço + esta)
+    await abrir();
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="water"]')!);
+    await waitFor(() => expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(5));
+  });
+
+  it("salvar a tarefa pela folha própria grava nas tarefas de hoje da Rotina e fecha tudo", async () => {
+    ligar();
+    const { n } = await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="task"]')!);
+    const tarefa = await screen.findByTestId("folha-nova-tarefa");
+    const campo = within(tarefa).getAllByRole("textbox")[0];
+    fireEvent.change(campo, { target: { value: "Ligar pro dentista" } });
+    const salvar = within(tarefa).getAllByRole("button").find((b) => /Salvar tarefa/i.test(b.textContent ?? ""));
+    expect(salvar, "o botão de salvar da folha da tarefa").toBeTruthy();
+    fireEvent.click(salvar!);
+    // as tarefas de hoje da Rotina (CHAVE_TAREFAS_ROTINA = rotina-day-tasks), como pelo QuickActions da Home de hoje
+    await waitFor(() => expect(JSON.stringify(n.ler("rotina-day-tasks") ?? {})).toContain("Ligar pro dentista"));
+    await waitFor(() => expect(screen.queryByTestId("folha-nova-tarefa")).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull());
+    expect(eventos.some(([e, d]) => e === "home_acao_rapida" && d.acao === "task" && d.origem === "folha")).toBe(true);
+  });
+
+  it("vindo direto em 'task' (uma pendência / a folha do score), a folha do '+' nem aparece: só a da tarefa; cancelar fecha tudo", async () => {
+    const n = criarNuvem(DADOS);
+    const onFechar = vi.fn();
+    render(<MemoryRouter><n.Provedor><FolhaMaisE aberta inicial="task" onFechar={onFechar} /></n.Provedor></MemoryRouter>);
+    expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida")).toBe("1"); // desde o 1º quadro
+    const tarefa = await screen.findByTestId("folha-nova-tarefa");
+    expect(tarefa.getAttribute("data-state")).toBe("open");
+    expect(onFechar).not.toHaveBeenCalled();
+    fireEvent.click(within(tarefa).getByLabelText("Fechar"));
+    await waitFor(() => expect(onFechar).toHaveBeenCalled());
+  });
+
+  it("o Voltar (Android/navegador) com a folha do '+' aberta fecha a folha, não a tela; fechar pelo X desfaz a entrada fantasma do histórico", async () => {
+    const n = criarNuvem(DADOS);
+    const onFechar = vi.fn();
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const arvore = (aberta: boolean) => <MemoryRouter><n.Provedor><FolhaMaisE aberta={aberta} onFechar={onFechar} /></n.Provedor></MemoryRouter>;
+    const { rerender } = render(arvore(true));
+    expect((window.history.state as { coreSheet?: string } | null)?.coreSheet).toBe("home-mais");
+    act(() => { window.dispatchEvent(new PopStateEvent("popstate")); });
+    expect(onFechar).toHaveBeenCalledTimes(1);
+    rerender(arvore(false));
+    expect(back).not.toHaveBeenCalled(); // fechou pelo Voltar: a entrada já foi consumida
+    rerender(arvore(true));
+    rerender(arvore(false)); // fechou pelo X
+    expect(back).toHaveBeenCalledTimes(1);
+    back.mockRestore();
+  });
+});
+
+describe("Home nova — a barra de vidro e as folhas padrão (revisor 26/10: a barra ficava por cima das folhas z-50)", () => {
+  it("o WidgetPicker (Dialog do Radix) aberto esconde a barra; fechar devolve", async () => {
+    ligar();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
+    const escolher = screen.queryByTestId("he-widgets-escolher") ?? screen.getByText("Escolher");
+    fireEvent.click(escolher);
+    await waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeTruthy());
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeNull());
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeNull());
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
+  });
+
+  it("em Conquistas/Você qualquer folha padrão esconde a barra (data-state open→closed), e o respiro de baixo do body fica", async () => {
+    ligar();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-aba-conquistas"]')).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-aba-conquistas"));
+    await waitFor(() => expect(document.body.classList.contains("com-barra-vidro")).toBe(true));
+    const dlg = document.createElement("div");
+    dlg.setAttribute("role", "dialog"); dlg.setAttribute("data-state", "open");
+    document.body.appendChild(dlg);
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeNull());
+    expect(document.body.classList.contains("com-barra-vidro")).toBe(true);
+    dlg.setAttribute("data-state", "closed");
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
+    dlg.remove();
+  });
+});
+
+describe("Home nova — o '+' fora da Home e o Rever tutorial", () => {
+  it("o '+' em outra aba volta pra Home SEM empilhar (POP: a Home estava logo abaixo), sem estado no histórico, e a folha abre ao chegar", async () => {
+    ligar();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-aba-voce"]')).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-aba-voce"));
+    await waitFor(() => expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/voce"));
+    expect(screen.getByTestId("sonda").getAttribute("data-tipo")).toBe("PUSH");
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/home"));
+    expect(screen.getByTestId("sonda").getAttribute("data-tipo")).toBe("POP");
+    expect(screen.getByTestId("sonda").getAttribute("data-estado")).toBe("");
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    expect(eventos.some(([e, d]) => e === "home_mais_abrir" && d.de === "voce")).toBe(true);
+  });
+
+  it("chegando direto numa aba (sem a Home atrás), o '+' SUBSTITUI a entrada (REPLACE) e a folha abre", async () => {
+    ligar();
+    const n = criarNuvem(DADOS);
+    render(<MemoryRouter initialEntries={["/voce"]}><n.Provedor><App /></n.Provedor></MemoryRouter>);
+    await respirar(30);
+    await waitFor(() => expect(screen.getByTestId("hn-mais")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/home"));
+    expect(screen.getByTestId("sonda").getAttribute("data-tipo")).toBe("REPLACE");
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+  });
+
+  it("Rever tutorial (aba Você → /home com reverTutorial) continua funcionando com a Home nova ligada: o replay entra, não a Home nova", async () => {
+    ligar();
+    const n = criarNuvem(DADOS);
+    render(<MemoryRouter initialEntries={[{ pathname: "/home", state: { reverTutorial: true } }]}><n.Provedor><App /></n.Provedor></MemoryRouter>);
+    await respirar(30);
+    await waitFor(() => expect(screen.getAllByText("Encerrar tutorial").length).toBeGreaterThan(0));
+    expect(document.querySelector('[data-layout="e"]')).toBeNull();
+    expect(document.querySelector('[data-testid="hn-barra"]')).toBeNull(); // a raiz não está pronta: sem barra sobre o tutorial
   });
 });

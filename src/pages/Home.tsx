@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
@@ -89,7 +89,13 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
 };
 
 /* 1.0.19 — a HOME NOVA (opção E, lib/home-nova): só carrega quando a chave `home_nova` liga pra conta; desligada, nada daqui entra no caminho */
-const HomeE = lazy(() => import("@/components/home-nova/e/HomeE").then((m) => ({ default: m.HomeE })));
+/* 1.0.19: a Home nova (opção E) é um pedaço à parte. Ligada DESDE a montagem (chave on/ab/força de QA, ou a resposta
+   de admin já guardada no aparelho): entra pelo lazy, com a tela em branco de sempre enquanto carrega. Ligada NO MEIO
+   da sessão (modo admin, 1ª abertura depois de ligar a chave — só o dono): a Home de hoje fica na tela até o pedaço
+   carregar e aí troca, sem piscar em branco (revisor 26/10). */
+let moduloHomeE: typeof import("@/components/home-nova/e/HomeE") | null = null;
+const carregarHomeE = () => import("@/components/home-nova/e/HomeE").then((m) => { moduloHomeE = m; return m; });
+const HomeE = lazy(() => carregarHomeE().then((m) => ({ default: m.HomeE })));
 
 const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
@@ -129,8 +135,19 @@ const HomePage = () => {
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
   // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã
-  // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`; o modo "admin" espera a checagem 1x)
+  // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`; no modo "admin" a checagem roda por trás e, sem
+  // resposta, vale "não" — a Home de hoje aparece na hora, nunca a tela em branco)
   const homeNova = useHomeNova(user);
+  const homeNovaDesdeAMontagem = useRef(homeNova.ligada);
+  const [homeECarregada, setHomeECarregada] = useState(moduloHomeE !== null);
+  useEffect(() => {
+    if (!homeNova.ligada || homeECarregada) return;
+    let viva = true;
+    carregarHomeE().then(() => { if (viva) setHomeECarregada(true); }).catch(() => { /* sem o pedaço fica a Home de hoje */ });
+    return () => { viva = false; };
+  }, [homeNova.ligada, homeECarregada]);
+  // ligada desde a montagem: o lazy (tela em branco de sempre); ligada no meio da sessão: só depois do pedaço carregar
+  const mostrarHomeNova = homeNova.ligada && (homeNovaDesdeAMontagem.current || homeECarregada);
   // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã.
   // Com a Home nova ligada o tour antigo NÃO entra (aponta pras ações rápidas, que lá viraram o "+").
   const mostrarTour = useTourDaHome(user?.created_at, !!user && !homeNova.ligada);
@@ -304,7 +321,7 @@ const HomePage = () => {
     else addWidget(id);
   };
 
-  if (!loaded || !onboardingResolved || !homeNova.pronta) {
+  if (!loaded || !onboardingResolved) {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 
@@ -345,8 +362,11 @@ const HomePage = () => {
     );
   }
 
-  // 1.0.19: a Home nova entra EXATAMENTE onde a Home de hoje entraria (depois do tutorial/replay/carregamento)
-  if (homeNova.ligada) {
+  // 1.0.19: a Home nova entra EXATAMENTE onde a Home de hoje entraria (depois do tutorial/replay/carregamento).
+  // Pedaço já carregado = monta direto (a troca no meio da sessão não passa pelo fallback); senão o lazy de sempre.
+  if (mostrarHomeNova) {
+    const Nova = moduloHomeE?.HomeE;
+    if (Nova) return <Nova />;
     return (
       <Suspense fallback={<div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />}>
         <HomeE />

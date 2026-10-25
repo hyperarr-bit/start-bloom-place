@@ -34,6 +34,13 @@ export const CHAVE_FORCA_HOME_NOVA = "forcar-home-nova";
 export const PARAM_HOME_NOVA = "home-nova";
 /** A barra de vidro pede pra abrir a folha do "+" (a folha mora na Home). */
 export const EVENTO_HOME_NOVA_MAIS = "home-nova:mais";
+
+/* O "+" tocado FORA da Home (Conquistas, Você): a barra leva pra Home e a folha tem que abrir ao chegar. Em memória
+ * (não no estado da navegação: um state no histórico reabriria a folha ao voltar pra essa entrada). */
+let maisPendente = false;
+export const pedirMaisNaHome = (): void => { maisPendente = true; };
+/** A Home consome o pedido ao montar (1x). */
+export const consumirMaisPendente = (): boolean => { const v = maisPendente; maisPendente = false; return v; };
 /** ROLLBACK/AJUSTE da força da cor = trocar aqui ("mais" é a aprovada; "suave" a reserva). */
 export const SUAVIDADE_HOME_NOVA: SuavidadeHomeNova = "mais";
 
@@ -73,7 +80,7 @@ export function registrarHomeNovaRemoto(offerings: unknown): void {
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; };
+export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; };
 
 /** Guarda `?home-nova=` (on|off grava a força; auto desfaz). */
 export function guardarForcaHomeNova(busca?: string | URLSearchParams): void {

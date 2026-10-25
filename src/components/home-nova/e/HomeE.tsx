@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,7 +19,7 @@ import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-copo";
 import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
-import { EVENTO_HOME_NOVA_MAIS, SUAVIDADE_HOME_NOVA, type SuavidadeHomeNova } from "@/lib/home-nova";
+import { EVENTO_HOME_NOVA_MAIS, SUAVIDADE_HOME_NOVA, consumirMaisPendente, type SuavidadeHomeNova } from "@/lib/home-nova";
 import { trackEvent } from "@/lib/analytics";
 import { PilulaFogoE } from "./PilulaFogoE";
 import { FolhaMaisE } from "./FolhaMaisE";
@@ -74,8 +73,6 @@ const saudacao = (): string => {
 };
 
 export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_HOME_NOVA, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, numeroDentro }: Props) => {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const { get, set, loaded } = useUserData();
   const lifeData = useLifeHubData();
@@ -104,18 +101,14 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const abrirMais = useCallback(() => { setAcaoInicial(null); setFolhaMais(true); }, []);
   const abrirScore = useCallback(() => { trackEvent("home_score_abrir", { score: lifeData.dayScore }); setFolhaScore(true); }, [lifeData.dayScore]);
 
-  // o "+" da barra de vidro (global) pede a folha por evento; vindo de outra aba, chega como estado da navegação (1x)
+  // o "+" da barra de vidro (global) pede a folha por evento; vindo de outra aba, o pedido fica em memória
+  // (lib/home-nova, nunca no estado da navegação — um state no histórico reabriria a folha ao voltar) e é consumido 1x
   useEffect(() => {
     const abrir = () => abrirMais();
     window.addEventListener(EVENTO_HOME_NOVA_MAIS, abrir);
     return () => window.removeEventListener(EVENTO_HOME_NOVA_MAIS, abrir);
   }, [abrirMais]);
-  const pedeMais = !!(location.state as { mais?: boolean } | null)?.mais;
-  useEffect(() => {
-    if (!pedeMais || !loaded) return;
-    abrirMais();
-    navigate(location.pathname, { replace: true, state: null });
-  }, [pedeMais, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (loaded && consumirMaisPendente()) abrirMais(); }, [loaded, abrirMais]);
 
   if (!loaded) return <div className="hn he min-h-dvh" aria-hidden data-suave={suave} />;
 

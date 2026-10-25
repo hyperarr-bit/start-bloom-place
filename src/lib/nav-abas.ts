@@ -101,6 +101,18 @@ export function barraVisivel(e: EstadoDaTela): boolean {
   return e.ligada && e.logado && abaDaRota(e.pathname) !== null && e.raizPronta && !e.camadaPorCima;
 }
 
+/**
+ * Folhas e diálogos PADRÃO abertos (Radix Sheet/Dialog/AlertDialog, vaul): ficam em z-50, e uma barra fixa acima
+ * disso (a barra de vidro da Home nova é z-60) apareceria POR CIMA deles — "Mostrar valores em R$ e peso?" e o
+ * Nível nas Conquistas, o WidgetPicker na Home (revisor 26/10). Enquanto um existe, a barra some. As folhas da
+ * própria Home nova (z-70, com fundo escurecido) não precisam: já cobrem a barra.
+ */
+export const SELETOR_DIALOGOS = '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
+/** Lê o DOM: há folha/diálogo padrão aberto? */
+export function dialogoAberto(doc: Document = document): boolean {
+  try { return !!doc.querySelector(SELETOR_DIALOGOS); } catch { return false; }
+}
+
 /** Lê o DOM: há camada guiada por cima? a raiz está pronta? */
 export function lerTela(doc: Document = document): { raizPronta: boolean; camadaPorCima: boolean } {
   try {

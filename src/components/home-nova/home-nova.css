@@ -1,0 +1,77 @@
+/* HOME NOVA — MOCKUP (25/10, ramo v1019-home). Só a rota /dev/home-nova monta isto.
+ *
+ * A regra do dono: "parece um site, não um app". Então aqui não existe LINHA separando nada:
+ * os blocos se separam por espaço, pelo fundo (papel levemente quente) e por uma sombra macia.
+ * Cantos generosos (24 px nos cards, 20 nos módulos, pílula na barra). Tudo em tokens do tema,
+ * então o escuro vem do mesmo sistema (styles/escuro.css + .dark do index.css). */
+.hn {
+  --hn-fundo: 40 12% 96%;
+  --hn-sombra: 0 1px 2px rgb(24 20 12 / 0.035), 0 14px 34px -18px rgb(24 20 12 / 0.2);
+  --hn-sombra-forte: 0 2px 6px rgb(0 0 0 / 0.06), 0 18px 44px -14px rgb(0 0 0 / 0.3);
+  --hn-mais: hsl(var(--fixo-tinta));
+  --hn-mais-texto: #ffffff;
+  background: hsl(var(--hn-fundo));
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.dark .hn {
+  --hn-fundo: 222 16% 7%;
+  /* no escuro a sombra some no fundo: o relevo vem de um fio de luz de 1 px (como o iOS), não de borda */
+  --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.055), 0 14px 34px -18px rgb(0 0 0 / 0.85);
+  --hn-sombra-forte: 0 0 0 1px rgb(255 255 255 / 0.09), 0 18px 44px -14px rgb(0 0 0 / 0.95);
+  --hn-mais: hsl(var(--fixo-tinta));
+  --hn-mais-texto: hsl(222 16% 7%);
+}
+
+.hn-card {
+  background: hsl(var(--card));
+  border-radius: 24px;
+  box-shadow: var(--hn-sombra);
+}
+
+/* widgets de hoje (components/home/widgets) dentro da Home nova: a moldura deles (borda + shadow-sm)
+   vira a mesma do resto — sem borda, sombra macia, canto 20. Só o mockup faz isso; os widgets não mudam. */
+.hn-widget > * {
+  border-color: transparent !important;
+  box-shadow: var(--hn-sombra) !important;
+  border-radius: 20px !important;
+}
+
+/* A rota de dev mostra as telas Conquistas e Você de hoje por baixo da barra nova: a linha do cabeçalho
+   e as bordas dos grupos saem, pra combinar. Só o mockup. */
+.hn-tela header.sticky { border-bottom-color: transparent !important; background: hsl(var(--hn-fundo)) !important; }
+.hn-tela .border-border\/60, .hn-tela .border-border { border-color: transparent !important; box-shadow: var(--hn-sombra); }
+.hn-tela .divide-border\/60 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--muted)) !important; }
+/* Conquistas como ABA: o cabeçalho dela soma a área segura por conta própria (o shell já soma) e tem a seta ← —
+   numa aba não há pra onde voltar. Só o mockup. */
+.hn-tela .cn-cabecalho { padding-top: 0 !important; }
+.hn-tela .cn-cabecalho > div > button[aria-label="Voltar"], .hn-tela .cn-cabecalho > div > button:first-child:not([aria-label="Alternar modo escuro"]) { display: none !important; }
+
+/* o carrossel de páginas dos módulos (variação) rola de lado, sem barra de rolagem */
+.hn-paginas { scrollbar-width: none; -ms-overflow-style: none; }
+.hn-paginas::-webkit-scrollbar { display: none; }
+
+/* ---- moldura do iPhone (só pros prints: ?status=1) ---- */
+.hn-status {
+  position: fixed; inset: 0 0 auto 0; height: var(--app-safe-top, 59px);
+  z-index: 2147483647; pointer-events: none;
+  color: hsl(var(--foreground));
+  font-family: -apple-system, BlinkMacSystemFont, Inter, sans-serif;
+}
+.hn-ilha {
+  position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+  width: 126px; height: 37px; border-radius: 999px; background: #000;
+}
+.hn-hora {
+  position: absolute; top: 15px; left: 0; width: calc(50% - 63px);
+  text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.2px; line-height: 22px;
+}
+.hn-status-icones {
+  position: absolute; top: 17px; right: 0; width: calc(50% - 63px);
+  display: flex; justify-content: center; align-items: center; gap: 6px;
+}
+.hn-indicador {
+  position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%);
+  width: 134px; height: 5px; border-radius: 999px; background: hsl(var(--foreground));
+  z-index: 2147483647; pointer-events: none;
+}

@@ -102,7 +102,13 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
   const lifeData = useLifeHubData();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
-  useEffect(() => { onAtivaChange?.(activeAction); }, [activeAction]); // eslint-disable-line react-hooks/exhaustive-deps
+  // avisa só MUDANÇAS (não o valor inicial da montagem): o aviso "null" na montagem chegava à folha do "+" antes de ela
+  // zerar o que lembrava da abertura anterior e a fechava em 150 ms ao reabrir (achado no Simulador, 26/10)
+  const montouAvisos = useRef(false);
+  useEffect(() => {
+    if (!montouAvisos.current) { montouAvisos.current = true; return; }
+    onAtivaChange?.(activeAction);
+  }, [activeAction]); // eslint-disable-line react-hooks/exhaustive-deps
   const [waterSplash, setWaterSplash] = useState(false);
   const [successId, setSuccessId] = useState<ActionId | null>(null);
 
@@ -117,8 +123,12 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
   // grava nas tarefas de hoje da Rotina — antes virava urgência sem hora (e ia pra duas listas).
   const tarefasRotina = useTarefasDoDia(CHAVE_TAREFAS_ROTINA);
   const [folhaTarefa, setFolhaTarefa] = useState(false);
-  // a folha da tarefa é um Sheet do Radix (z-50, modal): quem nos abriga numa folha própria precisa saber (1.0.19)
-  useEffect(() => { onFolhaPropriaChange?.(folhaTarefa ? "task" : null); }, [folhaTarefa]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a folha da tarefa é um Sheet do Radix (z-50, modal): quem nos abriga numa folha própria precisa saber (1.0.19) — só mudanças, idem
+  const montouAvisoPropria = useRef(false);
+  useEffect(() => {
+    if (!montouAvisoPropria.current) { montouAvisoPropria.current = true; return; }
+    onFolhaPropriaChange?.(folhaTarefa ? "task" : null);
+  }, [folhaTarefa]); // eslint-disable-line react-hooks/exhaustive-deps
   const [gratitudeText, setGratitudeText] = useState("");
   const [sleepHours, setSleepHours] = useState("");
   /* Refeição em dois toques (07/09): escolhe a refeição do plano, confirma as

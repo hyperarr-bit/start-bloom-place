@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { estiloDaFolhaComTeclado, rolarCampoFocado, useAreaVisivel } from "@/hooks/use-area-visivel";
 import { armarAvisos } from "@/lib/armar-avisos";
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
@@ -299,11 +300,24 @@ export function FormTarefa({
   inicial,
   rotuloSalvar = "Salvar tarefa",
   onSalvar,
+  focarQuando = false,
 }: {
   inicial?: Partial<CamposNovos>;
   rotuloSalvar?: string;
   onSalvar: (c: CamposNovos) => void;
+  /** quem abre a folha diz QUANDO o campo foca (depois da folha assentar) — ver o foco abaixo */
+  focarQuando?: boolean;
 }) {
+  // FOCO SÓ DEPOIS DA FOLHA ASSENTAR (26/10, achado do QA no Simulador): o `autoFocus` focava DURANTE a animação de abrir,
+  // com o campo ainda abaixo da tela — o WebKit rolava a página inteira (701 px) e arrastava a janela visível, e o
+  // campo "O que precisa fazer" ficava fora da tela, acima do relógio, com o teclado aberto. Agora quem abre a folha
+  // avisa quando ela assentou (`focarQuando`), e o foco não rola nada (preventScroll): a folha se encaixa sozinha
+  // acima do teclado (estiloDaFolhaComTeclado). Vale pros 3 caminhos: "+" da Home nova, Ações rápidas, "+ Nova tarefa" da Rotina.
+  const campoRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!focarQuando) return;
+    try { campoRef.current?.focus({ preventScroll: true }); } catch { campoRef.current?.focus(); }
+  }, [focarQuando]);
   const [texto, setTexto] = useState(inicial?.texto ?? "");
   const [hora, setHora] = useState(normalizarHora(inicial?.hora) ?? "");
   const [aviso, setAviso] = useState<number>(Number.isInteger(inicial?.aviso) ? (inicial?.aviso as number) : AVISO_PADRAO_TAREFA);
@@ -355,7 +369,7 @@ export function FormTarefa({
           placeholder="Ex.: Ligar pro fornecedor"
           aria-label="O que precisa fazer"
           className="mt-1 h-11 text-[15px]"
-          autoFocus={!inicial?.texto}
+          ref={campoRef}
         />
       </label>
 
@@ -518,13 +532,27 @@ export function FolhaNovaTarefa({
   onde?: string;
 }) {
   const hoje = localDayKey();
+  // TECLADO (26/10): com ele aberto a folha se ancora acima do que ele cobre e nunca passa da área visível (o iOS
+  // arrasta a janela visível quando o campo está numa folha fixa — o topo de uma folha de 92dvh sumia da tela).
+  const area = useAreaVisivel(aberta);
+  // a folha ASSENTOU (fim da animação de abrir; ou 600 ms, porque sem animação não há animationend): só então o campo foca
+  const [assentou, setAssentou] = useState(false);
+  useEffect(() => {
+    if (!aberta) { setAssentou(false); return; }
+    const t = window.setTimeout(() => setAssentou(true), 600);
+    return () => window.clearTimeout(t);
+  }, [aberta]);
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="folha-nova-tarefa" data-folha="tarefa-nova">
+      <SheetContent
+        side="bottom" semFechar className={FOLHA} style={estiloDaFolhaComTeclado(area)}
+        onAnimationEnd={(e) => { if (e.target === e.currentTarget) setAssentou(true); }}
+        data-testid="folha-nova-tarefa" data-folha="tarefa-nova" data-teclado={area.teclado ? "1" : undefined}
+      >
         <FaixaDaFolha titulo={`${nomeDoDiaDeHoje()} · NOVA TAREFA`} sub={`Tarefa de hoje, ${diaCurto(hoje)} · ${onde}`} onFechar={onFechar} />
-        <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]" onFocus={(e) => rolarCampoFocado(e)}>
           {/* o conteúdo da folha só existe aberta (o Radix desmonta ao fechar): cada abertura é um formulário novo */}
-          <FormTarefa inicial={{ texto: textoInicial }} onSalvar={(c) => { onSalvar(c); onFechar(); }} />
+          <FormTarefa inicial={{ texto: textoInicial }} focarQuando={assentou && !textoInicial} onSalvar={(c) => { onSalvar(c); onFechar(); }} />
         </div>
       </SheetContent>
     </Sheet>
@@ -576,10 +604,12 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
   // 09/10: prazo — e a tarefa com prazo que nasceu outro dia é "de hoje" por estar na lista, não pelo `dia`
   const prazo = t ? estadoDoPrazo({ ...t, feito: !!ficha?.feito }, hoje) : null;
   const diaDaFaixa = t && t.dia !== hoje && prazoDaTarefa(t) ? hoje : (t?.dia ?? hoje);
+  // TECLADO (26/10): editando, a folha se ancora acima do teclado e cabe na área visível (ver FolhaNovaTarefa)
+  const area = useAreaVisivel(aberta);
 
   return (
     <Sheet open={aberta} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" semFechar className={FOLHA} data-testid="ficha-tarefa" data-folha="tarefa-ficha">
+      <SheetContent side="bottom" semFechar className={FOLHA} style={estiloDaFolhaComTeclado(area)} data-testid="ficha-tarefa" data-folha="tarefa-ficha" data-teclado={area.teclado ? "1" : undefined}>
         {ficha && (
           <>
             <FaixaDaFolha
@@ -587,7 +617,7 @@ export function FichaDaTarefa({ ficha: fichaAtual, onFechar }: { ficha: FichaAbe
               sub={editando ? "Editando a tarefa" : `${prazoDaTarefa(t) ? "Tarefa com prazo" : "Tarefa de hoje"} · ${ficha.onde}`}
               onFechar={onFechar}
             />
-            <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))]" onFocus={(e) => rolarCampoFocado(e)}>
               {editando && ficha.onSalvar ? (
                 <FormTarefa
                   inicial={{ texto: t?.texto ?? ficha.texto, hora: hora ?? undefined, aviso: t && Number.isInteger(t.aviso) ? t.aviso : undefined, detalhes, prioridade: t?.prioridade, subtarefas, prazo: prazoDaTarefa(t) ?? undefined }}

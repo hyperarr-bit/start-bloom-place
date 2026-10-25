@@ -385,6 +385,35 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
     await waitFor(() => expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(5));
   });
 
+  it("abrir um formulário, fechar pelo X e reabrir o '+': a folha FICA aberta (no Simulador ela se fechava sozinha em 150 ms)", async () => {
+    ligar();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="idea"]')!);
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa")).toBe("idea"));
+    fireEvent.click(screen.getByTestId("hn-folha-mais-fechar"));
+    await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull());
+    await respirar(400);
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    await respirar(700); // mais que os 150 ms do fechamento automático
+    expect(screen.getByTestId("hn-folha-mais")).toBeTruthy();
+    expect(screen.getByTestId("hn-acoes")).toBeTruthy(); // a grade, sem formulário
+    // e a mesma coisa depois da Tarefa cancelada
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="task"]')!);
+    const tarefa = await screen.findByTestId("folha-nova-tarefa");
+    fireEvent.click(within(tarefa).getByLabelText("Fechar"));
+    await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull());
+    await respirar(400);
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    await respirar(700);
+    expect(screen.getByTestId("hn-folha-mais")).toBeTruthy();
+    expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida")).toBeNull();
+  });
+
   it("salvar a tarefa pela folha própria grava nas tarefas de hoje da Rotina e fecha tudo", async () => {
     ligar();
     const { n } = await montar();

@@ -4,6 +4,7 @@ import { Banknote, Check, Droplets, Dumbbell, Heart, Leaf, Lightbulb, ListTodo, 
 import { QuickActions, abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
 import { useVoltarFecha } from "@/hooks/use-voltar-fecha";
+import { useAreaVisivel } from "@/hooks/use-area-visivel";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloMl } from "@/lib/saude-copo";
 import { trackEvent } from "@/lib/analytics";
 import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
@@ -56,22 +57,6 @@ interface Props {
   inicial?: ActionId | null;
 }
 
-/** Com o teclado aberto, quanto do fundo da tela ele cobre (px) — 0 sem teclado / fora do celular. */
-function useAlturaDoTeclado(ativa: boolean): number {
-  const [altura, setAltura] = useState(0);
-  useEffect(() => {
-    if (!ativa) { setAltura(0); return; }
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    if (!vv) return;
-    const ler = () => setAltura(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
-    ler();
-    vv.addEventListener("resize", ler);
-    vv.addEventListener("scroll", ler);
-    return () => { vv.removeEventListener("resize", ler); vv.removeEventListener("scroll", ler); };
-  }, [ativa]);
-  return altura;
-}
-
 export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
   const { get } = useUserData();
   const copo = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
@@ -84,13 +69,15 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
   const fechando = useRef(false);
   const timer = useRef<number | null>(null);
   const folha = useRef<HTMLDivElement>(null);
-  const teclado = useAlturaDoTeclado(aberta);
+  const area = useAreaVisivel(aberta);
   useVoltarFecha(aberta, onFechar, "home-mais");
 
   // abrir: zera; e, se veio com uma ação (pendência), pede ao QuickActions assim que ele estiver montado.
   // Vindo em "task" a folha já nasce escondida (a da tarefa é quem aparece); se a folha própria não vier, fecha.
   useEffect(() => {
-    if (!aberta) return;
+    // fechou (pelo X, com um formulário aberto): esquece a abertura — senão o aviso da próxima montagem do QuickActions
+    // encontrava `tinhaAtiva` ligado e fechava a folha recém-reaberta (achado no Simulador, 26/10)
+    if (!aberta) { tinhaAtiva.current = false; tinhaPropria.current = false; fechando.current = false; return; }
     setAtiva(null); setFeita(null); tinhaAtiva.current = false; tinhaPropria.current = false; fechando.current = false;
     setEscondida(inicial === "task");
     if (!inicial) return;
@@ -143,8 +130,10 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
   };
 
   const titulo = ativa ? ROTULO[ativa] : "O que você quer registrar?";
+  // teclado aberto: ancorada logo acima do que ele cobre e nunca mais alta que a ÁREA VISÍVEL (o iOS arrasta a janela
+  // visível quando o campo está num elemento fixo — "100dvh - teclado" não serve, 100dvh continua sendo a tela inteira)
   const estilo: CSSProperties = {
-    ...(teclado > 0 ? { bottom: teclado, maxHeight: `calc(100dvh - ${teclado}px - 12px)` } : { maxHeight: "88dvh" }),
+    ...(area.teclado ? { bottom: area.coberto, maxHeight: Math.max(160, area.altura - 12) } : { maxHeight: "88dvh" }),
     ...(escondida ? { pointerEvents: "none", visibility: "hidden" } : {}),
   };
 

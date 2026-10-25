@@ -13,6 +13,9 @@ import StoreKit
  * (é o que alimenta o SKAdNetwork e a medição agregada da Meta); a COMPRA sai
  * do SERVIDOR por CAPI, com e-mail/id em hash — fecha com o app em segundo
  * plano, e um evento do cliente ali seria perdido ou duplicado.
+ * 1.0.19 (25/10): EXCEÇÃO — o INÍCIO DO TESTE também sai do SDK
+ * (`MetaAds.logInicioTeste`, 1x por transação), porque só evento do SDK
+ * alimenta o SKAdNetwork. O servidor continua mandando o dele (ver o método).
  *
  * ATT (19/09, build 15): a build 13 nasceu sem o pedido (decisão de 07/09,
  * depois de duas recusas 2.1 "unable to locate the ATT permission request" —
@@ -350,6 +353,7 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "idPublicidade", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logCompra", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logInicioTeste", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pedirRastreamento", returnType: CAPPluginReturnPromise)
     ]
 
@@ -393,6 +397,40 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
         if let pedido = call.getString("pedido") { params[AppEvents.ParameterName("fb_order_id")] = pedido }
         AppEvents.shared.logPurchase(amount: valor, currency: moeda, parameters: params)
         call.resolve(["ok": true])
+    }
+
+    /* INÍCIO DO TESTE PELO SDK (1.0.19, 25/10) — pro SKAdNetwork.
+     * 24/10: a tela do SKAN no Gerenciador de Eventos ("Usar o SDK do Facebook")
+     * listou ZERO eventos: o StartTrial só saía do servidor (CAPI), e evento de
+     * servidor não atualiza o valor de conversão do SKAN — quem faz isso é o SDK,
+     * aqui no aparelho, no instante do logEvent. O JS (lib/meta-inicio-teste-ios)
+     * só chama isto 1x por transação, quando a folha da Apple fechou com sucesso
+     * e o RevenueCat disse que entrou em TESTE.
+     * Parâmetros: valor/moeda do produto da loja; fb_content_id; fb_order_id e
+     * fb_transaction_id = id da transação da Apple; e `event_id` com o MESMO id —
+     * é o campo que a Meta usa pra juntar SDK × CAPI (mesmo nome + mesmo event_id,
+     * 48 h). O servidor hoje usa outro id (o "sub…" do RevenueCat); ver
+     * META_STARTTRIAL_ID_DA_LOJA no meta-backfill-app. */
+    @objc func logInicioTeste(_ call: CAPPluginCall) {
+        guard AppDelegate.metaConfigurada else { call.resolve(["ok": false]); return }
+        let valor = call.getDouble("valor") ?? 0
+        let moeda = call.getString("moeda") ?? "BRL"
+        var params: [AppEvents.ParameterName: Any] = [.currency: moeda]
+        if let produto = call.getString("produto"), !produto.isEmpty {
+            params[.contentID] = produto
+            params[.contentType] = "product"
+        }
+        if let tx = call.getString("transacao"), !tx.isEmpty {
+            params[.orderID] = tx
+            params[AppEvents.ParameterName("fb_transaction_id")] = tx
+            params[AppEvents.ParameterName("event_id")] = tx
+        }
+        DispatchQueue.main.async {
+            AppEvents.shared.logEvent(.startTrial, valueToSum: valor, parameters: params)
+            // Manda já: a pessoa costuma fechar o app logo depois da folha da Apple.
+            AppEvents.shared.flush()
+            call.resolve(["ok": true])
+        }
     }
 
     @objc func idPublicidade(_ call: CAPPluginCall) {

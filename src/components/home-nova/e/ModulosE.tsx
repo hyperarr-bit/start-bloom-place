@@ -3,60 +3,30 @@ import { Settings2, Star } from "lucide-react";
 import { MODULOS, type Modulo } from "@/lib/modulos";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
-import type { PendenciasDeHoje } from "@/components/home/NextHoursTimeline";
-import { TIPOS_DO_MODULO, type TipoPendencia } from "@/lib/home-pendencias";
 import { trackEvent } from "@/lib/analytics";
 import { estadoDoModulo } from "../ModulosNova";
+import { TRACO, corDoModulo, tintaDoModulo } from "./paleta";
 
 /**
- * OS MÓDULOS, MELHOR ORGANIZADOS (opção E, 25/10) — logo abaixo do carrossel, começando ainda na primeira
- * tela. Duas alternativas (o dono achou feios os cartões de 2 colunas da direção A):
+ * OS MÓDULOS (opção E) — logo abaixo do carrossel, começando ainda na primeira tela.
  *
- *  GRADE (recomendada): 4 colunas, 16 azulejos de 60 px com o ícone e a cor de sempre, o nome embaixo e um
- *  SELO com o que está pendente hoje naquele módulo (como o número vermelho nos ícones do iPhone, mas em
- *  grafite): Rotina 5 (hábitos), Dieta 4 (refeições), Saúde 2 (água, sono), Finanças "!" (conta a vencer).
- *  Cabe tudo em 4 linhas; a ordem é a da pessoa, favoritos na frente com a estrelinha; oculto fica fora.
+ *  GRADE (recomendada): 4 colunas, 16 azulejos de 64 px, o nome embaixo. A ordem é a da pessoa, favoritos
+ *  na frente com a estrelinha; oculto fica fora. RODADA 3: os azulejos na PALETA ÚNICA — o fundo é a cor do
+ *  módulo a 14 % e o ícone (o mesmo glifo de hoje, traço 1,75) é a cor cheia; os SELOS com o número do que
+ *  falta (1 · 4 · 5 · 2) saíram — o dono não entendeu o que eram, e o "o que falta" já mora no carrossel.
  *
- *  CARTÕES 3: cartões menores, 3 por linha, com a linha de estado do dia por extenso ("0/5 hábitos hoje",
- *  "Treino de hoje feito ✓") — mais informação, mais altura (6 linhas).
+ *  CARTÕES 3: cartões menores, 3 por linha, com a linha de estado do dia por extenso.
  */
 export type VarianteModulosE = "grade" | "cartoes3";
 
-const MODULO_DO_TIPO: Record<TipoPendencia, string> = (() => {
-  const out = {} as Record<TipoPendencia, string>;
-  (Object.keys(TIPOS_DO_MODULO) as string[]).forEach((m) => TIPOS_DO_MODULO[m].forEach((t) => { out[t] = m; }));
-  out.humor = "desenvolvimento";
-  out.gratidao = "desenvolvimento";
-  return out;
-})();
-
-/** O selo de cada módulo: o que ele tem pendente hoje (número) ou "!" (conta a vencer). */
-export function selosDosModulos(p: PendenciasDeHoje, d: LifeHubData): Record<string, string> {
-  const n: Record<string, number> = {};
-  const soma = (m: string, q: number) => { n[m] = (n[m] ?? 0) + q; };
-  p.pending.forEach((item) => {
-    if (item.tipo === "habitos") soma("rotina", d.habits.length ? d.habits.filter((h) => !h.done).length : 1);
-    else if (item.tipo === "refeicoes") soma("dieta", Math.max(1, d.mealsTotal - d.mealsLogged));
-    else if (item.tipo) soma(MODULO_DO_TIPO[item.tipo], 1);
-    else if (item.route?.startsWith("/rotina")) soma("rotina", 1);
-  });
-  const selos: Record<string, string> = {};
-  Object.entries(n).forEach(([m, q]) => { if (q > 0) selos[m] = q > 9 ? "9+" : String(q); });
-  if (p.avisoConta && !selos.financas) selos.financas = "!";
-  return selos;
-}
-
-const Azulejo = ({ m, selo, favorito, onClick }: { m: Modulo; selo?: string; favorito: boolean; onClick: () => void }) => (
+const Azulejo = ({ m, favorito, onClick }: { m: Modulo; favorito: boolean; onClick: () => void }) => (
   <button type="button" onClick={onClick} data-track={`modulo:${m.id}`} data-testid="hn-modulo" className="flex flex-col items-center gap-2 min-w-0 active:scale-95 transition-transform">
     <span className="relative">
-      <span className={`w-[64px] h-[64px] rounded-[19px] ${m.color} grid place-items-center`}>
-        <m.Icon className="w-[28px] h-[28px]" strokeWidth={2} aria-hidden />
+      <span className="w-[64px] h-[64px] rounded-[19px] grid place-items-center" style={{ background: tintaDoModulo(m.id), color: corDoModulo(m.id) }}>
+        <m.Icon className="w-[28px] h-[28px]" strokeWidth={TRACO} aria-hidden />
       </span>
-      {selo && (
-        <span className="he-selo absolute -top-1.5 -right-1.5 min-w-[21px] h-[21px] px-1.5 rounded-full grid place-items-center text-[11px] font-bold tabular-nums leading-none" data-testid="he-selo" aria-label={`${selo} pendente`}>{selo}</span>
-      )}
       {favorito && (
-        <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-yellow-400 grid place-items-center" aria-label="Favorito" style={{ boxShadow: "0 0 0 2px hsl(var(--hn-fundo))" }}>
+        <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full grid place-items-center" aria-label="Favorito" style={{ background: corDoModulo("financas"), boxShadow: "0 0 0 2px hsl(var(--hn-fundo))" }}>
           <Star className="w-2.5 h-2.5 text-white fill-white" />
         </span>
       )}
@@ -67,12 +37,10 @@ const Azulejo = ({ m, selo, favorito, onClick }: { m: Modulo; selo?: string; fav
 
 const Cartao3 = ({ m, estado, favorito, onClick }: { m: Modulo; estado: string; favorito: boolean; onClick: () => void }) => (
   <button type="button" onClick={onClick} data-track={`modulo:${m.id}`} data-testid="hn-modulo" className="hn-card !rounded-[18px] relative p-3 text-left flex flex-col gap-2.5 min-h-[118px] active:scale-[0.98] transition-transform">
-    <span className={`w-10 h-10 rounded-xl ${m.color} grid place-items-center`}><m.Icon className="w-5 h-5" strokeWidth={2.1} aria-hidden /></span>
-    {favorito && <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-yellow-400 grid place-items-center" aria-label="Favorito"><Star className="w-2.5 h-2.5 text-white fill-white" /></span>}
-    {/* texto colado no ícone (não no pé): os nomes de uma linha ficam na mesma altura em toda a fileira */}
+    <span className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: tintaDoModulo(m.id), color: corDoModulo(m.id) }}><m.Icon className="w-5 h-5" strokeWidth={TRACO} aria-hidden /></span>
+    {favorito && <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full grid place-items-center" aria-label="Favorito" style={{ background: corDoModulo("financas") }}><Star className="w-2.5 h-2.5 text-white fill-white" /></span>}
     <span className="min-w-0">
       <span className="block text-[13.5px] font-semibold leading-tight truncate">{m.label}</span>
-      {/* sem `block`: o line-clamp precisa do display -webkit-box dele */}
       <span className="text-[11.5px] text-muted-foreground leading-[1.3] line-clamp-2 mt-0.5">{estado}</span>
     </span>
   </button>
@@ -80,21 +48,18 @@ const Cartao3 = ({ m, estado, favorito, onClick }: { m: Modulo; estado: string; 
 
 interface Props {
   data: LifeHubData;
-  pendencias: PendenciasDeHoje;
   variante: VarianteModulosE;
 }
 
-export const ModulosE = ({ data, pendencias, variante }: Props) => {
+export const ModulosE = ({ data, variante }: Props) => {
   const navigate = useNavigate();
   const { isFavorite, isHidden, ordenar } = useModulePreferences();
   const visiveis = ordenar(MODULOS).filter((m) => !isHidden(m.id));
   const ocultos = MODULOS.length - visiveis.length;
-  const selos = selosDosModulos(pendencias, data);
   const abrir = (m: Modulo, i: number) => { trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) }); navigate(m.path); };
 
   return (
     <section data-testid="hn-modulos" data-variante={variante}>
-      {/* rodada 2: "Organizar" no centro vertical do título */}
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-[20px] font-bold tracking-tight leading-none">Módulos</h2>
         <button
@@ -103,14 +68,14 @@ export const ModulosE = ({ data, pendencias, variante }: Props) => {
           data-testid="hn-organizar"
           className="min-h-[36px] -mr-1 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground active:bg-muted/60"
         >
-          <Settings2 className="w-4 h-4" strokeWidth={2.2} aria-hidden />
+          <Settings2 className="w-4 h-4" strokeWidth={TRACO} aria-hidden />
           Organizar
         </button>
       </div>
 
       {variante === "grade" ? (
         <div className="grid grid-cols-4 gap-x-2 gap-y-5 px-0.5">
-          {visiveis.map((m, i) => <Azulejo key={m.id} m={m} selo={selos[m.id]} favorito={isFavorite(m.id)} onClick={() => abrir(m, i)} />)}
+          {visiveis.map((m, i) => <Azulejo key={m.id} m={m} favorito={isFavorite(m.id)} onClick={() => abrir(m, i)} />)}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2.5">

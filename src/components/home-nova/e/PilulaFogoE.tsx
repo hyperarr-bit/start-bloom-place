@@ -43,9 +43,8 @@ export const PilulaFogoE = ({ seq, onTocar, animar = true }: Props) => {
     setAcendendo(true);
     const t = window.setTimeout(() => setAcendendo(false), 700);
     return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado, animar]);
-  const cor = { "--dias-c": seq.faixa.hojeTexto, "--dias-cd": seq.faixa.hojeTextoEscuro } as CSSProperties;
+  const cor = { "--dias-c": seq.faixa.hojeTexto } as CSSProperties;
   const rotulo = estado === "neutro" ? "Sem sequência — abrir Conquistas" : `${seq.dias} dias de sequência${estado === "apagado" ? ", hoje ainda não garantido" : ", garantido hoje"} — abrir Conquistas`;
   return (
     <button
@@ -60,8 +59,9 @@ export const PilulaFogoE = ({ seq, onTocar, animar = true }: Props) => {
       {estado === "neutro"
         ? <Flame className="w-[22px] h-[22px] text-muted-foreground" strokeWidth={2.2} aria-hidden />
         : <Fogo faixa={seq.faixa} tamanho={22} viva={estado === "aceso"} semBrilho={estado === "apagado"} className={estado === "apagado" ? "he-fogo-apagado" : undefined} />}
+      {/* rodada 3: o número em PRETO (como o "🔥 0" do Cal AI); só o fogo leva a cor da faixa. Apagado = cinza-escuro. */}
       <span
-        className={`text-[17px] font-bold tabular-nums leading-none ${estado === "neutro" ? "text-muted-foreground" : "text-[var(--dias-c)] dark:text-[var(--dias-cd)]"}${estado === "apagado" ? " opacity-60" : ""}`}
+        className={`text-[17px] font-bold tabular-nums leading-none ${estado === "neutro" ? "text-muted-foreground" : estado === "apagado" ? "text-foreground/65" : "text-foreground"}`}
         data-testid="hn-pilula-dias"
       >
         {seq.dias}

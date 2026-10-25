@@ -35,12 +35,13 @@ import "./home-e.css";
  *   1. Topo: "Boa noite, João" + a pílula do fogo na cor da faixa — APAGADA enquanto o dia não está
  *      garantido, ACESA (com um pulso, 1× por dia) ao garantir (rodada 2, porte da direção A v3). Sem data,
  *      sem a semana.
- *   2. O CARROSSEL DO DIA (3 páginas, bolinhas): 1 · Seu dia (score grande + Hábitos, Água, Refeições);
- *      2 · Pendências de hoje (a lista, compacta, com ação); 3 · Seus widgets (os que a pessoa escolhe,
- *      redesenhados). O "?" do card do score (e o anel) abrem a folha "Como funciona a pontuação", que
- *      carrega no topo a dica da sequência ("Pra garantir hoje: …" / "✓ Dia garantido").
- *   3. Módulos, já na primeira tela: grade de 4 (com selos) ou cartões de 3.
+ *   2. O CARROSSEL DO DIA (3 páginas, bolinhas): 1 · Seu dia ("27 pontos · Score do dia" + anel com a
+ *      estrela, que abre a folha "Como funciona a pontuação"; + Hábitos, Água, Refeições); 2 · Pendências de
+ *      hoje (a lista, compacta, com ação); 3 · Seus widgets (os que a pessoa escolhe, redesenhados).
+ *   3. Módulos, já na primeira tela: grade de 4 (sem selos, rodada 3) ou cartões de 3.
  *   4. A barra de VIDRO (Início · Conquistas · Você) + o "+" que abre a folha das ações rápidas.
+ *   RODADA 3: paleta única (paleta.ts, oklch com a mesma luminosidade/croma, uma matiz por módulo), ícones
+ *   Lucide com traço 1,75 em tudo, fundo quase branco com véu no topo, sombras mínimas, barra mais embaixo.
  *
  * Lê os MESMOS dados da Home de hoje (hub, sequência, widgets, pendências). Não grava nada por conta
  * própria; as ações da folha são de mentira no mockup.
@@ -99,7 +100,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
   if (!loaded) return <div className="hn he min-h-dvh" aria-hidden />;
 
   const paginas = [
-    <PaginaSeuDia key="dia" data={lifeData} faltam={pendencias.pending.length} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
+    <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
     <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirScore} />,
     <PaginaWidgets key="wid" data={lifeData} widgets={activeWidgets} onEscolher={() => setPicker(true)} />,
   ];
@@ -119,7 +120,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
         </div>
 
         <div className="mt-5">
-          <ModulosE data={lifeData} pendencias={pendencias} variante={modulos} />
+          <ModulosE data={lifeData} variante={modulos} />
         </div>
         <p className="text-center text-[11px] text-muted-foreground/70 pt-8">CORE · organize sua vida</p>
       </main>

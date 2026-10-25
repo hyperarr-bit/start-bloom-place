@@ -41,12 +41,14 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos }: Props) =>
   return (
     <div
       className="hn-barra fixed inset-x-4 z-[60] flex items-center gap-3 max-w-lg mx-auto"
-      style={{ bottom: "calc(var(--app-safe-bottom, 0px) + 12px)" }}
+      /* rodada 3: mais embaixo, como no Cal AI — a base da pílula 6 px abaixo do topo da área segura (≈28 px da
+         borda), nunca menos de 10 px em aparelho sem área segura; antes era área segura + 12 (46 px) */
+      style={{ bottom: "max(10px, calc(var(--app-safe-bottom, 0px) - 6px))" }}
       data-testid="hn-barra"
     >
-      <nav aria-label="Navegação principal" className="he-vidro rounded-full flex-1 h-[64px] p-1.5 flex items-center">
-        <Aba id="inicio"><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.4 : 1.9} aria-hidden /></Aba>
-        <Aba id="conquistas"><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.4 : 1.9} aria-hidden /></Aba>
+      <nav aria-label="Navegação principal" className="he-vidro rounded-full flex-1 h-[60px] p-1.5 flex items-center">
+        <Aba id="inicio"><Home className="w-[22px] h-[22px]" strokeWidth={ativa === "inicio" ? 2.2 : 1.75} aria-hidden /></Aba>
+        <Aba id="conquistas"><Trophy className="w-[22px] h-[22px]" strokeWidth={ativa === "conquistas" ? 2.2 : 1.75} aria-hidden /></Aba>
         <Aba id="voce">
           <span
             className="w-[22px] h-[22px] rounded-full grid place-items-center text-[9.5px] font-bold leading-none"
@@ -62,10 +64,10 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos }: Props) =>
         onClick={onMais}
         aria-label="Registrar agora"
         data-testid="hn-mais"
-        className="w-[60px] h-[60px] rounded-full grid place-items-center shrink-0 active:scale-95 transition-transform"
+        className="w-[56px] h-[56px] rounded-full grid place-items-center shrink-0 active:scale-95 transition-transform"
         style={{ background: "var(--hn-mais)", color: "var(--hn-mais-texto)", boxShadow: "var(--he-vidro-sombra)" }}
       >
-        <Plus className="w-7 h-7" strokeWidth={2.6} aria-hidden />
+        <Plus className="w-7 h-7" strokeWidth={2.4} aria-hidden />
       </button>
     </div>
   );

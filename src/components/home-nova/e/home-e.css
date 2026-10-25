@@ -1,37 +1,40 @@
 /* HOME NOVA — OPÇÃO E (mockup 25/10, ramo v1019-home-e). Só /dev/home-nova?layout=e monta isto.
- * Em cima de .hn (home-nova.css): o mesmo papel, as mesmas sombras, os mesmos tokens do tema.
- * O que é só da E: o fundo com um degradê de leve (como o Cal AI, mais claro em cima), o trilho dos
- * anéis, o carrossel que rola de lado e a barra de VIDRO (translúcida, com o conteúdo desfocado atrás). */
+ * Em cima de .hn (home-nova.css): os mesmos tokens do tema; o que é só da E vem aqui.
+ *
+ * RODADA 3 (sobriedade e harmonia, como o Cal AI):
+ *  - fundo quase branco com um véu só no topo (não o papel bege chapado);
+ *  - sombras reduzidas a quase nada (o relevo é o branco do card sobre o fundo);
+ *  - a PALETA ÚNICA: toda cor da Home é oklch(--he-L --he-C H) — só a matiz muda por módulo (paleta.ts).
+ *    No claro L 0,67 / C 0,115 (os anéis do Cal AI); no escuro L 0,76 / C 0,10 (mais claro sobre o grafite). */
 .hn.he {
+  --he-L: 0.67;
+  --he-C: 0.115;
+  --he-tinta: 0.14;
   --he-trilho: hsl(var(--foreground) / 0.07);
+  --hn-fundo: 0 0% 98%;
+  --hn-sombra: 0 1px 2px rgb(0 0 0 / 0.025), 0 2px 10px rgb(0 0 0 / 0.04);
+  --hn-sombra-forte: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 18px rgb(0 0 0 / 0.08);
   --he-vidro: rgb(255 255 255 / 0.82);
   --he-vidro-aba: rgb(255 255 255 / 0.92);
   --he-vidro-fio: rgb(255 255 255 / 0.85);
-  --he-vidro-borda: rgb(255 255 255 / 0.55);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 16px 40px -12px rgb(24 20 12 / 0.28);
-  --he-selo: hsl(var(--fixo-tinta));
-  --he-selo-texto: #ffffff;
-  /* cores dos anéis e barras (no escuro trocam pelas da noite, as mesmas de styles/escuro.css) */
-  --he-c-emerald: #10b981; --he-c-cyan: #0891b2; --he-c-green: #16a34a; --he-c-blue: #2563eb; --he-c-orange: #ea580c;
-  --he-c-indigo: #4f46e5; --he-c-amber: #d97706; --he-c-purple: #9333ea; --he-c-pink: #db2777; --he-c-violet: #7c3aed;
-  --he-c-rose: #e11d48; --he-c-red: #dc2626; --he-c-teal: #0d9488; --he-c-lime: #65a30d; --he-c-slate: #475569;
-  background:
-    linear-gradient(180deg, hsl(40 20% 98.5%) 0px, hsl(var(--hn-fundo)) 320px, hsl(var(--hn-fundo)) 100%);
+  --he-vidro-borda: rgb(0 0 0 / 0.04);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.08);
+  background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
 }
 .dark .hn.he {
+  --he-L: 0.76;
+  --he-C: 0.10;
+  --he-tinta: 0.18;
   --he-trilho: hsl(var(--foreground) / 0.1);
+  --hn-fundo: 222 16% 7%;
+  --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);
+  --hn-sombra-forte: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.5);
   --he-vidro: rgb(30 33 40 / 0.78);
   --he-vidro-aba: rgb(255 255 255 / 0.11);
   --he-vidro-fio: rgb(255 255 255 / 0.16);
   --he-vidro-borda: rgb(255 255 255 / 0.08);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.9);
-  --he-selo: hsl(var(--fixo-tinta));
-  --he-selo-texto: hsl(222 16% 7%);
-  --he-c-emerald: #6FC79C; --he-c-cyan: #6BC4D4; --he-c-green: #6FC79C; --he-c-blue: #86B4E8; --he-c-orange: #E6A276;
-  --he-c-indigo: #9AA5EA; --he-c-amber: #D9B26A; --he-c-purple: #B49BE8; --he-c-pink: #E08AB5; --he-c-violet: #A99FEA;
-  --he-c-rose: #E68C9A; --he-c-red: #E68C8C; --he-c-teal: #6BC4BA; --he-c-lime: #B5CF7A; --he-c-slate: #A3A9B6;
-  background:
-    linear-gradient(180deg, hsl(222 16% 9.5%) 0px, hsl(var(--hn-fundo)) 320px, hsl(var(--hn-fundo)) 100%);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.6);
+  background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
 }
 
 /* ---- o carrossel do dia: páginas de largura cheia, que param uma por vez ---- */
@@ -87,10 +90,3 @@
   100% { transform: scale(1); filter: brightness(1); }
 }
 @media (prefers-reduced-motion: reduce) { .he-acende { animation: none; } }
-
-/* ---- selos de pendência nos módulos (grade): pílula escura com o número ---- */
-.he-selo {
-  background: var(--he-selo);
-  color: var(--he-selo-texto);
-  box-shadow: 0 0 0 2px hsl(var(--hn-fundo));
-}

@@ -5,18 +5,18 @@ import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { Anel } from "./Anel";
-import { BARRA_DO_TIPO, resumoDoScore } from "./score-itens";
-import { tituloDoScore } from "./PaginaSeuDia";
+import { resumoDoScore } from "./score-itens";
+import { explicacaoDoScore, tituloDoScore } from "./PaginaSeuDia";
+import { ICONE_DO_TIPO, TRACO, corDoScore, corDoTipo } from "./paleta";
 
 /**
- * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E, 25/10) — como a "Pontuação diária · Ótimo equilíbrio 90"
- * do Cal AI: sobe de baixo pelo "?" do card do score (ou pelo anel). Em cima o título pela faixa
- * ("Vamos lá!") e o anel com o número; logo abaixo (rodada 2) a DICA DA SEQUÊNCIA que saiu do card:
- * "Pra garantir hoje: <ação do dia>" enquanto o dia não está garantido, ou "✓ Dia garantido na sequência"
- * discreto. Embaixo os itens REAIS que compõem o score hoje (score-itens.ts: a mesma conta do hub), cada um
- * com a barra dos pontos e o que falta — e o toque leva pra resolver (formulário do "+" ou o módulo).
- * Leitura sem livro em leitura e Suplementos sem cadastro não aparecem (contam, mas não há o que fazer).
- * No fim, a regra em duas frases e a porta pra "Personalizar".
+ * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E) — como a "Pontuação diária · Ótimo equilíbrio 90" do Cal AI.
+ * RODADA 3: abre pelo ANEL do card do score (a estrela é o convite); a frase "Faltam N coisas pra fechar o dia"
+ * saiu do card e mora aqui, no topo. Depois a dica da sequência ("Pra garantir hoje: <ação>" / "✓ Dia
+ * garantido"), e os itens REAIS que compõem o score hoje (score-itens.ts: a mesma conta do hub), cada um
+ * com o ícone da família única no disco da cor do tipo, a barra dos pontos e o que falta — o toque leva pra
+ * resolver. Leitura sem livro e Suplementos sem cadastro não aparecem. No fim, a regra em duas frases e a
+ * porta pra "Personalizar".
  */
 interface Props {
   aberta: boolean;
@@ -37,8 +37,7 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
   const navigate = useNavigate();
   const r = resumoDoScore(data);
   const score = data.dayScore;
-  const corAnel = score >= 80 ? "hsl(var(--success))" : "hsl(var(--score-ring, var(--warning)))";
-  // o que não existe pra pessoa (sem livro, sem suplemento) conta como feito, mas não é uma linha: não há o que fazer
+  const corAnel = corDoScore(score);
   const mostrados = r.itens.filter((i) => !((i.tipo === "leitura" && !data.currentBook) || (i.tipo === "suplementos" && data.supplementsTotal === 0)));
   const pendentes = mostrados.filter((i) => !i.feito);
   const feitos = mostrados.filter((i) => i.feito);
@@ -50,26 +49,30 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
     else if (i.route) navigate(i.route);
   };
 
-  const Item = ({ i }: { i: (typeof r.itens)[number] }) => (
-    <li>
-      <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} className="w-full flex items-center gap-3 py-2 -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
-        <span className={`w-9 h-9 rounded-xl grid place-items-center text-[17px] leading-none shrink-0 ${i.feito ? "bg-success/10" : "bg-muted"}`} aria-hidden>
-          {i.feito ? <Check className="w-4 h-4 text-success" strokeWidth={3} /> : i.emoji}
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="flex items-baseline justify-between gap-2">
-            <span className={`text-[14px] font-semibold truncate ${i.feito ? "text-muted-foreground" : ""}`}>{i.nome}</span>
-            <span className="text-[12.5px] font-semibold tabular-nums text-muted-foreground shrink-0">{i.pontos}<span className="font-medium text-muted-foreground/70">/{i.max}</span></span>
+  const Item = ({ i }: { i: (typeof r.itens)[number] }) => {
+    const Icone = ICONE_DO_TIPO[i.tipo];
+    const c = corDoTipo(i.tipo);
+    return (
+      <li>
+        <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} className="w-full flex items-center gap-3 py-2 -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
+          <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: i.feito ? "hsl(var(--muted))" : corDoTipo(i.tipo, 0.13) }} aria-hidden>
+            {i.feito ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[18px] h-[18px]" strokeWidth={TRACO} style={{ color: c }} />}
           </span>
-          <span className="block h-1.5 rounded-full bg-muted mt-1.5 overflow-hidden">
-            <span className={`block h-full rounded-full ${i.feito ? "bg-success" : BARRA_DO_TIPO[i.tipo]}`} style={{ width: `${i.max > 0 ? Math.round((i.pontos / i.max) * 100) : 0}%` }} />
+          <span className="flex-1 min-w-0">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className={`text-[14px] font-semibold truncate ${i.feito ? "text-muted-foreground" : ""}`}>{i.nome}</span>
+              <span className="text-[12.5px] font-semibold tabular-nums text-muted-foreground shrink-0">{i.pontos}<span className="font-medium text-muted-foreground/70">/{i.max}</span></span>
+            </span>
+            <span className="block h-1.5 rounded-full bg-muted mt-1.5 overflow-hidden">
+              <span className="block h-full rounded-full" style={{ width: `${i.max > 0 ? Math.round((i.pontos / i.max) * 100) : 0}%`, background: i.feito ? "hsl(var(--muted-foreground) / 0.45)" : c }} />
+            </span>
+            <span className="block text-[12px] text-muted-foreground mt-1 truncate">{i.detalhe}</span>
           </span>
-          <span className="block text-[12px] text-muted-foreground mt-1 truncate">{i.detalhe}</span>
-        </span>
-        {!i.feito && <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" aria-hidden />}
-      </button>
-    </li>
-  );
+          {!i.feito && <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />}
+        </button>
+      </li>
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -88,19 +91,19 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
             <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" aria-hidden />
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{dataCurta()} · Pontuação do dia</p>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{dataCurta()} · Score do dia</p>
                 <h3 className="text-[24px] font-bold tracking-tight leading-tight mt-0.5">{tituloDoScore(score)}</h3>
-                <p className="text-[13px] text-muted-foreground mt-0.5">{pendentes.length === 0 ? "Tudo o que o score cobra está feito." : pendentes.length === 1 ? "Falta 1 coisa pra fechar o dia." : `Faltam ${pendentes.length} coisas pra fechar o dia.`}</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5" data-testid="he-folha-explica">{explicacaoDoScore(pendentes.length, score)}.</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Anel tamanho={64} espessura={7} valor={score} max={100} cor={corAnel} atraso={0.1}>
-                  <span className={`text-[21px] font-bold tabular-nums tracking-tight${score >= 100 ? " text-success" : ""}`}>{score}</span>
+                  <span className="text-[21px] font-bold tabular-nums tracking-tight">{score}</span>
                 </Anel>
-                <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 -mr-1.5 rounded-full grid place-items-center bg-muted"><X className="w-4 h-4" strokeWidth={2.4} /></button>
+                <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 -mr-1.5 rounded-full grid place-items-center bg-muted"><X className="w-4 h-4" strokeWidth={2.2} /></button>
               </div>
             </div>
 
-            {/* a dica da sequência (rodada 2): o que garante o dia, enquanto não garantido; depois, discreta */}
+            {/* a dica da sequência: o que garante o dia, enquanto não garantido; depois, discreta */}
             {seq.dias > 0 || !seq.hojeFeito ? (
               <button
                 type="button"
@@ -111,7 +114,7 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
               >
                 {seq.hojeFeito ? (
                   <>
-                    <Check className="w-4 h-4 shrink-0" strokeWidth={3} style={{ color: seq.faixa.hojeTexto }} aria-hidden />
+                    <Check className="w-4 h-4 shrink-0" strokeWidth={2.5} style={{ color: seq.faixa.hojeTexto }} aria-hidden />
                     <span className="font-medium truncate">Dia garantido na sequência</span>
                   </>
                 ) : (
@@ -120,7 +123,7 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
                     <span className="truncate text-muted-foreground">{seq.dias > 0 ? "Pra garantir hoje: " : "Comece sua sequência: "}<span className="font-semibold text-foreground">{acaoDoDia}</span></span>
                   </>
                 )}
-                <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground/50 shrink-0" aria-hidden />
+                <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
               </button>
             ) : null}
 
@@ -145,9 +148,9 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
               </p>
             </div>
             <button type="button" onClick={() => { onFechar(); window.setTimeout(onPersonalizar, 220); }} data-testid="he-score-personalizar" className="mt-2 w-full min-h-[48px] px-3 rounded-2xl flex items-center gap-3 text-left active:bg-muted/50">
-              <SlidersHorizontal className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={2.2} aria-hidden />
+              <SlidersHorizontal className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={TRACO} aria-hidden />
               <span className="flex-1 text-[14px] font-semibold">Personalizar o que o score cobra</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/60" aria-hidden />
+              <ChevronRight className="w-4 h-4 text-muted-foreground/60" strokeWidth={2} aria-hidden />
             </button>
           </motion.div>
         </>

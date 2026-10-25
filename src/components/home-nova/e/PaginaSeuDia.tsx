@@ -1,27 +1,24 @@
-import { Apple, CalendarCheck, Check, Droplets, PenLine, Pill, Star } from "lucide-react";
+import { CalendarCheck, Check, Droplets, PenLine, Pill, Star, Utensils } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { TipoPendencia } from "@/lib/home-pendencias";
 import { COPO_ML_PADRAO, unidadeDaAgua } from "@/lib/saude-copo";
 import { Anel } from "./Anel";
-import type { CorDoTipo } from "./score-itens";
+import { MATIZ_DO_MODULO, MATIZ_DO_TIPO, TRACO, cor, corDoScore } from "./paleta";
 
 /**
- * PÁGINA 1 DO CARROSSEL — "SEU DIA" (opção E, 25/10). O conjunto do Cal AI, ajustado ao CORE:
+ * PÁGINA 1 DO CARROSSEL — "SEU DIA" (opção E). O conjunto do Cal AI, ajustado ao CORE.
  *
- *  - o CARD GRANDE é o Score do Dia: o número grande à esquerda ("27 pontos") e a frase que explica o
- *    número em coisas ("Faltam 5 coisas pra fechar o dia" — a conta real das pendências), com um "?"
- *    mínimo ao lado (círculo fino de 18 px, toque invisível de 44) que abre a folha "Como funciona a
- *    pontuação"; à direita o anel, maior que o de hoje, com a estrela dos pontos no meio (no 100 vira
- *    ✓ verde). Rodada 2 (dono): a linha "✓ Dia garantido na sequência ›" SAIU daqui — a sequência vive na
- *    pílula do fogo (apagada/acesa) e, como dica, no topo da folha do "?". O card ficou ~42 px mais baixo.
- *  - os 3 CARDS PEQUENOS são as três contas "x de y" que o app tem pra TODO MUNDO, e que mais pesam no
- *    score depois do treino: Hábitos (20 pts), Água (15) e Refeições (10) — 45 dos 100 pontos num olhar.
- *    Treino não entra aqui porque não é "x de y" (é feito / pendente / descanso) — vai pra página dos
- *    widgets. Se a pessoa ocultou um desses tipos em Personalizar, o lugar é preenchido pelo próximo
- *    da fila: Suplementos (x de y, quando cadastrados) e Registros do dia (x de 6: humor, gasto, peso,
- *    sono, ideia, gratidão).
+ * RODADA 3 (dono: "quanto menos informação melhor"):
+ *  - o CARD GRANDE é só o número: "27 pontos" (os dois em preto) e, embaixo, "Score do dia" em cinza — como
+ *    "2276 /2616 · Calorias consumidas" no Cal AI. Saíram "Faltam N coisas pra fechar o dia" e o "?". À direita
+ *    o anel com a ESTRELA, que é o convite: tocar nele abre a folha "Como funciona a pontuação" (e a frase
+ *    "faltam N coisas" mora lá, no topo). No 100 a estrela vira ✓.
+ *  - os 3 CARDS PEQUENOS continuam Hábitos (20 pts), Água (15) e Refeições (10) — as três contas "x de y"
+ *    que existem pra todo mundo, 45 dos 100 pontos num olhar —, agora com o anel e o ícone na cor do módulo
+ *    de origem da paleta única (verde-água, céu, sálvia) e traço 1,75. Fila de reserva, se a pessoa ocultar
+ *    um tipo em Personalizar: Suplementos (x de y, quando cadastrados) e Registros do dia (x de 6).
  */
 export interface Metrica {
   id: TipoPendencia | "registros";
@@ -29,7 +26,7 @@ export interface Metrica {
   valor: number;
   max: number;
   Icone: typeof Droplets;
-  cor: CorDoTipo;
+  matiz: number;
   route?: string;
   action?: ActionId;
   /** toque abre o "+" na grade (registros) */
@@ -52,41 +49,25 @@ export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO): 
   const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => cobra(t));
   const unidade = unidadeDaAgua(copoMl);
   const fila: (Metrica | null)[] = [
-    cobra("habitos") ? { id: "habitos", rotulo: d.habits.length ? "Hábitos feitos" : "Hábitos · crie o 1º", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, cor: "emerald", route: "/rotina" } : null,
-    cobra("agua") ? { id: "agua", rotulo: `${unidade.charAt(0).toUpperCase()}${unidade.slice(1)} de água`, valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, cor: "cyan", action: "water" } : null,
-    cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições registradas", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Apple, cor: "green", route: "/dieta" } : null,
-    cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos tomados", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, cor: "red", route: "/saude" } : null,
-    registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros do dia", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, cor: "purple", abreMais: true } : null,
+    cobra("habitos") ? { id: "habitos", rotulo: d.habits.length ? "Hábitos feitos" : "Hábitos · crie o 1º", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, matiz: MATIZ_DO_TIPO.habitos, route: "/rotina" } : null,
+    cobra("agua") ? { id: "agua", rotulo: `${unidade.charAt(0).toUpperCase()}${unidade.slice(1)} de água`, valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, matiz: MATIZ_DO_TIPO.agua, action: "water" } : null,
+    cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições registradas", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, matiz: MATIZ_DO_TIPO.refeicoes, route: "/dieta" } : null,
+    cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos tomados", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, matiz: MATIZ_DO_TIPO.suplementos, route: "/saude" } : null,
+    registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros do dia", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, matiz: MATIZ_DO_MODULO.desenvolvimento, abreMais: true } : null,
   ];
   return fila.filter((m): m is Metrica => !!m).slice(0, 3);
 }
 
-const corVar = (c: CorDoTipo) => `var(--he-c-${c})`;
-
 interface PropsScore {
   score: number;
-  faltam: number;
   onAbrir: () => void;
   /** variação: o número DENTRO do anel (como o anel de hoje) e o título da faixa no lugar dele */
   numeroDentro?: boolean;
 }
 
-/** O "?" mínimo: círculo fino de 18 px na cor secundária; a área de toque é o ::before invisível de 44 px. */
-const BotaoAjuda = ({ onClick }: { onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-label="Como funciona a pontuação"
-    data-testid="he-score-ajuda"
-    className="relative inline-grid place-items-center align-middle ml-1.5 -mt-0.5 w-[18px] h-[18px] rounded-full border-[1.5px] border-muted-foreground/55 text-muted-foreground text-[11px] font-bold leading-none before:absolute before:-inset-[13px] before:content-[''] before:rounded-full active:bg-muted"
-  >
-    ?
-  </button>
-);
-
-export const CardScoreE = ({ score, faltam, onAbrir, numeroDentro }: PropsScore) => {
+export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
   const completo = score >= 100;
-  const corAnel = score >= 80 ? "hsl(var(--success))" : "hsl(var(--score-ring, var(--warning)))";
+  const corAnel = corDoScore(score);
   return (
     <section className="hn-card he-score p-5 flex items-center gap-4" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
       <div className="flex-1 min-w-0">
@@ -94,24 +75,22 @@ export const CardScoreE = ({ score, faltam, onAbrir, numeroDentro }: PropsScore)
           <span className="block text-[24px] leading-tight font-bold tracking-tight" data-testid="he-score-titulo">{tituloDoScore(score)}</span>
         ) : (
           <span className="flex items-baseline gap-1.5">
-            <span className={`text-[46px] leading-[0.95] font-bold tabular-nums tracking-[-0.035em]${completo ? " text-success" : ""}`} data-testid="he-score-numero">{score}</span>
-            <span className="text-[17px] font-medium text-muted-foreground">pontos</span>
+            <span className="text-[46px] leading-[0.95] font-bold tabular-nums tracking-[-0.035em]" data-testid="he-score-numero">{score}</span>
+            <span className="text-[18px] font-semibold text-foreground">pontos</span>
           </span>
         )}
-        <span className={`block ${numeroDentro ? "mt-1.5 text-[14.5px] text-muted-foreground" : "mt-2 text-[14.5px] text-foreground/85"} leading-[1.3] font-medium [text-wrap:balance]`} data-testid="hn-score-explica">
-          {explicacaoDoScore(faltam, score)}
-          <BotaoAjuda onClick={onAbrir} />
-        </span>
+        <span className="block mt-1.5 text-[15px] leading-snug font-medium text-muted-foreground" data-testid="hn-score-explica">Score do dia</span>
       </div>
-      <button type="button" onClick={onAbrir} aria-label="Como funciona a pontuação" className="shrink-0 rounded-full active:scale-95 transition-transform">
+      {/* a estrela dentro do anel é o convite: tocar abre "Como funciona a pontuação" */}
+      <button type="button" onClick={onAbrir} aria-label="Como funciona a pontuação" data-testid="he-score-abrir" className="shrink-0 rounded-full active:scale-95 transition-transform">
         <Anel tamanho={108} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
           {numeroDentro ? (
             <span className="flex flex-col items-center justify-center">
-              <span className={`text-[30px] leading-none font-bold tabular-nums tracking-tight${completo ? " text-success" : ""}`} data-testid="he-score-numero">{score}</span>
+              <span className="text-[30px] leading-none font-bold tabular-nums tracking-tight" data-testid="he-score-numero">{score}</span>
               <span className="text-[9.5px] mt-1 text-muted-foreground font-semibold uppercase tracking-[0.12em]">pontos</span>
             </span>
           ) : completo
-            ? <Check className="w-9 h-9 text-success" strokeWidth={3} aria-hidden />
+            ? <Check className="w-9 h-9" strokeWidth={2.5} style={{ color: corAnel }} aria-hidden />
             : <Star className="w-8 h-8" style={{ color: corAnel, fill: corAnel }} strokeWidth={1.5} aria-hidden />}
         </Anel>
       </button>
@@ -129,6 +108,7 @@ interface PropsMetrica {
 export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
   const navigate = useNavigate();
   const completo = m.max > 0 && m.valor >= m.max;
+  const c = cor(m.matiz);
   const tocar = () => {
     if (m.abreMais) return onMais();
     if (m.action) return onAcao(m.action);
@@ -148,10 +128,10 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
       </span>
       <span className="mt-1.5 text-[12px] leading-[1.25] text-muted-foreground line-clamp-2 min-h-[30px]">{m.rotulo}</span>
       <span className="mt-auto self-center pt-1.5">
-        <Anel tamanho={62} espessura={7} valor={m.valor} max={m.max} cor={corVar(m.cor)} atraso={atraso}>
+        <Anel tamanho={62} espessura={7} valor={m.valor} max={m.max} cor={c} atraso={atraso}>
           {completo
-            ? <Check className="w-5 h-5" strokeWidth={3} style={{ color: corVar(m.cor) }} aria-hidden />
-            : <m.Icone className="w-[21px] h-[21px]" strokeWidth={2.2} style={{ color: corVar(m.cor) }} aria-hidden />}
+            ? <Check className="w-5 h-5" strokeWidth={2.5} style={{ color: c }} aria-hidden />
+            : <m.Icone className="w-[21px] h-[21px]" strokeWidth={TRACO} style={{ color: c }} aria-hidden />}
         </Anel>
       </span>
     </button>
@@ -160,7 +140,6 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
 
 interface Props {
   data: LifeHubData;
-  faltam: number;
   onAbrirScore: () => void;
   onAcao: (id: ActionId) => void;
   onMais: () => void;
@@ -168,11 +147,11 @@ interface Props {
   copoMl?: number;
 }
 
-export const PaginaSeuDia = ({ data, faltam, onAbrirScore, onAcao, onMais, numeroDentro, copoMl }: Props) => {
+export const PaginaSeuDia = ({ data, onAbrirScore, onAcao, onMais, numeroDentro, copoMl }: Props) => {
   const metricas = metricasDoDia(data, copoMl);
   return (
     <div className="he-pagina" data-testid="he-pagina-1">
-      <CardScoreE score={data.dayScore} faltam={faltam} onAbrir={onAbrirScore} numeroDentro={numeroDentro} />
+      <CardScoreE score={data.dayScore} onAbrir={onAbrirScore} numeroDentro={numeroDentro} />
       <div className="grid grid-cols-3 gap-3 mt-3 flex-1">
         {metricas.map((m, i) => <CardMetrica key={m.id} m={m} atraso={0.3 + i * 0.1} onAcao={onAcao} onMais={onMais} />)}
       </div>

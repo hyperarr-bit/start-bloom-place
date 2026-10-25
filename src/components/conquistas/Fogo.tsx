@@ -44,14 +44,14 @@ export const Fogo = ({ faixa, dias, tamanho, semBrilho, viva, className, style }
       <defs>
         <linearGradient id={`${uid}-a`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={apagado ? "#b8b4ad" : f.meio} />
-          <stop offset="1" stopColor={apagado ? "#8a867f" : f.escuro} />
+          <stop offset="1" stopColor={apagado ? "#8a867f" : f.chamaBase ?? f.escuro} />
         </linearGradient>
         <linearGradient id={`${uid}-b`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={apagado ? "#e7e3dc" : f.claro} />
           <stop offset="1" stopColor={apagado ? "#b8b4ad" : f.meio} />
         </linearGradient>
       </defs>
-      <path d={CHAMA} fill={`url(#${uid}-a)`} stroke={apagado ? "#8a867f" : f.escuro} strokeWidth="1" strokeLinejoin="round" />
+      <path d={CHAMA} fill={`url(#${uid}-a)`} stroke={apagado ? "#8a867f" : f.chamaContorno ?? f.escuro} strokeWidth="1" strokeLinejoin="round" />
       {/* a chama de dentro: a mesma forma, menor, presa na base */}
       <path d={CHAMA} fill={`url(#${uid}-b)`} transform="translate(12 21.5) scale(.52) translate(-12 -21.5)" />
     </svg>

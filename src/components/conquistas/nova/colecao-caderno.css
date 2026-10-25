@@ -62,3 +62,46 @@
   .cn-colecao .cn-celula { transition: none; }
   .cn-colecao .cn-celula:hover { transform: none; }
 }
+
+/* Sugestões ficam dentro da coleção, com os mesmos filtros da grade. */
+.cn-colecao-visao { display:flex; gap:4px; margin:16px 20px 0; padding:4px; border-radius:14px; background:var(--colecao-linha); }
+.cn-colecao-visao button { flex:1; min-height:40px; padding:6px 10px; border-radius:10px; font-size:12px; font-weight:650; color:var(--colecao-secundaria); }
+.cn-colecao-visao button[aria-pressed="true"] { background:var(--colecao-folha); color:var(--colecao-tinta); box-shadow:0 1px 3px #18243b0d; }
+.cn-colecao-proximas { padding:0 20px 24px; }
+.cn-proximas-intro { margin:4px 0 14px; font-size:12px; color:var(--colecao-secundaria); }
+.cn-colecao-proximas > div { border:1px solid var(--colecao-linha); border-radius:18px; background:var(--colecao-folha); overflow:hidden; }
+.cn-proxima-acao { display:flex; width:100%; align-items:center; text-align:left; padding:16px 12px; gap:12px; }
+.cn-proxima-acao + .cn-proxima-acao { border-top:1px solid var(--colecao-linha); }
+.cn-proxima-acao > span:first-child { flex-shrink:0; width:72px; }
+.cn-proxima-acao > span:nth-child(2) { flex:1; min-width:0; }
+.cn-proxima-acao > svg { flex-shrink:0; }
+.cn-proxima-acao b { display:block; font-size:14px; font-weight:700; }
+.cn-proxima-acao small { display:block; font-size:12px; line-height:1.5; color:var(--colecao-secundaria); margin-top:4px; }
+.cn-proxima-acao em { display:block; font-size:11px; font-style:normal; color:var(--colecao-secundaria); margin-top:7px; }
+.cn-colecao-visao button:focus-visible,.cn-proxima-acao:focus-visible { outline:2px solid var(--colecao-tinta); outline-offset:-3px; }
+
+/* Evolução: personagens maiores e marcos conquistados na mesma faixa. */
+.cn-evolucao-cab { display:flex; align-items:center; gap:12px; padding:10px 0 18px; }
+.cn-evolucao { border-radius:18px; background:#f6f2e8; border:1px solid #e7e0d3; overflow:hidden; }
+.cn-evolucao-titulo { display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:16px 16px 4px; }
+.cn-evolucao-titulo h3 { font-size:14px; font-weight:700; color:#26334e; }
+.cn-evolucao-titulo > span { font-size:10px; color:#75786e; }
+.cn-evolucao-figurinhas { position:relative; display:flex; gap:10px; padding:12px 16px 16px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x proximity; scroll-padding-inline:16px; scrollbar-width:thin; scrollbar-color:#d0c7b5 transparent; }
+.cn-evolucao-figurinhas li { flex:0 0 114px; scroll-snap-align:start; }
+.cn-evolucao-etapa { width:100%; display:flex; flex-direction:column; align-items:center; gap:6px; border-radius:12px; padding:8px 4px 12px; background:#fffdf7; border:1px solid #e9e1d1; }
+.cn-evolucao-figurinhas [data-destaque] .cn-evolucao-etapa { border-color:#b5a68c; }
+.cn-evolucao-arte { display:grid; place-items:end center; height:112px; padding-bottom:4px; }
+.cn-evolucao-pedrinha { object-fit:contain; filter:drop-shadow(0 2px 2px #26334e18); }
+.cn-evolucao-figurinhas b { font-size:14px; color:#26334e; font-weight:700; }
+.cn-evolucao-figurinhas small { display:flex; align-items:center; gap:3px; font-size:10px; color:#77796f; }
+.cn-evolucao-figurinhas [data-conquistada] small { color:#52745d; }
+.cn-evolucao-figurinhas button:focus-visible { outline:2px solid #52745d; outline-offset:-3px; }
+.dark .cn-evolucao { background:#252c37; border-color:#424b59; }
+.dark .cn-evolucao-etapa { background:#303846; border-color:#424b59; }
+.dark .cn-evolucao-figurinhas [data-destaque] .cn-evolucao-etapa { border-color:#bdaf95; }
+.dark .cn-evolucao-titulo h3,.dark .cn-evolucao-figurinhas b { color:#f4eee3; }
+.dark .cn-evolucao-titulo > span,.dark .cn-evolucao-figurinhas small { color:#b5bac4; }
+.dark .cn-evolucao-figurinhas [data-conquistada] small { color:#a9d0b4; }
+
+.cn-evolucao-fechar { position:absolute; top:6px; right:6px; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#7b7e84; }
+.cn-evolucao-fechar:focus-visible { outline:2px solid currentColor; outline-offset:-5px; }

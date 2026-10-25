@@ -7,7 +7,7 @@ import { CATEGORIAS, type Badge, type BadgeCategoria } from "@/components/gamifi
  */
 export const ORDEM_EDITORIAL: Partial<Record<BadgeCategoria, readonly string[]>> = {
   sequencia: [
-    "sequencia-2", "sequencia-3", "sequencia-7", "sequencia-14", "sequencia-30",
+    "sequencia-1", "sequencia-2", "sequencia-3", "sequencia-7", "sequencia-14", "sequencia-30",
     "retorno", "protetor-1", "sequencia-100", "mes-20", "ano-365",
   ],
   finance: [

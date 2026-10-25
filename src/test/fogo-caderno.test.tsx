@@ -10,7 +10,7 @@ beforeEach(() => { estado.vista = null; estado.loaded = true; estado.reduzir = f
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("fogo do caderno", () => {
-  it.each([[1,"salvia"],[6,"salvia"],[7,"ambar"],[13,"ambar"],[14,"petroleo"],[29,"petroleo"],[30,"violeta"],[99,"violeta"],[100,"dourado"],[365,"dourado"]])("%s dias → %s", (dias, id) => {
+  it.each([[1,"laranja"],[2,"laranja"],[3,"laranja"],[6,"laranja"],[7,"ambar"],[13,"ambar"],[14,"petroleo"],[29,"petroleo"],[30,"violeta"],[99,"violeta"],[100,"dourado"],[365,"dourado"]])("%s dias → %s", (dias, id) => {
     expect(fogoDoCaderno(Number(dias)).id).toBe(id);
   });
   it("zero e dados inválidos ficam apagados; próximos marcos não dependem dos protetores", () => {
@@ -19,6 +19,22 @@ describe("fogo do caderno", () => {
     expect(proximoFogoDoCaderno(12)?.min).toBe(14);
     expect(proximoFogoDoCaderno(35)?.min).toBe(100);
     expect(proximoFogoDoCaderno(100)).toBeNull();
+  });
+  it("3 dias muda o pigmento sem remapear as faixas salvas nem repetir a festa", () => {
+    expect(fogoDoCaderno(1).meio).not.toBe(fogoDoCaderno(3).meio);
+    expect([1,3,7,14,30,100].map(d => fogoDoCaderno(d).indice)).toEqual([0,0,1,2,3,4]);
+    expect(proximoFogoDoCaderno(2)?.min).toBe(3);
+    expect(proximoFogoDoCaderno(3)?.min).toBe(7);
+    estado.vista = 0;
+    const { container } = render(<FogoDaSequencia dias={3}/>);
+    expect(estado.set).not.toHaveBeenCalled();
+    expect(container.querySelector("[data-subiu]")).toBeNull();
+  });
+  it("a chama usa pigmento vivo e não o tom escuro reservado ao texto", () => {
+    const { container } = render(<FogoDaSequencia dias={7}/>);
+    const stops = container.querySelectorAll("linearGradient")[0].querySelectorAll("stop");
+    expect(stops[1].getAttribute("stop-color")).toBe(fogoDoCaderno(7).chamaBase);
+    expect(stops[1].getAttribute("stop-color")).not.toBe(fogoDoCaderno(7).hojeTexto);
   });
   it("primeira visita registra a faixa sem festa; zero mostra SVG apagado", () => {
     const {container, rerender} = render(<FogoDaSequencia dias={30}/>);

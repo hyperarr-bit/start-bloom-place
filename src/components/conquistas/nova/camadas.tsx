@@ -1,23 +1,25 @@
 import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { Bell, ChevronRight, Shield, X } from "lucide-react";
+import { Bell, Check, ChevronRight, Shield, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { trackEvent } from "@/lib/analytics";
 import { normalizarDias, somarDias } from "@/lib/sequencia";
-import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type DiaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
+import { ROTULOS_DA_SEMANA, segundaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
 import { ARTES_CADERNO } from "../artes-caderno";
+import { proximasFigurinhas } from "../capa-pessoal";
+import { requisitoDaFigurinha } from "../textos-figurinhas";
 import { RARIDADES_EM_TESTE } from "../MarcaRaridade";
 import { giroDoAdesivo } from "../adesivos-arte";
 import { Fogo } from "../Fogo";
 import { IconeMarcaAlbum } from "../IconeMarcaAlbum";
-import { FOGOS_CADERNO, fogoDoCaderno } from "./fogo-caderno";
+import { fogoDoCaderno } from "./fogo-caderno";
 import { varsDaFaixa } from "../CardSequencia";
 import { LembreteDaSequencia } from "../LembreteDaSequencia";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, contagem, ehMarcoDeFesta, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
+import { EVENTOS2, contagem, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
 import { type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import "../conquistas.css";
 import "./conquistas-nova.css";
@@ -57,36 +59,6 @@ export const CelebracaoMarco = ({ badge, dias, seq: _seq, onContinuar, onCompart
 
 /* ------------------------------------------------------------------ o detalhe da sequência */
 
-const R = 86, C = 98, FOLGA = 10;
-const TOTAL = 2 * Math.PI * R;
-const ARCO = TOTAL / 7 - FOLGA;
-
-/** O ANEL DE 7 ARCOS da semana (direção B), com o fogo e o número no centro — agora só no detalhe (17/10). */
-export const AnelDaSemana = ({ seq }: { seq: Sequencia }) => {
-  const semana = useMemo(() => semanaDaSequencia(seq.lista, seq.usados, seq.hoje), [seq.lista, seq.usados, seq.hoje]);
-  const hojeIdx = semana.findIndex((d) => d.estado === "hoje");
-  const semHoje: DiaDaSemana[] = semana.map((d) => (d.estado === "hoje" ? { ...d, estado: "futuro" as EstadoDia } : d));
-  const ini = (i: number) => (i * (ARCO + FOLGA) + FOLGA / 2) / TOTAL * Math.PI * 2;
-  const a0 = ini(Math.max(0, hojeIdx)), a1 = a0 + (ARCO / TOTAL) * Math.PI * 2;
-  const p = (a: number) => `${(C + Math.cos(a) * R).toFixed(2)} ${(C + Math.sin(a) * R).toFixed(2)}`;
-  return (
-    <div className="cn-b-anel" data-testid="cn-anel">
-      <svg viewBox="0 0 196 196" aria-hidden>
-        {semHoje.map((d, i) => (
-          <circle key={d.dia} className="cn-b-seg" data-estado={d.estado} cx={C} cy={C} r={R} strokeDasharray={`${ARCO} ${TOTAL - ARCO}`} strokeDashoffset={-(i * (ARCO + FOLGA) + FOLGA / 2)} />
-        ))}
-        {/* o arco de "hoje" tracejado precisa do próprio recorte: um arco só, tracejado, no lugar dele */}
-        {hojeIdx >= 0 && <path className="cn-b-seg" data-estado="hoje" d={`M ${p(a0)} A ${R} ${R} 0 0 1 ${p(a1)}`} />}
-      </svg>
-      <div className="cn-b-centro">
-        <Fogo dias={seq.dias} faixa={seq.dias > 0 ? fogoDoCaderno(seq.dias) : undefined} tamanho={44} semBrilho={seq.dias < 100} />
-        <span className="cn-b-num">{seq.dias}</span>
-        <span className="cn-b-rot">{seq.dias === 1 ? "DIA SEGUIDO" : "DIAS SEGUIDOS"}</span>
-      </div>
-    </div>
-  );
-};
-
 const Calendario28 = ({ seq }: { seq: Sequencia }) => {
   const anotados = useMemo(() => new Set(normalizarDias(seq.lista)), [seq.lista]);
   const protegidos = useMemo(() => new Set(seq.usados), [seq.usados]);
@@ -105,24 +77,52 @@ const Calendario28 = ({ seq }: { seq: Sequencia }) => {
   );
 };
 
+/** Os personagens têm espaço próprio; a tela principal só antecipa o próximo prêmio. */
+const EvolucaoDaSequencia = ({ trilha, dias, recorde, onAdesivo }: { trilha: Badge[]; dias: number; recorde: number; onAdesivo: (b: Badge) => void }) => {
+  const faixa = useRef<HTMLOListElement>(null);
+  // Voltei segue no catálogo e no álbum; esta faixa acompanha só a família de pedra.
+  const personagens = trilha.filter(b => b.id !== "sequencia-2");
+  const iniciou = Math.max(dias, recorde) >= 1 || trilha.some(b => b.unlocked);
+  const proxima = personagens.find(b => !b.unlocked);
+  const destaque = iniciou ? proxima?.id ?? personagens.at(-1)?.id : "sequencia-1";
+  useEffect(() => {
+    const lista = faixa.current;
+    const alvo = lista?.querySelector<HTMLElement>('[data-destaque]');
+    if (lista && alvo) lista.scrollLeft = Math.max(0, alvo.offsetLeft - lista.offsetLeft - 124);
+  }, [destaque]);
+  return <section className="cn-evolucao" aria-labelledby="cn-evolucao-titulo">
+    <div className="cn-evolucao-titulo"><h3 id="cn-evolucao-titulo">Sua evolução</h3><span>Deslize para explorar</span></div>
+    <ol ref={faixa} className="cn-evolucao-figurinhas" aria-label="Marcos da sequência">
+      {personagens.map(b => {
+        const marco = marcoDoAdesivo(b.id)!;
+        const falta = Math.max(1, marco - dias);
+        const estado = b.unlocked ? "Conquistada" : iniciou && b.id === proxima?.id ? `Falta${falta === 1 ? "" : "m"} ${falta} ${falta === 1 ? "dia" : "dias"}` : "A conquistar";
+        return <li key={b.id} data-destaque={b.id === destaque ? "" : undefined} data-conquistada={b.unlocked ? "" : undefined}>
+          <button type="button" className="cn-evolucao-etapa" data-testid={marco === 1 ? "cn-evolucao-inicio" : undefined} onClick={() => onAdesivo(b)} aria-label={`${b.name}: ${estado.toLowerCase()}`}>
+            <span className="cn-evolucao-arte"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={marco === 1 ? 82 : marco === 3 ? 96 : 104} trancado={!b.unlocked} progresso={b.progresso}/></span>
+            <b>{contagem(marco, "dia", "dias")}</b><small>{b.unlocked && <Check size={11} aria-hidden/>}{estado}</small>
+          </button>
+        </li>;
+      })}
+    </ol>
+  </section>;
+};
+
 export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: EstadoConquistasNova; aberto: boolean; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
   const { seq, trilha } = e;
-  const proximos = trilha.filter((b) => !b.unlocked).slice(0, 3);
+  const fechar = useRef<HTMLButtonElement>(null);
   return (
     <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[92dvh] overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="cn-detalhe-sequencia">
+      <SheetContent semFechar onOpenAutoFocus={event => { event.preventDefault(); fechar.current?.focus({preventScroll:true}); }} side="bottom" className="rounded-t-3xl max-h-[92dvh] overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="cn-detalhe-sequencia">
+        <button ref={fechar} type="button" className="cn-evolucao-fechar" aria-label="Fechar" onClick={onFechar}><X size={18} aria-hidden/></button>
         <div className="max-w-sm mx-auto pt-1" style={varsDaFaixa(fogoDoCaderno(seq.dias))}>
-          <AnelDaSemana seq={seq} />
-          <div className="text-center mt-2">
-            <SheetTitle className="text-[16px] font-black tracking-tight leading-none">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
-            <SheetDescription className="text-[12px] text-muted-foreground mt-1">{fogoDoCaderno(seq.dias).nome} · recorde {seq.recorde} · {contagem(seq.lista.length, "dia anotado", "dias anotados")}</SheetDescription>
+          <div className="cn-evolucao-cab">
+            <Fogo dias={seq.dias} faixa={seq.dias > 0 ? fogoDoCaderno(seq.dias) : undefined} tamanho={42} semBrilho={seq.dias < 100}/>
+            <div><SheetTitle className="text-[22px] font-bold tracking-tight leading-tight">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
+              <SheetDescription className="text-[12px] text-muted-foreground mt-1">Recorde de {contagem(seq.recorde, "dia", "dias")}</SheetDescription>
+            </div>
           </div>
-          <ol className="cn-fogo-trilha" aria-label="Evolução da chama">
-            {FOGOS_CADERNO.map(f => <li key={f.id} data-atual={seq.dias > 0 && fogoDoCaderno(seq.dias).id === f.id ? "" : undefined} aria-current={seq.dias > 0 && fogoDoCaderno(seq.dias).id === f.id ? "step" : undefined} aria-label={`${f.min} ${f.min === 1 ? "dia" : "dias"}: ${f.nome}`}>
-              <Fogo faixa={f} tamanho={27} semBrilho />
-              <span>{f.min}d</span>
-            </li>)}
-          </ol>
+          <EvolucaoDaSequencia trilha={trilha} dias={seq.dias} recorde={seq.recorde} onAdesivo={onAdesivo}/>
           <div className="mt-4 rounded-2xl border border-border p-3">
             <p className="cn-caps text-muted-foreground mb-2">Últimas 4 semanas</p>
             <Calendario28 seq={seq} />
@@ -133,23 +133,6 @@ export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: Estado
               <p className="text-[13px] font-extrabold leading-tight">{seq.saldo} de 2 protetores</p>
               <p className="text-[11.5px] text-muted-foreground leading-[1.35]">A cada 7 dias seguidos você ganha 1. Um dia vazio? Ele segura sozinho a sequência.</p>
             </div>
-          </div>
-          <div className="mt-3 rounded-2xl border border-border px-3 py-1">
-            <p className="cn-caps text-muted-foreground pt-2 pb-1">Próximos adesivos</p>
-            {proximos.map((b) => {
-              const m = marcoDoAdesivo(b.id)!;
-              const faltam = Math.max(1, m - seq.dias);
-              return (
-                <button type="button" key={b.id} className="cn-premio-linha w-full text-left" onClick={() => onAdesivo(b)}>
-                  <AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={40} trancado progresso={b.progresso} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-extrabold leading-tight">{b.name}{m % 7 === 0 ? <span className="text-muted-foreground font-bold text-[11px]"> e mais 1 protetor</span> : ""}</p>
-                    <p className="text-[11px] text-muted-foreground">adesivo {RARIDADE_LABEL[raridadeDe(b)].toLowerCase()}{ehMarcoDeFesta(b.id) ? " · com comemoração e Stories" : ""}</p>
-                  </div>
-                  <span className="cn-pill cn-pill-suave">{faltam === 1 ? "amanhã" : `em ${faltam} dias`}</span>
-                </button>
-              );
-            })}
           </div>
           <p className="mt-3 text-[11.5px] text-muted-foreground leading-[1.4]">
             <b className="text-foreground">O que conta:</b> anotar qualquer coisa, em qualquer módulo — um gasto, um hábito, a água, uma página lida. Só abrir o app não conta.
@@ -205,7 +188,10 @@ const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
         if (!url) { juntar([id]); continue; }
         const img = new Image();
         img.src = url;
-        (typeof img.decode === "function" ? img.decode() : Promise.resolve()).catch(() => undefined).then(() => juntar([id]));
+        // 1.0.19 (páginas em branco na "Sua coleção", TestFlight do dono): no WebKit o decode() pode demorar muito ou nem
+        // voltar com dezenas pedidas juntas (rolagem rápida) — a célula esperava pra sempre, vazia. Espera no máximo 250 ms.
+        const decodificada = typeof img.decode === "function" ? img.decode().catch(() => undefined) : Promise.resolve();
+        Promise.race([decodificada, new Promise((r) => window.setTimeout(r, 250))]).then(() => juntar([id]));
       }
     }, { root: raiz, rootMargin: `${MARGEM_CARREGA * 100}% 0px` });
     const solta = new IntersectionObserver((es) => {
@@ -215,7 +201,15 @@ const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
     ios.current = { carrega, solta };
     for (const el of celulas.current.keys()) { carrega.observe(el); solta.observe(el); }
     pertoAgora([...celulas.current.keys()]);
-    return () => { carrega.disconnect(); solta.disconnect(); ios.current = null; };
+    // rede de segurança: o WebKit nem sempre entrega o IntersectionObserver de um rolador `fixed` durante a rolagem
+    // com inércia (só no fim) — a conta na mão a cada quadro de rolagem garante a arte de quem está na tela.
+    let quadro = 0;
+    const aoRolar = () => {
+      if (quadro) return;
+      quadro = window.requestAnimationFrame(() => { quadro = 0; pertoAgora([...celulas.current.keys()]); });
+    };
+    raiz.addEventListener("scroll", aoRolar, { passive: true });
+    return () => { carrega.disconnect(); solta.disconnect(); ios.current = null; raiz.removeEventListener("scroll", aoRolar); if (quadro) window.cancelAnimationFrame(quadro); };
   }, [rolagem, semIO, juntar, pertoAgora]);
   const observar = useCallback((el: HTMLElement, id: string) => {
     celulas.current.set(el, id);
@@ -241,6 +235,7 @@ const ArteDaCelula = ({ b, i, obs }: { b: Badge; i: number; obs: Observador }) =
 export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<EstadoConquistasNova, "colecoes" | "abertos" | "total">; inicial: ColecaoNova | null; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
   const [filtro, setFiltro] = useState<string>(inicial?.id ?? "todas");
   const [raridadeFiltro, setRaridadeFiltro] = useState("todas");
+  const [visao, setVisao] = useState<"todas" | "perto">("todas");
   const fechar = useRef<HTMLButtonElement>(null);
   const rolagem = useRef<HTMLDivElement>(null);
   const obs = useArteSobDemanda(rolagem);
@@ -261,6 +256,9 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
   const secoes = (filtro === "todas" ? e.colecoes : e.colecoes.filter((c) => c.id === filtro))
     .map(c => ({...c, adesivos:c.adesivos.filter(b => raridadeFiltro === "todas" || raridadeDe(b) === raridadeFiltro)}))
     .filter(c => c.adesivos.length > 0);
+  const candidatas = secoes.flatMap(c => c.adesivos);
+  // A sequência tem sua própria evolução, mas continua consultável pelo filtro do módulo.
+  const proximas = filtro === "sequencia" ? candidatas.filter(b => !b.unlocked).slice(0, 2) : proximasFigurinhas(candidatas);
   return (
     <div ref={rolagem} className="cn-tela cn-colecao" role="dialog" aria-modal="true" aria-label="Todos os adesivos" data-testid="cn-colecao-tela" onKeyDown={teclado}>
       <div className="cn-colecao-moldura">
@@ -271,6 +269,10 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
             <p>{e.abertos} de {e.total} figurinhas conquistadas</p>
           </div>
           <span className="cn-colecao-simbolo" aria-hidden><IconeMarcaAlbum /></span>
+        </div>
+        <div className="cn-colecao-visao" role="group" aria-label="Mostrar figurinhas">
+          <button type="button" aria-pressed={visao === "todas"} onClick={() => setVisao("todas")}>Todas</button>
+          <button type="button" aria-pressed={visao === "perto"} onClick={() => setVisao("perto")}>Perto de conquistar</button>
         </div>
         <div className="cn-b-chips" role="group" aria-label="Filtrar por módulo">
           <button type="button" className="cn-b-chip" data-ativo={filtro === "todas" ? "" : undefined} aria-pressed={filtro === "todas"} onClick={() => setFiltro("todas")}>Todas</button>
@@ -283,8 +285,13 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
             <option value="todas">Todas as raridades</option><option value="comum">Comuns</option><option value="raro">Raras</option><option value="epico">Épicas</option><option value="lendario">Lendárias</option>
           </select>
         </label>
-        {secoes.length === 0 && <p className="cn-colecao-vazia" role="status">Nenhuma figurinha desta raridade neste módulo.</p>}
-        <div className="cn-colecao-secoes">
+        {visao === "todas" && secoes.length === 0 && <p className="cn-colecao-vazia" role="status">Nenhuma figurinha desta raridade neste módulo.</p>}
+        {visao === "perto" ? <section className="cn-colecao-proximas" aria-label="Perto de conquistar">
+          {proximas.length ? <><p className="cn-proximas-intro">Ideias para continuar sua coleção.</p><div>{proximas.map(b => <button type="button" key={b.id} onClick={() => onAdesivo(b)} className="cn-proxima-acao">
+            <span aria-hidden><AdesivoRaro id={b.id} tamanho={72} raridade={raridadeDe(b)} trancado progresso={b.progresso}/></span>
+            <span><b>{b.name}</b><small>{requisitoDaFigurinha(b)}</small>{b.progresso && b.progresso.atual > 0 && <em>{Math.min(100, Math.floor(b.progresso.atual / b.progresso.alvo * 100))}% do caminho</em>}</span><ChevronRight size={17} aria-hidden/>
+          </button>)}</div></> : <p className="cn-colecao-vazia" role="status">Nenhuma sugestão com estes filtros. Explore outros módulos ou veja todas as figurinhas.</p>}
+        </section> : <div className="cn-colecao-secoes">
           {secoes.map((c) => (
             <section key={c.id} className="cn-card cn-colecao-secao" aria-label={c.label}>
               <div className="cn-colecao-secao-cab">
@@ -303,7 +310,7 @@ export const ColecaoTela = ({ e, inicial, onFechar, onAdesivo }: { e: Pick<Estad
               </div>
             </section>
           ))}
-        </div>
+        </div>}
       </div>
     </div>
   );

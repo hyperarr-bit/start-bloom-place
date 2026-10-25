@@ -32,7 +32,17 @@ import { eventoDaMissao, type DiaDaMissao, type ModuloDaMissao } from "@/lib/mis
 export const PRIMEIRO_REGISTRO: Partial<Record<ModuloDaMissao, string[]>> = {
   financas: ["first-expense", "first-income"],
   rotina: ["rotina-1"],
-  treino: ["treino-1"],
+  treino: ["treino-1", "treino-plano", "treino-nota"],
+  saude: ["agua-1", "sono-1", "humor-1", "saude-log", "saude-remedio"],
+  dieta: ["dieta-refeicao", "dieta-plano", "receita-1"],
+  desenvolvimento: ["diario-1", "humor-1", "meta-passo"],
+  hiperfoco: ["foco-1"],
+  estudos: ["estudos-revisao-1"],
+  carreira: ["carreira-candidatura", "carreira-projeto", "carreira-ensaio"],
+  biblioteca: ["leitura-primeira", "leitura-nota", "leitura-estante", "leitura-1"],
+  viagens: ["viagem-plano"],
+  relacionamentos: ["momento-1"],
+  detox: ["detox-1"],
 };
 
 /** Os marcos da sequência que a dose pode mostrar (o ramo das Conquistas cria os dois). */

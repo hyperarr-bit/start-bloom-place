@@ -26,17 +26,17 @@ describe("Curadoria estável do álbum editorial", () => {
     }
   });
 
-  it("preserva todas as 98 figurinhas e seus dados sem modificar a entrada", () => {
+  it("preserva todas as 99 figurinhas e seus dados sem modificar a entrada", () => {
     const base = catalogo();
     const idsOriginais = base.map(b => b.id);
     const ordenados = ordenarParaAlbumEditorial(base);
-    expect(base).toHaveLength(98);
-    expect(ordenados).toHaveLength(98);
+    expect(base).toHaveLength(99);
+    expect(ordenados).toHaveLength(99);
     expect(new Set(ordenados.map(b => b.id))).toEqual(new Set(idsOriginais));
     expect(base.map(b => b.id)).toEqual(idsOriginais);
     for (const figurinha of ordenados) expect(base.find(b => b.id === figurinha.id)).toBe(figurinha);
     const miolo = vagasDoMiolo(base).flatMap(p => p.ids);
-    expect(miolo).toHaveLength(98);
+    expect(miolo).toHaveLength(99);
     expect(new Set(miolo)).toEqual(new Set(idsOriginais));
     expect(ordenados.some(b => b.id === "treino-25")).toBe(true);
   });
@@ -53,7 +53,7 @@ describe("Curadoria estável do álbum editorial", () => {
   it("mantém a evolução da sequência e dos dias de treino mesmo com entrada invertida", () => {
     const ordenados = ordenarParaAlbumEditorial([...catalogo()].reverse());
     expect(ordenados.filter(b => b.category === "sequencia").map(b => b.id)).toEqual([
-      "sequencia-2", "sequencia-3", "sequencia-7", "sequencia-14", "sequencia-30",
+      "sequencia-1", "sequencia-2", "sequencia-3", "sequencia-7", "sequencia-14", "sequencia-30",
       "retorno", "protetor-1", "sequencia-100", "mes-20", "ano-365",
     ]);
     const diasDeTreino = new Set(["treino-1", "treino-7", "treino-12", "treino-25", "treino-50", "treino-100"]);

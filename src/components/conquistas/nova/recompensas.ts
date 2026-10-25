@@ -30,7 +30,7 @@ export const marcoDoAdesivo = (id: string): number | null => {
   return m ? Number(m[1]) : null;
 };
 
-/** É um dos 3 adesivos novos da sequência (2/3/14)? */
+/** É um dos marcos adicionados à sequência (1/2/3/14)? */
 export const ehAdesivoNovoDaSequencia = (id: string): boolean => {
   const m = marcoDoAdesivo(id);
   return m !== null && (MARCOS_NOVOS as readonly number[]).includes(m);
@@ -52,7 +52,7 @@ export const formatoDoAviso = (b: Pick<Badge, "id" | "xp" | "raridade">, primeir
 export const podeCompartilhar = (b: Pick<Badge, "id">): boolean => ehMarcoDeFesta(b.id);
 
 /**
- * Os 3 adesivos novos abrem pelo RECORDE (quem já teve 14 dias ganha "Duas
+ * Os adesivos novos abrem pelo RECORDE (quem já teve 14 dias ganha "Duas
  * Semanas" na 1ª abertura). A festa/toast é só de quem BATEU o marco hoje:
  * dias seguidos = o marco e hoje já anotado. O resto cola em silêncio.
  */
@@ -92,7 +92,7 @@ export const contagem = (n: number, um: string, varios: string): string => `${n}
 export const nomeDoPremio = (marco: number, adesivo: Badge | null): string => {
   if (!adesivo) return "protetor";
   if (marco === 2) return `adesivo "Voltei"`;
-  return `adesivo de ${marco} dias`;
+  return `adesivo de ${contagem(marco, "dia", "dias")}`;
 };
 
 /**
@@ -106,6 +106,14 @@ export const fraseDoPremio = (p: Pick<ProximoPremio, "quando" | "faltam" | "marc
   if (p.quando === "hoje") return `Anota algo hoje e ganha o ${nome}`;
   if (p.quando === "amanha") return `Amanhã: ${p.adesivo ? nome : "mais 1 protetor"} 🔥`;
   return `Faltam ${p.faltam} dias pro ${p.adesivo ? nome : "próximo protetor"} 🔥`;
+};
+
+/** Uma única chamada na tela principal; os marcos e personagens ficam no detalhe. */
+export const fraseCompactaDoPremio = (p: Pick<ProximoPremio, "quando" | "faltam" | "adesivo">): string => {
+  const premio = p.adesivo ? "figurinha" : "protetor";
+  if (p.quando === "hoje") return `Anote hoje e ganhe ${p.adesivo ? "uma nova" : "mais um"} ${premio}.`;
+  if (p.quando === "amanha") return `Amanhã tem ${p.adesivo ? "uma nova" : "mais um"} ${premio}.`;
+  return `Mais ${p.faltam} dias para ${p.adesivo ? "sua próxima" : "seu próximo"} ${premio}.`;
 };
 
 /** A instrução embaixo da frase: o que conta. */

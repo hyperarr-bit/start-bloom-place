@@ -3,6 +3,8 @@ import { raridadeDe, type Badge } from "@/components/gamification/types";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { AdesivoRaro, AnelRaridadeSvg } from "./adesivos-raridade";
 import "./conquistas.css";
+import { CORES_CAPA, type CorCapa } from "./capa-pessoal";
+import "./capa-pessoal.css";
 
 /**
  * A CAPA DO ÁLBUM DE FIGURINHAS (27/09): lombada magenta, faixa "ÁLBUM DE
@@ -27,6 +29,8 @@ interface Props {
   foto?: boolean;
   /** Composição impressa da capa da referência, independente do progresso. */
   referencia?: boolean;
+  figurinhasCapa?: Badge[];
+  corCapa?: CorCapa;
   style?: CSSProperties;
 }
 
@@ -49,23 +53,21 @@ const Figurinha = ({ b, tam, foto, grossa, giro }: { b: Badge; tam: number; foto
   );
 };
 
-export const CapaAlbum = ({ largura, altura, maisRaros, abertos, total, nome, ano, foto = false, referencia = false, style }: Props) => {
+export const CapaAlbum = ({ largura, altura, maisRaros, abertos, total, nome, ano, foto = false, referencia = false, figurinhasCapa, corCapa = "azul", style }: Props) => {
   const k = largura / 200;
   const h = altura ?? Math.round(largura * 1.32);
   const heroi = maisRaros[0];
   const minis = maisRaros.slice(1, 5);
+  const pessoais = (figurinhasCapa ?? maisRaros).filter(b => b.unlocked).slice(0, 3);
+  const cor = CORES_CAPA[corCapa] ?? CORES_CAPA.azul;
   return (
-    <div className="alb-capa" data-capa-album="" data-referencia={referencia ? "" : undefined} style={{ width: largura, height: h, "--k": k, ...style } as CSSProperties}>
+    <div className="alb-capa" data-capa-album="" data-referencia={referencia ? "" : undefined} data-pessoal={referencia ? pessoais.length : undefined} style={{ width: largura, height: h, "--k": k, "--capa-cor": cor.cor, "--capa-clara": cor.clara, ...style } as CSSProperties}>
       <div className="alb-capa-lombada" />
       <div className="alb-capa-face">
         <div className="alb-capa-faixa"><span>ÁLBUM DE FIGURINHAS</span><b>CORE · {ano}</b></div>
-        <div className="alb-capa-titulo">{referencia ? <>Pequenas<br />conquistas.</> : <>Figurinhas da<br />minha vida.</>}</div>
+        <div className="alb-capa-titulo">Figurinhas da<br />minha vida.</div>
         <div className="alb-capa-arte">
-          {referencia ? <>
-            <span className="alb-capa-caderno-leitura"><Adesivo id="leitura-1" tamanho={105 * k}/></span>
-            <span className="alb-capa-caderno-salario"><Adesivo id="first-income" tamanho={94 * k}/></span>
-            <span className="alb-capa-caderno-marco"><Adesivo id="sequencia-30" tamanho={61 * k}/></span>
-          </> : heroi ? (
+          {referencia ? pessoais.length ? pessoais.map((b, i) => <span key={b.id} className={`alb-pessoal-fig alb-pessoal-fig-${i}`} data-capa-figurinha={b.id}><Adesivo id={b.id} tamanho={(pessoais.length === 1 ? 116 : pessoais.length === 2 ? 96 : i === 0 ? 106 : 67) * k}/></span>) : <div className="alb-pessoal-monograma" aria-hidden><span>{Array.from(nome.trim() || "C")[0].toUpperCase()}</span><i>uma história por dia</i></div> : heroi ? (
             <span className="alb-capa-heroi"><Figurinha b={heroi} tam={92 * k} foto={foto} grossa /></span>
           ) : (
             <span className="alb-capa-heroi" data-vazio="">?</span>

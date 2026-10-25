@@ -45,6 +45,34 @@ describe("navegação da coleção de figurinhas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Primeiro Salário: conquistada" }));
     expect(selecionar).toHaveBeenCalledWith(salario);
   });
+  it("traz sugestões para dentro da coleção e respeita módulo e raridade", () => {
+    const selecionar = vi.fn();
+    const despesa: Badge = {...salario, id:"first-expense", name:"Primeira Despesa", unlocked:false, progresso:{atual:0,alvo:1}};
+    const poupador: Badge = {...salario, id:"saver", name:"Poupador", unlocked:false, raridade:"raro", progresso:{atual:8,alvo:10}};
+    const e = {...estado, total:3, colecoes:[{...colecao, total:3, adesivos:[salario,despesa,poupador]}]};
+    render(<ColecaoTela e={e} inicial={null} onFechar={() => {}} onAdesivo={selecionar}/>);
+    fireEvent.click(screen.getByRole("button", {name:"Perto de conquistar"}));
+    const sugestoes = screen.getByRole("region", {name:"Perto de conquistar"});
+    expect(within(sugestoes).queryByText("Primeiro Salário")).toBeNull();
+    expect(within(sugestoes).getByText("Poupador")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", {name:"Filtrar por raridade"}), {target:{value:"comum"}});
+    expect(within(sugestoes).queryByText("Poupador")).toBeNull();
+    fireEvent.click(within(sugestoes).getByRole("button", {name:/Primeira Despesa/}));
+    expect(selecionar).toHaveBeenCalledWith(despesa);
+    expect(screen.queryByTestId("album-tela")).toBeNull();
+    fireEvent.click(within(screen.getByRole("group", {name:"Mostrar figurinhas"})).getByRole("button", {name:"Todas"}));
+    expect(screen.getByRole("button", {name:"Primeiro Salário: conquistada"})).toBeTruthy();
+  });
+
+  it("mostra os próximos marcos quando a pessoa escolhe o módulo Sequência", () => {
+    const marco: Badge = {...salario,id:"sequencia-14",name:"14 Dias Seguidos",category:"sequencia",unlocked:false,progresso:{atual:12,alvo:14}};
+    const e = {...estado,abertos:0,total:1,colecoes:[{...colecao,id:"sequencia" as const,label:"Sequência",abertos:0,adesivos:[marco]}]};
+    render(<ColecaoTela e={e} inicial={null} onFechar={() => {}} onAdesivo={() => {}}/>);
+    fireEvent.click(screen.getByRole("button", {name:"Perto de conquistar"}));
+    fireEvent.click(within(screen.getByRole("group", {name:"Filtrar por módulo"})).getByRole("button", {name:/Sequência/}));
+    expect(within(screen.getByRole("region", {name:"Perto de conquistar"})).getByText("14 Dias Seguidos")).toBeTruthy();
+  });
+
 });
 
 describe("coleção 'Ver todas': arte sob demanda (23/10, ~160 MB de imagem com tudo montado)", () => {
@@ -89,6 +117,25 @@ describe("coleção 'Ver todas': arte sob demanda (23/10, ~160 MB de imagem com 
       expect(carrega.alvos.size).toBe(60);
       await act(async () => { carrega.cb([{ target: celulas[59], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); await new Promise((r) => setTimeout(r, 0)); });
       expect(comArte(celulas[59])).toBe(true);
+      // 1.0.19: decode() que nunca volta (WebKit) não deixa a célula vazia pra sempre — no máximo 250 ms
+      const proto = HTMLImageElement.prototype as { decode?: () => Promise<void> };
+      const decodeOriginal = proto.decode;
+      proto.decode = () => new Promise<void>(() => {});
+      await act(async () => { carrega.cb([{ target: celulas[56], isIntersecting: true } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); await new Promise((r) => setTimeout(r, 10)); });
+      expect(comArte(celulas[56])).toBe(false);
+      await act(async () => { await new Promise((r) => setTimeout(r, 300)); });
+      expect(comArte(celulas[56])).toBe(true);
+      if (decodeOriginal) proto.decode = decodeOriginal; else delete proto.decode;
+      // rolagem com inércia sem aviso do IntersectionObserver: a conta a cada quadro de rolagem monta quem está na tela
+      rect.mockImplementation(function (this: Element) {
+        if ((this as HTMLElement).matches?.(".cn-colecao")) return { top: 0, bottom: 800, height: 800, left: 0, right: 390, width: 390, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+        const i = Array.from(document.querySelectorAll(".cn-colecao-arte")).indexOf(this);
+        const top = i < 0 ? 0 : 300 + Math.floor(i / 3) * 150 - 2400; // rolou 2400 px
+        return { top, bottom: top + 96, height: 96, left: 0, right: 96, width: 96, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
+      });
+      expect(comArte(celulas[45])).toBe(false);
+      await act(async () => { container.querySelector(".cn-colecao")!.dispatchEvent(new Event("scroll")); await new Promise((r) => setTimeout(r, 50)); });
+      expect(comArte(celulas[45])).toBe(true);
       // a 0 ficou bem longe → solta a arte, a moldura fica
       act(() => { solta.cb([{ target: celulas[0], isIntersecting: false } as unknown as IntersectionObserverEntry], {} as IntersectionObserver); });
       expect(comArte(celulas[0])).toBe(false);

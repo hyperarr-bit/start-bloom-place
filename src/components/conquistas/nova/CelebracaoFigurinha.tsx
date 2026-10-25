@@ -1,3 +1,4 @@
+import { textoConquistado } from "../textos-figurinhas";
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, Check, Share2, X } from "lucide-react";
@@ -5,6 +6,7 @@ import { categoriaDe, raridadeDe, type Badge } from "@/components/gamification/t
 import { trackEvent } from "@/lib/analytics";
 import { AdesivoRaro } from "../adesivos-raridade";
 import { IconeMarcaAlbum } from "../IconeMarcaAlbum";
+import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
 import "./celebracao-figurinha.css";
 
 export const DURACAO_COMUM_MS = 6000;
@@ -26,6 +28,8 @@ export function CelebracaoFigurinha({ badge, primeira = false, quantidade = 1, o
   const raridade = raridadeDe(badge);
   const tipo = primeira ? "primeira" : marco ? (marco.dias >= 100 ? "lendario" : marco.dias >= 30 ? "epico" : "raro") : raridade;
   const compacta = tipo === "comum";
+  // a cena cobre a tela inteira (fixed inset-0): a faixa do relógio não fica branca por cima dela (mesma régua do álbum, 1.0.18)
+  useFaixaDoRelogioTransparente(!compacta);
   const reduzir = useReducedMotion();
   const tituloId = useId();
   const raiz = useRef<HTMLDivElement>(null);
@@ -71,6 +75,7 @@ export function CelebracaoFigurinha({ badge, primeira = false, quantidade = 1, o
     document.body.style.overflow = "hidden";
     focoInicial.current?.focus({ preventScroll: true });
     const tecla = (e: KeyboardEvent) => {
+      if (document.querySelector(".share-fig")) return;
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); encerrarRef.current("continuar"); }
       if (e.key !== "Tab") return;
       const botoes = Array.from(raiz.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
@@ -120,7 +125,7 @@ export function CelebracaoFigurinha({ badge, primeira = false, quantidade = 1, o
           <div className="cf-textos">
             <p className="cf-edicao">{compacta ? quantidade > 1 ? `${quantidade} figurinhas novas` : "Figurinha nova" : primeira ? "Sua primeira figurinha" : `Figurinha ${ROTULOS[raridade].toLowerCase()}`}</p>
             <h2 id={tituloId}>{nome}</h2>
-            <p className="cf-descricao">{compacta ? quantidade > 1 ? `e mais ${quantidade - 1} para o seu álbum` : "Uma pequena conquista, só sua." : primeira ? "Toda coleção começa com uma história. Essa é a sua." : marco ? "Você voltou. E voltou de novo. Olha até onde chegou." : badge.description}</p>
+            <p className="cf-descricao">{compacta ? quantidade > 1 ? `e mais ${quantidade - 1} para o seu álbum` : "Uma pequena conquista, só sua." : primeira ? "Toda coleção começa com uma história. Essa é a sua." : marco ? "Você voltou. E voltou de novo. Olha até onde chegou." : textoConquistado(badge)}</p>
             {!compacta && <p className="cf-legenda"><IconeMarcaAlbum modulo={badge.category} /><span>{categoriaDe(badge.category).label}</span><i /> <b>+{badge.xp} XP</b></p>}
             {marco?.protetor && <p className="cf-protetor"><Check size={14} /> +1 protetor guardado</p>}
           </div>

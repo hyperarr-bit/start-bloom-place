@@ -8,12 +8,16 @@ const paleta = (indice: number, id: Faixa["id"], cor: string, claro: string, mei
   hojeFundoEscuro: `${meio}20`, hojeTexto: escuro, hojeTextoEscuro: claro,
 });
 
+// A chama usa pigmentos suaves; o texto mantém um tom escuro legível.
+// 3 dias varia a cor dentro da faixa inicial (índice 0): não remapeia o
+// histórico salvo nem cria outra festa. 7/14/30/100 mantêm índices 1/2/3/4.
 export const FOGOS_CADERNO: Faixa[] = [
-  paleta(0, "salvia", "sálvia", "#dce8d6", "#91aa82", "#4e6953", "#eef2e9"),
-  paleta(1, "ambar", "âmbar", "#ffe3a0", "#dba53e", "#94631d", "#f8efdc"),
-  paleta(2, "petroleo", "petróleo", "#a7d9d5", "#498b91", "#285c68", "#e7f1f0"),
-  paleta(3, "violeta", "violeta", "#ded1fa", "#9876c1", "#65448d", "#f0eafa"),
-  paleta(4, "dourado", "dourado", "#fff3bd", "#e3bf58", "#8e661e", "#faf2d9"),
+  { ...paleta(0, "laranja", "laranja", "#f9e9bc", "#e7a65b", "#984411", "#fff1df"), chamaBase: "#d58b3e", chamaContorno: "#bd7839" },
+  { ...paleta(0, "laranja", "laranja vivo", "#f7dfab", "#e5974e", "#9c390e", "#ffeddd"), min: 3, chamaBase: "#d17c36", chamaContorno: "#ba6931" },
+  { ...paleta(1, "ambar", "amarelo dourado", "#f8edbf", "#e1bd60", "#80510d", "#fff5d5"), chamaBase: "#d2a747", chamaContorno: "#b58c39" },
+  { ...paleta(2, "petroleo", "petróleo", "#d1e9e3", "#6aa3a6", "#245e69", "#e7f3f1"), chamaBase: "#50898f", chamaContorno: "#3e717a" },
+  { ...paleta(3, "violeta", "violeta", "#e5dbef", "#ad93c6", "#67438d", "#f2eafa"), chamaBase: "#9274ae", chamaContorno: "#76588e" },
+  { ...paleta(4, "dourado", "ouro", "#f6eac5", "#d4b36b", "#805819", "#faf1d8"), chamaBase: "#bf964b", chamaContorno: "#a37b38" },
 ];
 
 const APAGADO: Faixa = {

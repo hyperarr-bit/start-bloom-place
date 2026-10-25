@@ -15,6 +15,15 @@ import listaDesejos from "@/assets/conquistas-caderno/variacoes/uma-cor/lista-de
 import salario from "@/assets/conquistas-caderno/variacoes/uma-cor/salario-jade.webp";
 import sequencia14 from "@/assets/conquistas-caderno/variacoes/uma-cor/sequencia-14-petroleo.webp";
 import sequencia30 from "@/assets/conquistas-caderno/variacoes/uma-cor/sequencia-30-violeta.webp";
+import comoEuTo from "@/assets/conquistas-caderno/revisao-humor/humor-1.webp";
+import horaMarcada from "@/assets/conquistas-caderno/revisao-rotina/compromisso-1.webp";
+import pegandoRitmo from "@/assets/conquistas-caderno/revisao-rotina/rotina-21.webp";
+import doMeuJeito from "@/assets/conquistas-caderno/variacoes/aplicadas/habito-criado.webp";
+import entrelinhas from "@/assets/conquistas-caderno/revisao-leitura-financas/leitura-nota-v3.webp";
+import mesFechado from "@/assets/conquistas-caderno/revisao-leitura-financas/mes-fechado.webp";
+import meuMesPaginas from "@/assets/conquistas-caderno/variacoes/aplicadas/mes-20.webp";
+import sequencia1 from "@/assets/conquistas-caderno/sequencia-aprovada/inicio-1-brasa.png";
+import sequencia3 from "@/assets/conquistas-caderno/sequencia-aprovada/sequencia-3-despertar.webp";
 
 // Vite resolve URLs leves; os arquivos só são baixados quando uma imagem é exibida.
 const novas = import.meta.glob<string>("/src/assets/conquistas-caderno/colecao/*.webp", { eager: true, query: "?url", import: "default" });
@@ -65,4 +74,14 @@ export const ARTES_CADERNO: Record<string, string> = {
   "treino-semana": semanaCumprida,
   // A Máquina anterior ganha uma conquista própria; o robô continua em treino-50.
   "treino-25": forcaDeVontade,
+  "humor-1": comoEuTo,
+  "compromisso-1": horaMarcada,
+  "rotina-21": pegandoRitmo,
+  "habito-criado": doMeuJeito,
+  "leitura-nota": entrelinhas,
+  "mes-fechado": mesFechado,
+  "mes-20": meuMesPaginas,
+  // Primeiro registro e três dias: artes aprovadas para toda a coleção.
+  "sequencia-1": sequencia1,
+  "sequencia-3": sequencia3,
 };

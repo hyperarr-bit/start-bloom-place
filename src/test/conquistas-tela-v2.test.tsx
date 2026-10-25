@@ -356,17 +356,17 @@ describe("Postar nos Stories", () => {
     expect(previa).toHaveTextContent("Prévia · Meu álbum de figurinhas");
     const arte = previa.querySelector('[data-stories="album"]')!;
     expect(arte).toHaveTextContent("OS MAIS RAROS");
-    expect(arte.querySelectorAll('[data-celula][data-aberto="true"]')).toHaveLength(4);
+    expect(arte.querySelectorAll('[data-celula][data-aberto="true"]')).toHaveLength(5);
     // com 3+ coladas a arte não mostra as "próximas a colar"
     expect(arte.querySelectorAll('[data-celula][data-aberto="false"]')).toHaveLength(0);
   });
 });
 
 describe("o álbum de figurinhas (card + tela cheia)", () => {
-  it("o card diz '4 de 98 coladas' (16/10: +Voltei e 3 Dias pelo recorde), a raridade e o mais perto; 'Abrir o álbum' abre a tela cheia na página dos mais raros com as vagas numeradas; as abas pulam de seção; a vaga abre o detalhe; o X fecha", async () => {
+  it("o card diz '5 de 99 coladas' (16/10: +Voltei e 3 Dias pelo recorde), a raridade e o mais perto; 'Abrir o álbum' abre a tela cheia na página dos mais raros com as vagas numeradas; as abas pulam de seção; a vaga abre o detalhe; o X fecha", async () => {
     abrir(montarStore(cenario()));
     const card = screen.getByTestId("album-card");
-    expect(screen.getByTestId("album-card-contagem")).toHaveTextContent("4 de 98 coladas");
+    expect(screen.getByTestId("album-card-contagem")).toHaveTextContent("5 de 99 coladas");
     expect(card).toHaveTextContent("3 raros");
     expect(screen.getByTestId("album-card-proximo")).toHaveTextContent(/Perto de colar/);
     expect(card).toHaveAttribute("data-novas", "0");
@@ -375,18 +375,18 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     fireEvent.click(screen.getByTestId("album-abrir"));
     const tela = await screen.findByTestId("album-tela");
     expect(tela).toHaveTextContent("Álbum CORE 2026");
-    expect(tela).toHaveTextContent("4 de 98 · faltam 94");
+    expect(tela).toHaveTextContent("5 de 99 · faltam 94");
     const p0 = within(tela).getByTestId("album-tela-pagina-0");
     expect(p0).toHaveTextContent("OS MAIS RAROS");
     const vagas = Array.from(p0.querySelectorAll("[data-vaga]")).map((el) => [el.getAttribute("data-vaga"), el.getAttribute("data-aberta")]);
     // os mais raros primeiro (raros antes do comum "Voltei"); na mesma raridade, o colado mais recente ("3 Dias", hoje, pelo recorde)
     expect(vagas.slice(0, 3)).toEqual([["sequencia-3", "true"], ["leitura-1", "true"], ["sequencia-7", "true"]]);
     // (02/10, dono) "Os mais raros" é só das mais raras da pessoa: sem "Próximas a colar" nem a dica
-    expect(vagas).toHaveLength(4);
+    expect(vagas).toHaveLength(5);
     expect(p0).not.toHaveTextContent("PRÓXIMAS A COLAR");
-    expect(p0.querySelector('[data-vaga="sequencia-7"] .vaga-n')).toHaveTextContent("Nº 03");
+    expect(p0.querySelector('[data-vaga="sequencia-7"] .vaga-n')).toHaveTextContent("Nº 04");
     expect(within(tela).queryByTestId("album-tela-dica")).toBeNull();
-    expect(eventos).toContainEqual(["album_abrir", { adesivos: 4, novas: 0, via: "card", pagina: 0 }]);
+    expect(eventos).toContainEqual(["album_abrir", { adesivos: 5, novas: 0, via: "card", pagina: 0 }]);
     // as abas
     fireEvent.click(within(tela).getByTestId("album-aba-epico"));
     expect(tela).toHaveAttribute("data-atual", "2");
@@ -402,7 +402,7 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
     expect(raros).toHaveTextContent("3 de 25 · faltam 22");
     fireEvent.click(raros.querySelector('[data-vaga="sequencia-7"]')!);
     const detalhe = await screen.findByTestId("detalhe-vaga");
-    expect(detalhe).toHaveTextContent("Figurinha Nº 03");
+    expect(detalhe).toHaveTextContent("Figurinha Nº 04");
     expect(detalhe).toHaveTextContent("7 Dias Seguidos");
     expect(detalhe).toHaveTextContent(/Conquistada em 20 de setembro/);
     expect(within(detalhe).getByTestId("vaga-postar")).toBeInTheDocument();
@@ -413,20 +413,20 @@ describe("o álbum de figurinhas (card + tela cheia)", () => {
   });
 
   it("o pacotinho: coladas desde a última abertura ('1 figurinha nova'); abrir marca tudo como visto", async () => {
-    const store = montarStore(cenario({ [CHAVE_ALBUM_VISTO]: ["sequencia-7", "sequencia-2", "sequencia-3"] }));
+    const store = montarStore(cenario({ [CHAVE_ALBUM_VISTO]: ["sequencia-1", "sequencia-7", "sequencia-2", "sequencia-3"] }));
     abrir(store);
     expect(screen.getByTestId("album-card")).toHaveAttribute("data-novas", "1");
     expect(screen.getByTestId("album-pacotinho")).toHaveTextContent("1 figurinha nova");
     fireEvent.click(screen.getByTestId("album-pacotinho"));
     await screen.findByTestId("album-tela");
-    expect((store.dados[CHAVE_ALBUM_VISTO] as string[]).sort()).toEqual(["leitura-1", "sequencia-2", "sequencia-3", "sequencia-7"]);
-    expect(eventos).toContainEqual(["album_abrir", { adesivos: 4, novas: 1, via: "pacotinho", pagina: 0 }]);
+    expect((store.dados[CHAVE_ALBUM_VISTO] as string[]).sort()).toEqual(["leitura-1", "sequencia-1", "sequencia-2", "sequencia-3", "sequencia-7"]);
+    expect(eventos).toContainEqual(["album_abrir", { adesivos: 5, novas: 1, via: "pacotinho", pagina: 0 }]);
   });
 
   it("a 1ª vez desta versão entra em silêncio (tudo o que já estava colado vira visto); sem adesivo, 'COMEÇANDO O ÁLBUM'", async () => {
     const store = montarStore(cenario());
     abrir(store);
-    await waitFor(() => expect((store.dados[CHAVE_ALBUM_VISTO] as string[]).sort()).toEqual(["leitura-1", "sequencia-2", "sequencia-3", "sequencia-7"]));
+    await waitFor(() => expect((store.dados[CHAVE_ALBUM_VISTO] as string[]).sort()).toEqual(["leitura-1", "sequencia-1", "sequencia-2", "sequencia-3", "sequencia-7"]));
     const vazio = montarStore({ "core-user-name": "Ana", "conquistas-desbloqueadas": {}, [CHAVE_NIVEL_PISO]: "Bronze", [CHAVE_DICA_PLANNER]: { vistas: 3, fim: true } });
     render(
       <MemoryRouter initialEntries={["/conquistas"]}>

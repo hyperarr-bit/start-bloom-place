@@ -52,6 +52,13 @@
 /* a barra de vidro global (fora da Home) só precisa das variáveis: sem o fundo em degradê */
 .hn.he.he-so-vars { background: none; }
 
+/* ---- os formulários do "+" (FolhaAcaoE): o NÚMERO-HERÓI e a área de texto ----
+   o index.css força `input, textarea { font-size: 16px !important }` no celular (contra o auto-zoom do Safari) — por
+   isso o "R$ 12,50" saía em fonte de corpo. Aqui a regra é mais específica e também !important: o número grande (44 px,
+   peso forte) e o texto da ideia/gratidão (18 px). Acima de 16 px o Safari não dá zoom. */
+.hn.he .he-campo-heroi { font-size: 44px !important; line-height: 1 !important; font-weight: 700 !important; letter-spacing: -0.02em; }
+.hn.he .he-campo-texto { font-size: 18px !important; line-height: 1.35 !important; }
+
 /* rodada 6: os dois níveis de meio-termo (data-suave no .hn.he) */
 .hn.he[data-suave="suave"] { --he-t: 0.5; }
 .hn.he[data-suave="mais"] { --he-t: 0.7; }

@@ -72,13 +72,13 @@ const Campo = ({ valor, aoMudar, aoEnviar, placeholder, rotulo, modo, prefixo, s
         <textarea
           ref={campoRef as React.RefObject<HTMLTextAreaElement>} value={valor} onChange={(e) => aoMudar(e.target.value)} placeholder={placeholder} aria-label={rotulo} rows={3}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); aoEnviar(); } }}
-          className="w-full bg-transparent text-[20px] leading-snug font-semibold outline-none resize-none placeholder:text-muted-foreground/40"
+          className="he-campo-texto w-full bg-transparent text-[20px] leading-snug font-semibold outline-none resize-none placeholder:text-muted-foreground/40"
         />
       ) : (
         <input
           ref={campoRef as React.RefObject<HTMLInputElement>} type="text" inputMode={modo} value={valor} onChange={(e) => aoMudar(e.target.value)} placeholder={placeholder} aria-label={rotulo}
           onKeyDown={(e) => e.key === "Enter" && aoEnviar()} enterKeyHint="done"
-          className="w-full min-w-0 bg-transparent text-[36px] leading-none font-bold tabular-nums tracking-[-0.02em] outline-none placeholder:text-muted-foreground/35"
+          className="he-campo-heroi w-full min-w-0 bg-transparent text-[36px] leading-none font-bold tabular-nums tracking-[-0.02em] outline-none placeholder:text-muted-foreground/35"
         />
       )}
       {sufixo && <span className="text-[18px] font-semibold text-muted-foreground shrink-0">{sufixo}</span>}

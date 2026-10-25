@@ -26,6 +26,7 @@ import { ATRIBUTO_RAIZ, marcarVolta } from "@/lib/nav-abas";
 import { AccountDrawer } from "@/components/home/AccountDrawer";
 import { PainelAparencia } from "@/components/account/PainelAparencia";
 import { linhaDoPlano } from "@/lib/linha-do-plano";
+import { versaoVisivel } from "@/lib/versao-visivel";
 
 /**
  * ABA VOCÊ (1.0.17) — a página que substitui a folha "Menu" do avatar da Home.
@@ -125,7 +126,8 @@ export default function Voce() {
     { id: "termos", Icone: FileText, rotulo: "Termos de uso", onClick: () => ir("termos", "/termos") },
   ];
 
-  const versao = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
+  // a versão DA PLATAFORMA (lib/versao-visivel): no iPhone a do project.pbxproj — o rodapé mostrava "1.0.133 (134)", a do Android
+  const versao = versaoVisivel();
 
   if (nova) {
     const plano = linhaDoPlano(auth, trialCartaoAtivo());

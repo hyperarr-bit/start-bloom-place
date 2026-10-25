@@ -484,7 +484,8 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(detalhe.getAttribute("data-vaga-detalhe")).toBe("first-income");
     expect(detalhe.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe("Primeiro Salário");
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Fechar visualização da figurinha" }));
-    expect(store.dados["conquistas-album-visto"]).toEqual(["first-income"]);
+    // 26/10: a "1 Dia Anotado" de quem já usava entra colada em silêncio; o toque na prévia não cola nada além disso
+    expect(store.dados["conquistas-album-visto"]).toEqual(["first-income", "sequencia-1"]);
     fireEvent.click(screen.getByRole("button", { name: "Fechar visualização da figurinha" }));
     await waitFor(() => expect(screen.queryByTestId("detalhe-vaga")).toBeNull(), { timeout: 3000 });
     expect(screen.queryByTestId("album-tela")).toBeNull();
@@ -513,7 +514,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     expect(filtro.hasAttribute("data-ativo")).toBe(true);
     expect(document.activeElement).toBe(figurinha);
     expect(document.body.style.overflow).not.toBe("hidden");
-    expect(store.dados["conquistas-album-visto"]).toEqual(["first-income"]);
+    expect(store.dados["conquistas-album-visto"]).toEqual(["first-income", "sequencia-1"]); // 26/10: a "1 Dia Anotado" colada em silêncio
     expect(nomes()).not.toContain(EVENTOS2.albumAbrir);
   });
 
@@ -537,7 +538,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   it("no teste grátis (dia 2, sem anotar hoje): a missão, 'Hoje você ganha Voltei' e o adesivo esperando no álbum", () => {
     montar({ testeDia: 2 }, { "core-dias-anotados": [somarDias(HOJE, -1)], "conquistas-desbloqueadas": { "first-expense": somarDias(HOJE, -1) }, "conquistas-album-visto": [] });
     expect(screen.getByTestId("cn-missao").textContent).toMatch(/dia 2 de 3/);
-    expect(screen.getByTestId("cn-missao-album").textContent).toBe("2 adesivos novos pra colar ›");
+    expect(screen.getByTestId("cn-missao-album").textContent).toBe("1 adesivo novo pra colar ›"); // 26/10: a "1 Dia Anotado" de quem já anotava cola em silêncio
     // a ação do dia no teste: "anote o gasto de hoje" vira "Hoje: anote o gasto" (sem "hoje" duas vezes)
     expect(screen.getByTestId("cn-acao").textContent).toMatch(/^Anote /);
     expect(screen.getByTestId("cn-amanha-frase").textContent).toBe("Anote hoje e ganhe uma nova figurinha.");
@@ -552,15 +553,16 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     // o registro de antes de 16/10: só o 7, o first-expense e o visto antigo (sem sequencia-2/3)
     const { store } = montar({}, { "conquistas-desbloqueadas": { "sequencia-7": "2026-10-10", "first-expense": "2026-09-01" }, "conquistas-album-visto": ["sequencia-7", "first-expense"] });
     expect(screen.getByTestId("cn-hero").textContent).toContain("12");
-    expect(screen.getByTestId("cn-album-contagem").getAttribute("aria-label")).toContain("2 de 99 figurinhas coladas"); // 7 + first-expense; 2 e 3 estão conquistadas, mas ainda esperam a colagem
-    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("3");
-    expect(screen.getByTestId("cn-album-pacotinho").textContent).toBe("Colar 3 figurinhas");
-    // as chaves de sempre continuam lá, intactas (a tela só lê; o visto antigo não foi reescrito)
+    // 26/10: a "1 Dia Anotado" de quem já usava cola EM SILÊNCIO (3 coladas); 2 e 3 estão conquistadas, mas ainda esperam a colagem
+    expect(screen.getByTestId("cn-album-contagem").getAttribute("aria-label")).toContain("3 de 99 figurinhas coladas");
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("2");
+    expect(screen.getByTestId("cn-album-pacotinho").textContent).toBe("Colar 2 figurinhas");
+    // as chaves de sempre continuam lá (a tela só lê; o visto antigo só ganha a "1 Dia Anotado" silenciosa)
     expect(store.dados["core-dias-anotados"]).toHaveLength(12);
-    expect(store.dados["conquistas-album-visto"]).toEqual(["sequencia-7", "first-expense"]);
-    // o registro ganha os 2 novos com a data de hoje (como qualquer adesivo que abre); os de antes ficam com a data deles
+    expect(store.dados["conquistas-album-visto"]).toEqual(["sequencia-7", "first-expense", "sequencia-1"]);
+    // o registro ganha os 2 novos com a data de hoje (como qualquer adesivo que abre); a "1 Dia Anotado" com a do 1º dia da lista; os de antes ficam com a data deles
     const desbloqueadas = store.dados["conquistas-desbloqueadas"] as Record<string, string>;
-    expect(desbloqueadas).toMatchObject({ "sequencia-7": "2026-10-10", "first-expense": "2026-09-01", "sequencia-1": HOJE, "sequencia-2": HOJE, "sequencia-3": HOJE });
+    expect(desbloqueadas).toMatchObject({ "sequencia-7": "2026-10-10", "first-expense": "2026-09-01", "sequencia-1": somarDias(HOJE, -12), "sequencia-2": HOJE, "sequencia-3": HOJE });
   });
 
   it("conta vazia: capa com inicial e convite ao primeiro registro", () => {
@@ -969,5 +971,59 @@ describe("a coleção: arte sob demanda × o IntersectionObserver do WebKit (rod
       expect(comArte()).toBe(artes().length - 1);
       longe.getBoundingClientRect = original;
     } finally { janela.IntersectionObserver = ioOriginal; }
+  });
+});
+
+describe("'1 Dia Anotado' (nova na 1.0.19) × quem JÁ usava o app (26/10, aprovado pelo dono)", () => {
+  beforeEach(() => { localStorage.setItem(CHAVE_FORCA_CONQUISTAS2, "on"); });
+  const contaAntiga = (extra: Record<string, unknown> = {}) => ({
+    "core-user-name": "Ana Beatriz",
+    "conquistas-desbloqueadas": { "sequencia-7": "2026-10-10", "first-expense": "2026-09-01" },
+    "conquistas-vistas": { adesivos: ["sequencia-7", "first-expense"], marcos: [7] },
+    "conquistas-album-visto": ["sequencia-7", "first-expense"],
+    "finance-expenses": [{ id: 1, value: 10, date: "2026-10-10" }],
+    ...extra,
+  });
+
+  it("conta antiga (12 dias anotados antes): cola EM SILÊNCIO, datada do 1º registro da lista, já vista e já colada — nada de 'nova pra colar'", () => {
+    const { store } = montar({}, contaAntiga({ "core-dias-anotados": corrida(somarDias(HOJE, -1), 12) }));
+    const desbloqueadas = store.dados["conquistas-desbloqueadas"] as Record<string, string>;
+    expect(desbloqueadas["sequencia-1"]).toBe(somarDias(HOJE, -12)); // 2026-10-04: o 1º dia que a lista guarda, não hoje
+    expect(store.dados["conquistas-album-visto"]).toContain("sequencia-1");
+    expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toContain("sequencia-1");
+    // só a "1 Dia Anotado" é silenciosa: as de 2 e 3 dias (também novas na Conquistas 2) continuam chegando pra colar
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("2");
+    expect(screen.getByTestId("cn-album-pacotinho").textContent).toBe("Colar 2 figurinhas");
+  });
+
+  it("conta antiga com EXATAMENTE 1 dia seguido e hoje anotado (o caso do toast): nem toast nem festa; vista e colada", async () => {
+    const store = montarStore(contaAntiga({ "core-dias-anotados": [somarDias(HOJE, -20), HOJE] }));
+    render(
+      <MemoryRouter initialEntries={["/conquistas"]}>
+        <Provedor store={store}><MomentosConquistas /><ConquistasNova testeDia={null} /></Provedor>
+      </MemoryRouter>,
+    );
+    await espera(1700);
+    // nenhuma comemoração da "1 Dia Anotado" (outra figurinha que abra pelo mesmo dado — a "Volta por cima" da pausa — segue normal)
+    const comemoracoes = Array.from(document.querySelectorAll(".cf-chegada, [data-testid='cn-toast'], [data-testid='momento-adesivo'], [data-testid='cn-festa']")).map((e) => e.textContent ?? "");
+    expect(comemoracoes.some((t) => /1 Dia Anotado|primeiro registro/i.test(t))).toBe(false);
+    expect((store.dados["conquistas-desbloqueadas"] as Record<string, string>)["sequencia-1"]).toBe(somarDias(HOJE, -20));
+    expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).toContain("sequencia-1");
+    expect(store.dados["conquistas-album-visto"]).toContain("sequencia-1");
+  });
+
+  it("conta antiga sem dia anotado antes de hoje mas com adesivo gravado: também em silêncio, datada de hoje (sem destaque)", () => {
+    const { store } = montar({}, contaAntiga({ "core-dias-anotados": [HOJE], "conquistas-desbloqueadas": { "first-expense": "2026-09-01" }, "conquistas-vistas": { adesivos: ["first-expense"], marcos: [] }, "conquistas-album-visto": ["first-expense"] }));
+    expect((store.dados["conquistas-desbloqueadas"] as Record<string, string>)["sequencia-1"]).toBe(HOJE);
+    expect(store.dados["conquistas-album-visto"]).toContain("sequencia-1");
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("0");
+  });
+
+  it("conta NOVA (1º registro agora): a figurinha chega pra colar, como antes", () => {
+    const { store } = montar({}, { "core-user-name": "Ana", "core-dias-anotados": [HOJE], "conquistas-desbloqueadas": {}, "conquistas-vistas": { adesivos: [], marcos: [] }, "conquistas-album-visto": [], "finance-expenses": [] });
+    expect((store.dados["conquistas-desbloqueadas"] as Record<string, string>)["sequencia-1"]).toBe(HOJE);
+    expect(store.dados["conquistas-album-visto"]).not.toContain("sequencia-1");
+    expect((store.dados["conquistas-vistas"] as { adesivos: string[] }).adesivos).not.toContain("sequencia-1");
+    expect(screen.getByTestId("cn-album").getAttribute("data-novas")).toBe("1");
   });
 });

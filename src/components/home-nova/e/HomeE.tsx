@@ -21,7 +21,7 @@ import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-copo";
 import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
-import { EVENTO_HOME_NOVA_MAIS, SUAVIDADE_HOME_NOVA, consumirMaisPendente, type SuavidadeHomeNova } from "@/lib/home-nova";
+import { CHAVE_COR_ANTES_HOME_NOVA, EVENTO_HOME_NOVA_MAIS, SUAVIDADE_HOME_NOVA, consumirMaisPendente, type SuavidadeHomeNova } from "@/lib/home-nova";
 import { trackEvent } from "@/lib/analytics";
 import { PilulaFogoE } from "./PilulaFogoE";
 import { FolhaMaisE } from "./FolhaMaisE";
@@ -96,7 +96,12 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
   // rodada 2 (dono): só o tema padrão com a Home nova — quem tinha outra cor volta pro Original (claro/escuro continuam)
   const { palette, setPalette } = useTheme();
-  useEffect(() => { if (palette !== "default") setPalette("default"); }, [palette, setPalette]);
+  useEffect(() => {
+    if (!loaded || palette === "default") return;
+    // 26/10 (dono): a cor fica GUARDADA na conta (core-cor-antes-home-nova) e volta quando a chave home_nova desligar (pages/Home)
+    set(CHAVE_COR_ANTES_HOME_NOVA, palette, { system: true });
+    setPalette("default");
+  }, [loaded, palette, setPalette, set]);
   const [folhaMais, setFolhaMais] = useState(!!folhaMaisAberta);
   const [acaoInicial, setAcaoInicial] = useState<ActionId | null>(null);
   const [folhaScore, setFolhaScore] = useState(!!folhaScoreAberta);

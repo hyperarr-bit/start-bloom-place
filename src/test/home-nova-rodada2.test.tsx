@@ -285,7 +285,7 @@ describe("o fundo da tela até o topo (adendo 26/10: a faixa do relógio na cor 
 });
 
 describe("a cor do tema", () => {
-  it("com a Home nova, quem tinha outra cor volta pro padrão (claro/escuro ficam)", async () => {
+  it("com a Home nova, quem tinha outra cor volta pro padrão (claro/escuro ficam) — e a cor fica GUARDADA na conta (26/10)", async () => {
     ligar();
     localStorage.setItem("core-theme-palette", "rose");
     localStorage.setItem("core-theme-mode", "dark");
@@ -294,5 +294,23 @@ describe("a cor do tema", () => {
     await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
     await waitFor(() => expect(localStorage.getItem("core-theme-palette")).toBe("default"));
     expect(localStorage.getItem("core-theme-mode")).toBe("dark");
+    await waitFor(() => expect(n.ler<string>("core-cor-antes-home-nova")).toBe("rose"));
+  });
+  it("com a chave DESLIGADA, a cor guardada volta na abertura e o guardado sai (o outro sentido)", async () => {
+    localStorage.setItem("core-theme-palette", "default");
+    const n = criarNuvem({ ...DADOS, "core-cor-antes-home-nova": "rose" });
+    render(<ThemeProvider><MemoryRouter initialEntries={["/home"]}><n.Provedor><App /></n.Provedor></MemoryRouter></ThemeProvider>);
+    await waitFor(() => expect(screen.queryByTestId("home-nova")).toBeNull());
+    await waitFor(() => expect(localStorage.getItem("core-theme-palette")).toBe("rose"));
+    await waitFor(() => expect(n.ler<string | null>("core-cor-antes-home-nova") ?? null).toBeNull());
+  });
+  it("com a Home nova e sem cor guardada, nada é gravado (quem já usava o Original não ganha chave)", async () => {
+    ligar();
+    localStorage.setItem("core-theme-palette", "default");
+    const n = criarNuvem(DADOS);
+    render(<ThemeProvider><MemoryRouter initialEntries={["/home"]}><n.Provedor><App /></n.Provedor></MemoryRouter></ThemeProvider>);
+    await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
+    await respirar(50);
+    expect(n.ler<string | null>("core-cor-antes-home-nova") ?? null).toBeNull();
   });
 });

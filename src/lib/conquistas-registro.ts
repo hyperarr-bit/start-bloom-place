@@ -53,6 +53,22 @@ export const ADESIVOS_SEQUENCIA_NOVOS: Record<(typeof MARCOS_NOVOS)[number], { n
 export const MARCOS_ADESIVO = [1, 2, 3, 7, 14, 30, 100] as const;
 
 /**
+ * "1 DIA ANOTADO" PRA QUEM JÁ USAVA O APP (26/10, aprovado pelo dono). A figurinha nasceu na 1.0.19; quem já tinha
+ * registro (dia anotado antes de hoje) ou adesivo gravado antes desta abertura NÃO "fez o primeiro registro agora":
+ * ela cola EM SILÊNCIO — já vista (sem festa, sem toast), já colada (sem entrar no "Colar N figurinhas") — datada do
+ * 1º registro que a lista guarda (senão, hoje, sem destaque). Só a conta nova (1º registro agora) ganha a comemoração.
+ * Devolve a data a gravar, ou null quando é conta nova.
+ */
+export const ID_DIA_UM = "sequencia-1";
+export const dataDoDiaUmSilencioso = (diasAnotados: readonly string[], gravadas: Record<string, string>, hoje: string): string | null => {
+  const antes = diasAnotados.filter((d) => ehDia(d) && d < hoje).sort();
+  // adesivo datado de ANTES de hoje (o de hoje pode ser do mesmo 1º registro, gravado um tique antes — conta nova)
+  const tinhaAdesivo = Object.entries(gravadas).some(([id, dia]) => id !== ID_DIA_UM && dia < hoje);
+  if (!antes.length && !tinhaAdesivo) return null;
+  return antes[0] ?? hoje;
+};
+
+/**
  * Adesivos da sequência (dias com algo anotado): 1, 2, 3, 7, 14, 30 e 100 dias
  * seguidos (comum · comum · raro · raro · raro · épico · lendário), "Salvo pelo Gelo"
  * (1 protetor já segurou um dia vazio) e "Um Ano Anotado" (365 dias no total).

@@ -4,7 +4,8 @@
  *   · status: "Hoje já conta." + próxima faixa (nomes do caderno) OU "Pra continuar hoje: <ação>" que leva a fazer;
  *   · a semana em 7 bolinhas com os estados reais (feito / gelo / hoje / vazio / futuro); "Ver mais" = 4 semanas;
  *   · "Sua evolução" compacta, posicionada no próximo marco (conquistados à esquerda), tocar amplia (onAdesivo);
- *   · protetores numa linha + ⓘ; rodapé "O que conta"; sem "Últimas 4 semanas" nem lembrete;
+ *   · protetores numa linha + ⓘ; rodapé "O que conta"; sem "Últimas 4 semanas" nem o botão de lembrete do Codex;
+ *   · 26/10: a linha "🔔 Me lembrar da sequência" (só no app) liga o lembrete de hoje; ligado, leva a Lembretes;
  *   · eventos sequencia_folha_aberta / _acao com a origem.
  */
 process.env.TZ = "America/Sao_Paulo";
@@ -14,12 +15,17 @@ import { render, screen, fireEvent, cleanup, within } from "@testing-library/rea
 
 const eventos = vi.hoisted(() => [] as Array<[string, Record<string, unknown>]>);
 vi.mock("@/lib/analytics", async (orig) => ({ ...(await orig<typeof import("@/lib/analytics")>()), trackEvent: (n: string, d: Record<string, unknown> = {}) => { eventos.push([n, d]); } }));
+const nativo = vi.hoisted(() => ({ v: false }));
+vi.mock("@/lib/native-shell", async (orig) => ({ ...(await orig<typeof import("@/lib/native-shell")>()), isNativeShell: () => nativo.v }));
+vi.mock("@/lib/notificacoes", () => ({ temPermissao: async () => true, pedirPermissao: async () => true }));
+vi.mock("@/lib/reagendar", () => ({ reagendarTudo: async () => {} }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn(), message: vi.fn(), warning: vi.fn() }), Toaster: () => null }));
 
 import { FolhaSequencia, fraseDaProximaFaixaDoCaderno } from "@/components/fogo/FolhaSequencia";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import type { Badge } from "@/components/gamification/types";
 import { faixaDoFogo } from "@/lib/fogo-sequencia";
-import { prepararJsdom } from "./compat-comum";
+import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
 
 // quarta-feira 28/10/2026: a semana vai de 26 (seg) a 1/11 (dom)
 const HOJE = "2026-10-28";
@@ -33,14 +39,15 @@ const seqDe = (p: Partial<Sequencia> & { dias: number; hojeFeito: boolean }): Se
   lista: p.lista ?? [], acao: p.acao ?? ({ id: "habito", texto: "marcar um hábito hoje", rota: "/rotina" } as unknown as Sequencia["acao"]),
   faixa: faixaDoFogo(p.dias), protegidoOntem: false,
 });
-const montar = (seq: Sequencia, extra: Partial<Parameters<typeof FolhaSequencia>[0]> = {}) => {
+const montar = (seq: Sequencia, extra: Partial<Parameters<typeof FolhaSequencia>[0]> = {}, dados: Dados = {}) => {
   const onAdesivo = vi.fn(); const onIr = vi.fn(); const onFechar = vi.fn();
-  render(<FolhaSequencia aberta onFechar={onFechar} seq={seq} trilha={TRILHA} origem="home" onAdesivo={onAdesivo} onIr={onIr} {...extra} />);
-  return { onAdesivo, onIr, onFechar };
+  const n = criarNuvem(dados); // a folha lê a conta (o lembrete da sequência)
+  render(<n.Provedor><FolhaSequencia aberta onFechar={onFechar} seq={seq} trilha={TRILHA} origem="home" onAdesivo={onAdesivo} onIr={onIr} {...extra} /></n.Provedor>);
+  return { onAdesivo, onIr, onFechar, n };
 };
 
 beforeAll(() => { prepararJsdom(); vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00")); });
-beforeEach(() => { eventos.length = 0; });
+beforeEach(() => { eventos.length = 0; nativo.v = false; });
 afterEach(() => cleanup());
 
 describe("cabeçalho e status", () => {
@@ -132,7 +139,8 @@ describe("a evolução (as figurinhas da sequência)", () => {
   it("0 dias e nada conquistado: o 1º marco em destaque, tudo 'A conquistar'", () => {
     cleanup();
     const trilha = TRILHA.map((b) => ({ ...b, unlocked: false }));
-    render(<FolhaSequencia aberta onFechar={() => {}} seq={seqDe({ dias: 0, hojeFeito: false })} trilha={trilha} origem="home" onAdesivo={() => {}} onIr={() => {}} />);
+    const n = criarNuvem({});
+    render(<n.Provedor><FolhaSequencia aberta onFechar={() => {}} seq={seqDe({ dias: 0, hojeFeito: false })} trilha={trilha} origem="home" onAdesivo={() => {}} onIr={() => {}} /></n.Provedor>);
     expect(screen.getByTestId("he-seq-evolucao").getAttribute("data-destaque")).toBe("sequencia-1");
     expect(screen.getByTestId("he-seq-fogo").getAttribute("data-fogo")).toBe("neutro");
     expect(screen.getByTestId("he-seq-dias").textContent).toBe("0");
@@ -147,5 +155,40 @@ describe("protetores e rodapé", () => {
     fireEvent.click(screen.getByTestId("he-seq-protetores-info"));
     expect(screen.getByTestId("he-seq-protetores-explica").textContent).toContain("A cada 7 dias seguidos você ganha 1.");
     expect(screen.getByTestId("he-seq-o-que-conta").textContent).toContain("Só abrir o app não conta.");
+  });
+});
+
+describe("o lembrete da sequência na folha (26/10)", () => {
+  it("no site não existe; no app, 'Me lembrar da sequência' liga o lembrete de hoje (mesmo evento) e vira 'Lembrete ligado · 20h'", async () => {
+    montar(seqDe({ dias: 9, hojeFeito: true, lista: [HOJE] }));
+    expect(screen.queryByTestId("he-seq-lembrete")).toBeNull();
+    cleanup();
+    nativo.v = true;
+    const { n } = montar(seqDe({ dias: 9, hojeFeito: true, lista: [HOJE] }));
+    const linha = screen.getByTestId("he-seq-lembrete");
+    expect(linha.getAttribute("data-ligado")).toBe("0");
+    expect(linha.textContent).toContain("Me lembrar da sequência");
+    fireEvent.click(linha);
+    expect(eventos.some(([e]) => e === "sequencia_lembrete_ligar")).toBe(true);
+    vi.useRealTimers();
+    await new Promise((r) => setTimeout(r, 30));
+    expect((n.ler<{ sequencia?: boolean }>("notif-prefs") ?? {}).sequencia).toBe(true);
+    expect(screen.getByTestId("he-seq-lembrete").getAttribute("data-ligado")).toBe("1");
+    expect(screen.getByTestId("he-seq-lembrete").textContent).toContain("Lembrete ligado · 20h");
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00"));
+  });
+  it("já ligado: 'Lembrete ligado · 20h' e o toque fecha a folha e leva a Lembretes (evento com a origem)", async () => {
+    nativo.v = true;
+    const { onFechar, onIr } = montar(seqDe({ dias: 9, hojeFeito: true, lista: [HOJE] }), { origem: "conquistas" }, { "notif-prefs": { sequencia: true, horaSequencia: 20 } });
+    const linha = screen.getByTestId("he-seq-lembrete");
+    expect(linha.getAttribute("data-ligado")).toBe("1");
+    expect(linha.textContent).toContain("Lembrete ligado · 20h");
+    fireEvent.click(linha);
+    expect(onFechar).toHaveBeenCalled();
+    expect(eventos.some(([e, d]) => e === "sequencia_folha_acao" && d.acao === "lembretes" && d.destino === "/notificacoes" && d.origem === "conquistas")).toBe(true);
+    vi.useRealTimers();
+    await new Promise((r) => setTimeout(r, 250));
+    expect(onIr).toHaveBeenCalledWith("/notificacoes");
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-28T12:00:00"));
   });
 });

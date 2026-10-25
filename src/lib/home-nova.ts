@@ -31,6 +31,8 @@ export const CHAVE_ADMIN_HOME_NOVA = "core-home-nova-admin";
 export const CHAVE_FOGO_ACESO_HOME_NOVA = "core-home-nova-fogo";
 /** Força de QA — fora dos prefixos que as vassouras do cache apagam ("home-" é varrido; lib/chaves-do-aparelho). */
 export const CHAVE_FORCA_HOME_NOVA = "forcar-home-nova";
+/** 26/10: a cor do tema que a pessoa tinha ANTES da Home nova forçar o Original (chave da conta); volta quando a chave desliga. */
+export const CHAVE_COR_ANTES_HOME_NOVA = "core-cor-antes-home-nova";
 export const PARAM_HOME_NOVA = "home-nova";
 /** A barra de vidro pede pra abrir a folha do "+" (a folha mora na Home). */
 export const EVENTO_HOME_NOVA_MAIS = "home-nova:mais";

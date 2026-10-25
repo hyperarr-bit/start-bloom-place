@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, ChevronRight, Info, Shield, X } from "lucide-react";
+import { Bell, Check, ChevronRight, Info, Shield, X } from "lucide-react";
 import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { raridadeDe, type Badge } from "@/components/gamification/types";
 import { AdesivoRaro } from "@/components/conquistas/adesivos-raridade";
@@ -9,6 +9,7 @@ import { fogoDoCaderno, proximoFogoDoCaderno } from "@/components/conquistas/nov
 import { ROTULOS_DA_SEMANA, segundaDaSemana, semanaDaSequencia, type EstadoDia } from "@/lib/sequencia-semana";
 import { normalizarDias, somarDias } from "@/lib/sequencia";
 import { trackEvent } from "@/lib/analytics";
+import { useLembreteDaSequencia } from "@/components/conquistas/LembreteDaSequencia";
 import { FogoSequencia, estadoDoFogo } from "./FogoSequencia";
 import "./fogo-sequencia.css";
 
@@ -24,7 +25,9 @@ import "./fogo-sequencia.css";
  *  4. "Sua evolução": o carrossel do Codex, COMPACTO — só a figurinha (as artes dele) e "Conquistada" / "Faltam N dias" /
  *     "A conquistar", sem repetir "N dias" (já está na arte); abre posicionado no PRÓXIMO marco (os conquistados ficam
  *     à esquerda, é arrastar); o próximo em destaque; tocar amplia a figurinha (a ampliação do Codex);
- *  5. os protetores numa linha: "🛡 2 protetores guardados" + ⓘ que explica;
+ *  5. os protetores numa linha: "🛡 2 protetores guardados" + ⓘ que explica; embaixo (só no app), o LEMBRETE da sequência:
+ *     "🔔 Me lembrar da sequência" liga o lembrete de hoje (mesmo evento sequencia_lembrete_ligar); já ligado, "🔔 Lembrete
+ *     ligado · 20h" leva a Lembretes;
  *  6. o rodapé pequeno "O que conta…". Sai o lembrete.
  * Estilo da E (sem bordas/linhas, sombras mínimas, cantos grandes) conversando com o azul-tinta das Conquistas.
  * Eventos: sequencia_folha_aberta / sequencia_folha_acao com `origem: home | conquistas`.
@@ -134,6 +137,7 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
   const acao = (seq.acao?.texto ?? "").replace(/\s+(de\s+)?hoje\b\.?$/i, "").trim();
   const [maisSemanas, setMaisSemanas] = useState(false);
   const [explicaProtetor, setExplicaProtetor] = useState(false);
+  const lembrete = useLembreteDaSequencia();
 
   useEffect(() => {
     if (!aberta) { setMaisSemanas(false); setExplicaProtetor(false); return; }
@@ -148,6 +152,15 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
   const tocarAdesivo = (b: Badge) => {
     trackEvent("sequencia_folha_acao", { acao: "figurinha", destino: b.id, dias: seq.dias, origem });
     onAdesivo(b);
+  };
+  const tocarLembrete = () => {
+    if (lembrete.ligado) {
+      trackEvent("sequencia_folha_acao", { acao: "lembretes", destino: "/notificacoes", dias: seq.dias, origem });
+      onFechar();
+      window.setTimeout(() => onIr("/notificacoes"), 180);
+      return;
+    }
+    void lembrete.ligar();
   };
   const mola = semMovimento ? { duration: 0 } : { type: "spring" as const, stiffness: 420, damping: 38 };
 
@@ -230,6 +243,14 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
                 <button type="button" onClick={() => setExplicaProtetor((v) => !v)} aria-label="O que é um protetor" aria-expanded={explicaProtetor} data-testid="he-seq-protetores-info" className="w-8 h-8 -mr-1.5 rounded-full grid place-items-center text-muted-foreground"><Info className="w-[17px] h-[17px]" strokeWidth={2} /></button>
               </div>
               {explicaProtetor && <p className="mt-1.5 text-[12.5px] text-muted-foreground leading-snug" data-testid="he-seq-protetores-explica">A cada 7 dias seguidos você ganha 1. Um dia vazio? Ele segura a sequência.</p>}
+              {/* o lembrete da sequência (só no app): a mesma linha pequena, sem a folha precisar rolar */}
+              {lembrete.visivel && (
+                <button type="button" onClick={tocarLembrete} disabled={lembrete.ligando} data-testid="he-seq-lembrete" data-ligado={lembrete.ligado ? "1" : "0"} className="mt-2.5 w-full flex items-center gap-2.5 text-left disabled:opacity-60">
+                  <Bell className="w-[18px] h-[18px] text-amber-600 dark:text-amber-300 shrink-0" strokeWidth={2.2} aria-hidden />
+                  <span className="flex-1 text-[13.5px] font-semibold">{lembrete.ligado ? `Lembrete ligado · ${lembrete.hora}h` : "Me lembrar da sequência"}</span>
+                  {lembrete.ligado && <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" strokeWidth={2} aria-hidden />}
+                </button>
+              )}
             </div>
 
             {/* 6. o rodapé */}

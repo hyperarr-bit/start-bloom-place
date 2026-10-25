@@ -7,7 +7,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 import { MARCOS_SEQUENCIA } from "@/lib/sequencia";
-import { CHAVE_VISTAS } from "@/lib/conquistas-registro";
+import { CHAVE_VISTAS, ID_DIA_UM } from "@/lib/conquistas-registro";
 import { RARIDADES, RARIDADE_LABEL, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
 import { AdesivoRaro, ChipRaridade } from "./adesivos-raridade";
 import { Roseta } from "./Roseta";
@@ -781,8 +781,10 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
       .sort((a, b) => pesoDaRaridade(b) - pesoDaRaridade(a));
     if (c2) {
       // quem já tinha o recorde quando os adesivos de 2/3/14 chegaram cola em silêncio
-      const silenciosos = novos.filter((b) => !festaDoMarcoNovo(b.id, seq)).map((b) => b.id);
-      novos = novos.filter((b) => festaDoMarcoNovo(b.id, seq));
+      // 26/10: a "1 Dia Anotado" de quem JÁ usava o app (conq.diaUmSilencioso) cola quieta — nem toast, nem festa
+      const festeja = (b: Badge) => festaDoMarcoNovo(b.id, seq) && !(b.id === ID_DIA_UM && conq.diaUmSilencioso);
+      const silenciosos = novos.filter((b) => !festeja(b)).map((b) => b.id);
+      novos = novos.filter(festeja);
       // O tutorial em cena adia a chegada; não consome a primeira figurinha em silêncio.
       // A assinatura/trial não define a comemoração. Nenhuma festa cobre uma dose ativa.
       if (esperaMissao) return { fila: [], semFesta: silenciosos };
@@ -815,7 +817,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     if (noPopup.length) itens.push({ tipo: "popup", badges: noPopup });
     const semFesta = [...raros.slice(maxRaros), ...comuns.slice(maxComuns)].map((b) => b.id);
     return { fila: itens, semFesta };
-  }, [loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
+  }, [loaded, vistas, seq.recorde, seq.dias, seq.hojeFeito, conq.folha, conq.diaUmSilencioso, contaNova, capasVistas, emConquistas, esperaMissao, c2, mostradasAntes]);
 
   // os que ficaram sem festa entram como vistos (uma escrita só)
   const semFestaTxt = semFesta.join(",");

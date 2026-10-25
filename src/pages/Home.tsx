@@ -31,6 +31,8 @@ import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
 import { useHomeNova } from "@/hooks/use-home-nova";
+import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
+import { CHAVE_COR_ANTES_HOME_NOVA } from "@/lib/home-nova";
 import { contarUso } from "@/lib/medicao-total";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
@@ -138,6 +140,15 @@ const HomePage = () => {
   // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`; no modo "admin" a checagem roda por trás e, sem
   // resposta, vale "não" — a Home de hoje aparece na hora, nunca a tela em branco)
   const homeNova = useHomeNova(user);
+  // 26/10: a Home nova guarda a cor do tema de antes (core-cor-antes-home-nova) ao forçar o Original; com a chave
+  // DESLIGADA a cor volta na próxima abertura e o guardado sai
+  const { setPalette } = useTheme();
+  const corGuardada = get<unknown>(CHAVE_COR_ANTES_HOME_NOVA, null);
+  useEffect(() => {
+    if (!loaded || homeNova.ligada || typeof corGuardada !== "string" || !corGuardada) return;
+    if (corGuardada !== "default" && corGuardada in palettes) setPalette(corGuardada as ThemePalette);
+    setData(CHAVE_COR_ANTES_HOME_NOVA, null, { system: true });
+  }, [loaded, homeNova.ligada, corGuardada, setPalette, setData]);
   const homeNovaDesdeAMontagem = useRef(homeNova.ligada);
   const [homeECarregada, setHomeECarregada] = useState(moduloHomeE !== null);
   useEffect(() => {

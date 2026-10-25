@@ -10,7 +10,7 @@ import {
 } from "@/lib/sequencia";
 import { acaoDoDia, type AcaoDoDia } from "@/lib/acao-do-dia";
 import { faixaDoFogo, type Faixa } from "@/lib/fogo-sequencia";
-import { CHAVE_ALBUM_VISTO, CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, lerDesbloqueadas, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
+import { CHAVE_ALBUM_VISTO, CHAVE_DESBLOQUEADAS, CHAVE_VISTAS, ID_DIA_UM, dataDoDiaUmSilencioso, buildBadgesSequencia, mesclarDesbloqueios, lerDesbloqueadas, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
 import {
@@ -113,6 +113,8 @@ export interface EstadoConquistas {
   colecoes: Colecao[];
   /** Já existe o registro gravado (fora a 1ª abertura desta versão). */
   registroPronto: boolean;
+  /** 26/10: conta que JÁ usava o app — a "1 Dia Anotado" (nova na 1.0.19) cola em silêncio, sem festa/toast. */
+  diaUmSilencioso: boolean;
 }
 
 /** Contagem por raridade e por módulo — puro, pra testes e pras artes. */
@@ -141,6 +143,8 @@ export function useConquistas(): EstadoConquistas {
   }, [lista, hub, hoje]);
   const gravadas = get<unknown>(CHAVE_DESBLOQUEADAS, undefined);
   const piso = get<unknown>(CHAVE_NIVEL_PISO, undefined);
+  // 26/10: "1 Dia Anotado" pra quem JÁ usava o app cola em silêncio, datada do 1º registro (lib/conquistas-registro)
+  const dataDoDiaUm = useMemo(() => dataDoDiaUmSilencioso(diasEfetivos(lista, hub, hoje), lerDesbloqueadas(gravadas), hoje), [lista, hub, hoje, gravadas]);
 
   const r = useMemo(() => {
     const daSequencia = buildBadgesSequencia(seq.recorde, { protetoresUsados: seq.usados.length, diasAnotados: seq.diasAnotados });
@@ -171,17 +175,28 @@ export function useConquistas(): EstadoConquistas {
   const primeiraVez = gravadas === undefined;
   useEffect(() => {
     if (!loaded || (!novasTxt && !primeiraVez)) return;
-    set(CHAVE_DESBLOQUEADAS, r.desbloqueadas, { system: true });
+    const novas = novasTxt ? novasTxt.split(",") : [];
+    // 26/10: a "1 Dia Anotado" de quem JÁ usava o app entra datada do 1º registro, já vista e já colada (em silêncio)
+    const diaUmSilencioso = !primeiraVez && novas.includes(ID_DIA_UM) && dataDoDiaUm !== null;
+    set(CHAVE_DESBLOQUEADAS, diaUmSilencioso ? { ...r.desbloqueadas, [ID_DIA_UM]: dataDoDiaUm } : r.desbloqueadas, { system: true });
     if (primeiraVez) {
       if (get<unknown>(CHAVE_ALBUM_VISTO, undefined) === undefined) {
         set(CHAVE_ALBUM_VISTO, r.adesivos.filter((b) => b.unlocked).map((b) => b.id), { system: true });
       }
       return;
     }
-    for (const id of novasTxt.split(",")) {
+    if (diaUmSilencioso) {
+      const visto = get<unknown>(CHAVE_ALBUM_VISTO, undefined);
+      if (Array.isArray(visto) && !visto.includes(ID_DIA_UM)) set(CHAVE_ALBUM_VISTO, [...visto, ID_DIA_UM], { system: true });
+      const vistas = get<unknown>(CHAVE_VISTAS, undefined) as { adesivos?: unknown } | undefined;
+      if (vistas && typeof vistas === "object" && Array.isArray(vistas.adesivos) && !vistas.adesivos.includes(ID_DIA_UM)) {
+        set(CHAVE_VISTAS, { ...vistas, adesivos: [...vistas.adesivos, ID_DIA_UM] }, { system: true });
+      }
+    }
+    for (const id of novas) {
       if (eventosDeAdesivo.has(id)) continue;
       eventosDeAdesivo.add(id);
-      trackEvent("adesivo_desbloqueado", { id });
+      trackEvent("adesivo_desbloqueado", diaUmSilencioso && id === ID_DIA_UM ? { id, silencioso: true } : { id });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, novasTxt, primeiraVez]);
@@ -225,8 +240,9 @@ export function useConquistas(): EstadoConquistas {
       proximo: proximoAdesivo(ativos),
       ...contarAdesivos(ativos),
       registroPronto: gravadas !== undefined,
+      diaUmSilencioso: dataDoDiaUm !== null,
     };
-  }, [r, gravadas, piso, pisoInicial, nivelPorXp]);
+  }, [r, gravadas, piso, pisoInicial, nivelPorXp, dataDoDiaUm]);
 }
 
 /* ------------------------------------------------------------------------- *

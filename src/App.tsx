@@ -373,6 +373,8 @@ const DevMissao1PorDia = import.meta.env.DEV ? lazy(() => import("./pages/dev/De
 const DevIntroModulo = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevIntroModulo")) : null;
 // 29/09: os cards de compartilhar (cada conquista em 9:16, 4:5 e adesivo) com dados de exemplo — só no dev
 const DevCompartilhar = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevCompartilhar")) : null;
+// 25/10: a HOME NOVA (mockup: topo com semana/fogo, card do score, Hoje, módulos grandes, barra flutuante + "+") com os dados reais da conta — só no dev
+const DevHomeNova = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevHomeNova")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -811,6 +813,9 @@ const AnimatedRoutes = () => {
         <Route path="/funil-radar" element={<FunilAposentado web={<PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />} />
         {import.meta.env.DEV && DevCompartilhar && (
           <Route path="/dev/compartilhar" element={<Suspense fallback={null}><DevCompartilhar /></Suspense>} />
+        )}
+        {import.meta.env.DEV && DevHomeNova && (
+          <Route path="/dev/home-nova" element={<Suspense fallback={null}><DevHomeNova /></Suspense>} />
         )}
         {/* ENTRADA_APP: a porta do app da loja. v53 (16/08): no SHELL renderiza
             o funil do TESTE GRÁTIS (4 perguntas → app real em modo guiado →

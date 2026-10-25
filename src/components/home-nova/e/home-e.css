@@ -1,0 +1,103 @@
+/* HOME NOVA — OPÇÃO E (mockup 25/10, ramo v1019-home-e). Só /dev/home-nova?layout=e monta isto.
+ * Em cima de .hn (home-nova.css): os mesmos tokens do tema; o que é só da E vem aqui.
+ *
+ * RODADA 3 (sobriedade e harmonia, como o Cal AI):
+ *  - fundo quase branco com um véu só no topo (não o papel bege chapado);
+ *  - sombras reduzidas a quase nada (o relevo é o branco do card sobre o fundo);
+ *  - a PALETA: cada módulo é uma cor com nome {h, L, C} (paleta.ts); o tema só clareia no escuro e dá a
+ *    luminosidade fixa das tintas (azulejos e discos). */
+.hn.he {
+  /* rodada 5: cada tom tem o próprio {L, C} (paleta.ts); no claro a cor é a própria (L' = L, C' = C) e a tinta
+     dos azulejos/discos tem luminosidade fixa com uma fração do croma da cor.
+     rodada 6: --he-t é o ponto da régua v5 → r4 (0 = v5 forte · 0,5 = suave · 0,7 = mais suave); a tinta lava junto:
+     luminosidade 0,955 → 0,962 e fração do croma 0,30 → 0,18 */
+  --he-t: 0;
+  --he-Lk: 0; --he-Lm: 1; --he-Cm: 1;
+  --he-tinta-L: calc(0.955 + var(--he-t) * 0.01);
+  --he-tinta-k: calc(0.3 - var(--he-t) * 0.17);
+  --he-trilho: hsl(var(--foreground) / 0.07);
+  --hn-fundo: 0 0% 98%;
+  --hn-sombra: 0 1px 2px rgb(0 0 0 / 0.025), 0 2px 10px rgb(0 0 0 / 0.04);
+  --hn-sombra-forte: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 18px rgb(0 0 0 / 0.08);
+  --he-vidro: rgb(255 255 255 / 0.82);
+  --he-vidro-aba: rgb(255 255 255 / 0.92);
+  --he-vidro-fio: rgb(255 255 255 / 0.85);
+  --he-vidro-borda: rgb(0 0 0 / 0.04);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.08);
+  background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
+}
+.dark .hn.he {
+  /* no escuro a cor clareia (L' = 0,46 + 0,5·L → marinho 0,42 vira 0,67; ouro 0,76 vira 0,84) com 85 % do croma;
+     a tinta é um fundo escuro com um sopro da cor */
+  --he-Lk: 0.46; --he-Lm: 0.5; --he-Cm: 0.85;
+  --he-tinta-L: calc(0.27 - var(--he-t) * 0.015);
+  --he-tinta-k: calc(0.4 - var(--he-t) * 0.2);
+  --he-trilho: hsl(var(--foreground) / 0.1);
+  --hn-fundo: 222 16% 7%;
+  --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);
+  --hn-sombra-forte: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.5);
+  --he-vidro: rgb(30 33 40 / 0.78);
+  --he-vidro-aba: rgb(255 255 255 / 0.11);
+  --he-vidro-fio: rgb(255 255 255 / 0.16);
+  --he-vidro-borda: rgb(255 255 255 / 0.08);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.6);
+  background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
+}
+
+/* rodada 6: os dois níveis de meio-termo (data-suave no .hn.he) */
+.hn.he[data-suave="suave"] { --he-t: 0.5; }
+.hn.he[data-suave="mais"] { --he-t: 0.7; }
+
+/* ---- o carrossel do dia: páginas de largura cheia, que param uma por vez ---- */
+.he-trilho {
+  display: flex;
+  align-items: stretch;
+  /* 28 e não 16: com 16 o fio de luz (escuro) e a sombra do card da página vizinha apareciam na beirada da tela */
+  gap: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* respiro vertical pra sombra dos cards não ser cortada pelo overflow */
+  margin: -20px -16px;
+  padding: 20px 16px;
+  scroll-padding-inline: 16px;
+}
+.he-trilho::-webkit-scrollbar { display: none; }
+.he-trilho[data-arrasto] { scroll-snap-type: none; }
+.he-pagina {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- a barra de vidro (liquid glass): translúcida, desfoca e satura o que passa atrás;
+   um fio de luz na borda de cima dá o "vidro"; sem linha de divisão. ---- */
+.he-vidro {
+  background: var(--he-vidro);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 var(--he-vidro-fio),
+    inset 0 0 0 0.5px var(--he-vidro-borda),
+    var(--he-vidro-sombra);
+}
+.he-vidro-aba { background: var(--he-vidro-aba); }
+/* o "+" segue sólido (grafite / tinta de noite): é o único botão de ação da tela, precisa de contraste */
+
+/* ---- o fogo da pílula (rodada 2, porte da direção A v3): apagado enquanto o dia não está garantido;
+   acende 1× por dia (pulso de 0,6 s; prefers-reduced-motion desliga) ---- */
+.he-fogo-apagado { filter: saturate(0.35) brightness(1.05); opacity: 0.42; }
+.dark .he-fogo-apagado { filter: saturate(0.35) brightness(1.25); opacity: 0.45; }
+.he-acende { animation: he-acende 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes he-acende {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.14); filter: brightness(1.35) saturate(1.3); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@media (prefers-reduced-motion: reduce) { .he-acende { animation: none; } }

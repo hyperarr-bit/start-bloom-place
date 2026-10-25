@@ -22,7 +22,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
         theme={theme as ToasterProps["theme"]}
         className="toaster group"
         position="top-center"
+        // no celular o sonner usa o mobileOffset (não o offset): abaixo do relógio/ilha (--app-safe-top, lib/status-bar)
         offset="calc(var(--app-safe-top, 0px) + 10px)"
+        mobileOffset={{ top: "calc(var(--app-safe-top, 0px) + 10px)", left: "16px", right: "16px", bottom: "16px" }}
         gap={8}
         toastOptions={{
           classNames: {

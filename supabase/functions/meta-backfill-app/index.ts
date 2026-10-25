@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { chaveIdDaLojaLigada, eventIdDoStartTrial } from "../_shared/meta-starttrial-id.ts";
 
 /**
  * meta-backfill-app — reenvia pra Meta compras do app que ficaram pra trás.
@@ -57,6 +58,22 @@ async function cobrancaConfirmadaNoRevenueCat(userId: string, txId: string): Pro
     if (!sub) return null;
     if (sub.status === "trialing") return false;
     return Number(sub?.total_revenue_in_usd?.gross ?? 0) > 0;
+  } catch {
+    return null;
+  }
+}
+
+/** 1.0.19: a assinatura no RevenueCat (só pra ler `store` e `store_subscription_identifier`). null = sem secret/erro. */
+async function assinaturaNoRevenueCat(userId: string, txId: string): Promise<{ id?: string; store?: string | null; store_subscription_identifier?: string | null } | null> {
+  const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
+  if (!secret || !/^sub/.test(txId)) return null;
+  try {
+    const r = await fetch(`${RC_API}/projects/${PROJETO}/customers/${encodeURIComponent(userId)}/subscriptions`, {
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j?.items ?? []).find((x: { id?: string }) => x?.id === txId) ?? null;
   } catch {
     return null;
   }
@@ -215,6 +232,15 @@ async function mandarCompraProMeta(
   const anonId = s("anon_id");
   if (anonId) user_data.anon_id = anonId;
 
+  /* 1.0.19 (SKAN, 25/10) — DESLIGADO até o dono decidir (secret META_STARTTRIAL_ID_DA_LOJA=on).
+   * O app 1.0.19 manda StartTrial também pelo SDK, com event_id = id da transação da Apple. Ligada, a
+   * chave faz o StartTrial de assinatura da App Store sair com o MESMO id (store_subscription_identifier
+   * do RevenueCat) e a Meta junta os dois. Desligada (padrão): event_id = tx de sempre ("sub…"). */
+  let eventId = txId;
+  if (tipo === "trial" && chaveIdDaLojaLigada(Deno.env.get("META_STARTTRIAL_ID_DA_LOJA"))) {
+    eventId = eventIdDoStartTrial(txId, await assinaturaNoRevenueCat(userId, txId), true);
+  }
+
   const payload: Record<string, unknown> = {
     data: [{
       event_name: nomeEvento,
@@ -227,7 +253,7 @@ async function mandarCompraProMeta(
         Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
         Math.floor(Date.now() / 1000) - Math.floor(6.5 * 86400),
       ),
-      event_id: txId,                        // dedup, igual ao padrão da web
+      event_id: eventId,                     // dedup, igual ao padrão da web (StartTrial do iPhone: ver abaixo)
       action_source: "app",
       user_data,
       app_data: {

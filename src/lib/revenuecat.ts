@@ -57,6 +57,7 @@ import { registrarDias23Remoto } from "@/lib/dias23";
 import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
 import { registrarDegrau2Remoto, registrarMotivosRemoto } from "@/lib/mensal-degraus";
 import { registrarRetroOutubroRemoto } from "@/lib/retro-outubro";
+import { registrarInicioDoTesteNoSdk } from "@/lib/meta-inicio-teste-ios";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
  *  ofertas de saída (10/10), Conquistas 2 (16/10, `conquistas2`), a intro do módulo (16/10, `intro_modulo`), o
@@ -581,6 +582,8 @@ export async function comprarPresente69(lugar: LugarDoPresente): Promise<boolean
     // 10/10: no "x_paywall" a compra pode ENTRAR EM TESTE (3 dias) — o paywall do
     // funil lê isto pra armar o lembrete "acaba amanhã", como no comprarAnualIos.
     anotarTrialDaCompra(resultado, presente69.dados.comTrial);
+    // 1.0.19: o teste que começou aqui vai também pelo SDK da Meta (SKAdNetwork) — 1x por transação.
+    void registrarInicioDoTesteNoSdk(resultado, pacote69.product, "presente69");
     await sincronizarAssinatura();
     return true;
   } catch (e) {
@@ -1461,10 +1464,14 @@ export async function comprarAnualIos(): Promise<boolean> {
       : P.purchaseStoreProduct({ product: produto })));
     registrarResultadoDaFolha("sucesso", idProdutoAnualIos());
     anotarTrialDaCompra(resultado, anualIosTemTrial());
+    // 1.0.19 (SKAN): o "registro automático" do SDK NÃO apareceu na Meta (24/10: lista do SKAdNetwork vazia).
+    // Quando a compra entrou em TESTE, o aparelho manda StartTrial pelo SDK — 1x por transação (lib/meta-inicio-teste-ios).
+    void registrarInicioDoTesteNoSdk(resultado, pacote?.product ?? produto, "anual_ios");
     /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
      * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
      * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe
-     * na cobrança. A VENDA (Purchase 97,90) sai do servidor pelo CAPI quando o
+     * na cobrança. (24/10: NA PRÁTICA não chegou nenhum evento do SDK — por isso
+     * o StartTrial manual acima, 1.0.19. Purchase manual continua fora.) A VENDA (Purchase 97,90) sai do servidor pelo CAPI quando o
      * trial vira cobrança (meta-backfill-app: período < 10 dias = StartTrial,
      * depois Purchase no período cheio). Um Purchase de R$ 0 aqui contava
      * "compra" sem dinheiro e ensinava a campanha a buscar quem só começa o

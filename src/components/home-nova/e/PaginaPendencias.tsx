@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
-import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, MATIZ_DO_MODULO, MATIZ_DO_TIPO, TRACO, cor } from "./paleta";
+import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
 
 /**
  * PÁGINA 2 DO CARROSSEL — "PENDÊNCIAS DE HOJE" (opção E). Um card só, da altura da página 1: a lista do que
@@ -22,16 +22,16 @@ interface Props {
   onVerTodas: () => void;
 }
 
-const Disco = ({ Icone, matiz, feita }: { Icone: LucideIcon; matiz: number; feita?: boolean }) => (
-  <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : cor(matiz, 0.13) }} aria-hidden>
-    {feita ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[17px] h-[17px]" strokeWidth={TRACO} style={{ color: cor(matiz) }} />}
+const Disco = ({ Icone, tom, feita }: { Icone: LucideIcon; tom: Tom; feita?: boolean }) => (
+  <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : cor(tom, "var(--he-tinta)") }} aria-hidden>
+    {feita ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[17px] h-[17px]" strokeWidth={TRACO} style={{ color: cor(tom) }} />}
   </span>
 );
 
 /** Compromisso com hora (sem tipo) usa o ícone de calendário com relógio, na cor da Rotina. */
 const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; onClick?: () => void }) => {
   const Icone = item.tipo ? ICONE_DO_TIPO[item.tipo] : ICONE_COMPROMISSO;
-  const matiz = item.tipo ? MATIZ_DO_TIPO[item.tipo] : MATIZ_DO_MODULO.rotina;
+  const tom = item.tipo ? TOM_DO_TIPO[item.tipo] : TOM_DO_MODULO.rotina;
   return (
     <button
       type="button"
@@ -39,7 +39,7 @@ const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; o
       data-testid={feita ? "hn-pendencia-feita" : "hn-pendencia"}
       className={`w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60 ${feita ? "opacity-55" : ""}`}
     >
-      <Disco Icone={Icone} matiz={matiz} feita={feita} />
+      <Disco Icone={Icone} tom={tom} feita={feita} />
       <span className={`flex-1 min-w-0 text-[14.5px] font-medium truncate ${feita ? "text-muted-foreground line-through decoration-muted-foreground/50" : ""}`}>{item.label}</span>
       {!feita && (item.route || item.action) && <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />}
     </button>
@@ -49,9 +49,9 @@ const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; o
 export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerTodas }: Props) => {
   const navigate = useNavigate();
   const { pending, done, avisoConta, avisoTreino } = pendencias;
-  const avisos: { Icone: LucideIcon; matiz: number; texto: string; route: string }[] = [];
-  if (avisoConta) avisos.push({ Icone: ICONE_CONTA, matiz: MATIZ_DO_MODULO.financas, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas" });
-  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, matiz: MATIZ_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino" });
+  const avisos: { Icone: LucideIcon; tom: Tom; texto: string; route: string }[] = [];
+  if (avisoConta) avisos.push({ Icone: ICONE_CONTA, tom: TOM_DO_MODULO.financas, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas" });
+  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino" });
   const vagas = Math.max(0, MAX_LINHAS - avisos.length);
   const visiveis = pending.slice(0, vagas);
   const escondidas = pending.length - visiveis.length;
@@ -81,7 +81,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
 
         {pending.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-2">
-            <span className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: cor(MATIZ_DO_MODULO.dieta, 0.14) }} aria-hidden><Check className="w-6 h-6" strokeWidth={2.5} style={{ color: cor(MATIZ_DO_MODULO.dieta) }} /></span>
+            <span className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: cor(TOM_DO_MODULO.rotina, "var(--he-tinta)") }} aria-hidden><Check className="w-6 h-6" strokeWidth={2.5} style={{ color: cor(TOM_DO_MODULO.rotina) }} /></span>
             <p className="text-[15px] font-semibold">Tudo feito por hoje</p>
             {done.length > 0 && <p className="text-[12.5px] text-muted-foreground">{done.length} {done.length === 1 ? "coisa feita" : "coisas feitas"}</p>}
           </div>
@@ -90,9 +90,9 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
             {visiveis.map((item, i) => <Linha key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
               <button key={a.texto} type="button" onClick={() => navigate(a.route)} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
-                <Disco Icone={a.Icone} matiz={a.matiz} />
+                <Disco Icone={a.Icone} tom={a.tom} />
                 <span className="flex-1 min-w-0 text-[14px] font-medium truncate">{a.texto}</span>
-                <span className="text-[10.5px] font-bold uppercase tracking-wider shrink-0 pr-1" style={{ color: cor(a.matiz) }}>aviso</span>
+                <span className="text-[10.5px] font-bold uppercase tracking-wider shrink-0 pr-1" style={{ color: cor(a.tom) }}>aviso</span>
               </button>
             ))}
           </div>

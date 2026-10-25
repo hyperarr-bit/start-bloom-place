@@ -5,7 +5,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { WIDGET_CATALOG, type ActiveWidget, type WidgetId } from "@/hooks/use-home-widgets";
 import { localDayKey } from "@/lib/utils";
 import { Anel } from "./Anel";
-import { MATIZ_DO_MODULO, MATIZ_DO_TIPO, TRACO, cor } from "./paleta";
+import { TRACO, corDoModulo, corDoTipo, type Tom } from "./paleta";
+import { TOM_DO_MODULO, TOM_DO_TIPO, cor } from "./paleta";
 
 /**
  * PÁGINA 3 DO CARROSSEL — "SEUS WIDGETS" (opção E). Os widgets que a pessoa já escolhe hoje (a mesma lista
@@ -40,9 +41,9 @@ const ROTA_DO_WIDGET: Partial<Record<WidgetId, string>> = {
   tasks: "/rotina", pet: "/pet", relacoes: "/relacionamentos", skincare: "/beleza", cuidados: "/beleza", "week-progress": "/conquistas",
 };
 
-const Rotulo = ({ Icone, matiz, texto }: { Icone: typeof Dumbbell; matiz: number; texto: string }) => (
+const Rotulo = ({ Icone, tom, texto }: { Icone: typeof Dumbbell; tom: Tom; texto: string }) => (
   <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
-    <Icone className="w-[15px] h-[15px]" strokeWidth={TRACO} style={{ color: cor(matiz) }} aria-hidden />
+    <Icone className="w-[15px] h-[15px]" strokeWidth={TRACO} style={{ color: cor(tom) }} aria-hidden />
     {texto}
   </span>
 );
@@ -98,14 +99,14 @@ const CardSemana = ({ onClick }: { onClick: () => void }) => {
   return (
     <button type="button" onClick={onClick} data-testid="he-widget-week-progress" className="hn-card !rounded-[22px] p-4 col-span-2 flex flex-col text-left active:scale-[0.99] transition-transform">
       <div className="flex items-center justify-between">
-        <Rotulo Icone={CalendarCheck} matiz={MATIZ_DO_MODULO.rotina} texto="Sua semana" />
+        <Rotulo Icone={CalendarCheck} tom={TOM_DO_MODULO.rotina} texto="Sua semana" />
         <span className="text-[12px] font-medium text-muted-foreground tabular-nums">{feitos} de 7 dias</span>
       </div>
       <div className="mt-3 flex items-end justify-between gap-2">
         {semana.map((d) => (
           <div key={d.dia} className="flex-1 flex flex-col items-center gap-1.5">
             <div className="w-full max-w-[22px] h-[44px] rounded-full overflow-hidden flex items-end" style={{ background: "hsl(var(--foreground) / 0.06)" }}>
-              <div className="w-full rounded-full" style={{ height: `${d.valor > 0 ? Math.max(18, d.valor) : 0}%`, background: d.hoje ? cor(MATIZ_DO_MODULO.financas) : cor(MATIZ_DO_MODULO.rotina) }} />
+              <div className="w-full rounded-full" style={{ height: `${d.valor > 0 ? Math.max(18, d.valor) : 0}%`, background: d.hoje ? corDoModulo("financas") : corDoModulo("rotina") }} />
             </div>
             <span className={`text-[10.5px] leading-none ${d.hoje ? "font-bold text-foreground" : "font-medium text-muted-foreground"}`}>{d.dia}</span>
           </div>
@@ -122,10 +123,10 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
   switch (w.id) {
     case "calories": {
       const semKcal = data.caloriesConsumed <= 0 && data.mealsLogged > 0;
-      const c = cor(MATIZ_DO_MODULO.dieta);
+      const c = corDoModulo("dieta");
       return (
         <Medio onClick={() => ir("/dieta")} testid="he-widget-calories">
-          <Rotulo Icone={Utensils} matiz={MATIZ_DO_MODULO.dieta} texto="Calorias" />
+          <Rotulo Icone={Utensils} tom={TOM_DO_MODULO.dieta} texto="Calorias" />
           <div className="mt-2 flex items-center justify-between gap-2 flex-1">
             <span className="min-w-0">
               <span className="flex items-baseline gap-1">
@@ -144,11 +145,11 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
     case "workout":
       return (
         <Medio onClick={() => ir("/treino")} testid="he-widget-workout">
-          <Rotulo Icone={Dumbbell} matiz={MATIZ_DO_MODULO.treino} texto="Treino" />
+          <Rotulo Icone={Dumbbell} tom={TOM_DO_MODULO.treino} texto="Treino" />
           {data.todayWorkoutGroup ? (
             <>
               <span className="mt-2 text-[17px] leading-[1.2] font-bold tracking-tight line-clamp-2">{data.todayWorkoutGroup}</span>
-              <span className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold" style={data.workoutDone ? { background: cor(MATIZ_DO_MODULO.dieta, 0.14), color: cor(MATIZ_DO_MODULO.dieta) } : { background: "hsl(var(--muted))" }}>
+              <span className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold" style={data.workoutDone ? { background: corDoModulo("dieta", "var(--he-tinta)"), color: corDoModulo("dieta") } : { background: "hsl(var(--muted))" }}>
                 {data.workoutDone ? <><Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />Feito</> : "Marcar feito"}
               </span>
             </>
@@ -164,7 +165,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
       const h = data.sleepHours;
       return (
         <Medio onClick={() => ir("/saude")} testid="he-widget-sleep-log">
-          <Rotulo Icone={Moon} matiz={MATIZ_DO_TIPO.sono} texto="Sono" />
+          <Rotulo Icone={Moon} tom={TOM_DO_TIPO.sono} texto="Sono" />
           <span className="mt-2 flex items-baseline gap-1">
             <span className="text-[24px] leading-none font-bold tabular-nums tracking-[-0.02em]">{h ? String(h).replace(".", ",") : "—"}</span>
             <span className="text-[12.5px] font-medium text-muted-foreground">h</span>
@@ -177,7 +178,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
     case "reading":
       return (
         <Medio onClick={() => ir("/biblioteca")} testid="he-widget-reading">
-          <Rotulo Icone={BookOpen} matiz={MATIZ_DO_MODULO.biblioteca} texto="Leitura" />
+          <Rotulo Icone={BookOpen} tom={TOM_DO_MODULO.biblioteca} texto="Leitura" />
           {data.currentBook ? (
             <>
               <span className="mt-2 flex items-baseline gap-1">
@@ -185,7 +186,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
                 <span className="text-[12.5px] font-medium text-muted-foreground">%</span>
               </span>
               <span className="mt-1 text-[12px] text-muted-foreground line-clamp-2 leading-tight">{data.currentBook}</span>
-              <span className="mt-auto h-1.5 w-full rounded-full bg-muted overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${data.readingProgress}%`, background: cor(MATIZ_DO_MODULO.biblioteca) }} /></span>
+              <span className="mt-auto h-1.5 w-full rounded-full bg-muted overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${data.readingProgress}%`, background: corDoModulo("biblioteca") }} /></span>
             </>
           ) : (
             <>
@@ -198,10 +199,10 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
     case "habits": {
       const t = data.habits.length;
       const f = data.habits.filter((x) => x.done).length;
-      const c = cor(MATIZ_DO_MODULO.rotina);
+      const c = corDoModulo("rotina");
       return (
         <Medio onClick={() => ir("/rotina")} testid="he-widget-habits">
-          <Rotulo Icone={CalendarCheck} matiz={MATIZ_DO_MODULO.rotina} texto="Hábitos" />
+          <Rotulo Icone={CalendarCheck} tom={TOM_DO_MODULO.rotina} texto="Hábitos" />
           <div className="mt-2 flex items-center justify-between gap-2 flex-1">
             <span className="flex items-baseline gap-1"><span className="text-[24px] leading-none font-bold tabular-nums">{f}</span><span className="text-[12.5px] font-medium text-muted-foreground">/{t}</span></span>
             <Anel tamanho={58} espessura={7} valor={f} max={t} cor={c} atraso={0.4}><CalendarCheck className="w-5 h-5" strokeWidth={TRACO} style={{ color: c }} aria-hidden /></Anel>
@@ -210,10 +211,10 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
       );
     }
     case "health": {
-      const c = cor(MATIZ_DO_TIPO.agua);
+      const c = corDoTipo("agua");
       return (
         <Medio onClick={() => ir("/saude")} testid="he-widget-health">
-          <Rotulo Icone={Droplets} matiz={MATIZ_DO_TIPO.agua} texto="Água" />
+          <Rotulo Icone={Droplets} tom={TOM_DO_TIPO.agua} texto="Água" />
           <div className="mt-2 flex items-center justify-between gap-2 flex-1">
             <span className="flex items-baseline gap-1"><span className="text-[24px] leading-none font-bold tabular-nums">{Math.min(data.waterGlasses, data.waterGoal)}</span><span className="text-[12.5px] font-medium text-muted-foreground">/{data.waterGoal}</span></span>
             <Anel tamanho={58} espessura={7} valor={data.waterGlasses} max={data.waterGoal} cor={c} atraso={0.4}><Droplets className="w-5 h-5" strokeWidth={TRACO} style={{ color: c }} aria-hidden /></Anel>
@@ -224,7 +225,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
     case "finances":
       return (
         <Medio onClick={() => ir("/financas")} testid="he-widget-finances">
-          <Rotulo Icone={Receipt} matiz={MATIZ_DO_MODULO.financas} texto="Próxima conta" />
+          <Rotulo Icone={Receipt} tom={TOM_DO_MODULO.financas} texto="Próxima conta" />
           {data.nextBillName ? (
             <>
               <span className="mt-2 text-[18px] leading-tight font-bold tracking-tight line-clamp-2">{data.nextBillName}</span>

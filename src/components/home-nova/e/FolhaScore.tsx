@@ -7,7 +7,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { Anel } from "./Anel";
 import { resumoDoScore } from "./score-itens";
 import { explicacaoDoScore, tituloDoScore } from "./PaginaSeuDia";
-import { ICONE_DO_TIPO, TRACO, corDoScore, corDoTipo } from "./paleta";
+import { ICONE_DO_TIPO, TINTA, TRACO, corDoTipo } from "./paleta";
 
 /**
  * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E) — como a "Pontuação diária · Ótimo equilíbrio 90" do Cal AI.
@@ -37,7 +37,7 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
   const navigate = useNavigate();
   const r = resumoDoScore(data);
   const score = data.dayScore;
-  const corAnel = corDoScore(score);
+  const corAnel = TINTA; // rodada 4: o anel do cabeçalho em tinta, como o do card
   const mostrados = r.itens.filter((i) => !((i.tipo === "leitura" && !data.currentBook) || (i.tipo === "suplementos" && data.supplementsTotal === 0)));
   const pendentes = mostrados.filter((i) => !i.feito);
   const feitos = mostrados.filter((i) => i.feito);
@@ -129,13 +129,13 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
 
             {pendentes.length > 0 && (
               <>
-                <p className="mt-5 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Ainda falta</p>
+                <p className="mt-5 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Falta</p>
                 <ul>{pendentes.map((i) => <Item key={i.tipo} i={i} />)}</ul>
               </>
             )}
             {feitos.length > 0 && (
               <>
-                <p className="mt-4 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Já contou</p>
+                <p className="mt-4 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Feito</p>
                 <ul>{feitos.map((i) => <Item key={i.tipo} i={i} />)}</ul>
               </>
             )}

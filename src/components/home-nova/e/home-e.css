@@ -4,11 +4,13 @@
  * RODADA 3 (sobriedade e harmonia, como o Cal AI):
  *  - fundo quase branco com um véu só no topo (não o papel bege chapado);
  *  - sombras reduzidas a quase nada (o relevo é o branco do card sobre o fundo);
- *  - a PALETA ÚNICA: toda cor da Home é oklch(--he-L --he-C H) — só a matiz muda por módulo (paleta.ts).
- *    No claro L 0,67 / C 0,115 (os anéis do Cal AI); no escuro L 0,76 / C 0,10 (mais claro sobre o grafite). */
+ *  - a PALETA ÚNICA: toda cor da Home é oklch(L C h) com L/C de um dos níveis (A profundo, B claro, N neutro)
+ *    e a matiz do módulo (paleta.ts). No escuro os níveis sobem de luminosidade (mais claros sobre o grafite). */
 .hn.he {
-  --he-L: 0.67;
-  --he-C: 0.115;
+  /* rodada 4: dois níveis (A profundo · B claro, em xadrez na grade) + neutro (N) — paleta.ts */
+  --he-L-A: 0.62; --he-C-A: 0.13;
+  --he-L-B: 0.72; --he-C-B: 0.10;
+  --he-L-N: 0.58; --he-C-N: 0.03;
   --he-tinta: 0.14;
   --he-trilho: hsl(var(--foreground) / 0.07);
   --hn-fundo: 0 0% 98%;
@@ -22,8 +24,9 @@
   background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
 }
 .dark .hn.he {
-  --he-L: 0.76;
-  --he-C: 0.10;
+  --he-L-A: 0.74; --he-C-A: 0.11;
+  --he-L-B: 0.82; --he-C-B: 0.085;
+  --he-L-N: 0.72; --he-C-N: 0.02;
   --he-tinta: 0.18;
   --he-trilho: hsl(var(--foreground) / 0.1);
   --hn-fundo: 222 16% 7%;

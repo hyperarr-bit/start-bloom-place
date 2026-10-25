@@ -16,7 +16,7 @@ import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { trackEvent } from "@/lib/analytics";
 import { PilulaFogoE } from "./PilulaFogoE";
 import { iniciaisDe } from "../HomeNova";
-import { FolhaMais } from "../FolhaMais";
+import { FolhaMaisE } from "./FolhaMaisE";
 import type { AbaNova } from "../BarraFlutuante";
 import { CarrosselDia } from "./CarrosselDia";
 import { PaginaSeuDia } from "./PaginaSeuDia";
@@ -126,7 +126,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
       </main>
 
       <BarraVidro ativa="inicio" iniciais={iniciaisDe(nomeCompleto)} onIr={ir} onMais={abrirMais} rotulos={rotulos} />
-      <FolhaMais aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} />
+      <FolhaMaisE aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} />
       <FolhaScore aberta={folhaScore} onFechar={() => setFolhaScore(false)} data={lifeData} seq={seq} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
       <WidgetPicker open={picker} onOpenChange={setPicker} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
       <PersonalizarPendencias open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />

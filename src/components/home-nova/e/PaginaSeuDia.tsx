@@ -5,7 +5,7 @@ import type { ActionId } from "@/components/home/QuickActions";
 import type { TipoPendencia } from "@/lib/home-pendencias";
 import { COPO_ML_PADRAO, unidadeDaAgua } from "@/lib/saude-copo";
 import { Anel } from "./Anel";
-import { MATIZ_DO_MODULO, MATIZ_DO_TIPO, TRACO, cor, corDoScore } from "./paleta";
+import { TOM_DO_MODULO, TOM_DO_TIPO, TINTA, TRACO, cor, type Tom } from "./paleta";
 
 /**
  * PÁGINA 1 DO CARROSSEL — "SEU DIA" (opção E). O conjunto do Cal AI, ajustado ao CORE.
@@ -14,11 +14,12 @@ import { MATIZ_DO_MODULO, MATIZ_DO_TIPO, TRACO, cor, corDoScore } from "./paleta
  *  - o CARD GRANDE é só o número: "27 pontos" (os dois em preto) e, embaixo, "Score do dia" em cinza — como
  *    "2276 /2616 · Calorias consumidas" no Cal AI. Saíram "Faltam N coisas pra fechar o dia" e o "?". À direita
  *    o anel com a ESTRELA, que é o convite: tocar nele abre a folha "Como funciona a pontuação" (e a frase
- *    "faltam N coisas" mora lá, no topo). No 100 a estrela vira ✓.
+ *    "faltam N coisas" mora lá, no topo). No 100 a estrela vira ✓. RODADA 4: anel e estrela em TINTA (grafite;
+ *    no escuro a tinta clara do "+"), como o anel preto do Cal AI; trilho cinza claro.
  *  - os 3 CARDS PEQUENOS continuam Hábitos (20 pts), Água (15) e Refeições (10) — as três contas "x de y"
- *    que existem pra todo mundo, 45 dos 100 pontos num olhar —, agora com o anel e o ícone na cor do módulo
- *    de origem da paleta única (verde-água, céu, sálvia) e traço 1,75. Fila de reserva, se a pessoa ocultar
- *    um tipo em Personalizar: Suplementos (x de y, quando cadastrados) e Registros do dia (x de 6).
+ *    que existem pra todo mundo, 45 dos 100 pontos num olhar —, com o anel e o ícone na cor do módulo de
+ *    origem da paleta única (verde-água, céu, sálvia) e traço 1,75. RODADA 4: só o nome, uma palavra
+ *    ("Hábitos", "Água", "Refeições"; na fila de reserva, "Suplementos" e "Registros").
  */
 export interface Metrica {
   id: TipoPendencia | "registros";
@@ -26,7 +27,7 @@ export interface Metrica {
   valor: number;
   max: number;
   Icone: typeof Droplets;
-  matiz: number;
+  tom: Tom;
   route?: string;
   action?: ActionId;
   /** toque abre o "+" na grade (registros) */
@@ -47,13 +48,14 @@ export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO): 
   const cobra = (t: TipoPendencia) => !d.pendenciasCobradas || d.pendenciasCobradas.includes(t);
   const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
   const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => cobra(t));
-  const unidade = unidadeDaAgua(copoMl);
+  // (a unidade da água — copos/garrafas — não aparece mais no rótulo; segue valendo no "x/y" e nas pendências)
+  void unidadeDaAgua(copoMl);
   const fila: (Metrica | null)[] = [
-    cobra("habitos") ? { id: "habitos", rotulo: d.habits.length ? "Hábitos feitos" : "Hábitos · crie o 1º", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, matiz: MATIZ_DO_TIPO.habitos, route: "/rotina" } : null,
-    cobra("agua") ? { id: "agua", rotulo: `${unidade.charAt(0).toUpperCase()}${unidade.slice(1)} de água`, valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, matiz: MATIZ_DO_TIPO.agua, action: "water" } : null,
-    cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições registradas", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, matiz: MATIZ_DO_TIPO.refeicoes, route: "/dieta" } : null,
-    cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos tomados", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, matiz: MATIZ_DO_TIPO.suplementos, route: "/saude" } : null,
-    registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros do dia", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, matiz: MATIZ_DO_MODULO.desenvolvimento, abreMais: true } : null,
+    cobra("habitos") ? { id: "habitos", rotulo: "Hábitos", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, tom: TOM_DO_TIPO.habitos, route: "/rotina" } : null,
+    cobra("agua") ? { id: "agua", rotulo: "Água", valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, tom: TOM_DO_TIPO.agua, action: "water" } : null,
+    cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, tom: TOM_DO_TIPO.refeicoes, route: "/dieta" } : null,
+    cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, tom: TOM_DO_TIPO.suplementos, route: "/saude" } : null,
+    registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, tom: TOM_DO_MODULO.desenvolvimento, abreMais: true } : null,
   ];
   return fila.filter((m): m is Metrica => !!m).slice(0, 3);
 }
@@ -67,7 +69,7 @@ interface PropsScore {
 
 export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
   const completo = score >= 100;
-  const corAnel = corDoScore(score);
+  const corAnel = TINTA;
   return (
     <section className="hn-card he-score p-5 flex items-center gap-4" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
       <div className="flex-1 min-w-0">
@@ -108,7 +110,7 @@ interface PropsMetrica {
 export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
   const navigate = useNavigate();
   const completo = m.max > 0 && m.valor >= m.max;
-  const c = cor(m.matiz);
+  const c = cor(m.tom);
   const tocar = () => {
     if (m.abreMais) return onMais();
     if (m.action) return onAcao(m.action);
@@ -126,7 +128,7 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
         <span className="text-[23px] leading-none font-bold tabular-nums tracking-[-0.02em]">{m.valor}</span>
         <span className="text-[13px] font-medium text-muted-foreground tabular-nums">/{m.max}</span>
       </span>
-      <span className="mt-1.5 text-[12px] leading-[1.25] text-muted-foreground line-clamp-2 min-h-[30px]">{m.rotulo}</span>
+      <span className="mt-1.5 text-[12.5px] leading-[1.25] text-muted-foreground truncate max-w-full">{m.rotulo}</span>
       <span className="mt-auto self-center pt-1.5">
         <Anel tamanho={62} espessura={7} valor={m.valor} max={m.max} cor={c} atraso={atraso}>
           {completo

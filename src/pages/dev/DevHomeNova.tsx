@@ -34,6 +34,8 @@ const Voce = lazy(() => import("@/pages/Voce"));
  *   &arrasto=0.45            · congela o carrossel no meio do arrasto (0…1 entre a 1ª e a 2ª página)
  *   &folha=score             · abre a folha "Como funciona a pontuação"; &folha=1 abre a do "+"
  *   &numero=dentro           · variação do card do score com o número dentro do anel (como hoje)
+ *   &fundo=gradiente         · MOCKUP (adendo 26/10, só pra comparar — não está no app): o fundo em degradê como o
+ *                              do Cal AI (véu quente/rosado no alto que some ao descer) — html.he-mock-gradiente, home-e.css
  */
 export default function DevHomeNova() {
   const [sp] = useSearchParams();
@@ -61,6 +63,11 @@ export default function DevHomeNova() {
     if (!tema) return;
     document.documentElement.classList.toggle("dark", tema === "escuro");
   }, [tema]);
+  const fundoGradiente = layoutE && sp.get("fundo") === "gradiente";
+  useEffect(() => {
+    document.documentElement.classList.toggle("he-mock-gradiente", fundoGradiente);
+    return () => { document.documentElement.classList.remove("he-mock-gradiente"); };
+  }, [fundoGradiente]);
 
   const escuro = tema === "escuro" || (tema !== "claro" && typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
   const fundo = escuro ? "hsl(222 16% 7%)" : "hsl(40 12% 96%)";
@@ -84,7 +91,8 @@ export default function DevHomeNova() {
           <BarraFlutuante ativa={tela} iniciais={iniciaisDe(nome)} onIr={ir} onMais={() => ir("inicio")} rotulos={rotuloInicio ? { inicio: rotuloInicio } : undefined} />
         </div>
       )}
-      {status && <MolduraIphone fundo={fundo} />}
+      {/* com a E, a faixa do relógio é a de verdade (html.he-fundo-da-tela): a moldura não pinta por cima */}
+      {status && <MolduraIphone fundo={layoutE ? null : fundo} />}
     </>
   );
 }

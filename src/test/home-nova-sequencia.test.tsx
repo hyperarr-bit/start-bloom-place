@@ -60,22 +60,31 @@ describe("Home nova — pílula do fogo e folha da sequência", () => {
     await montar(base([diasAtras(1), hoje]));
     const pilula = screen.getByTestId("hn-pilula-fogo");
     expect(pilula.getAttribute("data-fogo")).toBe("aceso");
-    expect(pilula.querySelector("svg[data-fogo='aceso'][data-faixa='laranja']")).toBeTruthy();
+    // 26/10: o fogo unificado (components/fogo) — a faixa e o estado no invólucro, o desenho do Codex dentro
+    expect(pilula.querySelector("[data-testid='fg-seq'][data-fogo='aceso'][data-faixa='laranja'] svg[data-fogo='laranja']")).toBeTruthy();
     expect(screen.getByTestId("hn-pilula-dias").textContent).toBe("2");
     fireEvent.click(pilula);
     await waitFor(() => expect(screen.getByTestId("he-folha-sequencia")).toBeTruthy());
     expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/home"); // não foi pra Conquistas
-    expect(screen.getByText("Um dia de cada vez")).toBeTruthy();
+    // 26/10: a folha unificada (components/fogo/FolhaSequencia — a mesma das Conquistas), vinda da Home
+    expect(screen.getByTestId("he-folha-sequencia").getAttribute("data-origem")).toBe("home");
+    expect(screen.getByText(/dias seguidos/)).toBeTruthy();
     expect(screen.getByTestId("he-seq-dias").textContent).toBe("2");
+    expect(screen.queryByTestId("he-seq-recorde")).toBeNull(); // recorde = sequência atual: não mostra
     const dias = Array.from(document.querySelectorAll('[data-testid="he-seq-dia"]'));
     expect(dias).toHaveLength(7);
     const deHoje = dias.find((d) => d.getAttribute("data-hoje") === "1");
     expect(deHoje?.getAttribute("data-estado")).toBe("feito");
     expect(dias.filter((d) => d.getAttribute("data-estado") === "feito").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Hoje já conta.");
-    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Faltam 5 dias pro fogo vermelho");
+    // a próxima faixa nos nomes da sequência das Conquistas (paleta do caderno): com 2 dias, o laranja vivo vem aos 3
+    expect(screen.getByTestId("he-seq-garantido").textContent).toContain("Falta 1 dia pro fogo laranja vivo");
     expect(screen.queryByTestId("he-seq-acao")).toBeNull();
-    expect(eventos.some(([e, d]) => e === "sequencia_folha_aberta" && d.garantido === true && d.dias === 2)).toBe(true);
+    expect(eventos.some(([e, d]) => e === "sequencia_folha_aberta" && d.garantido === true && d.dias === 2 && d.origem === "home")).toBe(true);
+    // a evolução com as figurinhas da sequência, aberta no próximo marco (3 dias), e os protetores numa linha
+    expect(screen.getByTestId("he-seq-evolucao").getAttribute("data-destaque")).toBe("sequencia-3");
+    expect(screen.getByTestId("he-seq-protetores").textContent).toMatch(/protetor/);
+    expect(screen.queryByText(/Últimas 4 semanas/)).toBeNull();
   });
 
   it("dia NÃO garantido: fogo apagado; a folha mostra 'Pra continuar hoje: <ação do dia>' e o toque leva pra fazer", async () => {
@@ -97,14 +106,16 @@ describe("Home nova — pílula do fogo e folha da sequência", () => {
     expect(String(ev![1].destino)).toBe(screen.getByTestId("sonda").getAttribute("data-rota"));
   });
 
-  it("'Ver conquistas' leva pra /conquistas com origem home", async () => {
+  it("tocar numa figurinha da evolução leva pras Conquistas ampliando ela (state.figurinha, origem home)", async () => {
     await montar(base([hoje]));
     fireEvent.click(screen.getByTestId("hn-pilula-fogo"));
-    await waitFor(() => expect(screen.getByTestId("he-seq-conquistas")).toBeTruthy());
-    fireEvent.click(screen.getByTestId("he-seq-conquistas"));
+    await waitFor(() => expect(screen.getAllByTestId("he-seq-marco").length).toBeGreaterThan(0));
+    const marcos = screen.getAllByTestId("he-seq-marco");
+    expect(marcos.length).toBeGreaterThanOrEqual(5); // 1 · 3 · 7 · 14 · 30 · 100 (sem o "Voltei")
+    fireEvent.click(marcos[0]);
     await waitFor(() => expect(screen.getByTestId("sonda").getAttribute("data-rota")).toBe("/conquistas"));
     expect(screen.getByTestId("sonda").getAttribute("data-origem")).toBe("home");
-    expect(eventos.some(([e, d]) => e === "sequencia_folha_acao" && d.acao === "conquistas")).toBe(true);
+    expect(eventos.some(([e, d]) => e === "sequencia_folha_acao" && d.acao === "figurinha" && d.origem === "home")).toBe(true);
   });
 
   it("sem sequência: fogo neutro e a folha diz 0 dias", async () => {

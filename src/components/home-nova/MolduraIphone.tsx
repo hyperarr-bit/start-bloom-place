@@ -7,12 +7,13 @@ import { createPortal } from "react-dom";
  * seguras de um iPhone 15 (59 pt em cima, 34 embaixo) nas variáveis que o app já usa. É um portal no
  * <body> pra ficar DEPOIS do .app-safe-top-guard na ordem do DOM (os dois têm o mesmo z-index máximo).
  */
-export const MolduraIphone = ({ fundo }: { fundo: string }) => {
+export const MolduraIphone = ({ fundo }: { fundo: string | null }) => {
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty("--app-safe-top", "59px");
     r.style.setProperty("--app-safe-bottom", "34px");
-    r.style.setProperty("--safe-top-cor", fundo);
+    // fundo null (a E): a faixa do relógio fica com a cor de verdade da tela (html.he-fundo-da-tela, home-e.css)
+    if (fundo) r.style.setProperty("--safe-top-cor", fundo);
     return () => { r.style.removeProperty("--app-safe-top"); r.style.removeProperty("--app-safe-bottom"); r.style.removeProperty("--safe-top-cor"); };
   }, [fundo]);
 

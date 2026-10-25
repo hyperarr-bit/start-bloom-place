@@ -52,6 +52,37 @@
 /* a barra de vidro global (fora da Home) só precisa das variáveis: sem o fundo em degradê */
 .hn.he.he-so-vars { background: none; }
 
+/* O FUNDO DA TELA ATÉ O TOPO (adendo 26/10 — print do dono no iPhone b46 × Cal AI; hook useFundoDaTelaE em
+   fundo-da-tela.ts). A faixa do relógio (.app-safe-top-guard, index.css) pintava o BRANCO do tema por cima do
+   cinza-claro da E — a "faixa branca" atrás do relógio/ilha. Com uma tela da E montada (Home, Você, Personalizar
+   início), a faixa fica na cor do TOPO do degradê da E, translúcida com um leve desfoque (ao rolar, o conteúdo passa
+   por trás, sem faixa branca), e a casca (html/body/.app-safe-shell) pinta o fundo da E — nada de branco em volta,
+   nem no elástico da rolagem nem depois do fim da página. Claro e escuro. */
+html.he-fundo-da-tela { --safe-top-cor: hsl(40 8% 95% / 0.82); }
+html.he-fundo-da-tela .app-safe-top-guard { -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+html.he-fundo-da-tela, html.he-fundo-da-tela body, html.he-fundo-da-tela .app-safe-shell { background-color: hsl(0 0% 98%); }
+html.dark.he-fundo-da-tela { --safe-top-cor: hsl(222 14% 10% / 0.82); }
+html.dark.he-fundo-da-tela, html.dark.he-fundo-da-tela body, html.dark.he-fundo-da-tela .app-safe-shell { background-color: hsl(222 16% 7%); }
+
+/* MOCKUP, SÓ PRA COMPARAR (não está no app): /dev/home-nova?layout=e&fundo=gradiente — o fundo em degradê como o do
+   Cal AI, medido no print de referência: quase branco com um véu quente no alto à direita (pêssego hsl(24 38% 94%) →
+   rosa hsl(350 19% 94%) → lilás hsl(260 9% 93%)) que some ao descer, branco por volta de 430 pt. O véu mora na casca
+   (.app-safe-shell), por isso chega até atrás do relógio; a E fica transparente e a faixa do relógio também. */
+html.he-mock-gradiente .hn.he:not(.he-so-vars) { background: transparent; }
+html.he-mock-gradiente.he-fundo-da-tela { --safe-top-cor: transparent; }
+html.he-mock-gradiente.he-fundo-da-tela, html.he-mock-gradiente.he-fundo-da-tela body { background-color: hsl(0 0% 99.2%); }
+html.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
+  background:
+    radial-gradient(560px 480px at 92% -40px, hsl(24 42% 93.5%) 0%, hsl(350 24% 94%) 36%, hsl(262 14% 95.5%) 60%, hsl(0 0% 99.2% / 0) 100%),
+    linear-gradient(180deg, hsl(0 0% 98.2%) 0px, hsl(0 0% 99.2%) 440px, hsl(0 0% 99.2%) 100%);
+}
+html.dark.he-mock-gradiente.he-fundo-da-tela, html.dark.he-mock-gradiente.he-fundo-da-tela body { background-color: hsl(222 16% 7%); }
+html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
+  background:
+    radial-gradient(560px 480px at 92% -40px, hsl(262 24% 15%) 0%, hsl(335 16% 12.5%) 40%, hsl(222 16% 7% / 0) 100%),
+    linear-gradient(180deg, hsl(222 14% 9%) 0px, hsl(222 16% 7%) 400px, hsl(222 16% 7%) 100%);
+}
+
 /* ---- os formulários do "+" (FolhaAcaoE): o NÚMERO-HERÓI e a área de texto ----
    o index.css força `input, textarea { font-size: 16px !important }` no celular (contra o auto-zoom do Safari) — por
    isso o "R$ 12,50" saía em fonte de corpo. Aqui a regra é mais específica e também !important: o número grande (44 px,

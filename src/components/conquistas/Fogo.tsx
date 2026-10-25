@@ -52,8 +52,10 @@ export const Fogo = ({ faixa, dias, tamanho, semBrilho, viva, className, style }
         </linearGradient>
       </defs>
       <path d={CHAMA} fill={`url(#${uid}-a)`} stroke={apagado ? "#8a867f" : f.chamaContorno ?? f.escuro} strokeWidth="1" strokeLinejoin="round" />
-      {/* a chama de dentro: a mesma forma, menor, presa na base */}
-      <path d={CHAMA} fill={`url(#${uid}-b)`} transform="translate(12 21.5) scale(.52) translate(-12 -21.5)" />
+      {/* a chama de dentro: a mesma forma, menor, presa na base (o <g> é o alvo da tremulação da gota — components/fogo) */}
+      <g className="fogo-gota">
+        <path d={CHAMA} fill={`url(#${uid}-b)`} transform="translate(12 21.5) scale(.52) translate(-12 -21.5)" />
+      </g>
     </svg>
   );
 };

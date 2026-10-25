@@ -320,11 +320,14 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     const evolucao = screen.getByRole("list", { name: "Marcos da sequência" });
     expect(evolucao.querySelectorAll("li")).toHaveLength(6);
     expect(evolucao.querySelectorAll("button")).toHaveLength(6);
-    expect(screen.getByTestId("cn-evolucao-inicio")).toHaveTextContent("1 diaConquistada");
+    // 26/10: a folha unificada (components/fogo/FolhaSequencia) — compacta, sem repetir "N dias" (já está na arte)
+    expect(within(evolucao).getAllByTestId("he-seq-marco")[0]).toHaveTextContent("Conquistada");
     expect(within(evolucao).queryByRole("button", { name: /Voltei/ })).toBeNull();
-    expect(Array.from(evolucao.querySelectorAll("li b"), n => n.textContent)).toEqual(["1 dia", "3 dias", "7 dias", "14 dias", "30 dias", "100 dias"]);
+    expect(Array.from(evolucao.querySelectorAll("li"), n => n.getAttribute("data-marco"))).toEqual(["1", "3", "7", "14", "30", "100"]);
+    expect(evolucao.textContent).not.toMatch(/\b(3|7|14|30|100) dias\b/);
     expect(evolucao.textContent).toContain("Conquistada");
     expect(evolucao.textContent).toContain("Faltam 2 dias");
+    expect(screen.getByTestId("he-seq-evolucao").getAttribute("data-destaque")).toBe("sequencia-14");
     fireEvent.click(screen.getByRole("button", { name: "14 Dias Seguidos: faltam 2 dias" }));
     expect(screen.getByTestId("cn-figurinha-em-foco")).toBeTruthy();
     expect(screen.queryByTestId("album-tela")).toBeNull();
@@ -334,7 +337,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
     montar();
     fireEvent.click(screen.getByTestId("cn-abrir-sequencia"));
     expect(within(screen.getByRole("list", { name: "Marcos da sequência" })).queryByRole("button", { name: /Voltei/ })).toBeNull();
-    fireEvent.click(within(screen.getByTestId("cn-detalhe-sequencia")).getByRole("button", { name: "Fechar" }));
+    fireEvent.click(within(screen.getByTestId("he-folha-sequencia")).getByRole("button", { name: "Fechar" }));
     fireEvent.click(screen.getByTestId("cn-ver-todos"));
     fireEvent.click(within(screen.getByTestId("cn-colecao-tela")).getByRole("button", { name: "Voltei: conquistada" }));
     expect(screen.getByTestId("cn-figurinha-em-foco")).toHaveTextContent("Voltei");
@@ -348,7 +351,7 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   ])("1 dia exige um registro real e continua ganho após pausa: $registros", ({ registros, conquistada }) => {
     const { store } = montar({}, { "core-dias-anotados": registros, "conquistas-desbloqueadas": {}, "conquistas-album-visto": [], "finance-expenses": [] });
     fireEvent.click(screen.getByTestId("cn-abrir-sequencia"));
-    const inicio = screen.getByTestId("cn-evolucao-inicio");
+    const inicio = screen.getAllByTestId("he-seq-marco")[0];
     expect(inicio.tagName).toBe("BUTTON");
     expect(inicio).toHaveTextContent(conquistada ? "Conquistada" : "A conquistar");
     expect(store.dados["core-dias-anotados"]).toEqual(registros);
@@ -613,10 +616,13 @@ describe("a tela: sequência, álbum como herói, trilha, por módulo", () => {
   it("o detalhe da sequência abre a evolução, mantém quatro semanas e mede", () => {
     montar();
     fireEvent.click(screen.getByTestId("cn-abrir-sequencia"));
-    expect(screen.getByTestId("cn-detalhe-sequencia")).toBeTruthy();
+    // 26/10: a folha unificada vinda das Conquistas; as 4 semanas ficam atrás do "Ver mais", com os mesmos estados
+    const folha = screen.getByTestId("he-folha-sequencia");
+    expect(folha.getAttribute("data-origem")).toBe("conquistas");
     expect(screen.getByRole("list", {name:"Marcos da sequência"})).toBeTruthy();
-    expect(screen.getByRole("button", {name:"Fechar"})).toHaveFocus();
-    expect(screen.getByTestId("cn-calendario").querySelectorAll('[data-estado="feito"]').length).toBe(12);
+    expect(screen.getAllByTestId("he-seq-dia")).toHaveLength(7);
+    fireEvent.click(screen.getByTestId("he-seq-ver-mais"));
+    expect(screen.getByTestId("he-seq-quatro-semanas").querySelectorAll('[data-estado="feito"]').length).toBe(12);
     expect(nomes()).toContain(EVENTOS2.sequenciaAbrir);
   });
 
@@ -735,8 +741,10 @@ describe("conta NOVA: a 1ª figurinha chega como a 2ª — '1 nova pra colar' e 
     abrirTela(store);
     expect(screen.getByTestId("cn-seq-resumo").getAttribute("aria-label")).toBe("Recorde 1 dia · 0 de 2 protetores · 1 dia anotado");
     fireEvent.click(screen.getByTestId("cn-abrir-sequencia"));
-    const folha = screen.getByTestId("cn-detalhe-sequencia");
-    expect(folha.textContent).toContain("Recorde de 1 dia");
+    const folha = screen.getByTestId("he-folha-sequencia");
+    expect(screen.getByTestId("he-seq-dias").textContent).toBe("1");
+    expect(folha.textContent).toContain("dia seguido"); // singular; o recorde só aparece quando é MAIOR que a sequência atual
+    expect(folha.textContent).not.toContain("dias seguidos");
     expect(folha.textContent).not.toMatch(/\b1 dias\b/);
     expect(document.body.textContent).not.toMatch(/\b1 (dias|figurinhas|adesivos)\b/);
   });

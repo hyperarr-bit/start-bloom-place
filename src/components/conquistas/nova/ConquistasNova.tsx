@@ -224,6 +224,17 @@ export const ConquistasNova = ({ testeDia: testeDiaProp, camada = null, prototip
     setTimeout(() => { setLevantando(false); setAlbum({ aberto: true, pagina, via }); }, LEVANTAR_MS);
   }, [e.pendentes.length, reduzir]);
 
+  // 26/10: veio da folha da sequência da Home nova tocando numa figurinha — amplia (a mesma camada de sempre), 1x por chegada
+  const figurinhaPedida = (estado as { figurinha?: string } | null)?.figurinha ?? null;
+  const figurinhaTratada = useRef<string | null>(null);
+  useEffect(() => {
+    if (!figurinhaPedida || !e.registroPronto || figurinhaTratada.current === figurinhaPedida) return;
+    figurinhaTratada.current = figurinhaPedida;
+    const b = e.adesivos.find((x) => x.id === figurinhaPedida);
+    if (b) setFigurinhaEmFoco(b);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [figurinhaPedida, e.registroPronto]);
+
   // veio do toast (ou da missão): abre o álbum na página da figurinha nova — uma vez por chegada
   const chegada = estado?.album ?? null;
   const chegadaTratada = useRef<string | null>(null);

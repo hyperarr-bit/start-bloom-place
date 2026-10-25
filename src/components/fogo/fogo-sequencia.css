@@ -1,0 +1,65 @@
+/* O FOGO UNIFICADO (26/10) — ver FogoSequencia.tsx. O desenho e as cores são do `Fogo` + paleta do caderno; aqui
+   moram os estados e as animações:
+   · aceso  → a CHAMA VIVA: tremulação lenta e sutil (2,6 s) no corpo — escala/inclinação mínimas — e a gota de
+             dentro balançando um pouco mais devagar (2,1 s). Nada que distraia.
+   · apagado (hoje ainda não garantido) → a mesma chama, desbotada e PARADA.
+   · neutro (0 dias) → o cinza do caderno, parado.
+   · [data-acende] → o acender: pulso + brilho rápido (0,6 s), 1x por dia (a pílula decide).
+   · [data-subiu] → a subida de faixa do caderno (conquistas-caderno.css) — sem a tremulação por cima.
+   prefers-reduced-motion desliga tudo. */
+.fg-seq { position: relative; display: grid; place-items: center; flex-shrink: 0; line-height: 0; }
+.fg-seq:not(.cn-fogo) { width: calc(var(--fg-t, 42px) + 4px); height: calc(var(--fg-t, 42px) + 4px); }
+.fg-seq > svg { transform-origin: 50% 88%; }
+.fg-seq .fogo-gota { transform-box: fill-box; transform-origin: 50% 92%; }
+
+.fg-seq[data-viva]:not([data-subiu]) > svg { animation: fg-vivo 2.6s ease-in-out infinite; }
+.fg-seq[data-viva]:not([data-subiu]) .fogo-gota { animation: fg-gota 2.1s ease-in-out infinite; }
+@keyframes fg-vivo {
+  0%, 100% { transform: rotate(-1.4deg) scale(1); }
+  38% { transform: rotate(1.2deg) scale(1.025); }
+  70% { transform: rotate(-0.6deg) scale(1.01); }
+}
+@keyframes fg-gota {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  45% { transform: scaleY(1.07) translateY(-2%); }
+  75% { transform: scaleY(0.97) translateY(1%); }
+}
+
+.fg-seq[data-fogo="apagado"] > svg { opacity: 0.45; filter: saturate(0.55) brightness(1.04); }
+.dark .fg-seq[data-fogo="apagado"] > svg { opacity: 0.5; filter: saturate(0.55) brightness(1.2); }
+
+.fg-seq[data-acende] { animation: fg-acende 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; transform-origin: 50% 85%; }
+@keyframes fg-acende {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.16); filter: brightness(1.35) saturate(1.3); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fg-seq > svg, .fg-seq .fogo-gota, .fg-seq[data-acende] { animation: none !important; }
+}
+
+/* ---- A FOLHA DA SEQUÊNCIA UNIFICADA (FolhaSequencia.tsx): o estilo da E conversando com o azul-tinta das Conquistas ----
+   (a posição da folha é das utilidades no JSX — `fixed inset-x-0 bottom-0`; nada aqui pode disputar com elas: este
+   arquivo entra DEPOIS do Tailwind no bundle e ganharia o empate) */
+.fs-tinta { color: #26334e; }
+.dark .fs-tinta { color: #f4eee3; }
+.fs-bolinha { display: grid; place-items: center; border-radius: 999px; box-sizing: border-box; }
+.fs-bolinha-vazia { border: 1.5px solid hsl(var(--foreground) / 0.12); }
+.fs-bolinha-futuro { background: hsl(var(--foreground) / 0.04); }
+.fs-bolinha-gelo { background: #e0f2fe; color: #0369a1; }
+.dark .fs-bolinha-gelo { background: #10324a; color: #7dd3fc; }
+/* a evolução: a faixa das figurinhas do Codex, compacta, rolando de lado sem barra */
+.fs-evolucao { display: flex; gap: 8px; margin: 8px -20px 0; padding: 4px 20px 2px; list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; -ms-overflow-style: none; }
+.fs-evolucao::-webkit-scrollbar { display: none; }
+.fs-evolucao li { flex: 0 0 92px; scroll-snap-align: start; }
+.fs-marco { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; border-radius: 18px; padding: 8px 4px 9px; background: hsl(var(--muted) / 0.55); }
+.fs-evolucao li[data-destaque] .fs-marco { background: #f6f2e8; box-shadow: inset 0 0 0 1.5px #d9cdb6; }
+.dark .fs-evolucao li[data-destaque] .fs-marco { background: #303846; box-shadow: inset 0 0 0 1.5px #bdaf95; }
+.fs-marco-arte { display: grid; place-items: end center; height: 76px; }
+.fs-marco small { display: flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: hsl(var(--muted-foreground)); line-height: 1.2; }
+.fs-marco small.fs-marco-ok { color: #52745d; }
+.dark .fs-marco small.fs-marco-ok { color: #a9d0b4; }
+.fs-marco small.fs-tinta { color: #26334e; }
+.dark .fs-marco small.fs-tinta { color: #f4eee3; }
+.fs-marco:focus-visible { outline: 2px solid #52745d; outline-offset: -3px; }

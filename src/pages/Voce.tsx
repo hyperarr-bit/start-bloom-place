@@ -16,6 +16,7 @@ import { CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO } from "@/lib/home-pendencias";
 import { VoceE, type CategoriaVoce } from "@/components/home-nova/e/VoceE";
 import { EscolherWidgetsE } from "@/components/home-nova/e/EscolherWidgetsE";
 import { PersonalizarPendenciasE } from "@/components/home-nova/e/PersonalizarPendenciasE";
+import { useFundoDaTelaE } from "@/components/home-nova/e/fundo-da-tela";
 import { TRACO } from "@/components/home-nova/e/paleta";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
@@ -252,6 +253,7 @@ export function PersonalizarInicio() {
   const navigate = useNavigate();
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
+  useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
   const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
   const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;

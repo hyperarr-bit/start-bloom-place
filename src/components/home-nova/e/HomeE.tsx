@@ -32,7 +32,11 @@ import { PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
 import { ModulosE, type AzulejoE, type VarianteModulosE } from "./ModulosE";
 import { OrganizarModulos } from "./OrganizarModulos";
-import { FolhaSequencia } from "./FolhaSequencia";
+import { useNavigate } from "react-router-dom";
+import { useConquistas } from "@/components/conquistas/use-conquistas";
+import { marcoDoAdesivo } from "@/components/conquistas/nova/recompensas";
+import { FolhaSequencia } from "@/components/fogo/FolhaSequencia";
+import { useFundoDaTelaE } from "./fundo-da-tela";
 import "../home-nova.css";
 import "./home-e.css";
 
@@ -79,6 +83,12 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const { get, set, loaded } = useUserData();
   const lifeData = useLifeHubData();
   const seq = useSequencia();
+  const navigate = useNavigate();
+  // adendo 26/10: a faixa do relógio e a casca na cor da E (sem a faixa branca atrás do relógio)
+  useFundoDaTelaE();
+  // 26/10: a folha da sequência unificada mostra as figurinhas da sequência (a trilha das Conquistas, as artes do Codex)
+  const conq = useConquistas();
+  const trilha = useMemo(() => conq.adesivos.filter((b) => marcoDoAdesivo(b.id) !== null).sort((a, b) => marcoDoAdesivo(a.id)! - marcoDoAdesivo(b.id)!), [conq.adesivos]);
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
   // UMA instância das preferências de módulos: a grade e a folha "Organizar" leem/gravam o mesmo estado (como o ModuleDrawer de hoje)
   const preferencias = useModulePreferences();
@@ -166,7 +176,11 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
         <FolhaMaisE aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} data={lifeData} />
         <FolhaScore aberta={folhaScore} onFechar={() => setFolhaScore(false)} data={lifeData} seq={seq} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
         <OrganizarModulos aberta={organizar} onFechar={() => setOrganizar(false)} preferencias={preferencias} />
-        <FolhaSequencia aberta={folhaSequencia} onFechar={() => setFolhaSequencia(false)} seq={seq} />
+        <FolhaSequencia
+          aberta={folhaSequencia} onFechar={() => setFolhaSequencia(false)} seq={seq} trilha={trilha} origem="home"
+          onIr={(rota) => navigate(rota)}
+          onAdesivo={(b) => { setFolhaSequencia(false); window.setTimeout(() => navigate("/conquistas", { state: { origem: "home", figurinha: b.id } }), 180); }}
+        />
         {/* rodada 2: Widgets e Personalizar pendências no estilo da Home nova (as mesmas chaves e regras de hoje) */}
         <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
         <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />

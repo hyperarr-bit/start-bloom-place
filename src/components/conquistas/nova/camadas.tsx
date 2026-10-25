@@ -1,10 +1,7 @@
 import { CelebracaoFigurinha } from "./CelebracaoFigurinha";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { Bell, Check, ChevronRight, Shield, X } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { ChevronRight, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
-import { normalizarDias, somarDias } from "@/lib/sequencia";
-import { ROTULOS_DA_SEMANA, segundaDaSemana, type EstadoDia } from "@/lib/sequencia-semana";
 import { RARIDADE_LABEL, raridadeDe, type Badge } from "@/components/gamification/types";
 import { rotuloProgresso } from "@/lib/conquistas-registro";
 import { AdesivoRaro } from "../adesivos-raridade";
@@ -13,13 +10,11 @@ import { proximasFigurinhas } from "../capa-pessoal";
 import { requisitoDaFigurinha } from "../textos-figurinhas";
 import { RARIDADES_EM_TESTE } from "../MarcaRaridade";
 import { giroDoAdesivo } from "../adesivos-arte";
-import { Fogo } from "../Fogo";
+import { FolhaSequencia } from "@/components/fogo/FolhaSequencia";
+import { useNavigate } from "react-router-dom";
 import { IconeMarcaAlbum } from "../IconeMarcaAlbum";
-import { fogoDoCaderno } from "./fogo-caderno";
-import { varsDaFaixa } from "../CardSequencia";
-import { LembreteDaSequencia } from "../LembreteDaSequencia";
 import type { Sequencia } from "../use-conquistas";
-import { EVENTOS2, contagem, marcoDoAdesivo, podeCompartilhar } from "./recompensas";
+import { EVENTOS2, podeCompartilhar } from "./recompensas";
 import { type ColecaoNova, type EstadoConquistasNova } from "./use-conquistas-nova";
 import "../conquistas.css";
 import "./conquistas-nova.css";
@@ -59,93 +54,15 @@ export const CelebracaoMarco = ({ badge, dias, seq: _seq, onContinuar, onCompart
 
 /* ------------------------------------------------------------------ o detalhe da sequência */
 
-const Calendario28 = ({ seq }: { seq: Sequencia }) => {
-  const anotados = useMemo(() => new Set(normalizarDias(seq.lista)), [seq.lista]);
-  const protegidos = useMemo(() => new Set(seq.usados), [seq.usados]);
-  const inicio = somarDias(segundaDaSemana(seq.hoje), -21);
-  const dias = Array.from({ length: 28 }, (_, i) => somarDias(inicio, i));
-  const estado = (d: string): EstadoDia => (anotados.has(d) ? "feito" : protegidos.has(d) ? "gelo" : d === seq.hoje ? "hoje" : d > seq.hoje ? "futuro" : "vazio");
-  return (
-    <div>
-      <div className="cn-cal mb-1">
-        {ROTULOS_DA_SEMANA.map((r) => <span key={r} className="text-center text-[9px] font-extrabold text-muted-foreground">{r.charAt(0)}</span>)}
-      </div>
-      <div className="cn-cal" data-testid="cn-calendario">
-        {dias.map((d) => <span key={d} className="cn-cal-dia" data-estado={estado(d)}>{Number(d.slice(8, 10))}</span>)}
-      </div>
-    </div>
-  );
-};
-
-/** Os personagens têm espaço próprio; a tela principal só antecipa o próximo prêmio. */
-const EvolucaoDaSequencia = ({ trilha, dias, recorde, onAdesivo }: { trilha: Badge[]; dias: number; recorde: number; onAdesivo: (b: Badge) => void }) => {
-  const faixa = useRef<HTMLOListElement>(null);
-  // Voltei segue no catálogo e no álbum; esta faixa acompanha só a família de pedra.
-  const personagens = trilha.filter(b => b.id !== "sequencia-2");
-  const iniciou = Math.max(dias, recorde) >= 1 || trilha.some(b => b.unlocked);
-  const proxima = personagens.find(b => !b.unlocked);
-  const destaque = iniciou ? proxima?.id ?? personagens.at(-1)?.id : "sequencia-1";
-  useEffect(() => {
-    const lista = faixa.current;
-    const alvo = lista?.querySelector<HTMLElement>('[data-destaque]');
-    if (lista && alvo) lista.scrollLeft = Math.max(0, alvo.offsetLeft - lista.offsetLeft - 124);
-  }, [destaque]);
-  return <section className="cn-evolucao" aria-labelledby="cn-evolucao-titulo">
-    <div className="cn-evolucao-titulo"><h3 id="cn-evolucao-titulo">Sua evolução</h3><span>Deslize para explorar</span></div>
-    <ol ref={faixa} className="cn-evolucao-figurinhas" aria-label="Marcos da sequência">
-      {personagens.map(b => {
-        const marco = marcoDoAdesivo(b.id)!;
-        const falta = Math.max(1, marco - dias);
-        const estado = b.unlocked ? "Conquistada" : iniciou && b.id === proxima?.id ? `Falta${falta === 1 ? "" : "m"} ${falta} ${falta === 1 ? "dia" : "dias"}` : "A conquistar";
-        return <li key={b.id} data-destaque={b.id === destaque ? "" : undefined} data-conquistada={b.unlocked ? "" : undefined}>
-          <button type="button" className="cn-evolucao-etapa" data-testid={marco === 1 ? "cn-evolucao-inicio" : undefined} onClick={() => onAdesivo(b)} aria-label={`${b.name}: ${estado.toLowerCase()}`}>
-            <span className="cn-evolucao-arte"><AdesivoRaro id={b.id} raridade={raridadeDe(b)} tamanho={marco === 1 ? 82 : marco === 3 ? 96 : 104} trancado={!b.unlocked} progresso={b.progresso}/></span>
-            <b>{contagem(marco, "dia", "dias")}</b><small>{b.unlocked && <Check size={11} aria-hidden/>}{estado}</small>
-          </button>
-        </li>;
-      })}
-    </ol>
-  </section>;
-};
-
+/**
+ * 26/10 (dono): a folha da sequência é UMA só — components/fogo/FolhaSequencia (a mesma do toque no fogo da Home nova):
+ * fogo unificado + dias seguidos (recorde só se maior), status/ação do dia, a semana em bolinhas (4 semanas no "Ver mais"),
+ * "Sua evolução" compacta já no próximo marco (as artes daqui), protetores numa linha, "O que conta". Sai a grade
+ * cinza e o lembrete. Tocar numa figurinha segue ampliando (onAdesivo → a camada de sempre).
+ */
 export const DetalheSequencia = ({ e, aberto, onFechar, onAdesivo }: { e: EstadoConquistasNova; aberto: boolean; onFechar: () => void; onAdesivo: (b: Badge) => void }) => {
-  const { seq, trilha } = e;
-  const fechar = useRef<HTMLButtonElement>(null);
-  return (
-    <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent semFechar onOpenAutoFocus={event => { event.preventDefault(); fechar.current?.focus({preventScroll:true}); }} side="bottom" className="rounded-t-3xl max-h-[92dvh] overflow-y-auto pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="cn-detalhe-sequencia">
-        <button ref={fechar} type="button" className="cn-evolucao-fechar" aria-label="Fechar" onClick={onFechar}><X size={18} aria-hidden/></button>
-        <div className="max-w-sm mx-auto pt-1" style={varsDaFaixa(fogoDoCaderno(seq.dias))}>
-          <div className="cn-evolucao-cab">
-            <Fogo dias={seq.dias} faixa={seq.dias > 0 ? fogoDoCaderno(seq.dias) : undefined} tamanho={42} semBrilho={seq.dias < 100}/>
-            <div><SheetTitle className="text-[22px] font-bold tracking-tight leading-tight">{seq.dias} {seq.dias === 1 ? "dia seguido" : "dias seguidos"}</SheetTitle>
-              <SheetDescription className="text-[12px] text-muted-foreground mt-1">Recorde de {contagem(seq.recorde, "dia", "dias")}</SheetDescription>
-            </div>
-          </div>
-          <EvolucaoDaSequencia trilha={trilha} dias={seq.dias} recorde={seq.recorde} onAdesivo={onAdesivo}/>
-          <div className="mt-4 rounded-2xl border border-border p-3">
-            <p className="cn-caps text-muted-foreground mb-2">Últimas 4 semanas</p>
-            <Calendario28 seq={seq} />
-          </div>
-          <div className="mt-3 rounded-2xl border border-border p-3 flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl grid place-items-center bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"><Shield className="w-5 h-5" /></span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-extrabold leading-tight">{seq.saldo} de 2 protetores</p>
-              <p className="text-[11.5px] text-muted-foreground leading-[1.35]">A cada 7 dias seguidos você ganha 1. Um dia vazio? Ele segura sozinho a sequência.</p>
-            </div>
-          </div>
-          <p className="mt-3 text-[11.5px] text-muted-foreground leading-[1.4]">
-            <b className="text-foreground">O que conta:</b> anotar qualquer coisa, em qualquer módulo — um gasto, um hábito, a água, uma página lida. Só abrir o app não conta.
-          </p>
-          {/* o lembrete das 20h de sempre (opt-in, mesmo id de notificação); só no app */}
-          <div onClickCapture={() => trackEvent(EVENTOS2.lembreteLigar, {})} data-testid="cn-lembrete">
-            <LembreteDaSequencia />
-          </div>
-          <p className="mt-2 text-[10.5px] text-muted-foreground inline-flex items-center gap-1"><Bell className="w-3 h-3" aria-hidden /> O lembrete avisa qual adesivo vem amanhã.</p>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
+  const navigate = useNavigate();
+  return <FolhaSequencia aberta={aberto} onFechar={onFechar} seq={e.seq} trilha={e.trilha} origem="conquistas" onAdesivo={onAdesivo} onIr={(rota) => navigate(rota)} />;
 };
 
 /* ------------------------------------------------------------------ a coleção inteira (ver todos, secundária) */

@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
 import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
 import { TRACO } from "./paleta";
+import { useFundoDaTelaE } from "./fundo-da-tela";
 import "../home-nova.css";
 import "./home-e.css";
 
@@ -45,6 +46,7 @@ const Linha = ({ item }: { item: ItemVoce }) => (
 export function VoceE({ nome, email, iniciais, categorias, onConta, onSair, versao, children }: Props) {
   const semMovimento = useReducedMotion();
   const [aberta, setAberta] = useState<string | null>(categorias[0]?.id ?? null);
+  useFundoDaTelaE(); // adendo 26/10: a faixa do relógio e a casca na cor da E
   return (
     <div className="hn he min-h-dvh" data-testid="tela-voce" data-layout="e" data-suave={SUAVIDADE_HOME_NOVA} {...{ [ATRIBUTO_RAIZ]: "voce" }}>
       <main className="max-w-lg mx-auto px-4 pt-2 pb-6">

@@ -9,6 +9,8 @@
  */
 process.env.TZ = "America/Sao_Paulo";
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, act, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -240,6 +242,45 @@ describe("a aba Você no estilo da E e Personalizar início", () => {
     await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
     const rotulos = Array.from(document.querySelectorAll('[data-testid="he-metrica"]')).map((e) => e.getAttribute("data-metrica"));
     expect(rotulos).toEqual(["habitos", "agua", "sono"]);
+  });
+});
+
+describe("o fundo da tela até o topo (adendo 26/10: a faixa do relógio na cor da E)", () => {
+  const CLASSE = "he-fundo-da-tela";
+  const css = readFileSync(resolve(process.cwd(), "src/components/home-nova/e/home-e.css"), "utf8");
+  it("a Home nova, a aba Você e Personalizar início põem html.he-fundo-da-tela enquanto estão na tela; sai ao desmontar", async () => {
+    ligar();
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(false);
+    await montar("/home");
+    await waitFor(() => expect(document.querySelector('[data-layout="e"]')).toBeTruthy());
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(true);
+    cleanup();
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(false);
+    await montar("/voce");
+    await waitFor(() => expect(screen.getByTestId("tela-voce")).toBeTruthy());
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(true);
+    cleanup();
+    await montar("/voce/inicio");
+    await waitFor(() => expect(screen.getByTestId("tela-personalizar-inicio")).toBeTruthy());
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(true);
+    cleanup();
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(false);
+  });
+  it("com a chave desligada, a Home de hoje não põe a classe (a faixa branca de sempre)", async () => {
+    await montar("/home");
+    await waitFor(() => expect(screen.queryByTestId("home-nova")).toBeNull());
+    await respirar(50);
+    expect(document.documentElement.classList.contains(CLASSE)).toBe(false);
+  });
+  it("o CSS: a faixa do relógio na cor do topo da E com desfoque, e a casca no fundo da E — claro e escuro", () => {
+    expect(css).toMatch(/html\.he-fundo-da-tela \{ --safe-top-cor: hsl\(40 8% 95% \/ 0\.82\); \}/);
+    expect(css).toMatch(/html\.he-fundo-da-tela \.app-safe-top-guard \{[^}]*backdrop-filter: blur\(14px\)/);
+    expect(css).toMatch(/html\.he-fundo-da-tela, html\.he-fundo-da-tela body, html\.he-fundo-da-tela \.app-safe-shell \{ background-color: hsl\(0 0% 98%\); \}/);
+    expect(css).toMatch(/html\.dark\.he-fundo-da-tela \{ --safe-top-cor: hsl\(222 14% 10% \/ 0\.82\); \}/);
+    expect(css).toMatch(/html\.dark\.he-fundo-da-tela, html\.dark\.he-fundo-da-tela body, html\.dark\.he-fundo-da-tela \.app-safe-shell \{ background-color: hsl\(222 16% 7%\); \}/);
+    // o topo do degradê da E é a mesma cor da faixa (claro 40 8% 95%, escuro 222 14% 10%)
+    expect(css).toContain("background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px");
+    expect(css).toContain("background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px");
   });
 });
 

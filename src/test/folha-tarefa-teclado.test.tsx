@@ -163,7 +163,8 @@ describe("FolhaNovaTarefa — os 3 caminhos ('+' da Home nova, Ações rápidas,
 describe("a folha do '+' da Home nova usa a mesma régua", () => {
   it("teclado aberto: bottom = o coberto e altura máxima = a área visível (não '100dvh − teclado'); sem teclado, 88dvh", async () => {
     const n = criarNuvem({});
-    render(<MemoryRouter><n.Provedor><FolhaMaisE aberta onFechar={() => {}} /></n.Provedor></MemoryRouter>);
+    const hub = { waterGlasses: 0, waterGoal: 8, dayScore: 0 } as unknown as import("@/hooks/use-life-hub-data").LifeHubData;
+    render(<MemoryRouter><n.Provedor><FolhaMaisE aberta onFechar={() => {}} data={hub} /></n.Provedor></MemoryRouter>);
     const folha = screen.getByTestId("hn-folha-mais");
     expect(folha.style.maxHeight).toBe("88dvh");
     teclado(498, 376); // o que o Simulador mostrou no Gasto (teclado numérico, janela arrastada)

@@ -1,10 +1,14 @@
-import { Check, ChevronRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { AlarmClock, Check, ChevronRight, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
 import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
-import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
+import { ICONE_COMPROMISSO, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
+
+/** O alerta de conta a vencer: despertador na cor de aviso (a laranja da paleta), diferente do gasto. */
+const ICONE_ALERTA = AlarmClock;
+const TOM_ALERTA: Tom = TOM_DO_MODULO.dieta;
 
 /**
  * PÁGINA 2 DO CARROSSEL — "PENDÊNCIAS DE HOJE" (opção E). Um card só, da altura da página 1: a lista do que
@@ -52,9 +56,11 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
   // a dose de hoje da missão em doses (1.0.16): a 1ª linha, como na Home de hoje (fora do score)
   const dose = useDoseDeHoje();
   const { pending, done, avisoConta, avisoTreino } = pendencias;
-  const avisos: { Icone: LucideIcon; tom: Tom; texto: string; route: string }[] = [];
-  if (avisoConta) avisos.push({ Icone: ICONE_CONTA, tom: TOM_DO_MODULO.financas, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas" });
-  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino" });
+  // rodada 2 (dono): a conta a vencer é um ALERTA — ícone de despertador e cor de aviso próprios, pra não parecer
+  // a mesma linha de "Registre um gasto" (que é da cor do gasto). Sem R$ (R$ só dentro de Finanças).
+  const avisos: { Icone: LucideIcon; tom: Tom; texto: string; route: string; selo: string; alerta?: boolean }[] = [];
+  if (avisoConta) avisos.push({ Icone: ICONE_ALERTA, tom: TOM_ALERTA, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas", selo: "conta", alerta: true });
+  if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino", selo: "aviso" });
   const vagas = Math.max(0, MAX_LINHAS - avisos.length - (dose ? 1 : 0));
   const visiveis = pending.slice(0, vagas);
   const escondidas = pending.length - visiveis.length;
@@ -65,9 +71,10 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
     else if (item.route) navigate(item.route);
   };
 
-  const partes: string[] = [];
-  if (escondidas > 0) partes.push(`mais ${escondidas}`);
-  if (done.length > 0) partes.push(`${done.length} ${done.length === 1 ? "feita" : "feitas"}`);
+  // rodada 2 (dono: "mais 1 · 1 feitas" confundia): um rodapé só, claro — "Ver todas (N)" com o total do dia
+  // (pendentes + feitas); só aparece quando há algo que não está na lista (escondidas ou feitas)
+  const total = pending.length + done.length;
+  const rodape = escondidas > 0 || done.length > 0 ? `Ver todas (${total})` : null;
 
   return (
     <div className="he-pagina" data-testid="he-pagina-2">
@@ -93,19 +100,19 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
             {dose && <div className="px-1 pb-1.5"><LinhaDoseDeHoje dose={dose} /></div>}
             {visiveis.map((item, i) => <Linha key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
-              <button key={a.texto} type="button" onClick={() => navigate(a.route)} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
+              <button key={a.texto} type="button" onClick={() => navigate(a.route)} data-testid={a.alerta ? "hn-aviso-conta" : "hn-aviso"} data-alerta={a.alerta ? "1" : undefined} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
                 <Disco Icone={a.Icone} tom={a.tom} />
                 <span className="flex-1 min-w-0 text-[14px] font-medium truncate">{a.texto}</span>
-                <span className="text-[10.5px] font-bold uppercase tracking-wider shrink-0 pr-1" style={{ color: cor(a.tom) }}>aviso</span>
+                <span className="h-6 px-2 rounded-full grid place-items-center text-[10.5px] font-bold uppercase tracking-wider shrink-0" style={{ color: cor(a.tom), background: tinta(a.tom) }}>{a.selo}</span>
               </button>
             ))}
           </div>
         )}
 
-        {partes.length > 0 && (
-          <button type="button" onClick={onVerTodas} data-testid="hn-pendencias-mais" className="h-[32px] mt-auto px-2 flex items-center justify-center gap-1 text-[12.5px] font-semibold text-muted-foreground">
-            {partes.join(" · ")}
-            <ChevronRight className="w-3.5 h-3.5" strokeWidth={2} aria-hidden />
+        {rodape && (
+          <button type="button" onClick={onVerTodas} data-testid="hn-pendencias-mais" className="h-[36px] mt-auto px-2 flex items-center justify-center gap-1 text-[13px] font-semibold text-foreground">
+            {rodape}
+            <ChevronRight className="w-4 h-4 text-muted-foreground/60" strokeWidth={2} aria-hidden />
           </button>
         )}
       </section>

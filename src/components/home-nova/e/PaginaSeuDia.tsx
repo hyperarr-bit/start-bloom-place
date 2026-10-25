@@ -1,10 +1,12 @@
-import { CalendarCheck, Check, Droplets, PenLine, Pill, Star, Utensils } from "lucide-react";
+import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Star, Utensils, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
 import type { TipoPendencia } from "@/lib/home-pendencias";
 import { COPO_ML_PADRAO, unidadeDaAgua } from "@/lib/saude-copo";
+import { RESUMOS_PADRAO, type IdDoResumo } from "@/lib/home-resumos";
 import { Anel } from "./Anel";
+import { Entrada, NumeroQueConta } from "./Animacoes";
 import { TOM_DO_MODULO, TOM_DO_TIPO, TINTA, TRACO, cor, type Tom } from "./paleta";
 
 /**
@@ -43,21 +45,35 @@ export const explicacaoDoScore = (faltam: number, score: number): string => {
   return faltam === 1 ? "Falta 1 coisa pra fechar o dia" : `Faltam ${faltam} coisas pra fechar o dia`;
 };
 
-/** As três métricas da página 1, pelos dados do dia e pelo que a pessoa cobra. `copoMl` dá a unidade da água (copos/garrafas). */
-export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO): Metrica[] {
+/**
+ * As três métricas da página 1, pelos dados do dia e pelo que a pessoa cobra. `copoMl` dá a unidade da água.
+ * RODADA 2: `resumos` são os cards que a pessoa escolheu em Você › Personalizar início (lib/home-resumos: até 3,
+ * entre Hábitos · Água · Refeições · Sono · Gasto · Treino · Leitura); sem escolha, os 3 de sempre. Os que a pessoa
+ * ocultou em Personalizar pendências saem; se sobrar vaga, entram Suplementos e Registros como antes.
+ * Tocar num card ABRE o registro/detalhe — nunca registra sozinho (água abre o formulário da água, com o "+ 1 copo").
+ */
+export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, resumos: IdDoResumo[] = RESUMOS_PADRAO): Metrica[] {
   const cobra = (t: TipoPendencia) => !d.pendenciasCobradas || d.pendenciasCobradas.includes(t);
   const reg = d.registrosHoje ?? { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
   const registrosCobrados = (["humor", "gasto", "peso", "sono", "ideia", "gratidao"] as const).filter((t) => cobra(t));
   // (a unidade da água — copos/garrafas — não aparece mais no rótulo; segue valendo no "x/y" e nas pendências)
   void unidadeDaAgua(copoMl);
-  const fila: (Metrica | null)[] = [
-    cobra("habitos") ? { id: "habitos", rotulo: "Hábitos", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, tom: TOM_DO_TIPO.habitos, route: "/rotina" } : null,
-    cobra("agua") ? { id: "agua", rotulo: "Água", valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, tom: TOM_DO_TIPO.agua, action: "water" } : null,
-    cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, tom: TOM_DO_TIPO.refeicoes, route: "/dieta" } : null,
+  const porId: Record<IdDoResumo, Metrica | null> = {
+    habitos: cobra("habitos") ? { id: "habitos", rotulo: "Hábitos", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, tom: TOM_DO_TIPO.habitos, route: "/rotina" } : null,
+    agua: cobra("agua") ? { id: "agua", rotulo: "Água", valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, tom: TOM_DO_TIPO.agua, action: "water" } : null,
+    refeicoes: cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, tom: TOM_DO_TIPO.refeicoes, route: "/dieta" } : null,
+    sono: { id: "sono", rotulo: "Sono", valor: Math.min(8, Math.max(0, Math.round(d.sleepHours ?? 0))), max: 8, Icone: Moon, tom: TOM_DO_TIPO.sono, action: "sleep" },
+    financas: { id: "gasto", rotulo: "Gasto", valor: reg.gasto ? 1 : 0, max: 1, Icone: Wallet, tom: TOM_DO_TIPO.gasto, action: "expense" },
+    treino: { id: "treino", rotulo: "Treino", valor: d.workoutDone ? 1 : 0, max: 1, Icone: Dumbbell, tom: TOM_DO_TIPO.treino, action: "workout" },
+    leitura: { id: "leitura", rotulo: "Leitura", valor: d.leuHoje ? 1 : 0, max: 1, Icone: BookOpen, tom: TOM_DO_MODULO.biblioteca, route: "/biblioteca" },
+  };
+  const escolhidos = (resumos.length > 0 ? resumos : RESUMOS_PADRAO).map((id) => porId[id]).filter((m): m is Metrica => !!m);
+  const reserva: (Metrica | null)[] = [
     cobra("suplementos") && d.supplementsTotal > 0 ? { id: "suplementos", rotulo: "Suplementos", valor: Math.min(d.supplementsTaken, d.supplementsTotal), max: d.supplementsTotal, Icone: Pill, tom: TOM_DO_TIPO.suplementos, route: "/saude" } : null,
     registrosCobrados.length > 0 ? { id: "registros", rotulo: "Registros", valor: registrosCobrados.filter((t) => reg[t]).length, max: registrosCobrados.length, Icone: PenLine, tom: TOM_DO_MODULO.desenvolvimento, abreMais: true } : null,
   ];
-  return fila.filter((m): m is Metrica => !!m).slice(0, 3);
+  const fila = [...escolhidos, ...reserva.filter((m): m is Metrica => !!m && !escolhidos.some((e) => e.id === m.id))];
+  return fila.slice(0, 3);
 }
 
 interface PropsScore {
@@ -71,30 +87,32 @@ export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
   const completo = score >= 100;
   const corAnel = TINTA;
   return (
-    <section className="hn-card he-score p-5 flex items-center gap-4" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
-      <div className="flex-1 min-w-0">
-        {numeroDentro ? (
-          <span className="block text-[24px] leading-tight font-bold tracking-tight" data-testid="he-score-titulo">{tituloDoScore(score)}</span>
-        ) : (
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-[46px] leading-[0.95] font-bold tabular-nums tracking-[-0.035em]" data-testid="he-score-numero">{score}</span>
-            <span className="text-[18px] font-semibold text-foreground">pontos</span>
-          </span>
-        )}
-        <span className="block mt-1.5 text-[15px] leading-snug font-medium text-muted-foreground" data-testid="hn-score-explica">Score do dia</span>
-      </div>
-      {/* a estrela dentro do anel é o convite: tocar abre "Como funciona a pontuação" */}
-      <button type="button" onClick={onAbrir} aria-label="Como funciona a pontuação" data-testid="he-score-abrir" className="shrink-0 rounded-full active:scale-95 transition-transform">
-        <Anel tamanho={108} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
+    <section className="hn-card he-score" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
+      {/* rodada 2 (dono): tocar em QUALQUER parte do card abre a folha da pontuação — não só a estrela */}
+      <button type="button" onClick={onAbrir} aria-label="Score do dia — como funciona a pontuação" data-testid="he-score-abrir" className="w-full p-5 flex items-center gap-4 text-left rounded-[24px] active:scale-[0.99] transition-transform">
+        <span className="flex-1 min-w-0 block">
           {numeroDentro ? (
-            <span className="flex flex-col items-center justify-center">
-              <span className="text-[30px] leading-none font-bold tabular-nums tracking-tight" data-testid="he-score-numero">{score}</span>
-              <span className="text-[9.5px] mt-1 text-muted-foreground font-semibold uppercase tracking-[0.12em]">pontos</span>
+            <span className="block text-[24px] leading-tight font-bold tracking-tight" data-testid="he-score-titulo">{tituloDoScore(score)}</span>
+          ) : (
+            <span className="flex items-baseline gap-1.5">
+              <NumeroQueConta valor={score} className="text-[46px] leading-[0.95] font-bold tabular-nums tracking-[-0.035em]" testid="he-score-numero" />
+              <span className="text-[18px] font-semibold text-foreground">pontos</span>
             </span>
-          ) : completo
-            ? <Check className="w-9 h-9" strokeWidth={2.5} style={{ color: corAnel }} aria-hidden />
-            : <Star className="w-8 h-8" style={{ color: corAnel, fill: corAnel }} strokeWidth={1.5} aria-hidden />}
-        </Anel>
+          )}
+          <span className="block mt-1.5 text-[15px] leading-snug font-medium text-muted-foreground" data-testid="hn-score-explica">Score do dia</span>
+        </span>
+        <span className="shrink-0 rounded-full block">
+          <Anel tamanho={108} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
+            {numeroDentro ? (
+              <span className="flex flex-col items-center justify-center">
+                <span className="text-[30px] leading-none font-bold tabular-nums tracking-tight" data-testid="he-score-numero">{score}</span>
+                <span className="text-[9.5px] mt-1 text-muted-foreground font-semibold uppercase tracking-[0.12em]">pontos</span>
+              </span>
+            ) : completo
+              ? <Check className="w-9 h-9" strokeWidth={2.5} style={{ color: corAnel }} aria-hidden />
+              : <Star className="w-8 h-8" style={{ color: corAnel, fill: corAnel }} strokeWidth={1.5} aria-hidden />}
+          </Anel>
+        </span>
       </button>
     </section>
   );
@@ -122,7 +140,7 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
       onClick={tocar}
       data-testid="he-metrica"
       data-metrica={m.id}
-      className="hn-card !rounded-[22px] p-3.5 flex flex-col items-start text-left min-h-[148px] active:scale-[0.98] transition-transform"
+      className="hn-card !rounded-[22px] p-3.5 flex flex-col items-start text-left min-h-[148px] w-full active:scale-[0.98] transition-transform"
     >
       <span className="flex items-baseline gap-1">
         <span className="text-[23px] leading-none font-bold tabular-nums tracking-[-0.02em]">{m.valor}</span>
@@ -147,15 +165,22 @@ interface Props {
   onMais: () => void;
   numeroDentro?: boolean;
   copoMl?: number;
+  /** os cards escolhidos em Você › Personalizar início (lib/home-resumos) */
+  resumos?: IdDoResumo[];
 }
 
-export const PaginaSeuDia = ({ data, onAbrirScore, onAcao, onMais, numeroDentro, copoMl }: Props) => {
-  const metricas = metricasDoDia(data, copoMl);
+export const PaginaSeuDia = ({ data, onAbrirScore, onAcao, onMais, numeroDentro, copoMl, resumos }: Props) => {
+  const metricas = metricasDoDia(data, copoMl, resumos);
   return (
     <div className="he-pagina" data-testid="he-pagina-1">
-      <CardScoreE score={data.dayScore} onAbrir={onAbrirScore} numeroDentro={numeroDentro} />
+      {/* rodada 2: os cards entram de leve, escalonados (o score primeiro, depois os três) */}
+      <Entrada atraso={0}><CardScoreE score={data.dayScore} onAbrir={onAbrirScore} numeroDentro={numeroDentro} /></Entrada>
       <div className="grid grid-cols-3 gap-3 mt-3 flex-1">
-        {metricas.map((m, i) => <CardMetrica key={m.id} m={m} atraso={0.3 + i * 0.1} onAcao={onAcao} onMais={onMais} />)}
+        {metricas.map((m, i) => (
+          <Entrada key={m.id} atraso={0.08 + i * 0.07} className="flex">
+            <CardMetrica m={m} atraso={0.3 + i * 0.1} onAcao={onAcao} onMais={onMais} />
+          </Entrada>
+        ))}
       </div>
     </div>
   );

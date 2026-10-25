@@ -7,8 +7,10 @@ import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useSequencia } from "@/components/conquistas/use-conquistas";
 import { pendenciasDeHoje } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
-import { WidgetPicker } from "@/components/home/WidgetPicker";
-import { PersonalizarPendencias } from "@/components/home/PersonalizarPendencias";
+import { useTheme } from "@/hooks/use-theme";
+import { CHAVE_RESUMOS, normalizarResumos } from "@/lib/home-resumos";
+import { EscolherWidgetsE } from "./EscolherWidgetsE";
+import { PersonalizarPendenciasE } from "./PersonalizarPendenciasE";
 import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 import { CardSeuDia } from "@/components/missao-doses/CardSeuDia";
@@ -80,6 +82,11 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
   // UMA instância das preferências de módulos: a grade e a folha "Organizar" leem/gravam o mesmo estado (como o ModuleDrawer de hoje)
   const preferencias = useModulePreferences();
+  // rodada 2: os 3 cards da página 1 escolhidos em Você › Personalizar início (lib/home-resumos)
+  const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
+  // rodada 2 (dono): só o tema padrão com a Home nova — quem tinha outra cor volta pro Original (claro/escuro continuam)
+  const { palette, setPalette } = useTheme();
+  useEffect(() => { if (palette !== "default") setPalette("default"); }, [palette, setPalette]);
   const [folhaMais, setFolhaMais] = useState(!!folhaMaisAberta);
   const [acaoInicial, setAcaoInicial] = useState<ActionId | null>(null);
   const [folhaScore, setFolhaScore] = useState(!!folhaScoreAberta);
@@ -113,7 +120,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
   if (!loaded) return <div className="hn he min-h-dvh" aria-hidden data-suave={suave} />;
 
   const paginas = [
-    <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
+    <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} resumos={resumos} />,
     <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirScore} />,
     <PaginaWidgets key="wid" data={lifeData} widgets={activeWidgets} onEscolher={() => setPicker(true)} onAcao={abrirAcao} />,
   ];
@@ -123,7 +130,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
       <DailyNudge />
       {/* ATRIBUTO_RAIZ: a Home de verdade está na tela — é o que deixa a barra de vidro aparecer */}
       <div className="hn he min-h-dvh" data-testid="home-nova" data-layout="e" data-modulos={modulos} data-suave={suave} {...{ [ATRIBUTO_RAIZ]: "hoje" }}>
-        <main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+108px)]">
+        {/* rodada 2 (dono: "a Home rola além do necessário"): embaixo só o respiro da barra de vidro (60 + folga) */}
+        <main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+72px)]">
           <header className="flex items-center justify-between gap-3 pt-1" data-testid="hn-topo">
             <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">
               {saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}
@@ -148,20 +156,21 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
           {/* o convite das lojas (só no site; no app não existe) */}
           <div className="mt-6 empty:hidden"><LojasCard variant="home" /></div>
 
-          <p className="text-center text-[11px] text-muted-foreground/70 pt-8">Core © {new Date().getFullYear()} — Organize sua vida</p>
+          <p className="text-center text-[11px] text-muted-foreground/70 pt-5">Core © {new Date().getFullYear()} — Organize sua vida</p>
         </main>
         <CelebracaoDia100 score={lifeData.dayScore} streak={seq.dias} />
       </div>
 
       {/* as folhas são `fixed` fora do contêiner da Home: este nó (sem fundo) só leva as variáveis da paleta até elas */}
       <div className="hn he he-so-vars" data-suave={suave}>
-        <FolhaMaisE aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} />
+        <FolhaMaisE aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} data={lifeData} />
         <FolhaScore aberta={folhaScore} onFechar={() => setFolhaScore(false)} data={lifeData} seq={seq} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
         <OrganizarModulos aberta={organizar} onFechar={() => setOrganizar(false)} preferencias={preferencias} />
         <FolhaSequencia aberta={folhaSequencia} onFechar={() => setFolhaSequencia(false)} seq={seq} />
+        {/* rodada 2: Widgets e Personalizar pendências no estilo da Home nova (as mesmas chaves e regras de hoje) */}
+        <EscolherWidgetsE aberta={picker} onFechar={() => setPicker(false)} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
+        <PersonalizarPendenciasE open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
       </div>
-      <WidgetPicker open={picker} onOpenChange={setPicker} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
-      <PersonalizarPendencias open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
     </>
   );
 };

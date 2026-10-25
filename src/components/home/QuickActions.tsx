@@ -5,20 +5,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloAcaoAgua } from "@/lib/saude-copo";
-import { CHAVE_MACROS, type MacrosPlano, entradaDoPlano, formatarMacros, idDoPlano, temMacros } from "@/lib/dieta-macros";
+import { CHAVE_MACROS, type MacrosPlano, formatarMacros, temMacros } from "@/lib/dieta-macros";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/lib/analytics";
-import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
-import { lancarGasto } from "@/lib/finance-lancar";
-import { numeroBR } from "@/lib/data-normalizers";
-import { chaveDoHabito, datasDeCheckin, marcarCheckin } from "@/lib/detox";
+import { chaveDoHabito, datasDeCheckin } from "@/lib/detox";
 import { FolhaNovaTarefa, useTarefasDoDia } from "@/components/tarefas/tarefas-do-dia";
-import { CHAVE_TAREFAS_ROTINA, avisoDaTarefa, avisoJaPassou, horaDaTarefa, horaDoAviso } from "@/lib/tarefas";
-import { anotarAcaoRapida } from "@/lib/intro-modulo";
+import { CHAVE_TAREFAS_ROTINA } from "@/lib/tarefas";
 import { TarjaDoRelogio } from "@/components/app/TarjaDoRelogio";
+import {
+  gravarAgua, gravarDetox, gravarGanho, gravarGasto, gravarGratidao, gravarHumor, gravarIdeia, gravarPeso, gravarRefeicao, gravarSono, gravarTarefa, gravarTreino,
+  type ContextoAcao,
+} from "@/lib/acoes-rapidas";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -197,69 +197,22 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
     timerSucesso.current = window.setTimeout(() => { timerSucesso.current = null; setSuccessId(null); }, 1500);
   };
 
+  /* 26/10: as gravações moram em lib/acoes-rapidas (as mesmas chaves, validações, avisos e Desfazer de sempre — os
+     formulários novos do "+" da Home nova gravam pelas mesmas funções). Aqui fica só o que é desta interface:
+     o ✓ no botão, o respingo da água e os estados dos campos. */
+  const ctx: ContextoAcao = { get, set, navigate, waterGoal: lifeData.waterGoal };
+
   const addWater = () => {
-    const tStr = todayStr();
-    const waterLog = get<Record<string, number>>("core-saude-water", {});
-    const waterLogModulo = get<Record<string, number>>("water-log", {});
-    /*
-     * 16/08 — dois defeitos que apareciam juntos aqui:
-     *  1. cada chave era incrementada a partir do PRÓPRIO valor. Como quem
-     *     lê usa o MAIOR das duas, elas desincronizavam e o contador pulava.
-     *     Agora as duas partem do mesmo `current` e terminam no mesmo valor.
-     *  2. o toast dizia 200ml CRAVADO, ignorando o tamanho de copo que a
-     *     pessoa configurou no Saúde ("configurei 500ml e aqui diz 200").
-     */
-    const current = Math.max(waterLog[tStr] || 0, Number(waterLogModulo[tStr]) || 0);
-    const proximo = Math.min(20, current + 1);
-    anotarAcaoRapida("water", get, set); // 1.0.17: o tutorial da Saúde ainda aparece na 1ª abertura
-    set("core-saude-water", { ...waterLog, [tStr]: proximo });
-    set("water-log", { ...waterLogModulo, [tStr]: proximo });
-    const copoMl = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
-    vibrate();
-    showSuccess("water");
+    gravarAgua(ctx, () => showSuccess("water"));
     setWaterSplash(true);
     if (timerAgua.current !== null) window.clearTimeout(timerAgua.current);
     timerAgua.current = window.setTimeout(() => { timerAgua.current = null; setWaterSplash(false); }, 800);
-    const faltam = lifeData.waterGoal - proximo;
-    toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`);
   };
 
-  const markWorkout = () => {
-    const tStr = todayStr();
-    const log = get<string[]>("saude-workout-log", []);
-    // escreve SEMPRE (sem duplicar o dia): o set re-dispara core:activation
-    // e a trilha do teste credita o passo mesmo quando o treino de hoje já
-    // estava marcado — antes o if engolia o gesto (review 16/08)
-    const jaTinha = log.includes(tStr);
-    anotarAcaoRapida("workout", get, set);
-    set("saude-workout-log", jaTinha ? [...log] : [...log, tStr]);
-    vibrate();
-    showSuccess("workout");
-    // 07/10 (chamado: "cliquei sem querer e não sai"): um toque marcava o dia sem
-    // volta pelo atalho. Desfazer tira o dia (só se foi este toque que pôs).
-    toast.success("💪 Treino do dia registrado!", {
-      duration: 6000,
-      action: jaTinha
-        ? { label: "Ver Treino", onClick: () => navigate("/treino") }
-        : { label: "Desfazer", onClick: () => set("saude-workout-log", get<string[]>("saude-workout-log", []).filter((d) => d !== tStr)) },
-      cancel: jaTinha ? undefined : { label: "Ver Treino", onClick: () => navigate("/treino") },
-    });
-  };
+  const markWorkout = () => { gravarTreino(ctx, () => showSuccess("workout")); };
 
   const submitExpense = () => {
-    // numeroBR (26/09): parseFloat trocando só a 1ª vírgula gravava "1.250,50" como R$ 1,25
-    const amount = numeroBR(expenseValue);
-    if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
-    const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
-    // 28/09: o mesmo caminho do "Lançar em Finanças · Beleza" (lib/finance-lancar) — balde do mês, perfil ativo
-    anotarAcaoRapida("expense", get, set);
-    if (!lancarGasto(get, set, { descricao: expenseCategory, valor: amount, categoria: catMap[expenseCategory] || "outros", data: todayStr() })) {
-      toast.error("Não deu pra lançar daqui. Abre Finanças e lança por lá.");
-      return;
-    }
-    vibrate();
-    showSuccess("expense");
-    toast.success(`💸 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em ${expenseCategory}`);
+    if (!gravarGasto(ctx, { valorTexto: expenseValue, categoria: expenseCategory }, () => showSuccess("expense"))) return;
     setExpenseValue("");
     setExpenseCategory("Outros");
     setActiveAction(null);
@@ -272,144 +225,54 @@ export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito
      em vez de parseFloat porque "1.250,50" digitado vira 1.25 no parseFloat
      (o bug de valores da review ★3 de 20/08). */
   const submitIncome = () => {
-    const amount = numeroBR(incomeValue);
-    if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
-    const incomes = get<any[]>("finance-incomes", []);
-    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
-    set("finance-incomes", [
-      ...incomes,
-      etiquetar({
-        id: crypto.randomUUID(),
-        description: incomeKind,
-        value: amount,
-        date: todayStr(),
-      }, perfil),
-    ]);
-    vibrate();
-    showSuccess("income");
-    toast.success(`💰 ${amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} — ${incomeKind}`, { action: { label: "Ver Finanças", onClick: () => navigate("/financas") } });
+    if (!gravarGanho(ctx, { valorTexto: incomeValue, tipo: incomeKind }, () => showSuccess("income"))) return;
     setIncomeValue("");
     setIncomeKind(incomeKinds[0]);
     setActiveAction(null);
   };
 
   const submitWeight = () => {
-    const weight = parseFloat(weightValue.replace(",", "."));
-    if (!weight || weight <= 0) { toast.error("Informe um peso válido"); return; }
-    const tStr = todayStr();
-    const measures = get<any[]>("core-saude-measures", []);
-    measures.push({ date: tStr, weight, id: crypto.randomUUID() });
-    set("core-saude-measures", measures);
-    vibrate();
-    showSuccess("weight");
-    toast.success(`⚖️ ${weight}kg registrado!`);
+    if (!gravarPeso(ctx, { pesoTexto: weightValue }, () => showSuccess("weight"))) return;
     setWeightValue("");
     setActiveAction(null);
   };
 
   const submitIdea = () => {
-    if (!ideaText.trim()) { toast.error("Digite sua ideia"); return; }
-    const dateKey = todayStr();
-    const allDays = get<Record<string, any>>("hiperfoco-thoughts", {});
-    const dayData = allDays[dateKey] || {};
-    const hour = new Date().getHours();
-    const thoughts = dayData[hour] || [];
-    thoughts.push({ id: crypto.randomUUID(), text: ideaText.trim(), tags: ["ideia"], hour });
-    dayData[hour] = thoughts;
-    anotarAcaoRapida("idea", get, set);
-    set("hiperfoco-thoughts", { ...allDays, [dateKey]: dayData });
-    vibrate();
-    showSuccess("idea");
-    toast.success("💡 Ideia capturada!", { action: { label: "Ver em Mente", onClick: () => navigate("/hiperfoco") } });
+    if (!gravarIdeia(ctx, { texto: ideaText }, () => showSuccess("idea"))) return;
     setIdeaText("");
     setActiveAction(null);
   };
 
   const criarTarefa = (c: Parameters<typeof tarefasRotina.adicionar>[0]) => {
-    const t = tarefasRotina.adicionar(c);
-    const aviso = avisoDaTarefa(t);
-    const hora = horaDaTarefa(t);
-    vibrate();
-    showSuccess("task");
-    toast.success("Tarefa anotada", {
-      description: hora && aviso >= 0 && !avisoJaPassou(t.dia, hora, aviso) ? `🔔 O aviso toca às ${horaDoAviso(hora, aviso)}` : undefined,
-      action: { label: "Ver na Rotina", onClick: () => navigate("/rotina") },
-    });
+    gravarTarefa(ctx, tarefasRotina, c, () => showSuccess("task"));
   };
 
   const submitGratitude = () => {
-    if (!gratitudeText.trim()) { toast.error("Pelo que você é grato?"); return; }
-    const tStr = todayStr();
-    const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
-    const todayEntries = gratLog[tStr] || [];
-    todayEntries.push(gratitudeText.trim());
-    set("core-gratitude-log", { ...gratLog, [tStr]: todayEntries });
-    vibrate();
-    showSuccess("gratitude");
-    toast.success("🙏 Gratidão registrada!");
+    if (!gravarGratidao(ctx, { texto: gratitudeText }, () => showSuccess("gratitude"))) return;
     setGratitudeText("");
     setActiveAction(null);
   };
 
   const submitMood = (value: number, emoji: string) => {
-    const tStr = todayStr();
-    const moodLog = get<Record<string, { value: number; emoji: string; time: string }>>("core-mood-log", {});
-    moodLog[tStr] = { value, emoji, time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) };
-    set("core-mood-log", moodLog);
-    vibrate();
-    showSuccess("mood");
-    toast.success(`${emoji} Humor registrado!`);
+    gravarHumor(ctx, { value, emoji }, () => showSuccess("mood"));
     setActiveAction(null);
   };
 
   const submitSleep = () => {
-    const hours = parseFloat(sleepHours.replace(",", "."));
-    if (!hours || hours <= 0 || hours > 24) { toast.error("Informe horas válidas (1-24)"); return; }
-    const tStr = todayStr();
-    const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
-    anotarAcaoRapida("sleep", get, set);
-    set("core-saude-sleep", { ...sleepLog, [tStr]: hours });
-    vibrate();
-    showSuccess("sleep");
-    toast.success(`🌙 ${hours}h de sono registradas!`, { action: { label: "Ver Saúde", onClick: () => navigate("/saude") } });
+    if (!gravarSono(ctx, { horasTexto: sleepHours }, () => showSuccess("sleep"))) return;
     setSleepHours("");
     setActiveAction(null);
   };
 
   const submitMealSelection = (mealType: string, food: string, kcalTexto: string) => {
-    const tStr = todayStr();
-    const dietLog = get<Record<string, any>>("core-dieta-log", {});
-    const dayMeals = { ...(dietLog[tStr] || {}) };
-    const calories = Math.max(0, Math.round(Number(String(kcalTexto).replace(",", ".")) || 0));
-    /* 18/09: id determinístico por refeição do plano — registrar o mesmo
-       almoço aqui e marcar "segui" no diário da Dieta escrevem a MESMA
-       entrada (nunca somam em dobro). As gramas vêm do cardápio: a pessoa
-       digitou uma vez lá, aqui só confirma que comeu. */
-    const weekDayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-    const hojeNome = weekDayNames[new Date().getDay()];
-    const macrosPlan = get<MacrosPlano>(CHAVE_MACROS, {});
-    const macros = macrosPlan[hojeNome.toUpperCase()]?.[mealType] || macrosPlan[hojeNome]?.[mealType];
-    dayMeals[idDoPlano(mealType)] = entradaDoPlano(mealType, food, calories, macros);
-    set("core-dieta-log", { ...dietLog, [tStr]: dayMeals });
-    vibrate();
-    showSuccess("meal");
-    toast.success(calories > 0 ? `🍽️ ${mealType} registrado (${calories} kcal)!` : `🍽️ ${mealType} registrado!`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
+    gravarRefeicao(ctx, { mealType, food, kcalTexto }, () => showSuccess("meal"));
     setMealEscolhida(null);
     setMealKcal("");
     setActiveAction(null);
   };
 
   const submitDetoxCheckin = (chave: string, habitName: string) => {
-    const habits = get<any[]>("detox-habits", []);
-    // 26/09: o Detox guarda LISTA de datas; isto gravava um objeto {dia: n} que
-    // virava [] no banco (e quebrava o Detox em hábito antigo). Um por dia.
-    // 28/09: pelo ID (ou posição, em hábito antigo) — pelo nome, dois hábitos
-    // com o mesmo nome levavam o check-in juntos.
-    anotarAcaoRapida("detox", get, set);
-    set("detox-habits", marcarCheckin(Array.isArray(habits) ? habits : [], chave, todayStr()));
-    vibrate();
-    showSuccess("detox");
-    toast.success(`🛡️ Check-in: ${habitName}`, { action: { label: "Ver Detox", onClick: () => navigate("/detox") } });
+    gravarDetox(ctx, { chave, nome: habitName }, () => showSuccess("detox"));
     setActiveAction(null);
   };
 

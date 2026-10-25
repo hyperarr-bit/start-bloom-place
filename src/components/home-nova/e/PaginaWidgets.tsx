@@ -7,6 +7,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { WIDGET_CATALOG, type ActiveWidget, type WidgetId } from "@/hooks/use-home-widgets";
 import { localDayKey } from "@/lib/utils";
 import { Anel } from "./Anel";
+import { Entrada } from "./Animacoes";
 import { TRACO, corDoModulo, corDoTipo, tintaDoModulo, type Tom } from "./paleta";
 import { TOM_DO_MODULO, TOM_DO_TIPO, cor } from "./paleta";
 
@@ -53,7 +54,7 @@ const Rotulo = ({ Icone, tom, texto }: { Icone: typeof Dumbbell; tom: Tom; texto
 );
 
 const Medio = ({ children, onClick, testid }: { children: React.ReactNode; onClick?: () => void; testid: string }) => (
-  <button type="button" onClick={onClick} data-testid={testid} className="hn-card !rounded-[22px] p-4 min-h-[150px] flex flex-col text-left active:scale-[0.98] transition-transform">
+  <button type="button" onClick={onClick} data-testid={testid} className="hn-card !rounded-[22px] p-4 min-h-[150px] w-full flex flex-col text-left active:scale-[0.98] transition-transform">
     {children}
   </button>
 );
@@ -101,7 +102,7 @@ const CardSemana = ({ onClick }: { onClick: () => void }) => {
   const semana = useScoresDaSemana();
   const feitos = semana.filter((d) => d.valor > 0).length;
   return (
-    <button type="button" onClick={onClick} data-testid="he-widget-week-progress" className="hn-card !rounded-[22px] p-4 col-span-2 flex flex-col text-left active:scale-[0.99] transition-transform">
+    <button type="button" onClick={onClick} data-testid="he-widget-week-progress" className="hn-card !rounded-[22px] p-4 col-span-2 w-full flex flex-col text-left active:scale-[0.99] transition-transform">
       <div className="flex items-center justify-between">
         <Rotulo Icone={CalendarCheck} tom={TOM_DO_MODULO.rotina} texto="Sua semana" />
         <span className="text-[12px] font-medium text-muted-foreground tabular-nums">{feitos} de 7 dias</span>
@@ -282,7 +283,12 @@ export const PaginaWidgets = ({ data, widgets, onEscolher, onAcao }: Props) => {
         </section>
       ) : (
         <div className="grid grid-cols-2 gap-3 flex-1 content-start" data-testid="hn-widgets">
-          {widgets.map((w) => <CardWidget key={w.id} w={w} data={data} onAcao={onAcao} />)}
+          {/* rodada 2: os cartões entram de leve, escalonados */}
+          {widgets.map((w, i) => (
+            <Entrada key={w.id} atraso={0.05 + i * 0.06} className={w.id === "week-progress" ? "col-span-2 flex" : "flex"}>
+              <CardWidget w={w} data={data} onAcao={onAcao} />
+            </Entrada>
+          ))}
           {lugares < 4 && (
             <button type="button" onClick={onEscolher} data-testid="he-widgets-escolher" className="rounded-[22px] min-h-[150px] flex flex-col items-center justify-center gap-2 text-muted-foreground bg-foreground/[0.035] dark:bg-white/[0.04] active:bg-foreground/[0.06]">
               <span className="w-10 h-10 rounded-full bg-card grid place-items-center" style={{ boxShadow: "var(--hn-sombra)" }}><Plus className="w-5 h-5" strokeWidth={2.2} aria-hidden /></span>

@@ -58,6 +58,11 @@ import { BarraVidroGlobal, __zerarPilhaDaBarraVidro } from "@/components/home-no
 import { _definirTempoLimiteAdmin, _zerarConsultaAdmin } from "@/hooks/use-home-nova";
 import { FolhaMaisE } from "@/components/home-nova/e/FolhaMaisE";
 import type { ActionId } from "@/components/home/QuickActions";
+import type { LifeHubData } from "@/hooks/use-life-hub-data";
+import { toast } from "sonner";
+
+/** os dados do dia que os formulários do "+" leem quando montados sozinhos */
+const HUB = { dayScore: 27, waterGlasses: 3, waterGoal: 8, todayWorkoutGroup: "Peito", workoutDone: false, workoutStatus: "treino" } as unknown as LifeHubData;
 import { CHAVE_ADMIN_HOME_NOVA, CHAVE_FOGO_ACESO_HOME_NOVA, CHAVE_FORCA_HOME_NOVA, _zerarHomeNova, registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { localDayKey, semanaAtualId } from "@/lib/utils";
 import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
@@ -152,23 +157,41 @@ describe("Home nova — chave ON", () => {
     expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(hoje);
   });
 
-  it("o '+' abre a folha e a água GRAVA pelo QuickActions de verdade (as duas chaves, +1), com o evento de origem", async () => {
+  it("o '+' → Água abre o FORMULÁRIO da água (não registra no toque); '+ 1 copo' grava nas duas chaves, a folha fica aberta e 'Pronto' fecha", async () => {
     ligar();
     const { n } = await montar();
     await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
     fireEvent.click(screen.getByTestId("hn-mais"));
     await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
     fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="water"]')!);
+    await waitFor(() => expect(screen.getByTestId("hn-folha-acao").getAttribute("data-acao")).toBe("water"));
+    expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(3); // só abrir não grava
+    expect(screen.getByTestId("hn-agua-numero").textContent).toBe("3");
+    expect(eventos.some(([e, d]) => e === "home_acao_rapida" && d.acao === "water" && d.origem === "folha")).toBe(true);
+    fireEvent.click(screen.getByTestId("hn-agua-mais"));
     await waitFor(() => expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(4));
     expect((n.ler<Record<string, number>>("water-log") ?? {})[hoje]).toBe(4);
-    expect(eventos.some(([e, d]) => e === "home_acao_rapida" && d.acao === "water" && d.origem === "folha")).toBe(true);
-    // a folha fecha sozinha depois do ✓
+    await waitFor(() => expect(screen.getByTestId("hn-agua-numero").textContent).toBe("4"));
+    expect(screen.getByTestId("hn-folha-mais")).toBeTruthy(); // fica aberta pra somar copos
+    fireEvent.click(screen.getByTestId("hn-acao-pronto"));
     await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
     // os 3 cards acompanham: Água 4/8
     expect(document.querySelector('[data-metrica="agua"]')?.textContent?.replace(/\s+/g, "")).toContain("4/8");
   });
 
-  it("humor abre o formulário de sempre dentro da folha e grava em core-mood-log", async () => {
+  it("BUG do dono: tocar no CARD 'Água' da página 1 NÃO registra um copo — abre o formulário da água", async () => {
+    ligar();
+    const { n } = await montar();
+    await waitFor(() => expect(document.querySelector('[data-metrica="agua"]')).toBeTruthy());
+    fireEvent.click(document.querySelector('[data-metrica="agua"]')!);
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa")).toBe("water"));
+    await respirar(100);
+    expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(3);
+    expect(screen.getByTestId("hn-agua-mais")).toBeTruthy();
+    expect(screen.queryByTestId("hn-acao-voltar")).toBeNull(); // veio direto, não da grade
+  });
+
+  it("humor: os 5 humores grandes no formulário novo; tocar grava em core-mood-log e a folha fecha", async () => {
     ligar();
     const { n } = await montar();
     await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
@@ -177,12 +200,28 @@ describe("Home nova — chave ON", () => {
     fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="mood"]')!);
     await waitFor(() => expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa")).toBe("mood"));
     expect(screen.queryByTestId("hn-acoes")).toBeNull(); // a grade some com o formulário aberto
-    const formulario = screen.getByTestId("hn-formularios");
-    const botoes = within(formulario).getAllByRole("button");
-    const bom = botoes.find((b) => /🙂|😊|Bem|Bom/.test(b.textContent ?? ""));
-    expect(bom, "um botão de humor").toBeTruthy();
-    fireEvent.click(bom!);
-    await waitFor(() => expect((n.ler<Record<string, unknown>>("core-mood-log") ?? {})[hoje]).toBeTruthy());
+    expect(document.querySelectorAll("[data-humor]").length).toBe(5);
+    fireEvent.click(document.querySelector('[data-humor="4"]')!);
+    await waitFor(() => expect((n.ler<Record<string, { value: number }>>("core-mood-log") ?? {})[hoje]?.value).toBe(4));
+    await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
+  });
+
+  it("gasto: campo grande com teclado decimal, categoria em pílulas e o botão principal — grava pelo mesmo caminho de Finanças", async () => {
+    ligar();
+    await montar();
+    await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
+    fireEvent.click(screen.getByTestId("hn-mais"));
+    await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy());
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="expense"]')!);
+    const campo = await screen.findByLabelText("Valor do gasto");
+    expect(campo.getAttribute("inputmode")).toBe("decimal");
+    fireEvent.click(screen.getByTestId("hn-acao-principal"));
+    expect(toast.error).toHaveBeenCalledWith("Informe um valor válido"); // a mesma validação de sempre
+    fireEvent.change(campo, { target: { value: "12,50" } });
+    fireEvent.click(document.querySelector('[data-pilula="Lazer"]')!);
+    fireEvent.click(screen.getByTestId("hn-acao-principal"));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("12,50")));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Lazer"));
     await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
   });
 
@@ -340,22 +379,18 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
   const TODAS: ActionId[] = ["water", "mood", "expense", "income", "task", "workout", "sleep", "meal", "weight", "idea", "gratitude", "detox"];
   const DIALOGO_PADRAO = '[role="dialog"][data-state="open"]';
 
-  it("nenhuma ação abre escondida nem trava a grade; a Tarefa (Sheet do Radix) tira a folha do '+' da frente e, ao fechar, leva a folha junto", async () => {
+  it("as 12 ações: cada uma abre o SEU formulário (nenhuma grava no toque, nenhuma fica atrás de um diálogo); a Tarefa abre a folha da Rotina por cima e, ao fechar, leva o '+' junto", async () => {
     ligar();
     const { n } = await montar();
     await waitFor(() => expect(document.querySelector('[data-testid="hn-mais"]')).toBeTruthy());
     const abrir = async () => { fireEvent.click(screen.getByTestId("hn-mais")); await waitFor(() => expect(screen.getByTestId("hn-folha-mais")).toBeTruthy()); };
     const fecharPeloX = async () => { fireEvent.click(screen.getByTestId("hn-folha-mais-fechar")); await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull()); };
+    const agua = () => (n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje];
+    const treino = () => n.ler<string[]>("saude-workout-log") ?? [];
     for (const id of TODAS) {
       await abrir();
       expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida"), id).toBeNull();
       fireEvent.click(document.querySelector(`[data-testid="hn-acoes"] [data-acao="${id}"]`)!);
-      if (id === "water" || id === "workout") {
-        // gravou no toque: ✓ e a folha fecha sozinha
-        await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
-        expect(document.querySelector(DIALOGO_PADRAO)).toBeNull();
-        continue;
-      }
       if (id === "task") {
         const tarefa = await screen.findByTestId("folha-nova-tarefa");
         expect(tarefa.getAttribute("data-state")).toBe("open");
@@ -372,17 +407,26 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
         expect(document.body.style.pointerEvents).not.toBe("none");
         continue;
       }
-      // formulário inline dentro da folha, na frente, sem nenhum diálogo padrão escondido atrás
-      await waitFor(() => expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa"), id).toBe(id));
+      // o formulário da ação, dentro da folha, na frente, sem nenhum diálogo padrão escondido atrás — e nada gravado só de abrir
+      await waitFor(() => expect(screen.getByTestId("hn-folha-acao").getAttribute("data-acao"), id).toBe(id));
+      expect(screen.getByTestId("hn-folha-mais").getAttribute("data-ativa")).toBe(id);
       expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida")).toBeNull();
-      expect(screen.getByTestId("hn-formularios").className).not.toContain("hidden");
+      expect(screen.queryByTestId("hn-acoes")).toBeNull();
       expect(document.querySelector(DIALOGO_PADRAO), id).toBeNull();
+      expect(agua(), id).toBe(3);
+      expect(treino(), id).not.toContain(hoje);
+      // a seta ← volta pra grade
+      fireEvent.click(screen.getByTestId("hn-acao-voltar"));
+      await waitFor(() => expect(screen.getByTestId("hn-acoes")).toBeTruthy());
       await fecharPeloX();
     }
-    // depois de tudo a grade responde: a água grava (3 do dia + 1 do laço + esta)
+    // o treino grava só pelo botão principal do formulário dele (nunca no toque do azulejo)
     await abrir();
-    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="water"]')!);
-    await waitFor(() => expect((n.ler<Record<string, number>>("core-saude-water") ?? {})[hoje]).toBe(5));
+    fireEvent.click(document.querySelector('[data-testid="hn-acoes"] [data-acao="workout"]')!);
+    await waitFor(() => expect(screen.getByTestId("hn-folha-acao").getAttribute("data-acao")).toBe("workout"));
+    fireEvent.click(screen.getByTestId("hn-acao-principal"));
+    await waitFor(() => expect(treino()).toContain(hoje));
+    await waitFor(() => expect(screen.queryByTestId("hn-folha-mais")).toBeNull(), { timeout: 3000 });
   });
 
   it("abrir um formulário, fechar pelo X e reabrir o '+': a folha FICA aberta (no Simulador ela se fechava sozinha em 150 ms)", async () => {
@@ -437,7 +481,7 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
   it("vindo direto em 'task' (uma pendência / a folha do score), a folha do '+' nem aparece: só a da tarefa; cancelar fecha tudo", async () => {
     const n = criarNuvem(DADOS);
     const onFechar = vi.fn();
-    render(<MemoryRouter><n.Provedor><FolhaMaisE aberta inicial="task" onFechar={onFechar} /></n.Provedor></MemoryRouter>);
+    render(<MemoryRouter><n.Provedor><FolhaMaisE aberta inicial="task" onFechar={onFechar} data={HUB} /></n.Provedor></MemoryRouter>);
     expect(screen.getByTestId("hn-folha-mais").getAttribute("data-escondida")).toBe("1"); // desde o 1º quadro
     const tarefa = await screen.findByTestId("folha-nova-tarefa");
     expect(tarefa.getAttribute("data-state")).toBe("open");
@@ -450,7 +494,7 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
     const n = criarNuvem(DADOS);
     const onFechar = vi.fn();
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const arvore = (aberta: boolean) => <MemoryRouter><n.Provedor><FolhaMaisE aberta={aberta} onFechar={onFechar} /></n.Provedor></MemoryRouter>;
+    const arvore = (aberta: boolean) => <MemoryRouter><n.Provedor><FolhaMaisE aberta={aberta} onFechar={onFechar} data={HUB} /></n.Provedor></MemoryRouter>;
     const { rerender } = render(arvore(true));
     expect((window.history.state as { coreSheet?: string } | null)?.coreSheet).toBe("home-mais");
     act(() => { window.dispatchEvent(new PopStateEvent("popstate")); });
@@ -465,16 +509,24 @@ describe("Home nova — as 12 ações do '+' (revisor 26/10: a Tarefa abria esco
 });
 
 describe("Home nova — a barra de vidro e as folhas padrão (revisor 26/10: a barra ficava por cima das folhas z-50)", () => {
-  it("o WidgetPicker (Dialog do Radix) aberto esconde a barra; fechar devolve", async () => {
+  it("a folha de Widgets (estilo E, rodada 2) abre por cima da barra e grava na mesma chave; um diálogo padrão (Radix) na Home ainda esconde a barra", async () => {
     ligar();
-    await montar();
+    const { n } = await montar();
     await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
     const escolher = screen.queryByTestId("he-widgets-escolher") ?? screen.getByText("Escolher");
     fireEvent.click(escolher);
-    await waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("hn-widgets-folha")).toBeTruthy());
+    expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeNull(); // não é Radix: fica acima da barra (z-71)
+    fireEvent.click(screen.getByLabelText("Mostrar Treino"));
+    await waitFor(() => expect(JSON.stringify(n.ler("core-home-widgets-v2") ?? [])).toContain("workout"));
+    fireEvent.click(screen.getByTestId("hn-widgets-fechar"));
+    await waitFor(() => expect(screen.queryByTestId("hn-widgets-folha")).toBeNull());
+    // um diálogo padrão (Radix) ainda esconde a barra
+    const dlg = document.createElement("div");
+    dlg.setAttribute("role", "dialog"); dlg.setAttribute("data-state", "open");
+    document.body.appendChild(dlg);
     await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeNull());
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    await waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).toBeNull());
+    dlg.remove();
     await waitFor(() => expect(document.querySelector('[data-testid="hn-barra"]')).toBeTruthy());
   });
 

@@ -1,6 +1,8 @@
 import { Check, Moon, Sun } from "lucide-react";
 import { useTheme, palettes, type ThemePalette } from "@/hooks/use-theme";
 import { trackEvent } from "@/lib/analytics";
+import { useAuth } from "@/hooks/use-auth";
+import { useHomeNova } from "@/hooks/use-home-nova";
 
 /**
  * O MIOLO DA APARÊNCIA (modo claro/escuro + a cor do tema) — o que morava no sol e na paleta do topo da Home.
@@ -9,6 +11,10 @@ import { trackEvent } from "@/lib/analytics";
  */
 export function PainelAparencia({ origem }: { origem: "aparencia" | "menu" }) {
   const { mode, toggleMode, palette, setPalette } = useTheme();
+  // rodada 2 da Home nova (26/10, dono): com a chave ligada só existe o tema padrão — as cores somem daqui
+  // (quem tinha outra cor já voltou pro Original ao abrir a Home nova); claro/escuro continuam
+  const { user } = useAuth();
+  const semCores = useHomeNova(user).ligada;
 
   const escolherModo = (m: "light" | "dark") => {
     if (m === mode) return;
@@ -46,7 +52,7 @@ export function PainelAparencia({ origem }: { origem: "aparencia" | "menu" }) {
         </div>
       </section>
 
-      <section>
+      <section hidden={semCores} data-testid="aparencia-cores">
         <h2 id={`aparencia-cor-${origem}`} className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 px-1">Cor</h2>
         <ul role="radiogroup" aria-labelledby={`aparencia-cor-${origem}`} className="bg-card rounded-2xl border border-border/60 divide-y divide-border/60 overflow-hidden">
           {(Object.keys(palettes) as ThemePalette[]).map((p) => {

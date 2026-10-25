@@ -510,6 +510,7 @@ const BarraVidroGlobal = lazy(() => import("@/components/home-nova/e/BarraVidroG
 const Modulos = lazyPage(() => import("./pages/Modulos"));
 const Voce = lazyPage(() => import("./pages/Voce"));
 const Aparencia = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.Aparencia })));
+const PersonalizarInicio = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.PersonalizarInicio })));
 const Preview = lazyPage(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazyPage(() => import("./pages/v2/ComecarV2"));
@@ -868,6 +869,7 @@ const AnimatedRoutes = () => {
         <Route path="/modulos" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="modulos"><Modulos /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/voce" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="voce"><Voce /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/voce/aparencia" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="aparencia"><Aparencia /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
+        <Route path="/voce/inicio" element={<SoComAbas><ProtectedRoute><PageTransition><RouteErrorBoundary routeName="personalizar-inicio"><PersonalizarInicio /></RouteErrorBoundary></PageTransition></ProtectedRoute></SoComAbas>} />
         <Route path="/notificacoes" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="notificacoes"><Notificacoes /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         {/* allowGuest: o convidado do teste grátis também trava, e mandar
             ele pro /auth quando ele foi pedir socorro é o pior desfecho. */}

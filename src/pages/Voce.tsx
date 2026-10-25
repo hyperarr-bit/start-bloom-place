@@ -1,12 +1,22 @@
 import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Bell, ChevronRight, CreditCard, FileText, LifeBuoy, LogOut, Monitor, Palette,
-  RotateCcw, Shield, Sparkles, Star, Trophy,
+  ArrowLeft, Bell, ChevronRight, CreditCard, FileText, Home, LayoutGrid, LifeBuoy, ListChecks, LogOut, Monitor, Palette,
+  RotateCcw, Shield, SlidersHorizontal, Sparkles, Star, Trophy, UserRound,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { useTheme, palettes } from "@/hooks/use-theme";
+import { useHomeNova } from "@/hooks/use-home-nova";
+import { useHomeWidgets } from "@/hooks/use-home-widgets";
+import { useLifeHubData } from "@/hooks/use-life-hub-data";
+import { SUAVIDADE_HOME_NOVA } from "@/lib/home-nova";
+import { CATALOGO_RESUMOS, CHAVE_RESUMOS, MAX_RESUMOS, alternarResumo, normalizarResumos } from "@/lib/home-resumos";
+import { CHAVE_PENDENCIAS_PREFS, PREFS_PADRAO } from "@/lib/home-pendencias";
+import { VoceE, type CategoriaVoce } from "@/components/home-nova/e/VoceE";
+import { EscolherWidgetsE } from "@/components/home-nova/e/EscolherWidgetsE";
+import { PersonalizarPendenciasE } from "@/components/home-nova/e/PersonalizarPendenciasE";
+import { TRACO } from "@/components/home-nova/e/paleta";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { abrirPaginaDeAvaliacao } from "@/lib/avaliacao";
@@ -72,6 +82,8 @@ export default function Voce() {
   const { mode, palette } = useTheme();
   const [folha, setFolha] = useState<null | "account" | "computador">(null);
   const nativo = isNativeShell();
+  // rodada 2 da Home nova (26/10): com a chave ligada, a aba no estilo da E — categorias que abrem subcategorias
+  const nova = useHomeNova(user).ligada;
 
   // aquece os destinos mais tocados (mesmo cuidado da folha antiga: falha aqui é silenciosa)
   useEffect(() => {
@@ -114,6 +126,39 @@ export default function Voce() {
   ];
 
   const versao = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
+
+  if (nova) {
+    const plano = linhaDoPlano(auth, trialCartaoAtivo());
+    const categorias: CategoriaVoce[] = [
+      {
+        id: "inicio", Icone: Home, titulo: "Início", resumo: "Resumos, widgets, pendências e o tutorial",
+        itens: [
+          { id: "personalizar-inicio", Icone: SlidersHorizontal, rotulo: "Personalizar início", onClick: () => ir("personalizar-inicio", "/voce/inicio") },
+          { id: "tutorial", Icone: RotateCcw, rotulo: "Rever tutorial", onClick: () => { clicar("tutorial"); navigate("/home", { state: { reverTutorial: true } }); } },
+        ],
+      },
+      {
+        id: "conta", Icone: UserRound, titulo: "Conta", resumo: plano,
+        itens: [
+          { id: "plano", Icone: CreditCard, rotulo: "Meu plano", detalhe: plano, onClick: () => ir("plano", "/planos") },
+          { id: "aparencia", Icone: Palette, rotulo: "Aparência", detalhe: mode === "dark" ? "Escuro" : "Claro", onClick: () => ir("aparencia", "/voce/aparencia") },
+          ...(nativo ? [{ id: "lembretes", Icone: Bell, rotulo: "Lembretes", onClick: () => ir("lembretes", "/notificacoes") }] : []),
+          ...(nativo ? [{ id: "computador", Icone: Monitor, rotulo: "Usar no computador", onClick: () => { clicar("computador"); setFolha("computador"); } }] : []),
+        ],
+      },
+      { id: "progresso", Icone: Trophy, titulo: "Progresso", resumo: "Conquistas e retrospectiva", itens: progresso },
+      { id: "ajuda", Icone: LifeBuoy, titulo: "Ajuda", resumo: "Suporte, avaliação, privacidade e termos", itens: ajuda },
+    ];
+    return (
+      <VoceE
+        nome={nome} email={user?.email ?? ""} iniciais={iniciais} categorias={categorias} versao={versao}
+        onConta={() => { clicar("conta"); trackEvent("account_drawer_open", { via: "voce" }); setFolha("account"); }}
+        onSair={() => { clicar("sair"); void signOut(); }}
+      >
+        <AccountDrawer open={folha !== null} onOpenChange={(o) => { if (!o) setFolha(null); }} inicial={folha ?? "menu"} displayName={nome} />
+      </VoceE>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-background flex flex-col" {...{ [ATRIBUTO_RAIZ]: "voce" }} data-testid="tela-voce">
@@ -192,6 +237,83 @@ export function Aparencia() {
       <main className="flex-1 max-w-lg md:max-w-2xl mx-auto w-full px-4 pt-4 pb-8">
         <PainelAparencia origem="aparencia" />
       </main>
+    </div>
+  );
+}
+
+/**
+ * /voce/inicio — PERSONALIZAR INÍCIO (rodada 2 da Home nova, 26/10): os RESUMOS (os 3 cards de "Seu dia", até 3 entre
+ * Hábitos · Água · Refeições · Sono · Gasto · Treino · Leitura — lib/home-resumos), os WIDGETS da página 3 e as
+ * PENDÊNCIAS de hoje — as mesmas folhas da Home, as mesmas chaves. Só existe com a Home nova ligada.
+ */
+export function PersonalizarInicio() {
+  const navigate = useNavigate();
+  const { get, set } = useUserData();
+  const lifeData = useLifeHubData();
+  const { activeWidgets, addWidget, removeWidget, isActive, toggleSize } = useHomeWidgets();
+  const resumos = normalizarResumos(get<unknown>(CHAVE_RESUMOS, null));
+  const prefs = lifeData.pendenciasPrefs ?? PREFS_PADRAO;
+  const [widgets, setWidgets] = useState(false);
+  const [pendencias, setPendencias] = useState(false);
+  const alternar = (id: (typeof CATALOGO_RESUMOS)[number]["id"]) => {
+    const lista = alternarResumo(resumos, id);
+    if (lista === resumos) return;
+    trackEvent("home_resumos", { resumos: lista.join(",") });
+    set(CHAVE_RESUMOS, lista);
+  };
+  return (
+    <div className="hn he min-h-dvh" data-testid="tela-personalizar-inicio" data-suave={SUAVIDADE_HOME_NOVA}>
+      <main className="max-w-lg mx-auto px-4 pt-2 pb-10">
+        <header className="flex items-center gap-2.5 pt-1">
+          <button type="button" onClick={() => navigate("/voce")} aria-label="Voltar" className="w-10 h-10 -ml-1 rounded-full grid place-items-center bg-card shrink-0" style={{ boxShadow: "var(--hn-sombra)" }}>
+            <ArrowLeft className="w-5 h-5" strokeWidth={TRACO} />
+          </button>
+          <h1 className="text-[24px] leading-[1.15] font-bold tracking-[-0.025em] truncate">Personalizar início</h1>
+        </header>
+
+        <section className="hn-card mt-5 p-4" data-testid="pi-resumos">
+          <h2 className="text-[16px] font-bold tracking-tight">Resumos</h2>
+          <p className="text-[13px] text-muted-foreground mt-0.5">Os 3 cards de "Seu dia". Escolha até {MAX_RESUMOS}.</p>
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Resumos">
+            {CATALOGO_RESUMOS.map((r) => {
+              const on = resumos.includes(r.id);
+              const cheio = !on && resumos.length >= MAX_RESUMOS;
+              return (
+                <button
+                  key={r.id} type="button" onClick={() => alternar(r.id)} aria-pressed={on} disabled={cheio} data-testid={`resumo-${r.id}`}
+                  className="h-10 px-4 rounded-full text-[14px] font-semibold transition-colors disabled:opacity-40"
+                  style={on ? { background: "var(--hn-mais)", color: "var(--hn-mais-texto)" } : { background: "hsl(var(--muted) / 0.7)" }}
+                >
+                  {r.rotulo}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="hn-card mt-3 p-2" data-testid="pi-atalhos">
+          <button type="button" onClick={() => setWidgets(true)} data-testid="pi-widgets" className="w-full min-h-[56px] flex items-center gap-3.5 px-3 text-left rounded-2xl active:bg-muted/60">
+            <span className="w-10 h-10 rounded-xl grid place-items-center bg-muted/60 shrink-0" aria-hidden><LayoutGrid className="w-[19px] h-[19px]" strokeWidth={TRACO} /></span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[15px] font-semibold">Widgets</span>
+              <span className="block text-[12.5px] text-muted-foreground">{activeWidgets.length === 0 ? "Nenhum na página 3" : `${activeWidgets.length} na página 3`}</span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
+          </button>
+          <button type="button" onClick={() => setPendencias(true)} data-testid="pi-pendencias" className="w-full min-h-[56px] flex items-center gap-3.5 px-3 text-left rounded-2xl active:bg-muted/60">
+            <span className="w-10 h-10 rounded-xl grid place-items-center bg-muted/60 shrink-0" aria-hidden><ListChecks className="w-[19px] h-[19px]" strokeWidth={TRACO} /></span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[15px] font-semibold">Pendências de hoje</span>
+              <span className="block text-[12.5px] text-muted-foreground">{prefs.ocultos.length === 0 ? "Tudo ligado" : `${prefs.ocultos.length} ${prefs.ocultos.length === 1 ? "oculta" : "ocultas"}`}</span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" strokeWidth={2} aria-hidden />
+          </button>
+        </section>
+      </main>
+      <div className="hn he he-so-vars" data-suave={SUAVIDADE_HOME_NOVA}>
+        <EscolherWidgetsE aberta={widgets} onFechar={() => setWidgets(false)} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
+        <PersonalizarPendenciasE open={pendencias} onOpenChange={setPendencias} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
+      </div>
     </div>
   );
 }

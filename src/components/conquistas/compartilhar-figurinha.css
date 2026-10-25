@@ -1,0 +1,21 @@
+.share-fig-overlay { position:fixed; inset:0; z-index:430; background:#131c2a99; }
+.share-fig { position:fixed; inset:0; z-index:431; display:flex; flex-direction:column; background:#f5f2eb; color:#25344d; padding-top:var(--app-safe-top,0px); }
+.share-fig header { display:flex; align-items:center; justify-content:space-between; padding:8px 16px; }
+.share-fig header h2 { font-size:16px; font-weight:700; }
+.share-fig header button { width:44px; height:44px; display:grid; place-items:center; }
+.share-fig-formatos { display:flex; gap:4px; align-self:center; background:#e8e3d9; border-radius:14px; padding:4px; }
+.share-fig-formatos button { min-height:40px; padding:0 18px; font-size:12px; font-weight:650; border-radius:10px; }
+.share-fig-formatos [aria-pressed="true"] { background:#fffdf7; box-shadow:0 2px 6px #252d3d10; }
+.share-fig-palco { min-height:0; flex:1; display:grid; place-items:center; overflow:hidden; padding:0; margin:8px 0; }
+.share-fig-palco[data-recorte] { background-image:linear-gradient(45deg,#dfddd6 25%,transparent 25%),linear-gradient(-45deg,#dfddd6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#dfddd6 75%),linear-gradient(-45deg,transparent 75%,#dfddd6 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0; }
+.share-fig footer { width:min(440px,100%); margin-inline:auto; padding:0 16px max(12px,env(safe-area-inset-bottom)); }
+.share-fig footer p { text-align:center; color:#6e7684; font-size:11px; margin:0 0 8px; }
+.share-fig footer button, .share-fig footer .share-fig-salvar { min-height:44px; display:flex; align-items:center; justify-content:center; gap:8px; width:100%; font-size:13px; font-weight:650; border-radius:12px; }
+.share-fig footer .share-fig-principal { background:#263650; color:#fff; }
+.share-fig button:disabled { opacity:.5; }
+.share-fig button:focus-visible { outline:2px solid #b95248; outline-offset:2px; }
+.dark .share-fig { background:#202a38; color:#f9f5ec; }
+.dark .share-fig-formatos { background:#354254; }
+.dark .share-fig-formatos [aria-pressed="true"] { background:#506079; }
+.dark .share-fig footer p { color:#bdc5d0; }
+.dark .share-fig footer .share-fig-principal { background:#e3eaf4; color:#263650; }

@@ -1,5 +1,5 @@
 /* Caderno: a interface recua para as figurinhas ocuparem o primeiro plano. */
-.cn.cn { --cn-ink: #202c47; --cn-rosa: #bc423d; --cn-muted: #787c83; background: #faf9f6; }
+.cn.cn { --cn-ink: #202c47; --cn-acento: #273653; --cn-sobre-acento: #fff; --cn-acento-suave: #e7ecf3; --cn-rosa: var(--cn-acento); --cn-muted: #787c83; background: #faf9f6; }
 .cn .cn-main { max-width: 480px; }
 .cn .cn-main > div { padding: 10px 20px 32px; }
 .cn .cn-main > div > * + * { margin-top: 20px; }
@@ -17,13 +17,13 @@
 .cn-caderno-palco { position: relative; display: grid; place-items: center; height: 230px; background: radial-gradient(ellipse at center, #e6dfd1 0, transparent 66%); }
 .cn .cn-album-capa { width: 154px; height: 203px; margin: 0; transform: rotate(-7deg); }
 .cn .cn-album-capa > .alb-capa { transform: none; }
-.cn-caderno-nova { position: absolute; left: calc(50% + 60px); top: 26px; background: #bc423d; color: #fff; border: 3px solid #f5f2e9; border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 700; transform: rotate(7deg); white-space: nowrap; }
+.cn .cn-caderno-nova { position: absolute; left: calc(50% + 60px); top: 26px; background: var(--cn-acento); color: var(--cn-sobre-acento); border: 3px solid #f5f2e9; border-radius: 20px; padding: 5px 11px; font-size: 11px; font-weight: 700; transform: rotate(7deg); white-space: nowrap; }
 .cn-caderno-progresso { height: 3px; background: #e2ddd2; overflow: hidden; border-radius: 10px; margin-bottom: 14px; }
-.cn-caderno-progresso > i { display: block; height: 100%; background: #bc423d; transition: width .3s; }
-.cn button.cn-album-colar { background: #bc423d; min-height: 46px; border-radius: 12px; font-size: 14px; gap: 9px; font-weight: 650; }
+.cn .cn-caderno-progresso > i { display: block; height: 100%; background: var(--cn-acento); transition: width .3s; }
+.cn button.cn-album-colar { background: var(--cn-acento); color:var(--cn-sobre-acento); min-height: 46px; border-radius: 12px; font-size: 14px; gap: 9px; font-weight: 650; }
 .cn .cn-album-colar > svg { width: 19px; height: 19px; }
 .cn button.cn-album-abrir { min-height: 44px; margin: 0; font-weight: 600; color: var(--cn-ink); font-size: 12px; }
-.cn button.cn-album-abrir-principal { background: var(--cn-ink); color: #fff; margin-bottom: 8px; }
+.cn button.cn-album-abrir-principal { background: var(--cn-acento); color: var(--cn-sobre-acento); margin-bottom: 8px; }
 .cn .cn-album-nota { margin: 0 0 14px; text-align: center; color: #71747d; font-size: 12px; }
 
 /* Capa tipográfica, lombada azul e três recortes do mesmo universo visual. */
@@ -82,7 +82,7 @@
 .alb-tela[data-editorial] .alb-lombada { background: linear-gradient(90deg, #17243c, #364968 40%, #22314c); }
 .alb-tela[data-editorial] .alb-cap-titulo h3 { color: #273653; }
 .alb-tela[data-editorial] .alb-cap-frase { display: none; }
-.dark .cn.cn { --cn-ink: #ece9e1; --cn-rosa: #f08b7f; background: #1d2430; }
+.dark .cn.cn { --cn-ink: #ece9e1; --cn-acento: #bfd0e8; --cn-sobre-acento: #202c47; --cn-acento-suave: #354459; --cn-rosa: var(--cn-acento); background: #1d2430; }
 .dark .cn .cn-cabecalho { background: #1d2430; }
 .dark .cn .cn-card { border-color: #3b424f; }
 .dark .cn .cn-album { background: #2a3039; }
@@ -97,8 +97,8 @@
 .dark .cn .cn-colecao-estado, .dark .cn .cn-caderno-nova { border-color: #252c37; }
 .dark .cn .cn-proxima-marco { color: #f08b7f; background: #40373a; }
 .dark .cn .cn-caderno-progresso { background: #434852; }
-.dark .cn .cn-album-abrir-principal { background: #e6e5df; color: #222b3e; }
-.cn button:focus-visible { outline: 2px solid var(--cn-rosa); outline-offset: 4px; }
+.dark .cn button.cn-album-abrir-principal { background: var(--cn-acento); color: var(--cn-sobre-acento); }
+.cn button:focus-visible { outline: 2px solid var(--cn-acento); outline-offset: 4px; }
 @media (max-width: 359px) {
   .cn .cn-main > div { padding-inline: 12px; }
   .cn .cn-album { padding-inline: 14px; }
@@ -139,7 +139,7 @@
 .cn-fogo[data-subiu] > svg { animation: cn-fogo-evolui 1.1s ease-out both; transform-origin: 50% 85%; }
 .cn-fogo[data-subiu] .cn-fogo-faisca { animation: cn-fogo-brilha 1.1s ease-out both; }
 .cn .cn-seq-evolucao { display: block; margin-top: 3px; font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--cn-muted, #777d87); }
-.cn .cn-seq-semana [data-estado="feito"] i { background: var(--fg-escuro); }
+.cn .cn-seq-semana [data-estado="feito"] i { background: color-mix(in srgb, var(--fg-meio) 22%, #f5f3ee); color: #26374b; }
 .cn .cn-seq-semana [data-estado="hoje"] { color: var(--fg-hoje-texto); }
 .cn .cn-seq-semana [data-estado="hoje"] i { box-shadow: inset 0 0 0 1.5px var(--fg-meio); color: var(--fg-hoje-texto); background: var(--fg-hoje); }
 .cn .cn-seq .cn-proxima-progresso .cn-barra > i { background: var(--fg-meio); }
@@ -156,8 +156,33 @@
 @media (prefers-reduced-motion: reduce) { .cn-fogo[data-subiu] > svg, .cn-fogo[data-subiu] .cn-fogo-faisca { animation: none; } }
 /* O calendário do detalhe usa o mesmo tom, inclusive no dia de hoje. */
 [data-testid="cn-detalhe-sequencia"] .cn-cal-dia[data-estado="hoje"] { box-shadow: inset 0 0 0 1.5px var(--fg-meio); color: var(--fg-hoje-texto); }
-[data-testid="cn-detalhe-sequencia"] .cn-cal-dia[data-estado="feito"] { background: var(--fg-escuro); }
+[data-testid="cn-detalhe-sequencia"] .cn-cal-dia[data-estado="feito"] { background: color-mix(in srgb, var(--fg-meio) 22%, #f5f3ee); color: #26374b; }
 .dark [data-testid="cn-detalhe-sequencia"] .cn-cal-dia[data-estado="hoje"] { color: var(--fg-hoje-texto-escuro); }
-.dark .cn .cn-seq-semana [data-estado="feito"] i { background: var(--fg-escuro); }
+.dark .cn .cn-seq-semana [data-estado="feito"] i,
+.dark [data-testid="cn-detalhe-sequencia"] .cn-cal-dia[data-estado="feito"] { background: color-mix(in srgb, var(--fg-meio) 22%, #263243); color: #f0ede5; }
 .cn .cn-seq .cn-proxima-marco:not([data-arte]) { color: var(--fg-hoje-texto); background: var(--fg-hoje); }
 .dark .cn .cn-seq .cn-proxima-marco:not([data-arte]) { color: var(--fg-hoje-texto-escuro); background: var(--fg-hoje-escuro); }
+
+/* Ações da tela compartilham uma tinta; fogo e artes mantêm suas cores próprias. */
+.cn.cn .cn-album-pessoal button.cn-album-colar,
+.cn.cn .cn-album-pessoal button.cn-album-abrir-principal { background:var(--cn-acento); color:var(--cn-sobre-acento); }
+.cn .cn-colecao-cab button { color:var(--cn-acento); }
+.cn .cn-pill-acento { background:var(--cn-acento-suave); color:var(--cn-ink); }
+
+/* 1.0.19 — margens com a casca do app (prints do dono 26/10).
+   Topo: o .app-safe-shell (App.tsx) já desce o conteúdo pela área segura; o cabeçalho somava a MESMA área segura de
+   novo (conquistas-editorial.css) — dentro da casca ele fica só com o respiro dele. Fora da casca (prévia /dev) nada muda.
+   Fundo: a faixa do relógio (.app-safe-top-guard), a casca e o respiro de baixo da barra de vidro (body.com-barra-vidro,
+   index.css) pintavam o branco do tema por trás do papel da tela; com a tela aberta, tudo pinta o papel. */
+.app-safe-shell .cn .cn-cabecalho { padding-top: 0; }
+/* o papel do fundo agora vem do html/body (abaixo): a tela não precisa mais esticar até 100dvh — esticada, ela somava
+   a área segura e o respiro da barra e deixava um vão rolável vazio depois de "Memórias da coleção" */
+.app-safe-shell .cn.min-h-screen, .app-safe-shell .cn .cn-main { min-height: 0; }
+html.cn-fundo-da-tela { --safe-top-cor: #faf9f6; }
+html.cn-fundo-da-tela, html.cn-fundo-da-tela body, html.cn-fundo-da-tela .app-safe-shell { background-color: #faf9f6; }
+html.dark.cn-fundo-da-tela { --safe-top-cor: #1d2430; }
+html.dark.cn-fundo-da-tela, html.dark.cn-fundo-da-tela body, html.dark.cn-fundo-da-tela .app-safe-shell { background-color: #1d2430; }
+/* com a barra de vidro o body já reserva a altura dela; o fim da página não soma o respiro próprio por cima */
+body.com-barra-vidro .cn .cn-main > div { padding-bottom: 12px; }
+/* …e a casca não soma a área segura de baixo de novo (o respiro da barra no body já conta com ela) */
+html.cn-fundo-da-tela body.com-barra-vidro .app-safe-shell { padding-bottom: 0; }

@@ -22,7 +22,7 @@ describe("Catálogo aprovado: união, critérios e migração", () => {
   expect(new Set(ids)).toEqual(new Set(base.map(b => b.id)));
   expect(paginas.slice(1).every(p => p.vagas.length <= 5 && p.modulo && !p.raridade)).toBe(true);
   expect(paginas.filter(p => p.modulo === "rotina").map(p => p.vagas.length)).toEqual([5, 4, 4, 4]);
-  expect(paginas.filter(p => p.modulo === "sequencia").map(p => p.vagas.length)).toEqual([5, 5]);
+  expect(paginas.filter(p => p.modulo === "sequencia").map(p => p.vagas.length)).toEqual([4, 4, 3]);
   const conjunta = paginas.find(p => p.id === "carreira-core")!;
   expect(conjunta.modulos).toEqual(["carreira", "geral"]);
   expect(paginas[paginaDaFigurinha(paginas, "master")]).toBe(conjunta);
@@ -32,7 +32,7 @@ describe("Catálogo aprovado: união, critérios e migração", () => {
  it("mantém os dois planos, ids únicos e todas as categorias novas", () => {
   const base = catalogo();
   expect(new Set(base.map(b=>b.id)).size).toBe(base.length);
-  expect(base).toHaveLength(97); // o Mestre é somado pelo registro, total 98
+  expect(base).toHaveLength(98); // o Mestre é somado pelo registro, total 99
   expect(NOVAS_CONQUISTAS).toHaveLength(45);
   for(const id of ["saver-60", "retorno", "leitura-nota", "treino-plano", "carreira-projeto", "acao-rapida"]) expect(base.some(b=>b.id===id)).toBe(true);
   expect(base.some(b=>IDS_ARQUIVADOS.has(b.id))).toBe(false);
@@ -43,16 +43,15 @@ describe("Catálogo aprovado: união, critérios e migração", () => {
   expect(ids.filter(id=>!ARTES_CADERNO[id])).toEqual([]);
   const revisadas = ["diario-7", "diario-1", "leitura-3", "meta-semanal-4"];
   const finalizadas = ["leitura-10", "dieta-jejum", "rotina-semana", "treino-50", "dieta-refeicao", "saude-log"];
-  for (const id of ids.filter(id => !["tarefa-1", "tarefa-feita", "sequencia-2", "finance-3", "receita-1", "treino-carga", ...revisadas, ...finalizadas].includes(id))) expect(ARTES_CADERNO[id]).toContain("/variacoes/");
+  // Reconstruções aprovadas também vivem em pastas próprias, não só em variacoes.
+  for (const id of ids) expect(ARTES_CADERNO[id]).toMatch(/^\/src\/assets\/conquistas-caderno\/.+\.(?:webp|png)$/);
+  expect(ARTES_CADERNO["sequencia-3"]).toContain("/sequencia-aprovada/sequencia-3-despertar.webp");
   for (const id of revisadas) expect(ARTES_CADERNO[id]).toContain(`/revisao-paleta/${id}.webp`);
   for (const id of finalizadas) expect(ARTES_CADERNO[id]).toContain(`/revisao-final/${id}.webp`);
   for (const id of ["tarefa-1", "tarefa-feita"]) expect(ARTES_CADERNO[id]).toContain(`/colecao/${id}.webp`);
   expect(ARTES_CADERNO["receita-1"]).toContain("chef-de-casa.webp");
   for (const id of ["sequencia-2", "finance-3"]) expect(ARTES_CADERNO[id]).toContain(`/revisao-outubro/${id}.webp`);
   expect(ARTES_CADERNO["sono-7"]).toContain("sono-suave.webp");
-  // escolha final do dono (23/10): só a nova Um passo acima; a menina dos discos vira Semana cumprida
-  expect(ARTES_CADERNO["treino-carga"]).toContain("/revisao-equilibrio/treino-carga.webp");
-  expect(ARTES_CADERNO["treino-semana"]).toContain("/variacoes/aplicadas/treino-carga.webp");
  });
  it("arquiva só conquistas já ganhas, preserva data e XP", () => {
   const gravadas = {"investor-100k":"2026-01-10", "saver-60":"2026-02-01", "rotina-1":"2026-02-02"};

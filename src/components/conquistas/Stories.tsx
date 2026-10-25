@@ -104,47 +104,7 @@ export const StoriesRoseta = ({ dias, nome, membroDesde, nivel, transparente = f
   );
 };
 
-const FUNDO_RARIDADE: Record<Raridade, string> = {
-  comum: "#f4ecdc",
-  raro: "linear-gradient(180deg,#eef4ff 0%,#dbe7fb 100%)",
-  epico: "linear-gradient(160deg,#f3e8ff 0%,#e0f2fe 45%,#fce7f3 100%)",
-  lendario: "linear-gradient(180deg,#fff7d6 0%,#f3dfa0 100%)",
-};
-
-/** Stories do adesivo (figurinha): o adesivo grande na folha pontilhada — fundo holográfico no épico, dourado no lendário. */
-export const StoriesAdesivo = ({ id, titulo, descricao, raridade = "comum", nome, membroDesde }: { id: string; titulo: string; descricao: string; raridade?: Raridade; nome: string; membroDesde: string }) => {
-  const brilha = raridade === "epico" || raridade === "lendario";
-  const nomeRar = RARIDADE_FEM[raridade].toLowerCase();
-  return (
-    <div style={{ ...base, background: FUNDO_RARIDADE[raridade] }} data-stories="adesivo" data-raridade={raridade}>
-      <div style={{ ...pontilhado("rgba(60,50,40,.16)"), opacity: 0.9 }} />
-      <div style={{ ...manchete, top: 300, fontSize: 84, lineHeight: 1.02 }}>
-        {raridade === "comum" ? "Mais uma figurinha" : `Figurinha ${nomeRar}`}
-        <br />
-        no meu álbum.
-      </div>
-      <div style={{ position: "absolute", left: 260, top: brilha ? 600 : 560, width: 560, height: 560 }}>
-        {brilha && <AnelRaridadeSvg raridade={raridade} tamanho={560} />}
-        <div style={{ position: "absolute", inset: 0, transform: "rotate(-5deg)" }}>
-          <Adesivo id={id} tamanho={560} bordaGrossa />
-        </div>
-      </div>
-      <div style={{ position: "absolute", left: 60, right: 60, top: brilha ? 1236 : 1206, textAlign: "center" }}>
-        {raridade !== "comum" && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, height: 44, padding: "0 20px", borderRadius: 999, background: "rgba(43,43,47,.08)", fontSize: 20, fontWeight: 800, letterSpacing: ".2em", color: "#2b2b2f", marginBottom: 22 }}>
-            FIGURINHA {RARIDADE_FEM[raridade].toUpperCase()} · +{XP_RARIDADE[raridade]} XP
-          </div>
-        )}
-        <div style={{ fontSize: 72, fontWeight: 900, letterSpacing: "-.03em", color: "#2b2b2f", lineHeight: 1.05 }}>{titulo}</div>
-        <div style={{ fontSize: 32, color: "#6f665a", marginTop: 14, fontWeight: 500 }}>{descricao}</div>
-        <div style={{ fontSize: 26, color: "#8c8272", marginTop: 34, fontWeight: 600 }}>
-          {nome} · membro desde {membroDesde}
-        </div>
-      </div>
-      <div style={rodape("#8c8272", 1516)}>CORE · ORGANIZE SUA VIDA</div>
-    </div>
-  );
-};
+export { StoriesAdesivo } from "./StoryFigurinha";
 
 /* ------------------------------------------------------------------------- *
  * MINHA CONQUISTA DO MÊS (a insígnia enorme) — imagem e camadas do vídeo

@@ -11,6 +11,7 @@ import { CHAVE_VISTAS } from "@/lib/conquistas-registro";
 import { RARIDADES, RARIDADE_LABEL, raridadeDe, type Badge, type Raridade } from "@/components/gamification/types";
 import { AdesivoRaro, ChipRaridade } from "./adesivos-raridade";
 import { Roseta } from "./Roseta";
+import { CompartilharFigurinha } from "./CompartilharFigurinha";
 import { compartilharAdesivo, compartilharRoseta } from "./compartilhar-conquistas";
 import { useConquistas, useEfeitosSequencia, usePerfilConquistas, useSequencia } from "./use-conquistas";
 import { CAPAS, CHAVE_CAPA, CapaResponsiva, type CapaId } from "./CapaPlanner";
@@ -865,6 +866,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
   const chaveAtual = atual ? (atual.tipo === "marco" ? `marco-${atual.dias}` : atual.tipo === "popup" || atual.tipo === "toast" ? `${atual.tipo}-${atual.badges.map((b) => b.id).join("+")}` : atual.tipo === "capa" ? `capa-${atual.capas.join("+")}` : atual.badge.id) : null;
   // "Ver em tela cheia" do popup: a festa de hoje do adesivo escolhido, por cima; "Voltar" devolve ao cartão
   const [telaCheia, setTelaCheia] = useState<Badge | null>(null);
+  const [previaStory, setPreviaStory] = useState<Badge | null>(null);
   useEffect(() => { setTelaCheia(null); }, [chaveAtual]);
 
   // 14/10: apareceu → fica gravado NESTE aparelho (fechar o app com a festa aberta não a repete na próxima abertura)
@@ -909,7 +911,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
     navigate("/conquistas", { state: { origem: "celebracao", ...(atual?.tipo === "adesivo" ? { album: atual.badge.id, colar: true } : atual?.tipo === "marco" ? { album: `sequencia-${atual.dias}`, colar: true } : {}) } });
   };
 
-  return (
+  return (<>
     <AnimatePresence mode="wait">
       {atual?.tipo === "marco" && !c2 && (
         <MomentoMarco key={chaveAtual!} dias={atual.dias} nome={perfil.nome} membroDesde={perfil.membroDesde} nivel={conq.nivel.name} onContinuar={continuar} />
@@ -922,7 +924,7 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
           seq={seq}
           onContinuar={continuar}
           onColar={verAdesivos}
-          onCompartilhar={() => { const b = adesivoDoMarco(atual.dias); return b ? compartilharAdesivo({ id: b.id, titulo: b.name, descricao: b.description, raridade: raridadeDe(b), nome: perfil.nome, membroDesde: perfil.membroDesde }) : undefined; }}
+          onCompartilhar={() => { const b = adesivoDoMarco(atual.dias); if (b) { continuar(); entregarAoAlbum(); setPreviaStory(b); } }}
         />
       )}
       {atual?.tipo === "toast" && (
@@ -951,5 +953,6 @@ export const MomentosConquistas = ({ contaNova = false }: { contaNova?: boolean 
         <MomentoAdesivo key={`${chaveAtual}-cheia-${telaCheia.id}`} badge={telaCheia} nome={perfil.nome} membroDesde={perfil.membroDesde} origem="popup" onContinuar={() => setTelaCheia(null)} onVerAdesivos={verAdesivos} />
       )}
     </AnimatePresence>
-  );
+    {previaStory && <CompartilharFigurinha badge={previaStory} onFechar={()=>setPreviaStory(null)}/>}
+  </>);
 };

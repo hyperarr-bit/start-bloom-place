@@ -1,3 +1,4 @@
+import { AlbumDaMissao } from "./AlbumDaMissao";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { missaoWebConvidada } from "@/lib/missao-web";
 import { createPortal } from "react-dom";
@@ -23,7 +24,7 @@ import { EV_PRIMEIRO_GASTO, lerTelaDoNumero, msDesdeOResultado } from "@/lib/mon
 import { CHAVE_SEM_GASTO, marcarDiaSemGasto } from "@/lib/acao-do-dia";
 import { CONHECER_MAIS, SETUPS_ENCAIXADOS, metaGuiadaDaIntro } from "./encaixes";
 import { horaSugeridaDaMissao, porDiaExato, praHojeDasFinancas } from "@/lib/lembrete-dia2";
-import { useSequencia } from "@/components/conquistas/use-conquistas";
+import { useConquistas, useSequencia } from "@/components/conquistas/use-conquistas";
 import { ArteDoAdesivo, useAdesivoDaDose, type AdesivoDaDose } from "./adesivo-da-dose";
 import "./missao-doses.css";
 import { lembretesSoNoApp } from "@/lib/missao-web";
@@ -1580,6 +1581,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   const proximo = n === 1 ? MODULOS[missao.modulos[1]] : n === 2 ? MODULOS[missao.modulos[2]] : null;
   const escolha = useAdesivoDaDose(n, modulo, missao.adesivosMostrados, aoMostrarAdesivo);
   const seq = useSequencia();
+  const conq = useConquistas();
   const [hora, setHora] = useState<Lembrete>(missao.lembrete ?? horaSugeridaDaMissao());
   const frase = fraseDoFeito(modulo, rotulo, porDiaAgora);
   void hoje;
@@ -1676,6 +1678,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
             {primeiraDose ? (tourPorVir ? "Conhecer minha Home" : "Continuar") : "Até amanhã"}
           </button>
         )}
+        {n === 1 && aoFecharDia && a?.tipo === "registro" && <AlbumDaMissao primeira badge={conq.adesivos.find(b=>b.id===a.id)} onSair={aoFecharDia}/>}
         <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />
       </motion.div>
       {popupApp && <BaixarAppPopup contexto="festa_dia2" onAgoraNao={() => { setPopupApp(false); aoCombinar("sem"); }} />}

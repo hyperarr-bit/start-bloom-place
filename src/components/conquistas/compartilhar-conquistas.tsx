@@ -47,6 +47,12 @@ export async function compartilharAdesivo(dados: { id: string; titulo: string; d
   return enviar(blob, `core-figurinha-${dados.id}.png`, `Figurinha: ${dados.titulo}`, "conquista");
 }
 
+/** A prévia prepara o arquivo antes do toque, preservando a ativação do compartilhar na web. */
+export async function compartilharFigurinhaPronta(blob: Blob, id: string, titulo: string, recorte: boolean) {
+  trackEvent("badge_share", {badge:id,formato:recorte?"figurinha-recortada":"figurinha-story"});
+  return enviar(blob, `core-${id}${recorte?"-recorte":"-story"}.png`, titulo, "conquista");
+}
+
 export async function compartilharAlbum(dados: DadosArtes) {
   trackEvent("album_share", { nivel: dados.nivel, adesivos: dados.adesivos, raros: dados.maisRaros.map((b) => b.id).join(",") });
   const blob = await gerarPng(<StoriesAlbum {...dados} />, { largura: STORIES.w, altura: STORIES.h });

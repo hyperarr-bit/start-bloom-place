@@ -35,6 +35,9 @@ export interface Faixa {
   meio: string;
   escuro: string;
   brilho: string;
+  /** Pigmentos da chama, independentes do tom escuro usado em textos da UI. */
+  chamaBase?: string;
+  chamaContorno?: string;
   /** A faixa de cima do card (degradê) e a cor do texto nela. */
   cabecalho: [string, string];
   textoCabecalho: string;

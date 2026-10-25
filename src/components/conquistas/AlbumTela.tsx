@@ -1,3 +1,4 @@
+import { textoConquistado, requisitoDaFigurinha } from "./textos-figurinhas";
 import "@fontsource/instrument-serif/latin-400-italic.css";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import { ChipRaridade } from "./adesivos-raridade";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { IconeMarcaAlbum } from "./IconeMarcaAlbum";
 import { CapaAlbum } from "./CapaAlbum";
+import { CORES_CAPA } from "./capa-pessoal";
 import { FigurinhaColada, FigurinhaVazia, soltarFoils, useGiroscopioDoFoil } from "./FigurinhaAlbum";
 import { quaseConquistada } from "./FigurinhaOculta";
 import { Destacar } from "./GradeAdesivos";
@@ -265,11 +267,12 @@ interface DetalheProps {
   diasDeSequencia: number;
   onFechar: () => void;
   onPostar: (b: Badge) => void;
+  onUsarNaCapa?: (b: Badge) => void;
   onIr: (caminho: string) => void;
 }
 
 /** O detalhe da vaga (folha por cima da mesa): "FIGURINHA Nº 46", o chip, o que falta ou quando colou. */
-export const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, onFechar, onPostar, onIr }: DetalheProps) => {
+export const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequencia, onFechar, onPostar, onIr, onUsarNaCapa }: DetalheProps) => {
   const reduzir = useReducedMotion();
   const painel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -302,7 +305,7 @@ export const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequ
             <div className="pin-rot text-muted-foreground">Figurinha Nº {nDeDois(n)}</div>
             <h2 className="text-[24px] font-black tracking-tight leading-[1.1] mt-1 mb-2">{b.name}</h2>
             <ChipRaridade raridade={raridade} tam="m" texto={b.unlocked ? RARIDADE_FEM[raridade] : `A caminho · ${RARIDADE_FEM[raridade]}`} />
-            <p className="text-[14px] text-muted-foreground mt-2 leading-snug">{b.description}</p>
+            <p className="text-[14px] text-muted-foreground mt-2 leading-snug">{b.unlocked ? textoConquistado(b) : requisitoDaFigurinha(b)}</p>
           </div>
         </div>
         {b.unlocked ? (
@@ -321,6 +324,7 @@ export const DetalheFigurinha = ({ b, n, desbloqueadoEm, porRaridade, diasDeSequ
           </>
         )}
         <div className="flex flex-col gap-1 mt-4">
+          {b.unlocked && onUsarNaCapa && <button type="button" onClick={() => onUsarNaCapa(b)} className="h-11 rounded-xl border border-border font-bold text-[13px]" data-testid="figurinha-usar-capa">Usar na capa</button>}
           {b.unlocked ? (
             <button type="button" onClick={() => onPostar(b)} className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2" data-testid="vaga-postar">
               <Instagram className="w-4 h-4" aria-hidden /> Postar esta figurinha
@@ -542,6 +546,9 @@ const VersoDaCapa = ({ nome, ano }: { nome: string; ano: number }) => (
 /* ------------------------------------------------------------ a tela */
 
 export interface AlbumTelaProps {
+  figurinhasCapa?: Badge[];
+  corCapa?: import("./capa-pessoal").CorCapa;
+  onUsarNaCapa?: (b: Badge) => void;
   aberto: boolean;
   paginas: PaginaAlbum[];
   adesivos: Badge[];
@@ -583,7 +590,7 @@ export interface AlbumTelaProps {
 const SEM_PENDENTES: string[] = [];
 const SEM_DESTAQUES: Record<string, string> = {};
 
-export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, editorial = false, onFechar, onCompartilhar, onCompartilharFigurinha }: AlbumTelaProps) => {
+export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, maisRaros, abertos, total, porRaridade, nome, nivel, ano, diasDeSequencia, paginaInicial = 0, via = "card", pendentes = SEM_PENDENTES, onColar, destaques = SEM_DESTAQUES, rodapeFaltam = false, editorial = false, onFechar, onCompartilhar, onCompartilharFigurinha, figurinhasCapa, corCapa, onUsarNaCapa }: AlbumTelaProps) => {
   const reduzir = !!useReducedMotion();
   const navigate = useNavigate();
   const n = paginas.length;
@@ -735,7 +742,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
     // as animações da tela de trás (o fogo da capa, a entrada) param: nada pinta por baixo do álbum
     document.documentElement.setAttribute("data-album-aberto", "");
     const tecla = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector(".share-fig")) return;
       if (detalhe) setDetalhe(null);
       else onFechar();
     };
@@ -907,7 +914,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   const papelDe = (i: number): Papel => (virando ? (i === virando.sobreIndice ? "sobre" : i === virando.fundoIndice ? "fundo" : "espera") : i === atual ? "fundo" : "espera");
 
   return (
-    <motion.div ref={raiz} className="alb-tela" data-editorial={editorial ? "" : undefined} role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
+    <motion.div ref={raiz} className="alb-tela" data-editorial={editorial ? "" : undefined} data-cor-capa={editorial ? corCapa ?? "azul" : undefined} style={editorial ? { "--capa-cor": CORES_CAPA[corCapa ?? "azul"].cor, "--capa-clara": CORES_CAPA[corCapa ?? "azul"].clara } as CSSProperties : undefined} role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} data-reduzir={reduzir ? "" : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
       {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
           câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
           --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
@@ -969,7 +976,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
                     papel="capa"
                     dir={1}
                     testid="album-capa-folha"
-                    frente={<CapaAlbum referencia={editorial} largura={largura} altura={alturaLivro} maisRaros={maisRaros} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
+                    frente={<CapaAlbum referencia={editorial} largura={largura} altura={alturaLivro} maisRaros={maisRaros} figurinhasCapa={figurinhasCapa} corCapa={corCapa} abertos={abertos} total={total} nome={nome} ano={ano} style={{ height: "100%" }} />}
                     verso={<VersoDaCapa nome={nome} ano={ano} />}
                   />
                 </div>
@@ -1017,6 +1024,7 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
             porRaridade={porRaridade}
             diasDeSequencia={diasDeSequencia}
             onFechar={() => setDetalhe(null)}
+            onUsarNaCapa={onUsarNaCapa}
             onPostar={(b) => { setDetalhe(null); onCompartilharFigurinha(b); }}
             onIr={(caminho) => { setDetalhe(null); onFechar(); navigate(caminho); }}
           />

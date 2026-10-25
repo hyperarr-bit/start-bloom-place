@@ -1,0 +1,68 @@
+/* A mesma composição aparece na miniatura, no livro e no editor. */
+.alb-capa.alb-capa[data-pessoal] .alb-capa-face { background: #fcf8ed; border: 1px solid #d8cfbe; box-shadow: 3px 3px 0 #ded7c9, 0 14px 22px -10px #262c4660; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-lombada { background: linear-gradient(90deg, #0007, transparent 45%, #0002), var(--capa-cor); }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-faixa { color: var(--capa-cor); background: var(--capa-clara); padding: calc(10px * var(--k)) calc(24px * var(--k)); border-bottom: 1px solid #24334b12; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-faixa span { display: none; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-faixa b { font-size: calc(9px * var(--k)); letter-spacing: .12em; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-titulo { top: calc(43px * var(--k)); left: calc(24px * var(--k)); font-size: calc(25px * var(--k)); color: #20304b; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-arte { top: calc(105px * var(--k)); left: calc(20px * var(--k)); right: calc(8px * var(--k)); height: calc(126px * var(--k)); }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-conta { display: none; }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-rodape { justify-content: flex-end; color: #23334e; bottom: calc(10px * var(--k)); }
+.alb-capa.alb-capa[data-pessoal] .alb-capa-dono { max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alb-pessoal-fig { position: absolute; line-height: 0; }
+.alb-pessoal-fig-0 { top: 0; left: 0; transform: rotate(-8deg); }
+.alb-pessoal-fig-1 { top: calc(-2px * var(--k)); right: 0; transform: rotate(9deg); }
+.alb-pessoal-fig-2 { bottom: 0; right: calc(8px * var(--k)); transform: rotate(-5deg); }
+.alb-capa[data-pessoal="1"] .alb-pessoal-fig-0 { left: 50%; top: 50%; transform: translate(-50%,-50%) rotate(-7deg); }
+.alb-capa[data-pessoal="2"] .alb-pessoal-fig-1 { top: auto; bottom: 0; }
+.alb-pessoal-monograma { position: absolute; inset: calc(8px * var(--k)) calc(23px * var(--k)); display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--capa-cor); border: 1px solid #b9ab8b80; border-radius: 50% 50% 4px 4px; box-shadow: inset 0 0 0 calc(4px * var(--k)) #fcf8ed, inset 0 0 0 calc(5px * var(--k)) #d7cdb5; }
+.alb-pessoal-monograma span { font: italic calc(53px * var(--k))/1 'Instrument Serif', Georgia, serif; }
+.alb-pessoal-monograma i { margin-top: calc(9px * var(--k)); font: calc(7px * var(--k))/1.2 Inter, sans-serif; letter-spacing: .06em; }
+.capa-editor-overlay { position: fixed; inset: 0; z-index: 420; background: #101b2a99; }
+.capa-editor { position: fixed; inset: max(12px,var(--app-safe-top,0px)) 10px max(12px,env(safe-area-inset-bottom)); z-index: 421; width: min(460px,calc(100% - 20px)); margin-inline: auto; display: flex; flex-direction: column; background: #faf9f6; color: #202c47; border-radius: 24px; box-shadow: 0 20px 80px #101b2a50; overflow: hidden; }
+.capa-editor header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 6px; }
+.capa-editor h2 { font-size: 21px; font-weight: 750; letter-spacing: -.5px; }
+.capa-editor header button { display: grid; place-items: center; width: 44px; height: 44px; }
+.capa-editor-corpo { padding: 0 20px 16px; overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; }
+.capa-editor-preview { display: grid; place-items: center; padding: 22px 0 20px; background: radial-gradient(ellipse,#e7e0d2,transparent 65%); }
+.capa-editor-preview .alb-capa { transform: rotate(-5deg); }
+.capa-editor p { font-size: 12px; color: #717783; line-height: 1.5; }
+.capa-editor fieldset { margin-top: 14px; }
+.capa-editor legend { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.capa-cores { display: flex; justify-content: space-between; gap: 6px; }
+.capa-cores button { width: 44px; height: 44px; display: grid; place-items: center; border: 2px solid transparent; border-radius: 50%; }
+.capa-cores button[aria-pressed="true"] { border-color: #202c47; }
+.capa-cores i { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.capa-editor-selecao { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 12px 0; }
+.capa-editor-selecao button { font-size: 11px; padding: 7px 10px; background: #e9e5db; border-radius: 10px; min-height: 44px; }
+.capa-editor-grade { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.capa-editor-grade button { position: relative; display: flex; align-items: center; flex-direction: column; padding: 9px 4px; border: 1px solid #e5e0d5; border-radius: 14px; font-size: 10px; line-height: 1.3; gap: 5px; }
+.capa-editor-grade button[aria-pressed="true"] { border-color: #304463; background: #e6ebf0; }
+.capa-editor-grade button:disabled { opacity: .45; }
+.capa-editor-grade b { position: absolute; top: 5px; right: 6px; background: #304463; color: white; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; }
+.capa-editor footer { padding: 12px 20px; border-top: 1px solid #e5e0d5; display: flex; gap: 10px; background: #faf9f6; }
+.capa-editor footer button { min-height: 46px; border-radius: 12px; font-size: 13px; font-weight: 650; flex: 1; }
+.capa-editor footer button:last-child { background: #263650; color: #fff; flex: 2; }
+.capa-editor button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.dark .capa-editor,.dark .capa-editor footer { background: #222b37; color: #f5f0e6; }
+.dark .capa-editor p { color: #b9c0ca; }
+.dark .capa-editor-grade button,.dark .capa-editor footer { border-color: #424d5c; }
+.dark .capa-editor-grade button[aria-pressed="true"],.dark .capa-editor-selecao button { background: #3a485c; border-color: #9caec7; }
+.dark .capa-editor footer button:last-child { background: #e5eaf2; color: #24334a; }
+.dark .capa-cores button[aria-pressed="true"] { border-color: #f5f0e6; }
+
+@media (max-width:360px) {
+  .capa-editor-corpo { padding-inline:16px; }
+  .capa-cores { gap:0; }
+  .capa-editor header { padding-inline:16px; }
+  .capa-editor h2 { font-size:19px; }
+  .capa-editor header button { flex-shrink:0; }
+}
+
+/* A cor pertence ao livro inteiro, inclusive depois que a capa vira. */
+.alb-tela.alb-tela[data-editorial][data-cor-capa] { background:radial-gradient(ellipse at 45% 30%,#ffffff14,#00000070 75%),var(--capa-cor); }
+.alb-tela[data-editorial][data-cor-capa] .alb-lombada { background:linear-gradient(90deg,#0007,transparent 40%,#0003),var(--capa-cor); }
+.alb-tela[data-editorial][data-cor-capa] .alb-pilha > i:last-child { background:var(--capa-cor); }
+.alb-tela[data-editorial][data-cor-capa] .alb-verso-capa { background:linear-gradient(90deg,#00000014,transparent 14%),var(--capa-clara); }
+.alb-tela[data-editorial][data-cor-capa] .alb-verso-dono { color:var(--capa-cor); border-color:currentColor; }
+.alb-tela[data-editorial][data-cor-capa] .alb-verso-dono b,.alb-tela[data-editorial][data-cor-capa] .alb-verso-dono i { color:inherit; }

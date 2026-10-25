@@ -154,7 +154,7 @@ describe("as páginas", () => {
     expect(new Set(paginas.slice(1).flatMap(p => p.vagas.map(v => v.id))).size).toBe(adesivos.length);
     expect(paginas.filter((p) => p.raridade === "epico").map((p) => p.vagas.length)).toEqual([14]);
     expect(paginas.filter((p) => p.raridade === "raro").map((p) => p.vagas.length)).toEqual([12, 11]);
-    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([13, 12]);
+    expect(paginas.filter((p) => p.raridade === "comum").map((p) => p.vagas.length)).toEqual([13, 13]);
   });
 });
 

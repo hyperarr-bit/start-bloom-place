@@ -11,9 +11,15 @@ import { useEffect, useState, type CSSProperties } from "react";
  *   · `coberto` = quanto do FUNDO do layout está fora da janela visível (= onde ancorar o `bottom` da folha);
  *   · `teclado` = o teclado está aberto (a área visível encolheu mais de 100 px).
  */
-export interface AreaVisivel { altura: number; coberto: number; teclado: boolean }
+export interface AreaVisivel {
+  altura: number;
+  coberto: number;
+  teclado: boolean;
+  /** onde a janela visível começa, no layout (visualViewport.offsetTop): 0 sem arrasto; = altura do teclado arrastada até o fundo */
+  topo: number;
+}
 
-const PARADA: AreaVisivel = { altura: 0, coberto: 0, teclado: false };
+const PARADA: AreaVisivel = { altura: 0, coberto: 0, teclado: false, topo: 0 };
 
 /** A altura do LAYOUT (a tela inteira no iOS, mesmo com o teclado): o clientHeight do <html>, não o innerHeight. */
 export const alturaDoLayout = (): number => {
@@ -21,14 +27,25 @@ export const alturaDoLayout = (): number => {
   return document.documentElement?.clientHeight || window.innerHeight || 0;
 };
 
+/** O topo seguro (relógio / ilha): no celular o app grava `--app-safe-top` em px no <html> (lib/status-bar); fora dele, 0. */
+export const alturaSeguraDoTopo = (): number => {
+  if (typeof document === "undefined") return 0;
+  const html = document.documentElement;
+  let v = "";
+  try { v = html.style.getPropertyValue("--app-safe-top") || getComputedStyle(html).getPropertyValue("--app-safe-top"); } catch { v = ""; }
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+};
+
 export function lerAreaVisivel(): AreaVisivel {
   if (typeof window === "undefined") return PARADA;
   const layout = alturaDoLayout();
   const vv = window.visualViewport;
-  if (!vv) return { altura: layout, coberto: 0, teclado: false };
+  if (!vv) return { altura: layout, coberto: 0, teclado: false, topo: 0 };
   const altura = Math.round(vv.height);
+  const topo = Math.max(0, Math.round(vv.offsetTop));
   const coberto = Math.max(0, Math.round(layout - vv.height - vv.offsetTop));
-  return { altura, coberto, teclado: layout - altura > 100 };
+  return { altura, coberto, teclado: layout - altura > 100, topo };
 }
 
 /** Acompanha a visualViewport enquanto `ativa` (a folha aberta); parada = tudo zero. */
@@ -39,7 +56,7 @@ export function useAreaVisivel(ativa = true): AreaVisivel {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
     const atualizar = () => setArea((ant) => {
       const n = lerAreaVisivel();
-      return ant.altura === n.altura && ant.coberto === n.coberto && ant.teclado === n.teclado ? ant : n;
+      return ant.altura === n.altura && ant.coberto === n.coberto && ant.teclado === n.teclado && ant.topo === n.topo ? ant : n;
     });
     atualizar();
     if (!vv) return;
@@ -56,7 +73,9 @@ export function useAreaVisivel(ativa = true): AreaVisivel {
  */
 export function estiloDaFolhaComTeclado(area: AreaVisivel, margem = 8): CSSProperties | undefined {
   if (!area.teclado) return undefined;
-  return { bottom: area.coberto, maxHeight: Math.max(160, area.altura - margem) };
+  // sem arrasto a janela visível começa no y=0 do layout, debaixo do relógio: a folha fica abaixo da área segura
+  const sobra = Math.max(0, alturaSeguraDoTopo() - area.topo);
+  return { bottom: area.coberto, maxHeight: Math.max(160, area.altura - margem - sobra) };
 }
 
 /** Ao focar um campo dentro da folha, rola o campo pra dentro da área visível (depois do teclado assentar). */

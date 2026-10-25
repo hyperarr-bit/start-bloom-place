@@ -4,7 +4,7 @@ import { Banknote, Check, Droplets, Dumbbell, Heart, Leaf, Lightbulb, ListTodo, 
 import { QuickActions, abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
 import { useVoltarFecha } from "@/hooks/use-voltar-fecha";
-import { useAreaVisivel } from "@/hooks/use-area-visivel";
+import { estiloDaFolhaComTeclado, useAreaVisivel } from "@/hooks/use-area-visivel";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloMl } from "@/lib/saude-copo";
 import { trackEvent } from "@/lib/analytics";
 import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
@@ -133,7 +133,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
   // teclado aberto: ancorada logo acima do que ele cobre e nunca mais alta que a ÁREA VISÍVEL (o iOS arrasta a janela
   // visível quando o campo está num elemento fixo — "100dvh - teclado" não serve, 100dvh continua sendo a tela inteira)
   const estilo: CSSProperties = {
-    ...(area.teclado ? { bottom: area.coberto, maxHeight: Math.max(160, area.altura - 12) } : { maxHeight: "88dvh" }),
+    ...(estiloDaFolhaComTeclado(area, 12) ?? { maxHeight: "88dvh" }),
     ...(escondida ? { pointerEvents: "none", visibility: "hidden" } : {}),
   };
 

@@ -69,17 +69,29 @@ const montarTarefa = (props: Partial<Parameters<typeof FolhaNovaTarefa>[0]> = {}
 
 describe("a régua da área visível (use-area-visivel)", () => {
   it("sem teclado: nada; teclado sem arrasto: bottom = o que ele cobre; arrasto inteiro: bottom 0; e nunca mais alta que a área visível", () => {
-    expect(lerAreaVisivel()).toEqual({ altura: 874, coberto: 0, teclado: false });
+    expect(lerAreaVisivel()).toEqual({ altura: 874, coberto: 0, teclado: false, topo: 0 });
     expect(estiloDaFolhaComTeclado(lerAreaVisivel())).toBeUndefined();
     vv.height = 471; vv.offsetTop = 0;
-    expect(lerAreaVisivel()).toEqual({ altura: 471, coberto: 403, teclado: true });
+    expect(lerAreaVisivel()).toEqual({ altura: 471, coberto: 403, teclado: true, topo: 0 });
     expect(estiloDaFolhaComTeclado(lerAreaVisivel())).toEqual({ bottom: 403, maxHeight: 463 });
     vv.offsetTop = 403; // o WebKit arrastou a janela visível até o fundo
-    expect(lerAreaVisivel()).toEqual({ altura: 471, coberto: 0, teclado: true });
+    expect(lerAreaVisivel()).toEqual({ altura: 471, coberto: 0, teclado: true, topo: 403 });
     vv.offsetTop = 200; // arrasto parcial
     expect(lerAreaVisivel().coberto).toBe(203);
     vv.height = 800; vv.offsetTop = 0; // barra de busca/endereço, não teclado
     expect(lerAreaVisivel().teclado).toBe(false);
+  });
+
+  it("no celular (`--app-safe-top` gravado no <html>): sem arrasto a folha fica abaixo do relógio; arrastada até o fundo, não precisa", () => {
+    document.documentElement.style.setProperty("--app-safe-top", "59px");
+    try {
+      expect(estiloDaFolhaComTeclado({ altura: 471, coberto: 403, teclado: true, topo: 0 })).toEqual({ bottom: 403, maxHeight: 404 });
+      expect(estiloDaFolhaComTeclado({ altura: 471, coberto: 0, teclado: true, topo: 403 })).toEqual({ bottom: 0, maxHeight: 463 });
+      expect(estiloDaFolhaComTeclado({ altura: 471, coberto: 373, teclado: true, topo: 30 })).toEqual({ bottom: 373, maxHeight: 434 });
+    } finally {
+      document.documentElement.style.removeProperty("--app-safe-top");
+    }
+    expect(estiloDaFolhaComTeclado({ altura: 471, coberto: 403, teclado: true, topo: 0 })).toEqual({ bottom: 403, maxHeight: 463 });
   });
 });
 

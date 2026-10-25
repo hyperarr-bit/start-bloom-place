@@ -47,6 +47,9 @@ const compra = (o: { periodo?: string; tx?: string | null; quando?: number; semE
 
 beforeEach(() => {
   localStorage.clear();
+  // 26/10: o lib compara a data da compra com o relógio REAL (FRESCOR_MAXIMO_MS = 1 h) — com o fixture preso em
+  // AGORA (25/10 15:00Z) o teste vencia sozinho um dia depois ("transacao_velha"). O relógio fica em AGORA.
+  vi.spyOn(Date, "now").mockReturnValue(AGORA);
   nativo.plataforma = "ios";
   nativo.ok = true;
   nativo.log.mockClear();

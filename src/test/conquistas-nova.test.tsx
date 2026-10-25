@@ -931,3 +931,43 @@ describe("1.0.18 (menu novo): a Retrospectiva sai do menu e ganha a porta fixa n
     expect(screen.queryByTestId("conquistas-retrospectiva")).toBeNull();
   });
 });
+
+describe("a coleção: arte sob demanda × o IntersectionObserver do WebKit (rodada 2b, 26/10)", () => {
+  it("um 'fora' entregue pra célula que está NA TELA não apaga a arte dela (as duas últimas ficavam em branco depois de rolar rápido até o fim)", () => {
+    type Obs = { cb: IntersectionObserverCallback; opts?: IntersectionObserverInit; alvos: Element[] };
+    const observadores: Obs[] = [];
+    class IOFalso {
+      alvos: Element[] = []; root = null; rootMargin = ""; thresholds: number[] = [];
+      constructor(public cb: IntersectionObserverCallback, public opts?: IntersectionObserverInit) { observadores.push({ cb, opts, alvos: this.alvos }); }
+      observe(el: Element) { this.alvos.push(el); }
+      unobserve(el: Element) { const i = this.alvos.indexOf(el); if (i >= 0) this.alvos.splice(i, 1); }
+      disconnect() { this.alvos.length = 0; }
+      takeRecords() { return []; }
+    }
+    const janela = window as unknown as { IntersectionObserver: unknown };
+    const ioOriginal = janela.IntersectionObserver;
+    janela.IntersectionObserver = IOFalso;
+    try {
+      montar();
+      fireEvent.click(screen.getByTestId("cn-ver-todos"));
+      const tela = screen.getByTestId("cn-colecao-tela");
+      const artes = () => Array.from(tela.querySelectorAll(".cn-colecao-arte .ad-rar"));
+      const comArte = () => artes().filter((a) => a.querySelector("svg, .fig-oculta")).length;
+      expect(artes().length).toBeGreaterThan(5);
+      // no jsdom todo retângulo é 0×0 em (0,0): toda célula conta como "na tela" → toda arte montada
+      expect(comArte()).toBe(artes().length);
+      const solta = observadores.find((o) => o.opts?.rootMargin === "200% 0px");
+      expect(solta).toBeTruthy();
+      // o WebKit entrega "fora" pra quem está na tela: a geometria na hora da entrega manda, a arte fica
+      act(() => { solta!.cb(solta!.alvos.map((el) => ({ target: el, isIntersecting: false }) as unknown as IntersectionObserverEntry), solta as unknown as IntersectionObserver); });
+      expect(comArte()).toBe(artes().length);
+      // quem está longe DE VERDADE solta (a memória da arte): célula com o retângulo 3 telas abaixo
+      const longe = solta!.alvos[0] as HTMLElement;
+      const original = longe.getBoundingClientRect;
+      longe.getBoundingClientRect = () => ({ top: window.innerHeight * 3, bottom: window.innerHeight * 3 + 100, left: 0, right: 100, width: 100, height: 100, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+      act(() => { solta!.cb([{ target: longe, isIntersecting: false } as unknown as IntersectionObserverEntry], solta as unknown as IntersectionObserver); });
+      expect(comArte()).toBe(artes().length - 1);
+      longe.getBoundingClientRect = original;
+    } finally { janela.IntersectionObserver = ioOriginal; }
+  });
+});

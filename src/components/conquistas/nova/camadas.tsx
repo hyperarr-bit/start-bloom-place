@@ -100,7 +100,8 @@ const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
     const carrega = new IntersectionObserver((es) => {
       for (const e of es) {
         const id = e.isIntersecting ? idDe(e.target) : undefined;
-        if (!id) continue;
+        // 26/10 (rodada 2b, Simulador): um "fora" entregue a quem está na tela não pode deixar a célula vazia — a conta na mão decide
+        if (!id) { pertoAgora([e.target as HTMLElement]); continue; }
         const url = ARTES_CADERNO[id];
         if (!url) { juntar([id]); continue; }
         const img = new Image();
@@ -112,7 +113,14 @@ const useArteSobDemanda = (rolagem: RefObject<HTMLElement>): Observador => {
       }
     }, { root: raiz, rootMargin: `${MARGEM_CARREGA * 100}% 0px` });
     const solta = new IntersectionObserver((es) => {
-      const longe = es.filter((e) => !e.isIntersecting).map((e) => idDe(e.target)!).filter(Boolean);
+      // 26/10 (rodada 2b, Simulador do iPhone 17 Pro): depois de uma rolagem rápida até o FIM da coleção, o WebKit entregou
+      // "fora" pras duas últimas células — que estavam NA TELA — e a arte delas sumia (figurinhas em branco até a próxima
+      // rolagem). Só solta quem está longe DE VERDADE, pela geometria na hora da entrega.
+      const r = raiz.getBoundingClientRect();
+      const m = (r.height || window.innerHeight) * MARGEM_SOLTA;
+      const longe = es.filter((e) => !e.isIntersecting).map((e) => e.target as HTMLElement)
+        .filter((el) => { const b = el.getBoundingClientRect(); return b.bottom < r.top - m || b.top > r.bottom + m; })
+        .map((el) => idDe(el)!).filter(Boolean);
       if (longe.length) setPerto((p) => (longe.some((id) => p.has(id)) ? new Set([...p].filter((id) => !longe.includes(id))) : p));
     }, { root: raiz, rootMargin: `${MARGEM_SOLTA * 100}% 0px` });
     ios.current = { carrega, solta };

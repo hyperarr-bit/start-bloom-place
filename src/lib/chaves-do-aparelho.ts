@@ -180,6 +180,9 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-back-qa", "core-back-qa-v", "core-back-usados", // 21/10: BACK dos funis web — força de QA e "já usado" por etapa, só no sessionStorage (lib/back-funil)
     "core-demo-guarda", "core-demo-volta", "core-demo-tour", "core-pwa-open-sent",
     "core-lembretes", // id do canal de notificação do Android
+    // 1.0.19 (lib/home-nova): NÃO são chaves de storage — "home-nova" é o parâmetro da URL (?home-nova=on|off|auto),
+    // "home-nova:mais" é o nome do evento da barra de vidro, "home-nova:*" é o sal do sorteio do braço (FNV)
+    "home-nova", "home-nova:mais", "home-nova:*",
   ],
   // FUNIL ANTES DA CONTA: progresso/respostas que só valem até o cadastro (a área fica: core-funil-w-area).
   funil_antes_da_conta: [

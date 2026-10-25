@@ -5,7 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { WIDGET_CATALOG, type ActiveWidget, type WidgetId } from "@/hooks/use-home-widgets";
 import { localDayKey } from "@/lib/utils";
 import { Anel } from "./Anel";
-import { TRACO, corDoModulo, corDoTipo, type Tom } from "./paleta";
+import { TRACO, corDoModulo, corDoTipo, tintaDoModulo, type Tom } from "./paleta";
 import { TOM_DO_MODULO, TOM_DO_TIPO, cor } from "./paleta";
 
 /**
@@ -149,7 +149,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
           {data.todayWorkoutGroup ? (
             <>
               <span className="mt-2 text-[17px] leading-[1.2] font-bold tracking-tight line-clamp-2">{data.todayWorkoutGroup}</span>
-              <span className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold" style={data.workoutDone ? { background: corDoModulo("dieta", "var(--he-tinta)"), color: corDoModulo("dieta") } : { background: "hsl(var(--muted))" }}>
+              <span className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold" style={data.workoutDone ? { background: tintaDoModulo("rotina"), color: corDoModulo("rotina") } : { background: "hsl(var(--muted))" }}>
                 {data.workoutDone ? <><Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />Feito</> : "Marcar feito"}
               </span>
             </>

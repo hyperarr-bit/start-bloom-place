@@ -5,50 +5,48 @@ import {
 import type { TipoPendencia } from "@/lib/home-pendencias";
 
 /**
- * A PALETA ÚNICA DA OPÇÃO E (rodadas 3 e 4, 25/10) — 16 cores no mesmo tom do Cal AI (anéis #cf6f6c /
- * #d49d70 / #7397d8: em OKLCH, luminosidade 0,62–0,72 e croma 0,10–0,13), feitas pra serem DISTINGUÍVEIS
- * lado a lado na grade de 4.
+ * A PALETA DA OPÇÃO E — RODADA 5, versão "cores separadas" (25/10).
  *
- * RODADA 4 (refeita do zero, dono: "16 cores, nenhum par confundível"): cada módulo é um TOM {matiz, nível}.
- *  - dois níveis de luminosidade em XADREZ na grade (ordem padrão de lib/modulos): A = profundo
- *    (L 0,62 · C 0,13) e B = claro (L 0,72 · C 0,10). Vizinho horizontal e vertical SEMPRE troca de nível →
- *    ΔL 0,10, que a deuteranopia preserva (ela apaga a diferença vermelho×verde, não a de luminosidade).
- *  - dentro de cada nível, as 8 matizes ficam ≥ 38° uma da outra (ΔE OKLab ≥ 0,065 entre todos os pares).
- *  - 1 neutro: Carreira = aço (C 0,03).
- *  Teste numérico e simulação de daltonismo: novidades-guardadas/…/E/v4/scripts/paleta-verifica.cjs.
- *  Os valores L/C vêm do tema (home-e.css: --he-L-A/--he-C-A, --he-L-B/…, --he-L-N/…; no escuro, mais claros).
- *    cor cheia = oklch(L C h)        (ícone, anel, barra, disco)
- *    tinta     = oklch(L C h / 0,14) (fundo do azulejo e dos discos; 0,18 no escuro)
- * Uma família de ícones só: Lucide com traço 1,75 em tudo; os glifos dos módulos são os de hoje (lib/modulos).
+ * A rodada 4 tinha 16 cores no MESMO tom (L/C iguais, só a matiz mudava) e passava no ΔE, mas no olho ainda
+ * havia grupos: três rosados, três lilases, dois azuis, e um "dourado" que lia como oliva. Aqui cada módulo
+ * é uma COR COM NOME, escolhida pra ser distinta a olho nu — aceitando variar luminosidade e croma dentro de
+ * uma faixa sóbria (L 0,42–0,76 · C 0,03–0,15 em OKLCH; nada neon):
+ *   só UM rosa (Beleza) e UM roxo (Dev. Pessoal); três azuis que se separam pela luminosidade (marinho ·
+ *   cobalto · céu); dois verdes que se separam pela matiz e pelo croma (folha · oliva) + o turquesa; o
+ *   dourado de verdade (L alta, C alta); vinho e chocolate escuros; dois neutros (aço frio, areia quente).
+ * Cada tom guarda {h, L, C}; o tema muda a luminosidade no escuro (home-e.css: --he-Lk/--he-Lm/--he-Cm) e a
+ * TINTA dos azulejos/discos tem luminosidade FIXA (--he-tinta-L) com um pouco do croma da cor — assim as
+ * cores escuras (marinho, vinho) não viram azulejos pesados.
+ * Teste numérico (ΔE OKLab, deuteranopia) + "teste do olho" (pares críticos em tamanho real):
+ * novidades-guardadas/…/E/v5/scripts/paleta-v5-verifica.cjs. Ícones: Lucide, traço 1,75 em tudo.
  */
 export const TRACO = 1.75;
 
-export type Nivel = "A" | "B" | "N";
-export interface Tom { h: number; n: Nivel }
+export interface Tom { h: number; L: number; C: number; nome: string }
 
-/** Módulo → tom (a ordem é a da grade; A/B alternam em xadrez). */
+/** Módulo → cor (ordem da grade de lib/modulos). */
 export const TOM_DO_MODULO: Record<string, Tom> = {
-  financas: { h: 98, n: "B" },        // dourado — dinheiro é ouro
-  treino: { h: 240, n: "A" },         // azul
-  dieta: { h: 54, n: "B" },           // pêssego — comida
-  rotina: { h: 160, n: "A" },         // verde — o hábito feito
-  desenvolvimento: { h: 285, n: "A" }, // roxo
-  saude: { h: 14, n: "B" },           // coral — o vermelho do coração, no nível claro
-  casa: { h: 205, n: "A" },           // petróleo
-  estudos: { h: 250, n: "B" },        // pervinca
-  biblioteca: { h: 296, n: "B" },     // lilás-ameixa — a capa de um livro
-  beleza: { h: 352, n: "A" },         // rosa
-  viagens: { h: 190, n: "B" },        // água-marinha — o mar
-  carreira: { h: 250, n: "N" },       // aço — o neutro
-  hiperfoco: { h: 318, n: "A" },      // violeta (Mente)
-  relacionamentos: { h: 338, n: "B" }, // rosa-claro
-  pet: { h: 60, n: "A" },             // caramelo — o pelo
-  detox: { h: 140, n: "B" },          // sálvia — a folha
+  financas: { h: 90, L: 0.78, C: 0.15, nome: "ouro" },            // dinheiro é ouro — amarelo-ouro de verdade
+  treino: { h: 262, L: 0.55, C: 0.15, nome: "cobalto" },          // o azul do meio
+  dieta: { h: 48, L: 0.66, C: 0.15, nome: "laranja" },            // comida
+  rotina: { h: 158, L: 0.50, C: 0.13, nome: "esmeralda" },        // o hábito feito — verde-folha escuro
+  desenvolvimento: { h: 310, L: 0.60, C: 0.15, nome: "roxo" },    // o único roxo (mais claro que o petróleo da Mente)
+  saude: { h: 25, L: 0.54, C: 0.15, nome: "tijolo" },             // o vermelho do coração
+  casa: { h: 235, L: 0.78, C: 0.10, nome: "céu" },                // o azul claro
+  estudos: { h: 262, L: 0.42, C: 0.10, nome: "marinho" },         // o azul escuro
+  biblioteca: { h: 55, L: 0.42, C: 0.085, nome: "chocolate" },    // couro de livro
+  beleza: { h: 350, L: 0.72, C: 0.13, nome: "rosa" },             // o único rosa
+  viagens: { h: 185, L: 0.64, C: 0.13, nome: "turquesa" },        // o mar
+  carreira: { h: 250, L: 0.50, C: 0.03, nome: "aço" },            // neutro frio
+  hiperfoco: { h: 205, L: 0.52, C: 0.11, nome: "petróleo" },      // Mente: fundo do mar, não lilás
+  relacionamentos: { h: 350, L: 0.44, C: 0.14, nome: "vinho" },   // o calor, escuro — não um 2º rosa
+  pet: { h: 85, L: 0.72, C: 0.035, nome: "areia" },               // neutro quente (pelo)
+  detox: { h: 108, L: 0.60, C: 0.085, nome: "oliva" },            // a folha madura
 };
 
-/** Tipo de pendência → tom do módulo de origem (água num azul próprio, humor no roxo, gratidão no rosa-claro). */
+/** Tipo de pendência → tom do módulo de origem (água no cobalto, humor no roxo, gratidão no vinho). */
 export const TOM_DO_TIPO: Record<TipoPendencia, Tom> = {
-  habitos: TOM_DO_MODULO.rotina, treino: TOM_DO_MODULO.treino, agua: { h: 240, n: "A" }, refeicoes: TOM_DO_MODULO.dieta,
+  habitos: TOM_DO_MODULO.rotina, treino: TOM_DO_MODULO.treino, agua: TOM_DO_MODULO.treino, refeicoes: TOM_DO_MODULO.dieta,
   suplementos: TOM_DO_MODULO.saude, leitura: TOM_DO_MODULO.biblioteca, humor: TOM_DO_MODULO.desenvolvimento,
   gasto: TOM_DO_MODULO.financas, peso: TOM_DO_MODULO.saude, sono: TOM_DO_MODULO.estudos, ideia: TOM_DO_MODULO.hiperfoco,
   gratidao: TOM_DO_MODULO.relacionamentos,
@@ -62,18 +60,20 @@ export const ICONE_DO_TIPO: Record<TipoPendencia, LucideIcon> = {
 export const ICONE_COMPROMISSO = CalendarClock;
 export const ICONE_CONTA = Receipt;
 
-/** `oklch(L C h)` do tom, cheia ou com alfa (número ou uma variável CSS, ex.: "var(--he-tinta)"). */
-export const cor = (t: Tom, alfa?: number | string): string =>
-  `oklch(var(--he-L-${t.n}) var(--he-C-${t.n}) ${t.h}${alfa == null ? "" : ` / ${alfa}`})`;
+/** A cor cheia do tom (ícone, anel, barra). No escuro o tema clareia: L' = Lk + Lm·L, C' = Cm·C. */
+export const cor = (t: Tom): string =>
+  `oklch(calc(var(--he-Lk) + var(--he-Lm) * ${t.L}) calc(var(--he-Cm) * ${t.C}) ${t.h})`;
+/** A tinta do tom (fundo de azulejo e de disco): luminosidade fixa do tema + um pouco do croma da cor. */
+export const tinta = (t: Tom): string =>
+  `oklch(var(--he-tinta-L) calc(var(--he-tinta-k) * ${t.C}) ${t.h})`;
 
-export const corDoModulo = (id: string, alfa?: number | string) => cor(TOM_DO_MODULO[id] ?? TOM_DO_MODULO.carreira, alfa);
-export const corDoTipo = (t: TipoPendencia, alfa?: number | string) => cor(TOM_DO_TIPO[t], alfa);
-/** O fundo do azulejo/disco: a cor do módulo na tinta do tema (14 % no claro, 18 % no escuro). */
-export const tintaDoModulo = (id: string) => corDoModulo(id, "var(--he-tinta)");
+export const corDoModulo = (id: string) => cor(TOM_DO_MODULO[id] ?? TOM_DO_MODULO.carreira);
+export const tintaDoModulo = (id: string) => tinta(TOM_DO_MODULO[id] ?? TOM_DO_MODULO.carreira);
+export const corDoTipo = (t: TipoPendencia) => cor(TOM_DO_TIPO[t]);
+export const tintaDoTipo = (t: TipoPendencia) => tinta(TOM_DO_TIPO[t]);
 
 /**
- * A TINTA: o anel do score e a estrela dentro dele (rodada 4, dono: "preto como o do Cal AI") — grafite no
- * claro e, no escuro, a tinta invertida (clara), a mesma do botão "+" (--hn-mais, home-nova.css). O trilho
- * continua cinza claro (--he-trilho). Nada de caramelo/sálvia no anel.
+ * A TINTA do anel do score e da estrela (rodada 4, dono: "preto como o do Cal AI") — grafite no claro e, no
+ * escuro, a tinta invertida (clara), a mesma do botão "+" (--hn-mais, home-nova.css).
  */
 export const TINTA = "var(--hn-mais)";

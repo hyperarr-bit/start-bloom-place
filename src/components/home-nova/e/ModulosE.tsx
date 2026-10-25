@@ -18,11 +18,16 @@ import { TRACO, corDoModulo, tintaDoModulo } from "./paleta";
  *  CARTÕES 3: cartões menores, 3 por linha, com a linha de estado do dia por extenso.
  */
 export type VarianteModulosE = "grade" | "cartoes3";
+/** RODADA 5: azulejo com a tinta da cor (versão 1) ou BRANCO como os cards, só o ícone colorido (versão 2). */
+export type AzulejoE = "tinta" | "branco";
 
-const Azulejo = ({ m, favorito, onClick }: { m: Modulo; favorito: boolean; onClick: () => void }) => (
+const Azulejo = ({ m, favorito, branco, onClick }: { m: Modulo; favorito: boolean; branco?: boolean; onClick: () => void }) => (
   <button type="button" onClick={onClick} data-track={`modulo:${m.id}`} data-testid="hn-modulo" className="flex flex-col items-center gap-2 min-w-0 active:scale-95 transition-transform">
     <span className="relative">
-      <span className="w-[64px] h-[64px] rounded-[19px] grid place-items-center" style={{ background: tintaDoModulo(m.id), color: corDoModulo(m.id) }}>
+      <span
+        className={`w-[64px] h-[64px] rounded-[19px] grid place-items-center${branco ? " hn-card !rounded-[19px]" : ""}`}
+        style={branco ? { color: corDoModulo(m.id) } : { background: tintaDoModulo(m.id), color: corDoModulo(m.id) }}
+      >
         <m.Icon className="w-[28px] h-[28px]" strokeWidth={TRACO} aria-hidden />
       </span>
       {favorito && (
@@ -49,9 +54,10 @@ const Cartao3 = ({ m, estado, favorito, onClick }: { m: Modulo; estado: string; 
 interface Props {
   data: LifeHubData;
   variante: VarianteModulosE;
+  azulejo?: AzulejoE;
 }
 
-export const ModulosE = ({ data, variante }: Props) => {
+export const ModulosE = ({ data, variante, azulejo = "tinta" }: Props) => {
   const navigate = useNavigate();
   const { isFavorite, isHidden, ordenar } = useModulePreferences();
   const visiveis = ordenar(MODULOS).filter((m) => !isHidden(m.id));
@@ -59,7 +65,7 @@ export const ModulosE = ({ data, variante }: Props) => {
   const abrir = (m: Modulo, i: number) => { trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) }); navigate(m.path); };
 
   return (
-    <section data-testid="hn-modulos" data-variante={variante}>
+    <section data-testid="hn-modulos" data-variante={variante} data-azulejo={azulejo}>
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-[20px] font-bold tracking-tight leading-none">Módulos</h2>
         <button
@@ -75,7 +81,7 @@ export const ModulosE = ({ data, variante }: Props) => {
 
       {variante === "grade" ? (
         <div className="grid grid-cols-4 gap-x-2 gap-y-5 px-0.5">
-          {visiveis.map((m, i) => <Azulejo key={m.id} m={m} favorito={isFavorite(m.id)} onClick={() => abrir(m, i)} />)}
+          {visiveis.map((m, i) => <Azulejo key={m.id} m={m} favorito={isFavorite(m.id)} branco={azulejo === "branco"} onClick={() => abrir(m, i)} />)}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2.5">

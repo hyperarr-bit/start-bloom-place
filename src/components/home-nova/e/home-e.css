@@ -4,14 +4,13 @@
  * RODADA 3 (sobriedade e harmonia, como o Cal AI):
  *  - fundo quase branco com um véu só no topo (não o papel bege chapado);
  *  - sombras reduzidas a quase nada (o relevo é o branco do card sobre o fundo);
- *  - a PALETA ÚNICA: toda cor da Home é oklch(L C h) com L/C de um dos níveis (A profundo, B claro, N neutro)
- *    e a matiz do módulo (paleta.ts). No escuro os níveis sobem de luminosidade (mais claros sobre o grafite). */
+ *  - a PALETA: cada módulo é uma cor com nome {h, L, C} (paleta.ts); o tema só clareia no escuro e dá a
+ *    luminosidade fixa das tintas (azulejos e discos). */
 .hn.he {
-  /* rodada 4: dois níveis (A profundo · B claro, em xadrez na grade) + neutro (N) — paleta.ts */
-  --he-L-A: 0.62; --he-C-A: 0.13;
-  --he-L-B: 0.72; --he-C-B: 0.10;
-  --he-L-N: 0.58; --he-C-N: 0.03;
-  --he-tinta: 0.14;
+  /* rodada 5: cada tom tem o próprio {L, C} (paleta.ts); no claro a cor é a própria (L' = L, C' = C) e a tinta
+     dos azulejos/discos tem luminosidade fixa 0,955 com 30 % do croma da cor */
+  --he-Lk: 0; --he-Lm: 1; --he-Cm: 1;
+  --he-tinta-L: 0.955; --he-tinta-k: 0.3;
   --he-trilho: hsl(var(--foreground) / 0.07);
   --hn-fundo: 0 0% 98%;
   --hn-sombra: 0 1px 2px rgb(0 0 0 / 0.025), 0 2px 10px rgb(0 0 0 / 0.04);
@@ -24,10 +23,10 @@
   background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
 }
 .dark .hn.he {
-  --he-L-A: 0.74; --he-C-A: 0.11;
-  --he-L-B: 0.82; --he-C-B: 0.085;
-  --he-L-N: 0.72; --he-C-N: 0.02;
-  --he-tinta: 0.18;
+  /* no escuro a cor clareia (L' = 0,46 + 0,5·L → marinho 0,42 vira 0,67; ouro 0,76 vira 0,84) com 85 % do croma;
+     a tinta é um fundo escuro com um sopro da cor */
+  --he-Lk: 0.46; --he-Lm: 0.5; --he-Cm: 0.85;
+  --he-tinta-L: 0.27; --he-tinta-k: 0.4;
   --he-trilho: hsl(var(--foreground) / 0.1);
   --hn-fundo: 222 16% 7%;
   --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);

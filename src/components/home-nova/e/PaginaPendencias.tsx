@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
-import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
+import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
 
 /**
  * PÁGINA 2 DO CARROSSEL — "PENDÊNCIAS DE HOJE" (opção E). Um card só, da altura da página 1: a lista do que
@@ -23,7 +23,7 @@ interface Props {
 }
 
 const Disco = ({ Icone, tom, feita }: { Icone: LucideIcon; tom: Tom; feita?: boolean }) => (
-  <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : cor(tom, "var(--he-tinta)") }} aria-hidden>
+  <span className="w-8 h-8 rounded-[10px] grid place-items-center shrink-0" style={{ background: feita ? "hsl(var(--muted))" : tinta(tom) }} aria-hidden>
     {feita ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[17px] h-[17px]" strokeWidth={TRACO} style={{ color: cor(tom) }} />}
   </span>
 );
@@ -81,7 +81,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
 
         {pending.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-2">
-            <span className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: cor(TOM_DO_MODULO.rotina, "var(--he-tinta)") }} aria-hidden><Check className="w-6 h-6" strokeWidth={2.5} style={{ color: cor(TOM_DO_MODULO.rotina) }} /></span>
+            <span className="w-12 h-12 rounded-2xl grid place-items-center" style={{ background: tinta(TOM_DO_MODULO.rotina) }} aria-hidden><Check className="w-6 h-6" strokeWidth={2.5} style={{ color: cor(TOM_DO_MODULO.rotina) }} /></span>
             <p className="text-[15px] font-semibold">Tudo feito por hoje</p>
             {done.length > 0 && <p className="text-[12.5px] text-muted-foreground">{done.length} {done.length === 1 ? "coisa feita" : "coisas feitas"}</p>}
           </div>

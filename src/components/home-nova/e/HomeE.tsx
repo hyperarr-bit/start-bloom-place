@@ -23,7 +23,7 @@ import { PaginaSeuDia } from "./PaginaSeuDia";
 import { PaginaPendencias } from "./PaginaPendencias";
 import { PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
-import { ModulosE, type VarianteModulosE } from "./ModulosE";
+import { ModulosE, type AzulejoE, type VarianteModulosE } from "./ModulosE";
 import { BarraVidro } from "./BarraVidro";
 import "../home-nova.css";
 import "./home-e.css";
@@ -57,6 +57,8 @@ interface Props {
   rotulos?: Partial<Record<AbaNova, string>>;
   /** variação do card do score: o número dentro do anel (como hoje) */
   numeroDentro?: boolean;
+  /** rodada 5: azulejos dos módulos com tinta (versão 1) ou brancos (versão 2) */
+  azulejo?: AzulejoE;
 }
 
 const saudacao = (): string => {
@@ -67,7 +69,7 @@ const saudacao = (): string => {
   return "Boa noite";
 };
 
-export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, rotulos, numeroDentro }: Props) => {
+export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, rotulos, numeroDentro, azulejo }: Props) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { get, set, loaded } = useUserData();
@@ -120,7 +122,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
         </div>
 
         <div className="mt-5">
-          <ModulosE data={lifeData} variante={modulos} />
+          <ModulosE data={lifeData} variante={modulos} azulejo={azulejo} />
         </div>
         <p className="text-center text-[11px] text-muted-foreground/70 pt-8">CORE · organize sua vida</p>
       </main>

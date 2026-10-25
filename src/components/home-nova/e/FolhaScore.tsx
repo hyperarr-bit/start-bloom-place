@@ -7,7 +7,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { Anel } from "./Anel";
 import { resumoDoScore } from "./score-itens";
 import { explicacaoDoScore, tituloDoScore } from "./PaginaSeuDia";
-import { ICONE_DO_TIPO, TINTA, TRACO, corDoTipo } from "./paleta";
+import { ICONE_DO_TIPO, TINTA, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
 
 /**
  * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E) — como a "Pontuação diária · Ótimo equilíbrio 90" do Cal AI.
@@ -55,7 +55,7 @@ export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar
     return (
       <li>
         <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} className="w-full flex items-center gap-3 py-2 -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
-          <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: i.feito ? "hsl(var(--muted))" : corDoTipo(i.tipo, 0.13) }} aria-hidden>
+          <span className="w-9 h-9 rounded-xl grid place-items-center shrink-0" style={{ background: i.feito ? "hsl(var(--muted))" : tintaDoTipo(i.tipo) }} aria-hidden>
             {i.feito ? <Check className="w-4 h-4 text-muted-foreground" strokeWidth={2.5} /> : <Icone className="w-[18px] h-[18px]" strokeWidth={TRACO} style={{ color: c }} />}
           </span>
           <span className="flex-1 min-w-0">

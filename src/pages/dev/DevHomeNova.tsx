@@ -52,6 +52,7 @@ export default function DevHomeNova() {
   const arrastoE = sp.get("arrasto") !== null ? Number(sp.get("arrasto")) : null;
   const folhaScore = sp.get("folha") === "score";
   const numeroDentro = sp.get("numero") === "dentro";
+  const azulejoE = sp.get("azulejo") === "branco" ? "branco" : "tinta"; // rodada 5: &azulejo=branco = versão 2
 
   useEffect(() => {
     if (!tema) return;
@@ -66,7 +67,7 @@ export default function DevHomeNova() {
   return (
     <>
       {tela === "inicio" && layoutE ? (
-        <HomeE modulos={modulosE} paginaInicial={paginaE} arrasto={Number.isFinite(arrastoE) ? arrastoE : null} folhaScoreAberta={folhaScore} folhaMaisAberta={folha} numeroDentro={numeroDentro} rotulos={rotuloInicio ? { inicio: rotuloInicio } : undefined} />
+        <HomeE modulos={modulosE} paginaInicial={paginaE} arrasto={Number.isFinite(arrastoE) ? arrastoE : null} folhaScoreAberta={folhaScore} folhaMaisAberta={folha} numeroDentro={numeroDentro} azulejo={azulejoE} rotulos={rotuloInicio ? { inicio: rotuloInicio } : undefined} />
       ) : tela === "inicio" ? (
         <HomeNova topo={topo} modulos={modulos} folhaAberta={folha} rotulos={rotuloInicio ? { inicio: rotuloInicio } : undefined} />
       ) : (

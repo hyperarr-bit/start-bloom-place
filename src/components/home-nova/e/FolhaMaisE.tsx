@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { ActionId } from "@/components/home/QuickActions";
 import { useUserData } from "@/hooks/use-user-data";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl, rotuloMl } from "@/lib/saude-copo";
-import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
+import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
 
 /**
  * A FOLHA DO "+" DA OPÇÃO E (rodada 4) — a mesma folha da direção A (../FolhaMais.tsx: a pergunta e a grade de
@@ -101,7 +101,7 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial }: Props) => {
                   const ok = feita === a.id;
                   return (
                     <button key={a.id} type="button" onClick={() => tocar(a)} data-acao={a.id} className="flex flex-col items-center gap-2 min-h-[44px] active:scale-95 transition-transform">
-                      <span className="w-[58px] h-[58px] rounded-[20px] grid place-items-center" style={{ background: cor(a.tom, "var(--he-tinta)"), color: cor(a.tom) }}>
+                      <span className="w-[58px] h-[58px] rounded-[20px] grid place-items-center" style={{ background: tinta(a.tom), color: cor(a.tom) }}>
                         {ok ? <Check className="w-6 h-6" strokeWidth={2.5} aria-hidden /> : <a.Icone className="w-6 h-6" strokeWidth={TRACO} aria-hidden />}
                       </span>
                       <span className="text-[12.5px] font-medium leading-tight text-center">

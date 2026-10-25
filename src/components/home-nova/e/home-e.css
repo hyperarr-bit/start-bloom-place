@@ -1,0 +1,84 @@
+/* HOME NOVA — OPÇÃO E (mockup 25/10, ramo v1019-home-e). Só /dev/home-nova?layout=e monta isto.
+ * Em cima de .hn (home-nova.css): o mesmo papel, as mesmas sombras, os mesmos tokens do tema.
+ * O que é só da E: o fundo com um degradê de leve (como o Cal AI, mais claro em cima), o trilho dos
+ * anéis, o carrossel que rola de lado e a barra de VIDRO (translúcida, com o conteúdo desfocado atrás). */
+.hn.he {
+  --he-trilho: hsl(var(--foreground) / 0.07);
+  --he-vidro: rgb(255 255 255 / 0.82);
+  --he-vidro-aba: rgb(255 255 255 / 0.92);
+  --he-vidro-fio: rgb(255 255 255 / 0.85);
+  --he-vidro-borda: rgb(255 255 255 / 0.55);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 16px 40px -12px rgb(24 20 12 / 0.28);
+  --he-selo: hsl(var(--fixo-tinta));
+  --he-selo-texto: #ffffff;
+  /* cores dos anéis e barras (no escuro trocam pelas da noite, as mesmas de styles/escuro.css) */
+  --he-c-emerald: #10b981; --he-c-cyan: #0891b2; --he-c-green: #16a34a; --he-c-blue: #2563eb; --he-c-orange: #ea580c;
+  --he-c-indigo: #4f46e5; --he-c-amber: #d97706; --he-c-purple: #9333ea; --he-c-pink: #db2777; --he-c-violet: #7c3aed;
+  --he-c-rose: #e11d48; --he-c-red: #dc2626; --he-c-teal: #0d9488; --he-c-lime: #65a30d; --he-c-slate: #475569;
+  background:
+    linear-gradient(180deg, hsl(40 20% 98.5%) 0px, hsl(var(--hn-fundo)) 320px, hsl(var(--hn-fundo)) 100%);
+}
+.dark .hn.he {
+  --he-trilho: hsl(var(--foreground) / 0.1);
+  --he-vidro: rgb(30 33 40 / 0.78);
+  --he-vidro-aba: rgb(255 255 255 / 0.11);
+  --he-vidro-fio: rgb(255 255 255 / 0.16);
+  --he-vidro-borda: rgb(255 255 255 / 0.08);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 18px 44px -12px rgb(0 0 0 / 0.9);
+  --he-selo: hsl(var(--fixo-tinta));
+  --he-selo-texto: hsl(222 16% 7%);
+  --he-c-emerald: #6FC79C; --he-c-cyan: #6BC4D4; --he-c-green: #6FC79C; --he-c-blue: #86B4E8; --he-c-orange: #E6A276;
+  --he-c-indigo: #9AA5EA; --he-c-amber: #D9B26A; --he-c-purple: #B49BE8; --he-c-pink: #E08AB5; --he-c-violet: #A99FEA;
+  --he-c-rose: #E68C9A; --he-c-red: #E68C8C; --he-c-teal: #6BC4BA; --he-c-lime: #B5CF7A; --he-c-slate: #A3A9B6;
+  background:
+    linear-gradient(180deg, hsl(222 16% 9.5%) 0px, hsl(var(--hn-fundo)) 320px, hsl(var(--hn-fundo)) 100%);
+}
+
+/* ---- o carrossel do dia: páginas de largura cheia, que param uma por vez ---- */
+.he-trilho {
+  display: flex;
+  align-items: stretch;
+  /* 28 e não 16: com 16 o fio de luz (escuro) e a sombra do card da página vizinha apareciam na beirada da tela */
+  gap: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* respiro vertical pra sombra dos cards não ser cortada pelo overflow */
+  margin: -20px -16px;
+  padding: 20px 16px;
+  scroll-padding-inline: 16px;
+}
+.he-trilho::-webkit-scrollbar { display: none; }
+.he-trilho[data-arrasto] { scroll-snap-type: none; }
+.he-pagina {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- a barra de vidro (liquid glass): translúcida, desfoca e satura o que passa atrás;
+   um fio de luz na borda de cima dá o "vidro"; sem linha de divisão. ---- */
+.he-vidro {
+  background: var(--he-vidro);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow:
+    inset 0 1px 0 var(--he-vidro-fio),
+    inset 0 0 0 0.5px var(--he-vidro-borda),
+    var(--he-vidro-sombra);
+}
+.he-vidro-aba { background: var(--he-vidro-aba); }
+/* o "+" segue sólido (grafite / tinta de noite): é o único botão de ação da tela, precisa de contraste */
+
+/* ---- selos de pendência nos módulos (grade): pílula escura com o número ---- */
+.he-selo {
+  background: var(--he-selo);
+  color: var(--he-selo-texto);
+  box-shadow: 0 0 0 2px hsl(var(--hn-fundo));
+}

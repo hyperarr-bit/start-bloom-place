@@ -1,0 +1,130 @@
+import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Check, ChevronRight, SlidersHorizontal, X } from "lucide-react";
+import type { LifeHubData } from "@/hooks/use-life-hub-data";
+import type { ActionId } from "@/components/home/QuickActions";
+import { Anel } from "./Anel";
+import { BARRA_DO_TIPO, resumoDoScore } from "./score-itens";
+import { tituloDoScore } from "./PaginaSeuDia";
+
+/**
+ * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E, 25/10) — como a "Pontuação diária · Ótimo equilíbrio 90"
+ * do Cal AI: sobe de baixo ao tocar no card do score. Em cima o título pela faixa ("Vamos lá!") e o anel
+ * com o número; embaixo os itens REAIS que compõem o score hoje (score-itens.ts: a mesma conta do hub),
+ * cada um com a barra dos pontos e o que falta — e o toque leva pra resolver (formulário do "+" ou o
+ * módulo). No fim, a explicação em uma frase e a porta pra "Personalizar pendências".
+ */
+interface Props {
+  aberta: boolean;
+  onFechar: () => void;
+  data: LifeHubData;
+  onAcao: (id: ActionId) => void;
+  onPersonalizar: () => void;
+}
+
+const dataCurta = (): string => {
+  const d = new Date();
+  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return `${d.getDate()} de ${meses[d.getMonth()]}`;
+};
+
+export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: Props) => {
+  const navigate = useNavigate();
+  const r = resumoDoScore(data);
+  const score = data.dayScore;
+  const corAnel = score >= 80 ? "hsl(var(--success))" : "hsl(var(--score-ring, var(--warning)))";
+  const pendentes = r.itens.filter((i) => !i.feito);
+  const feitos = r.itens.filter((i) => i.feito);
+  const reescalado = r.max !== 100;
+
+  const resolver = (i: (typeof r.itens)[number]) => {
+    onFechar();
+    if (i.action) window.setTimeout(() => onAcao(i.action!), 220);
+    else if (i.route) navigate(i.route);
+  };
+
+  const Item = ({ i }: { i: (typeof r.itens)[number] }) => (
+    <li>
+      <button type="button" onClick={() => resolver(i)} data-testid="he-score-item" data-tipo={i.tipo} className="w-full flex items-center gap-3 py-2 -mx-1 px-1 rounded-xl text-left active:bg-muted/50">
+        <span className={`w-9 h-9 rounded-xl grid place-items-center text-[17px] leading-none shrink-0 ${i.feito ? "bg-success/10" : "bg-muted"}`} aria-hidden>
+          {i.feito ? <Check className="w-4 h-4 text-success" strokeWidth={3} /> : i.emoji}
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className={`text-[14px] font-semibold truncate ${i.feito ? "text-muted-foreground" : ""}`}>{i.nome}</span>
+            <span className="text-[12.5px] font-semibold tabular-nums text-muted-foreground shrink-0">{i.pontos}<span className="font-medium text-muted-foreground/70">/{i.max}</span></span>
+          </span>
+          <span className="block h-1.5 rounded-full bg-muted mt-1.5 overflow-hidden">
+            <span className={`block h-full rounded-full ${i.feito ? "bg-success" : BARRA_DO_TIPO[i.tipo]}`} style={{ width: `${i.max > 0 ? Math.round((i.pontos / i.max) * 100) : 0}%` }} />
+          </span>
+          <span className="block text-[12px] text-muted-foreground mt-1 truncate">{i.detalhe}</span>
+        </span>
+        {!i.feito && <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" aria-hidden />}
+      </button>
+    </li>
+  );
+
+  return (
+    <AnimatePresence>
+      {aberta && (
+        <>
+          <motion.button
+            type="button" aria-label="Fechar" onClick={onFechar}
+            className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          />
+          <motion.div
+            role="dialog" aria-label="Como funciona a pontuação" data-testid="he-folha-score"
+            className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+20px)]"
+            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 420, damping: 38 }}
+          >
+            <span className="block w-9 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" aria-hidden />
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{dataCurta()} · Pontuação do dia</p>
+                <h3 className="text-[24px] font-bold tracking-tight leading-tight mt-0.5">{tituloDoScore(score)}</h3>
+                <p className="text-[13px] text-muted-foreground mt-0.5">{pendentes.length === 0 ? "Tudo o que o score cobra está feito." : pendentes.length === 1 ? "Falta 1 coisa pra fechar o dia." : `Faltam ${pendentes.length} coisas pra fechar o dia.`}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Anel tamanho={64} espessura={7} valor={score} max={100} cor={corAnel} atraso={0.1}>
+                  <span className={`text-[21px] font-bold tabular-nums tracking-tight${score >= 100 ? " text-success" : ""}`}>{score}</span>
+                </Anel>
+                <button type="button" onClick={onFechar} aria-label="Fechar" className="w-9 h-9 -mr-1.5 rounded-full grid place-items-center bg-muted"><X className="w-4 h-4" strokeWidth={2.4} /></button>
+              </div>
+            </div>
+
+            {pendentes.length > 0 && (
+              <>
+                <p className="mt-5 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Ainda falta</p>
+                <ul>{pendentes.map((i) => <Item key={i.tipo} i={i} />)}</ul>
+              </>
+            )}
+            {feitos.length > 0 && (
+              <>
+                <p className="mt-4 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Já contou</p>
+                <ul>{feitos.map((i) => <Item key={i.tipo} i={i} />)}</ul>
+              </>
+            )}
+
+            <div className="mt-5 rounded-2xl bg-muted/60 p-4" data-testid="he-score-como">
+              <p className="text-[13.5px] font-bold">Como funciona a pontuação</p>
+              <p className="text-[13px] text-muted-foreground mt-1 leading-snug">
+                O dia fecha em 100 pontos somando 12 registros: hábitos (20), treino (15), água (15), refeições (10) e oito de 5 pontos — suplementos, leitura, humor, gasto, peso, sono, ideia e gratidão.
+                O que não existe pra você (sem treino hoje, sem livro em leitura, sem suplemento) já conta como feito.
+                {reescalado
+                  ? ` Você ocultou ${12 - r.itens.length} deles em Personalizar: ${12 - r.itens.length === 1 ? "saiu" : "saíram"} da conta e os ${r.itens.length} que ficaram se ajustam pra fechar em 100.`
+                  : " O que você ocultar em Personalizar sai da conta e o resto se ajusta pra fechar em 100."}
+                {!r.somaConfere && " (A conta desta folha ainda não bateu com o número do dia — avise o suporte.)"}
+              </p>
+            </div>
+            <button type="button" onClick={() => { onFechar(); window.setTimeout(onPersonalizar, 220); }} data-testid="he-score-personalizar" className="mt-2 w-full min-h-[48px] px-3 rounded-2xl flex items-center gap-3 text-left active:bg-muted/50">
+              <SlidersHorizontal className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={2.2} aria-hidden />
+              <span className="flex-1 text-[14px] font-semibold">Personalizar o que o score cobra</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/60" aria-hidden />
+            </button>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};

@@ -119,6 +119,10 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
   "core-skan-trial-enviado", // 1.0.19: ids das transações cujo StartTrial já saiu pelo SDK da Meta (lib/meta-inicio-teste-ios) — nunca repetir
   "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
+  "core-home-nova", // 1.0.19: a última resposta do RevenueCat pra Home nova (metadata home_nova: off|admin|on|ab, lib/home-nova)
+  "core-home-nova-braco", // 1.0.19: o braço sorteado no modo "ab" da home_nova (nova|atual), estável entre aberturas
+  "core-home-nova-admin", // 1.0.19: a resposta da checagem de admin pra conta ("<uid>:1|0"), pra 2ª abertura não esperar a consulta
+  "core-home-nova-fogo", // 1.0.19: o dia em que o fogo da pílula da Home nova já acendeu (o pulso toca 1x por dia)
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */

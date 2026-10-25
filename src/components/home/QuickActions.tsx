@@ -84,7 +84,14 @@ const vibrate = () => {
   if (navigator.vibrate) navigator.vibrate(30);
 };
 
-export const QuickActions = () => {
+/* 1.0.19 (Home nova): a folha do "+" (home-nova/e/FolhaMaisE) monta ESTE componente só com os formulários
+   (`apenasFormularios`: a fileira de botões não existe; as ações chegam pelo EVENTO_ACAO_RAPIDA) e escuta
+   `onAtivaChange` (qual formulário está aberto) e `onFeito` (uma ação gravou). Sem as props, nada muda. */
+export const QuickActions = ({ apenasFormularios = false, onAtivaChange, onFeito }: {
+  apenasFormularios?: boolean;
+  onAtivaChange?: (id: ActionId | null) => void;
+  onFeito?: (id: ActionId) => void;
+} = {}) => {
   const { get, set } = useUserData();
   // Água: o botão diz o tamanho do copo/garrafa que a pessoa escolheu em Saúde.
   const copoMlAgua = normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO));
@@ -92,6 +99,7 @@ export const QuickActions = () => {
   const lifeData = useLifeHubData();
   const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
+  useEffect(() => { onAtivaChange?.(activeAction); }, [activeAction]); // eslint-disable-line react-hooks/exhaustive-deps
   const [waterSplash, setWaterSplash] = useState(false);
   const [successId, setSuccessId] = useState<ActionId | null>(null);
 
@@ -168,6 +176,7 @@ export const QuickActions = () => {
   }, []);
   const showSuccess = (id: ActionId) => {
     set(CHAVE_ACOES_CONQUISTAS, registrarAcao(get(CHAVE_ACOES_CONQUISTAS, {}), "acao-rapida", todayStr()), { system: true });
+    onFeito?.(id);
     setSuccessId(id);
     if (timerSucesso.current !== null) window.clearTimeout(timerSucesso.current);
     timerSucesso.current = window.setTimeout(() => { timerSucesso.current = null; setSuccessId(null); }, 1500);
@@ -398,7 +407,7 @@ export const QuickActions = () => {
       {/* Faixa das ações. No celular rola pro lado com o dedo. No computador
           (md+) quebra em duas linhas: as 12 cabem no espaço e ninguém precisa
           descobrir que existe algo escondido à direita (cliente na web, 11/09). */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide md:flex-wrap md:overflow-visible">
+      {!apenasFormularios && <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide md:flex-wrap md:overflow-visible">
         {actions.map((a, i) => (
           <motion.button
             key={a.id}
@@ -431,7 +440,7 @@ export const QuickActions = () => {
             )}
           </motion.button>
         ))}
-      </div>
+      </div>}
 
       {/* B5 (1.0.18, QA 21/10): "Registrar Gasto" com o teclado do iPhone — o WKWebView rola a Home pra mostrar o campo e
           a linha "1 dia · garantido hoje" passava por baixo do relógio/ilha. A mesma tarja do cadastro pós-compra

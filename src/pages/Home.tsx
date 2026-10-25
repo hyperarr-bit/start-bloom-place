@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,6 +30,7 @@ import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { missaoDosesMandaNoApp } from "@/lib/missao-doses";
 import { guardarForcasDaUrl, varianteDoTour } from "@/lib/tour-home";
 import { TourDaHome, useTourDaHome } from "@/components/home/TourDaHome";
+import { useHomeNova } from "@/hooks/use-home-nova";
 import { contarUso } from "@/lib/medicao-total";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ATRIBUTO_RAIZ } from "@/lib/nav-abas";
@@ -87,6 +88,9 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
   cuidados: CuidadosWidget as WidgetComponent,
 };
 
+/* 1.0.19 — a HOME NOVA (opção E, lib/home-nova): só carrega quando a chave `home_nova` liga pra conta; desligada, nada daqui entra no caminho */
+const HomeE = lazy(() => import("@/components/home-nova/e/HomeE").then((m) => ({ default: m.HomeE })));
+
 const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
   // 10/10 — as forças de QA do tour/cartões/módulo-oculta (`?tour-home=on`…): só no navegador, antes do hub ler
@@ -125,7 +129,11 @@ const HomePage = () => {
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
   // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã
-  const mostrarTour = useTourDaHome(user?.created_at, !!user);
+  // 1.0.19: a Home nova pra esta conta? (chave remota `home_nova`; o modo "admin" espera a checagem 1x)
+  const homeNova = useHomeNova(user);
+  // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã.
+  // Com a Home nova ligada o tour antigo NÃO entra (aponta pras ações rápidas, que lá viraram o "+").
+  const mostrarTour = useTourDaHome(user?.created_at, !!user && !homeNova.ligada);
 
   const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino", "saude", "metas", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
 
@@ -296,7 +304,7 @@ const HomePage = () => {
     else addWidget(id);
   };
 
-  if (!loaded || !onboardingResolved) {
+  if (!loaded || !onboardingResolved || !homeNova.pronta) {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 
@@ -334,6 +342,15 @@ const HomePage = () => {
           forNewUser={forceNewUser}
         />
       </AnimatePresence>
+    );
+  }
+
+  // 1.0.19: a Home nova entra EXATAMENTE onde a Home de hoje entraria (depois do tutorial/replay/carregamento)
+  if (homeNova.ligada) {
+    return (
+      <Suspense fallback={<div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />}>
+        <HomeE />
+      </Suspense>
     );
   }
 

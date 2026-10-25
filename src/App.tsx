@@ -32,6 +32,7 @@ import { FunilAposentado } from "@/components/site/FunilAposentado";
 import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { BarraDeAbas } from "@/components/nav/BarraDeAbas";
 import { guardarForcaNavDaUrl, navAbasLigada } from "@/lib/nav-abas";
+import { guardarForcaHomeNova, homeNovaLigadaSincrona } from "@/lib/home-nova";
 import { guardarForcaMenuNovoDaUrl } from "@/lib/menu-novo";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { PortaPrimeiraAbertura } from "@/components/PortaPrimeiraAbertura";
@@ -54,6 +55,8 @@ captureLeadSource();
 // 1.0.17: `?nav-abas=on|off|auto` (QA, só no navegador) antes da 1ª tela ler a chave
 guardarForcaNavDaUrl();
 guardarForcaMenuNovoDaUrl();
+// 1.0.19: `?home-nova=on|off|auto` (QA) antes da Home ler a chave remota `home_nova` (lib/home-nova)
+guardarForcaHomeNova();
 
 
 
@@ -498,7 +501,12 @@ const Retrospectiva = lazyPage(() => import("./pages/Retrospectiva"));
 const Notificacoes = lazyPage(() => import("./pages/Notificacoes"));
 // 1.0.17 (parte 3): as abas Módulos e Você (lib/nav-abas, chave NAV_ABAS — DESLIGADA: fica pra depois da 1.0.17,
 // decisão do dono 19/10). Com a chave desligada as rotas viram /home (o app não muda em nada).
-const SoComAbas = ({ children }: { children: ReactNode }) => (navAbasLigada() ? <>{children}</> : <Navigate to="/home" replace />);
+// 1.0.19: a aba Você também existe com a HOME NOVA ligada (lib/home-nova) — é a 3ª aba da barra de vidro
+const SoComAbas = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+  return navAbasLigada() || homeNovaLigadaSincrona(user?.id) ? <>{children}</> : <Navigate to="/home" replace />;
+};
+const BarraVidroGlobal = lazy(() => import("@/components/home-nova/e/BarraVidroGlobal").then((m) => ({ default: m.BarraVidroGlobal })));
 const Modulos = lazyPage(() => import("./pages/Modulos"));
 const Voce = lazyPage(() => import("./pages/Voce"));
 const Aparencia = lazyPage(() => import("./pages/Voce").then((m) => ({ default: m.Aparencia })));
@@ -944,6 +952,8 @@ const App = () => {
                 </Routes>
                 {/* 1.0.17: Hoje · Módulos · Você — só nas 3 raízes, logado, sem camada guiada por cima (lib/nav-abas) */}
                 <BarraDeAbas />
+                {/* 1.0.19: a barra de VIDRO da Home nova (Início · Conquistas · Você + "+") — só com `home_nova` ligada pra esta conta */}
+                <Suspense fallback={null}><BarraVidroGlobal /></Suspense>
                 <TrialBanner />
                 {/* v53: as duas superfícies do teste grátis do shell — a faixa
                     "Dia X de 3" (comprador quente) e a semente guiada por cima

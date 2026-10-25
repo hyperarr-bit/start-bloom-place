@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { PendenciasDeHoje, PendingItem } from "@/components/home/NextHoursTimeline";
 import type { ActionId } from "@/components/home/QuickActions";
 import { trackEvent } from "@/lib/analytics";
+import { LinhaDoseDeHoje, useDoseDeHoje } from "@/components/missao-doses/LinhaDoseDeHoje";
 import { ICONE_COMPROMISSO, ICONE_CONTA, ICONE_DO_TIPO, TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, tinta, type Tom } from "./paleta";
 
 /**
@@ -48,11 +49,13 @@ const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; o
 
 export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerTodas }: Props) => {
   const navigate = useNavigate();
+  // a dose de hoje da missão em doses (1.0.16): a 1ª linha, como na Home de hoje (fora do score)
+  const dose = useDoseDeHoje();
   const { pending, done, avisoConta, avisoTreino } = pendencias;
   const avisos: { Icone: LucideIcon; tom: Tom; texto: string; route: string }[] = [];
   if (avisoConta) avisos.push({ Icone: ICONE_CONTA, tom: TOM_DO_MODULO.financas, texto: `${avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: ${avisoConta.nome}`, route: "/financas" });
   if (avisoTreino) avisos.push({ Icone: ICONE_DO_TIPO.treino, tom: TOM_DO_MODULO.treino, texto: "Configurar treino da semana", route: "/treino" });
-  const vagas = Math.max(0, MAX_LINHAS - avisos.length);
+  const vagas = Math.max(0, MAX_LINHAS - avisos.length - (dose ? 1 : 0));
   const visiveis = pending.slice(0, vagas);
   const escondidas = pending.length - visiveis.length;
 
@@ -87,6 +90,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
           </div>
         ) : (
           <div className="flex-1">
+            {dose && <div className="px-1 pb-1.5"><LinhaDoseDeHoje dose={dose} /></div>}
             {visiveis.map((item, i) => <Linha key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
               <button key={a.texto} type="button" onClick={() => navigate(a.route)} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">

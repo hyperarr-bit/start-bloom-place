@@ -57,6 +57,7 @@ import { registrarDias23Remoto } from "@/lib/dias23";
 import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
 import { registrarDegrau2Remoto, registrarMotivosRemoto } from "@/lib/mensal-degraus";
 import { registrarRetroOutubroRemoto } from "@/lib/retro-outubro";
+import { registrarHomeNovaRemoto } from "@/lib/home-nova";
 import { registrarInicioDoTesteNoSdk } from "@/lib/meta-inicio-teste-ios";
 
 /** As chaves que viajam no metadata das offerings (um lugar só, chamado em toda leitura de offerings):
@@ -86,6 +87,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarAvaliacaoTesteDia2Remoto, // 1.0.18: `avaliacao_teste_dia2` (on|off, padrão off) — pedir nota também pro teste que voltou no dia 2 (lib/avaliacao-teste-dia2)
     registrarDegrau2Remoto, // 1.0.18: `recusa_degrau2` (on|off, padrão off) — o 2º degrau da recusa, mensal 19,90 (lib/mensal-degraus)
     registrarRetroOutubroRemoto, // 23/10: `retro_outubro` (on|off, padrão off) — a retrospectiva de outubro em cards animados, a partir de 01/11 (lib/retro-outubro)
+    registrarHomeNovaRemoto, // 1.0.19: `home_nova` (off|admin|on|ab, padrão off) — a Home do carrossel do dia (lib/home-nova)
     registrarMotivosRemoto, // 1.0.18: `motivos_folha` (off|on|ab, padrão off) — a folha "O que te fez parar?" depois da folha do anual fechada (lib/mensal-degraus)
   ];
   for (const f of cada) {

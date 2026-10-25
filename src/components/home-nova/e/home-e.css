@@ -44,6 +44,9 @@
   background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
 }
 
+/* a barra de vidro global (fora da Home) só precisa das variáveis: sem o fundo em degradê */
+.hn.he.he-so-vars { background: none; }
+
 /* rodada 6: os dois níveis de meio-termo (data-suave no .hn.he) */
 .hn.he[data-suave="suave"] { --he-t: 0.5; }
 .hn.he[data-suave="mais"] { --he-t: 0.7; }

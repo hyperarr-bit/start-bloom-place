@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Settings2, Star } from "lucide-react";
 import { MODULOS, type Modulo } from "@/lib/modulos";
-import { useModulePreferences } from "@/hooks/use-module-preferences";
+import type { useModulePreferences } from "@/hooks/use-module-preferences";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { trackEvent } from "@/lib/analytics";
 import { estadoDoModulo } from "../ModulosNova";
@@ -55,11 +55,15 @@ interface Props {
   data: LifeHubData;
   variante: VarianteModulosE;
   azulejo?: AzulejoE;
+  /** "Organizar" (e "+N ocultos"): abre a configuração de módulos (a mesma de hoje, use-module-preferences) */
+  onOrganizar?: () => void;
+  /** A instância ÚNICA de use-module-preferences (a Home é a dona): a grade e a folha "Organizar" leem o mesmo estado. */
+  preferencias: ReturnType<typeof useModulePreferences>;
 }
 
-export const ModulosE = ({ data, variante, azulejo = "tinta" }: Props) => {
+export const ModulosE = ({ data, variante, azulejo = "tinta", onOrganizar, preferencias }: Props) => {
   const navigate = useNavigate();
-  const { isFavorite, isHidden, ordenar } = useModulePreferences();
+  const { isFavorite, isHidden, ordenar } = preferencias;
   const visiveis = ordenar(MODULOS).filter((m) => !isHidden(m.id));
   const ocultos = MODULOS.length - visiveis.length;
   const abrir = (m: Modulo, i: number) => { trackEvent("home_modulo", { modulo: m.id, posicao: i, favorito: isFavorite(m.id) }); navigate(m.path); };
@@ -70,7 +74,7 @@ export const ModulosE = ({ data, variante, azulejo = "tinta" }: Props) => {
         <h2 className="text-[20px] font-bold tracking-tight leading-none">Módulos</h2>
         <button
           type="button"
-          onClick={() => trackEvent("home_modulos_editar", { origem: "home-nova-e" })}
+          onClick={() => onOrganizar?.()}
           data-testid="hn-organizar"
           className="min-h-[36px] -mr-1 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground active:bg-muted/60"
         >
@@ -90,7 +94,9 @@ export const ModulosE = ({ data, variante, azulejo = "tinta" }: Props) => {
       )}
 
       {ocultos > 0 && (
-        <p className="text-center text-[12.5px] text-muted-foreground mt-4">+{ocultos} {ocultos === 1 ? "oculto" : "ocultos"} · Organizar</p>
+        <button type="button" onClick={() => { trackEvent("home_modulos_editar", { origem: "ocultos", ocultos }); onOrganizar?.(); }} data-track="modulos-ocultos-editar" className="w-full min-h-[40px] text-center text-[12.5px] text-muted-foreground mt-2">
+          +{ocultos} {ocultos === 1 ? "oculto" : "ocultos"} · Organizar
+        </button>
       )}
     </section>
   );

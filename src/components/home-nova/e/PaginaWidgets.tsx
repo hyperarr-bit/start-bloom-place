@@ -1,5 +1,7 @@
 import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, LayoutGrid, Moon, Plus, Receipt, Utensils } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import type { ActionId } from "@/components/home/QuickActions";
+import { anotarAcaoRapida } from "@/lib/intro-modulo";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { WIDGET_CATALOG, type ActiveWidget, type WidgetId } from "@/hooks/use-home-widgets";
@@ -31,6 +33,8 @@ interface Props {
   data: LifeHubData;
   widgets: ActiveWidget[];
   onEscolher: () => void;
+  /** abre a folha do "+" numa ação (o "Registrar" do Sono) */
+  onAcao?: (id: ActionId) => void;
 }
 
 const DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -116,10 +120,19 @@ const CardSemana = ({ onClick }: { onClick: () => void }) => {
   );
 };
 
-const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
+const CardWidget = ({ w, data, onAcao }: { w: ActiveWidget; data: LifeHubData; onAcao?: (id: ActionId) => void }) => {
   const navigate = useNavigate();
+  const { get, set } = useUserData();
   const ir = (rota?: string) => rota && navigate(rota);
   const def = WIDGET_CATALOG.find((c) => c.id === w.id);
+  /* a MESMA gravação do WorkoutWidget/QuickActions: o dia entra ou sai de `saude-workout-log` (sem duplicar) */
+  const alternarTreinoDeHoje = () => {
+    const hoje = localDayKey();
+    const log = get<string[]>("saude-workout-log", []);
+    if (log.includes(hoje)) { set("saude-workout-log", log.filter((d) => d !== hoje)); return; }
+    anotarAcaoRapida("workout", get, set);
+    set("saude-workout-log", [...log, hoje]);
+  };
   switch (w.id) {
     case "calories": {
       const semKcal = data.caloriesConsumed <= 0 && data.mealsLogged > 0;
@@ -149,7 +162,13 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
           {data.todayWorkoutGroup ? (
             <>
               <span className="mt-2 text-[17px] leading-[1.2] font-bold tracking-tight line-clamp-2">{data.todayWorkoutGroup}</span>
-              <span className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold" style={data.workoutDone ? { background: tintaDoModulo("rotina"), color: corDoModulo("rotina") } : { background: "hsl(var(--muted))" }}>
+              <span
+                role="button" tabIndex={0} data-testid="he-widget-workout-chip" aria-pressed={data.workoutDone}
+                onClick={(e) => { e.stopPropagation(); alternarTreinoDeHoje(); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); alternarTreinoDeHoje(); } }}
+                className="mt-auto inline-flex items-center gap-1.5 self-start h-8 px-3 rounded-full text-[12.5px] font-semibold"
+                style={data.workoutDone ? { background: tintaDoModulo("rotina"), color: corDoModulo("rotina") } : { background: "hsl(var(--muted))" }}
+              >
                 {data.workoutDone ? <><Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />Feito</> : "Marcar feito"}
               </span>
             </>
@@ -171,7 +190,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
             <span className="text-[12.5px] font-medium text-muted-foreground">h</span>
           </span>
           <span className="mt-1 text-[12px] text-muted-foreground">{h ? (h >= 7 ? "Noite boa" : h >= 5 ? "Noite regular" : "Pouco sono") : "ontem à noite"}</span>
-          <span className="mt-auto inline-flex items-center self-start h-8 px-3 rounded-full text-[12.5px] font-semibold bg-muted text-foreground">{h ? "Ajustar" : "Registrar"}</span>
+          <span role="button" tabIndex={0} data-testid="he-widget-sleep-chip" onClick={(e) => { e.stopPropagation(); onAcao?.("sleep"); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onAcao?.("sleep"); } }} className="mt-auto inline-flex items-center self-start h-8 px-3 rounded-full text-[12.5px] font-semibold bg-muted text-foreground">{h ? "Ajustar" : "Registrar"}</span>
         </Medio>
       );
     }
@@ -250,7 +269,7 @@ const CardWidget = ({ w, data }: { w: ActiveWidget; data: LifeHubData }) => {
   }
 };
 
-export const PaginaWidgets = ({ data, widgets, onEscolher }: Props) => {
+export const PaginaWidgets = ({ data, widgets, onEscolher, onAcao }: Props) => {
   const lugares = widgets.reduce((s, w) => s + (w.id === "week-progress" ? 2 : 1), 0);
   return (
     <div className="he-pagina" data-testid="he-pagina-3">
@@ -263,7 +282,7 @@ export const PaginaWidgets = ({ data, widgets, onEscolher }: Props) => {
         </section>
       ) : (
         <div className="grid grid-cols-2 gap-3 flex-1 content-start" data-testid="hn-widgets">
-          {widgets.map((w) => <CardWidget key={w.id} w={w} data={data} />)}
+          {widgets.map((w) => <CardWidget key={w.id} w={w} data={data} onAcao={onAcao} />)}
           {lugares < 4 && (
             <button type="button" onClick={onEscolher} data-testid="he-widgets-escolher" className="rounded-[22px] min-h-[150px] flex flex-col items-center justify-center gap-2 text-muted-foreground bg-foreground/[0.035] dark:bg-white/[0.04] active:bg-foreground/[0.06]">
               <span className="w-10 h-10 rounded-full bg-card grid place-items-center" style={{ boxShadow: "var(--hn-sombra)" }}><Plus className="w-5 h-5" strokeWidth={2.2} aria-hidden /></span>

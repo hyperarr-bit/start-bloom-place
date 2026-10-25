@@ -7,12 +7,14 @@ import { trackEvent } from "@/lib/analytics";
 /**
  * PÁGINA 2 DO CARROSSEL — "PENDÊNCIAS DE HOJE" (opção E, 25/10). Um card só, da altura da página 1:
  * a lista do que falta, compacta, cada linha com a ação (toque abre o formulário do "+" ou vai pro
- * módulo — o MESMO que a Home faz hoje). Cabe até 6 linhas (pendências + o aviso de conta a vencer,
- * sem valor em R$); o resto e as feitas ficam atrás de "mais N · M feitas", que abre a lista inteira.
+ * módulo — o MESMO que a Home faz hoje). Cabe até 5 linhas de 44 px (pendências + o aviso de conta a
+ * vencer, sem valor em R$); o resto e as feitas ficam atrás de "mais N · M feitas", que abre a lista
+ * inteira. (Rodada 2: eram 6 linhas de 42 — com o card do score mais baixo, esta página passou a ser a
+ * mais alta do carrossel e segurava os módulos lá embaixo; a altura do carrossel é a da página mais alta.)
  * É a continuação natural do card do score: "faltam 5 coisas" → arrasta → aqui estão as 5.
  * "Personalizar" abre a folha de sempre (ocultar tipo, frequência do peso).
  */
-const MAX_LINHAS = 6;
+const MAX_LINHAS = 5;
 
 interface Props {
   pendencias: PendenciasDeHoje;
@@ -26,7 +28,7 @@ const Linha = ({ item, feita, onClick }: { item: PendingItem; feita?: boolean; o
     type="button"
     onClick={onClick}
     data-testid={feita ? "hn-pendencia-feita" : "hn-pendencia"}
-    className={`w-full h-[42px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60 ${feita ? "opacity-55" : ""}`}
+    className={`w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60 ${feita ? "opacity-55" : ""}`}
   >
     <span className={`w-8 h-8 rounded-[10px] grid place-items-center text-[15px] leading-none shrink-0 ${feita ? "bg-success/10" : "bg-muted/80"}`} aria-hidden>
       {feita ? <Check className="w-3.5 h-3.5 text-success" strokeWidth={3} /> : item.emoji}
@@ -59,7 +61,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
   return (
     <div className="he-pagina" data-testid="he-pagina-2">
       <section className="hn-card flex-1 p-2 flex flex-col" data-testid="hn-pendencias" aria-label="Pendências de hoje">
-        <header className="flex items-center justify-between pl-2.5 pr-0.5 pt-1.5 pb-1">
+        <header className="flex items-center justify-between pl-2.5 pr-0.5 pt-0.5 pb-0.5">
           <h3 className="text-[15px] font-bold tracking-tight">
             Pendências de hoje
             {pending.length > 0 && <span className="ml-2 text-[12.5px] font-semibold text-muted-foreground tabular-nums">{pending.length}</span>}
@@ -79,7 +81,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
           <div className="flex-1">
             {visiveis.map((item, i) => <Linha key={`p-${item.tipo ?? i}`} item={item} onClick={() => tocar(item)} />)}
             {avisos.map((a) => (
-              <button key={a.texto} type="button" onClick={() => navigate(a.route)} className="w-full h-[42px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
+              <button key={a.texto} type="button" onClick={() => navigate(a.route)} className="w-full h-[44px] flex items-center gap-2.5 pl-1.5 pr-1.5 rounded-xl text-left active:bg-muted/60">
                 <span className="w-8 h-8 rounded-[10px] grid place-items-center text-[15px] leading-none shrink-0 bg-warning/12" aria-hidden>{a.emoji}</span>
                 <span className="flex-1 min-w-0 text-[14px] font-medium truncate">{a.texto}</span>
                 <span className="text-[10.5px] font-bold uppercase tracking-wider text-warning shrink-0 pr-1">aviso</span>
@@ -89,7 +91,7 @@ export const PaginaPendencias = ({ pendencias, onAcao, onPersonalizar, onVerToda
         )}
 
         {partes.length > 0 && (
-          <button type="button" onClick={onVerTodas} data-testid="hn-pendencias-mais" className="h-[36px] px-2 flex items-center justify-center gap-1 text-[12.5px] font-semibold text-muted-foreground">
+          <button type="button" onClick={onVerTodas} data-testid="hn-pendencias-mais" className="h-[32px] mt-auto px-2 flex items-center justify-center gap-1 text-[12.5px] font-semibold text-muted-foreground">
             {partes.join(" · ")}
             <ChevronRight className="w-3.5 h-3.5" aria-hidden />
           </button>

@@ -94,13 +94,14 @@ export const ModulosE = ({ data, pendencias, variante }: Props) => {
 
   return (
     <section data-testid="hn-modulos" data-variante={variante}>
-      <div className="flex items-end justify-between mb-4 px-1">
+      {/* rodada 2: "Organizar" no centro vertical do título */}
+      <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-[20px] font-bold tracking-tight leading-none">Módulos</h2>
         <button
           type="button"
           onClick={() => trackEvent("home_modulos_editar", { origem: "home-nova-e" })}
           data-testid="hn-organizar"
-          className="min-h-[36px] -mr-1 -mb-2 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground active:bg-muted/60"
+          className="min-h-[36px] -mr-1 px-2.5 rounded-full flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground active:bg-muted/60"
         >
           <Settings2 className="w-4 h-4" strokeWidth={2.2} aria-hidden />
           Organizar

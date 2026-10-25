@@ -3,21 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { Check, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
+import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { Anel } from "./Anel";
 import { BARRA_DO_TIPO, resumoDoScore } from "./score-itens";
 import { tituloDoScore } from "./PaginaSeuDia";
 
 /**
  * A FOLHA "COMO FUNCIONA A PONTUAÇÃO" (opção E, 25/10) — como a "Pontuação diária · Ótimo equilíbrio 90"
- * do Cal AI: sobe de baixo ao tocar no card do score. Em cima o título pela faixa ("Vamos lá!") e o anel
- * com o número; embaixo os itens REAIS que compõem o score hoje (score-itens.ts: a mesma conta do hub),
- * cada um com a barra dos pontos e o que falta — e o toque leva pra resolver (formulário do "+" ou o
- * módulo). No fim, a explicação em uma frase e a porta pra "Personalizar pendências".
+ * do Cal AI: sobe de baixo pelo "?" do card do score (ou pelo anel). Em cima o título pela faixa
+ * ("Vamos lá!") e o anel com o número; logo abaixo (rodada 2) a DICA DA SEQUÊNCIA que saiu do card:
+ * "Pra garantir hoje: <ação do dia>" enquanto o dia não está garantido, ou "✓ Dia garantido na sequência"
+ * discreto. Embaixo os itens REAIS que compõem o score hoje (score-itens.ts: a mesma conta do hub), cada um
+ * com a barra dos pontos e o que falta — e o toque leva pra resolver (formulário do "+" ou o módulo).
+ * Leitura sem livro em leitura e Suplementos sem cadastro não aparecem (contam, mas não há o que fazer).
+ * No fim, a regra em duas frases e a porta pra "Personalizar".
  */
 interface Props {
   aberta: boolean;
   onFechar: () => void;
   data: LifeHubData;
+  seq: Sequencia;
   onAcao: (id: ActionId) => void;
   onPersonalizar: () => void;
 }
@@ -28,14 +33,16 @@ const dataCurta = (): string => {
   return `${d.getDate()} de ${meses[d.getMonth()]}`;
 };
 
-export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: Props) => {
+export const FolhaScore = ({ aberta, onFechar, data, seq, onAcao, onPersonalizar }: Props) => {
   const navigate = useNavigate();
   const r = resumoDoScore(data);
   const score = data.dayScore;
   const corAnel = score >= 80 ? "hsl(var(--success))" : "hsl(var(--score-ring, var(--warning)))";
-  const pendentes = r.itens.filter((i) => !i.feito);
-  const feitos = r.itens.filter((i) => i.feito);
-  const reescalado = r.max !== 100;
+  // o que não existe pra pessoa (sem livro, sem suplemento) conta como feito, mas não é uma linha: não há o que fazer
+  const mostrados = r.itens.filter((i) => !((i.tipo === "leitura" && !data.currentBook) || (i.tipo === "suplementos" && data.supplementsTotal === 0)));
+  const pendentes = mostrados.filter((i) => !i.feito);
+  const feitos = mostrados.filter((i) => i.feito);
+  const acaoDoDia = seq.acao.texto.replace(/\s+(de\s+)?hoje\b\.?$/i, "");
 
   const resolver = (i: (typeof r.itens)[number]) => {
     onFechar();
@@ -93,6 +100,30 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
               </div>
             </div>
 
+            {/* a dica da sequência (rodada 2): o que garante o dia, enquanto não garantido; depois, discreta */}
+            {seq.dias > 0 || !seq.hojeFeito ? (
+              <button
+                type="button"
+                onClick={() => { onFechar(); window.setTimeout(() => navigate("/conquistas", { state: { origem: "home" } }), 220); }}
+                data-testid="he-folha-sequencia"
+                data-garantido={seq.hojeFeito ? "true" : "false"}
+                className={`mt-3 w-full min-h-[40px] px-3 rounded-2xl flex items-center gap-2.5 text-left text-[13px] ${seq.hojeFeito ? "bg-muted/50 text-muted-foreground" : "bg-muted"}`}
+              >
+                {seq.hojeFeito ? (
+                  <>
+                    <Check className="w-4 h-4 shrink-0" strokeWidth={3} style={{ color: seq.faixa.hojeTexto }} aria-hidden />
+                    <span className="font-medium truncate">Dia garantido na sequência</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seq.faixa.meio }} aria-hidden />
+                    <span className="truncate text-muted-foreground">{seq.dias > 0 ? "Pra garantir hoje: " : "Comece sua sequência: "}<span className="font-semibold text-foreground">{acaoDoDia}</span></span>
+                  </>
+                )}
+                <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground/50 shrink-0" aria-hidden />
+              </button>
+            ) : null}
+
             {pendentes.length > 0 && (
               <>
                 <p className="mt-5 mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Ainda falta</p>
@@ -109,11 +140,7 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
             <div className="mt-5 rounded-2xl bg-muted/60 p-4" data-testid="he-score-como">
               <p className="text-[13.5px] font-bold">Como funciona a pontuação</p>
               <p className="text-[13px] text-muted-foreground mt-1 leading-snug">
-                O dia fecha em 100 pontos somando 12 registros: hábitos (20), treino (15), água (15), refeições (10) e oito de 5 pontos — suplementos, leitura, humor, gasto, peso, sono, ideia e gratidão.
-                O que não existe pra você (sem treino hoje, sem livro em leitura, sem suplemento) já conta como feito.
-                {reescalado
-                  ? ` Você ocultou ${12 - r.itens.length} deles em Personalizar: ${12 - r.itens.length === 1 ? "saiu" : "saíram"} da conta e os ${r.itens.length} que ficaram se ajustam pra fechar em 100.`
-                  : " O que você ocultar em Personalizar sai da conta e o resto se ajusta pra fechar em 100."}
+                Cada item vale uma parte dos 100 pontos. O que você esconde em Personalizar não conta.
                 {!r.somaConfere && " (A conta desta folha ainda não bateu com o número do dia — avise o suporte.)"}
               </p>
             </div>

@@ -14,7 +14,7 @@ import { CHAVE_COMPROMISSOS, type Compromisso } from "@/lib/compromissos";
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-copo";
 import { nomeDaHome } from "@/lib/nome-da-pessoa";
 import { trackEvent } from "@/lib/analytics";
-import { PilulaFogo } from "../TopoNova";
+import { PilulaFogoE } from "./PilulaFogoE";
 import { iniciaisDe } from "../HomeNova";
 import { FolhaMais } from "../FolhaMais";
 import type { AbaNova } from "../BarraFlutuante";
@@ -32,10 +32,13 @@ import "./home-e.css";
  * HOME NOVA — OPÇÃO E (mockup 25/10, ramo v1019-home-e; a Home de verdade é pages/Home.tsx e não muda).
  *
  * De cima pra baixo:
- *   1. Topo: "Boa noite, João" + a pílula do fogo na cor da faixa. Sem data, sem a semana.
+ *   1. Topo: "Boa noite, João" + a pílula do fogo na cor da faixa — APAGADA enquanto o dia não está
+ *      garantido, ACESA (com um pulso, 1× por dia) ao garantir (rodada 2, porte da direção A v3). Sem data,
+ *      sem a semana.
  *   2. O CARROSSEL DO DIA (3 páginas, bolinhas): 1 · Seu dia (score grande + Hábitos, Água, Refeições);
  *      2 · Pendências de hoje (a lista, compacta, com ação); 3 · Seus widgets (os que a pessoa escolhe,
- *      redesenhados). Tocar no score abre a folha "Como funciona a pontuação".
+ *      redesenhados). O "?" do card do score (e o anel) abrem a folha "Como funciona a pontuação", que
+ *      carrega no topo a dica da sequência ("Pra garantir hoje: …" / "✓ Dia garantido").
  *   3. Módulos, já na primeira tela: grade de 4 (com selos) ou cartões de 3.
  *   4. A barra de VIDRO (Início · Conquistas · Você) + o "+" que abre a folha das ações rápidas.
  *
@@ -96,7 +99,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
   if (!loaded) return <div className="hn he min-h-dvh" aria-hidden />;
 
   const paginas = [
-    <PaginaSeuDia key="dia" data={lifeData} faltam={pendencias.pending.length} seq={seq} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
+    <PaginaSeuDia key="dia" data={lifeData} faltam={pendencias.pending.length} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
     <PaginaPendencias key="pend" pendencias={pendencias} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} onVerTodas={abrirScore} />,
     <PaginaWidgets key="wid" data={lifeData} widgets={activeWidgets} onEscolher={() => setPicker(true)} />,
   ];
@@ -108,7 +111,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
           <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">
             {saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}
           </h1>
-          <PilulaFogo seq={seq} />
+          <PilulaFogoE seq={seq} />
         </header>
 
         <div className="mt-5">
@@ -123,7 +126,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
 
       <BarraVidro ativa="inicio" iniciais={iniciaisDe(nomeCompleto)} onIr={ir} onMais={abrirMais} rotulos={rotulos} />
       <FolhaMais aberta={folhaMais} onFechar={() => setFolhaMais(false)} inicial={acaoInicial} />
-      <FolhaScore aberta={folhaScore} onFechar={() => setFolhaScore(false)} data={lifeData} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
+      <FolhaScore aberta={folhaScore} onFechar={() => setFolhaScore(false)} data={lifeData} seq={seq} onAcao={abrirAcao} onPersonalizar={() => setPrefsAbertas(true)} />
       <WidgetPicker open={picker} onOpenChange={setPicker} activeWidgets={activeWidgets} onToggle={(id) => (isActive(id) ? removeWidget(id) : addWidget(id))} onToggleSize={toggleSize} />
       <PersonalizarPendencias open={prefsAbertas} onOpenChange={setPrefsAbertas} prefs={prefs} onChange={(p) => set(CHAVE_PENDENCIAS_PREFS, p)} porModulo={lifeData.pendenciasPorModulo} />
     </div>

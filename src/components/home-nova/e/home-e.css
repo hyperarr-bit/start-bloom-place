@@ -76,6 +76,18 @@
 .he-vidro-aba { background: var(--he-vidro-aba); }
 /* o "+" segue sólido (grafite / tinta de noite): é o único botão de ação da tela, precisa de contraste */
 
+/* ---- o fogo da pílula (rodada 2, porte da direção A v3): apagado enquanto o dia não está garantido;
+   acende 1× por dia (pulso de 0,6 s; prefers-reduced-motion desliga) ---- */
+.he-fogo-apagado { filter: saturate(0.35) brightness(1.05); opacity: 0.42; }
+.dark .he-fogo-apagado { filter: saturate(0.35) brightness(1.25); opacity: 0.45; }
+.he-acende { animation: he-acende 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes he-acende {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.14); filter: brightness(1.35) saturate(1.3); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@media (prefers-reduced-motion: reduce) { .he-acende { animation: none; } }
+
 /* ---- selos de pendência nos módulos (grade): pílula escura com o número ---- */
 .he-selo {
   background: var(--he-selo);

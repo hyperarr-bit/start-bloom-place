@@ -59,6 +59,8 @@ interface Props {
   numeroDentro?: boolean;
   /** rodada 5: azulejos dos módulos com tinta (versão 1) ou brancos (versão 2) */
   azulejo?: AzulejoE;
+  /** rodada 6: o ponto da régua de cor v5 → r4 — "forte" (v5), "suave" (0,5) ou "mais" suave (0,7) */
+  suave?: "forte" | "suave" | "mais";
 }
 
 const saudacao = (): string => {
@@ -69,7 +71,7 @@ const saudacao = (): string => {
   return "Boa noite";
 };
 
-export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, rotulos, numeroDentro, azulejo }: Props) => {
+export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAberta, folhaMaisAberta, rotulos, numeroDentro, azulejo, suave = "forte" }: Props) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { get, set, loaded } = useUserData();
@@ -99,7 +101,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
     navigate(aba === "conquistas" ? "/conquistas" : "/voce", aba === "conquistas" ? { state: { origem: "home" } } : undefined);
   };
 
-  if (!loaded) return <div className="hn he min-h-dvh" aria-hidden />;
+  if (!loaded) return <div className="hn he min-h-dvh" aria-hidden data-suave={suave} />;
 
   const paginas = [
     <PaginaSeuDia key="dia" data={lifeData} onAbrirScore={abrirScore} onAcao={abrirAcao} onMais={abrirMais} numeroDentro={numeroDentro} copoMl={copo} />,
@@ -108,7 +110,7 @@ export const HomeE = ({ modulos, paginaInicial = 0, arrasto = null, folhaScoreAb
   ];
 
   return (
-    <div className="hn he min-h-dvh" data-testid="home-nova" data-layout="e" data-modulos={modulos}>
+    <div className="hn he min-h-dvh" data-testid="home-nova" data-layout="e" data-modulos={modulos} data-suave={suave}>
       <main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+108px)]">
         <header className="flex items-center justify-between gap-3 pt-1" data-testid="hn-topo">
           <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">

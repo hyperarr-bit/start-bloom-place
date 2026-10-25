@@ -8,9 +8,13 @@
  *    luminosidade fixa das tintas (azulejos e discos). */
 .hn.he {
   /* rodada 5: cada tom tem o próprio {L, C} (paleta.ts); no claro a cor é a própria (L' = L, C' = C) e a tinta
-     dos azulejos/discos tem luminosidade fixa 0,955 com 30 % do croma da cor */
+     dos azulejos/discos tem luminosidade fixa com uma fração do croma da cor.
+     rodada 6: --he-t é o ponto da régua v5 → r4 (0 = v5 forte · 0,5 = suave · 0,7 = mais suave); a tinta lava junto:
+     luminosidade 0,955 → 0,962 e fração do croma 0,30 → 0,18 */
+  --he-t: 0;
   --he-Lk: 0; --he-Lm: 1; --he-Cm: 1;
-  --he-tinta-L: 0.955; --he-tinta-k: 0.3;
+  --he-tinta-L: calc(0.955 + var(--he-t) * 0.01);
+  --he-tinta-k: calc(0.3 - var(--he-t) * 0.17);
   --he-trilho: hsl(var(--foreground) / 0.07);
   --hn-fundo: 0 0% 98%;
   --hn-sombra: 0 1px 2px rgb(0 0 0 / 0.025), 0 2px 10px rgb(0 0 0 / 0.04);
@@ -26,7 +30,8 @@
   /* no escuro a cor clareia (L' = 0,46 + 0,5·L → marinho 0,42 vira 0,67; ouro 0,76 vira 0,84) com 85 % do croma;
      a tinta é um fundo escuro com um sopro da cor */
   --he-Lk: 0.46; --he-Lm: 0.5; --he-Cm: 0.85;
-  --he-tinta-L: 0.27; --he-tinta-k: 0.4;
+  --he-tinta-L: calc(0.27 - var(--he-t) * 0.015);
+  --he-tinta-k: calc(0.4 - var(--he-t) * 0.2);
   --he-trilho: hsl(var(--foreground) / 0.1);
   --hn-fundo: 222 16% 7%;
   --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);
@@ -38,6 +43,10 @@
   --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.6);
   background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
 }
+
+/* rodada 6: os dois níveis de meio-termo (data-suave no .hn.he) */
+.hn.he[data-suave="suave"] { --he-t: 0.5; }
+.hn.he[data-suave="mais"] { --he-t: 0.7; }
 
 /* ---- o carrossel do dia: páginas de largura cheia, que param uma por vez ---- */
 .he-trilho {

@@ -5,43 +5,42 @@ import {
 import type { TipoPendencia } from "@/lib/home-pendencias";
 
 /**
- * A PALETA DA OPÇÃO E — RODADA 5, versão "cores separadas" (25/10).
+ * A PALETA DA OPÇÃO E — rodada 5 "cores separadas" + rodada 6 "meio-termo" (25/10).
  *
- * A rodada 4 tinha 16 cores no MESMO tom (L/C iguais, só a matiz mudava) e passava no ΔE, mas no olho ainda
- * havia grupos: três rosados, três lilases, dois azuis, e um "dourado" que lia como oliva. Aqui cada módulo
- * é uma COR COM NOME, escolhida pra ser distinta a olho nu — aceitando variar luminosidade e croma dentro de
- * uma faixa sóbria (L 0,42–0,76 · C 0,03–0,15 em OKLCH; nada neon):
- *   só UM rosa (Beleza) e UM roxo (Dev. Pessoal); três azuis que se separam pela luminosidade (marinho ·
- *   cobalto · céu); dois verdes que se separam pela matiz e pelo croma (folha · oliva) + o turquesa; o
- *   dourado de verdade (L alta, C alta); vinho e chocolate escuros; dois neutros (aço frio, areia quente).
- * Cada tom guarda {h, L, C}; o tema muda a luminosidade no escuro (home-e.css: --he-Lk/--he-Lm/--he-Cm) e a
- * TINTA dos azulejos/discos tem luminosidade FIXA (--he-tinta-L) com um pouco do croma da cor — assim as
- * cores escuras (marinho, vinho) não viram azulejos pesados.
- * Teste numérico (ΔE OKLab, deuteranopia) + "teste do olho" (pares críticos em tamanho real):
- * novidades-guardadas/…/E/v5/scripts/paleta-v5-verifica.cjs. Ícones: Lucide, traço 1,75 em tudo.
+ * Cada módulo é uma COR COM NOME {h, L, C} em OKLCH, escolhida pra ser distinta a olho nu (só um rosa e um roxo;
+ * três azuis separados pela luminosidade; esmeralda × oliva × turquesa; ouro de verdade; vinho e chocolate; dois
+ * neutros). As MATIZES não mudam entre as rodadas — são o que separa os grupos.
+ *
+ * RODADA 6 (dono: a v5 ficou forte demais, a r4 era "meio transparente" — quer o meio-termo): cada tom traz também
+ * um ALVO "r4-like" {L4, C4} — mais claro onde a v5 era pesada (esmeralda, marinho, vinho, chocolate) e com croma
+ * ~0,105–0,12 como a rodada 4 — e o tema escolhe o ponto da régua com `--he-t`: 0 = v5 · 0,5 = "suave" ·
+ * 0,7 = "mais suave" (data-suave no .hn.he). L(t) = L + t·(L4 − L) e C(t) = C + t·(C4 − C). A tinta do azulejo/disco
+ * também lava com t: luminosidade 0,955 → 0,962 e a fração do croma 0,30 → 0,18 (home-e.css).
+ * Teste (ΔE OKLab, grupos críticos, deuteranopia, teste do olho) nos dois níveis:
+ * novidades-guardadas/…/E/v6/scripts/paleta-v6-verifica.cjs. Ícones: Lucide, traço 1,75 em tudo.
  */
 export const TRACO = 1.75;
 
-export interface Tom { h: number; L: number; C: number; nome: string }
+export interface Tom { h: number; L: number; C: number; L4: number; C4: number; nome: string }
 
-/** Módulo → cor (ordem da grade de lib/modulos). */
+/** Módulo → cor (ordem da grade de lib/modulos). {L, C} = v5 (forte) · {L4, C4} = alvo r4-like (suave). */
 export const TOM_DO_MODULO: Record<string, Tom> = {
-  financas: { h: 90, L: 0.78, C: 0.15, nome: "ouro" },            // dinheiro é ouro — amarelo-ouro de verdade
-  treino: { h: 262, L: 0.55, C: 0.15, nome: "cobalto" },          // o azul do meio
-  dieta: { h: 48, L: 0.66, C: 0.15, nome: "laranja" },            // comida
-  rotina: { h: 158, L: 0.50, C: 0.13, nome: "esmeralda" },        // o hábito feito — verde-folha escuro
-  desenvolvimento: { h: 310, L: 0.60, C: 0.15, nome: "roxo" },    // o único roxo (mais claro que o petróleo da Mente)
-  saude: { h: 25, L: 0.54, C: 0.15, nome: "tijolo" },             // o vermelho do coração
-  casa: { h: 235, L: 0.78, C: 0.10, nome: "céu" },                // o azul claro
-  estudos: { h: 262, L: 0.42, C: 0.10, nome: "marinho" },         // o azul escuro
-  biblioteca: { h: 55, L: 0.42, C: 0.085, nome: "chocolate" },    // couro de livro
-  beleza: { h: 350, L: 0.72, C: 0.13, nome: "rosa" },             // o único rosa
-  viagens: { h: 185, L: 0.64, C: 0.13, nome: "turquesa" },        // o mar
-  carreira: { h: 250, L: 0.50, C: 0.03, nome: "aço" },            // neutro frio
-  hiperfoco: { h: 205, L: 0.52, C: 0.11, nome: "petróleo" },      // Mente: fundo do mar, não lilás
-  relacionamentos: { h: 350, L: 0.44, C: 0.14, nome: "vinho" },   // o calor, escuro — não um 2º rosa
-  pet: { h: 85, L: 0.72, C: 0.035, nome: "areia" },               // neutro quente (pelo)
-  detox: { h: 108, L: 0.60, C: 0.085, nome: "oliva" },            // a folha madura
+  financas: { h: 90, L: 0.78, C: 0.15, L4: 0.78, C4: 0.14, nome: "ouro" },
+  treino: { h: 262, L: 0.55, C: 0.15, L4: 0.64, C4: 0.12, nome: "cobalto" },
+  dieta: { h: 48, L: 0.66, C: 0.15, L4: 0.66, C4: 0.12, nome: "laranja" },
+  rotina: { h: 158, L: 0.50, C: 0.13, L4: 0.66, C4: 0.12, nome: "esmeralda" },
+  desenvolvimento: { h: 310, L: 0.60, C: 0.15, L4: 0.70, C4: 0.14, nome: "roxo" },
+  saude: { h: 22, L: 0.54, C: 0.15, L4: 0.56, C4: 0.13, nome: "tijolo" },
+  casa: { h: 240, L: 0.80, C: 0.09, L4: 0.80, C4: 0.09, nome: "céu" },
+  estudos: { h: 262, L: 0.42, C: 0.10, L4: 0.52, C4: 0.09, nome: "marinho" },
+  biblioteca: { h: 55, L: 0.42, C: 0.085, L4: 0.54, C4: 0.08, nome: "chocolate" },
+  beleza: { h: 350, L: 0.72, C: 0.13, L4: 0.74, C4: 0.11, nome: "rosa" },
+  viagens: { h: 185, L: 0.64, C: 0.13, L4: 0.76, C4: 0.12, nome: "turquesa" },
+  carreira: { h: 250, L: 0.50, C: 0.03, L4: 0.58, C4: 0.03, nome: "aço" },
+  hiperfoco: { h: 195, L: 0.52, C: 0.11, L4: 0.56, C4: 0.12, nome: "petróleo" },
+  relacionamentos: { h: 335, L: 0.44, C: 0.14, L4: 0.50, C4: 0.12, nome: "ameixa" },
+  pet: { h: 80, L: 0.76, C: 0.025, L4: 0.76, C4: 0.025, nome: "areia" },
+  detox: { h: 95, L: 0.60, C: 0.10, L4: 0.72, C4: 0.10, nome: "oliva" },
 };
 
 /** Tipo de pendência → tom do módulo de origem (água no cobalto, humor no roxo, gratidão no vinho). */
@@ -60,12 +59,17 @@ export const ICONE_DO_TIPO: Record<TipoPendencia, LucideIcon> = {
 export const ICONE_COMPROMISSO = CalendarClock;
 export const ICONE_CONTA = Receipt;
 
-/** A cor cheia do tom (ícone, anel, barra). No escuro o tema clareia: L' = Lk + Lm·L, C' = Cm·C. */
+const n = (x: number) => Number(x.toFixed(4));
+/** L e C no ponto `--he-t` da régua v5 → r4 (expressões CSS). */
+const Lt = (t: Tom) => `(${n(t.L)} + var(--he-t) * ${n(t.L4 - t.L)})`;
+const Ct = (t: Tom) => `(${n(t.C)} + var(--he-t) * ${n(t.C4 - t.C)})`;
+
+/** A cor cheia do tom (ícone, anel, barra). No escuro o tema clareia: L' = Lk + Lm·L(t), C' = Cm·C(t). */
 export const cor = (t: Tom): string =>
-  `oklch(calc(var(--he-Lk) + var(--he-Lm) * ${t.L}) calc(var(--he-Cm) * ${t.C}) ${t.h})`;
-/** A tinta do tom (fundo de azulejo e de disco): luminosidade fixa do tema + um pouco do croma da cor. */
+  `oklch(calc(var(--he-Lk) + var(--he-Lm) * ${Lt(t)}) calc(var(--he-Cm) * ${Ct(t)}) ${t.h})`;
+/** A tinta do tom (fundo de azulejo e de disco): luminosidade fixa do tema + uma fração do croma da cor. */
 export const tinta = (t: Tom): string =>
-  `oklch(var(--he-tinta-L) calc(var(--he-tinta-k) * ${t.C}) ${t.h})`;
+  `oklch(var(--he-tinta-L) calc(var(--he-tinta-k) * ${Ct(t)}) ${t.h})`;
 
 export const corDoModulo = (id: string) => cor(TOM_DO_MODULO[id] ?? TOM_DO_MODULO.carreira);
 export const tintaDoModulo = (id: string) => tinta(TOM_DO_MODULO[id] ?? TOM_DO_MODULO.carreira);

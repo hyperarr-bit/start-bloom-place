@@ -9,7 +9,6 @@ import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";
 import { AccountDrawer } from "./AccountDrawer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CHAVE_COPO_ML, COPO_ML_PADRAO, aguaQueFalta, normalizarCopoMl } from "@/lib/saude-copo";
 import { navAbasLigada, lerTela } from "@/lib/nav-abas";
 import { consumirAvisoMenuNovo, menuNovoLigado } from "@/lib/menu-novo";
 import { useTheme } from "@/hooks/use-theme";
@@ -30,63 +29,6 @@ const getGreeting = () => {
   if (h < 12) return { text: "Bom dia", Icon: Sun };
   if (h < 18) return { text: "Boa tarde", Icon: CloudSun };
   return { text: "Boa noite", Icon: Sunset };
-};
-
-const getContextualMessage = (data: LifeHubData, copoMl: number = COPO_ML_PADRAO): string => {
-  const h = new Date().getHours();
-  const dayOfWeek = new Date().getDay();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-  if (h < 6) return "Descanse bem, amanhã é um novo dia ✨";
-  if (h >= 6 && h < 9) {
-    if (data.todayWorkoutGroup && !data.workoutDone) return `Hora de começar! Treino de ${data.todayWorkoutGroup} te espera 💪`;
-    if (data.tasksTotal > 0 && data.tasksCompleted === 0) return `${data.tasksTotal} hábito${data.tasksTotal > 1 ? "s" : ""} para conquistar hoje 🎯`;
-    return isWeekend ? "Bom fim de semana! Cuide de você 🌿" : "Comece o dia com energia! ⚡";
-  }
-  if (h >= 9 && h < 12) {
-    if (data.tasksTotal > 0) {
-      const pct = Math.round((data.tasksCompleted / data.tasksTotal) * 100);
-      if (pct === 0) return "Vamos começar? Seus hábitos te esperam 🚀";
-      if (pct < 50) return `Já fez ${data.tasksCompleted}/${data.tasksTotal} — continue assim! 💪`;
-      return `${pct}% dos hábitos feitos! Quase lá 🔥`;
-    }
-    return "Manhã produtiva te espera ☀️";
-  }
-  if (h >= 12 && h < 14) {
-    if (data.mealsTotal > 0 && data.mealsLogged < data.mealsTotal) {
-      const faltam = data.mealsTotal - data.mealsLogged;
-      return `Hora do almoço! ${faltam} refei${faltam > 1 ? "ções restantes" : "ção restante"} 🍽️`;
-    }
-    return "Hora do almoço, recarregue as energias 🍽️";
-  }
-  if (h >= 14 && h < 18) {
-    if (data.waterGlasses < data.waterGoal) {
-      const copos = data.waterGoal - data.waterGlasses;
-      return `Hidrate-se! Falta${copos > 1 && copoMl < 500 ? "m" : ""} ${aguaQueFalta(copos, copoMl)} 💧`;
-    }
-    if (data.todayWorkoutGroup && !data.workoutDone) return `Ainda dá tempo do treino de ${data.todayWorkoutGroup} 🏋️`;
-    const remaining = data.tasksTotal - data.tasksCompleted;
-    if (remaining > 0) return `${remaining} hábito${remaining > 1 ? "s" : ""} pendente${remaining > 1 ? "s" : ""} para fechar o dia ✅`;
-    return "Tarde produtiva! Mantenha o ritmo 🌟";
-  }
-  /* "Dia completo" só quando está COMPLETO (10/09). A frase saía a partir de
-     80 — e como o score tinha teto de 95 pra quem não cadastrava suplemento
-     (cliente: "fiz tudo mas só vai até os 95%"), o app dizia "completo" pra
-     um dia que ele mesmo não deixava fechar. Agora 100 é 100; de 80 a 99
-     fica o "Dia incrível", que já existia. Vale nos dois turnos da noite,
-     senão às 19h o anel pulsa e o toast diz "100%" enquanto a saudação
-     ainda fala em "incrível". */
-  if (h >= 18 && h < 21) {
-    if (data.dayScore >= 100) return "Dia completo! Descanse com orgulho 🌟";
-    if (data.dayScore >= 80) return "Dia incrível! Você está arrasando 🏆";
-    if (data.dayScore >= 50) return "Bom progresso hoje! Finalize o que falta 🌙";
-    if (data.currentBook) return `Que tal ler um pouco de "${data.currentBook}"? 📖`;
-    return isWeekend ? "Aproveite a noite de fim de semana 🌃" : "Boa noite! Hora de desacelerar 🌙";
-  }
-  if (data.dayScore >= 100) return "Dia completo! Descanse com orgulho 🌟";
-  if (data.dayScore >= 80) return "Dia incrível! Você está arrasando 🏆";
-  if (data.dayScore >= 50) return "Bom dia! Amanhã será ainda melhor 💫";
-  return "Hora de descansar. Amanhã é uma nova chance ✨";
 };
 
 /** 1.0.18: algo por cima do balão do menu novo? Camada guiada (tour, missão, festa…), folha (dialog) ou a tela/card de
@@ -155,11 +97,6 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
     setShowAccount(true);
   };
 
-  /* B4 (1.0.18, QA 21/10): `Que tal ler um pouco de "Dom casmurro"? 📖` quebrava com o 📖 sozinho numa 3ª linha, e ao
-   * rolar o rótulo "AÇÕES RÁPIDAS" aparecia por baixo dele (o cabeçalho sticky não cobria essa linha). Dois cintos:
-   * o último pedaço (o emoji) gruda na palavra anterior com um espaço que não quebra — nunca mais uma linha só com o
-   * emoji — e o subtítulo fica em no máximo 2 linhas (line-clamp), então a altura do cabeçalho não cresce. */
-  const contextMessage = getContextualMessage(data, normalizarCopoMl(get<number>(CHAVE_COPO_ML, COPO_ML_PADRAO))).replace(/ (\S+)$/, " $1");
   const nomeCompleto = data.userName || user?.email?.split("@")[0] || "";
   /* Só o PRIMEIRO nome na saudação (29/07). "Boa tarde, João Victor 👋" não
      cabe em 360px e virava "Boa tarde, João Vic…" — nome cortado no meio é
@@ -179,14 +116,17 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
 
   return (
     <>
+      {/* 1.0.19 (dono): o topo é só "Bom dia, Nome 👋" — a frase de contexto embaixo saiu (Home mais limpa). Uma linha
+          só: items-center deixa a saudação no meio da altura do avatar (com items-start ela subia e o avatar ficava
+          mais baixo que o texto). */}
       <motion.div
-        className="flex items-start justify-between"
+        className="flex items-center justify-between"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2">
             <GreetingIcon className="w-4 h-4 text-warning" />
             {/* text-base em tela pequena (320px): a 18px "Boa tarde, João 👋"
                   ainda cortava. O nome é a parte que importa — encolhe a fonte
@@ -204,7 +144,6 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
               </button>
             )}
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-2" data-testid="saudacao-subtitulo">{contextMessage}</p>
         </div>
         {!comAbas && <div className="flex items-center gap-1 flex-shrink-0">
           {/* Avatar-badge (22/07, escolha do dono após ▾ e ☰): o próprio

@@ -262,10 +262,10 @@ describe("Aparência (dentro do menu)", () => {
 /* ------------------------------------------------------------------ o topo da Home */
 
 describe("o topo da Home", () => {
-  it("menu novo: saudação + subtítulo + avatar — sem o sol e a paleta", () => {
+  it("menu novo: saudação + avatar (sem o subtítulo, 1.0.19) — sem o sol e a paleta", () => {
     montar(<GreetingHeader data={lifeData} />);
     expect(screen.getByText(/Ana/)).toBeTruthy();
-    expect(screen.getByTestId("saudacao-subtitulo")).toBeTruthy();
+    expect(screen.queryByTestId("saudacao-subtitulo")).toBeNull();
     expect(screen.getByRole("button", { name: "Minha conta" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Alternar modo escuro" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Trocar a cor do tema" })).toBeNull();

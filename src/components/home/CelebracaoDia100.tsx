@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Check, Flame } from "lucide-react";
+import { Check } from "lucide-react";
 import { CHAVE_DIA_100_VISTO, MENSAGEM_DIA_100 } from "./DayScoreRing";
+import { Fogo } from "@/components/conquistas/Fogo";
+import { faixaDoFogo } from "@/lib/fogo-sequencia";
 import { localDayKey } from "@/lib/utils";
 
 /**
@@ -44,6 +46,12 @@ export const CelebracaoDia100 = ({ score, streak }: { score: number; streak: num
   const [aberta, setAberta] = useState(false);
   const semMovimento = useReducedMotion();
   const completo = score >= 100;
+  const faixa = faixaDoFogo(streak);
+  const corDaFaixa = {
+    "--sq-c": faixa.hojeTexto, "--sq-cd": faixa.hojeTextoEscuro,
+    "--sq-f": faixa.hojeFundo, "--sq-fd": faixa.hojeFundoEscuro,
+    "--sq-b": faixa.borda, "--sq-bd": faixa.bordaEscuro,
+  } as CSSProperties;
 
   useEffect(() => {
     if (!completo || dia100JaVisto()) return;
@@ -137,13 +145,18 @@ export const CelebracaoDia100 = ({ score, streak }: { score: number; streak: num
             </motion.p>
 
             {streak > 0 && (
+              /* 1.0.19 (dono): o fogo e os dias na COR DA FAIXA (roxo com 27 dias…), não o laranja/âmbar fixo; claro × escuro
+                 pelas cores do "hoje" da faixa, como a linha da sequência da Home */
               <motion.div
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 px-4 py-2 text-sm font-semibold text-amber-800 dark:text-amber-200"
+                className="mt-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold bg-[var(--sq-f)] dark:bg-[var(--sq-fd)] border-[var(--sq-b)] dark:border-[var(--sq-bd)] text-[var(--sq-c)] dark:text-[var(--sq-cd)]"
+                style={corDaFaixa}
+                data-testid="dia100-sequencia"
+                data-faixa={faixa.id}
                 initial={{ opacity: semMovimento ? 1 : 0, scale: semMovimento ? 1 : 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 1.5 }}
               >
-                <Flame className="w-4 h-4 text-orange-500" aria-hidden="true" />
+                <Fogo faixa={faixa} tamanho={16} semBrilho />
                 {streak} {streak === 1 ? "dia seguido" : "dias seguidos"}
               </motion.div>
             )}

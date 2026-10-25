@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Flame } from "lucide-react";
+import { Fogo } from "@/components/conquistas/Fogo";
+import { faixaDoFogo } from "@/lib/fogo-sequencia";
 import { localDayKey } from "@/lib/utils";
 
 interface DayScoreRingProps {
@@ -34,6 +36,16 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
   // Abaixo de 80 o anel usa a cor do tema (--score-ring; nos temas
   // alternativos é o acento, no Original cai no aviso âmbar de sempre).
   // ≥ 80 continua verde em todo tema: é informação, não decoração.
+  /* 1.0.19 (dono): o fogo e os "N dias" na COR DA FAIXA (laranja 1+, vermelho 7+, roxo 14+, azul 30+, dourado 100+),
+   * como a linha da sequência e as Conquistas — antes era o laranja fixo (--streak). Claro × escuro pelas cores de
+   * texto do "hoje" da faixa (hojeTexto / hojeTextoEscuro), o mesmo padrão da LinhaSequencia. */
+  const faixa = faixaDoFogo(streak);
+  const corDaFaixa = {
+    "--sq-c": faixa.hojeTexto, "--sq-cd": faixa.hojeTextoEscuro,
+    "--sq-f": faixa.hojeFundo, "--sq-fd": faixa.hojeFundoEscuro,
+    "--sq-b": faixa.borda, "--sq-bd": faixa.bordaEscuro,
+  } as CSSProperties;
+
   const getScoreColor = () => {
     if (score >= 80) return "hsl(var(--success))";
     return "hsl(var(--score-ring, var(--warning)))";
@@ -110,14 +122,16 @@ export const DayScoreRing = ({ score, streak, mostrarSequencia = true }: DayScor
              * não é conserto. A palavra "consecutivos" é a parte dispensável:
              * 🔥 + "20 dias" já diz sequência sozinho. Então ela só entra
              * quando há largura pra ela. */
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap max-w-full"
-            style={{ background: "hsl(var(--streak, var(--warning)) / 0.1)", border: "1px solid hsl(var(--streak, var(--warning)) / 0.2)" }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap max-w-full border bg-[var(--sq-f)] dark:bg-[var(--sq-fd)] border-[var(--sq-b)] dark:border-[var(--sq-bd)]"
+            style={corDaFaixa}
+            data-testid="anel-sequencia"
+            data-faixa={faixa.id}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.7, type: "spring" }}
           >
-            <Flame className="w-3.5 h-3.5" style={{ color: "hsl(var(--streak, var(--warning)))" }} />
-            <span className="text-xs font-bold" style={{ color: "hsl(var(--streak, var(--warning)))" }}>{streak} dia{streak > 1 ? "s" : ""}</span>
+            <span className="inline-flex" data-testid="anel-sequencia-fogo"><Fogo faixa={faixa} tamanho={14} semBrilho /></span>
+            <span className="text-xs font-bold text-[var(--sq-c)] dark:text-[var(--sq-cd)]" data-testid="anel-sequencia-dias">{streak} dia{streak > 1 ? "s" : ""}</span>
             <span className="hidden min-[350px]:inline text-[10px] text-muted-foreground">consecutivo{streak > 1 ? "s" : ""}</span>
           </motion.div>
         )}

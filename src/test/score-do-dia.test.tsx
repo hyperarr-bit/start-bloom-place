@@ -16,7 +16,6 @@ import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { DayScoreRing, CHAVE_DIA_100_VISTO, MENSAGEM_DIA_100 } from "@/components/home/DayScoreRing";
 import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
-import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { localDayKey } from "@/lib/utils";
 
 const toastMock = vi.fn();
@@ -165,37 +164,8 @@ describe("Score do Dia fecha em 100", () => {
 });
 
 describe("Comemoração dos 100", () => {
-  const dadosHeader = (dayScore: number) => ({
-    dayScore, streak: 3, monthBalance: 0, nextBillName: null, nextBillDate: null, nextBillDaysUntil: null,
-    todayWorkoutGroup: null, workoutDone: true, workoutTime: null,
-    caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 4, mealsTotal: 4,
-    waterGlasses: 8, waterGoal: 8, sleepHours: 7,
-    supplementsTaken: 0, supplementsTotal: 0,
-    currentBook: null, readingProgress: 0, booksReadThisYear: 0,
-    tasksCompleted: 2, tasksTotal: 2, habits: [], userName: "Ana",
-  });
-
-  it("'Dia completo' só em 100; de 80 a 99 é 'Dia incrível'", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 8, 10, 22, 0, 0));
-    const store = criarStore();
-    const a = renderComStore(<GreetingHeader data={dadosHeader(95)} />, store);
-    expect(screen.getByText(/Dia incrível/)).toBeInTheDocument();
-    expect(screen.queryByText(/Dia completo/)).not.toBeInTheDocument();
-    a.unmount();
-
-    const b = renderComStore(<GreetingHeader data={dadosHeader(100)} />, store);
-    expect(screen.getByText(/Dia completo! Descanse com orgulho/)).toBeInTheDocument();
-    b.unmount();
-
-    // no turno das 18–21 a mesma regra
-    vi.setSystemTime(new Date(2026, 8, 10, 19, 30, 0));
-    const c = renderComStore(<GreetingHeader data={dadosHeader(99)} />, store);
-    expect(screen.getByText(/Dia incrível/)).toBeInTheDocument();
-    c.unmount();
-    renderComStore(<GreetingHeader data={dadosHeader(100)} />, store);
-    expect(screen.getByText(/Dia completo/)).toBeInTheDocument();
-  });
+  // (1.0.19) o teste "'Dia completo' só em 100; de 80 a 99 é 'Dia incrível'" saiu junto com a frase embaixo da
+  // saudação da Home — o topo agora é só "Bom dia, Nome 👋" (src/test/home-1019-pequenos.test.tsx).
 
   it("anel marca o 100 e o número vai pro tom de sucesso; abaixo disso não", () => {
     const a = render(<DayScoreRing score={99} streak={0} />);

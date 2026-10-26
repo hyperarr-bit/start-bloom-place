@@ -8,7 +8,9 @@ import { trackEvent } from "@/lib/analytics";
 import { dialogoAberto, lerTela, limparVolta, marcarVolta, planoDeNavegacao } from "@/lib/nav-abas";
 import { EVENTO_HOME_NOVA_MAIS, pedirMaisNaHome } from "@/lib/home-nova";
 import { marcarTrocaDeAba } from "@/lib/troca-de-rota";
-import { BarraVidro } from "./BarraVidro";
+import { BarraVidro, DicaDoMais } from "./BarraVidro";
+import { CHAVE_DICA_MAIS, ESPERA_DICA_MAIS_MS, dicaDoMaisDevida, encerrarDicaMais, registrarAparicaoDicaMais } from "@/lib/dica-mais";
+import { EVENTO_MISSAO_DOSES, lerMissao } from "@/lib/missao-doses";
 import { iniciaisDe } from "../HomeNova";
 import type { AbaNova } from "../BarraFlutuante";
 import "../home-nova.css";
@@ -32,6 +34,9 @@ const abaDa = (pathname: string): AbaNova | null => {
 };
 
 let hojeLogoAbaixo = false;
+/** a dica do "+" já contou a aparição nesta abertura do app (fechar e abrir conta de novo; voltar pra Home, não) */
+let dicaContadaNestaAbertura = false;
+export const __zerarDicaDaBarraVidro = () => { dicaContadaNestaAbertura = false; };
 let pendente: { para: string; hojeAbaixo: boolean } | null = null;
 /** só pros testes */
 export const __zerarPilhaDaBarraVidro = () => { hojeLogoAbaixo = false; pendente = null; };
@@ -40,7 +45,7 @@ export function BarraVidroGlobal() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { get } = useUserData();
+  const { get, set } = useUserData();
   const nova = useHomeNova(user);
   const aba = abaDa(pathname);
   const candidata = nova.ligada && !!user && aba !== null;
@@ -90,6 +95,46 @@ export function BarraVidroGlobal() {
     return () => { document.body.classList.remove("com-barra-vidro"); };
   }, [naTela, aba]);
 
+  /* 1.0.19 (dono 26/10) — A DICA DO "+" (lib/dica-mais): só na Início, com a barra na frente (sem camada guiada,
+     festa ou folha por cima) e parada por ESPERA_DICA_MAIS_MS; some no 1º toque e nunca volta. */
+  const [, setMissaoVersao] = useState(0);
+  useEffect(() => {
+    const reler = () => setMissaoVersao((v) => v + 1);
+    window.addEventListener(EVENTO_MISSAO_DOSES, reler);
+    return () => window.removeEventListener(EVENTO_MISSAO_DOSES, reler);
+  }, []);
+  const marcaNaConta = get<unknown>(CHAVE_DICA_MAIS, null);
+  const dicaCandidata = visivel && aba === "inicio" && (() => { try { return dicaDoMaisDevida(lerMissao(), marcaNaConta, undefined, dicaContadaNestaAbertura); } catch { return false; } })();
+  const [dicaNaTela, setDicaNaTela] = useState(false);
+  useEffect(() => {
+    if (!dicaCandidata) { setDicaNaTela(false); return; }
+    const t = window.setTimeout(() => {
+      setDicaNaTela(true);
+      if (!dicaContadaNestaAbertura) {
+        dicaContadaNestaAbertura = true;
+        const marca = registrarAparicaoDicaMais(marcaNaConta);
+        set(CHAVE_DICA_MAIS, marca, { system: true });
+        trackEvent("home_dica_mais", { acao: "vista", aparicao: marca.aparicoes ?? 1 });
+      }
+    }, ESPERA_DICA_MAIS_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dicaCandidata]);
+  useEffect(() => {
+    if (!dicaNaTela) return;
+    // o 1º toque em QUALQUER lugar encerra (no "+" = usada: o toque segue e abre a folha)
+    const aoTocar = (e: Event) => {
+      const alvo = e.target as Element | null;
+      const via = alvo?.closest?.('[data-testid="hn-mais"]') ? "usada" : "dispensada";
+      const marca = encerrarDicaMais(via);
+      set(CHAVE_DICA_MAIS, marca, { system: true });
+      trackEvent("home_dica_mais", { acao: via });
+      setDicaNaTela(false);
+    };
+    document.addEventListener("pointerdown", aoTocar, true);
+    return () => document.removeEventListener("pointerdown", aoTocar, true);
+  }, [dicaNaTela, set]);
+
   if (!visivel || !aba) return null;
 
   const ir = (para: AbaNova) => {
@@ -120,7 +165,7 @@ export function BarraVidroGlobal() {
   const nome = nomeDaHome(get) || user?.email?.split("@")[0] || "";
   return (
     <div className="hn he he-so-vars" data-testid="barra-vidro-global">
-      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} />
+      <BarraVidro ativa={aba} iniciais={iniciaisDe(nome)} onIr={ir} onMais={mais} dica={dicaNaTela && dicaCandidata ? <DicaDoMais /> : null} />
     </div>
   );
 }

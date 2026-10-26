@@ -186,3 +186,28 @@ html.he-vidro-calai .he-vidro {
   backdrop-filter: blur(14px) saturate(1.7) brightness(1.02);
   box-shadow: var(--he-vidro-sombra), inset 0 0 0 0.5px var(--he-vidro-borda);
 }
+
+/* A DICA DO "+" (1.0.19, dono 26/10 — lib/dica-mais): o único ensino da Home nova. Um balão pequeno preso ao "+",
+   no papel do card com um sopro quente, SEM borda e com sombra mínima; a ponta aponta pro centro do "+" (56 px).
+   Entra subindo de leve (ou parado, com "reduzir movimento"). */
+.he-dica-mais {
+  position: absolute; right: 0; bottom: calc(100% + 12px);
+  width: max-content; max-width: min(232px, calc(100vw - 48px));
+  padding: 10px 14px; border-radius: 16px;
+  background: hsl(40 30% 99%); color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 18px rgb(0 0 0 / 0.07);
+  animation: he-dica-entra 320ms cubic-bezier(.2,.8,.2,1) both;
+  pointer-events: none;
+}
+.he-dica-mais-ponta {
+  position: absolute; right: 22px; bottom: -5px; width: 12px; height: 12px;
+  background: inherit; transform: rotate(45deg); border-radius: 2px;
+  box-shadow: 3px 3px 6px rgb(0 0 0 / 0.03);
+}
+.he-dica-mais-plus {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; margin: 0 1px; vertical-align: -3px;
+  border-radius: 999px; background: var(--hn-mais); color: var(--hn-mais-texto); font-weight: 700; font-size: 13px; line-height: 1;
+}
+.dark .he-dica-mais { background: hsl(222 12% 16%); box-shadow: 0 6px 18px rgb(0 0 0 / 0.45); }
+@keyframes he-dica-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .he-dica-mais { animation: none; } }

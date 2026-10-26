@@ -12,6 +12,7 @@ import {
   type BlocoDoScore, type PendenciasPrefs, type TipoPendencia,
 } from "@/lib/home-pendencias";
 import { moduloOcultaPendenciasLigado } from "@/lib/tour-home";
+import { CHAVE_ORIGEM_CONTA, contaEhNova, lerMarcadorOrigem } from "@/lib/home-nova";
 
 /**
  * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
@@ -444,7 +445,20 @@ export function useLifeHubData(): LifeHubData {
       ? (get<{ hidden?: unknown } | null>("core-module-prefs", null)?.hidden ?? [])
       : [];
     const pendenciasPorModulo = tiposDosModulosOcultos(modulosOcultos);
-    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, pendenciasPorModulo);
+    /* 1.0.19 (dono 26/10) — SEM PONTOS "DE GRAÇA" PRA CONTA NOVA: a conta que começa na 1.0.19+ (marcador de origem
+     * "nova", lib/home-nova) abria com ~25 pontos sem ter feito nada — treino sem plano (15), sem livro em leitura (5) e
+     * sem suplemento cadastrado (5) contavam como feitos. Pra ela esses três blocos SAEM da conta enquanto não houver o
+     * que cobrar (o resto se reescala pra 100, como no "Não mostrar isso": quem fez tudo o que a tela mostra fecha em
+     * 100). Dia de descanso de quem TEM plano continua contando. Quem já usa (sem o marcador "nova") não muda nada. */
+    const semPontosDeGraca = lerMarcadorOrigem(get<unknown>(CHAVE_ORIGEM_CONTA, null)) === "nova" || contaEhNova();
+    const semCadastro: TipoPendencia[] = semPontosDeGraca
+      ? [
+          ...(!todayGroup && workoutStatus !== "descanso" ? (["treino"] as const) : []),
+          ...(!currentBook ? (["leitura"] as const) : []),
+          ...(supplements.length === 0 ? (["suplementos"] as const) : []),
+        ]
+      : [];
+    const cobrados = tiposCobradosHoje(pendenciasPrefs, pesoCobrado, [...pendenciasPorModulo, ...semCadastro]);
     const dayScore = scoreDosBlocos(blocos, cobrados);
     const userName = nomeDaHome(get);
 

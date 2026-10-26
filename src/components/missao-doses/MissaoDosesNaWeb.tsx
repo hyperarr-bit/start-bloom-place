@@ -37,6 +37,7 @@ import { ConviteDoDia } from "./ConviteDoDia";
 import { PlanoDeAmanhaA } from "./PlanoDeAmanhaA";
 import { DicaDoDia } from "./DicaDoDia";
 import { missaoAtual } from "@/lib/teste-gratis";
+import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 import "./missao-doses.css";
 
 /**
@@ -413,7 +414,7 @@ function Ligada() {
   const homePendente = passoHomePendente(missao);
   useEffect(() => {
     if (!homePendente) return;
-    const concluir = (via: "tour" | "sem_tour") => {
+    const concluir = (via: "tour" | "sem_tour" | "home_nova") => {
       const m = lerMissao();
       if (!m || m.homeTour) return;
       const novo = { ...m, homeTour: { dia: hoje, via }, completaEm: hoje };
@@ -423,6 +424,9 @@ function Ligada() {
       try { window.dispatchEvent(new CustomEvent(EVENTO_MISSAO_COMPLETA, { detail: { variante: m.braco } })); } catch { /* noop */ }
       if (via === "tour") pedirNotaDepois("missao_completa");
     };
+    // 1.0.19 (dono 26/10): com a Home nova o tour antigo está aposentado — o 4º passo fecha na hora (sem a faixa
+    // "Missão · 4 de 4" por cima da barra) e vem o "Plano de amanhã" (a hora do lembrete; a nota é pedida lá)
+    if (homeNovaLigadaSincrona(user?.id)) { concluir("home_nova"); return; }
     // (1.0.16) feito neste aparelho OU na conta (reinstalou): o tour não volta — o 4º passo fecha em silêncio
     if (!tourHomeLigado() || tourFeito(get) || tourSemMaisAberturas()) { concluir("sem_tour"); return; }
     const aoFim = () => concluir("tour");
@@ -768,7 +772,8 @@ function Ligada() {
   }
 
   /* B, 4º passo: a faixa "Missão · 4 de 4" por cima do tour da Home */
-  if (homePendente && noHome && !emCurso) return <FaixaDoPasso4 />;
+  // (1.0.19: com a Home nova NUNCA — nem por um quadro: a faixa é camada guiada e tiraria a barra de vidro com o "+")
+  if (homePendente && noHome && !emCurso && !homeNovaLigadaSincrona(user?.id)) return <FaixaDoPasso4 />;
 
   /* D3/D4/D7: o passo do dia, dentro do módulo dele */
   const passo: Passo | null = emCurso ?? candidato;

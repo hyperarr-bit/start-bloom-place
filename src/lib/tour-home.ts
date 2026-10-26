@@ -29,6 +29,7 @@ import { contaNova, ehUmPorDia, lerMissao, missaoCumprida, missaoDosesLigada, mi
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
 import { v14Ligada } from "@/lib/v14-qa";
 import { modoTourHomeRemoto } from "@/lib/dia1-cheio";
+import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 
 export type ModoChave = "off" | "on";
 /** Cartões de boas-vindas (Finanças e Beleza). ROLLBACK/LIGAR = trocar aqui. */
@@ -98,7 +99,15 @@ const ligado = (modo: ModoChave, chaveForca: string): boolean => {
 };
 
 export const cartoesLigados = (modo: ModoChave = CARTOES_MODULO): boolean => ligado(modo, CHAVE_FORCA_CARTOES);
-export const tourHomeLigado = (modo: ModoChave = TOUR_HOME): boolean => ligado(modo, CHAVE_FORCA_TOUR_HOME);
+/**
+ * 1.0.19 (dono 26/10): com a HOME NOVA ligada pra conta da sessão (lib/home-nova) o tour antigo de 5 passos está
+ * APOSENTADO — ele apontava pro score/ações rápidas/widgets da Home de hoje. Responder "desligado" aqui é o que faz
+ * TODO mundo que espera o tour seguir sem ele: a missão (braço B fecha o 4º passo sozinha; braço A não segura o
+ * "Plano de amanhã"), a festa da dose 1 (sem "Conhecer minha Home") e o álbum (sem "Casa arrumada").
+ */
+export const tourHomeLigado = (modo: ModoChave = TOUR_HOME): boolean => !homeNovaLigadaSincrona() && ligado(modo, CHAVE_FORCA_TOUR_HOME);
+/** A Home nova está ligada pra conta da sessão (o tour antigo está aposentado). */
+export const tourAposentadoPelaHomeNova = (): boolean => homeNovaLigadaSincrona();
 export const moduloOcultaPendenciasLigado = (modo: ModoChave = MODULO_OCULTA_PENDENCIAS): boolean => ligado(modo, CHAVE_FORCA_MODULO_OCULTA);
 
 /** A força de QA do tour está ligada neste navegador (ignora a régua de conta nova — o dono testa com a conta dele). */

@@ -124,6 +124,8 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-home-nova-braco", // 1.0.19: o braço sorteado no modo "ab" da home_nova (nova|atual), estável entre aberturas
   "core-home-nova-admin", // 1.0.19: a resposta da checagem de admin pra conta ("<uid>:1|0"), pra 2ª abertura não esperar a consulta
   "core-home-nova-fogo", // 1.0.19: o dia em que o fogo da pílula da Home nova já acendeu (o pulso toca 1x por dia)
+  "core-home-nova-origem-aparelho", // 1.0.19 (26/10): o espelho da origem da conta ("<uid>:nova|antiga", lib/home-nova) — modo "novas"
+  "core-home-nova-dica-mais", // 1.0.19 (26/10): a dica do "+" já tocada/aparições (lib/dica-mais) — nunca volta; a mesma chave vai pra conta
 ]);
 
 /** Famílias de chaves do aparelho (prefixo + id). */
@@ -165,6 +167,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-dias-anotados", "core-hub-streak", "core-tip-seen-*", "core-demo-conta", "core-home-widgets-v2",
     "core-home-resumos", // os 3 cards da página 1 da Home nova (lib/home-resumos, gravado por useUserData.set)
     "core-cor-antes-home-nova", // a cor do tema de antes da Home nova (HomeE guarda; pages/Home devolve e apaga com a chave off)
+    "core-home-nova-origem", // 26/10: o marcador de origem da conta { tipo: nova|antiga } (OrigemDaContaNaSessao grava; lib/home-nova)
     "core-home-widgets-e", // os widgets da Home nova (lib/home-widgets-e: ids na ordem da escolha, até 6)
     "core-intro-vistas", // lista de módulos com intro vista NESTA CONTA (lib/intro-modulo, gravada por useUserData.set)
     "core-intro-feitas", // lista de módulos com intro FEITA nesta conta (a missão lê pra não repetir a 1ª ação)
@@ -186,7 +189,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     "core-lembretes", // id do canal de notificação do Android
     // 1.0.19 (lib/home-nova): NÃO são chaves de storage — "home-nova" é o parâmetro da URL (?home-nova=on|off|auto),
     // "home-nova:mais" é o nome do evento da barra de vidro, "home-nova:*" é o sal do sorteio do braço (FNV)
-    "home-nova", "home-nova:mais", "home-nova:*",
+    "home-nova", "home-nova:mais", "home-nova:*", "home-nova:origem",
   ],
   // FUNIL ANTES DA CONTA: progresso/respostas que só valem até o cadastro (a área fica: core-funil-w-area).
   funil_antes_da_conta: [

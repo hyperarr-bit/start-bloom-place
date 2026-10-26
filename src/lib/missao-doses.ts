@@ -56,6 +56,7 @@ import type { AreaKey } from "@/lib/funnel";
 import type { TipoDoItem } from "@/lib/demo-guiada";
 import { bracoFixo, bracoGravado, dia1CheioLigado, modoUmPorDia, tourHomeQuando, type BracoDia1, type PlanoAmanha } from "@/lib/dia1-cheio";
 import { dias23Ligado } from "@/lib/dias23";
+import { homeNovaLigadaSincrona } from "@/lib/home-nova";
 
 export type ModoMissaoDoses = "off" | "on";
 /** A web: desligada (02/10). */
@@ -290,7 +291,7 @@ export interface EstadoMissaoDoses {
   /** braço B, dias 2 e 3 ("aprofundar"): por dia, os módulos em que já houve 1 uso real */
   aprofundados?: Record<string, ModuloDaMissao[]>;
   /** braço B (10/10): o 4º passo da missão = o tour da Home ("Arrumar sua Home"); `via` = "tour" | "sem_tour" (tour indisponível/já feito) */
-  homeTour?: { dia: string; via: "tour" | "sem_tour" };
+  homeTour?: { dia: string; via: "tour" | "sem_tour" | "home_nova" };
   /** 1.0.16, braço A (uma dose por dia): o convite "Dia N da missão" na Home, por dia — "foi" (tocou em
    *  fazer) ou "depois" (Agora não). 1x por dia: mora AQUI (chave `missao-doses`, que nenhuma vassoura leva). */
   convites?: Record<string, "foi" | "depois">;
@@ -536,6 +537,9 @@ export function conviteDoDiaDevido(m: EstadoMissaoDoses | null, hoje: string = l
  */
 export function dicaDoDiaDevida(m: EstadoMissaoDoses | null, hoje: string = localDayKey(), naTela: 2 | 3 | null = null): 2 | 3 | null {
   if (!m || !ehUmPorDia(m) || m.explorou) return null;
+  // 1.0.19 (dono 26/10): com a Home nova as duas dicas saem (apontavam pro score antigo e pro "Adicionar widget",
+  // que não existem lá) — o único ensino da Home nova é a dica do "+" (lib/dica-mais)
+  if (homeNovaLigadaSincrona()) return null;
   const d = ([2, 3] as const).find((n) => m.feitos[n]?.dia === hoje && !m.dicas?.[n]);
   if (!d) return null;
   if (d === 3 && !m.fimVisto) return null; // dia 3: depois de "O que você construiu"
@@ -588,9 +592,11 @@ export const dosesFeitas = (m: EstadoMissaoDoses): number => ([1, 2, 3] as DiaDa
 
 /** Braço B: a missão do dia 1 tem 4 passos (3 doses + "Arrumar sua Home"); A tem 3. */
 export const TOTAL_PASSOS_B = 4;
-export const totalDePassos = (m: EstadoMissaoDoses | null): number => (ehBracoB(m) ? TOTAL_PASSOS_B : 3);
-/** Passos feitos contando o 4º (B). */
-export const passosFeitos = (m: EstadoMissaoDoses): number => dosesFeitas(m) + (ehBracoB(m) && m.homeTour ? 1 : 0);
+/** 1.0.19 (26/10): com a Home nova não existe tour — o B tem só as 3 doses (o 4º passo fecha sozinho, sem aparecer). */
+export const totalPassosB = (): number => (homeNovaLigadaSincrona() ? 3 : TOTAL_PASSOS_B);
+export const totalDePassos = (m: EstadoMissaoDoses | null): number => (ehBracoB(m) ? totalPassosB() : 3);
+/** Passos feitos contando o 4º (B, quando ele existe). */
+export const passosFeitos = (m: EstadoMissaoDoses): number => dosesFeitas(m) + (ehBracoB(m) && m.homeTour && totalPassosB() > 3 ? 1 : 0);
 /** Braço B: as 3 doses feitas e o tour da Home ainda por fazer (o 4º passo). */
 export const passoHomePendente = (m: EstadoMissaoDoses | null): boolean => !!m && ehBracoB(m) && missaoCumprida(m) && !m.homeTour;
 /** A missão inteira feita: A = 3 doses; B = 3 doses + o tour da Home. */

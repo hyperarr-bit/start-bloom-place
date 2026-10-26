@@ -42,6 +42,7 @@ import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/test
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
 import { DonoDaMissaoNaSessao, MissaoDosesNaWeb } from "@/components/missao-doses/MissaoDosesNaWeb";
+import { OrigemDaContaNaSessao } from "@/components/home-nova/OrigemDaConta";
 import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useLembreteDia2 } from "@/hooks/use-lembrete-dia2";
@@ -937,6 +938,8 @@ const App = () => {
                 <TrilhoLateral />
                 {/* 1.0.16: o dono da missão em doses na sessão, antes das rotas (lerMissao filtra pela conta) */}
                 <DonoDaMissaoNaSessao />
+                {/* 1.0.19 (26/10): a origem da conta (nova × antiga) pro modo "novas" da Home nova — depois do dono da missão, antes das rotas */}
+                <OrigemDaContaNaSessao />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -72,6 +72,8 @@ interface Props {
   numeroDentro?: boolean;
 }
 
+export const ROTULOS_DO_CARROSSEL = ["Seu dia", "Pendências de hoje", "Seus widgets"];
+
 const saudacao = (): string => {
   const h = new Date().getHours();
   if (h < 6) return "Boa madrugada";
@@ -129,6 +131,15 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
 
   const abrirAcao = useCallback((id: ActionId) => { setAcaoInicial(id); setFolhaMais(true); }, []);
   const abrirMais = useCallback(() => { setAcaoInicial(null); setFolhaMais(true); }, []);
+  /* 1.0.19 (26/10): medir quem vê as páginas 2 e 3 do carrossel (a dose do dia mora na 2) — 1 evento por troca de
+     página (a 1ª, aberta ao montar, não conta) com a página (1..3) e o rótulo */
+  const paginaAnterior = useRef(paginaInicial);
+  const aoMudarPagina = useCallback((n: number) => {
+    if (n === paginaAnterior.current) return;
+    const de = paginaAnterior.current;
+    paginaAnterior.current = n;
+    trackEvent("home_carrossel_pagina", { pagina: n + 1, de: de + 1, rotulo: ROTULOS_DO_CARROSSEL[n] ?? null });
+  }, []);
   const abrirScore = useCallback(() => { trackEvent("home_score_abrir", { score: lifeData.dayScore }); setFolhaScore(true); }, [lifeData.dayScore]);
 
   // o "+" da barra de vidro (global) pede a folha por evento; vindo de outra aba, o pedido fica em memória
@@ -167,7 +178,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
           <div className="mt-4 empty:hidden"><CardSeuDia lifeData={lifeData} sequencia={seq} /></div>
 
           <div className="mt-5">
-            <CarrosselDia paginas={paginas} rotulos={["Seu dia", "Pendências de hoje", "Seus widgets"]} paginaInicial={paginaInicial} arrasto={arrasto} />
+            <CarrosselDia paginas={paginas} rotulos={ROTULOS_DO_CARROSSEL} paginaInicial={paginaInicial} arrasto={arrasto} onMudar={aoMudarPagina} />
           </div>
 
           {/* Retrospectiva do mês que fechou, do dia 1 ao 10 — some sozinha fora da janela */}

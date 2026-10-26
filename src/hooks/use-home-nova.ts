@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { checkIsAdmin } from "@/lib/admin";
 import {
-  adminHomeNovaConhecido, guardarAdmin, homeNovaLigada, homeNovaPrecisaDeAdmin, informarAdminHomeNova, lerAdminGuardado, modoHomeNova,
-  type ModoHomeNova,
+  EVENTO_ORIGEM_HOME_NOVA, adminHomeNovaConhecido, guardarAdmin, homeNovaLigada, homeNovaPrecisaDeAdmin, informarAdminHomeNova, lerAdminGuardado,
+  modoHomeNova, origemConhecida, type ModoHomeNova,
 } from "@/lib/home-nova";
 
 /**
@@ -56,6 +56,14 @@ export function useHomeNova(user: { id?: string } | null | undefined): { ligada:
     return ouvirAdmin(user.id, (ok) => setAdmin(ok));
   }, [precisaAdmin, user?.id]);
 
+  // 26/10 (modo "novas"): a origem da conta (lib/home-nova) pode ficar conhecida depois do 1º render — relê no aviso
+  const [, setOrigemVersao] = useState(0);
+  useEffect(() => {
+    const reler = () => setOrigemVersao((v) => v + 1);
+    window.addEventListener(EVENTO_ORIGEM_HOME_NOVA, reler);
+    return () => window.removeEventListener(EVENTO_ORIGEM_HOME_NOVA, reler);
+  }, []);
+
   // sem resposta ainda (null), a decisão é "não": a Home de hoje, na hora — nunca a tela em branco
-  return { ligada: homeNovaLigada(admin), modo };
+  return { ligada: homeNovaLigada(admin, origemConhecida(user?.id)), modo };
 }

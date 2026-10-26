@@ -1,4 +1,4 @@
-import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Star, Utensils, Wallet } from "lucide-react";
+import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Plus, Star, Utensils, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
@@ -125,6 +125,26 @@ interface PropsMetrica {
   onMais: () => void;
 }
 
+/** 1.0.19 (dono 26/10): o texto do "Criar" de um resumo SEM META (0/0) — Hábitos sem hábito é o caso de toda conta nova. */
+export const CRIAR_DO_RESUMO: Partial<Record<Metrica["id"], string>> = {
+  habitos: "Criar hábito", refeicoes: "Criar plano", suplementos: "Adicionar", treino: "Criar treino", leitura: "Escolher livro",
+};
+export const textoDoCriar = (id: Metrica["id"]): string => CRIAR_DO_RESUMO[id] ?? "Criar";
+
+/** O anel TRACEJADO do "Criar": suave (traço fino, pontilhado, na cor do módulo bem clara) com o "+" no meio. */
+export const AnelCriar = ({ tamanho, cor: c }: { tamanho: number; cor: string }) => {
+  const esp = 2.25;
+  const r = (tamanho - esp) / 2 - 1;
+  return (
+    <span className="relative block shrink-0" style={{ width: tamanho, height: tamanho }} data-testid="he-anel-criar">
+      <svg className="w-full h-full block" viewBox={`0 0 ${tamanho} ${tamanho}`} aria-hidden>
+        <circle cx={tamanho / 2} cy={tamanho / 2} r={r} fill={c} fillOpacity={0.06} stroke={c} strokeOpacity={0.5} strokeWidth={esp} strokeDasharray="2.5 5.5" strokeLinecap="round" />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center"><Plus className="w-[22px] h-[22px]" strokeWidth={2} style={{ color: c }} aria-hidden /></span>
+    </span>
+  );
+};
+
 export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
   const navigate = useNavigate();
   const completo = m.max > 0 && m.valor >= m.max;
@@ -134,6 +154,25 @@ export const CardMetrica = ({ m, atraso, onAcao, onMais }: PropsMetrica) => {
     if (m.action) return onAcao(m.action);
     if (m.route) navigate(m.route);
   };
+  // 1.0.19 (dono 26/10): resumo sem meta (0/0) não mostra "0/0" — vira o convite "Criar" (anel tracejado + "+")
+  if (m.max <= 0) {
+    const texto = textoDoCriar(m.id);
+    return (
+      <button
+        type="button"
+        onClick={tocar}
+        data-testid="he-metrica"
+        data-metrica={m.id}
+        data-criar=""
+        aria-label={`${m.rotulo}: ${texto}`}
+        className="hn-card !rounded-[22px] p-3.5 flex flex-col items-start text-left min-h-[148px] w-full active:scale-[0.98] transition-transform"
+      >
+        <span className="text-[15px] leading-tight font-semibold tracking-[-0.01em] truncate max-w-full">{m.rotulo}</span>
+        <span className="mt-1.5 text-[12.5px] leading-[1.25] font-medium truncate max-w-full" style={{ color: c }} data-testid="he-metrica-criar">{texto}</span>
+        <span className="mt-auto self-center pt-1.5"><AnelCriar tamanho={62} cor={c} /></span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"

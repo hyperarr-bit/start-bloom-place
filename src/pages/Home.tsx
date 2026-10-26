@@ -149,7 +149,9 @@ const HomePage = () => {
     if (corGuardada !== "default" && corGuardada in palettes) setPalette(corGuardada as ThemePalette);
     setData(CHAVE_COR_ANTES_HOME_NOVA, null, { system: true });
   }, [loaded, homeNova.ligada, corGuardada, setPalette, setData]);
-  const homeNovaDesdeAMontagem = useRef(homeNova.ligada);
+  /* 26/10 (modo "novas"): a decisão "desde a montagem" é a do 1º render em que a Home APARECE (conta carregada,
+     tutorial resolvido) — antes disso a origem da conta nova ainda não é conhecida e a Home antiga piscava */
+  const homeNovaDesdeAMontagem = useRef<boolean | null>(null);
   const [homeECarregada, setHomeECarregada] = useState(moduloHomeE !== null);
   useEffect(() => {
     if (!homeNova.ligada || homeECarregada) return;
@@ -157,8 +159,6 @@ const HomePage = () => {
     carregarHomeE().then(() => { if (viva) setHomeECarregada(true); }).catch(() => { /* sem o pedaço fica a Home de hoje */ });
     return () => { viva = false; };
   }, [homeNova.ligada, homeECarregada]);
-  // ligada desde a montagem: o lazy (tela em branco de sempre); ligada no meio da sessão: só depois do pedaço carregar
-  const mostrarHomeNova = homeNova.ligada && (homeNovaDesdeAMontagem.current || homeECarregada);
   // "Sua Home em 5 passos" (TOUR_HOME): relê nos eventos da missão em doses — vem DEPOIS da missão/plano de amanhã.
   // Com a Home nova ligada o tour antigo NÃO entra (aponta pras ações rápidas, que lá viraram o "+").
   const mostrarTour = useTourDaHome(user?.created_at, !!user && !homeNova.ligada);
@@ -335,6 +335,9 @@ const HomePage = () => {
   if (!loaded || !onboardingResolved) {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
+  if (homeNovaDesdeAMontagem.current === null) homeNovaDesdeAMontagem.current = homeNova.ligada;
+  // ligada desde a montagem: o lazy (tela em branco de sempre); ligada no meio da sessão: só depois do pedaço carregar
+  const mostrarHomeNova = homeNova.ligada && (homeNovaDesdeAMontagem.current === true || homeECarregada);
 
   // Tutorial em andamento (fila viva) OU aberto pelo menu: o hub vira a tela
   // do tutorial — é o que faz o "voltar" de um módulo cair na ESCOLHA de

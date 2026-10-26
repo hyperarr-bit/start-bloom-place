@@ -10,7 +10,7 @@ import { MontarFinancas, deveMostrarMontarFinancas, ATRIBUTO_NA_TELA as ATRIBUTO
 import { MODELOS as MODELOS_DE_TREINO, aplicarModelo } from "@/lib/treino-plano";
 import { montarTreinoProprio } from "@/lib/intro-modulo-acoes";
 import { trackEvent } from "@/lib/analytics";
-import { deveMostrarTourHome, marcarCartoesVistos, tourFeito } from "@/lib/tour-home";
+import { deveMostrarTourHome, marcarCartoesVistos, tourAposentadoPelaHomeNova, tourFeito } from "@/lib/tour-home";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Anel, BotaoSeguir, Confete, ContaSubindo, PostItDaMissao, alturaVisivel, fundoDoTopoFixo, topoPreferidoDoAnel, useMarcaDaTelaDeslocada, type OutroDoPostIt } from "@/components/demo-guiada/pecas";
 import { Quadradinho } from "@/components/demo-guiada/Quadradinho";
@@ -18,7 +18,7 @@ import { CHIPS_DE_HABITO, criarHabitoPeloCampo, PERGUNTA_HABITO_MARCAR, PERGUNTA
 import { avisarEscritaDeFora } from "@/hooks/use-persisted-state";
 import { reais, rotuloCurto } from "@/lib/demo-guiada";
 import { localDayKey } from "@/lib/utils";
-import { doseCurta, emSegundos, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, TOTAL_PASSOS_B, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
+import { doseCurta, emSegundos, HORAS_DO_LEMBRETE, MAX_VISTAS_DO_SETUP, MODULOS, totalPassosB, diaDaMissao, eventoDaMissao, marcarDoseNaTela, msDesdePrimeiraVista, registrarMontagem, setupDaDose, tomarComecar, type DiaDaMissao, type EstadoMissaoDoses, type Lembrete, type ModuloDaMissao, type SetupDaDose } from "@/lib/missao-doses";
 import { introConcluida } from "@/lib/intro-modulo";
 import { EV_PRIMEIRO_GASTO, lerTelaDoNumero, msDesdeOResultado } from "@/lib/montar-financas";
 import { CHAVE_SEM_GASTO, marcarDiaSemGasto } from "@/lib/acao-do-dia";
@@ -984,8 +984,8 @@ export function PassoDoDia({ missao, n, modulo, hoje, aoFeito, aoPular, aoCombin
   };
 
   const B = braco === "B";
-  const total = B ? TOTAL_PASSOS_B : 3;
-  const feitos = ([1, 2, 3] as DiaDaMissao[]).filter((k) => missao.feitos[k] || (k === n && fase === "festa")).length + (B && missao.homeTour ? 1 : 0);
+  const total = B ? totalPassosB() : 3;
+  const feitos = ([1, 2, 3] as DiaDaMissao[]).filter((k) => missao.feitos[k] || (k === n && fase === "festa")).length + (B && missao.homeTour && total > 3 ? 1 : 0);
   /* A FAIXA (10/10, print do dono: título truncado, "mostrar onde" quebrado em 2 linhas cobrindo o
    * cabeçalho): UMA linha de altura fixa, "Missão · dose 1 de 4" sem o nome do módulo (ele já está no
    * cabeçalho logo abaixo), à direita só "Pular" e um alvo ⌖ pra "mostrar onde" (ícone, nunca texto). */
@@ -1377,7 +1377,7 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
         /* 17/10 (print do dono): o cartão seguia branco no modo escuro — agora é o papel do tema, como no braço A */
         className="md-tema relative w-full max-w-[340px] rounded-3xl bg-card text-card-foreground border border-border/60 p-5 text-center shadow-2xl"
       >
-        <span className="inline-block rounded-full bg-foreground text-background text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${TOTAL_PASSOS_B} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
+        <span className="inline-block rounded-full bg-foreground text-background text-[12px] font-extrabold px-3.5 py-1.5">{B ? `🔥 Dose ${n} de ${totalPassosB()} ✓` : `🔥 Dia ${n} da missão ✓`}</span>
         <p className="text-[21px] font-black tracking-[-0.02em] leading-tight mt-2.5">{titulo}</p>
         <p className="text-[13.5px] text-muted-foreground leading-snug mt-1.5" data-testid="missao-doses-festa-texto">
           {/* 1.0.16: a dose de Finanças virou o Montar (nos dois braços) — o texto do "olhar" fala de um gasto que talvez não exista */}
@@ -1388,9 +1388,9 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
         {/* o 1º gasto depois do Montar (o tutorial no formulário) — nos dois braços */}
         {gastoExtra && <p className="text-[12.5px] text-muted-foreground leading-snug mt-1" data-testid="missao-doses-gasto-extra">{fraseDoGastoExtra(gastoExtra, gastosNoExtra)}</p>}
         <div className="h-2 rounded-full bg-foreground/10 overflow-hidden mt-3.5">
-          <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? TOTAL_PASSOS_B : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
+          <motion.div className="h-full rounded-full bg-emerald-500" initial={reduzir ? false : { width: `${Math.round(((n - 1) / (B ? totalPassosB() : 3)) * 100)}%` }} animate={{ width: `${Math.round((n / (B ? totalPassosB() : 3)) * 100)}%` }} transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }} />
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1.5 font-semibold">{B ? `Missão de hoje · ${n} de ${TOTAL_PASSOS_B}` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
+        <p className="text-[11px] text-muted-foreground mt-1.5 font-semibold">{B ? `Missão de hoje · ${n} de ${totalPassosB()}` : `Missão dos 3 dias · ${n} de 3 toques`}</p>
 
         {/* BRAÇO B (DIA1_CHEIO): as 3 doses são de HOJE — a festa LEVA pra próxima sozinha (17/10: 22% e 18% se
             perdiam entre um módulo e outro); "Ir agora" adianta, "Agora não" para */}
@@ -1399,6 +1399,15 @@ export function ComemoracaoDoDia({ n, missao, modulo, rotulo, hoje, aoCombinar, 
             <PassagemDaProxima proximo={proximo} n={n} reduzir={reduzir} aoIr={(via) => aoBoraProxima?.(via)} aoAgoraNao={aoAgoraNao} />
             {/* o link quieto também aqui (dono, 17/10: "no fim da comemoração de cada dose"); tocar fecha a festa — e a
                 passagem junto (o tempo dela morre com ela) — e abre o passeio do módulo */}
+            <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />
+          </>
+        ) : B && totalPassosB() <= 3 ? (
+          <>
+            {/* 1.0.19 (26/10): com a Home nova não há tour — a 3ª dose fecha a missão de hoje e leva pra Home
+                (lá o 4º passo fecha sozinho e vem o "Plano de amanhã", com a hora do lembrete) */}
+            <button type="button" className="md-botao mt-3.5" data-tom="magenta" data-testid="missao-doses-fechar-dia" data-home-nova="" onClick={aoFecharDia}>
+              Ver minha Home <ArrowRight className="w-4 h-4" />
+            </button>
             <LinkConhecerMais modulo={modulo} aoConhecerMais={aoConhecerMais} />
           </>
         ) : B ? (
@@ -1467,7 +1476,7 @@ function PassagemDaProxima({ proximo, n, reduzir, aoIr, aoAgoraNao }: { proximo:
   return (
     <>
       <div className="mt-3.5 rounded-2xl text-left px-4 py-3 bg-[#FFF8D6] text-[#16121c] dark:bg-[#2a2618] dark:text-foreground" data-testid="missao-doses-proxima-dose" data-passagem="auto">
-        <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Dose {n + 1} de {TOTAL_PASSOS_B} · {proximo.emoji} {proximo.nome}</span>
+        <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#8a4b12] dark:text-[#e9c47c]">Dose {n + 1} de {totalPassosB()} · {proximo.emoji} {proximo.nome}</span>
         <span className="block text-[16px] font-extrabold leading-snug mt-0.5" data-testid="missao-doses-agora-o">{agoraO(proximo.modulo)} — {emSegundos(doseCurta(proximo.modulo, n + 1).seg)}</span>
         <span className="block text-[12.5px] opacity-75 mt-1">{proximo.pedido}.</span>
         <div className="h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden mt-2.5" aria-hidden>
@@ -1591,6 +1600,8 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
   const { get: lerDados } = useUserData();
   const { user: dono } = useAuth();
   const [tourPorVir] = useState(() => { try { return primeiraDose && !tourFeito(lerDados) && deveMostrarTourHome((dono as { created_at?: string } | null)?.created_at); } catch { return false; } });
+  // 1.0.19 (26/10): com a Home nova não existe tour — o botão leva direto pra Home ("Ver minha Home")
+  const [homeNovaAqui] = useState(() => { try { return tourAposentadoPelaHomeNova(); } catch { return false; } });
   // 18/10 (funil da missão na WEB): o "Te lembro às" do dia 2 sai — o "Combinado" abre o pop-up "Baixe o app pra
   // receber os lembretes" e o "Agora não" combina "sem lembrete" (o navegador não manda notificação)
   const [soNoApp] = useState(lembretesSoNoApp);
@@ -1675,7 +1686,7 @@ function ComemoracaoUmPorDia({ n, missao, modulo, rotulo, hoje, aoCombinar, aoVe
           </button>
         ) : (
           <button type="button" className="md-botao mt-5" data-tom="magenta" data-testid="missao-doses-continuar" onClick={() => sair(() => aoFecharDia?.())}>
-            {primeiraDose ? (tourPorVir ? "Conhecer minha Home" : "Continuar") : "Até amanhã"}
+            {primeiraDose ? (tourPorVir ? "Conhecer minha Home" : homeNovaAqui ? "Ver minha Home" : "Continuar") : "Até amanhã"}
           </button>
         )}
         {n === 1 && aoFecharDia && a?.tipo === "registro" && <AlbumDaMissao primeira badge={conq.adesivos.find(b=>b.id===a.id)} onSair={aoFecharDia}/>}

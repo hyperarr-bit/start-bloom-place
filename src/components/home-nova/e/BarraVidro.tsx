@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Home, Plus, Trophy } from "lucide-react";
 import type { AbaNova } from "../BarraFlutuante";
 
@@ -15,11 +16,23 @@ interface Props {
   onIr: (aba: AbaNova) => void;
   onMais: () => void;
   rotulos?: Partial<Record<AbaNova, string>>;
+  /** 1.0.19 (26/10): a dica do "+" (lib/dica-mais), presa ao botão — vem pronta de quem monta a barra */
+  dica?: ReactNode;
 }
+
+/** O balão da dica do "+": pequeno, sem borda, sombra mínima, na paleta suave da Home nova; a ponta aponta pro "+". */
+export const DicaDoMais = () => (
+  <div className="he-dica-mais" role="status" data-testid="hn-dica-mais">
+    <p className="text-[13.5px] leading-snug font-medium">
+      Toque no <span className="he-dica-mais-plus" aria-label="mais">+</span> pra anotar qualquer coisa do seu dia
+    </p>
+    <span className="he-dica-mais-ponta" aria-hidden />
+  </div>
+);
 
 const PADRAO: Record<AbaNova, string> = { inicio: "Início", conquistas: "Conquistas", voce: "Você" };
 
-export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos }: Props) => {
+export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos, dica }: Props) => {
   const nome = { ...PADRAO, ...(rotulos ?? {}) };
   const Aba = ({ id, children }: { id: AbaNova; children: React.ReactNode }) => {
     const on = id === ativa;
@@ -59,6 +72,8 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos }: Props) =>
           </span>
         </Aba>
       </nav>
+      <span className="relative shrink-0">
+      {dica}
       <button
         type="button"
         onClick={onMais}
@@ -69,6 +84,7 @@ export const BarraVidro = ({ ativa, iniciais, onIr, onMais, rotulos }: Props) =>
       >
         <Plus className="w-7 h-7" strokeWidth={2.4} aria-hidden />
       </button>
+      </span>
     </div>
   );
 };

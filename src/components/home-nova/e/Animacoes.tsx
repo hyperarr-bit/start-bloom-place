@@ -20,7 +20,8 @@ export const _zerarEntradaDaHome = (): void => { entradaJaTocou = false; };
 export const ContextoDaEntrada = createContext(true);
 
 export const NumeroQueConta = ({ valor, className, testid, duracao = 0.9 }: { valor: number; className?: string; testid?: string; duracao?: number }) => {
-  const semMovimento = useReducedMotion() || emTeste() || !useContext(ContextoDaEntrada);
+  const reduzido = useReducedMotion(); const entrada = useContext(ContextoDaEntrada); // hooks sempre na mesma ordem
+  const semMovimento = reduzido || emTeste() || !entrada;
   const [mostrado, setMostrado] = useState(semMovimento ? valor : 0);
   const anterior = useRef(semMovimento ? valor : 0);
   useEffect(() => {
@@ -37,15 +38,22 @@ export const NumeroQueConta = ({ valor, className, testid, duracao = 0.9 }: { va
   return <span className={className} data-testid={testid} data-valor={valor}>{mostrado}</span>;
 };
 
-export const Entrada = ({ children, atraso = 0, className, testid }: { children: ReactNode; atraso?: number; className?: string; testid?: string }) => {
-  const semMovimento = useReducedMotion() || emTeste() || !useContext(ContextoDaEntrada);
+/**
+ * RODADA 4 (vídeo do dono na b48: "a animação de subida PULA — o score aparece sozinho e os cards entram um a um"):
+ * a Entrada não desloca nem escalona mais NADA. Cada card já nasce no lugar, com o espaço reservado; o que dá vida é o
+ * número contando e os anéis enchendo. `Entrada` virou um invólucro parado (fica pelos pontos de uso); o conjunto
+ * inteiro ganha UM fade suave (FadeDoConjunto, opacity 0→1 em 200 ms, sem transform) na 1ª montagem da sessão.
+ */
+export const Entrada = ({ children, className, testid }: { children: ReactNode; atraso?: number; className?: string; testid?: string }) => (
+  <div className={className} data-testid={testid}>{children}</div>
+);
+
+export const FadeDoConjunto = ({ children, className, testid }: { children: ReactNode; className?: string; testid?: string }) => {
+  const reduzido = useReducedMotion(); const entrada = useContext(ContextoDaEntrada);
+  const semMovimento = reduzido || emTeste() || !entrada;
   if (semMovimento) return <div className={className} data-testid={testid}>{children}</div>;
   return (
-    <motion.div
-      className={className} data-testid={testid}
-      initial={{ opacity: 0, y: 12, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1], delay: atraso }}
-    >
+    <motion.div className={className} data-testid={testid} data-fade-conjunto="" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, ease: "easeOut" }}>
       {children}
     </motion.div>
   );

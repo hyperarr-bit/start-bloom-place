@@ -15,6 +15,25 @@ import { useCallback, useRef, type PointerEvent as PointerEventReact, type React
  *    do AnimatePresence parte de onde o dedo largou); senão volta com mola.
  */
 export const LIMITE_FECHAR_PX = 100;
+
+/**
+ * RODADA 4 (vídeo do dono: "as folhas sobem passando do ponto e voltam, e descem em degraus"): a subida/descida da folha
+ * é UMA mola CRITICAMENTE amortecida (sem overshoot: damping = 2·√stiffness), ~300 ms, só transform — e em PIXELS, a
+ * mesma unidade do `y` do arrasto (misturar "100%" com px fazia o framer medir no meio da saída → os degraus). O fundo
+ * escurecido não tem mais backdrop-blur (o desfoque sobre a página inteira derrubava quadros no iPhone).
+ */
+export const MOLA_FOLHA = { type: "spring" as const, stiffness: 300, damping: 35, mass: 1, restDelta: 0.5, restSpeed: 10 };
+/** A descida: tween com aceleração (easeIn), 260 ms — contínua, sempre igual, e a folha desmonta assim que sai (a mola
+ *  crítica demorava ~0,8 s pra "assentar" fora da tela: a folha ficava montada invisível e o teste de reabrir oscilava). */
+export const SAIDA_FOLHA = { type: "tween" as const, ease: "easeIn" as const, duration: 0.26 };
+export const alturaDaSaida = (): number => (typeof window !== "undefined" ? Math.max(window.innerHeight, 600) : 1000);
+export const propsDaFolha = (semMovimento: boolean) => ({
+  initial: { y: alturaDaSaida() }, animate: { y: 0 },
+  exit: { y: alturaDaSaida(), transition: semMovimento ? { duration: 0 } : SAIDA_FOLHA },
+  transition: semMovimento ? { duration: 0 } : MOLA_FOLHA,
+});
+export const CLASSE_FUNDO_FOLHA = "fixed inset-0 z-[70] bg-black/40";
+export const propsDoFundo = (semMovimento: boolean) => ({ initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: semMovimento ? 0 : 0.2 } });
 export const LIMITE_FECHAR_VEL = 0.5; // px/ms
 
 export const deveFechar = (deslocamento: number, velocidade: number): boolean =>
@@ -87,7 +106,7 @@ export function useFolhaArrastavel(onFechar: () => void, semMovimento = false): 
     // sobre a fileira dos personagens); se a folha já desceu um tanto, a intenção era fechar — fecha
     if (deveFechar(y.get(), g.vel) || (cancelado && (y.get() > 36 || (y.get() > 12 && g.vel > LIMITE_FECHAR_VEL)))) { onFechar(); return; }
     if (semMovimento) y.set(0);
-    else animate(y, 0, { type: "spring", stiffness: 520, damping: 42 });
+    else animate(y, 0, { type: "spring", stiffness: 520, damping: 46 }); // crítico (2·√520 ≈ 45,6): volta sem tremer
   }, [y, onFechar, semMovimento]);
   const cancelar = useCallback((e: PointerEventReact<HTMLElement>) => soltar(e, true), [soltar]);
 

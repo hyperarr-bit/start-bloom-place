@@ -22,12 +22,16 @@
   /* rodada 2 (dono: "não parece liquid glass no aparelho — o fundo de 82 % é quase sólido"): o vidro de verdade,
      estilo iOS 26 — bem mais translúcido, desfoque forte + saturação, realce especular na borda de cima e um fio
      claro na borda; o que passa por baixo (os azulejos coloridos) aparece nitidamente desfocado */
-  --he-vidro: rgb(255 255 255 / 0.5);
-  --he-vidro-aba: rgb(255 255 255 / 0.72);
-  --he-vidro-fio: rgb(255 255 255 / 0.95);
-  --he-vidro-borda: rgb(255 255 255 / 0.55);
-  --he-vidro-brilho: rgb(255 255 255 / 0.6);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px rgb(0 0 0 / 0.1);
+  /* rodada 4 (dono): o vidro "Cal AI" é o PADRÃO — ~26 % branco, desfoque 14 px, saturação 1,7, realce fino, fio de 0,5 px,
+     sombra difusa leve; a aba ativa um pouco mais branca pra o rótulo seguir legível (o antigo fica em html.he-vidro-antigo) */
+  --he-vidro: rgb(255 255 255 / 0.26);
+  --he-vidro-aba: rgb(255 255 255 / 0.62);
+  --he-vidro-fio: rgb(255 255 255 / 0.9);
+  --he-vidro-borda: rgb(255 255 255 / 0.5);
+  --he-vidro-brilho: rgb(255 255 255 / 0.55);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 28px rgb(0 0 0 / 0.09);
+  --he-vidro-blur: 14px;
+  --he-vidro-sat: 1.7;
   background: linear-gradient(180deg, hsl(40 8% 95%) 0px, hsl(40 6% 96.5%) 160px, hsl(var(--hn-fundo)) 420px, hsl(var(--hn-fundo)) 100%);
 }
 .dark .hn.he {
@@ -40,12 +44,12 @@
   --hn-fundo: 222 16% 7%;
   --hn-sombra: 0 0 0 1px rgb(255 255 255 / 0.045);
   --hn-sombra-forte: 0 0 0 1px rgb(255 255 255 / 0.08), 0 8px 24px rgb(0 0 0 / 0.5);
-  --he-vidro: rgb(26 28 34 / 0.45);
-  --he-vidro-aba: rgb(255 255 255 / 0.14);
-  --he-vidro-fio: rgb(255 255 255 / 0.24);
-  --he-vidro-borda: rgb(255 255 255 / 0.1);
-  --he-vidro-brilho: rgb(255 255 255 / 0.12);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.55);
+  --he-vidro: rgb(26 28 34 / 0.28);
+  --he-vidro-aba: rgb(255 255 255 / 0.16);
+  --he-vidro-fio: rgb(255 255 255 / 0.22);
+  --he-vidro-borda: rgb(255 255 255 / 0.12);
+  --he-vidro-brilho: rgb(255 255 255 / 0.14);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
   background: linear-gradient(180deg, hsl(222 14% 10%) 0px, hsl(var(--hn-fundo)) 360px, hsl(var(--hn-fundo)) 100%);
 }
 
@@ -131,8 +135,10 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
   isolation: isolate;
   overflow: hidden;
   background: var(--he-vidro);
-  -webkit-backdrop-filter: blur(24px) saturate(1.9) brightness(1.03);
-  backdrop-filter: blur(24px) saturate(1.9) brightness(1.03);
+  -webkit-backdrop-filter: blur(var(--he-vidro-blur, 14px)) saturate(var(--he-vidro-sat, 1.7)) brightness(1.02);
+  backdrop-filter: blur(var(--he-vidro-blur, 14px)) saturate(var(--he-vidro-sat, 1.7)) brightness(1.02);
+  /* legibilidade sobre os azulejos coloridos: um halo claro atrás do texto e dos ícones (escuro: halo escuro) */
+  text-shadow: 0 1px 6px rgb(255 255 255 / 0.85);
   box-shadow:
     inset 0 1px 0 var(--he-vidro-fio),
     inset 0 0 0 0.5px var(--he-vidro-borda),
@@ -163,53 +169,33 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
 }
 @media (prefers-reduced-motion: reduce) { .he-acende { animation: none; } }
 
-/* ---- VIDRO "CAL AI" — a VARIANTE pro dono comparar (rodada 3, 26/10; lib/vidro-calai põe `he-vidro-calai` no <html>):
-   bem mais transparente (fundo ~26 % branco), desfoque menor (14 px) com saturação 1,7 — o que passa por trás fica
-   nítido-desfocado e reconhecível —, realce especular fino no topo, fio claro de 0,5 px e sombra difusa leve. A aba
-   ativa fica um pouco mais branca pra o rótulo seguir legível; o "+" idem. A atual continua sendo a padrão. ---- */
-html.he-vidro-calai .hn.he {
-  --he-vidro: rgb(255 255 255 / 0.26);
-  --he-vidro-aba: rgb(255 255 255 / 0.62);
-  --he-vidro-fio: rgb(255 255 255 / 0.9);
-  --he-vidro-borda: rgb(255 255 255 / 0.5);
-  --he-vidro-brilho: rgb(255 255 255 / 0.55);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.04), 0 10px 28px rgb(0 0 0 / 0.09);
+/* ---- O VIDRO ANTIGO (b47: ~50 % branco, desfoque 24, saturação 1,9) — a alternativa pelo atalho de 5 toques (só admin)
+   e por ?vidro=antigo (lib/vidro-calai põe `he-vidro-antigo` no <html>). O padrão agora é o "Cal AI" acima. ---- */
+html.he-vidro-antigo .hn.he {
+  --he-vidro: rgb(255 255 255 / 0.5);
+  --he-vidro-aba: rgb(255 255 255 / 0.72);
+  --he-vidro-fio: rgb(255 255 255 / 0.95);
+  --he-vidro-borda: rgb(255 255 255 / 0.55);
+  --he-vidro-brilho: rgb(255 255 255 / 0.6);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px rgb(0 0 0 / 0.1);
+  --he-vidro-blur: 24px;
+  --he-vidro-sat: 1.9;
 }
-html.he-vidro-calai.dark .hn.he, html.dark.he-vidro-calai .hn.he {
-  --he-vidro: rgb(26 28 34 / 0.28);
-  --he-vidro-aba: rgb(255 255 255 / 0.16);
-  --he-vidro-fio: rgb(255 255 255 / 0.22);
-  --he-vidro-borda: rgb(255 255 255 / 0.12);
-  --he-vidro-brilho: rgb(255 255 255 / 0.14);
-  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.5);
+html.he-vidro-antigo.dark .hn.he, html.dark.he-vidro-antigo .hn.he {
+  --he-vidro: rgb(26 28 34 / 0.45);
+  --he-vidro-aba: rgb(255 255 255 / 0.14);
+  --he-vidro-fio: rgb(255 255 255 / 0.24);
+  --he-vidro-borda: rgb(255 255 255 / 0.1);
+  --he-vidro-brilho: rgb(255 255 255 / 0.12);
+  --he-vidro-sombra: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.55);
 }
-html.he-vidro-calai .he-vidro {
-  -webkit-backdrop-filter: blur(14px) saturate(1.7) brightness(1.02);
-  backdrop-filter: blur(14px) saturate(1.7) brightness(1.02);
-  box-shadow: var(--he-vidro-sombra), inset 0 0 0 0.5px var(--he-vidro-borda);
-}
+.dark .he-vidro { text-shadow: 0 1px 6px rgb(0 0 0 / 0.75); }
+.he-vidro svg { filter: drop-shadow(0 0 3px rgb(255 255 255 / 0.9)); }
+.dark .he-vidro svg { filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.8)); }
 
-/* A DICA DO "+" (1.0.19, dono 26/10 — lib/dica-mais): o único ensino da Home nova. Um balão pequeno preso ao "+",
-   no papel do card com um sopro quente, SEM borda e com sombra mínima; a ponta aponta pro centro do "+" (56 px).
-   Entra subindo de leve (ou parado, com "reduzir movimento"). */
-.he-dica-mais {
-  position: absolute; right: 0; bottom: calc(100% + 12px);
-  width: max-content; max-width: min(232px, calc(100vw - 48px));
-  padding: 10px 14px; border-radius: 16px;
-  background: hsl(40 30% 99%); color: hsl(var(--foreground));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 18px rgb(0 0 0 / 0.07);
-  animation: he-dica-entra 320ms cubic-bezier(.2,.8,.2,1) both;
-  pointer-events: none;
-}
-.he-dica-mais-ponta {
-  position: absolute; right: 22px; bottom: -5px; width: 12px; height: 12px;
-  background: inherit; transform: rotate(45deg); border-radius: 2px;
-  box-shadow: 3px 3px 6px rgb(0 0 0 / 0.03);
-}
-.he-dica-mais-plus {
-  display: inline-grid; place-items: center; width: 18px; height: 18px; margin: 0 1px; vertical-align: -3px;
-  border-radius: 999px; background: var(--hn-mais); color: var(--hn-mais-texto); font-weight: 700; font-size: 13px; line-height: 1;
-}
-.dark .he-dica-mais { background: hsl(222 12% 16%); box-shadow: 0 6px 18px rgb(0 0 0 / 0.45); }
-@keyframes he-dica-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .he-dica-mais { animation: none; } }
+/* ---- o FIM das telas com a barra de vidro (rodada 4, dono: "Você e Conquistas rolam demais no fim"): só o respiro da
+   barra (72 px + área segura), como na Home — a casca não soma a área segura de novo ---- */
+html.he-fundo-da-tela body.com-barra-vidro .app-safe-shell { padding-bottom: 0; }
+/* as telas da E têm min-h-dvh DENTRO da casca que soma as áreas seguras (59 + 34 px no iPhone): toda tela curta
+   (Aparência, Personalizar início) rolava ~93 px além do conteúdo — a altura mínima desconta as áreas seguras */
+html.he-fundo-da-tela .app-safe-shell .hn.he.min-h-dvh { min-height: calc(100dvh - var(--app-safe-top, 0px) - var(--app-safe-bottom, 0px)); }

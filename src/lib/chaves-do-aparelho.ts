@@ -25,7 +25,7 @@ export const PREFIXOS_VARRIDOS = ["u:", "finance-", "home-", "core-", "life-", "
 
 /** Chaves do APARELHO: sobrevivem à abertura do app, ao logout e à troca de conta. */
 export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
-  "core-vidro-calai", // rodada 3: a variante "vidro Cal AI" da barra (lib/vidro-calai) — experimento do dono, vale pro aparelho
+  "core-vidro-antigo", // rodada 4: o vidro ANTIGO da barra como alternativa (lib/vidro-calai; o Cal AI é o padrão) — só admin
   // preferências e marcas antigas (as listas inline desde 07–08/2026)
   "core-welcome-done",
   "theme",
@@ -190,6 +190,7 @@ export const CHAVES_REVISADAS_DA_CONTA_OU_TRANSITORIAS: Readonly<Record<string, 
     // 1.0.19 (lib/home-nova): NÃO são chaves de storage — "home-nova" é o parâmetro da URL (?home-nova=on|off|auto),
     // "home-nova:mais" é o nome do evento da barra de vidro, "home-nova:*" é o sal do sorteio do braço (FNV)
     "home-nova", "home-nova:mais", "home-nova:*", "home-nova:origem",
+    "core-vidro-calai", // rodada 4: a chave da rodada 3 (vidro Cal AI opcional) que lib/vidro-calai só APAGA — a vassoura pode apagar também
   ],
   // FUNIL ANTES DA CONTA: progresso/respostas que só valem até o cadastro (a área fica: core-funil-w-area).
   funil_antes_da_conta: [

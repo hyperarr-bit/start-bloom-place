@@ -57,7 +57,7 @@ export function VoceE({ nome, email, iniciais, secoes, onConta, onSair, onAvalia
   };
   return (
     <div className="hn he min-h-dvh" data-testid="tela-voce" data-layout="e" data-suave={SUAVIDADE_HOME_NOVA} {...{ [ATRIBUTO_RAIZ]: "voce" }}>
-      <main className="max-w-lg mx-auto px-4 pt-2 pb-6">
+      <main className="max-w-lg mx-auto px-4 pt-2 pb-1">
         <header className="pt-1">
           <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em]">Você</h1>
         </header>

@@ -31,7 +31,7 @@ import { PaginaPendencias } from "./PaginaPendencias";
 import { PaginaWidgets } from "./PaginaWidgets";
 import { FolhaScore } from "./FolhaScore";
 import { FolhaPendencias } from "./FolhaPendencias";
-import { ContextoDaEntrada, marcarEntradaDaHome } from "./Animacoes";
+import { ContextoDaEntrada, FadeDoConjunto, marcarEntradaDaHome } from "./Animacoes";
 import { ModulosE, type AzulejoE, type VarianteModulosE } from "./ModulosE";
 import { OrganizarModulos } from "./OrganizarModulos";
 import { useNavigate } from "react-router-dom";
@@ -166,7 +166,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
       <ContextoDaEntrada.Provider value={animarEntrada}>
       <div className="hn he min-h-dvh" data-testid="home-nova" data-layout="e" data-modulos={modulos} data-suave={suave} {...{ [ATRIBUTO_RAIZ]: "hoje" }}>
         {/* rodada 2 (dono: "a Home rola além do necessário"): embaixo só o respiro da barra de vidro (60 + folga) */}
-        <main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+72px)]">
+        <FadeDoConjunto><main className="max-w-lg mx-auto px-4 pt-2 pb-[calc(var(--app-safe-bottom,0px)+72px)]">
           <header className="flex items-center justify-between gap-3 pt-1" data-testid="hn-topo">
             <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">
               {saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}
@@ -192,7 +192,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
           <div className="mt-6 empty:hidden"><LojasCard variant="home" /></div>
 
           <p className="text-center text-[11px] text-muted-foreground/70 pt-5">Core © {new Date().getFullYear()} — Organize sua vida</p>
-        </main>
+        </main></FadeDoConjunto>
         <CelebracaoDia100 score={lifeData.dayScore} streak={seq.dias} />
       </div>
       </ContextoDaEntrada.Provider>

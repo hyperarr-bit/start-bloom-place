@@ -4,7 +4,7 @@
  *   · cada linha abre a subpágina com state.push = "ios" (lib/navegacao-ios); o PageTransition entra deslizando (push),
  *     volta com pop e tem a borda esquerda de arrastar pra voltar; `voltar` usa a pilha quando há;
  *   · Personalizar início › Resumos: a prévia dos 3 cards + a lista com interruptor, posição e máximo de 3;
- *   · Aparência no estilo da E com a chave; 5 toques na versão alternam o vidro "Cal AI" (lib/vidro-calai).
+ *   · Aparência no estilo da E com a chave; 5 toques na versão (só admin) alternam pro vidro ANTIGO — o "Cal AI" é o padrão (lib/vidro-calai).
  */
 process.env.TZ = "America/Sao_Paulo";
 
@@ -38,7 +38,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { CHAVE_FORCA_HOME_NOVA, _zerarHomeNova, guardarAdmin } from "@/lib/home-nova";
 import { PUSH_IOS, _empilhadas, _zerarPilhaIos, modoDeEntrada } from "@/lib/navegacao-ios";
-import { CHAVE_VIDRO_CALAI, CLASSE_VIDRO_CALAI, aplicarVidroCalai, guardarForcaVidro, vidroCalaiLigado } from "@/lib/vidro-calai";
+import { CHAVE_VIDRO_ANTIGO, CLASSE_VIDRO_ANTIGO, aplicarVidroAntigo, guardarForcaVidro, vidroAntigoLigado } from "@/lib/vidro-calai";
 import { localDayKey, semanaAtualId } from "@/lib/utils";
 import { criarNuvem, prepararJsdom, type Dados } from "./compat-comum";
 
@@ -75,7 +75,7 @@ const montar = async (rota = "/voce", dados: Dados = DADOS) => {
 };
 
 beforeAll(() => { prepararJsdom(); Element.prototype.scrollTo = (() => {}) as typeof Element.prototype.scrollTo; });
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); eventos.length = 0; toasts.length = 0; avaliar.chamadas.length = 0; nativo.v = false; _zerarHomeNova(); _zerarPilhaIos(); localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "on"); document.documentElement.classList.remove(CLASSE_VIDRO_CALAI); });
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); eventos.length = 0; toasts.length = 0; avaliar.chamadas.length = 0; nativo.v = false; _zerarHomeNova(); _zerarPilhaIos(); localStorage.setItem(CHAVE_FORCA_HOME_NOVA, "on"); document.documentElement.classList.remove(CLASSE_VIDRO_ANTIGO); });
 afterEach(() => { cleanup(); document.body.className = ""; });
 
 describe("a aba Você no estilo do menu do Cal AI", () => {
@@ -126,20 +126,22 @@ describe("a aba Você no estilo do menu do Cal AI", () => {
     expect(within(tela).getByRole("heading", { level: 1 }).textContent).toBe("Aparência");
     expect(within(tela).getByLabelText("Voltar")).toBeTruthy();
   });
-  it("5 toques seguidos na versão alternam o vidro 'Cal AI' — só pro admin (dono)", async () => {
+  it("5 toques seguidos na versão alternam pro vidro ANTIGO (o Cal AI é o padrão) — só pro admin (dono)", async () => {
     await montar();
     const versao0 = screen.getByTestId("voce-versao");
     for (let i = 0; i < 5; i++) fireEvent.click(versao0);
-    expect(vidroCalaiLigado()).toBe(false); // cliente comum: o atalho não faz nada
+    expect(vidroAntigoLigado()).toBe(false); // cliente comum: o atalho não faz nada — fica no padrão (Cal AI)
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(false);
     guardarAdmin("u1", true);
     const versao = screen.getByTestId("voce-versao");
     for (let i = 0; i < 5; i++) fireEvent.click(versao);
-    expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(true);
-    expect(localStorage.getItem(CHAVE_VIDRO_CALAI)).toBe("on");
-    expect(toasts.at(-1)).toMatch(/Cal AI/);
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(true);
+    expect(localStorage.getItem(CHAVE_VIDRO_ANTIGO)).toBe("on");
+    expect(toasts.at(-1)).toMatch(/antigo/);
     for (let i = 0; i < 5; i++) fireEvent.click(versao);
-    expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(false);
-    expect(vidroCalaiLigado()).toBe(false);
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(false);
+    expect(vidroAntigoLigado()).toBe(false);
+    expect(toasts.at(-1)).toMatch(/Cal AI/);
   });
 });
 
@@ -155,16 +157,17 @@ describe("a navegação empilhada (lib/navegacao-ios)", () => {
     expect(modoDeEntrada("e", false, "PUSH")).toBeNull(); // saiu por outro caminho: zera
     expect(_empilhadas()).toBe(0);
   });
-  it("a força de QA ?vidro=calai liga (e guarda); ?vidro=atual desliga; sem o parâmetro aplica o guardado", () => {
+  it("a força de QA ?vidro=antigo liga o antigo (e guarda); ?vidro=calai volta ao padrão; sem o parâmetro aplica o guardado", () => {
+    guardarForcaVidro("?vidro=antigo");
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(true);
+    expect(localStorage.getItem(CHAVE_VIDRO_ANTIGO)).toBe("on");
     guardarForcaVidro("?vidro=calai");
-    expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(true);
-    expect(localStorage.getItem(CHAVE_VIDRO_CALAI)).toBe("on");
-    guardarForcaVidro("?vidro=atual");
-    expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(false);
-    localStorage.setItem(CHAVE_VIDRO_CALAI, "on");
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(false);
+    expect(localStorage.getItem(CHAVE_VIDRO_ANTIGO)).toBe("off");
+    localStorage.setItem(CHAVE_VIDRO_ANTIGO, "on");
     guardarForcaVidro("?x=1");
-    expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(true);
-    aplicarVidroCalai(false);
+    expect(document.documentElement.classList.contains(CLASSE_VIDRO_ANTIGO)).toBe(true);
+    aplicarVidroAntigo(false);
   });
 });
 

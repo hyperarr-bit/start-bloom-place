@@ -19,7 +19,7 @@ import { CardMetrica, metricasDoDia } from "@/components/home-nova/e/PaginaSeuDi
 import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-copo";
 import { irEmpilhando, voltar } from "@/lib/navegacao-ios";
 import { toast } from "sonner";
-import { alternarVidroCalai, vidroCalaiLigado } from "@/lib/vidro-calai";
+import { alternarVidroAntigo } from "@/lib/vidro-calai";
 import { lerAdminGuardado } from "@/lib/home-nova";
 import { TOM_DO_MODULO, TOM_DO_TIPO, cor, tinta, type Tom } from "@/components/home-nova/e/paleta";
 import { EscolherWidgetsE } from "@/components/home-nova/e/EscolherWidgetsE";
@@ -188,7 +188,7 @@ export default function Voce() {
         onAvaliar={podeAvaliar ? () => { clicar("avaliar"); trackEvent("voce_avaliar_card", {}); abrirPaginaDeAvaliacao("voce"); } : undefined}
         onConta={() => { clicar("conta"); trackEvent("account_drawer_open", { via: "voce" }); setFolha("account"); }}
         onSair={() => { clicar("sair"); void signOut(); }}
-        onVersaoCincoToques={() => { if (lerAdminGuardado(user?.id) !== true) return; /* revisor b48: atalho só do dono (admin) */ const ligado = alternarVidroCalai(); toast.message(ligado ? "Vidro: Cal AI (experimento do dono)" : "Vidro: o de sempre"); }}
+        onVersaoCincoToques={() => { if (lerAdminGuardado(user?.id) !== true) return; /* revisor b48: atalho só do dono (admin) */ const antigo = alternarVidroAntigo(); toast.message(antigo ? "Vidro: o antigo (só admin)" : "Vidro: Cal AI (o padrão)"); }}
       >
         <AccountDrawer open={folha !== null} onOpenChange={(o) => { if (!o) setFolha(null); }} inicial={folha ?? "menu"} displayName={nome} />
       </VoceE>
@@ -284,7 +284,7 @@ function AparenciaE({ onVoltar }: { onVoltar: () => void }) {
   useFundoDaTelaE();
   return (
     <div className="hn he min-h-dvh" data-testid="tela-aparencia" data-layout="e" data-suave={SUAVIDADE_HOME_NOVA}>
-      <main className="max-w-lg mx-auto px-4 pt-2 pb-10">
+      <main className="max-w-lg mx-auto px-4 pt-2 pb-2">
         <header className="flex items-center gap-2.5 pt-1">
           <button type="button" onClick={onVoltar} aria-label="Voltar" className="w-10 h-10 -ml-1 rounded-full grid place-items-center bg-card shrink-0" style={{ boxShadow: "var(--hn-sombra)" }}>
             <ArrowLeft className="w-5 h-5" strokeWidth={TRACO} />
@@ -328,7 +328,7 @@ export function PersonalizarInicio() {
   };
   return (
     <div className="hn he min-h-dvh" data-testid="tela-personalizar-inicio" data-suave={SUAVIDADE_HOME_NOVA}>
-      <main className="max-w-lg mx-auto px-4 pt-2 pb-10">
+      <main className="max-w-lg mx-auto px-4 pt-2 pb-2">
         <header className="flex items-center gap-2.5 pt-1">
           <button type="button" onClick={() => voltar(navigate, "/voce")} aria-label="Voltar" className="w-10 h-10 -ml-1 rounded-full grid place-items-center bg-card shrink-0" style={{ boxShadow: "var(--hn-sombra)" }}>
             <ArrowLeft className="w-5 h-5" strokeWidth={TRACO} />

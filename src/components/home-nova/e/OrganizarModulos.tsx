@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Alca, useFolhaArrastavel } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Star, X } from "lucide-react";
 import { MODULOS } from "@/lib/modulos";
 import type { useModulePreferences } from "@/hooks/use-module-preferences";
@@ -24,12 +24,12 @@ export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
     <AnimatePresence>
       {aberta && (
         <>
-          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
+          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
           <motion.div
             role="dialog" aria-label="Organizar módulos" data-testid="hn-organizar-folha"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-4 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
             style={{ y: arrasto.y }} {...arrasto.folha}
-            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 420, damping: 38 }}
+            {...propsDaFolha(false)}
           >
             <Alca arrasto={arrasto} className="mb-0.5" />
             <div className="flex items-center justify-between px-1 mb-1">

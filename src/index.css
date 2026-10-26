@@ -1118,7 +1118,7 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
 @media (max-width: 1023px) {
   body.com-abas { padding-bottom: calc(52px + 0.5rem) !important; }
   /* 1.0.19: a barra de VIDRO da Home nova sobre Conquistas e Você (a Home nova já tem o próprio respiro) */
-  body.com-barra-vidro { padding-bottom: calc(var(--app-safe-bottom, 0px) + 100px) !important; }
+  body.com-barra-vidro { padding-bottom: calc(var(--app-safe-bottom, 0px) + 72px) !important; } /* rodada 4: 100 → 72, como a Home */
 }
 
 /*

@@ -11,7 +11,7 @@ import { normalizarDias, somarDias } from "@/lib/sequencia";
 import { trackEvent } from "@/lib/analytics";
 import { useLembreteDaSequencia } from "@/components/conquistas/LembreteDaSequencia";
 import { FogoSequencia, estadoDoFogo } from "./FogoSequencia";
-import { Alca, useFolhaArrastavel } from "@/components/home-nova/e/folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "@/components/home-nova/e/folha-arrasto";
 import "./fogo-sequencia.css";
 
 /**
@@ -173,18 +173,17 @@ export const FolhaSequencia = ({ aberta, onFechar, seq, trilha, origem, onAdesiv
     }
     void lembrete.ligar();
   };
-  const mola = semMovimento ? { duration: 0 } : { type: "spring" as const, stiffness: 420, damping: 38 };
 
   return (
     <AnimatePresence>
       {aberta && (
         <>
-          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
+          <motion.button type="button" aria-label="Fechar" onClick={onFechar} className={CLASSE_FUNDO_FOLHA} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }} />
           <motion.div
             role="dialog" aria-label="Sua sequência" data-testid="he-folha-sequencia" data-garantido={seq.hojeFeito ? "1" : "0"} data-origem={origem} data-faixa={faixa.id}
             className="fs-folha fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[92dvh] overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+16px)]"
             style={{ y: arrasto.y }} {...arrasto.folha}
-            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={mola}
+            {...propsDaFolha(!!semMovimento)}
           >
             <Alca arrasto={arrasto} className="mb-0.5" />
 

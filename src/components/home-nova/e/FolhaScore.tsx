@@ -7,7 +7,7 @@ import type { Sequencia } from "@/components/conquistas/use-conquistas";
 import { resumoDoScore, type ItemDoScore } from "./score-itens";
 import { explicacaoDoScore } from "./PaginaSeuDia";
 import { NumeroQueConta } from "./Animacoes";
-import { Alca, useFolhaArrastavel } from "./folha-arrasto";
+import { Alca, useFolhaArrastavel, CLASSE_FUNDO_FOLHA, propsDaFolha } from "./folha-arrasto";
 import { ICONE_DO_TIPO, TRACO, corDoTipo, tintaDoTipo } from "./paleta";
 
 /**
@@ -89,14 +89,14 @@ export const FolhaScore = ({ aberta, onFechar, data, onAcao, onPersonalizar }: P
         <>
           <motion.button
             type="button" aria-label="Fechar" onClick={onFechar}
-            className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-[2px]"
+            className={CLASSE_FUNDO_FOLHA}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }}
           />
           <motion.div
             role="dialog" aria-label="Score do dia" data-testid="he-folha-score"
             className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto rounded-t-[28px] bg-card max-h-[88dvh] overflow-y-auto overscroll-contain px-5 pt-2.5 pb-[calc(var(--app-safe-bottom,0px)+20px)]"
             style={{ y: arrasto.y }} {...arrasto.folha}
-            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={semMovimento ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
+            {...propsDaFolha(!!semMovimento)}
           >
             <Alca arrasto={arrasto} className="mb-1.5" />
             <div className="flex items-start justify-between gap-3">

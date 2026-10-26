@@ -59,7 +59,7 @@ guardarForcaNavDaUrl();
 guardarForcaMenuNovoDaUrl();
 // 1.0.19: `?home-nova=on|off|auto` (QA) antes da Home ler a chave remota `home_nova` (lib/home-nova)
 guardarForcaHomeNova();
-guardarForcaVidro(); // rodada 3: a variante "vidro Cal AI" (?vidro=calai | ?vidro=atual), guardada no aparelho
+guardarForcaVidro(); // rodada 4: o vidro "Cal AI" é o padrão da barra; ?vidro=antigo liga o antigo (guardado no aparelho), ?vidro=calai volta
 
 
 

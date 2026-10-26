@@ -117,8 +117,9 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
 
   const escondida = tarefa;
   const titulo = ativa ? ROTULO_DA_ACAO[ativa] : "O que você quer registrar?";
+  const comTeclado = estiloDaFolhaComTeclado(area, 12);
   const estilo: CSSProperties = {
-    ...(estiloDaFolhaComTeclado(area, 12) ?? { maxHeight: "88dvh" }),
+    ...(comTeclado ?? { maxHeight: "88dvh" }),
     ...(escondida ? { pointerEvents: "none", visibility: "hidden" } : {}),
   };
   const arrasto = useFolhaArrastavel(onFechar, !!semMovimento); // rodada 3: arrastar pra baixo fecha (grade e formulários)
@@ -134,6 +135,9 @@ export const FolhaMaisE = ({ aberta, onFechar, inicial, data }: Props) => {
             style={escondida ? { visibility: "hidden", pointerEvents: "none" } : undefined}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: semMovimento ? 0 : 0.2 }}
           />
+          {/* grandes (D, 26/10): com o teclado aberto a folha se ancora acima dele e, no vão até a borda (a faixa
+              translúcida do teclado do iOS 26), aparecia a Home escurecida — o fundo do cartão vai até o fim da tela */}
+          {comTeclado && !escondida && <div aria-hidden data-testid="hn-folha-mais-pe" className="fixed inset-x-0 bottom-0 z-[71] max-w-lg mx-auto bg-card pointer-events-none" style={{ height: Math.max(0, area.coberto) + 40 }} />}
           <motion.div
             ref={folha}
             role="dialog" aria-label="Registrar agora" data-testid="hn-folha-mais" data-ativa={ativa ?? undefined}

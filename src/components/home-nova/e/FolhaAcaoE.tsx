@@ -43,15 +43,31 @@ interface Props {
   onFechar: () => void;
 }
 
-const Principal = ({ children, onClick, testid = "hn-acao-principal", tom }: { children: ReactNode; onClick: () => void; testid?: string; tom?: string }) => (
-  <button
-    type="button" onClick={onClick} data-testid={testid}
-    className="mt-5 w-full h-14 rounded-2xl text-[16px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
-    style={{ background: tom ?? "var(--hn-mais)", color: "var(--hn-mais-texto)" }}
-  >
-    {children}
-  </button>
-);
+/**
+ * O botão principal do formulário. `preso` (varredura 26/10, iPhone SE: "+" → Gasto com o teclado aberto deixava
+ * "Registrar gasto" atrás do teclado — campo + 3 fileiras de categorias + botão não cabem em 364 pt): nos formulários
+ * com campo o botão fica PRESO no pé da folha (sticky, com o fundo do cartão), sempre à vista acima do teclado; quando
+ * tudo cabe, fica onde sempre esteve (o respiro de cima é o mesmo mt-5, agora como pt-5 do invólucro).
+ */
+const Principal = ({ children, onClick, testid = "hn-acao-principal", tom, preso }: { children: ReactNode; onClick: () => void; testid?: string; tom?: string; preso?: boolean }) => {
+  const botao = (
+    <button
+      type="button" onClick={onClick} data-testid={testid}
+      className={`${preso ? "" : "mt-5 "}w-full h-14 rounded-2xl text-[16px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-2`}
+      style={{ background: tom ?? "var(--hn-mais)", color: "var(--hn-mais-texto)" }}
+    >
+      {children}
+    </button>
+  );
+  if (!preso) return botao;
+  // o sticky do WebKit para no padding do rolador (pb = área segura + 20, FolhaMaisE): o que rola apareceria nesse vão
+  // embaixo do botão — uma sombra chapada na cor do cartão cobre o vão (sombra não ocupa espaço nem muda a rolagem)
+  return (
+    <div className="sticky bottom-0 z-[2] -mx-5 px-5 pt-5 bg-card" style={{ boxShadow: "0 calc(var(--app-safe-bottom, 0px) + 20px) 0 0 hsl(var(--card))" }} data-testid="hn-acao-pe">
+      {botao}
+    </div>
+  );
+};
 
 const Secundario = ({ children, onClick, testid }: { children: ReactNode; onClick: () => void; testid?: string }) => (
   <button type="button" onClick={onClick} data-testid={testid} className="mt-2 w-full h-12 rounded-2xl text-[15px] font-semibold text-muted-foreground active:bg-muted/60">
@@ -170,7 +186,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
         <div data-testid="hn-folha-acao" data-acao="expense">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="0,00" rotulo="Valor do gasto" modo="decimal" prefixo="R$" campoRef={campoRef} />
           <Pilulas opcoes={CATEGORIAS_DE_GASTO} ativa={escolha} aoEscolher={setEscolha} rotulo="Categoria" />
-          <Principal onClick={enviar}>Registrar gasto</Principal>
+          <Principal preso onClick={enviar}>Registrar gasto</Principal>
         </div>
       );
     }
@@ -180,7 +196,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
         <div data-testid="hn-folha-acao" data-acao="income">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="0,00" rotulo="Valor do ganho" modo="decimal" prefixo="R$" campoRef={campoRef} />
           <Pilulas opcoes={TIPOS_DE_GANHO} ativa={escolha} aoEscolher={setEscolha} rotulo="Tipo" />
-          <Principal onClick={enviar}>Registrar ganho</Principal>
+          <Principal preso onClick={enviar}>Registrar ganho</Principal>
         </div>
       );
     }
@@ -189,7 +205,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
       return (
         <div data-testid="hn-folha-acao" data-acao="weight">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="0,0" rotulo="Peso de hoje" modo="decimal" sufixo="kg" campoRef={campoRef} />
-          <Principal onClick={enviar}>Registrar peso</Principal>
+          <Principal preso onClick={enviar}>Registrar peso</Principal>
         </div>
       );
     }
@@ -199,7 +215,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
         <div data-testid="hn-folha-acao" data-acao="sleep">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="0" rotulo="Horas de sono" modo="decimal" sufixo="h" campoRef={campoRef} />
           <Pilulas opcoes={["6", "7", "8", "9"]} ativa={texto} aoEscolher={setTexto} rotulo="Horas" />
-          <Principal onClick={enviar}>Registrar sono</Principal>
+          <Principal preso onClick={enviar}>Registrar sono</Principal>
         </div>
       );
     }
@@ -208,7 +224,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
       return (
         <div data-testid="hn-folha-acao" data-acao="idea">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="Sua ideia brilhante…" rotulo="Sua ideia" modo="text" campoRef={campoRef} multilinha />
-          <Principal onClick={enviar}>Guardar ideia</Principal>
+          <Principal preso onClick={enviar}>Guardar ideia</Principal>
         </div>
       );
     }
@@ -217,7 +233,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
       return (
         <div data-testid="hn-folha-acao" data-acao="gratitude">
           <Campo valor={texto} aoMudar={setTexto} aoEnviar={enviar} placeholder="Pelo que você é grato agora?" rotulo="Gratidão" modo="text" campoRef={campoRef} multilinha />
-          <Principal onClick={enviar}>Registrar gratidão</Principal>
+          <Principal preso onClick={enviar}>Registrar gratidão</Principal>
         </div>
       );
     }
@@ -267,7 +283,7 @@ export const FolhaAcaoE = ({ acao, data, assentada, onFeito, onFechar }: Props) 
             <div className="mt-3">
               <Campo valor={kcal} aoMudar={setKcal} aoEnviar={enviar} placeholder="0" rotulo="Calorias da refeição" modo="numeric" sufixo="kcal" campoRef={campoRef} />
             </div>
-            <Principal tom={c} onClick={enviar}>Registrar refeição</Principal>
+            <Principal preso tom={c} onClick={enviar}>Registrar refeição</Principal>
           </div>
         );
       }

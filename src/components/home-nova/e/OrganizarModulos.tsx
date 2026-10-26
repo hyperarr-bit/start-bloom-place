@@ -10,6 +10,9 @@ import { TRACO, corDoModulo, tintaDoModulo } from "./paleta";
  * ModuleDrawer: favoritar ★, esconder, mover), com a MESMA fonte (use-module-preferences: `core-module-prefs`,
  * favoritos/ocultos/ordem). Só a cara muda: uma folha com a lista dos 16, cada linha com ★ · olho · ↑ ↓.
  * Esconder um módulo tira o azulejo da grade (e, com MODULO_OCULTA_PENDENCIAS ligada, as pendências dele).
+ * Varredura 26/10: o subtítulo dizia "Favorito vai pra frente", mas com ordem gravada (qualquer ↑↓) o `ordenar` de
+ * use-module-preferences mantém a ordem da pessoa — a regra é a mesma da Home antiga e não muda; o texto diz o que a
+ * folha faz de verdade.
  */
 interface Props { aberta: boolean; onFechar: () => void; preferencias: ReturnType<typeof useModulePreferences> }
 
@@ -36,7 +39,7 @@ export const OrganizarModulos = ({ aberta, onFechar, preferencias }: Props) => {
             <div className="flex items-center justify-between px-1 mb-1">
               <div>
                 <h3 className="text-[19px] font-bold tracking-tight">Organizar módulos</h3>
-                <p className="text-[12.5px] text-muted-foreground">Favorito vai pra frente · esconder tira da Home{ocultos ? ` · ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}` : ""}</p>
+                <p className="text-[12.5px] text-muted-foreground" data-testid="hn-organizar-sub">↑↓ muda a ordem · esconder tira da Home{ocultos ? ` · ${ocultos} ${ocultos === 1 ? "oculto" : "ocultos"}` : ""}</p>
               </div>
               <button type="button" onClick={onFechar} aria-label="Pronto" data-testid="hn-organizar-pronto" className="h-9 px-3.5 rounded-full text-[13px] font-bold shrink-0" style={{ background: "var(--hn-mais)", color: "var(--hn-mais-texto)" }}>Pronto</button>
             </div>

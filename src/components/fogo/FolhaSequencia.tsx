@@ -58,12 +58,33 @@ export const fraseDaProximaFaixaDoCaderno = (dias: number): string | null => {
   return `${faltam === 1 ? "Falta" : "Faltam"} ${plural(faltam, "dia", "dias")} pro ${prox.nome}`;
 };
 
+/**
+ * A tinta do ✓ sobre a cor da faixa (varredura 26/10): o branco fixo dava 1,8:1 no âmbar, 2,0 no ouro e 2,7–2,8 no
+ * violeta/petróleo (ícone pede ≥ 3:1). Branco só onde passa de 3:1 (o magenta); nas faixas claras, a tinta quase preta
+ * do caderno (#2a1d05: 5,8–9,1:1).
+ */
+const luminancia = (cor: string): number | null => {
+  const hex = cor.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})(?:[0-9a-f]{2})?$/i)?.[1];
+  const rgb = hex
+    ? (hex.length === 3 ? hex.split("").map((c) => parseInt(c + c, 16)) : [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)))
+    : cor.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i)?.slice(1, 4).map(Number);
+  if (!rgb || rgb.some((n) => !Number.isFinite(n))) return null;
+  const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+export const TINTA_ESCURA_DO_CHECK = "#2a1d05";
+export const tintaDoCheck = (fundo: string): string => {
+  const l = luminancia(fundo);
+  if (l === null) return "#fff";
+  return 1.05 / (l + 0.05) >= 3 ? "#fff" : TINTA_ESCURA_DO_CHECK;
+};
+
 /** Uma bolinha de dia — a mesma em qualquer semana. */
 const Bolinha = ({ estado, cor, tamanho = 36, rotulo }: { estado: EstadoDia; cor: string; tamanho?: number; rotulo?: string }) => {
   const base: React.CSSProperties = { width: tamanho, height: tamanho };
   const icone = Math.round(tamanho * 0.5);
   const comum = { "aria-label": rotulo, "data-estado": estado } as const;
-  if (estado === "feito") return <span className="fs-bolinha" style={{ ...base, background: cor }} {...comum}><Check style={{ width: icone, height: icone, color: "#fff" }} strokeWidth={2.8} aria-hidden /></span>;
+  if (estado === "feito") return <span className="fs-bolinha" style={{ ...base, background: cor }} {...comum}><Check style={{ width: icone, height: icone, color: tintaDoCheck(cor) }} strokeWidth={2.8} aria-hidden /></span>;
   if (estado === "gelo") return <span className="fs-bolinha fs-bolinha-gelo" style={base} {...comum}><Shield style={{ width: icone - 2, height: icone - 2 }} strokeWidth={2.2} aria-hidden /></span>;
   if (estado === "hoje") return <span className="fs-bolinha" style={{ ...base, border: `1.5px dashed ${cor}` }} {...comum} />;
   if (estado === "vazio") return <span className="fs-bolinha fs-bolinha-vazia" style={base} {...comum} />;

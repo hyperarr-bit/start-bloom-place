@@ -416,7 +416,12 @@ export interface PassoDaIntro {
    * módulo — o anel nele, o post-it só com esta instrução e SEM chips (nada de pergunta dobrada), e o passo espera o
    * `escutar`. Sem o alvo (módulo não montou), valem a `pergunta` e os chips de sempre.
    */
-  quandoNoModulo?: { pergunta: string; descricao?: string; rotulo?: string };
+  quandoNoModulo?: {
+    pergunta: string; descricao?: string; rotulo?: string;
+    /** só quando o alvo achado é ESTE controle (Pet/Relações: o cartão "começo pronto" que faz a mesma pergunta; o
+     *  vazio/"adicionar" sem a pergunta segue com os chips). Sem `so`: qualquer alvo achado (Beleza). */
+    so?: string;
+  };
   /** depois de gravar: um toque no DOM do módulo (abrir a aba HOJE, rolar até a lista…) */
   depois?: () => void;
 }
@@ -464,6 +469,19 @@ let detoxDaIntro = "";
  */
 /* 1.0.17 (dono, dado da 1.0.16: 41 de 50 pulos são no PASSO 1 — o tamanho não é o problema): os passos da 1.0.16
  * ficam; muda a copy (curta, uma ideia por passo), o "Agora não" quieto e o "+ Outro" (EscolhaRapida) nas listas. */
+/** Pet/Relações (quandoNoModulo): quem ENTROU na lista (o nome do último novo) — a escuta do passo; null = nada novo. */
+const CHAVE_PESSOAS_REL = "rel-people";
+const CHAVE_PETS_INTRO = "pet-list";
+function novoNaLista(valor: unknown, anterior: unknown): string | null {
+  const agora = Array.isArray(valor) ? valor : [];
+  const antes = Array.isArray(anterior) ? anterior : [];
+  if (agora.length <= antes.length) return null;
+  const ids = new Set(antes.map((x) => String((x as { id?: unknown } | null)?.id ?? "")));
+  const novo = agora.filter((x) => !ids.has(String((x as { id?: unknown } | null)?.id ?? ""))).at(-1) ?? agora.at(-1);
+  const nome = String((novo as { name?: unknown } | null)?.name ?? "").trim();
+  return nome || "Cadastrado";
+}
+
 export const INTROS: Record<string, IntroConfig> = {
   /* ───────── guiadas: a dose, sem a missão em volta ───────── */
   financas: {
@@ -874,6 +892,11 @@ export const INTROS: Record<string, IntroConfig> = {
       opcoes: [op("🌷", "Mãe", "mae"), op("💛", "Meu amor", "amor"), op("✨", "Melhor amiga", "melhor-amiga")],
       outro: { placeholder: "Nome ou apelido" },
       executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? adicionarPessoaPropria(ctx, o.rotulo) : adicionarPessoaDoComeco(ctx, o.id)),
+      // varredura 26/10 (como a Beleza, c271c441): o cartão "Comece por aqui" do módulo JÁ pergunta quem importa (8
+      // pessoas) — com ele na tela, o post-it só aponta pra ele, sem repetir Mãe/Meu amor/Melhor amiga; o passo espera a
+      // pessoa entrar na lista (rel-people). Sem o cartão (lista vazia/"adicionar"), os chips de sempre.
+      quandoNoModulo: { pergunta: "Escolha aqui quem importa", descricao: "Toque numa pessoa e guarde. O aniversário pode ficar pra depois.", rotulo: "1 toque", so: '[data-testid="comeco-pronto"]' },
+      escutar: { chaves: [CHAVE_PESSOAS_REL], rotulo: (valor, anterior) => novoNaLista(valor, anterior) },
       alvo: { aba: "PESSOAS", achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="pessoas-vazio"], [data-testid="adicionar-pessoa"]') },
     }],
     cor: { faixa: "#FFE1E7", tinta: "#881337", acento: "#e11d48" },
@@ -888,6 +911,11 @@ export const INTROS: Record<string, IntroConfig> = {
       opcoes: PETS_DA_INTRO.map((p) => op(p.emoji, p.rotulo, p.id)),
       outro: { placeholder: "Ex.: Calopsita" },
       executar: (ctx, o) => (o.id === ID_OUTRO_DA_INTRO ? cadastrarPetProprio(ctx, o.rotulo) : cadastrarPet(ctx, o.id as "cao" | "gato" | "outro")),
+      // varredura 26/10 (como a Beleza, c271c441): o cartão "Novo RG do pet" JÁ pergunta "Quem é o seu pet?" — com ele na
+      // tela, o post-it só aponta pra ele (sem Cachorro/Gato/Outro bicho repetidos) e o passo espera o pet nascer
+      // (pet-list). Sem o cartão, os chips de sempre.
+      quandoNoModulo: { pergunta: "Responda aqui no cartão", descricao: "Em 3 toques seu pet ganha RG, a rotina e a carteirinha.", rotulo: "3 toques", so: '[data-testid="comeco-pronto"]' },
+      escutar: { chaves: [CHAVE_PETS_INTRO], rotulo: (valor, anterior) => novoNaLista(valor, anterior) },
       alvo: { achar: porSeletor('[data-testid="comeco-pronto"], [data-testid="pet-vazio"]') },
     }, {
       // 2) a rotina de hoje: marca a comida (a ação no módulo)

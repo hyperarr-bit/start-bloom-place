@@ -214,7 +214,7 @@ export function IntroDeUmToque({ config, aoTerminar, passoInicial = 0, rotulosIn
 
   const pedido = passo?.pedido ?? config.pedido;
   /** o passo está usando o controle do próprio módulo (achou o alvo): sem chips, sem pergunta dobrada */
-  const noModulo = passo?.quandoNoModulo && alvo ? passo.quandoNoModulo : null;
+  const noModulo = passo?.quandoNoModulo && alvo && (!passo.quandoNoModulo.so || (() => { try { return alvo.matches(passo.quandoNoModulo!.so!); } catch { return false; } })()) ? passo.quandoNoModulo : null;
   const faixa = (
     <div className="im-faixa" data-testid="intro-modulo-faixa" data-camada-guia="intro-modulo" data-fase={fase} data-formato="toque" data-passo={numero} style={{ background: config.cor.faixa, color: config.cor.tinta }} role="presentation">
       <span className="im-faixa-titulo">Primeira vez aqui · {fase === "pronto" ? "pronto ✓" : pedido}</span>

@@ -355,6 +355,32 @@ describe("os 16 módulos têm intro, e ela é a 1ª coisa que a pessoa vê — e
     medir.mockRestore();
   });
 
+  /* varredura 26/10: Pet e Relações perguntavam 2× (o cartão "começo pronto" do módulo + o post-it com os mesmos chips) */
+  for (const [m, pergunta, chave, novo] of [
+    ["pet", "Responda aqui no cartão", "pet-list", { id: "p1", name: "Thor", species: "Cachorro" }],
+    ["relacionamentos", "Escolha aqui quem importa", "rel-people", { id: "x1", name: "Mãe", relation: "Mãe" }],
+  ] as const) {
+    it(`${m}: com o cartão 'começo pronto' do módulo na tela, o passo 1 aponta pra ele SEM chips (sem pergunta dobrada) e anda quando o cadastro entra`, { timeout: 40_000 }, async () => {
+      const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 300, right: 310, bottom: 500, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+      const s = criarStore();
+      render(<s.Provedor><div><section data-testid="comeco-pronto"><button type="button">Cachorro</button></section><IntroDoModulo moduleId={m} /></div></s.Provedor>);
+      expect(faixa()!.textContent).toContain("Primeira vez aqui"); // o tutorial aparece na 1ª abertura
+      await waitFor(() => expect(screen.queryByTestId("intro-modulo-anel")).toBeTruthy(), { timeout: 9000 });
+      expect(screen.queryAllByTestId("demo-guia-chip")).toHaveLength(0);
+      expect(screen.getByTestId("demo-guia-postit").textContent).toContain(pergunta);
+      act(() => { s.set(chave, [novo]); }); // ela terminou no cartão do módulo
+      await waitFor(() => expect(screen.queryByTestId("intro-modulo-pronto") || screen.queryByTestId("intro-modulo-entendi") || screen.queryByTestId("demo-guia-postit")?.textContent?.includes(pergunta) === false).toBeTruthy(), { timeout: 9000 });
+      medir.mockRestore();
+    });
+    it(`${m}: sem o cartão (só o vazio), os chips de sempre`, { timeout: 40_000 }, async () => {
+      const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 120, right: 310, bottom: 320, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
+      const s = criarStore();
+      render(<s.Provedor><div><section data-testid={m === "pet" ? "pet-vazio" : "pessoas-vazio"}>vazio</section><IntroDoModulo moduleId={m} /></div></s.Provedor>);
+      await waitFor(() => expect(screen.queryAllByTestId("demo-guia-chip").length).toBeGreaterThanOrEqual(2), { timeout: 9000 });
+      medir.mockRestore();
+    });
+  }
+
   it("Saúde (guiada): água → olha → continua no sono (3 de 4, com '+ Outro' em stepper) → olha o IMC → o cartão do fim junta tudo e 'Pronto' marca feito", { timeout: 40_000 }, async () => {
     const medir = vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ top: 200, left: 10, width: 300, height: 40, right: 310, bottom: 240, x: 10, y: 200, toJSON: () => ({}) } as DOMRect);
     const s = criarStore();

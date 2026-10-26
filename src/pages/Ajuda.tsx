@@ -328,8 +328,7 @@ export default function Ajuda() {
 /** Mesmo cabeçalho de Notificações — a tela irmã, alcançada pelo mesmo menu. */
 function Cabecalho({ onVoltar }: { onVoltar: () => void }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/85 backdrop-blur border-b border-border
-                       pt-[max(0.75rem,env(safe-area-inset-top))]">
+    <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/85 backdrop-blur border-b border-border">
       <button onClick={onVoltar} aria-label="Voltar" className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted transition-colors">
         <ArrowLeft className="w-5 h-5" />
       </button>

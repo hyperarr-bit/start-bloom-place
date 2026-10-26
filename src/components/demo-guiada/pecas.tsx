@@ -488,7 +488,11 @@ export function Anel({ alvo, recorte, balao, interativo = false, duracao = 12_00
     const emCima = rect.top - 14 - h;
     const embaixo = rect.bottom + 16;
     const cabeEmbaixo = embaixo + h <= fundoLivre;
-    const top = abaixo && cabeEmbaixo ? embaixo : emCima >= topoLivre ? emCima : Math.min(embaixo, fundoLivre - h);
+    /* varredura 26/10 (Beleza no iPhone SE): o alvo (o quiz de 3 perguntas) é mais alto que a tela livre — o balão não
+     * cabe nem embaixo nem em cima e caía no rodapé, POR CIMA das últimas opções ("Sensível", "Prefiro montar do zero").
+     * Nesse caso o balão fica preso no TOPO livre, por cima do cabeçalho do alvo (o pedaço menos importante). */
+    const alvoMaiorQueATela = rect.height + h + 30 > fundoLivre - topoLivre;
+    const top = abaixo && cabeEmbaixo ? embaixo : emCima >= topoLivre ? emCima : alvoMaiorQueATela ? topoLivre : Math.min(embaixo, fundoLivre - h);
     setPosicao({ top: Math.max(topoLivre, top) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rect, digitando, noBalao, areaVisivel]);

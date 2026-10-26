@@ -118,6 +118,7 @@ export const CHAVES_DO_APARELHO: ReadonlySet<string> = new Set<string>([
   "core-codigo-pendente", // código promocional validado antes do cadastro, resgatado depois
   "core-montar-financas", // 1.0.16: "Vamos montar suas Finanças" feito/pulado (+ vistas); a mesma chave vai pra conta
   "core-montar-rotina", // 1.0.16: "Rotina pronta em 3 toques" feito/pulado (+ vistas, rascunho, 1º quadradinho); a mesma chave vai pra conta
+  "core-skan-trial-sdk", // 1.0.19 (varredura 26/10): a última resposta do RevenueCat pra chave skan_trial_sdk (on|off, padrão off) — o StartTrial pelo SDK da Meta (lib/skan-trial-sdk)
   "core-skan-trial-enviado", // 1.0.19: ids das transações cujo StartTrial já saiu pelo SDK da Meta (lib/meta-inicio-teste-ios) — nunca repetir
   "core-back-variante", // 21/10: o texto do BACK dos funis web (a|b) sorteado no aparelho — braço de A/B, não pode trocar (lib/back-funil)
   "core-home-nova", // 1.0.19: a última resposta do RevenueCat pra Home nova (metadata home_nova: off|admin|on|ab, lib/home-nova)

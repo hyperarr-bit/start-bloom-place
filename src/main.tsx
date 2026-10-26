@@ -11,6 +11,7 @@ import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 import { ehErroDeChunk, recarregarPorChunkNovo } from "@/lib/chunk-novo";
 import { guardarForcaDaCobrancaV14 } from "@/lib/cobranca-recusada";
 import { guardarForcaCardRecusa } from "@/lib/card-recusa";
+import { guardarForcaSkanTrialSdk } from "@/lib/skan-trial-sdk";
 import { guardarForcaDegrau2, guardarForcaMotivos } from "@/lib/mensal-degraus";
 import { guardarForcaDaAvaliacaoV14 } from "@/lib/avaliacao-v14";
 import { guardarForcaAvaliacaoTesteDia2 } from "@/lib/avaliacao-teste-dia2";
@@ -36,6 +37,7 @@ void iniciarMedicaoDoAparelho();
 guardarForcaDaCobrancaV14();
 guardarForcaDegrau2(); // 1.0.18: `?recusa-degrau2=on|off|auto|agora[,recomecar]` — o 2º degrau da recusa (mensal 19,90)
 guardarForcaMotivos(); // 1.0.18: `?motivos-folha=on|off|ab|auto` — a folha "O que te fez parar?" no paywall do funil
+guardarForcaSkanTrialSdk(); // 1.0.19 (varredura 26/10): `?skan-trial-sdk=on|off|auto` — o StartTrial pelo SDK da Meta no iPhone (padrão off)
 guardarForcaCardRecusa(); // 1.0.18: `?card-recusa=on|off|auto[,recomecar]` — o card de tela inteira do cartão recusado
 guardarForcaDaAvaliacaoV14();
 guardarForcaAvaliacaoTesteDia2(); // 1.0.18: `?avaliacao-teste-dia2=on|off|auto` — pedir nota também pro teste que voltou no dia 2

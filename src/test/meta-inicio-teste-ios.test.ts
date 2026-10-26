@@ -28,6 +28,9 @@ import {
   registrarInicioDoTesteNoSdk,
 } from "@/lib/meta-inicio-teste-ios";
 import { CHAVES_DO_APARELHO } from "@/lib/chaves-do-aparelho";
+import {
+  CHAVE_FORCA_SKAN_TRIAL_SDK, CHAVE_SKAN_TRIAL_SDK_APARELHO, _zerarSkanTrialSdkRemoto, lerSkanTrialSdkRemoto, modoSkanTrialSdk, registrarSkanTrialSdkRemoto,
+} from "@/lib/skan-trial-sdk";
 
 const AGORA = Date.parse("2026-10-25T15:00:00Z");
 const PRODUTO = { identifier: "core_anual_97", price: 97.9, currencyCode: "BRL" };
@@ -55,6 +58,9 @@ beforeEach(() => {
   nativo.log.mockClear();
   eventos.length = 0;
   vi.useRealTimers();
+  // varredura 26/10: o SDK fica atrás da chave `skan_trial_sdk` (padrão OFF) — os testes do envio rodam com ela LIGADA
+  _zerarSkanTrialSdkRemoto();
+  registrarSkanTrialSdkRemoto({ current: { metadata: { skan_trial_sdk: "on" } }, all: {} });
 });
 
 describe("decidirInicioDeTeste (pura)", () => {
@@ -149,5 +155,48 @@ describe("ligação nos caminhos de compra do iPhone (revenuecat.ts)", () => {
     expect(corpo("comprarMensal19")).not.toMatch(/registrarInicioDoTesteNoSdk/);
     // restaurar compra nunca manda
     expect(corpo("restaurar")).not.toMatch(/registrarInicioDoTesteNoSdk/);
+  });
+});
+
+/* varredura 26/10 — opção A do dono: o StartTrial pelo SDK atrás da chave remota `skan_trial_sdk` (padrão OFF) */
+describe("chave skan_trial_sdk (padrão OFF = como a 1.0.18)", () => {
+  const off = (meta: Record<string, unknown> = {}) => ({ current: { metadata: meta }, all: {} });
+  it("sem resposta do RevenueCat (nunca respondeu, sem cópia no aparelho): desligado — nada sai, nenhum evento, nada marcado", async () => {
+    _zerarSkanTrialSdkRemoto(); localStorage.clear();
+    expect(modoSkanTrialSdk()).toBe("off");
+    expect(await registrarInicioDoTesteNoSdk(compra(), PRODUTO, "anual_ios")).toBe("desligado");
+    expect(nativo.log).not.toHaveBeenCalled();
+    expect(eventos.filter(([n]) => n === "meta_sdk_inicio_teste")).toHaveLength(0);
+    expect(localStorage.getItem(CHAVE_INICIO_TESTE_ENVIADO)).toBeNull();
+  });
+  it("resposta SEM a chave, com lixo ou com 'off': desligado (e a cópia do aparelho some)", async () => {
+    for (const meta of [{}, { skan_trial_sdk: "talvez" }, { skan_trial_sdk: "off" }]) {
+      registrarSkanTrialSdkRemoto(off({ skan_trial_sdk: "on" }));
+      registrarSkanTrialSdkRemoto(off(meta));
+      expect(modoSkanTrialSdk()).toBe("off");
+      expect(await registrarInicioDoTesteNoSdk(compra({ tx: `T${Math.random()}` }), PRODUTO, "presente69")).toBe("desligado");
+    }
+    expect(nativo.log).not.toHaveBeenCalled();
+    expect(localStorage.getItem(CHAVE_SKAN_TRIAL_SDK_APARELHO)).toBe("off");
+  });
+  it("'on' na metadata (qualquer offering; a current vence): manda, como a 1.0.19; a resposta fica no aparelho pra próxima abertura", async () => {
+    expect(lerSkanTrialSdkRemoto({ current: { metadata: {} }, all: { anual_69: { metadata: { skan_trial_sdk: "on" } } } })).toBe("on");
+    expect(lerSkanTrialSdkRemoto({ current: { metadata: { skan_trial_sdk: "off" } }, all: { anual_69: { metadata: { skan_trial_sdk: "on" } } } })).toBe("off");
+    _zerarSkanTrialSdkRemoto(); localStorage.clear();
+    registrarSkanTrialSdkRemoto(off({ skan_trial_sdk: "on" }));
+    expect(localStorage.getItem(CHAVE_SKAN_TRIAL_SDK_APARELHO)).toBe("on");
+    _zerarSkanTrialSdkRemoto(); // nova abertura, RevenueCat ainda sem resposta: vale a cópia do aparelho
+    expect(await registrarInicioDoTesteNoSdk(compra(), PRODUTO, "anual_ios")).toBe("enviado");
+    expect(nativo.log).toHaveBeenCalledTimes(1);
+  });
+  it("força de QA vence (?skan-trial-sdk=)", () => {
+    localStorage.setItem(CHAVE_FORCA_SKAN_TRIAL_SDK, "off");
+    expect(modoSkanTrialSdk()).toBe("off");
+    localStorage.setItem(CHAVE_FORCA_SKAN_TRIAL_SDK, "on");
+    registrarSkanTrialSdkRemoto(off({ skan_trial_sdk: "off" }));
+    expect(modoSkanTrialSdk()).toBe("on");
+  });
+  it("a chave do aparelho está na lista das que sobrevivem (chaves-do-aparelho)", () => {
+    expect(CHAVES_DO_APARELHO).toContain(CHAVE_SKAN_TRIAL_SDK_APARELHO);
   });
 });

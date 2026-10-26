@@ -27,9 +27,15 @@
  * meta-backfill-app, que já está pronto e DESLIGADO).
  *
  * Só iOS nativo. Web e Android: nada (retorna "nao_ios").
+ *
+ * CHAVE REMOTA `skan_trial_sdk` (varredura 26/10, opção A do dono — lib/skan-trial-sdk): padrão OFF. Desligada (ou
+ * RevenueCat sem resposta), nada sai do aparelho (retorna "desligado", sem evento): o app fica como a 1.0.18 nesse
+ * ponto, e a Meta não conta o teste 2× (SDK + servidor com event_ids diferentes). Ligar com "on" na metadata só quando
+ * o servidor casar o event_id (META_STARTTRIAL_ID_DA_LOJA + deploy do meta-backfill-app).
  */
 import { trackEvent } from "@/lib/analytics";
 import { plataformaApp } from "@/lib/native-shell";
+import { skanTrialSdkLigado } from "@/lib/skan-trial-sdk";
 
 export const CHAVE_INICIO_TESTE_ENVIADO = "core-skan-trial-enviado"; // do aparelho (lib/chaves-do-aparelho)
 /** Transação mais velha que isto não é "o teste que acabou de começar". */
@@ -85,7 +91,7 @@ export function decidirInicioDeTeste(resultado: unknown, produto: ProdutoDaLoja,
   };
 }
 
-export type DesfechoInicioTeste = "enviado" | "nao_ios" | "sem_sdk" | "erro" | Extract<DecisaoInicioTeste, { mandar: false }>["motivo"];
+export type DesfechoInicioTeste = "enviado" | "nao_ios" | "desligado" | "sem_sdk" | "erro" | Extract<DecisaoInicioTeste, { mandar: false }>["motivo"];
 
 /** Chamado logo depois de `registrarResultadoDaFolha("sucesso")` nos caminhos do iPhone. Nunca lança. */
 export async function registrarInicioDoTesteNoSdk(resultado: unknown, produto: ProdutoDaLoja, origem: string): Promise<DesfechoInicioTeste> {
@@ -93,6 +99,8 @@ export async function registrarInicioDoTesteNoSdk(resultado: unknown, produto: P
     // Plataforma pelo global do runtime (sem importar o @capacitor/core antes da hora: o import só acontece
     // quando há mesmo o que mandar).
     if (plataformaApp() !== "ios") return "nao_ios";
+    // chave `skan_trial_sdk` desligada (padrão): como a 1.0.18 — nada pelo aparelho, nenhum evento, nada marcado
+    if (!skanTrialSdkLigado()) return "desligado";
     const d = decidirInicioDeTeste(resultado, produto);
     if (d.mandar === false) {
       const { motivo } = d as Extract<DecisaoInicioTeste, { mandar: false }>;

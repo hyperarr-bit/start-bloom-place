@@ -52,6 +52,7 @@ import { registrarMedicaoTotalRemota } from "@/lib/medicao-total";
 import { registrarChavePaywallMinimalista } from "@/lib/paywall-minimalista";
 import { registrarMenuNovoRemoto } from "@/lib/menu-novo";
 import { registrarSinoRemoto } from "@/lib/sino-paywall";
+import { registrarSkanTrialSdkRemoto } from "@/lib/skan-trial-sdk";
 import { registrarCardRecusaRemoto } from "@/lib/card-recusa";
 import { registrarDias23Remoto } from "@/lib/dias23";
 import { registrarAvaliacaoTesteDia2Remoto } from "@/lib/avaliacao-teste-dia2";
@@ -88,6 +89,7 @@ const registrarChavesDasOfferings = (offerings: unknown): void => {
     registrarDegrau2Remoto, // 1.0.18: `recusa_degrau2` (on|off, padrão off) — o 2º degrau da recusa, mensal 19,90 (lib/mensal-degraus)
     registrarRetroOutubroRemoto, // 23/10: `retro_outubro` (on|off, padrão off) — a retrospectiva de outubro em cards animados, a partir de 01/11 (lib/retro-outubro)
     registrarHomeNovaRemoto, // 1.0.19: `home_nova` (off|admin|on|ab|novas|novas+admin; sem a chave = padrão: app "novas+admin", site "off") — a Home do carrossel do dia (lib/home-nova)
+    registrarSkanTrialSdkRemoto, // 1.0.19 (varredura 26/10): `skan_trial_sdk` (on|off, padrão off) — o StartTrial pelo SDK da Meta no iPhone (lib/skan-trial-sdk)
     registrarMotivosRemoto, // 1.0.18: `motivos_folha` (off|on|ab, padrão off) — a folha "O que te fez parar?" depois da folha do anual fechada (lib/mensal-degraus)
   ];
   for (const f of cada) {

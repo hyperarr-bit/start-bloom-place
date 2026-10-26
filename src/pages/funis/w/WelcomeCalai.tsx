@@ -18,10 +18,11 @@ import { rotaComFoto } from "@/lib/troca-de-rota";
  *     fundo branco, um iPhone ENTRA pela direita girado e assenta no centro (0,7 s) já na HOME NOVA
  *     (1.0.19, opção E — a que toda conta nova vê) CHEIA de uma conta usada (Bom dia, Marina · 🔥 12
  *     apagado · 37 pontos com o anel e a estrela · Hábitos/Água/Refeições · grade de módulos · barra de
- *     vidro); dentro dele, uma gravação de tela CONTÍNUA (v3, 26/10): "+" → Gasto → 12 → Alimentação →
- *     Registrar gasto (toast no topo, score 37 → 42; o dedo tira o toast) → ZOOM limpo na saudação +
- *     card do score enquanto o fogo ACENDE (13) → volta → desliza o carrossel até Pendências de hoje e
- *     Seus widgets → o iPhone sai pela esquerda e o loop recomeça com ele entrando. Sem legendas.
+ *     vidro); dentro dele, uma gravação de tela CONTÍNUA (v4, 26/10): "+" → Gasto → 12 → Alimentação →
+ *     Registrar gasto (o score conta 37 → 42 liso e para no 42; SEM os toasts — dono 26/10) → ZOOM limpo
+ *     na saudação + card do score enquanto o fogo ACENDE (13) → volta → desliza o carrossel até
+ *     Pendências de hoje e Seus widgets → o iPhone sai pela esquerda e o loop recomeça com ele entrando.
+ *     Sem legendas.
  *     Gerado do app de verdade (/home com a Home nova, seeds da demo /preview, Supabase falso, relógio
  *     virtual; receita em novidades-guardadas/2026-10-26/welcome-home-nova/receita), 1080×1386 H.264
  *     ≤ 2 MB em public/funil/, com pôster JPEG (o iPhone assentado na Home nova) pra antes do 1º
@@ -81,7 +82,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
    * O iOS bloqueia <video> no WebView com pouca energia (o Cal AI é nativo, por isso roda lá), mas NÃO bloqueia imagem
    * animada. Então o pôster cobre o vídeo até ele rodar de verdade e, sem rodar em 1,2 s, entra o MESMO vídeo em WebP
-   * animado (720 px, 15 qps, ~1,1 MB no pacote desde a v3 de 26/10). O toque segue tentando o vídeo e, rodando, a capa sai. */
+   * animado (720 px, 15 qps, ~1,1 MB no pacote desde 26/10). O toque segue tentando o vídeo e, rodando, a capa sai. */
   const [rodando, setRodando] = useState(false);
   const [passeio, setPasseio] = useState(false);
   useEffect(() => { const t = window.setTimeout(() => { if (!rodouRef.current) setPasseio(true); }, 1200); return () => window.clearTimeout(t); }, []);

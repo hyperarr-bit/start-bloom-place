@@ -1,4 +1,4 @@
-import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Plus, Star, Utensils, Wallet } from "lucide-react";
+import { BookOpen, CalendarCheck, Check, Droplets, Dumbbell, Moon, PenLine, Pill, Plus, Utensils, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { LifeHubData } from "@/hooks/use-life-hub-data";
 import type { ActionId } from "@/components/home/QuickActions";
@@ -7,7 +7,8 @@ import { COPO_ML_PADRAO, unidadeDaAgua } from "@/lib/saude-copo";
 import { RESUMOS_PADRAO, type IdDoResumo } from "@/lib/home-resumos";
 import { Anel } from "./Anel";
 import { Entrada, NumeroQueConta } from "./Animacoes";
-import { TOM_DO_MODULO, TOM_DO_TIPO, TINTA, TRACO, cor, type Tom } from "./paleta";
+import { TOM_DO_MODULO, TOM_DO_TIPO, TRACO, cor, type Tom } from "./paleta";
+import { EcoDoAnel, EstrelaFesta, corDaFase, useFesta100 } from "./Festa100";
 
 /**
  * PÁGINA 1 DO CARROSSEL — "SEU DIA" (opção E). O conjunto do Cal AI, ajustado ao CORE.
@@ -16,8 +17,10 @@ import { TOM_DO_MODULO, TOM_DO_TIPO, TINTA, TRACO, cor, type Tom } from "./palet
  *  - o CARD GRANDE é só o número: "27 /100 pontos" (V7, 26/10: número preto, "/100 pontos" cinza na mesma linha) e, embaixo, "Score do dia" em cinza — como
  *    "2276 /2616 · Calorias consumidas" no Cal AI. Saíram "Faltam N coisas pra fechar o dia" e o "?". À direita
  *    o anel com a ESTRELA, que é o convite: tocar nele abre a folha "Como funciona a pontuação" (e a frase
- *    "faltam N coisas" mora lá, no topo). No 100 a estrela vira ✓. RODADA 4: anel e estrela em TINTA (grafite;
+ *    "faltam N coisas" mora lá, no topo). RODADA 4: anel e estrela em TINTA (grafite;
  *    no escuro a tinta clara do "+"), como o anel preto do Cal AI; trilho cinza claro.
+ *    26/10 (dono: "o Cal AI não muda o símbolo quando bate 100"): no 100 a estrela FICA (nada de ✓); estrela, anel
+ *    e número viram ÂMBAR (o laranja do score antigo) com a festinha de ~0,9 s, 1x por dia (Festa100.tsx).
  *  - os 3 CARDS PEQUENOS continuam Hábitos (20 pts), Água (15) e Refeições (10) — as três contas "x de y"
  *    que existem pra todo mundo, 45 dos 100 pontos num olhar —, com o anel e o ícone na cor do módulo de
  *    origem da paleta única (verde-água, céu, sálvia) e traço 1,75. RODADA 4: só o nome, uma palavra
@@ -81,13 +84,18 @@ interface PropsScore {
   onAbrir: () => void;
   /** variação: o número DENTRO do anel (como o anel de hoje) e o título da faixa no lugar dele */
   numeroDentro?: boolean;
+  /** a comemoração de tela cheia vai abrir / está aberta: a festinha do 100 espera ela fechar (HomeE) */
+  festaPausada?: boolean;
+  /** só a rota de dev: toca a festinha do 100 a cada montagem, sem gravar */
+  forcarFesta?: boolean;
 }
 
-export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
-  const completo = score >= 100;
-  const corAnel = TINTA;
+export const CardScoreE = ({ score, onAbrir, numeroDentro, festaPausada, forcarFesta }: PropsScore) => {
+  const fase = useFesta100(score, festaPausada, forcarFesta);
+  const corAnel = corDaFase(fase);
+  const ouro = fase !== "preto";
   return (
-    <section className="hn-card he-score" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
+    <section className="hn-card he-score" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"} data-fase-100={fase}>
       {/* rodada 2 (dono): tocar em QUALQUER parte do card abre a folha da pontuação — não só a estrela */}
       <button type="button" onClick={onAbrir} aria-label="Score do dia — como funciona a pontuação" data-testid="he-score-abrir" className="w-full p-5 flex items-center gap-3 text-left rounded-[24px] active:scale-[0.99] transition-transform">
         <span className="flex-1 min-w-0 block">
@@ -96,24 +104,24 @@ export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
           ) : (
             /* V7 (dono 26/10): "44 /100 pontos" — o número grande em preto e "/100 pontos" cinza na MESMA linha, como o
                "2276 /2616" do Cal AI (enche o meio do card, que sobrava vazio). Com 3 dígitos (100) o número desce de 50
-               pra 46 px pra linha caber em 390 pt sem encostar no anel (nowrap: nunca quebra). */
+               pra 46 px pra linha caber em 390 pt sem encostar no anel (nowrap: nunca quebra). 26/10: abaixo de 390 pt (375,
+               iPhone mini/SE) o "100" ficava a 2 pt do anel — lá o 100 vai a 42 px e "/100 pontos" a 17 px. */
             <span className="flex items-baseline gap-1 whitespace-nowrap" data-testid="he-score-linha">
-              <NumeroQueConta valor={score} className={`${score >= 100 ? "text-[46px]" : "text-[50px]"} leading-[0.95] font-bold tabular-nums tracking-[-0.04em]`} testid="he-score-numero" />
-              <span className="text-[19px] font-medium text-muted-foreground tabular-nums tracking-[-0.01em]" data-testid="he-score-meta">/100 pontos</span>
+              <NumeroQueConta valor={score} className={`${score >= 100 ? "text-[46px] max-[389px]:text-[42px]" : "text-[50px]"} he-numero-100 ${ouro ? "text-[color:var(--he-ouro-texto)]" : ""} leading-[0.95] font-bold tabular-nums tracking-[-0.04em]`} testid="he-score-numero" />
+              <span className={`text-[19px] ${score >= 100 ? "max-[389px]:text-[17px]" : ""} font-medium text-muted-foreground tabular-nums tracking-[-0.01em]`} data-testid="he-score-meta">/100 pontos</span>
             </span>
           )}
           <span className="block mt-1.5 text-[15px] leading-snug font-medium text-muted-foreground" data-testid="hn-score-explica">Score do dia</span>
         </span>
-        <span className="shrink-0 rounded-full block">
+        <span className="shrink-0 rounded-full block relative">
+          <EcoDoAnel fase={fase} espessura={11} />
           <Anel tamanho={104} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
             {numeroDentro ? (
               <span className="flex flex-col items-center justify-center">
                 <span className="text-[30px] leading-none font-bold tabular-nums tracking-tight" data-testid="he-score-numero">{score}</span>
                 <span className="text-[9.5px] mt-1 text-muted-foreground font-semibold uppercase tracking-[0.12em]">pontos</span>
               </span>
-            ) : completo
-              ? <Check className="w-9 h-9" strokeWidth={2.5} style={{ color: corAnel }} aria-hidden />
-              : <Star className="w-8 h-8" style={{ color: corAnel, fill: corAnel }} strokeWidth={1.5} aria-hidden />}
+            ) : <EstrelaFesta fase={fase} tamanho={32} />}
           </Anel>
         </span>
       </button>
@@ -209,14 +217,16 @@ interface Props {
   copoMl?: number;
   /** os cards escolhidos em Você › Personalizar início (lib/home-resumos) */
   resumos?: IdDoResumo[];
+  festaPausada?: boolean;
+  forcarFesta?: boolean;
 }
 
-export const PaginaSeuDia = ({ data, onAbrirScore, onAcao, onMais, numeroDentro, copoMl, resumos }: Props) => {
+export const PaginaSeuDia = ({ data, onAbrirScore, onAcao, onMais, numeroDentro, copoMl, resumos, festaPausada, forcarFesta }: Props) => {
   const metricas = metricasDoDia(data, copoMl, resumos);
   return (
     <div className="he-pagina" data-testid="he-pagina-1">
       {/* rodada 2: os cards entram de leve, escalonados (o score primeiro, depois os três) */}
-      <Entrada atraso={0}><CardScoreE score={data.dayScore} onAbrir={onAbrirScore} numeroDentro={numeroDentro} /></Entrada>
+      <Entrada atraso={0}><CardScoreE score={data.dayScore} onAbrir={onAbrirScore} numeroDentro={numeroDentro} festaPausada={festaPausada} forcarFesta={forcarFesta} /></Entrada>
       <div className="grid grid-cols-3 gap-3 mt-3 flex-1">
         {metricas.map((m, i) => (
           <Entrada key={m.id} atraso={0.08 + i * 0.07} className="flex">

@@ -41,6 +41,9 @@ const Voce = lazy(() => import("@/pages/Voce"));
  *   &numero=dentro           · variação do card do score com o número dentro do anel (como hoje)
  *   &fundo=gradiente         · MOCKUP (adendo 26/10, só pra comparar — não está no app): o fundo em degradê como o
  *                              do Cal AI (véu quente/rosado no alto que some ao descer) — html.he-mock-gradiente, home-e.css
+ *   &pts=N                   · 26/10: força o número do score (card e folha), sem gravar nada
+ *   &celebracao=anel|estrela · 26/10: abre a comemoração do 100 da E nessa variante (sem olhar a chave do dia)
+ *   &festa=1                 · 26/10: a festinha do 100 do card toca a cada montagem (com &pts=100)
  *   &tira=fogos              · rodada 3: a TIRA "fogos 1/7/14/30/100 × paleta da Home" (os 6 fogos do caderno ao lado
  *                              dos azulejos da grade), pra conferir a cor das faixas contra a régua suave da Home
  */
@@ -87,6 +90,9 @@ export default function DevHomeNova() {
   const folhaScore = sp.get("folha") === "score";
   const numeroDentro = sp.get("numero") === "dentro";
   const azulejoE = sp.get("azulejo") === "branco" ? "branco" : "tinta"; // rodada 5: &azulejo=branco = versão 2
+  const ptsDev = sp.get("pts") !== null && Number.isFinite(Number(sp.get("pts"))) ? Math.max(0, Math.min(100, Math.round(Number(sp.get("pts"))))) : null;
+  const celebracaoDev = sp.get("celebracao") === "estrela" ? "estrela" : sp.get("celebracao") ? "anel" : null;
+  const festaDev = sp.get("festa") === "1";
   const suaveE = sp.get("suave") === "2" ? "mais" : sp.get("suave") === "1" ? "suave" : sp.get("suave") === "0" ? "forte" : SUAVIDADE_HOME_NOVA; // rodada 6: &suave=0|1|2 (padrão = a aprovada)
 
   useEffect(() => {
@@ -110,7 +116,7 @@ export default function DevHomeNova() {
     <>
       {tela === "inicio" && layoutE ? (
         <>
-          <HomeE modulos={modulosE} paginaInicial={paginaE} arrasto={Number.isFinite(arrastoE) ? arrastoE : null} folhaScoreAberta={folhaScore} folhaMaisAberta={folha} numeroDentro={numeroDentro} azulejo={azulejoE} suave={suaveE} />
+          <HomeE modulos={modulosE} paginaInicial={paginaE} arrasto={Number.isFinite(arrastoE) ? arrastoE : null} folhaScoreAberta={folhaScore} folhaMaisAberta={folha} numeroDentro={numeroDentro} azulejo={azulejoE} suave={suaveE} scoreDev={ptsDev} celebracaoDev={celebracaoDev} festaDev={festaDev} />
           <div className="hn he he-so-vars">
             <BarraVidro ativa="inicio" iniciais={iniciaisDe(nome)} onIr={ir} onMais={() => window.dispatchEvent(new CustomEvent(EVENTO_HOME_NOVA_MAIS))} rotulos={rotuloInicio ? { inicio: rotuloInicio } : undefined} />
           </div>

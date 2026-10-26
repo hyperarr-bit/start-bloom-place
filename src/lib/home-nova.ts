@@ -1,12 +1,26 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
+import { isNativeShell } from "@/lib/native-shell";
 
 /**
  * HOME NOVA — OPÇÃO E (1.0.19, 26/10): a Home do carrossel do dia (src/components/home-nova/e), aprovada pelo
- * dono depois de 6 rodadas de mockup (novidades-guardadas/2026-10-25/home-nova/E). Para todo mundo continua a
- * Home de hoje; quem a vê é decidido por uma CHAVE REMOTA, no padrão de `dias23` / `sino_paywall`:
+ * dono depois de 6 rodadas de mockup (novidades-guardadas/2026-10-25/home-nova/E). Quem a vê é decidido por uma
+ * CHAVE REMOTA, no padrão de `dias23` / `sino_paywall`, com um PADRÃO por plataforma (26/10, "home nova garantida"):
+ *
+ * ┌ A REGRA FINAL (1.0.19 na loja) ───────────────────────────────────────────────────────────────────────────────┐
+ * │ 1. App das lojas: sem resposta do RevenueCat, sem cache e sem a chave na metadata = "novas+admin" (PADRÃO).    │
+ * │    Site/navegador: o padrão é "off" (a Home do site não muda; o RevenueCat nem roda lá).                       │
+ * │ 2. A chave `home_nova` manda quando responde COM um valor válido; o valor fica guardado no aparelho. "off" é o │
+ * │    desligar de emergência: vale da PRÓXIMA abertura em diante (nunca troca a Home na frente da pessoa).        │
+ * │ 3. O modo vale a abertura inteira: fixado na 1ª decisão com conta (fixarModoDaAbertura); uma resposta que     │
+ * │    chega depois só é guardada pra próxima abertura.                                                            │
+ * │ 4. Conta NOVA (origem gravada na conta, ver abaixo) vê a Home nova desde a 1ª Home, sempre; a Home ESPERA a   │
+ * │    origem estar decidida (pages/Home: tela de carregamento de sempre, nunca a Home antiga por um quadro).      │
+ * │ 5. Conta ANTIGA nunca vê a Home nova (só o admin, no "novas+admin"); uma vez nova/antiga, pra sempre.          │
+ * └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  *
  * `home_nova` na metadata de QUALQUER offering do RevenueCat (a `current` vence):
- *   · "off" (ou ausente, ou RevenueCat que nunca respondeu) → a Home de hoje, byte a byte;
+ *   · ausente ou valor estranho → NADA muda (vale o guardado no aparelho, senão o padrão da plataforma);
+ *   · "off" → a Home de hoje, byte a byte, pra todo mundo (o desligar de emergência);
  *   · "admin" → liga SÓ para contas com papel de admin (a mesma checagem do /admin, lib/admin) — é como o dono
  *     testa no TestFlight com os dados reais dele sem mudar nada para os clientes;
  *   · "on" → todos;
@@ -14,7 +28,7 @@ import { idDoAparelho } from "@/lib/dia1-cheio";
  *     entre aberturas; os eventos levam `home_nova: "nova" | "atual"` (camposHomeNova);
  *   · "novas" (dono 26/10, SEM A/B) → liga só pra CONTA NOVA: a que tem o marcador de origem "nova" gravado na conta
  *     (`core-home-nova-origem`, ver ORIGEM DA CONTA abaixo). Cliente antigo nunca liga; uma vez nova, nova pra sempre;
- *   · "novas+admin" → as contas novas E o dono (a checagem de admin, como no "admin").
+ *   · "novas+admin" (o PADRÃO do app das lojas) → as contas novas E o dono (a checagem de admin, como no "admin").
  *
  * ORIGEM DA CONTA (a regra do "novas", 26/10) — decidida UMA vez por conta, no app das lojas (1.0.19+), na 1ª
  * abertura com a conta carregada do servidor (OrigemDaContaNaSessao, App), e gravada na CONTA (sobe pro user_data;
@@ -24,11 +38,16 @@ import { idDoAparelho } from "@/lib/dia1-cheio";
  *                numa versão anterior já tem missão e fica "antiga";
  *   · "antiga" = todo o resto: conta com mais de 48 h (inclusive quem já tinha conta e só agora começa o teste),
  *                conta antiga reinstalando o app, conta com missão de uma versão anterior.
- *   No site (navegador) nada é classificado nem gravado: a conta criada pela Porta/site é decidida quando abrir o app.
+ *   No site (navegador) nada é classificado nem gravado: a conta criada pela Porta/site é decidida quando abrir o app
+ *   (dentro de 48 h = nova). Reinstalar no mesmo dia: o marcador volta da conta (ou, se não chegou a subir, a regra
+ *   decide de novo — a missão só sobe pra conta DEPOIS do marcador). Sem created_at: nada é gravado e esta abertura
+ *   fica com a Home de hoje (nunca liga a nova na dúvida).
+ *   A decisão só usa a conta QUANDO ELA É DESTA conta (loaded + contaCompleta: o render de troca convidado→conta
+ *   ainda tem o `loaded` do convidado) — components/home-nova/OrigemDaConta (decidirOrigemDaConta).
  *   Espelho no aparelho (`core-home-nova-origem-aparelho` = "<uid>:nova|antiga") pra decidir sem esperar a conta.
  *   O score sem os pontos "de graça" (use-life-hub-data) usa o MESMO marcador — vale pra conta nova com a chave em
  *   qualquer modo.
- * A última resposta fica no aparelho (`core-home-nova`); o braço sorteado em `core-home-nova-braco`; a resposta
+ * A última resposta VÁLIDA fica no aparelho (`core-home-nova`); o braço sorteado em `core-home-nova-braco`; a resposta
  * da checagem de admin em `core-home-nova-admin` (por conta, pra 2ª abertura não esperar a consulta).
  * QA: `?home-nova=on|off|auto` (guarda em `forcar-home-nova` neste aparelho/navegador; "auto" desfaz).
  *
@@ -46,6 +65,8 @@ export const CHAVE_BRACO_HOME_NOVA = "core-home-nova-braco";
 export const CHAVE_ADMIN_HOME_NOVA = "core-home-nova-admin";
 /** O dia em que o fogo da pílula já acendeu (o pulso toca 1x por dia). */
 export const CHAVE_FOGO_ACESO_HOME_NOVA = "core-home-nova-fogo";
+/** O dia em que o card do score já fez a festinha do 100 (estrela âmbar; 1x por dia — home-nova/e/Festa100). */
+export const CHAVE_SCORE_100_HOME_NOVA = "core-home-nova-score-100";
 /** Força de QA — fora dos prefixos que as vassouras do cache apagam ("home-" é varrido; lib/chaves-do-aparelho). */
 export const CHAVE_FORCA_HOME_NOVA = "forcar-home-nova";
 /** 26/10: a cor do tema que a pessoa tinha ANTES da Home nova forçar o Original (chave da conta); volta quando a chave desliga. */
@@ -86,36 +107,57 @@ const modoDe = (v: unknown): ModoHomeNova | null => {
 };
 const bracoDe = (v: unknown): BracoHomeNova | null => (v === "nova" || v === "atual" ? v : null);
 
+/** 26/10: o modo quando o RevenueCat não disse nada (sem resposta, sem cache, sem a chave): app das lojas = "novas+admin"
+ *  (toda conta nova vê a Home nova, garantido); site = "off" (a Home do site não muda). */
+export const MODO_PADRAO_APP: ModoHomeNova = "novas+admin";
+export const MODO_PADRAO_WEB: ModoHomeNova = "off";
+export const padraoHomeNova = (): ModoHomeNova => (isNativeShell() ? MODO_PADRAO_APP : MODO_PADRAO_WEB);
+
 /** Em memória: o que o getOfferings DESTA abertura disse (undefined = ainda não respondeu). */
 let remoto: ModoHomeNova | undefined;
 /** Em memória: a resposta da checagem de admin desta abertura (null = ainda não sabe / não precisou). */
 let adminAtual: boolean | null = null;
+/** 26/10: o modo FIXADO desta abertura (null = ainda não decidiu nada com conta). Ver fixarModoDaAbertura. */
+let modoFixo: ModoHomeNova | null = null;
 
-/** Decisão pura: a chave em qualquer offering (a `current` vence); ausente/estranha em todas = "off". */
-export function lerHomeNovaRemoto(offerings: unknown): ModoHomeNova {
+/** O valor EXPLÍCITO da chave em qualquer offering (a `current` vence); ausente/estranho em todas = null (não disse nada). */
+export function lerHomeNovaRemotoExplicito(offerings: unknown): ModoHomeNova | null {
   type Off = { metadata?: Record<string, unknown> } | null | undefined;
   const o = offerings as { current?: Off; all?: Record<string, Off> } | null | undefined;
   let lido: ModoHomeNova | null = null;
   for (const off of Object.values(o?.all ?? {})) if (off !== o?.current) lido = modoDe(off?.metadata?.[CHAVE_REMOTA_HOME_NOVA]) ?? lido;
   lido = modoDe(o?.current?.metadata?.[CHAVE_REMOTA_HOME_NOVA]) ?? lido;
-  return lido ?? "off";
+  return lido;
+}
+/** Decisão pura: o valor explícito; sem ele, o PADRÃO da plataforma (app "novas+admin", site "off"). */
+export function lerHomeNovaRemoto(offerings: unknown): ModoHomeNova {
+  return lerHomeNovaRemotoExplicito(offerings) ?? padraoHomeNova();
 }
 
-/** O revenuecat.ts chama isto com o resultado de cada getOfferings() que respondeu (registrarChavesDasOfferings). */
+/** O revenuecat.ts chama isto com o resultado de cada getOfferings() que respondeu (registrarChavesDasOfferings).
+ *  Só um valor VÁLIDO muda alguma coisa (memória + aparelho); a chave ausente/estranha não derruba o guardado nem o padrão.
+ *  Com o modo desta abertura já fixado, a resposta só é guardada — vale da próxima abertura em diante. */
 export function registrarHomeNovaRemoto(offerings: unknown): void {
   try {
     if (!offerings || typeof offerings !== "object") return;
-    remoto = lerHomeNovaRemoto(offerings);
-    ls.set(CHAVE_HOME_NOVA_APARELHO, remoto);
+    const lido = lerHomeNovaRemotoExplicito(offerings);
+    if (!lido) return;
+    remoto = lido;
+    ls.set(CHAVE_HOME_NOVA_APARELHO, lido);
   } catch { /* metadata estranha: fica como estava */ }
 }
 /** Só testes. */
-export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); contaDaSessao = null; };
+export const _zerarHomeNova = (): void => { remoto = undefined; adminAtual = null; maisPendente = false; origens.clear(); origensTentadas.clear(); contaDaSessao = null; modoFixo = null; };
 
 /* ------------------------------------------------------------------ ORIGEM DA CONTA (modo "novas") */
 
 /** Em memória: a origem já decidida/lida de cada conta nesta abertura. */
 const origens = new Map<string, OrigemDaConta>();
+/** Em memória: as contas cuja origem JÁ FOI TENTADA com a conta carregada nesta abertura (decidida ou indecidível —
+ *  sem created_at, no site). A Home só espera a origem de conta que ainda não foi tentada. */
+const origensTentadas = new Set<string>();
+export const marcarOrigemTentada = (userId: string): void => { origensTentadas.add(userId); };
+export const origemJaTentada = (userId: string): boolean => origensTentadas.has(userId);
 /** Em memória: a conta logada (OrigemDaContaNaSessao define a cada render) — pra quem decide sem o user na mão. */
 let contaDaSessao: string | null = null;
 export const definirContaHomeNova = (userId: string | null | undefined): void => { contaDaSessao = userId || null; };
@@ -184,10 +226,26 @@ export function forcaHomeNova(): "on" | "off" | null {
   return f === "on" || f === "off" ? f : null;
 }
 
-/** O modo AQUI: o que o RevenueCat disse nesta abertura > a última resposta do aparelho > "off". (A força de QA é tratada em homeNovaLigada.) */
-export function modoHomeNova(): ModoHomeNova {
+/** O modo que valeria AGORA, sem o fixado: o que o RevenueCat disse nesta abertura > a última resposta do aparelho >
+ *  o padrão da plataforma (app "novas+admin", site "off"). */
+function modoVivo(): ModoHomeNova {
   if (remoto) return remoto;
-  return modoDe(ls.get(CHAVE_HOME_NOVA_APARELHO)) ?? "off";
+  return modoDe(ls.get(CHAVE_HOME_NOVA_APARELHO)) ?? padraoHomeNova();
+}
+
+/** O modo AQUI: o fixado desta abertura, senão o vivo. (A força de QA é tratada em homeNovaLigada.) */
+export function modoHomeNova(): ModoHomeNova {
+  return modoFixo ?? modoVivo();
+}
+
+/**
+ * 26/10: FIXA o modo desta abertura (1x; as próximas chamadas não mudam nada). Quem decide com uma conta na mão chama
+ * isto (useHomeNova, homeNovaLigadaSincrona com conta): daí em diante uma resposta do RevenueCat — inclusive "off" — só
+ * é guardada e vale na PRÓXIMA abertura. É o que garante que a Home nunca troca na frente da pessoa.
+ */
+export function fixarModoDaAbertura(): ModoHomeNova {
+  if (!modoFixo) modoFixo = modoVivo();
+  return modoFixo;
 }
 
 /** Sorteio 50/50 determinístico pelo id (FNV-1a 32 bits, sal próprio — não compartilha braço com o sino nem com o dia 1). */
@@ -234,6 +292,7 @@ export const adminHomeNovaConhecido = (): boolean | null => adminAtual;
  * A decisão: a Home nova está ligada AQUI? força de QA (on|off) > modo remoto:
  * off → não · on → sim · admin → só se `admin` for true · ab → o braço sorteado é "nova" ·
  * novas → só se a origem da conta for "nova" (desconhecida = não) · novas+admin → origem "nova" OU admin.
+ * (A origem DESCONHECIDA nunca chega à Home nas lojas: pages/Home espera a decisão — ver origemJaTentada.)
  */
 export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | null = null): boolean {
   const f = forcaHomeNova();
@@ -252,6 +311,7 @@ export function homeNovaLigada(admin: boolean | null, origem: OrigemDaConta | nu
 export function homeNovaLigadaSincrona(userId?: string | null): boolean {
   try {
     const id = userId ?? contaDaSessao;
+    if (id) fixarModoDaAbertura();
     return homeNovaLigada(adminAtual ?? lerAdminGuardado(id), origemConhecida(id));
   } catch { return false; }
 }

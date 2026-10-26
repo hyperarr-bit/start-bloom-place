@@ -129,14 +129,17 @@ describe("home_nova — o sorteio", () => {
 });
 
 describe("home_nova — os campos dos eventos", () => {
+  // 26/10: o modo fica FIXO na abertura (a 1ª decisão com conta) — cada modo aqui é uma abertura nova (_zerarHomeNova)
   it("off: nenhum campo; on: nova; admin sem admin: atual; ab: o braço", () => {
     expect(camposHomeNova("u")).toEqual({});
     registrarHomeNovaRemoto(offerings({ home_nova: "on" }));
     expect(camposHomeNova("u")).toEqual({ home_nova: "nova" });
+    _zerarHomeNova();
     registrarHomeNovaRemoto(offerings({ home_nova: "admin" }));
     expect(camposHomeNova("u")).toEqual({ home_nova: "atual" });
     informarAdminHomeNova(true);
     expect(camposHomeNova("u")).toEqual({ home_nova: "nova" });
+    _zerarHomeNova();
     registrarHomeNovaRemoto(offerings({ home_nova: "ab" }));
     localStorage.setItem(CHAVE_BRACO_HOME_NOVA, "atual");
     expect(camposHomeNova("u")).toEqual({ home_nova: "atual" });

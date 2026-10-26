@@ -15,16 +15,17 @@ import { rotaComFoto } from "@/lib/troca-de-rota";
  *
  *   · o VÍDEO em loop do app real (~12 s, mudo, inline), no estilo do Cal AI (dono 17/10: "tem que
  *     mostrar o app mesmo, de forma fluida… o iPhone entra" e "o usuário quer ver primeiro o app"):
- *     fundo branco, um iPhone ENTRA pela direita girado e assenta no centro (0,7 s) já na HOME CHEIA
- *     de uma conta usada (Bom dia, score 37, 🔥 12 dias, widgets, módulos); dentro dele, uma gravação
- *     de tela CONTÍNUA: arrasta as ações rápidas → Registrar Gasto → 12 → Alimentação → ✓ (score
- *     37 → 42, 🔥 13 dias "garantido hoje") → rola a Home até os módulos → Finanças → rola até o
- *     QUANTO POSSO GASTAR HOJE → ZOOM só no card, limpo sobre o branco ("R$ 123 por dia · Sobram
- *     R$ 111 pra hoje") → volta → o iPhone sai pela esquerda e o loop recomeça com ele entrando.
- *     Sem legendas. Gerado do app (conta montada pelo fluxo + seeds da demo /preview, Supabase
- *     falso, loja mock; receita em scratchpad/video-welcome2/work), 1080×1386 H.264 ≤ 2 MB em
- *     public/funil/, com pôster JPEG (o iPhone assentado na Home cheia) pra antes do 1º quadro /
- *     autoplay negado;
+ *     fundo branco, um iPhone ENTRA pela direita girado e assenta no centro (0,7 s) já na HOME NOVA
+ *     (1.0.19, opção E — a que toda conta nova vê) CHEIA de uma conta usada (Bom dia, Marina · 🔥 12
+ *     apagado · 37 pontos com o anel e a estrela · Hábitos/Água/Refeições · grade de módulos · barra de
+ *     vidro); dentro dele, uma gravação de tela CONTÍNUA (v3, 26/10): "+" → Gasto → 12 → Alimentação →
+ *     Registrar gasto (toast no topo, score 37 → 42; o dedo tira o toast) → ZOOM limpo na saudação +
+ *     card do score enquanto o fogo ACENDE (13) → volta → desliza o carrossel até Pendências de hoje e
+ *     Seus widgets → o iPhone sai pela esquerda e o loop recomeça com ele entrando. Sem legendas.
+ *     Gerado do app de verdade (/home com a Home nova, seeds da demo /preview, Supabase falso, relógio
+ *     virtual; receita em novidades-guardadas/2026-10-26/welcome-home-nova/receita), 1080×1386 H.264
+ *     ≤ 2 MB em public/funil/, com pôster JPEG (o iPhone assentado na Home nova) pra antes do 1º
+ *     quadro / autoplay negado;
  *   · UMA frase ("Sua vida inteira organizada num app só" — ou a promessa da rota,
  *     se a pessoa já escolheu uma e voltou);
  *   · "Começar" — pede o ATT exatamente como a welcome de hoje (NÃO se move);
@@ -80,7 +81,7 @@ export function WelcomeCalai({ onComecar, onEntrar, area }: { onComecar: () => v
   /* 20/10 (dono, iPhone em Modo Pouca Energia): o vídeo negado ficava parado com o PLAY do iOS no meio do celular.
    * O iOS bloqueia <video> no WebView com pouca energia (o Cal AI é nativo, por isso roda lá), mas NÃO bloqueia imagem
    * animada. Então o pôster cobre o vídeo até ele rodar de verdade e, sem rodar em 1,2 s, entra o MESMO vídeo em WebP
-   * animado (720 px, 15 qps, ~2,6 MB no pacote). O toque segue tentando o vídeo e, rodando, a capa sai. */
+   * animado (720 px, 15 qps, ~1,1 MB no pacote desde a v3 de 26/10). O toque segue tentando o vídeo e, rodando, a capa sai. */
   const [rodando, setRodando] = useState(false);
   const [passeio, setPasseio] = useState(false);
   useEffect(() => { const t = window.setTimeout(() => { if (!rodouRef.current) setPasseio(true); }, 1200); return () => window.clearTimeout(t); }, []);

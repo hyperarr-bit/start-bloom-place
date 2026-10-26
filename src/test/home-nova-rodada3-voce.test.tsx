@@ -36,7 +36,7 @@ vi.mock("@/integrations/supabase/client", () => {
 import Voce, { Aparencia, PersonalizarInicio } from "@/pages/Voce";
 import { PageTransition } from "@/components/PageTransition";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { CHAVE_FORCA_HOME_NOVA, _zerarHomeNova } from "@/lib/home-nova";
+import { CHAVE_FORCA_HOME_NOVA, _zerarHomeNova, guardarAdmin } from "@/lib/home-nova";
 import { PUSH_IOS, _empilhadas, _zerarPilhaIos, modoDeEntrada } from "@/lib/navegacao-ios";
 import { CHAVE_VIDRO_CALAI, CLASSE_VIDRO_CALAI, aplicarVidroCalai, guardarForcaVidro, vidroCalaiLigado } from "@/lib/vidro-calai";
 import { localDayKey, semanaAtualId } from "@/lib/utils";
@@ -126,8 +126,12 @@ describe("a aba Você no estilo do menu do Cal AI", () => {
     expect(within(tela).getByRole("heading", { level: 1 }).textContent).toBe("Aparência");
     expect(within(tela).getByLabelText("Voltar")).toBeTruthy();
   });
-  it("5 toques seguidos na versão alternam o vidro 'Cal AI' (classe no html + chave do aparelho + aviso)", async () => {
+  it("5 toques seguidos na versão alternam o vidro 'Cal AI' — só pro admin (dono)", async () => {
     await montar();
+    const versao0 = screen.getByTestId("voce-versao");
+    for (let i = 0; i < 5; i++) fireEvent.click(versao0);
+    expect(vidroCalaiLigado()).toBe(false); // cliente comum: o atalho não faz nada
+    guardarAdmin("u1", true);
     const versao = screen.getByTestId("voce-versao");
     for (let i = 0; i < 5; i++) fireEvent.click(versao);
     expect(document.documentElement.classList.contains(CLASSE_VIDRO_CALAI)).toBe(true);

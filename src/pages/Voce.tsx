@@ -20,6 +20,7 @@ import { CHAVE_COPO_ML, COPO_ML_PADRAO, normalizarCopoMl } from "@/lib/saude-cop
 import { irEmpilhando, voltar } from "@/lib/navegacao-ios";
 import { toast } from "sonner";
 import { alternarVidroCalai, vidroCalaiLigado } from "@/lib/vidro-calai";
+import { lerAdminGuardado } from "@/lib/home-nova";
 import { TOM_DO_MODULO, TOM_DO_TIPO, cor, tinta, type Tom } from "@/components/home-nova/e/paleta";
 import { EscolherWidgetsE } from "@/components/home-nova/e/EscolherWidgetsE";
 import { PersonalizarPendenciasE } from "@/components/home-nova/e/PersonalizarPendenciasE";
@@ -187,7 +188,7 @@ export default function Voce() {
         onAvaliar={podeAvaliar ? () => { clicar("avaliar"); trackEvent("voce_avaliar_card", {}); abrirPaginaDeAvaliacao("voce"); } : undefined}
         onConta={() => { clicar("conta"); trackEvent("account_drawer_open", { via: "voce" }); setFolha("account"); }}
         onSair={() => { clicar("sair"); void signOut(); }}
-        onVersaoCincoToques={() => { const ligado = alternarVidroCalai(); toast.message(ligado ? "Vidro: Cal AI (experimento do dono)" : "Vidro: o de sempre"); }}
+        onVersaoCincoToques={() => { if (lerAdminGuardado(user?.id) !== true) return; /* revisor b48: atalho só do dono (admin) */ const ligado = alternarVidroCalai(); toast.message(ligado ? "Vidro: Cal AI (experimento do dono)" : "Vidro: o de sempre"); }}
       >
         <AccountDrawer open={folha !== null} onOpenChange={(o) => { if (!o) setFolha(null); }} inicial={folha ?? "menu"} displayName={nome} />
       </VoceE>

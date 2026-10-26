@@ -31,8 +31,9 @@ const BordaDeVoltar = ({ x, onVoltar }: { x: MotionValue<number>; onVoltar: () =
   return (
     <div
       data-testid="pt-borda-voltar" aria-hidden
-      className="fixed left-0 top-0 bottom-0 w-[22px] z-[60]"
-      style={{ touchAction: "none" }}
+      className="fixed left-0 bottom-0 w-[16px] z-[60]"
+      // revisor b48: a faixa cobria o terço esquerdo do botão ← do cabeçalho — começa abaixo dele
+      style={{ touchAction: "none", top: "calc(var(--app-safe-top, 0px) + 76px)" }}
       onPointerDown={(e) => { g.current = { x0: e.clientX, arrastando: false, xUlt: e.clientX, tUlt: e.timeStamp, vel: 0 }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ } }}
       onPointerMove={(e) => {
         const s = g.current;

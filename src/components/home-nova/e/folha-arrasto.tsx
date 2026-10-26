@@ -39,11 +39,11 @@ export interface FolhaArrastavel {
 
 export function useFolhaArrastavel(onFechar: () => void, semMovimento = false): FolhaArrastavel {
   const y = useMotionValue(0);
-  const gesto = useRef<{ y0: number; t0: number; yUlt: number; tUlt: number; vel: number; arrastando: boolean; valido: boolean; id: number } | null>(null);
+  const gesto = useRef<{ x0: number; y0: number; t0: number; yUlt: number; tUlt: number; vel: number; arrastando: boolean; valido: boolean; id: number } | null>(null);
 
   const comecar = useCallback((e: PointerEventReact<HTMLElement>, valido: boolean) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    gesto.current = { y0: e.clientY, t0: e.timeStamp, yUlt: e.clientY, tUlt: e.timeStamp, vel: 0, arrastando: false, valido, id: e.pointerId };
+    gesto.current = { x0: e.clientX, y0: e.clientY, t0: e.timeStamp, yUlt: e.clientY, tUlt: e.timeStamp, vel: 0, arrastando: false, valido, id: e.pointerId };
   }, []);
 
   const onPointerDown = useCallback((e: PointerEventReact<HTMLElement>) => {
@@ -64,10 +64,14 @@ export function useFolhaArrastavel(onFechar: () => void, semMovimento = false): 
     const g = gesto.current;
     if (!g || !g.valido || g.id !== e.pointerId) return;
     const dy = e.clientY - g.y0;
+    const dx = e.clientX - g.x0;
     const dt = Math.max(1, e.timeStamp - g.tUlt);
     g.vel = (e.clientY - g.yUlt) / dt; g.yUlt = e.clientY; g.tUlt = e.timeStamp;
     if (!g.arrastando) {
-      if (dy > 6) { g.arrastando = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sem captura, segue */ } }
+      // 26/10 (revisor b48): deslizar os personagens pro lado com o dedo descendo um pouco fechava a folha — só arrasta
+      // quando a descida vence o movimento lateral; lateral primeiro = rolagem horizontal, o gesto deixa de valer
+      if (Math.abs(dx) > 6 && Math.abs(dx) >= dy) { g.valido = false; return; }
+      if (dy > 6 && dy > Math.abs(dx)) { g.arrastando = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sem captura, segue */ } }
       else if (dy < -6) { g.valido = false; return; } // subiu: é rolagem
       else return;
     }

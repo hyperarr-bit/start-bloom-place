@@ -63,7 +63,8 @@ export function metricasDoDia(d: LifeHubData, copoMl: number = COPO_ML_PADRAO, r
   void unidadeDaAgua(copoMl);
   const porId: Record<IdDoResumo, Metrica | null> = {
     habitos: cobra("habitos") ? { id: "habitos", rotulo: "Hábitos", valor: d.habits.filter((h) => h.done).length, max: d.habits.length, Icone: CalendarCheck, tom: TOM_DO_TIPO.habitos, route: "/rotina" } : null,
-    agua: cobra("agua") ? { id: "agua", rotulo: "Água", valor: Math.min(d.waterGlasses, d.waterGoal), max: d.waterGoal, Icone: Droplets, tom: TOM_DO_TIPO.agua, action: "water" } : null,
+    // varredura 26/10: a água mostra o número REAL (15/8, como o formulário); o anel enche e para na meta (Anel limita)
+    agua: cobra("agua") ? { id: "agua", rotulo: "Água", valor: d.waterGlasses, max: d.waterGoal, Icone: Droplets, tom: TOM_DO_TIPO.agua, action: "water" } : null,
     refeicoes: cobra("refeicoes") ? { id: "refeicoes", rotulo: "Refeições", valor: Math.min(d.mealsLogged, d.mealsTotal), max: d.mealsTotal, Icone: Utensils, tom: TOM_DO_TIPO.refeicoes, route: "/dieta" } : null,
     sono: { id: "sono", rotulo: "Sono", valor: Math.min(8, Math.max(0, Math.round(d.sleepHours ?? 0))), max: 8, Icone: Moon, tom: TOM_DO_TIPO.sono, action: "sleep" },
     financas: { id: "gasto", rotulo: "Gasto", valor: reg.gasto ? 1 : 0, max: 1, Icone: Wallet, tom: TOM_DO_TIPO.gasto, action: "expense" },

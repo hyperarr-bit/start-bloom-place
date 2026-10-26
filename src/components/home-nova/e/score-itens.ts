@@ -62,7 +62,7 @@ export function itensDoScore(d: LifeHubData): ItemDoScore[] {
   );
 
   // água (15) — meta sempre existe
-  const copos = Math.min(d.waterGlasses, d.waterGoal);
+  const copos = d.waterGlasses; // varredura 26/10: o número REAL (os pontos continuam limitados à meta)
   item("agua", Math.min(15, Math.round((d.waterGlasses / Math.max(1, d.waterGoal)) * 15)), 15, `${copos} de ${d.waterGoal} copos`, d.waterGlasses >= d.waterGoal, { action: "water" });
 
   // refeições (10) — pelo número real do plano (4 sem plano)

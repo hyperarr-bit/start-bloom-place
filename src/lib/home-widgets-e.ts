@@ -155,7 +155,7 @@ export function dadoDoWidgetE(id: IdDoWidgetE, d: LifeHubData, get: Get, hoje = 
     }
     case "agua": {
       const meta = Math.max(1, d.waterGoal);
-      const v = Math.min(d.waterGlasses, meta);
+      const v = Math.max(0, d.waterGlasses); // varredura 26/10: o número REAL (15/8); o anel enche e para (Anel limita)
       return { ...base, numero: String(v), unidade: `/${meta}`, detalhe: v >= meta ? "meta batida" : `${meta - v} ${meta - v === 1 ? "copo" : "copos"} pra meta`, fracao: { valor: v, max: meta }, completo: v >= meta, vazio: null, action: "water" };
     }
     case "cuidados": {

@@ -57,7 +57,7 @@ export const estadoDoModulo = (id: string, d: LifeHubData): string => {
     case "dieta":
       return d.mealsTotal > 0 ? `${d.mealsLogged}/${d.mealsTotal} refeições hoje` : DESCRICAO.dieta;
     case "saude":
-      return d.waterGoal > 0 ? `Água ${Math.min(d.waterGlasses, d.waterGoal)}/${d.waterGoal} hoje` : DESCRICAO.saude;
+      return d.waterGoal > 0 ? `Água ${d.waterGlasses}/${d.waterGoal} hoje` : DESCRICAO.saude;
     case "biblioteca":
       return d.currentBook ? `Lendo: ${d.currentBook}` : DESCRICAO.biblioteca;
     default:

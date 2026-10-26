@@ -34,7 +34,7 @@ interface Props {
 export function contagemDoItem(i: ItemDoScore, d: LifeHubData): string | null {
   switch (i.tipo) {
     case "habitos": return d.habits.length > 0 ? `${d.habits.filter((h) => h.done).length}/${d.habits.length}` : null;
-    case "agua": return `${Math.min(d.waterGlasses, d.waterGoal)}/${d.waterGoal}`;
+    case "agua": return `${d.waterGlasses}/${d.waterGoal}`; // varredura 26/10: o número REAL (15/8), como o formulário
     case "refeicoes": return d.mealsTotal > 0 ? `${Math.min(d.mealsLogged, d.mealsTotal)}/${d.mealsTotal}` : null;
     case "suplementos": return d.supplementsTotal > 0 ? `${Math.min(d.supplementsTaken, d.supplementsTotal)}/${d.supplementsTotal}` : null;
     default: return null;

@@ -60,7 +60,8 @@
 .fs-marco-arte { display: grid; place-items: end center; height: 76px; }
 /* RODADA 3: os personagens GRANDES (~60 % da largura), parando centralizados; o próximo com a borda suave na cor da
    próxima faixa (--fs-proxima) e a barrinha de progresso; o respiro das pontas deixa o 1º e o último centrarem */
-.fs-evolucao-grande { gap: 12px; scroll-snap-type: x mandatory; padding: 6px calc(50% - 30% - 2px) 4px; }
+/* touch-action pan-x: o dedo descendo sobre a fileira não vira rolagem nativa — é o arrasto que fecha a folha (folha-arrasto) */
+.fs-evolucao-grande { gap: 12px; scroll-snap-type: x mandatory; padding: 6px calc(50% - 30% - 2px) 4px; touch-action: pan-x; }
 .fs-evolucao-grande li { flex: 0 0 60%; scroll-snap-align: center; }
 .fs-marco-grande { gap: 6px; padding: 14px 10px 12px; border-radius: 22px; }
 .fs-marco-grande .fs-marco-arte { height: 128px; }

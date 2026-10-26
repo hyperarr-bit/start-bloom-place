@@ -74,19 +74,22 @@ export function useFolhaArrastavel(onFechar: () => void, semMovimento = false): 
     y.set(dy > 0 ? dy : 0);
   }, [y]);
 
-  const soltar = useCallback((e: PointerEventReact<HTMLElement>) => {
+  const soltar = useCallback((e: PointerEventReact<HTMLElement>, cancelado = false) => {
     const g = gesto.current;
     gesto.current = null;
     if (!g || !g.arrastando || g.id !== e.pointerId) return;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-    if (deveFechar(y.get(), g.vel)) { onFechar(); return; }
+    // pointercancel = o WebKit tomou o gesto pra rolagem nativa no meio do arrasto (Simulador, rodada 3: começando
+    // sobre a fileira dos personagens); se a folha já desceu um tanto, a intenção era fechar — fecha
+    if (deveFechar(y.get(), g.vel) || (cancelado && y.get() > 60)) { onFechar(); return; }
     if (semMovimento) y.set(0);
     else animate(y, 0, { type: "spring", stiffness: 520, damping: 42 });
   }, [y, onFechar, semMovimento]);
+  const cancelar = useCallback((e: PointerEventReact<HTMLElement>) => soltar(e, true), [soltar]);
 
   return {
     y,
-    folha: { onPointerDown, onPointerMove, onPointerUp: soltar, onPointerCancel: soltar, "data-arrastavel": "1" },
+    folha: { onPointerDown, onPointerMove, onPointerUp: soltar, onPointerCancel: cancelar, "data-arrastavel": "1" },
     alca: { onPointerDown: onPointerDownAlca, style: { touchAction: "none" } },
   };
 }

@@ -12,14 +12,15 @@ import { localDayKey } from "@/lib/utils";
  * OS WIDGETS DA HOME NOVA (rodada 3, 26/10 — dono: "reformular no estilo Cal AI e tirar o excesso"). Um formato único
  * de card (número grande + rótulo curto + anel ou ícone, dado REAL, como os 3 resumos da página 1) e um catálogo
  * enxuto: só o que tem dado útil. Widget sem dado = estado vazio ÚTIL (uma ação pra cadastrar), nunca só a descrição.
- * A lista mora na conta em `core-home-widgets-e` (ids, na ordem da escolha, até 6); quem tinha os widgets antigos
+ * A lista mora na conta em `core-home-widgets-e` (ids, na ordem da escolha, até 4); quem tinha os widgets antigos
  * (`core-home-widgets-v2`) é migrado na 1ª leitura (os que têm par). R$ nunca aparece aqui (regra da casa: valor só
  * dentro de Finanças) — o orçamento vem em % do que sobra.
  */
 export type IdDoWidgetE = "proxima-conta" | "orcamento" | "calorias" | "treino" | "sono" | "leitura" | "habitos" | "agua" | "cuidados";
 
 export const CHAVE_WIDGETS_E = "core-home-widgets-e";
-export const MAX_WIDGETS_E = 6;
+/** 26/10 (dono): no máximo 4 — 2×2, a mesma altura da página 1; 5 ou 6 viravam 3 linhas e esticavam o carrossel. */
+export const MAX_WIDGETS_E = 4;
 export const WIDGETS_E_PADRAO: IdDoWidgetE[] = ["proxima-conta", "orcamento", "treino", "sono"];
 
 export interface DefWidgetE { id: IdDoWidgetE; rotulo: string; descricao: string; Icone: LucideIcon; tom: Tom; rota: string }
@@ -43,7 +44,7 @@ const DO_ANTIGO: Record<string, IdDoWidgetE> = {
   reading: "leitura", habits: "habitos", health: "agua", cuidados: "cuidados",
 };
 
-/** O que está gravado → uma lista válida (ids conhecidos, sem repetir, até 6). null = nada gravado. */
+/** O que está gravado → uma lista válida (ids conhecidos, sem repetir, até 4). null = nada gravado. */
 export function normalizarWidgetsE(v: unknown): IdDoWidgetE[] | null {
   if (!Array.isArray(v)) return null;
   const lista = v.filter((x): x is IdDoWidgetE => typeof x === "string" && VALIDOS.has(x));
@@ -62,7 +63,7 @@ export function widgetsE(gravado: unknown, antigos: unknown): IdDoWidgetE[] {
   return WIDGETS_E_PADRAO;
 }
 
-/** Liga/desliga (até 6; a ordem é a da escolha). */
+/** Liga/desliga (até 4; a ordem é a da escolha). */
 export function alternarWidgetE(atuais: IdDoWidgetE[], id: IdDoWidgetE): IdDoWidgetE[] {
   if (atuais.includes(id)) return atuais.filter((x) => x !== id);
   if (atuais.length >= MAX_WIDGETS_E) return atuais;

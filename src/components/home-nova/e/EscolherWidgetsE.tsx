@@ -7,7 +7,7 @@ import { TRACO, cor, tinta } from "./paleta";
 
 /**
  * "WIDGETS" NO ESTILO DA HOME NOVA — RODADA 3 (26/10): o catálogo enxuto de lib/home-widgets-e, uma linha por widget
- * (ícone no disco da cor, nome, o que mostra) com um interruptor; até 6, na ordem da escolha (o número ao lado). Sem
+ * (ícone no disco da cor, nome, o que mostra) com um interruptor; até 4, na ordem da escolha (o número ao lado). Sem
  * pequeno/grande — o card é um só. Usada na página 3 da Home e em Você › Personalizar início › Widgets.
  */
 interface ListaProps {

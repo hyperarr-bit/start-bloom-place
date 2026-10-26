@@ -97,7 +97,9 @@ html.dark.he-mock-gradiente.he-fundo-da-tela .app-safe-shell {
 /* ---- o carrossel do dia: páginas de largura cheia, que param uma por vez ---- */
 .he-trilho {
   display: flex;
-  align-items: stretch;
+  /* 26/10 (dono, b48: "com 5 widgets fica bugado"): cada página com a SUA altura — antes o stretch esticava os cards
+     do score e das pendências até a altura da página mais alta (widgets em 3 linhas) */
+  align-items: flex-start;
   /* 28 e não 16: com 16 o fio de luz (escuro) e a sombra do card da página vizinha apareciam na beirada da tela */
   gap: 28px;
   overflow-x: auto;

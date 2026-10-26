@@ -737,6 +737,13 @@ body {
   background: var(--safe-top-cor, hsl(var(--background)));
 }
 
+/* Toaster da Home nova (components/ui/sonner.tsx): no celular o sonner 1.7.4 faz o contêiner `left:16px; width:100%`
+   (passa 16 px da tela pra direita). Com width:auto, left/right de 16 px definem a largura e a pílula (w-full) fica
+   centrada. Varredura 26/10, item 1. */
+@media (max-width: 600px) {
+  [data-sonner-toaster].toaster-e { width: auto; }
+}
+
 @supports (padding: env(safe-area-inset-bottom)) {
   .app-safe-shell {
     padding-bottom: var(--app-safe-bottom);

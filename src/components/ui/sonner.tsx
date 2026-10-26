@@ -20,16 +20,20 @@ const Toaster = ({ ...props }: ToasterProps) => {
     return (
       <Sonner
         theme={theme as ToasterProps["theme"]}
-        className="toaster group"
+        className="toaster group toaster-e"
         position="top-center"
-        // no celular o sonner usa o mobileOffset (não o offset): abaixo do relógio/ilha (--app-safe-top, lib/status-bar)
+        // no celular o sonner usa o mobileOffset (não o offset): abaixo do relógio/ilha (--app-safe-top, lib/status-bar).
+        // Varredura 26/10: o contêiner do sonner (≤600 px) é `left:16px; width:100%` — passava 16 px da tela, e o
+        // `w-auto mx-auto` da pílula centrava ela nesse contêiner deslocado (32 px à esquerda, colada/cortada à direita).
+        // Agora o contêiner é `width:auto` (index.css, .toaster-e) — left/right de 16 px definem a largura — e a pílula
+        // ocupa 100% dele: centrada, 16 px dos dois lados, pontas redondas inteiras.
         offset="calc(var(--app-safe-top, 0px) + 10px)"
         mobileOffset={{ top: "calc(var(--app-safe-top, 0px) + 10px)", left: "16px", right: "16px", bottom: "16px" }}
         gap={8}
         toastOptions={{
           classNames: {
             toast:
-              "group toast group-[.toaster]:rounded-full group-[.toaster]:border-0 group-[.toaster]:bg-foreground group-[.toaster]:text-background group-[.toaster]:shadow-[0_10px_30px_rgb(0_0_0/0.22)] group-[.toaster]:px-4 group-[.toaster]:py-3 group-[.toaster]:items-center group-[.toaster]:gap-3 group-[.toaster]:w-auto group-[.toaster]:max-w-[calc(100vw-32px)] group-[.toaster]:mx-auto group-[.toaster]:font-semibold group-[.toaster]:text-[14px]",
+              "group toast group-[.toaster]:rounded-full group-[.toaster]:border-0 group-[.toaster]:bg-foreground group-[.toaster]:text-background group-[.toaster]:shadow-[0_10px_30px_rgb(0_0_0/0.22)] group-[.toaster]:px-4 group-[.toaster]:py-3 group-[.toaster]:items-center group-[.toaster]:gap-3 group-[.toaster]:w-full group-[.toaster]:font-semibold group-[.toaster]:text-[14px]",
             title: "group-[.toast]:font-semibold group-[.toast]:text-[14px] group-[.toast]:leading-snug",
             description: "group-[.toast]:text-background/70 group-[.toast]:text-[12.5px]",
             icon: "group-[.toast]:text-background",

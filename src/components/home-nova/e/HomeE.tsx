@@ -39,6 +39,7 @@ import { useConquistas } from "@/components/conquistas/use-conquistas";
 import { marcoDoAdesivo } from "@/components/conquistas/nova/recompensas";
 import { FolhaSequencia } from "@/components/fogo/FolhaSequencia";
 import { useFundoDaTelaE } from "./fundo-da-tela";
+import { useToastNaTela } from "./use-toast-na-tela";
 import "../home-nova.css";
 import "./home-e.css";
 
@@ -118,6 +119,8 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
     setPalette("default");
   }, [loaded, palette, setPalette, set]);
   const [folhaMais, setFolhaMais] = useState(!!folhaMaisAberta);
+  // 26/10: o aviso do topo (toast) cobre a pílula do fogo — o acender espera ele sair (use-toast-na-tela)
+  const toastNaTela = useToastNaTela();
   const [acaoInicial, setAcaoInicial] = useState<ActionId | null>(null);
   const [folhaScore, setFolhaScore] = useState(!!folhaScoreAberta);
   const [picker, setPicker] = useState(false);
@@ -181,7 +184,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
             <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">
               {saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}
             </h1>
-            <PilulaFogoE seq={seq} onTocar={() => setFolhaSequencia(true)} coberta={folhaMais || folhaScore || folhaSequencia || folhaPendencias || picker || organizar || prefsAbertas} />
+            <PilulaFogoE seq={seq} onTocar={() => setFolhaSequencia(true)} coberta={folhaMais || folhaScore || folhaSequencia || folhaPendencias || picker || organizar || prefsAbertas || toastNaTela} />
           </header>
 
           {/* "SEU DIA" da missão em doses (só no site; no app a missão abre por cima) */}

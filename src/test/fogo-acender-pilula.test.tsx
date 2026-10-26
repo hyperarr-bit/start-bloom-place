@@ -106,3 +106,57 @@ describe("o acender da pílula", () => {
     expect(css).toMatch(/\.core-fire\[data-status="pending"\] \{ opacity: \.52; \}/);
   });
 });
+
+/* 26/10 (agente do vídeo da welcome): registrou pelo "+", a folha fecha mas o AVISO do topo (toast, ~3–4 s, largura toda)
+   fica por cima da pílula — o acender esperava só a folha e tocava escondido. Agora o aviso também "cobre". */
+import { useToastNaTela, haToastNaTela } from "@/components/home-nova/e/use-toast-na-tela";
+
+describe("o acender espera o aviso (toast) do topo sair", () => {
+  const PilulaComAviso = ({ s }: { s: ReturnType<typeof seq> }) => {
+    const toast = useToastNaTela();
+    return <PilulaFogoE seq={s} onTocar={() => {}} coberta={toast} />;
+  };
+  const aviso = (removido = false) => {
+    const ol = document.createElement("ol");
+    ol.setAttribute("data-sonner-toaster", "");
+    const li = document.createElement("li");
+    li.setAttribute("data-sonner-toast", "");
+    if (removido) li.setAttribute("data-removed", "true");
+    ol.appendChild(li);
+    document.body.appendChild(ol);
+    return { ol, li };
+  };
+  afterEach(() => { document.querySelectorAll("[data-sonner-toaster]").forEach((e) => e.remove()); });
+
+  it("haToastNaTela: só conta o aviso que não está saindo", () => {
+    expect(haToastNaTela()).toBe(false);
+    const { li } = aviso();
+    expect(haToastNaTela()).toBe(true);
+    li.setAttribute("data-removed", "true");
+    expect(haToastNaTela()).toBe(false);
+  });
+
+  it("registrou com o aviso na tela: fica APAGADO enquanto o aviso está lá; o aviso sai → ~0,4 s → acende", async () => {
+    const { rerender } = render(<PilulaComAviso s={seq(4, false)} />);
+    const { ol } = aviso(); // o "Gasto registrado!" entra junto com o registro
+    await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+    rerender(<PilulaComAviso s={seq(5, true)} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3500); });
+    expect(fogo().getAttribute("data-fogo")).toBe("apagado");
+    expect(svg().querySelector(".cf-ignite")).toBeNull();
+    expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBeNull();
+    ol.remove(); // o aviso saiu
+    await act(async () => { await vi.advanceTimersByTimeAsync(20); });
+    expect(fogo().getAttribute("data-fogo")).toBe("apagado");
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_ANTES_DE_ACENDER_MS); });
+    expect(fogo().getAttribute("data-fogo")).toBe("aceso");
+    expect(svg().querySelector(".cf-ignite")).toBeTruthy();
+    expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(localDayKey());
+  });
+
+  it("a Home nova passa o aviso como 'coberta' pra pílula", () => {
+    const fonte = readFileSync(resolve(__dirname, "../components/home-nova/e/HomeE.tsx"), "utf8");
+    expect(fonte).toMatch(/const toastNaTela = useToastNaTela\(\)/);
+    expect(fonte).toMatch(/<PilulaFogoE seq=\{seq\}.*coberta=\{[^}]*toastNaTela[^}]*\}/);
+  });
+});

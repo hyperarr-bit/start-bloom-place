@@ -13,7 +13,7 @@ import { TOM_DO_MODULO, TOM_DO_TIPO, TINTA, TRACO, cor, type Tom } from "./palet
  * PÁGINA 1 DO CARROSSEL — "SEU DIA" (opção E). O conjunto do Cal AI, ajustado ao CORE.
  *
  * RODADA 3 (dono: "quanto menos informação melhor"):
- *  - o CARD GRANDE é só o número: "27 pontos" (os dois em preto) e, embaixo, "Score do dia" em cinza — como
+ *  - o CARD GRANDE é só o número: "27 /100 pontos" (V7, 26/10: número preto, "/100 pontos" cinza na mesma linha) e, embaixo, "Score do dia" em cinza — como
  *    "2276 /2616 · Calorias consumidas" no Cal AI. Saíram "Faltam N coisas pra fechar o dia" e o "?". À direita
  *    o anel com a ESTRELA, que é o convite: tocar nele abre a folha "Como funciona a pontuação" (e a frase
  *    "faltam N coisas" mora lá, no topo). No 100 a estrela vira ✓. RODADA 4: anel e estrela em TINTA (grafite;
@@ -89,20 +89,23 @@ export const CardScoreE = ({ score, onAbrir, numeroDentro }: PropsScore) => {
   return (
     <section className="hn-card he-score" data-testid="he-score" aria-label="Score do dia" data-numero={numeroDentro ? "dentro" : "fora"}>
       {/* rodada 2 (dono): tocar em QUALQUER parte do card abre a folha da pontuação — não só a estrela */}
-      <button type="button" onClick={onAbrir} aria-label="Score do dia — como funciona a pontuação" data-testid="he-score-abrir" className="w-full p-5 flex items-center gap-4 text-left rounded-[24px] active:scale-[0.99] transition-transform">
+      <button type="button" onClick={onAbrir} aria-label="Score do dia — como funciona a pontuação" data-testid="he-score-abrir" className="w-full p-5 flex items-center gap-3 text-left rounded-[24px] active:scale-[0.99] transition-transform">
         <span className="flex-1 min-w-0 block">
           {numeroDentro ? (
             <span className="block text-[24px] leading-tight font-bold tracking-tight" data-testid="he-score-titulo">{tituloDoScore(score)}</span>
           ) : (
-            <span className="flex items-baseline gap-1.5">
-              <NumeroQueConta valor={score} className="text-[46px] leading-[0.95] font-bold tabular-nums tracking-[-0.035em]" testid="he-score-numero" />
-              <span className="text-[18px] font-semibold text-foreground">pontos</span>
+            /* V7 (dono 26/10): "44 /100 pontos" — o número grande em preto e "/100 pontos" cinza na MESMA linha, como o
+               "2276 /2616" do Cal AI (enche o meio do card, que sobrava vazio). Com 3 dígitos (100) o número desce de 50
+               pra 46 px pra linha caber em 390 pt sem encostar no anel (nowrap: nunca quebra). */
+            <span className="flex items-baseline gap-1 whitespace-nowrap" data-testid="he-score-linha">
+              <NumeroQueConta valor={score} className={`${score >= 100 ? "text-[46px]" : "text-[50px]"} leading-[0.95] font-bold tabular-nums tracking-[-0.04em]`} testid="he-score-numero" />
+              <span className="text-[19px] font-medium text-muted-foreground tabular-nums tracking-[-0.01em]" data-testid="he-score-meta">/100 pontos</span>
             </span>
           )}
           <span className="block mt-1.5 text-[15px] leading-snug font-medium text-muted-foreground" data-testid="hn-score-explica">Score do dia</span>
         </span>
         <span className="shrink-0 rounded-full block">
-          <Anel tamanho={108} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
+          <Anel tamanho={104} espessura={11} valor={score} max={100} cor={corAnel} testid="hn-anel">
             {numeroDentro ? (
               <span className="flex flex-col items-center justify-center">
                 <span className="text-[30px] leading-none font-bold tabular-nums tracking-tight" data-testid="he-score-numero">{score}</span>

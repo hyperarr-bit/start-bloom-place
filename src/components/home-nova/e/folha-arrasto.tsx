@@ -81,7 +81,7 @@ export function useFolhaArrastavel(onFechar: () => void, semMovimento = false): 
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
     // pointercancel = o WebKit tomou o gesto pra rolagem nativa no meio do arrasto (Simulador, rodada 3: começando
     // sobre a fileira dos personagens); se a folha já desceu um tanto, a intenção era fechar — fecha
-    if (deveFechar(y.get(), g.vel) || (cancelado && y.get() > 60)) { onFechar(); return; }
+    if (deveFechar(y.get(), g.vel) || (cancelado && (y.get() > 36 || (y.get() > 12 && g.vel > LIMITE_FECHAR_VEL)))) { onFechar(); return; }
     if (semMovimento) y.set(0);
     else animate(y, 0, { type: "spring", stiffness: 520, damping: 42 });
   }, [y, onFechar, semMovimento]);

@@ -171,7 +171,7 @@ export const HomeE = ({ modulos = "grade", azulejo = "tinta", suave = SUAVIDADE_
             <h1 className="text-[26px] leading-[1.15] font-bold tracking-[-0.025em] truncate min-w-0">
               {saudacao()}{primeiroNome ? `, ${primeiroNome}` : ""}
             </h1>
-            <PilulaFogoE seq={seq} onTocar={() => setFolhaSequencia(true)} />
+            <PilulaFogoE seq={seq} onTocar={() => setFolhaSequencia(true)} coberta={folhaMais || folhaScore || folhaSequencia || folhaPendencias || picker || organizar || prefsAbertas} />
           </header>
 
           {/* "SEU DIA" da missão em doses (só no site; no app a missão abre por cima) */}

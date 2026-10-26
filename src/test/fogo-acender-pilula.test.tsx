@@ -2,6 +2,7 @@
  * 26/10 (adendo do dono) — O ACENDER do CoreFire na pílula da Home nova:
  *  (a) registrou com a Home na tela (apagado → aceso sem desmontar): acende NO MESMO quadro — o svg vira `done` e o
  *      cf-ignite já está lá (a opacidade sobe .52 → 1 dentro dele, sem pulo);
+ *      Com o "+" aberto por cima (registrou pela folha), espera a folha fechar e então acende;
  *  (b) voltou pra Home depois de registrar num módulo (monta já garantido): ~0,4 s APAGADO e então acende;
  *  (c) 1x por dia: reabrir/trocar de aba no mesmo dia monta aceso, sem acender; sair durante o "apagado" não gasta o dia;
  *  (d) o cartão das Conquistas e a folha nunca acendem sozinhos; prefers-reduced-motion não tem o "apagado → acende".
@@ -66,6 +67,20 @@ describe("o acender da pílula", () => {
     render(<PilulaFogoE seq={seq(5, true)} onTocar={() => {}} />);
     act(() => { vi.advanceTimersByTime(ESPERA_ANTES_DE_ACENDER_MS); });
     expect(svg().querySelector(".cf-ignite")).toBeTruthy();
+  });
+
+  it("registrou pelo '+' (folha por cima da pílula): fica apagado enquanto a folha está aberta e acende depois que fecha", () => {
+    const { rerender } = render(<PilulaFogoE seq={seq(4, false)} onTocar={() => {}} coberta />);
+    rerender(<PilulaFogoE seq={seq(5, true)} onTocar={() => {}} coberta />);
+    expect(fogo().getAttribute("data-fogo")).toBe("apagado");
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(fogo().getAttribute("data-fogo")).toBe("apagado"); // a folha continua aberta: espera
+    expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBeNull();
+    rerender(<PilulaFogoE seq={seq(5, true)} onTocar={() => {}} coberta={false} />);
+    act(() => { vi.advanceTimersByTime(ESPERA_ANTES_DE_ACENDER_MS); });
+    expect(fogo().getAttribute("data-fogo")).toBe("aceso");
+    expect(svg().querySelector(".cf-ignite")).toBeTruthy();
+    expect(localStorage.getItem(CHAVE_FOGO_ACESO_HOME_NOVA)).toBe(localDayKey());
   });
 
   it("(d) prefers-reduced-motion: monta aceso direto, sem o acender", () => {

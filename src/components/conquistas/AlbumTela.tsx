@@ -9,6 +9,7 @@ import { rotuloProgresso, textoFalta } from "@/lib/conquistas-registro";
 import { parseLocalDay } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { useFaixaDoRelogioTransparente } from "@/components/app/faixaDoRelogio";
+import { aplicarBarraDeStatus } from "@/lib/status-bar";
 import { ChipRaridade } from "./adesivos-raridade";
 import { Adesivo, giroDoAdesivo } from "./adesivos-arte";
 import { IconeMarcaAlbum } from "./IconeMarcaAlbum";
@@ -886,6 +887,13 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   }, [aberto, atual, paginas, n]);
 
   useFaixaDoRelogioTransparente(aberto);
+  // varredura 26/10 (pequenos #3): no tema claro o relógio/bateria ficavam PRETOS sobre o azul-escuro do álbum — com o
+  // álbum aberto a barra de status fica clara (texto branco) e volta ao tema do app ao fechar
+  useEffect(() => {
+    if (!aberto) return;
+    void aplicarBarraDeStatus("dark");
+    return () => { void aplicarBarraDeStatus(document.documentElement.classList.contains("dark") ? "dark" : "light"); };
+  }, [aberto]);
   if (!aberto) return null;
   const pagina = paginas[Math.min(atual, n - 1)];
   // (16/10) álbum por módulo: uma aba por módulo (só o emoji — 10 abas cabem na borda); por raridade, as de sempre

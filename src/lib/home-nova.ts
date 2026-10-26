@@ -1,5 +1,5 @@
 import { idDoAparelho } from "@/lib/dia1-cheio";
-import { isNativeShell } from "@/lib/native-shell";
+import { isIOS, isNativeShell } from "@/lib/native-shell";
 
 /**
  * HOME NOVA — OPÇÃO E (1.0.19, 26/10): a Home do carrossel do dia (src/components/home-nova/e), aprovada pelo
@@ -107,11 +107,12 @@ const modoDe = (v: unknown): ModoHomeNova | null => {
 };
 const bracoDe = (v: unknown): BracoHomeNova | null => (v === "nova" || v === "atual" ? v : null);
 
-/** 26/10: o modo quando o RevenueCat não disse nada (sem resposta, sem cache, sem a chave): app das lojas = "novas+admin"
- *  (toda conta nova vê a Home nova, garantido); site = "off" (a Home do site não muda). */
+/** 26/10: o modo quando o RevenueCat não disse nada (sem resposta, sem cache, sem a chave): app do iPhone = "novas+admin"
+ *  (toda conta nova vê a Home nova, garantido); site e Android = "off" (a Home do site não muda; o Android ainda não
+ *  passou pelo QA da Home nova — liga por lá só pela chave remota, quando o dono decidir). */
 export const MODO_PADRAO_APP: ModoHomeNova = "novas+admin";
 export const MODO_PADRAO_WEB: ModoHomeNova = "off";
-export const padraoHomeNova = (): ModoHomeNova => (isNativeShell() ? MODO_PADRAO_APP : MODO_PADRAO_WEB);
+export const padraoHomeNova = (): ModoHomeNova => (isNativeShell() && isIOS() ? MODO_PADRAO_APP : MODO_PADRAO_WEB);
 
 /** Em memória: o que o getOfferings DESTA abertura disse (undefined = ainda não respondeu). */
 let remoto: ModoHomeNova | undefined;

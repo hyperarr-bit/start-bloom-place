@@ -65,7 +65,7 @@ const PREFIXOS_DE_INTERFACE = [
   // a própria sequência, as conquistas e a gamificação antiga
   "core-hub-streak", "core-dias-anotados", "conquistas-", "gamification-", "core-dia-100",
   // aparência, lembretes, notificações, home e abas
-  "core-theme", "core-home-widgets", "home-widgets", "core-module-prefs", "core-lembrete", "lembrete",
+  "core-theme", "core-home-widgets", "core-home-resumos", "home-widgets", "core-module-prefs", "core-lembrete", "lembrete",
   "notif-", "abas-", "module-", "nudge-", "daily-nudge", "offline-", "core-offline",
   // identidade e marcadores de dispositivo
   "core-user-name", "core-pwa", "core-gw-arm", "core-chunk", "core-cb",

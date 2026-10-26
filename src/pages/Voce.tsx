@@ -324,7 +324,7 @@ export function PersonalizarInicio() {
     const lista = alternarResumo(resumos, id);
     if (lista === resumos) return;
     trackEvent("home_resumos", { resumos: lista.join(",") });
-    set(CHAVE_RESUMOS, lista);
+    set(CHAVE_RESUMOS, lista, { system: true }); // preferência de tela: não conta como dia anotado
   };
   return (
     <div className="hn he min-h-dvh" data-testid="tela-personalizar-inicio" data-suave={SUAVIDADE_HOME_NOVA}>
